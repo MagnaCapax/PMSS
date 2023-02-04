@@ -5,7 +5,8 @@ passthru('apt-get update; apt-get full-upgrade -y;');
 
 
 // Following from install.sh
-passthru('apt-get install lighttpd lighttpd-mod-webdav -y; /etc/init.d/lighttpd stop;');
+
+passthru('apt-get install lighttpd lighttpd-mod-webdav proftpd-basic -y; /etc/init.d/lighttpd stop;');
 passthru('apt-get install screen mc wget gawk subversion libtool libncurses5 sqlite locate ntpdate -y');
 passthru('apt-get remove openvpn -y');
 passthru('apt-get install python-pycurl python-crypto python-cheetah -y');
