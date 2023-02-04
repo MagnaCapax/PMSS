@@ -1,7 +1,10 @@
 <?php
-// Rclone installer + updater
+# Pulsed Media Seedbox Management Software "PMSS"
+# Rclone installer + update
+
 // Define version first
-$rcloneVersion = '1.56.1';
+# TODO just get the version # from https://rclone.org/downloads/ ....
+$rcloneVersion = '1.61.1';
 
 #Check rclone version
 if (file_exists('/usr/bin/rclone')) {
@@ -14,7 +17,7 @@ if (!file_exists('/usr/bin/rclone')) {
     // We use random directory so a potential malicious user could not try to pass their binary to be global. Extremely unlikely, and will require already "local" access to even attempt (ie. have non-privileged access already via local user account)
     $randomDirectory = sha1('rclone' . time() . rand(100, 900000));
     mkdir("/tmp/{$randomDirectory}", 0755);
-    passthru("cd  /tmp/{$randomDirectory}; wget http://pulsedmedia.com/remote/pkg/rclone-v{$rcloneVersion}-linux-amd64.zip; unzip rclone-v{$rcloneVersion}-linux-amd64.zip; cd rclone-v{$rcloneVersion}-linux-amd64; cp rclone /usr/bin/; chown root:root /usr/bin/rclone; chmod 755 /usr/bin/rclone; mkdir -p /usr/local/share/man/man1; cp rclone.1 /usr/local/share/man/man1/; mandb;");
+    passthru("cd  /tmp/{$randomDirectory}; wget https://downloads.rclone.org/v{$rcloneVersion}/rclone-v{$rcloneVersion}-linux-amd64.zip; unzip rclone-v{$rcloneVersion}-linux-amd64.zip; cd rclone-v{$rcloneVersion}-linux-amd64; cp rclone /usr/bin/; chown root:root /usr/bin/rclone; chmod 755 /usr/bin/rclone; mkdir -p /usr/local/share/man/man1; cp rclone.1 /usr/local/share/man/man1/; mandb;");
 }
 
 #Fix for rclone install path / paths lacking. Not included in above because in many places needs to fixed
