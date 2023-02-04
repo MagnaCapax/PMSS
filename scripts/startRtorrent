@@ -1,0 +1,21 @@
+#!/usr/bin/php
+<?php
+if ($argc != 2) die("Usage: startRtorrent USERNAME\n");
+$user = $argv[1];
+
+// Check user is valid
+if (!file_exists('/home/' . $user)) die("Invalid username\n");
+if (!is_dir('/home/' . $user)) die("User home is not a directory!\n");
+if (!file_exists('/home/' . $user . '/.rtorrent.rc')) die("User does not have rtorrent configuration - rTorrent maybe disabled\n");
+
+// Check if session directory exists - if not create it
+if (!file_exists('/home/' . $user . '/session')) {
+	passthru("cd /home/{$user}; su {$user} -c 'mkdir session'");
+}
+
+// Finally execute rTorrent
+if (!file_exists('/home/' . $user . '/.rtorrentExecute.php')) {	// If old version of master gui
+	passthru("cd /home/{$user}; rm -rf session/rtorrent.*; su {$user} -c 'screen -S rtorrent -fa -d -m rtorrent'; cd -;");
+} else passthru("cd /home/{$user}; su {$user} -c 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php'");	// This is for newer versions
+
+passthru("ps aux|grep {$user}"); // Output running processes

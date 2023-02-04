@@ -1,0 +1,1 @@
+a:9:{s:8:"iopsRead";s:4:"0.00";s:9:"iopsWrite";s:4:"1.80";s:14:"throughputRead";s:4:"0.00";s:15:"throughputWrite";s:4:"0.07";s:9:"diskAwait";s:5:"97.24";s:15:"diskServiceTime";s:5:"16.67";s:8:"diskUtil";s:4:"1.50";s:12:"diskQuantity";i:1;s:4:"time";i:1673628421;}

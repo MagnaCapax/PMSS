@@ -1,0 +1,23 @@
+# While editing: please remember there are other people on your server!
+directory = ~/data
+session = ~/session
+schedule = low_diskspace, 5, 120, close_low_diskspace=100M
+schedule = watch_directory,1,1,"load_start=~/watch/*.torrent"
+schedule = untied_directory,1,1,stop_untied=
+schedule = rss,0,00:30:00,"execute={sh,-c,php ~/www/rutorrent/plugins/rss/update.php& exit 0}"
+umask = 0002
+tracker_numwant = -1
+use_udp_trackers = yes
+port_range = 50000-60000
+# Increasing these values does not normally increase speed but can negatively impact the server -- please be careful
+#CHANGEmin_peers = 4
+#CHANGEmax_peers = 30
+#CHANGEmin_peers_seed = 4
+#CHANGEmax_peers_seed = 50
+#CHANGEmax_uploads = 50
+#CHANGEpieces.memory.max = 0
+# Hash checking is not meant to be done as fast as possible as this consumes a large portion of the CPU and disk IO -- you're on a shared server
+check_hash = no
+hash_interval = 300
+hash_max_tries = 2
+#CHANGEscgi_port = localhost:5000

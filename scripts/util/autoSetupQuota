@@ -1,0 +1,11 @@
+#!/bin/bash
+hddev=`df /home | sed 's/ .*//g' | grep "/" | sed 's/.*\///g'`
+if [ -z $hddev ]; then
+        echo "/home needs to be mounted"
+exit
+fi
+
+/scripts/util/editOptionsFstab $hddev
+ > /etc/fstab
+#these 2 lines need to be fixed in production,  done like this out of production to prevent accidental changes
+#tune2fs -m0 /dev/$hddev

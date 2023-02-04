@@ -1,0 +1,17 @@
+#!/bin/bash
+if [ -z "$1" ] ; then
+echo "usage: $0 device"
+exit
+fi
+device=$1
+options="$2 $3 $4 $5 $6 $7"
+temp=`cat /etc/fstab | grep $1 | sed 's/\t/::/g' | awk -F'::' '{ print $0 }'`
+mdevname=`echo $temp | awk -F'::' '{ print $1 }'`
+mmountpoint=`echo $temp | awk -F'::' '{ print $2 }'`
+mtype=`echo $temp | awk -F'::' '{ print $3 }'`
+moptions=`echo $temp | awk -F'::' '{ print $4 }'`
+mdump=`echo $temp | awk -F'::' '{ print $5 }'`
+mpass=`echo $temp | awk -F'::' '{ print $6 }'`
+moptions="defaults,noatime,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=$1"
+#add >> /etc/fstab after verifacation
+echo -e "$mdevname\t$mmountpoint\t$mtype\t$moptions\t$mdump\t$mpass" >> /etc/fstab

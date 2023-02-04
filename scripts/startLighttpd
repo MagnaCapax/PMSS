@@ -1,0 +1,20 @@
+#!/usr/bin/php
+<?php
+if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
+$user = $argv[1];
+
+// Check user is valid
+if (!file_exists('/home/' . $user)) die("Invalid username\n");
+if (!is_dir('/home/' . $user)) die("User home is not a directory!\n");
+if (!file_exists('/home/' . $user . '/.lighttpd.conf')) die("User does not have lighttpd configuration - lighttpd maybe disabled\n");
+
+// Check if session directory exists - if not create it
+if (!file_exists('/home/' . $user . '/.lighttpd')) {
+	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd'");
+	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd/upload'");
+	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd/compress'");
+}
+
+passthru("cd /home/{$user}; su {$user} -c '/usr/sbin/lighttpd -f /home/{$user}/.lighttpd.conf'");	// This is for newer versions
+
+passthru("ps aux|grep {$user}"); // Output running processes

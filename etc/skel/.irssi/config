@@ -1,0 +1,14 @@
+servers = (
+  {
+    address = "irc.freenode.org";
+    chatnet = "freenode";
+    port = "6667";
+    use_ssl = "no";
+    ssl_verify = "no";
+    autoconnect = "yes";
+  }
+);
+chatnets = { freenode = { type = "IRC"; }; };
+channels = (
+  { name = "#PulsedMedia"; chatnet = "freenode"; autojoin = "yes"; }
+);
