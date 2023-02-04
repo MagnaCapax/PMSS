@@ -14,7 +14,6 @@ passthru('apt-get install lighttpd lighttpd-mod-webdav proftpd-basic -y; /etc/in
 passthru('apt-get install screen mc wget gawk subversion libtool libncurses5 sqlite locate ntpdate -y');
 passthru('apt-get remove openvpn -y');
 passthru('apt-get install python-pycurl python-crypto python-cheetah -y');
-if ($debianVersion[0] == 7) passthru('apt-get install python-central -y');   #Not found on deb8
 passthru('apt-get install zip unzip bwm-ng sysstat apache2-utils irssi iotop ethtool -y');
 if ($debianVersion[0] >= 8 or
     $debianVersion[0] == 1) passthru('apt-get install unrar-free unp -y');   # Deb8, Deb10
@@ -70,14 +69,6 @@ if (!file_exists('/usr/bin/sabnzbdplus')) {
 }
 
 
-
-if ($debianVersion[0] < 8 &&
-    $debianVersion[0] > 1) {  // Deb7 or older
-    passthru('apt-get install znc znc-extra -y');
-    passthru('apt-get -y install libdigest-sha-perl');
-    passthru('apt-get install libzen0 mediainfo libmediainfo0 -y');
-
-}
 if ($debianVersion[0] >= 8 or
     $debianVersion[0] == 1) {    // Deb8, 9 or 10
     passthru('apt-get install znc znc-perl znc-tcl znc-python git -y;');
@@ -98,19 +89,17 @@ if ($debianVersion[0] >= 8 or
 
 #Install mkvtoolnix
 if (!file_exists('/usr/bin/mkvextract')) {
-    echo "## Installing mkvtoolnix\n";
-    if ($debianVersion[0] == 7) passthru('wget -q -O - https://www.bunkus.org/gpg-pub-moritzbunkus.txt | sudo apt-key add -; apt-get update; ');
     passthru('apt-get install mkvtoolnix -y');
-}
+
 
 // Veeeery old legacy probably no need for this
 passthru('apt-get remove munin -y');
 passthru('apt-get install sudo -y');
 passthru('apt-get remove consolekit -y');	// remove consolekit
-#Install Expect
+
+#Install Expect for the migrations code
 passthru('apt-get install expect -y');
 
-#Compile firehol
 if (!file_exists('/sbin/ipset'))
     passthru('apt-get install ipset -y');   #IPSet is required for Firehol
 
