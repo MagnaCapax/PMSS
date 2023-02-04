@@ -1,5 +1,9 @@
 #!/usr/bin/php
 <?php
+# Pulsed Media Seedbox Management Software "PMSS"
+# update system
+
+#TODO Check if we should even retain this, this is now outdated
 /*if (!file_exists('/etc/seedbox/runtime/version')) die("Version information is missing!\n");
 $currentVersion = file_get_contents('/etc/seedbox/runtime/version');
 
@@ -21,11 +25,21 @@ file_put_contents('/etc/seedbox/runtime/version', $updateData['toVersion']);	// 
 
 // passthru('rm -rf /root/soft.sh; wget -O/root/soft.sh http://pulsedmedia.com/remote/soft.sh; bash /root/soft.sh');
 
-passthru('bash /scripts/get.sh');
+# Update sources
+# TODO Make this just a simple git command perhaps? Consider merits of releases vs. just getting daily commit. This seems a bit complicated way to get latest as well
+passhthru(<<<EOF
+cd /tmp;
+rm -rf PMSS*;
+wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tarball_url/ {print $(NF-1)}' | xargs wget -O PMSS.tar.gz;
+tar -xzf PMSS.tar.gz;
+mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
+EOF;
+);
 
+# Following is now dynamic because it was just fetched and updated
+# TODO soft.sh kinda outdated now ... Should remove it
 passthru('bash /tmp/PMSS/soft.sh');
 
-passthru('apt-get clean;');
 
 if (file_exists('/scripts/util/update-step2.php'))
     require '/scripts/util/update-step2.php';
