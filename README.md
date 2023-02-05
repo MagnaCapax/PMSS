@@ -2,10 +2,13 @@
 
 ## Description
 
-Pulsed Media Seedbox Software, server side code. This builds and installs all the software and scripts to operate a seedbox.
-Works on Debian 10/11. Deb10 is stable, Deb11 is development/experimental.
+Pulsed Media Seedbox Software, server side code.
+This builds and installs all the software and scripts to operate a seedbox server.
+Works on Debian 10/11. Deb10 is stable, Deb11 is development/experimental stage.
 
-This can be used standalone fully, does not require a server from Pulsed Media. You can _freely_ use this for your own self-hosted seedbox. Some pieces will still be fetched from Pulsed Media servers, such as the latest GUI version. No commercial restrictions, you are free to provide seedbox services using this and there are even some minimalistic whitelabeling features.
+This can be used standalone fully, does not require a server from Pulsed Media. You can _freely_ use this for your own self-hosted seedbox.
+No commercial restrictions, you are free to provide seedbox services using this and there are even some minimalistic whitelabeling features.
+Some pieces will still be fetched from Pulsed Media servers, such as the latest GUI version.
 
 More information available at https://wiki.pulsedmedia.com/index.php/PM_Software_Stack
 
@@ -16,19 +19,20 @@ You can find information for common tasks such as adding/creating/suspending use
 
 ### Installation
 
-Install minimal system, and run following as the root:
+Install minimal Debian system, and run following as root:
 ```
 wget -O- https://github.com/MagnaCapax/PMSS/releases/latest/download/install.sh|bash
 ```
 
-### Support and help
+### Support
 
-You may ask our discord for guidance. Pulsed Media as a company will not provide support to use this on your own without a fee.
+You may ask our discord for guidance.
+Pulsed Media as a company will not provide support to use this on your own without a fee.
 
 
 ## Contributions
 
-Just make a pull request OR issue. All contributions will be considered. No matter small or big. Your contribution could be as tiny as fixing a typo, or badly worded sentence and it will be much appreciated as well.
+All contributions will be considered. No matter small or big. Your contribution could be as tiny as fixing a typo, or badly worded sentence and it will be much appreciated.
 
 Some important guidelines:
 
@@ -40,15 +44,16 @@ Some important guidelines:
 
  We try to stick Linux kernel development rules, in all regards. Some highlights:
 
-  * Many small tools doing single task very well
-  * camelCase
-  * Line width general rule of thumb stick to ~120-180characters
+  * Many small things doing single task very well
+  * Descriptive function and variable names, functions preferrably with comment what it does and why
+  * camelCase. reallyCamelCaseYourVariablesAndFunctionsAndClasses
+  * Line width general rule of thumb stick to ~120-160characters
   * Maximum 4 nesting/indents in single source file. Need more? Create a function/separate file/lib/class out of it.
   * Single source code file try to stick to ~150lines or so (if a lot of comments/user help, can be deviated)
   * Write open nested function calls and comment them
   * ~10 lines try to comment what is done
-  * Descriptive function and variable names, functions preferrably with comment what it does and why
+  * Consider how this function/method/script will break or fail, this leads to less bugs or regressions
 
  ### Rewards
 
- Best contributions may get rewards when implemented and test, in the form of Pulsed Media service credits.
+ Best contributions may get rewards when implemented and tested, in the form of Pulsed Media service credit.
