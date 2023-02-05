@@ -27,11 +27,11 @@ file_put_contents('/etc/seedbox/runtime/version', $updateData['toVersion']);	// 
 
 # Update sources
 # TODO Make this just a simple git command perhaps? Consider merits of releases vs. just getting daily commit. This seems a bit complicated way to get latest as well
+# TODO This is duplicated in install.sh
 passhthru(<<<EOF
 cd /tmp;
 rm -rf PMSS*;
 wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tarball_url/ {print $(NF-1)}' | xargs wget -O PMSS.tar.gz;
-tar -xzf PMSS.tar.gz;
 mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
 EOF;
 );
