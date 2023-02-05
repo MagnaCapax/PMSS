@@ -1,4 +1,11 @@
 <?php
+/**
+* PMSS: Master GUI: rclone start/disable/restart file
+*
+* Copyright (C) 2010-2023 Magna Capax Finland Oy
+*
+* #TODO Make this dynamic and single file with definitions for all apps, deluge, qbittorrent, jellyfin, *ARR etc.
+**/
 
 if (!isset($_REQUEST['action'])) die();
 $action = $_REQUEST['action'];
