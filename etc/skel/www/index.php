@@ -1,9 +1,8 @@
 <?php
 /**
-* Pulsed Media Seedbox Master Gui
+* PMSS: Master GUI, Index. Frameloader + auto-updater
 *
-* Copyright (C) 2010-2011 Aleksi Ursin / NuCode
-* All rights reserved.
+* Copyright (C) 2010-2023 Magna Capax Finland Oy
 *
 **/
 if (!($frames = @file_get_contents('https://pulsedmedia.com/remote/guiFrames.php?v=2')) ) {
