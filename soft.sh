@@ -9,6 +9,7 @@ cp -r scripts /
 cp -r etc /
 cp -r var /
 
-chmod o-rwx /scripts
-chmod o-rwx /scripts/*
-chmod o-rwx /root/*
+chmod o-rwx -R /scripts
+chmod o-rwx -R /root
+chmod o-rwx -R /etc/skel
+chmod o-rwx -R /etc/seedbox
