@@ -1,6 +1,13 @@
+<?php
+/**
+* PMSS: Master GUI, Statistics page.
+*
+* Copyright (C) 2010-2023 Magna Capax Finland Oy
+*
+**/
+?>
+
 <div class="portfolioimg">
-
-
 
 <h6>Disk usage / Quota</h6>
 <pre>

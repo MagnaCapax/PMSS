@@ -1,4 +1,13 @@
 <?php
+/**
+* PMSS: Master GUI, Welcome.
+* This is the actual index / first page user sees with all the buttons etc.
+*
+* Copyright (C) 2010-2023 Magna Capax Finland Oy
+*
+**/
+
+
 if (isset($_GET['quota'])) {
         $quotaInfo =  urldecode( $_GET['quota'] );
         $quotaInfo = str_replace('\\', '', $quotaInfo); // Serialized data might be malformed with \ chars!
