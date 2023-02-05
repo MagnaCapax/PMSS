@@ -1,8 +1,19 @@
 #!/usr/bin/php
 <?php
-# This is user's rTorrent + ruTorrent configurator
-# 2020 Update: Also deluge
-# TODO Refactor etc.
+# PMSS: User configuration
+# Copyright (C) Magna Capax Finland Oy 2010-2023
+
+#TODO Refactor, commenting etc. etc.
+#TODO Save every detail so we can locally check the settings later on, AKA local user database
+#TODO Better input parser, just like for userTrafficLimit.php
+#TODO Rtorrent + deluge config should be completely transferred to within userspace
+#TODO Deluge should not have special config in nginx, and should be changed like qBittorrent works
+#TODO Make IOWeights actually work and include other cgroup parameters as well
+#TODO Set port range for user based on user id, something like this: ((UserID-1000)*100)+1000 to give 100 ports for user \
+#       to employ systematically the same always to remove slightest chance of conflicts
+#TODO Check if docker rootless can be preinstalled just in skel
+#TODO Update skel user .bashrc to have the docker settings
+#TODO Should target about 30 lines of actual code when refactored properly, aka this should just be a "controller", see setting trafficlimit
 
 require_once '/scripts/lib/rtorrentConfig.php';
 require_once '/scripts/lib/update.php';
@@ -30,8 +41,9 @@ if (strpos($userList, $user['name']) === false) die("No such user in passwd list
 
 if (!empty($user['trafficLimit']) && $user['trafficLimit'] > 1) passthru("/scripts/util/userTrafficLimit.php {$user['name']} {$user['trafficLimit']}");
 
-if (empty($user['CPUWeight']) or $user['CPUWeight'] == 0) $user['CPUWeight'] = 500;
-if (empty($user['IOWeight']) or $user['IOWeight'] == 0) $user['IOWeight'] = 500;
+// Check for valid weights and set default
+if (empty($user['CPUWeight']) or (int) $user['CPUWeight'] == 0) $user['CPUWeight'] = 500;
+if (empty($user['IOWeight']) or (int) $user['IOWeight'] == 0) $user['IOWeight'] = 500;
 
 
 echo "Creating rTorrent config\n";
@@ -109,6 +121,8 @@ if (!file_exists("/home/{$user['name']}/.sessionDeluge")) shell_exec("mkdir -p /
 //}
 
 // qBittorrent Config!
+#TODO transfer this as user space configurator too, more dynamic and try to preserve user made configs
+#TODO Set to a static port, say userPortRange+5 or smthing (ie. user id = 1005, port range = 1500-1600, so qbit 1505)
 if (!file_exists("/home/{$user['name']}/.config/qBittorrent/qBittorrent.conf")) {
     $qbittorrentTemplate = file_get_contents('/etc/seedbox/config/template.qbittorrent.conf');
     $qbittorrentPort = round( rand(1500, 65500) );
@@ -122,7 +136,7 @@ if (!file_exists("/home/{$user['name']}/.config/qBittorrent/qBittorrent.conf")) 
 }
 
 
-
+#TODO setting quota ought to be /scripts/util/userQuota.php or so. many small utils philosophy
 // Set Quota
 $filesLimitPerGb = 500;
 $quota = $user['quota'] * 1024 * 1024;
@@ -167,13 +181,7 @@ echo passthru("systemctl daemon-reload");
 
 // Enable linger
 echo passthru("loginctl enable-linger {$user['name']}");
+
 // Install docker rootless
 echo passthru("su {$user['name']} -c 'curl -fsSL https://get.docker.com/rootless | sh'");
 echo passthru("su {$user['name']} -c 'wget https://github.com/docker/compose/releases/download/v2.14.2/docker-compose-linux-x86_64 -O ~/bin/docker-compose; chmod +x ~/bin/docker-compose; systemctl --user enable docker'");
-
-
-
-#TODO REMOVE THIS BY 01/2021
-// We need to update nginx config and restart it for deluge
-#`/scripts/util/createNginxConfig.php`;
-#`/etc/init.d/nginx restart`;
