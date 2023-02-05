@@ -1,5 +1,9 @@
 #!/usr/bin/php
 <?php
+# PMSS
+# Copyright (C) Magna Capax Finland Oy 2010-2023
+#TODO Check if this is still used, since transition happened years ago
+
 //Some kind of htpasswd synchronization from times when lighttpd global instance transition to per user instances
 
 $users = shell_exec('/scripts/listUsers.php');
