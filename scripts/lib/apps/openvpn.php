@@ -1,101 +1,57 @@
 <?php
-return;		// currently no openvpn
-// OpenVPN install!
-// Setup OpenVPN
+// OpenVPN installation script
 
-// Some basic configs first
+// Host naming //
+// .pulsedmedia.com gets appended if it's missing
+// Client config filenames use dashes instead of dots
 $openvpnClientConfigHostname = $serverHostname;
 if (strpos($openvpnClientConfigHostname, '.pulsedmedia.com') === false) $openvpnClientConfigHostname .= '.pulsedmedia.com';
 $openvpnClientConfigFilename = str_replace('.', '-', $openvpnClientConfigHostname);
-$openvpnCertInfo = array(
-	'KEY_COUNTRY' => 'FI',
-	'KEY_PROVINCE' => 'Uusimaa',
-	'KEY_CITY' => 'Helsinki',
-	'KEY_ORG' => 'Pulsed Media',
-	'KEY_EMAIL' => 'sales@pulsedmedia'
-);
 
-
-if (!file_exists('/etc/openvpn/easy-rsa/2.0/')) {
-    echo "#### Configuring OpenVPN\n";
-    if ($debianVersion[0] == 8) {
-        // Get easy-rsa
-        `cd /etc/openvpn; wget http://pulsedmedia.com/remote/pkg/easy-rsa-2.0.tar.gz; tar -xzf easy-rsa-2.0.tar.gz; cd -`;
-        // Fix file naming
-        `ln -s /usr/lib/openvpn/openvpn-plugin-auth-pam.so /usr/lib/openvpn/openvpn-auth-pam.so`;
-
-
-    } else {
-        `cp -r /usr/share/doc/openvpn/examples/easy-rsa /etc/openvpn/`;
-    }
-   
-    // Export key variables 
-    foreach($openvpnCertInfo AS $openvpnCertKey => $openvpnCertValue)
-		`export {$openvpnCertKey}="{$openvpnCertValue}"`;
-
-    `cd /etc/openvpn/easy-rsa/2.0/; . ./vars; ./clean-all; ./build-ca --batch; ./build-key-server --batch server; ./build-dh --batch; cd -`;
-    `cp -p /etc/seedbox/config/template.openvpn.server.config /etc/openvpn/openvpn.conf; /etc/init.d/openvpn restart`;
-    echo "\t#### OpenVPN Configured. Create client config + cert package\n";
-
-	// This is done below and at this stage those config files do not exist.
-    //`cd /home; tar -czvf /etc/skel/www/openvpn-config.tgz openvpn-{$openvpnClientConfigFilename}.ovpn openvpn-{$openvpnClientConfigFilename}.crt; cd -`;
-
-    foreach($users AS $thisUser)
-        updateUserFile('www/openvpn-config.tgz', $thisUser);
-
+// Detect old config //
+if (file_exists("/etc/openvpn/easy-rsa/2.0")) {
+    echo "#### Found old EasyRSA config, moving it away";
+    `mv /etc/openvpn/easy-rsa /etc/openvpn/easy-rsa-old`;
 }
 
-// If template has changed update it
-if ( file_get_contents('/etc/seedbox/config/template.openvpn.server.config') !== file_get_contents('/etc/openvpn/openvpn.conf') )
-	`cp -p /etc/seedbox/config/template.openvpn.server.config /etc/openvpn/openvpn.conf; /etc/init.d/openvpn restart`;
-
-/*
-if ($debianVersion[0] == 8 && !file_exists('/etc/openvpn/easy-rsa')) {
+// Configure EasyRSA and OpenVPN //
+if (!file_exists('/etc/openvpn/easy-rsa')) {
     echo "#### Configuring OpenVPN\n";
 
-    $easyrsaVars = file_get_contents('/etc/openvpn/easy-rsa/vars');
-    $easyrsaVarsOriginal = <<<EOF
-# These are the default values for fields
-# which will be placed in the certificate.
-# Don't leave any of these fields blank.
-export KEY_COUNTRY="US"
-export KEY_PROVINCE="CA"
-export KEY_CITY="SanFrancisco"
-export KEY_ORG="Fort-Funston"
-export KEY_EMAIL="me@myhost.mydomain"
-export KEY_OU="MyOrganizationalUnit"
+    // EasyRSA installation //
+    if ($debianVersion[0] == 8) {
+        // If running on Debian 8, fetch an up-to-date copy of EasyRSA
+        `cd /etc/openvpn; wget https://github.com/OpenVPN/easy-rsa/releases/download/v3.1.1/EasyRSA-3.1.1.tgz; tar -xzf EasyRSA-3.1.1.tgz; mv EasyRSA-3.1.1 easy-rsa; cd -`;
+    } else {
+        `cp -r /usr/share/easy-rsa /etc/openvpn/`;
+    }
 
-# X509 Subject Field
-export KEY_NAME="EasyRSA"
+    // EasyRSA variables //
+    // Note that vars should not be sourced anymore, it's read automatically
+    // Additionally, EASYRSA_BATCH is used to prevent prompting for user input
+    $easyrsaVars = <<<EOF
+set_var EASYRSA_REQ_COUNTRY "FI"
+set_var EASYRSA_REQ_PROVINCE "Uusimaa"
+set_var EASYRSA_REQ_CITY "Helsinki"
+set_var EASYRSA_REQ_ORG "Pulsed Media"
+set_var EASYRSA_REQ_EMAIL "sales@pulsedmedia.com"
+set_var EASYRSA_BATCH "1"
 EOF;
-    $easyrsaVarsReplace = <<<EOF
-# These are the default values for fields
-# which will be placed in the certificate.
-# Don't leave any of these fields blank.
-export KEY_COUNTRY="FI"
-export KEY_PROVINCE="Uusimaa"
-export KEY_CITY="Helsinki"
-export KEY_ORG="Pulsed Media"
-export KEY_EMAIL="sales@pulsedmedia.com"
-export KEY_OU=""
-
-# X509 Subject Field
-export KEY_NAME="Pulsed Media {$serverHostname}"
-EOF;
-
-    $easyrsaVars = str_replace($easyrsaVarsOriginal, $easyrsaVarsReplace, $easyrsaVars);
     file_put_contents('/etc/openvpn/easy-rsa/vars', $easyrsaVars);
 
-    `cd /etc/openvpn/easy-rsa/; . ./vars; ./clean-all; ./build-ca --batch; ./build-key-server --batch server; ./build-dh --batch; cd -`;
-    `cp -p /etc/seedbox/config/template.openvpn.server.config /etc/openvpn/openvpn.conf; /etc/init.d/openvpn restart`;
+    // Create the server config and restart OpenVPN //
+    `cd /etc/openvpn/easy-rsa/; ./easyrsa clean-all; ./easyrsa build-ca nopass; ./easyrsa build-server-full server nopass; ./easyrsa gen-dh; cd -`;
+    `cp -p /etc/seedbox/config/template.openvpn.server.config /etc/openvpn/openvpn.conf; systemctl restart openvpn@openvpn`;
     echo "\t#### OpenVPN Configured. Create client config + cert package\n";
-
 }
-*/
 
+// Restart on template change //
+if ( file_get_contents('/etc/seedbox/config/template.openvpn.server.config') !== file_get_contents('/etc/openvpn/openvpn.conf') )
+	`cp -p /etc/seedbox/config/template.openvpn.server.config /etc/openvpn/openvpn.conf; systemctl restart openvpn@openvpn`;
+
+// Create OpenVPN client config for this machine //
 if (!file_exists("/home/openvpn-{$openvpnClientConfigFilename}.ovpn")) {
     $openvpnClientConfig = file_get_contents('/etc/seedbox/config/template.openvpn.client.config');
-
     $openvpnClientConfig = str_replace(
         array('##SERVER_HOSTNAME##', '##CONFIG_FILENAME##'),
         array($openvpnClientConfigHostname, 'openvpn-' . $openvpnClientConfigFilename),
@@ -103,21 +59,19 @@ if (!file_exists("/home/openvpn-{$openvpnClientConfigFilename}.ovpn")) {
     );
     file_put_contents("/home/openvpn-{$openvpnClientConfigFilename}.ovpn", $openvpnClientConfig);
 }
+
+// Copy out CA certificate if it isn't in /home yet //
 if (!file_exists("/home/openvpn-{$openvpnClientConfigFilename}.crt")) {
-    `cp -p /etc/openvpn/easy-rsa/2.0/keys/ca.crt /home/openvpn-{$openvpnClientConfigFilename}.crt`;
+    `cp -p /etc/openvpn/easy-rsa/pki/ca.crt /home/openvpn-{$openvpnClientConfigFilename}.crt`;
 }
-// OpenVPN Config check
-if (!file_exists('/etc/skel/www/openvpn-config.tgz')) {
 
-    if (file_exists("/home/openvpn-{$openvpnClientConfigFilename}.crt") &&
-        file_exists("/home/openvpn-{$openvpnClientConfigFilename}.ovpn") ) {
-
-        `cd /home; tar -czvf /etc/skel/www/openvpn-config.tgz openvpn-{$openvpnClientConfigFilename}.ovpn openvpn-{$openvpnClientConfigFilename}.crt; cd -`;
-
+// Add openvpn-config.tgz to skel and put it in homedirs //
+// This runs only if there is no config package yet and the certificate and profile are present.
+if (!file_exists('/etc/skel/www/openvpn-config.tgz') &&
+    file_exists("/home/openvpn-{$openvpnClientConfigFilename}.crt") &&
+    file_exists("/home/openvpn-{$openvpnClientConfigFilename}.ovpn")) {
+    `cd /home; tar -czvf /etc/skel/www/openvpn-config.tgz openvpn-{$openvpnClientConfigFilename}.ovpn openvpn-{$openvpnClientConfigFilename}.crt; cd -`;
         foreach($users AS $thisUser)
             updateUserFile('www/openvpn-config.tgz', $thisUser);
-
-    }
-
 }
 
