@@ -36,6 +36,9 @@ mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
 EOF;
 );
 
+if (! empty($argv[1]))
+    passthru("cd /tmp/PMSS; git checkout {$argv[1]}");
+
 # Following is now dynamic because it was just fetched and updated
 # TODO soft.sh kinda outdated now ... Should remove it
 passthru('bash /tmp/PMSS/soft.sh');
