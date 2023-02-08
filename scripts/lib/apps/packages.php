@@ -12,7 +12,6 @@ passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 
 passthru('apt-get install lighttpd lighttpd-mod-webdav proftpd-basic -y; /etc/init.d/lighttpd stop;');
 passthru('apt-get install screen mc wget gawk subversion libtool libncurses5 sqlite locate ntpdate -y');
-passthru('apt-get remove openvpn -y');
 passthru('apt-get install python-pycurl python-crypto python-cheetah -y');
 passthru('apt-get install zip unzip bwm-ng sysstat apache2-utils irssi iotop ethtool -y');
 if ($debianVersion[0] >= 8 or
