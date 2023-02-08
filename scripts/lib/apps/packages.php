@@ -88,7 +88,7 @@ if ($debianVersion[0] >= 8 or
 
 
 #Install mkvtoolnix
-if (!file_exists('/usr/bin/mkvextract')) {
+if (!file_exists('/usr/bin/mkvextract'))
     passthru('apt-get install mkvtoolnix -y');
 
 
