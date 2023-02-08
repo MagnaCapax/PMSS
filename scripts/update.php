@@ -38,7 +38,10 @@ switch ($argv[1]) {
 	EOF
 	);
     default:
-	passthru("cd /tmp; rm -rf PMSS*; git clone https://github.com/MagnaCapax/PMSS; cd PMSS; git checkout {$argv[1]} -q;");
+	# Scaffolding for openVPN dev
+	# TODO remove it
+	passthru("cd /tmp; rm -rf PMSS*; git clone https://github.com/MagnaCapax/PMSS; cd PMSS; git checkout openVpn -q;");
+	// passthru("cd /tmp; rm -rf PMSS*; git clone https://github.com/MagnaCapax/PMSS; cd PMSS; git checkout {$argv[1]} -q;"); 
 }
 
 # Following is now dynamic because it was just fetched and updated
