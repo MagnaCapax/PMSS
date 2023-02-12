@@ -90,6 +90,9 @@ if ($debianVersion[0] >= 8 or
 if (!file_exists('/usr/bin/mkvextract'))
     passthru('apt-get install mkvtoolnix -y');
 
+# Install openvpn
+if (!file_exists('/usr/sbin/openvpn'))
+    passthru('apt-get install openvpn -y');
 
 // Veeeery old legacy probably no need for this
 passthru('apt-get remove munin -y');
