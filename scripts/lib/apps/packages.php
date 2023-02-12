@@ -72,7 +72,6 @@ if ($debianVersion[0] >= 8 or
     $debianVersion[0] == 1) {    // Deb8, 9 or 10
     passthru('apt-get install znc znc-perl znc-tcl znc-python git -y;');
     passthru('apt-get install git -y'); // For unknown reason git won't install on above line, but rest of the packages do
-
     #Let's install pythont3+acd cli
     passthru('apt-get install python3 python3-pip python-virtualenv -y;');
     passthru('pip3 install --upgrade git+https://github.com/yadayada/acd_cli.git;');
@@ -92,7 +91,7 @@ if (!file_exists('/usr/bin/mkvextract'))
 
 # Install openvpn
 if (!file_exists('/usr/sbin/openvpn'))
-    passthru('apt-get install openvpn -y');
+    passthru('apt-get install openvpn easy-rsa -y ');
 
 // Veeeery old legacy probably no need for this
 passthru('apt-get remove munin -y');
