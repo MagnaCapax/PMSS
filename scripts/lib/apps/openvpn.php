@@ -5,8 +5,7 @@
 // .pulsedmedia.com gets appended if it's missing
 // Client config filenames use dashes instead of dots
 $openvpnClientConfigHostname = $serverHostname;
-//TODO: uncomment this line
-// if (strpos($openvpnClientConfigHostname, '.pulsedmedia.com') === false) $openvpnClientConfigHostname .= '.pulsedmedia.com';
+if (strpos($openvpnClientConfigHostname, '.pulsedmedia.com') === false) $openvpnClientConfigHostname .= '.pulsedmedia.com';
 $openvpnClientConfigFilename = str_replace('.', '-', $openvpnClientConfigHostname);
 
 // Detect old config //
