@@ -12,7 +12,6 @@ passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 
 passthru('apt-get install lighttpd lighttpd-mod-webdav proftpd-basic -y; /etc/init.d/lighttpd stop;');
 passthru('apt-get install screen mc wget gawk subversion libtool libncurses5 sqlite locate ntpdate -y');
-passthru('apt-get remove openvpn -y');
 passthru('apt-get install python-pycurl python-crypto python-cheetah -y');
 passthru('apt-get install zip unzip bwm-ng sysstat apache2-utils irssi iotop ethtool -y');
 if ($debianVersion[0] >= 8 or
@@ -73,7 +72,6 @@ if ($debianVersion[0] >= 8 or
     $debianVersion[0] == 1) {    // Deb8, 9 or 10
     passthru('apt-get install znc znc-perl znc-tcl znc-python git -y;');
     passthru('apt-get install git -y'); // For unknown reason git won't install on above line, but rest of the packages do
-
     #Let's install pythont3+acd cli
     passthru('apt-get install python3 python3-pip python-virtualenv -y;');
     passthru('pip3 install --upgrade git+https://github.com/yadayada/acd_cli.git;');
@@ -91,6 +89,9 @@ if ($debianVersion[0] >= 8 or
 if (!file_exists('/usr/bin/mkvextract'))
     passthru('apt-get install mkvtoolnix -y');
 
+# Install openvpn
+if (!file_exists('/usr/sbin/openvpn'))
+    passthru('apt-get install openvpn easy-rsa -y ');
 
 // Veeeery old legacy probably no need for this
 passthru('apt-get remove munin -y');

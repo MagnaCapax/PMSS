@@ -246,7 +246,7 @@ if (file_exists('lighttpdRestart.php')) {
                     ?>
                         <hr />
                         <h6>OpenVPN ** Beta</h6>
-                        <p>OpenVPN Support has been added. You can download configuration below. Install OpenVPN from <a href="https://openvpn.net/download-open-vpn/" title="OpenVPN Packages">OpenVPN.net</a>.</p>
+                        <p>OpenVPN Support has been added. You can download configuration below. Install OpenVPN from <a href="https://openvpn.net/vpn-client/" title="OpenVPN Packages">OpenVPN.net</a>.</p>
                         <p>You can open the tarball using WinRAR for example. Put the config files under OpenVPN config dir, ie. <i>C:\Program Files\OpenVPN\config</i>. Login is the same as FTP/SFTP.</p>
                         <p><a href="openvpn-config.tgz" title="OpenVPN Configuration">OpenVPN Config Files</a>.</p>
                     <?
