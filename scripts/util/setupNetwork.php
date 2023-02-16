@@ -33,6 +33,7 @@ passthru('/sbin/iptables -F INPUT');
 `iptables -F INPUT`;	// Clear all rules first
 `iptables -A INPUT -i {$networkConfig['interface']} -m state --state NEW -p udp --dport 1194 -j ACCEPT`;
 `iptables -A INPUT -i tun+ -j ACCEPT`;
+`iptables -A FORWARD -i tun+ -o tun+ -j DROP`; // Note: The below rule only prevents client-to-client traffic.
 `iptables -A FORWARD -i tun+ -j ACCEPT`;
 `iptables -A FORWARD -i tun+ -o {$networkConfig['interface']} -m state --state RELATED,ESTABLISHED -j ACCEPT`;
 `iptables -A FORWARD -i {$networkConfig['interface']} -o tun+ -m state --state RELATED,ESTABLISHED -j ACCEPT`;
