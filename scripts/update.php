@@ -28,17 +28,38 @@ file_put_contents('/etc/seedbox/runtime/version', $updateData['toVersion']);	// 
 # Update sources
 # TODO This is duplicated in install.sh
 # If no argument, update from git main, if argument "release" update from latest release, if anything else treat it as a branch to update from.
-switch ($argv[1]) {
-    case "release":
+
+$sourceVersion = file_get_contents('/etc/seedbox/config/version');
+if (! empty($argv[1]))
+    $sourceVersion = $argv[1];
+
+switch (true) {
+    case stristr($sourceVersion, 'release'):
 	passthru(<<<EOF
 	cd /tmp;
 	rm -rf PMSS*;
-	wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tarball_url/ {print $(NF-1)}' | xargs wget -O PMSS.tar.gz;
+	VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
+	wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz;
 	mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
+	SOURCE="release"
+	echo "$SOURCE $VERSION" > /etc/seedbox/config/version;
 	EOF
 	);
-    default:
-	passthru("cd /tmp; rm -rf PMSS*; git clone https://github.com/MagnaCapax/PMSS; cd PMSS; git checkout {$argv[1]} -q;"); 
+    case stristr($sourceVersion, 'git'):
+	$gitBranch = explode(' ', $sourceVersion); // Get git/branch string
+	$branch = substr($gitBranch, 4); // Get branch string
+	passthru(<<<EOF
+	cd /tmp;
+	rm -rf PMSS*;
+	git clone https://github.com/MagnaCapax/PMSS;
+	cd PMSS;
+	git checkout $branch;
+	SOURCE=$gitBranch;
+	VERSION=$(date);
+	echo "$SOURCE $VERSION" > /etc/seedbox/config/version;
+	EOF
+	);
+	break;
 }
 
 # Following is now dynamic because it was just fetched and updated
