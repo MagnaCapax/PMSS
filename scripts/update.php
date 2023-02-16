@@ -46,8 +46,8 @@ switch (true) {
 	EOF
 	);
     case stristr($sourceVersion, 'git'):
-	$gitBranch = explode(' ', $sourceVersion); // Get git/branch string
-	$branch = substr($gitBranch, 4); // Get branch string
+	$gitBranch = _(explode(' ', $sourceVersion)); // Get git/branch string
+	$branch = _(substr($gitBranch, 4)); // Get branch string
 	passthru(<<<EOF
 	cd /tmp;
 	rm -rf PMSS*;
