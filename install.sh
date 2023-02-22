@@ -75,6 +75,7 @@ apt-get install libssl-dev libssl1.1 mediainfo libmediainfo0v5 -y  ##TODO Yuck d
 
 apt-get install git
 
+# Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 echo "### Setting up software"
 mkdir ~/compile
 cd /tmp

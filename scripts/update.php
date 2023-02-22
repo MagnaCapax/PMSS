@@ -25,10 +25,12 @@ file_put_contents('/etc/seedbox/runtime/version', $updateData['toVersion']);	// 
 
 // passthru('rm -rf /root/soft.sh; wget -O/root/soft.sh http://pulsedmedia.com/remote/soft.sh; bash /root/soft.sh');
 
-# Update sources
-# TODO This is duplicated in install.sh
-# If no argument, update from git main, if argument "release" update from latest release, if anything else treat it as a branch to update from.
+# The script accepts string with the source for the update: "git/branch" or "release". If empty, it uses
+# source specified in /etc/seedbox/config/version.
 
+#TODO Add help to the script
+
+# Fetch current source and version from the box
 $sourceVersion = file_get_contents('/etc/seedbox/config/version');
 if (! empty($argv[1]))
     $sourceVersion = $argv[1];
