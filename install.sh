@@ -75,6 +75,7 @@ apt-get install libssl-dev libssl1.1 mediainfo libmediainfo0v5 -y  ##TODO Yuck d
 
 apt-get install git
 
+# Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 echo "### Setting up software"
 mkdir ~/compile
 cd /tmp
@@ -83,13 +84,20 @@ if [ "${1:0:3}" = "git" ]; then
     git clone https://github.com/MagnaCapax/PMSS;
     cd PMSS;
     git checkout "${1:4}";
+    SOURCE=$1
+    VERSION=$(date)
 else
-    wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tarball_url/ {print $(NF-1)}' | xargs wget -O PMSS.tar.gz;
+    VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
+    wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz;
     mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
     cd PMSS;
+    SOURCE="release"
 fi
 
 bash soft.sh
+
+mkdir -p /etc/seedbox/config/
+echo "$SOURCE $VERSION" > /etc/seedbox/config/version
 
 #TODO Transfer over the proper rc.local + sysctl configs
 echo "### Setting up HDD schedulers"
