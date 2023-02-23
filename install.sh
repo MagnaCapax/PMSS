@@ -40,40 +40,45 @@ mount -o remount /home
 # Package selections, and remove some defaults etc.
 apt-get update; apt-get upgrade -y
 
+apt-cache dumpavail | dpkg --merge-avail
 
-apt-get remove samba-common exim4-base exim4 netcat netcat-traditonal netcat6 -y
+dpkg --set-selections < pkg_list
 
+apt-get dselect-upgrade
 
-apt-get install libncurses5-dev less -y
-apt-get install libxmlrpc-c++4-dev libxmlrpc-c++4 -y    #Not found on deb8
-apt-get install libxmlrpc-c++8v5 -y
-apt-get install automake autogen build-essential libwww-curl-perl libcurl4-openssl-dev libsigc++-2.0-dev libwww-perl sysfsutils libcppunit-dev -y
-apt-get install gcc g++ gettext glib-networking libglib2.0-dev libfuse-dev apt-transport-https -y
-
-# Looks like debian now wants to install apache2 with php5-geoip
-apt-get install php5 php5-cli php5-geoip php5-gd php5-mcrypt php-apc php5-cgi php5-sqlite php5-common php5-xmlrpc php5-curl -y  #Does not work on Deb10, as it has php7 autofails ;)
-apt-get install php php-cli php-geoip php-gd php-apcu php-cgi php-sqlite3 php-common php-xmlrpc php-curl -y
-
-
-apt-get install psmisc rsync subversion mktorrent -y
-#apt-get -t testing install mktorrent rsync -y
-
-apt-get install libncurses5 libncurses5-dev  links elinks lynx sudo -y
-apt-get install libgettext-ruby-util -y #no more present in deb8
-apt-get install pkg-config make openssl -y
-
-#From update-step2 l:72, remove them from there circa 03/2016
-apt-get install znc znc-perl znc-python znc-tcl -y
-apt-get install gcc g++ gettext python-cheetah curl fuse glib-networking libglib2.0-dev libfuse-dev apt-transport-https -y  #Everythin installed already on deb8
-apt-get install links elinks lynx ethtool p7zip-full smartmontools -y   #all but smart + p7zip already installed...
-apt-get install flac lame lame-doc mp3diags lftp -y
-#Following are for autodl-irssi
-apt-get -y install libarchive-zip-perl libnet-ssleay-perl libhtml-parser-perl libxml-libxml-perl libjson-perl libjson-xs-perl libxml-libxslt-perl   #ssleay, parser-perl, xml-perl already installed on deb8
-#apt-get install libcrypto++-dev libcrypto++-utils libcrypto++9 -y   #Needed on deb8 for libtorrent compile
-
-apt-get install libssl-dev libssl1.1 mediainfo libmediainfo0v5 -y  ##TODO Yuck distro version dependant
-
-apt-get install git -y
+# apt-get remove samba-common exim4-base exim4 netcat netcat-traditonal netcat6 -y
+#
+#
+# apt-get install libncurses5-dev less -y
+# apt-get install libxmlrpc-c++4-dev libxmlrpc-c++4 -y    #Not found on deb8
+# apt-get install libxmlrpc-c++8v5 -y
+# apt-get install automake autogen build-essential libwww-curl-perl libcurl4-openssl-dev libsigc++-2.0-dev libwww-perl sysfsutils libcppunit-dev -y
+# apt-get install gcc g++ gettext glib-networking libglib2.0-dev libfuse-dev apt-transport-https -y
+#
+# # Looks like debian now wants to install apache2 with php5-geoip
+# apt-get install php5 php5-cli php5-geoip php5-gd php5-mcrypt php-apc php5-cgi php5-sqlite php5-common php5-xmlrpc php5-curl -y  #Does not work on Deb10, as it has php7 autofails ;)
+# apt-get install php php-cli php-geoip php-gd php-apcu php-cgi php-sqlite3 php-common php-xmlrpc php-curl -y
+#
+#
+# apt-get install psmisc rsync subversion mktorrent -y
+# #apt-get -t testing install mktorrent rsync -y
+#
+# apt-get install libncurses5 libncurses5-dev  links elinks lynx sudo -y
+# apt-get install libgettext-ruby-util -y #no more present in deb8
+# apt-get install pkg-config make openssl -y
+#
+# #From update-step2 l:72, remove them from there circa 03/2016
+# apt-get install znc znc-perl znc-python znc-tcl -y
+# apt-get install gcc g++ gettext python-cheetah curl fuse glib-networking libglib2.0-dev libfuse-dev apt-transport-https -y  #Everythin installed already on deb8
+# apt-get install links elinks lynx ethtool p7zip-full smartmontools -y   #all but smart + p7zip already installed...
+# apt-get install flac lame lame-doc mp3diags lftp -y
+# #Following are for autodl-irssi
+# apt-get -y install libarchive-zip-perl libnet-ssleay-perl libhtml-parser-perl libxml-libxml-perl libjson-perl libjson-xs-perl libxml-libxslt-perl   #ssleay, parser-perl, xml-perl already installed on deb8
+# #apt-get install libcrypto++-dev libcrypto++-utils libcrypto++9 -y   #Needed on deb8 for libtorrent compile
+#
+# apt-get install libssl-dev libssl1.1 mediainfo libmediainfo0v5 -y  ##TODO Yuck distro version dependant
+#
+# apt-get install git -y
 
 # Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 echo "### Setting up software"
