@@ -43,7 +43,8 @@ switch (true) {
 	echo "Using releases as the source!\n";
 	$newVersion = trim(shell_exec(<<<EOF
 	    wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}'
-	EOF));
+EOF
+	));
 	$source = "release";
 	$script = <<<EOF
 	    cd /tmp;
@@ -51,7 +52,7 @@ switch (true) {
 	    wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/{$newVersion}" -O PMSS.tar.gz;
 	    mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
 	    echo "{$source} {$newVersion}" > /etc/seedbox/config/version;
-	EOF;
+EOF;
 	passthru($script);
 	break;
 
@@ -66,7 +67,7 @@ switch (true) {
 	    cd PMSS;
 	    git checkout {$branch};
 	    echo "{$source} {$date}" > /etc/seedbox/config/version;
-	EOF;
+EOF;
 	passthru($script);
 	break;
 }
@@ -77,4 +78,3 @@ passthru('bash /tmp/PMSS/soft.sh');
 
 if (file_exists('/scripts/util/update-step2.php'))
     require '/scripts/util/update-step2.php';
-
