@@ -16,7 +16,7 @@ passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 //     else passthru('apt-get install unrar rar php-apc -y');
 
 if ($debianVersion[0] == 1) 
-    passthru('wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-20_all.deb && dpkg -i repo-mediaarea_1.0-20_all.deb')
+    passthru('wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-20_all.deb && dpkg -i repo-mediaarea_1.0-20_all.deb');
     // passthru('apt-get install libzen0v5 sox tmux tree ncdu weechat php7.3-xml php7.3-zip php-mbstring -y; apt remove avahi-daemon mediainfo libmediainfo0v5 -y; apt install qbittorrent-nox -y; wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-20_all.deb && dpkg -i repo-mediaarea_1.0-20_all.deb && apt-get update; apt-get install mediainfo libmediainfo0v5 -y');
 	// else `apt-get install sox nzbget tmux tree ncdu weechat -y`;
 
