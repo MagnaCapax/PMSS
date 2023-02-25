@@ -21,7 +21,7 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     
     shell_exec('rm -rf /usr/local/lib/libtorrent*; ldconfig;'); // Clean up old libtorrent installed files
     
-    passthru('apt-get install -y libudns0 libudns-dev');
+    // passthru('apt-get install -y libudns0 libudns-dev');
 
     echo "**** Remove old rtorrent packages\n";
     //passthru('rm -rf /tmp/rtorrent*; rm -rf /tmp/libtorrent*; rm -rf /tmp/xmlrpc*');

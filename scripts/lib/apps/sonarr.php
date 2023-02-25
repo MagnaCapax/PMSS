@@ -11,6 +11,6 @@ if (!file_exists('/etc/apt/sources.list.d/sonarr.list')) {
 
 if (!file_exists('/opt/NzbDrone/NzbDrone.exe')) {
     echo "## Installing Sonarr / Nzbdrone\n";
-    passthru('apt-get update; apt-get install nzbdrone -y');
+    // passthru('apt-get update; apt-get install nzbdrone -y');
 }
 

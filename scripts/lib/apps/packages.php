@@ -8,6 +8,7 @@
 passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 
 // passthru('apt-get install lighttpd lighttpd-mod-webdav proftpd-basic -y; /etc/init.d/lighttpd stop;');
+passthru('/etc/init.d/lighttpd stop;');
 // passthru('apt-get install screen mc wget gawk subversion libtool libncurses5 sqlite locate ntpdate -y');
 // passthru('apt-get install python-pycurl python-crypto python-cheetah -y');
 // passthru('apt-get install zip unzip bwm-ng sysstat apache2-utils irssi iotop ethtool -y');
@@ -23,7 +24,7 @@ if ($debianVersion[0] == 1)
 // passthru('apt-get install zsh atop -y');
 
 // Following from update-step2 prior 29/04/2019
-// passthru('apt-get -f install -y');  # To fix potentially broken dependencies
+ passthru('apt-get -f install -y');  # To fix potentially broken dependencies
 // passthru('apt-get remove netcat netcat-traditional mercurial -y');
 // passthru('apt-get remove netcat6 go -y');
 // passthru('apt-get install aria2 htop mtr mktorrent -y');

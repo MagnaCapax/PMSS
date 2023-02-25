@@ -6,7 +6,7 @@ require_once '/scripts/lib/networkInfo.php';
 #TODO This should be in the install script
 #TODO Use an actual config template
 if (!file_exists('/usr/bin/vnstat')) {
-    passthru('apt-get install vnstat -y');
+    // passthru('apt-get install vnstat -y');
     passthru("vnstat -u -i {$link}");
 }
 if (file_exists('/etc/vnstat.conf')) {	// Fix some default configs! Especially on Deb6+7 this was an issue
