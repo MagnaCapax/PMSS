@@ -46,6 +46,8 @@ dpkg --set-selections < pkg_list
 
 apt-get dselect-upgrade
 
+/etc/init.d/nginx stop
+
 # apt-get remove samba-common exim4-base exim4 netcat netcat-traditonal netcat6 -y
 #
 #
