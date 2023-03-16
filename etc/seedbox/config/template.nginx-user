@@ -11,6 +11,8 @@ location /user-##username/ {
 
 location /public-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
         include /etc/nginx/proxy_params;
         limit_rate_after 100m;
         limit_rate 8192k;
