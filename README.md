@@ -21,7 +21,7 @@ You can find information for common tasks such as adding/creating/suspending use
 
 Install minimal Debian system, and run following as root:
 ```
-wget -qO https://github.com/MagnaCapax/PMSS/releases/latest/download/install.sh|bash install.sh
+wget -q https://github.com/MagnaCapax/PMSS/releases/latest/download/install.sh; bash install.sh
 ```
 
 ### Support
