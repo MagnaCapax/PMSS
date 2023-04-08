@@ -1,6 +1,11 @@
 #!/usr/bin/php
 <?php
-// Collect traffic usage statistics
+/**
+ * Collect traffic usage statistics
+ *
+ * @copyright (C) Magna Capax Finland Oy 2023
+ * @author Aleksi
+ */
 
 //CNC server not in use anymore, new management uses pull type instead of push
 //require_once '/scripts/lib/serverApi.php';
@@ -46,17 +51,17 @@ foreach($users AS $thisUser) {
                 //echo "Loggin {$thisLocalNet} for {$thisUser}/{$thisUid} result {$thisUserTrafficLocal}\n";
         }
 
-   $thisUserTraffic = (int) trim( $thisUserTraffic );
-   $thisUserTrafficLocal = (int) trim( $thisUserTrafficLocal );
+    $thisUserTraffic = (int) trim( $thisUserTraffic );
+    $thisUserTrafficLocal = (int) trim( $thisUserTrafficLocal );
 
 
 	// Do not log if usage was MORE than linkspeed for the past 5 minutes.
-    if ($thisUserTraffic > ($linkSpeed * 1000 * 1000 * 60 * 5)/4) {
-        file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} traffic exceeds 25% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
+    if ($thisUserTraffic > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
+        file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
         continue;  
     }
-    if ($thisUserTrafficLocal > ($linkSpeed * 1000 * 1000 * 60 * 5)/4) {
-        file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 25% link max: {$thisUserLocalTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
+    if ($thisUserTrafficLocal > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
+        file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserLocalTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
         continue;  
     }
 
@@ -81,5 +86,4 @@ if ($trafficUnmatched > 0) {
 }
 
 // Remove the temp file, not required anymore
-// temp do not remove as we need to debug
-//unlink($thisUsageFile);
+unlink($thisUsageFile);
