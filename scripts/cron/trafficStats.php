@@ -1,6 +1,12 @@
 #!/usr/bin/php
 <?php
-/* Gather per user traffic usage */
+/**
+ * Gather per user traffic usage and calculate statistics
+ *
+ * @copyright (C) Magna Capax Finland Oy 2023
+ * @author Aleksi
+ **/
+
 require_once '/scripts/lib/traffic.php';
 $trafficStatistics = new trafficStatistics;
 
