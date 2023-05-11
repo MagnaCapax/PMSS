@@ -31,7 +31,7 @@ foreach($users AS $thisUser) {
             echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";
 	}
     }
-    echo "/sbin/iptables -A OUTPUT ! -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j MARK --set-mark {$mark}\n";
+    if (!empty($thisLocalNet)) echo "/sbin/iptables -A OUTPUT ! -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j MARK --set-mark {$mark}\n";
     echo "/sbin/iptables -A OUTPUT -m owner --uid-owner {$thisUid} -j ACCEPT\n";
     ++$mark;
 
