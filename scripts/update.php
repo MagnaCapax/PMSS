@@ -13,7 +13,7 @@ if (! empty($argv[1]))
 
 $source = explode(' ', $sourceVersion);
 $source = $source[0];
-
+$path = sha256( microtime() . $source . rand(500,9999999999999999) . shell_exec('cat /etc/seedbox/config/version') ); // Pseudo random path, unpredictable enough
 switch (true) {
     case (substr($source,0,7) == "release"):
 	echo "Using releases as the source!\n";
@@ -25,8 +25,8 @@ EOF
 	$script = <<<EOF
 	    cd /tmp;
 	    rm -rf PMSS*;
-	    wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/{$newVersion}" -O PMSS.tar.gz;
-	    mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
+	    wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/{$newVersion}" -O PMSS{$path}.tar.gz;
+	    mkdir PMSS{$path} && tar -xzf PMSS{$path}.tar.gz -C PMSS{$path} --strip-components 1;
 	    echo "{$source} {$newVersion}" > /etc/seedbox/config/version;
 EOF;
 	passthru($script);
@@ -39,6 +39,7 @@ EOF;
 	$script = <<<EOF
 	    cd /tmp;
 	    rm -rf PMSS*;
+		mkdir PMSS{$path}; cd PMSS{$path};
 	    git clone https://github.com/MagnaCapax/PMSS;
 	    cd PMSS;
 	    git checkout {$branch};
@@ -49,7 +50,7 @@ EOF;
 }
 
 
-passthru('rm -rf /etc/skel/*; rm -rf /scripts/*; cd /tmp/PMSS; cp -rp scripts /; cp -rp etc /; cp -rp var /;');  // Update scripts etc.
+passthru("rm -rf /etc/skel/*; rm -rf /scripts/*; cd /tmp/PMSS{$path}; cp -rp scripts /; cp -rp etc /; cp -rp var /;");  // Update scripts etc.
 passthru('chmod o-rwx -R /scripts; chmod o-rwx -R /root; chmod o-rwx -R /etc/skel; chmod o-rwx -R /etc/seedbox;'); // Kind of deprecated but better safe than sorry
 
 

@@ -8,6 +8,16 @@ $users = explode("\n", trim($users));
 $debianVersion = file_get_contents('/etc/debian_version');
 $serverHostname = trim( file_get_contents('/etc/hostname') );
 
+
+//Hacky thing due to a bug in github version not getting updated when refactored.
+#TODO Remove around 05/2024
+$updateSource = file_get_contents('/scripts/update.php');
+if (strpos($updateSource, 'soft.sh') !== 0) {    // Still running old version! Force it to be dynamic this time to overwrite existing.
+    passthru('wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/main/scripts/update.php');
+    passthru('/scripts/update.php');
+    die();   // Avoid infinite loop :)
+}
+
 // If var run does not exist, create it. Deb8 likes to remove this if empty?
 if (!file_exists('/var/run/pmss'))
 	mkdir('/var/run/pmss', 0770);
