@@ -4,7 +4,7 @@
 
 // Define version first
 # TODO just get the version # from https://rclone.org/downloads/ ....
-$rcloneVersion = '1.61.1';
+$rcloneVersion = '1.62.2';
 
 #Check rclone version
 if (file_exists('/usr/bin/rclone')) {

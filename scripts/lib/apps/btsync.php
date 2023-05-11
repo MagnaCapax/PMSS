@@ -20,7 +20,9 @@ if (!file_exists('/usr/bin/btsync')) {
 
 
 // Install resilio sync
-#TODO get from resilio site and check for latest version
+$rslVersion = shell_exec("rslsync --help");
+if ($rslVersion !== strpos($rslVersion, "Resilio Sync 2.7.3 (1381)")) unlink('/usr/bin/rslsync');
+
 if (!file_exists('/usr/bin/rslsync')) {
     echo "*** Resilio sync not present, downloading and adding!\n";
     passthru("wget http://pulsedmedia.com/remote/pkg/rslsync -O /usr/bin/rslsync; chmod 755 /usr/bin/rslsync");
