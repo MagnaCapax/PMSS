@@ -13,7 +13,7 @@ if (! empty($argv[1]))
 
 $source = explode(' ', $sourceVersion);
 $source = $source[0];
-$path = sha256( microtime() . $source . rand(500,9999999999999999) . shell_exec('cat /etc/seedbox/config/version') ); // Pseudo random path, unpredictable enough
+$path = sha1( microtime() . $source . rand(500,9999999999999999) . shell_exec('cat /etc/seedbox/config/version') ); // Pseudo random path, unpredictable enough
 switch (true) {
     case (substr($source,0,7) == "release"):
 	echo "Using releases as the source!\n";
