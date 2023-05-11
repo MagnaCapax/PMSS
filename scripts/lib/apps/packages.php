@@ -30,7 +30,9 @@ passthru('apt-get remove netcat6 go -y');
 passthru('apt-get install aria2 htop mtr mktorrent -y');
 passthru('apt-get install genisoimage xorriso -y');
 passthru('apt-get install uidmap -y');  // no fuse-overlayfs, supplied by docker. This is for docker rootless to function
- 
+
+passthru('apt-get install net-tools nicstat');
+
 passthru('apt-get install links elinks lynx ethtool zip p7zip-full smartmontools flac lame lame-doc mp3diags gcc g++ gettext python-cheetah fuse glib-networking libglib2.0-dev libfuse-dev apt-transport-https pigz -y');
 passthru('apt-get install -t buster-backports curl libcurl4 -y');	// Fixes rtorrent crashes circa 12/2022
 passthru('apt-get install unionfs-fuse sshfs s3fs -y');
