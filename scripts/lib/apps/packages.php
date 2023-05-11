@@ -78,6 +78,9 @@ if ($debianVersion[0] >= 8 or
     passthru('apt-get install python3 python3-pip python-virtualenv -y;');
     passthru('pip3 install --upgrade git+https://github.com/yadayada/acd_cli.git;');
 
+    passthru('apt-get install -y python python-twisted python-openssl python-setuptools intltool python-xdg python-chardet geoip-database python-libtorrent python-notify python-pygame python-glade2 librsvg2-common xdg-utils python-mako python-setproctitle python3-setproctitle');
+
+
     if (!file_exists('/usr/bin/ffmpeg') ) {
         passthru('apt-get install ffmpeg -y');
     }
