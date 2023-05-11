@@ -41,8 +41,7 @@ EOF;
 	    rm -rf PMSS*;
 		mkdir PMSS{$path}; cd PMSS{$path};
 	    git clone https://github.com/MagnaCapax/PMSS;
-	    cd PMSS;
-	    git checkout {$branch};
+	    mv PMSS/* .; rm -rf PMSS/.git; rmdir PMSS
 	    echo "{$source} {$date}" > /etc/seedbox/config/version;
 EOF;
 	passthru($script);
@@ -50,7 +49,7 @@ EOF;
 }
 
 
-passthru("rm -rf /etc/skel/*; rm -rf /scripts/*; cd /tmp/PMSS{$path}; cp -rp scripts /; cp -rp etc /; cp -rp var /;");  // Update scripts etc.
+passthru("rm -rf /etc/skel/*; rm -rf /scripts/*; cd /tmp/PMSS{$path}; cp -rp scripts /; cp -rpu etc /; cp -rp var /;");  // Update scripts etc.
 passthru('chmod o-rwx -R /scripts; chmod o-rwx -R /root; chmod o-rwx -R /etc/skel; chmod o-rwx -R /etc/seedbox;'); // Kind of deprecated but better safe than sorry
 
 
