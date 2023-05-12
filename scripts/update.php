@@ -7,7 +7,10 @@
 # source specified in /etc/seedbox/config/version.
 
 # Fetch current source and version from the box
-$sourceVersion = file_get_contents('/etc/seedbox/config/version');
+$versionFile = '/etc/seedbox/config/version';
+if (file_exists($versionFile)) $sourceVersion = file_get_contents($versionFile);
+	else $sourceVersion = 'release:2025-05-11';
+
 if (! empty($argv[1]))
     $sourceVersion = $argv[1];
 
@@ -27,7 +30,7 @@ EOF
 	    rm -rf PMSS*;
 	    wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/{$newVersion}" -O PMSS{$path}.tar.gz;
 	    mkdir PMSS{$path} && tar -xzf PMSS{$path}.tar.gz -C PMSS{$path} --strip-components 1;
-	    echo "{$source} {$newVersion}" > /etc/seedbox/config/version;
+	    echo "{$source}:{$newVersion}" > /etc/seedbox/config/version;
 EOF;
 	passthru($script);
 	break;
@@ -42,7 +45,7 @@ EOF;
 		mkdir PMSS{$path}; cd PMSS{$path};
 	    git clone https://github.com/MagnaCapax/PMSS;
 	    mv PMSS/* .; rm -rf PMSS/.git; rmdir PMSS
-	    echo "{$source} {$date}" > /etc/seedbox/config/version;
+	    echo "{$source}:{$date}" > /etc/seedbox/config/version;
 EOF;
 	passthru($script);
 	break;
