@@ -1,0 +1,4 @@
+plugin.description: Status bar gauge of used HDD Quota.
+plugin.author: Pulsed Media
+plugin.version: 1.1
+need_rtorrent: 0
