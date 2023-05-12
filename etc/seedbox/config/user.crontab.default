@@ -1,2 +1,0 @@
-@reboot cd ~; sleep $[ ($RANDOM % 60 + 10) ];./.rtorrentExecute.php
-* * * * * cd ~; ./.rtorrentRestart.php

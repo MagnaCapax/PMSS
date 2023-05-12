@@ -1,4 +1,0 @@
-<?php
-
-$theSettings->registerPlugin("hddquota");
-
