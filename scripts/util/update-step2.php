@@ -326,6 +326,8 @@ foreach($users AS $thisUser) {
     updateUserFile('.rtorrentExecute.php', $thisUser);
     updateUserFile('.rtorrentRestart.php', $thisUser);
     updateUserFile('.bashrc', $thisUser);
+    updateUserFile('.qbittorrentPort.py', $thisUser);
+    updateUserFile('.delugePort.py', $thisUser);
     updateUserFile('.scriptsInc.php', $thisUser);
     updateUserFile('.lighttpd/php.ini', $thisUser);
     updateUserFile('www/filemanager.php', $thisUser);
