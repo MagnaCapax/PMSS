@@ -110,3 +110,5 @@ fi
 alias arrinfo='echo "RADARR-URL = https://$(hostname)/public-$(whoami)/radarr/" && echo "SONARR-URL = https://$(hostname)/public-$(whoami)/sonarr/" && echo "PROWLARR-URL = https://$(hostname)/public-$(whoami)/prowlarr/" && echo "JELLYFIN-URL = https://$(hostname)/public-$(whoami)/jellyfin/web/index.html" && echo ""'
 
 export PATH=~/bin:$PATH
+
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
