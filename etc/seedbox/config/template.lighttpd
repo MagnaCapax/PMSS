@@ -123,7 +123,7 @@ fastcgi.server += ( ".php" =>
                 "bin-path" => "/usr/bin/php-cgi -c /home/##username/.lighttpd/php.ini",
                 "socket" => "/home/##username/.lighttpd/php.socket",
                 "max-procs" => 4,
-                "min-procs" => 1,
+                "min-procs" => 4,
                 "bin-environment" => (
                     "PHP_FCGI_CHILDREN" => "4",
                     "PHP_FCGI_MAX_REQUESTS" => "5000"
