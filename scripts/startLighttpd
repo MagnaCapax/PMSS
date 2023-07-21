@@ -1,5 +1,8 @@
 #!/usr/bin/php
 <?php
+# Pulsed Media Seedbox Management Software "PMSS"
+# Start user's lighttpd process
+
 if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
 $user = $argv[1];
 
@@ -11,8 +14,12 @@ if (!file_exists('/home/' . $user . '/.lighttpd.conf')) die("User does not have 
 // Check if session directory exists - if not create it
 if (!file_exists('/home/' . $user . '/.lighttpd')) {
 	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd'");
-	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd/upload'");
 	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd/compress'");
+}
+
+// Surprisingly often it seems users delete this directory these days.
+if (!file_exists('/home/' . $user . '/.lighttpd/upload')) {
+	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd/upload'");
 }
 
 passthru("cd /home/{$user}; su {$user} -c '/usr/sbin/lighttpd -f /home/{$user}/.lighttpd.conf'");	// This is for newer versions
