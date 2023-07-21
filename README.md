@@ -24,10 +24,17 @@ Install minimal Debian system, and run following as root:
 wget -q https://github.com/MagnaCapax/PMSS/releases/latest/download/install.sh; bash install.sh
 ```
 
+### Update from pre-github version
+
+If you have older PMSS installed which is not yet based on this github version, here is how you can upgrade it:
+```
+wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/main/scripts/update.php;  /scripts/update.php
+```
+
 ### Support
 
 You may ask our discord for guidance.
-Pulsed Media as a company will not provide support to use this on your own without a fee.
+Pulsed Media as a company will not provide support to use this on your own servers without a fee, unless the server is bought from Pulsed Media directly.
 
 
 ## Contributions
