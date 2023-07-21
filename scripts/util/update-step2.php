@@ -21,8 +21,18 @@ if (strpos($updateSource, 'soft.sh') > 0) {    // Still running old version! For
 #TODO Move these permissions to their own directories later. Git doesn't properly track permission changes so these are important
 passthru('chmod -R 755 /etc/seedbox; chmod -R 750 /scripts');
 
-passthru('cp /etc/seedbox/config/template.motd /etc/motd');
+// Let's create MOTD  #TODO Separate this elsewhere in future
+$motdTemplatePath = '/etc/seedbox/config/template.motd';
+$motdOutputPath = '/etc/motd';
+$motdTemplate = file_get_contents($motdTemplatePath)
+$cpuInfo = shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'");
+$ramInfo = shell_exec("free -h | awk '/^Mem:/ { print $2 }'");
 
+$motdTemplate = str_replace('%HOSTNAME%', $serverHostname, $motdTemplate);
+$motdTemplate = str_replace('%SERVER_IP%', gethostbyname($serverHostname), $motdTemplate);
+$motdTemplate = str_replace('%SERVER_CPU%', $cpuInfo, $motdTemplate);
+$motdTemplate = str_replace('%SERVER_RAM%', $ramInfo, $motdTemplate);
+file_put_contents($motdOutputPath, $motdTemplate);
 
 // If var run does not exist, create it. Deb8 likes to remove this if empty?
 if (!file_exists('/var/run/pmss'))
