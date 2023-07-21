@@ -29,5 +29,5 @@ switch($action) {
 }
 
 function startDeluge() {
-    shell_exec('nohup deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');
+    shell_exec('nohup python3 /home/$(whoami)/.delugePort.py; deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');
 }
