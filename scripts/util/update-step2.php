@@ -354,8 +354,6 @@ if (file_exists("/home/{$thisUser}/.lighttpd/php.ini")) {
     updateUserFile('.scriptsInc.php', $thisUser);
     updateUserFile('.lighttpd/php.ini', $thisUser);
     updateUserFile('www/filemanager.php', $thisUser);
-    if (!file_exists("/home/{$thisUser}/www/owncloud")) updateUserFile('www/setup-owncloud.php', $thisUser);
-    updateUserFile("www/ajax/content.php", $thisUser);
     updateUserFile("www/openvpn-config.tgz", $thisUser);  // OpenVPN Config
 	// ruTorrent fix for 0.9.8 / 0.13.8 rtorrent/libtorrent versions
     updateUserFile("www/rutorrent/js/content.js", $thisUser);
