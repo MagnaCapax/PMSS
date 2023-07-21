@@ -25,13 +25,16 @@ passthru('chmod -R 755 /etc/seedbox; chmod -R 750 /scripts');
 $motdTemplatePath = '/etc/seedbox/config/template.motd';
 $motdOutputPath = '/etc/motd';
 $motdTemplate = file_get_contents($motdTemplatePath);
-$cpuInfo = shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'");
-$ramInfo = shell_exec("free -h | awk '/^Mem:/ { print $2 }'");
+$cpuInfo = trim( shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'") );
+$ramInfo = trim (shell_exec("free -h | awk '/^Mem:/ { print $2 }'") );
+$storageInfo = trim(shell_exec("df -h /home | awk 'NR==2 {print $2}'"));
 
 $motdTemplate = str_replace('%HOSTNAME%', $serverHostname, $motdTemplate);
 $motdTemplate = str_replace('%SERVER_IP%', gethostbyname($serverHostname), $motdTemplate);
 $motdTemplate = str_replace('%SERVER_CPU%', $cpuInfo, $motdTemplate);
 $motdTemplate = str_replace('%SERVER_RAM%', $ramInfo, $motdTemplate);
+$motdTemplate = str_replace('%SERVER_STORAGE%', $storageInfo, $motdTemplate);
+
 file_put_contents($motdOutputPath, $motdTemplate);
 
 // If var run does not exist, create it. Deb8 likes to remove this if empty?
