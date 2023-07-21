@@ -2,7 +2,7 @@
 <?php
 echo date('Y-m-d H:i:s') . ': Making ProFTPd configuration' . "\n";
 
-$configTemplate = file_get_contents('http://pulsedmedia.com/remote/config/proftpdTemplate.txt');
+$configTemplate = file_get_contents('/etc/seedbox/config/template.proftpd');
 $hostname = file_get_contents('/etc/hostname');
 
 if (empty($configTemplate) or empty($hostname)) die('No data, hostname or config template is empty!');
