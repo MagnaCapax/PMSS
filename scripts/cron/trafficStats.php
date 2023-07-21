@@ -1,4 +1,4 @@
-!/usr/bin/php
+#!/usr/bin/php
 <?php
 /**
  * Gather per user traffic usage and calculate statistics
@@ -23,7 +23,7 @@ $compareTime15min = time() - (15 * 60);
 
 $totalDataMonth = 0;    // Reset counter, avoid warning message
 
-* Check if the script is running in user-specific processing mode */
+/* Check if the script is running in user-specific processing mode */
 if (isset($argv[1])) {
     $username = sanitizeUserInput($_SERVER['argv'][1]);
     if (validateUser($username)) {
