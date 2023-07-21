@@ -6,10 +6,13 @@
 # The script accepts string with the source for the update: "git/branch" or "release". If empty, it uses
 # source specified in /etc/seedbox/config/version.
 
-# Fetch current source and version from the box
+# Fetch current source and version for this server
 $versionFile = '/etc/seedbox/config/version';
-if (file_exists($versionFile)) $sourceVersion = file_get_contents($versionFile);
-	else $sourceVersion = 'release:2025-05-11';
+if (file_exists($versionFile) && filesize($versionFile) > 0) {		// If empty ignore it.
+    $sourceVersion = file_get_contents($versionFile);
+} else {
+    $sourceVersion = 'release:2025-05-11';
+}
 
 if (! empty($argv[1]))
     $sourceVersion = $argv[1];
