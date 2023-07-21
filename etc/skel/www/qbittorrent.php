@@ -29,6 +29,6 @@ switch($action) {
 }
 
 function startQbittorrent() {    // this actually calls the function to start rTorrent :)
-    passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &');
+    passthru('python3 /home/$(whoami)/.qbittorrentPort.py; zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &');
 }
 
