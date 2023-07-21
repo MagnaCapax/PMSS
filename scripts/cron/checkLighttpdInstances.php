@@ -21,7 +21,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             passthru("killall -9 -u {$thisUser}");
             continue;  //Suspended
     }
-    
+
     $instancesLighttpd = shell_exec("pgrep -u {$thisUser} lighttpd");
     $instancesPhpCgi = shell_exec("pgrep -u {$thisUser} php-cgi");
     $socketError = false;
@@ -33,9 +33,9 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             continue;
 
     }
-                              
+
     // Connect to php-cgi socket
-    /*for ($i = 0; $i < 4; $i++) {  // Adjust the number 4 according to your `max-procs` value
+    for ($i = 0; $i < 4; $i++) {  // Adjust the number 4 according to your `max-procs` value
         $socket = fsockopen("unix:///home/{$thisUser}/.lighttpd/php.socket-$i", 0, $errno, $errstr, 1);
         if (!$socket or $errno or $errstr) {        
             echo "Error when attempting to connect to socket /home/{$thisUser}/.lighttpd/php.socket-$i: {$errno}, {$errstr}\n";
@@ -46,7 +46,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 
         if ($socketError); continue;
     }
-    if ($socketError); { restartLighttpd($thisUser); continue; }*/
+    if ($socketError == true) { restartLighttpd($thisUser); continue; }
 
 
 
@@ -59,12 +59,12 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 
    if (strpos($httpResponse, 'HTTP/1.1 401 Unauthorized') === false) $instancesLighttpd = '';
     */
-    
+
     if(empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
         startLighttpd($thisUser);
         continue;
     }
-    
+
 }
 
 
