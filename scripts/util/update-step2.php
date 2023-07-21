@@ -24,7 +24,7 @@ passthru('chmod -R 755 /etc/seedbox; chmod -R 750 /scripts');
 // Let's create MOTD  #TODO Separate this elsewhere in future
 $motdTemplatePath = '/etc/seedbox/config/template.motd';
 $motdOutputPath = '/etc/motd';
-$motdTemplate = file_get_contents($motdTemplatePath)
+$motdTemplate = file_get_contents($motdTemplatePath);
 $cpuInfo = shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'");
 $ramInfo = shell_exec("free -h | awk '/^Mem:/ { print $2 }'");
 
