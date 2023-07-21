@@ -4,8 +4,8 @@ location /user-##username/ {
         proxy_set_header Connection $connection_upgrade;
         include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
-        limit_rate_after 500m;
-        limit_rate 8192k;
+        limit_rate_after 1024m;
+        limit_rate 102400k;
         limit_conn addr 16;
         error_page 502 /error-502.html;
 }
@@ -17,7 +17,7 @@ location /public-##username/ {
         include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
         limit_rate_after 100m;
-        limit_rate 8192k;
+        limit_rate 32768k;
         limit_conn addr 8;
 }
 
@@ -26,6 +26,6 @@ location /deluge-##username/ {
     include /etc/nginx/proxy_params;
     proxy_http_version 1.1;
     limit_rate_after 500m;
-    limit_rate 8192k;
+    limit_rate 32768k;
     limit_conn addr 8;
 }
