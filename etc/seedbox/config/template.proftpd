@@ -57,12 +57,12 @@ AdminControlsEngine off
     TLSEngine                     on
     TLSLog                        /var/log/proftpd/tls.log
     TLSProtocol                   SSLv23
-    TLSOptions                    NoCertRequest
+    TLSOptions                    NoCertRequest NoSessionReuseRequired                          
     TLSRSACertificateFile         /etc/letsencrypt/live/%SERVERNAME%/cert.pem
     TLSRSACertificateKeyFile      /etc/letsencrypt/live/%SERVERNAME%/privkey.pem
     TLSCACertificateFile          /etc/letsencrypt/live/%SERVERNAME%/fullchain.pem
     TLSVerifyClient               off
-    TLSRequired                   on
+    TLSRequired                   off
 </IfModule>
 
 
