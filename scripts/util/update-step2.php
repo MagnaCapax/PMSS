@@ -21,6 +21,7 @@ if (strpos($updateSource, 'soft.sh') > 0) {    // Still running old version! For
 #TODO Move these permissions to their own directories later. Git doesn't properly track permission changes so these are important
 passthru('chmod -R 755 /etc/seedbox; chmod -R 750 /scripts');
 
+passthru('cp /etc/seedbox/config/template.motd /etc/motd');
 
 
 // If var run does not exist, create it. Deb8 likes to remove this if empty?
