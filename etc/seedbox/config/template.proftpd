@@ -1,0 +1,63 @@
+Include /etc/proftpd/modules.conf
+UseIPv6                         on
+IdentLookups                    off
+ServerName                      %SERVERNAME%
+ServerType                      standalone
+DeferWelcome                    off
+MultilineRFC2228                on
+DefaultServer                   on
+ShowSymlinks                    on
+TimeoutNoTransfer               300
+TimeoutStalled                  300
+TimeoutIdle                     1200
+
+DisplayLogin                    welcome.msg
+DisplayChdir                    .message true
+ListOptions                     "-l"
+
+DenyFilter                      \*.*/
+
+DefaultRoot                   ~
+Port                            21
+MaxInstances                    70
+MaxClientsPerUser               16
+MaxClientsPerHost               16
+PassivePorts                    60000 65535
+
+# Set the user and group that the server normally runs at.
+User                            proftpd
+Group                           nogroup
+
+Umask                           022  022
+AllowOverwrite                  on
+TransferLog /var/log/proftpd/xferlog
+SystemLog   /var/log/proftpd/proftpd.log
+
+<IfModule mod_quotatab.c>
+QuotaEngine off
+</IfModule>
+
+<IfModule mod_ratio.c>
+Ratios off
+</IfModule>
+
+<IfModule mod_delay.c>
+DelayEngine on
+</IfModule>
+
+<IfModule mod_ctrls.c>
+ControlsEngine        off
+ControlsMaxClients    2
+ControlsLog           /var/log/proftpd/controls.log
+ControlsInterval      5
+ControlsSocket        /var/run/proftpd/proftpd.sock
+</IfModule>
+
+<IfModule mod_ctrls_admin.c>
+AdminControlsEngine off
+</IfModule>
+
+AllowStoreRestart on
+AllowRetrieveRestart on
+AllowForeignAddress on
+
