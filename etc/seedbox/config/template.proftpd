@@ -1,15 +1,15 @@
 Include /etc/proftpd/modules.conf
-UseIPv6                         on
+UseIPv6                         off
 IdentLookups                    off
-ServerName                      %SERVERNAME%
+ServerName                      "%SERVERNAME%"
 ServerType                      standalone
 DeferWelcome                    off
 MultilineRFC2228                on
 DefaultServer                   on
 ShowSymlinks                    on
-TimeoutNoTransfer               300
+TimeoutNoTransfer               180
 TimeoutStalled                  300
-TimeoutIdle                     1200
+TimeoutIdle                     600
 
 DisplayLogin                    welcome.msg
 DisplayChdir                    .message true
@@ -37,10 +37,6 @@ SystemLog   /var/log/proftpd/proftpd.log
 QuotaEngine off
 </IfModule>
 
-<IfModule mod_ratio.c>
-Ratios off
-</IfModule>
-
 <IfModule mod_delay.c>
 DelayEngine on
 </IfModule>
@@ -56,6 +52,19 @@ ControlsSocket        /var/run/proftpd/proftpd.sock
 <IfModule mod_ctrls_admin.c>
 AdminControlsEngine off
 </IfModule>
+
+<IfModule mod_tls.c>
+    TLSEngine                     on
+    TLSLog                        /var/log/proftpd/tls.log
+    TLSProtocol                   SSLv23
+    TLSOptions                    NoCertRequest
+    TLSRSACertificateFile         /etc/letsencrypt/live/%SERVERNAME%/cert.pem
+    TLSRSACertificateKeyFile      /etc/letsencrypt/live/%SERVERNAME%/privkey.pem
+    TLSCACertificateFile          /etc/letsencrypt/live/%SERVERNAME%/fullchain.pem
+    TLSVerifyClient               off
+    TLSRequired                   on
+</IfModule>
+
 
 AllowStoreRestart on
 AllowRetrieveRestart on
