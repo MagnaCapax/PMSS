@@ -282,6 +282,29 @@ foreach($users AS $thisUser) {
  
     echo "***** Updating user {$thisUser}\n";
 
+     #Update PHP.ini
+     if (file_exists("/home/{$thisUser}/.lighttpd/php.ini")) {
+            // Parse the user's php.ini
+            $phpIni = parse_ini_file("/home/{$thisUser}/.lighttpd/php.ini");
+
+            // Check if error_log is set
+            if (!isset($phpIni['error_log'])) {
+                // If error_log is not set, set it and write the file back
+                $phpIni['error_log'] = "/home/{$thisUser}/.lighttpd/error.log";
+
+                // Build the new contents of the php.ini file
+                $newPhpIni = '';
+                foreach ($phpIni as $key => $value) {
+                    $newPhpIni .= "{$key} = \"{$value}\"\n";
+                }
+
+                // Write the new php.ini contents
+                file_put_contents("/home/{$thisUser}/.lighttpd/php.ini", $newPhpIni);
+                echo "Updated php.ini for user {$thisUser}\n";
+            }
+        }
+    }
+	
 /* Commented out 20/07/2020 -- this looks like something from quite a few years back
 	// Update user's rtorrent config    
 	$userRtorrentConfig = file_get_contents("/home/{$thisUser}/.rtorrent.rc");
