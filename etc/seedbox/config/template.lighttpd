@@ -16,8 +16,8 @@ server.upload-dirs = ( "/home/##username/.lighttpd/upload" )
 server.errorlog            = "/home/##username/.lighttpd/error.log"
 accesslog.filename         = "/home/##username/.lighttpd/access.log"
 server.pid-file            = "/home/##username/.lighttpd/lighttpd.pid"
-connection.kbytes-per-second    = 102400
-server.kbytes-per-second        = 204800
+connection.kbytes-per-second    = 204800
+server.kbytes-per-second        = 409600
 # Lighttpd essentially has caching / buffering enabled by default! This disables
 server.stream-response-body = 2
 server.stream-request-body = 2
