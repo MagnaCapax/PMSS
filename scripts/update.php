@@ -45,7 +45,7 @@ EOF;
 	$parts = explode(':', $branch);  // Date is attached, so we need to just take the branch
 	$branch = $parts[0];
 	
-	$date = date("D M j G:i:s T Y");
+	$date = date("Y-m-d H:i");
 	$script = <<<EOF
 	    cd /tmp;
 	    rm -rf PMSS*;
