@@ -518,8 +518,9 @@ if ($sshdConfig != $sshdConfigChanged) {
 
 
 // Systemd default unit
-if (!file_exists('/usr/lib/systemd/user-.slice.d/99-pmss.conf')) {
-    echo `cp -p /etc/seedbox/config/template.user-slices-pmss.conf /usr/lib/systemd/system/user-.slice.d/99-pmss.conf; chmod 644 /usr/lib/systemd/system/user-.slice.d/99-pmss.conf; systemctl daemon-reload`;
+if (file_exists('/usr/lib/systemd/user-.slice.d/99-pmss.conf')) unlink('/usr/lib/systemd/user-.slice.d/99-pmss.conf');  // Defaults! Should not be the last thing
+if (!file_exists('/usr/lib/systemd/user-.slice.d/15-pmss.conf')) {
+    echo `cp -p /etc/seedbox/config/template.user-slices-pmss.conf /usr/lib/systemd/system/user-.slice.d/15-pmss.conf; chmod 644 /usr/lib/systemd/system/user-.slice.d/15-pmss.conf; systemctl daemon-reload`;
 }
 
 
