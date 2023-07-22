@@ -21,6 +21,9 @@ if (strpos($updateSource, 'soft.sh') > 0) {    // Still running old version! For
 #TODO Move these permissions to their own directories later. Git doesn't properly track permission changes so these are important
 passthru('chmod -R 755 /etc/seedbox; chmod -R 750 /scripts');
 
+// Increase pids max, there was an issue with this and updates would halt due to pids max being reached. SSH unresponsive etc.
+passthru('echo 100000 > /sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max');
+
 // Let's create MOTD  #TODO Separate this elsewhere in future
 $motdTemplatePath = '/etc/seedbox/config/template.motd';
 $motdOutputPath = '/etc/motd';
