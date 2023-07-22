@@ -40,7 +40,11 @@ EOF;
 
     case (substr($source, 0, 3) == "git"):
 	echo "Using GitHub branch as the source!\n";
+	
 	$branch = substr($source, 4); // Get branch string
+	$parts = explode(':', $branch);  // Date is attached, so we need to just take the branch
+	$branch = $parts[0];
+	
 	$date = date("D M j G:i:s T Y");
 	$script = <<<EOF
 	    cd /tmp;
