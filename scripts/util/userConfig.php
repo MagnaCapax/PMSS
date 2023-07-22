@@ -173,8 +173,9 @@ $systemctlUserSlice = str_replace(
         array($user['memory'], $user['memory'] * 2, $user['CPUWeight'], $user['IOWeight']),
 $systemctlUserSliceTemplate);
 
-file_put_contents($slicePath . '/99-pmss.conf', $systemctlUserSlice);
-chmod($slicePath . '/99-pmss.conf', 0644);
+if (file_exists($slicePath . '/99-pmss.conf')) unlink($slicePath . '/99-pmss.conf');   // Renaming the conf file to avoid confusion
+file_put_contents($slicePath . '/90-pmss-user.conf', $systemctlUserSlice);
+chmod($slicePath . '/90-pmss-user.conf', 0644);
 //echo `systemctl restart user-{$user['id']}.slice`;
 echo passthru("systemctl daemon-reload");
 
