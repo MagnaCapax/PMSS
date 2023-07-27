@@ -108,6 +108,8 @@ fi
 
 
 alias arrinfo='echo "RADARR-URL = https://$(hostname)/public-$(whoami)/radarr/" && echo "SONARR-URL = https://$(hostname)/public-$(whoami)/sonarr/" && echo "PROWLARR-URL = https://$(hostname)/public-$(whoami)/prowlarr/" && echo "JELLYFIN-URL = https://$(hostname)/public-$(whoami)/jellyfin/web/index.html" && echo ""'
+alias passwordChange='newPassword=$(< /dev/urandom tr -dc A-NP-Za-km-np-z2-9 | head -c${1:-10};echo;); echo -e "$newPassword\n$newPassword" | passwd $(whoami); htpasswd -b -m $( [ -f ~/.lighttpd/.htpasswd ] || echo -n "-c" ) ~/.lighttpd/.htpasswd $(whoami) $newPassword; echo "New password is: $newPassword"'
+
 
 export PATH=~/bin:$PATH
 
