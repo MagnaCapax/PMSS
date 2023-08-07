@@ -150,7 +150,7 @@ if (file_exists('/etc/seedbox/localnet') && !file_exists('/etc/seedbox/config/lo
 }
 
 //Install latest rc.local file and execute it
-`wget http://pulsedmedia.com/remote/rc-local.txt -O /etc/rc.local; chmod u+x /etc/rc.local; /etc/rc.local`;
+`cp /etc/seedbox/config/template.rc.local /etc/rc.local; chown root.root /etc/rc.local; chmod 750 /etc/rc.local; nohup /etc/rc.local >> /dev/null 2>&1`;
 
 include_once '/scripts/lib/apps/packages.php';
 
