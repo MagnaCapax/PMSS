@@ -1,0 +1,37 @@
+#!/bin/bash
+
+modprobe bfq;
+
+for DISK in `ls /sys/block|grep -v nvme|grep -v md|grep -v loop`
+do
+    echo 4096 > /sys/block/${DISK}/queue/read_ahead_kb  &
+    echo "bfq" > /sys/block/${DISK}/queue/scheduler  &
+
+done
+
+for MD in `ls /sys/block|grep md|grep -v nvme|grep -v loop|grep -v bcache`
+do
+    # If RAID5, set stripe cache size
+    echo 32768 | tee /sys/block/${MD}/md/stripe_cache_size >> /dev/null 2>&1
+    # Sync speed: We do not want absolutely max speed, we need to ensure system remains usable during resync period
+    echo 10000 | tee /sys/block/${MD}/md/sync_speed_min >> /dev/null 2>&1
+    echo 75000 | tee /sys/block/${MD}/md/sync_speed_max >> /dev/null 2>&1
+    echo 4096 > /sys/block/${MD}/queue/read_ahead_kb >> /dev/null 2>&1
+    echo "bfq" > /sys/block/${MD}/queue/scheduler  &
+done
+
+# If there is bcache, set writeback caching
+for BCACHE in `ls /sys/block|grep -v md|grep -v nvme|grep -v loop|grep bcache`
+do
+    echo writeback > /sys/block/${BCACHE}/bcache/cache_mode
+    echo 75 > /sys/block/${BCACHE}/bcache/writeback_percent
+    echo 300 > /sys/block/${BCACHE}/bcache/writeback_delay
+done
+
+# Some security enhancements, making double certain
+mount -o remount,hidepid=2 /proc;
+chmod 741 /home;
+chmod 740 /home/* /var/run/utmp /var/log/wtmp;
+nohup /scripts/listUsers.php | xargs -n1 /scripts/util/userPermissions.php >> /dev/null 2>&1 &
+
+exit 0
