@@ -6,7 +6,7 @@
  * Creates nginx config for reverse proxying.
  *
  * @author Aleksi Ursin
- * @copyright NuCode 2015-2020 - All Rights reserved.
+ * @copyright NuCode 2015-2023 - All Rights reserved.
  * @since 31/03/2015
  * @version 1.1
  **/
@@ -67,7 +67,9 @@ foreach($users AS $thisUser) {
     if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;
     
     if (!file_exists("/etc/nginx/users")) mkdir("/etc/nginx/users");
-    #if (file_exists("/etc/nginx/users/{$thisUser}")) continue;  // This user has their config
+    	else passhthru('rm /etc/nginx/users*');	// Empty all previous configs to ensure no unnecessary ones there
+
+    
     passthru("/scripts/util/configureLighttpd.php {$thisUser}");
     $serverPort = trim( file_get_contents($portFile) );
     $delugePort = (int) file_get_Contents("/home/{$thisUser}/.delugePort");
