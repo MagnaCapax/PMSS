@@ -62,14 +62,13 @@ if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
     passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
 }
 
+if (!file_exists("/etc/nginx/users")) mkdir("/etc/nginx/users", 0751);
+    else passthru('rm /etc/nginx/users/*');	// Empty all previous configs to ensure no unnecessary ones there
+
 foreach($users AS $thisUser) {
     $portFile = "/etc/seedbox/runtime/ports/lighttpd-{$thisUser}";
     if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;
-    
-    if (!file_exists("/etc/nginx/users")) mkdir("/etc/nginx/users");
-    	else passthru('rm /etc/nginx/users/*');	// Empty all previous configs to ensure no unnecessary ones there
-
-    
+   
     passthru("/scripts/util/configureLighttpd.php {$thisUser}");
     $serverPort = trim( file_get_contents($portFile) );
     $delugePort = (int) file_get_Contents("/home/{$thisUser}/.delugePort");
@@ -80,5 +79,9 @@ foreach($users AS $thisUser) {
     file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
     
 }
+
+// Disallow config reading by anyone else
+passthru('chmod 640 /etc/nginx/users/*');
+passthru('chmod 640 /etc/nginx/*.conf');
 
 echo "## Done! You should restart nginx:\n/etc/init.d/nginx restart\n";
