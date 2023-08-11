@@ -67,7 +67,7 @@ foreach($users AS $thisUser) {
     if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;
     
     if (!file_exists("/etc/nginx/users")) mkdir("/etc/nginx/users");
-    	else passhthru('rm /etc/nginx/users*');	// Empty all previous configs to ensure no unnecessary ones there
+    	else passthru('rm /etc/nginx/users/*');	// Empty all previous configs to ensure no unnecessary ones there
 
     
     passthru("/scripts/util/configureLighttpd.php {$thisUser}");
