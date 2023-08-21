@@ -177,6 +177,7 @@ passthru('chmod 751 /home; chmod 740 /home/*');
 
 
 #TODO glob and foreach include?
+#TODO YES YES and YES
 include_once '/scripts/lib/apps/vnstat.php';	// Vnstat installer + configuration
 include_once '/scripts/lib/apps/pyload.php';	// pyload installer
 include_once '/scripts/lib/apps/megatools.php';	// Megatools installer
@@ -193,6 +194,7 @@ include_once '/scripts/lib/apps/iprange.php';
 include_once '/scripts/lib/apps/firehol.php';
 include_once '/scripts/lib/apps/filebot.php';
 include_once '/scripts/lib/apps/deluge.php';
+include_once '/scripts/lib/apps/watchdog.php';
 
 
 passthru('/scripts/util/setupLetsEncrypt.php noreplies@pulsedmedia.com');
