@@ -1,10 +1,12 @@
 <?php
 if (empty($debianVersion)) $debianVersion = file_get_contents('/etc/debian_version');
 
+echo "#### Deluge install // update\n";
+
 if (!file_exists('/usr/local/bin/deluged')) {
 
     if ($debianVersion[0] == 1) {
-      #TODO Packages ought to be in packages.php
+      echo "\t*** Deluge pip install:\n";
       passthru('pip install --upgrade twisted[tls] chardet mako pyxdg pillow slimit pygame certifi pyasn1==0.4.6 ');
       passthru('pip install --upgrade pillow'); // For some bizarre pythoness need to run this separately too???  UPD: Still fails occasionally?
       passthru('cd /tmp; rm -rf deluge-2*; wget https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz; tar -xvf deluge-2.0.5.tar.xz;');
