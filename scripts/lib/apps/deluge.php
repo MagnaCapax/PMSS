@@ -9,8 +9,8 @@ if (!file_exists('/usr/local/bin/deluged')) {
       echo "\t*** Deluge pip install:\n";
       passthru('pip install --upgrade twisted[tls] chardet mako pyxdg pillow slimit pygame certifi pyasn1==0.4.6 ');
       passthru('pip install --upgrade pillow'); // For some bizarre pythoness need to run this separately too???  UPD: Still fails occasionally?
-      passthru('cd /tmp; rm -rf deluge-2*; wget https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz; tar -xvf deluge-2.0.5.tar.xz;');
-      passthru('cd /tmp/deluge-2.0.3; python setup.py build; python setup.py install');
+      passthru('cd /tmp; rm -rf deluge-2*; wget https://ftp.osuosl.org/pub/deluge/source/2.1/deluge-2.1.1.tar.xz; tar -xvf deluge-2.1.1.tar.xz;');
+      passthru('cd /tmp/deluge-2.1.1 python setup.py build; python setup.py install');
    } else {
       passthru('apt-get install -y deluged deluge-web');
 //      passthru('ln -s /usr/bin/deluged /usr/local/bin/deluged; ln -s /usr/bin/deluge-web /usr/local/bin/deluge-web');
