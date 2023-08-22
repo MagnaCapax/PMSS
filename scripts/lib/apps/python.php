@@ -12,15 +12,8 @@ passthru('easy_install pip; ln -s /usr/local/bin/pip /usr/bin/pip;');
 echo "### Install gdrivefs\n";
 passthru('pip install --upgrade gdrivefs');
 
-// Install Flexget
-if (empty($flexget)) {  // no Flexget
-    echo "### Install Flexget:\n";
-    passthru('pip install --upgrade setuptools functools32 funcsigs chardet==3.0.3 certifi=2017.4.17; pip install flexget;'); // pip install --upgrade pyopenssl ndg-httpsclient pyasn1 cryptography setuptools');
-} elseif (strpos($flexget, 'You are on the latest release.') === false) {   // Outdated, update!
-    echo "### Update Flexget:\n";
-    passthru('pip install --upgrade setuptools funcsigs functools32; pip install --upgrade flexget; pip install --upgrade pyopenssl ndg-httpsclient pyasn1 cryptography');
-}
-
+echo "### Install/Update Flexget:\n";
+passthru('pip install --upgrade pyopenssl ndg-httpsclient cryptography; pip install --upgrade setuptools funcsigs functools32 chardet==3.0.3 certifi=2017.4.17; pip install --upgrade flexget;');
 
 
 //pip3 install youtube_dl
