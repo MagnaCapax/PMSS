@@ -30,6 +30,11 @@ If you have older PMSS installed which is not yet based on this github version, 
 ```
 wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/main/scripts/update.php;  /scripts/update.php
 ```
+with reboot using git/main ("testing") as the source instead of release:
+```
+wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/main/scripts/update.php;  /scripts/update.php git/main; reboot
+```
+
 
 ### Support
 
