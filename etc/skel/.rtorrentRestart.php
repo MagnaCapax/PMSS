@@ -1,8 +1,17 @@
 #!/usr/bin/php
 <?php
+/**
+* PMSS: Restart rTorrent
+*
+* Overtly complicated way to restart rTorrent ... This is some legacy stuff; But ought to work still so ...
+* refactor or not, that the question is. rTorrent is flaky as it is.
+*
+* Copyright (C) 2010-2024 Magna Capax Finland Oy
+**/
+
 if (!file_exists('www/.rtorrentRestart')) die();
 //unlink('www/.rtorrentRestart');
-system('rm -rf www/.rtorrentRestart');
+system('rm -rf ~/www/.rtorrentRestart');
 
 require_once '.scriptsInc.php';
 
@@ -22,9 +31,9 @@ if ($rtorrentLock != false) {
 
  if ($pid > 0) {
   system('kill ' . $pid);
-  sleep(15); // allow time to cleanly shut
+  sleep(5); // allow time to cleanly shut
   system('kill -9 ' . $pid); // make certain it died
-  sleep(61); // Allow rtorrent execute to restart, before determining it's not running
+  sleep(15); // Allow rtorrent execute to restart, before determining it's not running
  } else die(); 
 }
 
