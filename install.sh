@@ -5,7 +5,7 @@
 # This work is licensed under the Creative Commons Attribution-ShareAlike 3.0 Unported License. 
 # To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/3.0/ or send a letter to Creative Commons, 171 Second Street, Suite 300, San Francisco, California, 94105, USA.
 
-# Copyright 2010-2023 Magna Capax Finland Oy
+# Copyright 2010-2024 Magna Capax Finland Oy
 #
 # USE AT YOUR OWN RISK! ABSOLUTELY NO GUARANTEES GIVEN!
 # Pulsed Media does not take any responsibility over usage of this package, and will not be responsible for any damages, injuries, losses, or anything else for that matter due to the
