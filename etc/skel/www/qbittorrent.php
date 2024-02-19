@@ -1,10 +1,11 @@
 <?php
 /**
-* PMSS: Master GUI: qBittorrent start/disable/restart file
+* PMSS: User Frontend: qBittorrent start/disable/restart file
 *
-* Copyright (C) 2010-2023 Magna Capax Finland Oy
+* Copyright (C) 2010-2024 Magna Capax Finland Oy
 *
-* #TODO Make this dynamic and single file with definitions for all apps, deluge, qbittorrent, jellyfin, *ARR etc.
+* #TODO Make this dynamic and single file with definitions for all apps, deluge, qbittorrent, jellyfin, *ARR etc. GIT Issue #10
+* # https://github.com/MagnaCapax/PMSS/issues/10
 **/
 
 if (!isset($_REQUEST['action'])) die();

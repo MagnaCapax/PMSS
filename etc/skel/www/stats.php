@@ -1,8 +1,10 @@
 <?php
 /**
-* PMSS: Master GUI, Statistics page.
+* PMSS: Frontend Statistics Section on Info page
+* 
+* Show statistics on info page, quota, IP, traffic consumption etc.
 *
-* Copyright (C) 2010-2023 Magna Capax Finland Oy
+* Copyright (C) 2010-2024 Magna Capax Finland Oy
 *
 **/
 ?>

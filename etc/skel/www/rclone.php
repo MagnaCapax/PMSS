@@ -1,10 +1,10 @@
 <?php
 /**
-* PMSS: Master GUI: rclone start/disable/restart file
+* PMSS: Frontend: rclone start/disable/restart file
 *
-* Copyright (C) 2010-2023 Magna Capax Finland Oy
+* Copyright (C) 2010-2024 Magna Capax Finland Oy
 *
-* #TODO Make this dynamic and single file with definitions for all apps, deluge, qbittorrent, jellyfin, *ARR etc.
+* #TODO Make this dynamic and single file with definitions for all apps, deluge, qbittorrent, jellyfin, *ARR etc. https://github.com/MagnaCapax/PMSS/issues/10
 **/
 
 if (!isset($_REQUEST['action'])) die();

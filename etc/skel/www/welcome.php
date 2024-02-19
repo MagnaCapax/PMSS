@@ -1,9 +1,11 @@
 <?php
 /**
-* PMSS: Master GUI, Welcome.
+* PMSS: User Frontend Welcome Page
 * This is the actual index / first page user sees with all the buttons etc.
 *
-* Copyright (C) 2010-2023 Magna Capax Finland Oy
+* #TODO Major refactoring; https://github.com/MagnaCapax/PMSS/issues/64
+* 
+* Copyright (C) 2010-2024 Magna Capax Finland Oy
 *
 **/
 
@@ -33,6 +35,8 @@ if (file_exists('/etc/seedbox/config/vendor')) {
     $vendor = $vendorDefault;
 }
 ?>
+
+
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -44,6 +48,7 @@ if (file_exists('/etc/seedbox/config/vendor')) {
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>
     
 <?php
+// Old april fool's joke ... rerun something similar? ;)
 if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
 ?>
 
