@@ -1,0 +1,57 @@
+# Ignore everything
+*
+
+# But not these directories and their contents
+
+## start of etc
+!/etc
+
+# /etc/seedbox
+!/etc/seedbox/
+!/etc/seedbox/config/
+!/etc/seedbox/config/*
+/etc/seedbox/config/default
+/etc/seedbox/config/fireqos.conf
+/etc/seedbox/config/network
+/etc/seedbox/config/version
+
+!/etc/seedbox/runtime/
+!/etc/seedbox/runtime/version
+
+!/etc/seedbox/skel
+!/etc/seedbox/skel/srvmgmt
+!/etc/seedbox/skel/srvmgmt/*
+#
+
+# /etc/skel
+!/etc/skel/
+!/etc/skel/*
+!/etc/skel/www/*
+!/etc/skel/www/*/**
+/etc/skel/www/openvpn-config.tgz
+/etc/skel/.config/
+/etc/skel/.tmp/
+#
+## end of etc
+
+## start of scripts
+!/scripts/
+!/scripts/*
+## end of scripts
+
+# start of var
+!/var/
+!/var/www/
+!/var/www/*.php
+!/var/www/*.html
+!/var/www/error_images
+!/var/www/error_images/*
+/var/www/html
+/var/www/html/*
+## end of var
+
+# Additionally, do not ignore .gitignore file itself
+!.gitignore
+
+# And do not ignore gitkeep files to keep empty directories
+!.gitkeep
