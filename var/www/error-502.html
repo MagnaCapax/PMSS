@@ -1,36 +1,31 @@
 <span style="font-size: 1.8em; font-weight: bold; color: red">
-    502 - Bad Gateway
-  </span>
-  <br />
-  <img
-    src="{{ random_image }}"
-    alt="502 - Bad Gateway"
-    style="width: 40rem; margin-top: 1rem" />
+  502 - Bad Gateway
+</span>
+<br />
+<img
+  src="{{ random_image }}"
+  alt="502 - Bad Gateway"
+  style="width: 40rem; margin-top: 1rem" />
 
-  <p>Potential reasons:</p>
-  <p>
-    - Server is restarting, try again in 3 minutes.<br />
-    - Your lighttpd instance may have crashed or restart has been requested -
-    autorestart within ~1 minute.<br />
-    - You are beyond your burstable disk quota and/or burst time period has gone
-    full - You might need to check your data.<br />
-    - Have you paid your invoice? Check your account is not suspended.<br />
-  </p>
+<p>Potential reasons:</p>
+<p>
+  - Server is restarting, try again in 3 minutes.<br />
+  - Your lighttpd instance may have crashed or restart has been requested -
+  autorestart within ~1 minute.<br />
+  - You are beyond your burstable disk quota and/or burst time period has gone
+  full - You might need to check your data.<br />
+  - Have you paid your invoice? Check your account is not suspended.<br />
+</p>
 
-  <p>
-    Please wait 1-2 minutes and try again - if the issue persists, please open a
-    support ticket.
-  </p>
+<p>
+  Please wait 1-2 minutes and try again - if the issue persists, please open a
+  support ticket.
+</p>
 
-  <script>
-    const error_images = [
-      './error_images/502-1.png',
-      './error_images/502-2.png',
-      './error_images/502-3.png',
-    ];
-    const random_image =
-      error_images[Math.floor(Math.random() * error_images.length)];
+<script>
+  const random_index = Math.floor(Math.random() * 10) + 1;
+  const random_image = `./error_images/502-${random_index}.png`;
 
-    const imageElement = document.querySelector('img');
-    imageElement.src = random_image;
-  </script>
+  const imageElement = document.querySelector('img');
+  imageElement.src = random_image;
+</script>
