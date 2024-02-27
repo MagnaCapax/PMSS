@@ -1,26 +1,29 @@
-<span style="font-size: 1.8em; font-weight: bold; color: red">
-  502 - Bad Gateway
-</span>
-<br />
-<img
-  src="{{ random_image }}"
-  alt="502 - Bad Gateway"
-  style="width: 40rem; margin-top: 1rem" />
+<div class="container">
+  <span class="error-message">502 - Bad Gateway</span>
+  <br />
+  <div class="content-container">
+    <div id="image-container">
+      <img alt="502 - Bad Gateway" />
+    </div>
 
-<p>Potential reasons:</p>
-<p>
-  - Server is restarting, try again in 3 minutes.<br />
-  - Your lighttpd instance may have crashed or restart has been requested -
-  autorestart within ~1 minute.<br />
-  - You are beyond your burstable disk quota and/or burst time period has gone
-  full - You might need to check your data.<br />
-  - Have you paid your invoice? Check your account is not suspended.<br />
-</p>
+    <div class="error-description">
+      <p>Potential reasons:</p>
+      <p>
+        - Server is restarting, try again in 3 minutes.<br />
+        - Your lighttpd instance may have crashed or restart has been requested
+        - autorestart within ~1 minute.<br />
+        - You are beyond your burstable disk quota and/or burst time period has
+        gone full - You might need to check your data.<br />
+        - Have you paid your invoice? Check your account is not suspended.
+      </p>
 
-<p>
-  Please wait 1-2 minutes and try again - if the issue persists, please open a
-  support ticket.
-</p>
+      <p>
+        Please wait 1-2 minutes and try again - if the issue persists, please
+        open a support ticket.
+      </p>
+    </div>
+  </div>
+</div>
 
 <script>
   const random_index = Math.floor(Math.random() * 10) + 1;
@@ -28,4 +31,11 @@
 
   const imageElement = document.querySelector('img');
   imageElement.src = random_image;
+  imageElement.classList.add('error-image');
+
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.type = 'text/css';
+  link.href = './css/502-styles.css';
+  document.head.appendChild(link);
 </script>
