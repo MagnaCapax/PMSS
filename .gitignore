@@ -46,10 +46,11 @@
 !/var/www/*.html
 !/var/www/502_images
 !/var/www/502_images/*
+!/var/www/404_images
+!/var/www/404_images/*
 !/var/www/css/
 !/var/www/css/*
-/var/www/html
-/var/www/html/*
+
 ## end of var
 
 # Additionally, do not ignore .gitignore file itself
