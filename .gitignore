@@ -44,8 +44,10 @@
 !/var/www/
 !/var/www/*.php
 !/var/www/*.html
-!/var/www/error_images
-!/var/www/error_images/*
+!/var/www/502_images
+!/var/www/502_images/*
+!/var/www/css/
+!/var/www/css/*
 /var/www/html
 /var/www/html/*
 ## end of var
