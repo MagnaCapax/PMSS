@@ -1,57 +1,61 @@
-http {
-    limit_conn_zone $binary_remote_addr zone=addr:10m;
+limit_conn_zone $binary_remote_addr zone=addr:10m;
 
-    server {
-        listen   80; ## listen for ipv4; this line is default and implied
+server {
+	listen   80; ## listen for ipv4; this line is default and implied
+	root /var/www;
+	index index.html index.htm;
+
+	# Make site accessible from http://localhost/
+	server_name localhost;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		try_files $uri $uri/ /index.html;
+		# Uncomment to enable naxsi on this location
+		# include /etc/nginx/naxsi.rules
+	}
+	include /etc/nginx/users/*;
+
+
+    error_page 502 /error-502.html;
+    location = /error-502.html {
+            root /var/www;
+            internal;
+ 	}
+ 
+    error_page 404 /error-404.html;
+    location = /error-404.html {
         root /var/www;
-        index index.html index.htm;
-
-        # Make site accessible from http://localhost/
-        server_name localhost;
-
-        location / {
-            # First attempt to serve request as file, then
-            # as directory, then fall back to displaying a 404.
-            try_files $uri $uri/ /index.html;
-            # Uncomment to enable naxsi on this location
-            # include /etc/nginx/naxsi.rules
-        }
-        include /etc/nginx/users/*;
-
-        error_page 502 /error-502.html;
-        location = /error-502.html {
-            root /var/www;
-            internal;
-        }
-
-        error_page 404 /error-404.html;
-        location = /error-404.html {
-            root /var/www;
-            internal;
-        }
+        internal;
     }
+}
 
-    server {
-        listen 443 ssl;
-        server_name localhost;
-        ssl on;
+server {
+	listen 443 ssl;
+	server_name localhost;
+	ssl on;
 
-        root /var/www;
-        index index.html index.htm;
+	root /var/www;
+	index index.html index.htm;
 
-        ||SSL_SETTINGS_CONFIGURED_HERE||
+	||SSL_SETTINGS_CONFIGURED_HERE||
 
-        location / {
-            try_files $uri $uri/ =404;
-        }
+	location / {
+		try_files $uri $uri/ =404;
+	}
+    
+    include /etc/nginx/users/*;
 
-        include /etc/nginx/users/*;
-
-		# Define 404 page also for ssl server
-        error_page 404 /error-404.html;
-        location = /error-404.html {
+    error_page 502 /error-502.html;
+    location = /error-502.html {
             root /var/www;
             internal;
-        }
+ 	}
+ 
+    error_page 404 /error-404.html;
+    location = /error-404.html {
+        root /var/www;
+        internal;
     }
 }
