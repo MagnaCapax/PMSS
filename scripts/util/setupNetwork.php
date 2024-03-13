@@ -28,7 +28,6 @@ passthru('/sbin/iptables -F FORWARD');
 passthru('/sbin/iptables -F INPUT');
 
 `echo 1 > /proc/sys/net/ipv4/ip_forward`;
-`echo 0 > /proc/sys/net/ipv4/tcp_sack`;		// Disable tcp_sack to mitigate attacks
 
 `iptables -F INPUT`;	// Clear all rules first
 `iptables -A INPUT -i {$networkConfig['interface']} -m state --state NEW -p udp --dport 1194 -j ACCEPT`;
