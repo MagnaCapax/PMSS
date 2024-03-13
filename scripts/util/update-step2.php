@@ -180,7 +180,6 @@ passthru('chmod 751 /home; chmod 740 /home/*');
 #TODO YES YES and YES
 include_once '/scripts/lib/apps/vnstat.php';	// Vnstat installer + configuration
 include_once '/scripts/lib/apps/pyload.php';	// pyload installer
-include_once '/scripts/lib/apps/megatools.php';	// Megatools installer
 include_once '/scripts/lib/apps/mono.php';		// Mono installer
 include_once '/scripts/lib/apps/sonarr.php';	// Sonarr installer
 include_once '/scripts/lib/apps/radarr.php';
