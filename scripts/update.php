@@ -33,6 +33,7 @@ EOF
 	    rm -rf PMSS*;
 	    wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/{$newVersion}" -O PMSS{$path}.tar.gz;
 	    mkdir PMSS{$path} && tar -xzf PMSS{$path}.tar.gz -C PMSS{$path} --strip-components 1;
+	    mv PMSS{$path}/* .; rm -rf PMSS{$path}
 	    echo "{$source}:{$newVersion}" > /etc/seedbox/config/version;
 EOF;
 	passthru($script);
@@ -49,9 +50,9 @@ EOF;
 	$script = <<<EOF
 	    cd /tmp;
 	    rm -rf PMSS*;
-		mkdir PMSS{$path}; cd PMSS{$path};
+	    mkdir PMSS{$path}; cd PMSS{$path};
 	    git clone https://github.com/MagnaCapax/PMSS;
-	    mv PMSS/* .; rm -rf PMSS/.git; rmdir PMSS
+	    mv PMSS/* .; rm -rf PMSS
 	    echo "{$source}:{$date}" > /etc/seedbox/config/version;
 EOF;
 	passthru($script);
