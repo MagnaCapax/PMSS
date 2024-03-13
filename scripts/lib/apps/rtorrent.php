@@ -1,6 +1,8 @@
 <?php
 // rTorrent installer/updater + libRtorrent + libxmlrpc
-// (C) Pulsed Media 2020
+// (C) Magna Capax Finland Oy 2024
+//
+// This can be ran independently too
 
 $rtorrentVersion = shell_exec('rtorrent -h');
 // Choose version based on which debian version - 0.9.6 does not compile on deb10, but 0.9.8 has severe issues as well
@@ -46,13 +48,11 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     
     echo "**** compiling ....\n";
     echo "***** libtorrent\n";
-    passthru("cd /tmp/libtorrent-{$rtorrentVersionTargetLib}; rm -f scripts/{libtool,lt*}.m4; make clean; ./autogen.sh; ./configure {$rtorrentCompileOptionsLib}; make -j12; make install; ldconfig");
+    passthru("cd /tmp/libtorrent-{$rtorrentVersionTargetLib}; rm -f scripts/{libtool,lt*}.m4; ./autogen.sh; ./autogen.sh; ./configure {$rtorrentCompileOptionsLib}; make -j12; make install; ldconfig");
     
     echo "***** rtorrent\n";
-    passthru("cd /tmp/rtorrent-{$rtorrentVersionTarget}; rm -f scripts/{libtool,lt*}.m4; make clean; ./autogen.sh; ./configure {$rtorrentCompileOptions}; make -j12; make install;");
+    passthru("cd /tmp/rtorrent-{$rtorrentVersionTarget}; rm -f scripts/{libtool,lt*}.m4; make clean; ./autogen.sh; ./autogen.sh; ./configure {$rtorrentCompileOptions}; make -j12; make install;");
     
-    echo "**** Updating user spaces as necessary\n";
- 
     echo "**** Killing all running rtorrent processes\n";
     # So many because of potentially updating from ancient version, who knows ... Who even knows if you try to update deb 5 machine what happens :P
     passthru('killall -9 rtorrent');
