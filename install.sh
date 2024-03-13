@@ -82,19 +82,20 @@ cd /tmp
 rm -rf PMSS*
 if [ "${1:0:3}" = "git" ]; then
     git clone https://github.com/MagnaCapax/PMSS;
-    cd PMSS;
     git checkout "${1:4}";
+    mv PMSS/* /;
     SOURCE=$1
     VERSION=$(date)
 else
     VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
     wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz;
     mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
-    cd PMSS;
+    mv PMSS/* /;
+    
     SOURCE="release"
 fi
 
-bash soft.sh
+
 
 mkdir -p /etc/seedbox/config/
 echo "$SOURCE $VERSION" > /etc/seedbox/config/version
