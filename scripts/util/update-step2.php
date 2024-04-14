@@ -300,6 +300,9 @@ foreach($users AS $thisUser) {
  
     echo "***** Updating user {$thisUser}\n";
 
+    echo "\tConfiguing lighttpd\n";
+    passthru("/scripts/util/configureLighttpd.php {$thisUser}");
+	
      #Update PHP.ini
 if (file_exists("/home/{$thisUser}/.lighttpd/php.ini")) {
     // Parse the user's php.ini
@@ -321,6 +324,8 @@ if (file_exists("/home/{$thisUser}/.lighttpd/php.ini")) {
 	echo "Updated php.ini for user {$thisUser}\n";
     }
 }
+
+	
     
 	
 /* Commented out 20/07/2020 -- this looks like something from quite a few years back
