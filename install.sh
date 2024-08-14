@@ -16,6 +16,41 @@
 # For help, see http://wiki.pulsedmedia.com
 # Github: https://github.com/MagnaCapax/PMSS
 
+
+DEFAULT_REPOSITORY="https://github.com/MagnaCapax/PMSS"
+date=
+type=
+url=
+repository=
+branch=
+
+parse_version_string() {
+    local input_string="$1"
+
+    if [[ $input_string =~ (^git|^release)\/(.*)[:]?([0-9]{4}-[0-9]{2}-[0-9]{2}([ ]?[0-9]{2}[:][0-9]{2})?)$ ]]; then
+        type="${BASH_REMATCH[1]}"
+        url="${BASH_REMATCH[2]}"
+        date="${BASH_REMATCH[3]}"
+        echo "Type: $type"
+        echo "URL: $url"
+        echo "Date: $date"
+        if [[ $url =~ (.*[^:])[:](.*[^:])[:]?$ ]]; then
+            repository="${BASH_REMATCH[1]}"
+            branch="${BASH_REMATCH[2]}"
+            echo "Repository: $repository"
+            echo "Branch: $branch"
+
+        elif [[ $url =~ (^main)[:]$ ]]; then
+            repository=$DEFAULT_REPOSITORY
+            branch="${BASH_REMATCH[1]}"
+            echo "Repository: $repository"
+            echo "Branch: $branch"
+        fi
+    else
+        echo "Invalid input format."
+    fi
+}
+
 export DEBIAN_FRONTEND=noninteractive
 apt update;
 # Perform the full-upgrade
@@ -80,11 +115,13 @@ echo "### Setting up software"
 mkdir ~/compile
 cd /tmp
 rm -rf PMSS*
-if [ "${1:0:3}" = "git" ]; then
-    git clone https://github.com/MagnaCapax/PMSS;
-    git checkout "${1:4}";
+parse_version_string($1)
+
+if [ "$type" = "git" ]; then
+    git clone $repository PMSS;
+    git checkout "$branch";
     mv PMSS/* /;
-    SOURCE=$1
+    SOURCE="$type/$repository:$branch"
     VERSION=$(date)
 else
     VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
