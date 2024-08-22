@@ -9,11 +9,6 @@
 #Parse version string
 $default_repository = "https://github.com/MagnaCapax/PMSS";
 
-$repository="";
-$branch="";
-$date="";
-$type="";
-
 function parse_version_string($input_string, &$type, &$repository, &$branch, &$date) {
     global $default_repository;
 
@@ -25,20 +20,29 @@ function parse_version_string($input_string, &$type, &$repository, &$branch, &$d
 		echo "URL: $url\n";
         echo "Date: $date\n";
 		if(preg_match('/(.*[^:])[:](.*[^:])[:]?$/', $url, $more_matches)){
+			echo "url matches regex\n";	
 			$repository = $more_matches[1];
 			$branch = $more_matches[2];
-			echo "Repository: $repository";
-            echo "Branch: $branch";
-		} elseif(preg_match('/(^main)[:]$/', $repository, $more_matches)){
+			echo "Repository: $repository\n";
+            echo "Branch: $branch\n";
+		} elseif(preg_match('/(^main)[:]$/', $url, $more_matches)){
+			echo "url matches main\n";
 			$repository=$default_repository;
             $branch=$more_matches[1];
-            echo "Repository: $repository";
-            echo "Branch: $branch";
+            echo "Repository: $repository\n";
+            echo "Branch: $branch\n";
+		} else {
+			echo "url doesn't match\n";
 		}
     } else {
         echo "Invalid input format.\n";
     }
 }
+
+$repository="";
+$branch="";
+$date="";
+$type="";
 
 
 # Fetch current source and version for this server
@@ -76,15 +80,18 @@ EOF;
 
     case ($type == "git"):
 	echo "Using GitHub branch as the source!\n";
-	
+	echo "repository: $repository branch: $branch \n";
+		
 	$date = date("Y-m-d H:i");
 	$script = <<<EOF
 	    cd /tmp;
 	    rm -rf PMSS*;
 	    mkdir PMSS{$path}; cd PMSS{$path};
-	    git clone $repository;
+		git clone $repository PMSS;
+		cd PMSS;
 		git checkout $branch;
-	    mv PMSS/* .; rm -rf PMSS
+		cd ..;
+		mv PMSS/* .; rm -rf PMSS
 	    echo "{$source}:{$date}" > /etc/seedbox/config/version;
 EOF;
 	passthru($script);
