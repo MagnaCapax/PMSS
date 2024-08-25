@@ -45,6 +45,10 @@ parse_version_string() {
             branch="${BASH_REMATCH[1]}"
             echo "Repository: $repository"
             echo "Branch: $branch"
+        else
+            echo "Url doesn't match, using defaults"
+            repository=$DEFAULT_REPOSITORY
+            branch="main"
         fi
     else
         echo "Invalid input format."
@@ -115,7 +119,8 @@ echo "### Setting up software"
 mkdir ~/compile
 cd /tmp
 rm -rf PMSS*
-parse_version_string($1)
+echo 
+parse_version_string $1
 
 if [ "$type" = "git" ]; then
     git clone $repository PMSS;
