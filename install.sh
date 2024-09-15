@@ -24,6 +24,32 @@ url=
 repository=
 branch=
 
+get_dpkg_selections(){
+    local distro_name=$1;
+    local distro_version=$2;
+
+    # TODO: Check different distro versions for right packages
+    
+    echo $(wget  -nv -q -O - https://raw.githubusercontent.com/MagnaCapax/PMSS/main/packages.$distro_name.$distro_version) 
+
+}
+
+get_distro_name() {
+    eval $(
+        source /etc/os-release;
+        echo name=$ID;
+        )
+    echo $name;
+}
+
+get_distro_version() {
+    eval $(
+        source /etc/os-release;
+        echo version=$VERSION_ID;
+        )
+    echo $version;
+}
+
 parse_version_string() {
     local input_string="$1"
 
@@ -59,7 +85,8 @@ export DEBIAN_FRONTEND=noninteractive
 apt update;
 # Perform the full-upgrade
 apt-get full-upgrade -yqq
-
+# update dpkg available packages for dpkg --set-selections
+dpkg --admindir=/var/lib/dpkg --update-avail <(apt-cache dumpavail)
 
 # First Let's verify hostname
 apt-get install vim quota -y
@@ -79,40 +106,27 @@ vi /etc/fstab
 
 mount -o remount /home
 
-## #TODO: Update to dselections / dpkg set sel, automate
-# TODO this whole follow up section is yucky
 # Package selections, and remove some defaults etc.
+dpkg --clear-selections
+$distro_name=$(get_distro_name)
+$distro_version=$(get_distro_version)
 
+case $distro_name in
+    debian)
+        dpkg --set-selections < $(get_dpkg_selections $distro_name $distro_version)
+        ;;
+    ubuntu)
+        echo "Ubuntu is not supported yet."
+        exit 1
+        ;;
+    *)
+        echo "Unsupported distribution."
+        exit 1
+        ;;
+esac
 
-apt-get remove samba-common exim4-base exim4 netcat netcat-traditonal netcat6 -yq
+apt-get delect-upgrade
 
-
-apt-get install libncurses5-dev less -yq
-apt-get install libxmlrpc-c++4-dev libxmlrpc-c++4 -yq    #Not found on deb8
-apt-get install libxmlrpc-c++8v5 -yq
-apt-get install automake autogen build-essential libwww-curl-perl libcurl4-openssl-dev libsigc++-2.0-dev libwww-perl sysfsutils libcppunit-dev -yq
-apt-get install gcc g++ gettext glib-networking libglib2.0-dev libfuse-dev apt-transport-https -yq
-
-apt-get install php php-cli php-geoip php-gd php-apcu php-cgi php-sqlite3 php-common php-xmlrpc php-curl -yq
-
-
-apt-get install psmisc rsync subversion mktorrent -yq
-#apt-get -t testing install mktorrent rsync -y
-
-apt-get install libncurses5 libncurses5-dev  links elinks lynx sudo -yq
-apt-get install pkg-config make openssl -yq
-
-#From update-step2 l:72, remove them from there circa 03/2016
-apt-get install znc znc-perl znc-python znc-tcl -yq
-apt-get install gcc g++ gettext python-cheetah curl fuse glib-networking libglib2.0-dev libfuse-dev apt-transport-https -yq  #Everythin installed already on deb8
-apt-get install links elinks lynx ethtool p7zip-full smartmontools -yq   #all but smart + p7zip already installed...
-apt-get install flac lame lame-doc mp3diags lftp -yq
-#Following are for autodl-irssi
-apt-get install libarchive-zip-perl libnet-ssleay-perl libhtml-parser-perl libxml-libxml-perl libjson-perl libjson-xs-perl libxml-libxslt-perl  -yq
-
-apt-get install libssl-dev libssl1.1 mediainfo libmediainfo0v5 -yq  ##TODO Yuck distro version dependant
-
-apt-get install git -yq
 
 # Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 echo "### Setting up software"
