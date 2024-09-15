@@ -9,6 +9,9 @@
 #Parse version string
 $default_repository = "https://github.com/MagnaCapax/PMSS";
 
+$versionStrIndex=0;
+$scriptonly=false;
+
 function parse_version_string($input_string, &$type, &$repository, &$branch, &$date) {
     global $default_repository;
 
@@ -39,11 +42,30 @@ function parse_version_string($input_string, &$type, &$repository, &$branch, &$d
     }
 }
 
+# Function to parse command line options
+function parse_args($args){
+    $i=0;
+    foreach($args as $arg){
+        if($arg == "--scriptonly"){
+            global $scriptonly;
+            $scriptonly=true;
+        }
+        if(!strncmp($arg, "git/", 4) || !strncmp($arg, "release/", 8)){
+            global $versionStrIndex ;
+            $versionStrIndex = $i;
+        }
+        $i++;
+    }
+}
+
+$versionstring="";
 $repository="";
 $branch="";
 $date="";
 $type="";
 
+# Parse commandline options
+parse_args($argv);
 
 # Fetch current source and version for this server
 $versionFile = '/etc/seedbox/config/version';
@@ -53,8 +75,8 @@ if (file_exists($versionFile) && filesize($versionFile) > 0) {		// If empty igno
     $sourceVersion = 'release:2025-05-11';
 }
 
-if (! empty($argv[1]))
-    $sourceVersion = $argv[1];
+if ($versionStrIndex != 0)
+    $sourceVersion = $argv[$versionStrIndex];
 
 parse_version_string($sourceVersion, $type, $repository, $branch, $date);
 $source = ($type == "release" ? "$type/$date" : "$type/$repository:$branch");
@@ -104,5 +126,5 @@ passthru('chmod o-rwx -R /scripts; chmod o-rwx -R /root; chmod o-rwx -R /etc/ske
 
 
 # Following is now dynamic because it was just fetched and updated
-if (file_exists('/scripts/util/update-step2.php'))
+if (file_exists('/scripts/util/update-step2.php') && $scriptonly != true)
     require '/scripts/util/update-step2.php';
