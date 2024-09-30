@@ -247,7 +247,7 @@ include_once '/scripts/lib/apps/packages.php';
 //passthru('(echo y; echo y; echo y;)|cpan Archive::Zip Net::SSLeay HTML::Entities XML::LibXML Digest::SHA JSON JSON::XS');   // Perl modules
 
 
-if ($debianVersion[0] != 1) passthru("/etc/init.d/lighttpd stop; update-rc.d lighttpd stop 2 3 4 5; update-rc.d lighttpd remove; killall -9 lighttpd; killall -9 php-cgi; update-rc.d nginx defaults");
+if ($distroVersion < 10) passthru("/etc/init.d/lighttpd stop; update-rc.d lighttpd stop 2 3 4 5; update-rc.d lighttpd remove; killall -9 lighttpd; killall -9 php-cgi; update-rc.d nginx defaults");
 	else passthru("/etc/init.d/lighttpd stop; systemctl disable lighttpd; killall -9 lighttpd; killall -9 php-cgi; systemctl enable nginx");
 
 passthru("/scripts/util/configureLighttpd.php");
@@ -309,7 +309,7 @@ $servicesToCheck = array(
 );
 foreach ($servicesToCheck AS $thisService) {
     if (file_exists('/etc/init.d/' . $thisService)) passthru("/etc/init.d/{$thisService} stop");
-    if ($debianVersion[0] != 1) passthru("update-rc.d {$thisService} disable");
+    if ($distroVersion < 10) passthru("update-rc.d {$thisService} disable");
 		else passthru("systemctl disable {$thisService}");
 }
 
