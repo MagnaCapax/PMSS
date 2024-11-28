@@ -16,7 +16,7 @@
 # For help, see http://wiki.pulsedmedia.com
 # Github: https://github.com/MagnaCapax/PMSS
 
-# Usage for special branch: php update.php "git/http://github.com/MagnaCapax/PMSS:update2-distro-support:2023-07-22"
+# Usage for special branch: bash ./install.sh "git/http://github.com/MagnaCapax/PMSS:update2-distro-support:2023-07-22"
 
 DEFAULT_REPOSITORY="https://github.com/MagnaCapax/PMSS"
 date=
