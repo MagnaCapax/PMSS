@@ -190,7 +190,7 @@ EOF;
 
 $currentRepos = sha1(file_get_contents('/etc/apt/sources.list'));
 
-switch(get_distro_name){
+switch(get_distro_name()){
     case "debian":
         switch($distroVersion) {
             case 7:
