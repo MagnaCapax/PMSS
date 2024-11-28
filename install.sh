@@ -114,7 +114,8 @@ apt-get install libarchive-zip-perl libnet-ssleay-perl libhtml-parser-perl libxm
 apt-get install libssl-dev libssl1.1 mediainfo libmediainfo0v5 -yq  ##TODO Yuck distro version dependant
 
 apt-get install git -yq
-apt-get install php-cli iptables curl libssl-dev python3-pip cgroup-tools -yq
+apt-get install php-cli php-cgi iptables curl libssl-dev python3-pip cgroup-tools -yq
+touch /usr/share/pyload ## XXX: This is a hack to disable pyload-cli install
 
 # Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 echo "### Setting up software"
