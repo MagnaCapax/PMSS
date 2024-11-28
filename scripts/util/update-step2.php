@@ -6,10 +6,13 @@ function get_distro_name(){
     $name="";
     while(!feof($file)){
         $line = fgets($file);
+        $line = trim($line);
 
-        if(!strncmp($line, "ID", 2)){
-            $name_data=explode("=", $line);
-            $name=$version_data[1];
+        // Match the 'ID=' line exactly
+        if(preg_match('/^ID=(.*)/', $line, $matches)){
+            $value=$matches[1];
+            // Remove quotes if present
+            $name=trim($value, "\"");
             break;
         }
     }
@@ -19,15 +22,19 @@ function get_distro_name(){
 
 function get_distro_version(){
     $file=fopen("/etc/os-release", "r") or die("Cannot open /etc/os-release");
-    $version=0;
+    $version="";
     while(!feof($file)){
         $line = fgets($file);
+        $line = trim($line);
 
-        if(!strncmp($line, "VERSION_ID", 10)){
-            $version_data=explode("=", $line);
-            $versionStr=$version_data[1];
-            if(preg_match('/["]?([0-9]*)["]?/', $versionStr, $match)){
-                $version=intval($match[1]);
+        // Match the 'VERSION_ID=' line exactly
+        if(preg_match('/^VERSION_ID=(.*)/', $line, $matches)){
+            $value=$matches[1];
+            // Remove quotes if present
+            $versionStr=trim($value, "\"");
+            // Extract numeric part of the version
+            if(preg_match('/^([0-9]+)/', $versionStr, $versionMatches)){
+                $version=$versionMatches[1];
             }
             break;
         }
