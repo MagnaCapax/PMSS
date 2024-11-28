@@ -175,7 +175,7 @@ echo "### setting /home permissions"
 chmod o-rw /home
 
 echo "### Daemon configurations, quota checkup"
-/scripts/update.php
+/scripts/update.php "$1"
 /scripts/util/setupRootCron.php
 /scripts/util/setupSkelPermissions.php
 /scripts/util/quotaFix.php
