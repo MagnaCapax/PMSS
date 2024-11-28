@@ -16,6 +16,7 @@
 # For help, see http://wiki.pulsedmedia.com
 # Github: https://github.com/MagnaCapax/PMSS
 
+# Usage for special branch: php update.php "git/http://github.com/MagnaCapax/PMSS:update2-distro-support:2023-07-22"
 
 DEFAULT_REPOSITORY="https://github.com/MagnaCapax/PMSS"
 date=
@@ -124,16 +125,17 @@ parse_version_string $1
 
 if [ "$type" = "git" ]; then
     git clone $repository PMSS;
-    git checkout "$branch";
-    mv PMSS/* /;
+    ( cd PMSS; git checkout "$branch"; )
+    rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
+    rm -rf PMSS
     SOURCE="$type/$repository:$branch"
     VERSION=$(date)
 else
     VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
     wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz;
     mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
-    mv PMSS/* /;
-    
+    rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
+    rm -rf PMSS
     SOURCE="release"
 fi
 
