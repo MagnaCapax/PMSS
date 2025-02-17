@@ -1,11 +1,55 @@
 #!/usr/bin/php
 <?php
+
+function get_distro_name(){
+    $file=fopen("/etc/os-release", "r") or die("Cannot open /etc/os-release");
+    $name="";
+    while(!feof($file)){
+        $line = fgets($file);
+        $line = trim($line);
+
+        // Match the 'ID=' line exactly
+        if(preg_match('/^ID=(.*)/', $line, $matches)){
+            $value=$matches[1];
+            // Remove quotes if present
+            $name=trim($value, "\"");
+            break;
+        }
+    }
+    fclose($file);
+    return $name;
+}
+
+function get_distro_version(){
+    $file=fopen("/etc/os-release", "r") or die("Cannot open /etc/os-release");
+    $version="";
+    while(!feof($file)){
+        $line = fgets($file);
+        $line = trim($line);
+
+        // Match the 'VERSION_ID=' line exactly
+        if(preg_match('/^VERSION_ID=(.*)/', $line, $matches)){
+            $value=$matches[1];
+            // Remove quotes if present
+            $versionStr=trim($value, "\"");
+            // Extract numeric part of the version
+            if(preg_match('/^([0-9]+)/', $versionStr, $versionMatches)){
+                $version=$versionMatches[1];
+            }
+            break;
+        }
+    }
+    fclose($file);
+    return $version;
+}
+
 require_once '/scripts/lib/update.php';         // Load update related lib
 require_once '/scripts/lib/rtorrentConfig.php'; // Load rTorrentConfig class
 $rtorrentConfig = new rtorrentConfig;
 $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
-$debianVersion = file_get_contents('/etc/debian_version');
+$distroName = get_distro_name();
+$distroVersion = get_distro_version();
 $serverHostname = trim( file_get_contents('/etc/hostname') );
 
 //Hacky thing due to a bug in github version not getting updated when refactored.
@@ -112,36 +156,87 @@ deb-src http://www.nic.funet.fi/debian/ buster-updates main non-free contrib
 deb http://www.nic.funet.fi/debian/ buster-backports main non-free contrib
 EOF;
 
+$bullseyeRepos = <<<EOF
+deb http://www.nic.funet.fi/debian/ bullseye main non-free contrib
+deb-src http://www.nic.funet.fi/debian/ bullseye main non-free contrib
+
+deb http://security.debian.org/debian-security bullseye/updates main non-free contrib
+deb-src http://security.debian.org/debian-security bullseye/updates main non-free contrib
+
+# buster-updates, previously known as 'volatile'
+deb http://www.nic.funet.fi/debian/ bullseye-updates main non-free contrib
+deb-src http://www.nic.funet.fi/debian/ bullseye-updates main non-free contrib
+
+deb http://www.nic.funet.fi/debian/ bullseye-backports main non-free contrib
+EOF;
+
+$bookwormRepos = <<<EOF
+deb http://www.nic.funet.fi/debian/ bookworm main non-free contrib
+deb-src http://www.nic.funet.fi/debian/ bookworm main non-free contrib
+
+deb http://security.debian.org/debian-security bookworm/updates main non-free contrib
+deb-src http://security.debian.org/debian-security bookworm/updates main non-free contrib
+
+# buster-updates, previously known as 'volatile'
+deb http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib
+deb-src http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib
+
+deb http://www.nic.funet.fi/debian/ bookworm-backports main non-free contrib
+EOF;
+
 
 
 /****  END CONFIG ****/
 
 $currentRepos = sha1(file_get_contents('/etc/apt/sources.list'));
 
-switch($debianVersion[0]) {
-    case 7:
-        if ($currentRepos != sha1($wheezyRepos) ) {
-            file_put_contents('/etc/apt/sources.list', $wheezyRepos);
-//            passthru('apt-get update; apt-get upgrade -y;');
+switch(get_distro_name()){
+    case "debian":
+        switch($distroVersion) {
+            case 7:
+                if ($currentRepos != sha1($wheezyRepos) ) {
+                    file_put_contents('/etc/apt/sources.list', $wheezyRepos);
+        //            passthru('apt-get update; apt-get upgrade -y;');
+                }
+                break;
+                
+            case 8:
+                if ($currentRepos != sha1($jessieRepos) ) {
+                    file_put_contents('/etc/apt/sources.list', $jessieRepos);
+                    passthru('echo \'Acquire::Check-Valid-Until "false";\' >/etc/apt/apt.conf.d/90ignore-release-date');
+                    passthru('apt-get clean;');
+                }
+                break;
+
+            case 10:	// Debian10
+                echo `apt update -y`;	// Get new minor version update
+                if ($currentRepos != sha1($busterRepos) ) {
+                    file_put_contents('/etc/apt/sources.list', $busterRepos);
+                }
+                break;
+
+            case 11:	// Debian11
+                echo `apt update -y`;	// Get new minor version update
+                if ($currentRepos != sha1($busterRepos) ) {
+                    file_put_contents('/etc/apt/sources.list', $bullseyeRepos);
+                }
+                break;
+
+            case 12:	// Debian12
+                echo `apt update -y`;	// Get new minor version update
+                if ($currentRepos != sha1($busterRepos) ) {
+                    file_put_contents('/etc/apt/sources.list', $bookwormRepos);
+                }
+                break;
+
         }
         break;
-        
-    case 8:
-        if ($currentRepos != sha1($jessieRepos) ) {
-            file_put_contents('/etc/apt/sources.list', $jessieRepos);
-            passthru('echo \'Acquire::Check-Valid-Until "false";\' >/etc/apt/apt.conf.d/90ignore-release-date');
-            passthru('apt-get clean;');
-        }
+    case "ubuntu":
+        die("Ubuntu is not supported yet.\n");
         break;
-
-    case 1:	// Debian10
-        echo `apt update -y`;	// Get new minor version update
-        if ($currentRepos != sha1($busterRepos) ) {
-            file_put_contents('/etc/apt/sources.list', $busterRepos);
-        }
+    default:
+        die("Unsupported distro.\n");
         break;
-
-
 }
 
 // Localnet file location fix
@@ -159,7 +254,7 @@ include_once '/scripts/lib/apps/packages.php';
 //passthru('(echo y; echo y; echo y;)|cpan Archive::Zip Net::SSLeay HTML::Entities XML::LibXML Digest::SHA JSON JSON::XS');   // Perl modules
 
 
-if ($debianVersion[0] != 1) passthru("/etc/init.d/lighttpd stop; update-rc.d lighttpd stop 2 3 4 5; update-rc.d lighttpd remove; killall -9 lighttpd; killall -9 php-cgi; update-rc.d nginx defaults");
+if ($distroVersion < 10) passthru("/etc/init.d/lighttpd stop; update-rc.d lighttpd stop 2 3 4 5; update-rc.d lighttpd remove; killall -9 lighttpd; killall -9 php-cgi; update-rc.d nginx defaults");
 	else passthru("/etc/init.d/lighttpd stop; systemctl disable lighttpd; killall -9 lighttpd; killall -9 php-cgi; systemctl enable nginx");
 
 passthru("/scripts/util/configureLighttpd.php");
@@ -221,7 +316,7 @@ $servicesToCheck = array(
 );
 foreach ($servicesToCheck AS $thisService) {
     if (file_exists('/etc/init.d/' . $thisService)) passthru("/etc/init.d/{$thisService} stop");
-    if ($debianVersion[0] != 1) passthru("update-rc.d {$thisService} disable");
+    if ($distroVersion < 10) passthru("update-rc.d {$thisService} disable");
 		else passthru("systemctl disable {$thisService}");
 }
 

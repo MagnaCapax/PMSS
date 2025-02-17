@@ -16,6 +16,7 @@
 # For help, see http://wiki.pulsedmedia.com
 # Github: https://github.com/MagnaCapax/PMSS
 
+# Usage for special branch: bash ./install.sh "git/http://github.com/MagnaCapax/PMSS:update2-distro-support:2023-07-22"
 
 DEFAULT_REPOSITORY="https://github.com/MagnaCapax/PMSS"
 date=
@@ -113,6 +114,9 @@ apt-get install libarchive-zip-perl libnet-ssleay-perl libhtml-parser-perl libxm
 apt-get install libssl-dev libssl1.1 mediainfo libmediainfo0v5 -yq  ##TODO Yuck distro version dependant
 
 apt-get install git -yq
+apt-get install php-xml php8.2-cgi php8.2-cli php8.2-readline php8.2-opcache php8.2-common -yq
+apt-get install iptables curl libssl-dev python3-pip cgroup-tools libtool -yq
+touch /usr/share/pyload ## XXX: This is a hack to disable pyload-cli install
 
 # Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 echo "### Setting up software"
@@ -124,16 +128,17 @@ parse_version_string $1
 
 if [ "$type" = "git" ]; then
     git clone $repository PMSS;
-    git checkout "$branch";
-    mv PMSS/* /;
+    ( cd PMSS; git checkout "$branch"; )
+    rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
+    rm -rf PMSS
     SOURCE="$type/$repository:$branch"
     VERSION=$(date)
 else
     VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
     wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz;
     mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1;
-    mv PMSS/* /;
-    
+    rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
+    rm -rf PMSS
     SOURCE="release"
 fi
 
@@ -173,7 +178,7 @@ echo "### setting /home permissions"
 chmod o-rw /home
 
 echo "### Daemon configurations, quota checkup"
-/scripts/update.php
+/scripts/update.php "$1"
 /scripts/util/setupRootCron.php
 /scripts/util/setupSkelPermissions.php
 /scripts/util/quotaFix.php
