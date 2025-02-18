@@ -7,13 +7,15 @@
 
 Welcome to Your Pulsed Media Seedbox on %HOSTNAME%
 
-IP: %SERVER_IP%
+IP: %SERVER_IP%    ---   Uptime: %UPTIME%
 CPU: %SERVER_CPU% with %SERVER_RAM% RAM
 STORAGE: %SERVER_STORAGE%
+Network Speed: %NETWORK_SPEED%
 
-PMSS Version: %PMSS_VERSION%  Last Update: %UPDATE_DATE%  APT Update/Upgrade: %APT_LAST_UPDATE%
 
-Uptime: %UPTIME% Kernel: %KERNEL_VERSION% Network Speed: %NETWORK_SPEED%
+PMSS Version: %PMSS_VERSION%
+Last Update: %UPDATE_DATE%  APT Update/Upgrade: %APT_LAST_UPDATE%
+Kernel: %KERNEL_VERSION%
 
 -----
 
