@@ -1,0 +1,86 @@
+# PMSS SSH Server Configuration Template for Debian 11
+# ---------------------------------------------------------------------------
+# This file is intended for use as /etc/ssh/sshd_config on PMSS Seedbox systems.
+#
+#
+# Key modifications include:
+#   - PermitRootLogin is enabled for administrative access.
+#   - Additional legacy ciphers (aes128-cbc, aes192-cbc, aes256-cbc) are enabled.
+#   - Additional key exchange algorithms (diffie-hellman-group1-sha1,
+#     diffie-hellman-group14-sha1) are appended.
+#
+# Repository: https://github.com/MagnaCapax/PMSS
+#
+# OpenSSH defaults are provided in comments; uncomment and modify as required.
+# ---------------------------------------------------------------------------
+
+# Port and listening addresses
+Port 22
+AddressFamily any
+ListenAddress 0.0.0.0
+ListenAddress ::
+
+# Faster logins
+UseDNS no
+
+# Host key files
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Ciphers and key exchange algorithms
+# Enable additional legacy ciphers for compatibility.
+Ciphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com
+# Enable additional Kex algorithms.
+KexAlgorithms +diffie-hellman-group1-sha1,diffie-hellman-group14-sha1
+
+# Optionally, define MACs if needed.
+MACs hmac-sha2-256,hmac-sha2-512
+
+# Logging
+SyslogFacility AUTH
+LogLevel INFO
+
+# Authentication settings
+LoginGraceTime 2m
+PermitRootLogin yes
+StrictModes yes
+MaxAuthTries 6
+MaxSessions 10
+
+PubkeyAuthentication yes
+AuthorizedKeysFile      .ssh/authorized_keys .ssh/authorized_keys2
+
+ChallengeResponseAuthentication no
+
+# PAM authentication support
+UsePAM yes
+
+# X11 forwarding
+X11Forwarding yes
+X11DisplayOffset 10
+X11UseLocalhost yes
+
+# Environment settings
+AcceptEnv LANG LC_*
+
+# Subsystem for SFTP
+Subsystem       sftp    /usr/lib/openssh/sftp-server
+
+# Optional: Uncomment to enable password authentication (if required)
+# PasswordAuthentication yes
+# PermitEmptyPasswords no
+
+# Optional: Additional options (adjust as needed)
+# AllowAgentForwarding yes
+# AllowTcpForwarding yes
+# Compression delayed
+# ClientAliveInterval 60
+# ClientAliveCountMax 3
+
+# Optional banner (if you have one)
+# Banner /etc/issue.net
+
+# ---------------------------------------------------------------------------
+# End of PMSS SSH Server Configuration Template
+# ---------------------------------------------------------------------------

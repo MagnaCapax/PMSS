@@ -240,14 +240,15 @@ if (file_exists('/etc/seedbox/localnet') && !file_exists('/etc/seedbox/config/lo
 `cp /etc/seedbox/config/template.rc.local /etc/rc.local; chown root.root /etc/rc.local; chmod 750 /etc/rc.local; nohup /etc/rc.local >> /dev/null 2>&1`;
 
 //Install latest systemd/system.conf
-`cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf; chmod 750 /etc/systemd/system.conf; /usr/bin/systemctl daemon-reexec`;
+`cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf; chmod 644 /etc/systemd/system.conf; /usr/bin/systemctl daemon-reexec`;
+
+//Install latest sshd_config
+`cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config; chmod 644 /etc/ssh/sshd_config;  /usr/bin/systemctl restart sshd`;
 
 
+
+// Install APT Packages etc.
 include_once '/scripts/lib/apps/packages.php';
-
-
-// Was ist das? something relating to Perl but why and what ...
-//passthru('(echo y; echo y; echo y;)|cpan Archive::Zip Net::SSLeay HTML::Entities XML::LibXML Digest::SHA JSON JSON::XS');   // Perl modules
 
 
 if ($distroVersion < 10) passthru("/etc/init.d/lighttpd stop; update-rc.d lighttpd stop 2 3 4 5; update-rc.d lighttpd remove; killall -9 lighttpd; killall -9 php-cgi; update-rc.d nginx defaults");

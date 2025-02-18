@@ -2,8 +2,10 @@
 # Pulsed Media Seedbox Management Software "PMSS"
 # Install / Manage apt packages
 
-#TODO dpkg get sel set sel | ... 
 
+
+#TODO dpkg get sel set sel | ... 
+#TODO Move out of this directory so we can just glob everything here.
 
 passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 

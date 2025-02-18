@@ -9,6 +9,14 @@
  * 
  */
 
+####   WATCHDOG CAUSES MORE DOWNTIME THAN IT SOLVES
+echo `systemctl stop watchdog; systemctl disable watchdog;`;
+echo `apt remove watchdog -y`;
+
+
+return;
+
+/**
 
 # Install
 if (!file_exists('/etc/watchdog.conf')) passthru('apt install watchdog -y');
