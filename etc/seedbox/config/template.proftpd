@@ -1,15 +1,25 @@
 Include /etc/proftpd/modules.conf
+
+# Disable IPv6
 UseIPv6                         off
-IdentLookups                    off
+
+# Ident module is not used these days
+<IfModule mod_ident.c>
+  IdentLookups                  off
+</IfModule>
+
 ServerName                      "%SERVERNAME%"
 ServerType                      standalone
 DeferWelcome                    off
 MultilineRFC2228                on
 DefaultServer                   on
 ShowSymlinks                    on
+
+# Timeouts
 TimeoutNoTransfer               180
 TimeoutStalled                  300
 TimeoutIdle                     600
+
 
 DisplayLogin                    welcome.msg
 DisplayChdir                    .message true
@@ -17,12 +27,16 @@ ListOptions                     "-l"
 
 DenyFilter                      \*.*/
 
-DefaultRoot                   ~
+# User isolation: Chroot users to their homedirectory
+DefaultRoot                     ~
+
+# Network Settings
 Port                            21
 MaxInstances                    70
 MaxClientsPerUser               16
 MaxClientsPerHost               16
 PassivePorts                    60000 65535
+
 
 # Set the user and group that the server normally runs at.
 User                            proftpd
@@ -34,23 +48,23 @@ TransferLog /var/log/proftpd/xferlog
 SystemLog   /var/log/proftpd/proftpd.log
 
 <IfModule mod_quotatab.c>
-QuotaEngine off
+    QuotaEngine off
 </IfModule>
 
 <IfModule mod_delay.c>
-DelayEngine on
+    DelayEngine on
 </IfModule>
 
 <IfModule mod_ctrls.c>
-ControlsEngine        off
-ControlsMaxClients    2
-ControlsLog           /var/log/proftpd/controls.log
-ControlsInterval      5
-ControlsSocket        /var/run/proftpd/proftpd.sock
+    ControlsEngine        off
+    ControlsMaxClients    2
+    ControlsLog           /var/log/proftpd/controls.log
+    ControlsInterval      5
+    ControlsSocket        /var/run/proftpd/proftpd.sock
 </IfModule>
 
 <IfModule mod_ctrls_admin.c>
-AdminControlsEngine off
+    AdminControlsEngine off
 </IfModule>
 
 <IfModule mod_tls.c>
@@ -68,5 +82,7 @@ AdminControlsEngine off
 
 AllowStoreRestart on
 AllowRetrieveRestart on
+
+
 AllowForeignAddress on
 
