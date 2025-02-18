@@ -41,15 +41,15 @@ wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/m
 Dist-upgrade functions.
 YOLO Mostly Uattended command for the base system update:
 ```
-export DEBIAN_FRONTEND=noninteractive && \
-sudo sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list && \
-sudo sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list && \
-sudo sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list.d/.list && \
-sudo sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list.d/.list && \
-sudo apt update && \
-sudo apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" && \
-sudo apt full-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" && \
-sudo apt autoremove -y && \
+export DEBIAN_FRONTEND=noninteractive; \
+sudo sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list; \
+sudo sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.lis; \
+sudo sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list.d/.list; \
+sudo sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list.d/.list; \
+sudo apt update;  \
+sudo apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"; \
+sudo apt full-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"; \
+sudo apt autoremove -y; \
 sudo systemctl reboot
 ```
 
