@@ -1,10 +1,18 @@
 #!/usr/bin/php
 <?php
-# Pulsed Media Seedbox Management Software "PMSS"
-# update system
+/**
+ * Pulsed Media Seedbox Management Software "PMSS" Update Script
+ *
+ * This script performs system updates for PMSS and is the "static" portion, this
+ * is executed before scripts are updated so will update only for the next update.
+ *
+ * The script accepts string with the source for the update: "git/branch" or "release". If empty, it uses
+ * source specified in /etc/seedbox/config/version.
+ * A bit broken so specify date with : in the end sometimes, ie. git/main:2025-02-18
+ *
+ */
+#TODO Refactor the branch selection completely
 
-# The script accepts string with the source for the update: "git/branch" or "release". If empty, it uses
-# source specified in /etc/seedbox/config/version.
 
 #Parse version string
 $default_repository = "https://github.com/MagnaCapax/PMSS";
