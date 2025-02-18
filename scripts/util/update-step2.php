@@ -174,10 +174,10 @@ $bullseyeRepos = <<<EOF
 deb http://www.nic.funet.fi/debian/ bullseye main non-free contrib
 deb-src http://www.nic.funet.fi/debian/ bullseye main non-free contrib
 
-deb http://security.debian.org/debian-security bullseye/updates main non-free contrib
-deb-src http://security.debian.org/debian-security bullseye/updates main non-free contrib
+deb http://security.debian.org/debian-security bullseye-security main non-free contrib
+deb-src http://security.debian.org/debian-security bullseye-security main non-free contrib
 
-# buster-updates, previously known as 'volatile'
+# bullseye-updates, previously known as 'volatile'
 deb http://www.nic.funet.fi/debian/ bullseye-updates main non-free contrib
 deb-src http://www.nic.funet.fi/debian/ bullseye-updates main non-free contrib
 
@@ -188,8 +188,8 @@ $bookwormRepos = <<<EOF
 deb http://www.nic.funet.fi/debian/ bookworm main non-free contrib
 deb-src http://www.nic.funet.fi/debian/ bookworm main non-free contrib
 
-deb http://security.debian.org/debian-security bookworm/updates main non-free contrib
-deb-src http://security.debian.org/debian-security bookworm/updates main non-free contrib
+deb http://security.debian.org/debian-security bookworm-security main non-free contrib
+deb-src http://security.debian.org/debian-security bookworm-security main non-free contrib
 
 # buster-updates, previously known as 'volatile'
 deb http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib
