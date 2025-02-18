@@ -7,7 +7,7 @@
 
 Welcome to Your Pulsed Media Seedbox on %HOSTNAME%
 
-IP: %SERVER_IP%    ---   Uptime: %UPTIME%
+IP: %SERVER_IP%
 CPU: %SERVER_CPU% with %SERVER_RAM% RAM
 STORAGE: %SERVER_STORAGE%
 Network Speed: %NETWORK_SPEED%
