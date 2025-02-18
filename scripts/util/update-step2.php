@@ -12,7 +12,6 @@
 
 // Include required libraries
 require_once '/scripts/lib/update.php';
-require_once '/scripts/lib/rtorrentConfig.php';
 
 //Hacky thing due to a bug in github version not getting updated when refactored.
 #TODO Remove around 05/2024
