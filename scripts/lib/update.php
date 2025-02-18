@@ -6,6 +6,9 @@
  * Contains various functions, settings, etc. for use in /scripts/util/update-step2.php.
  */
 
+// rTorrent class required
+require_once '/scripts/lib/rtorrentConfig.php';
+
 // Global variables
 $rtorrentConfig = new rtorrentConfig();
 $users          = shell_exec('/scripts/listUsers.php');
