@@ -1,14 +1,18 @@
 #!/usr/bin/php
 <?php
-require_once '/scripts/lib/update.php';         // Load update related lib
-require_once '/scripts/lib/rtorrentConfig.php'; // Load rTorrentConfig class
-$rtorrentConfig = new rtorrentConfig;
-$users = shell_exec('/scripts/listUsers.php');
-$users = explode("\n", trim($users));
-$distroName = get_distro_name();   // and returns what?
-$distroVersion = get_distro_version();
-$serverHostname = trim( file_get_contents('/etc/hostname') );
-$lsbrelease = trim( shell_exec('/usr/bin/lsb_release -cs') );	// LSB Release info, codename of the distro. MAybe the best selector for packages?
+/**
+ * Update Script for PMSS -- Dynamic portion
+ * /scripts/util/update-step2.php
+ *
+ * This script performs various system updates including repository configuration,
+ * system and per‐user configuration updates, service management, and more.
+ * This script is updated before exeuction by /scripts/update.php
+ *
+ */
+
+// Include required libraries
+require_once '/scripts/lib/update.php';
+require_once '/scripts/lib/rtorrentConfig.php';
 
 //Hacky thing due to a bug in github version not getting updated when refactored.
 #TODO Remove around 05/2024
@@ -61,29 +65,6 @@ deb http://ppa.launchpad.net/jcfp/ppa/ubuntu precise main
 deb http://www.bunkus.org/debian/wheezy/ ./
 
 EOF;
-
-/* 2019/04: updates repo was removed, backports archived, bunkus has not worked for a loooong time.
-$jessieRepos = <<<EOF
-deb http://ftp.nl.debian.org/debian/ jessie main non-free
-deb-src http://ftp.nl.debian.org/debian/ jessie main non-free
-
-deb http://security.debian.org/ jessie/updates main non-free
-deb-src http://security.debian.org/ jessie/updates main non-free
-
-# jessie-updates, previously known as 'volatile'
-deb http://ftp.nl.debian.org/debian/ jessie-updates main non-free
-deb-src http://ftp.nl.debian.org/debian/ jessie-updates main non-free
-
-deb http://www.bunkus.org/debian/jessie/ ./
-
-#Sabnzbd repo for jessie is same as wheezy (Ubuntu precise)
-deb http://ppa.launchpad.net/jcfp/ppa/ubuntu precise main
-
-#Backports - ffmpeg etc.
-deb http://ftp.debian.org/debian jessie-backports main
-
-EOF;
-*/
 
 $jessieRepos = <<<EOF
 deb http://ftp.funet.fi/debian/ jessie main non-free
