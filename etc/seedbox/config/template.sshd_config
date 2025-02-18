@@ -35,7 +35,7 @@ Ciphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com
 KexAlgorithms +diffie-hellman-group1-sha1,diffie-hellman-group14-sha1
 
 # Optionally, define MACs if needed.
-MACs hmac-sha2-256,hmac-sha2-512
+# MACs hmac-sha2-256,hmac-sha2-512
 
 # Logging
 SyslogFacility AUTH
