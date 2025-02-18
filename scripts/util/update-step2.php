@@ -1,48 +1,5 @@
 #!/usr/bin/php
 <?php
-# TODO Following probably needs to be removed / refactored etc.?
-function get_distro_name(){
-    $file=fopen("/etc/os-release", "r") or die("Cannot open /etc/os-release");
-    $name="";
-    while(!feof($file)){
-        $line = fgets($file);
-        $line = trim($line);
-
-        // Match the 'ID=' line exactly
-        if(preg_match('/^ID=(.*)/', $line, $matches)){
-            $value=$matches[1];
-            // Remove quotes if present
-            $name=trim($value, "\"");
-            break;
-        }
-    }
-    fclose($file);
-    return $name;
-}
-
-function get_distro_version(){
-    $file=fopen("/etc/os-release", "r") or die("Cannot open /etc/os-release");
-    $version="";
-    while(!feof($file)){
-        $line = fgets($file);
-        $line = trim($line);
-
-        // Match the 'VERSION_ID=' line exactly
-        if(preg_match('/^VERSION_ID=(.*)/', $line, $matches)){
-            $value=$matches[1];
-            // Remove quotes if present
-            $versionStr=trim($value, "\"");
-            // Extract numeric part of the version
-            if(preg_match('/^([0-9]+)/', $versionStr, $versionMatches)){
-                $version=$versionMatches[1];
-            }
-            break;
-        }
-    }
-    fclose($file);
-    return $version;
-}
-
 require_once '/scripts/lib/update.php';         // Load update related lib
 require_once '/scripts/lib/rtorrentConfig.php'; // Load rTorrentConfig class
 $rtorrentConfig = new rtorrentConfig;
@@ -51,7 +8,7 @@ $users = explode("\n", trim($users));
 $distroName = get_distro_name();   // and returns what?
 $distroVersion = get_distro_version();
 $serverHostname = trim( file_get_contents('/etc/hostname') );
-$lsbrelease = trim( shell_exec('/usr/bin/lsb_release -cs') );
+$lsbrelease = trim( shell_exec('/usr/bin/lsb_release -cs') );	// LSB Release info, codename of the distro. MAybe the best selector for packages?
 
 //Hacky thing due to a bug in github version not getting updated when refactored.
 #TODO Remove around 05/2024
@@ -691,7 +648,7 @@ passthru('/scripts/util/ftpConfig.php');
 //passthru('/scripts/util/setupApiKey.php');
 
 
-passthru('/scripts/listUsers.php | xargs -r -n1 -I\'{1}\' crontab -u {1} /etc/seedbox/config/user.crontab.default');
+passthru('/scripts/listUsers.php | xargs -r -I\'{1}\' crontab -u {1} /etc/seedbox/config/user.crontab.default');
 
 
 
