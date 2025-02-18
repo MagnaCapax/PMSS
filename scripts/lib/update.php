@@ -67,3 +67,28 @@ function updateRutorrentConfig($username, $scgiPort) {
 */
 
 }
+
+
+function get_os_release_data() {
+    static $data = null;
+    if ($data === null) {
+        $data = parse_ini_file('/etc/os-release');
+    }
+    return $data;
+}
+
+function get_distro_name(){
+    $data = get_os_release_data();
+    return isset($data['ID']) ? $data['ID'] : '';
+}
+
+function get_distro_version(){
+    $data = get_os_release_data();
+    if (isset($data['VERSION_ID'])) {
+        if (preg_match('/^([0-9]+)/', $data['VERSION_ID'], $matches)) {
+            return $matches[1];
+        }
+        return $data['VERSION_ID'];
+    }
+    return '';
+}
