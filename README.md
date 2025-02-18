@@ -32,7 +32,7 @@ wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/m
 ```
 with reboot using git/main ("testing") as the source instead of release:
 ```
-wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/main/scripts/update.php;  /scripts/update.php git/main; reboot
+wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/main/scripts/update.php;  /scripts/update.php git/main:2025-02-19; reboot
 ```
 
 
