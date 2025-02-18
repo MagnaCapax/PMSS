@@ -184,5 +184,5 @@ echo passthru("systemctl daemon-reload");
 echo passthru("loginctl enable-linger {$user['name']}");
 
 // Install docker rootless
-echo passthru("su {$user['name']} -c 'curl -fsSL https://get.docker.com/rootless | sh'");
-echo passthru("su {$user['name']} -c 'wget https://github.com/docker/compose/releases/download/v2.14.2/docker-compose-linux-x86_64 -O ~/bin/docker-compose; chmod +x ~/bin/docker-compose; systemctl --user enable docker'");
+echo passthru("apt install systemd-container -y");  // machinectl from there; do not use su!
+echo passthru("machinectl shell {$user['name']}@ /usr/bin/dockerd-rootless-setuptool.sh install");
