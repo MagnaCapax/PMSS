@@ -177,13 +177,17 @@ switch($distroName){
         break;
 }
 
-// Localnet file location fix
+// Localnet file location fix -- this is very old TODO Remove say 09/2025
 if (file_exists('/etc/seedbox/localnet') && !file_exists('/etc/seedbox/config/localnet')) {
     `mv /etc/seedbox/localnet /etc/seedbox/config/localnet`;
 }
 
 //Install latest rc.local file and execute it
 `cp /etc/seedbox/config/template.rc.local /etc/rc.local; chown root.root /etc/rc.local; chmod 750 /etc/rc.local; nohup /etc/rc.local >> /dev/null 2>&1`;
+
+//Install latest systemd/system.conf
+`cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf; chmod 750 /etc/systemd/system.conf; /usr/bin/systemctl daemon-reexec`;
+
 
 include_once '/scripts/lib/apps/packages.php';
 
@@ -266,31 +270,6 @@ if (strpos($fstab, 'cgroup') === false) {   // Cgroups not installed
     `mount /sys/fs/cgroup`;
 }
 
-// Setup lighttpd HTTPS access
-/* SHOULD NOT BE REQUIRED ANYMORE AS WE DO NOT RUN GLOBAL LIGHTTPD INSTANCE   --- remove 09/2020 completely if no issues
-if (!file_exists('/etc/lighttpd/server.pem')) {
-    passthru('rm -rf /etc/lighttpd/ssl/customseedbox.com');
-    if (file_exists('/tmp/createCert-pulsed')) unlink('/tmp/createCert-pulsed');    
-    file_put_contents('/tmp/createCert-pulsed', <<<EOF
-RANDFILE                = /dev/urandom
-
-[ req ]
-default_bits            = 1024
-default_keyfile         = privkey.pem
-distinguished_name      = req_distinguished_name
-prompt                  = no
-policy                  = policy_anything
-
-[ req_distinguished_name ]
-commonName                      = {$serverHostname}
-EOF
-   );
-   passthru("openssl req -config /tmp/createCert-pulsed -new -x509 -days 3650 -nodes -out '/etc/lighttpd/server.pem' -keyout '/etc/lighttpd/server.pem' > /dev/null 2>&1");
-   passthru('chmod 600 /etc/lighttpd/server.pem');
-   passthru('lighty-enable-mod ssl;');
-}
-*/
-
 
 // Install mediainfo
 if (!file_exists('/usr/bin/mediainfo')) {
@@ -337,43 +316,30 @@ foreach($users AS $thisUser) {
     passthru("/scripts/util/configureLighttpd.php {$thisUser}");
 	
      #Update PHP.ini
-if (file_exists("/home/{$thisUser}/.lighttpd/php.ini")) {
-    // Parse the user's php.ini
-    $phpIni = parse_ini_file("/home/{$thisUser}/.lighttpd/php.ini");
+    if (file_exists("/home/{$thisUser}/.lighttpd/php.ini")) {
+        // Parse the user's php.ini
+        $phpIni = parse_ini_file("/home/{$thisUser}/.lighttpd/php.ini");
 
-    // Check if error_log is set
-    if (!isset($phpIni['error_log'])) {
-	// If error_log is not set, set it and write the file back
-	$phpIni['error_log'] = "/home/{$thisUser}/.lighttpd/error.log";
+        // Check if error_log is set
+        if (!isset($phpIni['error_log'])) {
+        // If error_log is not set, set it and write the file back
+        $phpIni['error_log'] = "/home/{$thisUser}/.lighttpd/error.log";
 
-	// Build the new contents of the php.ini file
-	$newPhpIni = '';
-	foreach ($phpIni as $key => $value) {
-	    $newPhpIni .= "{$key} = \"{$value}\"\n";
-	}
+        // Build the new contents of the php.ini file
+        $newPhpIni = '';
+        foreach ($phpIni as $key => $value) {
+            $newPhpIni .= "{$key} = \"{$value}\"\n";
+        }
 
-	// Write the new php.ini contents
-	file_put_contents("/home/{$thisUser}/.lighttpd/php.ini", $newPhpIni);
-	echo "Updated php.ini for user {$thisUser}\n";
+        // Write the new php.ini contents
+        file_put_contents("/home/{$thisUser}/.lighttpd/php.ini", $newPhpIni);
+        echo "Updated php.ini for user {$thisUser}\n";
+        }
     }
-}
 
 	
-    
+  
 	
-/* Commented out 20/07/2020 -- this looks like something from quite a few years back
-	// Update user's rtorrent config    
-	$userRtorrentConfig = file_get_contents("/home/{$thisUser}/.rtorrent.rc");
-    $userRtorrentConfig = str_replace(
-        array(
-            "umask = 0002\n",
-            "hash_interval = 300\n",
-            "hash_max_tries = 2\n",
-			"use_udp_trackers = yes\n",
-        ), '', $userRtorrentConfig);
-    file_put_contents("/home/{$thisUser}/.rtorrent.rc", $userRtorrentConfig);
-*/  
-
     // temp directory for ruTorrent
     if (!file_exists("/home/{$thisUser}/.tmp")) {
         mkdir("/home/{$thisUser}/.tmp");
@@ -607,6 +573,7 @@ chmod('/usr/bin/atop', 0750);
 `/scripts/util/setupRootCron.php`;
 
 /* Not using this method currently - afaik no one is
+TODO Remove all references to this from all places.
 if (!file_exists('/etc/seedbox/config/api.remoteKey')) {
     unlink('/etc/seedbox/config/api.localKey');
     passthru('/scripts/util/setupApiKey.php');
@@ -664,4 +631,3 @@ EOF;
 
 // Following should be moved to their own file eventually
 `chmod o-r /var/log/wtmp /var/run/utmp  /usr/bin/netstat /usr/bin/who /usr/bin/w`;
-
