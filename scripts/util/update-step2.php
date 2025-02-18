@@ -33,17 +33,71 @@ passthru('echo 100000 > /sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max');
 $motdTemplatePath = '/etc/seedbox/config/template.motd';
 $motdOutputPath = '/etc/motd';
 $motdTemplate = file_get_contents($motdTemplatePath);
-$cpuInfo = trim( shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'") );
-$ramInfo = trim (shell_exec("free -h | awk '/^Mem:/ { print $2 }'") );
-$storageInfo = trim(shell_exec("df -h /home | awk 'NR==2 {print $2}'"));
 
-$motdTemplate = str_replace('%HOSTNAME%', $serverHostname, $motdTemplate);
-$motdTemplate = str_replace('%SERVER_IP%', gethostbyname($serverHostname), $motdTemplate);
-$motdTemplate = str_replace('%SERVER_CPU%', $cpuInfo, $motdTemplate);
-$motdTemplate = str_replace('%SERVER_RAM%', $ramInfo, $motdTemplate);
-$motdTemplate = str_replace('%SERVER_STORAGE%', $storageInfo, $motdTemplate);
+// Retrieve basic server details.
+$serverHostname = trim(file_get_contents('/etc/hostname'));
+$serverIp       = gethostbyname($serverHostname);
+$cpuInfo        = trim(shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'"));
+$ramInfo        = trim(shell_exec("free -h | awk '/^Mem:/ { print \$2 }'"));
+$storageInfo    = trim(shell_exec("df -h /home | awk 'NR==2 {print \$2}'"));
 
-file_put_contents($motdOutputPath, $motdTemplate);
+
+// Retrieve PMSS version from version file.
+$versionFile = '/etc/seedbox/config/version';
+$pmssVersion = file_exists($versionFile) && filesize($versionFile) > 0
+               ? trim(file_get_contents($versionFile))
+               : "unknown";
+
+// Retrieve the update date from /var/run/pmss/updated.
+$updateDate = file_exists('/var/run/pmss/updated')
+              ? trim(file_get_contents('/var/run/pmss/updated'))
+              : "not set";
+
+// Retrieve the last apt update/upgrade timestamp, if available.
+$aptStampFile = '/var/lib/apt/periodic/update-success-stamp';
+if (file_exists($aptStampFile)) {
+    $aptLastUpdate = trim(shell_exec("stat -c '%y' " . escapeshellarg($aptStampFile)));
+} else {
+    $aptLastUpdate = "Not available";
+}
+
+// Retrieve system uptime.
+$uptime = trim(shell_exec("uptime -p")); // e.g., "up 3 days, 4 hours"
+
+// Retrieve kernel version.
+$kernelVersion = trim(shell_exec("uname -r"));
+
+// Retrieve network speed from eth0 via ethtool.
+$netSpeedRaw = shell_exec("ethtool eth0 2>/dev/null | grep 'Speed:'");
+if ($netSpeedRaw && preg_match('/Speed:\s+(\S+)/', $netSpeedRaw, $matches)) {
+    $networkSpeed = $matches[1];
+} else {
+    $networkSpeed = "N/A";
+}
+
+// Perform replacements in the template.
+$replacements = [
+    '%HOSTNAME%'         => $serverHostname,
+    '%SERVER_IP%'        => $serverIp,
+    '%SERVER_CPU%'       => $cpuInfo,
+    '%SERVER_RAM%'       => $ramInfo,
+    '%SERVER_STORAGE%'   => $storageInfo,
+    '%PMSS_VERSION%'     => $pmssVersion,
+    '%UPDATE_DATE%'      => $updateDate,
+    '%APT_LAST_UPDATE%'  => $aptLastUpdate,
+    '%UPTIME%'           => $uptime,
+    '%KERNEL_VERSION%'   => $kernelVersion,
+    '%NETWORK_SPEED%'    => $networkSpeed,
+];
+
+// Replace each placeholder in the template.
+foreach ($replacements as $placeholder => $value) {
+    $motdTemplate = str_replace($placeholder, $value, $motdTemplate);
+}
+
+if (file_put_contents($motdOutputPath, $motdTemplate) === false) {
+    echo "\n\n\t**** Error: Could not write MOTD to {$motdOutputPath} ****\n\n";
+}
 
 // If var run does not exist, create it. Deb8 likes to remove this if empty?
 if (!file_exists('/var/run/pmss'))

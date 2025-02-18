@@ -1,4 +1,3 @@
-
      //\\                 ______      _              _  ___  ___         _ _       
     //  \\                | ___ \    | |            | | |  \/  |        | (_)                
    //    \\               | |_/ /   _| |___  ___  __| | | .  . | ___  __| |_  __ _ 
@@ -10,14 +9,22 @@ Welcome to Your Pulsed Media Seedbox on %HOSTNAME%
 
 IP: %SERVER_IP%
 CPU: %SERVER_CPU% with %SERVER_RAM% RAM
-STORAGE:  %SERVER_STORAGE%
+STORAGE: %SERVER_STORAGE%
+
+PMSS Version: %PMSS_VERSION%  Last Update: %UPDATE_DATE%  APT Update/Upgrade: %APT_LAST_UPDATE%
+
+Uptime: %UPTIME% Kernel: %KERNEL_VERSION% Network Speed: %NETWORK_SPEED%
 
 -----
 
-Install *ARR + Jellyfin Media Package: https://pulsedmedia.com/clients/announcements.php?id=590
-arrinfo  to get urls RADARR + SONARR + PROWLARR + JELLYFYIN
+Install *ARR + Jellyfin Media Package: https://pulsedmedia.com/clients/announcements.php?id=590  
+Use `arrinfo` to get URLs for RADARR, SONARR, PROWLARR & JELLYFIN
+
+Wireguard & Base info: https://pulsedmedia.com/clients/announcements.php?id=587  
+LinuxServer.io setup: https://pulsedmedia.com/clients/announcements.php?id=596
 
 Docker rootless is installed by default for all accounts.
-Wireguard & Base info: https://pulsedmedia.com/clients/announcements.php?id=587
-LinuxServer.io setup: https://pulsedmedia.com/clients/announcements.php?id=596
+List Containts Running; `docker ps`
+Restart Docker: `systemctl --user restart docker`
+
 
