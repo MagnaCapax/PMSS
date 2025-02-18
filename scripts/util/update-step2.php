@@ -690,7 +690,8 @@ passthru('/scripts/util/setupRootCron.php');
 passthru('/scripts/util/ftpConfig.php');
 //passthru('/scripts/util/setupApiKey.php');
 
-passthru('/scripts/listUsers.php | xargs -n1 -I\'{1}\' crontab -u {1} /etc/seedbox/config/user.crontab.default');
+
+passthru('/scripts/listUsers.php | xargs -r -n1 -I\'{1}\' crontab -u {1} /etc/seedbox/config/user.crontab.default');
 
 
 
