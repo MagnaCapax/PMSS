@@ -14,6 +14,7 @@
 require_once '/scripts/lib/update.php';
 
 //Hacky thing due to a bug in github version not getting updated when refactored.
+//In essence this makes update.php kinda dynamic too...
 #TODO Remove around 05/2024
 $updateSource = file_get_contents('/scripts/update.php');
 if (strpos($updateSource, 'soft.sh') > 0) {    // Still running old version! Force it to be dynamic this time to overwrite existing.
@@ -23,11 +24,32 @@ if (strpos($updateSource, 'soft.sh') > 0) {    // Still running old version! For
 }
 
 
-#TODO Move these permissions to their own directories later. Git doesn't properly track permission changes so these are important
-passthru('chmod -R 755 /etc/seedbox; chmod -R 750 /scripts');
+
+// Cgroup stuff
+// we have to do this as first thing or we run out of processes due to incorrect config on some nodes ...
+$fstab = file_get_contents('/etc/fstab');
+if (strpos($fstab, 'cgroup') === false) {   // Cgroups not installed
+    passthru('apt-get install cgroup-bin -y');
+    $mount = "\ncgroup  /sys/fs/cgroup  cgroup  defaults  0   0\n";
+    file_put_contents('/etc/fstab', $mount, FILE_APPEND);
+    `mount /sys/fs/cgroup`;
+}
 
 // Increase pids max, there was an issue with this and updates would halt due to pids max being reached. SSH unresponsive etc.
 passthru('echo 100000 > /sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max');
+
+// Systemd default unit
+if (file_exists('/usr/lib/systemd/user-.slice.d/99-pmss.conf')) unlink('/usr/lib/systemd/user-.slice.d/99-pmss.conf');  // Defaults! Should not be the last thing
+if (!file_exists('/usr/lib/systemd/user-.slice.d/15-pmss.conf')) {
+    echo `cp -p /etc/seedbox/config/template.user-slices-pmss.conf /usr/lib/systemd/system/user-.slice.d/15-pmss.conf; chmod 644 /usr/lib/systemd/system/user-.slice.d/15-pmss.conf; systemctl daemon-reload`;
+}
+
+
+
+#TODO Move these permissions to their own directories later. Git doesn't properly track permission changes so these are important
+passthru('chmod -R 755 /etc/seedbox; chmod -R 750 /scripts');
+
+
 
 // Let's create MOTD  #TODO Separate this elsewhere in future
 $motdTemplatePath = '/etc/seedbox/config/template.motd';
@@ -317,13 +339,7 @@ foreach ($servicesToCheck AS $thisService) {
 		else passthru("systemctl disable {$thisService}");
 }
 
-$fstab = file_get_contents('/etc/fstab');
-if (strpos($fstab, 'cgroup') === false) {   // Cgroups not installed
-    passthru('apt-get install cgroup-bin -y');
-    $mount = "\ncgroup  /sys/fs/cgroup  cgroup  defaults  0   0\n";
-    file_put_contents('/etc/fstab', $mount, FILE_APPEND);
-    `mount /sys/fs/cgroup`;
-}
+
 
 
 // Install mediainfo
@@ -580,11 +596,6 @@ if ($sshdConfig != $sshdConfigChanged) {
 }
 
 
-// Systemd default unit
-if (file_exists('/usr/lib/systemd/user-.slice.d/99-pmss.conf')) unlink('/usr/lib/systemd/user-.slice.d/99-pmss.conf');  // Defaults! Should not be the last thing
-if (!file_exists('/usr/lib/systemd/user-.slice.d/15-pmss.conf')) {
-    echo `cp -p /etc/seedbox/config/template.user-slices-pmss.conf /usr/lib/systemd/system/user-.slice.d/15-pmss.conf; chmod 644 /usr/lib/systemd/system/user-.slice.d/15-pmss.conf; systemctl daemon-reload`;
-}
 
 
 /**** Setup srvmgmt if this is a .pulsedmedia.com server
