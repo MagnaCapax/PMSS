@@ -4,7 +4,8 @@
 
 Pulsed Media Seedbox Software, server side code.
 This builds and installs all the software and scripts to operate a seedbox server.
-Works on Debian 10/11. Deb10 is stable, Deb11 is development/experimental stage.
+
+Works on Debian 10/11/12. Deb10 is stable, Deb11 is in production qualification and Deb12 is development/experimental stage.
 
 This can be used standalone fully, does not require a server from Pulsed Media. You can _freely_ use this for your own self-hosted seedbox.
 No commercial restrictions, you are free to provide seedbox services using this and there are even some minimalistic whitelabeling features.
@@ -35,6 +36,22 @@ with reboot using git/main ("testing") as the source instead of release:
 wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/main/scripts/update.php;  /scripts/update.php git/main:2025-02-19; reboot
 ```
 
+### Debian 10 to Debian 11 Upgrade
+
+Dist-upgrade functions.
+YOLO Mostly Uattended command for the base system update:
+```
+export DEBIAN_FRONTEND=noninteractive && \
+sudo sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list && \
+sudo sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list && \
+sudo sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list.d/.list && \
+sudo sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list.d/.list && \
+sudo apt update && \
+sudo apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" && \
+sudo apt full-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" && \
+sudo apt autoremove -y && \
+sudo systemctl reboot
+```
 
 ### Support
 
