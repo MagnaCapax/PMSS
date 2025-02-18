@@ -1,6 +1,6 @@
 #!/usr/bin/php
 <?php
-
+# TODO Following probably needs to be removed / refactored etc.?
 function get_distro_name(){
     $file=fopen("/etc/os-release", "r") or die("Cannot open /etc/os-release");
     $name="";
@@ -48,9 +48,10 @@ require_once '/scripts/lib/rtorrentConfig.php'; // Load rTorrentConfig class
 $rtorrentConfig = new rtorrentConfig;
 $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
-$distroName = get_distro_name();
+$distroName = get_distro_name();   // and returns what?
 $distroVersion = get_distro_version();
 $serverHostname = trim( file_get_contents('/etc/hostname') );
+$lsbrelease = trim( shell_exec('/usr/bin/lsb_release -cs') );
 
 //Hacky thing due to a bug in github version not getting updated when refactored.
 #TODO Remove around 05/2024
