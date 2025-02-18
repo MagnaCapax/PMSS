@@ -10,7 +10,10 @@ passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 
 
 
-passthru('apt-get install lighttpd lighttpd-mod-webdav proftpd-basic -y; /etc/init.d/lighttpd stop;');
+passthru('apt-get install lighttpd lighttpd-mod-webdav -y;');
+if ($distroVersion >= 10) passthru('apt-get install proftpd-core proftpd-basic proftpd-mod-crypto proftpd-mod-wrap -y;');
+    else passthru('apt-get install proftpd-basic -y');
+
 passthru('apt-get install screen mc wget gawk subversion libtool libncurses5 sqlite locate ntpdate -y');
 passthru('apt-get install python-pycurl python-crypto python-cheetah -y');
 passthru('apt-get install zip unzip bwm-ng sysstat apache2-utils irssi iotop ethtool -y');
@@ -18,7 +21,7 @@ if ($distroVersion >= 8) passthru('apt-get install unrar-free unp -y');   # Deb8
     else passthru('apt-get install unrar rar php-apc -y');
 
 if ($distroVersion >= 10) passthru('apt-get install libzen0v5 sox tmux tree ncdu weechat php7.3-xml php7.3-zip php-mbstring -y; apt remove avahi-daemon mediainfo libmediainfo0v5 -y; apt install qbittorrent-nox -y; wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-20_all.deb && dpkg -i repo-mediaarea_1.0-20_all.deb && apt-get update; apt-get install mediainfo libmediainfo0v5 -y');
-	else `apt-get install sox nzbget tmux tree ncdu weechat -y`;
+    else `apt-get install sox nzbget tmux tree ncdu weechat -y`;
 
 passthru('apt-get install zsh atop -y');
 
