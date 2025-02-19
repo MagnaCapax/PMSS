@@ -27,6 +27,9 @@ if ($distroVersion >= 10) passthru('apt-get install libzen0v5 sox tmux tree ncdu
 
 passthru('apt-get install zsh atop -y');
 
+// 2025-02-19: Sigh, issues of not using dpkg get/set sel; some upgraded systems now are missing php-cgi ... what?
+passthru('apt-get install php-cgi php-cli -y');
+
 // Following from update-step2 prior 29/04/2019
 passthru('apt-get -f install -y');  # To fix potentially broken dependencies
 passthru('apt-get remove netcat netcat-traditional mercurial -y');
