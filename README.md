@@ -42,15 +42,16 @@ Dist-upgrade functions.
 YOLO Mostly Uattended command for the base system update:
 ```
 export DEBIAN_FRONTEND=noninteractive; \
-sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list; \
+sed -i 's/\<buster\>/bullseye/g' /etc/apt/sources.list; \
 sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list; \
-sed -i 's/<buster>/bullseye/g' /etc/apt/sources.list.d/.list; \
-sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list.d/.list; \
-apt update;  \
+sed -i 's/\<buster\>/bullseye/g' /etc/apt/sources.list.d/*.list; \
+sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list.d/*.list; \
+apt update; \
 apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"; \
 apt full-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"; \
 apt autoremove -y; \
 systemctl reboot
+
 ```
 
 ### Support
