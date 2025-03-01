@@ -121,12 +121,13 @@ fastcgi.debug = 0
 
 fastcgi.server += ( ".php" =>
         ((
-                "bin-path" => "/usr/bin/php-cgi -c /home/##username/.lighttpd/php.ini",
-                "socket" => "/home/##username/.lighttpd/php.socket",
-                "max-procs" => 4,
-                "min-procs" => 0,
+                "bin-path"              => "/usr/bin/php-cgi ",
+                "bin-args"              => ( "-c", "/home/##username/.lighttpd/php.ini" ),
+                "socket"                => "/home/##username/.lighttpd/php.socket",
+                "max-procs"             => 6,
+                "min-procs"             => 1,
                 "bin-environment" => (
-                    "PHP_FCGI_CHILDREN" => "4",
+                    "PHP_FCGI_CHILDREN" => "6",
                     "PHP_FCGI_MAX_REQUESTS" => "5000"
                 ),
                 "bin-copy-environment" => (

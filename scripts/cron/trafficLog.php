@@ -43,11 +43,11 @@ foreach($users AS $thisUser) {
     $thisUserTrafficLocal = 0;
 
         // Get this specific users data consumption
-    $thisUserTraffic = (int) `grep "0.0.0.0/0            owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | cut -d' ' -f3`;
+    $thisUserTraffic = (int) `grep "0.0.0.0/0            owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | awk '{print $2}'`;
     if ($localnets !== false &&
         count($localnets) > 0) {
             foreach ($localnets AS $thisLocalNet)
-                $thisUserTrafficLocal += (int) `grep "{$thisLocalNet}       owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | cut -d' ' -f3`;
+                $thisUserTrafficLocal += (int) `grep "{$thisLocalNet}       owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | awk '{print $2}'`;
                 //echo "Loggin {$thisLocalNet} for {$thisUser}/{$thisUid} result {$thisUserTrafficLocal}\n";
         }
 

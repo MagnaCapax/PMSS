@@ -9,7 +9,7 @@
 
 passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 
-
+passthru('apt --fix-broken install -y;')  // Sometimes a bit broken ...
 
 
 passthru('apt-get install lighttpd lighttpd-mod-webdav -y;');
@@ -22,7 +22,7 @@ passthru('apt-get install zip unzip bwm-ng sysstat apache2-utils irssi iotop eth
 if ($distroVersion >= 8) passthru('apt-get install unrar-free unp -y');   # Deb8, Deb10
     else passthru('apt-get install unrar rar php-apc -y');
 
-if ($distroVersion >= 10) passthru('apt-get install libzen0v5 sox tmux tree ncdu weechat php7.3-xml php7.3-zip php-mbstring -y; apt remove avahi-daemon mediainfo libmediainfo0v5 -y; apt install qbittorrent-nox -y; wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-20_all.deb && dpkg -i repo-mediaarea_1.0-20_all.deb && apt-get update; apt-get install mediainfo libmediainfo0v5 -y');
+if ($distroVersion >= 10) passthru('apt-get install libzen0v5 sox tmux tree ncdu weechat php-xml php-zip php-sqlite3 php-mbstring -y; apt remove avahi-daemon mediainfo libmediainfo0v5 -y; apt install qbittorrent-nox -y; wget https://mediaarea.net/repo/deb/repo-mediaarea_1.0-20_all.deb && dpkg -i repo-mediaarea_1.0-20_all.deb && apt-get update; apt-get install mediainfo libmediainfo0v5 -y');
     else `apt-get install sox nzbget tmux tree ncdu weechat -y`;
 
 passthru('apt-get install zsh atop -y');
