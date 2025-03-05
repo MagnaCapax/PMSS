@@ -9,10 +9,11 @@
 
 passthru('apt-get clean; apt-get update; apt-get full-upgrade -y;');
 
-passthru('apt --fix-broken install -y;')  // Sometimes a bit broken ...
+passthru('apt --fix-broken install -y;');  // Sometimes a bit broken ...
 
 
 passthru('apt-get install lighttpd lighttpd-mod-webdav -y;');
+
 if ($distroVersion >= 10) passthru('apt-get install proftpd-core proftpd-basic proftpd-mod-crypto proftpd-mod-wrap -y;');
     else passthru('apt-get install proftpd-basic -y');
 
