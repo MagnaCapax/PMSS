@@ -162,8 +162,9 @@ class rtorrentConfig {
     }
     
     protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000) {
-        $directoryBase = '/var/run/pmss/ports';
-        $directoryType = '/' . $directoryBase . $type;
+        // Use persistent location for reserved ports
+        $directoryBase = '/var/lib/pmss/ports';
+        $directoryType = $directoryBase . '/' . $type;
 
         if (!file_exists($directoryBase)) mkdir($directoryBase, 0755);
         if (!file_exists($directoryType)) mkdir($directoryType, 0755);
@@ -171,14 +172,12 @@ class rtorrentConfig {
         $attempts = 0;
         do {
             $port = rand($rangeStart, $rangeEnd);
-            $inUse = $this->_portInUse($port);
-            $reserved = file_exists($directoryType . '/' . $port);
             $attempts++;
-        } while (($inUse || $reserved) && $attempts < 50);
+        } while (($this->_portInUse($port) || file_exists($directoryType . '/' . $port)) && $attempts < 50);
 
-        if ($inUse || $reserved) throw new Exception('Could not allocate port');
+        if ($attempts >= 50) throw new Exception('Could not allocate port');
 
-        touch($directoryType . '/' . $port);
+        file_put_contents($directoryType . '/' . $port, '');
 
         return $port;
 
