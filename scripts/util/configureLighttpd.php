@@ -25,15 +25,33 @@ if (!file_exists('/root/backups')) `mkdir /root/backups`;
 $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
 $userConfig = '';
 
+function portInUse($port) {
+    $cmd = "ss -lnt '( sport = :{$port} )' 2>/dev/null | wc -l";
+    $output = (int) trim(shell_exec($cmd));
+    return $output > 1;
+}
+
+function findFreePort($start = 2000, $end = 38000) {
+    $attempts = 0;
+    do {
+        $port = rand($start, $end);
+        $attempts++;
+    } while (portInUse($port) && $attempts < 50);
+    if ($attempts >= 50) die("Unable to find free port\n");
+    return $port;
+}
+
 foreach($users AS $thisUser) {
     if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;   // Suspended or not torrent user
     $portFile = "{$portsDirectory}/lighttpd-{$thisUser}";
     if (file_exists($portFile)) {
         $serverPort = (int) file_get_contents($portFile);
+        if ($serverPort < 1024 || $serverPort > 65535 || portInUse($serverPort)) {
+            $serverPort = findFreePort();
+            file_put_contents($portFile, $serverPort);
+        }
     } else {
-        #TODO command line script to set the port
-		#TODO and check that no one else uses the same, doh!
-        $serverPort = (int) rand(2000,38000);
+        $serverPort = findFreePort();
         file_put_contents($portFile, $serverPort);
     }
     

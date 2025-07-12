@@ -59,6 +59,12 @@ systemctl reboot
 You may ask our discord for guidance.
 Pulsed Media as a company will not provide support to use this on your own servers without a fee, unless the server is bought from Pulsed Media directly.
 
+### Automatic port management
+
+Scripts now validate that chosen network ports are free before writing
+configuration files. Both `rtorrentConfig` and `configureLighttpd.php` use `ss`
+to check if a port is listening and pick another port if needed.
+
 
 ## Contributions
 

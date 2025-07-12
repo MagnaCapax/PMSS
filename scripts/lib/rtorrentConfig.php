@@ -164,19 +164,32 @@ class rtorrentConfig {
     protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000) {
         $directoryBase = '/var/run/pmss/ports';
         $directoryType = '/' . $directoryBase . $type;
-        
+
         if (!file_exists($directoryBase)) mkdir($directoryBase, 0755);
         if (!file_exists($directoryType)) mkdir($directoryType, 0755);
-        
-        $port = round(rand($rangeStart, $rangeEnd));
-        
-        if (file_exists($directoryType . '/' . $port)) $this->_configPortPrivate($type, $rangeStart, $rangeEnd);  // Highly doubtfull this will remain in infinite loop under normal conditions
-        
+
+        $attempts = 0;
+        do {
+            $port = rand($rangeStart, $rangeEnd);
+            $inUse = $this->_portInUse($port);
+            $reserved = file_exists($directoryType . '/' . $port);
+            $attempts++;
+        } while (($inUse || $reserved) && $attempts < 50);
+
+        if ($inUse || $reserved) throw new Exception('Could not allocate port');
+
         touch($directoryType . '/' . $port);
-        
+
         return $port;
-        
-        
+
+
+    }
+
+    protected function _portInUse($port) {
+        $cmd = "ss -lnt '( sport = :{$port} )' 2>/dev/null | wc -l";
+        $output = (int) trim(shell_exec($cmd));
+        return $output > 1;
+
     }
     
 	
