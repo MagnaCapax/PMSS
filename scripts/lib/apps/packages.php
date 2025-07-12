@@ -30,6 +30,10 @@ passthru('apt-get install zsh atop -y');
 
 // 2025-02-19: Sigh, issues of not using dpkg get/set sel; some upgraded systems now are missing php-cgi ... what?
 passthru('apt-get install php-cgi php-cli -y');
+// PHPUnit is used for running the internal test suite
+passthru('apt-get install phpunit -y');
+// iproute2 provides the `ss` utility used by PortManager
+passthru('apt-get install iproute2 -y');
 
 // Following from update-step2 prior 29/04/2019
 passthru('apt-get -f install -y');  # To fix potentially broken dependencies

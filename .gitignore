@@ -36,7 +36,7 @@
 
 ## start of scripts
 !/scripts/
-!/scripts/*
+!/scripts/**
 ## end of scripts
 
 # start of var
@@ -58,3 +58,6 @@
 
 # And do not ignore gitkeep files to keep empty directories
 !.gitkeep
+# start of tests
+!/tests/
+!/tests/**
