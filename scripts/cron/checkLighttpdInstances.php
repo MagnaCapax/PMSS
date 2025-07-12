@@ -1,5 +1,6 @@
 #!/usr/bin/php
 <?php
+require_once '/scripts/lib/restartBackoff.php';
 /*
 Pulsed Media Seedbox Management Software "PMSS"
 This script manages and monitors user-specific lighttpd and php-cgi processes.
@@ -29,7 +30,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     // If socket connection fails or no php-cgi instance is found
     if (empty($instancesPhpCgi)) {        
             echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
-            restartLighttpd($thisUser);
+            if (restartAllowed('lighttpd', $thisUser)) restartLighttpd($thisUser);
             continue;
 
     }
@@ -46,22 +47,28 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 
         if ($socketError); continue;
     }
-    if ($socketError == true) { restartLighttpd($thisUser); continue; }
+    if ($socketError == true) {
+        if (restartAllowed('lighttpd', $thisUser)) restartLighttpd($thisUser);
+        continue;
+    }
 
 
 
-    // Let's actually test we get 401 auth requested!
-    /* temp disabled, so much log spam and did not achieve desired results.
-    $curl = curl_init("http://127.0.0.1/user-{$thisUser}/");
-    curl_setopt( $curl, CURLOPT_HEADER, true);
-    curl_setopt( $curl, CURLOPT_RETURNTRANSFER, true);
-    $httpResponse = curl_exec( $curl );
-
-   if (strpos($httpResponse, 'HTTP/1.1 401 Unauthorized') === false) $instancesLighttpd = '';
-    */
+    // Quick HTTP check to ensure Lighttpd responds
+    $ch = curl_init("http://127.0.0.1/user-{$thisUser}/status.php");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+    $httpResponse = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($httpCode != 200 || trim($httpResponse) != 'Ok.') {
+        echo "HTTP check failed for user {$thisUser}\n";
+        if (restartAllowed('lighttpd', $thisUser)) restartLighttpd($thisUser);
+        continue;
+    }
 
     if(empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
-        startLighttpd($thisUser);
+        if (restartAllowed('lighttpd', $thisUser)) startLighttpd($thisUser);
         continue;
     }
 

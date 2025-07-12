@@ -8,9 +8,11 @@ $requiredDirectories = array(
     '/var/log/pmss/traffic',
     '/var/log/pmss/cgroup',
     '/var/log/pmss/trafficStats',
+    '/var/log/pmss/ioStats',
     '/var/run/pmss',
     '/var/run/pmss/api',
     '/var/run/pmss/trafficLimits',
+    '/var/run/pmss/ioStats',
 );
 
 foreach($requiredDirectories AS $thisDir) {

@@ -9,11 +9,28 @@ if (empty($argv[1]) or
 $user = array(
     'name'      => $argv[1],
     'password'  => $argv[2],
-    'memory'    => $argv[3],
+    'memory'    => (int) $argv[3],
     'quota'     => $argv[4]    
 );
 if (isset($argv[5])) $user['trafficLimit'] = (int) $argv[5];
 if ($user['password'] == 'rand') $user['password'] = '';
+
+// Cap requested memory to keep at least 5% of system RAM free
+$memTotal = 0;
+$memInfo  = @file_get_contents('/proc/meminfo');
+if (preg_match('/^MemTotal:\s+(\d+)\s+kB/m', (string) $memInfo, $m)) {
+    $memTotal = (int) $m[1];
+}
+$minMem = 8 * 1024 * 1024; // 8 GiB in kB
+if ($memTotal < $minMem) {
+    $memTotal = $minMem;
+}
+if ($memTotal > 0) {
+    $maxAllowed = (int) floor($memTotal * 0.95 / 1024); // MB
+    if ($user['memory'] > $maxAllowed) {
+        $user['memory'] = $maxAllowed;
+    }
+}
     
 require_once 'lib/rtorrentConfig.php';
 require_once 'lib/users.php';

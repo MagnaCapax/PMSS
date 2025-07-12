@@ -1,5 +1,7 @@
 #!/usr/bin/php
 <?php
+require_once '/scripts/lib/rtorrentXmlrpc.php';
+require_once '/scripts/lib/restartBackoff.php';
 // Check that rTorrent instances are running, start if not
 echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
 
@@ -35,7 +37,16 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     }
 
     if(empty($instances)) {    // No instances at all? Ok time to start rTorrent!
-        start($thisUser);
+        if (restartAllowed('rtorrent', $thisUser)) start($thisUser);
+        continue;
+    }
+
+    // Ping XML-RPC to check if rTorrent is responsive.  For now we only log the
+    // failure because this XML-RPC helper might not be working everywhere.
+    $scgi = new rtorrentXmlrpc("unix:///home/{$thisUser}/.rtorrent.socket", 0);
+    $ping = $scgi->makeCall($scgi->formatCall('system.client_version'));
+    if (empty($ping)) {
+        echo "rTorrent XML-RPC unresponsive for user: {$thisUser} (logging only)\n";
         continue;
     }
    
@@ -53,14 +64,14 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
              //echo("PID:" . $pid . "\nInstances: " . $instances . "\n");
 
              if (strpos($instances, $pid) === false) {    // No running instance found!
-                 start($thisUser);
+                 if (restartAllowed('rtorrent', $thisUser)) start($thisUser);
              }
          } else {
              echo "No certainty, killall!\n";
              passthru('killall -u ' . $thisUser);
              sleep(3); // We got to wait to make certain kill was success.
-             
-             start($thisUser);
+
+             if (restartAllowed('rtorrent', $thisUser)) start($thisUser);
              continue;
          }
     } else {    // Process is running, but no (valid or otherwise) lock file
@@ -69,7 +80,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         passthru('killall -9 "rtorrent main" -u '. $thisUser);
         passthru('killall -9 /usr/local/bin/rtorrent -u '. $thisUser);
         sleep(3);
-        start($thisUser);
+        if (restartAllowed('rtorrent', $thisUser)) start($thisUser);
     }
 
 */

@@ -18,7 +18,7 @@
 require_once '/scripts/lib/rtorrentConfig.php';
 require_once '/scripts/lib/update.php';
 
-$usage = 'Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT=1000] [IOWEIGHT=1000]';
+$usage = 'Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT=1000] [IOWEIGHT=1000] [IOPSLIMIT=0]';
 if (empty($argv[1]) or
     empty($argv[2]) or
     empty($argv[3]) ) die('need user name. ' . $usage . "\n");
@@ -28,10 +28,28 @@ $user = array(
     'memory'    => (int) $argv[2],
     'quota'     => (int) $argv[3]
 );
+# Cap memory usage to 95% of total system memory
+$info  = @file_get_contents('/proc/meminfo');
+$total = 0;
+if (preg_match('/^MemTotal:\s+(\d+)\s+kB/m', (string) $info, $m)) {
+    $total = (int) $m[1];
+}
+$minMem = 8 * 1024 * 1024; // 8 GiB in kB
+if ($total < $minMem) {
+    $total = $minMem;
+}
+$cap = 0;
+if ($total > 0) {
+    $cap = (int) floor($total * 0.95 / 1024);
+    if ($user['memory'] > $cap) {
+        $user['memory'] = $cap;
+    }
+}
 $user['id'] = (int) `id -u {$user['name']}`;
 if (isset($argv[4])) $user['trafficLimit'] = (int) $argv[4];
 if (isset($argv[5])) $user['CPUWeight'] = (int) $argv[5];
 if (isset($argv[6])) $user['IOWeight'] = (int) $argv[6];
+if (isset($argv[7])) $user['IOPSLimit'] = (int) $argv[7];
 
 if (!isset($user['id']) OR $user['id'] < 1000) die("No system ID or user does not exist\n");
 if (!file_exists("/home/{$user['name']}")) die("User does not exist\n");
@@ -44,6 +62,7 @@ if (!empty($user['trafficLimit']) && $user['trafficLimit'] > 1) passthru("/scrip
 // Check for valid weights and set default
 if (empty($user['CPUWeight']) or (int) $user['CPUWeight'] == 0) $user['CPUWeight'] = 500;
 if (empty($user['IOWeight']) or (int) $user['IOWeight'] == 0) $user['IOWeight'] = 500;
+if (empty($user['IOPSLimit'])) $user['IOPSLimit'] = 0;
 
 
 echo "Creating rTorrent config\n";
@@ -168,9 +187,14 @@ $slicePath = "/etc/systemd/system/user-{$user['id']}.slice.d";
 if (!file_exists($slicePath)) mkdir($slicePath);    // Hmm, questionable ...
 $systemctlUserSliceTemplate = file_get_contents('/etc/seedbox/config/template.user-slice.conf');
 
+$memoryMax = $user['memory'] * 2;
+if ($cap > 0 && $memoryMax > $cap) {
+    $memoryMax = $cap;
+}
+
 $systemctlUserSlice = str_replace(
         array('##USER_MEMORY##', '##USER_MEMORY_MAX##', '##USER_CPUWEIGHT##', '##USER_IOWEIGHT##'),
-        array($user['memory'], $user['memory'] * 2, $user['CPUWeight'], $user['IOWeight']),
+        array($user['memory'], $memoryMax, $user['CPUWeight'], $user['IOWeight']),
 $systemctlUserSliceTemplate);
 
 if (file_exists($slicePath . '/99-pmss.conf')) unlink($slicePath . '/99-pmss.conf');   // Renaming the conf file to avoid confusion
@@ -186,3 +210,14 @@ echo passthru("loginctl enable-linger {$user['name']}");
 // Install docker rootless
 echo passthru("apt install systemd-container -y");  // machinectl from there; do not use su!
 echo passthru("machinectl shell {$user['name']}@ /usr/bin/dockerd-rootless-setuptool.sh install");
+
+// Save runtime configuration
+$runtimeDir = '/etc/seedbox/runtime/userConfigs';
+if (!file_exists($runtimeDir)) {
+    mkdir($runtimeDir, 0700, true);
+}
+$configFile = $runtimeDir . '/' . $user['name'] . '.json';
+file_put_contents($configFile, json_encode($user, JSON_PRETTY_PRINT));
+chmod($configFile, 0600);
+copy($configFile, "/home/{$user['name']}/.userConfig");
+chmod("/home/{$user['name']}/.userConfig", 0644);

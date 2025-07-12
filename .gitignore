@@ -17,6 +17,8 @@
 
 !/etc/seedbox/runtime/
 !/etc/seedbox/runtime/version
+!/etc/seedbox/runtime/userConfigs/
+!/etc/seedbox/runtime/userConfigs/**
 
 !/etc/seedbox/skel
 !/etc/seedbox/skel/srvmgmt
@@ -37,6 +39,7 @@
 ## start of scripts
 !/scripts/
 !/scripts/*
+!/scripts/**
 ## end of scripts
 
 # start of var
@@ -58,3 +61,7 @@
 
 # And do not ignore gitkeep files to keep empty directories
 !.gitkeep
+
+# documentation
+!/docs/
+!/docs/**
