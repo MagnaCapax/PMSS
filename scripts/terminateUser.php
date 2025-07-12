@@ -1,5 +1,22 @@
 #!/usr/bin/php
 <?php
+/**
+ * Terminate a seedbox user and clean up runtime configs.
+ * Removes running processes, user account, ports and web server configs.
+ *
+ * Usage: terminateUser.php USERNAME [--confirm]
+ */
+define("PORTS_RUNTIME_DIR", "/etc/seedbox/runtime/ports");
+define("PORTS_PERSISTENT_DIR", "/etc/seedbox/config/ports");
+function clearUserPorts($user) {
+    foreach ([PORTS_RUNTIME_DIR, PORTS_PERSISTENT_DIR] as $dir) {
+        $file = "$dir/lighttpd-$user";
+        if (file_exists($file)) {
+            unlink($file);
+        }
+    }
+}
+
 $continue = '-';
 
 $usage = "Usage: terminateUser.php USERNAME\n";
@@ -44,9 +61,12 @@ passthru('/etc/init.d/nginx restart');
 passthru("userdel {$username}; groupdel {$username};"); // If during first attempt still some process running.
                                         //Make sure by attempting again FURTHER group needs to be deleted as well
 passthru("rm -rf /var/run/screen/S-{$username}");
+
+// Remove Lighttpd port assignments
+clearUserPorts($username);
+// Remove user home and nginx config
+
 passthru("rm -rf /home/{$username} /etc/nginx/users/{$username}");
-unlink("/etc/seedbox/runtime/ports/lighttpd-{$username}");
-unlink("/etc/nginx/users/{$username}");
 
 // If attemps 1 and 2 failed ...
 passthru("killall -9 -u {$username}");
