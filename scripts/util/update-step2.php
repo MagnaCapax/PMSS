@@ -14,6 +14,29 @@
 // Include required libraries
 require_once '/scripts/lib/update.php';
 
+// logmsg is defined in /scripts/update.php when this file is loaded from there.
+// Provide a very small fallback so running this script standalone won't fatal.
+if (!function_exists('logmsg')) {
+    /**
+     * Minimal logger used when update-step2 runs outside update.php
+     *
+     * Mirrors the behaviour of the main updater by writing to
+     * /var/log/pmss-update.log and falling back to /tmp if needed.
+     */
+    function logmsg(string $m): void {
+        $ts = date('[Y-m-d H:i:s] ');
+        $log = '/var/log/pmss-update.log';
+        $alt = '/tmp/pmss-update.log';
+
+        @file_put_contents($log, $ts.$m.PHP_EOL, FILE_APPEND | LOCK_EX)
+     || @file_put_contents($alt, $ts.$m.PHP_EOL, FILE_APPEND | LOCK_EX);
+        fwrite(STDERR, $m.PHP_EOL);
+    }
+}
+
+// Mark the start of this update step in the log
+logmsg('update-step2.php starting');
+
 //Hacky thing due to a bug in github version not getting updated when refactored.
 //In essence this makes update.php kinda dynamic too...
 #TODO Remove around 05/2024
@@ -25,6 +48,8 @@ if (strpos($updateSource, 'soft.sh') !== false) {
     passthru('/scripts/update.php');
     die();   // Avoid infinite loop :)
 }
+
+
 
 
 
@@ -149,18 +174,6 @@ if (!file_exists('/var/run/pmss')) {
 // Record when this update was executed
 file_put_contents('/var/run/pmss/updated', date('Y-m-d'));
 
-$wheezyRepos = <<<EOF
-deb http://debian.bhs.mirrors.ovh.net/debian/ wheezy main non-free
-deb-src http://debian.bhs.mirrors.ovh.net/debian/ wheezy main non-free
-
-deb http://security.debian.org/ wheezy/updates main non-free
-deb-src http://security.debian.org/ wheezy/updates main non-free
-
-deb http://ppa.launchpad.net/jcfp/ppa/ubuntu precise main
-
-deb http://www.bunkus.org/debian/wheezy/ ./
-
-EOF;
 
 $jessieRepos = <<<EOF
 deb http://ftp.funet.fi/debian/ jessie main non-free
@@ -223,56 +236,90 @@ EOF;
 
 /****  END CONFIG ****/
 
+/**
+ * Ensure /etc/apt/sources.list matches the desired repository configuration.
+ *
+ * The repository definitions are passed in as an associative array keyed by
+ * codename.  Only when the SHA1 hash of the current sources.list differs from
+ * the desired configuration will the file be replaced and the action logged.
+ */
+function updateAptSources(string $distroName, int $distroVersion, string $currentRepos,
+                          array $repos): void {
+    switch ($distroName) {
+        case 'debian':
+            switch ($distroVersion) {
+                case 8:
+                    $hash = sha1($repos['jessie']);
+                    if ($currentRepos !== $hash) {
+                        file_put_contents('/etc/apt/sources.list', $repos['jessie']);
+                        passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+                        passthru('apt-get clean;');
+                        logmsg('Applied Debian Jessie repository config');
+                    } else {
+                        logmsg('Debian Jessie repositories already correct');
+                    }
+                    break;
+
+                case 10:
+                    echo `apt update -y`;
+                    $hash = sha1($repos['buster']);
+                    if ($currentRepos !== $hash) {
+                        file_put_contents('/etc/apt/sources.list', $repos['buster']);
+                        logmsg('Applied Debian Buster repository config');
+                    } else {
+                        logmsg('Debian Buster repositories already correct');
+                    }
+                    break;
+
+                case 11:
+                    echo `apt update -y`;
+                    $hash = sha1($repos['bullseye']);
+                    if ($currentRepos !== $hash) {
+                        file_put_contents('/etc/apt/sources.list', $repos['bullseye']);
+                        logmsg('Applied Debian Bullseye repository config');
+                    } else {
+                        logmsg('Debian Bullseye repositories already correct');
+                    }
+                    break;
+
+                case 12:
+                    echo `apt update -y`;
+                    $hash = sha1($repos['bookworm']);
+                    if ($currentRepos !== $hash) {
+                        file_put_contents('/etc/apt/sources.list', $repos['bookworm']);
+                        logmsg('Applied Debian Bookworm repository config');
+                    } else {
+                        logmsg('Debian Bookworm repositories already correct');
+                    }
+                    break;
+            }
+            break;
+
+        case 'ubuntu':
+            die("Ubuntu is not supported yet.\n");
+
+        default:
+            die("Unsupported distro.\n");
+    }
+}
+
+
 $currentRepos = sha1(file_get_contents('/etc/apt/sources.list'));
 
-switch($distroName){
-    case "debian":
-        switch($distroVersion) {
-            case 7:
-                if ($currentRepos != sha1($wheezyRepos) ) {
-                    file_put_contents('/etc/apt/sources.list', $wheezyRepos);
-        //            passthru('apt-get update; apt-get upgrade -y;');
-                }
-                break;
-                
-            case 8:
-                if ($currentRepos != sha1($jessieRepos) ) {
-                    file_put_contents('/etc/apt/sources.list', $jessieRepos);
-                    passthru('echo \'Acquire::Check-Valid-Until "false";\' >/etc/apt/apt.conf.d/90ignore-release-date');
-                    passthru('apt-get clean;');
-                }
-                break;
-
-            case 10:	// Debian10
-                echo `apt update -y`;	// Get new minor version update
-                if ($currentRepos != sha1($busterRepos) ) {
-                    file_put_contents('/etc/apt/sources.list', $busterRepos);
-                }
-                break;
-
-            case 11:	// Debian11
-                echo `apt update -y`;	// Get new minor version update
-                if ($currentRepos != sha1($busterRepos) ) {
-                    file_put_contents('/etc/apt/sources.list', $bullseyeRepos);
-                }
-                break;
-
-            case 12:	// Debian12
-                echo `apt update -y`;	// Get new minor version update
-                if ($currentRepos != sha1($busterRepos) ) {
-                    file_put_contents('/etc/apt/sources.list', $bookwormRepos);
-                }
-                break;
-
-        }
-        break;
-    case "ubuntu":
-        die("Ubuntu is not supported yet.\n");
-        break;
-    default:
-        die("Unsupported distro.\n");
-        break;
-}
+// Compare against the known-good repository definitions and re-write the
+// sources list if it differs.  This keeps package updates consistent across
+// nodes even if admins tweak the file manually.
+updateAptSources(
+    $distroName,
+    (int)$distroVersion,
+    $currentRepos,
+    [
+        'jessie'   => $jessieRepos,
+        'buster'   => $busterRepos,
+        'bullseye' => $bullseyeRepos,
+        'bookworm' => $bookwormRepos,
+    ]
+);
 
 // Localnet file location fix -- this is very old TODO Remove say 09/2025
 if (file_exists('/etc/seedbox/localnet') && !file_exists('/etc/seedbox/config/localnet')) {
@@ -405,6 +452,8 @@ foreach($users AS $thisUser) {
     if (file_exists("/home/{$thisUser}/www-disabled")) continue; // User is suspended
  
     echo "***** Updating user {$thisUser}\n";
+    // Helpful when tracing user-specific issues during upgrades
+    logmsg("Updating user {$thisUser}");
 
     echo "\tConfiguring lighttpd\n";
     passthru("/scripts/util/configureLighttpd.php {$thisUser}");
@@ -714,6 +763,8 @@ return array(
 EOF;
 
     file_put_contents($networkConfigFile, $networkConfig);
+    // First time run on a fresh install will create this file
+    logmsg('Created default network configuration');
 
     // Allow administrator to review/edit the generated file
     passthru('vim /etc/seedbox/config/network');
@@ -725,3 +776,7 @@ EOF;
 
 // Temporary security hardening until dedicated script exists
 `chmod o-r /var/log/wtmp /var/run/utmp  /usr/bin/netstat /usr/bin/who /usr/bin/w`;
+
+// Mark the end of phase 2 so log parsing knows we finished cleanly
+logmsg('update-step2.php completed');
+

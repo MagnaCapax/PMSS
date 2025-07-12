@@ -6,11 +6,16 @@ $users = explode("\n", $users);
 
 $networkConfig = include '/etc/seedbox/config/network';
 
-$localnets = false;
+$localnets = ['185.148.0.0/22'];
+// Define LAN ranges that bypass traffic accounting.
+// Administrators may list multiple networks in /etc/seedbox/config/localnet.
 if (file_exists('/etc/seedbox/config/localnet')) {
-    $localnets = trim( file_get_contents('/etc/seedbox/config/localnet') );
-    $localnets = explode("\n", $localnets);
-
+    $cfg = trim(file_get_contents('/etc/seedbox/config/localnet'));
+    if ($cfg !== '') {
+        $localnets = preg_split('/\r?\n/', $cfg);
+    }
+} else {
+    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n");
 }
 
 
@@ -18,26 +23,72 @@ if (file_exists('/etc/seedbox/config/localnet')) {
 require_once '/scripts/lib/networkInfo.php';
 if (!isset($link) or empty($link)) die("Error: Could not get interfaces information\n");
 
+/**
+ * Execute an iptables rule and log the command.
+ *
+ * @param string $rule arguments for iptables binary
+ */
+function runIptables($rule)
+{
+    $cmd = "/sbin/iptables $rule";
+    echo "Executing: $cmd\n";
+    exec($cmd, $out, $ret);
+    if ($ret !== 0) {
+        file_put_contents('/var/log/pmss/iptables.log', date('c') . " ERROR $cmd\n", FILE_APPEND);
+    }
+}
 
 $monitoringRules = shell_exec('/scripts/util/makeMonitoringRules.php');
 if (!empty($monitoringRules)) {
-    passthru('/sbin/iptables -F OUTPUT'); // let's first clear old rules
-    passthru($monitoringRules);
+    runIptables('-F OUTPUT');
+    foreach (explode("\n", trim($monitoringRules)) as $line) {
+        $line = trim(preg_replace('/^\/?sbin\/iptables\s+/', '', $line));
+        if ($line !== '') runIptables($line);
+    }
 }
-passthru('/sbin/iptables -F FORWARD');
-passthru('/sbin/iptables -F INPUT');
 
-`echo 1 > /proc/sys/net/ipv4/ip_forward`;
+$replacements = [
+    '##IFACE##' => $networkConfig['interface'],
+    '##LINK##'  => $link
+];
 
-`iptables -F INPUT`;	// Clear all rules first
-`iptables -A INPUT -i {$networkConfig['interface']} -m state --state NEW -p udp --dport 1194 -j ACCEPT`;
-`iptables -A INPUT -i tun+ -j ACCEPT`;
-`iptables -A FORWARD -i tun+ -o tun+ -j DROP`; // Note: The below rule only prevents client-to-client traffic.
-`iptables -A FORWARD -i tun+ -j ACCEPT`;
-`iptables -A FORWARD -i tun+ -o {$networkConfig['interface']} -m state --state RELATED,ESTABLISHED -j ACCEPT`;
-`iptables -A FORWARD -i {$networkConfig['interface']} -o tun+ -m state --state RELATED,ESTABLISHED -j ACCEPT`;
-`iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o {$link} -j MASQUERADE`;
-`iptables -A OUTPUT -o tun+ -j ACCEPT`;
+$inputRules = [
+    '-F INPUT',
+    '-A INPUT -i ##IFACE## -m state --state NEW -p udp --dport 1194 -j ACCEPT',
+    '-A INPUT -i tun+ -j ACCEPT'
+];
+
+$forwardRules = [
+    '-F FORWARD',
+    '-A FORWARD -i tun+ -o tun+ -j DROP',
+    '-A FORWARD -i tun+ -j ACCEPT',
+    '-A FORWARD -i tun+ -o ##IFACE## -m state --state RELATED,ESTABLISHED -j ACCEPT',
+    '-A FORWARD -i ##IFACE## -o tun+ -m state --state RELATED,ESTABLISHED -j ACCEPT'
+];
+
+$natRules = [
+    '-t nat -A POSTROUTING -s 10.8.0.0/24 -o ##LINK## -j MASQUERADE'
+];
+
+$outputRules = [
+    '-A OUTPUT -o tun+ -j ACCEPT'
+];
+
+file_put_contents('/proc/sys/net/ipv4/ip_forward', '1');
+
+foreach ($inputRules as $rule) {
+    runIptables(str_replace(array_keys($replacements), array_values($replacements), $rule));
+}
+foreach ($forwardRules as $rule) {
+    runIptables(str_replace(array_keys($replacements), array_values($replacements), $rule));
+}
+foreach ($natRules as $rule) {
+    runIptables(str_replace(array_keys($replacements), array_values($replacements), $rule));
+}
+foreach ($outputRules as $rule) {
+    runIptables(str_replace(array_keys($replacements), array_values($replacements), $rule));
+}
+
 
 
 # Filtering bogons http://bgphelp.com/2017/02/21/ipv4-bogons/
@@ -56,13 +107,14 @@ $filterInput = array(
     '203.0.113.0/24',
     '224.0.0.0/3'
 );
-foreach($filterInput AS $thisFilter)
-    `iptables -I INPUT -i {$networkConfig['interface']} -s {$thisFilter} -j DROP`;
+foreach ($filterInput as $thisFilter) {
+    runIptables("-I INPUT -i {$networkConfig['interface']} -s {$thisFilter} -j DROP");
+}
 
 
 // Positioned here so it stays higher on the rule list
-`iptables -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j DROP`;   // Mitigate tcpsack attacks  https://access.redhat.com/security/vulnerabilities/tcpsack
-`iptables -I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j LOG --log-prefix "tcpsack: " --log-level 4`;	// Log tcpsack attacks  TODO Remove this around 03/2020
+runIptables('-I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j DROP');
+runIptables('-I INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j LOG --log-prefix "tcpsack: " --log-level 4');
 
 
 #TODO We could use a ban list here for ssh brute force attempts etc.

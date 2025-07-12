@@ -15,8 +15,9 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             continue;  //Suspended
     }
 
-    if (!file_exists("/home/{$thisUser}/.qbittorrentEnable")) continue;  // Deluge not enabled
+    if (!file_exists("/home/{$thisUser}/.qbittorrentEnable")) continue;  // qBittorrent not enabled
     
+    // pgrep returns running qbittorrent-nox processes owned by the user
     $instances = shell_exec('pgrep -u' . $thisUser . ' qbittorrent-nox');
     if (empty($instances)) startQbittorrent($thisUser);
  

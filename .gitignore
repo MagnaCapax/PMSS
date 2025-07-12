@@ -56,6 +56,10 @@
 
 ## end of var
 
+# Documentation
+!/docs/
+!/docs/*
+
 # Additionally, do not ignore .gitignore file itself
 !.gitignore
 

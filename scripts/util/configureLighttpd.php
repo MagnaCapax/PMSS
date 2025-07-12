@@ -31,10 +31,8 @@ foreach($users AS $thisUser) {
     if (file_exists($portFile)) {
         $serverPort = (int) file_get_contents($portFile);
     } else {
-        #TODO command line script to set the port
-		#TODO and check that no one else uses the same, doh!
-        $serverPort = (int) rand(2000,38000);
-        file_put_contents($portFile, $serverPort);
+        // Allocate a unique port using portManager utility
+        $serverPort = (int) trim(shell_exec("/scripts/util/portManager.php assign {$thisUser} lighttpd"));
     }
     
     

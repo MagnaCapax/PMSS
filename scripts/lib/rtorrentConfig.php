@@ -162,18 +162,19 @@ class rtorrentConfig {
     }
     
     protected function _configPortPrivate($type, $rangeStart = 2000, $rangeEnd = 65000) {
-        $directoryBase = '/var/run/pmss/ports';
-        $directoryType = '/' . $directoryBase . $type;
+        // Use persistent location for reserved ports
+        $directoryBase = '/var/lib/pmss/ports';
+        $directoryType = $directoryBase . '/' . $type;
         
         if (!file_exists($directoryBase)) mkdir($directoryBase, 0755);
         if (!file_exists($directoryType)) mkdir($directoryType, 0755);
         
-        $port = round(rand($rangeStart, $rangeEnd));
-        
-        if (file_exists($directoryType . '/' . $port)) $this->_configPortPrivate($type, $rangeStart, $rangeEnd);  // Highly doubtfull this will remain in infinite loop under normal conditions
-        
+        do {
+            $port = round(rand($rangeStart, $rangeEnd));
+        } while (file_exists($directoryType . '/' . $port));
+
         touch($directoryType . '/' . $port);
-        
+
         return $port;
         
         

@@ -60,6 +60,9 @@ $userDb->addUser( $user['name'], array(
     'suspended' => false
 ));
 
+// Assign HTTP server port
+passthru("/scripts/util/portManager.php assign {$user['name']} lighttpd");
+
 // Configure quota, rtorrent and ruTorrent.
 passthru('/scripts/util/userConfig.php "' . $user['name'] . '" "' . $user['memory'] . '" "' . $user['quota'] . '"');
 

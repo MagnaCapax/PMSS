@@ -35,8 +35,9 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 
     }
 
-    // Connect to php-cgi socket
-    for ($i = 0; $i < 1; $i++) {  // Adjust the number 4 according to your `max-procs` value
+    // Connect to each php-cgi socket to verify it responds.
+    // Increment the loop bound if php.max-procs is greater than one.
+    for ($i = 0; $i < 1; $i++) {
         $socket = fsockopen("unix:///home/{$thisUser}/.lighttpd/php.socket-$i", 0, $errno, $errstr, 1);
         if (!$socket or $errno or $errstr) {        
             echo "Error when attempting to connect to socket /home/{$thisUser}/.lighttpd/php.socket-$i: {$errno}, {$errstr}\n";
@@ -45,7 +46,9 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             break;
         }
 
-        if ($socketError); continue;
+        if ($socketError) {
+            continue;
+        }
     }
     if ($socketError == true) {
         if (restartAllowed('lighttpd', $thisUser)) restartLighttpd($thisUser);

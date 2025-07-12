@@ -1,5 +1,11 @@
 #!/usr/bin/php
 <?php
+// Cron job log file paths match the cron schedule in root.cron
+const LOG_FILE     = '/var/log/pmss/trafficLog.log';
+const FALLBACK_LOG = '/tmp/trafficLog.log';
+
+require_once '/scripts/lib/logger.php';
+$logger = new Logger(__FILE__);
 /**
  * Collect traffic usage statistics
  *
@@ -17,12 +23,20 @@ $users = explode("\n", $users);
 if (count($users) == 0) exit;    // Nothing to collect
 $users[] = 'www-data';  // Add www-data instance, we want to see this account aswell
 
-$localnets = false;
+// Load optional localnet definitions for counting LAN traffic separately.
+// Multiple networks may be listed one per line. If the file is missing
+// create one with the default Pulsed Media LAN range so admins know where
+// to customise it.
+$localnets = ['185.148.0.0/22'];
 if (file_exists('/etc/seedbox/config/localnet')) {
-    $localnets = trim( file_get_contents('/etc/seedbox/config/localnet') );
-    $localnets = explode("\n", $localnets);
-    
+    $cfg = trim(file_get_contents('/etc/seedbox/config/localnet'));
+    if ($cfg !== '') {
+        $localnets = preg_split('/\r?\n/', $cfg);
+    }
+} else {
+    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n");
 }
+// Provides $link and $linkSpeed variables used for threshold checks
 require_once '/scripts/lib/networkInfo.php';
 
     // Collect the current iptables stats and then reset the counters
@@ -42,7 +56,7 @@ chmod($thisUsageFile, 0600);
 
 //echo "Data: \n {$usage} \n";
 
-echo date('Y-m-d H:i:s') . ": Collecting data\n";
+$logger->msg("Collecting data");
 
 foreach($users AS $thisUser) {
     $thisUid = trim( shell_exec("id -u {$thisUser}") );
@@ -67,9 +81,14 @@ foreach($users AS $thisUser) {
         file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
         continue;  
     }
+    // Note: variable name typo caused undefined output; use the correct value
     if ($thisUserTrafficLocal > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
-        file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserLocalTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
-        continue;  
+        file_put_contents(
+            $logdir . 'error.log',
+            date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n",
+            FILE_APPEND
+        );
+        continue;
     }
 
 

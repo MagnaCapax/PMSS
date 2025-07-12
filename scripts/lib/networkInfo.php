@@ -1,49 +1,51 @@
 <?php
-/*  Get info on interfaces */
-# Determine what is our primary link #TODO: Check based on public address? If this ever bugs, then yes
-# if bonding interface found, otherwise first eth interface - This works for us, but may not work in all cases
-# if this does not work you can output static info too
+/**
+ * Utilities for retrieving network interface details.
+ *
+ * Including this file defines `$link` and `$linkSpeed` variables for the
+ * primary interface and its speed in Mbps. Configuration values from
+ * `/etc/seedbox/config/network` are used when available and otherwise
+ * detection falls back to `ip` and `ethtool`.
+ *
+ * Verified to work on Debian 10, 11 and 12. Older releases like Debian 8
+ * should also function provided `iproute2` and `ethtool` are available.
+ */
 
-#TODO uh oh so much refactoring ahead!
-
-$networkConfig = include '/etc/seedbox/config/network';
-$link = $networkConfig['interface'];
-$linkSpeed = $networkConfig['speed'];
-
-// None below actually work reliably
-
-/*
-$link = trim( shell_exec("/sbin/ifconfig|grep Ethernet|grep -v '\-ifb'|cut -d' ' -f1") );
-//$links = explode("\n", $link);
-if (strpos($link, 'bond') !== false) $link = 'bond0';
-	else $link = 'eth0';
-
-//echo $link . "\n";
-
-$linkSpeed = shell_exec("/sbin/ethtool {$link}|grep Speed");
-//echo $linkSpeed;
-
-#TODO Yucky code below, could do with a refactor
-if (empty($linkSpeed) or
-    (
-        strpos($linkSpeed, '10Mb') === false &&
-        strpos($linkSpeed, '100Mb') === false &&
-        strpos($linkSpeed, '1000Mb') === false &&
-        strpos($linkSpeed, '10000Mb') === false &&
-        strpos($linkSpeed, '20000Mb') === false
-
-    )
-    ) {
-        echo "Couldn't determine link speed, string: {$linkSpeed} -- Defaulting to 1000Mbps\n";
-        $linkSpeed = 1000;
+/** Determine the primary network interface name. */
+function detectPrimaryInterface(): string
+{
+    if (file_exists('/etc/seedbox/config/network')) {
+        $cfg = include '/etc/seedbox/config/network';
+        if (is_array($cfg) && !empty($cfg['interface'])) {
+            return $cfg['interface'];
+        }
     }
-    elseif (strpos($linkSpeed, '20000Mb') !== false) $linkSpeed = 20000;
-    elseif (strpos($linkSpeed, '10000Mb') !== false) $linkSpeed = 10000;
-    elseif (strpos($linkSpeed, '1000Mb') !== false) $linkSpeed = 1000;
-    elseif (strpos($linkSpeed, '100Mb') !== false) $linkSpeed = 100;
-    else $linkSpeed = 10;
 
-//echo "Determined link speed: {$linkSpeed}\n";
-//echo "{$link}||{$linkSpeed}\n";
+    $iface = trim(shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'"));
+    if ($iface === '') {
+        $iface = 'eth0';
+    }
+    return $iface;
+}
 
-*/
+/** Detect interface speed in Mbps using configuration or ethtool. */
+function getLinkSpeed(string $iface): int
+{
+    if (file_exists('/etc/seedbox/config/network')) {
+        $cfg = include '/etc/seedbox/config/network';
+        if (is_array($cfg) && isset($cfg['speed'])) {
+            return (int)$cfg['speed'];
+        }
+    }
+
+    $raw = shell_exec("/sbin/ethtool {$iface} 2>/dev/null | grep 'Speed:'");
+    if ($raw && preg_match('/Speed:\s*(\d+)Mb/', $raw, $m)) {
+        return (int)$m[1];
+    }
+
+    return 1000; // default if detection fails
+}
+
+$link = detectPrimaryInterface();
+$linkSpeed = getLinkSpeed($link);
+

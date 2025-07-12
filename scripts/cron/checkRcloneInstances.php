@@ -15,7 +15,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             continue;  //Suspended
     }
 
-    if (!file_exists("/home/{$thisUser}/.rcloneEnable")) continue;  // Deluge not enabled
+    // Skip users that have not explicitly enabled rclone support
+    if (!file_exists("/home/{$thisUser}/.rcloneEnable")) continue;
     
     $instances = shell_exec('pgrep -u' . $thisUser . ' rclone');
     if (empty($instances)) startRclone($thisUser);
