@@ -10,4 +10,4 @@ deb http://www.nic.funet.fi/debian/ bullseye-updates main non-free contrib
 deb-src http://www.nic.funet.fi/debian/ bullseye-updates main non-free contrib
 
 # MediaArea repository provides current mediainfo builds.
-deb https://mediaarea.net/repo/deb/debian/ stable main
+deb https://mediaarea.net/repo/deb/debian/ bullseye main

@@ -121,7 +121,7 @@ fi
 parse_version_string() {
 	local input_string="$1"
 
-	if [[ $input_string =~ (^git|^release)\/(.*)[:]?([0-9]{4}-[0-9]{2}-[0-9]{2}([ ]?[0-9]{2}[:][0-9]{2})?)$ ]]; then
+	if [[ $input_string =~ (^git|^release)\/(.*?)[:]?([0-9]{4}-[0-9]{2}-[0-9]{2})?[\ ]?([0-9]{2}[:][0-9]{2})?$ ]]; then
 		type="${BASH_REMATCH[1]}"
 		url="${BASH_REMATCH[2]}"
 		date="${BASH_REMATCH[3]}"
@@ -134,7 +134,7 @@ parse_version_string() {
 			log_info "Repository: $repository"
 			log_info "Branch: $branch"
 
-		elif [[ $url =~ (^main)[:]$ ]]; then
+		elif [[ $url =~ (^[a-zA-Z]*?)[:]?$ ]]; then
 			repository=$DEFAULT_REPOSITORY
 			branch="${BASH_REMATCH[1]}"
 			log_info "Repository: $repository"
@@ -371,6 +371,7 @@ if [ "$type" = "git" ]; then
 	(
 		cd PMSS || exit
 		git checkout "$branch"
+		chmod u+x ./scripts/*.php
 	)
 	rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /
 	rm -rf PMSS

@@ -62,7 +62,7 @@ function pmssEnsureMediaareaRepository(): void
             return;
         }
 
-        $packageUrl  = 'https://mediaarea.net/repo/deb/repo-mediaarea_1.0-20_all.deb';
+        $packageUrl  = 'https://mediaarea.net/repo/deb/repo-mediaarea_1.0-25_all.deb';
         $packagePath = $tmpDir.'/repo-mediaarea.deb';
 
         $downloadCmd = sprintf('wget -q -O %s %s', escapeshellarg($packagePath), escapeshellarg($packageUrl));
