@@ -32,3 +32,18 @@ jobs:
         run: |
           scripts/testing/test-bash.sh
 
+  php73-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 7.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.3'
+          coverage: none
+
+      - name: PHP 7.3 syntax check
+        run: |
+          scripts/testing/php-lint-compat.sh
