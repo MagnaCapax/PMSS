@@ -28,6 +28,10 @@ jobs:
         run: |
           bash scripts/testing/check-tools.sh
 
+      - name: PHP 7.3 compatibility scan (static)
+        run: |
+          bash scripts/testing/php73-compat-scan.sh
+
       - name: PHP lint and dev tests
         run: |
           scripts/testing/test-php.sh
