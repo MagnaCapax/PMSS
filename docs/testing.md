@@ -9,10 +9,14 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 - `test-php.sh` — PHP syntax lint and development suite.
 - `test-bash.sh` — bash syntax check and optional lint/format when tools are present.
 - `test-all.sh` — runs both of the above.
- - `doctrine-lint.sh` — ADR doctrine guardrails (H1, Category, no indexes). Always on in `test-all.sh`.
- - `camelcase-lint.sh` — filename lint for selected first-party PHP directories (lower camelCase filenames). Opt-in via `PMSS_LINT_CAMEL=1`.
- - `docblock-lint.sh` — requires docblocks for classes and public methods in first-party PHP. Opt-in via `PMSS_LINT_DOCBLOCK=1`.
- - `phpstan.sh` — static analysis wrapper (uses `phpstan.neon.dist`). Opt-in via `PMSS_LINT_PHPSTAN=1`.
+- `doctrine-lint.sh` — ADR doctrine guardrails (H1, Category, no indexes). Always on in `test-all.sh`.
+- `camelcase-lint.sh` — filename lint for selected first-party PHP directories (lower camelCase filenames). Opt-in via `PMSS_LINT_CAMEL=1`.
+- `docblock-lint.sh` — requires docblocks for classes and public methods in first-party PHP. Opt-in via `PMSS_LINT_DOCBLOCK=1`.
+- `phpstan.sh` — static analysis wrapper (uses `phpstan.neon.dist`). Opt-in via `PMSS_LINT_PHPSTAN=1`.
+- `classname-lint.sh` — checks class name matches file basename (tests and first-party libs). Opt-in via `PMSS_LINT_CLASS=1`.
+- `sharp-edges-lint.sh` — flags raw `rm -rf`/`mv`/`chmod -R`/`chown -R`/`chgrp -R` outside wrappers. Runs by default in advisory mode.
+- `net-edges-lint.sh` — flags raw `curl`/`wget`/`nc`/`telnet` usage outside `runStep()`; runs by default in advisory mode.
+- `check-tools.sh` — prints availability of optional tools (phpstan, shellcheck, shfmt, rg) for predictable local runs.
 
 These utilities augment existing runners. They do not replace the canonical test entry points.
 
@@ -21,7 +25,12 @@ These utilities augment existing runners. They do not replace the canonical test
   - `PMSS_LINT_CAMEL=1 scripts/testing/test-all.sh`
   - `PMSS_LINT_DOCBLOCK=1 scripts/testing/test-all.sh`
   - `PMSS_LINT_PHPSTAN=1 ALLOW_TOOL_SKIP=1 scripts/testing/test-all.sh`
+  - `PMSS_LINT_CLASS=1 scripts/testing/test-all.sh`
   - `ALLOW_TOOL_SKIP=1` allows skipping tools not installed (e.g., phpstan) rather than failing.
+
+### Advisory Lints (always on)
+- `sharp-edges-lint.sh` runs with `PMSS_LINT_SHARP_STRICT=0` and reports destructive primitives used outside wrappers.
+- `net-edges-lint.sh` runs with `PMSS_LINT_NET_STRICT=0` and reports raw network calls outside wrappers.
 
 ## CI Integration
 GitHub Actions run PHP lint, development tests, and bash checks on pushes and PRs. See `.github/workflows/ci.yml`.

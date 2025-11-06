@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+bash scripts/testing/check-tools.sh
 scripts/testing/test-php.sh
 scripts/testing/test-bash.sh
 echo "doctrine lint"
@@ -19,6 +20,8 @@ if [[ "${PMSS_LINT_PHPSTAN:-0}" == "1" ]]; then
 fi
 echo "sharp-edges lint (advisory)"
 PMSS_LINT_SHARP_STRICT=0 bash scripts/testing/sharp-edges-lint.sh
+echo "net-edges lint (advisory)"
+PMSS_LINT_NET_STRICT=0 bash scripts/testing/net-edges-lint.sh
 
 echo "OK: all checks"
 echo

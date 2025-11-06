@@ -11,7 +11,8 @@ class users extends UserRepository
     /**
      * Cached copy of the user database for quick access.
      */
-    private array $users = [];
+    /** @var array */
+    private $users = [];
 
     public function __construct()
     {

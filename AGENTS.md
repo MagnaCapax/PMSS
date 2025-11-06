@@ -39,6 +39,7 @@ instead of restating details.
 - Never Break Old Users: preserve backward compatibility; ship shims/migrations and time‑boxed deprecations; break only to remediate credible security issues.
 - Visible Footprint: reviewers consider footprint alongside correctness. `scripts/testing/test-all.sh` prints a LOC snapshot to keep drift obvious.
 - No Aliases: identifiers and env keys must be consistent—do not introduce alternate names for the same concept. Example: always use `PMSS_OS_RELEASE_PATH` (never variants like `PMSS_OS_RELEASE_FILE`).
+- Context‑First Naming: name and order from larger context to smaller context in identifiers, logs, and file names where applicable (e.g., dcId → rackId → chassisId → nodeId). Apply the same discipline to env keys and options.
 
 
 ## Coding Agent Notes

@@ -24,6 +24,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y shellcheck shfmt
 
+      - name: Tools preflight
+        run: |
+          scripts/testing/check-tools.sh
+
       - name: PHP lint and dev tests
         run: |
           scripts/testing/test-php.sh
@@ -31,6 +35,22 @@ jobs:
       - name: Bash checks
         run: |
           scripts/testing/test-bash.sh
+
+      - name: ADR doctrine lint
+        run: |
+          bash scripts/testing/doctrine-lint.sh
+
+      - name: Sharp edges (advisory)
+        run: |
+          PMSS_LINT_SHARP_STRICT=0 bash scripts/testing/sharp-edges-lint.sh
+
+      - name: Net edges (advisory)
+        run: |
+          PMSS_LINT_NET_STRICT=0 bash scripts/testing/net-edges-lint.sh
+
+      - name: LOC snapshot
+        run: |
+          scripts/testing/loc.sh || true
 
   php73-lint:
     runs-on: ubuntu-latest
