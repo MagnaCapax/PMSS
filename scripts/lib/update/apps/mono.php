@@ -13,7 +13,7 @@ if ($debianVersion[0] == 8 &&
     !file_exists('/opt/NzbDrone/NzbDrone.exe') &&
     file_exists('/etc/apt/sources.list.d/sonarr.list')) {
 
-    unlink('/etc/apt/sources.list.d/sonarr.list');
+    @unlink('/etc/apt/sources.list.d/sonarr.list');
     passthru("apt-get update");
 }
 

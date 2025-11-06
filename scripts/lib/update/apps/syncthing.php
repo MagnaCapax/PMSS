@@ -2,8 +2,12 @@
 // Install syncthing
 
 $syncthingVersion = 'v1.18.2 "Fermium Flea"';
-if (file_exists('/usr/bin/syncthing') &&
-    strpos(`syncthing -version`, $syncthingVersion) == false ) unlink('/usr/bin/syncthing');
+if (file_exists('/usr/bin/syncthing')) {
+    $out = @shell_exec('syncthing -version 2>/dev/null');
+    if ($out === null || strpos((string)$out, $syncthingVersion) === false) {
+        @unlink('/usr/bin/syncthing');
+    }
+}
 
 if (!file_exists('/usr/bin/syncthing')) {
     echo "*** Syncthing not present, downloading and adding!\n";
