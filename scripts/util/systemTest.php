@@ -174,8 +174,8 @@ foreach ($symlinkTargets as $label => [$link, $expected]) {
     }
 }
 
-$errors = count(array_filter($checks, static fn($c) => $c['status'] === 'ERR'));
-$warnings = count(array_filter($checks, static fn($c) => $c['status'] === 'WARN'));
+$errors = count(array_filter($checks, static function ($c) { return $c['status'] === 'ERR'; }));
+$warnings = count(array_filter($checks, static function ($c) { return $c['status'] === 'WARN'; }));
 $summary = [
     'ok'   => count($checks) - $warnings - $errors,
     'warn' => $warnings,

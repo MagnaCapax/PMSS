@@ -44,7 +44,9 @@ if (!function_exists('pmssProfileSummary')) {
         if (empty($profile)) {
             return;
         }
-        usort($profile, static fn($a, $b) => $b['duration'] <=> $a['duration']);
+        usort($profile, static function ($a, $b) {
+            return $b['duration'] <=> $a['duration'];
+        });
         $topSteps = array_slice($profile, 0, 5);
         logmsg('Step duration summary (top 5):');
         foreach ($topSteps as $entry) {

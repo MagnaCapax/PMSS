@@ -46,7 +46,7 @@ function pmssEnsureMediaareaRepository(): void
         $override = getenv('PMSS_MEDIAAREA_KEY_PATHS');
         if (is_string($override) && $override !== '') {
             $candidates = array_map('trim', explode(PATH_SEPARATOR, $override));
-            $candidates = array_filter($candidates, static fn($path) => $path !== '');
+            $candidates = array_filter($candidates, static function ($path) { return $path !== ''; });
             if (!empty($candidates)) {
                 $keyFiles = $candidates;
             }

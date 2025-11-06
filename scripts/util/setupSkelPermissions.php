@@ -84,5 +84,5 @@ if (is_dir($configDir)) {
     @chmod($configDir, 0775);
 }
 
-$failed = array_filter($exitCodes, static fn($rc) => $rc !== 0);
+$failed = array_filter($exitCodes, static function ($rc) { return $rc !== 0; });
 exit($failed ? 1 : 0);

@@ -77,6 +77,6 @@ foreach ($results as $entry) {
     echo $label.$entry['name'].$detail.PHP_EOL;
 }
 echo str_repeat('-', 60)."\n";
-$warn = count(array_filter($results, static fn($r) => $r['status'] === 'WARN'));
-$err  = count(array_filter($results, static fn($r) => $r['status'] === 'ERR'));
+$warn = count(array_filter($results, static function ($r) { return $r['status'] === 'WARN'; }));
+$err  = count(array_filter($results, static function ($r) { return $r['status'] === 'ERR'; }));
 echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", count($results) - $warn - $err, $warn, $err);

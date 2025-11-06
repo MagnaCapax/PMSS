@@ -31,5 +31,5 @@ $exitCodes[] = runStep(
 $exitCodes[] = runStep('Reloading cron daemon', '/etc/init.d/cron force-reload');
 $exitCodes[] = runStep('Restarting cron daemon', '/etc/init.d/cron restart');
 
-$failed = array_filter($exitCodes, static fn($rc) => $rc !== 0);
+$failed = array_filter($exitCodes, static function ($rc) { return $rc !== 0; });
 exit($failed ? 1 : 0);

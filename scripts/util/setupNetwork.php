@@ -61,7 +61,7 @@ $tcpsackRules = [
 
 // Render bogon list into INPUT drop rules for the uplink interface.
 $bogonRules = array_map(
-    fn (string $source) => "-A INPUT -i ##IFACE## -s {$source} -j DROP",
+    function (string $source) { return "-A INPUT -i ##IFACE## -s {$source} -j DROP"; },
     $bogonSources
 );
 
@@ -109,11 +109,11 @@ $natCommands = [
 file_put_contents('/proc/sys/net/ipv4/ip_forward', '1');
 
 $renderedFilter = array_map(
-    fn (string $cmd) => str_replace(array_keys($replacements), array_values($replacements), $cmd),
+    function (string $cmd) use ($replacements) { return str_replace(array_keys($replacements), array_values($replacements), $cmd); },
     $filterCommands
 );
 $renderedNat = array_map(
-    fn (string $cmd) => str_replace(array_keys($replacements), array_values($replacements), $cmd),
+    function (string $cmd) use ($replacements) { return str_replace(array_keys($replacements), array_values($replacements), $cmd); },
     $natCommands
 );
 
