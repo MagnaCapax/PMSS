@@ -70,6 +70,21 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
     foreach ($sedPairs as [$expr, $path]) {
         runCommand("sed -i '{$expr}' {$path}");
     }
+
+    // Ensure security repository uses the live security host after upgrade.
+    // Older Buster hosts may have been pointed at archive.debian.org; that host
+    // does not serve bullseye-security. Rewrite any archived security entries
+    // to security.debian.org explicitly.
+    $paths = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'];
+    foreach ($paths as $path) {
+        runCommand("sed -i -E 's@https?://archive\\.debian\\.org/debian-security@http://security.debian.org/debian-security@g' {$path}");
+    }
+
+    // Prefer active mirrors for the main archive after the upgrade. Switch
+    // archive.debian.org back to deb.debian.org for bullseye entries.
+    foreach ($paths as $path) {
+        runCommand("sed -i -E 's@https?://archive\\.debian\\.org/debian@http://deb.debian.org/debian@g' {$path}");
+    }
 }
 
 /**
