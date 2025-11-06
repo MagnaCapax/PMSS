@@ -29,6 +29,8 @@ instead of restating details.
 - Code behavior is the ground truth when discrepancies arise; update docs/ADRs to match.
 - Significant behavior, interface, security, or workflow changes must include an ADR capturing context, considered options, the decision, and consequences.
 - One ADR decides one subject. Cross-reference related ADRs when needed.
+ - Naming conventions: see `docs/adr/0002-naming-conventions.md` for the
+   camelCase/StudlyCaps rules adopted for PHP and the guidance for scripts.
 
 ## Coding Agent Notes
 - Split non-library scripts once they cross 75 lines; extract helpers into dedicated modules instead of allowing single files to balloon.
