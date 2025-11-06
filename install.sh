@@ -203,6 +203,73 @@ ensure_packages() {
 }
 
 export DEBIAN_FRONTEND=noninteractive
+
+# Detect Debian codename/major and, for Debian 10 (buster), rewrite APT sources
+# to archived mirrors so installs keep working on EOL systems. Keep this logic
+# scoped strictly to Debian 10 to avoid affecting supported releases.
+detect_debian_codename() {
+    local codename="" major=""
+    if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        codename="${VERSION_CODENAME:-}"
+        major="${VERSION_ID%%.*}"
+    fi
+    if [ -z "$codename" ] && [ -r /etc/debian_version ]; then
+        case "$(cut -d'.' -f1 </etc/debian_version)" in
+            10) codename=buster; major=10 ;;
+            11) codename=bullseye; major=11 ;;
+            12) codename=bookworm; major=12 ;;
+        esac
+    fi
+    printf '%s;%s\n' "$codename" "$major"
+}
+
+configure_buster_archive_sources_if_needed() {
+    local info codename major backup sl
+    info=$(detect_debian_codename)
+    codename=${info%%;*}
+    major=${info##*;}
+
+    if [ "$codename" != "buster" ] && [ "$major" != "10" ]; then
+        return 0
+    fi
+
+    log_step "Debian 10 detected; switching APT sources to archive.debian.org"
+
+    # Backup main sources.list before changes.
+    if [ -f /etc/apt/sources.list ]; then
+        backup="/etc/apt/sources.list.pmss-backup-$(date +%Y%m%d%H%M%S)"
+        cp /etc/apt/sources.list "$backup" 2>/dev/null || true
+        log_info "Backed up sources.list to ${backup##*/}"
+    fi
+
+    # Write minimal archived sources for buster. Use http to avoid TLS issues on bare installs.
+    cat >/etc/apt/sources.list <<'SRC'
+deb http://archive.debian.org/debian buster main contrib non-free
+deb http://archive.debian.org/debian-security buster/updates main contrib non-free
+SRC
+
+    # Disable any non-archive buster entries under sources.list.d to prevent 404s.
+    if ls /etc/apt/sources.list.d/*.list >/dev/null 2>&1; then
+        for sl in /etc/apt/sources.list.d/*.list; do
+            [ -f "$sl" ] || continue
+            if grep -Eq '^[[:space:]]*deb[[:space:]].*(debian|debian-security).*buster' "$sl" \
+               && ! grep -Eq 'archive\.debian\.org' "$sl"; then
+                cp "$sl" "${sl}.pmss-backup-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+                sed -E -i 's@^([^#].*)@# PMSS(buster-archive): disabled: \1@' "$sl"
+                log_info "Disabled stale buster entry in ${sl##*/}"
+            fi
+        done
+    fi
+
+    # EOL Release files are often past Valid-Until; relax check for buster only.
+    cat >/etc/apt/apt.conf.d/99pmss-buster-archive <<'APT'
+Acquire::Check-Valid-Until "false";
+APT
+}
+
+configure_buster_archive_sources_if_needed
 log_step "Updating package lists"
 apt update
 log_step "Running apt full-upgrade"
