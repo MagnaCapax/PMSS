@@ -6,6 +6,10 @@
 // Host naming //
 // .pulsedmedia.com gets appended if it's missing
 // Client config filenames use dashes instead of dots
+// Ensure serverHostname is defined on older hosts where the caller didn't set it.
+$serverHostname = isset($serverHostname) && $serverHostname !== ''
+    ? (string)$serverHostname
+    : trim((string) @file_get_contents('/etc/hostname'));
 $openvpnClientConfigHostname = $serverHostname;
 if (strpos($openvpnClientConfigHostname, '.pulsedmedia.com') === false) $openvpnClientConfigHostname .= '.pulsedmedia.com';
 $openvpnClientConfigFilename = str_replace('.', '-', $openvpnClientConfigHostname);

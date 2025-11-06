@@ -38,7 +38,9 @@ if (!function_exists('runCommand')) {
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $process = proc_open(['/bin/bash', '-lc', $cmd], $descriptor, $pipes, null, null, ['bypass_shell' => true]);
+        // Use a single command string for PHP 7.3 compatibility.
+        $bash = '/bin/bash -lc ' . escapeshellarg($cmd);
+        $process = proc_open($bash, $descriptor, $pipes);
         if (!is_resource($process)) {
             $log('[WARN] Failed to launch command: '.$cmd);
             $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];

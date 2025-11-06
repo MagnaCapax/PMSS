@@ -11,5 +11,4 @@ deb-src http://archive.debian.org/debian-security buster/updates main contrib no
 deb http://archive.debian.org/debian buster-updates main contrib non-free
 deb-src http://archive.debian.org/debian buster-updates main contrib non-free
 
-# MediaArea repository provides current mediainfo builds (kept for hosts that can reach it).
-deb [signed-by=/etc/apt/keyrings/mediaarea.gpg] https://mediaarea.net/repo/deb/debian/ stable main
+# Note: MediaArea apt repo is omitted on Buster (EOL) to avoid 404/Release errors.
