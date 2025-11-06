@@ -92,29 +92,34 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
  */
 function pmssExecuteUpgrade(): void
 {
-    $commands = [
-        'export DEBIAN_FRONTEND=noninteractive',
-        'apt-get update',
-        'apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
-        'apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
-        'apt-get autoremove -y',
-    ];
+    $env = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
-    $rc = runCommand(implode(' && ', $commands), true);
+    // Update package lists
+    runCommand("$env apt-get update", true);
+
+    // Upgrade packages (step 1)
+    $rc = runCommand("$env apt-get upgrade -y $opts", true);
     if ($rc !== 0) {
-        // Attempt recovery from interrupted dpkg configuration or dependency issues.
-        logMessage('dist-upgrade: attempting recovery (dpkg --configure -a, apt-get -f install)');
+        logMessage('dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)');
         runCommand('dpkg --configure -a', true);
-        runCommand('apt-get -f install -y', true);
-        runCommand('apt-get update', true);
-        // Retry the upgrade sequence once more.
-        $retry = [
-            'apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
-            'apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
-            'apt-get autoremove -y',
-        ];
-        runCommand(implode(' && ', $retry), true);
+        runCommand("$env apt-get -f install -y", true);
+        runCommand("$env apt-get update", true);
+        runCommand("$env apt-get upgrade -y $opts", true);
     }
+
+    // Dist-upgrade (step 2)
+    $rc = runCommand("$env apt-get full-upgrade -y $opts", true);
+    if ($rc !== 0) {
+        logMessage('dist-upgrade: full-upgrade failed, attempting recovery');
+        runCommand('dpkg --configure -a', true);
+        runCommand("$env apt-get -f install -y", true);
+        runCommand("$env apt-get update", true);
+        runCommand("$env apt-get full-upgrade -y $opts", true);
+    }
+
+    // Autoremove residuals
+    runCommand("$env apt-get autoremove -y", true);
 }
 
 /**
