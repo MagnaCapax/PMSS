@@ -33,6 +33,7 @@ instead of restating details.
 
 ## Engineering Doctrine (Repository Constitution)
 - Deletion‑First: prefer removing code paths/knobs over adding new ones; unify flows instead of special‑casing; prune dead code/config promptly. The best part is no part; refactoring wins.
+- Minimal Edits: keep diffs small, coherent, and reviewable; prefer changes that reduce complexity/LOC. Refactor toward clarity before adding features.
 - One Flow, No Special Cases: keep a single, explicit update path. Any exception requires an ADR and a removal plan.
 - Pit of Success Defaults: make safe paths the default; risky paths demand explicit, noisy opt‑in.
 - Never Break Old Users: preserve backward compatibility; ship shims/migrations and time‑boxed deprecations; break only to remediate credible security issues.

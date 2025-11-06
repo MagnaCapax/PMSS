@@ -17,10 +17,8 @@ if [[ "${PMSS_LINT_PHPSTAN:-0}" == "1" ]]; then
   echo "phpstan analysis"
   PHPSTAN_DISABLE_PARALLEL=1 bash scripts/testing/phpstan.sh
 fi
-if [[ "${PMSS_LINT_SHARP:-0}" == "1" ]]; then
-  echo "sharp-edges lint"
-  bash scripts/testing/sharp-edges-lint.sh
-fi
+echo "sharp-edges lint (advisory)"
+PMSS_LINT_SHARP_STRICT=0 bash scripts/testing/sharp-edges-lint.sh
 
 echo "OK: all checks"
 echo
