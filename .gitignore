@@ -61,7 +61,12 @@
 
 # Documentation
 !/docs/
-!/docs/*
+!/docs/**
+!/tests/
+!/tests/**
+!/.github/
+!/.github/**
+!/CONTRIBUTING.md
 
 # Additionally, do not ignore .gitignore file itself
 !.gitignore

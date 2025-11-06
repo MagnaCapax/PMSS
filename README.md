@@ -22,6 +22,12 @@ For a quick maintenance checklist covering dry-runs, structured logging and
 tests, see `docs/maintenance.md`. WireGuard usage notes are available in
 `docs/wireguard.md`.
 
+### Contributing & Decisions
+
+See `CONTRIBUTING.md` for workflow and validation steps. Significant technical
+choices are recorded as ADRs under `docs/adr/`; new decisions should include an
+ADR alongside code, tests, and documentation.
+
 ### Installation
 
 Install minimal Debian system, and run following as root:

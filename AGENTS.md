@@ -24,6 +24,12 @@ instead of restating details.
 - Always sandbox destructive shelling—use `runStep()` wrappers so timing, stdout/stderr, and JSON logs stay consistent.
 - Tests split: `scripts/lib/tests/development` (unit-style) vs. `scripts/lib/tests/production` (post-provision probes).
 
+### Governing Law & ADRs
+- This AGENTS.md and the ADRs under `docs/adr/` govern repository decisions and rails.
+- Code behavior is the ground truth when discrepancies arise; update docs/ADRs to match.
+- Significant behavior, interface, security, or workflow changes must include an ADR capturing context, considered options, the decision, and consequences.
+- One ADR decides one subject. Cross-reference related ADRs when needed.
+
 ## Coding Agent Notes
 - Split non-library scripts once they cross 75 lines; extract helpers into dedicated modules instead of allowing single files to balloon.
 - Treat `etc/skel/www` as read-only for now; remote updates coordinate that tree, so plan changes separately before touching it.
@@ -32,6 +38,16 @@ instead of restating details.
 - Check for an `agents.local.md` in the repo root before changing code locally and follow any host-specific guidance there.
 - Review the `docs/` directory and related Markdown guides before changing code so behaviour and documentation stay in sync.
 - Bundle tests by function, covering small input variances and extreme edge cases while keeping them hermetic—tests must never mutate the real filesystem.
+
+## Engineering Principles (Consolidated)
+- First Principles: reason from objectives and constraints; prefer the simplest design that satisfies requirements and safety.
+- KISS & DRY & YAGNI: keep solutions simple, reuse helpers, and avoid features/abstractions until necessary.
+- Pit of Success: defaults should guide operators toward safe, correct usage; sharp edges require explicit opt-in.
+- Separation of Concerns: keep domain, orchestration, and I/O concerns distinct; minimize cross-module knowledge.
+- Idempotence & Convergence: reruns must converge systems to the same safe state; only acceptable drift is due to rolling upgrades.
+- Never Break Old Users: preserve backward compatibility; use additive evolution and feature flags where needed.
+- Observability: log structured data with consistent fields; prefer JSON events in long-running tasks.
+- Comment Discipline: maintain ~1 line of meaningful commentary per 10 lines of code to expose intent and invariants.
 
 ## Core Principles
 - **KISS Principle**: Keep implementations simple, readable, and direct. Avoid unnecessary abstractions or over-engineering.
@@ -53,6 +69,39 @@ instead of restating details.
 - **Change Justification**: Only make modifications when there is a clear, documented reason. Do not alter stable, long-lived behavior without evidence that change is required.
 - **Commenting Rule**: Maintain comments such that, on average, at least one line of commentary appears for every ten lines of code (Linux Kernel style guidance).
 - **Language Policy**: Default to Bash for automation tasks. Step up to PHP when workflows become lengthy or complex, keeping the logic centralized. Do **not** introduce Python; if a requirement appears to demand it, escalate instead of adding a Python dependency.
+
+## Workflow Guardrails
+- Always read relevant docs (`docs/architecture.md`, `docs/update.md`, ADRs) and the source you intend to modify before planning changes.
+- Make small, focused changes; keep diffs coherent and easy to review.
+- Validate locally before pushing: run `php -l` on changed PHP files, `php scripts/lib/tests/development/Runner.php`, and the testing scripts under `scripts/testing/` as applicable.
+- Keep generated or ephemeral files out of commits; honor `.gitignore` and repository conventions.
+- When behavior or contracts change, ship code + tests + docs and, when appropriate, an ADR in the same PR.
+
+## Git / PR Workflow
+- Commit messages: describe what changed, why, and notable side effects. Reference ADRs or docs when relevant.
+- Prefer linear history (`rebase`) and avoid force pushes on shared branches.
+- Use PR templates to verify checklists (tests run, docs updated, ADR linked when required).
+- Before merge: CI must pass (lint, tests, basic bash checks). Production-impacting changes should include a dry-run validation note.
+
+## Language & Tone (Internal)
+- Internal docs and comments may be candid and direct. Keep all user-facing messages, logs, and public surfaces professional and free of profanity.
+
+## ADR Usage
+- Location: `docs/adr/`. Use the provided template to record decisions with context and consequences.
+- Process: draft ADR → collect feedback → update AGENTS.md or docs if rails change → ship with the implementing change.
+
+## Observability Baseline
+- Use structured logs for long-running operations. PMSS already emits JSON events via updater/runtime helpers; other scripts should align to the same fields when feasible: `timestamp`, `event`, `level`, `step`, `rc`, `duration`, `host`, `distro`, `correlationId`.
+- Prefer appending to `/var/log/pmss/*.log` and JSON lines to `/var/log/pmss-update.jsonl` where applicable.
+
+## Testing & Coverage Planning
+- Hermetic tests (development) must avoid network/system modifications; production tests are read-only probes on live hosts.
+- Testing scripts live under `scripts/testing/` to orchestrate common checks (PHP lint, dev suite, bash lint/format). Do not replace existing runners; extend them.
+- Track planned coverage or gaps in `tests/TODO.md` and close them progressively. Major gaps should be referenced by ADRs or issues.
+
+## CI / Automation
+- CI should run PHP lint, the dev test suite, and bash lint/format on PRs and pushes. See `.github/workflows/ci.yml`.
+- Favor fast feedback; keep the default CI path hermetic and non-destructive.
 
 ## Operational Philosophy
 - **Safety First**: Destructive actions (partitioning, formatting, wiping identifiers) must be guarded with clear intent checks, informative logging, and opportunities for dry runs or confirmation steps where practical.
