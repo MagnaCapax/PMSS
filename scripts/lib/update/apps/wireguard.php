@@ -141,8 +141,12 @@ function wgFetchExternalEndpoint(): ?string
 function wgDetectInterfaceAddress(): ?string
 {
     $override = getenv('PMSS_WG_INTERFACE_IP');
-    if ($override !== false && $override !== '') {
-        return trim($override);
+    if ($override !== false) {
+        $trimmed = trim($override);
+        if ($trimmed === '') {
+            return null;
+        }
+        return $trimmed;
     }
 
     $interface = detectPrimaryInterface();

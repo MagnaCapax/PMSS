@@ -332,6 +332,7 @@ ensure_quota_options() {
 	fi
 
 	if mv "$tmpfile" /etc/fstab; then
+		# shellcheck disable=SC1087
 		if grep -Eq "^[[:space:]]*[^#]+[[:space:]]+$mount_point[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]*${opts}" /etc/fstab; then
 			log_info "Quota options confirmed for $mount_point"
 		else

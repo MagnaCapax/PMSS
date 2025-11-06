@@ -9,7 +9,7 @@ if (!defined('PMSS_WIREGUARD_NO_ENTRYPOINT')) {
 
 require_once dirname(__DIR__, 2).'/update/apps/wireguard.php';
 
-class WireguardInstallerTest extends TestCase
+class WireGuardInstallerTest extends TestCase
 {
     /** @var array<string> */
     private array $cleanupPaths = [];
@@ -64,7 +64,7 @@ class WireguardInstallerTest extends TestCase
     {
         $this->withEnv([
             'PMSS_WG_DNS_IP'       => '10.0.0.3',
-            'PMSS_WG_EXTERNAL_IP'  => null,
+            'PMSS_WG_EXTERNAL_IP'  => '',
             'PMSS_WG_INTERFACE_IP' => '10.0.0.4',
         ], function (): void {
             [$ip, $source] = \wgResolveEndpoint('seed.example.com');
@@ -211,4 +211,3 @@ class WireguardInstallerTest extends TestCase
         }
     }
 }
-

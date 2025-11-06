@@ -29,14 +29,17 @@ class LoggerTest extends TestCase
         $this->assertTrue(strpos(file_get_contents($path), 'fallback line') !== false);
     }
 
-    public function testLogmsgWrapperFallbackToTmp(): void
+    public function testLogMsgWrapperFallbackToTmp(): void
     {
-        // Bind script name so base is deterministic
-        $_SERVER['SCRIPT_NAME'] = 'pmss-test-runner.php';
+        // update.php registers its own logmsg helper; verify it falls back to /tmp when primary is unavailable
+        $_SERVER['SCRIPT_NAME'] = __DIR__.'/Runner.php';
+        $fallbackPath = '/tmp/'.basename($_SERVER['SCRIPT_NAME'], '.php').'.log';
+
+        @unlink($fallbackPath);
         \logmsg('wrapper line');
-        $path = '/tmp/'.basename($_SERVER['SCRIPT_NAME'], '.php').'.log';
-        $this->assertTrue(file_exists($path));
-        $this->assertTrue(strpos(file_get_contents($path), 'wrapper line') !== false);
+
+        $this->assertTrue(file_exists($fallbackPath));
+        $this->assertTrue(strpos((string) file_get_contents($fallbackPath), 'wrapper line') !== false);
+        @unlink($fallbackPath);
     }
 }
-
