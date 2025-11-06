@@ -10,14 +10,21 @@ Update Flow Smoke
 - Add a dev-safe smoke script that runs `scripts/update.php --dry-run` with hermetic env and temp paths; assert JSON events and step ordering.
 - Validate that no filesystem mutation occurs in `--dry-run` mode; capture logs under `/tmp/pmss-tests-root/`.
 
+Docblocks (Tighten Coverage)
+- Make `docblock-lint.sh` required for `scripts/lib/update/**` as the first gating step (keep advisory elsewhere initially).
+- Track coverage (classes/public methods) and expand to `scripts/lib/**` once violations are resolved.
+- Add CI job to run docblock lint in required mode for selected directories.
+
 Naming & Lints
 - Expand camelCase filename lint coverage directory-by-directory.
 - Add opt-in class/file naming lint across first-party libs (one class per file, name matches file).
 - Enforce no-aliases policy on env keys via advisory lint.
+ - Plan rollout: enable `classname-lint.sh` in CI as advisory, then required per-directory once cleaned.
 
 Sharp/Net Edges
 - Make sharp-edges and net-edges lints strict in CI once the tree is clean.
 - Extend net-edges lint to detect non-wrapped HTTP calls in PHP (e.g., `file_get_contents('http://...')`) when appropriate.
+ - Add a central HTTP helper (wrapping curl) so all outbound calls flow through `runStep()` and consistent logging.
 
 Static Analysis
 - Raise phpstan level in stages; document suppression policies.
