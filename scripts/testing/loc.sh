@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Quick LOC summary for PMSS; exclude third-party payloads so totals reflect
-# only code we maintain.
+# LOC summary for PMSS that excludes third-party payloads so totals reflect only
+# in-repo code we maintain.
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 EXCLUDE_RELATIVE=(
 	"etc/skel/www"
@@ -10,101 +10,137 @@ EXCLUDE_RELATIVE=(
 	"scripts/lib/devristo"
 )
 
-TOTAL_LINES=0
-GIT_TOTAL=0
+declare -a TRACKED_FILES=()
+mapfile -d '' TRACKED_FILES < <(git -C "$ROOT_DIR" ls-files -z)
 
-declare -a EXCLUDE_ABS=()
-for rel in "${EXCLUDE_RELATIVE[@]}"; do
-	EXCLUDE_ABS+=("$ROOT_DIR/$rel")
+declare -A CATEGORY_LABEL=(
+	[scripts_php]="Scripts PHP"
+	[scripts_bash]="Scripts Bash"
+	[scripts_other]="Scripts other"
+	[tests]="Tests"
+	[top_level_bash]="Top-level Bash"
+	[root_docs]="Root docs"
+	[docs_adr]="Docs ADR"
+	[docs_other]="Docs other"
+	[automation]="Automation"
+	[config_etc]="Config etc"
+	[root_config]="Root config"
+)
+CATEGORY_ORDER=(
+	scripts_php
+	scripts_bash
+	scripts_other
+	tests
+	top_level_bash
+	root_docs
+	docs_adr
+	docs_other
+	automation
+	config_etc
+	root_config
+)
+
+declare -A CATEGORY_LINES=()
+for key in "${CATEGORY_ORDER[@]}"; do
+	CATEGORY_LINES["$key"]=0
 done
 
-# count_find prints the summed line count for files matching the supplied find
-# expression while pruning third-party directories. Totals roll up so we can
-# track how much code each category owns.
-count_find() {
-	local desc="$1"
-	shift
-	local dir="$1"
-	shift
+TOTAL_LINES=0
+declare -a ACCOUNTED_FILES=()
 
-	if [[ ! -d "$dir" ]]; then
-		printf "%-20s %7d\n" "${desc}:" 0
+# select_category maps a tracked file path to a reporting bucket so no file is
+# double-counted and unhandled paths fall back to root_config.
+select_category() {
+	local path="$1"
+
+	if [[ "$path" == scripts/* ]]; then
+		if [[ "$path" == *.php ]]; then
+			echo "scripts_php"
+			return
+		fi
+		if [[ "$path" == *.sh ]]; then
+			echo "scripts_bash"
+			return
+		fi
+		echo "scripts_other"
 		return
 	fi
 
-	local files=()
-	local find_cmd=(find "$dir")
-	for abs in "${EXCLUDE_ABS[@]}"; do
-		if [[ -d "$abs" && "$abs" == "$dir"* ]]; then
-			find_cmd+=(-path "$abs" -prune -o)
+	if [[ "$path" == tests/* ]]; then
+		echo "tests"
+		return
+	fi
+
+	if [[ "$path" == docs/adr/* ]]; then
+		echo "docs_adr"
+		return
+	fi
+	if [[ "$path" == docs/* ]]; then
+		echo "docs_other"
+		return
+	fi
+
+	if [[ "$path" == .github/* ]]; then
+		echo "automation"
+		return
+	fi
+
+	if [[ "$path" == etc/* ]]; then
+		echo "config_etc"
+		return
+	fi
+
+	if [[ "$path" == *.sh && "$path" != */* ]]; then
+		echo "top_level_bash"
+		return
+	fi
+	if [[ "$path" == *.md && "$path" != */* ]]; then
+		echo "root_docs"
+		return
+	fi
+
+	echo "root_config"
+}
+
+for relative in "${TRACKED_FILES[@]}"; do
+	skip=0
+	for rel in "${EXCLUDE_RELATIVE[@]}"; do
+		if [[ "$relative" == "$rel"* ]]; then
+			skip=1
+			break
 		fi
 	done
-	find_cmd+=('(' "$@" -print0 ')')
-
-	mapfile -d '' files < <("${find_cmd[@]}" 2>/dev/null || true)
-
-	local total=0
-	if ((${#files[@]})); then
-		total=$(wc -l "${files[@]}" | tail -n1 | awk '{print $1}')
+	if ((skip)); then
+		continue
 	fi
 
-	printf "%-20s %7d\n" "${desc}:" "$total"
-	TOTAL_LINES=$((TOTAL_LINES + total))
-}
-
-# git_total captures repository-wide line totals using tracked files only,
-# applying the same exclusion list as the category counts.
-git_total() {
-	local desc="$1"
-	shift
-	local files=()
-
-	while IFS= read -r -d '' relative; do
-		local skip=0
-		for rel in "${EXCLUDE_RELATIVE[@]}"; do
-			if [[ "$relative" == "$rel"* ]]; then
-				skip=1
-				break
-			fi
-		done
-		if ((skip)); then
-			continue
-		fi
-		if [[ -f "$ROOT_DIR/$relative" ]]; then
-			files+=("$ROOT_DIR/$relative")
-		fi
-	done < <(git -C "$ROOT_DIR" ls-files -z)
-
-	local total=0
-	if ((${#files[@]})); then
-		total=$(wc -l "${files[@]}" | tail -n1 | awk '{print $1}')
+	file="$ROOT_DIR/$relative"
+	if [[ ! -f "$file" ]]; then
+		continue
 	fi
 
-	GIT_TOTAL="$total"
-	printf "%-20s %7d\n" "${desc}:" "$total"
-}
+	lines=$(wc -l <"$file")
+
+	category=$(select_category "$relative")
+
+	CATEGORY_LINES["$category"]=$((CATEGORY_LINES["$category"] + lines))
+	TOTAL_LINES=$((TOTAL_LINES + lines))
+	ACCOUNTED_FILES+=("$file")
+done
+
+TRACKED_TOTAL=0
+if ((${#ACCOUNTED_FILES[@]})); then
+	TRACKED_TOTAL=$(wc -l "${ACCOUNTED_FILES[@]}" | tail -n1 | awk '{print $1}')
+fi
 
 echo "PMSS lines of code (excluding third-party trees)"
 echo "-------------------------------------------"
-
-count_find "Scripts PHP" "$ROOT_DIR/scripts" -type f -name '*.php'
-count_find "Scripts Bash" "$ROOT_DIR/scripts" -type f -name '*.sh'
-count_find "Scripts other" "$ROOT_DIR/scripts" -type f ! -name '*.php' ! -name '*.sh'
-count_find "Tests" "$ROOT_DIR/tests" -type f
-count_find "Top-level Bash" "$ROOT_DIR" -maxdepth 1 -type f -name '*.sh'
-count_find "Root docs" "$ROOT_DIR" -maxdepth 1 -type f -name '*.md'
-count_find "Docs ADR" "$ROOT_DIR/docs/adr" -type f -name '*.md'
-count_find "Docs other" "$ROOT_DIR/docs" -type f -name '*.md' ! -path "$ROOT_DIR/docs/adr/*"
-count_find "Automation" "$ROOT_DIR/.github" -type f
-count_find "Config etc" "$ROOT_DIR/etc" -type f
-count_find "Root config" "$ROOT_DIR" -maxdepth 1 -type f ! -name '*.md' ! -name '*.sh'
-
+for key in "${CATEGORY_ORDER[@]}"; do
+	printf "%-20s %7d\n" "${CATEGORY_LABEL[$key]}:" "${CATEGORY_LINES[$key]}"
+done
 echo "-------------------------------------------"
 printf "%-20s %7d\n" "Accounted total:" "$TOTAL_LINES"
-git_total "Tracked total"
-if ((GIT_TOTAL > TOTAL_LINES)); then
-	printf "%-20s %7d\n" "Other tracked:" "$((GIT_TOTAL - TOTAL_LINES))"
-fi
-if ((TOTAL_LINES > GIT_TOTAL)); then
-	printf "%-20s %7d\n" "Overcount:" "$((TOTAL_LINES - GIT_TOTAL))"
+printf "%-20s %7d\n" "Tracked total:" "$TRACKED_TOTAL"
+if ((TOTAL_LINES != TRACKED_TOTAL)); then
+	printf "%-20s %7d\n" "Variance:" "$((TOTAL_LINES - TRACKED_TOTAL))"
 fi
