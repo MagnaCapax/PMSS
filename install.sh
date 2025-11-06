@@ -268,93 +268,120 @@ else
 fi
 
 # Setup fstab for quota and /home array
-log_step "Rechecking kernel quota support (legacy helper)"
-log_warn "Remember to add usrjquota/grpjquota options to the quota mount (manual step)"
+log_step "Rechecking kernel quota support"
 append_unique_block \
-	/etc/fstab \
-	"#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1" \
-	$'\nproc            /proc           proc    defaults,hidepid=2        0       0\n\n# You need to add to the wanted device(s):\n#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n'
+    /etc/fstab \
+    "#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1" \
+    $'\nproc            /proc           proc    defaults,hidepid=2        0       0\n\n# You may need on target devices:\n#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n'
 
 quota_options="usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1"
+perf_options="noatime,nofail"
 
-# Attach quota options to a specific mount while keeping /etc/fstab intact.
-# Legacy helper to append quota options; kept for compatibility.
-ensure_quota_options() {
-	local mount_point="$1"
-	local opts="$2"
+# Return 0 if /etc/fstab contains a non-comment line for the mount point
+fstab_has_mount() {
+    local mp="$1"
+    grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+" /etc/fstab
+}
 
-	if [[ -z "$mount_point" ]]; then
-		return 1
-	fi
+# Return 0 if fstab line for mount contains known quota options
+fstab_mount_has_quota() {
+    local mp="$1"
+    grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]*(usrjquota=|grpjquota=|usrquota|grpquota)" /etc/fstab
+}
 
-	local tmpfile
-	tmpfile=$(mktemp)
+# Ensure the mount options for a mount point contain the given CSV list of options.
+# Creates a timestamped backup of /etc/fstab when making changes.
+ensure_fstab_options() {
+    local mount_point="$1"
+    local required_csv="$2"
 
-	if ! awk -v mp="$mount_point" -v quota_opts="$opts" '
-        BEGIN { updated = 0 }
+    if [[ -z "$mount_point" || -z "$required_csv" ]]; then
+        return 1
+    fi
+
+    local tmpfile backup
+    tmpfile=$(mktemp)
+
+    awk -v mp="$mount_point" -v reqcsv="$required_csv" '
+        BEGIN {
+            split(reqcsv, req, ",");
+        }
         /^[ \t]*#/ { print; next }
         NF < 2 { print; next }
-        $2 == mp {
-            split($4, current, ",")
-            present = 0
-            for (i in current) {
-                if (current[i] == quota_opts) {
-                    present = 1
-                    break
+        {
+            if ($2 == mp) {
+                # Normalize option field
+                opts = $4;
+                if (opts == "" || opts == "-" ) {
+                    opts = "defaults";
                 }
-            }
-            if (!present) {
-                if ($4 == "-" || $4 == "defaults") {
-                    $4 = quota_opts
-                } else {
-                    $4 = $4","quota_opts
+                n = split(opts, cur, ",");
+                delete have;
+                keep_defaults = 0;
+                for (i = 1; i <= n; i++) {
+                    if (cur[i] == "") continue;
+                    if (cur[i] == "defaults") { keep_defaults = 1; continue; }
+                    have[cur[i]] = 1;
                 }
-                updated = 1
-            } else {
-                updated = 2
+                # Add required
+                for (i in req) {
+                    o = req[i];
+                    if (o == "" ) continue;
+                    if (!(o in have)) {
+                        have[o] = 1;
+                    }
+                }
+                # Rebuild options list
+                newopts = "";
+                if (keep_defaults) newopts = "defaults";
+                for (o in have) {
+                    if (newopts == "") newopts = o; else newopts = newopts","o;
+                }
+                $4 = newopts;
+                # Rebuild standard six columns with tabs
+                out = $1"\t"$2"\t"$3"\t"$4;
+                if (NF >= 5) out = out"\t"$5; else out = out"\t0";
+                if (NF >= 6) out = out"\t"$6; else out = out"\t0";
+                print out;
+                next;
             }
         }
         { print }
-        END {
-            if (updated == 0) {
-                exit 2
-            }
-        }
-    ' /etc/fstab >"$tmpfile"; then
-		local rc=$?
-		rm -f "$tmpfile"
-		if [[ $rc -eq 2 ]]; then
-			log_warn "Quota mount $mount_point not found in /etc/fstab"
-			return 2
-		fi
-		log_warn "Failed to adjust /etc/fstab for $mount_point"
-		return $rc
-	fi
+    ' /etc/fstab >"$tmpfile"
 
-	if mv "$tmpfile" /etc/fstab; then
-		# shellcheck disable=SC1087
-		if grep -Eq "^[[:space:]]*[^#]+[[:space:]]+$mount_point[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]*${opts}" /etc/fstab; then
-			log_info "Quota options confirmed for $mount_point"
-		else
-			log_warn "Unable to confirm quota options for $mount_point"
-		fi
-	else
-		rm -f "$tmpfile"
-		log_warn "Failed to move updated /etc/fstab back"
-		return 1
-	fi
+    # Only replace if content changed
+    if ! cmp -s /etc/fstab "$tmpfile"; then
+        backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
+        cp /etc/fstab "$backup" 2>/dev/null || true
+        mv "$tmpfile" /etc/fstab
+        log_info "Updated /etc/fstab for $mount_point (backup: ${backup##*/})"
+        return 0
+    fi
+
+    rm -f "$tmpfile"
+    return 0
 }
 
 if [[ -n "$quota_mountpoint" ]]; then
-	ensure_quota_options "$quota_mountpoint" "$quota_options" || true
+    ensure_fstab_options "$quota_mountpoint" "$perf_options,$quota_options" || true
 elif [[ "$skip_quota_edit" == true ]]; then
-	log_info "Skipping quota configuration as requested"
+    log_info "Skipping quota configuration as requested"
 else
-	log_step "Review /etc/fstab quota options (Ctrl+X to exit nano)"
-	nano /etc/fstab
+    # Default to /home logic: if /home defined, ensure options automatically; if already has quota, skip editor
+    if fstab_has_mount "/home"; then
+        if fstab_mount_has_quota "/home"; then
+            log_info "Quota already configured in /etc/fstab for /home; skipping editor"
+        else
+            ensure_fstab_options "/home" "$perf_options,$quota_options" || true
+        fi
+    else
+        log_step "Review /etc/fstab quota options (Ctrl+X to exit editor)"
+        nano /etc/fstab
+    fi
 fi
 
-mount -o remount /home
+# Best-effort remount to pick up option changes (may be no-op on fresh installs)
+mount -o remount /home 2>/dev/null || true
 
 # Minimal prerequisites; remaining packages arrive via update-step2/pmssApplyDpkgSelections.
 ensure_packages git rsync curl wget ca-certificates unzip php php-cli php-xml zip unzip vim tzdata
