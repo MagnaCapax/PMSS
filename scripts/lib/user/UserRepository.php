@@ -12,7 +12,8 @@ class UserRepository
     public const USERS_DB_FILE  = '/etc/seedbox/runtime/users.json';
     public const SCHEMA_VERSION = 1;
 
-    private array $users = [];
+    /** @var array */
+    private $users = [];
 
     public function __construct()
     {
