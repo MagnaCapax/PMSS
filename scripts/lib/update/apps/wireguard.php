@@ -259,21 +259,17 @@ function wgRenderTemplate(string $path, array $placeholders): ?string
 }
 
 /**
- * Lay down the initial WireGuard configuration when absent.
+ * Lay down the WireGuard base configuration from the repo template.
  */
-function wgWriteConfig(string $privKey, int $port): void
+function wireguardWriteConfig(string $privKey, int $port): void
 {
     $configPath = wgConfigPath('wg0.conf');
-    if (file_exists($configPath)) {
-        wgLog('Existing wg0.conf detected; skipping overwrite');
-        return;
-    }
 
     $rendered = wgRenderTemplate(
-        '/etc/seedbox/config/template.wireguard.conf',
+        '/etc/seedbox/config/template.wireguard.wg0',
         [
-            '%PRIVATE_KEY%'  => $privKey,
-            '%LISTEN_PORT%'  => (string)$port,
+            '%%PRIVATE_KEY%%' => $privKey,
+            '%%LISTEN_PORT%%' => (string) $port,
         ]
     );
     if ($rendered === null) {
@@ -282,7 +278,7 @@ function wgWriteConfig(string $privKey, int $port): void
 
     file_put_contents($configPath, $rendered.PHP_EOL);
     chmod($configPath, 0640);
-    wgLog('Base configuration written to '.$configPath);
+    wgLog('WireGuard base configuration refreshed at '.$configPath);
 }
 
 /**
@@ -359,7 +355,7 @@ if (!defined('PMSS_WIREGUARD_NO_ENTRYPOINT')) {
     }
 
     $listenPort = 51820;
-    wgWriteConfig($privKey, $listenPort);
+    wireguardWriteConfig($privKey, $listenPort);
 
     $hostname = trim((string)file_get_contents('/etc/hostname'));
     [$endpoint, $endpointSource] = wgResolveEndpoint($hostname);

@@ -31,10 +31,10 @@ switch ($version) {
             "sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list; " .
             "sed -i 's/\\<buster\\>/bullseye/g' /etc/apt/sources.list.d/*.list; " .
             "sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list.d/*.list; " .
-            "apt update; " .
-            "apt upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
-            "apt full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
-            "apt autoremove -y", true);
+            "apt-get update; " .
+            "apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
+            "apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
+            "apt-get autoremove -y", true);
         break;
     case '11':
         echo "Upgrading Debian 11 -> 12\n";
@@ -43,10 +43,10 @@ switch ($version) {
             "sed -i 's#bookworm/updates#bookworm-security#g' /etc/apt/sources.list; " .
             "sed -i 's/\\<bullseye\\>/bookworm/g' /etc/apt/sources.list.d/*.list; " .
             "sed -i 's#bookworm/updates#bookworm-security#g' /etc/apt/sources.list.d/*.list; " .
-            "apt update; " .
-            "apt upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
-            "apt full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
-            "apt autoremove -y", true);
+            "apt-get update; " .
+            "apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
+            "apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"; " .
+            "apt-get autoremove -y", true);
         break;
     default:
         echo "No upgrade routine for Debian $version\n";

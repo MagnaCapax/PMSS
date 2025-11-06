@@ -13,8 +13,8 @@ if (version_compare($debianVersion, "12", "<")) {
 }
 
 // Install required packages
-passthru("apt update -y && apt install -y " . implode(" ", $requiredPackages));
-passthru("apt install ca-certificates curl -y");
+passthru("apt-get update -y && apt-get install -y " . implode(" ", $requiredPackages));
+passthru("apt-get install ca-certificates curl -y");
 
 // Add Docker's official GPG key
 passthru("install -m 0755 -d /etc/apt/keyrings");
@@ -30,8 +30,8 @@ $repoEntry .= "https://download.docker.com/linux/debian $debianCodename stable";
 file_put_contents("/etc/apt/sources.list.d/docker.list", $repoEntry . "\n");
 // #TODO Convert to deb822 .sources file format for consistency across repos.
 
-passthru("apt update -y");
-passthru("apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y");
+passthru("apt-get update -y");
+passthru("apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y");
 
 // Disable Docker service
 passthru("systemctl disable --now docker.service docker.socket");
@@ -45,7 +45,7 @@ passthru("sysctl --system");
 if (version_compare($debianVersion, "12", "<")) {
     passthru("curl -o slirp4netns --fail -L https://github.com/rootless-containers/slirp4netns/releases/download/v1.3.2/slirp4netns-" . trim(shell_exec("uname -m")));
     passthru("install slirp4netns /usr/local/bin/");
-    passthru("apt purge slirp4netns -y");
+    passthru("apt-get purge slirp4netns -y");
     passthru("ln -s /usr/sbin/iptables /usr/local/bin/");
 }
 

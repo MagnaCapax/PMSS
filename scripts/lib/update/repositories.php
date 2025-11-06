@@ -31,7 +31,13 @@ function pmssEnsureMediaareaRepository(): void
         //       third-party repos behind a single helper that manages
         //       keyrings and source files consistently.
         $status = pmssQueryPackageStatus('repo-mediaarea');
+        $keyringDir  = rtrim((string) (getenv('PMSS_APT_KEYRING_DIR') ?: '/etc/apt/keyrings'), '/');
+        if ($keyringDir === '') {
+            $keyringDir = '/etc/apt/keyrings';
+        }
+        $keyringPath = $keyringDir.'/mediaarea.gpg';
         $keyFiles = [
+            $keyringPath,
             '/etc/apt/trusted.gpg.d/mediaarea.gpg',
             '/etc/apt/trusted.gpg.d/mediaarea.asc',
             '/etc/apt/trusted.gpg.d/mediaarea-keyring.gpg',
@@ -50,6 +56,25 @@ function pmssEnsureMediaareaRepository(): void
             if (is_file($key)) {
                 return;
             }
+        }
+
+        // Prefer installing the repository key directly into /etc/apt/keyrings.
+        $keyUrl = 'https://mediaarea.net/repo/deb/debian/mediaarea.gpg';
+        if (!is_file($keyringPath)) {
+            runStep('Ensuring apt keyring directory exists', sprintf('install -m 0755 -d %s', escapeshellarg($keyringDir)));
+            $fetchCmd = sprintf(
+                'curl -fsSL %s | gpg --dearmor -o %s',
+                escapeshellarg($keyUrl),
+                escapeshellarg($keyringPath)
+            );
+            if (runStep('Fetching MediaArea repository key', $fetchCmd) === 0) {
+                runStep('Setting permissions on MediaArea repository key', sprintf('chmod 0644 %s', escapeshellarg($keyringPath)));
+                return;
+            }
+            @unlink($keyringPath);
+            logmsg('[WARN] MediaArea key fetch failed; falling back to repo-mediaarea package bootstrap');
+        } else {
+            return;
         }
 
         if ($status === 'install ok installed') {

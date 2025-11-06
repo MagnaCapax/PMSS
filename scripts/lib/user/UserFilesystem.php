@@ -17,7 +17,7 @@ class UserFilesystem
         if ($directory = @opendir($homeDir)) {
             try {
                 while (false !== ($entry = readdir($directory))) {
-                    if ($entry === '.' || $entry === '..' || strpos($entry, 'backup-') === 0) {
+                    if ($entry === '.' || $entry === '..' || strpos($entry, 'backup-') === 0 || strpos($entry, 'root-backup-') === 0) {
                         continue;
                     }
                     if (in_array($entry, $filterList, true)) {
@@ -59,7 +59,7 @@ class UserFilesystem
             if (strpos($home, '/home/') !== 0) {
                 continue;
             }
-            if (in_array($name, $filterList, true)) {
+            if (in_array($name, $filterList, true) || strpos($name, 'root-backup-') === 0) {
                 continue;
             }
             $names[$name] = true;

@@ -79,10 +79,10 @@ function pmssExecuteUpgrade(): void
 {
     $commands = [
         'export DEBIAN_FRONTEND=noninteractive',
-        'apt update',
-        'apt upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
-        'apt full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
-        'apt autoremove -y',
+        'apt-get update',
+        'apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
+        'apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
+        'apt-get autoremove -y',
     ];
 
     runCommand(implode(' && ', $commands), true);

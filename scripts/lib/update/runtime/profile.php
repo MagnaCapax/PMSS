@@ -46,8 +46,16 @@ if (!function_exists('pmssProfileSummary')) {
         }
         usort($profile, static fn($a, $b) => $b['duration'] <=> $a['duration']);
         $topSteps = array_slice($profile, 0, 5);
-        $phrases  = array_map(static fn($entry) => sprintf('%s (%s %.3fs rc=%d)', $entry['description'], $entry['status'], $entry['duration'], $entry['rc']), $topSteps);
-        logmsg('Step duration summary (top 5): '.implode(' | ', $phrases));
+        logmsg('Step duration summary (top 5):');
+        foreach ($topSteps as $entry) {
+            logmsg(sprintf(
+                '  - %s [%s %.3fs rc=%d]',
+                $entry['description'],
+                $entry['status'],
+                $entry['duration'],
+                $entry['rc']
+            ));
+        }
         pmssLogJson(['event' => 'profile_summary', 'steps' => $topSteps]);
 
         $profileOutput = getenv('PMSS_PROFILE_OUTPUT') ?: '';

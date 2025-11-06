@@ -37,7 +37,16 @@ if (!function_exists('pmssConfigureWebStack')) {
         runStep('Restarting nginx service', '/etc/init.d/nginx restart');
         runStep('Checking lighttpd per-user instances', '/scripts/cron/checkLighttpdInstances.php');
         runStep('Setting /home directory permissions', 'chmod 751 /home');
-        runStep('Setting user home directory permissions', 'chmod 740 /home/*');
+        // Quota state files reject chmod; prune them so the find commands stay noise-free.
+        $prune = '\( -name "aquota.user" -o -name "aquota.group" -o -name "lost+found" \)';
+        runStep(
+            'Hardening /home tenant directories',
+            'find /home -mindepth 1 -maxdepth 1 '.$prune.' -prune -o -type d -exec chmod 700 {} +'
+        );
+        runStep(
+            'Hardening /home tenant files',
+            'find /home -mindepth 1 -maxdepth 1 '.$prune.' -prune -o -type f -exec chmod 600 {} +'
+        );
     }
 }
 
@@ -47,10 +56,30 @@ if (!function_exists('pmssAdjustLighttpdSecurity')) {
      */
     function pmssAdjustLighttpdSecurity(): void
     {
-        runStep('Adjusting /etc/lighttpd/lighttpd.conf permissions', 'chmod 750 /etc/lighttpd/lighttpd.conf');
-        runStep('Setting ownership on /etc/lighttpd/lighttpd.conf', 'chown www-data.www-data /etc/lighttpd/lighttpd.conf');
-        runStep('Setting ownership on /etc/lighttpd/.htpasswd', 'chown www-data.www-data /etc/lighttpd/.htpasswd');
-        runStep('Adjusting /etc/lighttpd/.htpasswd permissions', 'chmod 750 /etc/lighttpd/.htpasswd');
+        $configDir  = '/etc/lighttpd';
+        $configFile = $configDir.'/lighttpd.conf';
+        $htpasswd   = $configDir.'/.htpasswd';
+
+        if (!is_dir($configDir)) {
+            logmsg('[SKIP] /etc/lighttpd missing; skipping lighttpd hardening');
+            return;
+        }
+
+        runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');
+
+        if (is_file($configFile)) {
+            runStep('Adjusting /etc/lighttpd/lighttpd.conf permissions', 'chmod 750 '.$configFile);
+            runStep('Setting ownership on /etc/lighttpd/lighttpd.conf', 'chown root.root '.$configFile);
+        } else {
+            logmsg('[SKIP] lighttpd.conf missing; skipping lighttpd permission adjustments');
+        }
+
+        if (is_file($htpasswd)) {
+            runStep('Setting ownership on /etc/lighttpd/.htpasswd', 'chown root.root '.$htpasswd);
+            runStep('Adjusting /etc/lighttpd/.htpasswd permissions', 'chmod 640 '.$htpasswd);
+        } else {
+            logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');
+        }
     }
 }
 
