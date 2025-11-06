@@ -1,8 +1,10 @@
 <?php
 /** Simple logging helper shared across cron scripts. */
 class Logger {
-    private string $log;
-    private string $fallback;
+    /** @var string */
+    private $log;
+    /** @var string */
+    private $fallback;
 
     public function __construct(string $script, string $dir = '/var/log/pmss') {
         $base = basename($script, '.php');
