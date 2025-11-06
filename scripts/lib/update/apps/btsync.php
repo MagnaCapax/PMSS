@@ -29,7 +29,8 @@ if (!file_exists('/usr/bin/btsync2.2')) {
 
 $btsyncPath = '/usr/bin/btsync';
 if (is_link($btsyncPath) && readlink($btsyncPath) !== '/usr/bin/btsync2.2') {
-    unlink($btsyncPath);
+    // Suppress race-condition warnings if path disappears between checks
+    @unlink($btsyncPath);
 }
 
 if (file_exists($btsyncPath) && !is_link($btsyncPath)) {
@@ -49,7 +50,7 @@ if (!file_exists($btsyncPath)) {
 // Install Resilio Sync if required.
 $rslsyncBinary   = '/usr/bin/rslsync';
 $rslsyncExpected = 'Resilio Sync 2.7.3 (1381)';
-$rslsyncOutput   = trim((string) shell_exec($rslsyncBinary.' --help 2>/dev/null'));
+$rslsyncOutput   = trim((string) @shell_exec($rslsyncBinary.' --help 2>/dev/null'));
 
 if ($rslsyncOutput === '' || strpos($rslsyncOutput, $rslsyncExpected) === false) {
     if (file_exists($rslsyncBinary)) {
