@@ -50,7 +50,17 @@ class RepositoryPrerequisitesTest extends TestCase
     {
         $pattern = sys_get_temp_dir().'/pmss-mediaarea-*';
         $entries = glob($pattern) ?: [];
-        $dirs = array_values(array_filter($entries, static fn($path) => is_dir($path)));
+        $dirs = array_values(array_filter($entries, static function ($path): bool {
+            if (!is_dir($path)) {
+                return false;
+            }
+            $base = basename($path);
+            // Ignore intentional test keyring dirs (pmss-mediaarea-keyring-*)
+            if (str_starts_with($base, 'pmss-mediaarea-keyring-')) {
+                return false;
+            }
+            return true;
+        }));
         sort($dirs);
         return $dirs;
     }

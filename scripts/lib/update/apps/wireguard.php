@@ -273,7 +273,10 @@ function wireguardWriteConfig(string $privKey, int $port): void
         ]
     );
     if ($rendered === null) {
-        return;
+        // Fail-soft fallback: write a minimal config when template is unavailable
+        $rendered = "[Interface]\n".
+                    "PrivateKey = {$privKey}\n".
+                    "ListenPort = {$port}\n";
     }
 
     file_put_contents($configPath, $rendered.PHP_EOL);

@@ -81,6 +81,13 @@ function pmssEnsureMediaareaRepository(): void
             return;
         }
 
+        // Do not create temporary directories or attempt package bootstrap during dry runs.
+        $isDryRun = (string) getenv('PMSS_DRY_RUN');
+        if ($isDryRun !== '' && $isDryRun !== false && $isDryRun !== '0') {
+            logmsg('[INFO] Dry-run active; skipping MediaArea repository package bootstrap');
+            return;
+        }
+
         $tmpDir = sys_get_temp_dir().'/pmss-mediaarea-'.bin2hex(random_bytes(6));
         if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0700, true)) {
             logmsg('[WARN] Unable to create temp dir for MediaArea repository bootstrap');

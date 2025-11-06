@@ -1,6 +1,7 @@
 # ADR NNNN: Title
 
 Date: YYYY-MM-DD
+Category: architecture | security | data | domain
 
 ## Status
 Proposed | Accepted | Deprecated | Superseded by NNNN
@@ -23,4 +24,3 @@ Chosen option and rationale. Call out why alternatives were not selected.
 
 ## References
 Links to issues, PRs, related ADRs, and external docs.
-

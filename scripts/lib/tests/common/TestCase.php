@@ -45,4 +45,12 @@ abstract class TestCase
             throw new \AssertionError($msg);
         }
     }
+
+    protected function assertStringContainsString(string $needle, string $haystack, string $message = ''): void
+    {
+        if (strpos($haystack, $needle) === false) {
+            $msg = $message !== '' ? $message : sprintf('Expected string to contain %s, but it did not', var_export($needle, true));
+            throw new \AssertionError($msg);
+        }
+    }
 }
