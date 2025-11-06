@@ -92,17 +92,19 @@ class WireGuardInstallerTest extends TestCase
         $this->assertEquals(null, \wgValidatePublicIp('127.0.0.1'));
     }
 
-    public function testWriteConfigSkipsOverwrite(): void
+    public function testWriteConfigOverwritesExisting(): void
     {
         $dir = $this->createTempDir();
         $config = $dir.'/wg0.conf';
         file_put_contents($config, 'existing');
 
         $this->withEnv(['PMSS_WG_CONFIG_DIR' => $dir], function () use ($config): void {
-            \wgWriteConfig('dummy', 12345);
+            \wireguardWriteConfig('dummy', 12345);
         });
 
-        $this->assertEquals('existing', (string) file_get_contents($config));
+        $contents = (string) file_get_contents($config);
+        $this->assertStringContainsString('PrivateKey = dummy', $contents);
+        $this->assertStringContainsString('ListenPort = 12345', $contents);
     }
 
     public function testEnsureKeysReusesExisting(): void

@@ -40,7 +40,7 @@ or update the generated `~/wireguard.txt` with the correct address if needed.
 ## Developer Notes
 
 - The WireGuard installer is covered by hermetic tests in
-  `scripts/lib/tests/development/WireguardInstallerTest.php`. These tests seed
+  `scripts/lib/tests/development/WireGuardInstallerTest.php`. These tests seed
   behaviour via environment overrides such as `PMSS_WG_DNS_IP` (mock DNS
   resolution), `PMSS_WG_EXTERNAL_IP` (stub public IP helper),
   `PMSS_WG_INTERFACE_IP` (fake uplink address), and `PMSS_WG_USER_LIST`
