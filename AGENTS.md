@@ -31,6 +31,15 @@ instead of restating details.
 - One ADR decides one subject. Cross-reference related ADRs when needed.
  
 
+## Engineering Doctrine (Repository Constitution)
+- Deletion‑First: prefer removing code paths/knobs over adding new ones; unify flows instead of special‑casing; prune dead code/config promptly. The best part is no part; refactoring wins.
+- One Flow, No Special Cases: keep a single, explicit update path. Any exception requires an ADR and a removal plan.
+- Pit of Success Defaults: make safe paths the default; risky paths demand explicit, noisy opt‑in.
+- Never Break Old Users: preserve backward compatibility; ship shims/migrations and time‑boxed deprecations; break only to remediate credible security issues.
+- Visible Footprint: reviewers consider footprint alongside correctness. `scripts/testing/test-all.sh` prints a LOC snapshot to keep drift obvious.
+- No Aliases: identifiers and env keys must be consistent—do not introduce alternate names for the same concept. Example: always use `PMSS_OS_RELEASE_PATH` (never variants like `PMSS_OS_RELEASE_FILE`).
+
+
 ## Coding Agent Notes
 - Split non-library scripts once they cross 75 lines; extract helpers into dedicated modules instead of allowing single files to balloon.
 - Treat `etc/skel/www` as read-only for now; remote updates coordinate that tree, so plan changes separately before touching it.

@@ -99,9 +99,42 @@ check_no_docs_index_files() {
 
 check_no_docs_index_files
 
+# 5) ADR single-context and section hygiene (advisory)
+check_adr_single_decision_and_sections() {
+  local adr_dir="$ROOT_DIR/docs/adr"
+  [[ -d "$adr_dir" ]] || return 0
+  local f decisions bare_dec title
+  local -a allowed=(
+    "## Context" "## Decision" "## Consequences" "## Guardrails" "## Rationale"
+    "## Implementation" "## Implementation Plan" "## Risks" "## Validation" "## Notes" "## Scope"
+  )
+  for f in "$adr_dir"/[0-9][0-9][0-9][0-9]-*.md; do
+    [[ -f "$f" ]] || continue
+    decisions=$(grep -E "^##[[:space:]]+Decision[[:space:]]*$" -c "$f" || true)
+    bare_dec=$(grep -E "^[[:space:]]*Decision[[:space:]]*$" -c "$f" || true)
+    if [[ "$decisions" -eq 0 && "$bare_dec" -eq 0 ]]; then
+      echo "doctrine lint (advisory): ADR should contain a 'Decision' section/marker: $f" >&2
+    fi
+    while IFS= read -r line; do
+      local ok=0
+      for a in "${allowed[@]}"; do
+        if [[ "$line" == "$a" ]]; then ok=1; break; fi
+      done
+      if [[ $ok -eq 0 ]]; then
+        echo "doctrine lint (advisory): unexpected H2 section '$line' in $f — ensure single-context decision" >&2
+      fi
+    done < <(grep -E "^##[[:space:]]+" "$f" | sed -E 's/[[:space:]]+$//')
+    title=$(grep -m1 -E '^# ADR [0-9]{4}:' "$f" | sed -E 's/^# ADR [0-9]{4}:[[:space:]]*//')
+    if echo "$title" | grep -Eqi '[[:space:]](and|or|vs)[[:space:]]'; then
+      echo "doctrine lint (advisory): ADR title may imply multiple aspects; confirm single-context decision: $f" >&2
+    fi
+  done
+}
+
+check_adr_single_decision_and_sections
+
 if [[ $FAIL -gt 0 ]]; then
   echo "doctrine lint: $FAIL issue(s) found" >&2
   exit 1
 fi
 echo "doctrine lint: OK"
-
