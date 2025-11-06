@@ -28,7 +28,7 @@ if (!function_exists('pmssConfigureWebStack')) {
             disableUnitIfPresent('lighttpd', 'Disabling lighttpd systemd service');
             killProcess('lighttpd', 'Terminating lingering lighttpd processes');
             killProcess('php-cgi', 'Terminating lingering php-cgi processes');
-            runStep('Enabling nginx systemd service', 'systemctl enable nginx');
+            enableUnitIfPresent('nginx', 'Enabling nginx systemd service');
         }
 
         runStep('Refreshing lighttpd configuration', '/scripts/util/configureLighttpd.php');

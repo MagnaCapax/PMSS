@@ -1,15 +1,15 @@
-# Debian Buster repository definition used by PMSS provisioning.
-deb http://www.nic.funet.fi/debian/ buster main non-free contrib
-deb-src http://www.nic.funet.fi/debian/ buster main non-free contrib
+# Debian Buster (EOL) repository definition for archived mirrors.
+# Use archive.debian.org for base/updates/security; backports are omitted.
+deb http://archive.debian.org/debian buster main contrib non-free
+deb-src http://archive.debian.org/debian buster main contrib non-free
 
-deb http://security.debian.org/debian-security buster/updates main non-free contrib
-deb-src http://security.debian.org/debian-security buster/updates main non-free contrib
+# Security archive for buster
+deb http://archive.debian.org/debian-security buster/updates main contrib non-free
+deb-src http://archive.debian.org/debian-security buster/updates main contrib non-free
 
-# Buster updates, previously known as 'volatile'.
-deb http://www.nic.funet.fi/debian/ buster-updates main non-free contrib
-deb-src http://www.nic.funet.fi/debian/ buster-updates main non-free contrib
+# Buster updates (archived)
+deb http://archive.debian.org/debian buster-updates main contrib non-free
+deb-src http://archive.debian.org/debian buster-updates main contrib non-free
 
-deb http://www.nic.funet.fi/debian/ buster-backports main non-free contrib
-
-# MediaArea repository provides current mediainfo builds.
+# MediaArea repository provides current mediainfo builds (kept for hosts that can reach it).
 deb [signed-by=/etc/apt/keyrings/mediaarea.gpg] https://mediaarea.net/repo/deb/debian/ stable main

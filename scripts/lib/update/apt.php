@@ -123,7 +123,11 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
             });
             return;
         case 10:
-            pmssApplyAptTemplate('Buster', $repos['buster'] ?? '', $currentHash, $log);
+            pmssApplyAptTemplate('Buster', $repos['buster'] ?? '', $currentHash, $log, function () {
+                // EOL suites lack valid Release timestamps; relax the check.
+                passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+                passthru('apt-get clean;');
+            });
             return;
         case 11:
             pmssApplyAptTemplate('Bullseye', $repos['bullseye'] ?? '', $currentHash, $log);
