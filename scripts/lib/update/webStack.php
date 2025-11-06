@@ -34,7 +34,7 @@ if (!function_exists('pmssConfigureWebStack')) {
         runStep('Refreshing lighttpd configuration', '/scripts/util/configureLighttpd.php');
         runStep('Regenerating nginx configuration', '/scripts/util/createNginxConfig.php');
         runStep('Verifying user HTTP authentication files', '/scripts/util/checkUserHtpasswd.php');
-        runStep('Restarting nginx service', '/etc/init.d/nginx restart');
+        runStep('Restarting nginx service', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
         runStep('Checking lighttpd per-user instances', '/scripts/cron/checkLighttpdInstances.php');
         runStep('Setting /home directory permissions', 'chmod 751 /home');
         // Quota state files reject chmod; prune them so the find commands stay noise-free.
@@ -92,7 +92,7 @@ if (!function_exists('pmssPostUpdateWebRefresh')) {
         runStep('Post-update lighttpd configuration refresh', '/scripts/util/configureLighttpd.php');
         runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php');
         runStep('Post-update htpasswd verification', '/scripts/util/checkUserHtpasswd.php');
-        runStep('Restarting nginx after configuration refresh', '/etc/init.d/nginx restart');
+        runStep('Restarting nginx after configuration refresh', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
         runStep('Checking lighttpd instances after update', '/scripts/cron/checkLighttpdInstances.php');
     }
 }

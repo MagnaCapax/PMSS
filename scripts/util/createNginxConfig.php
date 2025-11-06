@@ -16,15 +16,24 @@ $users = explode("\n", trim($users));
 if (count($users) == 0) die("No users setup - nothing to do\n");
 
 $template = file_get_contents("/etc/seedbox/config/template.nginx-user");
-passthru("cp /etc/seedbox/config/template.nginx-conf /etc/nginx/nginx.conf");
-passthru("cp /etc/seedbox/config/template.nginx-proxy_params /etc/nginx/proxy_params");
+
+// Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
+if (!is_dir('/etc/nginx')) {
+    @mkdir('/etc/nginx', 0755, true);
+}
+if (!is_dir('/etc/nginx/sites-available')) {
+    @mkdir('/etc/nginx/sites-available', 0755, true);
+}
+
+@copy('/etc/seedbox/config/template.nginx-conf', '/etc/nginx/nginx.conf');
+@copy('/etc/seedbox/config/template.nginx-proxy_params', '/etc/nginx/proxy_params');
 
 // Configure site default
 //passthru("cp /etc/seedbox/config/template.nginx-site-default /etc/nginx/sites-available/default");
 $serverHostname = trim(file_get_contents('/etc/hostname'));
-$nginxConfigSiteDefault = file_get_contents('/etc/seedbox/config/template.nginx-site-default');
-$nginxConfigSiteDefaultSsl = file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl');
-$nginxConfigSiteDefaultSslLetsEncrypt = file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl-lets-encrypt');
+$nginxConfigSiteDefault = @file_get_contents('/etc/seedbox/config/template.nginx-site-default');
+$nginxConfigSiteDefaultSsl = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl');
+$nginxConfigSiteDefaultSslLetsEncrypt = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl-lets-encrypt');
 
 
 // Do we have let's encrypt cert done?
@@ -46,20 +55,23 @@ if (file_exists("{$certificatePath}/fullchain.pem") &&
 }
 
 // Create config and save it :)
-$nginxConfigSiteDefault = str_replace('||SSL_SETTINGS_CONFIGURED_HERE||', $nginxConfigSiteDefaultSsl, $nginxConfigSiteDefault);
-file_put_contents('/etc/nginx/sites-available/default', $nginxConfigSiteDefault);
+if ($nginxConfigSiteDefault !== false) {
+    $nginxConfigSiteDefault = str_replace('||SSL_SETTINGS_CONFIGURED_HERE||', (string)$nginxConfigSiteDefaultSsl, $nginxConfigSiteDefault);
+    @file_put_contents('/etc/nginx/sites-available/default', $nginxConfigSiteDefault);
+}
 
 
 
 // Create SSL config if required!
 if (!file_exists("/etc/nginx/ssl")) {
-    mkdir("/etc/nginx/ssl");
+    @mkdir("/etc/nginx/ssl", 0755, true);
 }
 
 if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
     $hostname = trim( file_get_contents("/etc/hostname") );
     $hostname = str_replace(array("\n", "\r"), '', $hostname);
-    passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
+    // Generate a self-signed cert if Let's Encrypt not present yet (ignore errors on systems without openssl)
+    @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
 }
 
 if (!file_exists("/etc/nginx/users")) {

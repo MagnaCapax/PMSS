@@ -158,7 +158,7 @@ runProvisionStep(
     'Start lighttpd',
     sprintf('/scripts/startLighttpd %s', escapeshellarg($user['name']))
 );
-runProvisionStep('Restart nginx', '/etc/init.d/nginx restart');
+runProvisionStep('Restart nginx', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
 runProvisionStep('Refresh network rules', '/scripts/util/setupNetwork.php');
 
 if (!empty($user['trafficLimit']) &&

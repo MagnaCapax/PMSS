@@ -54,6 +54,16 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
 
 function networkApplyFireqos(string $config): void
 {
-    file_put_contents('/etc/seedbox/config/fireqos.conf', $config);
-    shell_exec('fireqos start /etc/seedbox/config/fireqos.conf >> /var/log/pmss/fireqos.log 2>&1');
+    // Ensure target paths exist and FireQOS is available before attempting start.
+    if (!is_dir('/etc/seedbox/config')) {
+        @mkdir('/etc/seedbox/config', 0755, true);
+    }
+    if (!is_dir('/var/log/pmss')) {
+        @mkdir('/var/log/pmss', 0755, true);
+    }
+    @file_put_contents('/etc/seedbox/config/fireqos.conf', $config);
+    $hasFireqos = trim((string)@shell_exec('command -v fireqos 2>/dev/null')) !== '';
+    if ($hasFireqos) {
+        @shell_exec('fireqos start /etc/seedbox/config/fireqos.conf >> /var/log/pmss/fireqos.log 2>&1');
+    }
 }

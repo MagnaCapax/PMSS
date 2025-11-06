@@ -53,16 +53,44 @@ if (!function_exists('pmssSystemdUnitExists')) {
         if (!pmssSystemdAvailable()) {
             return false;
         }
-        exec('systemctl list-unit-files '.escapeshellarg($unit).' 2>/dev/null', $output, $status);
-        if ($status !== 0) {
-            return false;
+        $candidate = $unit;
+        if (!preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $candidate)) {
+            $candidate .= '.service';
         }
-        foreach ($output as $line) {
-            if (stripos($line, $unit) === 0) {
-                return true;
+        $output = [];
+        exec('systemctl list-unit-files '.escapeshellarg($candidate).' 2>/dev/null', $output, $status);
+        if ($status === 0) {
+            foreach ($output as $line) {
+                if (stripos($line, $candidate) === 0) {
+                    return true;
+                }
             }
         }
-        return false;
+        // Fallback: check on-disk unit files and systemctl cat
+        if (is_file('/etc/systemd/system/'.$candidate) || is_file('/lib/systemd/system/'.$candidate)) {
+            return true;
+        }
+        exec('systemctl cat '.escapeshellarg($candidate).' >/dev/null 2>&1', $_, $st2);
+        return $st2 === 0;
+    }
+}
+
+if (!function_exists('enableUnitIfPresent')) {
+    /**
+     * Enable a systemd unit only when it exists on the target host.
+     */
+    function enableUnitIfPresent(string $unit, string $description): void
+    {
+        if (!pmssSystemdAvailable()) {
+            logmsg("[SKIP] {$description} (systemd unavailable)");
+            return;
+        }
+        if (!pmssSystemdUnitExists($unit)) {
+            logmsg("[SKIP] {$description} (unit {$unit} missing)");
+            return;
+        }
+        $candidate = preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit) ? $unit : $unit.'.service';
+        runStep($description, 'systemctl enable '.escapeshellarg($candidate));
     }
 }
 

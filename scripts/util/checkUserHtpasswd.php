@@ -26,10 +26,11 @@ if ($globalContents === false || trim($globalContents) === '') {
 $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
 foreach ($users as $thisUser) {
+    if ($thisUser === '') { continue; }
     $thisUserDir = "/home/{$thisUser}";
     if (file_exists($thisUserDir . '/.lighttpd/.htpasswd')) {
-        $userHtpasswdContents = file_get_contents($thisUserDir . '/.lighttpd/.htpasswd');
-        if (strpos($userHtpasswdContents, $thisUser) !== false) continue;   // Already exists! :)
+        $userHtpasswdContents = @file_get_contents($thisUserDir . '/.lighttpd/.htpasswd');
+        if ($userHtpasswdContents !== false && strpos($userHtpasswdContents, $thisUser) !== false) continue;   // Already exists! :)
     }
 
     foreach ($passwords as $thisPassword) {

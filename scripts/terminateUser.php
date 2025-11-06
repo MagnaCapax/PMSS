@@ -86,7 +86,7 @@ echo "\nDeleting user, user data and HTTP password:\n";
 passthru("userdel {$username}; cd /home; rm -rf {$username}");
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 passthru('/scripts/util/createNginxConfig.php');   // Reconfig nginx
-passthru('/etc/init.d/nginx restart');
+passthru('systemctl restart nginx || /etc/init.d/nginx restart || true');
 passthru("userdel {$username}; groupdel {$username};"); // If during first attempt still some process running.
                                         //Make sure by attempting again FURTHER group needs to be deleted as well
 passthru("rm -rf /var/run/screen/S-{$username}");
