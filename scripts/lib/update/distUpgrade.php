@@ -100,7 +100,21 @@ function pmssExecuteUpgrade(): void
         'apt-get autoremove -y',
     ];
 
-    runCommand(implode(' && ', $commands), true);
+    $rc = runCommand(implode(' && ', $commands), true);
+    if ($rc !== 0) {
+        // Attempt recovery from interrupted dpkg configuration or dependency issues.
+        logMessage('dist-upgrade: attempting recovery (dpkg --configure -a, apt-get -f install)');
+        runCommand('dpkg --configure -a', true);
+        runCommand('apt-get -f install -y', true);
+        runCommand('apt-get update', true);
+        // Retry the upgrade sequence once more.
+        $retry = [
+            'apt-get upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
+            'apt-get full-upgrade -y -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\"',
+            'apt-get autoremove -y',
+        ];
+        runCommand(implode(' && ', $retry), true);
+    }
 }
 
 /**
