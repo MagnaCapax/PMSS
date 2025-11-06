@@ -17,7 +17,7 @@ if (strpos($argv[1], '@') == false) die('You need valid e-mail address');
 // Gather the fqdn and Debian codename; the latter determines whether we need
 // the virtualenv install path still required on Debian 10 (buster).
 $domain = trim( file_get_contents('/etc/hostname') );
-$lsbrelease = trim( shell_exec('/usr/bin/lsb_release -cs') );   #TODO Something more robut than this
+$codename = detectDebianCodename();
 
 //Certbot changed completely how it functions
 //`apt-get remove certbot -y`;
@@ -30,13 +30,13 @@ $lsbrelease = trim( shell_exec('/usr/bin/lsb_release -cs') );   #TODO Something 
 // 3rd time we have to change how certbot is installed *sigh*, they really like breaking old users, don't they? Since now via PIP, pray this works for more than a  week -Aleksi 22/08/2021
 
 #TODO this stuff should be on app installs ...
-if (!file_exists('/opt/certbot') && $lsbrelease == 'buster') {
+if (!file_exists('/opt/certbot') && $codename === 'buster') {
     // Debian 10 ships a dated certbot, so deploy the upstream virtualenv build.
     `python3 -m venv /opt/certbot/`;
     `/opt/certbot/bin/pip install --upgrade pip`;
     `/opt/certbot/bin/pip install certbot certbot-nginx`;
     `ln -s /opt/certbot/bin/certbot /usr/bin/certbot`;
-} else echo `apt -y install certbot python3-certbot-nginx; `; #TODO Doesn't belong here for real ...
+} else echo `apt-get -y install certbot python3-certbot-nginx; `; #TODO Doesn't belong here for real ...
 
 // Legacy behaviour: look for the literal '/etc/letsencrypt/live/{$domain}'
 // placeholder before requesting a certificate. The single-quoted string keeps
@@ -60,3 +60,46 @@ if (!file_exists('/etc/nginx/ssl/selfsigned') &&
 // Regenerate nginx vhost configuration so the new certificate path is active.
 `/scripts/util/createNginxConfig.php`;
 `/etc/init.d/nginx restart`;
+
+/**
+ * Detect the Debian codename using os-release with lsb_release as a fallback.
+ */
+function detectDebianCodename(): string
+{
+    $osReleasePath = getenv('PMSS_OS_RELEASE_PATH') ?: '/etc/os-release';
+    $codename = '';
+
+    if (is_readable($osReleasePath)) {
+        $lines = file($osReleasePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') {
+                continue;
+            }
+            if (strpos($line, '=') === false) {
+                continue;
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value, " \t\n\r\0\x0B\"'");
+            if ($key === 'VERSION_CODENAME' && $value !== '') {
+                $codename = strtolower($value);
+                break;
+            }
+        }
+    }
+
+    if ($codename === '') {
+        $fallback = strtolower(trim((string)@shell_exec('/usr/bin/lsb_release -cs 2>/dev/null')));
+        if ($fallback !== '') {
+            $codename = $fallback;
+        }
+    }
+
+    if ($codename === '') {
+        // Default to Debian 11 behaviour if detection fails completely.
+        $codename = 'bullseye';
+    }
+
+    return $codename;
+}
