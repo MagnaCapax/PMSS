@@ -78,7 +78,7 @@ Inspect and apply limits per user:
 ## Root Slice Safety
 
 - Root slice (user‑0.slice) is never limited. PMSS installs an override and a repair job to enforce this:
-  - At boot (after 20 seconds) and every 2 hours: `/scripts/cron/checkRootCgroup.php` fixes limits if misconfigured.
+  - At boot (after 20 seconds) and every 2 hours: `/scripts/cron/cgroupRootCheck.php` fixes limits if misconfigured.
 
 ## Integration Hooks
 
