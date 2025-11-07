@@ -147,6 +147,21 @@ check_adr_single_decision_and_sections() {
 
 check_adr_single_decision_and_sections
 
+# 7) Cron naming guidance (advisory): prefer context-first names in scripts/cron
+check_cron_context_first_names() {
+  local cron_dir="$ROOT_DIR/scripts/cron"
+  [[ -d "$cron_dir" ]] || return 0
+  local f base
+  while IFS= read -r -d '' f; do
+    base="$(basename "$f")"
+    if [[ "$base" =~ ^(check|setup|configure|update)[A-Z].*\.php$ ]]; then
+      echo "doctrine lint (advisory): cron filename should be context-first (prefer domainAction, e.g., cgroupRootCheck.php), found: $base" >&2
+    fi
+  done < <(find "$cron_dir" -maxdepth 1 -type f -name "*.php" -print0)
+}
+
+check_cron_context_first_names
+
 if [[ $FAIL -gt 0 ]]; then
   echo "doctrine lint: $FAIL issue(s) found" >&2
   exit 1

@@ -40,6 +40,7 @@ instead of restating details.
 - Visible Footprint: reviewers consider footprint alongside correctness. `scripts/testing/test-all.sh` prints a LOC snapshot to keep drift obvious.
 - No Aliases: identifiers and env keys must be consistent—do not introduce alternate names for the same concept. Example: always use `PMSS_OS_RELEASE_PATH` (never variants like `PMSS_OS_RELEASE_FILE`).
 - Context‑First Naming: name and order from larger context to smaller context in identifiers, logs, and file names where applicable (e.g., dcId → rackId → chassisId → nodeId). Apply the same discipline to env keys and options.
+  - Cron/Util naming (MUST for new files): filenames should follow context‑first order with the domain first and the action second. Examples: `cgroupRootCheck.php`, `networkRulesApply.php`, `storageBenchmark.php`. Avoid verb‑first names like `checkRootCgroup.php`. Legacy scripts may retain historical names; migrate opportunistically.
 
 ## Compatibility Baseline (MUST)
 - PHP 7.3 Compatibility: All PHP code in this repository must run on PHP 7.3. Keep language features and libraries compatible with 7.3. The minimum version may be raised in the future via an explicit decision (ADR + CI update), but until then, treat 7.3 as the hard baseline.
