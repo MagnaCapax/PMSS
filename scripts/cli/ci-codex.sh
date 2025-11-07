@@ -46,7 +46,7 @@ ARTIFACT_LINES=${ARTIFACT_LINES:-200}
 MAX_ARTIFACT_FILES=${MAX_ARTIFACT_FILES:-6}
 PMSS_CI_WAIT_SECS=${PMSS_CI_WAIT_SECS:-300}
 
-read -r -d '' DEFAULT_PROMPT <<'PMSSPROMPT'
+DEFAULT_PROMPT=$(cat <<'PMSSPROMPT'
 PMSS CI Assist — Strict Rails Mode
 
 Goal: Make required CI jobs pass with the smallest coherent change. Read AGENTS.md first; obey Doctrine/Constitution and ADRs.
@@ -69,6 +69,7 @@ Absolutes:
 
 Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch and verification commands.
 PMSSPROMPT
+)
 
 job_name=""
 custom_prompt=""
