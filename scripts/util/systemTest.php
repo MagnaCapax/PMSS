@@ -128,6 +128,29 @@ if ($codename !== '' && is_file('/etc/apt/sources.list')) {
     }
 }
 
+// Check OpenVPN client artifacts in /home (profile + CA), following installer naming.
+($checks[] = (function (): array {
+    $hostname = trim((string) @file_get_contents('/etc/hostname'));
+    if ($hostname === '') {
+        return ['name' => 'OpenVPN client artifacts', 'status' => 'WARN', 'detail' => 'hostname unknown'];
+    }
+    $fqdn = $hostname;
+    if (strpos($fqdn, '.pulsedmedia.com') === false) {
+        $fqdn .= '.pulsedmedia.com';
+    }
+    $slug = str_replace('.', '-', $fqdn);
+    $ovpn = "/home/openvpn-{$slug}.ovpn";
+    $crt  = "/home/openvpn-{$slug}.crt";
+    $ok   = is_file($ovpn) && is_file($crt);
+    if ($ok) {
+        return ['name' => 'OpenVPN client artifacts', 'status' => 'OK', 'detail' => basename($ovpn).', '.basename($crt)];
+    }
+    $missing = [];
+    if (!is_file($ovpn)) { $missing[] = basename($ovpn); }
+    if (!is_file($crt))  { $missing[] = basename($crt); }
+    return ['name' => 'OpenVPN client artifacts', 'status' => 'WARN', 'detail' => 'missing: '.implode(', ', $missing)];
+})());
+
 // Confirm MediaArea repository package is present so mediainfo can install from apt.
 $repoStatus = pmssExec("dpkg-query -W -f='\${Status} \${Version}' repo-mediaarea 2>/dev/null");
 if (preg_match('/install ok installed/i', $repoStatus)) {
