@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Optional debug: PMSS_CI_CODEX_DEBUG=1 enables bash -x tracing
+if [[ "${PMSS_CI_CODEX_DEBUG:-0}" == "1" ]]; then
+  export PS4='[ci-codex:trace] '
+  set -x
+fi
 
 # ci-codex.sh — Fetch latest CI logs and feed them to a coding assistant (Codex CLI or similar).
 #
@@ -88,6 +93,9 @@ if ! have gh; then
   echo "[ci-codex] GitHub CLI not found. Install gh and run 'gh auth login'" >&2
   exit 1
 fi
+
+echo "[ci-codex] gh: $(command -v gh)" >&2 || true
+gh --version 2>/dev/null | sed 's/^/[ci-codex] /' >&2 || true
 
 mkdir -p "$OUTDIR" "$ARTDIR"
 
