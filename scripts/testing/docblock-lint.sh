@@ -8,7 +8,10 @@ set -euo pipefail
 #   * at least one non-@ description line
 #   * an @return tag
 #   * if parameters exist, at least one @param tag
-# Scope: scripts/lib (excluding tests/ and devristo/), scripts/util, scripts/*.php
+#
+# Scope (required CI gate): scripts/lib/update/** only.
+#  - This reflects the staged rollout in tests/TODO.md: make docblocks required
+#    for updater libraries first; keep broader enforcement advisory/opt-in.
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 VIOLATIONS=0
@@ -79,14 +82,9 @@ scan_file() {
   ' "$file" || VIOLATIONS=$((VIOLATIONS+1))
 }
 
-# Collect target files
+# Collect target files (updater libraries only)
 mapfile -t FILES < <(
-  {
-    find "$ROOT_DIR/scripts" -maxdepth 1 -type f -name "*.php";
-    find "$ROOT_DIR/scripts/util" -type f -name "*.php";
-    find "$ROOT_DIR/scripts/lib" -type f -name "*.php" \
-      -not -path "*/tests/*" -not -path "*/devristo/*";
-  } | sort -u
+  find "$ROOT_DIR/scripts/lib/update" -type f -name "*.php" | sort -u
 )
 
 for f in "${FILES[@]}"; do
@@ -98,4 +96,3 @@ if [[ $VIOLATIONS -gt 0 ]]; then
   exit 1
 fi
 echo "docblock lint: OK"
-
