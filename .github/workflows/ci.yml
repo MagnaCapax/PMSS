@@ -21,11 +21,13 @@ jobs:
 
       - name: PHP 7.3 syntax lint
         run: |
-          scripts/testing/php-lint-compat.sh | tee smoke-php-lint.log
+          # Capture both stdout and stderr so artifact is non-empty
+          scripts/testing/php-lint-compat.sh 2>&1 | tee smoke-php-lint.log
 
       - name: PHP 7.3 static scan (no false positives)
         run: |
-          scripts/testing/php73-compat-scan.sh | tee smoke-php-compat-scan.log
+          # Capture both stdout and stderr so artifact is non-empty
+          scripts/testing/php73-compat-scan.sh 2>&1 | tee smoke-php-compat-scan.log
 
       - name: Upload smoke logs
         uses: actions/upload-artifact@v4
