@@ -168,12 +168,21 @@ if [[ -n "$exec_cmd" ]]; then
   cat "$PROMPT" | eval $exec_cmd
 else
   if command -v codex >/dev/null 2>&1; then
-    echo "[ci-codex] piping prompt to: codex chat --input - (fallback to codex \"...\")" >&2
-    # Prefer stdin to avoid arg length/quoting issues; fallback to legacy form
-    cat "$PROMPT" | codex chat --input - || codex "$(cat "$PROMPT")" || true
+    echo "[ci-codex] piping prompt to: codex (stdin)" >&2
+    # Prefer stdin to avoid arg length limits; try simple form first, then known subcommands
+    if ! cat "$PROMPT" | codex; then
+      echo "[ci-codex] fallback: codex chat --input -" >&2
+      if ! cat "$PROMPT" | codex chat --input -; then
+        echo "[ci-codex] fallback: codex ask -f -" >&2
+        if ! cat "$PROMPT" | codex ask -f -; then
+          echo "[ci-codex] all codex invocation methods failed. Try explicitly: --exec 'codex'" >&2
+          exit 1
+        fi
+      fi
+    fi
   else
-    echo "[ci-codex] To send to your assistant CLI, try for example:" >&2
-    echo "  scripts/cli/ci.sh --exec 'codex chat --input -'" >&2
+    echo "[ci-codex] Codex CLI not found. To send to your assistant, try:" >&2
+    echo "  scripts/cli/ci.sh --exec 'codex'" >&2
     echo "or pipe manually: cat '$PROMPT' | codex" >&2
   fi
 fi
