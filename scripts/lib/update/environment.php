@@ -160,6 +160,12 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         if ($rc !== 0) {
             $success = false;
         }
+        // Ensure any lingering vendor repo debs are removed from selection/cache before upgrade.
+        runStep('Clearing repo-mediaarea selections (post-apply)', "printf 'repo-mediaarea\tdeinstall\nrepo-mediaarea-snapshots\tdeinstall\n' | dpkg --set-selections");
+        runStep('Removing repo-mediaarea packages if present', aptCmd('remove -y repo-mediaarea repo-mediaarea-snapshots || true'));
+        runStep('Purging repo-mediaarea packages if present', aptCmd('purge -y repo-mediaarea repo-mediaarea-snapshots || true'));
+        runStep('Clearing repo-mediaarea package cache', "sh -lc 'rm -f /var/cache/apt/archives/repo-mediaarea_* || true'");
+
         $installCmd = aptCmd('dselect-upgrade -y');
         $rc = runStep('Installing packages from selection baseline', $installCmd);
         if ($rc !== 0) {
