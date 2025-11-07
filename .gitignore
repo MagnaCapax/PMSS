@@ -79,3 +79,7 @@ agents.local.md
 # Explicitly ignore local assistant config/state and CI scratch
 .codex
 # Note: ci-codex and job artifacts are written to the system temp dir
+.DS_Store
+
+# Tool artifacts
+tools/

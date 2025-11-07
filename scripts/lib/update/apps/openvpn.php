@@ -1,7 +1,9 @@
 <?php
 // OpenVPN installation script
-// #TODO Replace ad-hoc exec/backticks with runStep wrappers and move package
-//       management to dpkg baselines/repo installs where possible.
+// #TODO(complexity-refactor): Replace ad-hoc exec/backticks with runStep
+// wrappers; move package management to dpkg baselines/repo installs. Split
+// installer into idempotent steps (install → configure → restart) with clear
+// decision points to reduce branching and improve readability.
 
 // Host naming //
 // .pulsedmedia.com gets appended if it's missing

@@ -94,6 +94,12 @@ jobs:
         run: |
           scripts/testing/loc.sh || true
 
+      - name: PHP LOC metrics (advisory)
+        run: |
+          mkdir -p tools
+          curl -sSL -o tools/phploc.phar https://phar.phpunit.de/phploc.phar
+          bash scripts/testing/phploc.sh || true
+
       - name: PHPStan (advisory, level 3)
         run: |
           # Run at a slightly higher strictness; still advisory and allowed to skip

@@ -10,6 +10,12 @@
  * @version 0.9.1
  */
 class rtorrentConfig {
+    // TODO(complexity-refactor): This class aggregates IO, template rendering,
+    // and parameter normalization in one place. Split into small helpers:
+    //  - pure config assembly (no IO)
+    //  - filesystem IO (read/write, port reservation)
+    //  - defaults/validation
+    // Aim to reduce branching, add unit-style tests, and keep PHP 7.3.
 	/**
 	 * Local template/resource paths used when defaults are not injected.
 	 */

@@ -5,6 +5,9 @@ require_once __DIR__.'/../update.php';
 
 class Motd
 {
+    // TODO(complexity-refactor): Shell-outs and substitution are intertwined.
+    // Extract IO (shell/system reads) from formatting, and isolate template
+    // replacements into a pure function to simplify testing and reduce paths.
     public static function motdGenerate(): void
     {
         $tplPath = getenv('PMSS_MOTD_TEMPLATE_PATH') ?: '/etc/seedbox/config/template.motd';
@@ -123,4 +126,3 @@ class Motd
         return implode(' | ', $lines);
     }
 }
-

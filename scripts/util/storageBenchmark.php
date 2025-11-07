@@ -4,6 +4,12 @@
  * storageBenchmark.php — Non-destructive storage benchmark (fio wrapper)
  * Context-first naming (storage → benchmark) as per doctrine.
  */
+// TODO(complexity-refactor): Separate CLI parsing + shelling from core
+// measurement/aggregation. Extract small, testable helpers for:
+//  - size parsing and cap logic
+//  - idle detection (ioping/iostat)
+//  - fio command generation and result parsing
+// Keep runtime flags; preserve non-destructive guarantees and PHP 7.3.
 
 require_once __DIR__.'/../lib/runtime.php';
 
