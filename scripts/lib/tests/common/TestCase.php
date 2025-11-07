@@ -5,7 +5,10 @@ class SkipTest extends \Exception {}
 
 abstract class TestCase
 {
-    private array $results = [];
+    /**
+     * @var array<int, array{0:bool|string,1:string,2:?string}>
+     */
+    private $results = [];
 
     public function run(): array
     {
