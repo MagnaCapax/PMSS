@@ -7,6 +7,9 @@ if [[ "${PMSS_CI_CODEX_DEBUG:-0}" == "1" ]]; then
   set -x
 fi
 
+# Predeclare for shellcheck: assigned in trap context
+rc=0
+
 trap 'rc=$?; echo "[ci-codex] ERROR rc=$rc at line $LINENO while: $BASH_COMMAND" >&1' ERR
 
 echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
