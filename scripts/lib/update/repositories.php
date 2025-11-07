@@ -106,38 +106,14 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
      */
 function pmssEnsureMediaareaRepository(): void
     {
-        // Minimal, fail-soft policy: disable MediaArea by default to avoid
-        // recurring apt breakage. Operators can opt-in by setting
-        // PMSS_MEDIAAREA=enable.
-        $mode = strtolower((string) getenv('PMSS_MEDIAAREA'));
-        if ($mode !== 'enable') {
-            // Remove deb822 file and comment any legacy entries to prevent apt warnings.
-            @unlink('/etc/apt/sources.list.d/mediaarea.sources');
-            $sources = pmssAptSourcesPath();
-            if (is_file($sources)) {
-                $data = @file_get_contents($sources);
-                if ($data !== false && stripos($data, 'mediaarea.net/repo/deb') !== false) {
-                    $lines = preg_split('/\r?\n/', $data);
-                    $changed = false;
-                    foreach ($lines as $i => $line) {
-                        $trim = ltrim($line);
-                        if ($trim !== '' && $trim[0] !== '#' && stripos($line, 'mediaarea.net/repo/deb') !== false) {
-                            $lines[$i] = '# PMSS(disable, mediaarea policy): '.$line;
-                            $changed = true;
-                        }
-                    }
-                    if ($changed) {
-                        @file_put_contents($sources, implode(PHP_EOL, $lines).PHP_EOL);
-                        logmsg('MediaArea repository disabled by policy (PMSS_MEDIAAREA!=enable)');
-                    }
-                }
-            }
+        // Respect explicit disable if operator requests it.
+        $policy = strtolower((string) getenv('PMSS_MEDIAAREA'));
+        if ($policy === 'disable') {
+            logmsg('MediaArea repository disabled by policy (PMSS_MEDIAAREA=disable)');
             return;
         }
 
-        // #TODO Prefer deb822 sources and `/etc/apt/keyrings` over legacy
-        //       trusted.gpg.d entries. Unify third‑party repos behind a
-        //       single helper that manages keyrings and .sources consistently.
+        // Prefer deb822 sources and /etc/apt/keyrings with signed-by.
         $status = pmssQueryPackageStatus('repo-mediaarea');
         $keyringDir  = rtrim((string) (getenv('PMSS_APT_KEYRING_DIR') ?: '/etc/apt/keyrings'), '/');
         if ($keyringDir === '') {
@@ -160,32 +136,53 @@ function pmssEnsureMediaareaRepository(): void
             }
         }
 
+        $keyPresent = false;
         foreach ($keyFiles as $key) {
-            if (is_file($key)) {
-                return;
-            }
+            if (is_file($key)) { $keyPresent = true; break; }
         }
 
-        // Prefer installing the repository key directly into /etc/apt/keyrings.
-        $keyUrl = 'https://mediaarea.net/repo/deb/debian/mediaarea.gpg';
-        if (!is_file($keyringPath)) {
+        // Install the repository key into /etc/apt/keyrings.
+        if (!$keyPresent) {
             runStep('Ensuring apt keyring directory exists', sprintf('install -m 0755 -d %s', escapeshellarg($keyringDir)));
-            $fetchCmd = sprintf(
-                'curl -fsSL %s | gpg --dearmor -o %s',
-                escapeshellarg($keyUrl),
-                escapeshellarg($keyringPath)
-            );
-            if (runStep('Fetching MediaArea repository key', $fetchCmd) === 0) {
-                runStep('Setting permissions on MediaArea repository key', sprintf('chmod 0644 %s', escapeshellarg($keyringPath)));
-            } else {
+
+            // Try explicit override first
+            $candidates = [];
+            $override = getenv('PMSS_MEDIAAREA_KEY_URL');
+            if (is_string($override) && $override !== '') { $candidates[] = $override; }
+            // Fallback guesses (kept minimal; operators can set override for reliability)
+            $candidates[] = 'https://mediaarea.net/repo/deb/debian/mediaarea.gpg';
+            $candidates[] = 'https://mediaarea.net/repo/deb/mediaarea.gpg';
+
+            foreach ($candidates as $url) {
+                $cmd = sprintf('curl -fsSL %s | gpg --dearmor -o %s', escapeshellarg($url), escapeshellarg($keyringPath));
+                if (runStep('Fetching MediaArea repository key from '.$url, $cmd) === 0 && is_file($keyringPath)) {
+                    runStep('Setting permissions on MediaArea repository key', sprintf('chmod 0644 %s', escapeshellarg($keyringPath)));
+                    $keyPresent = true;
+                    break;
+                }
                 @unlink($keyringPath);
-                logmsg('[WARN] MediaArea key fetch failed; falling back to repo-mediaarea package bootstrap');
+            }
+
+            // Fallback to keyserver by key ID when direct URL fetches fail.
+            if (!$keyPresent) {
+                $keyId = getenv('PMSS_MEDIAAREA_KEY_ID') ?: 'C10E11090EC0E438';
+                $cmd = 'sh -lc '.escapeshellarg(
+                    'gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys '.escapeshellarg($keyId)
+                    .' && gpg --batch --export '.escapeshellarg($keyId).' | gpg --dearmor -o '.escapeshellarg($keyringPath)
+                );
+                if (runStep('Importing MediaArea key from keyserver ('.$keyId.')', $cmd) === 0 && is_file($keyringPath)) {
+                    runStep('Setting permissions on MediaArea repository key', sprintf('chmod 0644 %s', escapeshellarg($keyringPath)));
+                    $keyPresent = true;
+                } else {
+                    @unlink($keyringPath);
+                    logmsg('[WARN] MediaArea key import failed; repository setup skipped');
+                }
             }
         }
 
         // On supported releases (Debian >=11), ensure deb822 .sources with signed-by and disable legacy .list entries.
         $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
-        if ($version >= 11) {
+        if ($version >= 11 && $keyPresent) {
             $sourcesDir = '/etc/apt/sources.list.d';
             $deb822Path = $sourcesDir.'/mediaarea.sources';
             // Prefer the codename-specific suite to avoid 404s on 'stable'.
@@ -251,62 +248,8 @@ function pmssEnsureMediaareaRepository(): void
             }
         }
 
-        if ($status === 'install ok installed') {
-            return;
-        }
-
-        // Do not create temporary directories or attempt package bootstrap during dry runs.
-        $isDryRun = (string) getenv('PMSS_DRY_RUN');
-        if ($isDryRun !== '' && $isDryRun !== false && $isDryRun !== '0') {
-            logmsg('[INFO] Dry-run active; skipping MediaArea repository package bootstrap');
-            return;
-        }
-
-        $tmpDir = sys_get_temp_dir().'/pmss-mediaarea-'.bin2hex(random_bytes(6));
-        if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0700, true)) {
-            logmsg('[WARN] Unable to create temp dir for MediaArea repository bootstrap');
-            return;
-        }
-
-        $packageUrl  = 'https://mediaarea.net/repo/deb/repo-mediaarea_1.0-25_all.deb';
-        $packagePath = $tmpDir.'/repo-mediaarea.deb';
-
-        $downloadCmd = sprintf('wget -q -O %s %s', escapeshellarg($packagePath), escapeshellarg($packageUrl));
-        if (runStep('Fetching MediaArea repository package', $downloadCmd) !== 0) {
-            @unlink($packagePath);
-            @rmdir($tmpDir);
-            return;
-        }
-
-        $rc = runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
-        if ($rc !== 0) {
-            // dpkg may not support zstd-compressed control.tar on some upgraded hosts.
-            // As a fail-soft fallback, disable MediaArea repository to keep apt healthy.
-            logmsg('[WARN] Disabling MediaArea repository due to bootstrap failure (will rely on distro mediainfo)');
-            @unlink('/etc/apt/sources.list.d/mediaarea.sources');
-            // Also comment out any mediaarea lines in the primary sources.list to avoid duplicates.
-            $sources = pmssAptSourcesPath();
-            if (is_file($sources)) {
-                $data = @file_get_contents($sources);
-                if ($data !== false && stripos($data, 'mediaarea.net/repo/deb') !== false) {
-                    $lines = preg_split('/\r?\n/', $data);
-                    $changed = false;
-                    foreach ($lines as $i => $line) {
-                        $trim = ltrim($line);
-                        if ($trim !== '' && $trim[0] !== '#' && stripos($line, 'mediaarea.net/repo/deb') !== false) {
-                            $lines[$i] = '# PMSS(disable, mediaarea bootstrap failed): '.$line;
-                            $changed = true;
-                        }
-                    }
-                    if ($changed) {
-                        @file_put_contents($sources, implode(PHP_EOL, $lines).PHP_EOL);
-                        logmsg('Disabled MediaArea entries in primary sources.list');
-                    }
-                }
-            }
-        }
-        @unlink($packagePath);
-        @rmdir($tmpDir);
+        // Do not attempt installing repo-mediaarea package (zstd control tar often breaks on older dpkg).
+        // Rely solely on deb822 + keyring; if key setup failed, skip enabling.
     }
 }
 
