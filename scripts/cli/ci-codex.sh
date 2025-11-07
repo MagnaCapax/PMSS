@@ -133,9 +133,9 @@ echo "[ci-codex] waiting for run completion (timeout ${PMSS_CI_WAIT_SECS}s)…" 
 status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 deadline=$(( $(date +%s) + PMSS_CI_WAIT_SECS ))
 while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
-  echo "[ci-codex] run status: $status (waiting)" >&1
-  sleep 5
-  status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
+	echo "[ci-codex] run status: $status (waiting)" >&1
+	sleep 5
+	status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 done
 echo "[ci-codex] run status now: $status" >&1
 
@@ -209,10 +209,10 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
   echo
   # Include job logs if present
   for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
-    [[ -s "$jl" ]] || continue
-    echo "=== Job Log (tail last ${JOB_LOG_LINES}): $(basename "$jl") ==="
-    tail -n "${JOB_LOG_LINES}" "$jl" || true
-    echo
+	[[ -s "$jl" ]] || continue
+	echo "=== Job Log (tail last ${JOB_LOG_LINES}): $(basename "$jl") ==="
+	tail -n "${JOB_LOG_LINES}" "$jl" || true
+	echo
   done
   if compgen -G "$ARTDIR/*" >/dev/null; then
     echo "=== Artifact Inventory ==="
@@ -221,35 +221,35 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
     # Print limited content from a subset of files inside the artifact tree
     count=0
     while IFS= read -r -d '' f; do
-      count=$((count+1))
-      if (( count > MAX_ARTIFACT_FILES )); then
-        echo "... Skipping remaining artifacts; see $ARTDIR" 
-        break
-      fi
-      echo "=== Artifact (tail last ${ARTIFACT_LINES}): $(basename "$f") ==="
-      tail -n "${ARTIFACT_LINES}" "$f" || true
-      echo
-    done < <(find "$ARTDIR" -type f -print0 | sort -z)
+		count=$((count+1))
+		if (( count > MAX_ARTIFACT_FILES )); then
+			echo "... Skipping remaining artifacts; see $ARTDIR"
+			break
+		fi
+		echo "=== Artifact (tail last ${ARTIFACT_LINES}): $(basename "$f") ==="
+		tail -n "${ARTIFACT_LINES}" "$f" || true
+		echo
+	    done < <(find "$ARTDIR" -type f -print0 | sort -z)
   fi
-} > "$PROMPT"
+} >"$PROMPT"
 
-prompt_bytes=$(wc -c < "$PROMPT" | tr -d ' ')
-prompt_lines=$(wc -l < "$PROMPT" | tr -d ' ')
+prompt_bytes=$(wc -c <"$PROMPT" | tr -d ' ')
+prompt_lines=$(wc -l <"$PROMPT" | tr -d ' ')
 echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
 
 # Invoke Codex using @file (preferred), with a minimal fallback
 if [[ -n "$exec_cmd" ]]; then
-  echo "[ci-codex] sending prompt via: $exec_cmd (@file)" >&1
-  # shellcheck disable=SC2086
-  eval $exec_cmd "@${PROMPT}"
+	echo "[ci-codex] sending prompt via: $exec_cmd (@file)" >&1
+	# shellcheck disable=SC2086
+	eval $exec_cmd "@${PROMPT}"
 else
   if command -v codex >/dev/null 2>&1; then
-    echo "[ci-codex] sending prompt to: codex @file" >&1
-    codex "@${PROMPT}" || {
-      echo "[ci-codex] codex invocation failed. Run manually: codex '@$PROMPT'" >&1
-      exit 1
-    }
-  else
-    echo "[ci-codex] Codex CLI not found. To send to your assistant, run: codex '@$PROMPT'" >&1
-  fi
+		echo "[ci-codex] sending prompt to: codex @file" >&1
+		codex "@${PROMPT}" || {
+			echo "[ci-codex] codex invocation failed. Run manually: codex '@$PROMPT'" >&1
+			exit 1
+		}
+	else
+		echo "[ci-codex] Codex CLI not found. To send to your assistant, run: codex '@$PROMPT'" >&1
+	fi
 fi

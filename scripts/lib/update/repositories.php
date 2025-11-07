@@ -151,7 +151,33 @@ function pmssEnsureMediaareaRepository(): void
             return;
         }
 
-        runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
+        $rc = runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
+        if ($rc !== 0) {
+            // dpkg may not support zstd-compressed control.tar on some upgraded hosts.
+            // As a fail-soft fallback, disable MediaArea repository to keep apt healthy.
+            logmsg('[WARN] Disabling MediaArea repository due to bootstrap failure (will rely on distro mediainfo)');
+            @unlink('/etc/apt/sources.list.d/mediaarea.sources');
+            // Also comment out any mediaarea lines in the primary sources.list to avoid duplicates.
+            $sources = pmssAptSourcesPath();
+            if (is_file($sources)) {
+                $data = @file_get_contents($sources);
+                if ($data !== false && stripos($data, 'mediaarea.net/repo/deb') !== false) {
+                    $lines = preg_split('/\r?\n/', $data);
+                    $changed = false;
+                    foreach ($lines as $i => $line) {
+                        $trim = ltrim($line);
+                        if ($trim !== '' && $trim[0] !== '#' && stripos($line, 'mediaarea.net/repo/deb') !== false) {
+                            $lines[$i] = '# PMSS(disable, mediaarea bootstrap failed): '.$line;
+                            $changed = true;
+                        }
+                    }
+                    if ($changed) {
+                        @file_put_contents($sources, implode(PHP_EOL, $lines).PHP_EOL);
+                        logmsg('Disabled MediaArea entries in primary sources.list');
+                    }
+                }
+            }
+        }
         @unlink($packagePath);
         @rmdir($tmpDir);
     }

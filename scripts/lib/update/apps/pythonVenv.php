@@ -37,12 +37,19 @@ if (!function_exists('pmssPythonVenvEnsure')) {
             return [];
         }
 
-        if (!is_file($pipBin)) {
-            runStep('Bootstrapping pip in '.$label.' virtualenv', sprintf('%s -m ensurepip --upgrade', escapeshellarg($pythonBin)));
+        // Determine if pip is actually importable, not just if a script exists.
+        $hasPip = pmssPythonVenvHasPip($pythonBin);
+        if (!$hasPip) {
+            runStep('Bootstrapping pip in '.$label.' virtualenv', sprintf('%s -m ensurepip --upgrade --default-pip', escapeshellarg($pythonBin)));
+            // Emit minimal debug context to help diagnose odd hosts.
+            runStep('Debug '.$label.' ensurepip context', sprintf("%s -c 'import sys,ensurepip; print(sys.version); print(getattr(ensurepip,\"__file__\",\"n/a\"))'", escapeshellarg($pythonBin)));
+            $hasPip = pmssPythonVenvHasPip($pythonBin);
         }
 
-        if (!is_file($pipBin)) {
-            $log('[ERR] '.$label.' virtualenv missing pip; ensure python3-venv is installed and rerun update');
+        if (!$hasPip) {
+            $log('[ERR] '.$label.' virtualenv missing pip after ensurepip; ensure python3-venv is installed and rerun update');
+            // List venv bin dir to aid debugging.
+            @runStep('Debug '.$label.' venv bin listing', sprintf('ls -la %s || true', escapeshellarg(dirname($pythonBin))));
             return [];
         }
 
@@ -52,3 +59,14 @@ if (!function_exists('pmssPythonVenvEnsure')) {
     }
 }
 
+if (!function_exists('pmssPythonVenvHasPip')) {
+    /**
+     * True if `python -m pip --version` runs successfully.
+     */
+    function pmssPythonVenvHasPip(string $pythonBin): bool
+    {
+        $cmd = escapeshellarg($pythonBin).' -m pip --version 1>/dev/null 2>&1';
+        exec($cmd, $out, $rc);
+        return $rc === 0;
+    }
+}
