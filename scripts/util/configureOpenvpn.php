@@ -38,9 +38,17 @@ $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
 $clientOvpn  = "/home/openvpn-{$slug}.ovpn";
 $clientCrt   = "/home/openvpn-{$slug}.crt";
 
-// Fast-path: if OpenVPN appears configured (server conf + CA present), skip.
-$alreadyConfigured = is_file($serverConf)
-    && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'));
+// Fast-path: skip when OpenVPN appears configured per systemTest semantics:
+//  - openvpn binary present
+//  - server config present
+//  - EasyRSA CA (or issued/server.crt) present
+//  - client artifacts (.ovpn + .crt) present in /home
+$openvpnBin = trim((string) @shell_exec('command -v openvpn 2>/dev/null'));
+$alreadyConfigured = ($openvpnBin !== '')
+    && is_file($serverConf)
+    && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
+    && is_file($clientOvpn)
+    && is_file($clientCrt);
 if ($alreadyConfigured) {
     logmsg('[SKIP] OpenVPN already configured; skipping provisioning');
     return;
