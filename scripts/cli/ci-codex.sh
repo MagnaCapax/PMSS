@@ -49,7 +49,12 @@ PMSS_CI_WAIT_SECS=${PMSS_CI_WAIT_SECS:-300}
 DEFAULT_PROMPT=$(cat <<'PMSSPROMPT'
 PMSS CI Assist — Strict Rails Mode
 
-Goal: Make required CI jobs pass with the smallest coherent change. Read AGENTS.md first; obey Doctrine/Constitution and ADRs.
+Goal: Make required CI jobs pass with the smallest coherent change.
+
+Read First (ABSOLUTE — do not proceed until read):
+- AGENTS.md (entire file; rails/Constitution/Doctrine).
+- docs/architecture.md and docs/update.md (provisioning flow, updater topology).
+- docs/adr/* (governing decisions; when present, they apply).
 
 Must Follow:
 - PHP 7.3 compatibility for all PHP runtime code.
