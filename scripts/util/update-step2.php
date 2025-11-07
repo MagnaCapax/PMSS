@@ -135,7 +135,8 @@ $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effective
 runStep('Stopping Apache httpd (legacy)', 'systemctl stop apache2 || true');
 runStep('Disabling Apache httpd service', 'systemctl disable apache2 || true');
 runStep('Masking Apache httpd service', 'systemctl mask apache2 || true');
-runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data apache2-utils libapache2-mod-php7.4 || true'));
+// Remove legacy Apache packages; keep apache2-utils for htpasswd/ab and related tools.
+runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));
 runStep('Stopping Apache httpd (legacy)', 'systemctl stop apache2 || true');
 runStep('Disabling Apache httpd service', 'systemctl disable apache2 || true');
 runStep('Masking Apache httpd service', 'systemctl mask apache2 || true');

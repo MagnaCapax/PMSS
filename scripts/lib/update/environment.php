@@ -150,6 +150,11 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             }
         }
 
+        // Explicitly clear problematic vendor repo packages from selections so dselect-upgrade
+        // will not attempt to install them from cache even if a previous run queued them.
+        $clearSelections = "printf 'repo-mediaarea\tdeinstall\nrepo-mediaarea-snapshots\tdeinstall\n' | dpkg --set-selections";
+        runStep('Clearing repo-mediaarea selections', $clearSelections);
+
         $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));
         $rc = runStep('Applying dpkg selection baseline', $cmd);
         if ($rc !== 0) {
