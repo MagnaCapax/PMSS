@@ -154,8 +154,8 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
   # Include job logs if present
   for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
     [[ -s "$jl" ]] || continue
-    echo "=== Job Log: $(basename "$jl") ==="
-    sed -n "1,${JOB_LOG_LINES}p" "$jl" || true
+    echo "=== Job Log (tail last ${JOB_LOG_LINES}): $(basename "$jl") ==="
+    tail -n "${JOB_LOG_LINES}" "$jl" || true
     echo
   done
   if compgen -G "$ARTDIR/*" >/dev/null; then
@@ -170,8 +170,8 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
         echo "... Skipping remaining artifacts; see $ARTDIR" 
         break
       fi
-      echo "=== Artifact: $(basename "$f") ==="
-      sed -n "1,${ARTIFACT_LINES}p" "$f" || true
+      echo "=== Artifact (tail last ${ARTIFACT_LINES}): $(basename "$f") ==="
+      tail -n "${ARTIFACT_LINES}" "$f" || true
       echo
     done < <(find "$ARTDIR" -type f -print0 | sort -z)
   fi
@@ -201,14 +201,18 @@ if [[ -n "$exec_cmd" ]]; then
   eval $exec_cmd "$(cat "$PROMPT_ARG")"
 else
   if command -v codex >/dev/null 2>&1; then
-    echo "[ci-codex] sending prompt to: codex (arg)" >&2
-    codex "$(cat "$PROMPT_ARG")" || {
-      echo "[ci-codex] codex invocation failed. You can run manually:" >&2
-      echo "  codex \"\$(cat '$PROMPT_ARG')\"" >&2
-      exit 1
-    }
+    echo "[ci-codex] sending prompt to: codex @file (preferred)" >&2
+    if ! codex "@${PROMPT}"; then
+      echo "[ci-codex] fallback to arg string (trimmed)" >&2
+      if ! codex "$(cat "$PROMPT_ARG")"; then
+        echo "[ci-codex] codex invocation failed. You can run manually:" >&2
+        echo "  codex '@$PROMPT'" >&2
+        echo "  or: codex \"\$(cat '$PROMPT_ARG')\"" >&2
+        exit 1
+      fi
+    fi
   else
     echo "[ci-codex] Codex CLI not found. To send to your assistant, try:" >&2
-    echo "  scripts/cli/ci.sh --exec 'codex'" >&2
+    echo "  codex '@$PROMPT'" >&2
   fi
 fi
