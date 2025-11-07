@@ -106,10 +106,38 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
      */
 function pmssEnsureMediaareaRepository(): void
     {
+        // Minimal, fail-soft policy: disable MediaArea by default to avoid
+        // recurring apt breakage. Operators can opt-in by setting
+        // PMSS_MEDIAAREA=enable.
+        $mode = strtolower((string) getenv('PMSS_MEDIAAREA'));
+        if ($mode !== 'enable') {
+            // Remove deb822 file and comment any legacy entries to prevent apt warnings.
+            @unlink('/etc/apt/sources.list.d/mediaarea.sources');
+            $sources = pmssAptSourcesPath();
+            if (is_file($sources)) {
+                $data = @file_get_contents($sources);
+                if ($data !== false && stripos($data, 'mediaarea.net/repo/deb') !== false) {
+                    $lines = preg_split('/\r?\n/', $data);
+                    $changed = false;
+                    foreach ($lines as $i => $line) {
+                        $trim = ltrim($line);
+                        if ($trim !== '' && $trim[0] !== '#' && stripos($line, 'mediaarea.net/repo/deb') !== false) {
+                            $lines[$i] = '# PMSS(disable, mediaarea policy): '.$line;
+                            $changed = true;
+                        }
+                    }
+                    if ($changed) {
+                        @file_put_contents($sources, implode(PHP_EOL, $lines).PHP_EOL);
+                        logmsg('MediaArea repository disabled by policy (PMSS_MEDIAAREA!=enable)');
+                    }
+                }
+            }
+            return;
+        }
+
         // #TODO Prefer deb822 sources and `/etc/apt/keyrings` over legacy
-        //       trusted.gpg.d entries. Unify MediaArea/Docker and other
-        //       third-party repos behind a single helper that manages
-        //       keyrings and source files consistently.
+        //       trusted.gpg.d entries. Unify third‑party repos behind a
+        //       single helper that manages keyrings and .sources consistently.
         $status = pmssQueryPackageStatus('repo-mediaarea');
         $keyringDir  = rtrim((string) (getenv('PMSS_APT_KEYRING_DIR') ?: '/etc/apt/keyrings'), '/');
         if ($keyringDir === '') {
