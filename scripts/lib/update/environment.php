@@ -133,10 +133,8 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     $warnings = true;
                     continue;
                 }
-                // Drop version-pinned kernel images; rely on meta 'linux-image-amd64'
+                // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'
                 if (preg_match('/^linux-image-[0-9]/i', $package)) {
-                    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Ignoring versioned kernel package '.$package.' from baseline', 0); }
-                    elseif (function_exists('logmsg')) { logmsg('[SKIP] Ignoring versioned kernel package '.$package.' from baseline'); }
                     $warnings = true;
                     continue;
                 }
@@ -148,6 +146,11 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 }
                 // If requesting install of a package not available in the current apt cache, drop it
                 if (strtolower($state) === 'install' && !pmssPackageAvailable($package)) {
+                    // Silence known obsolete transitional like cgroup-bin
+                    if (strtolower($package) === 'cgroup-bin') {
+                        $warnings = true;
+                        continue;
+                    }
                     if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Baseline package not available: '.$package.' (dropping)', 0); }
                     elseif (function_exists('logmsg')) { logmsg('[SKIP] Baseline package not available: '.$package.' (dropping)'); }
                     $warnings = true;
