@@ -10,6 +10,7 @@
  * - Restarts OpenVPN service as needed
  */
 
+require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/update/apt.php';
@@ -126,4 +127,3 @@ if (file_exists($clientOvpn) && file_exists($clientCrt) && is_dir('/etc/skel/www
 }
 
 logmsg('OpenVPN configuration task complete');
-

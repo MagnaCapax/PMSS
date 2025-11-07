@@ -70,12 +70,52 @@ function pmssEnsureMediaareaRepository(): void
             );
             if (runStep('Fetching MediaArea repository key', $fetchCmd) === 0) {
                 runStep('Setting permissions on MediaArea repository key', sprintf('chmod 0644 %s', escapeshellarg($keyringPath)));
-                return;
+            } else {
+                @unlink($keyringPath);
+                logmsg('[WARN] MediaArea key fetch failed; falling back to repo-mediaarea package bootstrap');
             }
-            @unlink($keyringPath);
-            logmsg('[WARN] MediaArea key fetch failed; falling back to repo-mediaarea package bootstrap');
-        } else {
-            return;
+        }
+
+        // On supported releases (Debian >=11), ensure deb822 .sources with signed-by and disable legacy .list entries.
+        $version = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+        if ($version >= 11) {
+            $sourcesDir = '/etc/apt/sources.list.d';
+            $deb822Path = $sourcesDir.'/mediaarea.sources';
+            $deb822 = "Types: deb\n".
+                     "URIs: https://mediaarea.net/repo/deb/debian\n".
+                     "Suites: stable\n".
+                     "Components: main\n".
+                     "Signed-By: {$keyringPath}\n";
+            if (@file_put_contents($deb822Path, $deb822) !== false) {
+                @chmod($deb822Path, 0644);
+                logmsg('MediaArea deb822 source written: '.$deb822Path);
+            } else {
+                logmsg('[WARN] Unable to write MediaArea deb822 source (will rely on template or existing config)');
+            }
+
+            // Disable any legacy mediaarea .list entries that lack signed-by or pin a suite like bullseye.
+            $lists = glob($sourcesDir.'/*.list') ?: [];
+            foreach ($lists as $file) {
+                $data = @file_get_contents($file);
+                if ($data === false) continue;
+                if (stripos($data, 'mediaarea.net/repo/deb') !== false) {
+                    $backup = $file.'.pmss-backup-'.date('YmdHis');
+                    @copy($file, $backup);
+                    $lines = preg_split('/\r?\n/', $data);
+                    $changed = false;
+                    foreach ($lines as $i => $line) {
+                        $trim = ltrim($line);
+                        if ($trim !== '' && $trim[0] !== '#') {
+                            $lines[$i] = '# PMSS(disable, mediaarea legacy): '.$line;
+                            $changed = true;
+                        }
+                    }
+                    if ($changed) {
+                        @file_put_contents($file, implode(PHP_EOL, $lines).PHP_EOL);
+                        logmsg('Disabled legacy MediaArea entry in '.basename($file));
+                    }
+                }
+            }
         }
 
         if ($status === 'install ok installed') {

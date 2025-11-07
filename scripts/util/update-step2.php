@@ -199,7 +199,7 @@ pmssConfigureWebStack($distroVersion);
 pmssReapplyLocaleDefinitions();
 
 // Configure OpenVPN via dedicated utility for better logging/observability.
-runStep('Configuring OpenVPN', '/scripts/util/configureOpenvpn.php');
+runStep('Configuring OpenVPN', 'php /scripts/util/configureOpenvpn.php');
 
 // Load application installers automatically (sorted for deterministic order),
 // but skip the legacy OpenVPN app script as it is superseded by the utility.
