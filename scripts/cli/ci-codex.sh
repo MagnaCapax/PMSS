@@ -71,8 +71,20 @@ Absolutes:
 - Commit the fix after applying it: stage all and commit with a clear, focused message (e.g., `git add -A && git commit -m "ci: <scope> — <short reason>"`). Do not push.
 - ABSOLUTELY NO ZFS — unacceptable for our workload (poor 100% random I/O performance and elevated data-loss risk). Do not propose or introduce it here.
 - Keep diffs small, idempotent, backward‑compatible; reuse existing helpers; no aliases; context‑first naming.
+ 
+Workflow (Do This Now):
+- Triage the first failing required job/step using the CI summary and job log tails below.
+- Implement the smallest coherent fix; do not touch frozen paths; reuse existing helpers and keep changes minimal.
+- Verify locally:
+  * php -l <each changed PHP file>
+  * php scripts/lib/tests/development/Runner.php
+  * scripts/testing/test-php.sh
+  * scripts/testing/test-bash.sh
+  * scripts/testing/php73-compat-scan.sh
+- Commit the fix (no branches, no push):
+  * git add -A && git commit -m "ci: <scope> — <short reason>"
 
-Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch and verification commands.
+Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch and the verification commands you ran.
 PMSSPROMPT
 )
 
