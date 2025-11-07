@@ -20,7 +20,7 @@ require_once __DIR__.'/../lib/runtime.php';
 
 function printUsage(): void
 {
-    echo "Usage: benchmarkStorage.php [--target=<dir>] [--size=<bytes|MiB|GiB>] [--runtime=<seconds>] [--json=<path>] [--label=<name>]\n";
+    echo "Usage: benchmarkStorage.php [--target=<dir>] [--size=<bytes|MiB|GiB>] [--runtime=<seconds>] [--json=<path>] [--label=<name>] [--devices] [--dd-size=<MiB|GiB>] [--device-runtime=<seconds>]\n";
 }
 
 // --- CLI args ---
@@ -29,6 +29,9 @@ $fileSize  = '500G';
 $runtime   = 60;       // seconds per test
 $jsonLog   = '/var/log/pmss/benchmark-storage.jsonl';
 $label     = '';
+$testDevices = false;
+$ddSize   = '1G';       // per-device sequential read size
+$devRuntime = 30;       // seconds per-device fio tests
 
 foreach ($argv as $arg) {
     if (strpos($arg, '--target=') === 0) {
@@ -41,6 +44,12 @@ foreach ($argv as $arg) {
         $jsonLog = substr($arg, 7);
     } elseif (strpos($arg, '--label=') === 0) {
         $label = substr($arg, 8);
+    } elseif (strpos($arg, '--dd-size=') === 0) {
+        $ddSize = substr($arg, 10);
+    } elseif (strpos($arg, '--device-runtime=') === 0) {
+        $devRuntime = (int) substr($arg, 18);
+    } elseif ($arg === '--devices') {
+        $testDevices = true;
     } elseif ($arg === '--help' || $arg === '-h') {
         printUsage();
         exit(0);
@@ -88,7 +97,14 @@ function parseSize(string $s): int {
     return 0;
 }
 
-// Test set: tuned for shared storage/seedbox usage.
+function runShell(string $cmd): array {
+    $rc = runCommand($cmd, true);
+    $out = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
+    $err = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stderr'] ?? '';
+    return [$rc, $out, $err];
+}
+
+// Test set (file-backed): tuned for shared storage/seedbox usage.
 // - Mixed random, read-heavy, variable block sizes up to 1024k (~700k average)
 // - Complementary random-read and small-block tests
 $tests = [
@@ -274,3 +290,86 @@ foreach ($summary as $row) {
 }
 
 echo "\nJSON log: {$jsonLog}\n";
+
+// ---- Optional per-device read-only benchmarking ----
+if ($testDevices) {
+    echo "\n== Per-device read-only benchmarks ==\n";
+    // Enumerate disks
+    $ls = shell_exec('lsblk -dn -o KNAME,TYPE 2>/dev/null');
+    $devices = [];
+    if ($ls) {
+        $lines = preg_split('/\r?\n/', trim($ls));
+        foreach ($lines as $line) {
+            if ($line === '') continue;
+            $parts = preg_split('/\s+/', trim($line));
+            if (count($parts) < 2) continue;
+            [$kname,$type] = $parts;
+            if ($type !== 'disk') continue;
+            // Skip loop/ram devices
+            if (strpos($kname, 'loop') === 0 || strpos($kname, 'ram') === 0) continue;
+            $path = '/dev/'.$kname;
+            $devices[] = $path;
+        }
+    }
+    foreach ($devices as $path) {
+        if (!is_readable($path)) continue;
+        $sizeBytes = (int) trim((string) shell_exec('blockdev --getsize64 '.escapeshellarg($path).' 2>/dev/null'));
+        // dd sequential read from random offset
+        $readBytes = parseSize($ddSize);
+        if ($readBytes <= 0) $readBytes = 1024*1024*1024;
+        $skipBlocks = 0;
+        if ($sizeBytes > ($readBytes + 4*1024*1024)) {
+            $maxSkipBlocks = (int) floor(($sizeBytes - $readBytes) / (1024*1024));
+            $skipBlocks = $maxSkipBlocks > 0 ? random_int(0, $maxSkipBlocks) : 0;
+        }
+        $ddCmd = sprintf('dd if=%s of=/dev/null bs=1M count=%d skip=%d iflag=direct 2>&1',
+            escapeshellarg($path), (int) floor($readBytes/(1024*1024)), $skipBlocks);
+        [$rc, $stdout, $stderr] = runShell($ddCmd);
+        $line = trim($stderr !== '' ? $stderr : $stdout);
+        $mbps = null; $secs = null;
+        if (preg_match('/\s([0-9.]+)\s+s,\s+([0-9.]+)\s+MB\/s/', $line, $m)) {
+            $secs = (float) $m[1];
+            $mbps = (float) $m[2];
+        }
+        $entry = [
+            'timestamp' => date('c'),
+            'label'     => $label !== '' ? $label : null,
+            'device'    => $path,
+            'test'      => 'device-seqread-dd',
+            'params'    => ['bs' => '1M', 'count' => (int) floor($readBytes/(1024*1024)), 'skip_blocks' => $skipBlocks],
+            'ok'        => $rc === 0 && $mbps !== null,
+        ];
+        if ($mbps !== null) {
+            $entry['metrics'] = ['seqread_MBps' => $mbps, 'elapsed_s' => $secs];
+        } else {
+            $entry['error'] = 'dd parse failed';
+        }
+        @file_put_contents($jsonLog, json_encode($entry, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        printf("%s\tdd_seqread_MB/s=%s\n", $path, $mbps !== null ? number_format($mbps,2) : 'n/a');
+
+        // fio random read small and large on device
+        $devJobs = [
+            ['name' => 'dev-randread-4k', 'rw' => 'randread', 'bs' => '4k', 'iodepth' => 64, 'numjobs' => 1, 'direct' => 1],
+            ['name' => 'dev-randread-1M', 'rw' => 'randread', 'bs' => '1M', 'iodepth' => 32, 'numjobs' => 1, 'direct' => 1],
+        ];
+        foreach ($devJobs as $job) {
+            $res = runFioJob($path, $sizeBytes, $devRuntime, $job);
+            $e = [
+                'timestamp' => date('c'),
+                'label'     => $label !== '' ? $label : null,
+                'device'    => $path,
+                'test'      => $job['name'],
+                'params'    => ['rw'=>$job['rw'],'bs'=>$job['bs'],'iodepth'=>$job['iodepth'],'numjobs'=>$job['numjobs'],'runtime'=>$devRuntime],
+                'ok'        => $res['ok'],
+            ];
+            if ($res['ok']) {
+                $e['metrics'] = $res['result'];
+                printf("%s\t%s\tread_MB/s=%.2f\tread_iops=%.1f\tread_p95_ms=%.2f\n",
+                    $path, $job['name'], $res['result']['read_bw_MBps'], $res['result']['read_iops'], $res['result']['read_p95_ms']);
+            } else {
+                $e['error'] = $res['error'] ?? 'fio failed';
+            }
+            @file_put_contents($jsonLog, json_encode($e, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        }
+    }
+}

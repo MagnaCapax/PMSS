@@ -28,7 +28,7 @@ class UpdateHelpersTest extends TestCase
         $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
         $data = \loadRepoTemplate('this-code-name-does-not-exist', $logger);
         $this->assertEquals('', $data);
-        $this->assertTrue((bool)array_filter($logs, fn($l) => strpos($l, 'Repository template missing:') !== false));
+        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Repository template missing:') !== false; }));
     }
 
     public function testSafeWriteSourcesEmptyContentSkips(): void
@@ -37,7 +37,7 @@ class UpdateHelpersTest extends TestCase
         $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
         $ok = \safeWriteSources('', 'UnitTest', $logger);
         $this->assertTrue($ok === false);
-        $this->assertTrue((bool)array_filter($logs, fn($l) => strpos($l, 'Empty repository content') !== false));
+        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Empty repository content') !== false; }));
     }
 
     public function testUpdateAptSourcesDebian9UnsupportedLogs(): void
@@ -47,7 +47,7 @@ class UpdateHelpersTest extends TestCase
         \updateAptSources('debian', 9, 'dead', [
             'jessie' => '', 'buster' => '', 'bullseye' => '', 'bookworm' => '', 'trixie' => ''
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, fn($l) => strpos($l, 'Unsupported Debian version: 9') !== false));
+        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Unsupported Debian version: 9') !== false; }));
     }
 
     public function testUpdateAptSourcesAlreadyCorrectNoChange(): void
@@ -61,7 +61,7 @@ class UpdateHelpersTest extends TestCase
             'bookworm' => $content,
             'bullseye' => '', 'buster' => '', 'jessie' => '', 'trixie' => '',
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, fn($l) => strpos($l, 'already correct') !== false));
+        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'already correct') !== false; }));
         // Important: No destructive call path is taken here
     }
 
@@ -72,7 +72,7 @@ class UpdateHelpersTest extends TestCase
         \updateAptSources('debian', 11, 'hash', [
             'bullseye' => '', 'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => ''
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, fn($l) => strpos($l, 'Bullseye template missing') !== false));
+        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Bullseye template missing') !== false; }));
     }
 
     public function testUpdateAptSourcesDebian13AlreadyCorrect(): void
@@ -85,7 +85,7 @@ class UpdateHelpersTest extends TestCase
             'trixie' => $content,
             'bookworm' => '', 'bullseye' => '', 'buster' => '', 'jessie' => '',
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, fn($l) => strpos($l, 'Trixie') !== false));
+        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Trixie') !== false; }));
     }
 
     public function testGetOsReleaseDataIsArray(): void

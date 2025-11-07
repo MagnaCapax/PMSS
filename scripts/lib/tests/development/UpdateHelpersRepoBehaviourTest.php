@@ -15,7 +15,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         \updateAptSources('arch', 1, '', [], function (string $msg) use (&$logs): void {
             $logs[] = $msg;
         });
-        $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'Unsupported distro: arch')));
+        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'Unsupported distro: arch') !== false; }));
     }
 
     public function testUpdateAptSourcesUbuntuLogsMessage(): void
@@ -24,7 +24,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         \updateAptSources('ubuntu', 22, '', [], function (string $msg) use (&$logs): void {
             $logs[] = $msg;
         });
-        $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'Ubuntu is not supported yet')));
+        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'Ubuntu is not supported yet') !== false; }));
     }
 
     public function testUpdateAptSourcesUnsupportedVersionLogs(): void
@@ -35,7 +35,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         ], function (string $msg) use (&$logs): void {
             $logs[] = $msg;
         });
-        $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'Unsupported Debian version')));
+        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'Unsupported Debian version') !== false; }));
     }
 
     public function testUpdateAptSourcesBusterWritesTemplate(): void
@@ -79,7 +79,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         ], function (string $msg) use (&$logs): void {
             $logs[] = $msg;
         });
-        $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'already correct')));
+        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'already correct') !== false; }));
     }
 
     public function testUpdateAptSourcesEmptyRepositoriesSkipsWrites(): void
@@ -139,7 +139,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
                     putenv('PMSS_DRY_RUN');
                 }
                 $this->assertEquals($template, file_get_contents($target));
-                $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'Applied Debian Trixie repository config')));
+                $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'Applied Debian Trixie repository config') !== false; }));
             });
         });
     }
@@ -158,7 +158,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
             $plan = \pmssRepositoryUpdatePlan('debian', 0, function (string $msg) use (&$logs): void { $logs[] = $msg; });
             $this->assertEquals('unchanged', file_get_contents($target));
             $this->assertEquals('reuse', $plan['mode']);
-            $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'reusing existing sources')));
+            $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'reusing existing sources') !== false; }));
         });
     }
 

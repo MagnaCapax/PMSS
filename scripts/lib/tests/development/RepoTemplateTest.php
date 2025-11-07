@@ -7,7 +7,7 @@ require_once dirname(__DIR__, 2).'/update/apt.php';
 
 class RepoTemplateTest extends TestCase
 {
-    private string $tmpSources;
+    private $tmpSources;
 
     protected function setUp(): void
     {
@@ -28,6 +28,6 @@ class RepoTemplateTest extends TestCase
             $logs[] = $msg;
         });
         $this->assertEquals('reuse', $plan['mode']);
-        $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'reusing existing sources')));
+        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'reusing existing sources') !== false; }));
     }
 }

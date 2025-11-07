@@ -5,9 +5,9 @@
 
 class TrafficStorage
 {
-    private string $homeDir;
-    private string $runtimeDir;
-    private string $statsDir;
+    private $homeDir;
+    private $runtimeDir;
+    private $statsDir;
 
     public function __construct(array $paths = [])
     {

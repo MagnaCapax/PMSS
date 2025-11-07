@@ -85,7 +85,7 @@ class DistroRepoSelectionTest extends TestCase
 
         $written = file_get_contents($target);
         $this->assertEquals($template, $written);
-        $this->assertTrue((bool)array_filter($logs, static fn($m) => str_contains($m, 'Applied Debian Bullseye')));
+        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'Applied Debian Bullseye') !== false; }));
 
         $backup = $target.'.pmss-backup';
         $this->assertEquals($initial, file_get_contents($backup));

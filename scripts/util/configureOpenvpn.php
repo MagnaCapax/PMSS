@@ -14,6 +14,8 @@ require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/update/apt.php';
+require_once __DIR__.'/../lib/update/repositories.php';
+require_once __DIR__.'/../lib/update/distro.php';
 
 requireRoot();
 
@@ -37,6 +39,11 @@ $clientOvpn  = "/home/openvpn-{$slug}.ovpn";
 $clientCrt   = "/home/openvpn-{$slug}.crt";
 
 // 1) Ensure OpenVPN and EasyRSA packages
+// Make sure repository prerequisites (keys/sources) are in place before apt update.
+// Seed PMSS_DISTRO_VERSION for helpers that branch by release.
+$dist = pmssDetectDistro();
+putenv('PMSS_DISTRO_VERSION='.(string) ((int) ($dist['version'] ?? 0)));
+pmssEnsureRepositoryPrerequisites();
 runStep('Refreshing APT indexes (OpenVPN)', aptCmd('update -yq'));
 runStep('Installing OpenVPN and EasyRSA', aptCmd('install -yq openvpn easy-rsa'));
 
