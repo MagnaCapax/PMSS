@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/packages/helpers.php';
+require_once __DIR__.'/pythonVenv.php';
 
 $logger = function (string $message): void {
     if (function_exists('logmsg')) {
@@ -27,8 +28,6 @@ if ($python === '') {
 }
 
 $venvDir   = '/opt/pyload';
-$pythonBin = $venvDir.'/bin/python';
-$pipBin    = $venvDir.'/bin/pip';
 $cliBin    = $venvDir.'/bin/pyload';
 
 $aptDeps = [
@@ -44,33 +43,12 @@ $aptDeps = [
 ];
 runStep('Installing pyLoad apt dependencies', aptCmd('install -y '.implode(' ', array_map('escapeshellarg', $aptDeps))));
 
-if (!is_dir($venvDir)) {
-    runStep('Creating pyLoad virtualenv', sprintf('%s -m venv %s', escapeshellarg($python), escapeshellarg($venvDir)));
-}
-
-if (!is_file($pythonBin)) {
-    if ($dryRun) {
-        return;
-    }
-    $logger('[WARN] pyLoad virtualenv missing python binary after creation');
+$venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', $logger);
+if (empty($venv)) {
     return;
 }
 
-// Some Debian builds create venvs without pip; bootstrap it if missing.
-if (!is_file($pipBin)) {
-    runStep('Bootstrapping pip in pyLoad virtualenv', sprintf('%s -m ensurepip --upgrade', escapeshellarg($pythonBin)));
-}
-
-// If pip is still unavailable, fail soft and skip the install to avoid repeated errors.
-if (!is_file($pipBin)) {
-    if (!$dryRun) {
-        $logger('[ERR] pyLoad virtualenv missing pip; ensure python3-venv is installed and rerun update');
-    }
-    return;
-}
-
-runStep('Upgrading pyLoad virtualenv tooling', sprintf('%s -m pip install --upgrade pip setuptools wheel', escapeshellarg($pythonBin)));
-runStep('Installing pyLoad (pyload-ng)', sprintf('%s -m pip install --upgrade pyload-ng', escapeshellarg($pythonBin)));
+runStep('Installing pyLoad (pyload-ng)', sprintf('%s -m pip install --upgrade pyload-ng', escapeshellarg($venv['python'])));
 
 if (is_file($cliBin)) {
     if (!is_link('/usr/local/bin/pyload') || readlink('/usr/local/bin/pyload') !== $cliBin) {

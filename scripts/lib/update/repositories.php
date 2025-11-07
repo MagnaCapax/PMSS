@@ -77,13 +77,19 @@ function pmssEnsureMediaareaRepository(): void
         }
 
         // On supported releases (Debian >=11), ensure deb822 .sources with signed-by and disable legacy .list entries.
-        $version = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+        $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
         if ($version >= 11) {
             $sourcesDir = '/etc/apt/sources.list.d';
             $deb822Path = $sourcesDir.'/mediaarea.sources';
+            // Prefer the codename-specific suite to avoid 404s on 'stable'.
+            $suite = getenv('PMSS_DISTRO_CODENAME') ?: '';
+            if ($suite === '') {
+                // Fallback mapping when codename is unavailable.
+                $suite = $version === 11 ? 'bullseye' : ($version === 12 ? 'bookworm' : ($version === 13 ? 'trixie' : 'stable'));
+            }
             $deb822 = "Types: deb\n".
                      "URIs: https://mediaarea.net/repo/deb/debian\n".
-                     "Suites: stable\n".
+                     "Suites: {$suite}\n".
                      "Components: main\n".
                      "Signed-By: {$keyringPath}\n";
             if (@file_put_contents($deb822Path, $deb822) !== false) {

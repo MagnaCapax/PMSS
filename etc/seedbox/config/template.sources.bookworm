@@ -12,4 +12,4 @@ deb-src http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib
 deb http://www.nic.funet.fi/debian/ bookworm-backports main non-free contrib
 
 # MediaArea repository provides current mediainfo builds.
-deb [signed-by=/etc/apt/keyrings/mediaarea.gpg] https://mediaarea.net/repo/deb/debian/ stable main
+deb [signed-by=/etc/apt/keyrings/mediaarea.gpg] https://mediaarea.net/repo/deb/debian/ bookworm main
