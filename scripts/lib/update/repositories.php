@@ -106,12 +106,7 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
      */
 function pmssEnsureMediaareaRepository(): void
     {
-        // Respect explicit disable if operator requests it.
-        $policy = strtolower((string) getenv('PMSS_MEDIAAREA'));
-        if ($policy === 'disable') {
-            logmsg('MediaArea repository disabled by policy (PMSS_MEDIAAREA=disable)');
-            return;
-        }
+        // Always attempt to ensure MediaArea repository; no policy gate here.
 
         // Prefer deb822 sources and /etc/apt/keyrings with signed-by.
         $status = pmssQueryPackageStatus('repo-mediaarea');
@@ -223,7 +218,7 @@ function pmssEnsureMediaareaRepository(): void
                 logmsg('[WARN] Unable to write MediaArea deb822 source (will rely on template or existing config)');
             }
 
-            // Disable any legacy mediaarea .list entries that lack signed-by or pin a suite like bullseye.
+            // Comment legacy mediaarea .list entries to avoid duplicate target warnings.
             $lists = glob($sourcesDir.'/*.list') ?: [];
             foreach ($lists as $file) {
                 $data = @file_get_contents($file);
@@ -236,13 +231,13 @@ function pmssEnsureMediaareaRepository(): void
                     foreach ($lines as $i => $line) {
                         $trim = ltrim($line);
                         if ($trim !== '' && $trim[0] !== '#') {
-                            $lines[$i] = '# PMSS(disable, mediaarea legacy): '.$line;
+                            $lines[$i] = '# PMSS(adjust, mediaarea legacy; deb822 in use): '.$line;
                             $changed = true;
                         }
                     }
                     if ($changed) {
                         @file_put_contents($file, implode(PHP_EOL, $lines).PHP_EOL);
-                        logmsg('Disabled legacy MediaArea entry in '.basename($file));
+                        logmsg('Commented legacy MediaArea entry in '.basename($file).' to avoid duplicates');
                     }
                 }
             }
