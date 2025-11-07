@@ -40,7 +40,6 @@ JOBLOG="$OUTDIR/job.log"
 PROMPT="$OUTDIR/prompt.txt"
 
 # Render caps to keep prompt readable
-AGENTS_LINES=${AGENTS_LINES:-300}
 JOB_LOG_LINES=${JOB_LOG_LINES:-600}
 ARTIFACT_LINES=${ARTIFACT_LINES:-200}
 MAX_ARTIFACT_FILES=${MAX_ARTIFACT_FILES:-6}
@@ -91,7 +90,6 @@ PMSSPROMPT
 job_name=""
 custom_prompt=""
 exec_cmd=""
-include_agents=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -101,8 +99,6 @@ while [[ $# -gt 0 ]]; do
       custom_prompt=${2:-}; shift 2 || true ;;
     --exec)
       exec_cmd=${2:-}; shift 2 || true ;;
-    --include-agents)
-      include_agents=1; shift 1 || true ;;
     -h|--help)
       sed -n '1,60p' "$0"; exit 0 ;;
     *)
@@ -124,7 +120,6 @@ mkdir -p "$OUTDIR" "$ARTDIR"
 
 echo "[ci-codex] workspace: $OUTDIR" >&1
 echo "[ci-codex] artifact dir: $ARTDIR" >&1
-echo "[ci-codex] config: include_agents=$include_agents, AGENTS_LINES=$AGENTS_LINES, JOB_LOG_LINES=$JOB_LOG_LINES, ARTIFACT_LINES=$ARTIFACT_LINES, MAX_ARTIFACT_FILES=$MAX_ARTIFACT_FILES, MAX_PROMPT_ARG_BYTES=${MAX_PROMPT_ARG_BYTES:-n/a}" >&1
 
 echo "[ci-codex] discovering latest run..." >&1
 run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
@@ -207,15 +202,7 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 {
   echo "$prompt_text"
   echo
-  echo "Context files to read first (repo rails):"
-  echo " - AGENTS.md"
-  echo " - docs/ (architecture, ADRs, update flow)"
-  echo
-  if [[ $include_agents -eq 1 && -f "$ROOT/AGENTS.md" ]]; then
-    echo "=== AGENTS.md (inline) ==="
-    sed -n "1,${AGENTS_LINES}p" "$ROOT/AGENTS.md" || true
-    echo
-  fi
+  # Rails are referenced above; AGENTS.md/docs/ADRs are not inlined — read them from the repo.
   echo "----- LOG FOLLOWS:"
   echo
   echo "=== CI Summary ==="
