@@ -20,6 +20,7 @@ Naming & Lints
 - Add opt-in class/file naming lint across first-party libs (one class per file, name matches file).
 - Enforce no-aliases policy on env keys via advisory lint.
  - Plan rollout: enable `classname-lint.sh` in CI as advisory, then required per-directory once cleaned.
+ - #TODO Flip sharp-edges and net-edges lints to strict in CI once the tree is clean (set `PMSS_LINT_SHARP_STRICT=1`, `PMSS_LINT_NET_STRICT=1`).
 
 Sharp/Net Edges
 - Make sharp-edges and net-edges lints strict in CI once the tree is clean.
@@ -28,6 +29,7 @@ Sharp/Net Edges
 
 Static Analysis
 - Raise phpstan level in stages; document suppression policies.
+ - #TODO Add per-directory phpstan configs to raise to level 2 for `scripts/lib/update/**` first (advisory), then expand.
 
 Observability
 - Add unit coverage for JSON event helpers (required fields, timestamps, rc, durations) when accessible.
