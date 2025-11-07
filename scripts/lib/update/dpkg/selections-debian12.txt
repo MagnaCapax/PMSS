@@ -1287,7 +1287,6 @@ quota
 rake
 ranger
 readline-common
-repo-mediaarea
 reportbug
 restic
 rsync
