@@ -10,6 +10,7 @@
 
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
+require_once __DIR__.'/apps/packages/helpers.php';
 
 if (!function_exists('pmssConfigureAptNonInteractive')) {
     /**
@@ -121,9 +122,18 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 $package = $parts[0];
                 $state   = $parts[1];
                 // Skip problematic or deprecated packages from baseline
-                if (in_array($package, ['repo-mediaarea', 'repo-mediaarea-snapshots'], true)) {
+                $lower = strtolower($package);
+                if (in_array($lower, ['repo-mediaarea', 'repo-mediaarea-snapshots', 'nzbdrone', 'pyload-cli'], true)) {
                     if (function_exists('logmsg')) {
-                        logmsg('[SKIP] Ignoring baseline package '.$package.' (handled via explicit repository setup)');
+                        logmsg('[SKIP] Ignoring baseline package '.$package.' (obsolete/handled elsewhere)');
+                    }
+                    $warnings = true;
+                    continue;
+                }
+                // Drop version-pinned kernel images; rely on meta 'linux-image-amd64'
+                if (preg_match('/^linux-image-[0-9]/i', $package)) {
+                    if (function_exists('logmsg')) {
+                        logmsg('[SKIP] Ignoring versioned kernel package '.$package.' from baseline');
                     }
                     $warnings = true;
                     continue;
@@ -131,6 +141,14 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 if (!preg_match('/^[a-z0-9.+:-]+$/i', $package) || !preg_match('/^(install|hold|purge|deinstall)$/i', $state)) {
                     if (function_exists('logmsg')) {
                         logmsg(sprintf('[WARN] Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed));
+                    }
+                    $warnings = true;
+                    continue;
+                }
+                // If requesting install of a package not available in the current apt cache, drop it
+                if (strtolower($state) === 'install' && !pmssPackageAvailable($package)) {
+                    if (function_exists('logmsg')) {
+                        logmsg('[SKIP] Baseline package not available: '.$package.' (dropping)');
                     }
                     $warnings = true;
                     continue;
