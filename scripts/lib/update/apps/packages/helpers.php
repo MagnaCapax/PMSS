@@ -256,6 +256,10 @@ function pmssFilterAvailablePackages(array $packages): array
             continue;
         }
         if (pmssPackageAvailable($pkg)) {
+            // Skip packages already installed to reduce apt noise and runtime.
+            if (pmssPackageStatus($pkg) === 'install ok installed') {
+                continue;
+            }
             $installable[] = $pkg;
         } else {
             $missing[] = $pkg;

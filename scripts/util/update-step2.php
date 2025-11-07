@@ -121,6 +121,9 @@ pmssConfigureAptNonInteractive('logmsg');
 // -------------------------------------------------------------------------------------------
 
 runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
+// Ensure core packaging tools are current before bootstrapping third-party repos
+runStep('Refreshing apt package index (core tools)', aptCmd('update'));
+runStep('Upgrading core packaging tools', aptCmd('install -y dpkg apt libzstd1'));
 pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
 pmssAutoremovePackages();
 pmssCompletePendingDpkg();
