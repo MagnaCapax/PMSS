@@ -198,10 +198,17 @@ pmssEnsureLocaleBaseline();
 pmssConfigureWebStack($distroVersion);
 pmssReapplyLocaleDefinitions();
 
-// Load application installers automatically (sorted for deterministic order).
+// Configure OpenVPN via dedicated utility for better logging/observability.
+runStep('Configuring OpenVPN', '/scripts/util/configureOpenvpn.php');
+
+// Load application installers automatically (sorted for deterministic order),
+// but skip the legacy OpenVPN app script as it is superseded by the utility.
 $apps = glob('/scripts/lib/update/apps/*.php') ?: [];
 sort($apps);
 foreach ($apps as $app) {
+    if (basename($app) === 'openvpn.php') {
+        continue;
+    }
     include_once $app;
 }
 
