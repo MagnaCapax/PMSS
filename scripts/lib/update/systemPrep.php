@@ -6,6 +6,41 @@
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 
+if (!function_exists('pmssCgroupMode')) {
+    /**
+     * Detect cgroup mode: 'v2', 'v1', or 'unknown'.
+     */
+    function pmssCgroupMode(): string
+    {
+        if (is_file('/sys/fs/cgroup/cgroup.controllers')) {
+            return 'v2';
+        }
+        // Basic v1 hint: presence of controller directories under /sys/fs/cgroup/
+        $v1hints = glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [];
+        foreach ($v1hints as $d) {
+            if (basename((string)$d) !== 'unified') {
+                return 'v1';
+            }
+        }
+        return 'unknown';
+    }
+}
+
+if (!function_exists('pmssTotalMemMiB')) {
+    /** Return total system memory in MiB (rounded). */
+    function pmssTotalMemMiB(): int
+    {
+        $meminfo = @file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [];
+        foreach ($meminfo as $line) {
+            if (strpos($line, 'MemTotal:') === 0) {
+                $kb = (int)filter_var($line, FILTER_SANITIZE_NUMBER_INT);
+                return (int)round($kb / 1024);
+            }
+        }
+        return 0;
+    }
+}
+
 if (!function_exists('pmssEnsureCgroupsConfigured')) {
     /**
      * Guarantee that cgroup mounts and PID limits are configured sanely.
@@ -13,25 +48,36 @@ if (!function_exists('pmssEnsureCgroupsConfigured')) {
     function pmssEnsureCgroupsConfigured(?callable $logger = null): void
     {
         $log   = pmssSelectLogger($logger);
-        $fstab = @file_get_contents('/etc/fstab');
-        if ($fstab === false || strpos($fstab, 'cgroup') === false) {
-            runStep('Ensuring cgroup-bin package present', aptCmd('install -y -q cgroup-bin'));
-            $mountLine = "\ncgroup  /sys/fs/cgroup  cgroup  defaults  0   0\n";
-            if (@file_put_contents('/etc/fstab', $mountLine, FILE_APPEND) === false) {
-                $log('[WARN] Unable to append cgroup mount to /etc/fstab');
+        $mode = pmssCgroupMode();
+        if ($mode === 'v1') {
+            $fstab = @file_get_contents('/etc/fstab');
+            if ($fstab === false || strpos((string)$fstab, ' /sys/fs/cgroup ') === false) {
+                $mountLine = "\ncgroup  /sys/fs/cgroup  cgroup  defaults  0   0\n";
+                if (@file_put_contents('/etc/fstab', $mountLine, FILE_APPEND) === false) {
+                    $log('[WARN] Unable to append cgroup mount to /etc/fstab');
+                } else {
+                    $log('Appended cgroup mount configuration to /etc/fstab (v1)');
+                }
+                runStep('Mounting /sys/fs/cgroup (v1)', 'mount /sys/fs/cgroup');
             } else {
-                $log('Appended cgroup mount configuration to /etc/fstab');
+                $log('[SKIP] cgroup v1 mount already present in /etc/fstab');
             }
-            runStep('Mounting /sys/fs/cgroup', 'mount /sys/fs/cgroup');
+        } elseif ($mode === 'v2') {
+            $log('[SKIP] cgroup v2 detected; no fstab mount or cgroup-bin needed');
         } else {
-            $log('[SKIP] cgroup entry already present in /etc/fstab');
+            $log('[WARN] cgroup mode unknown; leaving mounts untouched');
         }
 
-        $rootPidSlice = '/sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max';
-        if (file_exists($rootPidSlice)) {
-            runStep('Raising PID limit for root user slice', "sh -c 'echo 100000 > {$rootPidSlice}'");
+        // On v2, prefer TasksMax limits via slice; on v1, pids.max may be available.
+        if ($mode === 'v1') {
+            $rootPidSlice = '/sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max';
+            if (file_exists($rootPidSlice)) {
+                runStep('Raising PID limit for root user slice (v1)', "sh -c 'echo 100000 > {$rootPidSlice}'");
+            } else {
+                $log('[SKIP] pids.max controller path missing (v1), relying on system defaults');
+            }
         } else {
-            $log('[SKIP] Raising PID limit for root user slice (pids controller path missing)');
+            $log('[SKIP] Using systemd TasksMax for PID limits (cgroup v2)');
         }
     }
 }
@@ -44,21 +90,59 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
     {
         $log = pmssSelectLogger($logger);
 
-        $obsolete = '/usr/lib/systemd/user-.slice.d/99-pmss.conf';
-        if (file_exists($obsolete)) {
-            @unlink($obsolete);
-            $log('Removed obsolete user slice override '.$obsolete);
+        // Clean up obsolete vendor drop-ins
+        foreach ([
+            '/usr/lib/systemd/user-.slice.d/99-pmss.conf',
+            '/usr/lib/systemd/system/user-.slice.d/15-pmss.conf',
+        ] as $obsolete) {
+            if (file_exists($obsolete)) {
+                @unlink($obsolete);
+                $log('Removed obsolete vendor drop-in '.$obsolete);
+            }
         }
 
-        $target = '/usr/lib/systemd/system/user-.slice.d/15-pmss.conf';
-        if (file_exists($target)) {
-            $log('[SKIP] user slice override already present');
+        $mode = pmssCgroupMode();
+        $dropDir = '/etc/systemd/system/user-.slice.d';
+        $target  = $dropDir.'/15-pmss.conf';
+        if (!is_dir($dropDir)) {
+            runStep('Creating user-.slice drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropDir));
+        }
+
+        // Render template based on cgroup mode
+        $tpl = $mode === 'v2'
+            ? '/etc/seedbox/config/template.user-slice.v2.conf'
+            : '/etc/seedbox/config/template.user-slice.v1.conf';
+        if (!file_exists($tpl)) {
+            $log('[WARN] Slice template missing: '.$tpl);
             return;
         }
 
-        runStep('Installing user slice override template', 'cp -p /etc/seedbox/config/template.user-slices-pmss.conf '.$target);
-        runStep('Setting permissions on user slice override', 'chmod 644 '.$target);
+        // Compute sane defaults with constraints
+        $totalMiB     = pmssTotalMemMiB();
+        $minHighMiB   = 250; // minimum MemoryHigh
+        $defaultHigh  = max($minHighMiB, (int)floor($totalMiB * 0.10)); // default ~10% of RAM
+        $maxCapMiB    = (int)floor($totalMiB * 0.95); // MemoryMax never above 95% of total
+        $calcMax      = min($maxCapMiB, (int)floor($defaultHigh * 1.5)); // High +50% cap
+        $cpuWeight    = 200;
+        $ioWeight     = 200;
+        $tasksMax     = 4096;
+
+        $repl = [
+            '%%USER_MEMORY_HIGH%%' => (string)$defaultHigh,
+            '%%USER_MEMORY_MAX%%'  => (string)$calcMax,
+            '%%USER_CPUWEIGHT%%'   => (string)$cpuWeight,
+            '%%USER_IOWEIGHT%%'    => (string)$ioWeight,
+            '%%TASKS_MAX%%'        => (string)$tasksMax,
+        ];
+        $raw = (string)@file_get_contents($tpl);
+        foreach ($repl as $k => $v) { $raw = str_replace($k, $v, $raw); }
+        if (@file_put_contents($target, $raw) === false) {
+            $log('[WARN] Failed to write user-.slice drop-in '.$target);
+            return;
+        }
+        runStep('Setting permissions on user slice override', 'chmod 644 '.escapeshellarg($target));
         runStep('Reloading systemd manager configuration', 'systemctl daemon-reload');
+        $log(sprintf('Installed %s slice override (mode=%s)', $target, $mode));
     }
 }
 

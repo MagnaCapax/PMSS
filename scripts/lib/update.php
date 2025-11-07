@@ -340,6 +340,53 @@ function generateMotd(): void {
     $wireguardStatus = $serviceStatus('wg-quick@wg0', '/etc/wireguard/wg0.conf', 'WireGuard');
     $openvpnStatus = $serviceStatus('openvpn@openvpn', '/etc/openvpn/openvpn.conf', 'OpenVPN');
 
+    // Storage health warnings (from JSONL logs)
+    $storageWarn = '';
+    $healthLog = '/var/log/pmss/storage-health.jsonl';
+    if (is_file($healthLog)) {
+        $fh = @fopen($healthLog, 'r');
+        if ($fh) {
+            $lastSmart = [];
+            $raidWarn = null; $zfsWarn = null; $nvmeCrit = [];
+            while (($line = fgets($fh)) !== false) {
+                $j = json_decode($line, true);
+                if (!is_array($j)) continue;
+                $k = $j['kind'] ?? '';
+                if ($k === 'smart') {
+                    $lastSmart[$j['device'] ?? ''] = $j;
+                } elseif ($k === 'raid') {
+                    if (($j['severity'] ?? 'ok') !== 'ok') $raidWarn = $j;
+                } elseif ($k === 'zfs') {
+                    if (($j['ok'] ?? true) === false) $zfsWarn = $j;
+                } elseif ($k === 'nvme') {
+                    if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme';
+                }
+            }
+            fclose($fh);
+            $lines = [];
+            if ($raidWarn) {
+                $arr = $raidWarn['array'] ?? 'md';
+                $flags = implode(',', (array)($raidWarn['flags'] ?? []));
+                $lines[] = "RAID $arr: ".($flags !== '' ? $flags : ($raidWarn['state'] ?? 'warn'));
+            }
+            if ($zfsWarn) {
+                $lines[] = 'ZFS: pool status not healthy';
+            }
+            if (!empty($nvmeCrit)) {
+                $lines[] = 'NVMe critical warning: '.implode(', ', array_unique($nvmeCrit));
+            }
+            // UDMA CRC increases (common) flagged as info; surface only if recent entry contains 'udma_crc_increase'
+            foreach ($lastSmart as $dev => $s) {
+                if (in_array('udma_crc_increase', (array)($s['flags'] ?? []), true)) {
+                    $lines[] = "SATA UDMA CRC increased: ".$dev;
+                }
+            }
+            if (!empty($lines)) {
+                $storageWarn = implode(' | ', $lines);
+            }
+        }
+    }
+
     $replacements = [
         '%HOSTNAME%'        => $serverHostname,
         '%SERVER_IP%'       => $serverIp,
@@ -359,6 +406,10 @@ function generateMotd(): void {
 
     foreach ($replacements as $p => $v) {
         $motdTemplate = str_replace($p, $v, $motdTemplate);
+    }
+    // Inject storage warnings if present
+    if ($storageWarn !== '') {
+        $motdTemplate .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
     }
     file_put_contents($motdOutputPath, $motdTemplate);
 }
