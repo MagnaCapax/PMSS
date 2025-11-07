@@ -219,7 +219,6 @@ pmssRemoveAutodlConfig();
 // Legacy daemons that should never run globally.
 $legacyServices = ['btsync', 'rslsync', 'pyload', 'sabnzbdplus', 'lighttpd'];
 pmssDisableLegacyServices($legacyServices, $distroVersion);
-pmssInstallMediaInfo($lsbCodename, 'logmsg');
 pmssAdjustLighttpdSecurity();
 
 // Per-user updates ensure ruTorrent stays consistent.

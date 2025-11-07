@@ -7,6 +7,7 @@ require_once __DIR__.'/packages/helpers.php';
 require_once __DIR__.'/packages/system.php';
 require_once __DIR__.'/packages/python.php';
 require_once __DIR__.'/packages/misc.php';
+require_once __DIR__.'/packages/mediaarea.php';
 require_once __DIR__.'/packages/docker.php';
 
 $version = isset($distroVersion) ? (int)$distroVersion : 0;
@@ -21,3 +22,4 @@ pmssInstallZncStack($version);
 pmssInstallMiscTools();
 pmssInstallWireguardPackages();
 pmssInstallDockerPackages($version);
+pmssInstallMediaAreaTools($version);

@@ -144,3 +144,65 @@ printf "%-20s %7d\n" "Tracked total:" "$TRACKED_TOTAL"
 if ((TOTAL_LINES != TRACKED_TOTAL)); then
 	printf "%-20s %7d\n" "Variance:" "$((TOTAL_LINES - TRACKED_TOTAL))"
 fi
+
+# Advisory: simple cyclomatic-like complexity for Bash scripts
+# This is a crude proxy (sum of control-flow tokens) for trend/compare, not absolutes.
+echo
+echo "Advisory complexity (Bash only)"
+echo "-------------------------------"
+
+declare -a BASH_FILES=()
+for rel in "${TRACKED_FILES[@]}"; do
+  # Exclude third-party trees and non-.sh files
+  skip=0
+  for ex in "${EXCLUDE_RELATIVE[@]}"; do
+    if [[ "$rel" == "$ex"* ]]; then skip=1; break; fi
+  done
+  [[ $skip -eq 1 ]] && continue
+  [[ "$rel" == *.sh ]] || continue
+  BASH_FILES+=("$rel")
+done
+
+total_complex=0
+declare -a COMPLEX_ROWS=()
+for rel in "${BASH_FILES[@]}"; do
+  file="$ROOT_DIR/$rel"
+  # Basic counts
+  total=$(wc -l <"$file")
+  blank=$(grep -c -E '^\s*$' "$file" || true)
+  comments=$(grep -c -E '^\s*#' "$file" || true)
+  code=$(( total - blank - comments ))
+  # Control-flow tokens (very rough)
+  set +o pipefail
+  ifc=$(grep -o -E '(^|;|\s)if\b' "$file" | wc -l | tr -d ' ' || true)
+  elifc=$(grep -o -E '\belif\b' "$file" | wc -l | tr -d ' ' || true)
+  forc=$(grep -o -E '(^|;|\s)for\b' "$file" | wc -l | tr -d ' ' || true)
+  whilec=$(grep -o -E '(^|;|\s)while\b' "$file" | wc -l | tr -d ' ' || true)
+  untilc=$(grep -o -E '(^|;|\s)until\b' "$file" | wc -l | tr -d ' ' || true)
+  casec=$(grep -o -E '(^|;|\s)case\b' "$file" | wc -l | tr -d ' ' || true)
+  andor=$(grep -o -E '&&|\|\|' "$file" | wc -l | tr -d ' ' || true)
+  funcc=$(grep -o -E '^[a-zA-Z_][a-zA-Z0-9_]*\s*\(\)\s*\{' "$file" | wc -l | tr -d ' ' || true)
+  set -o pipefail
+  complex=$(( ifc + elifc + forc + whilec + untilc + casec + andor + funcc ))
+  total_complex=$(( total_complex + complex ))
+  density=0
+  if (( code > 0 )); then
+    # scaled by 100 code LOC
+    density=$(( (complex * 100 + code/2) / code ))
+  fi
+  COMPLEX_ROWS+=("$rel|code=$code|complex=$complex|density=$density")
+done
+
+echo "Bash files analyzed: ${#BASH_FILES[@]}"
+echo "Aggregate complexity: $total_complex"
+
+# Top 8 by density (complexity per 100 code LOC)
+printf "%s\n" "${COMPLEX_ROWS[@]}" | \
+  awk -F'[|]' '{
+    # parse fields like code=### etc.
+    code=$2; sub(/code=/, "", code);
+    complex=$3; sub(/complex=/, "", complex);
+    density=$4; sub(/density=/, "", density);
+    printf "%05d %s %s %s %s\n", density, $1, $2, $3, $4;
+  }' | sort -r | head -n 8 | \
+  awk '{printf "%-60s %s %s %s/100loc\n", $2, $3, $4, $5}' || true
