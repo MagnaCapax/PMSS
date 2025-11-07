@@ -120,6 +120,14 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 }
                 $package = $parts[0];
                 $state   = $parts[1];
+                // Skip problematic or deprecated packages from baseline
+                if (in_array($package, ['repo-mediaarea', 'repo-mediaarea-snapshots'], true)) {
+                    if (function_exists('logmsg')) {
+                        logmsg('[SKIP] Ignoring baseline package '.$package.' (handled via explicit repository setup)');
+                    }
+                    $warnings = true;
+                    continue;
+                }
                 if (!preg_match('/^[a-z0-9.+:-]+$/i', $package) || !preg_match('/^(install|hold|purge|deinstall)$/i', $state)) {
                     if (function_exists('logmsg')) {
                         logmsg(sprintf('[WARN] Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed));
