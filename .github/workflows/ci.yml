@@ -92,9 +92,10 @@ jobs:
         run: |
           scripts/testing/loc.sh || true
 
-      - name: PHPStan (advisory)
+      - name: PHPStan (advisory, level 3)
         run: |
-          ALLOW_TOOL_SKIP=1 bash scripts/testing/phpstan.sh || true
+          # Run at a slightly higher strictness; still advisory and allowed to skip
+          ALLOW_TOOL_SKIP=1 bash scripts/testing/phpstan.sh --level=3 || true
 
   php73-lint:
     runs-on: ubuntu-latest

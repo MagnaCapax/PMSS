@@ -31,5 +31,5 @@ if [[ -f "$ROOT_DIR/phpstan.neon.dist" ]]; then
   ARGS+=( "-c" "$ROOT_DIR/phpstan.neon.dist" )
 fi
 
-exec "$PHAR_BIN" "${ARGS[@]}"
-
+# Forward any extra arguments to allow CI/local overrides (e.g., --level=3)
+exec "$PHAR_BIN" "${ARGS[@]}" "$@"
