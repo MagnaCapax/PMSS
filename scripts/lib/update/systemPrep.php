@@ -6,6 +6,72 @@
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 
+if (!function_exists('pmssHasLocale')) {
+    /**
+     * Return true when the given locale (e.g., en_US.UTF-8) is generated.
+     */
+    function pmssHasLocale(string $locale): bool
+    {
+        $out = [];
+        @exec('locale -a 2>/dev/null', $out);
+        if (empty($out)) {
+            return false;
+        }
+        $needle1 = strtolower($locale);
+        $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
+        foreach ($out as $line) {
+            $val = strtolower(trim($line));
+            if ($val === $needle1 || $val === $needle2) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('pmssLocaleEnabledInGen')) {
+    /**
+     * True when /etc/locale.gen has an uncommented line for the locale.
+     */
+    function pmssLocaleEnabledInGen(string $locale): bool
+    {
+        $data = @file_get_contents('/etc/locale.gen');
+        if ($data === false) {
+            return false;
+        }
+        foreach (preg_split('/\r?\n/', $data) as $line) {
+            $trim = trim($line);
+            if ($trim === '') continue;
+            if ($trim[0] === '#') continue;
+            if (stripos($trim, $locale.' UTF-8') === 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('pmssDefaultLocaleMatches')) {
+    /**
+     * Check if /etc/default/locale sets LANG/LC_ALL to the target.
+     */
+    function pmssDefaultLocaleMatches(string $target): bool
+    {
+        $data = @file_get_contents('/etc/default/locale');
+        if ($data === false) {
+            return false;
+        }
+        $lang = null; $lcAll = null;
+        foreach (preg_split('/\r?\n/', $data) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') continue;
+            if (stripos($line, 'LANG=') === 0)   { $lang  = trim(substr($line, 5)); }
+            if (stripos($line, 'LC_ALL=') === 0) { $lcAll = trim(substr($line, 7)); }
+        }
+        return ($lang === $target && $lcAll === $target);
+    }
+}
+
 if (!function_exists('pmssCgroupMode')) {
     /**
      * Detect cgroup mode: 'v2', 'v1', or 'unknown'.
@@ -208,8 +274,25 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
      */
     function pmssEnsureLocaleBaseline(): void
     {
-        runStep('Generating en_US.UTF-8 locale', 'locale-gen en_US.UTF-8');
-        runStep('Setting default system locale', 'update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8');
+        $locale = 'en_US.UTF-8';
+        $enabled = pmssLocaleEnabledInGen($locale);
+        if (!$enabled) {
+            runStep('Enabling '.$locale.' in /etc/locale.gen', "sed -i 's/# \?".$locale." UTF-8/".$locale." UTF-8/g' /etc/locale.gen");
+        }
+
+        $has = pmssHasLocale($locale);
+        if (!$has || !$enabled) {
+            runStep('Generating '.$locale.' locale', 'locale-gen '.$locale);
+        } else {
+            logMessage('[SKIP] '.$locale.' already generated');
+        }
+
+        if (!pmssDefaultLocaleMatches($locale)) {
+            runStep('Setting default system locale', 'update-locale LANG='.$locale.' LC_ALL='.$locale);
+        } else {
+            logMessage('[SKIP] Default system locale already set to '.$locale);
+        }
+
         require_once __DIR__.'/../motd/Generator.php';
         \Motd::motdGenerate();
     }
@@ -221,9 +304,8 @@ if (!function_exists('pmssReapplyLocaleDefinitions')) {
      */
     function pmssReapplyLocaleDefinitions(): void
     {
-        runStep('Ensuring en_US.UTF-8 locale is enabled', "sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g' /etc/locale.gen");
-        runStep('Regenerating locales', 'locale-gen');
-        runStep('Setting default LANG in /etc/default/locale', "sed -i 's/LANG=en_US\\n/LANG=en_US.UTF-8/g' /etc/default/locale");
+        // Reuse the same idempotent logic as the baseline to avoid repeated work.
+        pmssEnsureLocaleBaseline();
     }
 }
 
