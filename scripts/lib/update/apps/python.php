@@ -40,6 +40,19 @@ if (!is_file($pythonBin)) {
     return;
 }
 
+// Bootstrap pip inside the venv when missing (some Debian setups omit it).
+if (!is_file($pipBin)) {
+    runStep('Bootstrapping pip in FlexGet virtualenv', sprintf('%s -m ensurepip --upgrade', escapeshellarg($pythonBin)));
+}
+
+// If pip remains unavailable, fail soft with a clear message and skip.
+if (!is_file($pipBin)) {
+    if (!$dryRun) {
+        $logger('[ERR] FlexGet virtualenv missing pip; ensure python3-venv is installed and rerun update');
+    }
+    return;
+}
+
 runStep('Upgrading FlexGet virtualenv tooling', sprintf('%s -m pip install --upgrade pip setuptools wheel', escapeshellarg($pythonBin)));
 runStep('Installing gdrivefs in FlexGet venv', sprintf('%s -m pip install --upgrade gdrivefs', escapeshellarg($pythonBin)));
 runStep('Installing FlexGet dependencies', sprintf("%s -m pip install --upgrade pyopenssl ndg-httpsclient cryptography funcsigs 'chardet==3.0.3' 'certifi==2017.4.17'", escapeshellarg($pythonBin)));

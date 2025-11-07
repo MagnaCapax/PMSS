@@ -28,6 +28,7 @@ if ($python === '') {
 
 $venvDir   = '/opt/pyload';
 $pythonBin = $venvDir.'/bin/python';
+$pipBin    = $venvDir.'/bin/pip';
 $cliBin    = $venvDir.'/bin/pyload';
 
 $aptDeps = [
@@ -52,6 +53,19 @@ if (!is_file($pythonBin)) {
         return;
     }
     $logger('[WARN] pyLoad virtualenv missing python binary after creation');
+    return;
+}
+
+// Some Debian builds create venvs without pip; bootstrap it if missing.
+if (!is_file($pipBin)) {
+    runStep('Bootstrapping pip in pyLoad virtualenv', sprintf('%s -m ensurepip --upgrade', escapeshellarg($pythonBin)));
+}
+
+// If pip is still unavailable, fail soft and skip the install to avoid repeated errors.
+if (!is_file($pipBin)) {
+    if (!$dryRun) {
+        $logger('[ERR] pyLoad virtualenv missing pip; ensure python3-venv is installed and rerun update');
+    }
     return;
 }
 
