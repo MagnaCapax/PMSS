@@ -251,3 +251,22 @@ else
   echo "[ci-codex] Codex CLI not found. Run manually:" >&1
   echo "  codex \"\$(cat '$PROMPT')\" ${attachments[*]}" >&1
 fi
+
+# Auto-commit any changes created by the assistant (no branches, no push)
+PMSS_CI_AUTOCOMMIT=${PMSS_CI_AUTOCOMMIT:-1}
+if [[ "$PMSS_CI_AUTOCOMMIT" == "1" ]]; then
+  if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "[ci-codex] auto-commit: checking for changes" >&1
+    if [[ -n "$(git -C "$ROOT" status --porcelain)" ]]; then
+      msg="ci-codex: apply assistant changes for run $run_id"
+      git -C "$ROOT" add -A
+      git -C "$ROOT" commit -m "$msg" && echo "[ci-codex] auto-commit: committed changes" >&1 || echo "[ci-codex] auto-commit: commit failed" >&1
+    else
+      echo "[ci-codex] auto-commit: no changes to commit" >&1
+    fi
+  else
+    echo "[ci-codex] auto-commit: git not available or not inside a repo" >&1
+  fi
+else
+  echo "[ci-codex] auto-commit disabled (PMSS_CI_AUTOCOMMIT=0)" >&1
+fi
