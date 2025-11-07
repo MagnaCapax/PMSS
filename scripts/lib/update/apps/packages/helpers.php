@@ -289,10 +289,18 @@ function pmssInstallProftpdStack(int $distroVersion): void
         pmssQueuePackages(['nftables']);
     }
 
-    pmssQueuePostInstallCommand(
-        'Reconfiguring proftpd packages',
-        'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true'
-    );
+    // Only queue a reconfigure if dpkg reports half-configured state.
+    $proftpdPkgs = ['proftpd-core', 'proftpd-mod-crypto', 'proftpd-mod-wrap', 'proftpd-basic'];
+    if (pmssPackagesNeedCleanup($proftpdPkgs)) {
+        pmssQueuePostInstallCommand(
+            'Reconfiguring proftpd packages',
+            'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true'
+        );
+    } else {
+        if (function_exists('logmsg')) {
+            logmsg('[SKIP] ProFTPD packages already configured');
+        }
+    }
 }
 
 /**
