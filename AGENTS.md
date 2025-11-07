@@ -99,6 +99,10 @@ instead of restating details.
 - Prefer linear history (`rebase`) and avoid force pushes on shared branches.
 - Use PR templates to verify checklists (tests run, docs updated, ADR linked when required).
 - Before merge: CI must pass (lint, tests, basic bash checks). Production-impacting changes should include a dry-run validation note.
+- Commit cadence: frequent, small commits with meaningful messages. Aim for a logical checkpoint roughly every 10–120 minutes or at completion of a self‑contained micro‑feature/refactor. Many commits per day on feature branches are fine (10–50+); avoid giant monolithic commits.
+- Branching (repository policy): use a dedicated branch per task/issue (e.g., `topic/<ticket>-<short-slug>`). Create the branch before making changes; keep work isolated until ready to merge.
+- Agent branching constraint: the agent must never create branches unless explicitly instructed by the operator. By default, the agent edits the current workspace without creating branches.
+- Session constraints: if the current session forbids auto‑commit/branch operations, the operator must explicitly instruct the agent to commit and/or create a branch. Otherwise changes remain as uncommitted workspace edits.
 
 ## Language & Tone (Internal)
 - Internal docs and comments may be candid and direct. Keep all user-facing messages, logs, and public surfaces professional and free of profanity.
