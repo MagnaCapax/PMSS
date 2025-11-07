@@ -29,11 +29,31 @@ ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 PROMPT="$OUTDIR/prompt.txt"
 
-DEFAULT_PROMPT="Last CI Integration Logs are here. Your objective: make CI (smoke + build) and QC/QA checks pass. If issues or code fails, fix them with the smallest coherent change. First read AGENTS.md, docs, and ADRs to understand the rails; double‑check TODOs and existing tests before any change. Adhere strictly to the Constitution/Doctrine (context‑first naming, PHP 7.3 baseline, hermetic tests, Skel WWW lockdown, no ZFS, idempotence). If multiple tasks arise, do only the first, highest‑value fix, then stop and request a re‑run."
+DEFAULT_PROMPT="PMSS CI Assist — Strict Rails Mode
+
+Goal: Make required CI jobs pass with the smallest coherent change. Read AGENTS.md first; obey Doctrine/Constitution and ADRs.
+
+Must Follow:
+- PHP 7.3 compatibility for all PHP runtime code.
+- Updater topology: install.sh → scripts/update.php (bootstrap/minimal) → scripts/util/update-step2.php (orchestration/profiling).
+- Distro detection: use scripts/lib/update/distro.php::pmssDetectDistro(); trust VERSION_CODENAME; allowed env overrides: PMSS_OS_RELEASE_PATH, PMSS_APT_SOURCES_PATH.
+- Do not modify etc/skel/www/ (and subpaths), third-party/vendor bundles, or scripts/lib/update/dpkg/selections*.txt.
+- Language/deps: Bash-first; PHP for complex flows; do not introduce Python; avoid new dependencies without explicit approval.
+- Doctrine: Deletion‑First; Minimal Edits; One Flow; Pit of Success; No Aliases; Context‑First naming (domain→action); Single‑Method Consistency; Separation of Concerns; Idempotence; Fail‑Soft where safe.
+- Observability: route shelling through runStep(); prefer structured logs; use PMSS_JSON_LOG and PMSS_PROFILE_OUTPUT when applicable.
+- Tests (dev): hermetic by default (no real network/system modification); prefer PMSS_TEST_MODE=1 to remove jitter.
+
+Absolutes:
+- NEVER CREATE GIT BRANCHES. Commits allowed only when explicitly instructed; default to uncommitted workspace edits.
+- ABSOLUTELY NO ZFS — unacceptable for our workload (poor 100% random I/O performance and elevated data-loss risk). Do not propose or introduce it here.
+- Keep diffs small, idempotent, backward‑compatible; reuse existing helpers; no aliases; context‑first naming.
+
+Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch and verification commands."
 
 job_name=""
 custom_prompt=""
 exec_cmd=""
+include_agents=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,6 +63,8 @@ while [[ $# -gt 0 ]]; do
       custom_prompt=${2:-}; shift 2 || true ;;
     --exec)
       exec_cmd=${2:-}; shift 2 || true ;;
+    --include-agents)
+      include_agents=1; shift 1 || true ;;
     -h|--help)
       sed -n '1,60p' "$0"; exit 0 ;;
     *)
@@ -110,6 +132,13 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
   echo " - AGENTS.md"
   echo " - docs/ (architecture, ADRs, update flow)"
   echo
+  if [[ $include_agents -eq 1 && -f "$ROOT/AGENTS.md" ]]; then
+    echo "=== AGENTS.md (inline) ==="
+    sed -n '1,4000p' "$ROOT/AGENTS.md" || true
+    echo
+  fi
+  echo "----- LOG FOLLOWS:"
+  echo
   echo "=== CI Summary ==="
   gh run view "$run_id" || true
   echo
@@ -139,12 +168,12 @@ if [[ -n "$exec_cmd" ]]; then
   cat "$PROMPT" | eval $exec_cmd
 else
   if command -v codex >/dev/null 2>&1; then
-    echo "[ci-codex] sending prompt to: codex" >&2
-    # Pass as single argument to match 'codex [PROMPT]' usage
-    codex "$(cat "$PROMPT")" || true
+    echo "[ci-codex] piping prompt to: codex chat --input - (fallback to codex \"...\")" >&2
+    # Prefer stdin to avoid arg length/quoting issues; fallback to legacy form
+    cat "$PROMPT" | codex chat --input - || codex "$(cat "$PROMPT")" || true
   else
     echo "[ci-codex] To send to your assistant CLI, try for example:" >&2
-    echo "  cat '$PROMPT' | codex" >&2
-    echo "or specify explicitly: --exec 'codex'" >&2
+    echo "  scripts/cli/ci.sh --exec 'codex chat --input -'" >&2
+    echo "or pipe manually: cat '$PROMPT' | codex" >&2
   fi
 fi

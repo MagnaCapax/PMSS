@@ -19,9 +19,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 cd "$ROOT"
 
-job="build"
+job=""
 exec_cmd=""
 custom_prompt=""
+include_agents=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
