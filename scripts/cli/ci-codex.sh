@@ -22,12 +22,14 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-OUTDIR="$ROOT/ci-codex"
+# Create a throwaway workspace under the system temp dir (avoid repo clutter)
+TMP="${TMPDIR:-/tmp}"
+OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 PROMPT="$OUTDIR/prompt.txt"
 
-DEFAULT_PROMPT="Last CI Integration Logs are here. If issues or code fails, please fix them. First read AGENTS.md, docs, and ADRs to understand the rails, and double check TODOs before any code changes. Maintain PHP 7.3 compatibility and hermetic tests."
+DEFAULT_PROMPT="Last CI Integration Logs are here. Your objective: make CI (smoke + build) and QC/QA checks pass. If issues or code fails, fix them with the smallest coherent change. First read AGENTS.md, docs, and ADRs to understand the rails; double‑check TODOs and existing tests before any change. Adhere strictly to the Constitution/Doctrine (context‑first naming, PHP 7.3 baseline, hermetic tests, Skel WWW lockdown, no ZFS, idempotence). If multiple tasks arise, do only the first, highest‑value fix, then stop and request a re‑run."
 
 job_name=""
 custom_prompt=""
@@ -108,6 +110,7 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 } > "$PROMPT"
 
 echo "[ci-codex] prompt written: $PROMPT" >&2
+echo "[ci-codex] workspace: $OUTDIR" >&2
 
 if [[ -n "$exec_cmd" ]]; then
   echo "[ci-codex] piping prompt to: $exec_cmd" >&2
@@ -118,4 +121,3 @@ else
   echo "  cat '$PROMPT' | codex chat --input -" >&2
   echo "or specify explicitly: --exec 'codex chat --input -'" >&2
 fi
-

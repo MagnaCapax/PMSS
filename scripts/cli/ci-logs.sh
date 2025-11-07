@@ -12,6 +12,7 @@ set -euo pipefail
 #   scripts/cli/ci-logs.sh smoke              # stream only the 'smoke' job logs from the latest run
 #   scripts/cli/ci-logs.sh job-name <name>    # stream a job by name from the latest run (e.g., build)
 #   scripts/cli/ci-logs.sh last-artifacts     # download all artifacts for the latest run into ./ci-artifacts/
+#   scripts/cli/ci-logs.sh codex [--job <name>] [--prompt "..."] [--exec 'codex chat --input -']
 #   scripts/cli/ci-logs.sh run <run-id>       # stream logs for a specific run id
 #   scripts/cli/ci-logs.sh job <job-id>       # stream logs for a specific job id
 
@@ -63,6 +64,10 @@ case "$cmd" in
     jobid=${1:-}
     if [[ -z "$jobid" ]]; then echo "usage: ci-logs.sh job <job-id>" >&2; exit 2; fi
     gh run view --job "$jobid" --log
+    ;;
+  codex)
+    # proxy to ci-codex.sh to assemble prompt and send to your assistant
+    bash "$ROOT/scripts/cli/ci-codex.sh" "$@"
     ;;
   help|-h|--help)
     sed -n '1,40p' "$0" | sed -n '1,20p'

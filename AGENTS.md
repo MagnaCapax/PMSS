@@ -114,6 +114,12 @@ instead of restating details.
 - Hermetic tests (development) must avoid network/system modifications; production tests are read-only probes on live hosts.
 - Testing scripts live under `scripts/testing/` to orchestrate common checks (PHP lint, dev suite, bash lint/format). Do not replace existing runners; extend them.
 - Track planned coverage or gaps in `tests/TODO.md` and close them progressively. Major gaps should be referenced by ADRs or issues.
+- Test Doctrine (MUST):
+  - Follow the same engineering rails as runtime code: KISS, DRY, YAGNI; context‑first naming; no aliases.
+  - Hermetic by default: no real network or destructive system changes. Use env overrides, temp paths, and stubs/shims (PATH‑injected) to simulate system tools.
+  - Determinism toggles: prefer `PMSS_TEST_MODE=1` or purpose‑built env flags to eliminate jitter and sleeps.
+  - Adversarial cases: write multiple edge/negative tests per function (aim 5+), covering invalid types, empty inputs, and boundary values.
+  - Doctrine/lints apply to tests where practical (naming, structure). Docblock lint is required for first‑party runtime libraries and utilities; test classes are exempt but should be clear and documented where complex.
 
 ## CI / Automation
 - CI should run PHP lint, the dev test suite, and bash lint/format on PRs and pushes. See `.github/workflows/ci.yml`.

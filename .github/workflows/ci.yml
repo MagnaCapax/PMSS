@@ -72,6 +72,10 @@ jobs:
         run: |
           bash scripts/testing/doctrine-lint.sh
 
+      - name: Docblock lint (required)
+        run: |
+          bash scripts/testing/docblock-lint.sh
+
       - name: Cgroup template lint
         run: |
           bash scripts/testing/cgroup-template-lint.sh
@@ -87,6 +91,10 @@ jobs:
       - name: LOC snapshot
         run: |
           scripts/testing/loc.sh || true
+
+      - name: PHPStan (advisory)
+        run: |
+          ALLOW_TOOL_SKIP=1 bash scripts/testing/phpstan.sh || true
 
   php73-lint:
     runs-on: ubuntu-latest
