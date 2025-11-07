@@ -101,11 +101,12 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
     echo
   fi
   if compgen -G "$ARTDIR/*" >/dev/null; then
-    for f in "$ARTDIR"/*; do
+    # Print up to 4000 lines of each file inside the artifact tree
+    while IFS= read -r -d '' f; do
       echo "=== Artifact: $(basename "$f") ==="
       sed -n '1,4000p' "$f" || true
       echo
-    done
+    done < <(find "$ARTDIR" -type f -print0 | sort -z)
   fi
 } > "$PROMPT"
 
@@ -117,7 +118,13 @@ if [[ -n "$exec_cmd" ]]; then
   # shellcheck disable=SC2086
   cat "$PROMPT" | eval $exec_cmd
 else
-  echo "[ci-codex] To send to your assistant CLI, try for example:" >&2
-  echo "  cat '$PROMPT' | codex chat --input -" >&2
-  echo "or specify explicitly: --exec 'codex chat --input -'" >&2
+  if command -v codex >/dev/null 2>&1; then
+    echo "[ci-codex] sending prompt to: codex" >&2
+    # Prefer passing as a single argument to avoid stdin quirks
+    codex "$(cat "$PROMPT")" || true
+  else
+    echo "[ci-codex] To send to your assistant CLI, try for example:" >&2
+    echo "  cat '$PROMPT' | codex" >&2
+    echo "or specify explicitly: --exec 'codex'" >&2
+  fi
 fi
