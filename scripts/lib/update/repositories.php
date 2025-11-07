@@ -102,40 +102,42 @@ if (!function_exists('pmssEnsureDockerRepository')) {
 
 if (!function_exists('pmssEnsureMediaareaRepository')) {
     /**
-     * MediaArea repository bootstrap (vendor path only; no custom key/deb822).
+     * MediaArea repository bootstrap (manual .list + ASCII key) to avoid zstd .deb issues on Debian 10/11.
      *
-     * Why no custom key/deb822 logic anymore?
-     * - For years, the vendor-provided repo package has been the authoritative
-     *   way to configure MediaArea’s apt repository. It installs keys and
-     *   sources in one step and stays in sync with their infrastructure.
-     * - Our bespoke key/URL/deb822 handling drifted and repeatedly caused apt
-     *   breakage (NO_PUBKEY, 404s, or dpkg issues) on older hosts.
-     * - Simplicity and reliability win: install the vendor package before the
-     *   package phase; the package phase will run `apt-get update` and install
-     *   CLI tools queued elsewhere.
+     * Keep it simple and explicit: write a codename-specific .list and place the
+     * vendor ASCII key in /etc/apt/trusted.gpg.d. The package phase will run apt update.
      */
-function pmssEnsureMediaareaRepository(): void
+    function pmssEnsureMediaareaRepository(): void
     {
-        // Vendor path only (see comments in this function header).
-        if (pmssQueryPackageStatus('repo-mediaarea') === 'install ok installed') {
-            return;
+        $codename = getenv('PMSS_DISTRO_CODENAME') ?: '';
+        $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+        if ($codename === '') {
+            if ($version === 11) $codename = 'bullseye';
+            elseif ($version === 12) $codename = 'bookworm';
+            elseif ($version === 13) $codename = 'trixie';
+            else return;
         }
-        $tmpDir = sys_get_temp_dir().'/pmss-mediaarea-'.bin2hex(random_bytes(6));
-        @mkdir($tmpDir, 0700, true);
-        $packageUrl  = 'https://mediaarea.net/repo/deb/repo-mediaarea_1.0-26_all.deb';
-        $packagePath = $tmpDir.'/repo-mediaarea_1.0-26_all.deb';
-        $downloadCmd = sprintf('wget -q -O %s %s', escapeshellarg($packagePath), escapeshellarg($packageUrl));
-        if (runStep('Fetching MediaArea repository package', $downloadCmd) === 0 && is_file($packagePath)) {
-            $rc = runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
-            if ($rc !== 0) {
-                // Some upgraded hosts have an older dpkg that cannot read control.tar.zst.
-                // Keep it simple: try upgrading dpkg and retry once, then move on.
-                runStep('Upgrading dpkg for zstd control.tar support', aptCmd('install -y dpkg libzstd1'));
-                runStep('Re-attempting MediaArea repository package install', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
-            }
+
+        $listPath = '/etc/apt/sources.list.d/mediaarea.list';
+        $line     = 'deb https://mediaarea.net/repo/deb/debian '.$codename.' main';
+        $current  = @file_get_contents($listPath);
+        if ($current === false || strpos((string)$current, $line) === false) {
+            $cmd = 'sh -lc '.escapeshellarg('echo '.escapeshellarg($line).' > '.escapeshellarg($listPath));
+            runStep('Writing MediaArea apt list ('.$codename.')', $cmd);
+            @chmod($listPath, 0644);
         }
-        @unlink($packagePath);
-        @rmdir($tmpDir);
+
+        // Remove any legacy deb822 file to avoid duplicate target warnings
+        @unlink('/etc/apt/sources.list.d/mediaarea.sources');
+
+        $keyDst = '/etc/apt/trusted.gpg.d/mediaarea.asc';
+        if (!is_file($keyDst)) {
+            $keyUrl = 'https://mediaarea.net/repo/deb/ubuntu/pubkey.gpg';
+            $fetch  = sprintf('wget -qO %s %s', escapeshellarg($keyDst), escapeshellarg($keyUrl));
+            runStep('Fetching MediaArea repository key (ASCII)', $fetch);
+            @chmod($keyDst, 0644);
+            logmsg('MediaArea key saved to '.$keyDst.' (fingerprint should be C5CDF62C7AE05CC847657390C10E11090EC0E438)');
+        }
     }
 }
 
