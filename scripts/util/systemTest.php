@@ -147,14 +147,7 @@ if ($codename !== '' && is_file('/etc/apt/sources.list')) {
     return ['name' => 'OpenVPN client artifacts', 'status' => 'WARN', 'detail' => 'missing: '.implode(', ', $missing)];
 })());
 
-// Confirm MediaArea repository package is present so mediainfo can install from apt.
-$repoStatus = pmssExec("dpkg-query -W -f='\${Status} \${Version}' repo-mediaarea 2>/dev/null");
-if (preg_match('/install ok installed/i', $repoStatus)) {
-    $detail = trim(str_ireplace('install ok installed', '', $repoStatus));
-    $checks[] = ['name' => 'Package: repo-mediaarea', 'status' => 'OK', 'detail' => $detail !== '' ? $detail : 'installed'];
-} else {
-    $checks[] = ['name' => 'Package: repo-mediaarea', 'status' => 'WARN', 'detail' => $repoStatus === '' ? 'package missing' : trim($repoStatus)];
-}
+// MediaArea repo is configured via manual list + ASCII key; no repo-mediaarea package check.
 
 // Validate virtualenv-managed binaries.
 $venvTargets = [

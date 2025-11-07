@@ -121,9 +121,13 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 }
                 $package = $parts[0];
                 $state   = $parts[1];
-                // Skip problematic or deprecated packages from baseline
+                // Skip problematic or deprecated packages from baseline; do not log mediaarea repo packages at all
                 $lower = strtolower($package);
-                if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package) || in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
+                if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package)) {
+                    $warnings = true;
+                    continue;
+                }
+                if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
                     if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Ignoring baseline package '.$package.' (obsolete/handled elsewhere)', 0); }
                     elseif (function_exists('logmsg')) { logmsg('[SKIP] Ignoring baseline package '.$package.' (obsolete/handled elsewhere)'); }
                     $warnings = true;
