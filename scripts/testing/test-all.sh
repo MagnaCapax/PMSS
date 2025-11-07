@@ -6,6 +6,8 @@ scripts/testing/test-php.sh
 scripts/testing/test-bash.sh
 echo "doctrine lint"
 bash scripts/testing/doctrine-lint.sh
+echo "cgroup template lint"
+bash scripts/testing/cgroup-template-lint.sh
 if [[ "${PMSS_LINT_CAMEL:-0}" == "1" ]]; then
   echo "camelCase filename lint"
   bash scripts/testing/camelcase-lint.sh

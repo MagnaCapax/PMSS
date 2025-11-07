@@ -12,6 +12,10 @@ if (!function_exists('pmssCgroupMode')) {
      */
     function pmssCgroupMode(): string
     {
+        $override = getenv('PMSS_CGROUP_MODE');
+        if (is_string($override) && ($override === 'v2' || $override === 'v1')) {
+            return $override;
+        }
         if (is_file('/sys/fs/cgroup/cgroup.controllers')) {
             return 'v2';
         }
@@ -30,6 +34,10 @@ if (!function_exists('pmssTotalMemMiB')) {
     /** Return total system memory in MiB (rounded). */
     function pmssTotalMemMiB(): int
     {
+        $override = getenv('PMSS_TOTAL_MEM_MIB');
+        if (is_string($override) && $override !== '' && ctype_digit($override)) {
+            return (int)$override;
+        }
         $meminfo = @file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [];
         foreach ($meminfo as $line) {
             if (strpos($line, 'MemTotal:') === 0) {
@@ -102,16 +110,23 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         }
 
         $mode = pmssCgroupMode();
-        $dropDir = '/etc/systemd/system/user-.slice.d';
+        $dropDir = getenv('PMSS_SYSTEMD_USER_SLICE_DIR');
+        if (!is_string($dropDir) || $dropDir === '') {
+            $dropDir = '/etc/systemd/system/user-.slice.d';
+        }
         $target  = $dropDir.'/15-pmss.conf';
         if (!is_dir($dropDir)) {
             runStep('Creating user-.slice drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropDir));
         }
 
         // Render template based on cgroup mode
+        $cfgDir = getenv('PMSS_CONFIG_DIR');
+        if (!is_string($cfgDir) || $cfgDir === '') {
+            $cfgDir = '/etc/seedbox/config';
+        }
         $tpl = $mode === 'v2'
-            ? '/etc/seedbox/config/template.user-slice.v2.conf'
-            : '/etc/seedbox/config/template.user-slice.v1.conf';
+            ? $cfgDir.'/template.user-slice.v2.conf'
+            : $cfgDir.'/template.user-slice.v1.conf';
         if (!file_exists($tpl)) {
             $log('[WARN] Slice template missing: '.$tpl);
             return;
