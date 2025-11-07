@@ -12,6 +12,10 @@ if [[ "${PMSS_LINT_CAMEL:-0}" == "1" ]]; then
   echo "camelCase filename lint"
   bash scripts/testing/camelcase-lint.sh
 fi
+if [[ "${PMSS_LINT_EXEC:-0}" == "1" ]]; then
+  echo "exec-bit lint"
+  bash scripts/testing/exec-bit-lint.sh
+fi
 if [[ "${PMSS_LINT_DOCBLOCK:-0}" == "1" ]]; then
   echo "docblock lint"
   bash scripts/testing/docblock-lint.sh
