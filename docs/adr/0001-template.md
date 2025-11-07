@@ -1,7 +1,7 @@
-# ADR NNNN: Title
+# ADR 0001: Template for Architecture Decision Records
 
 Date: YYYY-MM-DD
-Category: architecture | security | data | domain
+Category: architecture
 
 ## Status
 Proposed | Accepted | Deprecated | Superseded by NNNN
