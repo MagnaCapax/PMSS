@@ -9,9 +9,13 @@
  */
 
 require_once __DIR__.'/../lib/cli/OptionParser.php';
+require_once __DIR__.'/../lib/logger.php';
+require_once __DIR__.'/../lib/update/runtime/commands.php';
 
-function pmssCgroupMode(): string {
-    return is_file('/sys/fs/cgroup/cgroup.controllers') ? 'v2' : 'v1';
+if (!function_exists('pmssCgroupMode')) {
+    function pmssCgroupMode(): string {
+        return is_file('/sys/fs/cgroup/cgroup.controllers') ? 'v2' : 'v1';
+    }
 }
 
 function uidFromUser(string $user): int {
@@ -57,26 +61,92 @@ function showStatus(string $slice, int $uid): void {
     }
 }
 
-// CLI parsing
-$args = $argv;
-array_shift($args);
-if (count($args) === 0) {
-    fwrite(STDERR, "Usage: php /scripts/util/userCgroup.php USERNAME [--status] [--config]\n");
-    exit(2);
+function totalMemMiB(): int {
+    $o = @file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [];
+    foreach ($o as $line) {
+        if (strpos($line, 'MemTotal:') === 0) {
+            $kb = (int)filter_var($line, FILTER_SANITIZE_NUMBER_INT);
+            return (int)round($kb/1024);
+        }
+    }
+    return 0;
 }
-$user = $args[0];
-$flags = array_slice($args, 1);
-$wantStatus = in_array('--status', $flags, true);
-$wantConfig = in_array('--config', $flags, true);
-if (!$wantStatus && !$wantConfig) { $wantStatus = $wantConfig = true; }
 
-$uid = uidFromUser($user);
-if ($uid < 0) {
-    fwrite(STDERR, "Unknown user: $user\n");
-    exit(1);
+function computeSetProps(array $opts, int $sysMemMiB): array {
+    $props = [];
+    if (isset($opts['cpu-weight']))  { $props['CPUWeight'] = (int)$opts['cpu-weight']; }
+    if (isset($opts['io-weight']))   { $props['IOWeight']  = (int)$opts['io-weight']; }
+    if (isset($opts['tasks-max']))   { $props['TasksMax']  = (int)$opts['tasks-max']; }
+    $minHigh = 250;
+    if (isset($opts['memory-high'])) {
+        $mh = max($minHigh, (int)$opts['memory-high']);
+        $props['MemoryHigh'] = $mh.'M';
+    }
+    if (isset($opts['memory-max'])) {
+        $defaultHigh = max($minHigh, (int)($sysMemMiB*0.10));
+        $high = isset($props['MemoryHigh']) ? (int)rtrim($props['MemoryHigh'],'M') : $defaultHigh;
+        if (!isset($props['MemoryHigh'])) { $props['MemoryHigh'] = $high.'M'; }
+        $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB*0.95) : PHP_INT_MAX;
+        $mm = (int)$opts['memory-max'];
+        $mm = max($high, min($mm, $maxCap));
+        $props['MemoryMax'] = $mm.'M';
+    } elseif (isset($props['MemoryHigh'])) {
+        $high = (int)rtrim($props['MemoryHigh'],'M');
+        $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB*0.95) : PHP_INT_MAX;
+        $mm = min((int)floor($high*1.5), $maxCap);
+        $props['MemoryMax'] = $mm.'M';
+    }
+    return $props;
 }
-$slice = "user-{$uid}.slice";
-echo "user=$user uid=$uid slice=$slice mode=".pmssCgroupMode()."\n";
-if ($wantConfig) showConfig($slice);
-if ($wantStatus) showStatus($slice, $uid);
 
+function main(array $argv): int {
+    $args = $argv; array_shift($args);
+    if (count($args) === 0) {
+        fwrite(STDERR, "Usage: /scripts/util/userCgroup.php USERNAME [--status] [--config] [--apply] [--dry-run] [--cpu-weight N] [--io-weight N] [--tasks-max N] [--memory-high MiB] [--memory-max MiB]\n");
+        return 2;
+    }
+    $user  = $args[0];
+    $flags = array_slice($args, 1);
+    $uid   = uidFromUser($user);
+    if ($uid < 0) { fwrite(STDERR, "Unknown user: $user\n"); return 1; }
+    $slice = "user-{$uid}.slice";
+    $mode  = pmssCgroupMode();
+    echo "user=$user uid=$uid slice=$slice mode=$mode\n";
+
+    // Parse flags
+    $opt = [];
+    $wantStatus = in_array('--status', $flags, true);
+    $wantConfig = in_array('--config', $flags, true);
+    $apply      = in_array('--apply', $flags, true);
+    $dryRun     = in_array('--dry-run', $flags, true);
+    foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max'] as $k) {
+        foreach ($flags as $i => $f) {
+            if (strpos($f, $k.'=') === 0) {
+                $opt[substr($k,2)] = substr($f, strlen($k)+1);
+            }
+        }
+    }
+    if (!$wantStatus && !$wantConfig && empty($opt)) { $wantStatus = $wantConfig = true; }
+    if ($wantConfig) showConfig($slice);
+    if ($wantStatus) showStatus($slice, $uid);
+
+    if (!empty($opt)) {
+        $props = computeSetProps($opt, totalMemMiB());
+        echo "\n[Planned properties]\n";
+        foreach ($props as $k=>$v) { echo "$k=$v\n"; }
+        if ($apply && !$dryRun) {
+            requireRoot();
+            $pairs = [];
+            foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
+            $cmd = 'systemctl set-property '.escapeshellarg($slice).' '.implode(' ',$pairs);
+            runStep('Applying cgroup properties', $cmd);
+        } else {
+            echo "(dry-run or no --apply; not changing system)\n";
+        }
+    }
+    return 0;
+}
+
+if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
+    exit(main($argv));
+}

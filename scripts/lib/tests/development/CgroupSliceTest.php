@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
-class CgroupSliceTest extends TestCase
+class cgroupSliceTest extends TestCase
 {
     private function tempDir(string $prefix): string
     {
@@ -26,8 +26,8 @@ class CgroupSliceTest extends TestCase
         $drop   = $this->tempDir('drop');
 
         $tplBody = "[Slice]\nCPUAccounting=yes\nIOAccounting=yes\nMemoryAccounting=yes\nCPUWeight=%%USER_CPUWEIGHT%%\nIOWeight=%%USER_IOWEIGHT%%\nTasksMax=%%TASKS_MAX%%\nMemoryHigh=%%USER_MEMORY_HIGH%%M\nMemoryMax=%%USER_MEMORY_MAX%%M\n";
-        $this->writeTemplate($cfgDir, 'template.user-slice.v2.conf', $tplBody);
-        $this->writeTemplate($cfgDir, 'template.user-slice.v1.conf', 'ignored');
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', 'ignored');
 
         putenv('PMSS_CGROUP_MODE=v2');
         putenv('PMSS_CONFIG_DIR='.$cfgDir);
@@ -52,8 +52,8 @@ class CgroupSliceTest extends TestCase
         $cfgDir = $this->tempDir('cfg2');
         $drop   = $this->tempDir('drop2');
         $tplBody = "[Slice]\nMemoryHigh=%%USER_MEMORY_HIGH%%M\nMemoryMax=%%USER_MEMORY_MAX%%M\n";
-        $this->writeTemplate($cfgDir, 'template.user-slice.v2.conf', $tplBody);
-        $this->writeTemplate($cfgDir, 'template.user-slice.v1.conf', 'ignored');
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', 'ignored');
 
         // Very low RAM: ensure MemoryHigh >= 250MiB
         putenv('PMSS_CGROUP_MODE=v2');
@@ -85,8 +85,8 @@ class CgroupSliceTest extends TestCase
         $cfgDir = $this->tempDir('cfgv1');
         $drop   = $this->tempDir('dropv1');
         $v1Body = "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CPUWEIGHT%%\nTasksMax=%%TASKS_MAX%%\nMemoryHigh=%%USER_MEMORY_HIGH%%M\nMemoryMax=%%USER_MEMORY_MAX%%M\n";
-        $this->writeTemplate($cfgDir, 'template.user-slice.v1.conf', $v1Body);
-        $this->writeTemplate($cfgDir, 'template.user-slice.v2.conf', 'ignored');
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', $v1Body);
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', 'ignored');
 
         putenv('PMSS_CGROUP_MODE=v1');
         putenv('PMSS_CONFIG_DIR='.$cfgDir);
@@ -104,8 +104,8 @@ class CgroupSliceTest extends TestCase
         $cfgDir = $this->tempDir('cfgv3');
         $drop   = $this->tempDir('dropv3');
         $tplBody = "[Slice]\nTasksMax=%%TASKS_MAX%%\n";
-        $this->writeTemplate($cfgDir, 'template.user-slice.v2.conf', $tplBody);
-        $this->writeTemplate($cfgDir, 'template.user-slice.v1.conf', $tplBody);
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', $tplBody);
 
         putenv('PMSS_CGROUP_MODE=v2');
         putenv('PMSS_CONFIG_DIR='.$cfgDir);

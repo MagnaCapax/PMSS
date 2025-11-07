@@ -1,16 +1,15 @@
 #!/usr/bin/php
 <?php
 /**
- * Snapshot storage health (SMART/NVMe + RAID/ZFS) to JSONL.
+ * Storage health snapshot (SMART/NVMe + mdadm) to JSONL.
  *
- * - SMART (smartctl): -H and selected -A attributes (Reallocated, Pending, CRC, Temp)
- * - NVMe (nvme smart-log): critical warnings, media errors, temp, writes
+ * - SMART (smartctl): -n standby -H -A; parse Reallocated, Pending, UDMA_CRC, Temp
+ * - NVMe (nvme smart-log): critical_warnings, temperature, media_errors, err log, percentage_used
  * - RAID (mdadm via /proc/mdstat): degraded/resync states
- * - ZFS: zpool status -x (warn when not healthy)
  *
- * Writes JSON Lines to /var/log/pmss/storage-health.jsonl with device metadata,
- * metrics and severity (ok/warn/fail). Performs simple drift detection by
- * comparing to the last snapshot of the same device and kind.
+ * Absolutely NO ZFS here. We like our data intact, accessible, and performant —
+ * no ZFS bullshit anywhere in these fleets. If you add ZFS support, expect a
+ * stern code review and a rubber chicken.
  */
 
 require_once __DIR__.'/../lib/runtime.php';
@@ -65,7 +64,6 @@ function listDisks(): array {
 
 function snapshotSmart(array $disk, array $last): array {
     $dev = $disk['path'];
-    $exists = is_readable($dev);
     $entry = [
         'timestamp'=> date('c'),
         'kind'     => 'smart',
@@ -78,17 +76,20 @@ function snapshotSmart(array $disk, array $last): array {
         'ok'       => false,
         'severity' => 'warn',
     ];
-    if (!$exists || trim((string) shell_exec('command -v smartctl 2>/dev/null')) === '') {
+    if (!is_readable($dev) || trim((string) shell_exec('command -v smartctl 2>/dev/null')) === '') {
         $entry['error'] = 'smartctl missing or device unreadable';
         return $entry;
     }
-    $out = shell_exec('smartctl -H -A '.escapeshellarg($dev).' 2>/dev/null');
+    $out = shell_exec('smartctl -n standby,now -H -A '.escapeshellarg($dev).' 2>/dev/null');
     if (!$out) { $entry['error']='smartctl produced no output'; return $entry; }
+    if (stripos($out, 'Device is in STANDBY') !== false || stripos($out,'Device is in SLEEP') !== false) {
+        $entry['ok'] = true; $entry['severity']='ok'; $entry['flags']=['standby'];
+        return $entry;
+    }
     $metrics = [ 'health'=>'UNKNOWN', 'reallocated'=>null, 'pending'=>null, 'udma_crc'=>null, 'temp_c'=>null ];
     if (preg_match('/SMART overall-health.*?:\s*(\S+)/i', $out, $m)) {
         $metrics['health'] = strtoupper($m[1]);
     }
-    // Parse key attributes
     foreach (preg_split('/\r?\n/', $out) as $line) {
         if (preg_match('/\bReallocated_Sector_Ct\b.*?\s(\d+)\s*$/', $line, $m)) $metrics['reallocated'] = (int)$m[1];
         if (preg_match('/\bCurrent_Pending_Sector\b.*?\s(\d+)\s*$/', $line, $m)) $metrics['pending'] = (int)$m[1];
@@ -99,12 +100,16 @@ function snapshotSmart(array $disk, array $last): array {
     $entry['metrics'] = $metrics;
     $flags = [];
     $sev = 'ok';
-    if ($metrics['health'] !== 'PASSED') { $sev = 'fail'; $flags[] = 'health_not_passed'; }
+    if ($metrics['health'] !== 'PASSED') { $sev='fail'; $flags[]='health_not_passed'; }
     if (($metrics['pending'] ?? 0) > 0) { $sev = max($sev,'warn'); $flags[]='pending_sectors'; }
-    if (($metrics['reallocated'] ?? 0) > 0) { $flags[]='reallocated_nonzero'; }
-    if (($metrics['temp_c'] ?? 0) >= 55) { $flags[]='hot_drive'; $sev = max($sev,'warn'); }
+    // Temp thresholds by media class
+    $temp = $metrics['temp_c'] ?? null;
+    if ($temp !== null) {
+        if (($disk['rota'] ?? 1) == 1) { if ($temp >= 50) { $flags[]='hot_hdd'; $sev = max($sev,'warn'); } }
+        else { if ($temp >= 70) { $flags[]='hot_ssd'; $sev = max($sev,'warn'); } }
+    }
     // Drift detection vs last
-    $key = 'smart::'.$dev; $prev = $last[$key]['metrics'] ?? null;
+    $prev = $last['smart::'.$dev]['metrics'] ?? null;
     if (is_array($prev)) {
         if (isset($metrics['reallocated'],$prev['reallocated']) && $metrics['reallocated'] > $prev['reallocated']) $flags[]='reallocated_increase';
         if (isset($metrics['pending'],$prev['pending']) && $metrics['pending'] > $prev['pending']) { $flags[]='pending_increase'; $sev = max($sev,'warn'); }
@@ -120,11 +125,15 @@ function snapshotNvme(array $disk, array $last): ?array {
     if (trim((string) shell_exec('command -v nvme 2>/dev/null')) === '') return null;
     $out = shell_exec('nvme smart-log '.escapeshellarg($dev).' 2>/dev/null');
     if (!$out) return null;
-    $metrics = [ 'critical_warnings'=>null, 'temperature'=>null, 'media_errors'=>null, 'num_err_log_entries'=>null ];
+    $metrics = [ 'critical_warnings'=>null, 'temperature'=>null, 'media_errors'=>null, 'num_err_log_entries'=>null, 'percentage_used'=>null ];
     if (preg_match('/critical_warning\s*:\s*(\d+)/i', $out, $m)) $metrics['critical_warnings'] = (int)$m[1];
-    if (preg_match('/temperature\s*:\s*(\d+)/i', $out, $m)) $metrics['temperature'] = (int)$m[1] - 273; // K to C approx if K
+    if (preg_match('/temperature\s*:\s*([0-9]+)\s*([KC])?/i', $out, $m)) {
+        $val = (int)$m[1]; $unit = strtoupper($m[2] ?? 'C');
+        $metrics['temperature'] = ($unit === 'K') ? ($val - 273) : $val;
+    }
     if (preg_match('/media_errors\s*:\s*(\d+)/i', $out, $m)) $metrics['media_errors'] = (int)$m[1];
     if (preg_match('/num_err_log_entries\s*:\s*(\d+)/i', $out, $m)) $metrics['num_err_log_entries'] = (int)$m[1];
+    if (preg_match('/percentage_used\s*:\s*(\d+)/i', $out, $m)) $metrics['percentage_used'] = (int)$m[1];
     $entry = [
         'timestamp'=> date('c'),
         'kind'     => 'nvme',
@@ -139,6 +148,8 @@ function snapshotNvme(array $disk, array $last): ?array {
     $flags = []; $sev='ok';
     if (($metrics['critical_warnings'] ?? 0) > 0) { $sev='fail'; $flags[]='nvme_critical_warning'; }
     if (($metrics['temperature'] ?? 0) >= 70) { $sev = max($sev,'warn'); $flags[]='hot_nvme'; }
+    if (($metrics['percentage_used'] ?? 0) >= 95) { $sev='warn'; $flags[]='wearout_critical'; }
+    elseif (($metrics['percentage_used'] ?? 0) >= 80) { $flags[]='wearout_high'; }
     $prev = $last['nvme::'.$dev]['metrics'] ?? null;
     if (is_array($prev)) {
         if (isset($metrics['media_errors'],$prev['media_errors']) && $metrics['media_errors'] > $prev['media_errors']) { $flags[]='media_errors_increase'; $sev = max($sev,'warn'); }
@@ -148,7 +159,7 @@ function snapshotNvme(array $disk, array $last): ?array {
     return $entry;
 }
 
-function snapshotRaid(array $last): array {
+function snapshotRaid(): array {
     $entries = [];
     $md = @file_get_contents('/proc/mdstat');
     if ($md !== false) {
@@ -156,13 +167,12 @@ function snapshotRaid(array $last): array {
         foreach (preg_split('/\r?\n/', $md) as $line) {
             if (preg_match('/^(md\d+)\s*:\s*(\w+)\s+(raid\d)\s+(.*)$/', trim($line), $m)) {
                 $currentArray = $m[1]; $state = $m[2]; $level = $m[3]; $detail = $m[4];
-                $entry = [ 'timestamp'=>date('c'), 'kind'=>'raid', 'array'=>$currentArray, 'level'=>$level, 'state'=>$state, 'detail'=>$detail ];
-                $entry['ok']=true; $entry['severity']='ok'; $flags=[];
+                $entry = [ 'timestamp'=>date('c'), 'kind'=>'raid', 'array'=>$currentArray, 'level'=>$level, 'state'=>$state, 'detail'=>$detail, 'ok'=>true, 'severity'=>'ok', 'flags'=>[] ];
                 if (preg_match('/\[(\d+)\/(\d+)\]\s*\[([U_]+)\]/', $detail, $mm)) {
                     $n = (int)$mm[1]; $memb=(int)$mm[2]; $map=$mm[3];
-                    if (strpos($map,'_') !== false || $n !== $memb) { $entry['severity']='fail'; $entry['ok']=false; $flags[]='degraded'; }
+                    if (strpos($map,'_') !== false || $n !== $memb) { $entry['severity']='fail'; $entry['ok']=false; $entry['flags'][]='degraded'; }
                 }
-                $entry['flags']=$flags; $entries[]=$entry;
+                $entries[]=$entry;
             } elseif ($currentArray && (strpos($line,'resync')!==false || strpos($line,'recovery')!==false || strpos($line,'reshape')!==false)) {
                 $lastIdx = count($entries)-1; if ($lastIdx>=0) {
                     $entries[$lastIdx]['severity'] = max($entries[$lastIdx]['severity'],'warn');
@@ -172,27 +182,15 @@ function snapshotRaid(array $last): array {
             }
         }
     }
-    // ZFS
-    if (trim((string) shell_exec('command -v zpool 2>/dev/null')) !== '') {
-        $status = trim((string) shell_exec('zpool status -x 2>/dev/null'));
-        $entry = [ 'timestamp'=>date('c'), 'kind'=>'zfs', 'ok'=>true, 'severity'=>'ok', 'detail'=>$status ];
-        if ($status !== '' && stripos($status, 'all pools are healthy') === false) { $entry['ok']=false; $entry['severity']='warn'; }
-        $entries[] = $entry;
-    }
     return $entries;
 }
 
 // --- Run snapshots ---
 $last = readLastEntries($logPath);
-
-// Disks (SMART/NVMe)
 foreach (listDisks() as $disk) {
-    $s = snapshotSmart($disk, $last); appendJson($logPath, $s);
+    appendJson($logPath, snapshotSmart($disk, $last));
     $n = snapshotNvme($disk, $last); if ($n) appendJson($logPath, $n);
 }
-
-// RAID/ZFS
-foreach (snapshotRaid($last) as $e) appendJson($logPath, $e);
-
+foreach (snapshotRaid() as $e) appendJson($logPath, $e);
 echo "Storage health snapshot written to {$logPath}\n";
 

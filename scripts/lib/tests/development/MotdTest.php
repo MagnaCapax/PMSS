@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/update.php';
+require_once dirname(__DIR__, 3).'/motd/Generator.php';
 
 class MotdTest extends TestCase
 {
@@ -21,7 +21,7 @@ class MotdTest extends TestCase
         putenv('PMSS_MOTD_OUTPUT_PATH='.$output);
         putenv('PMSS_RUNTIME_DIR='.$runtime);
 
-        \generateMotd();
+        \Motd::motdGenerate();
 
         $this->assertTrue(file_exists($output), 'MOTD output file missing');
         $content = (string)file_get_contents($output);
@@ -37,13 +37,13 @@ class MotdTest extends TestCase
         $this->assertTrue(is_array($lines) && count($lines) > 0, 'unable to read update-step2.php');
         $lastIdx = -1;
         foreach ($lines as $i => $line) {
-            if (strpos($line, 'generateMotd(') !== false) {
+            if (strpos($line, 'Motd::motdGenerate(') !== false) {
                 $lastIdx = $i;
             }
         }
-        $this->assertTrue($lastIdx >= 0, 'generateMotd() not referenced in update-step2.php');
+        $this->assertTrue($lastIdx >= 0, 'Motd::motdGenerate() not referenced in update-step2.php');
         $total = count($lines);
         // Expect the last call to appear within the last 50 lines of the script.
-        $this->assertTrue(($total - $lastIdx) <= 50, 'generateMotd() should be near the end of update-step2.php');
+        $this->assertTrue(($total - $lastIdx) <= 50, 'Motd::motdGenerate() should be near the end of update-step2.php');
     }
 }

@@ -9,10 +9,8 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/update.php';
+require_once __DIR__.'/../lib/motd/Generator.php';
 
 requireRoot();
-
-generateMotd();
+\Motd::motdGenerate();
 echo "MOTD refreshed.\n";
-

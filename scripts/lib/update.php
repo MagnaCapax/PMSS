@@ -347,7 +347,7 @@ function generateMotd(): void {
         $fh = @fopen($healthLog, 'r');
         if ($fh) {
             $lastSmart = [];
-            $raidWarn = null; $zfsWarn = null; $nvmeCrit = [];
+            $raidWarn = null; $nvmeCrit = [];
             while (($line = fgets($fh)) !== false) {
                 $j = json_decode($line, true);
                 if (!is_array($j)) continue;
@@ -356,8 +356,6 @@ function generateMotd(): void {
                     $lastSmart[$j['device'] ?? ''] = $j;
                 } elseif ($k === 'raid') {
                     if (($j['severity'] ?? 'ok') !== 'ok') $raidWarn = $j;
-                } elseif ($k === 'zfs') {
-                    if (($j['ok'] ?? true) === false) $zfsWarn = $j;
                 } elseif ($k === 'nvme') {
                     if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme';
                 }
@@ -368,9 +366,6 @@ function generateMotd(): void {
                 $arr = $raidWarn['array'] ?? 'md';
                 $flags = implode(',', (array)($raidWarn['flags'] ?? []));
                 $lines[] = "RAID $arr: ".($flags !== '' ? $flags : ($raidWarn['state'] ?? 'warn'));
-            }
-            if ($zfsWarn) {
-                $lines[] = 'ZFS: pool status not healthy';
             }
             if (!empty($nvmeCrit)) {
                 $lines[] = 'NVMe critical warning: '.implode(', ', array_unique($nvmeCrit));

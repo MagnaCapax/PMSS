@@ -125,8 +125,8 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
             $cfgDir = '/etc/seedbox/config';
         }
         $tpl = $mode === 'v2'
-            ? $cfgDir.'/template.user-slice.v2.conf'
-            : $cfgDir.'/template.user-slice.v1.conf';
+            ? $cfgDir.'/template.cgroup.user-slice.v2.conf'
+            : $cfgDir.'/template.cgroup.user-slice.v1.conf';
         if (!file_exists($tpl)) {
             $log('[WARN] Slice template missing: '.$tpl);
             return;
@@ -135,15 +135,26 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         // Compute sane defaults with constraints
         $totalMiB     = pmssTotalMemMiB();
         $minHighMiB   = 250; // minimum MemoryHigh
+        // Allow policy override via PHP array file: cgroup.policy.php returning ['memoryHighMiB'=>..,'memoryMaxMiB'=>..,'cpuWeight'=>..,'ioWeight'=>..,'tasksMax'=>..]
+        $policyFile = rtrim($cfgDir,'/').'/cgroup.policy.php';
+        $policy = [];
+        if (file_exists($policyFile)) {
+            $loaded = @include $policyFile;
+            if (is_array($loaded)) { $policy = $loaded; }
+        }
+
         $defaultHigh  = max($minHighMiB, (int)floor($totalMiB * 0.10)); // default ~10% of RAM
         $maxCapMiB    = (int)floor($totalMiB * 0.95); // MemoryMax never above 95% of total
-        $calcMax      = min($maxCapMiB, (int)floor($defaultHigh * 1.5)); // High +50% cap
-        $cpuWeight    = 200;
-        $ioWeight     = 200;
-        $tasksMax     = 4096;
+        $policyHigh   = isset($policy['memoryHighMiB']) && is_numeric($policy['memoryHighMiB']) ? (int)$policy['memoryHighMiB'] : $defaultHigh;
+        $policyHigh   = max($minHighMiB, $policyHigh);
+        $calcMax      = isset($policy['memoryMaxMiB']) && is_numeric($policy['memoryMaxMiB']) ? (int)$policy['memoryMaxMiB'] : (int)floor($policyHigh * 1.5);
+        $calcMax      = min($calcMax, $maxCapMiB);
+        $cpuWeight    = isset($policy['cpuWeight']) && is_numeric($policy['cpuWeight']) ? (int)$policy['cpuWeight'] : 200;
+        $ioWeight     = isset($policy['ioWeight']) && is_numeric($policy['ioWeight']) ? (int)$policy['ioWeight'] : 200;
+        $tasksMax     = isset($policy['tasksMax']) && is_numeric($policy['tasksMax']) ? (int)$policy['tasksMax'] : 4096;
 
         $repl = [
-            '%%USER_MEMORY_HIGH%%' => (string)$defaultHigh,
+            '%%USER_MEMORY_HIGH%%' => (string)$policyHigh,
             '%%USER_MEMORY_MAX%%'  => (string)$calcMax,
             '%%USER_CPUWEIGHT%%'   => (string)$cpuWeight,
             '%%USER_IOWEIGHT%%'    => (string)$ioWeight,
@@ -158,6 +169,17 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         runStep('Setting permissions on user slice override', 'chmod 644 '.escapeshellarg($target));
         runStep('Reloading systemd manager configuration', 'systemctl daemon-reload');
         $log(sprintf('Installed %s slice override (mode=%s)', $target, $mode));
+
+        // Ensure root (uid 0) slice is not limited: create user-0 specific override setting infinity/large limits.
+        $rootDir = dirname($dropDir).'/user-0.slice.d';
+        if (!is_dir($rootDir)) {
+            @mkdir($rootDir, 0755, true);
+        }
+        $rootDrop = $rootDir.'/99-pmss-unlimited.conf';
+        $rootConf = "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n";
+        @file_put_contents($rootDrop, $rootConf);
+        @chmod($rootDrop, 0644);
+        runStep('Reloading systemd manager configuration (root slice)', 'systemctl daemon-reload');
     }
 }
 
@@ -180,7 +202,8 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
     {
         runStep('Generating en_US.UTF-8 locale', 'locale-gen en_US.UTF-8');
         runStep('Setting default system locale', 'update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8');
-        generateMotd();
+        require_once __DIR__.'/../motd/Generator.php';
+        \Motd::motdGenerate();
     }
 }
 

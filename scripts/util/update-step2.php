@@ -38,6 +38,7 @@ require_once __DIR__.'/../lib/update/services/security.php';
 require_once __DIR__.'/../lib/update/userMaintenance.php';
 require_once __DIR__.'/../lib/update/networking.php';
 require_once __DIR__.'/../lib/update/services/bootstrap.php';
+require_once __DIR__.'/../lib/motd/Generator.php';
 
 requireRoot();
 
@@ -243,6 +244,8 @@ pmssApplySecurityHardening();
 if (function_exists('generateMotd')) {
     generateMotd();
 }
+// Refresh MOTD at end
+Motd::motdGenerate();
 pmssProfileSummary();
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
 logmsg('update-step2.php completed');

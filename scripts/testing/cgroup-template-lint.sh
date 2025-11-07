@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
-v2="$ROOT_DIR/etc/seedbox/config/template.user-slice.v2.conf"
-v1="$ROOT_DIR/etc/seedbox/config/template.user-slice.v1.conf"
+v2="$ROOT_DIR/etc/seedbox/config/template.cgroup.user-slice.v2.conf"
+v1="$ROOT_DIR/etc/seedbox/config/template.cgroup.user-slice.v1.conf"
 
 fail=0
 
@@ -53,4 +53,3 @@ if [[ $fail -ne 0 ]]; then
   exit 1
 fi
 echo "cgroup-template-lint: OK"
-
