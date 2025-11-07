@@ -37,6 +37,7 @@ OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 PROMPT="$OUTDIR/prompt.txt"
+SUMMARY="$OUTDIR/ci-summary.txt"
 
 # Render caps to keep prompt readable
 JOB_LOG_LINES=${JOB_LOG_LINES:-600}
