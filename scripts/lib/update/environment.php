@@ -171,22 +171,11 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             }
         }
 
-        // Explicitly clear problematic vendor repo packages from selections so dselect-upgrade
-        // will not attempt to install them from cache even if a previous run queued them.
-        // Use double quotes for the sh -lc payload to avoid complex PHP escaping
-        $clearSelections = 'sh -lc "dpkg --get-selections | grep -q \"^repo-mediaarea\\s\" && printf \"repo-mediaarea\\tdeinstall\\n\" | dpkg --set-selections; dpkg --get-selections | grep -q \"^repo-mediaarea-snapshots\\s\" && printf \"repo-mediaarea-snapshots\\tdeinstall\\n\" | dpkg --set-selections"';
-        runStep('Clearing repo-mediaarea selections', $clearSelections);
-
         $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));
         $rc = runStep('Applying dpkg selection baseline', $cmd);
         if ($rc !== 0) {
             $success = false;
         }
-        // Ensure any lingering vendor repo debs are removed from selection/cache before upgrade.
-        runStep('Clearing repo-mediaarea selections (post-apply)', 'sh -lc "dpkg --get-selections | grep -q \"^repo-mediaarea\\s\" && printf \"repo-mediaarea\\tdeinstall\\n\" | dpkg --set-selections; dpkg --get-selections | grep -q \"^repo-mediaarea-snapshots\\s\" && printf \"repo-mediaarea-snapshots\\tdeinstall\\n\" | dpkg --set-selections"');
-        runStep('Removing repo-mediaarea packages if present', aptCmd('remove -y repo-mediaarea repo-mediaarea-snapshots || true'));
-        runStep('Purging repo-mediaarea packages if present', aptCmd('purge -y repo-mediaarea repo-mediaarea-snapshots || true'));
-        runStep('Clearing repo-mediaarea package cache', "sh -lc 'rm -f /var/cache/apt/archives/repo-mediaarea_* || true'");
 
         $installCmd = aptCmd('dselect-upgrade -y');
         $rc = runStep('Installing packages from selection baseline', $installCmd);
