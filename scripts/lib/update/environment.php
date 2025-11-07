@@ -127,12 +127,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     $warnings = true;
                     continue;
                 }
-                if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
-                    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Ignoring baseline package '.$package.' (obsolete/handled elsewhere)', 0); }
-                    elseif (function_exists('logmsg')) { logmsg('[SKIP] Ignoring baseline package '.$package.' (obsolete/handled elsewhere)'); }
-                    $warnings = true;
-                    continue;
-                }
+                // Do not drop nzbdrone or pyload-cli — required packages in our environment
                 // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'
                 if (preg_match('/^linux-image-[0-9]/i', $package)) {
                     $warnings = true;
