@@ -78,7 +78,7 @@ Inspect and apply limits per user:
 ## Root Slice Safety
 
 - Root slice (user‑0.slice) is never limited. PMSS installs an override and a repair job to enforce this:
-  - At boot (after 20 seconds) and at 6‑hour intervals: `/scripts/util/checkRootCgroup.php` fixes limits if misconfigured.
+  - At boot (after 20 seconds) and every 2 hours: `/scripts/cron/checkRootCgroup.php` fixes limits if misconfigured.
 
 ## Integration Hooks
 
@@ -109,4 +109,3 @@ Inspect and apply limits per user:
 
 - IOWeight effectiveness depends on device scheduler. It works well with BFQ (HDDs), but is less effective with NVMe (none/mq‑deadline). Prefer strict throttles when needed.
 - cgroup v1 systems (Debian 10) use BlockIOAccounting and analogous memory/task settings. PMSS retains a v1 template and selection by kernel detection.
-

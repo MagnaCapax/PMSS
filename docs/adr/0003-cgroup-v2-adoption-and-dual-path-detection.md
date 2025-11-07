@@ -20,7 +20,7 @@ Production systems span Debian 10/11/12 with a mix of kernel capabilities. Debia
 - Policy overrides come from a PHP array file: `etc/seedbox/config/cgroup.policy.php`, using mount‑based IO defaults (`/` and `/home`) resolved to devices at runtime (via `findmnt`). Policy keys include memory/CPU/IO weights, `CPUQuotaPercent`, `TasksMax`, and mount IO caps (bandwidth/IOPS). Guardrails above always apply.
 - Utilities:
   - `scripts/util/userCgroup.php` manages per‑user slice config/status with explicit flags and shorthands (device resolution by mount path such as `/home`); changes are additive; `--wipe` reverts slice.
-  - `scripts/util/checkRootCgroup.php` ensures root slice is unlimited (`@reboot` and periodic cron cadence).
+  - `scripts/cron/checkRootCgroup.php` ensures root slice is unlimited (`@reboot` and periodic cron cadence).
 - Lifecycle hooks:
   - User creation applies policy defaults: `php /scripts/util/userCgroup.php USER --apply --defaults`.
   - User termination reverts the user slice (`systemctl revert user‑UID.slice`) before removal.
@@ -73,4 +73,3 @@ Production systems span Debian 10/11/12 with a mix of kernel capabilities. Debia
 
 ## Scope
 This ADR governs per‑user resource control (cgroups) via systemd slices and related tooling, including detection, policy, templates, utilities, lifecycle hooks, and CI lints. It does not cover application‑level QoS or network shaping beyond notes and TODOs.
-

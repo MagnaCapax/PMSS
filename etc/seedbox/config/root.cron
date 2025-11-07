@@ -51,5 +51,5 @@ SHELL=/bin/bash
 @reboot root    sleep 5; /scripts/cron/checkLighttpdInstances.php >> /var/log/pmss/checkLighttpdInstances.log 2>&1
 @reboot root    sleep 10; /scripts/cron/checkInstances.php >> /var/log/pmss/checkInstances.log 2>&1
 @reboot root    sleep 15; /scripts/util/motdGenerate.php >> /var/log/pmss/motdGenerate.log 2>&1
-@reboot root    sleep 20; /scripts/util/checkRootCgroup.php >> /var/log/pmss/checkRootCgroup.log 2>&1
-0 */2 * * *   root    /scripts/util/checkRootCgroup.php >> /var/log/pmss/checkRootCgroup.log 2>&1
+@reboot root    sleep 20; /scripts/cron/checkRootCgroup.php >> /var/log/pmss/checkRootCgroup.log 2>&1
+0 */2 * * *   root    /scripts/cron/checkRootCgroup.php >> /var/log/pmss/checkRootCgroup.log 2>&1

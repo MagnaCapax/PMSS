@@ -20,7 +20,7 @@ class RootGuardCliTest extends TestCase
     {
         $stubPath = $this->makeSystemctlStub($responses);
         $env = 'PATH='.escapeshellarg($stubPath.':'.getenv('PATH'));
-        $cmd = $env.' php '.escapeshellarg(getcwd().'/scripts/util/checkRootCgroup.php');
+        $cmd = $env.' php '.escapeshellarg(getcwd().'/scripts/cron/checkRootCgroup.php');
         return (string)@shell_exec($cmd.' 2>&1');
     }
 
@@ -36,4 +36,3 @@ class RootGuardCliTest extends TestCase
         $this->assertStringContainsString('Unlimiting root user slice', $out);
     }
 }
-
