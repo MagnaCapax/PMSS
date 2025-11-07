@@ -206,3 +206,63 @@ printf "%s\n" "${COMPLEX_ROWS[@]}" | \
     printf "%05d %s %s %s %s\n", density, $1, $2, $3, $4;
   }' | sort -r | head -n 8 | \
   awk '{printf "%-60s %s %s %s/100loc\n", $2, $3, $4, $5}' || true
+
+# Advisory: simple heuristic complexity for PHP files (dependency-free)
+echo
+echo "Advisory complexity (PHP heuristic)"
+echo "-----------------------------------"
+
+declare -a PHP_FILES=()
+for rel in "${TRACKED_FILES[@]}"; do
+  skip=0
+  for ex in "${EXCLUDE_RELATIVE[@]}"; do
+    if [[ "$rel" == "$ex"* ]]; then skip=1; break; fi
+  done
+  [[ $skip -eq 1 ]] && continue
+  [[ "$rel" == *.php ]] || continue
+  PHP_FILES+=("$rel")
+done
+
+php_total_complex=0
+declare -a PHP_COMPLEX_ROWS=()
+for rel in "${PHP_FILES[@]}"; do
+  file="$ROOT_DIR/$rel"
+  total=$(wc -l <"$file")
+  # Count blanks and simple comment lines (// or /* ... starts or * continuation)
+  blank=$(grep -c -E '^\s*$' "$file" || true)
+  comments=$(grep -c -E '^\s*(//|/\*|\*)' "$file" || true)
+  code=$(( total - blank - comments ))
+  set +o pipefail
+  ifc=$(grep -o -E '\bif\b' "$file" | wc -l | tr -d ' ' || true)
+  elseifc=$(grep -o -E '\belseif\b' "$file" | wc -l | tr -d ' ' || true)
+  forlc=$(grep -o -E '\bfor\b' "$file" | wc -l | tr -d ' ' || true)
+  foreachc=$(grep -o -E '\bforeach\b' "$file" | wc -l | tr -d ' ' || true)
+  whilec=$(grep -o -E '\bwhile\b' "$file" | wc -l | tr -d ' ' || true)
+  switchc=$(grep -o -E '\bswitch\b' "$file" | wc -l | tr -d ' ' || true)
+  casec=$(grep -o -E '\bcase\b' "$file" | wc -l | tr -d ' ' || true)
+  andor=$(grep -o -E '&&|\|\|' "$file" | wc -l | tr -d ' ' || true)
+  funcc=$(grep -o -E '\bfunction\b' "$file" | wc -l | tr -d ' ' || true)
+  set -o pipefail
+  php_complex=$(( ifc + elseifc + forlc + foreachc + whilec + switchc + casec + andor + funcc ))
+  php_total_complex=$(( php_total_complex + php_complex ))
+  density=0
+  if (( code > 0 )); then
+    density=$(( (php_complex * 100 + code/2) / code ))
+  fi
+  PHP_COMPLEX_ROWS+=("$rel|code=$code|complex=$php_complex|density=$density")
+done
+
+echo "PHP files analyzed: ${#PHP_FILES[@]}"
+echo "Aggregate complexity: $php_total_complex"
+
+printf "%s\n" "${PHP_COMPLEX_ROWS[@]}" | \
+  awk -F'[|]' '{
+    code=$2; sub(/code=/, "", code);
+    complex=$3; sub(/complex=/, "", complex);
+    density=$4; sub(/density=/, "", density);
+    printf "%05d %s %s %s %s\n", density, $1, $2, $3, $4;
+  }' | sort -r | head -n 10 | \
+  awk '{printf "%-60s %s %s %s/100loc\n", $2, $3, $4, $5}' || true
+
+echo
+echo "Note: Complexity sections are advisory only. Review top hotspots periodically and add TODOs for simplification/refactor when time permits."

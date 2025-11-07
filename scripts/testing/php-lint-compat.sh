@@ -9,6 +9,6 @@ echo "[php-lint-compat] using $(php -r 'echo PHP_VERSION;')" >&2
 find . -type f -name "*.php" \
   -not -path "./vendor/*" \
   -not -path "./scripts/lib/tests/*" \
-  -print0 | xargs -0 -n1 php -l > /dev/null
+  -print0 | xargs -0 -n1 php -l >/dev/null
 
 echo "OK: PHP syntax check (compat)" >&2

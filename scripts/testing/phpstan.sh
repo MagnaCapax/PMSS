@@ -24,11 +24,11 @@ if [[ -z "$PHAR_BIN" ]]; then
   fi
 fi
 
-ARGS=( "analyse" "--no-progress" )
+ARGS=("analyse" "--no-progress")
 [[ "${PHPSTAN_DISABLE_PARALLEL:-0}" == "1" ]] && ARGS+=("--no-parallel")
 
 if [[ -f "$ROOT_DIR/phpstan.neon.dist" ]]; then
-  ARGS+=( "-c" "$ROOT_DIR/phpstan.neon.dist" )
+  ARGS+=("-c" "$ROOT_DIR/phpstan.neon.dist")
 fi
 
 # Forward any extra arguments to allow CI/local overrides (e.g., --level=3)
