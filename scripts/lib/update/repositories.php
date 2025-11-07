@@ -95,6 +95,26 @@ function pmssEnsureMediaareaRepository(): void
             if (@file_put_contents($deb822Path, $deb822) !== false) {
                 @chmod($deb822Path, 0644);
                 logmsg('MediaArea deb822 source written: '.$deb822Path);
+                // Avoid duplicate configuration: comment out MediaArea lines in primary sources.list
+                $sources = pmssAptSourcesPath();
+                if (is_file($sources)) {
+                    $data = @file_get_contents($sources);
+                    if ($data !== false && stripos($data, 'mediaarea.net/repo/deb') !== false) {
+                        $lines = preg_split('/\r?\n/', $data);
+                        $changed = false;
+                        foreach ($lines as $i => $line) {
+                            $trim = ltrim($line);
+                            if ($trim !== '' && $trim[0] !== '#' && stripos($line, 'mediaarea.net/repo/deb') !== false) {
+                                $lines[$i] = '# PMSS(disable, mediaarea switched to deb822): '.$line;
+                                $changed = true;
+                            }
+                        }
+                        if ($changed) {
+                            @file_put_contents($sources, implode(PHP_EOL, $lines).PHP_EOL);
+                            logmsg('Disabled MediaArea entries in primary sources.list to avoid duplicates');
+                        }
+                    }
+                }
             } else {
                 logmsg('[WARN] Unable to write MediaArea deb822 source (will rely on template or existing config)');
             }
