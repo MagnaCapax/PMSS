@@ -107,7 +107,7 @@ mkdir -p "$OUTDIR" "$ARTDIR"
 
 echo "[ci-codex] workspace: $OUTDIR" >&1
 echo "[ci-codex] artifact dir: $ARTDIR" >&1
-echo "[ci-codex] config: include_agents=$include_agents, AGENTS_LINES=$AGENTS_LINES, JOB_LOG_LINES=$JOB_LOG_LINES, ARTIFACT_LINES=$ARTIFACT_LINES, MAX_ARTIFACT_FILES=$MAX_ARTIFACT_FILES, MAX_PROMPT_ARG_BYTES=$MAX_PROMPT_ARG_BYTES" >&1
+echo "[ci-codex] config: include_agents=$include_agents, AGENTS_LINES=$AGENTS_LINES, JOB_LOG_LINES=$JOB_LOG_LINES, ARTIFACT_LINES=$ARTIFACT_LINES, MAX_ARTIFACT_FILES=$MAX_ARTIFACT_FILES, MAX_PROMPT_ARG_BYTES=${MAX_PROMPT_ARG_BYTES:-n/a}" >&1
 
 echo "[ci-codex] discovering latest run..." >&1
 run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
