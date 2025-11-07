@@ -275,8 +275,14 @@ if (!function_exists('updateAptSources')) {
 
 /** Generate /etc/motd using the template and system details */
 function generateMotd(): void {
-    $motdTemplatePath = '/etc/seedbox/config/template.motd';
-    $motdOutputPath   = '/etc/motd';
+    $motdTemplatePath = getenv('PMSS_MOTD_TEMPLATE_PATH');
+    if ($motdTemplatePath === false || $motdTemplatePath === '') {
+        $motdTemplatePath = '/etc/seedbox/config/template.motd';
+    }
+    $motdOutputPath = getenv('PMSS_MOTD_OUTPUT_PATH');
+    if ($motdOutputPath === false || $motdOutputPath === '') {
+        $motdOutputPath = '/etc/motd';
+    }
     $motdTemplate     = @file_get_contents($motdTemplatePath);
     if ($motdTemplate === false) return;
 
@@ -287,10 +293,14 @@ function generateMotd(): void {
     $storageInfo    = trim(shell_exec("df -h /home | awk 'NR==2 {print \$2}'"));
 
     $pmssVersion = getPmssVersion();
-    if (!is_dir('/var/run/pmss')) {
-        mkdir('/var/run/pmss', 0770, true);
+    $runtimeDir = getenv('PMSS_RUNTIME_DIR');
+    if ($runtimeDir === false || $runtimeDir === '') {
+        $runtimeDir = '/var/run/pmss';
     }
-    $versionCache = '/var/run/pmss/version';
+    if (!is_dir($runtimeDir)) {
+        @mkdir($runtimeDir, 0770, true);
+    }
+    $versionCache = rtrim($runtimeDir, '/').'/version';
     file_put_contents($versionCache, $pmssVersion);
     $runtimeVersion = trim(@file_get_contents($versionCache));
     $updateDate = file_exists('/var/run/pmss/updated') ? trim(file_get_contents('/var/run/pmss/updated')) : 'not set';

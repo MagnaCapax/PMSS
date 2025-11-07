@@ -232,6 +232,10 @@ pmssApplyNetworkConfig();
 pmssApplySecurityHardening();
 
 // Mark the end of phase 2 so log parsing knows we finished cleanly.
+// Refresh MOTD at the very end so VPN/service status reflects final state.
+if (function_exists('generateMotd')) {
+    generateMotd();
+}
 pmssProfileSummary();
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
 logmsg('update-step2.php completed');
