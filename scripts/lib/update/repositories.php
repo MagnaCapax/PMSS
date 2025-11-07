@@ -126,7 +126,13 @@ function pmssEnsureMediaareaRepository(): void
         $packagePath = $tmpDir.'/repo-mediaarea_1.0-26_all.deb';
         $downloadCmd = sprintf('wget -q -O %s %s', escapeshellarg($packagePath), escapeshellarg($packageUrl));
         if (runStep('Fetching MediaArea repository package', $downloadCmd) === 0 && is_file($packagePath)) {
-            runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
+            $rc = runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
+            if ($rc !== 0) {
+                // Some upgraded hosts have an older dpkg that cannot read control.tar.zst.
+                // Keep it simple: try upgrading dpkg and retry once, then move on.
+                runStep('Upgrading dpkg for zstd control.tar support', aptCmd('install -y dpkg libzstd1'));
+                runStep('Re-attempting MediaArea repository package install', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
+            }
         }
         @unlink($packagePath);
         @rmdir($tmpDir);
