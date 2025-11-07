@@ -265,3 +265,4 @@ try {
 }
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
 logmsg('update-step2.php completed');
+logmsg('Completed at: '.date('Y-m-d H:i:s'));
