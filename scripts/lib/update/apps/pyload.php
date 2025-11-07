@@ -30,18 +30,7 @@ if ($python === '') {
 $venvDir   = '/opt/pyload';
 $cliBin    = $venvDir.'/bin/pyload';
 
-$aptDeps = [
-    'python3',
-    'python3-venv',
-    'python3-pip',
-    'python3-setuptools',
-    'python3-distutils',
-    'libffi-dev',
-    'libssl-dev',
-    'libjpeg-dev',
-    'zlib1g-dev',
-];
-runStep('Installing pyLoad apt dependencies', aptCmd('install -y '.implode(' ', array_map('escapeshellarg', $aptDeps))));
+// Required Python toolchain packages are queued centrally via packages/python.php
 
 $venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', $logger);
 if (empty($venv)) {

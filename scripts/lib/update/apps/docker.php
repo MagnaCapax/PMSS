@@ -13,7 +13,10 @@ if (version_compare($debianVersion, "12", "<")) {
 }
 
 // Install required packages
-passthru("apt-get update -y && apt-get install -y " . implode(" ", $requiredPackages));
+// Queue docker-related packages; apt refresh/install happens in the package phase.
+if (function_exists('pmssQueuePackages')) {
+    pmssQueuePackages($requiredPackages);
+}
 passthru("apt-get install ca-certificates curl -y");
 
 // Add Docker's official GPG key

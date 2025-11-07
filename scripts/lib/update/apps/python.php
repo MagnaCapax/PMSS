@@ -25,8 +25,6 @@ if ($python === '') {
 $venvDir   = '/opt/flexget';
 $cliBin    = $venvDir.'/bin/flexget';
 
-runStep('Ensuring Python tooling for FlexGet', aptCmd('install -y python3 python3-venv python3-pip python3-setuptools python3-distutils'));
-
 $venv = pmssPythonVenvEnsure($venvDir, 'FlexGet', $logger);
 if (empty($venv)) {
     return;

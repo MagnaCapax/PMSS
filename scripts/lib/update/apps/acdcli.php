@@ -13,8 +13,6 @@ require_once __DIR__.'/pythonVenv.php';
 $dryRun = getenv('PMSS_DRY_RUN') === '1';
 // #TODO Pin acd_cli to a specific commit/tag to avoid unbounded upgrades.
 
-runStep('Ensuring Python tooling for acd_cli', aptCmd('install -y python3 python3-venv python3-pip'));
-
 $venvDir = '/opt/acd_cli';
 $cliBin  = $venvDir.'/bin/acd_cli';
 

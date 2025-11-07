@@ -9,6 +9,9 @@ function pmssInstallPythonToolchain(int $distroVersion): void
 {
     pmssQueuePackages([
         'libffi-dev',
+        'libssl-dev',
+        'libjpeg-dev',
+        'zlib1g-dev',
         'python3',
         'python3-dev',
         'python3-venv',
