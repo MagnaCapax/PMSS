@@ -13,11 +13,9 @@
 require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
-require_once __DIR__.'/../lib/update/apt.php';
-require_once __DIR__.'/../lib/update/repositories.php';
-// Bring in OS-release helpers (getDistroName/Version/Codename) before distro.php uses them
+// Bring in shared runtime helpers; avoid duplicating apt/repo logic here.
+// Package installation for OpenVPN/EasyRSA is handled centrally in the package phase.
 require_once __DIR__.'/../lib/update.php';
-require_once __DIR__.'/../lib/update/distro.php';
 
 requireRoot();
 
@@ -40,14 +38,11 @@ $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
 $clientOvpn  = "/home/openvpn-{$slug}.ovpn";
 $clientCrt   = "/home/openvpn-{$slug}.crt";
 
-// 1) Ensure OpenVPN and EasyRSA packages
-// Make sure repository prerequisites (keys/sources) are in place before apt update.
-// Seed PMSS_DISTRO_VERSION for helpers that branch by release.
-$dist = pmssDetectDistro();
-putenv('PMSS_DISTRO_VERSION='.(string) ((int) ($dist['version'] ?? 0)));
-pmssEnsureRepositoryPrerequisites();
-runStep('Refreshing APT indexes (OpenVPN)', aptCmd('update -yq'));
-runStep('Installing OpenVPN and EasyRSA', aptCmd('install -yq openvpn easy-rsa'));
+// 1) Package presence (informational)
+// OpenVPN/EasyRSA packages are expected to be installed during the package phase.
+if (!is_file('/usr/sbin/openvpn') || (!is_dir($easyRsaShare) && !is_dir($easyRsaDir))) {
+    logmsg('[INFO] OpenVPN/EasyRSA packages not detected; proceeding with EasyRSA fallback if needed');
+}
 
 // 2) Ensure directories
 runStep('Ensuring OpenVPN directory', 'install -d -m 0755 '.escapeshellarg($openvpnDir));
