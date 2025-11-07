@@ -127,7 +127,11 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     $warnings = true;
                     continue;
                 }
-                // Do not drop nzbdrone or pyload-cli — required packages in our environment
+                // Drop legacy names we no longer install via apt (tarball/venv used instead)
+                if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
+                    $warnings = true;
+                    continue;
+                }
                 // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'
                 if (preg_match('/^linux-image-[0-9]/i', $package)) {
                     $warnings = true;

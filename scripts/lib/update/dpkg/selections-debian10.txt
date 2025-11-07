@@ -1026,7 +1026,6 @@ nicstat						install
 notification-daemon				install
 ntp						install
 ntpdate						install
-nzbdrone					install
 opensc						install
 opensc-pkcs11:amd64				install
 openssh-client					install
@@ -1084,7 +1083,6 @@ proftpd-basic					install
 proftpd-doc					install
 psmisc						install
 publicsuffix					install
-pyload-cli					install
 python						install
 python-all					install
 python-all-dev					install

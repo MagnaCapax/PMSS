@@ -1086,7 +1086,6 @@ nicstat
 notification-daemon
 ntp
 ntpdate
-nzbdrone
 ocl-icd-libopencl1:amd64
 opensc
 opensc-pkcs11:amd64
