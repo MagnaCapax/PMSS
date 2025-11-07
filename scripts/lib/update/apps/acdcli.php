@@ -21,7 +21,13 @@ if (empty($venv)) {
     return;
 }
 
-runStep('Installing acd_cli in virtualenv', sprintf('%s -m pip install --upgrade git+https://github.com/yadayada/acd_cli.git', escapeshellarg($venv['python'])));
+$forceUpdate = getenv('PMSS_FORCE_ACDCLI_UPDATE') === '1';
+$already     = pmssPythonVenvHasPackage($venv['python'], 'acdcli');
+if ($already && !$forceUpdate) {
+    logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
+} else {
+    runStep('Installing acd_cli in virtualenv', sprintf('%s -m pip install --upgrade git+https://github.com/yadayada/acd_cli.git', escapeshellarg($venv['python'])));
+}
 
 if (is_file($cliBin)) {
     runStep('Linking acd_cli CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/acd_cli')));

@@ -70,3 +70,15 @@ if (!function_exists('pmssPythonVenvHasPip')) {
         return $rc === 0;
     }
 }
+
+if (!function_exists('pmssPythonVenvHasPackage')) {
+    /**
+     * True if `python -m pip show <package>` returns successfully in the venv.
+     */
+    function pmssPythonVenvHasPackage(string $pythonBin, string $package): bool
+    {
+        $cmd = escapeshellarg($pythonBin).' -m pip show '.escapeshellarg($package).' 1>/dev/null 2>&1';
+        exec($cmd, $out, $rc);
+        return $rc === 0;
+    }
+}
