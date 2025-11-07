@@ -68,19 +68,37 @@ fi
 
 echo "[ci-codex] latest run id: $run_id" >&2
 
-# Download artifacts (smoke logs etc.)
+# Wait for run completion (up to 180s) for logs/artifacts to be ready
+status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
+deadline=$(( $(date +%s) + 180 ))
+while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
+  echo "[ci-codex] run status: $status (waiting)" >&2
+  sleep 5
+  status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
+done
+
+# Download artifacts (best-effort)
 echo "[ci-codex] downloading artifacts to $ARTDIR" >&2
-gh run download "$run_id" --dir "$ARTDIR" || true
+gh run download "$run_id" --dir "$ARTDIR" || echo "no valid artifacts found to download" >&2
 
 # Optionally capture a specific job log
+# Fetch logs for a requested job, or both 'build' and 'smoke' by default
+fetch_job_log() {
+  local name="$1" out="$2"
+  local id
+  id=$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId") || true
+  if [[ -n "$id" ]]; then
+    gh run view --job "$id" --log > "$out" || true
+  fi
+}
+
 if [[ -n "$job_name" ]]; then
   echo "[ci-codex] fetching job logs for '$job_name'" >&2
-  job_id=$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$job_name\").databaseId") || true
-  if [[ -n "$job_id" ]]; then
-    gh run view --job "$job_id" --log > "$JOBLOG" || true
-  else
-    echo "[ci-codex] job '$job_name' not found in latest run" >&2
-  fi
+  fetch_job_log "$job_name" "$JOBLOG"
+else
+  echo "[ci-codex] fetching job logs for 'build' and 'smoke'" >&2
+  fetch_job_log "build" "$OUTDIR/job-build.log"
+  fetch_job_log "smoke" "$OUTDIR/job-smoke.log"
 fi
 
 # Build the prompt file
@@ -95,11 +113,13 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
   echo "=== CI Summary ==="
   gh run view "$run_id" || true
   echo
-  if [[ -s "$JOBLOG" ]]; then
-    echo "=== Job: $job_name (latest) ==="
-    cat "$JOBLOG"
+  # Include job logs if present
+  for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
+    [[ -s "$jl" ]] || continue
+    echo "=== Job Log: $(basename "$jl") ==="
+    sed -n '1,4000p' "$jl" || true
     echo
-  fi
+  done
   if compgen -G "$ARTDIR/*" >/dev/null; then
     # Print up to 4000 lines of each file inside the artifact tree
     while IFS= read -r -d '' f; do
@@ -120,7 +140,7 @@ if [[ -n "$exec_cmd" ]]; then
 else
   if command -v codex >/dev/null 2>&1; then
     echo "[ci-codex] sending prompt to: codex" >&2
-    # Prefer passing as a single argument to avoid stdin quirks
+    # Pass as single argument to match 'codex [PROMPT]' usage
     codex "$(cat "$PROMPT")" || true
   else
     echo "[ci-codex] To send to your assistant CLI, try for example:" >&2
