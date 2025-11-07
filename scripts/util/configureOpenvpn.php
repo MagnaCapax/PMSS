@@ -15,6 +15,8 @@ require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/update/apt.php';
 require_once __DIR__.'/../lib/update/repositories.php';
+// Bring in OS-release helpers (getDistroName/Version/Codename) before distro.php uses them
+require_once __DIR__.'/../lib/update.php';
 require_once __DIR__.'/../lib/update/distro.php';
 
 requireRoot();
