@@ -38,15 +38,13 @@ OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 PROMPT="$OUTDIR/prompt.txt"
-PROMPT_ARG="$OUTDIR/prompt.arg.txt"
 
-# Size and content caps to prevent 'Argument list too long' and keep prompts readable
-# Keep the argument under ~120KB by default to stay well below typical ARG_MAX including env.
-MAX_PROMPT_ARG_BYTES=${MAX_PROMPT_ARG_BYTES:-120000}
+# Render caps to keep prompt readable
 AGENTS_LINES=${AGENTS_LINES:-300}
 JOB_LOG_LINES=${JOB_LOG_LINES:-600}
 ARTIFACT_LINES=${ARTIFACT_LINES:-200}
 MAX_ARTIFACT_FILES=${MAX_ARTIFACT_FILES:-6}
+PMSS_CI_WAIT_SECS=${PMSS_CI_WAIT_SECS:-300}
 
 read -r -d '' DEFAULT_PROMPT <<'PMSSPROMPT'
 PMSS CI Assist — Strict Rails Mode
@@ -119,19 +117,31 @@ fi
 
 echo "[ci-codex] latest run id: $run_id" >&1
 
-# Wait for run completion (up to 180s) for logs/artifacts to be ready
+echo "[ci-codex] waiting for run completion (timeout ${PMSS_CI_WAIT_SECS}s)…" >&1
 status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
-deadline=$(( $(date +%s) + 180 ))
+deadline=$(( $(date +%s) + PMSS_CI_WAIT_SECS ))
 while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
   echo "[ci-codex] run status: $status (waiting)" >&1
   sleep 5
   status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 done
+echo "[ci-codex] run status now: $status" >&1
 
 # Download artifacts (best-effort)
 echo "[ci-codex] downloading artifacts to $ARTDIR" >&1
-gh run download "$run_id" --dir "$ARTDIR" || echo "no valid artifacts found to download" >&2
-art_count=$(find "$ARTDIR" -type f | wc -l | tr -d ' ')
+mkdir -p "$ARTDIR"
+art_count=0
+for attempt in {1..10}; do
+  if gh run download "$run_id" --dir "$ARTDIR" >/dev/null 2>&1; then
+    :
+  fi
+  art_count=$(find "$ARTDIR" -type f 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$art_count" -gt 0 || "$status" == "completed" && $attempt -ge 3 ]]; then
+    break
+  fi
+  echo "[ci-codex] artifacts not ready (attempt $attempt); waiting…" >&1
+  sleep 5
+done
 echo "[ci-codex] artifacts downloaded: $art_count file(s)" >&1
 
 # Optionally capture a specific job log
@@ -153,8 +163,26 @@ else
   fetch_job_log "build" "$OUTDIR/job-build.log"
   fetch_job_log "smoke" "$OUTDIR/job-smoke.log"
 fi
-log_count=$(ls "$OUTDIR"/job-*.log 2>/dev/null | wc -l | tr -d ' ')
-echo "[ci-codex] job logs present: $log_count file(s)" >&1
+nonempty_logs=0
+for attempt in {1..10}; do
+  nonempty_logs=0
+  for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
+    [[ -s "$jl" ]] && nonempty_logs=$((nonempty_logs+1))
+  done
+  if [[ $nonempty_logs -gt 0 || "$status" == "completed" && $attempt -ge 3 ]]; then
+    break
+  fi
+  echo "[ci-codex] job logs not ready (attempt $attempt); waiting…" >&1
+  sleep 5
+  # re-fetch to refresh
+  if [[ -n "$job_name" ]]; then
+    fetch_job_log "$job_name" "$JOBLOG"
+  else
+    fetch_job_log "build" "$OUTDIR/job-build.log"
+    fetch_job_log "smoke" "$OUTDIR/job-smoke.log"
+  fi
+done
+echo "[ci-codex] job logs present: $nonempty_logs file(s)" >&1
 
 # Build the prompt file
 prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
@@ -205,39 +233,19 @@ prompt_bytes=$(wc -c < "$PROMPT" | tr -d ' ')
 prompt_lines=$(wc -l < "$PROMPT" | tr -d ' ')
 echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
 
-# Build a trimmed argument-safe prompt, then invoke codex with it as a single positional argument
-size=$(wc -c < "$PROMPT" | tr -d ' ')
-if [[ $size -gt $MAX_PROMPT_ARG_BYTES ]]; then
-  echo "[ci-codex] prompt exceeds $MAX_PROMPT_ARG_BYTES bytes; creating trimmed argument copy" >&2
-  head -c "$MAX_PROMPT_ARG_BYTES" "$PROMPT" > "$PROMPT_ARG"
-  {
-    echo
-    echo "[TRUNCATED — see full context at]:"
-    echo "  $PROMPT"
-    echo "  workspace: $OUTDIR"
-  } >> "$PROMPT_ARG"
-else
-  cp "$PROMPT" "$PROMPT_ARG"
-fi
-
+# Invoke Codex using @file (preferred), with a minimal fallback
 if [[ -n "$exec_cmd" ]]; then
-  echo "[ci-codex] sending prompt via: $exec_cmd (arg)" >&1
+  echo "[ci-codex] sending prompt via: $exec_cmd (@file)" >&1
   # shellcheck disable=SC2086
-  eval $exec_cmd "$(cat "$PROMPT_ARG")"
+  eval $exec_cmd "@${PROMPT}"
 else
   if command -v codex >/dev/null 2>&1; then
-    echo "[ci-codex] sending prompt to: codex @file (preferred)" >&1
-    if ! codex "@${PROMPT}"; then
-      echo "[ci-codex] fallback to arg string (trimmed)" >&1
-      if ! codex "$(cat "$PROMPT_ARG")"; then
-        echo "[ci-codex] codex invocation failed. You can run manually:" >&1
-        echo "  codex '@$PROMPT'" >&1
-        echo "  or: codex \"\$(cat '$PROMPT_ARG')\"" >&1
-        exit 1
-      fi
-    fi
+    echo "[ci-codex] sending prompt to: codex @file" >&1
+    codex "@${PROMPT}" || {
+      echo "[ci-codex] codex invocation failed. Run manually: codex '@$PROMPT'" >&1
+      exit 1
+    }
   else
-    echo "[ci-codex] Codex CLI not found. To send to your assistant, try:" >&1
-    echo "  codex '@$PROMPT'" >&1
+    echo "[ci-codex] Codex CLI not found. To send to your assistant, run: codex '@$PROMPT'" >&1
   fi
 fi
