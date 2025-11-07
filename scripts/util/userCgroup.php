@@ -134,6 +134,8 @@ function main(array $argv): int {
             }
         }
     }
+    // Default view when no action flags are provided
+    $hasIoFlag = false; // track IO-only operations
     if (!$wantStatus && !$wantConfig && empty($opt)) { $wantStatus = $wantConfig = true; }
 
     // Support --defaults to apply policy-derived defaults
@@ -159,11 +161,8 @@ function main(array $argv): int {
     if ($wantConfig) showConfig($slice);
     if ($wantStatus) showStatus($slice, $uid);
 
+    // Profiles: CPU/mem/tasks shorthand (expand into concrete values before computing props)
     if (!empty($opt)) {
-        $props = computeSetProps($opt, totalMemMiB());
-        echo "\n[Planned properties]\n";
-        foreach ($props as $k=>$v) { echo "$k=$v\n"; }
-        // Profiles: CPU/mem/tasks shorthand
         if (isset($opt['cpu-profile']) && !isset($opt['cpu-weight'])) {
             switch ($opt['cpu-profile']) {
                 case 'low':     $opt['cpu-weight'] = '50'; break;
@@ -189,78 +188,94 @@ function main(array $argv): int {
             }
             // memory-max will be derived if not provided
         }
+    }
 
-        // Device and IO profile shorthands
-        $devResolved = '';
-        if ($device !== '') {
-            if (strpos($device, '/dev/') === 0) {
-                $devResolved = $device;
-            } else {
-                if ($device === '/home') {
-                    $homeDev = getenv('PMSS_HOME_DEVICE');
-                    if (is_string($homeDev) && $homeDev !== '') {
-                        $devResolved = $homeDev;
-                    } else {
-                        $devResolved = trim((string)@shell_exec('findmnt -no SOURCE /home 2>/dev/null'));
-                    }
+    // Resolve device (for IO profile shorthands)
+    $devResolved = '';
+    if ($device !== '') {
+        if (strpos($device, '/dev/') === 0) {
+            $devResolved = $device;
+        } else {
+            if ($device === '/home') {
+                $homeDev = getenv('PMSS_HOME_DEVICE');
+                if (is_string($homeDev) && $homeDev !== '') {
+                    $devResolved = $homeDev;
                 } else {
-                    $devResolved = trim((string)@shell_exec('findmnt -no SOURCE '.escapeshellarg($device).' 2>/dev/null'));
+                    $devResolved = trim((string)@shell_exec('findmnt -no SOURCE /home 2>/dev/null'));
                 }
+            } else {
+                $devResolved = trim((string)@shell_exec('findmnt -no SOURCE '.escapeshellarg($device).' 2>/dev/null'));
             }
         }
+    }
 
-        // Parse IO throttles regardless of apply; print planned IO pairs too
-        $ioPairs = [];
-        $ioMap = [
-            'io-read-bw'   => 'IOReadBandwidthMax',
-            'io-write-bw'  => 'IOWriteBandwidthMax',
-            'io-read-iops' => 'IOReadIOPSMax',
-            'io-write-iops'=> 'IOWriteIOPSMax',
-        ];
-        foreach ($ioMap as $flag=>$prop) {
-            foreach ($flags as $f) {
-                if (strpos($f, '--'.$flag.'=') === 0) {
-                    $spec = substr($f, strlen('--'.$flag.'=')); // e.g., /dev/sda:5M
-                    $ioPairs[] = $prop.'='.str_replace(':',' ', $spec);
-                }
+    // Parse IO throttles regardless of other flags; always plan/print IO when present
+    $ioPairs = [];
+    $ioMap = [
+        'io-read-bw'   => 'IOReadBandwidthMax',
+        'io-write-bw'  => 'IOWriteBandwidthMax',
+        'io-read-iops' => 'IOReadIOPSMax',
+        'io-write-iops'=> 'IOWriteIOPSMax',
+    ];
+    foreach ($ioMap as $flag=>$prop) {
+        foreach ($flags as $f) {
+            if (strpos($f, '--'.$flag.'=') === 0) {
+                $spec = substr($f, strlen('--'.$flag.'=')); // e.g., /dev/sda:5M
+                $ioPairs[] = $prop.'='.str_replace(':',' ', $spec);
+                $hasIoFlag = true;
             }
         }
-        // Apply profile expansion if requested and device resolves
-        if ($ioProfile !== '' && $devResolved !== '') {
-            switch ($ioProfile) {
-                case 'hdd':
-                    if (!isset($opt['io-weight'])) { $opt['io-weight'] = '200'; }
-                    $ioPairs[] = 'IOReadBandwidthMax='.$devResolved.' 5M';
-                    $ioPairs[] = 'IOWriteBandwidthMax='.$devResolved.' 10M';
-                    $ioPairs[] = 'IOReadIOPSMax='.$devResolved.' 100';
-                    $ioPairs[] = 'IOWriteIOPSMax='.$devResolved.' 100';
-                    break;
-                case 'nvme':
-                    if (!isset($opt['io-weight'])) { $opt['io-weight'] = '200'; }
-                    // No throttles by default
-                    break;
-                case 'bulk':
-                    if (!isset($opt['io-weight'])) { $opt['io-weight'] = '500'; }
-                    if (!isset($opt['cpu-weight'])) { $opt['cpu-weight'] = '300'; }
-                    if (!isset($opt['tasks-max'])) { $opt['tasks-max'] = '8192'; }
-                    break;
-            }
+    }
+
+    // Apply IO profile expansion if requested and device resolves
+    if ($ioProfile !== '' && $devResolved !== '') {
+        switch ($ioProfile) {
+            case 'hdd':
+                if (!isset($opt['io-weight'])) { $opt['io-weight'] = '200'; }
+                $ioPairs[] = 'IOReadBandwidthMax='.$devResolved.' 5M';
+                $ioPairs[] = 'IOWriteBandwidthMax='.$devResolved.' 10M';
+                $ioPairs[] = 'IOReadIOPSMax='.$devResolved.' 100';
+                $ioPairs[] = 'IOWriteIOPSMax='.$devResolved.' 100';
+                break;
+            case 'nvme':
+                if (!isset($opt['io-weight'])) { $opt['io-weight'] = '200'; }
+                // No throttles by default
+                break;
+            case 'bulk':
+                if (!isset($opt['io-weight'])) { $opt['io-weight'] = '500'; }
+                if (!isset($opt['cpu-weight'])) { $opt['cpu-weight'] = '300'; }
+                if (!isset($opt['tasks-max'])) { $opt['tasks-max'] = '8192'; }
+                break;
         }
-        if (!empty($ioPairs)) {
-            echo "[Planned IO properties]\n";
-            foreach ($ioPairs as $p) echo $p."\n";
-        }
+    }
+
+    // Compute final properties after all profile expansions
+    $props = !empty($opt) ? computeSetProps($opt, totalMemMiB()) : [];
+
+    if (!empty($props)) {
+        echo "\n[Planned properties]\n";
+        foreach ($props as $k=>$v) { echo "$k=$v\n"; }
+    }
+    if (!empty($ioPairs)) {
+        echo "[Planned IO properties]\n";
+        foreach ($ioPairs as $p) echo $p."\n";
+    }
+
+    // Apply or simulate changes when there is something to do (props, IO pairs, or wipe)
+    $doWipe = in_array('--wipe', $flags, true);
+    $hasPlan = !empty($props) || !empty($ioPairs) || $doWipe || $hasIoFlag;
+    if ($hasPlan) {
         if ($apply && !$dryRun) {
             requireRoot();
-            $pairs = [];
-            foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
-            $allPairs = array_merge($pairs, $ioPairs);
-            if (in_array('--wipe', $flags, true)) {
+            if ($doWipe) {
                 // Revert slice and unlimit core props safely
                 runStep('Reverting user slice', 'systemctl revert '.escapeshellarg($slice).' || true');
                 runStep('Unlimiting core properties', 'systemctl set-property '.escapeshellarg($slice).' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity CPUWeight=100 IOWeight=100');
             } else {
-                $cmd = 'systemctl set-property '.escapeshellarg($slice).' '.implode(' ',$allPairs);
+                $pairs = [];
+                foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
+                $allPairs = array_merge($pairs, $ioPairs);
+                $cmd = 'systemctl set-property '.escapeshellarg($slice).' '.implode(' ', $allPairs);
                 runStep('Applying cgroup properties', $cmd);
             }
         } else {

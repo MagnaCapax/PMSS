@@ -21,10 +21,12 @@ if ($memMax  !== '' && strtolower($memMax)  !== 'infinity') { $fixes['MemoryMax'
 if ($tasks   !== '' && strtolower($tasks)   !== 'infinity') { $fixes['TasksMax']='infinity'; }
 
 if ($fixes) {
-    requireRoot();
+    // In test mode, allow running without root to exercise logging paths
+    if (!defined('PMSS_TEST_MODE') && getenv('PMSS_TEST_MODE') !== '1') {
+        requireRoot();
+    }
     $pairs=[]; foreach($fixes as $k=>$v){ $pairs[]=$k.'='.$v; }
     runStep('Unlimiting root user slice', 'systemctl set-property user-0.slice '.implode(' ', $pairs));
 } else {
     logmsg('[OK] Root slice already unlimited');
 }
-

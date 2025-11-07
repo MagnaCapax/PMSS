@@ -8,6 +8,8 @@ if (!is_dir($versionDir)) {
     @mkdir($versionDir, 0755, true);
 }
 putenv('PMSS_VERSION_DIR='.$versionDir);
+// Propagate test mode to child processes invoked via shell_exec
+putenv('PMSS_TEST_MODE=1');
 putenv('PMSS_JSON_LOG');
 putenv('PMSS_PROFILE_OUTPUT');
 
