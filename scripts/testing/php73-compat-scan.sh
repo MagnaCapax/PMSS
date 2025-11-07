@@ -30,9 +30,9 @@ fail=0
 scan() {
   local pattern="$1" label="$2"
   if [[ "$IS_RG" -eq 1 ]]; then
-    out=$("${SEARCHER[@]}" ${EXCLUDES[@]} "$pattern" "${paths[@]}" || true)
+    out=$("${SEARCHER[@]}" "${EXCLUDES[@]}" "$pattern" "${paths[@]}" || true)
   else
-    out=$("${SEARCHER[@]}" ${EXCLUDES[@]} -E "$pattern" "${paths[@]}" || true)
+    out=$("${SEARCHER[@]}" "${EXCLUDES[@]}" -E "$pattern" "${paths[@]}" || true)
   fi
   if [[ -n "${out:-}" ]]; then
     if [[ -n "$out" ]]; then
