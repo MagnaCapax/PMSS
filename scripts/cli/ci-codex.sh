@@ -157,6 +157,13 @@ for attempt in {1..10}; do
 done
 echo "[ci-codex] artifacts downloaded: $art_count file(s)" >&1
 
+# Prepare CI summary and capture latest artifact path for reference
+gh run view "$run_id" > "$SUMMARY" || true
+latest_art=""
+if compgen -G "$ARTDIR/*" >/dev/null; then
+  latest_art=$(find "$ARTDIR" -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
+fi
+
 # Optionally capture a specific job log
 # Fetch logs for a requested job, or both 'build' and 'smoke' by default
 fetch_job_log() {
@@ -197,60 +204,43 @@ for attempt in {1..10}; do
 done
 echo "[ci-codex] job logs present: $nonempty_logs file(s)" >&1
 
-# Build the prompt file (header/instructions only). Context will be attached via @files.
+# Build the prompt file (header/instructions only). Context paths are listed for the assistant to open.
 prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 {
   echo "$prompt_text"
   echo
-  echo "Attached context: CI summary, job log tails, and the latest artifact will be provided as separate @files. Read AGENTS.md/docs/ADRs from the repo."
+  echo "Context to open (paths in this workspace):"
+  echo " - $SUMMARY (CI summary)"
+  for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
+    [[ -s "$jl" ]] || continue
+    echo " - $jl"
+  done
+  if [[ -n "$latest_art" ]]; then
+    echo " - $latest_art (newest artifact file)"
+  fi
+  echo
+  echo "Do not inline these; read them directly from disk."
 } >"$PROMPT"
 
 prompt_bytes=$(wc -c <"$PROMPT" | tr -d ' ')
 prompt_lines=$(wc -l <"$PROMPT" | tr -d ' ')
 echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
 
-# Prepare attachments: CI summary, job logs (non-empty tails), and the newest artifact file
-echo "[ci-codex] preparing attachments (@files)" >&1
-gh run view "$run_id" > "$SUMMARY" || true
-attachments=( "@$SUMMARY" )
-
-for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
-  [[ -s "$jl" ]] || continue
-  # write a tailed copy to ensure small size
-  tail_file="$jl.tail"
-  tail -n "${JOB_LOG_LINES}" "$jl" > "$tail_file" || true
-  attachments+=( "@${tail_file}" )
-done
-
-latest_art=""
-if compgen -G "$ARTDIR/*" >/dev/null; then
-  latest_art=$(find "$ARTDIR" -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
-  if [[ -n "$latest_art" && -f "$latest_art" ]]; then
-    # write a tailed copy to keep context compact
-    art_tail="$OUTDIR/$(basename "$latest_art").tail"
-    tail -n "${ARTIFACT_LINES}" "$latest_art" > "$art_tail" || true
-    attachments+=( "@${art_tail}" )
-  fi
-fi
-
-echo "[ci-codex] attachments: ${#attachments[@]} file(s)" >&1
-for a in "${attachments[@]}"; do echo " - $a" >&1; done
-
-# Invoke Codex with the main prompt string and separate @file attachments
+# Invoke Codex with the main prompt string only; the prompt lists the file paths to read
 prompt_str=$(cat "$PROMPT")
 if [[ -n "$exec_cmd" && "$exec_cmd" != "codex" ]]; then
   echo "[ci-codex] unsupported --exec value ('$exec_cmd'); defaulting to 'codex'" >&1
 fi
 if command -v codex >/dev/null 2>&1; then
-  echo "[ci-codex] invoking: codex [prompt-string] @files" >&1
-  codex "$prompt_str" "${attachments[@]}" || {
+  echo "[ci-codex] invoking: codex [prompt-string]" >&1
+  codex "$prompt_str" || {
     echo "[ci-codex] codex invocation failed. Run manually:" >&1
-    echo "  codex \"\$(cat '$PROMPT')\" ${attachments[*]}" >&1
+    echo "  codex \"\$(cat '$PROMPT')\"" >&1
     exit 1
   }
 else
   echo "[ci-codex] Codex CLI not found. Run manually:" >&1
-  echo "  codex \"\$(cat '$PROMPT')\" ${attachments[*]}" >&1
+  echo "  codex \"\$(cat '$PROMPT')\"" >&1
 fi
 
 # Auto-commit any changes created by the assistant (no branches, no push)
