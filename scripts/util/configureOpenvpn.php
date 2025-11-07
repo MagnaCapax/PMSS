@@ -38,6 +38,14 @@ $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
 $clientOvpn  = "/home/openvpn-{$slug}.ovpn";
 $clientCrt   = "/home/openvpn-{$slug}.crt";
 
+// Fast-path: if OpenVPN appears configured (server conf + CA present), skip.
+$alreadyConfigured = is_file($serverConf)
+    && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'));
+if ($alreadyConfigured) {
+    logmsg('[SKIP] OpenVPN already configured; skipping provisioning');
+    return;
+}
+
 // 1) Package presence (informational)
 // OpenVPN/EasyRSA packages are expected to be installed during the package phase.
 if (!is_file('/usr/sbin/openvpn') || (!is_dir($easyRsaShare) && !is_dir($easyRsaDir))) {
