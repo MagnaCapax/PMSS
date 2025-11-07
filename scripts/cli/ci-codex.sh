@@ -99,6 +99,10 @@ gh --version 2>/dev/null | sed 's/^/[ci-codex] /' >&2 || true
 
 mkdir -p "$OUTDIR" "$ARTDIR"
 
+echo "[ci-codex] workspace: $OUTDIR" >&2
+echo "[ci-codex] artifact dir: $ARTDIR" >&2
+echo "[ci-codex] config: include_agents=$include_agents, AGENTS_LINES=$AGENTS_LINES, JOB_LOG_LINES=$JOB_LOG_LINES, ARTIFACT_LINES=$ARTIFACT_LINES, MAX_ARTIFACT_FILES=$MAX_ARTIFACT_FILES, MAX_PROMPT_ARG_BYTES=$MAX_PROMPT_ARG_BYTES" >&2
+
 echo "[ci-codex] discovering latest run..." >&2
 run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
 if [[ -z "$run_id" ]]; then
@@ -120,6 +124,8 @@ done
 # Download artifacts (best-effort)
 echo "[ci-codex] downloading artifacts to $ARTDIR" >&2
 gh run download "$run_id" --dir "$ARTDIR" || echo "no valid artifacts found to download" >&2
+art_count=$(find "$ARTDIR" -type f | wc -l | tr -d ' ')
+echo "[ci-codex] artifacts downloaded: $art_count file(s)" >&2
 
 # Optionally capture a specific job log
 # Fetch logs for a requested job, or both 'build' and 'smoke' by default
@@ -140,6 +146,8 @@ else
   fetch_job_log "build" "$OUTDIR/job-build.log"
   fetch_job_log "smoke" "$OUTDIR/job-smoke.log"
 fi
+log_count=$(ls "$OUTDIR"/job-*.log 2>/dev/null | wc -l | tr -d ' ')
+echo "[ci-codex] job logs present: $log_count file(s)" >&2
 
 # Build the prompt file
 prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
@@ -186,8 +194,9 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
   fi
 } > "$PROMPT"
 
-echo "[ci-codex] prompt written: $PROMPT" >&2
-echo "[ci-codex] workspace: $OUTDIR" >&2
+prompt_bytes=$(wc -c < "$PROMPT" | tr -d ' ')
+prompt_lines=$(wc -l < "$PROMPT" | tr -d ' ')
+echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&2
 
 # Build a trimmed argument-safe prompt, then invoke codex with it as a single positional argument
 size=$(wc -c < "$PROMPT" | tr -d ' ')
