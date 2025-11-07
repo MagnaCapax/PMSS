@@ -280,15 +280,13 @@ function pmssFilterAvailablePackages(array $packages): array
  */
 function pmssInstallProftpdStack(int $distroVersion): void
 {
-    $proftpdPackages = ['proftpd-core', 'proftpd-basic', 'proftpd-mod-crypto', 'proftpd-mod-wrap'];
-
+    // Avoid re-queueing ProFTPD packages; baseline selections handle presence.
+    // Only ensure supporting packages we actually need (nftables on newer Debian).
     if ($distroVersion >= 10) {
         if (is_dir('/run/systemd/system')) {
             runStep('Ensuring proftpd unit is not masked', 'systemctl unmask proftpd || true');
         }
-        pmssQueuePackages(array_merge($proftpdPackages, ['nftables']));
-    } else {
-        pmssQueuePackage('proftpd-basic');
+        pmssQueuePackages(['nftables']);
     }
 
     pmssQueuePostInstallCommand(
