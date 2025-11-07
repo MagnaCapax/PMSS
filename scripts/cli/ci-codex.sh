@@ -48,7 +48,8 @@ JOB_LOG_LINES=${JOB_LOG_LINES:-600}
 ARTIFACT_LINES=${ARTIFACT_LINES:-200}
 MAX_ARTIFACT_FILES=${MAX_ARTIFACT_FILES:-6}
 
-DEFAULT_PROMPT="PMSS CI Assist — Strict Rails Mode
+read -r -d '' DEFAULT_PROMPT <<'PMSSPROMPT'
+PMSS CI Assist — Strict Rails Mode
 
 Goal: Make required CI jobs pass with the smallest coherent change. Read AGENTS.md first; obey Doctrine/Constitution and ADRs.
 
@@ -68,7 +69,8 @@ Absolutes:
 - ABSOLUTELY NO ZFS — unacceptable for our workload (poor 100% random I/O performance and elevated data-loss risk). Do not propose or introduce it here.
 - Keep diffs small, idempotent, backward‑compatible; reuse existing helpers; no aliases; context‑first naming.
 
-Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch and verification commands."
+Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch and verification commands.
+PMSSPROMPT
 
 job_name=""
 custom_prompt=""
