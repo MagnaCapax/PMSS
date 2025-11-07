@@ -32,6 +32,8 @@ function pmssInstallSystemUtilities(int $distroVersion): void
         'libncurses-dev',
     ], 'ncurses development headers');
     pmssQueuePackages(['python3-pycurl', 'python3-crypto', 'python3-cheetah']);
+    // apache2-utils is required system-wide (htpasswd, ab). Lighttpd user
+    // auth and other tooling depend on htpasswd; do NOT remove.
     pmssQueuePackages(['zip', 'unzip', 'bwm-ng', 'sysstat', 'apache2-utils', 'irssi', 'iotop', 'ethtool']);
     pmssQueuePackages(['unrar-free', 'unp']);
 }
