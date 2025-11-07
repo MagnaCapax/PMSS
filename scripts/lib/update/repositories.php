@@ -102,26 +102,34 @@ if (!function_exists('pmssEnsureDockerRepository')) {
 
 if (!function_exists('pmssEnsureMediaareaRepository')) {
     /**
-     * MediaArea ships the latest mediainfo build; ensure its repo package is present for GPG keys.
+     * MediaArea repository bootstrap (vendor path only; no custom key/deb822).
+     *
+     * Why no custom key/deb822 logic anymore?
+     * - For years, the vendor-provided repo package has been the authoritative
+     *   way to configure MediaArea’s apt repository. It installs keys and
+     *   sources in one step and stays in sync with their infrastructure.
+     * - Our bespoke key/URL/deb822 handling drifted and repeatedly caused apt
+     *   breakage (NO_PUBKEY, 404s, or dpkg issues) on older hosts.
+     * - Simplicity and reliability win: install the vendor package before the
+     *   package phase; the package phase will run `apt-get update` and install
+     *   CLI tools queued elsewhere.
      */
 function pmssEnsureMediaareaRepository(): void
     {
-        // Minimal vendor bootstrap: install repo-mediaarea package when missing.
+        // Vendor path only (see comments in this function header).
         if (pmssQueryPackageStatus('repo-mediaarea') === 'install ok installed') {
             return;
         }
         $tmpDir = sys_get_temp_dir().'/pmss-mediaarea-'.bin2hex(random_bytes(6));
         @mkdir($tmpDir, 0700, true);
-        $pkgVer = getenv('PMSS_MEDIAAREA_REPO_DEB_VER') ?: '1.0-26';
-        $packageUrl  = 'https://mediaarea.net/repo/deb/repo-mediaarea_'.$pkgVer.'_all.deb';
-        $packagePath = $tmpDir.'/repo-mediaarea.deb';
+        $packageUrl  = 'https://mediaarea.net/repo/deb/repo-mediaarea_1.0-26_all.deb';
+        $packagePath = $tmpDir.'/repo-mediaarea_1.0-26_all.deb';
         $downloadCmd = sprintf('wget -q -O %s %s', escapeshellarg($packagePath), escapeshellarg($packageUrl));
-        if (runStep('Fetching MediaArea repository package', $downloadCmd) !== 0) {
-            @unlink($packagePath); @rmdir($tmpDir);
-            return;
+        if (runStep('Fetching MediaArea repository package', $downloadCmd) === 0 && is_file($packagePath)) {
+            runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
         }
-        runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
-        @unlink($packagePath); @rmdir($tmpDir);
+        @unlink($packagePath);
+        @rmdir($tmpDir);
     }
 }
 
