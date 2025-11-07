@@ -136,6 +136,25 @@ function pmssEnsureMediaareaRepository(): void
             if (is_file($key)) { $keyPresent = true; break; }
         }
 
+        // If neither the repo package nor a deb822+keyring is present, try the vendor bootstrap .deb first.
+        $deb822PathCheck = '/etc/apt/sources.list.d/mediaarea.sources';
+        if ($status !== 'install ok installed' && !$keyPresent && !is_file($deb822PathCheck)) {
+            $tmpDir = sys_get_temp_dir().'/pmss-mediaarea-'.bin2hex(random_bytes(6));
+            @mkdir($tmpDir, 0700, true);
+            $pkgVer = getenv('PMSS_MEDIAAREA_REPO_DEB_VER') ?: '1.0-26';
+            $packageUrl  = 'https://mediaarea.net/repo/deb/repo-mediaarea_'.$pkgVer.'_all.deb';
+            $packagePath = $tmpDir.'/repo-mediaarea.deb';
+            $downloadCmd = sprintf('wget -q -O %s %s', escapeshellarg($packagePath), escapeshellarg($packageUrl));
+            if (runStep('Fetching MediaArea repository package', $downloadCmd) === 0 && is_file($packagePath)) {
+                $rc = runStep('Installing MediaArea repository package', sprintf('dpkg -i %s', escapeshellarg($packagePath)));
+                if ($rc === 0) {
+                    @unlink($packagePath); @rmdir($tmpDir);
+                    return;
+                }
+            }
+            @unlink($packagePath); @rmdir($tmpDir);
+        }
+
         // Install the repository key into /etc/apt/keyrings.
         if (!$keyPresent) {
             runStep('Ensuring apt keyring directory exists', sprintf('install -m 0755 -d %s', escapeshellarg($keyringDir)));
