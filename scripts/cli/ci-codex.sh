@@ -16,14 +16,13 @@ echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 # Requirements:
 #   - GitHub CLI (gh) installed and authenticated: gh auth login
 # Optional:
-#   - A local assistant CLI that can read prompt from stdin. Provide via --exec
-#     e.g. --exec 'codex chat --input -' or --exec 'codex ask -f -'
+#   - A local assistant CLI to receive the prompt. Provide via --exec (e.g., --exec 'codex')
 #
 # Usage:
 #   scripts/cli/ci-codex.sh                          # assemble prompt + logs into ci-codex/prompt.txt
 #   scripts/cli/ci-codex.sh --job smoke               # include only 'smoke' job logs in the prompt
 #   scripts/cli/ci-codex.sh --prompt "text..."        # use custom high-level prompt text
-#   scripts/cli/ci-codex.sh --exec 'codex chat --input -'   # pipe prompt to Codex CLI directly
+#   scripts/cli/ci-codex.sh --exec 'codex'             # send prompt to Codex CLI directly
 #
 # The default prompt:
 #   "Last CI Integration Logs are here. If issues or code fails, please fix them.
