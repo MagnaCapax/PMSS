@@ -123,7 +123,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 $state   = $parts[1];
                 // Skip problematic or deprecated packages from baseline
                 $lower = strtolower($package);
-                if (in_array($lower, ['repo-mediaarea', 'repo-mediaarea-snapshots', 'nzbdrone', 'pyload-cli'], true)) {
+                if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package) || in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
                     if (function_exists('logmsg')) {
                         logmsg('[SKIP] Ignoring baseline package '.$package.' (obsolete/handled elsewhere)');
                     }
@@ -170,7 +170,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
 
         // Explicitly clear problematic vendor repo packages from selections so dselect-upgrade
         // will not attempt to install them from cache even if a previous run queued them.
-        $clearSelections = "printf 'repo-mediaarea\tdeinstall\nrepo-mediaarea-snapshots\tdeinstall\n' | dpkg --set-selections";
+        $clearSelections = "sh -lc 'dpkg --get-selections | grep -q ""^repo-mediaarea\\s"" && printf ""repo-mediaarea\\tdeinstall\\n"" | dpkg --set-selections; dpkg --get-selections | grep -q ""^repo-mediaarea-snapshots\\s"" && printf ""repo-mediaarea-snapshots\\tdeinstall\\n"" | dpkg --set-selections'";
         runStep('Clearing repo-mediaarea selections', $clearSelections);
 
         $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));
@@ -179,7 +179,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             $success = false;
         }
         // Ensure any lingering vendor repo debs are removed from selection/cache before upgrade.
-        runStep('Clearing repo-mediaarea selections (post-apply)', "printf 'repo-mediaarea\tdeinstall\nrepo-mediaarea-snapshots\tdeinstall\n' | dpkg --set-selections");
+        runStep('Clearing repo-mediaarea selections (post-apply)', "sh -lc 'dpkg --get-selections | grep -q ""^repo-mediaarea\\s"" && printf ""repo-mediaarea\\tdeinstall\\n"" | dpkg --set-selections; dpkg --get-selections | grep -q ""^repo-mediaarea-snapshots\\s"" && printf ""repo-mediaarea-snapshots\\tdeinstall\\n"" | dpkg --set-selections'");
         runStep('Removing repo-mediaarea packages if present', aptCmd('remove -y repo-mediaarea repo-mediaarea-snapshots || true'));
         runStep('Purging repo-mediaarea packages if present', aptCmd('purge -y repo-mediaarea repo-mediaarea-snapshots || true'));
         runStep('Clearing repo-mediaarea package cache', "sh -lc 'rm -f /var/cache/apt/archives/repo-mediaarea_* || true'");

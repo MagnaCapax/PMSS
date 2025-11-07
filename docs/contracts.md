@@ -144,7 +144,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Writes template via `pmssSafeWriteSources` when hash differs; runs post-hook if provided.
 
 - pmssEnsureRepositoryPrerequisites(): void → currently ensures MediaArea keyring package.
-- pmssEnsureMediaareaRepository(): void → downloads and installs `repo-mediaarea` deb when needed.
+- pmssEnsureMediaareaRepository(): void → configures MediaArea repository via manual `.list` + ASCII key; avoids vendor `.deb` to preserve compatibility on Debian 10/11.
 - pmssQueryPackageStatus(string $package): string → returns `dpkg-query -W` status or `''`.
 - pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger=null): array
   - `mode=reuse` (unknown version) or `mode=update` with current hash and loaded templates.
@@ -458,4 +458,3 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - Honor environment overrides in tests (`PMSS_*` flags) to avoid mutating the real system.
 - Treat `etc/skel/www` and vendor code as read-only.
 - Keep destructive actions guarded and idempotent; reuse existing conventions.
-
