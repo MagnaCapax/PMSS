@@ -98,16 +98,7 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
     {
         $log = pmssSelectLogger($logger);
 
-        // Clean up obsolete vendor drop-ins
-        foreach ([
-            '/usr/lib/systemd/user-.slice.d/99-pmss.conf',
-            '/usr/lib/systemd/system/user-.slice.d/15-pmss.conf',
-        ] as $obsolete) {
-            if (file_exists($obsolete)) {
-                @unlink($obsolete);
-                $log('Removed obsolete vendor drop-in '.$obsolete);
-            }
-        }
+        // Drop-in management must target /etc paths only; avoid vendor dirs.
 
         $mode = pmssCgroupMode();
         $dropDir = getenv('PMSS_SYSTEMD_USER_SLICE_DIR');
