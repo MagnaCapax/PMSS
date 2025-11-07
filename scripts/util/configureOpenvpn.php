@@ -37,7 +37,8 @@ list($clientOvpn, $clientCrt) = pmssOpenvpnArtifactPathsFromSlug($slug);
 // Fast-path using shared helper semantics (matches systemTest expectations)
 $alreadyConfigured = pmssOpenvpnIsConfigured();
 if ($alreadyConfigured) {
-    logmsg('[SKIP] OpenVPN already configured; skipping provisioning');
+    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0); }
+    else { logmsg('[SKIP] OpenVPN already configured; skipping provisioning'); }
     return;
 }
 

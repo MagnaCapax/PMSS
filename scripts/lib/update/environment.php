@@ -113,9 +113,9 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 }
                 $parts = preg_split('/\s+/', $trimmed);
                 if (count($parts) < 2) {
-                    if (function_exists('logmsg')) {
-                        logmsg(sprintf('[WARN] Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed));
-                    }
+                    if (function_exists('pmssLogStatus')) {
+                        pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0);
+                    } elseif (function_exists('logmsg')) { logmsg(sprintf('[WARN] Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed)); }
                     $warnings = true;
                     continue;
                 }
@@ -124,32 +124,28 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 // Skip problematic or deprecated packages from baseline
                 $lower = strtolower($package);
                 if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package) || in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
-                    if (function_exists('logmsg')) {
-                        logmsg('[SKIP] Ignoring baseline package '.$package.' (obsolete/handled elsewhere)');
-                    }
+                    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Ignoring baseline package '.$package.' (obsolete/handled elsewhere)', 0); }
+                    elseif (function_exists('logmsg')) { logmsg('[SKIP] Ignoring baseline package '.$package.' (obsolete/handled elsewhere)'); }
                     $warnings = true;
                     continue;
                 }
                 // Drop version-pinned kernel images; rely on meta 'linux-image-amd64'
                 if (preg_match('/^linux-image-[0-9]/i', $package)) {
-                    if (function_exists('logmsg')) {
-                        logmsg('[SKIP] Ignoring versioned kernel package '.$package.' from baseline');
-                    }
+                    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Ignoring versioned kernel package '.$package.' from baseline', 0); }
+                    elseif (function_exists('logmsg')) { logmsg('[SKIP] Ignoring versioned kernel package '.$package.' from baseline'); }
                     $warnings = true;
                     continue;
                 }
                 if (!preg_match('/^[a-z0-9.+:-]+$/i', $package) || !preg_match('/^(install|hold|purge|deinstall)$/i', $state)) {
-                    if (function_exists('logmsg')) {
-                        logmsg(sprintf('[WARN] Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed));
-                    }
+                    if (function_exists('pmssLogStatus')) { pmssLogStatus('WARN', sprintf('Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed), 0); }
+                    elseif (function_exists('logmsg')) { logmsg(sprintf('[WARN] Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed)); }
                     $warnings = true;
                     continue;
                 }
                 // If requesting install of a package not available in the current apt cache, drop it
                 if (strtolower($state) === 'install' && !pmssPackageAvailable($package)) {
-                    if (function_exists('logmsg')) {
-                        logmsg('[SKIP] Baseline package not available: '.$package.' (dropping)');
-                    }
+                    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Baseline package not available: '.$package.' (dropping)', 0); }
+                    elseif (function_exists('logmsg')) { logmsg('[SKIP] Baseline package not available: '.$package.' (dropping)'); }
                     $warnings = true;
                     continue;
                 }
@@ -200,8 +196,9 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             @unlink($tmpSelection);
         }
 
-        if ($warnings && function_exists('logmsg')) {
-            logmsg('[WARN] Dpkg selection baseline contained ignored entries; proceeding with remaining packages');
+        if ($warnings) {
+            if (function_exists('pmssLogStatus')) { pmssLogStatus('WARN', 'Dpkg selection baseline contained ignored entries; proceeding with remaining packages', 0); }
+            elseif (function_exists('logmsg')) { logmsg('[WARN] Dpkg selection baseline contained ignored entries; proceeding with remaining packages'); }
         }
 
         return $success;
