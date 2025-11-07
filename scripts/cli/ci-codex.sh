@@ -53,7 +53,8 @@ Must Follow:
 - Tests (dev): hermetic by default (no real network/system modification); prefer PMSS_TEST_MODE=1 to remove jitter.
 
 Absolutes:
-- NEVER CREATE GIT BRANCHES. Commits allowed only when explicitly instructed; default to uncommitted workspace edits.
+- NEVER CREATE GIT BRANCHES.
+- Commit the fix after applying it: stage all and commit with a clear, focused message (e.g., `git add -A && git commit -m "ci: <scope> — <short reason>"`). Do not push.
 - ABSOLUTELY NO ZFS — unacceptable for our workload (poor 100% random I/O performance and elevated data-loss risk). Do not propose or introduce it here.
 - Keep diffs small, idempotent, backward‑compatible; reuse existing helpers; no aliases; context‑first naming.
 
