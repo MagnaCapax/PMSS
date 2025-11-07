@@ -28,6 +28,14 @@ OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 PROMPT="$OUTDIR/prompt.txt"
+PROMPT_ARG="$OUTDIR/prompt.arg.txt"
+
+# Size and content caps to prevent 'Argument list too long' and keep prompts readable
+MAX_PROMPT_ARG_BYTES=${MAX_PROMPT_ARG_BYTES:-800000}
+AGENTS_LINES=${AGENTS_LINES:-600}
+JOB_LOG_LINES=${JOB_LOG_LINES:-1200}
+ARTIFACT_LINES=${ARTIFACT_LINES:-400}
+MAX_ARTIFACT_FILES=${MAX_ARTIFACT_FILES:-10}
 
 DEFAULT_PROMPT="PMSS CI Assist — Strict Rails Mode
 
@@ -134,7 +142,7 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
   echo
   if [[ $include_agents -eq 1 && -f "$ROOT/AGENTS.md" ]]; then
     echo "=== AGENTS.md (inline) ==="
-    sed -n '1,4000p' "$ROOT/AGENTS.md" || true
+    sed -n "1,${AGENTS_LINES}p" "$ROOT/AGENTS.md" || true
     echo
   fi
   echo "----- LOG FOLLOWS:"
@@ -146,14 +154,23 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
   for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
     [[ -s "$jl" ]] || continue
     echo "=== Job Log: $(basename "$jl") ==="
-    sed -n '1,4000p' "$jl" || true
+    sed -n "1,${JOB_LOG_LINES}p" "$jl" || true
     echo
   done
   if compgen -G "$ARTDIR/*" >/dev/null; then
-    # Print up to 4000 lines of each file inside the artifact tree
+    echo "=== Artifact Inventory ==="
+    find "$ARTDIR" -type f -printf " - %P\n" | sed -n '1,400p' || true
+    echo
+    # Print limited content from a subset of files inside the artifact tree
+    count=0
     while IFS= read -r -d '' f; do
+      count=$((count+1))
+      if (( count > MAX_ARTIFACT_FILES )); then
+        echo "... Skipping remaining artifacts; see $ARTDIR" 
+        break
+      fi
       echo "=== Artifact: $(basename "$f") ==="
-      sed -n '1,4000p' "$f" || true
+      sed -n "1,${ARTIFACT_LINES}p" "$f" || true
       echo
     done < <(find "$ARTDIR" -type f -print0 | sort -z)
   fi
@@ -162,27 +179,35 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 echo "[ci-codex] prompt written: $PROMPT" >&2
 echo "[ci-codex] workspace: $OUTDIR" >&2
 
+# Build a trimmed argument-safe prompt, then invoke codex with it as a single positional argument
+size=$(wc -c < "$PROMPT" | tr -d ' ')
+if [[ $size -gt $MAX_PROMPT_ARG_BYTES ]]; then
+  echo "[ci-codex] prompt exceeds $MAX_PROMPT_ARG_BYTES bytes; creating trimmed argument copy" >&2
+  head -c "$MAX_PROMPT_ARG_BYTES" "$PROMPT" > "$PROMPT_ARG"
+  {
+    echo
+    echo "[TRUNCATED — see full context at]:"
+    echo "  $PROMPT"
+    echo "  workspace: $OUTDIR"
+  } >> "$PROMPT_ARG"
+else
+  cp "$PROMPT" "$PROMPT_ARG"
+fi
+
 if [[ -n "$exec_cmd" ]]; then
-  echo "[ci-codex] piping prompt to: $exec_cmd" >&2
+  echo "[ci-codex] sending prompt via: $exec_cmd (arg)" >&2
   # shellcheck disable=SC2086
-  cat "$PROMPT" | eval $exec_cmd
+  eval $exec_cmd "$(cat "$PROMPT_ARG")"
 else
   if command -v codex >/dev/null 2>&1; then
-    echo "[ci-codex] piping prompt to: codex (stdin)" >&2
-    # Prefer stdin to avoid arg length limits; try simple form first, then known subcommands
-    if ! cat "$PROMPT" | codex; then
-      echo "[ci-codex] fallback: codex chat --input -" >&2
-      if ! cat "$PROMPT" | codex chat --input -; then
-        echo "[ci-codex] fallback: codex ask -f -" >&2
-        if ! cat "$PROMPT" | codex ask -f -; then
-          echo "[ci-codex] all codex invocation methods failed. Try explicitly: --exec 'codex'" >&2
-          exit 1
-        fi
-      fi
-    fi
+    echo "[ci-codex] sending prompt to: codex (arg)" >&2
+    codex "$(cat "$PROMPT_ARG")" || {
+      echo "[ci-codex] codex invocation failed. You can run manually:" >&2
+      echo "  codex \"\$(cat '$PROMPT_ARG')\"" >&2
+      exit 1
+    }
   else
     echo "[ci-codex] Codex CLI not found. To send to your assistant, try:" >&2
     echo "  scripts/cli/ci.sh --exec 'codex'" >&2
-    echo "or pipe manually: cat '$PROMPT' | codex" >&2
   fi
 fi
