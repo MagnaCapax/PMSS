@@ -11,19 +11,20 @@ function usage(): void {
     echo "\nStorage benchmark (non-destructive)\n";
     echo "Usage: storageBenchmark.php [options]\n\n";
     echo "Core options:\n";
-    echo "  --target=<dir>            Directory for file-backed tests (default /home)\n";
-    echo "  --size=<bytes|MiB|GiB>    Target file size (default 500G, capped to 80% free)\n";
-    echo "  --runtime=<seconds>       Per-test runtime for volume fio tests (default 60)\n";
-    echo "  --label=<name>            Tag results (e.g., hostname/site/array)\n";
-    echo "  --json=<path>             JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl)\n\n";
+    echo "  --target <dir>            Directory for file-backed tests (default /home)\n";
+    echo "  --size <bytes|MiB|GiB>    Target file size (default 500G, capped to 80% free)\n";
+    echo "  --runtime <seconds>       Per-test runtime for volume fio tests (default 60)\n";
+    echo "  --label <name>            Tag results (e.g., hostname/site/array)\n";
+    echo "  --json <path>             JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl)\n";
+    echo "  (also accepts --key=value form for all options above)\n\n";
     echo "Device options (read-only):\n";
     echo "  --devices                 Enable per-device tests (dd seqread + fio randread)\n";
-    echo "  --dd-size=<MiB|GiB>       Size for dd seqread per device (default 1G)\n";
-    echo "  --device-runtime=<sec>    Per-device fio runtime (default 30)\n\n";
+    echo "  --dd-size <MiB|GiB>       Size for dd seqread per device (default 1G)\n";
+    echo "  --device-runtime <sec>    Per-device fio runtime (default 30)\n\n";
     echo "Idle checks:\n";
     echo "  --require-idle            Abort if busy (ioping/iostat exceed thresholds)\n";
-    echo "  --idle-latency-ms=<ms>    ioping avg latency threshold (default 100)\n";
-    echo "  --idle-util=<percent>     iostat util threshold (default 85)\n\n";
+    echo "  --idle-latency-ms <ms>    ioping avg latency threshold (default 100)\n";
+    echo "  --idle-util <percent>     iostat util threshold (default 85)\n\n";
     echo "Other:\n";
     echo "  --show-last               Print the last run's human summary and exit\n";
     echo "  --help                    Show this help\n\n";
@@ -40,20 +41,58 @@ $ddSize = '1G';
 $devRuntime = 30;
 $requireIdle=false; $idleLatencyMs=100; $idleUtilPct=85; $showLast=false;
 
-foreach ($argv as $arg) {
-    if (strpos($arg,'--target=')===0) $targetDir=substr($arg,9);
-    elseif (strpos($arg,'--size=')===0) $fileSize=substr($arg,7);
-    elseif (strpos($arg,'--runtime=')===0) $runtime=(int)substr($arg,10);
-    elseif (strpos($arg,'--json=')===0) $jsonLog=substr($arg,7);
-    elseif (strpos($arg,'--label=')===0) $label=substr($arg,8);
-    elseif ($arg==='--devices') $testDevices=true;
-    elseif (strpos($arg,'--dd-size=')===0) $ddSize=substr($arg,10);
-    elseif (strpos($arg,'--device-runtime=')===0) $devRuntime=(int)substr($arg,18);
-    elseif ($arg==='--require-idle') $requireIdle=true;
-    elseif (strpos($arg,'--idle-latency-ms=')===0) $idleLatencyMs=(int)substr($arg,18);
-    elseif (strpos($arg,'--idle-util=')===0) $idleUtilPct=(int)substr($arg,13);
-    elseif ($arg==='--show-last') $showLast=true;
-    elseif ($arg==='--help' || $arg==='-h') { usage(); exit(0);} }
+for ($i=1; $i<count($argv); $i++) {
+    $arg = $argv[$i];
+    $next = ($i+1 < count($argv)) ? $argv[$i+1] : null;
+    $kv = null;
+    if (strpos($arg, '=') !== false) {
+        $kv = explode('=', $arg, 2);
+    }
+    $key = $kv ? $kv[0] : $arg;
+    $val = $kv ? $kv[1] : null;
+    switch ($key) {
+        case '--target':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $targetDir = $val;
+            break;
+        case '--size':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $fileSize = $val;
+            break;
+        case '--runtime':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $runtime = (int)$val;
+            break;
+        case '--json':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $jsonLog = $val;
+            break;
+        case '--label':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $label = $val;
+            break;
+        case '--devices':
+            $testDevices = true; break;
+        case '--dd-size':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $ddSize = $val; break;
+        case '--device-runtime':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $devRuntime = (int)$val; break;
+        case '--require-idle':
+            $requireIdle = true; break;
+        case '--idle-latency-ms':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $idleLatencyMs = (int)$val; break;
+        case '--idle-util':
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            if ($val !== null) $idleUtilPct = (int)$val; break;
+        case '--show-last':
+            $showLast = true; break;
+        case '--help': case '-h':
+            usage(); exit(0);
+    }
+}
 
 function parseSizeSB(string $s): int { if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }
 function appendLog(string $path,array $j){ @file_put_contents($path,json_encode($j,JSON_UNESCAPED_SLASHES).PHP_EOL,FILE_APPEND|LOCK_EX); }
@@ -64,8 +103,9 @@ if ($showLast) {
     $lines = file($jsonLog, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) ?: [];
     $entries=[]; $lastId=''; $lastTs='';
     foreach ($lines as $line) { $j=json_decode($line,true); if (!is_array($j)) continue; if (!empty($j['run_id'])) { $entries[]=$j; if (($j['run_ts']??'')>$lastTs){$lastTs=$j['run_ts'];$lastId=$j['run_id'];}} }
-    if ($lastId===''){ echo "No runs found.\n"; exit(0);} $run=array_values(array_filter($entries,fn($e)=>($e['run_id']??'')===$lastId));
-    echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".$run[0]['run_ts'].($run[0]['label']?"  Label: ".$run[0]['label']:'')."\n\n";
+    if ($lastId===''){ echo "No runs found.\n"; exit(0);} $run=array_values(array_filter($entries, function ($e) use ($lastId) { return (($e['run_id'] ?? '') === $lastId); }));
+    $labelStr = (isset($run[0]['label']) && $run[0]['label']!=='') ? ('  Label: '.$run[0]['label']) : '';
+    echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".$run[0]['run_ts'].$labelStr."\n\n";
     foreach ($run as $e) { if (($e['test']??'')==='preflight-idle'){ echo "Preflight: ioping=".($e['ioping_avg_ms']??'n/a')." ms util=".($e['iostat_util_pct']??'n/a')."%\n\n"; break; } }
     echo "File-backed tests\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n";
     foreach ($run as $e){ if (isset($e['test']) && empty($e['device']) && ($e['params']['rw']??'')!=='') { $m=$e['metrics']??[]; printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n",$e['test'],$m['read_bw_MBps']??0,$m['write_bw_MBps']??0,$m['read_iops']??0,$m['write_iops']??0,$m['read_p95_ms']??0,$m['write_p95_ms']??0); } }
@@ -91,7 +131,7 @@ appendLog($jsonLog,$pre); if($requireIdle && !$pre['ok']){ fwrite(STDERR,"Busy s
 $requested=parseSizeSB($fileSize); $free=(int)trim((string) shell_exec('df -PB1 '.escapeshellarg($targetDir).' | awk ' . escapeshellarg('NR==2 {print $4}') )); $use=(int) min($requested>0?$requested:PHP_INT_MAX, floor($free*0.8)); if($use<=0){ fwrite(STDERR,"Insufficient free space.\n"); exit(1);} 
 $testFile=rtrim($targetDir,'/').'/pmss-fio-'.bin2hex(random_bytes(4)).'.dat'; if(trim((string) shell_exec('command -v fallocate 2>/dev/null'))!=='') runCommand('fallocate -l '.$use.' '.escapeshellarg($testFile));
 $tests=[ ['name'=>'randmix-large-95r5w','rw'=>'randrw','rwmixread'=>95,'bssplit'=>'4k/2:64k/3:128k/5:256k/10:512k/20:768k/25:1024k/35','iodepth'=>32,'numjobs'=>4,'direct'=>1], ['name'=>'randread-large','rw'=>'randread','bs'=>'1M','iodepth'=>32,'numjobs'=>4,'direct'=>1], ['name'=>'randread-small','rw'=>'randread','bs'=>'4k','iodepth'=>64,'numjobs'=>4,'direct'=>1], ['name'=>'randwrite-small-short','rw'=>'randwrite','bs'=>'4k','iodepth'=>32,'numjobs'=>2,'direct'=>1,'runtime'=>max(15,(int)floor($runtime/3))], ['name'=>'seqread-large','rw'=>'read','bs'=>'1M','iodepth'=>32,'numjobs'=>2,'direct'=>1] ];
-function fioRun(string $file,int $size,int $runtime,array $job): array { $json=sys_get_temp_dir().'/fio-'.bin2hex(random_bytes(4)).'.json'; $opts=['--name='.escapeshellarg($job['name']),'--filename='.escapeshellarg($file),'--size='.$size,'--time_based=1','--runtime='.(int)($job['runtime']??$runtime),'--rw='.escapeshellarg($job['rw']),'--ioengine=libaio','--iodepth='.(int)$job['iodepth'],'--numjobs='.(int)$job['numjobs'],'--direct='.(int)$job['direct'],'--group_reporting=1']; if(isset($job['bs'])) $opts[]='--bs='.escapeshellarg($job['bs']); if(isset($job['bssplit'])) $opts[]='--bssplit='.escapeshellarg($job['bssplit']); if(isset($job['rwmixread'])) $opts[]='--rwmixread='.(int)$job['rwmixread']; $cmd='fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ',$opts); $rc=runCommand($cmd,true); $payload=@file_get_contents($json); @unlink($json); if($rc!==0 || $payload===false || trim($payload)==='') return ['ok'=>false,'error'=>'fio failed']; $j=json_decode($payload,true); if(!is_array($j)||empty($j['jobs'][0])) return ['ok'=>false,'error'=>'invalid fio JSON']; $rbw=0;$wbw=0;$ri=0;$wi=0;$rp=[];$wp=[]; foreach($j['jobs'] as $jobj){ $rbw+=(int)($jobj['read']['bw_bytes']??0); $wbw+=(int)($jobj['write']['bw_bytes']??0); $ri+=(float)($jobj['read']['iops']??0); $wi+=(float)($jobj['write']['iops']??0); $p95r=$jobj['read']['clat_ns']['percentile']['95.000000']??null; $p95w=$jobj['write']['clat_ns']['percentile']['95.000000']??null; if($p95r!==null) $rp[]=(float)$p95r; if($p95w!==null) $wp[]=(float)$p95w; } $avg=function($a){return count($a)?array_sum($a)/count($a):0;}; return ['ok'=>true,'result'=>['read_bw_MBps'=>round($rbw/(1024*1024),2),'write_bw_MBps'=>round($wbw/(1024*1024),2),'read_iops'=>round($ri,1),'write_iops'=>round($wi,1),'read_p95_ms'=>round($avg($rp)/1_000_000,2),'write_p95_ms'=>round($avg($wp)/1_000_000,2),'raw'=>$j]]; }
+ function fioRun(string $file,int $size,int $runtime,array $job): array { $json=sys_get_temp_dir().'/fio-'.bin2hex(random_bytes(4)).'.json'; $opts=['--name='.escapeshellarg($job['name']),'--filename='.escapeshellarg($file),'--size='.$size,'--time_based=1','--runtime='.(int)($job['runtime']??$runtime),'--rw='.escapeshellarg($job['rw']),'--ioengine=libaio','--iodepth='.(int)$job['iodepth'],'--numjobs='.(int)$job['numjobs'],'--direct='.(int)$job['direct'],'--group_reporting=1']; if(isset($job['bs'])) $opts[]='--bs='.escapeshellarg($job['bs']); if(isset($job['bssplit'])) $opts[]='--bssplit='.escapeshellarg($job['bssplit']); if(isset($job['rwmixread'])) $opts[]='--rwmixread='.(int)$job['rwmixread']; $cmd='fio --output-format=json --output '.escapeshellarg($json).' '.implode(' ',$opts); $rc=runCommand($cmd,true); $payload=@file_get_contents($json); @unlink($json); if($rc!==0 || $payload===false || trim($payload)==='') return ['ok'=>false,'error'=>'fio failed']; $j=json_decode($payload,true); if(!is_array($j)||empty($j['jobs'][0])) return ['ok'=>false,'error'=>'invalid fio JSON']; $rbw=0;$wbw=0;$ri=0;$wi=0;$rp=[];$wp=[]; foreach($j['jobs'] as $jobj){ $rbw+=(int)($jobj['read']['bw_bytes']??0); $wbw+=(int)($jobj['write']['bw_bytes']??0); $ri+=(float)($jobj['read']['iops']??0); $wi+=(float)($jobj['write']['iops']??0); $p95r=$jobj['read']['clat_ns']['percentile']['95.000000']??null; $p95w=$jobj['write']['clat_ns']['percentile']['95.000000']??null; if($p95r!==null) $rp[]=(float)$p95r; if($p95w!==null) $wp[]=(float)$p95w; } $avg=function($a){return count($a)?array_sum($a)/count($a):0;}; return ['ok'=>true,'result'=>['read_bw_MBps'=>round($rbw/(1024*1024),2),'write_bw_MBps'=>round($wbw/(1024*1024),2),'read_iops'=>round($ri,1),'write_iops'=>round($wi,1),'read_p95_ms'=>round($avg($rp)/1000000,2),'write_p95_ms'=>round($avg($wp)/1000000,2),'raw'=>$j]]; }
 $summary=[]; foreach($tests as $job){ $res=fioRun($testFile,$use,$runtime,$job); $entry=['timestamp'=>$runTs,'label'=>$label?:null,'run_id'=>$runId,'run_ts'=>$runTs,'target_dir'=>$targetDir,'device'=>$mntDev,'filesystem'=>$fs,'test'=>$job['name'],'params'=>['rw'=>$job['rw'],'rwmixread'=>$job['rwmixread']??null,'bs'=>$job['bs']??null,'bssplit'=>$job['bssplit']??null,'iodepth'=>$job['iodepth'],'numjobs'=>$job['numjobs'],'direct'=>$job['direct'],'runtime'=>(int)($job['runtime']??$runtime),'size_bytes'=>$use],'ok'=>$res['ok']]; if($res['ok']){$entry['metrics']=$res['result']; $summary[]=[ $job['name'],$res['result']['read_bw_MBps'],$res['result']['write_bw_MBps'],$res['result']['read_iops'],$res['result']['write_iops'],$res['result']['read_p95_ms'],$res['result']['write_p95_ms'] ];} else {$entry['error']=$res['error']??'unknown';} appendLog($jsonLog,$entry);} @unlink($testFile);
 echo "\n== Storage benchmark summary (".($label!==''?$label.' ':'')."on {$targetDir}) ==\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95_ms\twrite_p95_ms\n"; foreach($summary as $row){ printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n",...$row);} echo "\nJSON log: {$jsonLog}\n";
 
@@ -105,4 +145,3 @@ if($testDevices){ echo "\n== Per-device read-only benchmarks ==\n"; $ls=shell_ex
   $medDd=$median($get($peer,'dd_mb')); $medIop=$median($get($peer,'iop_ms')); $med4k=$median($get($peer,'fio4k_mb'));
   foreach($peer as $p=>$r){ if($medDd>0 && isset($r['dd_mb']) && $r['dd_mb']!==null && $r['dd_mb']<0.6*$medDd) echo "WARN: {$p} seqread < 60% median\n"; if($medIop>0 && isset($r['iop_ms']) && $r['iop_ms']!==null && $r['iop_ms']>max(50,2*$medIop)) echo "WARN: {$p} ioping > 2x median\n"; if($med4k>0 && isset($r['fio4k_mb']) && $r['fio4k_mb']!==null && $r['fio4k_mb']<0.5*$med4k) echo "WARN: {$p} 4k randread < 50% median\n"; }
 }
-

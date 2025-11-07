@@ -151,17 +151,34 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         $calcMax      = min($calcMax, $maxCapMiB);
         $cpuWeight    = isset($policy['cpuWeight']) && is_numeric($policy['cpuWeight']) ? (int)$policy['cpuWeight'] : 200;
         $ioWeight     = isset($policy['ioWeight']) && is_numeric($policy['ioWeight']) ? (int)$policy['ioWeight'] : 200;
-        $tasksMax     = isset($policy['tasksMax']) && is_numeric($policy['tasksMax']) ? (int)$policy['tasksMax'] : 4096;
+        $tasksMax     = isset($policy['tasksMax']) && is_numeric($policy['tasksMax']) ? (int)$policy['tasksMax'] : 512;
+        $cpuQuotaPct  = isset($policy['cpuQuotaPercent']) && is_numeric($policy['cpuQuotaPercent']) ? (int)$policy['cpuQuotaPercent'] : 85;
 
         $repl = [
-            '%%USER_MEMORY_HIGH%%' => (string)$policyHigh,
-            '%%USER_MEMORY_MAX%%'  => (string)$calcMax,
-            '%%USER_CPUWEIGHT%%'   => (string)$cpuWeight,
-            '%%USER_IOWEIGHT%%'    => (string)$ioWeight,
-            '%%TASKS_MAX%%'        => (string)$tasksMax,
+            '%%USER_CGROUP_MEMORY_HIGH%%' => (string)$policyHigh,
+            '%%USER_CGROUP_MEMORY_MAX%%'  => (string)$calcMax,
+            '%%USER_CGROUP_CPU_WEIGHT%%'  => (string)$cpuWeight,
+            '%%USER_CGROUP_IO_WEIGHT%%'   => (string)$ioWeight,
+            '%%USER_CGROUP_TASKS_MAX%%'   => (string)$tasksMax,
+            '%%USER_CGROUP_CPU_QUOTA%%'   => (string)$cpuQuotaPct.'%',
         ];
         $raw = (string)@file_get_contents($tpl);
         foreach ($repl as $k => $v) { $raw = str_replace($k, $v, $raw); }
+        // Append per-mount device throttles and weights from policy
+        if (isset($policy['mounts']) && is_array($policy['mounts'])) {
+            $append = [];
+            foreach ($policy['mounts'] as $mount => $def) {
+                if (!is_array($def)) continue;
+                $src = trim((string)@shell_exec('findmnt -no SOURCE '.escapeshellarg($mount).' 2>/dev/null'));
+                if ($src === '') continue;
+                if (isset($def['ioWeight']) && is_numeric($def['ioWeight'])) {
+                    $append[] = 'IODeviceWeight='.$src.' '.(int)$def['ioWeight'];
+                }
+                if (isset($def['readBw']))  { $append[] = 'IOReadBandwidthMax='.$src.' '.$def['readBw']; }
+                if (isset($def['writeBw'])) { $append[] = 'IOWriteBandwidthMax='.$src.' '.$def['writeBw']; }
+            }
+            if (!empty($append)) { $raw .= "\n".implode("\n", $append)."\n"; }
+        }
         if (@file_put_contents($target, $raw) === false) {
             $log('[WARN] Failed to write user-.slice drop-in '.$target);
             return;

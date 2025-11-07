@@ -99,6 +99,20 @@ check_no_docs_index_files() {
 
 check_no_docs_index_files
 
+# 6) Guardrail: context-first names in scripts/util (fail known bad patterns)
+check_util_context_first_names() {
+  local util_dir="$ROOT_DIR/scripts/util"
+  [[ -d "$util_dir" ]] || return 0
+  local bad
+  bad=$(find "$util_dir" -maxdepth 1 -type f -name 'benchmarkStorage.php' -print 2>/dev/null)
+  if [[ -n "$bad" ]]; then
+    echo "doctrine lint: util filename should be context-first (use storageBenchmark.php), found: $bad" >&2
+    FAIL=$((FAIL+1))
+  fi
+}
+
+check_util_context_first_names
+
 # 5) ADR single-context and section hygiene (advisory)
 check_adr_single_decision_and_sections() {
   local adr_dir="$ROOT_DIR/docs/adr"

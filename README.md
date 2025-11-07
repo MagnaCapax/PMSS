@@ -25,8 +25,8 @@ tests, see `docs/maintenance.md`. WireGuard usage notes are available in
 ### Contributing & Decisions
 
 See `CONTRIBUTING.md` for workflow and validation steps. Significant technical
-choices are recorded as ADRs under `docs/adr/`; new decisions should include an
-ADR alongside code, tests, and documentation.
+choices are recorded as ADRs; new decisions should include an ADR alongside
+code, tests, and documentation.
 
 ### Installation
 

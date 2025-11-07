@@ -7,6 +7,34 @@ on:
     branches: [ "**" ]
 
 jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 7.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.3'
+          coverage: none
+
+      - name: PHP 7.3 syntax lint
+        run: |
+          scripts/testing/php-lint-compat.sh | tee smoke-php-lint.log
+
+      - name: PHP 7.3 static scan (no false positives)
+        run: |
+          scripts/testing/php73-compat-scan.sh | tee smoke-php-compat-scan.log
+
+      - name: Upload smoke logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-php73-logs
+          path: |
+            smoke-php-lint.log
+            smoke-php-compat-scan.log
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -43,6 +71,10 @@ jobs:
       - name: ADR doctrine lint
         run: |
           bash scripts/testing/doctrine-lint.sh
+
+      - name: Cgroup template lint
+        run: |
+          bash scripts/testing/cgroup-template-lint.sh
 
       - name: Sharp edges (advisory)
         run: |

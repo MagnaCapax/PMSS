@@ -34,7 +34,9 @@ if (!function_exists('runStep')) {
         if ($status === 'ERR' && $stderrShort !== '') {
             $message .= ' :: '.$stderrShort;
         }
-        logmsg($message);
+        // Use structured logger from logging.php to avoid missing logmsg() when
+        // this runtime is invoked outside update.php/bootstrap paths.
+        logMessage($message);
         pmssRecordProfile([
             'description'    => $description,
             'command'        => $command,
@@ -65,7 +67,7 @@ if (!function_exists('runStepSequence')) {
      */
     function runStepSequence(string $description, array $commands): void
     {
-        logmsg($description);
+        logMessage($description);
         foreach ($commands as $cmd) {
             runStep($description, $cmd);
         }

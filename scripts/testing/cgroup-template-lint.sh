@@ -32,16 +32,18 @@ check_file_exists "$v1"
 # v2 template rules
 check_absent  "$v2" "BlockIOAccounting" "BlockIOAccounting must not appear (v2)"
 check_absent  "$v2" "MemoryLimit" "MemoryLimit must not appear (use MemoryMax/High)"
-check_present "$v2" "CPUWeight=%%USER_CPUWEIGHT%%" "CPUWeight placeholder"
-check_present "$v2" "IOWeight=%%USER_IOWEIGHT%%" "IOWeight placeholder"
-check_present "$v2" "TasksMax=%%TASKS_MAX%%" "TasksMax placeholder"
-check_present "$v2" "MemoryHigh=%%USER_MEMORY_HIGH%%M" "MemoryHigh placeholder"
-check_present "$v2" "MemoryMax=%%USER_MEMORY_MAX%%M" "MemoryMax placeholder"
+check_present "$v2" "CPUWeight=%%USER_CGROUP_CPU_WEIGHT%%" "CPUWeight placeholder"
+check_present "$v2" "IOWeight=%%USER_CGROUP_IO_WEIGHT%%" "IOWeight placeholder"
+check_present "$v2" "TasksMax=%%USER_CGROUP_TASKS_MAX%%" "TasksMax placeholder"
+check_present "$v2" "MemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M" "MemoryHigh placeholder"
+check_present "$v2" "MemoryMax=%%USER_CGROUP_MEMORY_MAX%%M" "MemoryMax placeholder"
+check_present "$v2" "CPUQuota=%%USER_CGROUP_CPU_QUOTA%%" "CPUQuota placeholder"
 
 # v1 template rules
 check_present "$v1" "BlockIOAccounting=yes" "BlockIOAccounting (v1)"
 check_absent  "$v1" "MemoryLimit" "MemoryLimit must not appear (even v1 here)"
-check_present "$v1" "TasksMax=%%TASKS_MAX%%" "TasksMax placeholder (v1)"
+check_present "$v1" "TasksMax=%%USER_CGROUP_TASKS_MAX%%" "TasksMax placeholder (v1)"
+check_present "$v1" "CPUQuota=%%USER_CGROUP_CPU_QUOTA%%" "CPUQuota placeholder (v1)"
 
 # SystemPrep path rules: drop-ins under /etc not /usr/lib
 if rg -n "/usr/lib/systemd/(system|user).*/user-.slice" "$ROOT_DIR/scripts/lib/update/systemPrep.php" >/dev/null 2>&1; then

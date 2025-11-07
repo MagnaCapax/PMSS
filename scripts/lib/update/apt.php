@@ -117,16 +117,24 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
 {
     switch ($version) {
         case 8:
-            pmssApplyAptTemplate('Jessie', $repos['jessie'] ?? '', $currentHash, $log, function () {
-                passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-                passthru('apt-get clean;');
+            pmssApplyAptTemplate('Jessie', $repos['jessie'] ?? '', $currentHash, $log, function () use ($log) {
+                if (!defined('PMSS_TEST_MODE')) {
+                    passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+                    passthru('apt-get clean;');
+                } else {
+                    $log('PMSS_TEST_MODE: skipping apt conf/clean (Jessie)');
+                }
             });
             return;
         case 10:
-            pmssApplyAptTemplate('Buster', $repos['buster'] ?? '', $currentHash, $log, function () {
+            pmssApplyAptTemplate('Buster', $repos['buster'] ?? '', $currentHash, $log, function () use ($log) {
                 // EOL suites lack valid Release timestamps; relax the check.
-                passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-                passthru('apt-get clean;');
+                if (!defined('PMSS_TEST_MODE')) {
+                    passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+                    passthru('apt-get clean;');
+                } else {
+                    $log('PMSS_TEST_MODE: skipping apt conf/clean (Buster)');
+                }
             });
             return;
         case 11:

@@ -9,13 +9,20 @@ require_once __DIR__.'/storage.php';
 
 class TrafficStatsProcessor
 {
-    private trafficStatistics $stats;
-    private string $trafficDir;
-    private string $homeDir;
-    private string $runtimeDir;
-    private string $passwdFile;
-    private string $statsRuntimeDir;
-    private TrafficStorage $storage;
+    /** @var trafficStatistics */
+    private $stats;
+    /** @var string */
+    private $trafficDir;
+    /** @var string */
+    private $homeDir;
+    /** @var string */
+    private $runtimeDir;
+    /** @var string */
+    private $passwdFile;
+    /** @var string */
+    private $statsRuntimeDir;
+    /** @var TrafficStorage */
+    private $storage;
 
     public function __construct(trafficStatistics $stats, array $paths = [])
     {

@@ -25,7 +25,7 @@ class cgroupSliceTest extends TestCase
         $cfgDir = $this->tempDir('cfg');
         $drop   = $this->tempDir('drop');
 
-        $tplBody = "[Slice]\nCPUAccounting=yes\nIOAccounting=yes\nMemoryAccounting=yes\nCPUWeight=%%USER_CPUWEIGHT%%\nIOWeight=%%USER_IOWEIGHT%%\nTasksMax=%%TASKS_MAX%%\nMemoryHigh=%%USER_MEMORY_HIGH%%M\nMemoryMax=%%USER_MEMORY_MAX%%M\n";
+        $tplBody = "[Slice]\nCPUAccounting=yes\nIOAccounting=yes\nMemoryAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', 'ignored');
 
@@ -51,7 +51,7 @@ class cgroupSliceTest extends TestCase
     {
         $cfgDir = $this->tempDir('cfg2');
         $drop   = $this->tempDir('drop2');
-        $tplBody = "[Slice]\nMemoryHigh=%%USER_MEMORY_HIGH%%M\nMemoryMax=%%USER_MEMORY_MAX%%M\n";
+        $tplBody = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', 'ignored');
 
@@ -84,7 +84,7 @@ class cgroupSliceTest extends TestCase
     {
         $cfgDir = $this->tempDir('cfgv1');
         $drop   = $this->tempDir('dropv1');
-        $v1Body = "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CPUWEIGHT%%\nTasksMax=%%TASKS_MAX%%\nMemoryHigh=%%USER_MEMORY_HIGH%%M\nMemoryMax=%%USER_MEMORY_MAX%%M\n";
+        $v1Body = "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', $v1Body);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', 'ignored');
 
@@ -103,7 +103,7 @@ class cgroupSliceTest extends TestCase
     {
         $cfgDir = $this->tempDir('cfgv3');
         $drop   = $this->tempDir('dropv3');
-        $tplBody = "[Slice]\nTasksMax=%%TASKS_MAX%%\n";
+        $tplBody = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', $tplBody);
 

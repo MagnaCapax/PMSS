@@ -82,6 +82,16 @@ if (file_exists($portFile)) {
     }
 }
 
+// Reset per-user slice properties so no stale limits linger (safe if slice missing)
+if (function_exists('posix_getpwnam')) {
+    $info = posix_getpwnam($username);
+    if (is_array($info) && isset($info['uid'])) {
+        $uid = (int)$info['uid'];
+        // Use systemd revert to drop any drop-ins for user slice if present
+        @passthru('systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true');
+    }
+}
+
 echo "\nDeleting user, user data and HTTP password:\n";
 passthru("userdel {$username}; cd /home; rm -rf {$username}");
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");

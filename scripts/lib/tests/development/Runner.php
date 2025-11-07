@@ -50,13 +50,17 @@ $classes = array_filter(get_declared_classes(), static function ($class) {
 
 $total = 0;
 $failures = 0;
+$skips = 0;
 foreach ($classes as $class) {
     /** @var TestCase $instance */
     $instance = new $class();
     foreach ($instance->run() as [$status, $method, $message]) {
         $total++;
-        if ($status) {
+        if ($status === true) {
             echo "[PASS] {$class}::{$method}\n";
+        } elseif ($status === 'skip') {
+            $skips++;
+            echo "[SKIP] {$class}::{$method} - {$message}\n";
         } else {
             $failures++;
             echo "[FAIL] {$class}::{$method} - {$message}\n";
@@ -64,5 +68,5 @@ foreach ($classes as $class) {
     }
 }
 
-echo "\nTests: {$total}, Failures: {$failures}\n";
+echo "\nTests: {$total}, Failures: {$failures}, Skipped: {$skips}\n";
 exit($failures === 0 ? 0 : 1);

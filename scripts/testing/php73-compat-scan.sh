@@ -17,12 +17,12 @@ paths=(
 # Build ripgrep or grep command
 if command -v rg >/dev/null 2>&1; then
   IS_RG=1
-  SEARCHER=(rg -n -H --hidden --no-ignore)
-  EXCLUDES=(--glob '!vendor/**' --glob '!scripts/lib/tests/**' --glob '!scripts/testing/**' --glob '!scripts/testing/php73-compat-scan.sh' --glob '!etc/skel/www/**')
+  SEARCHER=(rg -n -H --hidden --no-ignore --glob '*.php')
+  EXCLUDES=(--glob '!vendor/**' --glob '!scripts/lib/tests/**' --glob '!etc/skel/www/**')
 else
   IS_RG=0
   SEARCHER=(grep -RIn)
-  EXCLUDES=(--exclude-dir=vendor --exclude-dir=scripts/lib/tests --exclude-dir=scripts/testing --exclude=scripts/testing/php73-compat-scan.sh --exclude-dir=etc/skel/www)
+  EXCLUDES=(--exclude-dir=vendor --exclude-dir=scripts/lib/tests --exclude-dir=etc/skel/www --include='*.php')
 fi
 
 fail=0

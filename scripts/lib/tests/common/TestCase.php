@@ -1,6 +1,8 @@
 <?php
 namespace PMSS\Tests;
 
+class SkipTest extends \Exception {}
+
 abstract class TestCase
 {
     private array $results = [];
@@ -14,6 +16,8 @@ abstract class TestCase
             try {
                 $this->$method();
                 $this->results[] = [true, $method, null];
+            } catch (SkipTest $e) {
+                $this->results[] = ['skip', $method, $e->getMessage()];
             } catch (\AssertionError $e) {
                 $this->results[] = [false, $method, $e->getMessage()];
             } catch (\Throwable $e) {
@@ -51,6 +55,22 @@ abstract class TestCase
         if (strpos($haystack, $needle) === false) {
             $msg = $message !== '' ? $message : sprintf('Expected string to contain %s, but it did not', var_export($needle, true));
             throw new \AssertionError($msg);
+        }
+    }
+
+    protected function isSandbox(): bool
+    {
+        if (getenv('PMSS_SANDBOX') === '1') return true;
+        // Not root or no systemd bus → assume sandbox/CI
+        $notRoot = function_exists('posix_geteuid') ? (posix_geteuid() !== 0) : true;
+        $noSystemd = !is_dir('/run/systemd/system');
+        return $notRoot || $noSystemd;
+    }
+
+    protected function skipIfSandbox(string $reason = 'sandboxed environment'): void
+    {
+        if ($this->isSandbox()) {
+            throw new SkipTest($reason);
         }
     }
 }
