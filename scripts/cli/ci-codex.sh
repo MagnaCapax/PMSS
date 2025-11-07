@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -o errtrace
 # Optional debug: PMSS_CI_CODEX_DEBUG=1 enables bash -x tracing
 if [[ "${PMSS_CI_CODEX_DEBUG:-0}" == "1" ]]; then
   export PS4='[ci-codex:trace] '
   set -x
 fi
+
+trap 'rc=$?; echo "[ci-codex] ERROR rc=$rc at line $LINENO while: $BASH_COMMAND" >&1' ERR
+
+echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 
 # ci-codex.sh — Fetch latest CI logs and feed them to a coding assistant (Codex CLI or similar).
 #
@@ -90,42 +95,42 @@ done
 have() { command -v "$1" >/dev/null 2>&1; }
 
 if ! have gh; then
-  echo "[ci-codex] GitHub CLI not found. Install gh and run 'gh auth login'" >&2
+  echo "[ci-codex] GitHub CLI not found. Install gh and run 'gh auth login'" >&1
   exit 1
 fi
 
-echo "[ci-codex] gh: $(command -v gh)" >&2 || true
-gh --version 2>/dev/null | sed 's/^/[ci-codex] /' >&2 || true
+echo "[ci-codex] gh: $(command -v gh)" >&1 || true
+gh --version 2>/dev/null | sed 's/^/[ci-codex] /' >&1 || true
 
 mkdir -p "$OUTDIR" "$ARTDIR"
 
-echo "[ci-codex] workspace: $OUTDIR" >&2
-echo "[ci-codex] artifact dir: $ARTDIR" >&2
-echo "[ci-codex] config: include_agents=$include_agents, AGENTS_LINES=$AGENTS_LINES, JOB_LOG_LINES=$JOB_LOG_LINES, ARTIFACT_LINES=$ARTIFACT_LINES, MAX_ARTIFACT_FILES=$MAX_ARTIFACT_FILES, MAX_PROMPT_ARG_BYTES=$MAX_PROMPT_ARG_BYTES" >&2
+echo "[ci-codex] workspace: $OUTDIR" >&1
+echo "[ci-codex] artifact dir: $ARTDIR" >&1
+echo "[ci-codex] config: include_agents=$include_agents, AGENTS_LINES=$AGENTS_LINES, JOB_LOG_LINES=$JOB_LOG_LINES, ARTIFACT_LINES=$ARTIFACT_LINES, MAX_ARTIFACT_FILES=$MAX_ARTIFACT_FILES, MAX_PROMPT_ARG_BYTES=$MAX_PROMPT_ARG_BYTES" >&1
 
-echo "[ci-codex] discovering latest run..." >&2
+echo "[ci-codex] discovering latest run..." >&1
 run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
 if [[ -z "$run_id" ]]; then
   echo "[ci-codex] no workflow runs found" >&2
   exit 1
 fi
 
-echo "[ci-codex] latest run id: $run_id" >&2
+echo "[ci-codex] latest run id: $run_id" >&1
 
 # Wait for run completion (up to 180s) for logs/artifacts to be ready
 status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 deadline=$(( $(date +%s) + 180 ))
 while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
-  echo "[ci-codex] run status: $status (waiting)" >&2
+  echo "[ci-codex] run status: $status (waiting)" >&1
   sleep 5
   status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 done
 
 # Download artifacts (best-effort)
-echo "[ci-codex] downloading artifacts to $ARTDIR" >&2
+echo "[ci-codex] downloading artifacts to $ARTDIR" >&1
 gh run download "$run_id" --dir "$ARTDIR" || echo "no valid artifacts found to download" >&2
 art_count=$(find "$ARTDIR" -type f | wc -l | tr -d ' ')
-echo "[ci-codex] artifacts downloaded: $art_count file(s)" >&2
+echo "[ci-codex] artifacts downloaded: $art_count file(s)" >&1
 
 # Optionally capture a specific job log
 # Fetch logs for a requested job, or both 'build' and 'smoke' by default
@@ -139,15 +144,15 @@ fetch_job_log() {
 }
 
 if [[ -n "$job_name" ]]; then
-  echo "[ci-codex] fetching job logs for '$job_name'" >&2
+  echo "[ci-codex] fetching job logs for '$job_name'" >&1
   fetch_job_log "$job_name" "$JOBLOG"
 else
-  echo "[ci-codex] fetching job logs for 'build' and 'smoke'" >&2
+  echo "[ci-codex] fetching job logs for 'build' and 'smoke'" >&1
   fetch_job_log "build" "$OUTDIR/job-build.log"
   fetch_job_log "smoke" "$OUTDIR/job-smoke.log"
 fi
 log_count=$(ls "$OUTDIR"/job-*.log 2>/dev/null | wc -l | tr -d ' ')
-echo "[ci-codex] job logs present: $log_count file(s)" >&2
+echo "[ci-codex] job logs present: $log_count file(s)" >&1
 
 # Build the prompt file
 prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
@@ -196,7 +201,7 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 
 prompt_bytes=$(wc -c < "$PROMPT" | tr -d ' ')
 prompt_lines=$(wc -l < "$PROMPT" | tr -d ' ')
-echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&2
+echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
 
 # Build a trimmed argument-safe prompt, then invoke codex with it as a single positional argument
 size=$(wc -c < "$PROMPT" | tr -d ' ')
@@ -214,23 +219,23 @@ else
 fi
 
 if [[ -n "$exec_cmd" ]]; then
-  echo "[ci-codex] sending prompt via: $exec_cmd (arg)" >&2
+  echo "[ci-codex] sending prompt via: $exec_cmd (arg)" >&1
   # shellcheck disable=SC2086
   eval $exec_cmd "$(cat "$PROMPT_ARG")"
 else
   if command -v codex >/dev/null 2>&1; then
-    echo "[ci-codex] sending prompt to: codex @file (preferred)" >&2
+    echo "[ci-codex] sending prompt to: codex @file (preferred)" >&1
     if ! codex "@${PROMPT}"; then
-      echo "[ci-codex] fallback to arg string (trimmed)" >&2
+      echo "[ci-codex] fallback to arg string (trimmed)" >&1
       if ! codex "$(cat "$PROMPT_ARG")"; then
-        echo "[ci-codex] codex invocation failed. You can run manually:" >&2
-        echo "  codex '@$PROMPT'" >&2
-        echo "  or: codex \"\$(cat '$PROMPT_ARG')\"" >&2
+        echo "[ci-codex] codex invocation failed. You can run manually:" >&1
+        echo "  codex '@$PROMPT'" >&1
+        echo "  or: codex \"\$(cat '$PROMPT_ARG')\"" >&1
         exit 1
       fi
     fi
   else
-    echo "[ci-codex] Codex CLI not found. To send to your assistant, try:" >&2
-    echo "  codex '@$PROMPT'" >&2
+    echo "[ci-codex] Codex CLI not found. To send to your assistant, try:" >&1
+    echo "  codex '@$PROMPT'" >&1
   fi
 fi

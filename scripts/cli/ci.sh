@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "[ci] starting CI prompt assembly…" >&1
+
 # ci.sh — one-command helper
 #
 # Defaults:
@@ -40,4 +42,9 @@ args=( )
 [[ -n "$custom_prompt" ]] && args+=( --prompt "$custom_prompt" )
 [[ -n "$exec_cmd" ]] && args+=( --exec "$exec_cmd" )
 
+set +e
 bash "$ROOT/scripts/cli/ci-codex.sh" "${args[@]}"
+rc=$?
+set -e
+echo "[ci] ci-codex.sh exited with rc=$rc" >&1
+exit $rc
