@@ -16,6 +16,7 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 // Bring in shared runtime helpers; avoid duplicating apt/repo logic here.
 // Package installation for OpenVPN/EasyRSA is handled centrally in the package phase.
 require_once __DIR__.'/../lib/update.php';
+require_once __DIR__.'/../lib/openvpn.php';
 
 requireRoot();
 
@@ -23,11 +24,7 @@ $hostname = trim((string) @file_get_contents('/etc/hostname'));
 if ($hostname === '') {
     $hostname = 'localhost';
 }
-$fqdn = $hostname;
-if (strpos($fqdn, '.pulsedmedia.com') === false) {
-    $fqdn .= '.pulsedmedia.com';
-}
-$slug = str_replace('.', '-', $fqdn);
+$slug = pmssOpenvpnSlugFromHostname($hostname);
 
 $openvpnDir   = '/etc/openvpn';
 $easyRsaDir   = $openvpnDir.'/easy-rsa';
@@ -35,20 +32,10 @@ $easyRsaShare = '/usr/share/easy-rsa';
 $serverConf   = $openvpnDir.'/openvpn.conf';
 $tplServer    = '/etc/seedbox/config/template.openvpn.server.config';
 $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
-$clientOvpn  = "/home/openvpn-{$slug}.ovpn";
-$clientCrt   = "/home/openvpn-{$slug}.crt";
+list($clientOvpn, $clientCrt) = pmssOpenvpnArtifactPathsFromSlug($slug);
 
-// Fast-path: skip when OpenVPN appears configured per systemTest semantics:
-//  - openvpn binary present
-//  - server config present
-//  - EasyRSA CA (or issued/server.crt) present
-//  - client artifacts (.ovpn + .crt) present in /home
-$openvpnBin = trim((string) @shell_exec('command -v openvpn 2>/dev/null'));
-$alreadyConfigured = ($openvpnBin !== '')
-    && is_file($serverConf)
-    && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
-    && is_file($clientOvpn)
-    && is_file($clientCrt);
+// Fast-path using shared helper semantics (matches systemTest expectations)
+$alreadyConfigured = pmssOpenvpnIsConfigured();
 if ($alreadyConfigured) {
     logmsg('[SKIP] OpenVPN already configured; skipping provisioning');
     return;

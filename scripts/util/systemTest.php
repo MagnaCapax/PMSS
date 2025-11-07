@@ -11,6 +11,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/openvpn.php';
 require_once __DIR__.'/../lib/cli/OptionParser.php';
 
 /**
@@ -134,20 +135,15 @@ if ($codename !== '' && is_file('/etc/apt/sources.list')) {
     if ($hostname === '') {
         return ['name' => 'OpenVPN client artifacts', 'status' => 'WARN', 'detail' => 'hostname unknown'];
     }
-    $fqdn = $hostname;
-    if (strpos($fqdn, '.pulsedmedia.com') === false) {
-        $fqdn .= '.pulsedmedia.com';
-    }
-    $slug = str_replace('.', '-', $fqdn);
-    $ovpn = "/home/openvpn-{$slug}.ovpn";
-    $crt  = "/home/openvpn-{$slug}.crt";
-    $ok   = is_file($ovpn) && is_file($crt);
+    $slug = pmssOpenvpnSlugFromHostname($hostname);
+    list($ovpn, $crt) = pmssOpenvpnArtifactPathsFromSlug($slug);
+    $ok   = $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);
     if ($ok) {
         return ['name' => 'OpenVPN client artifacts', 'status' => 'OK', 'detail' => basename($ovpn).', '.basename($crt)];
     }
     $missing = [];
-    if (!is_file($ovpn)) { $missing[] = basename($ovpn); }
-    if (!is_file($crt))  { $missing[] = basename($crt); }
+    if ($ovpn === '' || !is_file($ovpn)) { $missing[] = ($ovpn !== '' ? basename($ovpn) : 'openvpn-<slug>.ovpn'); }
+    if ($crt === ''  || !is_file($crt))  { $missing[] = ($crt  !== '' ? basename($crt)  : 'openvpn-<slug>.crt'); }
     return ['name' => 'OpenVPN client artifacts', 'status' => 'WARN', 'detail' => 'missing: '.implode(', ', $missing)];
 })());
 
