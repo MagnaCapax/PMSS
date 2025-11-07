@@ -37,6 +37,19 @@ if (!is_file($pythonBin)) {
     return;
 }
 
+// Some Debian builds create venvs without pip preinstalled. Bootstrap it if missing.
+if (!is_file($pipBin)) {
+    runStep('Bootstrapping pip in acd_cli virtualenv', sprintf('%s -m ensurepip --upgrade', escapeshellarg($pythonBin)));
+}
+
+// If pip is still unavailable, fail soft with a clear log and skip.
+if (!is_file($pipBin)) {
+    if (!$dryRun) {
+        logmsg('[ERR] acd_cli virtualenv missing pip; ensure python3-venv is installed and try rerunning update');
+    }
+    return;
+}
+
 runStep('Upgrading acd_cli virtualenv tooling', sprintf('%s -m pip install --upgrade pip setuptools wheel', escapeshellarg($pythonBin)));
 runStep('Installing acd_cli in virtualenv', sprintf('%s -m pip install --upgrade git+https://github.com/yadayada/acd_cli.git', escapeshellarg($pythonBin)));
 

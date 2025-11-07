@@ -247,5 +247,22 @@ if (function_exists('generateMotd')) {
 // Refresh MOTD at end
 Motd::motdGenerate();
 pmssProfileSummary();
+// Surface log locations for operators to review after updates.
+try {
+    $plainLog   = defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : '/var/log/pmss-update.log';
+    $jsonLog    = getenv('PMSS_JSON_LOG') ?: '';
+    $profileOut = getenv('PMSS_PROFILE_OUTPUT') ?: ($jsonLog !== '' ? $jsonLog.'.profile.json' : '');
+
+    logmsg('Update logs saved to:');
+    logmsg('  - Text:   '.$plainLog);
+    if ($jsonLog !== '') {
+        logmsg('  - JSON:   '.$jsonLog);
+    }
+    if ($profileOut !== '') {
+        logmsg('  - Profile: '.$profileOut);
+    }
+} catch (\Throwable $e) {
+    // Fail-soft: logging paths are best-effort only.
+}
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
 logmsg('update-step2.php completed');
