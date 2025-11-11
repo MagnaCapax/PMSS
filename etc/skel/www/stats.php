@@ -28,6 +28,7 @@
     if (is_array($trafficData)) {
         echo "<h6>Traffic usage</h6><pre>\n\nTraffic consumption at " . date('Y-m-d H:i:s', $trafficTime) . ":\nWeek {$trafficData['display']['week']}, Day: {$trafficData['display']['day']}\n";
         echo "Past 30 days upload traffic: {$trafficData['display']['month']}\n\n";
+    
     }
     
     if ( file_exists('../.trafficLimit') ) {
@@ -35,7 +36,7 @@
         if ($trafficLimit > 0) echo "Traffic limit: " . number_format($trafficLimit) . " GiB\n";
     }
 
-	if (isset($trafficData['daily']) && is_array($trafficData['daily']) && count($trafficData['daily']) > 3) {
+	if (isset($trafficData['daily']) and count($trafficData['daily'] > 3)) {
 		echo '<canvas id="trafficChart" width="500px" height="200px"></canvas>';
 		$displayDataDays = array();
 		$displayDataDayConsumption = array();
@@ -50,25 +51,21 @@
 echo <<<EOF
 <script>
 window.onload = function () {
-  if (typeof Chart === 'undefined') return;
-  new Chart(
-    document.getElementById('trafficChart'),
-    {
-      type: 'line',
-      data: {
-        labels: [{$displayDataDays}],
-        datasets: [{
-          label: 'Traffic usage (MiB) by day',
-          data: [{$displayDataDayConsumption}],
-          fill: true,
-          borderColor: 'rgb(75, 192, 192)',
-          tension: 0.4,
-          backgroundColor: 'rgba(75, 192, 192, 0.6)'
-        }]
-      },
-      options: {}
-    }
-  );
+	new Chart(
+		document.getElementById("trafficChart"),
+		{
+			"type":"line",
+			"data":{"labels":[{$displayDataDays}],
+			"datasets":[{
+				"label":"Traffic usage (MiB) by day","data":[{$displayDataDayConsumption}],
+				"fill":true,
+				"borderColor":"rgb(75, 192, 192)",
+				"lineTension":0.4,
+			        "backgroundColor":"rgb(75, 192, 192, 0.6)"
+			}]
+		},
+		"options":{}}
+	);
 };
 </script>
 EOF;
@@ -82,7 +79,7 @@ EOF;
 </div>
 <div class="portfoliodesc">
 
-<h6> <?= htmlspecialchars($_SERVER['SERVER_NAME'] ?? '', ENT_QUOTES, 'UTF-8'); ?> info </h6>
+<h6> <?=$_SERVER['SERVER_NAME'];?> info </h6>
 <b>IP:</b> <?= @file_get_contents('https://pulsedmedia.com/remote/myip.php'); ?>
 <pre>
 <?=passthru('uptime');?>
