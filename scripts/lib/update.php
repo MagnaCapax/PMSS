@@ -58,7 +58,7 @@ function updateUserFile($file, $user) {
     //       Preserve existing mode/owner when content is unchanged.
     // #TODO Add hermetic tests covering safe-write behavior.
     if (empty($file) || empty($user) || !file_exists("/home/{$user}")) {
-        logMessage("[user:${user}] updateUserFile skipped (invalid params or home missing): {$file}");
+        echo "Invalid parameters, file: {$file} user: {$user}\n";
         return;
     }
 
@@ -66,29 +66,29 @@ function updateUserFile($file, $user) {
     $targetFile = "/home/{$user}/" . $file;
         
     if (!file_exists($sourceFile)) {
-        logMessage("[user:${user}] Source skeleton missing for {$file}");
+        echo "Source file: {$file} is missing\n";
         return;
     }
     
     if (!file_exists($targetFile)) {
         copyToUserSpace($sourceFile, $targetFile, $user);
-        logMessage("[user:${user}] Added skeleton file: {$file}");
+        echo "Added: {$file} for {$user}\n";
     } else {
         $sourceContent = file_get_contents($sourceFile);
         $targetContent = file_get_contents($targetFile);
         if ($sourceContent === false || $targetContent === false) {
-            logMessage("[user:${user}] Error reading file contents for comparison: {$file}");
+            echo "Error reading file contents for comparison.\n";
             return;
         }
         $sourceChecksum = sha1($sourceContent);
         $targetChecksum = sha1($targetContent);
         if ($sourceChecksum !== $targetChecksum) {
             if (!unlink($targetFile)) {
-                logMessage("[user:${user}] Failed to remove old file: {$targetFile}");
+                echo "Failed to remove old file: {$targetFile}\n";
                 return;
             }
             copyToUserSpace($sourceFile, $targetFile, $user);
-            logMessage("[user:${user}] Updated skeleton file: {$file}");
+            echo "Updated: {$file} for {$user}\n";
         }
     }
 }

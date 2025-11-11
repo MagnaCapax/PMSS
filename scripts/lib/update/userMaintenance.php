@@ -25,11 +25,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
      */
     function pmssUpdateAllUsers(string $rutorrentIndexSha): void
     {
-        $list = pmssListManagedUsers();
-        $count = count($list);
-        // High-level banner so operators can see whether this phase ran at all
-        logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
-        foreach ($list as $user) {
+        foreach (pmssListManagedUsers() as $user) {
             if ($user === '') {
                 continue;
             }
@@ -76,28 +72,5 @@ if (!function_exists('pmssRestoreUserCrontabs')) {
             escapeshellarg('/scripts/listUsers.php | xargs -r -I{} crontab -u {} /etc/seedbox/config/user.crontab.default')
         );
         runStep('Restoring default crontab for all users', $command);
-    }
-}
-
-if (!function_exists('pmssApplyCgroupDefaultsAllUsers')) {
-    /**
-     * Apply cgroup defaults to all managed users so resource controls converge
-     * during the update run (before the orchestrator completes).
-     */
-    function pmssApplyCgroupDefaultsAllUsers(): void
-    {
-        $list = pmssListManagedUsers();
-        $count = count($list);
-        logMessage(sprintf('Applying cgroup defaults for %d user(s)', $count));
-        foreach ($list as $user) {
-            if ($user === '') {
-                continue;
-            }
-            runUserStep(
-                $user,
-                'Applying cgroup properties (defaults)',
-                sprintf('php /scripts/util/userCgroup.php %s --apply --defaults', escapeshellarg($user))
-            );
-        }
     }
 }
