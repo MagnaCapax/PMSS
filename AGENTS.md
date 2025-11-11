@@ -4,6 +4,10 @@
 Note: Canonical behavior and workflows are documented in `docs/architecture.md`
 and `docs/update.md`. Prefer reading those and cross-referencing from here
 instead of restating details.
+ 
+- Legacy codebase: This repository has ~15 years of history. Prioritize
+  stability over perfection; make conservative, minimal diffs. Never break old
+  users.
 ## Architecture Cheat Sheet
 - **Before touching any code**, read `docs/architecture.md` and the related workflow docs in `docs/update.md` / `docs/install.md`. These describe the provisioning hierarchy (install → update.php → update-step2) and must be understood prior to making changes.
 
@@ -32,6 +36,8 @@ instead of restating details.
  
 
 ## Engineering Doctrine (Repository Constitution)
+- Stability over perfection: bias toward proven patterns; avoid churn that puts
+  user workflows at risk. Prefer incremental improvements.
 - Deletion‑First: prefer removing code paths/knobs over adding new ones; unify flows instead of special‑casing; prune dead code/config promptly. The best part is no part; refactoring wins.
 - Minimal Edits: keep diffs small, coherent, and reviewable; prefer changes that reduce complexity/LOC. Refactor toward clarity before adding features.
 - One Flow, No Special Cases: keep a single, explicit update path. Any exception requires an ADR and a removal plan.
@@ -69,6 +75,8 @@ instead of restating details.
 ## Core Principles
 - **KISS Principle**: Keep implementations simple, readable, and direct. Avoid unnecessary abstractions or over-engineering.
 - **DRY Principle**: Don’t repeat yourself. Consolidate shared logic instead of copying blocks between modules.
+- **No Copy‑Pasta**: Do not duplicate logic or ship “spaghetti” patches. Reuse
+  established helpers or keep changes tiny and local without forking flows.
 - **Single-Method Consistency**: When a problem has already been solved in this codebase, reuse the established method instead of introducing alternate approaches. Prefer shared helpers/abstractions over duplicating logic.
 - **Separation of Concerns**: Keep modules focused; each file should own one area of responsibility (distro detection, package management, user updates, etc.).
 - **Single Responsibility**: Functions/classes/modules should have exactly one reason to change. Split multi-purpose code into smaller units rather than piling on conditionals.
