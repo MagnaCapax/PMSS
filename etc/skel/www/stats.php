@@ -11,6 +11,14 @@
 
 <div class="portfolioimg">
 
+<pre>
+Base resources (current):
+<?php
+// Show a brief slice status line similar to production snippet
+@passthru('systemctl status user-$("/usr/bin/id" -u).slice | grep -A3 -m1 "IP: "');
+?>
+</pre>
+
 <h6>Disk usage / Quota</h6>
 <pre>
 <?php
@@ -95,20 +103,16 @@
     
     
     if (is_array($trafficData)) {
-        echo "<h6>Traffic usage</h6><pre>\n\nTraffic consumption at " . date('Y-m-d H:i:s', $trafficTime) . ":\nWeek {$trafficData['display']['week']}, Day: {$trafficData['display']['day']}\n";
-        echo "Past 30 days upload traffic: {$trafficData['display']['month']}\n\n";
-        // Render a traffic gauge based on monthly usage vs. limit, below the header
+        echo "<h6>Traffic usage</h6>\n";
+        // Render traffic gauge first, under the header, full width
         $trafficLimitGauge = 0;
         if (file_exists('../.trafficLimit')) {
             $trafficLimitGauge = (int) trim(@file_get_contents('../.trafficLimit'));
         }
         if ($trafficLimitGauge > 0) {
-            // Close pre for the gauge block, then reopen
-            echo "</pre>\n";
             $usedGiB = (int) round((($trafficData['raw']['month'] ?? 0)/1024));
             $percent = $trafficLimitGauge > 0 ? min(999, round(($usedGiB / $trafficLimitGauge) * 100, 1)) : 0;
             $title = $usedGiB.'GiB / '.$trafficLimitGauge.'GiB';
-            // reuse the same color gradient as quota gauge
             $gaugeColor = function ($p): string {
                 if ($p>100) return 'FF4040';
                 $start=[0x99,0xE6,0x99]; $end=[0xEE,0x99,0x99];
@@ -124,8 +128,10 @@
             echo '<div id="meter-disk-value" style="float:left;width: '.$percent.'%; background-color:#'.$bg.'; visibility:visible;">&nbsp;</div>';
             echo '</div></td></tr></table>';
             echo '<span style="font-size:1.05em; float:right; text-align:right; line-height:13px;">'.htmlspecialchars($title,ENT_QUOTES,'UTF-8').'</span>';
-            echo "\n<pre>\n"; // reopen pre for the rest of the block
+            echo "\n";
         }
+        echo "<pre>\nTraffic consumption at ".date('Y-m-d H:i:s', $trafficTime).":\nWeek {$trafficData['display']['week']}, Day: {$trafficData['display']['day']}\n";
+        echo "Past 30 days upload traffic: {$trafficData['display']['month']}\n\n";
     }
     
     if ( file_exists('../.trafficLimit') ) {
@@ -263,11 +269,11 @@ $contents = file_get_contents('/proc/meminfo');
 preg_match_all('/(\w+):\s+(\d+)\s/', $contents, $matches);
 $info = array_combine($matches[1], $matches[2]);
 
-echo "Memory Total:     ".formatKB($info['MemTotal']) . "MB\n";
-//echo "Memory Free:      ".formatKB($info['MemFree']) . "MB\n";
-echo "Memory Available: ".formatKB($info['MemAvailable']) . "MB\n";
-echo "Swap Total:       ".formatKB($info['SwapTotal'])."MB\n";
-echo "Swap Free:        ".formatKB($info['SwapFree'])."MB\n";
+echo "Memory Total:     ".formatKB($info['MemTotal']) . "MiB\n";
+//echo "Memory Free:      ".formatKB($info['MemFree']) . "MiB\n";
+echo "Memory Available: ".formatKB($info['MemAvailable']) . "MiB\n";
+echo "Swap Total:       ".formatKB($info['SwapTotal'])."MiB\n";
+echo "Swap Free:        ".formatKB($info['SwapFree'])."MiB\n";
 
 // Cgroup memory limits (per-user slice)
 $uid = function_exists('posix_geteuid') ? @posix_geteuid() : 0;
