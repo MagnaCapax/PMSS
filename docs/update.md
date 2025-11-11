@@ -178,6 +178,11 @@ Dry-run a release update to inspect logging only:
   pattern: one focused responsibility per file, concise docblocks, and reuse of
   the runtime helpers for logging.
 
+### Release Strategy
+- Rolling updates by default: the fleet intentionally runs a mix of versions across hosts; updates roll forward progressively and can be paused.
+- Coexistence across distros: Debian 10 and 11 hosts are operated side‑by‑side; update logic must remain compatible with both baselines.
+- Script rollbacks: scripts and configs can be reverted independently of package state; keep pre‑change backups and version metadata for quick rollback.
+
 Keeping the bootstrap minimal and the second phase modular allows PMSS to update
 safely even on partially broken systems while keeping the complex logic in files
 that are easy to test and reason about.

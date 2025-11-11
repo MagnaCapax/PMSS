@@ -20,7 +20,7 @@ Long-running PMSS operations should emit structured logs for traceability.
 ## Storage
 - Text logs: `/var/log/pmss/*.log`
 - JSON events: `/var/log/pmss-update.jsonl`
+- Per-user action logs: `/var/log/pmss/user-<username>.log` (best-effort text lines for actions taken on behalf of users; adopt progressively in cron scripts).
 
 ## Runbooks
 See `docs/runbooks/update-failures.md` for quick diagnosis steps.
-

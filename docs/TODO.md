@@ -20,3 +20,15 @@ This document tracks small, stability‑focused improvements and medium‑term r
 - Correlation / run ID
   - Generate a correlationId in phase 1 and thread it through logs and JSON events in both phases. Store in /var/run/pmss/correlation so child processes can attach it. Simplifies cross‑phase tracing and incident timelines.
 
+- Config backups with TTL
+  - Standardize pre-change backups for critical services (sshd, nginx, proftpd) and prune by age/version (TTL). Some ad‑hoc backups exist; consolidate naming, include version/correlationId, and add a simple retention policy.
+
+- Profile completeness
+  - Ensure every sub-step is wrapped with runStep()/pmssRecordProfile (apps, user steps, network). Where practical, record per-step counts (e.g., files changed) to aid diagnosis. This complements the existing profiling TODO in docs/update.md.
+
+- Per-user action logs (observability)
+  - Introduce a simple, dependency-free helper for per-user logs under `/var/log/pmss/user-<username>.log` so root/cron actions taken on behalf of users are traceable.
+  - Adopt the helper progressively in cron scripts (start/stop daemons, quota updates, web restarts) to append concise, timestamped lines; avoid excessive noise.
+  - Wire boot-time actions to per-user logs (e.g., rc.local starting `user@UID.service`). Add correlation IDs later and optional JSON lines if needed.
+  - Unify existing ad-hoc logs (e.g., pmss-update-user-<username>.log) under the helper over time to reduce duplication.
+  - Add a lightweight logrotate policy for `/var/log/pmss/user-*.log` with sane retention.
