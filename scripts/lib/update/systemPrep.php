@@ -82,16 +82,36 @@ if (!function_exists('pmssCgroupMode')) {
         if (is_string($override) && ($override === 'v2' || $override === 'v1')) {
             return $override;
         }
+
+        // Strongest signal: cgroup2 mount present in /proc/self/mountinfo
+        $mountinfo = @file('/proc/self/mountinfo', FILE_IGNORE_NEW_LINES) ?: [];
+        foreach ($mountinfo as $line) {
+            // Fields: ... mountpoint ... - fstype source options
+            // Look for " - cgroup2 " which unambiguously indicates unified v2
+            if (strpos($line, ' - cgroup2 ') !== false) {
+                return 'v2';
+            }
+        }
+
+        // Kernel exposes controllers file only on v2
         if (is_file('/sys/fs/cgroup/cgroup.controllers')) {
             return 'v2';
         }
-        // Basic v1 hint: presence of controller directories under /sys/fs/cgroup/
+
+        // Kernel cmdline override used by systemd to force v1 on newer Debian
+        $cmdline = @file_get_contents('/proc/cmdline');
+        if (is_string($cmdline) && strpos($cmdline, 'systemd.unified_cgroup_hierarchy=0') !== false) {
+            return 'v1';
+        }
+
+        // v1 hint: presence of controller directories under /sys/fs/cgroup/
         $v1hints = glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [];
         foreach ($v1hints as $d) {
             if (basename((string)$d) !== 'unified') {
                 return 'v1';
             }
         }
+
         return 'unknown';
     }
 }
@@ -152,6 +172,36 @@ if (!function_exists('pmssEnsureCgroupsConfigured')) {
             }
         } else {
             $log('[SKIP] Using systemd TasksMax for PID limits (cgroup v2)');
+        }
+
+        // Advisory: hidepid=2 on /proc breaks rootless Docker under cgroup v2 on many hosts.
+        // Emit a warning so operators can adjust policy if needed.
+        try {
+            $procMount = '';
+            $hidepid   = '';
+            $mi = @file('/proc/self/mountinfo', FILE_IGNORE_NEW_LINES);
+            if (is_array($mi)) {
+                foreach ($mi as $l) {
+                    // Identify the /proc mountpoint line
+                    if (preg_match('#\s(/proc)\s#', $l)) { $procMount = $l; }
+                }
+            }
+            if ($procMount !== '') {
+                // Extract mount options field (4th field) and parse hidepid option
+                $parts = explode(' ', $procMount);
+                if (isset($parts[3])) {
+                    $opts = explode(',', $parts[3]);
+                    foreach ($opts as $o) {
+                        if (strpos($o, 'hidepid=') === 0) { $hidepid = substr($o, 8); break; }
+                    }
+                }
+            }
+            $rootlessTool = is_file('/usr/bin/dockerd-rootless-setuptool.sh');
+            if ($mode === 'v2' && $hidepid !== '' && (int)$hidepid > 0 && $rootlessTool) {
+                $log('[WARN] cgroup v2 with /proc hidepid>0 detected; rootless Docker may fail. Consider remounting /proc without hidepid or adjusting policy.');
+            }
+        } catch (\Throwable $e) {
+            // Best-effort advisory only
         }
     }
 }
