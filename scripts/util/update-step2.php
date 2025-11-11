@@ -7,6 +7,12 @@
  * (/scripts/update.php) refreshes itself. Tasks include repository setup,
  * service configuration, user environment maintenance and security tweaks.
  *
+ * #TODO profiling
+ * In a future refactor, launch this sequence from a thinner orchestrator and
+ * ensure EVERY unit of work is wrapped in profiling/structured logging. That
+ * means no bare function calls or shell execs without runStep/pmssRecordProfile
+ * (or a wrapper), so the JSON/profile output gives a complete breakdown.
+ *
  * Package phase invariant: repository templating, dpkg baseline replay, and
  * queued package installs must succeed before any other module executes. Do
  * not insert additional orchestration ahead of the package phase.

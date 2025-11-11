@@ -145,6 +145,11 @@ Every step flows through the shared `runStep()` helper which logs to
 `pmss-update.log`, records JSON events, and collects profiling metadata. When
 `PMSS_DRY_RUN=1` the orchestration still logs planned work but skips execution.
 
+### TODO: Profiling coverage
+- Move toward a thinner top-level orchestrator that launches each unit of work
+  under a profiling wrapper. No bare function calls or shell execs should be
+  outside the profiling layer so JSON/profile output reflects every step.
+
 ## Usage Examples
 
 Upgrade to the latest release:
