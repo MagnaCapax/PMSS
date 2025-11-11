@@ -24,7 +24,6 @@ cd "$ROOT"
 job=""
 exec_cmd=""
 custom_prompt=""
-include_agents=1
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
