@@ -15,6 +15,7 @@ if (count($users) == 0) die("No users in this system!\n");
 
 $trafficData = array();
 foreach($users AS $thisUser) {
+    #TODO(user-logs): log per-user throttling enable/disable actions to /var/log/pmss/user-<username>.log
     $userTrafficLimitFile = "/etc/seedbox/runtime/trafficLimits/{$thisUser}";
     $trafficDataFile = "/home/{$thisUser}/.trafficData";
     if (!file_exists($trafficDataFile) or
@@ -109,6 +110,7 @@ foreach ($trafficData AS $thisUser => $thisData) {
         
         if ($trafficLimitEnabledTime > $trafficLimitPeriod) {   // Time to remove the limit
             unlink( $userTrafficLimitEnabledFile );
+            #TODO(user-logs): record throttle removal in per-user log
             setRateLimit($thisUser, $thisData['trafficLimit'], false);
 			// Do it second time as removal does not always work for some reason
 			sleep(1);

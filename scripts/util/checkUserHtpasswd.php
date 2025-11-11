@@ -26,6 +26,7 @@ if ($globalContents === false || trim($globalContents) === '') {
 $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
 foreach ($users as $thisUser) {
+    #TODO(user-logs): log per-user htpasswd sync operations to /var/log/pmss/user-<username>.log
     if ($thisUser === '') { continue; }
     $thisUserDir = "/home/{$thisUser}";
     if (file_exists($thisUserDir . '/.lighttpd/.htpasswd')) {

@@ -6,6 +6,7 @@ This script manages and monitors user-specific lighttpd and php-cgi processes.
 */
 
 echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
+// #TODO(user-logs): record start/restart actions to /var/log/pmss/user-<username>.log via pmssUserLog()
 
 // Get & parse users list
 $users = shell_exec('/scripts/listUsers.php');
@@ -81,4 +82,5 @@ function restartLighttpd($thisUser) {    // Kill any php-cgi or lighttpd process
     shell_exec("killall -15 -u {$thisUser} lighttpd; killall -15 -u {$thisUser} php-cgi; sleep 5; killall -9 -u {$thisUser} lighttpd; killall -9 -u {$thisUser} php-cgi;");
     usleep(50000);   // brief pause before relaunch
     startLighttpd($thisUser);
+    #TODO(user-logs): record lighttpd restart in per-user log
 }

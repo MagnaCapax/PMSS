@@ -26,6 +26,7 @@ $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
 $userConfig = '';
 
 foreach($users AS $thisUser) {
+    #TODO(user-logs): log per-user lighttpd config/port allocation and file operations to /var/log/pmss/user-<username>.log
     if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;   // Suspended or not torrent user
     $portFile = "{$portsDirectory}/lighttpd-{$thisUser}";
     if (file_exists($portFile)) {
@@ -88,4 +89,3 @@ foreach($users AS $thisUser) {
 
     
 }
-

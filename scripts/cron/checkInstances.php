@@ -10,6 +10,7 @@ $changedConfig = array();
 
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
+    #TODO(user-logs): log per-user start/kill actions to /var/log/pmss/user-<username>.log
     if (empty($thisUser)) continue;
     $escapedUser = escapeshellarg($thisUser);
     
@@ -18,6 +19,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         !file_exists("/home/{$thisUser}/www") ) {
             echo "User: {$thisUser} is suspended\n";
             passthru('killall -9 -u ' . $escapedUser);  // Ensure nothing for the user is running
+            #TODO(user-logs): record suspension cleanup in per-user log
             continue;  //Suspended
     }
     //echo "Checking: {$thisUser}\n";
@@ -39,6 +41,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 
     if(empty($instances)) {    // No instances at all? Ok time to start rTorrent!
         start($thisUser);
+        #TODO(user-logs): record restart in per-user log
         continue;
     }
    
@@ -69,6 +72,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     } else {    // Process is running, but no (valid or otherwise) lock file
         
         echo "No lock file found! Killall, restart.\n";
+        #TODO(user-logs): record lockfile mismatch and restart in per-user log
         passthru('killall -9 -u ' . $escapedUser . ' ' . escapeshellarg('rtorrent main'));
         passthru('killall -9 -u ' . $escapedUser . ' ' . escapeshellarg('/usr/local/bin/rtorrent'));
         sleep(3);

@@ -56,6 +56,7 @@ chmod($thisUsageFile, 0600);
 $logger->msg("Collecting data");
 
 foreach($users AS $thisUser) {
+    #TODO(user-logs): log per-user traffic anomalies and threshold actions into /var/log/pmss/user-<username>.log
     $thisUid = trim( shell_exec("id -u {$thisUser}") );
     $thisUserTraffic = 0;
     $thisUserTrafficLocal = 0;

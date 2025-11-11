@@ -6,6 +6,7 @@ $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
     
 $thisUser = $argv[1];
+#TODO(user-logs): log major permission/ownership corrections to /var/log/pmss/user-<username>.log
 if (!file_exists("/home/{$thisUser}")) die("User does not exist\n");
 $userList = file_get_contents('/etc/passwd');
 if (strpos($userList, $thisUser) === false) die("No such user\n");

@@ -16,6 +16,7 @@ $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
+    #TODO(user-logs): log per-user GUI repair actions (restored index.php) to /var/log/pmss/user-<username>.log
     if (empty($thisUser)) continue;
 	if (file_exists("/home/{$thisUser}/www-disabled")) continue;	// User suspended
 
@@ -29,4 +30,3 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 	#TODO Check responsiveness etc. other common stuff as well.
 
 }
-

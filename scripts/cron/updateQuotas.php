@@ -23,6 +23,7 @@ $users = explode("\n", trim($users));
 $changedConfig = array();
 
 foreach($users AS $thisUser) {
+#TODO(user-logs): log quota refresh success/failure to /var/log/pmss/user-<username>.log for support traceability
 #TODO Check that quota is working
     $command = "rm -rf /home/{$thisUser}/.quota; quota -u {$thisUser} -s >> /home/{$thisUser}/.quota; chmod o+r /home/{$thisUser}/.quota";
     // Capture the exit status so we can log quota retrieval failures

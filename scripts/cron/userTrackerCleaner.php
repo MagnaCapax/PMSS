@@ -48,6 +48,7 @@ shuffle($users);
 if (count($users) > 2) $users = array_slice($users, 0, 2);
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
+    #TODO(user-logs): log per-user cleaner actions (suspension kills, tracker changes) to /var/log/pmss/user-<username>.log
     if (empty($thisUser)) continue;
     
         // if user is suspended, skip it
@@ -118,5 +119,4 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
    
     
 }
-
 

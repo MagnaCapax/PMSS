@@ -3,6 +3,7 @@
 /**
  * Ensure the WireGuard service remains healthy.
  */
+// #TODO(user-logs): when taking user-impacting actions, log to per-user logs if a mapping exists
 
 $logPrefix = date('c') . ' ';
 $config = '/etc/wireguard/wg0.conf';

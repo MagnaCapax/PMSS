@@ -86,6 +86,7 @@ if (!file_exists("/etc/nginx/users")) {
 }
 
 foreach($users AS $thisUser) {
+    #TODO(user-logs): log per-user web config regeneration to /var/log/pmss/user-<username>.log
     $portFile = "/etc/seedbox/runtime/ports/lighttpd-{$thisUser}";
     if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;
    

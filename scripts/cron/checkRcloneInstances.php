@@ -7,11 +7,13 @@ $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
+    #TODO(user-logs): log per-user start/kill actions to /var/log/pmss/user-<username>.log
     if (empty($thisUser)) continue;
     if (file_exists("/home/{$thisUser}/www-disabled") or 
         !file_exists("/home/{$thisUser}/www")) {
             echo "User: {$thisUser} is suspended\n";
             passthru("killall -9 -u {$thisUser}");
+            #TODO(user-logs): record suspension cleanup in per-user log
             continue;  //Suspended
     }
 
@@ -20,6 +22,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     
     $instances = shell_exec('pgrep -u' . $thisUser . ' rclone');
     if (empty($instances)) startRclone($thisUser);
+    #TODO(user-logs): record rclone start in per-user log
  
 
 }
@@ -30,4 +33,3 @@ function startRclone($user) {    // this actually calls the function to start rT
     $port = (int) file_get_contents( "/home/{$user}/.rclonePort" );
     passthru("su {$user} -c 'cd ~; nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &'");
 }
-
