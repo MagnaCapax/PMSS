@@ -34,4 +34,12 @@ chmod 741 /home;
 chmod 740 /home/* /var/run/utmp /var/log/wtmp;
 nohup /scripts/listUsers.php | xargs -n1 /scripts/util/userPermissions.php >> /dev/null 2>&1 &
 
+# Ensure per-user systemd instances are started so user services (e.g., rootless Docker) can run
+nohup /scripts/listUsers.php | while read -r U; do
+    [ -z "$U" ] && continue
+    UID_NUM=$(id -u "$U" 2>/dev/null) || continue
+    systemctl start "user@${UID_NUM}.service" || true
+    #TODO(user-logs): consider writing to /var/log/pmss/user-<username>.log when reliable
+done >> /dev/null 2>&1 &
+
 exit 0
