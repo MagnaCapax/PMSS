@@ -235,6 +235,11 @@ pmssAdjustLighttpdSecurity();
 // Per-user updates ensure ruTorrent stays consistent.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
 pmssUpdateAllUsers($rutorrentIndexSha);
+// #TODO(user-logs): per-user environment updates could append summary lines to /var/log/pmss/user-<username>.log
+// Ensure user linger/systemd and rootless Docker are enabled and running; logs go to per-user files.
+if (function_exists('pmssEnsureLingerAndDockerAllUsers')) {
+    pmssEnsureLingerAndDockerAllUsers();
+}
 
 pmssEnsureAuthorizedKeysDirective();
 pmssEnsureTestfile();
