@@ -11,74 +11,13 @@
 
 <div class="portfolioimg">
 
-<pre>
-Base resources (current):
-<?php
-// Show a brief slice status line similar to production snippet
-@passthru('systemctl status user-$("/usr/bin/id" -u).slice | grep -A3 -m1 "IP: "');
-?>
-</pre>
+ 
 
 <h6>Disk usage / Quota</h6>
 <pre>
 <?php
- // Show raw quota output and a visual gauge based on parsed values
- if (file_exists('../.quota')) {
-     echo @file_get_contents('../.quota');
-     $quotaMtime = @filemtime('../.quota');
-     if ($quotaMtime) {
-         echo "\nUpdated: ".date('Y-m-d H:i:s', $quotaMtime)."\n";
-     }
-     // Parse the human output to compute used/soft/hard and render a gauge
-     @require_once __DIR__.'/_lib/gauge.php';
-     $quotaRaw = @file_get_contents('../.quota');
-     $lines = @preg_split('/\r?\n/', (string)$quotaRaw);
-     if (is_array($lines) && count($lines) >= 3) {
-         $line = trim($lines[2]);
-         // Some distros add a by-uuid/mapper line; adjust if detected
-         if (strpos($line, 'disk/by-uuid') !== false || strpos($line, '/mapper/') !== false) {
-             $line = trim($lines[3] ?? '');
-         }
-         if ($line !== '') {
-             $line = preg_replace('/([\s]--)/', '', $line);
-             $parts = preg_split('/\s+/', $line);
-             if (is_array($parts) && count($parts) >= 4) {
-                 $toBytes = function (string $s): int {
-                     $s = str_replace('*', '', $s);
-                     $u = strtoupper(substr($s, -1));
-                     $n = (int)$s;
-                     if ($u === 'K') $n *= 1024;
-                     elseif ($u === 'M') $n *= 1024*1024;
-                     elseif ($u === 'G') $n *= 1024*1024*1024;
-                     elseif ($u === 'T') $n *= 1024*1024*1024*1024;
-                     return $n;
-                 };
-                 // Columns: filesystem, space, quota (soft), limit (hard), ...
-                 $usedBytes  = $toBytes($parts[1]);
-                 $softBytes  = $toBytes($parts[2]);
-                 $hardBytes  = $toBytes($parts[3]);
-                 $percent    = $softBytes > 0 ? round(($usedBytes / $softBytes) * 100, 1) : 0;
-                 $percentMax = $hardBytes > 0 ? round(($usedBytes / $hardBytes) * 100, 1) : $percent;
-                 if ($percent < 100) $percentMax = $percent; // draw against soft until bursting
-                 // Render gauge via shared helper
-                 $readable = function (int $bytes): string {
-                     $units=['B','KiB','MiB','GiB','TiB']; $i=0; $v=max($bytes,0);
-                     while ($v>=1024 && $i<count($units)-1) { $v/=1024; $i++; }
-                     return round($v,2).' '.$units[$i];
-                 };
-                 $titleText = $readable($usedBytes).' / '.$readable($softBytes);
-                 if ($percent > 100) $titleText .= ' Burst: '.$readable($hardBytes);
-                 echo "\n";
-                 echo createGauge($titleText, $titleText, $percent, $percentMax);
-                 // Explicit burst indicator when above soft limit
-                 if ($percent > 100) {
-                     echo '<br /><span style="float:right; color:#dc3545; font-size:0.95em;">Bursting — limit: '.htmlspecialchars($readable($hardBytes), ENT_QUOTES, 'UTF-8').'</span>';
-                 }
-                 echo "\n\n";
-             }
-         }
-     }
- }
+ if (file_exists('../.quota')) echo @file_get_contents('../.quota');
+?>
 // echo `cd ..; du -hcd1 .; cd -`;
 ?>
  </pre>
