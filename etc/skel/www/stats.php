@@ -75,6 +75,10 @@
                  echo '<div id="meter-disk-value" style="float:left;width: '.$percentMax.'%; background-color:#'.$bg.'; visibility:visible;">&nbsp;</div>';
                  echo '</div></td></tr></table>';
                  echo '<span style="font-size:1.05em; float:right; text-align:right; line-height:13px;">'.htmlspecialchars($titleText,ENT_QUOTES,'UTF-8').'</span>';
+                 // Explicit burst indicator when above soft limit
+                 if ($percent > 100) {
+                     echo '<br /><span style="float:right; color:#dc3545; font-size:0.95em;">Bursting — limit: '.htmlspecialchars($readable($hardBytes), ENT_QUOTES, 'UTF-8').'</span>';
+                 }
                  echo "\n\n";
              }
          }
