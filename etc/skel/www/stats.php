@@ -97,6 +97,35 @@
     if (is_array($trafficData)) {
         echo "<h6>Traffic usage</h6><pre>\n\nTraffic consumption at " . date('Y-m-d H:i:s', $trafficTime) . ":\nWeek {$trafficData['display']['week']}, Day: {$trafficData['display']['day']}\n";
         echo "Past 30 days upload traffic: {$trafficData['display']['month']}\n\n";
+        // Render a traffic gauge based on monthly usage vs. limit, below the header
+        $trafficLimitGauge = 0;
+        if (file_exists('../.trafficLimit')) {
+            $trafficLimitGauge = (int) trim(@file_get_contents('../.trafficLimit'));
+        }
+        if ($trafficLimitGauge > 0) {
+            // Close pre for the gauge block, then reopen
+            echo "</pre>\n";
+            $usedGiB = (int) round((($trafficData['raw']['month'] ?? 0)/1024));
+            $percent = $trafficLimitGauge > 0 ? min(999, round(($usedGiB / $trafficLimitGauge) * 100, 1)) : 0;
+            $title = $usedGiB.'GiB / '.$trafficLimitGauge.'GiB';
+            // reuse the same color gradient as quota gauge
+            $gaugeColor = function ($p): string {
+                if ($p>100) return 'FF4040';
+                $start=[0x99,0xE6,0x99]; $end=[0xEE,0x99,0x99];
+                $d=[ $start[0]-$end[0], $start[1]-$end[1], $start[2]-$end[2] ];
+                $o=[ round($d[0]*($p/100)), round($d[1]*($p/100)), round($d[2]*($p/100)) ];
+                $c=[ $start[0]-$o[0], $start[1]-$o[1], $start[2]-$o[2] ];
+                return sprintf('%02x%02x%02x', $c[0],$c[1],$c[2]);
+            };
+            $bg = $gaugeColor($percent);
+            echo '<table style="margin:0; padding:0; width: 100%;"><tr><td id="meter-disk-td" title="'.htmlspecialchars($title,ENT_QUOTES,'UTF-8').'">';
+            echo '<div id="meter-disk-holder">';
+            echo '<span id="meter-disk-text" style="overflow:visible;">'.$percent.'%</span>';
+            echo '<div id="meter-disk-value" style="float:left;width: '.$percent.'%; background-color:#'.$bg.'; visibility:visible;">&nbsp;</div>';
+            echo '</div></td></tr></table>';
+            echo '<span style="font-size:1.05em; float:right; text-align:right; line-height:13px;">'.htmlspecialchars($title,ENT_QUOTES,'UTF-8').'</span>';
+            echo "\n<pre>\n"; // reopen pre for the rest of the block
+        }
     }
     
     if ( file_exists('../.trafficLimit') ) {
@@ -194,9 +223,20 @@ echo 'WireGuard: <span style="color:#'.($wg==='active'?'28a745':($wg==='inactive
 echo 'OpenVPN: <span style="color:#'.($ovpn==='active'?'28a745':($ovpn==='inactive'?'dc3545':'ffc107')).';">'.htmlspecialchars($ovpn,ENT_QUOTES,'UTF-8').'</span>, ';
 echo 'Docker: <span style="color:#'.($dock==='active'?'28a745':($dock==='inactive'?'dc3545':'ffc107')).';">'.htmlspecialchars($dock,ENT_QUOTES,'UTF-8').'</span>';
 
-// Per-user processes (assumes per-user web server)
-$who = function_exists('posix_geteuid') ? @posix_getpwuid(@posix_geteuid()) : null;
-$uname = is_array($who) ? ($who['name'] ?? '') : (getenv('USER') ?: '');
+// Per-user processes: derive username from web root path if available (e.g., /home/<user>/www)
+$uname = '';
+if (function_exists('posix_geteuid')) {
+    $who = @posix_getpwuid(@posix_geteuid());
+    $uname = is_array($who) ? ($who['name'] ?? '') : '';
+}
+if ($uname === '') {
+    $webRoot = realpath(__DIR__);
+    if ($webRoot !== false) {
+        $home = dirname($webRoot);
+        $candidate = basename($home);
+        if ($candidate && $candidate !== 'www') $uname = $candidate;
+    }
+}
 $isRunning = function ($proc, $user) {
     if ($user === '') return false;
     $cmd = 'pgrep -x '.escapeshellarg($proc).' -u '.escapeshellarg($user).' >/dev/null 2>&1';
@@ -210,6 +250,7 @@ echo '<br /><b>Apps:</b> rTorrent: <span style="color:#'.($rt==='running'?'28a74
 echo 'Deluge: <span style="color:#'.($dg==='running'?'28a745':'dc3545').';">'.$dg.'</span>, ';
 echo 'rclone: <span style="color:#'.($rc==='running'?'28a745':'dc3545').';">'.$rc.'</span>';
 ?>
+<pre>
 <pre>
 <?=passthru('uptime');?>
 
@@ -227,6 +268,33 @@ echo "Memory Total:     ".formatKB($info['MemTotal']) . "MB\n";
 echo "Memory Available: ".formatKB($info['MemAvailable']) . "MB\n";
 echo "Swap Total:       ".formatKB($info['SwapTotal'])."MB\n";
 echo "Swap Free:        ".formatKB($info['SwapFree'])."MB\n";
+
+// Cgroup memory limits (per-user slice)
+$uid = function_exists('posix_geteuid') ? @posix_geteuid() : 0;
+if ($uid > 0) {
+    $v2limit = "/sys/fs/cgroup/user.slice/user-{$uid}.slice/memory.max";
+    $v2usage = "/sys/fs/cgroup/user.slice/user-{$uid}.slice/memory.current";
+    $v1limit = "/sys/fs/cgroup/memory/user.slice/user-{$uid}.slice/memory.limit_in_bytes";
+    $v1usage = "/sys/fs/cgroup/memory/user.slice/user-{$uid}.slice/memory.usage_in_bytes";
+    $lim = null; $use = null; $mode = '';
+    if (is_readable($v2limit) && is_readable($v2usage)) {
+        $l = trim((string)@file_get_contents($v2limit));
+        $u = trim((string)@file_get_contents($v2usage));
+        $lim = ($l === 'max') ? 'unlimited' : (int)$l;
+        $use = (int)$u; $mode = 'cgroup v2';
+    } elseif (is_readable($v1limit) && is_readable($v1usage)) {
+        $lim = (int)trim((string)@file_get_contents($v1limit));
+        $use = (int)trim((string)@file_get_contents($v1usage));
+        $mode = 'cgroup v1';
+    }
+    if ($lim !== null && $use !== null) {
+        $fmt = function (int $bytes): string {
+            $u=['B','KiB','MiB','GiB','TiB']; $i=0; $v=$bytes; while($v>=1024 && $i<count($u)-1){$v/=1024;$i++;} return round($v,2).' '.$u[$i];
+        };
+        $line = ($lim === 'unlimited') ? 'Limit: unlimited' : ('Limit: '.$fmt((int)$lim));
+        echo "\nCgroup memory ({$mode})\n".$line."\nCurrent: ".$fmt((int)$use)."\n";
+    }
+}
 
 ?>
 </pre>
