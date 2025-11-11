@@ -27,20 +27,34 @@ custom_prompt=""
 include_agents=1
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --job) job=${2:-}; shift 2 || true ;;
-    --exec) exec_cmd=${2:-}; shift 2 || true ;;
-    --prompt) custom_prompt=${2:-}; shift 2 || true ;;
-    -h|--help)
-      sed -n '1,80p' "$0"; exit 0 ;;
-    *) echo "[ci] unknown option: $1" >&2; exit 2 ;;
-  esac
+	case "$1" in
+	--job)
+		job=${2:-}
+		shift 2 || true
+		;;
+	--exec)
+		exec_cmd=${2:-}
+		shift 2 || true
+		;;
+	--prompt)
+		custom_prompt=${2:-}
+		shift 2 || true
+		;;
+	-h | --help)
+		sed -n '1,80p' "$0"
+		exit 0
+		;;
+	*)
+		echo "[ci] unknown option: $1" >&2
+		exit 2
+		;;
+	esac
 done
 
-args=( )
-[[ -n "$job" ]] && args+=( --job "$job" )
-[[ -n "$custom_prompt" ]] && args+=( --prompt "$custom_prompt" )
-[[ -n "$exec_cmd" ]] && args+=( --exec "$exec_cmd" )
+args=()
+[[ -n "$job" ]] && args+=(--job "$job")
+[[ -n "$custom_prompt" ]] && args+=(--prompt "$custom_prompt")
+[[ -n "$exec_cmd" ]] && args+=(--exec "$exec_cmd")
 
 set +e
 bash "$ROOT/scripts/cli/ci-codex.sh" "${args[@]}"

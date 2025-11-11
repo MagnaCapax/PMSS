@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Wait up to two hours to obscure the exact backup time
 if [ -z "${BACKUP_ETC_TEST:-}" ]; then
-    sleep $(shuf -i0-7200 -n1)
+	sleep $(shuf -i0-7200 -n1)
 fi
 
 BACKUP_DIR_FILE="/root/.backup_dir"

@@ -234,6 +234,13 @@ pmssAdjustLighttpdSecurity();
 
 // Per-user updates ensure ruTorrent stays consistent.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
+// Ensure per-user cgroup defaults converge during the update run, before applying
+// user-level skeleton/permission changes.
+if (function_exists('pmssApplyCgroupDefaultsAllUsers')) {
+    pmssApplyCgroupDefaultsAllUsers();
+} else {
+    logmsg('[WARN] pmssApplyCgroupDefaultsAllUsers missing; skipping cgroup defaults application');
+}
 pmssUpdateAllUsers($rutorrentIndexSha);
 
 pmssEnsureAuthorizedKeysDirective();
