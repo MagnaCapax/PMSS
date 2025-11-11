@@ -29,8 +29,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 shopt -s nullglob
-files=( "$ADR_DIR"/[0-9][0-9][0-9][0-9]-*.md )
-IFS=$'\n' files=( $(printf '%s\n' "${files[@]}" | sort) )
+# Build the list via compgen to avoid shfmt confusion with [0-9] in array literals
+mapfile -t files < <(compgen -G "$ADR_DIR"/[0-9][0-9][0-9][0-9]-*.md | sort)
 
 match_keywords() {
   local hay="$1"; shift
@@ -70,4 +70,3 @@ for f in "${files[@]}"; do
     printf '%s %s — [%s] — %s\n' "$num" "${title:-<no title>}" "${cat:-unknown}" "$f"
   fi
 done
-

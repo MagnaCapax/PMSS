@@ -16,6 +16,10 @@ requireRoot();
 $exitCodes = [];
 
 if (is_dir('/etc/skel')) {
+    // NOTE: Historical implementation uses globs including '.*'. This has been
+    // deployed for years; do not change the behavior lightly.
+    // #TODO Consider replacing with a safer find-based approach that excludes
+    // '.' and '..' explicitly to avoid any future shell expansion pitfalls.
     $exitCodes[] = runStep(
         'Hardening /etc/skel content permissions',
         'cd /etc/skel && chmod o-w * -R && chmod o-w .* -R'
@@ -26,6 +30,7 @@ if (is_dir('/etc/skel')) {
 }
 
 if (is_dir('/etc/seedbox')) {
+    // #TODO As above, review glob safety; keep current behavior for stability.
     $exitCodes[] = runStep(
         'Hardening /etc/seedbox content permissions',
         'cd /etc/seedbox && chmod o-w * -R && chmod o-w .* -R'

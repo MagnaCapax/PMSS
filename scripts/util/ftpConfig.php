@@ -4,19 +4,23 @@
  * Render and apply the ProFTPD configuration using project templates.
  */
 
-echo date('Y-m-d H:i:s').': Making ProFTPd configuration' . "\n";
+require_once __DIR__.'/../lib/update/logging.php';
+require_once __DIR__.'/../lib/update/runtime/commands.php';
+
+logMessage('Making ProFTPD configuration');
 
 $configTemplate = @file_get_contents('/etc/seedbox/config/template.proftpd');
 $hostnameRaw    = @file_get_contents('/etc/hostname');
 
 if ($configTemplate === false || $hostnameRaw === false) {
-    die('No data, hostname or config template is empty!');
+    logMessage('No data, hostname or config template is empty!');
+    exit(1);
 }
 
 $proftpdDir = '/etc/proftpd';
 if (!is_dir($proftpdDir)) {
-    fwrite(STDERR, "Skipping ProFTPD configuration (directory {$proftpdDir} missing).\n");
-    return;
+    logMessage("Skipping ProFTPD configuration (directory {$proftpdDir} missing).");
+    exit(0);
 }
 
 $hostname = sanitizeHostname($hostnameRaw);
@@ -36,23 +40,24 @@ $logDir = '/var/log/proftpd';
 $runDir = '/var/run/proftpd';
 
 if (!is_dir($logDir) && !@mkdir($logDir, 0750, true)) {
-    echo "Warning: Unable to create {$logDir}\n";
+    logMessage("Warning: Unable to create {$logDir}");
 }
 if (!is_dir($runDir) && !@mkdir($runDir, 0750, true)) {
-    echo "Warning: Unable to create {$runDir}\n";
+    logMessage("Warning: Unable to create {$runDir}");
 }
 
-file_put_contents('/etc/proftpd/proftpd.conf', $rendered);
+if (@file_put_contents('/etc/proftpd/proftpd.conf', $rendered) === false) {
+    logMessage('Failed to write /etc/proftpd/proftpd.conf');
+    exit(1);
+}
+logMessage('Wrote /etc/proftpd/proftpd.conf');
 
-$rc = 0;
 if (is_dir('/run/systemd/system')) {
-    passthru('systemctl restart proftpd', $rc);
+    runStep('Restarting ProFTPD (systemd)', 'systemctl restart proftpd');
 } elseif (file_exists('/etc/init.d/proftpd')) {
-    passthru('/etc/init.d/proftpd restart', $rc);
-}
-
-if (($rc ?? 0) !== 0) {
-    fwrite(STDERR, "Warning: ProFTPD restart returned code {$rc}.\n");
+    runStep('Restarting ProFTPD (sysvinit)', '/etc/init.d/proftpd restart');
+} else {
+    logMessage('ProFTPD service manager not found; skipped restart');
 }
 
 /**

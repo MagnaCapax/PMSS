@@ -6,25 +6,24 @@ set -euo pipefail
 # Excludes third-party/frozen trees so metrics reflect first-party code.
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-HERE="$(cd "$(dirname "$0")" && pwd)"
 
-PHPLC=""
+PHPLC_BIN=()
 if [[ -x "$ROOT_DIR/vendor/bin/phploc" ]]; then
-  PHPLC="$ROOT_DIR/vendor/bin/phploc"
+  PHPLC_BIN=("$ROOT_DIR/vendor/bin/phploc")
 elif [[ -f "$ROOT_DIR/tools/phploc.phar" ]]; then
-  PHPLC="php $ROOT_DIR/tools/phploc.phar"
+  PHPLC_BIN=(php "$ROOT_DIR/tools/phploc.phar")
 elif command -v phploc >/dev/null 2>&1; then
-  PHPLC="phploc"
+  PHPLC_BIN=(phploc)
 fi
 
-if [[ -z "$PHPLC" ]]; then
+if [[ ${#PHPLC_BIN[@]} -eq 0 ]]; then
   echo "[phploc] phploc not found. Options:" >&2
   echo "  - composer require --dev phploc/phploc" >&2
   echo "  - or: mkdir -p tools && curl -L -o tools/phploc.phar https://phar.phpunit.de/phploc.phar" >&2
   exit 1
 fi
 
-echo "[phploc] using: $PHPLC" >&2
+echo "[phploc] using: ${PHPLC_BIN[*]}" >&2
 
 # Exclusions to match LOC script intent
 EXCLUDES=(
@@ -37,5 +36,4 @@ EXCLUDES=(
 # Run phploc over the whole repo root (fast) with our excludes
 # phploc outputs a readable summary by default; we just print it through.
 set -x
-eval "$PHPLC" "${EXCLUDES[@]}" "$ROOT_DIR"
-
+"${PHPLC_BIN[@]}" "${EXCLUDES[@]}" "$ROOT_DIR"

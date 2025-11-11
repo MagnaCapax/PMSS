@@ -445,6 +445,9 @@ function stageSnapshot(string $tmp, bool $dryRun): void
             if (is_dir($source.'/skel') && is_dir('/etc/skel')) {
                 runFatal('find /etc/skel -mindepth 1 -maxdepth 1 -exec rm -rf {} +', EXIT_COPY);
             }
+            // Intentionally using cp -rpu here so locally-newer files under /etc
+            // are not overwritten by the snapshot. This is desired behavior to
+            // preserve operator edits or newer timestamps.
             runFatal('cp -rpu '.escapeshellarg($source).' /', EXIT_COPY);
         },
         'var' => function (string $source) {

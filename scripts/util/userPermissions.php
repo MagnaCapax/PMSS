@@ -10,9 +10,14 @@ if (!file_exists("/home/{$thisUser}")) die("User does not exist\n");
 $userList = file_get_contents('/etc/passwd');
 if (strpos($userList, $thisUser) === false) die("No such user\n");
 
-function run(string $cmd): void
+function run(string $cmd): int
 {
-    shell_exec($cmd);
+    $rc = 0;
+    passthru($cmd, $rc);
+    if ($rc !== 0) {
+        fwrite(STDERR, "Command failed (rc={$rc}): {$cmd}\n");
+    }
+    return $rc;
 }
 
 function chmodPath(string $path, int $perm, bool $recursive = false): void
@@ -26,10 +31,12 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
 {
     $flag = $recursive ? '-R ' : '';
     $target = strpbrk($path, '*?[]') === false ? escapeshellarg($path) : $path;
-    run("chown {$flag}{$owner} {$target}");
+    // Quote owner spec as a single argument; chown accepts quoted 'user.group'
+    run(sprintf('chown %s%s %s', $flag, escapeshellarg($owner), $target));
 }
 
-run('find /home/' . escapeshellarg($thisUser) . ' -type d|xargs -n1 -d "\n" chmod 750');
+// Safer traversal without relying on xargs delimiters; applies to each directory in place.
+run(sprintf('find %s -type d -exec chmod 750 {} +', escapeshellarg('/home/'.$thisUser)));
 
 $chmodItems = [
     ["/home/{$thisUser}", 0770],

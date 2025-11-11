@@ -25,7 +25,10 @@ if (!function_exists('pmssUpdateAllUsers')) {
      */
     function pmssUpdateAllUsers(string $rutorrentIndexSha): void
     {
-        foreach (pmssListManagedUsers() as $user) {
+        $list = pmssListManagedUsers();
+        $count = count($list);
+        logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
+        foreach ($list as $user) {
             if ($user === '') {
                 continue;
             }
@@ -43,6 +46,29 @@ if (!function_exists('pmssRefreshSkeletonAndCron')) {
         runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
         runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
         runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
+    }
+}
+
+if (!function_exists('pmssApplyCgroupDefaultsAllUsers')) {
+    /**
+     * Apply cgroup defaults to all managed users, respecting any existing
+     * settings when invoked with --respect-existing by the caller.
+     */
+    function pmssApplyCgroupDefaultsAllUsers(): void
+    {
+        $list = pmssListManagedUsers();
+        $count = count($list);
+        logMessage(sprintf('Applying cgroup defaults for %d user(s)', $count));
+        foreach ($list as $user) {
+            if ($user === '') {
+                continue;
+            }
+            runUserStep(
+                $user,
+                'Applying cgroup properties (defaults, respect-existing)',
+                sprintf('php /scripts/util/userCgroup.php %s --apply --defaults --respect-existing', escapeshellarg($user))
+            );
+        }
     }
 }
 

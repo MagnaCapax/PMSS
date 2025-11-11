@@ -6,6 +6,12 @@
  * Usage:
  *   php /scripts/util/userCgroup.php USERNAME [--status] [--config]
  * Default: shows both config and status when no flags are provided.
+ *
+ * Flags:
+ *   --apply              Apply computed properties
+ *   --defaults           Seed properties from policy defaults (cgroup.policy.php)
+ *   --respect-existing   When used with --defaults, do not overwrite properties
+ *                        already present on the slice. Intended for safe updates.
  */
 
 require_once __DIR__.'/../lib/cli/OptionParser.php';
@@ -30,6 +36,23 @@ function showConfig(string $slice): void {
     $cmd = 'systemctl show '.escapeshellarg($slice).' -p '.implode(',', $props);
     $out = @shell_exec($cmd);
     echo $out !== null ? trim($out)."\n" : "(no data)\n";
+}
+
+function readCurrentProps(string $slice): array {
+    $props = ['CPUWeight','IOWeight','MemoryHigh','MemoryMax','TasksMax'];
+    $cmd = 'systemctl show '.escapeshellarg($slice).' -p '.implode(' -p ', $props);
+    $out = @shell_exec($cmd);
+    $map = [];
+    if (!is_string($out)) return $map;
+    foreach (preg_split('/\r?\n/', trim($out)) as $line) {
+        if ($line === '') continue;
+        $pos = strpos($line, '=');
+        if ($pos === false) continue;
+        $k = substr($line, 0, $pos);
+        $v = substr($line, $pos+1);
+        $map[$k] = $v;
+    }
+    return $map;
 }
 
 function showStatus(string $slice, int $uid): void {
@@ -119,6 +142,7 @@ function main(array $argv): int {
     $wantConfig = in_array('--config', $flags, true);
     $apply      = in_array('--apply', $flags, true);
     $dryRun     = in_array('--dry-run', $flags, true);
+    $respectExisting = in_array('--respect-existing', $flags, true);
     $device = '';
     $ioProfile = '';
     foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile'] as $k) {
@@ -251,6 +275,16 @@ function main(array $argv): int {
 
     // Compute final properties after all profile expansions
     $props = !empty($opt) ? computeSetProps($opt, totalMemMiB()) : [];
+
+    // If requested, avoid overwriting existing properties when applying defaults.
+    if ($useDefaults && $respectExisting && !empty($props)) {
+        $current = readCurrentProps($slice);
+        foreach (array_keys($props) as $k) {
+            if (isset($current[$k]) && trim((string)$current[$k]) !== '') {
+                unset($props[$k]);
+            }
+        }
+    }
 
     if (!empty($props)) {
         echo "\n[Planned properties]\n";
