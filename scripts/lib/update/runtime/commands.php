@@ -90,19 +90,18 @@ if (!function_exists('pmssLogStatus')) {
     /**
      * Log a status line with duration/rc in the same format as runStep(), without executing a command.
      */
-    function pmssLogStatus(string $status, string $description, int $rc = 0): void
+    function pmssLogStatus(string $status, string $description, int $rc = 0, ?float $duration = null): void
     {
         pmssInitProfileStore();
-        $started  = microtime(true);
-        $duration = microtime(true) - $started;
-        $message  = sprintf('[%s %.3fs rc=%d] %s', strtoupper($status), $duration, $rc, $description);
+        $dur = $duration !== null ? $duration : 0.0;
+        $message  = sprintf('[%s %.3fs rc=%d] %s', strtoupper($status), $dur, $rc, $description);
         logMessage($message);
         pmssRecordProfile([
             'description'    => $description,
             'command'        => '',
             'status'         => strtoupper($status),
             'rc'             => $rc,
-            'duration'       => round($duration, 4),
+            'duration'       => round($dur, 4),
             'dry_run'        => false,
             'stdout_excerpt' => '',
             'stderr_excerpt' => '',

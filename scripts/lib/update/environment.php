@@ -106,6 +106,10 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         $warnings      = false;
         if ($lines !== false) {
             $sanitised = [];
+            $t0 = microtime(true);
+            $droppedUnavailable = [];
+            $droppedObsolete    = [];
+            $droppedKernel      = [];
             foreach ($lines as $idx => $line) {
                 $trimmed = trim($line);
                 if ($trimmed === '') {
@@ -123,20 +127,11 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 $state   = $parts[1];
                 // Skip problematic or deprecated packages from baseline; do not log mediaarea repo packages at all
                 $lower = strtolower($package);
-                if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package)) {
-                    $warnings = true;
-                    continue;
-                }
+                if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package)) { $warnings = true; continue; }
                 // Drop legacy names we no longer install via apt (tarball/venv used instead)
-                if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) {
-                    $warnings = true;
-                    continue;
-                }
+                if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) { $warnings = true; $droppedObsolete[] = $package; continue; }
                 // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'
-                if (preg_match('/^linux-image-[0-9]/i', $package)) {
-                    $warnings = true;
-                    continue;
-                }
+                if (preg_match('/^linux-image-[0-9]/i', $package)) { $warnings = true; $droppedKernel[] = $package; continue; }
                 if (!preg_match('/^[a-z0-9.+:-]+$/i', $package) || !preg_match('/^(install|hold|purge|deinstall)$/i', $state)) {
                     if (function_exists('pmssLogStatus')) { pmssLogStatus('WARN', sprintf('Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed), 0); }
                     elseif (function_exists('logmsg')) { logmsg(sprintf('[WARN] Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed)); }
@@ -144,17 +139,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     continue;
                 }
                 // If requesting install of a package not available in the current apt cache, drop it
-                if (strtolower($state) === 'install' && !pmssPackageAvailable($package)) {
-                    // Silence known obsolete transitional like cgroup-bin
-                    if (strtolower($package) === 'cgroup-bin') {
-                        $warnings = true;
-                        continue;
-                    }
-                    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'Baseline package not available: '.$package.' (dropping)', 0); }
-                    elseif (function_exists('logmsg')) { logmsg('[SKIP] Baseline package not available: '.$package.' (dropping)'); }
-                    $warnings = true;
-                    continue;
-                }
+                if (strtolower($state) === 'install' && !pmssPackageAvailable($package)) { $warnings = true; if (strtolower($package) !== 'cgroup-bin') { $droppedUnavailable[] = $package; } continue; }
                 $sanitised[] = $package."\t".strtolower($state);
             }
 
@@ -167,6 +152,18 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     $tmpSelection = null;
                     $warnings     = true;
                 }
+            }
+
+            // Aggregate summary logs instead of per-package noise
+            if (!empty($droppedUnavailable) && function_exists('pmssLogStatus')) {
+                $sample = array_slice($droppedUnavailable, 0, 10);
+                pmssLogStatus('SKIP', sprintf('Baseline: dropped %d unavailable packages (first %d: %s)', count($droppedUnavailable), count($sample), implode(', ', $sample)), 0, microtime(true)-$t0);
+            }
+            if (!empty($droppedKernel) && function_exists('pmssLogStatus')) {
+                pmssLogStatus('SKIP', sprintf('Baseline: dropped %d versioned kernel packages', count($droppedKernel)), 0, 0.0);
+            }
+            if (!empty($droppedObsolete) && function_exists('pmssLogStatus')) {
+                pmssLogStatus('SKIP', sprintf('Baseline: dropped %d obsolete entries (legacy names)', count($droppedObsolete)), 0, 0.0);
             }
         }
 
