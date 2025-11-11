@@ -251,10 +251,7 @@ pmssApplySecurityHardening();
 
 // Mark the end of phase 2 so log parsing knows we finished cleanly.
 // Refresh MOTD at the very end so VPN/service status reflects final state.
-if (function_exists('generateMotd')) {
-    generateMotd();
-}
-// Refresh MOTD at end
+// Consolidated on the Motd class generator for determinism
 Motd::motdGenerate();
 pmssProfileSummary();
 // Surface log locations for operators to review after updates.

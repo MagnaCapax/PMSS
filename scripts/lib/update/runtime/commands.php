@@ -86,6 +86,33 @@ if (!function_exists('aptCmd')) {
     }
 }
 
+if (!function_exists('pmssBuildCommand')) {
+    /**
+     * Build a shell-safe command string from a binary and arguments.
+     * Uses escapeshellarg on each argument; intended for simple argv-style
+     * commands without shell metacharacter features.
+     */
+    function pmssBuildCommand(string $program, array $args = []): string
+    {
+        $prog = escapeshellcmd($program);
+        if (empty($args)) {
+            return $prog;
+        }
+        $escaped = array_map(static function ($a) { return escapeshellarg((string)$a); }, $args);
+        return $prog.' '.implode(' ', $escaped);
+    }
+}
+
+if (!function_exists('runStepCmd')) {
+    /**
+     * Execute a command composed from argv parts with safe quoting under runStep().
+     */
+    function runStepCmd(string $description, string $program, array $args): int
+    {
+        return runStep($description, pmssBuildCommand($program, $args));
+    }
+}
+
 if (!function_exists('pmssLogStatus')) {
     /**
      * Log a status line with duration/rc in the same format as runStep(), without executing a command.
