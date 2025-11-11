@@ -4,6 +4,7 @@
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/runtime.php';
+require_once '/scripts/lib/user/log.php';
 
 $logger = new Logger(__FILE__);
 $legacyLog = '/var/log/pmss/rootlessDocker.log';
@@ -48,7 +49,10 @@ foreach ($users as $user) {
             escapeshellarg('systemctl --user start docker.service')
         );
         runCommand($startCmd, false, 'logDockerMessage');
+        // Per-user observability: record watchdog action
+        pmssUserLog($user, 'watchdog: systemctl --user start docker.service');
     } else {
         logDockerMessage("Docker already running for {$user}");
+        // #TODO(user-logs): consider logging healthy checks at debug level to user log (risk: noisy)
     }
 }
