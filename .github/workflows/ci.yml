@@ -78,6 +78,10 @@ jobs:
         run: |
           bash scripts/testing/docblock-lint.sh
 
+      - name: Short open tag lint (advisory)
+        run: |
+          bash scripts/testing/short-open-tag-lint.sh || true
+
       - name: Cgroup template lint
         run: |
           bash scripts/testing/cgroup-template-lint.sh

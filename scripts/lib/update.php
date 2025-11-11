@@ -58,7 +58,7 @@ function updateUserFile($file, $user) {
     //       Preserve existing mode/owner when content is unchanged.
     // #TODO Add hermetic tests covering safe-write behavior.
     if (empty($file) || empty($user) || !file_exists("/home/{$user}")) {
-        echo "Invalid parameters, file: {$file} user: {$user}\n";
+        logMessage("[user:${user}] updateUserFile skipped (invalid params or home missing): {$file}");
         return;
     }
 
@@ -66,29 +66,31 @@ function updateUserFile($file, $user) {
     $targetFile = "/home/{$user}/" . $file;
         
     if (!file_exists($sourceFile)) {
-        echo "Source file: {$file} is missing\n";
+        logMessage("[user:${user}] Source skeleton missing for {$file}");
         return;
     }
     
     if (!file_exists($targetFile)) {
+        // #TODO Defensive directory creation: ensure parent directory exists with
+        // sane permissions and log when created to improve idempotence.
         copyToUserSpace($sourceFile, $targetFile, $user);
-        echo "Added: {$file} for {$user}\n";
+        logMessage("[user:${user}] Added skeleton file: {$file}");
     } else {
         $sourceContent = file_get_contents($sourceFile);
         $targetContent = file_get_contents($targetFile);
         if ($sourceContent === false || $targetContent === false) {
-            echo "Error reading file contents for comparison.\n";
+            logMessage("[user:${user}] Error reading file contents for comparison: {$file}");
             return;
         }
         $sourceChecksum = sha1($sourceContent);
         $targetChecksum = sha1($targetContent);
         if ($sourceChecksum !== $targetChecksum) {
             if (!unlink($targetFile)) {
-                echo "Failed to remove old file: {$targetFile}\n";
+                logMessage("[user:${user}] Failed to remove old file: {$targetFile}");
                 return;
             }
             copyToUserSpace($sourceFile, $targetFile, $user);
-            echo "Updated: {$file} for {$user}\n";
+            logMessage("[user:${user}] Updated skeleton file: {$file}");
         }
     }
 }

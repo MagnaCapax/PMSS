@@ -66,7 +66,7 @@ if (!function_exists('pmssApplyCgroupDefaultsAllUsers')) {
             runUserStep(
                 $user,
                 'Applying cgroup properties (defaults, respect-existing)',
-                sprintf('php /scripts/util/userCgroup.php %s --apply --defaults --respect-existing', escapeshellarg($user))
+                pmssBuildCommand('php', ['/scripts/util/userCgroup.php', $user, '--apply', '--defaults', '--respect-existing'])
             );
         }
     }

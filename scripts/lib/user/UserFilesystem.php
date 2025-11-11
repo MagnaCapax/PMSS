@@ -25,6 +25,14 @@ class UserFilesystem
                     }
                     $path = $homeDir.'/'.$entry;
                     if (is_dir($path)) {
+                        // Skip symlinks or root-owned paths to avoid transient mounts/special homes
+                        if (@is_link($path)) {
+                            continue;
+                        }
+                        $owner = @fileowner($path);
+                        if ($owner === 0) { // root-owned home dir often indicates special/system use
+                            continue;
+                        }
                         $users[$entry] = true;
                     }
                 }

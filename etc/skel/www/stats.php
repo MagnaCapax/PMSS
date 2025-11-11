@@ -30,6 +30,7 @@ Base resources (current):
          echo "\nUpdated: ".date('Y-m-d H:i:s', $quotaMtime)."\n";
      }
      // Parse the human output to compute used/soft/hard and render a gauge
+     @require_once __DIR__.'/_lib/gauge.php';
      $quotaRaw = @file_get_contents('../.quota');
      $lines = @preg_split('/\r?\n/', (string)$quotaRaw);
      if (is_array($lines) && count($lines) >= 3) {
@@ -59,7 +60,7 @@ Base resources (current):
                  $percent    = $softBytes > 0 ? round(($usedBytes / $softBytes) * 100, 1) : 0;
                  $percentMax = $hardBytes > 0 ? round(($usedBytes / $hardBytes) * 100, 1) : $percent;
                  if ($percent < 100) $percentMax = $percent; // draw against soft until bursting
-                 // Render gauge reused from welcome.php
+                 // Render gauge via shared helper
                  $readable = function (int $bytes): string {
                      $units=['B','KiB','MiB','GiB','TiB']; $i=0; $v=max($bytes,0);
                      while ($v>=1024 && $i<count($units)-1) { $v/=1024; $i++; }
@@ -67,22 +68,8 @@ Base resources (current):
                  };
                  $titleText = $readable($usedBytes).' / '.$readable($softBytes);
                  if ($percent > 100) $titleText .= ' Burst: '.$readable($hardBytes);
-                 $gaugeColor = function ($p): string {
-                     if ($p>100) return 'FF4040';
-                     $start=[0x99,0xE6,0x99]; $end=[0xEE,0x99,0x99];
-                     $d=[ $start[0]-$end[0], $start[1]-$end[1], $start[2]-$end[2] ];
-                     $o=[ round($d[0]*($p/100)), round($d[1]*($p/100)), round($d[2]*($p/100)) ];
-                     $c=[ $start[0]-$o[0], $start[1]-$o[1], $start[2]-$o[2] ];
-                     return sprintf('%02x%02x%02x', $c[0],$c[1],$c[2]);
-                 };
-                 $bg = $gaugeColor($percent);
                  echo "\n";
-                 echo '<table style="margin:0; padding:0;"><tr><td id="meter-disk-td" title="'.htmlspecialchars($titleText,ENT_QUOTES,'UTF-8').'">';
-                 echo '<div id="meter-disk-holder">';
-                 echo '<span id="meter-disk-text" style="overflow:visible;">'.$percent.'%</span>';
-                 echo '<div id="meter-disk-value" style="float:left;width: '.$percentMax.'%; background-color:#'.$bg.'; visibility:visible;">&nbsp;</div>';
-                 echo '</div></td></tr></table>';
-                 echo '<span style="font-size:1.05em; float:right; text-align:right; line-height:13px;">'.htmlspecialchars($titleText,ENT_QUOTES,'UTF-8').'</span>';
+                 echo createGauge($titleText, $titleText, $percent, $percentMax);
                  // Explicit burst indicator when above soft limit
                  if ($percent > 100) {
                      echo '<br /><span style="float:right; color:#dc3545; font-size:0.95em;">Bursting — limit: '.htmlspecialchars($readable($hardBytes), ENT_QUOTES, 'UTF-8').'</span>';
@@ -103,46 +90,13 @@ Base resources (current):
     
     
     if (is_array($trafficData)) {
-        echo "<h6>Traffic usage</h6>\n";
-        // Render traffic gauge first, under the header, full width
-        $trafficLimitGauge = 0;
-        if (file_exists('../.trafficLimit')) {
-            $trafficLimitGauge = (int) trim(@file_get_contents('../.trafficLimit'));
-        }
-        if ($trafficLimitGauge > 0) {
-            $usedGiB = (int) round((($trafficData['raw']['month'] ?? 0)/1024));
-            $percent = $trafficLimitGauge > 0 ? min(999, round(($usedGiB / $trafficLimitGauge) * 100, 1)) : 0;
-            $title = $usedGiB.'GiB / '.$trafficLimitGauge.'GiB';
-            $gaugeColor = function ($p): string {
-                if ($p>100) return 'FF4040';
-                $start=[0x99,0xE6,0x99]; $end=[0xEE,0x99,0x99];
-                $d=[ $start[0]-$end[0], $start[1]-$end[1], $start[2]-$end[2] ];
-                $o=[ round($d[0]*($p/100)), round($d[1]*($p/100)), round($d[2]*($p/100)) ];
-                $c=[ $start[0]-$o[0], $start[1]-$o[1], $start[2]-$o[2] ];
-                return sprintf('%02x%02x%02x', $c[0],$c[1],$c[2]);
-            };
-            $bg = $gaugeColor($percent);
-            echo '<table style="margin:0; padding:0; width: 100%;"><tr><td id="meter-disk-td" title="'.htmlspecialchars($title,ENT_QUOTES,'UTF-8').'">';
-            echo '<div id="meter-disk-holder">';
-            echo '<span id="meter-disk-text" style="overflow:visible;">'.$percent.'%</span>';
-            echo '<div id="meter-disk-value" style="float:left;width: '.$percent.'%; background-color:#'.$bg.'; visibility:visible;">&nbsp;</div>';
-            echo '</div></td></tr></table>';
-            echo '<span style="font-size:1.05em; float:right; text-align:right; line-height:13px;">'.htmlspecialchars($title,ENT_QUOTES,'UTF-8').'</span>';
-            echo "\n";
-        }
-        echo "<pre>\nTraffic consumption at ".date('Y-m-d H:i:s', $trafficTime).":\nWeek {$trafficData['display']['week']}, Day: {$trafficData['display']['day']}\n";
+        echo "<h6>Traffic usage</h6><pre>\n\nTraffic consumption at " . date('Y-m-d H:i:s', $trafficTime) . ":\nWeek {$trafficData['display']['week']}, Day: {$trafficData['display']['day']}\n";
         echo "Past 30 days upload traffic: {$trafficData['display']['month']}\n\n";
     }
     
     if ( file_exists('../.trafficLimit') ) {
         $trafficLimit = (int) trim( file_get_contents('../.trafficLimit') );
-        if ($trafficLimit > 0) {
-            echo "Traffic limit: " . number_format($trafficLimit) . " GiB\n";
-            // Remaining = limit - month (GiB)
-            $usedGiB = (int) round(($trafficData['raw']['month'] ?? 0)/1024);
-            $remaining = max(0, $trafficLimit - $usedGiB);
-            echo "Remaining: " . number_format($remaining) . " GiB\n";
-        }
+        if ($trafficLimit > 0) echo "Traffic limit: " . number_format($trafficLimit) . " GiB\n";
     }
 
 	if (isset($trafficData['daily']) && is_array($trafficData['daily']) && count($trafficData['daily']) > 3) {
@@ -192,42 +146,24 @@ EOF;
 </div>
 <div class="portfoliodesc">
 
-<h6> <?= htmlspecialchars($_SERVER['SERVER_NAME'] ?? '', ENT_QUOTES, 'UTF-8'); ?> info </h6>
+<h6> <?=$_SERVER['SERVER_NAME'];?> info </h6>
 <b>IP:</b> <?= @file_get_contents('https://pulsedmedia.com/remote/myip.php'); ?>
 <?php
-// Link speed, WireGuard/OpenVPN/Docker status, and per-user processes
-// Link speed: reuse backend helper when available
-@require_once '/scripts/lib/networkInfo.php';
-if (!isset($linkSpeed) || !isset($link)) {
-    if (function_exists('detectPrimaryInterface') && function_exists('getLinkSpeed')) {
-        $link = detectPrimaryInterface();
-        $linkSpeed = getLinkSpeed($link);
-    }
-}
-if (!empty($linkSpeed)) {
-    echo '<br /><b>Link:</b> '.htmlspecialchars((string)$linkSpeed, ENT_QUOTES, 'UTF-8').' Mbps';
-}
-
-function svcStatus($service, $configPath = null) {
-    if ($configPath !== null && !file_exists($configPath)) return ['not configured','33'];
-    if (!is_dir('/run/systemd/system')) return ['unknown','33'];
+// Service statuses (WireGuard/OpenVPN only)
+$svcStatus = function ($service, $configPath = null) {
+    if ($configPath !== null && !file_exists($configPath)) return 'not configured';
     @exec('systemctl is-active --quiet '.escapeshellarg($service), $o, $rc);
-    if ($rc === 0) return ['active','32'];
+    if ($rc === 0) return 'active';
     @exec('systemctl is-enabled --quiet '.escapeshellarg($service), $o, $en);
-    return ($en !== 0) ? ['disabled','33'] : ['inactive','31'];
-}
-
-function colored($text,$color) { return "\e[{$color}m{$text}\e[0m"; }
-
-// Service statuses
-[$wg,$wgColor]   = svcStatus('wg-quick@wg0','/etc/wireguard/wg0.conf');
-[$ovpn,$oColor]  = svcStatus('openvpn@openvpn','/etc/openvpn/openvpn.conf');
-[$dock,$dColor]  = svcStatus('docker', null);
-
+    return ($en !== 0) ? 'disabled' : 'inactive';
+};
+$wg   = $svcStatus('wg-quick@wg0','/etc/wireguard/wg0.conf');
+$ovpn = $svcStatus('openvpn@openvpn','/etc/openvpn/openvpn.conf');
 echo '<br /><b>Services:</b> ';
-echo 'WireGuard: <span style="color:#'.($wg==='active'?'28a745':($wg==='inactive'?'dc3545':'ffc107')).';">'.htmlspecialchars($wg,ENT_QUOTES,'UTF-8').'</span>, ';
-echo 'OpenVPN: <span style="color:#'.($ovpn==='active'?'28a745':($ovpn==='inactive'?'dc3545':'ffc107')).';">'.htmlspecialchars($ovpn,ENT_QUOTES,'UTF-8').'</span>, ';
-echo 'Docker: <span style="color:#'.($dock==='active'?'28a745':($dock==='inactive'?'dc3545':'ffc107')).';">'.htmlspecialchars($dock,ENT_QUOTES,'UTF-8').'</span>';
+echo 'WireGuard: '.htmlspecialchars($wg,ENT_QUOTES,'UTF-8').', ';
+$ovpnLabel = 'OpenVPN: '.htmlspecialchars($ovpn,ENT_QUOTES,'UTF-8');
+if (file_exists('openvpn-config.tgz')) { $ovpnLabel = '<a href="openvpn-config.tgz">OpenVPN: '.htmlspecialchars($ovpn,ENT_QUOTES,'UTF-8').'</a>'; }
+echo $ovpnLabel;
 
 // Per-user processes: derive username from web root path if available (e.g., /home/<user>/www)
 $uname = '';
@@ -257,7 +193,6 @@ echo 'Deluge: <span style="color:#'.($dg==='running'?'28a745':'dc3545').';">'.$d
 echo 'rclone: <span style="color:#'.($rc==='running'?'28a745':'dc3545').';">'.$rc.'</span>';
 ?>
 <pre>
-<pre>
 <?=passthru('uptime');?>
 
 Memory usage:
@@ -274,33 +209,6 @@ echo "Memory Total:     ".formatKB($info['MemTotal']) . "MiB\n";
 echo "Memory Available: ".formatKB($info['MemAvailable']) . "MiB\n";
 echo "Swap Total:       ".formatKB($info['SwapTotal'])."MiB\n";
 echo "Swap Free:        ".formatKB($info['SwapFree'])."MiB\n";
-
-// Cgroup memory limits (per-user slice)
-$uid = function_exists('posix_geteuid') ? @posix_geteuid() : 0;
-if ($uid > 0) {
-    $v2limit = "/sys/fs/cgroup/user.slice/user-{$uid}.slice/memory.max";
-    $v2usage = "/sys/fs/cgroup/user.slice/user-{$uid}.slice/memory.current";
-    $v1limit = "/sys/fs/cgroup/memory/user.slice/user-{$uid}.slice/memory.limit_in_bytes";
-    $v1usage = "/sys/fs/cgroup/memory/user.slice/user-{$uid}.slice/memory.usage_in_bytes";
-    $lim = null; $use = null; $mode = '';
-    if (is_readable($v2limit) && is_readable($v2usage)) {
-        $l = trim((string)@file_get_contents($v2limit));
-        $u = trim((string)@file_get_contents($v2usage));
-        $lim = ($l === 'max') ? 'unlimited' : (int)$l;
-        $use = (int)$u; $mode = 'cgroup v2';
-    } elseif (is_readable($v1limit) && is_readable($v1usage)) {
-        $lim = (int)trim((string)@file_get_contents($v1limit));
-        $use = (int)trim((string)@file_get_contents($v1usage));
-        $mode = 'cgroup v1';
-    }
-    if ($lim !== null && $use !== null) {
-        $fmt = function (int $bytes): string {
-            $u=['B','KiB','MiB','GiB','TiB']; $i=0; $v=$bytes; while($v>=1024 && $i<count($u)-1){$v/=1024;$i++;} return round($v,2).' '.$u[$i];
-        };
-        $line = ($lim === 'unlimited') ? 'Limit: unlimited' : ('Limit: '.$fmt((int)$lim));
-        echo "\nCgroup memory ({$mode})\n".$line."\nCurrent: ".$fmt((int)$use)."\n";
-    }
-}
 
 ?>
 </pre>
