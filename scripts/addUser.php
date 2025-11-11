@@ -203,3 +203,45 @@ runProvisionStep(
     'Queue permissions fix',
     sprintf('nohup /scripts/util/userPermissions.php %s >> /dev/null 2>&1 &', escapeshellarg($user['name']))
 );
+
+// Seed per-user quota file by invoking the same refresher used by cron to avoid duplication.
+// Then normalize permissions to 0640 to align with userPermissions policy.
+runProvisionStep('Seed quota file', 'php /scripts/cron/updateQuotas.php');
+runProvisionStep(
+    'Normalize quota file permissions',
+    sprintf('chmod 640 %s', escapeshellarg("/home/{$user['name']}/.quota"))
+);
+
+// Seed traffic files with zero values so first login does not show errors before cron populates them.
+// Format mirrors scripts/lib/traffic/storage.php consumers (serialized array with raw/display/daily keys).
+try {
+    $zeroRaw = ['month'=>0.0,'week'=>0.0,'day'=>0.0,'hour'=>0.0,'15min'=>0.0];
+    $zeroDisplay = ['month'=>'0MiB','week'=>'0MiB','day'=>'0MiB','hour'=>'0MiB','15min'=>'0MiB'];
+    $zeroTraffic = ['raw'=>$zeroRaw,'display'=>$zeroDisplay,'daily'=>[]];
+    $homeBase = "/home/{$user['name']}";
+    $runtimeStatsDir = '/var/run/pmss/trafficStats';
+    if (!is_dir($runtimeStatsDir)) @mkdir($runtimeStatsDir, 0755, true);
+    // Home files
+    @file_put_contents("$homeBase/.trafficData", serialize($zeroTraffic));
+    @chown("$homeBase/.trafficData", 'root');
+    @chgrp("$homeBase/.trafficData", $user['name']);
+    @chmod("$homeBase/.trafficData", 0640);
+    @file_put_contents("$homeBase/.trafficDataLocal", serialize($zeroTraffic));
+    @chown("$homeBase/.trafficDataLocal", 'root');
+    @chgrp("$homeBase/.trafficDataLocal", $user['name']);
+    @chmod("$homeBase/.trafficDataLocal", 0640);
+    // Runtime cache
+    @file_put_contents("$runtimeStatsDir/{$user['name']}", serialize($zeroTraffic));
+    @chown("$runtimeStatsDir/{$user['name']}", 'root');
+    @chgrp("$runtimeStatsDir/{$user['name']}", 'root');
+    @chmod("$runtimeStatsDir/{$user['name']}", 0600);
+    logProvisionMessage('Seeded traffic files with zero values');
+} catch (\Throwable $e) {
+    logProvisionMessage('Seeding traffic files failed: '.$e->getMessage());
+}
+
+// Ensure .trafficLimit exists even when no limit is configured at creation time.
+if (empty($user['trafficLimit'])) {
+    @file_put_contents("/home/{$user['name']}/.trafficLimit", '0');
+    @chmod("/home/{$user['name']}/.trafficLimit", 0664);
+}
