@@ -18,7 +18,7 @@
                 
 
 <div id="stats">
- <? include 'stats.php'; ?>
+ <?php include 'stats.php'; ?>
 </div>
 
                 
