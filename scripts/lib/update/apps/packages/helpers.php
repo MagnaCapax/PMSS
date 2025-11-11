@@ -202,6 +202,13 @@ function pmssPackageAvailable(string $package): bool
     if (array_key_exists($package, $cache)) {
         return $cache[$package];
     }
+    // Fast path: consult a prebuilt set of available package names.
+    $nameOnly = strtolower(preg_replace('/:.+$/', '', $package));
+    $set = pmssAvailablePackageSet();
+    if (!empty($set)) {
+        return $cache[$package] = isset($set[$nameOnly]);
+    }
+    // Fallback: query apt-cache policy (slower, per package)
     $cmd = 'apt-cache policy '.escapeshellarg($package).' 2>/dev/null';
     exec($cmd, $output, $rc);
     if ($rc !== 0 || empty($output)) {
@@ -213,6 +220,34 @@ function pmssPackageAvailable(string $package): bool
         }
     }
     return $cache[$package] = true;
+}
+
+if (!function_exists('pmssAvailablePackageSet')) {
+    /**
+     * Build and cache a set of all available package names (lowercased), once per run.
+     */
+    function pmssAvailablePackageSet(): array
+    {
+        static $set = null;
+        if (is_array($set)) {
+            return $set;
+        }
+        $out = [];
+        exec('apt-cache pkgnames 2>/dev/null', $out, $rc);
+        if ($rc !== 0 || empty($out)) {
+            $set = [];
+            return $set;
+        }
+        $tmp = [];
+        foreach ($out as $name) {
+            $name = strtolower(trim($name));
+            if ($name !== '') {
+                $tmp[$name] = true;
+            }
+        }
+        $set = $tmp;
+        return $set;
+    }
 }
 
 /**
