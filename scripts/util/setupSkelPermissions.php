@@ -4,6 +4,9 @@
  * Normalise skeleton and configuration permissions so hosts converge on the
  * secure baseline expected by provisioning. Intended for idempotent reruns
  * during updates and manual recovery.
+ *
+ * Updated: 2025 — includes basic secrets hardening for common private key
+ * locations to ensure minimum required permissions are applied.
  */
 #TODO Wrong naming etc.
 
@@ -87,6 +90,29 @@ if (is_dir($configDir)) {
 
     // Ensure the root directory keeps execute permission for traversal.
     @chmod($configDir, 0775);
+}
+
+// Minimal secrets audit: tighten common private key locations (best-effort).
+// Keep scope narrow and commands idempotent for stability.
+if (is_dir('/etc/letsencrypt/live')) {
+    runStep('Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -exec chmod 600 {} +");
+}
+if (is_dir('/etc/seedbox/config/ssl')) {
+    runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
+}
+if (is_dir('/etc/openvpn/easy-rsa/pki/private')) {
+    runStep('Hardening OpenVPN private keys', "find /etc/openvpn/easy-rsa/pki/private -type f -name '*.key' -exec chmod 600 {} +");
+}
+
+// WireGuard hardening: restrict directory and sensitive files
+if (is_dir('/etc/wireguard')) {
+    runStep('Hardening WireGuard config directory', 'chmod 700 /etc/wireguard');
+    if (is_file('/etc/wireguard/wg0.conf')) {
+        runStep('Restricting WireGuard wg0.conf', 'chmod 600 /etc/wireguard/wg0.conf');
+    }
+    if (is_file('/etc/wireguard/server_private.key')) {
+        runStep('Restricting WireGuard server_private.key', 'chmod 600 /etc/wireguard/server_private.key');
+    }
 }
 
 $failed = array_filter($exitCodes, static function ($rc) { return $rc !== 0; });
