@@ -24,22 +24,81 @@ Endpoint detection prefers resolving the host's FQDN and falls back to a public
 IP lookup plus interface inspection. Make sure the hostname resolves externally
 or update the generated `~/wireguard.txt` with the correct address if needed.
 
-## End-User Quick Start
+## Tenant Quick Start (Step by Step)
 
-1. Download the contents of your `~/wireguard.txt` file (or copy it securely)
-   and import it into your WireGuard client. Replace `<client private key>`
-   with the private key you generated locally.
-2. On the seedbox, append your client public key to `~/.wireguard-public-key`
-   (one key per line; multiple devices are allowed). Within a few minutes the
-   server will pick it up and refresh its configuration.
-3. Keep the interface marked as a *Public/Untrusted* network profile on your
-   operating system. All tenants share the `10.90.90.0/24` overlay; do not treat
-   the VPN as a trusted LAN unless you have explicit peer agreements.
-4. Restrict local firewalls to the services you want reachable through the VPN.
-   The server enforces NAT and forwarding centrally, so only the ports you
-   expose on your device become reachable by other peers.
-5. Regenerate a new client key pair and replace the corresponding line in
-   `~/.wireguard-public-key` if your device is lost or compromised.
+This section is intended to be copy-pasteable for end users.
+
+1. **Install a WireGuard client on your device**
+   - Linux: install the `wireguard-tools` package or use your distro's WireGuard app.
+   - Windows/macOS/mobile: install the official "WireGuard" app from the vendor store.
+
+2. **Log in to your seedbox via SSH**
+   - Use the username and password (or SSH key) provided for your account.
+
+3. **Generate a client key pair on your own device**
+
+   On Linux/macOS (in a local terminal, *not* on the seedbox):
+
+   ```bash
+   umask 077
+   wg genkey | tee private.key | wg pubkey > public.key
+   ```
+
+   - `private.key` must never be shared.
+   - `public.key` will be stored on the seedbox account.
+
+4. **Register your public key on the seedbox**
+
+   On the seedbox (SSH session, as your user):
+
+   ```bash
+   echo "$(cat public.key)" >> ~/.wireguard-public-key
+   ```
+
+   - One key per line; you can add multiple lines for multiple devices.
+   - Invalid lines are ignored by the server and do not affect other peers.
+   - Within a few minutes the server will detect the new key and refresh its
+     WireGuard configuration.
+
+5. **Fetch your base configuration from the seedbox**
+
+   - On the seedbox, view your `~/wireguard.txt` file:
+
+     ```bash
+     cat ~/wireguard.txt
+     ```
+
+   - Copy the entire contents to your clipboard or download the file via SFTP.
+
+6. **Create a tunnel in your WireGuard client**
+
+   - In the WireGuard app, create a new tunnel and paste the contents of
+     `wireguard.txt` into the configuration editor.
+   - In the `[Interface]` section, replace the placeholder:
+
+     ```ini
+     PrivateKey = <client private key>
+     ```
+
+     with the contents of your local `private.key` file from step 3.
+
+7. **Treat the VPN as untrusted and lock down services**
+
+   - Keep the WireGuard interface marked as a *Public/Untrusted* network in your
+     OS. All tenants share the `10.90.90.0/24` overlay; do not treat it as a
+     trusted LAN.
+   - Configure your local firewall to only expose the services you want reachable
+     over the VPN.
+   - The server enforces NAT and forwarding centrally, so only ports you expose
+     on your device become reachable by other peers.
+
+8. **Rotate keys when devices are lost or compromised**
+
+   - Generate a new key pair, update the corresponding line in
+     `~/.wireguard-public-key`, and update your client config with the new
+     private key.
+   - Remove any obsolete lines from `~/.wireguard-public-key` to revoke access
+     for old devices.
 
 ## Developer Notes
 
