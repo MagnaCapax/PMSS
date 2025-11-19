@@ -24,20 +24,53 @@ function run(string $cmd): int
 function chmodPath(string $path, int $perm, bool $recursive = false): void
 {
     $flag = $recursive ? '-R ' : '';
-    $target = strpbrk($path, '*?[]') === false ? escapeshellarg($path) : $path;
+    $hasGlob = strpbrk($path, '*?[]') !== false;
+
+    if ($hasGlob) {
+        $matches = glob($path);
+        if ($matches === false || $matches === []) {
+            return;
+        }
+        $target = $path;
+    } else {
+        if (!file_exists($path)) {
+            return;
+        }
+        $target = escapeshellarg($path);
+    }
+
     run(sprintf('chmod %s%o %s', $flag, $perm, $target));
 }
 
 function chownPath(string $path, string $owner, bool $recursive = false): void
 {
     $flag = $recursive ? '-R ' : '';
-    $target = strpbrk($path, '*?[]') === false ? escapeshellarg($path) : $path;
+    $hasGlob = strpbrk($path, '*?[]') !== false;
+
+    if ($hasGlob) {
+        $matches = glob($path);
+        if ($matches === false || $matches === []) {
+            return;
+        }
+        $target = $path;
+    } else {
+        if (!file_exists($path)) {
+            return;
+        }
+        $target = escapeshellarg($path);
+    }
+
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
     run(sprintf('chown %s%s %s', $flag, escapeshellarg($owner), $target));
 }
 
 // Safer traversal without relying on xargs delimiters; applies to each directory in place.
-run(sprintf('find %s -type d -exec chmod 750 {} +', escapeshellarg('/home/'.$thisUser)));
+// Skip ~/.local entirely to avoid interfering with per-user application data (e.g. Docker overlays).
+run(sprintf(
+    'find %s -path %s -prune -o -type d -exec chmod 750 {} +',
+    escapeshellarg('/home/'.$thisUser),
+    escapeshellarg("/home/{$thisUser}/.local")
+));
 
 $chmodItems = [
     ["/home/{$thisUser}", 0770],
@@ -79,11 +112,14 @@ $chownItems = [
     ["/home/{$thisUser}/www/rutorrent/conf/config.php", "root.root"],
 ];
 
-foreach ($chmodItems as [$path, $perm, $recursive]) {
-    chmodPath($path, $perm, $recursive ?? false);
+foreach ($chmodItems as $item) {
+    $path = $item[0];
+    $perm = $item[1];
+    $recursive = isset($item[2]) ? (bool)$item[2] : false;
+    chmodPath($path, $perm, $recursive);
 }
 
-// Targeted chown of the home tree excluding known root-owned paths
+// Targeted chown of the home tree excluding known root-owned paths and ~/.local
 $excludes = [
     "/home/{$thisUser}/.trafficData",
     "/home/{$thisUser}/.trafficDataLocal",
@@ -91,6 +127,8 @@ $excludes = [
     "/home/{$thisUser}/www/rutorrent/conf/config.php",
 ];
 $findParts = [sprintf('find %s -mindepth 1', escapeshellarg("/home/{$thisUser}"))];
+// Prune ~/.local subtree to avoid noisy chown failures on application-managed trees (e.g. Docker).
+$findParts[] = '-path '.escapeshellarg("/home/{$thisUser}/.local").' -prune -o';
 foreach ($excludes as $ex) {
     $findParts[] = '-not -path '.escapeshellarg($ex);
 }
@@ -100,8 +138,11 @@ $findParts[] = '{}';
 $findParts[] = '+';
 run(implode(' ', $findParts));
 
-foreach ($chownItems as [$path, $owner, $recursive]) {
-    chownPath($path, $owner, $recursive ?? false);
+foreach ($chownItems as $item) {
+    $path = $item[0];
+    $owner = $item[1];
+    $recursive = isset($item[2]) ? (bool)$item[2] : false;
+    chownPath($path, $owner, $recursive);
 }
 
 if (file_exists("/home/{$thisUser}/.ssh")) {

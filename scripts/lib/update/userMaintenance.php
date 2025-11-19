@@ -193,9 +193,10 @@ if (!function_exists('pmssRestoreUserCrontabs')) {
      */
     function pmssRestoreUserCrontabs(): void
     {
+        // Only restore crontabs for users that still exist in /etc/passwd.
         $command = sprintf(
             'bash -lc %s',
-            escapeshellarg('/scripts/listUsers.php | xargs -r -I{} crontab -u {} /etc/seedbox/config/user.crontab.default')
+            escapeshellarg('/scripts/listUsers.php | while read -r U; do id "$U" >/dev/null 2>&1 && crontab -u "$U" /etc/seedbox/config/user.crontab.default; done')
         );
         runStep('Restoring default crontab for all users', $command);
     }
