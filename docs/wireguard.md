@@ -10,11 +10,12 @@ Typical workflow:
 1. Read `~/wireguard.txt` to obtain your server endpoint, public key, and
    configuration template.
 2. Generate a client key pair (`wg genkey | tee private.key | wg pubkey > public.key`).
-3. Share the public key with the administrator so it can be appended as a `[Peer]`
-   in `/etc/wireguard/wg0.conf`. The template provides the MTU defaults; NAT and
-   firewall rules are applied centrally by `/scripts/util/setupNetwork.php`, which
-   runs automatically during updates.
-4. Apply the client template on your device and set the private key.
+3. On the seedbox, store your public key in `~/.wireguard-public-key` (one key
+   per line). The updater periodically rebuilds `/etc/wireguard/wg0.conf` from
+   these files, adding a `[Peer]` entry for every valid key.
+4. Apply the client template on your device and set the private key. The server
+   assigns each key a unique `/32` address inside `10.90.90.0/24`; peers are not
+   treated as a trusted LAN, and routing between tenants is controlled centrally.
 
 A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded and
 `wg-quick@wg0` remains active. Logs are available in `/var/log/pmss/checkWireguard.log`.
@@ -28,14 +29,17 @@ or update the generated `~/wireguard.txt` with the correct address if needed.
 1. Download the contents of your `~/wireguard.txt` file (or copy it securely)
    and import it into your WireGuard client. Replace `<client private key>`
    with the private key you generated locally.
-2. Keep the interface marked as a *Public/Untrusted* network profile on your
-   operating system. All tenants share the `10.90.90.0/24` overlay so treating
-   the link as a trusted LAN is unsafe unless you have explicit peer agreements.
-3. Restrict local firewalls to the services you want reachable through the VPN.
+2. On the seedbox, append your client public key to `~/.wireguard-public-key`
+   (one key per line; multiple devices are allowed). Within a few minutes the
+   server will pick it up and refresh its configuration.
+3. Keep the interface marked as a *Public/Untrusted* network profile on your
+   operating system. All tenants share the `10.90.90.0/24` overlay; do not treat
+   the VPN as a trusted LAN unless you have explicit peer agreements.
+4. Restrict local firewalls to the services you want reachable through the VPN.
    The server enforces NAT and forwarding centrally, so only the ports you
    expose on your device become reachable by other peers.
-4. Regenerate a new client key pair and send the public key to support if your
-   device is lost or compromised so the old peer entry can be revoked.
+5. Regenerate a new client key pair and replace the corresponding line in
+   `~/.wireguard-public-key` if your device is lost or compromised.
 
 ## Developer Notes
 

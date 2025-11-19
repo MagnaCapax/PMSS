@@ -92,19 +92,73 @@ class WireGuardInstallerTest extends TestCase
         $this->assertEquals(null, \wgValidatePublicIp('127.0.0.1'));
     }
 
+    public function testValidatePublicKeyAcceptsBase64Key(): void
+    {
+        // Base64-encoded 32-byte zero buffer.
+        $key = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $this->assertTrue(\wgValidatePublicKey($key));
+    }
+
+    public function testValidatePublicKeyRejectsInvalidKey(): void
+    {
+        $this->assertEquals(false, \wgValidatePublicKey('not-a-key'));
+        $this->assertEquals(false, \wgValidatePublicKey('AAAA'));
+    }
+
     public function testWriteConfigOverwritesExisting(): void
     {
         $dir = $this->createTempDir();
         $config = $dir.'/wg0.conf';
         file_put_contents($config, 'existing');
 
-        $this->withEnv(['PMSS_WG_CONFIG_DIR' => $dir], function () use ($config): void {
+        $homeBase = $this->createTempDir();
+
+        $this->withEnv([
+            'PMSS_WG_CONFIG_DIR' => $dir,
+            'PMSS_WG_HOME_BASE'  => $homeBase,
+            'PMSS_WG_USER_LIST'  => 'dummy',
+        ], function () use ($config): void {
             \wireguardWriteConfig('dummy', 12345);
         });
 
         $contents = (string) file_get_contents($config);
         $this->assertStringContainsString('PrivateKey = dummy', $contents);
         $this->assertStringContainsString('ListenPort = 12345', $contents);
+    }
+
+    public function testWriteConfigIncludesPeersFromUserKeys(): void
+    {
+        $dir      = $this->createTempDir();
+        $homeBase = $this->createTempDir();
+
+        @mkdir($homeBase.'/alice', 0755, true);
+        @mkdir($homeBase.'/bob', 0755, true);
+
+        // Base64-encoded 32-byte buffers as dummy public keys.
+        $aliceKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $bobKey   = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=';
+
+        file_put_contents($homeBase.'/alice/.wireguard-public-key', $aliceKey."\n");
+        file_put_contents($homeBase.'/bob/.wireguard-public-key', $bobKey."\n");
+
+        $this->withEnv([
+            'PMSS_WG_CONFIG_DIR' => $dir,
+            'PMSS_WG_HOME_BASE'  => $homeBase,
+            'PMSS_WG_USER_LIST'  => 'alice,bob',
+        ], function () use ($dir, $aliceKey, $bobKey): void {
+            \wireguardWriteConfig('dummy', 12345);
+            $config = $dir.'/wg0.conf';
+            $this->assertTrue(file_exists($config));
+            $contents = (string) file_get_contents($config);
+
+            // Base interface section remains.
+            $this->assertStringContainsString('PrivateKey = dummy', $contents);
+
+            // Peer sections exist for both keys with per-key AllowedIPs in 10.90.90.0/24.
+            $this->assertStringContainsString('PublicKey = '.$aliceKey, $contents);
+            $this->assertStringContainsString('PublicKey = '.$bobKey, $contents);
+            $this->assertMatches('/AllowedIPs = 10\\.90\\.90\\.[0-9]+\\/32/', $contents);
+        });
     }
 
     public function testEnsureKeysReusesExisting(): void

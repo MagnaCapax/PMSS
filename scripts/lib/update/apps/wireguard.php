@@ -259,12 +259,160 @@ function wgRenderTemplate(string $path, array $placeholders): ?string
 }
 
 /**
- * Lay down the WireGuard base configuration from the repo template.
+ * Validate that the supplied string is a plausible WireGuard public key.
+ *
+ * Keys are expected to be base64-encoded 32-byte values.
  */
-function wireguardWriteConfig(string $privKey, int $port): void
+function wgValidatePublicKey(string $key): bool
 {
-    $configPath = wgConfigPath('wg0.conf');
+    $key = trim($key);
+    if ($key === '') {
+        return false;
+    }
+    if (!preg_match('/^[A-Za-z0-9+\/=]+$/', $key)) {
+        return false;
+    }
+    $decoded = base64_decode($key, true);
+    if ($decoded === false || strlen($decoded) !== 32) {
+        return false;
+    }
+    return true;
+}
 
+/**
+ * Collect valid WireGuard public keys from ~/.wireguard-public-key for each user.
+ *
+ * @return array<int,array{user:string,key:string}>
+ */
+function wgCollectUserPublicKeys(): array
+{
+    $homeBase = wgHomeBase();
+    $result   = [];
+
+    foreach (wgListHomeUsers() as $user) {
+        if ($user === '') {
+            continue;
+        }
+        $path = $homeBase.'/'.$user.'/.wireguard-public-key';
+        if (!is_file($path)) {
+            continue;
+        }
+        $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            wgLog('Failed to read '.$path.' for user '.$user);
+            continue;
+        }
+        foreach ($lines as $index => $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#' || $line[0] === ';') {
+                continue;
+            }
+            if (!wgValidatePublicKey($line)) {
+                wgLog(sprintf('Ignoring invalid WireGuard public key for user %s at %s line %d', $user, $path, $index + 1));
+                continue;
+            }
+            $result[] = [
+                'user' => $user,
+                'key'  => $line,
+            ];
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Derive a stable /32 address under 10.90.90.0/24 for a given public key.
+ *
+ * @param array<string,bool> $usedIps
+ */
+function wgDeriveClientIp(string $key, array $usedIps): string
+{
+    $hash = hash('sha256', $key, true);
+    $num  = unpack('N', substr($hash, 0, 4));
+    $base = isset($num[1]) ? (int) $num[1] : 1;
+    if ($base === 0) {
+        $base = 1;
+    }
+
+    // Reserve .1 for the server and avoid network/broadcast addresses.
+    $candidate = ($base % 253) + 2; // 2..254
+    $tries     = 0;
+    while ($tries < 253) {
+        $ip = '10.90.90.'.$candidate;
+        if (!isset($usedIps[$ip])) {
+            return $ip;
+        }
+        $candidate = ($candidate % 253) + 2;
+        $tries++;
+    }
+
+    // Extremely unlikely with typical tenant counts; fail-soft by skipping the key.
+    return '';
+}
+
+/**
+ * Assign unique /32 addresses to each collected key.
+ *
+ * @param array<int,array{user:string,key:string}> $entries
+ * @return array<int,array{user:string,key:string,ip:string}>
+ */
+function wgAssignClientIps(array $entries): array
+{
+    $used      = [];
+    $assigned  = [];
+
+    foreach ($entries as $entry) {
+        $ip = wgDeriveClientIp($entry['key'], $used);
+        if ($ip === '') {
+            wgLog('Unable to assign WireGuard IP for user '.$entry['user'].' (exhausted address space?)');
+            continue;
+        }
+        $used[$ip] = true;
+        $assigned[] = [
+            'user' => $entry['user'],
+            'key'  => $entry['key'],
+            'ip'   => $ip,
+        ];
+    }
+
+    return $assigned;
+}
+
+/**
+ * Render auto-managed peer sections from collected public keys.
+ */
+function wgBuildPeersConfig(): string
+{
+    $entries = wgCollectUserPublicKeys();
+    if (empty($entries)) {
+        return "# No WireGuard peers configured; place public key(s) in ~/.wireguard-public-key on each user account.\n";
+    }
+
+    $assigned = wgAssignClientIps($entries);
+    if (empty($assigned)) {
+        return "# No valid WireGuard peers configured; all provided keys were invalid.\n";
+    }
+
+    $lines   = [];
+    $lines[] = '# Peers managed by PMSS – do not edit by hand.';
+
+    foreach ($assigned as $entry) {
+        $lines[] = '[Peer]';
+        $lines[] = '# user='.$entry['user'];
+        $lines[] = 'PublicKey = '.$entry['key'];
+        $lines[] = 'AllowedIPs = '.$entry['ip'].'/32';
+        $lines[] = '';
+    }
+
+    return rtrim(implode("\n", $lines))."\n";
+}
+
+/**
+ * Build the full WireGuard configuration (interface + peers).
+ */
+function wireguardBuildConfig(string $privKey, int $port): string
+{
     $rendered = wgRenderTemplate(
         '/etc/seedbox/config/template.wireguard.wg0',
         [
@@ -275,13 +423,28 @@ function wireguardWriteConfig(string $privKey, int $port): void
     if ($rendered === null) {
         // Fail-soft fallback: write a minimal config when template is unavailable
         $rendered = "[Interface]\n".
+                    "Address = 10.90.90.1/24\n".
                     "PrivateKey = {$privKey}\n".
                     "ListenPort = {$port}\n";
     }
 
-    file_put_contents($configPath, $rendered.PHP_EOL);
+    $base   = rtrim($rendered, "\r\n");
+    $peers  = wgBuildPeersConfig();
+
+    return $base."\n\n".$peers;
+}
+
+/**
+ * Lay down the WireGuard base configuration from the repo template.
+ */
+function wireguardWriteConfig(string $privKey, int $port): void
+{
+    $configPath = wgConfigPath('wg0.conf');
+    $contents   = wireguardBuildConfig($privKey, $port);
+
+    file_put_contents($configPath, $contents);
     chmod($configPath, 0640);
-    wgLog('WireGuard base configuration refreshed at '.$configPath);
+    wgLog('WireGuard configuration refreshed at '.$configPath);
 }
 
 /**

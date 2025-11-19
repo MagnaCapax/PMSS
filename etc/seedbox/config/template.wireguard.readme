@@ -11,7 +11,9 @@ Client quick start (Linux/macOS)
 --------------------------------
   umask 077
   wg genkey | tee private.key | wg pubkey > public.key
-  # send public.key to the administrator for inclusion in wg0.conf
+  # on the seedbox account, append public.key to:
+  #   ~/.wireguard-public-key
+  # one key per line; invalid lines are ignored
 
 Client configuration template
 -----------------------------
@@ -27,5 +29,12 @@ Endpoint = %ENDPOINT%:%LISTEN_PORT%
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
 
-Enable on the server after adding peers:
-  systemctl enable --now wg-quick@wg0
+Server behaviour
+----------------
+- `/etc/wireguard/wg0.conf` is rebuilt automatically from per-user
+  `~/.wireguard-public-key` files (one base64 WireGuard public key per line).
+- Each valid key is assigned a unique `/32` address inside 10.90.90.0/24 and
+  added as a `[Peer]` with `AllowedIPs = 10.90.90.X/32`.
+- Invalid or malformed keys are ignored and never reach the server config.
+- A cron job refreshes the configuration regularly and restarts `wg-quick@wg0`
+  only when the generated config changes.
