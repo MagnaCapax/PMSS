@@ -32,3 +32,14 @@ This document tracks small, stability‑focused improvements and medium‑term r
   - Wire boot-time actions to per-user logs (e.g., rc.local starting `user@UID.service`). Add correlation IDs later and optional JSON lines if needed.
   - Unify existing ad-hoc logs (e.g., pmss-update-user-<username>.log) under the helper over time to reduce duplication.
   - Add a lightweight logrotate policy for `/var/log/pmss/user-*.log` with sane retention.
+
+- Consistent Command Execution and Error Handling
+  - Standardize on a single, consistent approach to executing shell commands and handling errors. The `runStep()` function is a good candidate for this.
+
+- Robust Argument Handling and Input Validation
+  - Adopt a consistent approach to argument parsing, such as using `getopt()`.
+  - Implement robust input validation in all scripts.
+
+- Refactor Hardcoded Values
+  - Move configurable values to configuration files or command-line arguments.
+  - Generalize the approach taken with `etc/seedbox/config/apps.php` for other hardcoded values.

@@ -22,6 +22,8 @@ if (empty($argv[1]) || empty($argv[2]) || empty($argv[3])) {
     die('need user name. '.$usage."\n");
 }
 
+// The $user array is populated from sanitized command-line arguments ($argv)
+// provided by an operator or trusted automation.
 $user = [
     'name'      => $argv[1],
     'memory'    => (int) $argv[2],
@@ -29,7 +31,15 @@ $user = [
     'CPUWeight' => isset($argv[5]) ? (int) $argv[5] : 500,
     'IOWeight'  => isset($argv[6]) ? (int) $argv[6] : 500,
 ];
-$user['id'] = (int) trim(`id -u {$user['name']}`);
+
+// Safely get the user ID
+$output = [];
+$return_var = 0;
+exec('id -u ' . escapeshellarg($user['name']), $output, $return_var);
+if ($return_var !== 0) {
+    die("Failed to get user ID for {$user['name']}\n");
+}
+$user['id'] = (int) trim($output[0]);
 
 if (isset($argv[4])) {
     $user['trafficLimit'] = (int) $argv[4];

@@ -45,6 +45,8 @@ function logProvisionMessage(string $message): void
 
 /**
  * Run a shell command and log whether it succeeded without aborting.
+ * The 'continue on failure' behavior is intentional to allow as many
+ * provisioning steps as possible to complete.
  *
  * @param string $description Operator-facing label describing the action.
  * @param string $command     Full shell command executed through runCommand().
