@@ -24,14 +24,14 @@ $users[] = 'www-data';  // Add www-data instance, we want to see this account as
 // Multiple networks may be listed one per line. If the file is missing
 // create one with the default Pulsed Media LAN range so admins know where
 // to customise it.
-$localnets = ['185.148.0.0/22'];
+$localnets = ['185.148.0.0/22']; // #TODO Refactor hardcoded value
 if (file_exists('/etc/seedbox/config/localnet')) {
     $cfg = trim(file_get_contents('/etc/seedbox/config/localnet'));
     if ($cfg !== '') {
         $localnets = preg_split('/\r?\n/', $cfg);
     }
 } else {
-    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n");
+    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n"); // #TODO Refactor hardcoded value
 }
 // Provides $link and $linkSpeed variables used for threshold checks
 require_once '/scripts/lib/networkInfo.php';

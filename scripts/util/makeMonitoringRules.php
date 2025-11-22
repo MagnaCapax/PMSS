@@ -11,7 +11,7 @@ $users[] = 'www-data';
 
 $mark = 1;
 
-$localnets = ['185.148.0.0/22'];
+$localnets = ['185.148.0.0/22']; // #TODO Refactor hardcoded value
 // Multiple networks may be defined, one per line, to mark "local" traffic.
 if (file_exists('/etc/seedbox/config/localnet')) {
     $cfg = trim(file_get_contents('/etc/seedbox/config/localnet'));
@@ -19,7 +19,7 @@ if (file_exists('/etc/seedbox/config/localnet')) {
         $localnets = preg_split('/\r?\n/', $cfg);
     }
 } else {
-    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n");
+    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n"); // #TODO Refactor hardcoded value
 }
 
 
