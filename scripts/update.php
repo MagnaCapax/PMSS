@@ -601,18 +601,10 @@ function runUpdateStep2(bool $dryRun): void
     }
 
     // Preflight expectations before handing off to phase 2:
-    //   * Ensure at least ~2 GB free on the root filesystem so dpkg baselines and
-    //     queued packages have room for temporary archives.
-    //   * Verify network reachability for the configured repository mirror so
-    //     apt can synchronise metadata (e.g., `apt-get update --dry-run`).
-    //   * Confirm `/var/lib/dpkg/lock` is clear and `dpkg --audit` reports no
-    //     outstanding breakage. update-step2 assumes package repair already
-    //     succeeded.
-    // #TODO Implement explicit preflight probes and a `--check` mode that only
-    //       runs these checks and exits non-zero on failure. Emit JSON events
-    //       like `preflight_ok` / `preflight_error` for automation.
-    // #TODO Add hermetic tests for preflight planner (disk space, dpkg lock,
-    //       apt reachability) using environment overrides and temp paths.
+    //   * Ensure at least ~3 GB free on the root filesystem and /home.
+    //   * Verify network reachability (implicit if we got this far).
+    checkDiskSpace();
+
     logmsg('Handing off to update-step2.php');
     logEvent('update_step2_start');
     $start = microtime(true);
@@ -622,6 +614,32 @@ function runUpdateStep2(bool $dryRun): void
     if ($rc !== 0) {
         fatal('update-step2.php exited with status '.$rc, $rc);
     }
+}
+
+function checkDiskSpace(): void
+{
+    // 3 GiB in bytes
+    $required = 3.0 * 1024 * 1024 * 1024;
+    $paths = ['/', '/home'];
+
+    foreach ($paths as $path) {
+        if (!is_dir($path)) {
+            continue;
+        }
+        $free = @disk_free_space($path);
+        if ($free === false) {
+            logmsg("[WARN] Unable to determine free space for {$path}");
+            continue;
+        }
+        if ($free < $required) {
+            $availableGb = round($free / 1073741824, 2);
+            $requiredGb  = round($required / 1073741824, 2);
+            $msg = "Insufficient free space on {$path}: {$availableGb} GiB available, {$requiredGb} GiB required";
+            logEvent('preflight_error', ['check' => 'disk_space', 'path' => $path, 'available_bytes' => $free, 'required_bytes' => $required]);
+            fatal($msg, EXIT_COPY);
+        }
+    }
+    logmsg('[INFO] Preflight disk space check passed');
 }
 
 function runAutoremove(): void
