@@ -53,6 +53,13 @@ declare -a ACCOUNTED_FILES=()
 select_category() {
 	local path="$1"
 
+	# Treat library tests under scripts/lib/tests as tests so they
+	# are grouped with other coverage rather than runtime scripts.
+	if [[ "$path" == scripts/lib/tests/* ]]; then
+		echo "tests"
+		return
+	fi
+
 	if [[ "$path" == scripts/* ]]; then
 		if [[ "$path" == *.php ]]; then
 			echo "scripts_php"
