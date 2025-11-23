@@ -60,6 +60,19 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
         return false;
     }
 
+    // Guard against directory targets (test overrides or misconfiguration).
+    // In that case we avoid writing into the directory itself, emit a warning,
+    // and persist the intended content only to the backup path so callers can
+    // inspect what would have been written without touching the real tree.
+    if (is_dir($target)) {
+        if (@file_put_contents($backup, $content, LOCK_EX) === false) {
+            $log("[WARN] Target sources path is a directory for $label and backup write failed, skipping update");
+        } else {
+            $log("[WARN] Target sources path is a directory for $label, wrote backup and skipped update");
+        }
+        return false;
+    }
+
     $current = @file_get_contents($target);
     $dir = dirname($target);
     if (!is_dir($dir)) {
