@@ -37,7 +37,6 @@ SHELL=/bin/bash
 * * * * *   root /scripts/cron/updateQuotas.php >> /var/log/pmss/updateQuotas.log 2>&1
 */5 * * * * root /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1
 */5 * * * *   root    /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
-5 * * * *   root    /scripts/cron/cgroup.php >> /var/log/pmss/cgroup.log 2>&1
 */5 * * * *    root    /scripts/cron/diskIostat.php >> /var/log/pmss/iostatLog.log 2>&1
 */15 * * * *    root    /scripts/cron/cpuStat.php >> /var/log/pmss/cpuStat.log 2>&1
 7 * * * *   root    sleep 45; /scripts/cron/trafficLimits.php >> /var/log/pmss/trafficLimits.log 2>&1
