@@ -106,6 +106,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         $warnings      = false;
         if ($lines !== false) {
             $sanitised = [];
+            $shortFormSeen = false;
             $t0 = microtime(true);
             $droppedUnavailable = [];
             $droppedObsolete    = [];
@@ -116,15 +117,26 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     continue;
                 }
                 $parts = preg_split('/\s+/', $trimmed);
-                if (count($parts) < 2) {
+                if (count($parts) === 1) {
+                    // Debian 12 baseline currently uses short-form lines containing only
+                    // the package name. Treat these as "install" selections instead of
+                    // emitting per-line warnings. Aggregated validation below still
+                    // enforces allowed package/state patterns.
+                    $package = $parts[0];
+                    $state   = 'install';
+                    $shortFormSeen = true;
+                } elseif (count($parts) >= 2) {
+                    $package = $parts[0];
+                    $state   = $parts[1];
+                } else {
                     if (function_exists('pmssLogStatus')) {
                         pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0);
-                    } elseif (function_exists('logmsg')) { logmsg(sprintf('[WARN] Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed)); }
+                    } elseif (function_exists('logmsg')) {
+                        logmsg(sprintf('[WARN] Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed));
+                    }
                     $warnings = true;
                     continue;
                 }
-                $package = $parts[0];
-                $state   = $parts[1];
                 // Skip problematic or deprecated packages from baseline; do not log mediaarea repo packages at all
                 $lower = strtolower($package);
                 if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package)) { $warnings = true; continue; }
@@ -167,6 +179,9 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             }
             if (!empty($droppedObsolete) && function_exists('pmssLogStatus')) {
                 pmssLogStatus('SKIP', sprintf('Baseline: dropped %d obsolete entries (legacy names)', count($droppedObsolete)), 0, 0.0);
+            }
+            if ($shortFormSeen && function_exists('pmssLogStatus')) {
+                pmssLogStatus('INFO', 'Baseline: detected short-form dpkg selection entries; treating as \"install\" state', 0, 0.0);
             }
         }
 
