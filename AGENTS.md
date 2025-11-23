@@ -9,7 +9,7 @@ instead of restating details.
   stability over perfection; make conservative, minimal diffs. Never break old
   users.
 ## Architecture Cheat Sheet
-- **Before touching any code**, read `docs/architecture.md` and the related workflow docs in `docs/update.md` / `docs/install.md`. These describe the provisioning hierarchy (install → update.php → update-step2) and must be understood prior to making changes.
+- **Before touching any code**, read `docs/architecture.md`, the related workflow docs in `docs/update.md` / `docs/install.md`, and the refactoring guide in `docs/refactoring.md`. These describe the provisioning hierarchy (install → update.php → update-step2) and must be understood prior to making changes.
 
 - **Purpose**: PMSS is Pulsed Media's distro overlay for seedboxing, data hoarding, streaming etc. working on top of Debian distro and this repo is overlayed on top of the distro to manage the multi-tenant environment.
 - **Supported OS**: Production targets Debian 10 (buster) and Debian 11 (bullseye); Debian 12 (bookworm) is currently under validation.
@@ -97,6 +97,8 @@ instead of restating details.
 
 ## Workflow Guardrails
 - Always read relevant docs (`docs/architecture.md`, `docs/update.md`, ADRs) and the source you intend to modify before planning changes.
+- Never overwrite a file without reading it first and understanding its current behaviour; always inspect contents and context before editing.
+- Avoid sweeping changes or bulk deletions of code; keep removals targeted to clearly dead or superseded paths with explicit justification.
 - Make small, focused changes; keep diffs coherent and easy to review.
 - Validate locally before pushing: run `php -l` on changed PHP files, `php scripts/lib/tests/development/Runner.php`, and the testing scripts under `scripts/testing/` as applicable.
 - Keep generated or ephemeral files out of commits; honor `.gitignore` and repository conventions.
