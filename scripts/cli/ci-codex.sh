@@ -84,11 +84,11 @@ Workflow (Do This Now):
   * scripts/testing/test-php.sh
   * scripts/testing/test-bash.sh
   * scripts/testing/php73-compat-scan.sh
-  * scripts/testing/loc.sh (capture category totals and top complexity hotspots)
+- From the CI logs, locate the latest LOC snapshot emitted by scripts/testing/loc.sh (look for "PMSS lines of code (excluding third-party trees)" and the advisory complexity sections) and use that to understand category growth and hotspots; do not re-run loc.sh unless explicitly requested.
 - Commit the fix (no branches, no push):
   * git add -A && git commit -m "ci: <scope> — <short reason>"
 
-Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch, the verification commands you ran, and a brief summary of the latest loc.sh snapshot (key category totals and any notable hotspots).
+Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch, the verification commands you ran, and a brief summary of the latest LOC snapshot from the CI logs (key category totals and any notable hotspots based on the loc.sh output).
 PMSSPROMPT
 )
 
