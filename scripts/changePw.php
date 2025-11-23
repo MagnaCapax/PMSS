@@ -21,7 +21,7 @@ if (empty($argv[2])) $password = generatePassword();
     
 echo "\t *******  {$username}     new password:   {$password} \n";
 
-shell_exec('echo "' . $password . '\n' . $password . '"|passwd ' . $username);
+shell_exec('echo "' . $password . "\n" . $password . "\"|passwd {$username}");
 
 $htpasswdFile = "/home/{$username}/.lighttpd/.htpasswd";
 

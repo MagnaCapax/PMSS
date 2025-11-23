@@ -10,7 +10,7 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
     $templatePath = getenv('PMSS_FIREQOS_TEMPLATE') ?: '/etc/seedbox/config/template.fireqos';
     $template = file_get_contents($templatePath);
     if ($template === false) {
-        $template = 'interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n';
+        $template = "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n";
     }
 
     $fireqosConfigLocal = "class local commit 10%\n";

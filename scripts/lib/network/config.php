@@ -20,7 +20,7 @@ function networkLoadLocalnets(): array
     $default = ['185.148.0.0/22']; // #TODO Refactor hardcoded value
     $path = networkLocalnetPath();
     if (!file_exists($path)) {
-        file_put_contents($path, implode("\n", $default).'\n');
+        file_put_contents($path, implode("\n", $default) . "\n");
         return $default;
     }
 

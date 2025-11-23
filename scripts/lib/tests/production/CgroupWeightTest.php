@@ -27,47 +27,58 @@ class CgroupWeightTest extends \PMSS\Tests\TestCase
             throw new \PMSS\Tests\SkipTest('Cannot inspect systemd slices in sandbox');
         }
 
-        // 1. Discover active user slices
-        // #TODO Refactor to use a robust slice discovery helper if available
-        exec('systemctl list-units --type=slice --no-legend --no-pager "user-*.slice"', $lines, $rc);
-        if ($rc !== 0 || empty($lines)) {
-            throw new \PMSS\Tests\SkipTest('No active user slices found');
+        // 1. Discover users via listUsers.php
+        $usersRaw = shell_exec('/scripts/listUsers.php');
+        if (empty($usersRaw)) {
+            throw new \PMSS\Tests\SkipTest('No users returned by /scripts/listUsers.php');
         }
+        $users = array_filter(explode("\n", trim($usersRaw)));
 
         $checked = 0;
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '' || strpos($line, 'user-0.slice') !== false) {
-                continue; // Skip root
+        foreach ($users as $user) {
+            $user = trim($user);
+            if ($user === '') continue;
+
+            // 2. Check user config existence
+            if (!is_dir("/home/$user")) {
+                echo "[WARN] User $user returned by listUsers but home directory missing.\n";
+                continue;
             }
 
-            // Extract unit name (user-1001.slice)
-            $parts = preg_split('/\s+/', $line);
-            $unit = $parts[0] ?? '';
-            if (empty($unit)) continue;
+            // 3. Resolve UID and slice
+            $uid = (int)shell_exec('id -u ' . escapeshellarg($user));
+            if ($uid < 1000) {
+                echo "[WARN] User $user has invalid UID $uid.\n";
+                continue;
+            }
+            $unit = "user-$uid.slice";
 
-            // 2. Read current properties
+            // 4. Check if slice is active
+            exec('systemctl is-active ' . escapeshellarg($unit), $dummy, $rc);
+            if ($rc !== 0) {
+                echo "[INFO] Skipping $user ($unit): Slice not active.\n";
+                continue;
+            }
+
+            // 5. Read current properties
             $props = $this->getSystemdProperties($unit, ['MemoryHigh', 'CPUWeight', 'IOWeight']);
             
             // If MemoryHigh is infinity or missing, we can't verify the calculation
             if (empty($props['MemoryHigh']) || $props['MemoryHigh'] === 'infinity') {
-                echo "[INFO] Skipping $unit: MemoryHigh not set (unlimited?)\n";
+                echo "[INFO] Skipping $user: MemoryHigh not set (unlimited?)\n";
                 continue;
             }
 
-            // 3. Calculate expected weight
+            // 6. Calculate expected weight
             // Systemd returns bytes, userCgroup uses MiB
             $ramBytes = (int)$props['MemoryHigh'];
             $ramMiB   = (int)($ramBytes / 1024 / 1024);
             
             $expected = \calculateCgroupWeightFromMemory($ramMiB);
             
-            // 4. Assert
-            // CPUWeight and IOWeight should match, OR be close if there's rounding variance
-            // #TODO Allow for explicit overrides (check if cgroup.policy.php has a static override?)
-            
-            $this->assertEquals($expected, (int)$props['CPUWeight'], "CPUWeight mismatch for $unit (RAM: {$ramMiB}MiB)");
-            $this->assertEquals($expected, (int)$props['IOWeight'], "IOWeight mismatch for $unit (RAM: {$ramMiB}MiB)");
+            // 7. Assert
+            $this->assertEquals($expected, (int)$props['CPUWeight'], "CPUWeight mismatch for $user (RAM: {$ramMiB}MiB)");
+            $this->assertEquals($expected, (int)$props['IOWeight'], "IOWeight mismatch for $user (RAM: {$ramMiB}MiB)");
             
             $checked++;
         }
