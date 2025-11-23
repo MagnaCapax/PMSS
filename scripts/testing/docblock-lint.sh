@@ -9,9 +9,12 @@ set -euo pipefail
 #   * an @return tag
 #   * if parameters exist, at least one @param tag
 #
-# Scope (required CI gate): scripts/lib/update/** only.
-#  - This reflects the staged rollout in tests/TODO.md: make docblocks required
-#    for updater libraries first; keep broader enforcement advisory/opt-in.
+# Scope (required CI gate): updater libraries plus top-level shared libs.
+#  - Required: all PHP files under scripts/lib/update/**.
+#  - Required: first-party shared helpers in scripts/lib/*.php (maxdepth 1).
+#  - This reflects the staged rollout in tests/TODO.md: updater libraries were
+#    enforced first, then core shared helpers; broader tree coverage remains
+#    advisory/opt‑in for now.
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 VIOLATIONS=0
