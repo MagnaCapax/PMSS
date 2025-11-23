@@ -18,7 +18,6 @@ VPN Services:
 
 
 PMSS Version: %PMSS_VERSION%
-Runtime Version: %RUN_VERSION%
 Last Update: %UPDATE_DATE%  APT Update/Upgrade: %APT_LAST_UPDATE%
 Kernel: %KERNEL_VERSION%
 

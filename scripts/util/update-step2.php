@@ -274,8 +274,13 @@ try {
         logmsg('  - Profile: '.$profileOut);
     }
 } catch (\Throwable $e) {
-    // Fail-soft: logging paths are best-effort only.
-}
-pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
-logmsg('update-step2.php completed');
+        // Fail-soft: logging paths are best-effort only.
+    }
+    
+    // Record successful completion for MOTD/monitoring
+    @file_put_contents('/var/run/pmss/updated', date('Y-m-d H:i:s'));
+    @chmod('/var/run/pmss/updated', 0644);
+    
+    pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
+    logmsg('update-step2.php completed');
 logmsg('Completed at: '.date('Y-m-d H:i:s'));

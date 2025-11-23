@@ -16,7 +16,7 @@ class Motd
         if ($tpl === false) return;
 
         [$host,$ip,$cpu,$ram,$storage] = self::sysBasics();
-        [$pmssVersion,$runtimeVersion,$updateDate] = self::versionInfo();
+        [$pmssVersion,$updateDate] = self::versionInfo();
         [$uptime,$kernel,$netSpeed] = self::runtimeInfo();
         [$wg,$ovpn] = self::serviceStatuses();
         $storageWarn = self::storageWarnings();
@@ -28,7 +28,6 @@ class Motd
             '%SERVER_RAM%'      => $ram,
             '%SERVER_STORAGE%'  => $storage,
             '%PMSS_VERSION%'    => $pmssVersion,
-            '%RUN_VERSION%'     => $runtimeVersion,
             '%UPDATE_DATE%'     => $updateDate,
             '%APT_LAST_UPDATE%' => self::aptLastUpdate(),
             '%UPTIME%'          => $uptime,
@@ -38,6 +37,11 @@ class Motd
             '%OPENVPN_STATUS%'  => $ovpn,
         ];
         foreach ($repl as $k => $v) $tpl = str_replace($k, $v, $tpl);
+        
+        // Clean up lines that might remain if the template still has %RUN_VERSION%
+        $tpl = str_replace('Runtime Version: %RUN_VERSION%', '', $tpl);
+        $tpl = preg_replace('/^\s*Runtime Version:.*$/m', '', $tpl);
+
         if ($storageWarn !== '') {
             $tpl .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
         }
@@ -57,13 +61,18 @@ class Motd
     private static function versionInfo(): array
     {
         $pmssVersion = getPmssVersion();
-        $runtimeDir = getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss';
-        if (!is_dir($runtimeDir)) @mkdir($runtimeDir, 0770, true);
-        $verCache = rtrim($runtimeDir,'/').'/version';
-        @file_put_contents($verCache, $pmssVersion);
-        $runtimeVersion = trim((string) @file_get_contents($verCache));
+        
+        // Append short commit hash if available
+        $metaPath = '/etc/seedbox/config/version.meta';
+        if (is_file($metaPath)) {
+            $meta = json_decode(file_get_contents($metaPath), true);
+            if (isset($meta['commit']) && strlen($meta['commit']) >= 7) {
+                $pmssVersion .= ' ('.substr($meta['commit'], 0, 7).')';
+            }
+        }
+
         $updateDate = is_file('/var/run/pmss/updated') ? trim((string) @file_get_contents('/var/run/pmss/updated')) : 'not set';
-        return [$pmssVersion,$runtimeVersion,$updateDate];
+        return [$pmssVersion,$updateDate];
     }
 
     private static function aptLastUpdate(): string

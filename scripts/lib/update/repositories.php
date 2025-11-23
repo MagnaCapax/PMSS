@@ -203,17 +203,16 @@ if (!function_exists('pmssRefreshRepositories')) {
             return;
         }
 
-        $log = pmssSelectLogger($logger);
-        updateAptSources($distroName, (int)$distroVersion, $plan['current_hash'], $plan['templates'], $log);
-        runStep('Refreshing apt package index', aptCmd('update'));
-    }
+    $log = pmssSelectLogger($logger);
+    updateAptSources($distroName, (int)$distroVersion, $plan['current_hash'], $plan['templates'], $log);
+    runStep('Refreshing apt package index', aptCmd('update'));
+    
+    // Touch the periodic stamp so tools like MOTD know the index is fresh
+    @mkdir('/var/lib/apt/periodic', 0755, true);
+    @touch('/var/lib/apt/periodic/update-success-stamp');
 }
 
-if (!function_exists('pmssAutoremovePackages')) {
-    /**
-     * Remove packages that are no longer required.
-     */
-    function pmssAutoremovePackages(): void
+function pmssAutoremovePackages(): void
     {
         runStep('Removing packages no longer required', aptCmd('autoremove -y'));
     }
