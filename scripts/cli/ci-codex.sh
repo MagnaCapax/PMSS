@@ -84,10 +84,11 @@ Workflow (Do This Now):
   * scripts/testing/test-php.sh
   * scripts/testing/test-bash.sh
   * scripts/testing/php73-compat-scan.sh
+  * scripts/testing/loc.sh (capture category totals and top complexity hotspots)
 - Commit the fix (no branches, no push):
   * git add -A && git commit -m "ci: <scope> — <short reason>"
 
-Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch and the verification commands you ran.
+Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch, the verification commands you ran, and a brief summary of the latest loc.sh snapshot (key category totals and any notable hotspots).
 PMSSPROMPT
 )
 
