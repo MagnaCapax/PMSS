@@ -114,9 +114,29 @@ instead of restating details.
 - Session constraints: if the current session forbids auto‑commit/branch operations, the operator must explicitly instruct the agent to commit and/or create a branch. Otherwise changes remain as uncommitted workspace edits.
 
 ## Language & Tone (Internal)
-- Internal docs and comments may be candid and direct. Keep all user-facing messages, logs, and public surfaces professional and free of profanity.
+
+- Internal docs and comments may be candid and direct. Keep all user-facing messages, logs, and public surfaces professional and free of p
+
+rofanity.
+
+
+
+## Workflow / Documentation (MUST)
+
+- **No New TODO Files:** Do NOT create new files like `docs/todo-topic.md`. Consolidate findings into:
+
+  - `docs/TODO.md` for architectural, feature, or general improvements.
+
+  - `tests/TODO.md` for testing gaps and plans.
+
+- **Verify Before Create:** Always check if a similar file (e.g., `refactoring.md`, `TODO.md`) already exists before creating a new one to avoid fragmentation or overwrites.
+
+- **Append, Don't Clutter:** Add sections to existing documentation rather than spawning new micro-files unless the content is a formal ADR.
+
+
 
 ## ADR Usage
+
 - Location: `docs/adr/`. Use the provided template to record decisions with context and consequences.
 - Process: draft ADR → collect feedback → update AGENTS.md or docs if rails change → ship with the implementing change.
 
