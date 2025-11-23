@@ -8,9 +8,15 @@ require_once __DIR__.'/../update.php';
 /**
  * Entry point used by util/update-dist-upgrade.php.
  */
-function pmssRunDistUpgrade(): int
+function pmssRunDistUpgrade(?string $target = null): int
 {
     requireRoot();
+
+    if ($target === null) {
+        logMessage('Safety error: You must explicitly specify the target Debian major version (e.g., 11 or bullseye).');
+        logMessage('Usage: scripts/util/update-dist-upgrade.php <target>');
+        return 1;
+    }
 
     $distro = getDistroName();
     if ($distro !== 'debian') {
@@ -18,17 +24,44 @@ function pmssRunDistUpgrade(): int
         return 1;
     }
 
-    $version = getDistroVersion();
-    [$from, $to] = pmssDetermineUpgradePath($version);
-    if ($from === null || $to === null) {
-        logMessage('No upgrade recipe for Debian '.$version);
+    $current = getDistroVersion();
+    $targetMajor = pmssResolveTargetVersion($target);
+
+    if ($targetMajor === '') {
+        logMessage("Unknown target version: $target");
+        return 1;
+    }
+
+    [$from, $next] = pmssDetermineUpgradePath($current);
+    if ($from === null || $next === null) {
+        logMessage('No upgrade recipe for Debian '.$current);
         return 0;
     }
 
-    logMessage(sprintf('Initiating Debian %s → %s upgrade', $from, $to));
-    pmssRewriteSources($from, $to);
+    if ($targetMajor !== $next) {
+        logMessage(sprintf('Safety halt: Current version is %s. The next logical upgrade is to %s, but you requested %s.', $current, $next, $targetMajor));
+        logMessage('Skipping versions is not supported.');
+        return 1;
+    }
+
+    logMessage(sprintf('Initiating Debian %s → %s upgrade', $from, $next));
+    pmssRewriteSources($from, $next);
     pmssExecuteUpgrade();
     return 0;
+}
+
+/**
+ * Resolve a target string (number or codename) to a major version string.
+ */
+function pmssResolveTargetVersion(string $input): string
+{
+    $map = [
+        '10'       => '10', 'buster'   => '10',
+        '11'       => '11', 'bullseye' => '11',
+        '12'       => '12', 'bookworm' => '12',
+        '13'       => '13', 'trixie'   => '13',
+    ];
+    return $map[strtolower($input)] ?? '';
 }
 
 /**

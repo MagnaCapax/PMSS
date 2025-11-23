@@ -6,4 +6,4 @@
 
 require_once __DIR__.'/../lib/update/distUpgrade.php';
 
-exit(pmssRunDistUpgrade());
+exit(pmssRunDistUpgrade($argv[1] ?? null));

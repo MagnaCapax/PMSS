@@ -8,8 +8,18 @@
  *   2. Fetch the requested tree (git branch/pin or release tarball)
  *   3. Copy scripts/etc/var into place and hand off to update-step2.php
  *
- * Keep this file largely self-contained – it may be the only asset available
- * on rescue systems. All richer orchestration happens inside update-step2.php.
+ * ARCHITECTURAL CONSTRAINT (DO NOT REFACTOR):
+ * This file MUST remain largely self-contained and monolithic. It is the
+ * "break-glass" recovery tool. In catastrophic failure modes (e.g., where
+ * the update mechanism itself is broken or deleted), an operator must be
+ * able to restore functionality via a simple one-liner like:
+ *   `wget -qO- https://.../update.php | php -- --scripts-only`
+ *
+ * Modularizing this file into multiple dependencies would require manually
+ * fetching dozens of files to correct paths during an outage, turning a
+ * seconds-long recovery into a 15+ minute manual reconstruction task.
+ * Do not extract logic from here into `scripts/lib/` unless it is strictly
+ * optional/progressive enhancement.
  *
  * | Flag / Spec        | Purpose |
  * | ------------------ | ------- |
@@ -103,13 +113,13 @@ function ensureRoot(): void
 
 function usage(string $script): void
 {
-    echo "Usage: {$script} [<spec>] [--repo=<url>] [--branch=<name>] [--dry-run] [--dist-upgrade] [--scripts-only]\n";
+    echo "Usage: {$script} [<spec>] [--repo=<url>] [--branch=<name>] [--dry-run] [--dist-upgrade=<target>] [--scripts-only]\n";
     echo "Examples:\n";
     echo "  {$script}                      # update from git/main (default repo)\n";
     echo "  {$script} git/dev:2025-01-03   # dev branch pinned to a date\n";
     echo "  {$script} release:2025-07-12   # explicit tagged release\n";
     echo "  {$script} --repo=https://git/url.git --branch=beta\n";
-    echo "  {$script} --dist-upgrade            # run Debian release helper\n";
+    echo "  {$script} --dist-upgrade=11         # upgrade Debian release (explicit target required)\n";
 }
 
 /**
@@ -120,13 +130,13 @@ function usage(string $script): void
  *
  * Inputs:
  *  - argv array from PHP entrypoint (index 0 is the script path)
- *  - Accepts: <spec>, --dry-run, --dist-upgrade, --scripts-only,
+ *  - Accepts: <spec>, --dry-run, --dist-upgrade=<ver>, --scripts-only,
  *             --repo=<url>, --branch=<name>, and internal --skip-self-update
  * Behavior:
  *  - Synthesizes `spec` when --repo/--branch are supplied
  *  - Defaults spec to storedSpec() or 'git/main' when omitted
  * Output: associative array with keys:
- *  - dry_run(bool), dist_upgrade(bool), scripts_only(bool),
+ *  - dry_run(bool), dist_upgrade(bool|string), scripts_only(bool),
  *    skip_self_update(bool), spec(string), repo(?string), branch(?string)
  */
 function parseArguments(array $argv): array
@@ -148,6 +158,10 @@ function parseArguments(array $argv): array
         }
         if ($arg === '--dry-run') {
             $options['dry_run'] = true;
+            continue;
+        }
+        if (str_starts_with($arg, '--dist-upgrade=')) {
+            $options['dist_upgrade'] = substr($arg, 15);
             continue;
         }
         if ($arg === '--dist-upgrade') {
@@ -650,13 +664,19 @@ function runAutoremove(): void
     runFatal($cmd, EXIT_COPY);
 }
 
-function maybeRunDistUpgrade(bool $distUpgrade): void
+/**
+ * @param bool|string $distUpgrade
+ */
+function maybeRunDistUpgrade($distUpgrade): void
 {
-    if (!$distUpgrade) {
+    if ($distUpgrade === false) {
         return;
     }
-    logEvent('dist_upgrade_start');
-    runFatal('/scripts/util/update-dist-upgrade.php', EXIT_DIST);
+    if ($distUpgrade === true) {
+        fatal("You must specify a target version for dist-upgrade (e.g. --dist-upgrade=11 or --dist-upgrade=bullseye).", EXIT_PARSE);
+    }
+    logEvent('dist_upgrade_start', ['target' => $distUpgrade]);
+    runFatal('/scripts/util/update-dist-upgrade.php ' . escapeshellarg($distUpgrade), EXIT_DIST);
     logEvent('dist_upgrade_end');
 }
 
