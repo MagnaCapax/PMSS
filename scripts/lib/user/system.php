@@ -15,24 +15,41 @@ function userEnsureShell(array $user): void
 
 function userConfigureSystemdSlice(array $user): void
 {
-    $slicePath = sprintf('/etc/systemd/system/user-%d.slice.d', $user['id']);
-    if (!file_exists($slicePath)) {
-        mkdir($slicePath, 0755, true);
+    // Delegate cgroup configuration to the dedicated utility.
+    // This ensures v1/v2 compatibility and automatic weight calculation.
+    $args = [
+        '/scripts/util/userCgroup.php',
+        $user['name'],
+        '--apply',
+        '--memory-high=' . $user['memory'],
+        '--memory-max=' . ($user['memory'] * 2),
+    ];
+
+    if (!empty($user['CPUWeight']) && $user['CPUWeight'] > 0) {
+        $args[] = '--cpu-weight=' . $user['CPUWeight'];
     }
-    $template = file_get_contents('/etc/seedbox/config/template.user-slice.conf');
-    $rendered = str_replace(
-        ['##USER_MEMORY##', '##USER_MEMORY_MAX##', '##USER_CPUWEIGHT##', '##USER_IOWEIGHT##'],
-        [$user['memory'], $user['memory'] * 2, $user['CPUWeight'], $user['IOWeight']],
-        $template
+    if (!empty($user['IOWeight']) && $user['IOWeight'] > 0) {
+        $args[] = '--io-weight=' . $user['IOWeight'];
+    }
+
+    // Optional I/O throttles
+    if (!empty($user['IOReadBW'])) {
+        $args[] = '--io-read-bw=' . $user['IOReadBW'];
+    }
+    if (!empty($user['IOWriteBW'])) {
+        $args[] = '--io-write-bw=' . $user['IOWriteBW'];
+    }
+    if (!empty($user['IOReadIOPS'])) {
+        $args[] = '--io-read-iops=' . $user['IOReadIOPS'];
+    }
+    if (!empty($user['IOWriteIOPS'])) {
+        $args[] = '--io-write-iops=' . $user['IOWriteIOPS'];
+    }
+
+    userRunCommand(
+        'Configuring cgroups',
+        pmssBuildCommand('php', $args)
     );
-
-    if (file_exists($slicePath.'/99-pmss.conf')) {
-        unlink($slicePath.'/99-pmss.conf');
-    }
-
-    file_put_contents($slicePath.'/90-pmss-user.conf', $rendered);
-    chmod($slicePath.'/90-pmss-user.conf', 0644);
-    userRunCommand('Reloading systemd configuration', 'systemctl daemon-reload');
 }
 
 function userEnableLingerAndDocker(array $user): void

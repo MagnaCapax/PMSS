@@ -95,30 +95,58 @@ function totalMemMiB(): int {
     return 0;
 }
 
+function calculateCgroupWeightFromMemory(int $memoryMiB): int {
+    $weight = (int) round(8 * sqrt($memoryMiB));
+    return max(10, min(1000, $weight));
+}
+
 function computeSetProps(array $opts, int $sysMemMiB): array {
     $props = [];
-    if (isset($opts['cpu-weight']))  { $props['CPUWeight'] = (int)$opts['cpu-weight']; }
-    if (isset($opts['io-weight']))   { $props['IOWeight']  = (int)$opts['io-weight']; }
-    if (isset($opts['tasks-max']))   { $props['TasksMax']  = (int)$opts['tasks-max']; }
     $minHigh = 250;
+
     if (isset($opts['memory-high'])) {
-        $mh = max($minHigh, (int)$opts['memory-high']);
-        $props['MemoryHigh'] = $mh.'M';
+        $memoryHigh = max($minHigh, (int)$opts['memory-high']);
+        $props['MemoryHigh'] = $memoryHigh.'M';
     }
+
     if (isset($opts['memory-max'])) {
         $defaultHigh = max($minHigh, (int)($sysMemMiB*0.10));
         $high = isset($props['MemoryHigh']) ? (int)rtrim($props['MemoryHigh'],'M') : $defaultHigh;
         if (!isset($props['MemoryHigh'])) { $props['MemoryHigh'] = $high.'M'; }
         $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB*0.95) : PHP_INT_MAX;
-        $mm = (int)$opts['memory-max'];
-        $mm = max($high, min($mm, $maxCap));
-        $props['MemoryMax'] = $mm.'M';
+        $memoryMax = (int)$opts['memory-max'];
+        $memoryMax = max($high, min($memoryMax, $maxCap));
+        $props['MemoryMax'] = $memoryMax.'M';
     } elseif (isset($props['MemoryHigh'])) {
         $high = (int)rtrim($props['MemoryHigh'],'M');
         $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB*0.95) : PHP_INT_MAX;
-        $mm = min((int)floor($high*1.5), $maxCap);
-        $props['MemoryMax'] = $mm.'M';
+        $memoryMax = min((int)floor($high*1.5), $maxCap);
+        $props['MemoryMax'] = $memoryMax.'M';
     }
+
+    // Derive weights from RAM if not explicitly set
+    $derivedWeight = null;
+    if (isset($props['MemoryHigh'])) {
+        $ram = (int)rtrim($props['MemoryHigh'], 'M');
+        $derivedWeight = calculateCgroupWeightFromMemory($ram);
+    }
+
+    if (isset($opts['cpu-weight'])) {
+        $props['CPUWeight'] = (int)$opts['cpu-weight'];
+    } elseif ($derivedWeight !== null) {
+        $props['CPUWeight'] = $derivedWeight;
+    }
+
+    if (isset($opts['io-weight'])) {
+        $props['IOWeight'] = (int)$opts['io-weight'];
+    } elseif ($derivedWeight !== null) {
+        $props['IOWeight'] = $derivedWeight;
+    }
+
+    if (isset($opts['tasks-max'])) {
+        $props['TasksMax'] = (int)$opts['tasks-max'];
+    }
+
     return $props;
 }
 
