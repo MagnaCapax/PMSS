@@ -10,6 +10,21 @@ EXCLUDE_RELATIVE=(
 	"scripts/lib/devristo"
 )
 
+# is_excluded_relative returns success when the given tracked path lives under
+# one of the excluded prefixes defined above.
+is_excluded_relative() {
+	local path="$1"
+	local rel
+
+	for rel in "${EXCLUDE_RELATIVE[@]}"; do
+		if [[ "$path" == "$rel"* ]]; then
+			return 0
+		fi
+	done
+
+	return 1
+}
+
 declare -a TRACKED_FILES=()
 mapfile -d '' TRACKED_FILES < <(git -C "$ROOT_DIR" ls-files -z)
 
@@ -110,14 +125,7 @@ select_category() {
 }
 
 for relative in "${TRACKED_FILES[@]}"; do
-	skip=0
-	for rel in "${EXCLUDE_RELATIVE[@]}"; do
-		if [[ "$relative" == "$rel"* ]]; then
-			skip=1
-			break
-		fi
-	done
-	if ((skip)); then
+	if is_excluded_relative "$relative"; then
 		continue
 	fi
 
@@ -161,14 +169,9 @@ echo "-------------------------------"
 declare -a BASH_FILES=()
 for rel in "${TRACKED_FILES[@]}"; do
 	# Exclude third-party trees and non-.sh files
-	skip=0
-	for ex in "${EXCLUDE_RELATIVE[@]}"; do
-		if [[ "$rel" == "$ex"* ]]; then
-			skip=1
-			break
-		fi
-	done
-	[[ $skip -eq 1 ]] && continue
+	if is_excluded_relative "$rel"; then
+		continue
+	fi
 	[[ "$rel" == *.sh ]] || continue
 	BASH_FILES+=("$rel")
 done
@@ -224,14 +227,9 @@ echo "-----------------------------------"
 
 declare -a PHP_FILES=()
 for rel in "${TRACKED_FILES[@]}"; do
-	skip=0
-	for ex in "${EXCLUDE_RELATIVE[@]}"; do
-		if [[ "$rel" == "$ex"* ]]; then
-			skip=1
-			break
-		fi
-	done
-	[[ $skip -eq 1 ]] && continue
+	if is_excluded_relative "$rel"; then
+		continue
+	fi
 	[[ "$rel" == *.php ]] || continue
 	PHP_FILES+=("$rel")
 done
