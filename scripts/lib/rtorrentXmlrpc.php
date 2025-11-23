@@ -9,13 +9,25 @@
  * @since 13/09/2014
  * @version 0.7
  */
- 
- class rtorrentXmlrpc {
- 
+	 
+	 class rtorrentXmlrpc {
+	 
     protected $_host;
-    protected $_port;
-    
-    public function __construct($host, $port) {
+	    protected $_port;
+	    
+	    /**
+	     * Create a new XML-RPC SCGI client for an rTorrent instance.
+	     *
+	     * The client keeps the hostname and SCGI port and reuses them when
+	     * building XML-RPC requests so callers only need to supply method
+	     * names and parameters for each subsequent call.
+	     *
+	     * @param string $host Hostname or IP address where rTorrent listens.
+	     * @param int    $port SCGI port exposed by the rTorrent instance.
+	     *
+	     * @return void
+	     */
+	    public function __construct($host, $port) {
         $this->_host = $host;
         $this->_port = $port;
     }

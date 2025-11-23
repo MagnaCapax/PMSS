@@ -24,7 +24,19 @@ class rtorrentConfig {
 	protected $_resourceConfig;
 	protected $_template;
 	
-	function __construct($resourceConfig = array(), $template = null) {
+		/**
+		 * Build a configuration helper around the provided templates.
+		 *
+		 * When no resource configuration or template is supplied the class
+		 * loads defaults from `/etc/seedbox/config`. The internal state is
+		 * then validated to keep downstream callers resilient to missing keys.
+		 *
+		 * @param array       $resourceConfig Resource configuration overrides.
+		 * @param string|null $template       Template contents for .rtorrent.rc.
+		 *
+		 * @return void
+		 */
+		function __construct($resourceConfig = array(), $template = null) {
 		if (count($resourceConfig) == 0) {
 			$resourceConfig = $this->loadDefaultResourceConfig();
 		}
@@ -39,7 +51,20 @@ class rtorrentConfig {
     
    
 	
-	public function createConfig($config = array()) {
+		/**
+		 * Create a rendered rTorrent configuration based on the given inputs.
+		 *
+		 * Validates the payload, derives port allocations and memory-based
+		 * tuning from the resources configuration, and returns both the final
+		 * configuration text and the normalised settings that were applied.
+		 *
+		 * @param array $config Input settings such as RAM, DHT/PEX flags and ports.
+		 *
+		 * @return array Array with keys `configFile` and `config`.
+		 *
+		 * @throws Exception When required inputs are missing or invalid.
+		 */
+		public function createConfig($config = array()) {
 		if (!is_array($config) || count($config) == 0) throw new Exception('createConfig requires an array with atleast RAM defined', 100);
 		if (!isset($config['ram'])) throw new Exception('no ram defined for create config');
 		
@@ -81,16 +106,21 @@ class rtorrentConfig {
 		return array('configFile' => $configFile, 'config' => $config);
 	}
 	
-	/**
-	 * Write config
-	 * 
-	 * Writes the actual configuration to the file. Pass full .rtorrent.rc file
-	 * 
-	 * @param string $user
-	 * @param string $config
-	 * @throws Exception
-	 */
-	public function writeConfig($user, $config) {
+		/**
+		 * Persist a rendered configuration to the user's `.rtorrent.rc` file.
+		 * 
+		 * Writes the supplied configuration string to `/home/<user>/.rtorrent.rc`
+		 * after basic validation and logging. Existing files are created with
+		 * safe permissions when missing and overwritten on success.
+		 * 
+		 * @param string $user   Target username whose home directory is updated.
+		 * @param string $config Fully rendered configuration contents.
+		 *
+		 * @return bool True on successful write, false on failure.
+		 *
+		 * @throws Exception When the configuration or user name is empty.
+		 */
+		public function writeConfig($user, $config) {
 	    if (empty($config)) throw new Exception('rtorrentConfig->writeConfig: Config cannot be empty!');
 	    if (empty($user)) throw new Exception('rtorrentConfig->writeConfig: User cannot be empty!');
 
@@ -107,16 +137,20 @@ class rtorrentConfig {
 		} else return false;
 	}
 	
-	/**
-	 * Idempotent config
-	 * 
-	 * Ensures idempotency by getting user config and comparing it to the config just created.
-	 * If not identical, write new.
-	 * 
-	 * @param string $user
-	 * @param string $config
-	 */
-	public function idempotentConfig($user, $config) {
+		/**
+		 * Apply configuration changes idempotently for the given user.
+		 * 
+		 * Reads the current `.rtorrent.rc` from the user’s home directory and
+		 * compares it with the provided configuration. Only when the contents
+		 * differ is the file rewritten through `writeConfig()`.
+		 * 
+		 * @param string $user   Target username whose configuration is checked.
+		 * @param string $config Proposed configuration contents.
+		 *
+		 * @return bool|null True when a new config is written, false when the
+		 *                   write fails, and null when no change was required.
+		 */
+		public function idempotentConfig($user, $config) {
 		$file = '/home/' . $user . '/.rtorrent.rc';
 		#TODO Check mtime + permissions first. if root and no "other" write permission + mtime exceeds 2-3 months, we can be 99.9% certain it's right
                 $data = file_get_contents( $file );
@@ -124,27 +158,33 @@ class rtorrentConfig {
 		if ($data !== $config) return $this->writeConfig($user, $config);
 	}
     
-    /**
-     * Read User Config
-     *
-     * Read a user's config file. Wrapper for readConfig.
-     *
-     * @param string $user
-     */
-    public function readUserConfig($user) {
+	    /**
+	     * Read a user's configuration file via the high-level helper.
+	     *
+	     * Convenience wrapper that targets `/home/<user>/.rtorrent.rc` and
+	     * delegates parsing to `readConfig()` while handling basic guards.
+	     *
+	     * @param string $user Username whose configuration should be read.
+	     *
+	     * @return array|false Parsed configuration array or false on failure.
+	     */
+	    public function readUserConfig($user) {
         if (!file_exists("/home/{$user}/.rtorrent.rc") or
             is_dir("/home/{$user}/.rtorrent.rc") ) return false;
         return $this->readConfig( "/home/{$user}/.rtorrent.rc" );
     }
     
-    /**
-     * Read config
-     *
-     * This reads and parses .rtorrent.rc config file.
-     *
-     * @param string file
-     */
-    public function readConfig($file) {
+	    /**
+	     * Read and parse a `.rtorrent.rc` style configuration file.
+	     *
+	     * Skips empty lines and comments, splits `key = value` style entries,
+	     * and returns a simple associative array of configuration settings.
+	     *
+	     * @param string $file Absolute path to the configuration file.
+	     *
+	     * @return array|false Parsed configuration array or false on failure.
+	     */
+	    public function readConfig($file) {
         if (!file_exists($file) or
             is_dir($file)) return false;
             

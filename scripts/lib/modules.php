@@ -20,12 +20,19 @@ class modules {
     var $modules;
     
     /**
-     * Constructor
+     * Construct a modules loader bound to a specific base directory.
      *
-     * @param string $baseName      Subdirectory of `/etc/seedbox/modules` to scan
-     * @param array  $capabilities  Hooks to seek. Currently unused.
+     * The loader will later scan `/etc/seedbox/modules/<baseName>` for PHP
+     * files and instantiate classes whose names match the filenames. This
+     * keeps optional extension points isolated from the core repository.
+     *
+     * @param string $baseName     Subdirectory of `/etc/seedbox/modules` to scan.
+     * @param array  $capabilities Capability hooks to seek (currently unused).
+     *
+     * @return void
      */
-    public function __construct($baseName, $capabilities = array()) {
+    public function __construct($baseName, $capabilities = array())
+    {
         $this->baseName = $baseName;
     }
     
