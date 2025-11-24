@@ -1375,7 +1375,6 @@ quota	install
 rake	install
 ranger	install
 readline-common	install
-repo-mediaarea	install
 reportbug	install
 restic	install
 rpcsvc-proto	install

@@ -21,6 +21,19 @@ function pmssEnsureRepositoryPrerequisites(): void
     }
 }
 
+if (!function_exists('pmssEnsureMediaareaRepository')) {
+    /**
+     * Legacy shim: MediaArea repository bootstrap was retired.
+     *
+     * Keep the function defined for backward compatibility; it intentionally
+     * performs no work.
+     */
+    function pmssEnsureMediaareaRepository(): void
+    {
+        // No-op
+    }
+}
+
 if (!function_exists('pmssEnsureDockerRepository')) {
     /**
      * Ensure Docker's official repository is configured via deb822 with a keyring.
