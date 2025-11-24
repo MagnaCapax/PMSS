@@ -34,8 +34,9 @@ Install minimal Debian system, and run following as root
 
 Release:
 ```
-wget -q https://github.com/MagnaCapax/PMSS/raw/main/install.sh; bash install.sh
+wget -qO- https://github.com/MagnaCapax/PMSS/raw/main/install.sh | bash
 ```
+To pin a specific version, pass it as the first argument (e.g. `| bash -s -- git/main` for the latest main branch or `| bash -s -- release:2023-07-22` for a tagged release).
 
 git/main "testing":
 ```

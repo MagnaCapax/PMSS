@@ -39,6 +39,7 @@ log_step() { echo -e "${COLOR_BLUE}==>${COLOR_RESET} $*"; }
 log_info() { echo -e "${COLOR_GREEN}-->${COLOR_RESET} $*"; }
 log_warn() { echo -e "${COLOR_YELLOW}WARN${COLOR_RESET} $*"; }
 log_error() { echo -e "${COLOR_RED}ERR ${COLOR_RESET} $*"; }
+run_cmd() { log_step "Running: $*"; "$@"; }
 
 # Installer runtime flags, populated from CLI switches.
 hostname_override=
@@ -225,6 +226,48 @@ detect_debian_codename() {
     printf '%s;%s\n' "$codename" "$major"
 }
 
+normalize_sources_for_detected_distro() {
+    local codename="$1" major="$2"
+    local sources="/etc/apt/sources.list"
+
+    if [ -z "$codename" ] || [ "$codename" = "buster" ]; then
+        return 0
+    fi
+
+    if [ -f "$sources" ] && grep -Eq "\\b${codename}\\b" "$sources"; then
+        return 0
+    fi
+
+    if [ -f "$sources" ] && ! grep -Eq "\\bbuster\\b" "$sources"; then
+        # Avoid clobbering custom/non-buster sources when the codename already differs.
+        return 0
+    fi
+
+    log_step "Refreshing apt sources for detected suite: ${codename}"
+
+    local components="main contrib non-free"
+    if [ "$major" -ge 12 ]; then
+        components="$components non-free-firmware"
+    fi
+
+    cat >"$sources" <<EOF
+deb http://deb.debian.org/debian ${codename} ${components}
+deb http://security.debian.org/debian-security ${codename}-security ${components}
+deb http://deb.debian.org/debian ${codename}-updates ${components}
+EOF
+
+    if ls /etc/apt/sources.list.d/*.list >/dev/null 2>&1; then
+        for sl in /etc/apt/sources.list.d/*.list; do
+            [ -f "$sl" ] || continue
+            if grep -Eq "\\bbuster\\b" "$sl"; then
+                cp "$sl" "${sl}.pmss-backup-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+                sed -E -i 's@^([^#].*)@# PMSS(suite-mismatch): disabled: \1@' "$sl"
+                log_info "Disabled stale entry in ${sl##*/}"
+            fi
+        done
+    fi
+}
+
 configure_buster_archive_sources_if_needed() {
     local info codename major backup sl
     info=$(detect_debian_codename)
@@ -269,11 +312,16 @@ Acquire::Check-Valid-Until "false";
 APT
 }
 
+info=$(detect_debian_codename)
+distro_codename=${info%%;*}
+distro_major=${info##*;}
+log_info "Detected Debian codename=${distro_codename:-unknown} major=${distro_major:-unknown}"
+normalize_sources_for_detected_distro "$distro_codename" "$distro_major"
 configure_buster_archive_sources_if_needed
 log_step "Updating package lists"
-apt update
+run_cmd apt update
 log_step "Running apt full-upgrade"
-apt-get full-upgrade -yqq
+run_cmd apt-get full-upgrade -yqq
 
 # Ensure baseline sysctl, bashrc, and permissions only once.
 install_sysctl_defaults() {
@@ -499,7 +547,7 @@ log_step "Adjusting /home permissions"
 chmod o-rw /home
 
 log_step "Refreshing package lists (final pass before update.php)"
-apt update
+run_cmd apt update
 
 log_step "Handing off to /scripts/update.php"
 /scripts/update.php "${UPDATE_ARGS[@]}"

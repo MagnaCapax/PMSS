@@ -104,6 +104,96 @@ function fatal(string $message, int $code): void
     exit($code);
 }
 
+/**
+ * Detect Debian codename and major version from the local system.
+ */
+function detectDistroCodename(): array
+{
+    $codename = '';
+    $major    = '';
+
+    if (is_readable('/etc/os-release')) {
+        $data = parse_ini_file('/etc/os-release');
+        if ($data !== false) {
+            $codename = $data['VERSION_CODENAME'] ?? '';
+            $version  = $data['VERSION_ID'] ?? '';
+            if ($version !== '') {
+                $major = explode('.', $version)[0];
+            }
+        }
+    }
+
+    if ($codename === '' && is_readable('/etc/debian_version')) {
+        $version = trim((string) @file_get_contents('/etc/debian_version'));
+        if ($version !== '') {
+            $parts = explode('.', $version);
+            $major = $parts[0];
+            if ($major === '10') $codename = 'buster';
+            elseif ($major === '11') $codename = 'bullseye';
+            elseif ($major === '12') $codename = 'bookworm';
+            elseif ($major === '13') $codename = 'trixie';
+        }
+    }
+
+    return [$codename, $major];
+}
+
+/**
+ * Make sure /etc/apt/sources.list matches the detected suite before any apt command runs.
+ */
+function normalizeAptSources(): void
+{
+    [$codename, $major] = detectDistroCodename();
+    logmsg(sprintf('[INFO] Detected distro codename=%s major=%s', $codename !== '' ? $codename : 'unknown', $major !== '' ? $major : 'unknown'));
+
+    if ($codename === '' || $codename === 'buster') {
+        return;
+    }
+
+    $sourcesPath = '/etc/apt/sources.list';
+    $current     = @file_get_contents($sourcesPath) ?: '';
+
+    if ($current !== '' && strpos($current, $codename) !== false) {
+        return;
+    }
+
+    if ($current !== '' && strpos($current, 'buster') === false) {
+        // Custom/non-buster sources present; leave untouched to avoid clobbering operator config.
+        logmsg('[INFO] Existing sources.list uses a non-buster custom suite; leaving unchanged');
+        return;
+    }
+
+    $components = 'main contrib non-free';
+    if ((int) $major >= 12) {
+        $components .= ' non-free-firmware';
+    }
+
+    $content = "deb http://deb.debian.org/debian {$codename} {$components}\n";
+    $content .= "deb http://security.debian.org/debian-security {$codename}-security {$components}\n";
+    $content .= "deb http://deb.debian.org/debian {$codename}-updates {$components}\n";
+
+    if (@file_put_contents($sourcesPath, $content) !== false) {
+        @chmod($sourcesPath, 0644);
+        logmsg("[INFO] Rewrote sources.list for suite {$codename}");
+    }
+
+    $extraLists = glob('/etc/apt/sources.list.d/*.list') ?: [];
+    foreach ($extraLists as $list) {
+        $data = @file_get_contents($list);
+        if ($data === false) {
+            continue;
+        }
+        if (strpos($data, 'buster') !== false) {
+            @copy($list, $list.'.pmss-backup-'.date('YmdHis'));
+            $mutated = preg_replace('/^([^#].*)/m', '# PMSS(suite-mismatch): disabled: $1', $data);
+            if ($mutated !== null) {
+                @file_put_contents($list, $mutated);
+                logmsg('[INFO] Disabled stale buster entry in '.basename($list));
+            }
+        }
+    }
+}
+
 function ensureRoot(): void
 {
     if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
@@ -683,6 +773,7 @@ function maybeRunDistUpgrade($distUpgrade): void
 function bootstrapMain(array $argv): void
 {
     ensureRoot();
+    normalizeAptSources();
 
     $startTime    = microtime(true);
     $originalHash = currentUpdaterHash();
