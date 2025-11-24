@@ -19,6 +19,12 @@ type=
 url=
 repository=
 branch=
+LOG_FILE="/var/log/pmss-install.log"
+DRY_RUN=false
+FORCE_NONINTERACTIVE=false
+SKIP_UPGRADE=false
+RUN_UPDATE=true
+SCRIPTS_ONLY=false
 
 # Simple colour-aware logging helpers.
 if [ -t 1 ]; then
@@ -35,11 +41,26 @@ else
 	COLOR_RESET=""
 fi
 
-log_step() { echo -e "${COLOR_BLUE}==>${COLOR_RESET} $*"; }
-log_info() { echo -e "${COLOR_GREEN}-->${COLOR_RESET} $*"; }
-log_warn() { echo -e "${COLOR_YELLOW}WARN${COLOR_RESET} $*"; }
-log_error() { echo -e "${COLOR_RED}ERR ${COLOR_RESET} $*"; }
-run_cmd() { log_step "Running: $*"; "$@"; }
+log_file() {
+	if [ -z "$LOG_FILE" ]; then
+		return
+	fi
+	mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+	printf '%s\n' "$*" >>"$LOG_FILE"
+}
+
+log_step() { local msg="==> $*"; echo -e "${COLOR_BLUE}${msg}${COLOR_RESET}"; log_file "$msg"; }
+log_info() { local msg="--> $*"; echo -e "${COLOR_GREEN}${msg}${COLOR_RESET}"; log_file "$msg"; }
+log_warn() { local msg="WARN $*"; echo -e "${COLOR_YELLOW}${msg}${COLOR_RESET}"; log_file "$msg"; }
+log_error() { local msg="ERR  $*"; echo -e "${COLOR_RED}${msg}${COLOR_RESET}"; log_file "$msg"; }
+run_cmd() {
+	if [ "$DRY_RUN" = true ]; then
+		log_step "[DRY-RUN] Skipping: $*"
+		return 0
+	}
+	log_step "Running: $*"
+	"$@"
+}
 
 # Installer runtime flags, populated from CLI switches.
 hostname_override=
@@ -86,12 +107,42 @@ while [[ $# -gt 0 ]]; do
 		shift
 		continue
 		;;
+	--non-interactive)
+		FORCE_NONINTERACTIVE=true
+		shift
+		continue
+		;;
+	--skip-upgrade)
+		SKIP_UPGRADE=true
+		shift
+		continue
+		;;
+	--dry-run)
+		DRY_RUN=true
+		shift
+		continue
+		;;
+	--skip-update)
+		RUN_UPDATE=false
+		shift
+		continue
+		;;
+	--scripts-only)
+		SCRIPTS_ONLY=true
+		shift
+		continue
+		;;
 	--help)
 		log_info "Usage: bash install.sh [update-source] [options...]"
 		log_info "  --hostname=<name>      set system hostname non-interactively"
 		log_info "  --skip-hostname        skip hostname confirmation"
 		log_info "  --quota-mount=<path>   add quota options to specified fstab mount"
 		log_info "  --skip-quota           skip quota guidance section"
+		log_info "  --non-interactive      skip hostname/quota prompts even on a TTY"
+		log_info "  --skip-upgrade         skip initial apt full-upgrade"
+		log_info "  --dry-run              parse and report plan without changing the system"
+		log_info "  --skip-update          stop after staging files; do not run update.php"
+		log_info "  --scripts-only         pass through to update.php to skip phase 2"
 		exit 0
 		;;
 	--*)
@@ -118,9 +169,16 @@ if [ -n "$SOURCE_SPEC" ]; then
 else
 	UPDATE_ARGS=("$@")
 fi
+if [ "$SCRIPTS_ONLY" = true ]; then
+	UPDATE_ARGS+=("--scripts-only")
+fi
 
 # Auto-disable interactive editors when stdin is not a TTY (common for piped installs).
-if [ ! -t 0 ]; then
+if [ "$FORCE_NONINTERACTIVE" = true ]; then
+	log_info "Non-interactive mode requested; skipping hostname and quota editors"
+	skip_hostname_edit=true
+	skip_quota_edit=true
+elif [ ! -t 0 ]; then
 	log_info "Non-interactive stdin detected; skipping hostname and quota editors (use flags to override)"
 	skip_hostname_edit=true
 	skip_quota_edit=true
@@ -212,11 +270,59 @@ ensure_packages() {
 
 export DEBIAN_FRONTEND=noninteractive
 
+preflight_checks() {
+	local required_bytes=$((2 * 1024 * 1024 * 1024)) # 2 GiB
+	local free_bytes
+
+	free_bytes=$(df -Pk / | awk 'NR==2 {print $4 * 1024}')
+	if [ -n "$free_bytes" ] && [ "$free_bytes" -lt "$required_bytes" ]; then
+		log_error "Insufficient disk space on / (need >= 2 GiB free)"
+		exit 1
+	}
+
+	if command -v curl >/dev/null 2>&1; then
+		if ! curl -fsI https://github.com >/dev/null 2>&1; then
+			log_warn "GitHub reachability check failed; installer may not fetch updates"
+		}
+	else
+		log_warn "curl not available; skipping GitHub reachability check"
+	fi
+}
+
+print_summary() {
+	local spec_display
+	if [ "$type" = "git" ]; then
+		spec_display="${type}/${repository}:${branch}${date:+:$date}"
+	else
+		spec_display="${type}${url:+/${url}}${date:+:$date}"
+	fi
+
+	log_step "Install summary"
+	log_info "Spec: ${spec_display}"
+	log_info "Hostname prompt: $([[ "$skip_hostname_edit" == true ]] && echo skipped || echo enabled)"
+	log_info "Quota prompt: $([[ "$skip_quota_edit" == true ]] && echo skipped || echo enabled)"
+	log_info "Apt full-upgrade: $([[ "$SKIP_UPGRADE" == true ]] && echo skipped || echo enabled)"
+	log_info "Run update.php: $([[ "$RUN_UPDATE" == true ]] && echo yes || echo no)"
+	log_info "Scripts-only flag: $([[ "$SCRIPTS_ONLY" == true ]] && echo yes || echo no)"
+	log_info "Dry-run: $([[ "$DRY_RUN" == true ]] && echo yes || echo no)"
+}
+
+preflight_checks
+print_summary
+
+if [ "$DRY_RUN" = true ]; then
+	exit 0
+fi
+
 log_info "Installer bootstrap: leaving existing apt sources untouched"
 log_step "Updating package lists"
 run_cmd apt update
-log_step "Running apt full-upgrade"
-run_cmd apt-get full-upgrade -yqq
+if [ "$SKIP_UPGRADE" != true ]; then
+	log_step "Running apt full-upgrade"
+	run_cmd apt-get full-upgrade -yqq
+else
+	log_info "Skipping apt full-upgrade as requested"
+fi
 
 # Ensure baseline sysctl, bashrc, and permissions only once.
 install_sysctl_defaults() {
@@ -394,10 +500,12 @@ fi
 mount -o remount /home 2>/dev/null || true
 
 # Minimal prerequisites; remaining packages arrive via update-step2/pmssApplyDpkgSelections.
+log_step "Ensuring minimal prerequisites are present"
 ensure_packages git rsync curl wget ca-certificates unzip php php-cli php-xml zip unzip vim tzdata
 
 # Build toolchain bootstrap to keep source-built installers (rtorrent, firehol, iprange) working
 # even on fresh hosts before the dpkg baseline is applied.
+log_step "Ensuring build toolchain prerequisites are present"
 ensure_packages build-essential autoconf automake pkg-config libtool subversion
 
 # Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
@@ -450,10 +558,13 @@ chmod o-rw /home
 log_step "Refreshing package lists (final pass before update.php)"
 run_cmd apt update
 
-log_step "Handing off to /scripts/update.php"
-/scripts/update.php "${UPDATE_ARGS[@]}"
-
-/scripts/util/setupRootCron.php
-/scripts/util/setupSkelPermissions.php
-/scripts/util/quotaFix.php
-/scripts/util/ftpConfig.php
+if [ "$RUN_UPDATE" = true ]; then
+	log_step "Handing off to /scripts/update.php"
+	run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
+	run_cmd /scripts/util/setupRootCron.php
+	run_cmd /scripts/util/setupSkelPermissions.php
+	run_cmd /scripts/util/quotaFix.php
+	run_cmd /scripts/util/ftpConfig.php
+else
+	log_info "Skipping update.php hand-off (--skip-update)"
+fi

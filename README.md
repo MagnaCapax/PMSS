@@ -48,6 +48,11 @@ wget -qO- https://github.com/MagnaCapax/PMSS/raw/main/install.sh | bash -s -- gi
 - `--skip-hostname` to retain the current hostname
 - `--quota-mount=<mountpoint>` to inject quota options into `/etc/fstab`
 - `--skip-quota` to leave quota configuration manual
+- `--non-interactive` to skip hostname/quota prompts even on a TTY
+- `--skip-upgrade` to skip the initial apt full-upgrade
+- `--dry-run` to parse and print the plan without changing the system
+- `--skip-update` to stop after staging files (do not run `update.php`)
+- `--scripts-only` to pass through to `update.php --scripts-only`
 
 ### Update
 
