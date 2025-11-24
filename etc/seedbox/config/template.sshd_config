@@ -28,6 +28,9 @@ HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
 
+# Enable legacy ssh-rsa host key algorithm for compatibility with older clients.
+HostKeyAlgorithms +ssh-rsa
+
 # Ciphers and key exchange algorithms
 # Enable additional legacy ciphers for compatibility.
 Ciphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com
@@ -75,7 +78,6 @@ PermitEmptyPasswords no
 # This block narrows relaxed algorithms and root password access to the
 # management network only. Safe to remove once all legacy clients are upgraded.
 Match Address 185.148.0.0/22
-    HostKeyAlgorithms +ssh-rsa
     PubkeyAcceptedKeyTypes +ssh-rsa
     PermitRootLogin yes
     PasswordAuthentication yes
