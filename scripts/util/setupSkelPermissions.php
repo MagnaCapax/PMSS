@@ -52,6 +52,18 @@ function pmssEnsureRootOwnership(string $path, array &$exitCodes): void
     );
 }
 
+/**
+ * Skip when the path is a symlink to avoid hardening unexpected destinations.
+ */
+function pmssSkipSymlink(string $path): bool
+{
+    if (is_link($path)) {
+        logmsg(sprintf('Skipping %s: symlink detected', $path));
+        return true;
+    }
+    return false;
+}
+
 $exitCodes = [];
 
 pmssHardenDirectoryPermissions(
@@ -74,6 +86,13 @@ pmssHardenDirectoryPermissions(
 
 pmssEnsureRootOwnership('/etc/skel', $exitCodes);
 pmssEnsureRootOwnership('/etc/seedbox', $exitCodes);
+
+if (is_dir('/etc/skel')) {
+    $exitCodes[] = runStep('Removing other permissions from /etc/skel files', "find /etc/skel -type f -exec chmod o-rwx -- {} +");
+}
+if (is_dir('/etc/seedbox')) {
+    $exitCodes[] = runStep('Removing other permissions from /etc/seedbox files', "find /etc/seedbox -type f -exec chmod o-rwx -- {} +");
+}
 
 // Setup openvpn config perms
 if (is_dir('/etc/openvpn')) {
@@ -126,17 +145,26 @@ if (is_dir($configDir)) {
 
 // Minimal secrets audit: tighten common private key locations (best-effort).
 // Keep scope narrow and commands idempotent for stability.
-if (is_dir('/etc/letsencrypt/live')) {
+if (!pmssSkipSymlink('/etc/letsencrypt/live') && is_dir('/etc/letsencrypt/live')) {
     runStep('Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -exec chmod 600 {} +");
 }
-if (is_dir('/etc/letsencrypt/accounts')) {
+if (!pmssSkipSymlink('/etc/letsencrypt/accounts') && is_dir('/etc/letsencrypt/accounts')) {
     runStep('Hardening TLS account keys (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'private_key.json' -o -name 'private_key*.pem' \\) -exec chmod 600 {} +");
+    runStep('Hardening TLS account metadata (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'registration.json' -o -name 'meta.json' \\) -exec chmod 600 {} +");
 }
-if (is_dir('/etc/letsencrypt/archive')) {
+if (!pmssSkipSymlink('/etc/letsencrypt/archive') && is_dir('/etc/letsencrypt/archive')) {
     runStep('Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -exec chmod 600 {} +");
 }
-if (is_dir('/etc/letsencrypt/renewal')) {
+if (!pmssSkipSymlink('/etc/letsencrypt/renewal') && is_dir('/etc/letsencrypt/renewal')) {
     runStep('Restricting TLS renewal configs (Let\'s Encrypt)', "find /etc/letsencrypt/renewal -type f -name '*.conf' -exec chmod 600 {} +");
+}
+if (!pmssSkipSymlink('/var/lib/letsencrypt') && is_dir('/var/lib/letsencrypt')) {
+    pmssEnsureRootOwnership('/var/lib/letsencrypt', $exitCodes);
+    runStep('Restricting /var/lib/letsencrypt', 'chmod 700 /var/lib/letsencrypt');
+}
+if (!pmssSkipSymlink('/var/log/letsencrypt') && is_dir('/var/log/letsencrypt')) {
+    pmssEnsureRootOwnership('/var/log/letsencrypt', $exitCodes);
+    runStep('Restricting /var/log/letsencrypt', 'chmod 700 /var/log/letsencrypt');
 }
 if (is_dir('/etc/seedbox/config/ssl')) {
     runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
@@ -145,6 +173,25 @@ if (is_dir('/etc/openvpn/easy-rsa/pki/private')) {
     pmssEnsureRootOwnership('/etc/openvpn/easy-rsa/pki/private', $exitCodes);
     runStep('Restricting OpenVPN private key directory', 'chmod 700 /etc/openvpn/easy-rsa/pki/private');
     runStep('Hardening OpenVPN private keys', "find /etc/openvpn/easy-rsa/pki/private -type f -name '*.key' -exec chmod 600 {} +");
+}
+foreach (['/etc/openvpn/easy-rsa/pki/issued', '/etc/openvpn/easy-rsa/pki/reqs', '/etc/openvpn/easy-rsa/pki/crl', '/etc/openvpn/easy-rsa/pki/certs_by_serial'] as $dir) {
+    if (is_dir($dir)) {
+        pmssEnsureRootOwnership($dir, $exitCodes);
+        runStep('Restricting OpenVPN PKI directory '.$dir, 'chmod 750 '.escapeshellarg($dir));
+    }
+}
+if (is_file('/etc/openvpn/easy-rsa/pki/crl.pem')) {
+    pmssEnsureRootOwnership('/etc/openvpn/easy-rsa/pki/crl.pem', $exitCodes);
+    runStep('Restricting OpenVPN CRL', 'chmod 600 /etc/openvpn/easy-rsa/pki/crl.pem');
+}
+if (is_file('/etc/openvpn/ta.key')) {
+    pmssEnsureRootOwnership('/etc/openvpn/ta.key', $exitCodes);
+    runStep('Restricting OpenVPN ta.key', 'chmod 600 /etc/openvpn/ta.key');
+}
+if (is_dir('/etc/openvpn')) {
+    runStep('Restricting OpenVPN configs', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -exec chmod 640 {} +");
+    pmssEnsureRootOwnership('/etc/openvpn', $exitCodes);
+    $exitCodes[] = runStep('Ensuring OpenVPN configs owned by root', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -exec chown root:root {} +");
 }
 
 // WireGuard hardening: restrict directory and sensitive files
