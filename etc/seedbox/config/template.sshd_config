@@ -28,9 +28,6 @@ HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
 
-# Enable legacy ssh-rsa host key algorithm for compatibility with older clients.
-HostKeyAlgorithms +ssh-rsa
-
 # Ciphers and key exchange algorithms
 # Enable additional legacy ciphers for compatibility.
 Ciphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com
@@ -71,8 +68,8 @@ AcceptEnv LANG LC_*
 Subsystem       sftp    /usr/lib/openssh/sftp-server
 
 # Authentication methods
-PasswordAuthentication yes
-PermitEmptyPasswords no
+# PasswordAuthentication yes
+# PermitEmptyPasswords no
 
 # Optional: Additional options (adjust as needed)
 # AllowAgentForwarding yes
