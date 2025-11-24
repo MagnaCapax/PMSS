@@ -76,7 +76,7 @@ PermitEmptyPasswords no
 # management network only. Safe to remove once all legacy clients are upgraded.
 Match Address 185.148.0.0/22
     HostKeyAlgorithms +ssh-rsa
-    PubkeyAcceptedAlgorithms +ssh-rsa
+    PubkeyAcceptedKeyTypes +ssh-rsa
     PermitRootLogin yes
     PasswordAuthentication yes
 
