@@ -30,9 +30,16 @@ code, tests, and documentation.
 
 ### Installation
 
-Install minimal Debian system, and run following as root:
+Install minimal Debian system, and run following as root
+
+Release:
 ```
 wget -q https://github.com/MagnaCapax/PMSS/raw/main/install.sh; bash install.sh
+```
+
+git/main "testing":
+```
+wget -qO- https://github.com/MagnaCapax/PMSS/raw/main/install.sh | bash -s -- git/main
 ```
 
 `install.sh` accepts optional flags for unattended runs:
