@@ -19,7 +19,7 @@ STRICT="${PMSS_LINT_SHARP_STRICT:-1}"
 VIOL=0
 
 php_scan() {
-  local file pattern raw
+  local file raw
   while IFS= read -r -d '' file; do
     # grep candidate lines
     while IFS= read -r raw; do
@@ -59,4 +59,3 @@ if [[ $VIOL -gt 0 ]]; then
   fi
 fi
 echo "sharp-edges lint: OK (advisory)"
-
