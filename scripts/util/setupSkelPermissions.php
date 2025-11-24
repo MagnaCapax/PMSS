@@ -129,6 +129,9 @@ if (is_dir($configDir)) {
 if (is_dir('/etc/letsencrypt/live')) {
     runStep('Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -exec chmod 600 {} +");
 }
+if (is_dir('/etc/letsencrypt/accounts')) {
+    runStep('Hardening TLS account keys (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'private_key.json' -o -name 'private_key*.pem' \\) -exec chmod 600 {} +");
+}
 if (is_dir('/etc/letsencrypt/archive')) {
     runStep('Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -exec chmod 600 {} +");
 }
@@ -141,12 +144,18 @@ if (is_dir('/etc/openvpn/easy-rsa/pki/private')) {
 
 // WireGuard hardening: restrict directory and sensitive files
 if (is_dir('/etc/wireguard')) {
+    pmssEnsureRootOwnership('/etc/wireguard', $exitCodes);
     runStep('Hardening WireGuard config directory', 'chmod 700 /etc/wireguard');
     if (is_file('/etc/wireguard/wg0.conf')) {
+        pmssEnsureRootOwnership('/etc/wireguard/wg0.conf', $exitCodes);
         runStep('Restricting WireGuard wg0.conf', 'chmod 600 /etc/wireguard/wg0.conf');
     }
     if (is_file('/etc/wireguard/server_private.key')) {
+        pmssEnsureRootOwnership('/etc/wireguard/server_private.key', $exitCodes);
         runStep('Restricting WireGuard server_private.key', 'chmod 600 /etc/wireguard/server_private.key');
+    }
+    if (is_file('/etc/wireguard/server_public.key')) {
+        pmssEnsureRootOwnership('/etc/wireguard/server_public.key', $exitCodes);
     }
     runStep('Restricting WireGuard key material', "find /etc/wireguard -type f -name '*.key' -exec chmod 600 {} +");
 }
