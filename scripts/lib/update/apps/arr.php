@@ -47,18 +47,16 @@ function pmssArrUpdate(array $config): void
     }
 
     $archivePath = $workDir.'/'.$assetName;
-    if (!pmssArrDownload($downloadUrl, $archivePath, $log)) {
-        pmssArrCleanup($workDir);
-        return;
-    }
-
-    if (!pmssArrExtract($archivePath, $workDir, $config['extract_dir'], $log)) {
+    $extractPath = $workDir.'/'.$config['extract_dir'];
+    $prepared = pmssArrDownload($downloadUrl, $archivePath, $log)
+        && pmssArrExtract($archivePath, $workDir, $config['extract_dir'], $log);
+    if (!$prepared) {
         pmssArrCleanup($workDir);
         return;
     }
 
     runCommand('rm -rf '.escapeshellarg($installPath));
-    runCommand(sprintf('mv %s %s', escapeshellarg($workDir.'/'.$config['extract_dir']), escapeshellarg($installPath)));
+    runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)));
     pmssArrCleanup($workDir);
 
     $log("Installed version {$latestVersion}");
