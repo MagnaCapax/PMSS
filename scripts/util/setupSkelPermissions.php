@@ -135,10 +135,15 @@ if (is_dir('/etc/letsencrypt/accounts')) {
 if (is_dir('/etc/letsencrypt/archive')) {
     runStep('Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -exec chmod 600 {} +");
 }
+if (is_dir('/etc/letsencrypt/renewal')) {
+    runStep('Restricting TLS renewal configs (Let\'s Encrypt)', "find /etc/letsencrypt/renewal -type f -name '*.conf' -exec chmod 600 {} +");
+}
 if (is_dir('/etc/seedbox/config/ssl')) {
     runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
 }
 if (is_dir('/etc/openvpn/easy-rsa/pki/private')) {
+    pmssEnsureRootOwnership('/etc/openvpn/easy-rsa/pki/private', $exitCodes);
+    runStep('Restricting OpenVPN private key directory', 'chmod 700 /etc/openvpn/easy-rsa/pki/private');
     runStep('Hardening OpenVPN private keys', "find /etc/openvpn/easy-rsa/pki/private -type f -name '*.key' -exec chmod 600 {} +");
 }
 
