@@ -33,6 +33,8 @@ HostKey /etc/ssh/ssh_host_ed25519_key
 Ciphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com
 # Enable additional Kex algorithms.
 KexAlgorithms +diffie-hellman-group1-sha1,diffie-hellman-group14-sha1
+HostkeyAlgorithms +ssh-rsa
+PubkeyAcceptedKeyTypes +ssh-rsa
 
 # Optionally, define MACs if needed.
 # MACs hmac-sha2-256,hmac-sha2-512
