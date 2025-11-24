@@ -137,9 +137,10 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     $warnings = true;
                     continue;
                 }
-                // Skip problematic or deprecated packages from baseline; do not log mediaarea repo packages at all
+                $package = $parts[0];
+                $state   = $parts[1];
+                // Skip problematic or deprecated packages from baseline
                 $lower = strtolower($package);
-                if (preg_match('/^repo-mediaarea(\-snapshots)?(\:.+)?$/i', $package)) { $warnings = true; continue; }
                 // Drop legacy names we no longer install via apt (tarball/venv used instead)
                 if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) { $warnings = true; $droppedObsolete[] = $package; continue; }
                 // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'
@@ -183,19 +184,6 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             if ($shortFormSeen && function_exists('pmssLogStatus')) {
                 pmssLogStatus('INFO', 'Baseline: detected short-form dpkg selection entries; treating as \"install\" state', 0, 0.0);
             }
-        }
-
-        // Explicitly purge legacy repo-mediaarea packages to prevent conflict with manual repo setup.
-        // These packages are known to cause dependency issues on older Debian releases.
-        $mediaAreaPkgs = ['repo-mediaarea', 'repo-mediaarea-snapshots'];
-        $toPurge = [];
-        foreach ($mediaAreaPkgs as $pkg) {
-            if (pmssPackageStatus($pkg) === 'install ok installed') {
-                $toPurge[] = $pkg;
-            }
-        }
-        if (!empty($toPurge)) {
-            runStep('Purging legacy MediaArea repo packages', aptCmd('purge -y '.implode(' ', $toPurge)));
         }
 
         $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));

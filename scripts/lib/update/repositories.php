@@ -12,7 +12,6 @@ if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
      */
 function pmssEnsureRepositoryPrerequisites(): void
     {
-        pmssEnsureMediaareaRepository();
         pmssEnsureDockerRepository();
         pmssDisableLegacySonarrRepository();
         // #TODO Provide a unified third-party repo bootstrap that accepts
@@ -96,47 +95,6 @@ if (!function_exists('pmssEnsureDockerRepository')) {
                     logmsg('Disabled legacy Docker entry in docker.list');
                 }
             }
-        }
-    }
-}
-
-if (!function_exists('pmssEnsureMediaareaRepository')) {
-    /**
-     * MediaArea repository bootstrap (manual .list + ASCII key) to avoid zstd .deb issues on Debian 10/11.
-     *
-     * Keep it simple and explicit: write a codename-specific .list and place the
-     * vendor ASCII key in /etc/apt/trusted.gpg.d. The package phase will run apt update.
-     */
-    function pmssEnsureMediaareaRepository(): void
-    {
-        $codename = getenv('PMSS_DISTRO_CODENAME') ?: '';
-        $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
-        if ($codename === '') {
-            if ($version === 11) $codename = 'bullseye';
-            elseif ($version === 12) $codename = 'bookworm';
-            elseif ($version === 13) $codename = 'trixie';
-            else return;
-        }
-
-        $listPath = '/etc/apt/sources.list.d/mediaarea.list';
-        $line     = 'deb https://mediaarea.net/repo/deb/debian '.$codename.' main';
-        $current  = @file_get_contents($listPath);
-        if ($current === false || strpos((string)$current, $line) === false) {
-            $cmd = 'sh -lc '.escapeshellarg('echo '.escapeshellarg($line).' > '.escapeshellarg($listPath));
-            runStep('Writing MediaArea apt list ('.$codename.')', $cmd);
-            @chmod($listPath, 0644);
-        }
-
-        // Remove any legacy deb822 file to avoid duplicate target warnings
-        @unlink('/etc/apt/sources.list.d/mediaarea.sources');
-
-        $keyDst = '/etc/apt/trusted.gpg.d/mediaarea.asc';
-        if (!is_file($keyDst)) {
-            $keyUrl = 'https://mediaarea.net/repo/deb/ubuntu/pubkey.gpg';
-            $fetch  = sprintf('wget -qO %s %s', escapeshellarg($keyDst), escapeshellarg($keyUrl));
-            runStep('Fetching MediaArea repository key (ASCII)', $fetch);
-            @chmod($keyDst, 0644);
-            logmsg('MediaArea key saved to '.$keyDst.' (fingerprint should be C5CDF62C7AE05CC847657390C10E11090EC0E438)');
         }
     }
 }
