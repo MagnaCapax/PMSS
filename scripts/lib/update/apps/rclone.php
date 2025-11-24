@@ -2,6 +2,11 @@
 # Pulsed Media Seedbox Management Software "PMSS"
 # Rclone installer + update
 
+// Runtime version record keeps hosts from redownloading the same archive; the
+// pin lives in code so we are not shipping static metadata under /etc.
+const RCLONE_VERSION_RECORD = '/etc/seedbox/config/app-versions/rclone';
+const RCLONE_DEFAULT_VERSION = '1.69.1';
+
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
 [$rcloneVersion, $fetchedLatest] = pmssResolveRcloneVersion();
 
@@ -36,8 +41,8 @@ if (file_exists('/usr/sbin/rclone') &&
  */
 function pmssResolveRcloneVersion(): array
 {
-    $pinnedFile = '/etc/seedbox/config/app-versions/rclone';
-    $default = '1.69.1';
+    $pinnedFile = RCLONE_VERSION_RECORD;
+    $default = RCLONE_DEFAULT_VERSION;
 
     $pinned = trim((string)@file_get_contents($pinnedFile));
     if ($pinned !== '' && $pinned[0] === 'v') {

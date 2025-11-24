@@ -10,8 +10,7 @@
 !/etc/seedbox/
 !/etc/seedbox/config/
 !/etc/seedbox/config/*
-!/etc/seedbox/config/app-versions/
-!/etc/seedbox/config/app-versions/*
+/etc/seedbox/config/app-versions/
 /etc/seedbox/config/default
 /etc/seedbox/config/fireqos.conf
 /etc/seedbox/config/network
