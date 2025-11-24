@@ -64,6 +64,34 @@ function pmssSkipSymlink(string $path): bool
     return false;
 }
 
+/**
+ * Run one or more commands for a directory when present and not symlinked.
+ */
+function pmssRunDirectorySteps(string $path, array $steps): void
+{
+    if (pmssSkipSymlink($path) || !is_dir($path)) {
+        return;
+    }
+
+    foreach ($steps as $step) {
+        [$message, $command] = $step;
+        runStep($message, $command);
+    }
+}
+
+/**
+ * Enforce root ownership and run a chmod for a directory when present.
+ */
+function pmssOwnAndRestrictDirectory(string $path, string $message, string $command, array &$exitCodes): void
+{
+    if (pmssSkipSymlink($path) || !is_dir($path)) {
+        return;
+    }
+
+    pmssEnsureRootOwnership($path, $exitCodes);
+    runStep($message, $command);
+}
+
 $exitCodes = [];
 
 pmssHardenDirectoryPermissions(
@@ -145,27 +173,28 @@ if (is_dir($configDir)) {
 
 // Minimal secrets audit: tighten common private key locations (best-effort).
 // Keep scope narrow and commands idempotent for stability.
-if (!pmssSkipSymlink('/etc/letsencrypt/live') && is_dir('/etc/letsencrypt/live')) {
-    runStep('Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -exec chmod 600 {} +");
+$letsencryptSteps = [
+    '/etc/letsencrypt/live' => [
+        ['Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -exec chmod 600 {} +"],
+    ],
+    '/etc/letsencrypt/accounts' => [
+        ['Hardening TLS account keys (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'private_key.json' -o -name 'private_key*.pem' \\) -exec chmod 600 {} +"],
+        ['Hardening TLS account metadata (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'registration.json' -o -name 'meta.json' \\) -exec chmod 600 {} +"],
+    ],
+    '/etc/letsencrypt/archive' => [
+        ['Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -exec chmod 600 {} +"],
+    ],
+    '/etc/letsencrypt/renewal' => [
+        ['Restricting TLS renewal configs (Let\'s Encrypt)', "find /etc/letsencrypt/renewal -type f -name '*.conf' -exec chmod 600 {} +"],
+    ],
+];
+
+foreach ($letsencryptSteps as $path => $steps) {
+    pmssRunDirectorySteps($path, $steps);
 }
-if (!pmssSkipSymlink('/etc/letsencrypt/accounts') && is_dir('/etc/letsencrypt/accounts')) {
-    runStep('Hardening TLS account keys (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'private_key.json' -o -name 'private_key*.pem' \\) -exec chmod 600 {} +");
-    runStep('Hardening TLS account metadata (Let\'s Encrypt)', "find /etc/letsencrypt/accounts -type f \\( -name 'registration.json' -o -name 'meta.json' \\) -exec chmod 600 {} +");
-}
-if (!pmssSkipSymlink('/etc/letsencrypt/archive') && is_dir('/etc/letsencrypt/archive')) {
-    runStep('Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -exec chmod 600 {} +");
-}
-if (!pmssSkipSymlink('/etc/letsencrypt/renewal') && is_dir('/etc/letsencrypt/renewal')) {
-    runStep('Restricting TLS renewal configs (Let\'s Encrypt)', "find /etc/letsencrypt/renewal -type f -name '*.conf' -exec chmod 600 {} +");
-}
-if (!pmssSkipSymlink('/var/lib/letsencrypt') && is_dir('/var/lib/letsencrypt')) {
-    pmssEnsureRootOwnership('/var/lib/letsencrypt', $exitCodes);
-    runStep('Restricting /var/lib/letsencrypt', 'chmod 700 /var/lib/letsencrypt');
-}
-if (!pmssSkipSymlink('/var/log/letsencrypt') && is_dir('/var/log/letsencrypt')) {
-    pmssEnsureRootOwnership('/var/log/letsencrypt', $exitCodes);
-    runStep('Restricting /var/log/letsencrypt', 'chmod 700 /var/log/letsencrypt');
-}
+
+pmssOwnAndRestrictDirectory('/var/lib/letsencrypt', 'Restricting /var/lib/letsencrypt', 'chmod 700 /var/lib/letsencrypt', $exitCodes);
+pmssOwnAndRestrictDirectory('/var/log/letsencrypt', 'Restricting /var/log/letsencrypt', 'chmod 700 /var/log/letsencrypt', $exitCodes);
 if (is_dir('/etc/seedbox/config/ssl')) {
     runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
 }
