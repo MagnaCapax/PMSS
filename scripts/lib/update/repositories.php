@@ -13,6 +13,7 @@ if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
 function pmssEnsureRepositoryPrerequisites(): void
     {
         pmssEnsureDockerRepository();
+        pmssEnsureSonarrKey();
         pmssDisableLegacySonarrRepository();
         // #TODO Provide a unified third-party repo bootstrap that accepts
         //       (name, url, suites, components, key-url/keyring) and writes a
@@ -31,6 +32,32 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
     function pmssEnsureMediaareaRepository(): void
     {
         // No-op
+    }
+}
+
+if (!function_exists('pmssEnsureSonarrKey')) {
+    /**
+     * Ensure the Sonarr apt key is installed so apt update does not fail.
+     */
+    function pmssEnsureSonarrKey(): void
+    {
+        $keyPath = '/etc/apt/trusted.gpg.d/sonarr.gpg';
+        if (is_file($keyPath)) {
+            return;
+        }
+
+        $fetch = sprintf(
+            'curl -fsSL %s | gpg --dearmor -o %s',
+            escapeshellarg('https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xEBFF6B99D9B78493'),
+            escapeshellarg($keyPath)
+        );
+        if (runStep('Fetching Sonarr repository key', $fetch) === 0) {
+            @chmod($keyPath, 0644);
+            logmsg('Sonarr key installed at '.$keyPath.' (fingerprint EBFF6B99D9B78493)');
+        } else {
+            @unlink($keyPath);
+            logmsg('[WARN] Failed to fetch Sonarr key; Sonarr apt repo may remain unsigned');
+        }
     }
 }
 
