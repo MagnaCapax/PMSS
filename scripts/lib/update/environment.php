@@ -185,6 +185,19 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             }
         }
 
+        // Explicitly purge legacy repo-mediaarea packages to prevent conflict with manual repo setup.
+        // These packages are known to cause dependency issues on older Debian releases.
+        $mediaAreaPkgs = ['repo-mediaarea', 'repo-mediaarea-snapshots'];
+        $toPurge = [];
+        foreach ($mediaAreaPkgs as $pkg) {
+            if (pmssPackageStatus($pkg) === 'install ok installed') {
+                $toPurge[] = $pkg;
+            }
+        }
+        if (!empty($toPurge)) {
+            runStep('Purging legacy MediaArea repo packages', aptCmd('purge -y '.implode(' ', $toPurge)));
+        }
+
         $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));
         $rc = runStep('Applying dpkg selection baseline', $cmd);
         if ($rc !== 0) {

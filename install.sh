@@ -453,6 +453,10 @@ mount -o remount /home 2>/dev/null || true
 # Minimal prerequisites; remaining packages arrive via update-step2/pmssApplyDpkgSelections.
 ensure_packages git rsync curl wget ca-certificates unzip php php-cli php-xml zip unzip vim tzdata
 
+# Build toolchain bootstrap to keep source-built installers (rtorrent, firehol, iprange) working
+# even on fresh hosts before the dpkg baseline is applied.
+ensure_packages build-essential autoconf automake pkg-config libtool subversion
+
 # Script installs from release by default and uses a specific git branch as the source if given string of "git/branch" format
 log_step "Setting up base software"
 mkdir ~/compile

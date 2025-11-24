@@ -223,6 +223,7 @@ if (!function_exists('pmssDisableLegacySonarrRepository')) {
      */
     function pmssDisableLegacySonarrRepository(): void
     {
+        /*
         $files = glob('/etc/apt/sources.list.d/*.list') ?: [];
         foreach ($files as $file) {
             $data = @file_get_contents($file);
@@ -244,5 +245,6 @@ if (!function_exists('pmssDisableLegacySonarrRepository')) {
                 }
             }
         }
+        */
     }
 }
