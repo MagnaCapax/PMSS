@@ -316,8 +316,7 @@ info=$(detect_debian_codename)
 distro_codename=${info%%;*}
 distro_major=${info##*;}
 log_info "Detected Debian codename=${distro_codename:-unknown} major=${distro_major:-unknown}"
-normalize_sources_for_detected_distro "$distro_codename" "$distro_major"
-configure_buster_archive_sources_if_needed
+log_info "Leaving existing apt sources untouched (installer bootstrap)"
 log_step "Updating package lists"
 run_cmd apt update
 log_step "Running apt full-upgrade"
