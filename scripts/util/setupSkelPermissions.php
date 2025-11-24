@@ -16,27 +16,45 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 requireRoot();
 
+/**
+ * Apply directory hardening steps when the target exists; log a skip otherwise.
+ */
+function pmssHardenDirectoryPermissions(
+    string $path,
+    string $contentMessage,
+    string $contentCommand,
+    string $directoryMessage,
+    string $directoryCommand,
+    array &$exitCodes
+): void {
+    if (!is_dir($path)) {
+        logmsg(sprintf('Skipping %s permission adjustments; directory missing', $path));
+        return;
+    }
+
+    $exitCodes[] = runStep($contentMessage, $contentCommand);
+    $exitCodes[] = runStep($directoryMessage, $directoryCommand);
+}
+
 $exitCodes = [];
 
-if (is_dir('/etc/skel')) {
-    $exitCodes[] = runStep(
-        'Hardening /etc/skel content permissions',
-        'cd /etc/skel && find . -mindepth 1 -exec chmod -R o-w -- {} +'
-    ); // not using 775 because there might be places where the perms differ and need to differ
-    $exitCodes[] = runStep('Restricting /etc/skel directory permissions', 'chmod 770 /etc/skel');
-} else {
-    logmsg('Skipping /etc/skel permission adjustments; directory missing');
-}
+pmssHardenDirectoryPermissions(
+    '/etc/skel',
+    'Hardening /etc/skel content permissions',
+    'cd /etc/skel && find . -mindepth 1 -exec chmod -R o-w -- {} +',
+    'Restricting /etc/skel directory permissions',
+    'chmod 770 /etc/skel',
+    $exitCodes
+); // not using 775 because there might be places where the perms differ and need to differ
 
-if (is_dir('/etc/seedbox')) {
-    $exitCodes[] = runStep(
-        'Hardening /etc/seedbox content permissions',
-        'cd /etc/seedbox && find . -mindepth 1 -exec chmod -R o-w -- {} +'
-    ); // not using 775 because there might be places where the perms differ and need to differ
-    $exitCodes[] = runStep('Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox');
-} else {
-    logmsg('Skipping /etc/seedbox permission adjustments; directory missing');
-}
+pmssHardenDirectoryPermissions(
+    '/etc/seedbox',
+    'Hardening /etc/seedbox content permissions',
+    'cd /etc/seedbox && find . -mindepth 1 -exec chmod -R o-w -- {} +',
+    'Ensuring /etc/seedbox is traversable',
+    'chmod o+x /etc/seedbox',
+    $exitCodes
+); // not using 775 because there might be places where the perms differ and need to differ
 
 // Setup openvpn config perms
 if (is_dir('/etc/openvpn')) {
