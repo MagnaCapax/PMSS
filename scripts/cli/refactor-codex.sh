@@ -191,7 +191,7 @@ Workflow (do this now):
    - scripts/testing/test-php.sh
    - scripts/testing/test-bash.sh
    - scripts/testing/php73-compat-scan.sh
-6) Stage and (if you are the human operator) commit with a clear, focused message. Do not create new branches or push from this flow.
+6) Stage and commit with a clear, focused message before finishing. Do not create new branches or push from this flow.
 7) Summarise in your response:
    - What you simplified or deleted.
    - Why it is safe and behaviour-preserving.
