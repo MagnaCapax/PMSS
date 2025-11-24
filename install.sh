@@ -58,8 +58,10 @@ run_cmd() {
 		log_step "[DRY-RUN] Skipping: $*"
 		return 0
 	fi
+
 	log_step "Running: $*"
 	"$@"
+	return $?
 }
 
 # Installer runtime flags, populated from CLI switches.
