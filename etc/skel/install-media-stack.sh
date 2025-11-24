@@ -27,14 +27,20 @@
 
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
+if ! command -v ss >/dev/null 2>&1; then
+  echo "Required dependency 'ss' (iproute2) not found; install it and retry."
+  exit 1
+fi
+
 # Safety check for existing .bin
-if [ -d "$HOME/.bin" ] && [ "$(ls -A $HOME/.bin)" ]; then
-  read -p "WARNING: ~/.bin exists and will be removed. Continue? (y/N): " confirm
+if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin")" ]; then
+  printf "WARNING: ~/.bin exists and will be removed. Continue? (y/N): "
+  read -r confirm
   [[ $confirm == [yY] ]] || exit 1
 fi
-rm -rf $HOME/.bin
+rm -rf "$HOME/.bin"
 
-mkdir -p $HOME/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
+mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
 
 # Dynamic versions (SABnzbd & Jellyfin via GitHub API)
 SABNZBD_VERSION=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4)
@@ -47,13 +53,14 @@ ASPDOTNET_URL="https://download.visualstudio.microsoft.com/download/pr/7d6a4b4e-
 
 # Enhanced port randomizer with bind test (for shared env security)
 random_open_port() {
-  LOW_BOUND=10000
-  UPPER_BOUND=65000
+  local LOW_BOUND=10000
+  local UPPER_BOUND=65000
+  local candidate
   while true; do
-    candidate=$(comm -23 <(seq ${LOW_BOUND} ${UPPER_BOUND} | sort -u) <(ss -Htan | awk '{print $4}' | rev | cut -d':' -f1 | rev | sort -u) | shuf | head -n 1)
+    candidate=$(comm -23 <(seq "${LOW_BOUND}" "${UPPER_BOUND}" | sort -u) <(ss -Htan | awk '{print $4}' | rev | cut -d':' -f1 | rev | sort -u) | shuf | head -n 1)
     # Test bind with Python (available on Debian 10+)
     if python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(('127.0.0.1', $candidate)); s.close(); exit(0)" 2>/dev/null; then
-      echo $candidate
+      echo "$candidate"
       return
     fi
   done
@@ -71,19 +78,21 @@ HOSTNAME=$(hostname)
 for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow; do
   tmux kill-session -t "${app}" 2>/dev/null || true
 done
-kill -9 $(pgrep -f -u ${USERNAME} "tmux") > /dev/null 2>&1  # Fallback global
+pkill -9 -f -u "$USERNAME" tmux > /dev/null 2>&1 || true  # Fallback global
 
 # Install Cloudplow (unchanged, repo active)
 app="cloudplow"
 echo "Installing ${app^^}..."
 installdir="$HOME/.bin/cloudplow"
 datadir="$HOME/.config/cloudplow"
-python3 -m venv ${installdir}
-cd ${installdir}
+mkdir -p "$datadir"
+python3 -m venv "$installdir"
+cd "$installdir"
 git clone https://github.com/l3uddz/cloudplow.git > /dev/null 2>&1
-source ${installdir}/bin/activate
+# shellcheck disable=SC1091
+source "${installdir}/bin/activate"
 python -m pip install -U pip > /dev/null 2>&1
-python3 -m pip install -r ${installdir}/cloudplow/requirements.txt > /dev/null 2>&1
+python3 -m pip install -r "${installdir}/cloudplow/requirements.txt" > /dev/null 2>&1
 deactivate
 echo "${app^^} Installed"
 echo ""
@@ -93,32 +102,34 @@ app="sabnzbd"
 echo "Installing ${app^^}..."
 installdir="$HOME/.bin/sabnzbd"
 datadir="$HOME/.config/sabnzbd"
-kill -9 $(pgrep -f -u ${USERNAME} "${app}") > /dev/null 2>&1
-python3 -m venv ${installdir}
-cd ${installdir}
-echo "Downloading...${app^^}"
-wget ${SABNZBD_URL} -O ${app}.tar.gz > /dev/null 2>&1
-mkdir ${app}
-tar -xf "${app}.tar.gz" -C ${app} --strip-components=1 > /dev/null 2>&1
-rm "${app}.tar.gz" > /dev/null 2>&1
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "${app}" > /dev/null 2>&1 || true
+python3 -m venv "$installdir"
+cd "$installdir"
+echo "Downloading...${app^^} (${SABNZBD_VERSION})"
+wget "${SABNZBD_URL}" -O "${app}.tar.gz" > /dev/null 2>&1
+mkdir -p "${app}"
+tar -xf "${app}.tar.gz" -C "${app}" --strip-components=1 > /dev/null 2>&1
+rm -f "${app}.tar.gz" > /dev/null 2>&1
 echo "Installation files downloaded and extracted"
-source ${installdir}/bin/activate
+# shellcheck disable=SC1091
+source "${installdir}/bin/activate"
 python -m pip install -U pip > /dev/null 2>&1
-python3 -m pip install -r ${installdir}/${app}/requirements.txt > /dev/null 2>&1
+python3 -m pip install -r "${installdir}/${app}/requirements.txt" > /dev/null 2>&1
 deactivate
 echo "${app^^} Installed"
 echo "Configuring ${app^^}"
-if [ ! -f $datadir/${app}.ini ]; then
-  cat << EOF > $datadir/${app}.ini
+if [ ! -f "$datadir/${app}.ini" ]; then
+  cat << EOF > "$datadir/${app}.ini"
 [misc]
 port = 8080
 url_base = /sabnzbd
 host_whitelist = ${HOSTNAME}
 EOF
 fi
-sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" $datadir/${app}.ini
-sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" $datadir/${app}.ini
-sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" $datadir/${app}.ini
+sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
+sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" "$datadir/${app}.ini"
+sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
 echo "${app^^} configured"
 echo ""
 
@@ -129,7 +140,8 @@ installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="master"
 ARCH=$(dpkg --print-architecture)
-kill -9 $(pgrep -f -u ${USERNAME} "${app^}") > /dev/null 2>&1
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "${app^}" > /dev/null 2>&1 || true
 dlbase="https://${app}.servarr.com/v1/update/${branch}/updatefile?os=linux&runtime=netcore"
 case "$ARCH" in
   "amd64") DLURL="${dlbase}&arch=x64" ;;
@@ -138,16 +150,21 @@ case "$ARCH" in
   *) echo "Arch not supported"; exit 1 ;;
 esac
 echo "Downloading...${app^^}"
-cd ${installdir}
+cd "$installdir"
 wget --content-disposition "$DLURL" > /dev/null 2>&1
-tar -xvzf ${app^}.*.tar.gz > /dev/null 2>&1
-rm ${app^}.*.tar.gz > /dev/null 2>&1
+archive=$(find . -maxdepth 1 -name "${app^}.*.tar.gz" -print -quit)
+if [ -z "${archive:-}" ]; then
+  echo "Failed to find downloaded ${app^^} archive"
+  exit 1
+fi
+tar -xvzf "$archive" > /dev/null 2>&1
+rm -f "$archive" > /dev/null 2>&1
 echo "Installation files downloaded and extracted"
 touch "$datadir"/update_required
 echo "${app^^} Installed"
 echo "Configuring ${app^^}"
-if [ ! -f $datadir/config.xml ]; then
-  cat << EOF > $datadir/config.xml
+if [ ! -f "$datadir/config.xml" ]; then
+  cat << EOF > "$datadir/config.xml"
 <Config>
   <UrlBase></UrlBase>
   <Port>7878</Port>
@@ -155,9 +172,9 @@ if [ ! -f $datadir/config.xml ]; then
 </Config>
 EOF
 fi
-sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$RADARR_PORT\2/g" $datadir/config.xml
-sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" $datadir/config.xml
-sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" $datadir/config.xml
+sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$RADARR_PORT\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
 echo "${app^^} configured"
 echo ""
 
@@ -168,7 +185,8 @@ installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="master"  # Stable
 ARCH=$(dpkg --print-architecture)
-kill -9 $(pgrep -f -u ${USERNAME} "${app^}") > /dev/null 2>&1
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "${app^}" > /dev/null 2>&1 || true
 dlbase="https://${app}.servarr.com/v1/update/${branch}/updatefile?os=linux&runtime=netcore"
 case "$ARCH" in
   "amd64") DLURL="${dlbase}&arch=x64" ;;
@@ -177,16 +195,21 @@ case "$ARCH" in
   *) echo "Arch not supported"; exit 1 ;;
 esac
 echo "Downloading...${app^^}"
-cd ${installdir}
+cd "$installdir"
 wget --content-disposition "$DLURL" > /dev/null 2>&1
-tar -xvzf ${app^}.*.tar.gz > /dev/null 2>&1
-rm ${app^}.*.tar.gz > /dev/null 2>&1
+archive=$(find . -maxdepth 1 -name "${app^}.*.tar.gz" -print -quit)
+if [ -z "${archive:-}" ]; then
+  echo "Failed to find downloaded ${app^^} archive"
+  exit 1
+fi
+tar -xvzf "$archive" > /dev/null 2>&1
+rm -f "$archive" > /dev/null 2>&1
 echo "Installation files downloaded and extracted"
 touch "$datadir"/update_required
 echo "${app^^} Installed"
 echo "Configuring ${app^^}"
-if [ ! -f $datadir/config.xml ]; then
-  cat << EOF > $datadir/config.xml
+if [ ! -f "$datadir/config.xml" ]; then
+  cat << EOF > "$datadir/config.xml"
 <Config>
   <UrlBase></UrlBase>
   <Port>9696</Port>
@@ -194,9 +217,9 @@ if [ ! -f $datadir/config.xml ]; then
 </Config>
 EOF
 fi
-sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$PROWLARR_PORT\2/g" $datadir/config.xml
-sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" $datadir/config.xml
-sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" $datadir/config.xml
+sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$PROWLARR_PORT\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
 echo "${app^^} configured"
 echo ""
 
@@ -207,7 +230,8 @@ installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="master"
 ARCH=$(dpkg --print-architecture)
-kill -9 $(pgrep -f -u ${USERNAME} "${app^}") > /dev/null 2>&1
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "${app^}" > /dev/null 2>&1 || true
 dlbase="https://services.${app}.tv/v1/update/${branch}/download?os=linux&runtime=netcore"
 case "$ARCH" in
   "amd64") DLURL="${dlbase}&arch=x64" ;;
@@ -216,16 +240,21 @@ case "$ARCH" in
   *) echo "Arch not supported"; exit 1 ;;
 esac
 echo "Downloading...${app^^}"
-cd ${installdir}
+cd "$installdir"
 wget --content-disposition "$DLURL" > /dev/null 2>&1
-tar -xvzf ${app^}.*.tar.gz > /dev/null 2>&1
-rm ${app^}.*.tar.gz > /dev/null 2>&1
+archive=$(find . -maxdepth 1 -name "${app^}.*.tar.gz" -print -quit)
+if [ -z "${archive:-}" ]; then
+  echo "Failed to find downloaded ${app^^} archive"
+  exit 1
+fi
+tar -xvzf "$archive" > /dev/null 2>&1
+rm -f "$archive" > /dev/null 2>&1
 echo "Installation files downloaded and extracted"
 touch "$datadir"/update_required
 echo "${app^^} Installed"
 echo "Configuring ${app^^}"
-if [ ! -f $datadir/config.xml ]; then
-  cat << EOF > $datadir/config.xml
+if [ ! -f "$datadir/config.xml" ]; then
+  cat << EOF > "$datadir/config.xml"
 <Config>
   <Port>8989</Port>
   <UrlBase></UrlBase>
@@ -233,9 +262,9 @@ if [ ! -f $datadir/config.xml ]; then
 </Config>
 EOF
 fi
-sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$SONARR_PORT\2/g" $datadir/config.xml
-sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" $datadir/config.xml
-sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" $datadir/config.xml
+sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$SONARR_PORT\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
 echo "${app^^} configured"
 echo ""
 
@@ -244,12 +273,17 @@ app="aspnetcore"
 echo "Installing ${app^^}..."
 echo "Downloading...${app^^}"
 installdir="$HOME/.bin/dotnet"
-mkdir -p ${installdir}
-cd ${installdir}
-wget $ASPDOTNET_URL > /dev/null 2>&1
-tar -xvzf *.tar.gz > /dev/null 2>&1
-rm *.tar.gz > /dev/null 2>&1
-cat << 'EOF' >> $HOME/.bashrc
+mkdir -p "$installdir"
+cd "$installdir"
+wget "$ASPDOTNET_URL" > /dev/null 2>&1
+archive=$(find . -maxdepth 1 -name "*.tar.gz" -print -quit)
+if [ -z "${archive:-}" ]; then
+  echo "Failed to find downloaded ASP.NET archive"
+  exit 1
+fi
+tar -xvzf "$archive" > /dev/null 2>&1
+rm -f "$archive" > /dev/null 2>&1
+cat << 'EOF' >> "$HOME"/.bashrc
 # Added by PMSS media stack installer (.NET 8)
 export DOTNET_ROOT=$HOME/.bin/dotnet
 export PATH=$DOTNET_ROOT:$PATH
@@ -263,17 +297,18 @@ app="jellyfin"
 echo "Installing ${app^^}..."
 installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
-cd ${installdir}
+mkdir -p "$datadir" "$datadir/log"
+cd "$installdir"
 echo "Downloading...${app^^}"
-wget "${JELLYFIN_URL}" -O ${app}.tar.gz > /dev/null 2>&1
-mkdir ${app}
-tar -xzf ${app}.tar.gz -C ${app} > /dev/null 2>&1
-rm ${app}.tar.gz > /dev/null 2>&1
+wget "${JELLYFIN_URL}" -O "${app}.tar.gz" > /dev/null 2>&1
+mkdir -p "${app}"
+tar -xzf "${app}.tar.gz" -C "${app}" > /dev/null 2>&1
+rm -f "${app}.tar.gz" > /dev/null 2>&1
 echo "Installation files downloaded and extracted"
 echo "${app^^} Installed"
 echo "Configuring ${app^^}"
-if [ ! -f $datadir/network.xml ]; then
-  cat << EOF > $datadir/network.xml
+if [ ! -f "$datadir/network.xml" ]; then
+  cat << EOF > "$datadir/network.xml"
 <?xml version="1.0" encoding="utf-8"?>
 <NetworkConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <EnableUPnP>false</EnableUPnP>
@@ -311,17 +346,17 @@ if [ ! -f $datadir/network.xml ]; then
 </NetworkConfiguration>
 EOF
 fi
-sed -i -e "s/\(<PublicPort>\)[^<]*\(<\/PublicPort>\)/\1$JELLYFIN_PORT\2/g" $datadir/network.xml
-sed -i -e "s/\(<HttpServerPortNumber>\)[^<]*\(<\/HttpServerPortNumber>\)/\1$JELLYFIN_PORT\2/g" $datadir/network.xml
-sed -i -e "s/<BaseUrl \/>/<BaseUrl><\/BaseUrl>/" $datadir/network.xml
-sed -i -e "s/\(<BaseUrl>\)[^<]*\(<\/BaseUrl>\)/\1\/public-${USERNAME}\/${app}\2/g" $datadir/network.xml
+sed -i -e "s/\(<PublicPort>\)[^<]*\(<\/PublicPort>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
+sed -i -e "s/\(<HttpServerPortNumber>\)[^<]*\(<\/HttpServerPortNumber>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
+sed -i -e "s/<BaseUrl \/>/<BaseUrl><\/BaseUrl>/" "$datadir/network.xml"
+sed -i -e "s/\(<BaseUrl>\)[^<]*\(<\/BaseUrl>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/network.xml"
 echo "${app^^} configured"
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
-cat << 'EOF' >> $HOME/.bashrc
+cat << 'EOF' >> "$HOME"/.bashrc
 # PMSS Media stack aliases (updated Nov 2025)
-alias jellyfin='tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=$HOME/.bin/dotnet && export JELLYFIN_DATA_DIR=$HOME/.config/jellyfin && JELLYFIN_LOG_DIR=$HOME/.config/jellyfin/log && nice -n 19 sh -c $DOTNET_ROOT/dotnet $HOME/.bin/jellyfin/jellyfin.dll"'
+alias jellyfin='tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'
 alias sonarr='tmux new-session -d -s "sonarr" "$HOME/.bin/Sonarr/Sonarr --data=$HOME/.config/sonarr; exec $SHELL"'
 alias radarr='tmux new-session -d -s "radarr" "$HOME/.bin/Radarr/Radarr -nobrowser -data=$HOME/.config/radarr; exec $SHELL"'
 alias prowlarr='tmux new-session -d -s "prowlarr" "$HOME/.bin/Prowlarr/Prowlarr -nobrowser -data=$HOME/.config/prowlarr; exec $SHELL"'
@@ -330,7 +365,8 @@ alias sabnzbd='tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/a
 EOF
 
 # Lighttpd config (use $HOSTNAME)
-cat << EOF > $HOME/.lighttpd/custom
+mkdir -p "$HOME/.lighttpd"
+cat << EOF > "$HOME/.lighttpd/custom"
 \$HTTP["url"] =~ "^/sabnzbd(\$|\/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
@@ -407,11 +443,16 @@ cat << EOF > $HOME/.lighttpd/custom
 }
 EOF
 
-source ~/.bashrc
+DOTNET_ROOT_PATH="$HOME/.bin/dotnet"
+JELLYFIN_DATA_DIR="$HOME/.config/jellyfin"
+PUBLIC_IP=$(curl -fsS ifconfig.me 2>/dev/null || echo "unavailable")
+
+# shellcheck source=/dev/null
+source "$HOME/.bashrc"
 
 echo ""
 echo "Starting applications"
-tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=$HOME/.bin/dotnet && export JELLYFIN_DATA_DIR=$HOME/.config/jellyfin && JELLYFIN_LOG_DIR=$HOME/.config/jellyfin/log && nice -n 19 sh -c $DOTNET_ROOT/dotnet $HOME/.bin/jellyfin/jellyfin.dll"
+tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_DATA_DIR/log\"; nice -n 19 \"$DOTNET_ROOT_PATH\" \"$HOME/.bin/jellyfin/jellyfin.dll\""
 tmux new-session -d -s "sonarr" "$HOME/.bin/Sonarr/Sonarr --data=$HOME/.config/sonarr; exec $SHELL"
 tmux new-session -d -s "radarr" "$HOME/.bin/Radarr/Radarr -nobrowser -data=$HOME/.config/radarr; exec $SHELL"
 tmux new-session -d -s "prowlarr" "$HOME/.bin/Prowlarr/Prowlarr -nobrowser -data=$HOME/.config/prowlarr; exec $SHELL"
@@ -432,12 +473,17 @@ echo "PROWLARR-URL = https://${HOSTNAME}/public-${USERNAME}/prowlarr/"
 echo "SABNZBD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/"
 echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
 echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
-echo "JELLYFIN-ALTERNATE-URL = $(curl -s ifconfig.me):${JELLYFIN_PORT}/public-${USERNAME}/jellyfin/"
+echo "JELLYFIN-ALTERNATE-URL = ${PUBLIC_IP}:${JELLYFIN_PORT}/public-${USERNAME}/jellyfin/"
+echo ""
+echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
+echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Jellyfin=$HOME/.config/jellyfin | Cloudplow=$HOME/.config/cloudplow"
+echo "Tmux sessions running: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
 echo ""
 echo "To kill all applications use 'tmux kill-server'"
 echo ""
 echo "Restarting lighttpd"
-killall -9 -u $(whoami) lighttpd; killall -9 -u $(whoami) php-cgi
+pkill -9 -u "$USERNAME" lighttpd > /dev/null 2>&1 || true
+pkill -9 -u "$USERNAME" php-cgi > /dev/null 2>&1 || true
 echo "It may take 1-2 minutes to restart lighttpd"
 
 echo ""
