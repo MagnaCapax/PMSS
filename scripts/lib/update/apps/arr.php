@@ -8,7 +8,6 @@
  *
  * Expected keys in the configuration array:
  *  - app: Human-readable application label (e.g. "Radarr")
- *  - version_record: File path where the installed version is persisted
  *  - install_path: Destination directory for the unpacked application
  *  - releases_url: GitHub API URL listing release metadata
  *  - asset_pattern: PCRE that captures the semantic version from asset names
@@ -28,13 +27,15 @@ function pmssArrUpdate(array $config): void
     }
     [$latestVersion, $downloadUrl, $assetName] = $asset;
 
-    $recordPath  = $config['version_record'];
     $installPath = $config['install_path'];
 
-    $currentVersion = trim((string)@file_get_contents($recordPath));
+    $currentVersion = pmssArrDetectInstalledVersion($installPath, $app);
     if ($currentVersion === $latestVersion && is_dir($installPath)) {
         $log("Already at {$latestVersion}, skipping update");
         return;
+    }
+    if ($currentVersion !== null && $currentVersion !== $latestVersion) {
+        $log("Updating from {$currentVersion} to {$latestVersion}");
     }
 
     $workDir = pmssArrCreateWorkspace($app, $log);
@@ -57,11 +58,7 @@ function pmssArrUpdate(array $config): void
     runCommand(sprintf('mv %s %s', escapeshellarg($workDir.'/'.$config['extract_dir']), escapeshellarg($installPath)));
     pmssArrCleanup($workDir);
 
-    if (pmssArrPersistVersion($recordPath, $latestVersion)) {
-        $log("Installed version {$latestVersion}");
-    } else {
-        $log('Installed, but failed to persist version metadata');
-    }
+    $log("Installed version {$latestVersion}");
 }
 
 /**
@@ -162,15 +159,17 @@ function pmssArrExtract(string $archivePath, string $workDir, string $expectedDi
 }
 
 /**
- * Persist the installed version and ensure the directory exists.
+ * Extract a semantic version string from the provided text.
  */
-function pmssArrPersistVersion(string $recordPath, string $version): bool
+function pmssArrExtractVersionFromString(?string $payload): ?string
 {
-    $dir = dirname($recordPath);
-    if (!is_dir($dir) && !@mkdir($dir, 0750, true) && !is_dir($dir)) {
-        return false;
+    if (!is_string($payload) || $payload === '') {
+        return null;
     }
-    return @file_put_contents($recordPath, $version.PHP_EOL) !== false;
+    if (preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $payload, $match)) {
+        return $match[1];
+    }
+    return null;
 }
 
 /**
@@ -179,6 +178,50 @@ function pmssArrPersistVersion(string $recordPath, string $version): bool
 function pmssArrCleanup(string $workDir): void
 {
     runCommand('rm -rf '.escapeshellarg($workDir));
+}
+
+/**
+ * Detect an installed version without relying on out-of-band state files.
+ */
+function pmssArrDetectInstalledVersion(string $installPath, string $app): ?string
+{
+    $versionFiles = [
+        $installPath.'/version.txt',
+        $installPath.'/VERSION',
+    ];
+    foreach ($versionFiles as $file) {
+        if (!is_file($file)) {
+            continue;
+        }
+        $version = pmssArrExtractVersionFromString(@file_get_contents($file));
+        if ($version !== null) {
+            return $version;
+        }
+    }
+
+    $binaries = [
+        $installPath.'/'.$app,
+        $installPath.'/'.strtolower($app),
+        $installPath.'/'.$app.'.exe',
+    ];
+    foreach ($binaries as $binary) {
+        if (!is_executable($binary)) {
+            continue;
+        }
+        $commands = [
+            escapeshellarg($binary).' --version 2>/dev/null',
+            escapeshellarg($binary).' -v 2>/dev/null',
+        ];
+        foreach ($commands as $command) {
+            $output = @shell_exec($command);
+            $version = pmssArrExtractVersionFromString($output);
+            if ($version !== null) {
+                return $version;
+            }
+        }
+    }
+
+    return null;
 }
 
 /**

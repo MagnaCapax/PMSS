@@ -2,11 +2,6 @@
 # Pulsed Media Seedbox Management Software "PMSS"
 # Rclone installer + update
 
-// Runtime version record keeps hosts from redownloading the same archive; the
-// pin lives in code so we are not shipping static metadata under /etc.
-const RCLONE_VERSION_RECORD = '/etc/seedbox/config/app-versions/rclone';
-const RCLONE_DEFAULT_VERSION = '1.69.1';
-
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
 [$rcloneVersion, $fetchedLatest] = pmssResolveRcloneVersion();
 
@@ -15,12 +10,9 @@ if ($fetchedLatest) {
     echo "Requested latest rclone release: {$rcloneVersion}\n";
 }
 
-#Check rclone version
-if (file_exists('/usr/bin/rclone')) {
-    $rcloneCurrentVersion = `/usr/bin/rclone -V`;
-    if (strpos($rcloneCurrentVersion, "rclone v{$rcloneVersion}") === false) {
-        unlink('/usr/bin/rclone');    // This forces following code to install rclone .. thus updating it :)
-    }
+$currentRclone = pmssDetectRcloneVersion();
+if ($currentRclone !== null && $currentRclone !== $rcloneVersion && file_exists('/usr/bin/rclone')) {
+    unlink('/usr/bin/rclone');    // This forces following code to install rclone .. thus updating it :)
 }
 
 #Install rclone
@@ -41,15 +33,7 @@ if (file_exists('/usr/sbin/rclone') &&
  */
 function pmssResolveRcloneVersion(): array
 {
-    $pinnedFile = RCLONE_VERSION_RECORD;
-    $default = RCLONE_DEFAULT_VERSION;
-
-    $pinned = trim((string)@file_get_contents($pinnedFile));
-    if ($pinned !== '' && $pinned[0] === 'v') {
-        $pinned = substr($pinned, 1);
-    }
-
-    $version = $pinned !== '' ? $pinned : $default;
+    $version = '1.69.1';
     $fetched = false;
 
     if (getenv('PMSS_RCLONE_FETCH_LATEST') === '1') {
@@ -60,7 +44,6 @@ function pmssResolveRcloneVersion(): array
         }
     }
 
-    pmssPersistRcloneVersion($pinnedFile, $version);
     return [$version, $fetched];
 }
 
@@ -87,13 +70,25 @@ function pmssFetchLatestRcloneVersion(): ?string
 }
 
 /**
- * Store the selected version for reproducible future runs.
+ * Detect the currently installed rclone version if present.
  */
-function pmssPersistRcloneVersion(string $file, string $version): void
+function pmssDetectRcloneVersion(): ?string
 {
-    $dir = dirname($file);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0750, true);
+    if (!file_exists('/usr/bin/rclone')) {
+        return null;
     }
-    @file_put_contents($file, $version.PHP_EOL);
+    $commands = [
+        '/usr/bin/rclone version 2>/dev/null',
+        '/usr/bin/rclone -V 2>/dev/null',
+    ];
+    foreach ($commands as $command) {
+        $output = @shell_exec($command);
+        if (!is_string($output)) {
+            continue;
+        }
+        if (preg_match('/rclone v?(\\d+\\.\\d+\\.\\d+)/i', $output, $match)) {
+            return $match[1];
+        }
+    }
+    return null;
 }

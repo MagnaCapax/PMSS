@@ -9,7 +9,6 @@
 require_once dirname(__DIR__, 2).'/runtime.php';
 require_once __DIR__.'/arr.php';
 
-const SONARR_VERSION_RECORD = '/etc/seedbox/config/app-versions/sonarr';
 const SONARR_INSTALL_PATH   = '/opt/Sonarr';
 const SONARR_RELEASES_URL   = 'https://api.github.com/repos/Sonarr/Sonarr/releases';
 const SONARR_LEGACY_REPO    = '/etc/apt/sources.list.d/sonarr.list';
@@ -22,7 +21,6 @@ if (file_exists(SONARR_LEGACY_REPO)) {
 
 pmssArrUpdate([
     'app'            => 'Sonarr',
-    'version_record' => SONARR_VERSION_RECORD,
     'install_path'   => SONARR_INSTALL_PATH,
     'releases_url'   => SONARR_RELEASES_URL,
     'asset_pattern'  => '/Sonarr\.(?:main|develop)\.([0-9.]+).*linux.*tar\.gz/i',

@@ -254,6 +254,12 @@ pmssEnsureNetworkTemplate('logmsg');
 pmssApplyNetworkConfig();
 pmssApplySecurityHardening();
 
+// Cleanup legacy runtime metadata that should never have shipped with snapshots.
+$legacyAppVersionDir = '/etc/seedbox/config/app-versions';
+if (is_dir($legacyAppVersionDir)) {
+    runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg($legacyAppVersionDir));
+}
+
 // Mark the end of phase 2 so log parsing knows we finished cleanly.
 // Refresh MOTD at the very end so VPN/service status reflects final state.
 // Consolidated on the Motd class generator for determinism

@@ -14,13 +14,11 @@ if (!@include_once $runtimePath) {
 }
 require_once __DIR__.'/arr.php';
 
-const RADARR_VERSION_RECORD = '/etc/seedbox/config/app-versions/radarr';
 const RADARR_INSTALL_PATH   = '/opt/Radarr';
 const RADARR_RELEASES_URL   = 'https://api.github.com/repos/Radarr/Radarr/releases';
 
 pmssArrUpdate([
     'app'            => 'Radarr',
-    'version_record' => RADARR_VERSION_RECORD,
     'install_path'   => RADARR_INSTALL_PATH,
     'releases_url'   => RADARR_RELEASES_URL,
     'asset_pattern'  => '/Radarr\.(?:develop|master)\.([0-9.]+).*linux.*tar\.gz/i',
