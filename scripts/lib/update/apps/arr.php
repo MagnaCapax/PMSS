@@ -37,6 +37,9 @@ function pmssArrUpdate(array $config): void
     if ($currentVersion !== null && $currentVersion !== $latestVersion) {
         $log("Updating from {$currentVersion} to {$latestVersion}");
     }
+    if ($currentVersion === null && is_dir($installPath)) {
+        $log('Unknown installed version; reinstalling to avoid stale binaries');
+    }
 
     $workDir = pmssArrCreateWorkspace($app, $log);
     if ($workDir === null) {
