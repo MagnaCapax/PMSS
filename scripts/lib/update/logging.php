@@ -45,11 +45,17 @@ if (!function_exists('logMessage')) {
     function logMessage(string $message, array $context = []): void
     {
         $ts = date('[Y-m-d H:i:s] ');
-        @file_put_contents(PMSS_LOG_FILE, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        
+        // Strip ANSI codes for file logging
+        $cleanMessage = preg_replace('/\x1b\[[0-9;]*m/', '', $message);
+        @file_put_contents(PMSS_LOG_FILE, $ts.$cleanMessage.PHP_EOL, FILE_APPEND | LOCK_EX);
+        
+        // Stdout gets the colored message
         echo $message.PHP_EOL;
+        
         pmssLogJson([
             'event'   => 'log',
-            'message' => $message,
+            'message' => $cleanMessage,
             'context' => $context,
         ]);
     }

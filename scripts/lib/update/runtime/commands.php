@@ -30,9 +30,27 @@ if (!function_exists('runStep')) {
         $stderrShort = $stderr !== '' ? preg_replace('/\s+/', ' ', trim(substr($stderr, 0, 300))) : '';
         $stdoutShort = $stdout !== '' ? preg_replace('/\s+/', ' ', trim(substr($stdout, 0, 300))) : '';
 
-        $message = sprintf('[%s %.3fs rc=%d] %s :: %s', $status, $duration, $rc, $description, $command);
+        // ANSI colors
+        $cReset  = "\033[0m";
+        $cRed    = "\033[31m";
+        $cGreen  = "\033[32m";
+        $cYellow = "\033[33m";
+        $cCyan   = "\033[36m";
+
+        $color = $cGreen;
+        if ($status === 'ERR') $color = $cRed;
+        if ($status === 'SKIP') $color = $cYellow;
+
+        // Colorize the status block: [STATUS ... rc=N]
+        $statusBlock = sprintf('[%s%s%s %.3fs rc=%s%d%s]', 
+            $color, $status, $cReset, 
+            $duration, 
+            ($rc === 0 ? $cGreen : $cRed), $rc, $cReset
+        );
+
+        $message = sprintf('%s %s :: %s', $statusBlock, $description, $command);
         if ($status === 'ERR' && $stderrShort !== '') {
-            $message .= ' :: '.$stderrShort;
+            $message .= ' :: ' . $cRed . $stderrShort . $cReset;
         }
         // Use structured logger from logging.php to avoid missing logmsg() when
         // this runtime is invoked outside update.php/bootstrap paths.
