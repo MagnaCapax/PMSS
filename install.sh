@@ -57,7 +57,7 @@ run_cmd() {
 	if [ "$DRY_RUN" = true ]; then
 		log_step "[DRY-RUN] Skipping: $*"
 		return 0
-	}
+	fi
 	log_step "Running: $*"
 	"$@"
 }
@@ -278,12 +278,12 @@ preflight_checks() {
 	if [ -n "$free_bytes" ] && [ "$free_bytes" -lt "$required_bytes" ]; then
 		log_error "Insufficient disk space on / (need >= 2 GiB free)"
 		exit 1
-	}
+	fi
 
 	if command -v curl >/dev/null 2>&1; then
 		if ! curl -fsI https://github.com >/dev/null 2>&1; then
 			log_warn "GitHub reachability check failed; installer may not fetch updates"
-		}
+		fi
 	else
 		log_warn "curl not available; skipping GitHub reachability check"
 	fi
