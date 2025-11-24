@@ -216,6 +216,14 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         // Avoid touching the host systemd manager in test mode so dev tests stay hermetic.
         $skipSystemctl = (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
 
+        $reloadSystemd = static function (string $runMessage, string $skipMessage) use ($skipSystemctl): void {
+            if ($skipSystemctl) {
+                pmssLogStatus('SKIP', $skipMessage, 0);
+                return;
+            }
+            runStep($runMessage, 'systemctl daemon-reload');
+        };
+
         // Drop-in management must target /etc paths only; avoid vendor dirs.
 
         $mode = pmssCgroupMode();
@@ -293,11 +301,10 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
             return;
         }
         runStep('Setting permissions on user slice override', 'chmod 644 '.escapeshellarg($target));
-        if ($skipSystemctl) {
-            pmssLogStatus('SKIP', 'Reloading systemd manager configuration (test mode)', 0);
-        } else {
-            runStep('Reloading systemd manager configuration', 'systemctl daemon-reload');
-        }
+        $reloadSystemd(
+            'Reloading systemd manager configuration',
+            'Reloading systemd manager configuration (test mode)'
+        );
         $log(sprintf('Installed %s slice override (mode=%s)', $target, $mode));
 
         // Ensure root (uid 0) slice is not limited: create user-0 specific override setting infinity/large limits.
@@ -309,11 +316,10 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         $rootConf = "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n";
         @file_put_contents($rootDrop, $rootConf);
         @chmod($rootDrop, 0644);
-        if ($skipSystemctl) {
-            pmssLogStatus('SKIP', 'Reloading systemd manager configuration (root slice, test mode)', 0);
-        } else {
-            runStep('Reloading systemd manager configuration (root slice)', 'systemctl daemon-reload');
-        }
+        $reloadSystemd(
+            'Reloading systemd manager configuration (root slice)',
+            'Reloading systemd manager configuration (root slice, test mode)'
+        );
     }
 }
 
