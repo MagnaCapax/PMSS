@@ -67,7 +67,7 @@ function pmssSkipSymlink(string $path): bool
 /**
  * Run one or more commands for a directory when present and not symlinked.
  */
-function pmssRunDirectorySteps(string $path, array $steps): void
+function pmssRunDirectorySteps(string $path, array $steps, array &$exitCodes): void
 {
     if (pmssSkipSymlink($path) || !is_dir($path)) {
         return;
@@ -75,7 +75,7 @@ function pmssRunDirectorySteps(string $path, array $steps): void
 
     foreach ($steps as $step) {
         [$message, $command] = $step;
-        runStep($message, $command);
+        $exitCodes[] = runStep($message, $command);
     }
 }
 
@@ -89,7 +89,7 @@ function pmssOwnAndRestrictDirectory(string $path, string $message, string $comm
     }
 
     pmssEnsureRootOwnership($path, $exitCodes);
-    runStep($message, $command);
+    $exitCodes[] = runStep($message, $command);
 }
 
 $exitCodes = [];
@@ -190,35 +190,35 @@ $letsencryptSteps = [
 ];
 
 foreach ($letsencryptSteps as $path => $steps) {
-    pmssRunDirectorySteps($path, $steps);
+    pmssRunDirectorySteps($path, $steps, $exitCodes);
 }
 
 pmssOwnAndRestrictDirectory('/var/lib/letsencrypt', 'Restricting /var/lib/letsencrypt', 'chmod 700 /var/lib/letsencrypt', $exitCodes);
 pmssOwnAndRestrictDirectory('/var/log/letsencrypt', 'Restricting /var/log/letsencrypt', 'chmod 700 /var/log/letsencrypt', $exitCodes);
 if (is_dir('/etc/seedbox/config/ssl')) {
-    runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
+    $exitCodes[] = runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
 }
 if (is_dir('/etc/openvpn/easy-rsa/pki/private')) {
     pmssEnsureRootOwnership('/etc/openvpn/easy-rsa/pki/private', $exitCodes);
-    runStep('Restricting OpenVPN private key directory', 'chmod 700 /etc/openvpn/easy-rsa/pki/private');
-    runStep('Hardening OpenVPN private keys', "find /etc/openvpn/easy-rsa/pki/private -type f -name '*.key' -exec chmod 600 {} +");
+    $exitCodes[] = runStep('Restricting OpenVPN private key directory', 'chmod 700 /etc/openvpn/easy-rsa/pki/private');
+    $exitCodes[] = runStep('Hardening OpenVPN private keys', "find /etc/openvpn/easy-rsa/pki/private -type f -name '*.key' -exec chmod 600 {} +");
 }
 foreach (['/etc/openvpn/easy-rsa/pki/issued', '/etc/openvpn/easy-rsa/pki/reqs', '/etc/openvpn/easy-rsa/pki/crl', '/etc/openvpn/easy-rsa/pki/certs_by_serial'] as $dir) {
     if (is_dir($dir)) {
         pmssEnsureRootOwnership($dir, $exitCodes);
-        runStep('Restricting OpenVPN PKI directory '.$dir, 'chmod 750 '.escapeshellarg($dir));
+        $exitCodes[] = runStep('Restricting OpenVPN PKI directory '.$dir, 'chmod 750 '.escapeshellarg($dir));
     }
 }
 if (is_file('/etc/openvpn/easy-rsa/pki/crl.pem')) {
     pmssEnsureRootOwnership('/etc/openvpn/easy-rsa/pki/crl.pem', $exitCodes);
-    runStep('Restricting OpenVPN CRL', 'chmod 600 /etc/openvpn/easy-rsa/pki/crl.pem');
+    $exitCodes[] = runStep('Restricting OpenVPN CRL', 'chmod 600 /etc/openvpn/easy-rsa/pki/crl.pem');
 }
 if (is_file('/etc/openvpn/ta.key')) {
     pmssEnsureRootOwnership('/etc/openvpn/ta.key', $exitCodes);
-    runStep('Restricting OpenVPN ta.key', 'chmod 600 /etc/openvpn/ta.key');
+    $exitCodes[] = runStep('Restricting OpenVPN ta.key', 'chmod 600 /etc/openvpn/ta.key');
 }
 if (is_dir('/etc/openvpn')) {
-    runStep('Restricting OpenVPN configs', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -exec chmod 640 {} +");
+    $exitCodes[] = runStep('Restricting OpenVPN configs', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -exec chmod 640 {} +");
     pmssEnsureRootOwnership('/etc/openvpn', $exitCodes);
     $exitCodes[] = runStep('Ensuring OpenVPN configs owned by root', "find /etc/openvpn -maxdepth 1 -type f -name '*.conf' -exec chown root:root {} +");
 }
@@ -226,19 +226,19 @@ if (is_dir('/etc/openvpn')) {
 // WireGuard hardening: restrict directory and sensitive files
 if (is_dir('/etc/wireguard')) {
     pmssEnsureRootOwnership('/etc/wireguard', $exitCodes);
-    runStep('Hardening WireGuard config directory', 'chmod 700 /etc/wireguard');
+    $exitCodes[] = runStep('Hardening WireGuard config directory', 'chmod 700 /etc/wireguard');
     if (is_file('/etc/wireguard/wg0.conf')) {
         pmssEnsureRootOwnership('/etc/wireguard/wg0.conf', $exitCodes);
-        runStep('Restricting WireGuard wg0.conf', 'chmod 600 /etc/wireguard/wg0.conf');
+        $exitCodes[] = runStep('Restricting WireGuard wg0.conf', 'chmod 600 /etc/wireguard/wg0.conf');
     }
     if (is_file('/etc/wireguard/server_private.key')) {
         pmssEnsureRootOwnership('/etc/wireguard/server_private.key', $exitCodes);
-        runStep('Restricting WireGuard server_private.key', 'chmod 600 /etc/wireguard/server_private.key');
+        $exitCodes[] = runStep('Restricting WireGuard server_private.key', 'chmod 600 /etc/wireguard/server_private.key');
     }
     if (is_file('/etc/wireguard/server_public.key')) {
         pmssEnsureRootOwnership('/etc/wireguard/server_public.key', $exitCodes);
     }
-    runStep('Restricting WireGuard key material', "find /etc/wireguard -type f -name '*.key' -exec chmod 600 {} +");
+    $exitCodes[] = runStep('Restricting WireGuard key material', "find /etc/wireguard -type f -name '*.key' -exec chmod 600 {} +");
 }
 
 $failed = array_filter($exitCodes, static function ($rc) { return $rc !== 0; });
