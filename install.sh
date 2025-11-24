@@ -119,6 +119,13 @@ else
 	UPDATE_ARGS=("$@")
 fi
 
+# Auto-disable interactive editors when stdin is not a TTY (common for piped installs).
+if [ ! -t 0 ]; then
+	log_info "Non-interactive stdin detected; skipping hostname and quota editors (use flags to override)"
+	skip_hostname_edit=true
+	skip_quota_edit=true
+fi
+
 parse_version_string() {
 	local input_string="$1"
 
@@ -205,118 +212,7 @@ ensure_packages() {
 
 export DEBIAN_FRONTEND=noninteractive
 
-# Detect Debian codename/major and, for Debian 10 (buster), rewrite APT sources
-# to archived mirrors so installs keep working on EOL systems. Keep this logic
-# scoped strictly to Debian 10 to avoid affecting supported releases.
-detect_debian_codename() {
-    local codename="" major=""
-    if [ -r /etc/os-release ]; then
-        # shellcheck disable=SC1091
-        . /etc/os-release
-        codename="${VERSION_CODENAME:-}"
-        major="${VERSION_ID%%.*}"
-    fi
-    if [ -z "$codename" ] && [ -r /etc/debian_version ]; then
-        case "$(cut -d'.' -f1 </etc/debian_version)" in
-            10) codename=buster; major=10 ;;
-            11) codename=bullseye; major=11 ;;
-            12) codename=bookworm; major=12 ;;
-        esac
-    fi
-    printf '%s;%s\n' "$codename" "$major"
-}
-
-normalize_sources_for_detected_distro() {
-    local codename="$1" major="$2"
-    local sources="/etc/apt/sources.list"
-
-    if [ -z "$codename" ] || [ "$codename" = "buster" ]; then
-        return 0
-    fi
-
-    if [ -f "$sources" ] && grep -Eq "\\b${codename}\\b" "$sources"; then
-        return 0
-    fi
-
-    if [ -f "$sources" ] && ! grep -Eq "\\bbuster\\b" "$sources"; then
-        # Avoid clobbering custom/non-buster sources when the codename already differs.
-        return 0
-    fi
-
-    log_step "Refreshing apt sources for detected suite: ${codename}"
-
-    local components="main contrib non-free"
-    if [ "$major" -ge 12 ]; then
-        components="$components non-free-firmware"
-    fi
-
-    cat >"$sources" <<EOF
-deb http://deb.debian.org/debian ${codename} ${components}
-deb http://security.debian.org/debian-security ${codename}-security ${components}
-deb http://deb.debian.org/debian ${codename}-updates ${components}
-EOF
-
-    if ls /etc/apt/sources.list.d/*.list >/dev/null 2>&1; then
-        for sl in /etc/apt/sources.list.d/*.list; do
-            [ -f "$sl" ] || continue
-            if grep -Eq "\\bbuster\\b" "$sl"; then
-                cp "$sl" "${sl}.pmss-backup-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-                sed -E -i 's@^([^#].*)@# PMSS(suite-mismatch): disabled: \1@' "$sl"
-                log_info "Disabled stale entry in ${sl##*/}"
-            fi
-        done
-    fi
-}
-
-configure_buster_archive_sources_if_needed() {
-    local info codename major backup sl
-    info=$(detect_debian_codename)
-    codename=${info%%;*}
-    major=${info##*;}
-
-    if [ "$codename" != "buster" ] && [ "$major" != "10" ]; then
-        return 0
-    fi
-
-    log_step "Debian 10 detected; switching APT sources to archive.debian.org"
-
-    # Backup main sources.list before changes.
-    if [ -f /etc/apt/sources.list ]; then
-        backup="/etc/apt/sources.list.pmss-backup-$(date +%Y%m%d%H%M%S)"
-        cp /etc/apt/sources.list "$backup" 2>/dev/null || true
-        log_info "Backed up sources.list to ${backup##*/}"
-    fi
-
-    # Write minimal archived sources for buster. Use http to avoid TLS issues on bare installs.
-    cat >/etc/apt/sources.list <<'SRC'
-deb http://archive.debian.org/debian buster main contrib non-free
-deb http://archive.debian.org/debian-security buster/updates main contrib non-free
-SRC
-
-    # Disable any non-archive buster entries under sources.list.d to prevent 404s.
-    if ls /etc/apt/sources.list.d/*.list >/dev/null 2>&1; then
-        for sl in /etc/apt/sources.list.d/*.list; do
-            [ -f "$sl" ] || continue
-            if grep -Eq '^[[:space:]]*deb[[:space:]].*(debian|debian-security).*buster' "$sl" \
-               && ! grep -Eq 'archive\.debian\.org' "$sl"; then
-                cp "$sl" "${sl}.pmss-backup-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-                sed -E -i 's@^([^#].*)@# PMSS(buster-archive): disabled: \1@' "$sl"
-                log_info "Disabled stale buster entry in ${sl##*/}"
-            fi
-        done
-    fi
-
-    # EOL Release files are often past Valid-Until; relax check for buster only.
-    cat >/etc/apt/apt.conf.d/99pmss-buster-archive <<'APT'
-Acquire::Check-Valid-Until "false";
-APT
-}
-
-info=$(detect_debian_codename)
-distro_codename=${info%%;*}
-distro_major=${info##*;}
-log_info "Detected Debian codename=${distro_codename:-unknown} major=${distro_major:-unknown}"
-log_info "Leaving existing apt sources untouched (installer bootstrap)"
+log_info "Installer bootstrap: leaving existing apt sources untouched"
 log_step "Updating package lists"
 run_cmd apt update
 log_step "Running apt full-upgrade"
@@ -511,6 +407,12 @@ cd /tmp || exit
 rm -rf PMSS*
 echo
 parse_version_string "$SOURCE_SPEC"
+if [ -z "$type" ]; then
+	type="git"
+	repository="$DEFAULT_REPOSITORY"
+	branch="main"
+	log_info "Defaulting to git/main"
+fi
 
 if [ "$type" = "git" ]; then
 	git clone "$repository" PMSS
