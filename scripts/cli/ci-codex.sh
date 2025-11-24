@@ -39,6 +39,7 @@ TMP="${TMPDIR:-/tmp}"
 OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
+RUNLOG="$OUTDIR/job-run.log"
 PROMPT="$OUTDIR/prompt.txt"
 SUMMARY="$OUTDIR/ci-summary.txt"
 
@@ -190,6 +191,11 @@ fetch_job_log() {
 	fi
 }
 
+fetch_run_log() {
+	local out="$1"
+	gh run view "$run_id" --log >"$out" || true
+}
+
 if [[ -n "$job_name" ]]; then
 	echo "[ci-codex] fetching job logs for '$job_name'" >&1
 	fetch_job_log "$job_name" "$JOBLOG"
@@ -219,6 +225,22 @@ for attempt in {1..10}; do
 done
 echo "[ci-codex] job logs present: $nonempty_logs file(s)" >&1
 
+echo "[ci-codex] fetching full run log" >&1
+fetch_run_log "$RUNLOG"
+if [[ ! -s "$RUNLOG" ]]; then
+	echo "[ci-codex] WARNING: full run log is empty; check gh auth/network" >&1
+fi
+
+# If nothing was retrieved, fail fast so callers notice missing QA context.
+any_logs=0
+for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
+	[[ -s "$jl" ]] && any_logs=$((any_logs + 1))
+done
+if [[ $any_logs -eq 0 ]]; then
+	echo "[ci-codex] ERROR: no CI logs could be fetched; aborting" >&2
+	exit 1
+fi
+
 # Build the prompt file (header/instructions only). Context paths are listed for the assistant to open.
 prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 {
@@ -226,7 +248,7 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 	echo
 	echo "Context to open (paths in this workspace):"
 	echo " - $SUMMARY (CI summary)"
-	for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
+	for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
 		[[ -s "$jl" ]] || continue
 		echo " - $jl"
 	done
