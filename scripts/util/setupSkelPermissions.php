@@ -36,6 +36,22 @@ function pmssHardenDirectoryPermissions(
     $exitCodes[] = runStep($directoryMessage, $directoryCommand);
 }
 
+/**
+ * Enforce root ownership on a target path when present.
+ */
+function pmssEnsureRootOwnership(string $path, array &$exitCodes): void
+{
+    if (!file_exists($path)) {
+        logmsg(sprintf('Skipping ownership enforcement; missing %s', $path));
+        return;
+    }
+
+    $exitCodes[] = runStep(
+        sprintf('Ensuring %s ownership is root:root', $path),
+        'chown root:root '.escapeshellarg($path)
+    );
+}
+
 $exitCodes = [];
 
 pmssHardenDirectoryPermissions(
@@ -55,6 +71,9 @@ pmssHardenDirectoryPermissions(
     'chmod o+x /etc/seedbox',
     $exitCodes
 ); // not using 775 because there might be places where the perms differ and need to differ
+
+pmssEnsureRootOwnership('/etc/skel', $exitCodes);
+pmssEnsureRootOwnership('/etc/seedbox', $exitCodes);
 
 // Setup openvpn config perms
 if (is_dir('/etc/openvpn')) {
@@ -110,6 +129,9 @@ if (is_dir($configDir)) {
 if (is_dir('/etc/letsencrypt/live')) {
     runStep('Hardening TLS private keys (Let\'s Encrypt)', "find /etc/letsencrypt/live -type f -name 'privkey.pem' -exec chmod 600 {} +");
 }
+if (is_dir('/etc/letsencrypt/archive')) {
+    runStep('Hardening TLS archive keys (Let\'s Encrypt)', "find /etc/letsencrypt/archive -type f -name 'privkey*.pem' -exec chmod 600 {} +");
+}
 if (is_dir('/etc/seedbox/config/ssl')) {
     runStep('Hardening seedbox SSL private keys', "find /etc/seedbox/config/ssl -type f -name 'privkey.pem' -exec chmod 600 {} +");
 }
@@ -126,6 +148,7 @@ if (is_dir('/etc/wireguard')) {
     if (is_file('/etc/wireguard/server_private.key')) {
         runStep('Restricting WireGuard server_private.key', 'chmod 600 /etc/wireguard/server_private.key');
     }
+    runStep('Restricting WireGuard key material', "find /etc/wireguard -type f -name '*.key' -exec chmod 600 {} +");
 }
 
 $failed = array_filter($exitCodes, static function ($rc) { return $rc !== 0; });
