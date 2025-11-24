@@ -10,7 +10,7 @@ if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
     /**
      * Ensure external repositories have their prerequisites (keys/config) in place before apt update.
      */
-function pmssEnsureRepositoryPrerequisites(): void
+    function pmssEnsureRepositoryPrerequisites(): void
     {
         pmssEnsureDockerRepository();
         pmssEnsureSonarrKey();
@@ -196,21 +196,22 @@ if (!function_exists('pmssRefreshRepositories')) {
     {
         pmssEnsureRepositoryPrerequisites();
         $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $logger);
+        $aptUpdate = aptCmd('update');
         if ($plan['mode'] === 'reuse') {
-            runStep('Refreshing apt package index (existing sources)', aptCmd('update'));
+            runStep('Refreshing apt package index (existing sources)', $aptUpdate);
             return;
         }
 
-    $log = pmssSelectLogger($logger);
-    updateAptSources($distroName, (int)$distroVersion, $plan['current_hash'], $plan['templates'], $log);
-    runStep('Refreshing apt package index', aptCmd('update'));
+        $log = pmssSelectLogger($logger);
+        updateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], $log);
+        runStep('Refreshing apt package index', $aptUpdate);
     
-    // Touch the periodic stamp so tools like MOTD know the index is fresh
-    @mkdir('/var/lib/apt/periodic', 0755, true);
-    @touch('/var/lib/apt/periodic/update-success-stamp');
-}
+        // Touch the periodic stamp so tools like MOTD know the index is fresh
+        @mkdir('/var/lib/apt/periodic', 0755, true);
+        @touch('/var/lib/apt/periodic/update-success-stamp');
+    }
 
-function pmssAutoremovePackages(): void
+    function pmssAutoremovePackages(): void
     {
         runStep('Removing packages no longer required', aptCmd('autoremove -y'));
     }
