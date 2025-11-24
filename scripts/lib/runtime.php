@@ -109,8 +109,33 @@ if (!function_exists('requireRoot')) {
     function requireRoot(): void
     {
         if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-            fwrite(STDERR, "This script must be run as root.\n");
-            exit(1);
+            pmssFatal("This script must be run as root.");
         }
+    }
+}
+
+if (!function_exists('pmssError')) {
+    /**
+     * Write an error message to STDERR and the log.
+     */
+    function pmssError(string $message): void
+    {
+        // Use ANSI red for visibility if interactive, otherwise plain text
+        $isTty = function_exists('posix_isatty') && posix_isatty(STDERR);
+        $prefix = $isTty ? "\033[31m[ERROR]\033[0m " : "[ERROR] ";
+        
+        fwrite(STDERR, $prefix . $message . PHP_EOL);
+        logMessage('[ERROR] ' . $message); // Persist to logfile
+    }
+}
+
+if (!function_exists('pmssFatal')) {
+    /**
+     * Report an error and exit with a non-zero status code.
+     */
+    function pmssFatal(string $message, int $code = 1): void
+    {
+        pmssError($message);
+        exit($code);
     }
 }

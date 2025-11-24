@@ -123,19 +123,55 @@ rofanity.
 
 ## Workflow / Documentation (MUST)
 
+
+
 - **No New TODO Files:** Do NOT create new files like `docs/todo-topic.md`. Consolidate findings into:
+
+
 
   - `docs/TODO.md` for architectural, feature, or general improvements.
 
+
+
   - `tests/TODO.md` for testing gaps and plans.
 
+
+
 - **Verify Before Create:** Always check if a similar file (e.g., `refactoring.md`, `TODO.md`) already exists before creating a new one to avoid fragmentation or overwrites.
+
+
 
 - **Append, Don't Clutter:** Add sections to existing documentation rather than spawning new micro-files unless the content is a formal ADR.
 
 
 
+
+
+
+
+## Agent Self-Correction (MANDATORY)
+
+
+
+- **Stop and Read:** Before generating *any* file or code, re-read the "Workflow / Documentation" and "Core Mandates" sections above.
+
+
+
+- **Verify Scope:** Confirm that your planned action (e.g., creating `docs/foo.md`) does not violate the "No New TODO Files" or "Minimal Edits" rules.
+
+
+
+- **Correct Course:** If your plan violates a rule, STOP. Adjust the plan to fit the constraints (e.g., append to `docs/TODO.md` instead).
+
+
+
+
+
+
+
 ## ADR Usage
+
+
 
 - Location: `docs/adr/`. Use the provided template to record decisions with context and consequences.
 - Process: draft ADR → collect feedback → update AGENTS.md or docs if rails change → ship with the implementing change.

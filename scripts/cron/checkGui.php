@@ -17,19 +17,25 @@ require_once __DIR__.'/../lib/users.php';
 
 $logger = new Logger(__FILE__);
 
-// Get & parse users list
+// Get & parse users list using the robust library method
 $users = users::listHomeUsers();
 
 foreach($users as $thisUser) {    // Loop users checking their instances
     if (empty($thisUser)) continue;
-    if (file_exists("/home/{$thisUser}/www-disabled")) continue;	// User suspended
+    
+    // User suspended check
+    if (file_exists("/home/{$thisUser}/www-disabled")) continue;
 
     $file = "/home/{$thisUser}/www/index.php";
 
-    if (!file_exists($file)
-		or filesize($file) == 0) {
-            $logger->msg("Restoring index.php for user {$thisUser}");
-	        runCommand("cp /etc/skel/www/index.php " . escapeshellarg($file), false, [$logger, 'msg']);
+    // Check if GUI entrypoint is missing or empty
+    if (!file_exists($file) || filesize($file) == 0) {
+        $logger->msg("Restoring index.php for user {$thisUser}");
+        // Use runCommand for safe execution and logging
+        runCommand("cp /etc/skel/www/index.php " . escapeshellarg($file), false, [$logger, 'msg']);
+        
+        // Ensure correct permissions after copy
+        runCommand("chown " . escapeshellarg("{$thisUser}:{$thisUser}") . " " . escapeshellarg($file), false, [$logger, 'msg']);
     }
 
 	#TODO Check responsiveness etc. other common stuff as well.
