@@ -16,7 +16,19 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 STRICT="${PMSS_LINT_SHARP_STRICT:-1}"
+PATTERN='rm\s+-rf|chmod\s+-R|chown\s+-R|chgrp\s+-R|\bmv\b'
 VIOL=0
+
+scan_matches() {
+  local file="$1"
+  grep -nE "$PATTERN" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true
+}
+
+report_violation() {
+  local kind="$1" file="$2" raw="$3"
+  echo "${kind} sharp edge: $file: ${raw}" >&2
+  VIOL=$((VIOL+1))
+}
 
 php_scan() {
   local file raw
@@ -24,12 +36,11 @@ php_scan() {
     # grep candidate lines
     while IFS= read -r raw; do
       # ignore when inside runStep command string
-      if grep -Eq "runStep\s*\(.*(rm\s+-rf|chmod\s+-R|chown\s+-R|chgrp\s+-R|\bmv\b).*\)" <<<"$raw"; then
+      if grep -Eq "runStep\s*\(.*(${PATTERN}).*\)" <<<"$raw"; then
         continue
       fi
-      echo "PHP sharp edge: $file: ${raw}" >&2
-      VIOL=$((VIOL+1))
-    done < <(grep -nE "rm\s+-rf|chmod\s+-R|chown\s+-R|chgrp\s+-R|\bmv\b" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+      report_violation "PHP" "$file" "$raw"
+    done < <(scan_matches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.php" \
            -not -path "*/vendor/*" \
            -not -path "*/scripts/lib/tests/*" \
@@ -41,9 +52,8 @@ sh_scan() {
   local file
   while IFS= read -r -d '' file; do
     while IFS= read -r raw; do
-      echo "Shell sharp edge: $file: ${raw}" >&2
-      VIOL=$((VIOL+1))
-    done < <(grep -nE "rm\s+-rf|chmod\s+-R|chown\s+-R|chgrp\s+-R|\bmv\b" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+      report_violation "Shell" "$file" "$raw"
+    done < <(scan_matches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.sh" \
            -not -path "*/vendor/*" \
            -not -path "*/etc/skel/*" -print0)
