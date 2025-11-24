@@ -19,13 +19,9 @@ requireRoot();
 $exitCodes = [];
 
 if (is_dir('/etc/skel')) {
-    // NOTE: Historical implementation uses globs including '.*'. This has been
-    // deployed for years; do not change the behavior lightly.
-    // #TODO Consider replacing with a safer find-based approach that excludes
-    // '.' and '..' explicitly to avoid any future shell expansion pitfalls.
     $exitCodes[] = runStep(
         'Hardening /etc/skel content permissions',
-        'cd /etc/skel && chmod o-w * -R && chmod o-w .* -R'
+        'cd /etc/skel && find . -mindepth 1 -exec chmod -R o-w -- {} +'
     ); // not using 775 because there might be places where the perms differ and need to differ
     $exitCodes[] = runStep('Restricting /etc/skel directory permissions', 'chmod 770 /etc/skel');
 } else {
@@ -33,10 +29,9 @@ if (is_dir('/etc/skel')) {
 }
 
 if (is_dir('/etc/seedbox')) {
-    // #TODO As above, review glob safety; keep current behavior for stability.
     $exitCodes[] = runStep(
         'Hardening /etc/seedbox content permissions',
-        'cd /etc/seedbox && chmod o-w * -R && chmod o-w .* -R'
+        'cd /etc/seedbox && find . -mindepth 1 -exec chmod -R o-w -- {} +'
     ); // not using 775 because there might be places where the perms differ and need to differ
     $exitCodes[] = runStep('Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox');
 } else {
