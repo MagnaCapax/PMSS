@@ -14,7 +14,6 @@ if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
     {
         pmssEnsureDockerRepository();
         pmssEnsureSonarrKey();
-        pmssDisableLegacySonarrRepository();
         // #TODO Provide a unified third-party repo bootstrap that accepts
         //       (name, url, suites, components, key-url/keyring) and writes a
         //       deb822 .sources file with signed-by keyring under
@@ -214,36 +213,5 @@ if (!function_exists('pmssRefreshRepositories')) {
     function pmssAutoremovePackages(): void
     {
         runStep('Removing packages no longer required', aptCmd('autoremove -y'));
-    }
-}
-if (!function_exists('pmssDisableLegacySonarrRepository')) {
-    /**
-     * Disable legacy Sonarr apt entries that cause unsigned repository errors on old hosts.
-     */
-    function pmssDisableLegacySonarrRepository(): void
-    {
-        /*
-        $files = glob('/etc/apt/sources.list.d/*.list') ?: [];
-        foreach ($files as $file) {
-            $data = @file_get_contents($file);
-            if ($data === false || stripos($file, 'sonarr') !== false || stripos((string)$data, 'apt.sonarr.tv') !== false) {
-                $backup = $file.'.pmss-backup-'.date('YmdHis');
-                @copy($file, $backup);
-                // Comment out non-comment lines
-                $lines = preg_split('/\r?\n/', (string)$data);
-                $mutated = false;
-                foreach ($lines as $i => $line) {
-                    $trim = ltrim($line);
-                    if ($trim !== '' && $trim[0] !== '#') {
-                        $lines[$i] = '# PMSS(disable, legacy Sonarr): '.$line;
-                        $mutated = true;
-                    }
-                }
-                if ($mutated) {
-                    @file_put_contents($file, implode(PHP_EOL, $lines).PHP_EOL);
-                }
-            }
-        }
-        */
     }
 }
