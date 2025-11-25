@@ -18,6 +18,7 @@ Defaults are computed conservatively with guardrails:
 - MemoryHigh ≥ 250 MiB (floor) and ~10% of total RAM by default.
 - MemoryMax = min(1.5 × MemoryHigh, 95% of total RAM).
 - CPUWeight=200, IOWeight=200, TasksMax=4096.
+- CPUQuota = 85% of Total Logical Cores (e.g., 1020% on a 12-thread system). Falls back to 600% if detection fails.
 
 You can override defaults per host/SKU via a PHP array file:
 

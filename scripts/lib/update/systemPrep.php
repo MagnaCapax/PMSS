@@ -135,6 +135,30 @@ if (!function_exists('pmssTotalMemMiB')) {
     }
 }
 
+if (!function_exists('pmssTotalCpuThreads')) {
+    /** Return total logical CPU threads. */
+    function pmssTotalCpuThreads(): int
+    {
+        $override = getenv('PMSS_TOTAL_CPU_THREADS');
+        if (is_string($override) && $override !== '' && ctype_digit($override)) {
+            return (int)$override;
+        }
+        // Robust check using /proc/cpuinfo
+        $cpuinfo = @file_get_contents('/proc/cpuinfo');
+        if ($cpuinfo !== false) {
+            $count = substr_count($cpuinfo, 'processor');
+            if ($count > 0) return $count;
+        }
+        // Fallback to nproc if available
+        $nproc = @shell_exec('nproc');
+        if ($nproc !== null) {
+            $count = (int)trim($nproc);
+            if ($count > 0) return $count;
+        }
+        return 0;
+    }
+}
+
 if (!function_exists('pmssEnsureCgroupsConfigured')) {
     /**
      * Guarantee that cgroup mounts and PID limits are configured sanely.
@@ -269,7 +293,13 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         $cpuWeight    = isset($policy['cpuWeight']) && is_numeric($policy['cpuWeight']) ? (int)$policy['cpuWeight'] : 200;
         $ioWeight     = isset($policy['ioWeight']) && is_numeric($policy['ioWeight']) ? (int)$policy['ioWeight'] : 200;
         $tasksMax     = isset($policy['tasksMax']) && is_numeric($policy['tasksMax']) ? (int)$policy['tasksMax'] : 512;
-        $cpuQuotaPct  = isset($policy['cpuQuotaPercent']) && is_numeric($policy['cpuQuotaPercent']) ? (int)$policy['cpuQuotaPercent'] : 85;
+        
+        // Calculate default CPUQuota: 85% of total logical cores (threads).
+        // Fallback to 600% (6 cores) if detection fails.
+        $cpuThreads   = pmssTotalCpuThreads();
+        $defaultQuota = ($cpuThreads > 0) ? ($cpuThreads * 85) : 600;
+        
+        $cpuQuotaPct  = isset($policy['cpuQuotaPercent']) && is_numeric($policy['cpuQuotaPercent']) ? (int)$policy['cpuQuotaPercent'] : $defaultQuota;
 
         $repl = [
             '%%USER_CGROUP_MEMORY_HIGH%%' => (string)$policyHigh,
