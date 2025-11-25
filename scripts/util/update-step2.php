@@ -128,12 +128,11 @@ pmssConfigureAptNonInteractive('logmsg');
 
 runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
 // Ensure core packaging tools are current before bootstrapping third-party repos
-runStep('Refreshing apt package index (core tools)', aptCmd('update'));
-runStep('Upgrading core packaging tools', aptCmd('install -y dpkg apt libzstd1'));
-pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
+// This is now handled by the main repo refresh + dpkg baseline to avoid redundant updates.
+$repoRefreshed = pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
 pmssAutoremovePackages();
 pmssCompletePendingDpkg();
-$dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null);
+$dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, $repoRefreshed);
 // Legacy hosts occasionally re-enable Apache during package recovery; perform
 // the stop/disable/mask sequence twice so hosts drifting between bullseye and
 // bookworm converge reliably. Success = units masked and no apache2 processes

@@ -190,24 +190,26 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
 if (!function_exists('pmssRefreshRepositories')) {
     /**
      * Apply the appropriate sources.list template and refresh indices.
+     * Returns true if apt-get update was executed.
      */
-    function pmssRefreshRepositories(string $distroName, int $distroVersion, ?callable $logger = null): void
+    function pmssRefreshRepositories(string $distroName, int $distroVersion, ?callable $logger = null): bool
     {
         pmssEnsureRepositoryPrerequisites();
         $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $logger);
         $aptUpdate = aptCmd('update');
         if ($plan['mode'] === 'reuse') {
             runStep('Refreshing apt package index (existing sources)', $aptUpdate);
-            return;
+            return true;
         }
 
         $log = pmssSelectLogger($logger);
         updateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], $log);
         runStep('Refreshing apt package index', $aptUpdate);
-    
+        
         // Touch the periodic stamp so tools like MOTD know the index is fresh
         @mkdir('/var/lib/apt/periodic', 0755, true);
         @touch('/var/lib/apt/periodic/update-success-stamp');
+        return true;
     }
 
     function pmssAutoremovePackages(): void

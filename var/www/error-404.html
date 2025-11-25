@@ -21,7 +21,7 @@
 
   <script>
     const random_index = Math.floor(Math.random() * 19) + 1;
-    const random_image = `./404_images/404-${random_index}.png`;
+    const random_image = `/404_images/404-${random_index}.png`;
 
     const imageElement = document.querySelector('img');
     imageElement.src = random_image;
@@ -30,6 +30,6 @@
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.type = 'text/css';
-    link.href = './css/error-styles.css';
+    link.href = '/css/error-styles.css';
     document.head.appendChild(link);
   </script>

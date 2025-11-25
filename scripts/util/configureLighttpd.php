@@ -40,22 +40,22 @@ foreach($users AS $thisUser) {
     # No lighttpd files yet? No matter, let's add them!
     if (!file_exists("/home/{$thisUser}/.lighttpd")) {
         passthru("cp -Rp /etc/skel/.lighttpd /home/{$thisUser}/");
-        passthru("chown {$thisUser}.{$thisUser} /home/{$thisUser}/.lighttpd -R");
+        passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd -R");
         passthru("chmod 751 /home/{$thisUser}/.lighttpd -R");
     }
     if (!file_exists("/home/{$thisUser}/.lighttpd/php.ini")) {
         passthru("cp -p /etc/skel/.lighttpd/php.ini /home/{$thisUser}/.lighttpd/php.ini");
-        passthru("chown {$thisUser}.{$thisUser} /home/{$thisUser}/.lighttpd/php.ini -R");
+        passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd/php.ini -R");
         passthru("chmod 751 /home/{$thisUser}/.lighttpd/php.ini -R");
     }
     if (!file_exists("/home/{$thisUser}/www/public")) {
         passthru("mkdir /home/{$thisUser}/www/public");
-        passthru("chown {$thisUser}.{$thisUser} /home/{$thisUser}/www/public");
+        passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/www/public");
         passthru("chmod 751 /home/{$thisUser}/www/public -R");
     }
     if (!file_exists("/home/{$thisUser}/.lighttpd/custom.d")) {
         passthru("mkdir /home/{$thisUser}/.lighttpd/custom.d");
-        passthru("chown {$thisUser}.{$thisUser} /home/{$thisUser}/.lighttpd/custom.d");
+        passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd/custom.d");
         passthru("chmod 750 /home/{$thisUser}/.lighttpd/custom.d");
     }
     
@@ -85,7 +85,7 @@ foreach($users AS $thisUser) {
     
     $thisUserConfig = str_replace(array("##username", "##serverPort", "##rclonePort", "##qbittorrentPort"), array($thisUser, $serverPort, $rclonePort, $qbittorrentPort), $template);
     file_put_contents("/home/{$thisUser}/.lighttpd.conf", $thisUserConfig);
-    passthru("chown {$thisUser}.{$thisUser} /home/{$thisUser}/.lighttpd.conf; chmod 741 /home/{$thisUser}/.lighttpd.conf");   // Set permissions
+    passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd.conf; chmod 741 /home/{$thisUser}/.lighttpd.conf");   // Set permissions
 
     
 }

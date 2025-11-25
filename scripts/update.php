@@ -800,39 +800,43 @@ function bootstrapMain(array $argv): void
         return;
     }
 
-    $workdir = createWorkdir();
+    // If we just restarted from a self-update, the new code is already staged.
+    // Skip re-fetching to avoid confusing logs and double work.
+    if (!$options['skip_self_update']) {
+        $workdir = createWorkdir();
 
-    try {
-        fetchSnapshot($spec, $workdir);
-        $spec['commit'] = $spec['type'] === 'git' ? collectCommitHash($workdir) : '';
-        stageSnapshot($workdir, $options['dry_run']);
+        try {
+            fetchSnapshot($spec, $workdir);
+            $spec['commit'] = $spec['type'] === 'git' ? collectCommitHash($workdir) : '';
+            stageSnapshot($workdir, $options['dry_run']);
 
-        $versionSpec = $spec['type'] === 'release'
-            ? 'release'.($spec['pin'] !== '' ? ':'.$spec['pin'] : '')
-            : (($spec['repo'] === DEFAULT_REPO ? 'git/'.$spec['branch'] : 'git/'.$spec['repo'].':'.$spec['branch'])
-                .($spec['pin'] !== '' ? ':'.$spec['pin'] : ''));
+            $versionSpec = $spec['type'] === 'release'
+                ? 'release'.($spec['pin'] !== '' ? ':'.$spec['pin'] : '')
+                : (($spec['repo'] === DEFAULT_REPO ? 'git/'.$spec['branch'] : 'git/'.$spec['repo'].':'.$spec['branch'])
+                    .($spec['pin'] !== '' ? ':'.$spec['pin'] : ''));
 
-        recordVersion($versionSpec, [
-            'spec_input'      => $options['spec'],
-            'spec_normalized' => $specRaw,
-            'type'            => $spec['type'],
-            'repo'            => $spec['repo'],
-            'branch'          => $spec['branch'],
-            'pin'             => $spec['pin'],
-            'commit'          => $spec['commit'] ?? '',
-        ], $options['dry_run']);
+            recordVersion($versionSpec, [
+                'spec_input'      => $options['spec'],
+                'spec_normalized' => $specRaw,
+                'type'            => $spec['type'],
+                'repo'            => $spec['repo'],
+                'branch'          => $spec['branch'],
+                'pin'             => $spec['pin'],
+                'commit'          => $spec['commit'] ?? '',
+            ], $options['dry_run']);
 
-        logEvent('snapshot_applied', [
-            'version_spec' => $versionSpec,
-            'commit'       => $spec['commit'] ?? '',
-            'dry_run'      => $options['dry_run'],
-        ]);
-    } finally {
-        cleanup($workdir);
-    }
+            logEvent('snapshot_applied', [
+                'version_spec' => $versionSpec,
+                'commit'       => $spec['commit'] ?? '',
+                'dry_run'      => $options['dry_run'],
+            ]);
+        } finally {
+            cleanup($workdir);
+        }
 
-    if (maybeSelfUpdate($argv, $options['dry_run'], $options['skip_self_update'], $originalHash)) {
-        return;
+        if (maybeSelfUpdate($argv, $options['dry_run'], $options['skip_self_update'], $originalHash)) {
+            return;
+        }
     }
 
     if ($options['scripts_only']) {

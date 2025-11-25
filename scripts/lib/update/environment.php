@@ -75,7 +75,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
      *
      * @return bool True when the baseline was parsed and applied successfully.
      */
-    function pmssApplyDpkgSelections(?int $distroVersion = null): bool
+    function pmssApplyDpkgSelections(?int $distroVersion = null, bool $skipUpdate = false): bool
     {
         $baseDir = __DIR__.'/dpkg';
         $candidates = [];
@@ -96,7 +96,9 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             return true;
         }
 
-        runStep('Refreshing apt cache before dpkg selection', aptCmd('update'));
+        if (!$skipUpdate) {
+            runStep('Refreshing apt cache before dpkg selection', aptCmd('update'));
+        }
         runStep('Refreshing dpkg availability database', 'apt-cache dumpavail | dpkg --merge-avail');
 
         $selectionPath = $selections;
