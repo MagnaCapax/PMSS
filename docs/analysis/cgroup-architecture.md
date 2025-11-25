@@ -27,7 +27,7 @@
 3.  **Docker Rootless Compatibility:**
     - We force `systemd.unified_cgroup_hierarchy=0` (v1) to support Docker Rootless on current kernels.
     - This constraints us to v1 controllers (`blkio`, `memory`, `cpu`).
-    - Our new `userCgroup.php` correctly maps `IOWeight` to `BlockIOWeight` for v1, ensuring per-user fairness works.
+    - Our new `userConfigCgroup.php` correctly maps `IOWeight` to `BlockIOWeight` for v1, ensuring per-user fairness works.
 
 ## Recommendations (Future Work)
 1.  **Tune `ionice` Priorities:**

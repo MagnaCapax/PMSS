@@ -7,7 +7,7 @@ class UserCgroupCliExplicitIoFlagsTest extends TestCase
 {
     private function runCli(array $args): string
     {
-        $cmd = 'php '.escapeshellarg(getcwd().'/scripts/util/userCgroup.php').' '.implode(' ', array_map('escapeshellarg', $args));
+        $cmd = 'php '.escapeshellarg(getcwd().'/scripts/util/userConfigCgroup.php').' '.implode(' ', array_map('escapeshellarg', $args));
         return (string)@shell_exec($cmd.' 2>&1');
     }
 

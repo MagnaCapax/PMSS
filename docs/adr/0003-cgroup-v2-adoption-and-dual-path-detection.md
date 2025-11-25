@@ -19,10 +19,10 @@ Production systems span Debian 10/11/12 with a mix of kernel capabilities. Debia
 - Root slice must be unlimited: create `/etc/systemd/system/user-0.slice.d/99-pmss-unlimited.conf` with `MemoryHigh/Max/TasksMax=infinity` and install a lightweight repair utility invoked on boot and periodically.
 - Policy overrides come from a PHP array file: `etc/seedbox/config/cgroup.policy.php`, using mount‑based IO defaults (`/` and `/home`) resolved to devices at runtime (via `findmnt`). Policy keys include memory/CPU/IO weights, `CPUQuotaPercent`, `TasksMax`, and mount IO caps (bandwidth/IOPS). Guardrails above always apply.
 - Utilities:
-  - `scripts/util/userCgroup.php` manages per‑user slice config/status with explicit flags and shorthands (device resolution by mount path such as `/home`); changes are additive; `--wipe` reverts slice.
+- `scripts/util/userConfigCgroup.php` manages per‑user slice config/status with explicit flags and shorthands (device resolution by mount path such as `/home`); changes are additive; `--wipe` reverts slice.
   - `scripts/cron/cgroupRootCheck.php` ensures root slice is unlimited (`@reboot` and periodic cron cadence).
 - Lifecycle hooks:
-  - User creation applies policy defaults: `php /scripts/util/userCgroup.php USER --apply --defaults`.
+- User creation applies policy defaults: `php /scripts/util/userConfigCgroup.php USER --apply --defaults`.
   - User termination reverts the user slice (`systemctl revert user‑UID.slice`) before removal.
 - CI/Guardrails:
   - Cgroup template lint verifies required placeholders exist in both templates.
@@ -46,7 +46,7 @@ Production systems span Debian 10/11/12 with a mix of kernel capabilities. Debia
 - Templates: provide both v1 and v2 templates with context‑first placeholders:
   - `%%USER_CGROUP_MEMORY_HIGH%%`, `%%USER_CGROUP_MEMORY_MAX%%`, `%%USER_CGROUP_CPU_WEIGHT%%`, `%%USER_CGROUP_IO_WEIGHT%%`, `%%USER_CGROUP_TASKS_MAX%%`, `%%USER_CGROUP_CPU_QUOTA%%`.
 - Policy file: `etc/seedbox/config/cgroup.policy.php` defines defaults and per‑mount IO settings; implementation resolves devices via `findmnt` in a single render pass.
-- Utilities: `userCgroup.php` (inspect/apply, shorthands, dry‑run, wipe) and `cgroupRootCheck.php` (repair).
+- Utilities: `userConfigCgroup.php` (inspect/apply, shorthands, dry‑run, wipe) and `cgroupRootCheck.php` (repair).
 - Orchestrator: `pmssEnsureCgroupsConfigured()` and `pmssEnsureSystemdSlices()` invoked from `update-step2.php` after package phase and before user/service refresh.
 - CI: add `scripts/testing/cgroup-template-lint.sh` and dev tests; advisory sharp‑edges/net‑edges lints validate safe patterns.
 

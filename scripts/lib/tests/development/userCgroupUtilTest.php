@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/util/userCgroup.php';
+require_once dirname(__DIR__, 3).'/util/userConfigCgroup.php';
 
 class UserCgroupUtilTest extends TestCase
 {
@@ -46,5 +46,12 @@ class UserCgroupUtilTest extends TestCase
         $this->assertEquals('250M', $p['MemoryHigh']);
         $this->assertEquals('500M', $p['MemoryMax']);
     }
-}
 
+    public function testComputePropsSupportsCpuQuota(): void
+    {
+        $withQuota = \computeSetProps(['memory-high'=>400,'cpu-quota-percent'=>85], 16000);
+        $this->assertEquals('85%', $withQuota['CPUQuota']);
+        $infinity = \computeSetProps(['memory-high'=>400,'cpu-quota-percent'=>0], 16000);
+        $this->assertEquals('infinity', $infinity['CPUQuota']);
+    }
+}

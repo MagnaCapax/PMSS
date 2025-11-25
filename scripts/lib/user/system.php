@@ -18,7 +18,7 @@ function userConfigureSystemdSlice(array $user): void
     // Delegate cgroup configuration to the dedicated utility.
     // This ensures v1/v2 compatibility and automatic weight calculation.
     $args = [
-        '/scripts/util/userCgroup.php',
+        '/scripts/util/userConfigCgroup.php',
         $user['name'],
         '--apply',
         '--memory-high=' . $user['memory'],
@@ -44,6 +44,9 @@ function userConfigureSystemdSlice(array $user): void
     }
     if (!empty($user['IOWriteIOPS'])) {
         $args[] = '--io-write-iops=' . $user['IOWriteIOPS'];
+    }
+    if (!empty($user['cpuQuotaPercent'])) {
+        $args[] = '--cpu-quota-percent=' . $user['cpuQuotaPercent'];
     }
 
     userRunCommand(

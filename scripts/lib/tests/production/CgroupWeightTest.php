@@ -14,7 +14,7 @@
 namespace PMSS\Tests\Production;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/util/userCgroup.php';
+require_once dirname(__DIR__, 3).'/util/userConfigCgroup.php';
 
 class CgroupWeightTest extends \PMSS\Tests\TestCase
 {
@@ -70,7 +70,7 @@ class CgroupWeightTest extends \PMSS\Tests\TestCase
             }
 
             // 6. Calculate expected weight
-            // Systemd returns bytes, userCgroup uses MiB
+            // Systemd returns bytes, userConfigCgroup uses MiB
             $ramBytes = (int)$props['MemoryHigh'];
             $ramMiB   = (int)($ramBytes / 1024 / 1024);
             

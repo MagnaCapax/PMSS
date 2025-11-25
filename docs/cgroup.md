@@ -42,8 +42,8 @@ Guardrails always apply: MemoryHigh ≥ 250 MiB; MemoryMax ≤ 95% of RAM.
 Inspect and apply limits per user:
 
 ```
-/scripts/util/userCgroup.php USER [--status] [--config]
-/scripts/util/userCgroup.php USER --apply [--dry-run] [--defaults] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:SIZED] [--io-write-bw=/dev/DEV:SIZED] [--io-read-iops=/dev/DEV:OPS] [--io-write-iops=/dev/DEV:OPS] [--wipe]
+/scripts/util/userConfigCgroup.php USER [--status] [--config]
+/scripts/util/userConfigCgroup.php USER --apply [--dry-run] [--defaults] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:SIZED] [--io-write-bw=/dev/DEV:SIZED] [--io-read-iops=/dev/DEV:OPS] [--io-write-iops=/dev/DEV:OPS] [--wipe]
 ```
 
 ### Examples (explicit)
@@ -84,7 +84,7 @@ Inspect and apply limits per user:
 ## Integration Hooks
 
 - User creation applies defaults automatically:
-  - `php /scripts/util/userCgroup.php USER --apply --defaults`
+  - `php /scripts/util/userConfigCgroup.php USER --apply --defaults`
   - #TODO: extend to apply device‑specific IO throttles when policy defines targets.
 - User termination clears slice overrides:
   - `systemctl revert user-UID.slice` before deleting OS user data.

@@ -7,7 +7,7 @@ class UserCgroupCliProfilesCombinationsTest extends TestCase
 {
     private function runCli(array $args, array $env = []): string
     {
-        $cmd = 'php '.escapeshellarg(getcwd().'/scripts/util/userCgroup.php').' '.implode(' ', array_map('escapeshellarg', $args));
+        $cmd = 'php '.escapeshellarg(getcwd().'/scripts/util/userConfigCgroup.php').' '.implode(' ', array_map('escapeshellarg', $args));
         $envExport = '';
         foreach ($env as $k=>$v) { $envExport .= $k.'='.escapeshellarg($v).' '; }
         return (string)@shell_exec($envExport.$cmd.' 2>&1');

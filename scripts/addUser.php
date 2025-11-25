@@ -121,13 +121,6 @@ runProvisionStep(
     )
 );
 
-// Apply default cgroup policy for the new user via the utility.
-// #TODO Extend to utilize strict IO BW/IOPS when policy provides device targets.
-runProvisionStep(
-    'Apply cgroup defaults',
-    sprintf('php /scripts/util/userCgroup.php %s --apply --defaults', escapeshellarg($user['name']))
-);
-
 runProvisionStep(
     'Configure lighttpd vhost',
     sprintf('/scripts/util/configureLighttpd.php %s', escapeshellarg($user['name']))
