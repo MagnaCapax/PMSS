@@ -1,3 +1,4 @@
+<?php
 if (!function_exists('dockerRootlessShellExec')) {
     function dockerRootlessShellExec(string $command): string
     {
