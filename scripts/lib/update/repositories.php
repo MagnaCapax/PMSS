@@ -173,16 +173,15 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
             ];
         }
 
+        $templates = [];
+        foreach (['jessie', 'buster', 'bullseye', 'bookworm', 'trixie'] as $suite) {
+            $templates[$suite] = loadRepoTemplate($suite, $log);
+        }
+
         return [
             'mode'         => 'update',
             'current_hash' => $currentHash,
-            'templates'    => [
-                'jessie'   => loadRepoTemplate('jessie', $log),
-                'buster'   => loadRepoTemplate('buster', $log),
-                'bullseye' => loadRepoTemplate('bullseye', $log),
-                'bookworm' => loadRepoTemplate('bookworm', $log),
-                'trixie'   => loadRepoTemplate('trixie', $log),
-            ],
+            'templates'    => $templates,
         ];
     }
 }
