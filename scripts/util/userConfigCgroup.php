@@ -194,6 +194,7 @@ function pmssUserConfigCgroupMain(array $argv): int {
     $respectExisting = in_array('--respect-existing', $flags, true);
     $device = '';
     $ioProfile = '';
+    $hasIoFlag = false;
     foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile','--cpu-quota-percent'] as $k) {
         foreach ($flags as $i => $f) {
             if (strpos($f, $k.'=') === 0) {
@@ -207,10 +208,6 @@ function pmssUserConfigCgroupMain(array $argv): int {
             }
         }
     }
-    // Default view when no action flags are provided
-    $hasIoFlag = false; // track IO-only operations
-    if (!$wantStatus && !$wantConfig && empty($opt)) { $wantStatus = $wantConfig = true; }
-
     // Support --defaults to apply policy-derived defaults
     $useDefaults = in_array('--defaults', $flags, true);
     if ($useDefaults) {
@@ -320,6 +317,12 @@ function pmssUserConfigCgroupMain(array $argv): int {
                 if (!isset($opt['tasks-max'])) { $opt['tasks-max'] = '8192'; }
                 break;
         }
+    }
+
+    // Default view when no change flags are present
+    if (!$wantStatus && !$wantConfig) {
+        $hasPlanInput = !empty($opt) || !empty($ioPairs) || $device !== '' || $ioProfile !== '' || $hasIoFlag || in_array('--wipe', $flags, true);
+        if (!$hasPlanInput) { $wantStatus = $wantConfig = true; }
     }
 
     // Compute final properties after all profile expansions
