@@ -4,6 +4,39 @@
 
 //echo date('Y-m-d H:i:s') . ': Re-creating Lighttpd configuration' . "\n";
 
+function pmssDetectDebianVersion(): int
+{
+    $path = getenv('PMSS_OS_RELEASE_PATH');
+    if ($path === false || $path === '') {
+        $path = '/etc/os-release';
+    }
+    if (!is_readable($path)) {
+        return 0;
+    }
+    $data = @file_get_contents($path);
+    if ($data === false) {
+        return 0;
+    }
+    if (preg_match('/^VERSION_ID=\"?([0-9]+)/m', $data, $matches)) {
+        return (int) $matches[1];
+    }
+    return 0;
+}
+
+function pmssNormalizeCompressionConfig(string $template, int $distroVersion): string
+{
+    // Debian 11/12 ship mod_deflate; compress.* triggers deprecation on bookworm.
+    if ($distroVersion < 11) {
+        return $template;
+    }
+
+    return str_replace(
+        array('compress.cache-dir', 'compress.filetype', '"mod_compress"'),
+        array('deflate.cache-dir', 'deflate.mimetypes', '"mod_deflate"'),
+        $template
+    );
+}
+
 $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
 if (count($users) == 0) die("No users setup - nothing to do\n");
@@ -23,6 +56,7 @@ if (!file_exists($portsDirectory))  {
 }
 if (!file_exists('/root/backups')) `mkdir /root/backups`;
 $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
+$template = pmssNormalizeCompressionConfig($template, pmssDetectDebianVersion());
 $userConfig = '';
 
 foreach($users AS $thisUser) {
@@ -57,6 +91,18 @@ foreach($users AS $thisUser) {
         passthru("mkdir /home/{$thisUser}/.lighttpd/custom.d");
         passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd/custom.d");
         passthru("chmod 750 /home/{$thisUser}/.lighttpd/custom.d");
+    }
+    $uploadDir = "/home/{$thisUser}/.lighttpd/upload";
+    if (!is_dir($uploadDir)) {
+        passthru("mkdir -p {$uploadDir}");
+        passthru("chown {$thisUser}:{$thisUser} {$uploadDir}");
+        passthru("chmod 751 {$uploadDir}");
+    }
+    $compressDir = "/home/{$thisUser}/.lighttpd/compress";
+    if (!is_dir($compressDir)) {
+        passthru("mkdir -p {$compressDir}");
+        passthru("chown {$thisUser}:{$thisUser} {$compressDir}");
+        passthru("chmod 751 {$compressDir}");
     }
     
     //Backup old one

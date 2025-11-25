@@ -92,34 +92,41 @@ function pmssOwnAndRestrictDirectory(string $path, string $message, string $comm
     $exitCodes[] = runStep($message, $command);
 }
 
+// Table-driven to keep skeleton/config hardening steps aligned and avoid drift.
+$permissionTargets = [
+    '/etc/skel' => [
+        'content'   => ['Hardening /etc/skel content permissions', 'cd /etc/skel && find . -mindepth 1 -exec chmod -R o-w -- {} +'],
+        'directory' => ['Restricting /etc/skel directory permissions', 'chmod 770 /etc/skel'],
+        'files'     => ['Removing other permissions from /etc/skel files', "find /etc/skel -type f -exec chmod o-rwx -- {} +"],
+    ],
+    '/etc/seedbox' => [
+        'content'   => ['Hardening /etc/seedbox content permissions', 'cd /etc/seedbox && find . -mindepth 1 -exec chmod -R o-w -- {} +'],
+        'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox'],
+        'files'     => ['Removing other permissions from /etc/seedbox files', "find /etc/seedbox -type f -exec chmod o-rwx -- {} +"],
+    ],
+];
+
 $exitCodes = [];
 
-pmssHardenDirectoryPermissions(
-    '/etc/skel',
-    'Hardening /etc/skel content permissions',
-    'cd /etc/skel && find . -mindepth 1 -exec chmod -R o-w -- {} +',
-    'Restricting /etc/skel directory permissions',
-    'chmod 770 /etc/skel',
-    $exitCodes
-); // not using 775 because there might be places where the perms differ and need to differ
-
-pmssHardenDirectoryPermissions(
-    '/etc/seedbox',
-    'Hardening /etc/seedbox content permissions',
-    'cd /etc/seedbox && find . -mindepth 1 -exec chmod -R o-w -- {} +',
-    'Ensuring /etc/seedbox is traversable',
-    'chmod o+x /etc/seedbox',
-    $exitCodes
-); // not using 775 because there might be places where the perms differ and need to differ
-
-pmssEnsureRootOwnership('/etc/skel', $exitCodes);
-pmssEnsureRootOwnership('/etc/seedbox', $exitCodes);
-
-if (is_dir('/etc/skel')) {
-    $exitCodes[] = runStep('Removing other permissions from /etc/skel files', "find /etc/skel -type f -exec chmod o-rwx -- {} +");
+foreach ($permissionTargets as $path => $target) {
+    pmssHardenDirectoryPermissions(
+        $path,
+        $target['content'][0],
+        $target['content'][1],
+        $target['directory'][0],
+        $target['directory'][1],
+        $exitCodes
+    ); // not using 775 because there might be places where the perms differ and need to differ
 }
-if (is_dir('/etc/seedbox')) {
-    $exitCodes[] = runStep('Removing other permissions from /etc/seedbox files', "find /etc/seedbox -type f -exec chmod o-rwx -- {} +");
+
+foreach ($permissionTargets as $path => $target) {
+    pmssEnsureRootOwnership($path, $exitCodes);
+}
+
+foreach ($permissionTargets as $path => $target) {
+    if (is_dir($path)) {
+        $exitCodes[] = runStep($target['files'][0], $target['files'][1]);
+    }
 }
 
 // Setup openvpn config perms

@@ -130,7 +130,6 @@ runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-b
 // Ensure core packaging tools are current before bootstrapping third-party repos
 // This is now handled by the main repo refresh + dpkg baseline to avoid redundant updates.
 $repoRefreshed = pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
-pmssAutoremovePackages();
 pmssCompletePendingDpkg();
 $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, $repoRefreshed);
 // Legacy hosts occasionally re-enable Apache during package recovery; perform
@@ -152,7 +151,7 @@ if ($repoLogMessage !== '') {
 if (!$dpkgBaselineOk) {
     logmsg('[WARN] Dpkg baseline application reported issues; attempting recovery');
     runStep('Attempting apt fix-broken install (dpkg baseline recovery)', aptCmd('--fix-broken install -y'));
-    $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null);
+    $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true);
     if (!$dpkgBaselineOk) {
         logmsg('[ERROR] Dpkg baseline still failing after recovery attempt; continuing with caution');
         pmssLogJson(['event' => 'package_phase', 'status' => 'warn', 'reason' => 'dpkg_baseline']);
@@ -161,17 +160,11 @@ if (!$dpkgBaselineOk) {
 
 require_once __DIR__.'/../lib/update/users.php';
 
-// Refresh repositories and install queued packages before any other orchestration.
-pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
-pmssAutoremovePackages();
 // #TODO Finish migration: once dpkg baselines cover all apps on all hosts,
 //       replace queued installs with a diff-summary report and remove the
 //       per-app package queue entirely.
 include_once '/scripts/lib/update/apps/packages.php';
 pmssFlushPackageQueue();
-pmssAutoremovePackages();
-runStep('Attempting apt fix-broken install (post-queue)', aptCmd('--fix-broken install -y'));
-pmssAutoremovePackages();
 
 $packageWarnings = (int) (getenv('PMSS_PACKAGE_INSTALL_WARNINGS') ?: 0);
 $packageErrors   = (int) (getenv('PMSS_PACKAGE_INSTALL_ERRORS') ?: 0);

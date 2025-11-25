@@ -15,6 +15,32 @@
  *   - User lighttpd process launched; script prints `ps` output for visibility.
  */
 
+function pmssEnsureUserDir(string $user, string $dir): void
+{
+    if (is_dir($dir)) {
+        return;
+    }
+    $cmd = sprintf(
+        "su %s -c %s",
+        escapeshellarg($user),
+        escapeshellarg('mkdir -p '.escapeshellarg($dir))
+    );
+    passthru($cmd);
+}
+
+function pmssClearSocketFiles(string $pattern): void
+{
+    $sockets = glob($pattern);
+    if ($sockets === false) {
+        return;
+    }
+    foreach ($sockets as $socket) {
+        if (is_file($socket) || is_link($socket)) {
+            @unlink($socket);
+        }
+    }
+}
+
 if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
 $user = $argv[1];
 
@@ -23,16 +49,14 @@ if (!file_exists('/home/' . $user)) die("Invalid username\n");
 if (!is_dir('/home/' . $user)) die("User home is not a directory!\n");
 if (!file_exists('/home/' . $user . '/.lighttpd.conf')) die("User does not have lighttpd configuration - lighttpd maybe disabled\n");
 
-// Check if session directory exists - if not create it
-if (!file_exists('/home/' . $user . '/.lighttpd')) {
-	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd'");
-	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd/compress'");
-}
+$lighttpdDir = '/home/'.$user.'/.lighttpd';
+$compressDir = $lighttpdDir.'/compress';
+$uploadDir   = $lighttpdDir.'/upload';
 
-// Surprisingly often it seems users delete this directory these days.
-if (!file_exists('/home/' . $user . '/.lighttpd/upload')) {
-	passthru("cd /home/{$user}; su {$user} -c 'mkdir .lighttpd/upload'");
-}
+pmssEnsureUserDir($user, $lighttpdDir);
+pmssEnsureUserDir($user, $compressDir);
+pmssEnsureUserDir($user, $uploadDir);
+pmssClearSocketFiles($lighttpdDir.'/php.socket*');
 
 passthru("cd /home/{$user}; su {$user} -c '/usr/sbin/lighttpd -f /home/{$user}/.lighttpd.conf'");	// This is for newer versions
 
