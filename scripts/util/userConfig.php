@@ -17,7 +17,7 @@ require_once '/scripts/lib/user/integrations.php';
 require_once '/scripts/lib/user/system.php';
 require_once '/scripts/lib/user/helpers.php';
 
-$usage = 'Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT=1000] [IOWEIGHT=1000] [CPUQUOTAPCT]';
+$usage = 'Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT]';
 if (empty($argv[1]) || empty($argv[2]) || empty($argv[3])) {
     die('need user name. '.$usage."\n");
 }
@@ -34,7 +34,7 @@ $user = [
     'IOWriteBW'   => isset($argv[8]) ? $argv[8] : null,
     'IOReadIOPS'  => isset($argv[9]) ? $argv[9] : null,
     'IOWriteIOPS' => isset($argv[10]) ? $argv[10] : null,
-    'cpuQuotaPercent' => isset($argv[11]) ? (int) $argv[11] : 0,
+    'cpuQuotaPercent' => isset($argv[11]) ? $argv[11] : 0,
 ];
 
 // Safely get the user ID
