@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 set -o errtrace
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+source "$ROOT/scripts/cli/lib/codex-common.sh"
+
 # Optional debug: PMSS_CI_CODEX_DEBUG=1 enables bash -x tracing
-if [[ "${PMSS_CI_CODEX_DEBUG:-0}" == "1" ]]; then
-	export PS4='[ci-codex:trace] '
-	set -x
-fi
+codex_enable_debug PMSS_CI_CODEX_DEBUG "ci-codex"
 
-# Predeclare for shellcheck: assigned in trap context
-rc=0
-
-trap 'rc=$?; echo "[ci-codex] ERROR rc=$rc at line $LINENO while: $BASH_COMMAND" >&1' ERR
+codex_set_error_trap "ci-codex"
 
 echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 
@@ -32,8 +31,6 @@ echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 #    First read AGENTS.md, docs, and ADRs to understand the rails, and double
 #    check TODOs before any code changes. Maintain PHP 7.3 compatibility."
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/../.." && pwd)"
 # Create a throwaway workspace under the system temp dir (avoid repo clutter)
 TMP="${TMPDIR:-/tmp}"
 OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
@@ -165,7 +162,7 @@ for attempt in {1..10}; do
 		:
 	fi
 	art_count=$(find "$ARTDIR" -type f 2>/dev/null | wc -l | tr -d ' ')
-	if [[ "$art_count" -gt 0 || "$status" == "completed" && $attempt -ge 3 ]]; then
+	if [[ "$art_count" -gt 0 || $attempt -ge 10 ]]; then
 		break
 	fi
 	echo "[ci-codex] artifacts not ready (attempt $attempt); waiting…" >&1
@@ -206,30 +203,33 @@ else
 fi
 nonempty_logs=0
 for attempt in {1..10}; do
-	nonempty_logs=0
-	for jl in "$OUTDIR"/job-*.log "$JOBLOG"; do
-		[[ -s "$jl" ]] && nonempty_logs=$((nonempty_logs + 1))
-	done
-	if [[ $nonempty_logs -gt 0 || "$status" == "completed" && $attempt -ge 3 ]]; then
-		break
-	fi
-	echo "[ci-codex] job logs not ready (attempt $attempt); waiting…" >&1
-	sleep 5
-	# re-fetch to refresh
+	# Refresh logs each pass; sometimes GitHub needs extra time to make them available.
 	if [[ -n "$job_name" ]]; then
 		fetch_job_log "$job_name" "$JOBLOG"
 	else
 		fetch_job_log "build" "$OUTDIR/job-build.log"
 		fetch_job_log "smoke" "$OUTDIR/job-smoke.log"
 	fi
+
+	nonempty_logs=$(codex_count_nonempty_files "$OUTDIR"/job-*.log "$JOBLOG")
+	if [[ $nonempty_logs -gt 0 || $attempt -ge 10 ]]; then
+		break
+	fi
+	echo "[ci-codex] job logs not ready (attempt $attempt); waiting…" >&1
+	sleep 5
 done
 echo "[ci-codex] job logs present: $nonempty_logs file(s)" >&1
 
 echo "[ci-codex] fetching full run log" >&1
-fetch_run_log "$RUNLOG"
-if [[ ! -s "$RUNLOG" ]]; then
-	echo "[ci-codex] WARNING: full run log is empty; check gh auth/network" >&1
-fi
+for attempt in {1..5}; do
+	fetch_run_log "$RUNLOG"
+	if [[ -s "$RUNLOG" || $attempt -ge 5 ]]; then
+		break
+	fi
+	echo "[ci-codex] run log not ready (attempt $attempt); waiting…" >&1
+	sleep 3
+done
+[[ -s "$RUNLOG" ]] || echo "[ci-codex] WARNING: full run log is empty; check gh auth/network" >&1
 
 # If nothing was retrieved, fail fast so callers notice missing QA context.
 any_logs=0

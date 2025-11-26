@@ -2,16 +2,14 @@
 set -euo pipefail
 set -o errtrace
 
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+source "$ROOT/scripts/cli/lib/codex-common.sh"
+
 # Optional debug: PMSS_REFACTOR_CODEX_DEBUG=1 enables bash -x tracing.
-if [[ "${PMSS_REFACTOR_CODEX_DEBUG:-0}" == "1" ]]; then
-	export PS4='[refactor-codex:trace] '
-	set -x
-fi
+codex_enable_debug PMSS_REFACTOR_CODEX_DEBUG "refactor-codex"
 
-# Predeclare for shellcheck: assigned in trap context.
-rc=0
-
-trap 'rc=$?; echo "[refactor-codex] ERROR rc=$rc at line $LINENO while: $BASH_COMMAND" >&1' ERR
+codex_set_error_trap "refactor-codex"
 
 echo "[refactor-codex] start: assembling refactor context and invoking assistant" >&1
 
@@ -24,9 +22,6 @@ echo "[refactor-codex] start: assembling refactor context and invoking assistant
 #   scripts/cli/refactor-codex.sh --target scripts/lib/update # narrow scope to a subtree
 #   scripts/cli/refactor-codex.sh --prompt "text..."         # use custom high-level prompt text
 #   scripts/cli/refactor-codex.sh --exec 'codex'             # send prompt to Codex CLI directly
-
-HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/../.." && pwd)"
 
 TMP="${TMPDIR:-/tmp}"
 OUTDIR="$(mktemp -d "${TMP%/}/pmss-refactor-codex-XXXXXXXX")"
