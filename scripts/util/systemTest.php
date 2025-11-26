@@ -12,7 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/openvpn.php';
-require_once __DIR__.'/../lib/cli/OptionParser.php';
+require_once __DIR__.'/../lib/cli/optionParser.php';
 
 /**
  * Execute a command and return trimmed output.

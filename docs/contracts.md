@@ -335,7 +335,7 @@ Class `rtorrentConfig`
 
 ---
 
-## CLI Option Parser – `scripts/lib/cli/OptionParser.php`
+## CLI Option Parser – `scripts/lib/cli/optionParser.php`
 
 - pmssParseCliTokens(array $argv): array
   - Output: `['options' => array, 'arguments' => array]` supporting GNU long options and short flags with or without values.

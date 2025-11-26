@@ -17,7 +17,7 @@
  *                        already present on the slice. Intended for safe updates.
  */
 
-require_once __DIR__.'/../lib/cli/OptionParser.php';
+require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 

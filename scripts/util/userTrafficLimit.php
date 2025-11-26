@@ -9,7 +9,7 @@
 # TODO Comment steps better
 # TODO Make common command variables parser which has more optional settings like --bandwidth 100M
 
-require_once '/scripts/lib/cli/OptionParser.php';
+require_once '/scripts/lib/cli/optionParser.php';
 
 $usage = 'Usage: ./userTrafficLimit.php --user=<username> --limit=<MiB>'; 
 $parsed = pmssParseCliTokens($argv);
