@@ -110,32 +110,31 @@ function calculateCgroupWeightFromMemory(int $memoryMiB): int {
 function computeSetProps(array $opts, int $sysMemMiB): array {
     $props = [];
     $minHigh = 250;
+    $memoryHighMiB = null;
+    $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB * 0.95) : PHP_INT_MAX;
 
     if (isset($opts['memory-high'])) {
-        $memoryHigh = max($minHigh, (int)$opts['memory-high']);
-        $props['MemoryHigh'] = $memoryHigh.'M';
+        $memoryHighMiB = max($minHigh, (int)$opts['memory-high']);
+        $props['MemoryHigh'] = $memoryHighMiB.'M';
     }
 
     if (isset($opts['memory-max'])) {
-        $defaultHigh = max($minHigh, (int)($sysMemMiB*0.10));
-        $high = isset($props['MemoryHigh']) ? (int)rtrim($props['MemoryHigh'],'M') : $defaultHigh;
-        if (!isset($props['MemoryHigh'])) { $props['MemoryHigh'] = $high.'M'; }
-        $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB*0.95) : PHP_INT_MAX;
+        if ($memoryHighMiB === null) {
+            $memoryHighMiB = max($minHigh, (int)($sysMemMiB*0.10));
+            $props['MemoryHigh'] = $memoryHighMiB.'M';
+        }
         $memoryMax = (int)$opts['memory-max'];
-        $memoryMax = max($high, min($memoryMax, $maxCap));
+        $memoryMax = max($memoryHighMiB, min($memoryMax, $maxCap));
         $props['MemoryMax'] = $memoryMax.'M';
-    } elseif (isset($props['MemoryHigh'])) {
-        $high = (int)rtrim($props['MemoryHigh'],'M');
-        $maxCap = $sysMemMiB > 0 ? (int)floor($sysMemMiB*0.95) : PHP_INT_MAX;
-        $memoryMax = min((int)floor($high*1.5), $maxCap);
+    } elseif ($memoryHighMiB !== null) {
+        $memoryMax = min((int)floor($memoryHighMiB*1.5), $maxCap);
         $props['MemoryMax'] = $memoryMax.'M';
     }
 
     // Derive weights from RAM if not explicitly set
     $derivedWeight = null;
-    if (isset($props['MemoryHigh'])) {
-        $ram = (int)rtrim($props['MemoryHigh'], 'M');
-        $derivedWeight = calculateCgroupWeightFromMemory($ram);
+    if ($memoryHighMiB !== null) {
+        $derivedWeight = calculateCgroupWeightFromMemory($memoryHighMiB);
     }
 
     if (isset($opts['cpu-weight'])) {
