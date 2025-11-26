@@ -103,25 +103,27 @@ function pmssClampMemoryLimit(int $memoryMiB): int
     return $bounded;
 }
 
-function pmssTotalCpuThreads(): int
-{
-    $override = getenv('PMSS_TOTAL_CPU_THREADS');
-    if (is_string($override) && $override !== '' && ctype_digit($override)) {
-        return (int)$override;
+if (!function_exists('pmssTotalCpuThreads')) {
+    function pmssTotalCpuThreads(): int
+    {
+        $override = getenv('PMSS_TOTAL_CPU_THREADS');
+        if (is_string($override) && $override !== '' && ctype_digit($override)) {
+            return (int)$override;
+        }
+        // Robust check using /proc/cpuinfo
+        $cpuinfo = @file_get_contents('/proc/cpuinfo');
+        if ($cpuinfo !== false) {
+            $count = substr_count($cpuinfo, 'processor');
+            if ($count > 0) return $count;
+        }
+        // Fallback to nproc if available
+        $nproc = @shell_exec('nproc');
+        if ($nproc !== null) {
+            $count = (int)trim($nproc);
+            if ($count > 0) return $count;
+        }
+        return 1; // Minimal fallback
     }
-    // Robust check using /proc/cpuinfo
-    $cpuinfo = @file_get_contents('/proc/cpuinfo');
-    if ($cpuinfo !== false) {
-        $count = substr_count($cpuinfo, 'processor');
-        if ($count > 0) return $count;
-    }
-    // Fallback to nproc if available
-    $nproc = @shell_exec('nproc');
-    if ($nproc !== null) {
-        $count = (int)trim($nproc);
-        if ($count > 0) return $count;
-    }
-    return 1; // Minimal fallback
 }
 
 function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
