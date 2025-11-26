@@ -1,4 +1,3 @@
-#!/usr/bin/php
 <?php
 /**
  * Display comprehensive resource limits for all users.
@@ -18,12 +17,17 @@ if ($usersRaw === null || trim($usersRaw) === '') {
 }
 $users = explode("\n", trim($usersRaw));
 
-// Table Headers
-printf(
-    "%-15s %-8s %-8s %-8s %-10s %-10s %-12s %-12s %-12s %-12s\n",
-    "User", "MemHigh", "MemMax", "CPUWt", "CPUQuota", "IOWt", "ReadBW", "WriteBW", "ReadIOPS", "WriteIOPS"
-);
-echo str_repeat("-", 120) . "\n";
+$options = getopt("", ["jsonl"]);
+$outputJsonl = isset($options['jsonl']);
+
+if (!$outputJsonl) {
+    // Table Headers
+    printf(
+        "%-15s %-8s %-8s %-8s %-10s %-10s %-12s %-12s %-12s %-12s\n",
+        "User", "MemHigh", "MemMax", "CPUWt", "CPUQuota", "IOWt", "ReadBW", "WriteBW", "ReadIOPS", "WriteIOPS"
+    );
+    echo str_repeat("-", 120) . "\n";
+}
 
 foreach ($users as $user) {
     $user = trim($user);
@@ -32,22 +36,40 @@ foreach ($users as $user) {
     $info = posix_getpwnam($user);
     if (!$info) continue;
 
-    $slice = "user-" . $info['uid'] . ".slice";
+    $slice = "user-{$info['uid']}.slice";
     $props = getSliceProperties($slice);
 
-    printf(
-        "%-15s %-8s %-8s %-8s %-10s %-10s %-12s %-12s %-12s %-12s\n",
-        substr($user, 0, 15),
-        formatBytes($props['MemoryHigh']),
-        formatBytes($props['MemoryMax']),
-        $props['CPUWeight'] !== '[not set]' ? $props['CPUWeight'] : '-',
-        formatCpuQuota($props),
-        $props['IOWeight'] !== '[not set]' ? $props['IOWeight'] : '-',
-        formatBytes($props['IOReadBandwidthMax']),
-        formatBytes($props['IOWriteBandwidthMax']),
-        formatIOPS($props['IOReadIOPSMax']),
-        formatIOPS($props['IOWriteIOPSMax'])
-    );
+    $resourceData = [
+        'user' => $user,
+        'uid' => $info['uid'],
+        'memory_high' => parseBytes($props['MemoryHigh']),
+        'memory_max' => parseBytes($props['MemoryMax']),
+        'cpu_weight' => ($props['CPUWeight'] !== '[not set]') ? (int)$props['CPUWeight'] : null,
+        'cpu_quota_percent' => parseCpuQuota($props, true),
+        'io_weight' => ($props['IOWeight'] !== '[not set]') ? (int)$props['IOWeight'] : null,
+        'io_read_bandwidth' => parseBytes($props['IOReadBandwidthMax']),
+        'io_write_bandwidth' => parseBytes($props['IOWriteBandwidthMax']),
+        'io_read_iops' => parseIOPS($props['IOReadIOPSMax'], true),
+        'io_write_iops' => parseIOPS($props['IOWriteIOPSMax'], true),
+    ];
+
+    if ($outputJsonl) {
+        echo json_encode($resourceData) . "\n";
+    } else {
+        printf(
+            "%-15s %-8s %-8s %-8s %-10s %-10s %-12s %-12s %-12s %-12s\n",
+            substr($user, 0, 15),
+            formatBytes($props['MemoryHigh']),
+            formatBytes($props['MemoryMax']),
+            $resourceData['cpu_weight'] ?? '-',
+            formatCpuQuota($props, false),
+            $resourceData['io_weight'] ?? '-',
+            formatBytes($props['IOReadBandwidthMax']),
+            formatBytes($props['IOWriteBandwidthMax']),
+            formatIOPS($props['IOReadIOPSMax'], false),
+            formatIOPS($props['IOWriteIOPSMax'], false)
+        );
+    }
 }
 
 function getSliceProperties(string $slice): array {
@@ -96,27 +118,53 @@ function formatBytes($val): string {
     return round($bytes, 1) . $units[$pow];
 }
 
-function formatCpuQuota(array $props): string {
+function parseBytes($val): ?int {
+    if ($val === '[not set]') return null;
+    $bytes = (int)$val;
+    if ($bytes === 0) return null;
+    return $bytes;
+}
+
+function formatCpuQuota(array $props, bool $forJson = false): string {
+    $quota = parseCpuQuota($props, true); // Get raw value for consistent parsing
+    if ($quota === null) {
+        return $forJson ? 'null' : '-';
+    }
+    return $quota . '%';
+}
+
+function parseCpuQuota(array $props, bool $raw = false): ?int {
     // Try straightforward v2 property first
     if ($props['CPUQuota'] !== '[not set]') {
-        return $props['CPUQuota'];
+        $val = $props['CPUQuota'];
+        if (strpos($val, '%') !== false) {
+            return (int)round((float)$val);
+        }
     }
     // Try calculating from period
     if ($props['CPUQuotaPerSecUSec'] !== '[not set]' && $props['CPUQuotaPeriodUSec'] !== '[not set]') {
          $p = (int)$props['CPUQuotaPeriodUSec'];
          if ($p > 0) {
-             $pct = round(((int)$props['CPUQuotaPerSecUSec'] / $p) * 100);
-             return $pct . '%';
+             return (int)round(((int)$props['CPUQuotaPerSecUSec'] / $p) * 100);
          }
     }
-    return '-';
+    return null;
 }
 
-function formatIOPS($val): string {
-    if ($val === '[not set]') return '-';
-    // Systemd returns "Device Node Path Value", we just want Value? 
-    // Actually systemd IO props are often "path value", e.g. "/dev/sda 100".
-    // If multiple devices, it might be multiline or space separated.
-    // For simple display, we'll just show "set" or the raw string if short.
-    return (strlen($val) > 10) ? 'Yes' : $val;
+function formatIOPS($val, bool $forJson = false): string {
+    $iops = parseIOPS($val, true);
+    if ($iops === null) {
+        return $forJson ? 'null' : '-';
+    }
+    return (string)$iops;
+}
+
+function parseIOPS($val, bool $raw = false): ?int {
+    if ($val === '[not set]') return null;
+    // systemd IO props are often "path value", e.g. "/dev/sda 100".
+    // For JSON, we want the numeric value.
+    if (preg_match('/([0-9]+)$/', $val, $matches)) {
+        return (int)$matches[1];
+    }
+    return null;
 }
