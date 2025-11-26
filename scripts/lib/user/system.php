@@ -45,8 +45,13 @@ function userConfigureSystemdSlice(array $user): void
     if (!empty($user['IOWriteIOPS'])) {
         $args[] = '--io-write-iops=' . $user['IOWriteIOPS'];
     }
-    if (!empty($user['cpuQuotaPercent'])) {
-        $args[] = '--cpu-quota-percent=' . $user['cpuQuotaPercent'];
+    if (array_key_exists('cpuQuotaPercent', $user) && $user['cpuQuotaPercent'] !== '' && $user['cpuQuotaPercent'] !== null) {
+        $quotaVal = $user['cpuQuotaPercent'];
+        $quotaLabel = (is_string($quotaVal) && strtolower((string)$quotaVal) === 'infinity')
+            ? 'infinity'
+            : $quotaVal.'%';
+        echo 'Applying CPU quota: '.$quotaLabel."\n";
+        $args[] = '--cpu-quota-percent=' . $quotaVal;
     }
 
     userRunCommand(

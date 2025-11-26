@@ -33,6 +33,24 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
         $this->assertTrue(strpos($out, 'CPUQuota=85%') !== false, 'CPUQuota percent not expanded');
     }
 
+    public function testCpuQuotaInfinityPreserved(): void
+    {
+        $cfgDir = $this->tempDir('cfginf');
+        $drop   = $this->tempDir('dropinf');
+        $tpl = "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n";
+        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
+        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
+        file_put_contents($cfgDir.'/cgroup.policy.php', "<?php return ['cpuQuotaPercent'=>'infinity'];\n");
+
+        putenv('PMSS_CGROUP_MODE=v2');
+        putenv('PMSS_CONFIG_DIR='.$cfgDir);
+        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
+        putenv('PMSS_TOTAL_MEM_MIB=2048');
+        \pmssEnsureSystemdSlices('logmsg');
+        $out = (string)file_get_contents($drop.'/15-pmss.conf');
+        $this->assertTrue(strpos($out, 'CPUQuota=infinity') !== false, 'CPUQuota infinity not rendered');
+    }
+
     public function testMountPolicyAppendsIoLinesWhenResolvable(): void
     {
         $cfgDir = $this->tempDir('cfg2');
@@ -58,4 +76,3 @@ PHP;
         $this->assertTrue(strpos($out, 'IOWriteBandwidthMax=') !== false);
     }
 }
-

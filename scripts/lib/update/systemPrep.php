@@ -299,7 +299,15 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         $cpuThreads   = pmssTotalCpuThreads();
         $defaultQuota = ($cpuThreads > 0) ? ($cpuThreads * 85) : 600;
         
-        $cpuQuotaPct  = isset($policy['cpuQuotaPercent']) && is_numeric($policy['cpuQuotaPercent']) ? (int)$policy['cpuQuotaPercent'] : $defaultQuota;
+        $cpuQuotaVal = $defaultQuota;
+        if (isset($policy['cpuQuotaPercent'])) {
+            $pVal = $policy['cpuQuotaPercent'];
+            if (is_string($pVal) && strtolower($pVal) === 'infinity') {
+                $cpuQuotaVal = 'infinity';
+            } elseif (is_numeric($pVal)) {
+                $cpuQuotaVal = (int)$pVal;
+            }
+        }
 
         $repl = [
             '%%USER_CGROUP_MEMORY_HIGH%%' => (string)$policyHigh,
@@ -307,7 +315,7 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
             '%%USER_CGROUP_CPU_WEIGHT%%'  => (string)$cpuWeight,
             '%%USER_CGROUP_IO_WEIGHT%%'   => (string)$ioWeight,
             '%%USER_CGROUP_TASKS_MAX%%'   => (string)$tasksMax,
-            '%%USER_CGROUP_CPU_QUOTA%%'   => (string)$cpuQuotaPct.'%',
+            '%%USER_CGROUP_CPU_QUOTA%%'   => ($cpuQuotaVal === 'infinity') ? 'infinity' : $cpuQuotaVal.'%',
         ];
         $raw = (string)@file_get_contents($tpl);
         foreach ($repl as $k => $v) { $raw = str_replace($k, $v, $raw); }
