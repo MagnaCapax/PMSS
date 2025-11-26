@@ -82,6 +82,10 @@ jobs:
         run: |
           bash scripts/testing/short-open-tag-lint.sh || true
 
+      - name: Open tag presence lint
+        run: |
+          bash scripts/testing/open-tag-lint.sh
+
       - name: Cgroup template lint
         run: |
           bash scripts/testing/cgroup-template-lint.sh

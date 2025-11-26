@@ -34,9 +34,8 @@ while(1==1) {
   sleep(5); // avoid overloading the server
 
   $lastRun = file_get_contents('.rtorrentExecuteRun');
-  if ( (time() - $lastRun) < 60 ) die(writeLog('There as another executor running, exiting... or we are in infinite restart loop') );
+  if ( (time() - $lastRun) < 15 ) die(writeLog('There as another executor running, exiting... or we are in infinite restart loop') );
 
   
 }
-
 

@@ -29,6 +29,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     $pid = null;
     
     $instances = shell_exec('pgrep -u ' . $escapedUser . ' -f rtorrentExecute.php');
+    $rtorrentMain = trim((string)shell_exec('pgrep -u ' . $escapedUser . ' -x rtorrent'));
     //echo "Instances:\n{$instances}\n";
 
     // Let's check socket file
@@ -40,8 +41,17 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     }
 
     if(empty($instances)) {    // No instances at all? Ok time to start rTorrent!
+        if (!empty($rtorrentMain)) {
+            echo "rTorrent running for user {$thisUser} but executor missing; skip duplicate start\n";
+            continue;
+        }
         start($thisUser);
         #TODO(user-logs): record restart in per-user log
+        continue;
+    }
+    if (empty($rtorrentMain)) {
+        echo "Executor present but rTorrent missing for user {$thisUser}; restarting\n";
+        start($thisUser);
         continue;
     }
    
