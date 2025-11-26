@@ -103,6 +103,27 @@ function pmssClampMemoryLimit(int $memoryMiB): int
     return $bounded;
 }
 
+function pmssTotalCpuThreads(): int
+{
+    $override = getenv('PMSS_TOTAL_CPU_THREADS');
+    if (is_string($override) && $override !== '' && ctype_digit($override)) {
+        return (int)$override;
+    }
+    // Robust check using /proc/cpuinfo
+    $cpuinfo = @file_get_contents('/proc/cpuinfo');
+    if ($cpuinfo !== false) {
+        $count = substr_count($cpuinfo, 'processor');
+        if ($count > 0) return $count;
+    }
+    // Fallback to nproc if available
+    $nproc = @shell_exec('nproc');
+    if ($nproc !== null) {
+        $count = (int)trim($nproc);
+        if ($count > 0) return $count;
+    }
+    return 1; // Minimal fallback
+}
+
 function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
 {
     if (isset($props['CPUQuota'])) {
@@ -120,7 +141,16 @@ function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
         return (int)round(((float)$perSec / (float)$period) * 100);
     }
 
-    return isset($policyDefaults['cpuQuotaPercent']) ? (int)$policyDefaults['cpuQuotaPercent'] : 100;
+    // Fallback if no systemd property is found:
+    // Use policy default if set, otherwise calculate based on total cores.
+    if (isset($policyDefaults['cpuQuotaPercent']) && is_numeric($policyDefaults['cpuQuotaPercent'])) {
+        return (int)$policyDefaults['cpuQuotaPercent'];
+    }
+
+    $threads = pmssTotalCpuThreads();
+    // Default: 85% of total capacity, but at least 200% (2 cores) if hardware permits.
+    $default = $threads * 85;
+    return max(200, $default);
 }
 
 function pmssReadUserSliceProps(string $user): array
