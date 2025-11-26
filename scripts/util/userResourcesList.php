@@ -11,17 +11,22 @@ if (posix_getuid() !== 0) {
     exit(1);
 }
 
-require_once __DIR__.'/../lib/cli/optionParser.php';
+require_once __DIR__.'/../lib/cli/OptionParser.php';
+
+$parsed = pmssParseCliTokens($argv);
+$outputJsonl = (bool)pmssCliOption($parsed, 'jsonl');
+$outputJson = !$outputJsonl && (bool)pmssCliOption($parsed, 'json');
 
 $usersRaw = shell_exec('/scripts/listUsers.php');
 if ($usersRaw === null || trim($usersRaw) === '') {
-    die("No users found.\n");
+    if ($outputJson) {
+        echo "[]\n";
+    } elseif (!$outputJsonl) {
+        echo "No users found.\n";
+    }
+    exit(0);
 }
 $users = explode("\n", trim($usersRaw));
-
-$parsed = pmssParseCliTokens($argv);
-$outputJson = (bool)pmssCliOption($parsed, 'json');
-$outputJsonl = (bool)pmssCliOption($parsed, 'jsonl');
 
 if (!$outputJson && !$outputJsonl) {
     // Table Headers
