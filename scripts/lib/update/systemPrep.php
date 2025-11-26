@@ -334,6 +334,9 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
             }
             if (!empty($append)) { $raw .= "\n".implode("\n", $append)."\n"; }
         }
+        if (file_exists($target)) {
+            unlink($target);
+        }
         if (@file_put_contents($target, $raw) === false) {
             $log('[WARN] Failed to write user-.slice drop-in '.$target);
             return;

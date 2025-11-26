@@ -85,7 +85,27 @@ if (!function_exists('pmssUpdateAllUsers')) {
             if ($user === '') {
                 continue;
             }
-            pmssUpdateUserEnvironment($user, ['rutorrent_index_sha' => $rutorrentIndexSha]);
+            // #TODO Remove this fix block by end of 2027.
+            // Legacy fix: Some users have "CPUQuota=85%" explicitly set on their slice due to
+            // an old default. This overrides the new, correct global default. Detect and revert it.
+            $uinfo = posix_getpwnam($user);
+            if ($uinfo && isset($uinfo['uid'])) {
+                $slice = 'user-'.(int)$uinfo['uid'].'.slice';
+                $qOut = shell_exec('systemctl show '.escapeshellarg($slice).' -p CPUQuota 2>/dev/null');
+                if ($qOut && strpos(trim($qOut), 'CPUQuota=85%') !== false) {
+                    // Only revert if it matches the exact bad default. User-set 200% etc is preserved.
+                    // "revert" clears /etc/systemd/system/user-X.slice.d/*.conf overrides.
+                    // This assumes the user has no other critical manual overrides in drop-ins that
+                    // aren't managed by our tools. Our tools re-apply desired state anyway.
+                    runStep("Fixing legacy 85% CPUQuota for $user", 'systemctl revert '.escapeshellarg($slice));
+                    // Re-apply standard cgroup config to ensure other limits (RAM) are correct
+                    // This will just use defaults or policy, effectively resetting them to "good" state.
+                    // We let the subsequent pmssUpdateUserEnvironment or userConfig.php calls handle
+                    // precise retuning if needed, but 'revert' is the big hammer to fix the quota.
+                }
+            }
+
+            pmssUpdateUserEnvironment($user, $rutorrentIndexSha);
         }
     }
 }
