@@ -93,15 +93,10 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 $slice = 'user-'.(int)$uinfo['uid'].'.slice';
                 $qOut = shell_exec('systemctl show '.escapeshellarg($slice).' -p CPUQuota 2>/dev/null');
                 if ($qOut && strpos(trim($qOut), 'CPUQuota=85%') !== false) {
-                    // Only revert if it matches the exact bad default. User-set 200% etc is preserved.
-                    // "revert" clears /etc/systemd/system/user-X.slice.d/*.conf overrides.
-                    // This assumes the user has no other critical manual overrides in drop-ins that
-                    // aren't managed by our tools. Our tools re-apply desired state anyway.
-                    runStep("Fixing legacy 85% CPUQuota for $user", 'systemctl revert '.escapeshellarg($slice));
-                    // Re-apply standard cgroup config to ensure other limits (RAM) are correct
-                    // This will just use defaults or policy, effectively resetting them to "good" state.
-                    // We let the subsequent pmssUpdateUserEnvironment or userConfig.php calls handle
-                    // precise retuning if needed, but 'revert' is the big hammer to fix the quota.
+                    // Only unset if it matches the exact bad default. User-set 200% etc is preserved.
+                    // We use 'set-property ... CPUQuota=' (empty) to remove just this one override
+                    // without wiping other custom settings (RAM, weights) like 'revert' would.
+                    runStep("Fixing legacy 85% CPUQuota for $user", 'systemctl set-property '.escapeshellarg($slice).' CPUQuota=');
                 }
             }
 
