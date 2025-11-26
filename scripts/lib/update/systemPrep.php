@@ -334,14 +334,20 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
             }
             if (!empty($append)) { $raw .= "\n".implode("\n", $append)."\n"; }
         }
-        if (file_exists($target)) {
-            unlink($target);
-        }
-        if (@file_put_contents($target, $raw) === false) {
-            $log('[WARN] Failed to write user-.slice drop-in '.$target);
+
+        // Atomic write to avoid race conditions where the file is briefly missing
+        $tmpTarget = $target . '.tmp';
+        if (@file_put_contents($tmpTarget, $raw) === false) {
+            $log('[WARN] Failed to write temp user-.slice drop-in '.$tmpTarget);
             return;
         }
-        runStep('Setting permissions on user slice override', 'chmod 644 '.escapeshellarg($target));
+        @chmod($tmpTarget, 0644);
+        if (!@rename($tmpTarget, $target)) {
+             $log('[WARN] Failed to atomically replace user-.slice drop-in '.$target);
+             unlink($tmpTarget);
+             return;
+        }
+
         $reloadSystemd(
             'Reloading systemd manager configuration',
             'Reloading systemd manager configuration (test mode)'

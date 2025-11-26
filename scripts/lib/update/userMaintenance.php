@@ -78,28 +78,38 @@ if (!function_exists('pmssUpdateAllUsers')) {
      */
     function pmssUpdateAllUsers(string $rutorrentIndexSha): void
     {
-        $list = pmssListManagedUsers();
-        $count = count($list);
-        logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
-        foreach ($list as $user) {
-            if ($user === '') {
-                continue;
-            }
-            // #TODO Remove this fix block by end of 2027.
-            // Legacy fix: Some users have "CPUQuota=85%" explicitly set on their slice due to
-            // an old default. This overrides the new, correct global default. Detect and revert it.
-            $uinfo = posix_getpwnam($user);
-            if ($uinfo && isset($uinfo['uid'])) {
-                $slice = 'user-'.(int)$uinfo['uid'].'.slice';
-                $qOut = shell_exec('systemctl show '.escapeshellarg($slice).' -p CPUQuota 2>/dev/null');
-                if ($qOut && strpos(trim($qOut), 'CPUQuota=85%') !== false) {
-                    // Only unset if it matches the exact bad default. User-set 200% etc is preserved.
-                    // We use 'set-property ... CPUQuota=' (empty) to remove just this one override
-                    // without wiping other custom settings (RAM, weights) like 'revert' would.
-                    runStep("Fixing legacy 85% CPUQuota for $user", 'systemctl set-property '.escapeshellarg($slice).' CPUQuota=');
+        // #TODO Remove this fix block by end of 2027.
+        // Legacy fix: Detect and remove "CPUQuota=85%" overrides.
+        // Optimized to scan config files directly to avoid 1000+ systemctl calls.
+        $sliceDirs = glob('/etc/systemd/system/user-*.slice.d', GLOB_ONLYDIR) ?: [];
+        foreach ($sliceDirs as $dir) {
+            if (!preg_match('/user-([0-9]+)\.slice\.d$/', $dir, $m)) continue;
+            $uid = (int)$m[1];
+            
+            // Find files containing the bad quota
+            // systemd drop-ins created by set-property are usually 50-*.conf
+            $files = glob($dir.'/*.conf') ?: [];
+            $needsFix = false;
+            foreach ($files as $f) {
+                $content = @file_get_contents($f);
+                if ($content && preg_match('/^CPUQuota\s*=\s*85%$/m', $content)) {
+                    $needsFix = true;
+                    break;
                 }
             }
+            
+            if ($needsFix) {
+                // Resolve UID to username for logging
+                $uinfo = posix_getpwuid($uid);
+                $name = $uinfo ? $uinfo['name'] : "uid-$uid";
+                $slice = "user-$uid.slice";
+                
+                runStep("Fixing legacy 85% CPUQuota for $name", 'systemctl set-property '.escapeshellarg($slice).' CPUQuota=');
+            }
+        }
 
+        foreach ($users as $user) {
+            if (trim($user) === '') continue;
             pmssUpdateUserEnvironment($user, $rutorrentIndexSha);
         }
     }
