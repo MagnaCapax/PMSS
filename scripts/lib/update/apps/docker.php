@@ -1,4 +1,22 @@
 <?php
+if (!function_exists('dockerRootlessLog')) {
+    function dockerRootlessLog(string $message): void
+    {
+        if (function_exists('logmsg')) {
+            logmsg('[docker] '.$message);
+        } else {
+            echo '[docker] '.$message."\n";
+        }
+    }
+}
+
+if (!function_exists('dockerRootlessStep')) {
+    function dockerRootlessStep(string $description, string $command): int
+    {
+        return runStep('[docker] '.$description, $command);
+    }
+}
+
 if (!function_exists('dockerRootlessShellExec')) {
     function dockerRootlessShellExec(string $command): string
     {
