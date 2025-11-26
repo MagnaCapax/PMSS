@@ -288,6 +288,7 @@ function pmssUserConfigLighttpdMain(array $argv): int
     if (!file_exists('/root/backups')) `mkdir /root/backups`;
     $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
     $template = pmssNormalizeCompressionConfig($template, pmssDetectDebianVersion());
+    $deflateEnabled = (bool) preg_match('/^[ \t]*deflate\./m', $template);
 
     $policyDefaults = pmssLoadCgroupPolicyDefaults();
 
@@ -323,11 +324,13 @@ function pmssUserConfigLighttpdMain(array $argv): int
             passthru("chown {$thisUser}:{$thisUser} {$uploadDir}");
             passthru("chmod 751 {$uploadDir}");
         }
-        $compressDir = "/home/{$thisUser}/.lighttpd/compress";
-        if (!is_dir($compressDir)) {
-            passthru("mkdir -p {$compressDir}");
-            passthru("chown {$thisUser}:{$thisUser} {$compressDir}");
-            passthru("chmod 751 {$compressDir}");
+        if ($deflateEnabled) {
+            $compressDir = "/home/{$thisUser}/.lighttpd/compress";
+            if (!is_dir($compressDir)) {
+                passthru("mkdir -p {$compressDir}");
+                passthru("chown {$thisUser}:{$thisUser} {$compressDir}");
+                passthru("chmod 751 {$compressDir}");
+            }
         }
 
         // Rclone port

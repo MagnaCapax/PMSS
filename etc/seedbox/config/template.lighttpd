@@ -8,7 +8,8 @@ server.modules              = (
         #"mod_webdav",
         "mod_fastcgi",
         "mod_proxy",
-        "mod_deflate",
+        # mod_deflate disabled (2025-11): single-tenant vhosts gain negligible benefit; revisit post-2028 and remove packages/config if still unused.
+        #"mod_deflate",
         "mod_accesslog",
 )
 #See https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ConfigurationOptions
@@ -42,8 +43,8 @@ server.username            = "##username"
 server.groupname           = "##username"
 
 #### compress module
-deflate.cache-dir          = "/home/##username/.lighttpd/compress"
-deflate.mimetypes          = ("text/plain", "text/html", "application/x-javascript", "text/css")
+# deflate disabled: marginal value for per-user vhosts; keep commented until post-2028 refactor removes module/package entirely.
+#deflate.mimetypes          = ("text/html", "text/css", "application/javascript")
 
 
 
@@ -136,4 +137,3 @@ fastcgi.server += ( ".php" =>
                 "broken-scriptfilename" => "enable"
         ))
 )
-
