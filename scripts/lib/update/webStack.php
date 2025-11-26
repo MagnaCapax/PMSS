@@ -31,7 +31,7 @@ if (!function_exists('pmssConfigureWebStack')) {
             enableUnitIfPresent('nginx', 'Enabling nginx systemd service');
         }
 
-        runStep('Refreshing lighttpd configuration', '/scripts/util/configureLighttpd.php');
+        runStep('Refreshing lighttpd configuration', '/scripts/util/userConfigLighttpd.php');
         runStep('Regenerating nginx configuration', '/scripts/util/createNginxConfig.php');
         runStep('Verifying user HTTP authentication files', '/scripts/util/checkUserHtpasswd.php');
         runStep('Restarting nginx service', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
@@ -89,7 +89,7 @@ if (!function_exists('pmssPostUpdateWebRefresh')) {
      */
     function pmssPostUpdateWebRefresh(): void
     {
-        runStep('Post-update lighttpd configuration refresh', '/scripts/util/configureLighttpd.php');
+        runStep('Post-update lighttpd configuration refresh', '/scripts/util/userConfigLighttpd.php');
         runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php');
         runStep('Post-update htpasswd verification', '/scripts/util/checkUserHtpasswd.php');
         runStep('Restarting nginx after configuration refresh', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
