@@ -411,30 +411,37 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
      */
     function pmssEnsureLegacySysctlBaseline(?callable $logger = null): void
     {
-        $log     = pmssSelectLogger($logger);
-        $target  = '/etc/sysctl.d/1-pmss-defaults.conf';
-        $content = <<<CONF
-# Pulsed Media Config
-block/sda/queue/scheduler = bfq
-block/sdb/queue/scheduler = bfq
-block/sdc/queue/scheduler = bfq
-block/sdd/queue/scheduler = bfq
-block/sde/queue/scheduler = bfq
-block/sdf/queue/scheduler = bfq
+        $log    = pmssSelectLogger($logger);
+        $target = '/etc/sysctl.d/1-pmss-defaults.conf';
 
-block/sda/queue/read_ahead_kb = 1024
-block/sdb/queue/read_ahead_kb = 1024
-block/sdc/queue/read_ahead_kb = 1024
-block/sdd/queue/read_ahead_kb = 1024
-block/sde/queue/read_ahead_kb = 1024
-block/sdf/queue/read_ahead_kb = 1024
+        $lines = ['# Pulsed Media Config'];
 
-net.ipv4.ip_forward = 1
-CONF;
+        // Dynamically detect sd* devices for scheduling/readahead tuning
+        $disks = glob('/sys/block/sd*');
+        if ($disks) {
+            foreach ($disks as $path) {
+                $dev = basename($path);
+                // Only tune if not a partition (glob matches block devices, so sda is fine, sda1 isn't in /sys/block)
+                if (preg_match('/^sd[a-z]+$/', $dev)) {
+                    $lines[] = "block/{$dev}/queue/scheduler = bfq";
+                    $lines[] = "block/{$dev}/queue/read_ahead_kb = 1024";
+                }
+            }
+        }
 
+        // Network and Security Hardening
+        $lines[] = '';
+        $lines[] = 'net.ipv4.ip_forward = 1';
+        $lines[] = 'fs.protected_regular = 2';
+        $lines[] = 'fs.protected_fifos = 2';
+        $lines[] = 'kernel.yama.ptrace_scope = 1';
+
+        $content = implode("\n", $lines);
+
+        // Check if file needs updating
         $existing = @file_get_contents($target);
         if ($existing !== false && trim($existing) === trim($content)) {
-            $log('[SKIP] Legacy sysctl defaults already present');
+            $log('[SKIP] Legacy sysctl defaults already present and up to date');
             return;
         }
 
