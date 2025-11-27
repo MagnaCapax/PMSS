@@ -78,7 +78,8 @@ if (!function_exists('pmssUpdateAllUsers')) {
      */
     function pmssUpdateAllUsers(string $rutorrentIndexSha): void
     {
-        $users = pmssListManagedUsers();
+        $users = users::listHomeUsers();
+        sort($users, SORT_NATURAL | SORT_FLAG_CASE);
         $count = count($users);
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
 
