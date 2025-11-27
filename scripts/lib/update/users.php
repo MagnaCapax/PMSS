@@ -11,9 +11,16 @@ require_once __DIR__.'/user/rutorrent.php';
 require_once __DIR__.'/user/plugins.php';
 require_once __DIR__.'/user/permissions.php';
 
-function pmssUpdateUserEnvironment(string $user, array $options = []): void
+/**
+ * Refresh a single user's environment (HTTP, skeleton, ruTorrent, plugins, permissions).
+ *
+ * The second parameter carries the current ruTorrent index checksum so helpers
+ * can detect when per-user assets are stale. It intentionally stays a simple
+ * scalar instead of a generic "options" bag to keep the call site readable.
+ */
+function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = ''): void
 {
-    $ctx = pmssBuildUserContext($user, $options);
+    $ctx = pmssBuildUserContext($user, $rutorrentIndexSha);
     if ($ctx === null) {
         return;
     }

@@ -107,7 +107,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 }
             }
 
-            pmssUpdateUserEnvironment($user, ['rutorrent_index_sha' => $rutorrentIndexSha]);
+            pmssUpdateUserEnvironment($user, $rutorrentIndexSha);
         }
     }
 }

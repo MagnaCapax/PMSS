@@ -185,13 +185,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
-- pmssUpdateUserEnvironment(string $user, array $options=[]): void
+- pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): void
   - Builds context (`pmssBuildUserContext`), returns early when invalid.
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh, plugins,
-    retracker cleanup, permissions. Each handler consumes `['user','home','user_esc', 'rutorrent_index_sha'?]`.
+    retracker cleanup, permissions. Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
 
 Sub-handlers:
-- pmssBuildUserContext(string $user, array $options): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
+- pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
 - pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; deletes `~/www/phpXplorer`.
 - pmssUserUpdateThemes(array $ctx): void → ensures named themes exist under `rutorrent/plugins/theme/themes/` (copied from skel), fixes ownership.

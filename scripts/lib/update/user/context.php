@@ -3,7 +3,7 @@
  * Context builders for per-user update routines.
  */
 
-function pmssBuildUserContext(string $user, array $options): ?array
+function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?array
 {
     $home = "/home/{$user}";
     if (!is_dir($home)) {
@@ -23,6 +23,6 @@ function pmssBuildUserContext(string $user, array $options): ?array
         'user'               => $user,
         'home'               => $home,
         'user_esc'           => escapeshellarg($user),
-        'rutorrent_index_sha'=> $options['rutorrent_index_sha'] ?? '',
+        'rutorrent_index_sha'=> $rutorrentIndexSha,
     ];
 }
