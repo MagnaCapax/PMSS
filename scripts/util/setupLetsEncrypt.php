@@ -9,7 +9,8 @@
  * configuration so HTTPS is ready immediately after provisioning.
  */
 
-require_once __DIR__ . '/../lib/update/distro.php';
+require_once __DIR__.'/../lib/update.php';
+require_once __DIR__.'/../lib/update/distro.php';
 
 // Basic input validation: the automation expects an e-mail for certificate
 // registration so Let's Encrypt can deliver expiry notices.
