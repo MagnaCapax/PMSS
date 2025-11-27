@@ -34,12 +34,8 @@ class RepoIdempotenceTest extends \PMSS\Tests\TestCase
             throw new \PMSS\Tests\SkipTest("No template found for {$codename}");
         }
 
-        $expected = trim(file_get_contents($templatePath));
-        $actual   = trim(file_get_contents('/etc/apt/sources.list'));
-
-        // Normalize whitespace
-        $expected = preg_replace('/\s+/', ' ', $expected);
-        $actual   = preg_replace('/\s+/', ' ', $actual);
+        $expected = $this->normalizeWhitespace(trim(file_get_contents($templatePath)));
+        $actual   = $this->normalizeWhitespace(trim(file_get_contents('/etc/apt/sources.list')));
 
         $this->assertEquals($expected, $actual, 'sources.list does not match template');
     }
@@ -71,6 +67,15 @@ class RepoIdempotenceTest extends \PMSS\Tests\TestCase
             }
         }
         $this->assertTrue(true);
+    }
+
+    /**
+     * Collapse whitespace runs so template and sources.list
+     * comparisons ignore formatting-only differences.
+     */
+    private function normalizeWhitespace($value)
+    {
+        return preg_replace('/\s+/', ' ', $value);
     }
 }
 

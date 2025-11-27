@@ -295,6 +295,399 @@ focuses purely on user-managed linuxserver.io containers. You can run both
 side by side as long as you choose non-conflicting ports and separate config
 directories.
 
+### 4.7 Example commands for other popular linuxserver.io images
+
+The following examples show how to launch other common linuxserver.io images on
+PMSS. Treat them as **starting points**, not copy‑paste gospel:
+
+- Adjust host ports to avoid clashes with anything you already run.
+- Adjust paths under `~/docker/...` and `~/media`, `~/downloads`, etc. to match
+  your layout.
+- Always cross‑check the official docs at https://docs.linuxserver.io/images/
+  for the current list of environment variables and ports.
+
+All examples follow the same baseline:
+
+```bash
+docker run -d \
+  --name <name> \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -v ~/docker/<name>/config:/config \
+  ... \
+  --restart unless-stopped \
+  lscr.io/linuxserver/<image>:latest
+```
+
+#### 4.7.1 Media servers
+
+**Jellyfin** – Open-source media server (see section 3 for a full walkthrough).
+
+**Emby** – Alternative media server:
+
+```bash
+mkdir -p ~/docker/emby/config ~/media
+
+docker run -d \
+  --name emby \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8097:8096 \
+  -v ~/docker/emby/config:/config \
+  -v ~/media:/media \
+  --restart unless-stopped \
+  lscr.io/linuxserver/emby:latest
+```
+
+**Plex** – Media server with rich client ecosystem:
+
+```bash
+mkdir -p ~/docker/plex/config ~/media
+
+docker run -d \
+  --name plex \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 32400:32400 \
+  -v ~/docker/plex/config:/config \
+  -v ~/media:/media \
+  --restart unless-stopped \
+  lscr.io/linuxserver/plex:latest
+```
+
+Plex has additional optional variables (for example `PLEX_CLAIM`) and ports for
+DLNA and discovery; review the linuxserver.io Plex docs when using it heavily.
+
+#### 4.7.2 Download clients (torrent and Usenet)
+
+**qBittorrent** – See section 4.1 for the full example.
+
+**Deluge** – Alternative torrent client:
+
+```bash
+mkdir -p ~/docker/deluge/config ~/downloads
+
+docker run -d \
+  --name deluge \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8112:8112 \
+  -v ~/docker/deluge/config:/config \
+  -v ~/downloads:/downloads \
+  --restart unless-stopped \
+  lscr.io/linuxserver/deluge:latest
+```
+
+This maps only the WebUI port (8112). For optimal torrent performance, add the
+listen ports recommended in the official Deluge container docs.
+
+**SABnzbd** – Usenet downloader with WebUI:
+
+```bash
+mkdir -p ~/docker/sabnzbd/config ~/downloads
+
+docker run -d \
+  --name sabnzbd \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8081:8080 \
+  -v ~/docker/sabnzbd/config:/config \
+  -v ~/downloads:/downloads \
+  --restart unless-stopped \
+  lscr.io/linuxserver/sabnzbd:latest
+```
+
+**NZBGet** – Lightweight Usenet client:
+
+```bash
+mkdir -p ~/docker/nzbget/config ~/downloads
+
+docker run -d \
+  --name nzbget \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 6789:6789 \
+  -v ~/docker/nzbget/config:/config \
+  -v ~/downloads:/downloads \
+  --restart unless-stopped \
+  lscr.io/linuxserver/nzbget:latest
+```
+
+**pyLoad-ng** – Download manager for one-click hosters:
+
+```bash
+mkdir -p ~/docker/pyload/config ~/downloads
+
+docker run -d \
+  --name pyload-ng \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8000:8000 \
+  -v ~/docker/pyload/config:/config \
+  -v ~/downloads:/downloads \
+  --restart unless-stopped \
+  lscr.io/linuxserver/pyload-ng:latest
+```
+
+#### 4.7.3 Automation, indexers, and request tools
+
+The ARR tools work best when they share `~/downloads` and media directories.
+Sonarr/Radarr examples already live in sections 4.2 and 4.3.
+
+**Lidarr** – Music library manager:
+
+```bash
+mkdir -p ~/docker/lidarr/config ~/music
+
+docker run -d \
+  --name lidarr \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8686:8686 \
+  -v ~/docker/lidarr/config:/config \
+  -v ~/music:/music \
+  -v ~/downloads:/downloads \
+  --restart unless-stopped \
+  lscr.io/linuxserver/lidarr:latest
+```
+
+**Readarr** – Books/audiobooks manager:
+
+```bash
+mkdir -p ~/docker/readarr/config ~/books
+
+docker run -d \
+  --name readarr \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8787:8787 \
+  -v ~/docker/readarr/config:/config \
+  -v ~/books:/books \
+  -v ~/downloads:/downloads \
+  --restart unless-stopped \
+  lscr.io/linuxserver/readarr:latest
+```
+
+**Bazarr** – Subtitle downloader for Sonarr/Radarr:
+
+```bash
+mkdir -p ~/docker/bazarr/config
+
+docker run -d \
+  --name bazarr \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 6767:6767 \
+  -v ~/docker/bazarr/config:/config \
+  -v ~/movies:/movies \
+  -v ~/tv:/tv \
+  --restart unless-stopped \
+  lscr.io/linuxserver/bazarr:latest
+```
+
+**Jackett** – Indexer proxy (many setups now prefer Prowlarr, but Jackett is
+still widely used):
+
+```bash
+mkdir -p ~/docker/jackett/config
+
+docker run -d \
+  --name jackett \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 9117:9117 \
+  -v ~/docker/jackett/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/jackett:latest
+```
+
+**NZBHydra2** – Usenet indexer/search proxy:
+
+```bash
+mkdir -p ~/docker/nzbhydra2/config
+
+docker run -d \
+  --name nzbhydra2 \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 5076:5076 \
+  -v ~/docker/nzbhydra2/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/nzbhydra2:latest
+```
+
+**Overseerr** – Modern request management UI:
+
+```bash
+mkdir -p ~/docker/overseerr/config
+
+docker run -d \
+  --name overseerr \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 5055:5055 \
+  -v ~/docker/overseerr/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/overseerr:latest
+```
+
+**Ombi** – Alternative request manager:
+
+```bash
+mkdir -p ~/docker/ombi/config
+
+docker run -d \
+  --name ombi \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 3579:3579 \
+  -v ~/docker/ombi/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/ombi:latest
+```
+
+**Tautulli** – Plex statistics and monitoring:
+
+```bash
+mkdir -p ~/docker/tautulli/config
+
+docker run -d \
+  --name tautulli \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8181:8181 \
+  -v ~/docker/tautulli/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/tautulli:latest
+```
+
+#### 4.7.4 Storage, sync, and cloud-style apps
+
+**Syncthing** – Encrypted file sync between devices:
+
+```bash
+mkdir -p ~/docker/syncthing/config ~/sync
+
+docker run -d \
+  --name syncthing \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8384:8384 \
+  -p 22000:22000 \
+  -p 22000:22000/udp \
+  -v ~/docker/syncthing/config:/config \
+  -v ~/sync:/sync \
+  --restart unless-stopped \
+  lscr.io/linuxserver/syncthing:latest
+```
+
+**Nextcloud** – Self-hosted file sync and collaboration (advanced):
+
+```bash
+mkdir -p ~/docker/nextcloud/config ~/nextcloud-data
+
+docker run -d \
+  --name nextcloud \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8445:80 \
+  -v ~/docker/nextcloud/config:/config \
+  -v ~/nextcloud-data:/data \
+  --restart unless-stopped \
+  lscr.io/linuxserver/nextcloud:latest
+```
+
+For Nextcloud you will almost always pair this with a database container such
+as MariaDB or PostgreSQL; see their docs for the recommended configuration.
+
+**MariaDB** – MySQL-compatible database:
+
+```bash
+mkdir -p ~/docker/mariadb/config
+
+docker run -d \
+  --name mariadb \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -e MYSQL_ROOT_PASSWORD=change_me \
+  -p 3306:3306 \
+  -v ~/docker/mariadb/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/mariadb:latest
+```
+
+**Postgres** – PostgreSQL database:
+
+```bash
+mkdir -p ~/docker/postgres/config
+
+docker run -d \
+  --name postgres \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -e POSTGRES_PASSWORD=change_me \
+  -p 5432:5432 \
+  -v ~/docker/postgres/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/postgres:latest
+```
+
+**phpMyAdmin** – Web UI for MySQL/MariaDB:
+
+```bash
+mkdir -p ~/docker/phpmyadmin/config
+
+docker run -d \
+  --name phpmyadmin \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8082:80 \
+  -v ~/docker/phpmyadmin/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/phpmyadmin:latest
+```
+
+Configure phpMyAdmin to talk to your MariaDB container using the host and port
+you chose above.
+
+#### 4.7.5 Dashboards, proxies, and utilities
+
+**Heimdall** – Application dashboard (see section 5 for a Compose example). A
+simple `docker run` variant:
+
+```bash
+mkdir -p ~/docker/heimdall/config
+
+docker run -d \
+  --name heimdall \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 8081:80 \
+  -v ~/docker/heimdall/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/heimdall:latest
+```
+
+**SWAG** – Secure Web Application Gateway (reverse proxy + TLS, advanced):
+
+```bash
+mkdir -p ~/docker/swag/config
+
+docker run -d \
+  --name swag \
+  -e PUID=0 -e PGID=0 \
+  -e TZ=Etc/UTC \
+  -p 80:80 \
+  -p 443:443 \
+  -v ~/docker/swag/config:/config \
+  --restart unless-stopped \
+  lscr.io/linuxserver/swag:latest
+```
+
+SWAG is powerful but requires careful configuration for virtual hosts, DNS, and
+TLS; treat the above as scaffolding and follow the linuxserver.io docs closely
+before exposing anything to the public internet.
+
 ## 5. Docker Compose (optional, advanced)
 
 Docker Compose is not required, but it can simplify running multiple services.
@@ -419,7 +812,68 @@ If you later change configuration, re-run `docker-compose up -d` to apply
 updates. To update images, use `docker-compose pull` followed by
 `docker-compose up -d`.
 
-## 6. Multi-tenant safety and good citizenship
+## 6. WireGuard: host service vs linuxserver.io container
+
+PMSS ships two distinct WireGuard options:
+
+- A **host-level WireGuard service** managed by PMSS itself.
+- An optional **linuxserver.io WireGuard container** you can run under your own
+  account with Docker.
+
+They solve different problems; understanding the split helps you pick the right
+tool.
+
+### 6.1 Host-level WireGuard (recommended default)
+
+The platform-wide WireGuard service is documented in
+[`docs/wireguard.md`](./wireguard.md). Key properties:
+
+- Managed at the host level under `/etc/wireguard/wg0.conf`.
+- Provisioning generates server keys, enables `wg-quick@wg0`, and writes
+  connection instructions to `/etc/wireguard/README` and `~/wireguard.txt`.
+- You add client public keys to `~/.wireguard-public-key`; the updater rebuilds
+  the server config to include each `[Peer]`.
+- A cron watchdog (`checkWireguard.php`, see [`docs/cron.md`](./cron.md))
+  ensures the kernel module and `wg-quick@wg0` stay healthy.
+
+This is the **canonical** way to access your seedbox over VPN. Use it when you:
+
+- Want a secure, PMSS-managed tunnel to your account from laptops/phones.
+- Prefer a solution that survives OS-level updates and is covered by platform
+  monitoring.
+- Do not need per-container VPN routing, just a tunnel into the host.
+
+### 6.2 linuxserver.io WireGuard container (optional)
+
+The default skeleton includes a helper script `install-wireguard.sh` in `~/bin`
+and it is mentioned in [`docs/docker-help.md`](./docker-help.md). It launches
+the linuxserver.io WireGuard container under your user:
+
+```bash
+install-wireguard.sh [PORT]
+```
+
+Characteristics:
+
+- Stores configuration under `~/.config/docker-wireguard`.
+- Exposes a WireGuard UDP port on the host (random high port by default).
+- Runs entirely under your account via Docker, separate from the host-level
+  `wg0` service.
+
+Use this only if you specifically want a **user-managed** WireGuard instance,
+for example to:
+
+- Build a separate VPN endpoint for a small set of peers you control.
+- Experiment with linuxserver.io’s WireGuard docs without touching the system
+  service.
+- Route traffic for containerized workloads through a user-level VPN.
+
+For most users the host-level WireGuard documented in `docs/wireguard.md` is
+easier to operate and better integrated with PMSS monitoring. The container
+option is more flexible but also more complex; if you are not sure which you
+need, start with the host-level service.
+
+## 7. Multi-tenant safety and good citizenship
 
 PMSS is a shared platform; keep these rules in mind:
 
@@ -435,7 +889,7 @@ The same principles are described at a higher level in
 [`docs/security/operational-safety.md`](./security/operational-safety.md); this
 guide simply applies them to Docker workloads.
 
-### 6.1 Securing web UIs
+### 7.1 Securing web UIs
 
 LinuxServer.io applications often expose HTTP interfaces (Jellyfin, qBittorrent,
 Radarr, Sonarr, Prowlarr, etc.). Treat them as internet-facing services:
@@ -457,7 +911,7 @@ putting it into long-term use.
 If you are ever unsure whether a container is appropriate for a seedbox, ask
 support before running it.
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 - **Permission denied / wrong owner**
   - Confirm you used `PUID=0` and `PGID=0`.
@@ -525,7 +979,57 @@ If a problem clearly involves PMSS-specific limits or network quirks and you
 cannot resolve it with the above steps, contact Pulsed Media support with the
 relevant `docker run` or `docker-compose.yml` snippet and error messages.
 
-## 8. Further reading
+## 9. FAQ
+
+**Q: Can I use `--network host` with linuxserver.io images on PMSS?**
+
+A: In rootless Docker the usual “host network” mode is not available in the
+same way as on a rootful daemon. Stick to the default bridge network with
+explicit `-p HOST:CONTAINER` mappings. If you try `--network host` and Docker
+complains, that is a limitation of rootless mode, not a PMSS quirk.
+
+**Q: Can I use `--privileged` or pass devices into containers?**
+
+A: On PMSS you should assume privileged containers and direct device mappings
+are not available. Rootless Docker deliberately limits low-level host access.
+If an image insists on `--privileged` or device flags, it is usually a poor fit
+for a shared seedbox environment.
+
+**Q: Where should I store configuration and data for backup?**
+
+A: Under your home directory, typically `~/docker/<app>/config` for settings
+and a separate path such as `~/downloads`, `~/movies`, or `~/tv` for data.
+Backing up those directories plus your `docker-compose.yml` (if you use
+Compose) is enough to recreate the stack later.
+
+**Q: Will containers keep running after I log out or the host reboots?**
+
+A: Containers started with `--restart unless-stopped` are restarted whenever
+your user’s systemd instance and Docker daemon come up. PMSS sets up linger and
+cron watchdogs so user services keep running between logins. If you notice
+containers consistently not restarting after reboots, reach out to support so
+they can inspect the host’s configuration.
+
+**Q: Can I run non-LinuxServer.io images with this guide?**
+
+A: Yes. Most patterns here (volumes under `~/`, port mappings, `--restart
+unless-stopped`) apply to any image. Only the `PUID`/`PGID` section is specific
+to LinuxServer.io images; many other images do not use those variables.
+
+**Q: How can I see how much space Docker is using?**
+
+A: Use:
+
+```bash
+docker system df
+docker images
+docker ps -a
+```
+
+to get an overview. Clean up old containers and images as shown in the
+troubleshooting section when space becomes tight.
+
+## 10. Further reading
 
 - LinuxServer.io image catalog: https://docs.linuxserver.io/images/
 - Docker rootless mode docs: https://docs.docker.com/engine/security/rootless/
