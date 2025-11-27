@@ -60,18 +60,6 @@ if (!function_exists('pmssRunAndLog')) {
     }
 }
 
-if (!function_exists('pmssListManagedUsers')) {
-    /**
-     * Return the list of seedbox users tracked by the platform.
-     */
-    function pmssListManagedUsers(): array
-    {
-        $users = users::listHomeUsers();
-        sort($users, SORT_NATURAL | SORT_FLAG_CASE);
-        return $users;
-    }
-}
-
 if (!function_exists('pmssUpdateAllUsers')) {
     /**
      * Refresh ruTorrent and skeleton data for every provisioned user.
@@ -83,40 +71,29 @@ if (!function_exists('pmssUpdateAllUsers')) {
         $count = count($users);
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
 
-        // #TODO Remove this fix block by end of 2027.
-        // Legacy fix: Detect and remove "CPUQuota=85%" overrides.
-        // Optimized to scan config files directly to avoid 1000+ systemctl calls.
-        $sliceDirs = glob('/etc/systemd/system/user-*.slice.d', GLOB_ONLYDIR) ?: [];
-        foreach ($sliceDirs as $dir) {
-            if (!preg_match('/user-([0-9]+)\.slice\.d$/', $dir, $m)) {
-                continue;
-            }
-            $uid = (int)$m[1];
-
-            // Resolve UID to username for logging
-            $uinfo = posix_getpwuid($uid);
-            $name = $uinfo ? $uinfo['name'] : '';
-            if ($name === '') {
-                $name = 'uid-'.$uid;
-            }
-
-            // Find files containing the bad quota
-            // systemd drop-ins created by set-property are usually 50-*.conf
-            $files = glob($dir.'/*.conf') ?: [];
-            foreach ($files as $f) {
-                $content = @file_get_contents($f);
-                if ($content && preg_match('/^CPUQuota\s*=\s*85%$/m', $content)) {
-                    $slice = "user-$uid.slice";
-                    runStep("Fixing legacy 85% CPUQuota for $name", 'systemctl set-property '.escapeshellarg($slice).' CPUQuota=');
-                    break;
-                }
-            }
-        }
-
         foreach ($users as $user) {
             if (trim($user) === '') {
                 continue;
             }
+
+            // #TODO Remove this fix block by end of 2027.
+            // Legacy fix: Detect and remove "CPUQuota=85%" overrides using drop-ins for this user.
+            $uinfo = posix_getpwnam($user);
+            if ($uinfo && isset($uinfo['uid'])) {
+                $sliceDir = '/etc/systemd/system/user-'.((int)$uinfo['uid']).'.slice.d';
+                if (is_dir($sliceDir)) {
+                    $files = glob($sliceDir.'/*.conf') ?: [];
+                    foreach ($files as $f) {
+                        $content = @file_get_contents($f);
+                        if ($content && preg_match('/^CPUQuota\s*=\s*85%$/m', $content)) {
+                            $slice = 'user-'.((int)$uinfo['uid']).'.slice';
+                            runStep("Fixing legacy 85% CPUQuota for {$user}", 'systemctl set-property '.escapeshellarg($slice).' CPUQuota=');
+                            break;
+                        }
+                    }
+                }
+            }
+
             pmssUpdateUserEnvironment($user, $rutorrentIndexSha);
         }
     }
@@ -161,7 +138,8 @@ if (!function_exists('pmssEnsureLingerAndDockerAllUsers')) {
     /** Apply linger/systemd/docker kick to all managed users with per-user logs. */
     function pmssEnsureLingerAndDockerAllUsers(): void
     {
-        $list = pmssListManagedUsers();
+        $list = users::listHomeUsers();
+        sort($list, SORT_NATURAL | SORT_FLAG_CASE);
         foreach ($list as $user) {
             if ($user === '') continue;
             pmssEnsureLingerAndDocker($user);
@@ -188,7 +166,8 @@ if (!function_exists('pmssApplyCgroupDefaultsAllUsers')) {
      */
     function pmssApplyCgroupDefaultsAllUsers(): void
     {
-        $list = pmssListManagedUsers();
+        $list = users::listHomeUsers();
+        sort($list, SORT_NATURAL | SORT_FLAG_CASE);
         $count = count($list);
         logMessage(sprintf('Applying cgroup defaults for %d user(s)', $count));
         foreach ($list as $user) {
