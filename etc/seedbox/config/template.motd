@@ -23,15 +23,13 @@ Kernel: %KERNEL_VERSION%
 
 -----
 
-Install *ARR + Jellyfin Media Package: https://pulsedmedia.com/clients/announcements.php?id=590  
-Use `arrinfo` to get URLs for RADARR, SONARR, PROWLARR & JELLYFIN
+Install *ARR + Jellyfin Media Package: https://pulsedmedia.com/clients/announcements.php?id=647
 
-Wireguard & Base info: https://pulsedmedia.com/clients/announcements.php?id=587  
-LinuxServer.io setup: https://pulsedmedia.com/clients/announcements.php?id=596
+WireGuard: https://github.com/MagnaCapax/PMSS/blob/main/docs/wireguard.md
+LinuxServer.io containers: https://github.com/MagnaCapax/PMSS/blob/main/docs/linuxserver.io.md
 
 Docker rootless is installed by default for all accounts.
-List Containts Running; `docker ps`
+List containers: `docker ps`
 Restart Docker: `systemctl --user restart docker`
 For usage tips run `docker-help`. The daemon is monitored by a cron job to
 ensure it stays running.
-
