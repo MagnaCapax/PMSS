@@ -7,7 +7,6 @@ return [
     // CPU/IO weights (1..10000). Lower = lower priority vs others. Default systemd is ~100.
     'cpuWeight'        => 100,
     'ioWeight'         => 100,
-    'cpuQuotaPercent'  => 85,     // enable CPUQuota by default to 85%
 
     // Process/thread cap under the user slice
     'tasksMax'         => 512,
