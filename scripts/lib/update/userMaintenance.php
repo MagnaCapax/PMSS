@@ -81,7 +81,6 @@ if (!function_exists('pmssUpdateAllUsers')) {
         $users = pmssListManagedUsers();
         $count = count($users);
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
-        $userIndex = array_flip($users);
 
         // #TODO Remove this fix block by end of 2027.
         // Legacy fix: Detect and remove "CPUQuota=85%" overrides.
@@ -93,11 +92,11 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
             $uid = (int)$m[1];
 
-            // Resolve UID to username for logging and ensure it is one of our managed users
+            // Resolve UID to username for logging
             $uinfo = posix_getpwuid($uid);
             $name = $uinfo ? $uinfo['name'] : '';
-            if ($name === '' || !isset($userIndex[$name])) {
-                continue;
+            if ($name === '') {
+                $name = 'uid-'.$uid;
             }
 
             // Find files containing the bad quota
