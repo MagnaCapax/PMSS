@@ -44,6 +44,12 @@ function pmssRunDistUpgrade(?string $target = null): int
         return 1;
     }
 
+    // Debian 11 → 12 upgrades must shed the legacy WireGuard DKMS module. Newer
+    // kernels ship WireGuard in-tree and the old wireguard-dkms package fails
+    // with BUILD_EXCLUSIVE errors during kernel/headers configuration, leaving
+    // linux-image/linux-headers packages half-configured.
+    pmssRemoveLegacyWireguardDkms($from, $next);
+
     logMessage(sprintf('Initiating Debian %s → %s upgrade', $from, $next));
     pmssRewriteSources($from, $next);
     pmssExecuteUpgrade();
@@ -153,6 +159,30 @@ function pmssExecuteUpgrade(): void
 
     // Autoremove residuals
     runCommand("$env apt-get autoremove -y", true);
+}
+
+/**
+ * Remove legacy WireGuard DKMS module before certain upgrades.
+ *
+ * Debian 11 → 12 hosts often carry an old wireguard-dkms (e.g. 1.0.20210219)
+ * which cannot build against 6.1 kernels due to BUILD_EXCLUSIVE guards. That
+ * breaks linux-image/linux-headers postinst scripts and wedges dpkg until the
+ * DKMS state is cleared. This helper purges the package and removes its DKMS
+ * entries prior to the dist-upgrade so kernel configuration can complete.
+ */
+function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void
+{
+    if ($fromMajor !== '11' || $toMajor !== '12') {
+        return;
+    }
+
+    logMessage('dist-upgrade: removing legacy wireguard-dkms before Debian 11 → 12 upgrade');
+    $env = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none';
+
+    // Best-effort purge; ignore failure if package is already absent.
+    runCommand("$env apt-get purge -y wireguard-dkms", true);
+    // Clean up DKMS registrations for the legacy module version; tolerate absence.
+    runCommand('dkms remove wireguard/1.0.20210219 --all || true', true);
 }
 
 /**
