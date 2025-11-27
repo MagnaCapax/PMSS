@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/runtime/commands.php';
+require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
 
@@ -77,24 +78,36 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
 
             // #TODO Remove this fix block by end of 2027.
-            // Legacy fix: Detect and remove "CPUQuota=85%" overrides using drop-ins for this user.
+            // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
+            // bump them to a host-based quota derived from total CPU threads so
+            // users are no longer capped to 85% of a single core.
             $uinfo = posix_getpwnam($user);
             if ($uinfo && isset($uinfo['uid'])) {
-                $sliceDir = '/etc/systemd/system/user-'.((int)$uinfo['uid']).'.slice.d';
+                $uid = (int)$uinfo['uid'];
+                $sliceDir = '/etc/systemd/system/user-'.$uid.'.slice.d';
+                $needsFix = false;
                 if (is_dir($sliceDir)) {
                     $files = glob($sliceDir.'/*.conf') ?: [];
                     foreach ($files as $f) {
                         $content = @file_get_contents($f);
                         if ($content && preg_match('/^CPUQuota\s*=\s*85%$/m', $content)) {
-                            $slice = 'user-'.((int)$uinfo['uid']).'.slice';
-                            runStep("Fixing legacy 85% CPUQuota for {$user}", 'systemctl set-property '.escapeshellarg($slice).' CPUQuota=');
+                            $needsFix = true;
                             break;
                         }
                     }
                 }
+                if ($needsFix) {
+                    $threads = pmssTotalCpuThreads();
+                    $newQuota = $threads > 0 ? max(200, $threads * 85) : 200;
+                    $slice = 'user-'.$uid.'.slice';
+                    runStep(
+                        "Fixing legacy 85% CPUQuota for {$user}",
+                        'systemctl set-property '.escapeshellarg($slice).' CPUQuota='.$newQuota.'%'
+                    );
+                }
             }
 
-            pmssUpdateUserEnvironment($user, $rutorrentIndexSha);
+            pmssUpdateUserEnvironment($user, ['rutorrent_index_sha' => $rutorrentIndexSha]);
         }
     }
 }

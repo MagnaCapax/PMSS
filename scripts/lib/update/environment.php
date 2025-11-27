@@ -113,6 +113,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             $droppedUnavailable = [];
             $droppedObsolete    = [];
             $droppedKernel      = [];
+            $runtimeVersion     = $distroVersion !== null ? (int) $distroVersion : (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
             foreach ($lines as $idx => $line) {
                 $trimmed = trim($line);
                 if ($trimmed === '') {
@@ -139,10 +140,20 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     $warnings = true;
                     continue;
                 }
-                $package = $parts[0];
-                $state   = $parts[1];
                 // Skip problematic or deprecated packages from baseline
                 $lower = strtolower($package);
+
+                // On Debian 12+ WireGuard is part of the stock kernel; the
+                // out-of-tree DKMS module is no longer required and can cause
+                // BUILD_EXCLUSIVE failures during kernel upgrades. Force its
+                // selection state to "deinstall" so dselect-upgrade removes it.
+                if ($runtimeVersion >= 12 && $lower === 'wireguard-dkms') {
+                    $sanitised[] = $package."\tdeinstall";
+                    $warnings = true;
+                    $droppedObsolete[] = $package;
+                    continue;
+                }
+
                 // Drop legacy names we no longer install via apt (tarball/venv used instead)
                 if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) { $warnings = true; $droppedObsolete[] = $package; continue; }
                 // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'

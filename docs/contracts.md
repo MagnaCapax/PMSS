@@ -288,7 +288,7 @@ System/app groups:
 - pmssInstallZncStack(int $distroVersion): void → queues `znc` and related packages; logs warn and returns on v<10.
 - pmssInstallSabnzbd(): void → queues `sabnzbdplus` if binary missing.
 - pmssInstallMiscTools(): void → queues mkvtoolnix, openvpn/easy-rsa when missing, `sudo`, `expect`, `ipset` if needed.
-- pmssInstallWireguardPackages(): void → queues `wireguard`, `wireguard-tools`, `wireguard-dkms` unless both tools already installed.
+- pmssInstallWireguardPackages(): void → on Debian 12+ queues `wireguard`/`wireguard-tools` only when tools are missing (kernel module is in-tree); on older releases also queues `wireguard-dkms` unless both tools are already installed.
 
 ---
 

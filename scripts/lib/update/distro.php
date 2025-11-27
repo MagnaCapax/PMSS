@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/runtime/commands.php';
+require_once __DIR__.'/../update.php';
 
 if (!function_exists('pmssDetectDistro')) {
     /**
