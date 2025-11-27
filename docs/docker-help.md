@@ -32,3 +32,6 @@ export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 If you need docker-compose, download the latest binary into `~/bin` and make it executable. The helper script `install-wireguard.sh` defaults to a random port if none is supplied and prints the chosen port.
 
 See the [rootless Docker limitations](https://docs.docker.com/engine/security/rootless/#known-limitations) for details.
+
+For a deeper guide to running linuxserver.io application containers on PMSS, see
+[`docs/linuxserver.io.md`](./linuxserver.io.md).
