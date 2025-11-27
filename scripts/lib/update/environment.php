@@ -154,6 +154,17 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     continue;
                 }
 
+                // Legacy MediaArea bootstrap package: repo-mediaarea is no longer
+                // required now that apt sources are templated directly. Newer
+                // builds also use control.tar.zst which older dpkg cannot unpack.
+                // Always mark it for deinstallation so hosts converge away from it.
+                if ($lower === 'repo-mediaarea') {
+                    $sanitised[] = $package."\tdeinstall";
+                    $warnings = true;
+                    $droppedObsolete[] = $package;
+                    continue;
+                }
+
                 // Drop legacy names we no longer install via apt (tarball/venv used instead)
                 if (in_array($lower, ['nzbdrone', 'pyload-cli'], true)) { $warnings = true; $droppedObsolete[] = $package; continue; }
                 // Drop version-pinned kernel images silently; rely on meta 'linux-image-amd64'
