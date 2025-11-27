@@ -107,30 +107,45 @@ function pmssClampMemoryLimit(int $memoryMiB): int
 
 function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
 {
+    $quota = null;
+
+    // Prefer explicit slice CPUQuota value when present.
     if (isset($props['CPUQuota'])) {
         $raw = trim((string)$props['CPUQuota']);
         if ($raw !== '' && stripos($raw, 'infinity') === false) {
             if (strpos($raw, '%') !== false) {
-                return (int)round((float)$raw);
+                $quota = (int)round((float)$raw);
             }
         }
     }
 
-    $perSec = $props['CPUQuotaPerSecUSec'] ?? null;
-    $period = $props['CPUQuotaPeriodUSec'] ?? null;
-    if (is_numeric($perSec) && is_numeric($period) && (float)$period > 0.0) {
-        return (int)round(((float)$perSec / (float)$period) * 100);
+    // Derive quota from period values when CPUQuota is not set directly.
+    if ($quota === null) {
+        $perSec = $props['CPUQuotaPerSecUSec'] ?? null;
+        $period = $props['CPUQuotaPeriodUSec'] ?? null;
+        if (is_numeric($perSec) && is_numeric($period) && (float)$period > 0.0) {
+            $quota = (int)round(((float)$perSec / (float)$period) * 100);
+        }
     }
 
-    // Fallback if no systemd property is found:
-    // Use policy default if set, otherwise calculate based on total cores.
+    // When quota is explicitly set and not a legacy 85% sentinel, use it as-is.
+    if ($quota !== null && $quota > 0 && $quota !== 85) {
+        return $quota;
+    }
+
+    // Fallback if no usable systemd property is found:
+    // Use policy default when it is a concrete value other than the legacy 85%.
     if (isset($policyDefaults['cpuQuotaPercent']) && is_numeric($policyDefaults['cpuQuotaPercent'])) {
-        return (int)$policyDefaults['cpuQuotaPercent'];
+        $policyQuota = (int)$policyDefaults['cpuQuotaPercent'];
+        if ($policyQuota > 0 && $policyQuota !== 85) {
+            return $policyQuota;
+        }
     }
 
+    // Legacy 85% (either from slice or policy) and "no quota" fall through to a
+    // host-based default: ~85% per logical CPU thread, but never below 200%.
     $threads = pmssTotalCpuThreads();
-    // Default: 85% of total capacity, but at least 200% (2 cores) if hardware permits.
-    $default = $threads * 85;
+    $default = $threads > 0 ? $threads * 85 : 200;
     return max(200, $default);
 }
 

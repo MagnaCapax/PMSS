@@ -24,6 +24,39 @@ class UserConfigLighttpdLogicTest extends TestCase
         $this->assertEquals(10, $planHigh['totalThreads']);
     }
 
+    public function testCpuQuotaLegacy85UsesThreadBasedDefault(): void
+    {
+        // Force a deterministic CPU thread count for the calculation.
+        putenv('PMSS_TOTAL_CPU_THREADS=8');
+        $props = ['CPUQuota' => '85%'];
+        $policy = ['cpuQuotaPercent' => 85];
+
+        $quota = \pmssExtractCpuQuotaPercent($props, $policy);
+        // 8 logical threads × 85% = 680% effective quota.
+        $this->assertEquals(680, $quota);
+    }
+
+    public function testCpuQuotaExplicitValuePreservedWhenNonLegacy(): void
+    {
+        putenv('PMSS_TOTAL_CPU_THREADS=8');
+        $props = ['CPUQuota' => '250%'];
+        $policy = ['cpuQuotaPercent' => 85];
+
+        $quota = \pmssExtractCpuQuotaPercent($props, $policy);
+        $this->assertEquals(250, $quota);
+    }
+
+    public function testCpuQuotaFallsBackToThreadsWhenMissing(): void
+    {
+        putenv('PMSS_TOTAL_CPU_THREADS=4');
+        $props = [];
+        $policy = [];
+
+        $quota = \pmssExtractCpuQuotaPercent($props, $policy);
+        // 4 logical threads × 85% = 340% effective quota.
+        $this->assertEquals(340, $quota);
+    }
+
     public function testParseSizeToMiB(): void
     {
         $this->assertEquals(500, \pmssParseSizeToMiB('524288000'));
