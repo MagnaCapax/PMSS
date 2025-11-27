@@ -224,7 +224,9 @@ $legacyServices = ['btsync', 'rslsync', 'pyload', 'sabnzbdplus', 'lighttpd'];
 pmssDisableLegacyServices($legacyServices, $distroVersion);
 pmssAdjustLighttpdSecurity();
 
-// Per-user updates ensure ruTorrent stays consistent.
+// Per-user updates ensure ruTorrent stays consistent. The SHA tracks the
+// skeleton ruTorrent index version so user instances can be upgraded when the
+// template changes.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
 pmssUpdateAllUsers($rutorrentIndexSha);
 // #TODO(user-logs): per-user environment updates could append summary lines to /var/log/pmss/user-<username>.log

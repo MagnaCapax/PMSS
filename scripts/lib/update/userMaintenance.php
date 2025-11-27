@@ -64,6 +64,10 @@ if (!function_exists('pmssRunAndLog')) {
 if (!function_exists('pmssUpdateAllUsers')) {
     /**
      * Refresh ruTorrent and skeleton data for every provisioned user.
+     *
+     * #TODO(user-maint): keep this as a simple foreach(users) orchestrator;
+     * avoid accumulating extra cross-cutting concerns here beyond logging and
+     * the temporary CPUQuota fix block.
      */
     function pmssUpdateAllUsers(string $rutorrentIndexSha): void
     {

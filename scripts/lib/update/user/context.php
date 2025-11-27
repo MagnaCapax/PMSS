@@ -19,6 +19,8 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
         return null;
     }
 
+    // rutorrent_index_sha tracks the current skeleton ruTorrent index.html
+    // hash so callers can detect when per-user instances are out of date.
     return [
         'user'               => $user,
         'home'               => $home,
