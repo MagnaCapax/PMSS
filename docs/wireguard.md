@@ -5,6 +5,12 @@ During provisioning the installer generates server keys, enables `wg-quick@wg0`
 and writes connection instructions to both `/etc/wireguard/README` and each
 user's `~/wireguard.txt`.
 
+This document describes the **host-level** WireGuard service managed by PMSS.
+Some accounts also use the optional linuxserver.io WireGuard container via
+Docker (see [`docs/docker-help.md`](./docker-help.md) and
+[`docs/linuxserver.io.md`](./linuxserver.io.md)); that container runs under
+your user account and is separate from the system `wg0` service covered here.
+
 Typical workflow:
 
 1. Read `~/wireguard.txt` to obtain your server endpoint, public key, and

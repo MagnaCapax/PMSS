@@ -34,4 +34,7 @@ If you need docker-compose, download the latest binary into `~/bin` and make it 
 See the [rootless Docker limitations](https://docs.docker.com/engine/security/rootless/#known-limitations) for details.
 
 For a deeper guide to running linuxserver.io application containers on PMSS, see
-[`docs/linuxserver.io.md`](./linuxserver.io.md).
+[`docs/linuxserver.io.md`](./linuxserver.io.md). For the host-managed WireGuard
+VPN service (recommended default), see [`docs/wireguard.md`](./wireguard.md);
+the linuxserver.io WireGuard container is optional and runs under your own
+account with Docker.
