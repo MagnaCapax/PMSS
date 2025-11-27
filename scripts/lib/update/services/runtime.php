@@ -12,7 +12,7 @@ if (!function_exists('pmssApplyRuntimeTemplates')) {
     function pmssApplyRuntimeTemplates(): void
     {
         runStep('Updating rc.local template', 'cp /etc/seedbox/config/template.rc.local /etc/rc.local');
-        runStep('Setting rc.local ownership', 'chown root.root /etc/rc.local');
+        runStep('Setting rc.local ownership', 'chown root:root /etc/rc.local');
         runStep('Setting rc.local permissions', 'chmod 750 /etc/rc.local');
         runStep('Executing rc.local to apply runtime tweaks', 'nohup /etc/rc.local >> /dev/null 2>&1');
 

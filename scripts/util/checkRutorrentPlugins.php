@@ -29,7 +29,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     if (!file_exists($userPath . 'hddquota')) {
         echo "HDD Quota does not exist - adding!\n";
         shell_exec("cp -rp /etc/skel/www/rutorrent/plugins/hddquota {$userPath}");
-        shell_exec("chown {$thisUser}.{$thisUser} {$userPath}hddquota");
+        shell_exec("chown {$thisUser}:{$thisUser} {$userPath}hddquota");
         shell_exec("chmod -R 777 {$userPath}hddquota");
     }
     

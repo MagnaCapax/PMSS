@@ -37,7 +37,7 @@ foreach ($users as $thisUser) {
     foreach ($passwords as $thisPassword) {
         if (strpos($thisPassword, $thisUser.':') === 0) {
             file_put_contents($thisUserDir . '/.lighttpd/.htpasswd', $thisPassword."\n", FILE_APPEND);
-            passthru("chown {$thisUser}.{$thisUser} {$thisUserDir}/.lighttpd/.htpasswd");
+            passthru("chown {$thisUser}:{$thisUser} {$thisUserDir}/.lighttpd/.htpasswd");
         }
     }
 }

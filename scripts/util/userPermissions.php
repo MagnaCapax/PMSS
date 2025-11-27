@@ -98,18 +98,18 @@ $chmodItems = [
 ];
 
 $chownItems = [
-    ["/home/{$thisUser}/.lighttpd/.htpasswd", "{$thisUser}.{$thisUser}"],
-    ["/home/{$thisUser}/.lighttpd/", "{$thisUser}.{$thisUser}", true],
+    ["/home/{$thisUser}/.lighttpd/.htpasswd", "{$thisUser}:{$thisUser}"],
+    ["/home/{$thisUser}/.lighttpd/", "{$thisUser}:{$thisUser}", true],
     // NOTE: Avoid blanket chown -R on the whole home; exclude known root-owned files/dirs first.
     // The remaining tree is handled by a targeted find below.
-    ["/home/{$thisUser}/.trafficData", "root.{$thisUser}"],
-    ["/home/{$thisUser}/.trafficDataLocal", "root.{$thisUser}"],
-    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings", "{$thisUser}.{$thisUser}"],
-    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings/retrackers.dat", "{$thisUser}.{$thisUser}"],
-    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}", "{$thisUser}.{$thisUser}"],
-    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/torrents", "{$thisUser}.{$thisUser}"],
-    ["/home/{$thisUser}/.rtorrent.rc", "root.root"],
-    ["/home/{$thisUser}/www/rutorrent/conf/config.php", "root.root"],
+    ["/home/{$thisUser}/.trafficData", "root:{$thisUser}"],
+    ["/home/{$thisUser}/.trafficDataLocal", "root:{$thisUser}"],
+    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings", "{$thisUser}:{$thisUser}"],
+    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings/retrackers.dat", "{$thisUser}:{$thisUser}"],
+    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}", "{$thisUser}:{$thisUser}"],
+    ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/torrents", "{$thisUser}:{$thisUser}"],
+    ["/home/{$thisUser}/.rtorrent.rc", "root:root"],
+    ["/home/{$thisUser}/www/rutorrent/conf/config.php", "root:root"],
 ];
 
 foreach ($chmodItems as $item) {
@@ -133,7 +133,7 @@ foreach ($excludes as $ex) {
     $findParts[] = '-not -path '.escapeshellarg($ex);
 }
 $findParts[] = '-exec chown';
-$findParts[] = escapeshellarg("{$thisUser}.{$thisUser}");
+$findParts[] = escapeshellarg("{$thisUser}:{$thisUser}");
 $findParts[] = '{}';
 $findParts[] = '+';
 run(implode(' ', $findParts));

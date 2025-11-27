@@ -25,8 +25,7 @@ if ($debianVersion[0] == 8) {
     `chown -R vnstat:vnstat /var/lib/vnstat`;
     `/etc/init.d/vnstat restart`;
 
-    passthru("chown vnstat.vnstat /var/lib/vnstat -R; chown vnstat.vnstat /var/lib/vnstat/* -R;");
+    passthru("chown vnstat:vnstat /var/lib/vnstat -R; chown vnstat:vnstat /var/lib/vnstat/* -R;");
 
 
 }
-

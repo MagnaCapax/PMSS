@@ -29,7 +29,7 @@ if (file_exists("/home/{$username}/.lighttpd/.htpasswd")) $htpasswdCommand = 'ht
     else $htpasswdCommand = 'htpasswd -c -b -m';
 
 shell_exec("{$htpasswdCommand} {$htpasswdFile} {$username} {$password}");     // Create http password
-passthru("chown {$username}.{$username} /home/{$username}/.lighttpd/.htpasswd");
+passthru("chown {$username}:{$username} /home/{$username}/.lighttpd/.htpasswd");
 
 
 

@@ -108,15 +108,15 @@ if (empty($randomFilename)) die("For a bizarre reason, could not create random f
 
 
 file_put_contents("/root/{$randomFilename}", $script);
-`chown root.root /root/{$randomFilename}`;
+`chown root:root /root/{$randomFilename}`;
 `chmod 700 /root/{$randomFilename}`;
 
 file_put_contents("/root/{$randomFilename}2", $script2);
-`chown root.root /root/{$randomFilename}2`;
+`chown root:root /root/{$randomFilename}2`;
 `chmod 700 /root/{$randomFilename}2`;
 
 file_put_contents("/root/{$rsyncCommandFilename}", $rsyncCommand);
-`chown root.root /root/{$rsyncCommandFilename}`;
+`chown root:root /root/{$rsyncCommandFilename}`;
 `chmod 700 /root/{$rsyncCommandFilename}`;
 
 echo "Scripts created, executing:\n";
@@ -146,7 +146,7 @@ if ($args['remoteUser'] !== $args['localUser']) {   // Rename ruTorrent users di
 // Chown the migrated data
 //$mask = '/*';
 $mask = '';
-`chown {$args['localUser']}.{$args['localUser']} /home/{$args['localUser']}{$mask} -R`;
+`chown {$args['localUser']}:{$args['localUser']} /home/{$args['localUser']}{$mask} -R`;
 
 echo "Requesting rTorrent restart\n";
 touch("/home/{$args['localUser']}/www/.rtorrentRestart");

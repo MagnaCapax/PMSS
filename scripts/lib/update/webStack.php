@@ -69,13 +69,13 @@ if (!function_exists('pmssAdjustLighttpdSecurity')) {
 
         if (is_file($configFile)) {
             runStep('Adjusting /etc/lighttpd/lighttpd.conf permissions', 'chmod 750 '.$configFile);
-            runStep('Setting ownership on /etc/lighttpd/lighttpd.conf', 'chown root.root '.$configFile);
+            runStep('Setting ownership on /etc/lighttpd/lighttpd.conf', 'chown root:root '.$configFile);
         } else {
             logmsg('[SKIP] lighttpd.conf missing; skipping lighttpd permission adjustments');
         }
 
         if (is_file($htpasswd)) {
-            runStep('Setting ownership on /etc/lighttpd/.htpasswd', 'chown root.root '.$htpasswd);
+            runStep('Setting ownership on /etc/lighttpd/.htpasswd', 'chown root:root '.$htpasswd);
             runStep('Adjusting /etc/lighttpd/.htpasswd permissions', 'chmod 640 '.$htpasswd);
         } else {
             logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');
