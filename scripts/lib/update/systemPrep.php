@@ -293,13 +293,11 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         $cpuWeight    = isset($policy['cpuWeight']) && is_numeric($policy['cpuWeight']) ? (int)$policy['cpuWeight'] : 200;
         $ioWeight     = isset($policy['ioWeight']) && is_numeric($policy['ioWeight']) ? (int)$policy['ioWeight'] : 200;
         $tasksMax     = isset($policy['tasksMax']) && is_numeric($policy['tasksMax']) ? (int)$policy['tasksMax'] : 512;
-        
-        // Calculate default CPUQuota: 85% of total logical cores (threads).
-        // Fallback to 600% (6 cores) if detection fails.
-        $cpuThreads   = pmssTotalCpuThreads();
-        $defaultQuota = ($cpuThreads > 0) ? ($cpuThreads * 85) : 600;
-        
-        $cpuQuotaVal = $defaultQuota;
+
+        // Do not hard-cap CPU by default; leave CPUQuota unset/infinity unless
+        // an explicit policy override is provided. This ensures system-wide
+        // defaults never clamp per-user slice quotas unexpectedly.
+        $cpuQuotaVal = 'infinity';
         if (isset($policy['cpuQuotaPercent'])) {
             $pVal = $policy['cpuQuotaPercent'];
             if (is_string($pVal) && strtolower($pVal) === 'infinity') {

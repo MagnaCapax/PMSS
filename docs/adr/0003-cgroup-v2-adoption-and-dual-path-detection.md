@@ -11,11 +11,13 @@ Production systems span Debian 10/11/12 with a mix of kernel capabilities. Debia
   - v2: `etc/seedbox/config/template.cgroup.user-slice.v2.conf`
   - v1: `etc/seedbox/config/template.cgroup.user-slice.v1.conf`
 - Render user slice overrides only under admin paths: `/etc/systemd/system/user-.slice.d/15-pmss.conf`. Vendor paths are never used; any lingering vendor drop‑ins are removed.
-- Enforce safe floors/caps in code when rendering:
+- Enforce safe floors/caps in code when rendering (CPU remains uncapped by
+  default so system-wide policy does not override per-user configuration):
   - `MemoryHigh` ≥ 250 MiB (floor)
   - Default `MemoryHigh` ≈ 10% of total RAM
   - `MemoryMax` = min(1.5 × `MemoryHigh`, 95% of total RAM)
-  - Default `CPUWeight`=200; `IOWeight`=200; `TasksMax`=512; `CPUQuota`=85%
+  - Default `CPUWeight`=200; `IOWeight`=200; `TasksMax`=512; `CPUQuota` left
+    unset/`infinity` unless a host policy (`cpuQuotaPercent`) explicitly opts in
 - Root slice must be unlimited: create `/etc/systemd/system/user-0.slice.d/99-pmss-unlimited.conf` with `MemoryHigh/Max/TasksMax=infinity` and install a lightweight repair utility invoked on boot and periodically.
 - Policy overrides come from a PHP array file: `etc/seedbox/config/cgroup.policy.php`, using mount‑based IO defaults (`/` and `/home`) resolved to devices at runtime (via `findmnt`). Policy keys include memory/CPU/IO weights, `CPUQuotaPercent`, `TasksMax`, and mount IO caps (bandwidth/IOPS). Guardrails above always apply.
 - Utilities:
