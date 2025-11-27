@@ -11,4 +11,5 @@ deb-src http://archive.debian.org/debian-security buster/updates main contrib no
 deb http://archive.debian.org/debian buster-updates main contrib non-free
 deb-src http://archive.debian.org/debian buster-updates main contrib non-free
 
-# Note: MediaArea apt repo is omitted on Buster (EOL) to avoid 404/Release errors.
+# MediaArea repository
+deb https://mediaarea.net/repo/deb/debian buster main

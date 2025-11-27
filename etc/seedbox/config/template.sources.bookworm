@@ -11,5 +11,5 @@ deb-src http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib
 
 deb http://www.nic.funet.fi/debian/ bookworm-backports main non-free contrib
 
-# MediaArea repository is managed via deb822 when explicitly enabled.
-# See scripts/lib/update/repositories.php and PMSS_MEDIAAREA env flag.
+# MediaArea repository
+deb https://mediaarea.net/repo/deb/debian bookworm main

@@ -10,3 +10,6 @@ deb http://www.nic.funet.fi/debian/ trixie-updates main non-free contrib
 deb-src http://www.nic.funet.fi/debian/ trixie-updates main non-free contrib
 
 deb http://www.nic.funet.fi/debian/ trixie-backports main non-free contrib
+
+# MediaArea repository
+deb https://mediaarea.net/repo/deb/debian trixie main
