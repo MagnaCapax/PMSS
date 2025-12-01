@@ -27,10 +27,35 @@
 
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
-if ! command -v ss >/dev/null 2>&1; then
+if ! command -v ss >/dev/null 2>&1;
+then
   echo "Required dependency 'ss' (iproute2) not found; install it and retry."
   exit 1
 fi
+
+# Detect Architecture
+ARCH=$(dpkg --print-architecture)
+case "$ARCH" in
+  "amd64")
+    JF_ARCH="amd64"
+    DOTNET_ARCH="x64"
+    SERVARR_ARCH="x64"
+    ;;
+  "arm64")
+    JF_ARCH="arm64"
+    DOTNET_ARCH="arm64"
+    SERVARR_ARCH="arm64"
+    ;;
+  "armhf")
+    JF_ARCH="armhf"
+    DOTNET_ARCH="arm"
+    SERVARR_ARCH="arm"
+    ;;
+  *) 
+    echo "Architecture '$ARCH' not supported."
+    exit 1
+    ;;
+esac
 
 # Safety check for existing .bin
 if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin")" ]; then
@@ -42,24 +67,43 @@ rm -rf "$HOME/.bin"
 
 mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
 
-# Dynamic versions (SABnzbd & Jellyfin via GitHub API)
+echo "Resolving latest versions..."
+
+# SABnzbd (GitHub API)
 SABNZBD_VERSION=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4)
 SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep '\-src' | cut -d '"' -f 4)
-JELLYFIN_VERSION=$(curl -s https://api.github.com/repos/jellyfin/jellyfin/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4 | sed 's/v//')  # e.g., 10.11.2
-JELLYFIN_URL="https://github.com/jellyfin/jellyfin/releases/download/v${JELLYFIN_VERSION}/jellyfin_${JELLYFIN_VERSION}_linux-amd64.tar.gz"
 
-# .NET 8 ASP.NET Core Runtime 8.0.21 (latest Nov 2025; verify at dotnet.microsoft.com/en-us/download/dotnet/8.0)
-ASPDOTNET_URL="https://download.visualstudio.microsoft.com/download/pr/7d6a4b4e-4f4e-4b4e-9f4e-7d6a4b4e4f4e/aspnetcore-runtime-8.0.21-linux-x64.tar.gz"  # Replace hash if needed
+# Jellyfin (Repo Scraping)
+# Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
+JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_ARCH}/"
+# Find filename like jellyfin_10.X.Y-amd64.tar.gz
+JF_FILENAME=$(curl -s "$JF_REPO_BASE" | grep -oE "jellyfin_[0-9]+\.[0-9]+\.[0-9]+-${JF_ARCH}\.tar\.gz" | head -n 1)
+if [[ -z "$JF_FILENAME" ]]; then
+  echo "Error: Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"
+  exit 1
+fi
+JELLYFIN_URL="${JF_REPO_BASE}${JF_FILENAME}"
+
+# ASP.NET Core Runtime (Microsoft aka.ms Links)
+# These redirect to the latest patch version of .NET 8 (LTS)
+ASPDOTNET_URL="https://aka.ms/dotnet/8.0/aspnetcore-runtime-linux-${DOTNET_ARCH}.tar.gz"
+
+echo "Versions resolved:"
+echo "  SABnzbd: $SABNZBD_VERSION"
+echo "  Jellyfin: $JF_FILENAME"
+echo "  ASP.NET: .NET 8 LTS ($DOTNET_ARCH)"
 
 # Enhanced port randomizer with bind test (for shared env security)
 random_open_port() {
   local LOW_BOUND=10000
   local UPPER_BOUND=65000
   local candidate
-  while true; do
+  while true;
+  do
     candidate=$(comm -23 <(seq "${LOW_BOUND}" "${UPPER_BOUND}" | sort -u) <(ss -Htan | awk '{print $4}' | rev | cut -d':' -f1 | rev | sort -u) | shuf | head -n 1)
     # Test bind with Python (available on Debian 10+)
-    if python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(('127.0.0.1', $candidate)); s.close(); exit(0)" 2>/dev/null; then
+    if python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(('127.0.0.1', $candidate)); s.close(); exit(0)" 2>/dev/null;
+    then
       echo "$candidate"
       return
     fi
@@ -72,10 +116,12 @@ PROWLARR_PORT=$(random_open_port)
 SONARR_PORT=$(random_open_port)
 JELLYFIN_PORT=$(random_open_port)
 USERNAME=$(whoami)
-HOSTNAME=$(hostname)
+HOTNAME=$(hostname)
 
 # Kill existing tmux sessions per app first
-for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow; do
+echo "Stopping existing sessions..."
+for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow;
+do
   tmux kill-session -t "${app}" 2>/dev/null || true
 done
 pkill -9 -f -u "$USERNAME" tmux > /dev/null 2>&1 || true  # Fallback global
@@ -139,16 +185,10 @@ echo "Installing ${app^^}..."
 installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="master"
-ARCH=$(dpkg --print-architecture)
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app^}" > /dev/null 2>&1 || true
-dlbase="https://${app}.servarr.com/v1/update/${branch}/updatefile?os=linux&runtime=netcore"
-case "$ARCH" in
-  "amd64") DLURL="${dlbase}&arch=x64" ;;
-  "armhf") DLURL="${dlbase}&arch=arm" ;;
-  "arm64") DLURL="${dlbase}&arch=arm64" ;;
-  *) echo "Arch not supported"; exit 1 ;;
-esac
+DLURL="https://${app}.servarr.com/v1/update/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+
 echo "Downloading...${app^^}"
 cd "$installdir"
 wget --content-disposition "$DLURL" > /dev/null 2>&1
@@ -172,9 +212,9 @@ if [ ! -f "$datadir/config.xml" ]; then
 </Config>
 EOF
 fi
-sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$RADARR_PORT\2/g" "$datadir/config.xml"
-sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/config.xml"
-sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<Port>\)[^<]*\(</Port>\)/\1$RADARR_PORT\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<UrlBase>\)[^<]*\(</UrlBase>\)/\1/public-${USERNAME}/${app}\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<BindAddress>\)[^<]*\(</BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
 echo "${app^^} configured"
 echo ""
 
@@ -184,16 +224,10 @@ echo "Installing ${app^^}..."
 installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="master"  # Stable
-ARCH=$(dpkg --print-architecture)
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app^}" > /dev/null 2>&1 || true
-dlbase="https://${app}.servarr.com/v1/update/${branch}/updatefile?os=linux&runtime=netcore"
-case "$ARCH" in
-  "amd64") DLURL="${dlbase}&arch=x64" ;;
-  "armhf") DLURL="${dlbase}&arch=arm" ;;
-  "arm64") DLURL="${dlbase}&arch=arm64" ;;
-  *) echo "Arch not supported"; exit 1 ;;
-esac
+DLURL="https://${app}.servarr.com/v1/update/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+
 echo "Downloading...${app^^}"
 cd "$installdir"
 wget --content-disposition "$DLURL" > /dev/null 2>&1
@@ -217,9 +251,9 @@ if [ ! -f "$datadir/config.xml" ]; then
 </Config>
 EOF
 fi
-sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$PROWLARR_PORT\2/g" "$datadir/config.xml"
-sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/config.xml"
-sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<Port>\)[^<]*\(</Port>\)/\1$PROWLARR_PORT\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<UrlBase>\)[^<]*\(</UrlBase>\)/\1/public-${USERNAME}/${app}\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<BindAddress>\)[^<]*\(</BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
 echo "${app^^} configured"
 echo ""
 
@@ -229,16 +263,10 @@ echo "Installing ${app^^}..."
 installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="master"
-ARCH=$(dpkg --print-architecture)
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app^}" > /dev/null 2>&1 || true
-dlbase="https://services.${app}.tv/v1/update/${branch}/download?os=linux&runtime=netcore"
-case "$ARCH" in
-  "amd64") DLURL="${dlbase}&arch=x64" ;;
-  "armhf") DLURL="${dlbase}&arch=arm" ;;
-  "arm64") DLURL="${dlbase}&arch=arm64" ;;
-  *) echo "Arch not supported"; exit 1 ;;
-esac
+DLURL="https://services.${app}.tv/v1/update/${branch}/download?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+
 echo "Downloading...${app^^}"
 cd "$installdir"
 wget --content-disposition "$DLURL" > /dev/null 2>&1
@@ -262,9 +290,9 @@ if [ ! -f "$datadir/config.xml" ]; then
 </Config>
 EOF
 fi
-sed -i -e "s/\(<Port>\)[^<]*\(<\/Port>\)/\1$SONARR_PORT\2/g" "$datadir/config.xml"
-sed -i -e "s/\(<UrlBase>\)[^<]*\(<\/UrlBase>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/config.xml"
-sed -i -e "s/\(<BindAddress>\)[^<]*\(<\/BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<Port>\)[^<]*\(</Port>\)/\1$SONARR_PORT\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<UrlBase>\)[^<]*\(</UrlBase>\)/\1/public-${USERNAME}/${app}\2/g" "$datadir/config.xml"
+sed -i -e "s/\(<BindAddress>\)[^<]*\(</BindAddress>\)/\1127.0.0.1\2/g" "$datadir/config.xml"
 echo "${app^^} configured"
 echo ""
 
@@ -275,14 +303,13 @@ echo "Downloading...${app^^}"
 installdir="$HOME/.bin/dotnet"
 mkdir -p "$installdir"
 cd "$installdir"
-wget "$ASPDOTNET_URL" > /dev/null 2>&1
-archive=$(find . -maxdepth 1 -name "*.tar.gz" -print -quit)
-if [ -z "${archive:-}" ]; then
-  echo "Failed to find downloaded ASP.NET archive"
-  exit 1
+wget -L "$ASPDOTNET_URL" -O aspnetcore.tar.gz > /dev/null 2>&1
+if [ ! -f "aspnetcore.tar.gz" ]; then
+    echo "Failed to find downloaded ASP.NET archive"
+    exit 1
 fi
-tar -xvzf "$archive" > /dev/null 2>&1
-rm -f "$archive" > /dev/null 2>&1
+tar -xvzf "aspnetcore.tar.gz" > /dev/null 2>&1
+rm -f "aspnetcore.tar.gz" > /dev/null 2>&1
 cat << 'EOF' >> "$HOME"/.bashrc
 # Added by PMSS media stack installer (.NET 8)
 export DOTNET_ROOT=$HOME/.bin/dotnet
@@ -346,20 +373,21 @@ if [ ! -f "$datadir/network.xml" ]; then
 </NetworkConfiguration>
 EOF
 fi
-sed -i -e "s/\(<PublicPort>\)[^<]*\(<\/PublicPort>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
-sed -i -e "s/\(<HttpServerPortNumber>\)[^<]*\(<\/HttpServerPortNumber>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
+sed -i -e "s/\(<PublicPort>\)[^<]*\(</PublicPort>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
+sed -i -e "s/\(<HttpServerPortNumber>\)[^<]*\(</HttpServerPortNumber>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
 sed -i -e "s/<BaseUrl \/>/<BaseUrl><\/BaseUrl>/" "$datadir/network.xml"
-sed -i -e "s/\(<BaseUrl>\)[^<]*\(<\/BaseUrl>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/network.xml"
+sed -i -e "s/\(<BaseUrl>\)[^<]*\(</BaseUrl>\)/\1/public-${USERNAME}/${app}\2/g" "$datadir/network.xml"
 echo "${app^^} configured"
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
 cat << 'EOF' >> "$HOME"/.bashrc
 # PMSS Media stack aliases (updated Nov 2025)
-alias jellyfin='tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'
+alias jellyfin='tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'
 alias sonarr='tmux new-session -d -s "sonarr" "$HOME/.bin/Sonarr/Sonarr --data=$HOME/.config/sonarr; exec $SHELL"'
 alias radarr='tmux new-session -d -s "radarr" "$HOME/.bin/Radarr/Radarr -nobrowser -data=$HOME/.config/radarr; exec $SHELL"'
 alias prowlarr='tmux new-session -d -s "prowlarr" "$HOME/.bin/Prowlarr/Prowlarr -nobrowser -data=$HOME/.config/prowlarr; exec $SHELL"'
+
 alias cloudplow='tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log"'
 alias sabnzbd='tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && /usr/bin/nice -n 19 python3 $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini"'
 EOF
@@ -367,7 +395,7 @@ EOF
 # Lighttpd config (use $HOSTNAME)
 mkdir -p "$HOME/.lighttpd"
 cat << EOF > "$HOME/.lighttpd/custom"
-\$HTTP["url"] =~ "^/sabnzbd(\$|\/)" {
+$HTTP["url"] =~ "^/sabnzbd(\\|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${SABNZBD_PORT}
@@ -382,7 +410,7 @@ cat << EOF > "$HOME/.lighttpd/custom"
   ) )
 }
 
-\$HTTP["url"] =~ "^/radarr(\$|\/)" {
+$HTTP["url"] =~ "^/radarr(\\|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${RADARR_PORT}
@@ -397,7 +425,7 @@ cat << EOF > "$HOME/.lighttpd/custom"
   ) )
 }
 
-\$HTTP["url"] =~ "^/prowlarr(\$|\/)" {
+$HTTP["url"] =~ "^/prowlarr(\\|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${PROWLARR_PORT}
@@ -412,7 +440,7 @@ cat << EOF > "$HOME/.lighttpd/custom"
   ) )
 }
 
-\$HTTP["url"] =~ "^/sonarr(\$|\/)" {
+$HTTP["url"] =~ "^/sonarr(\\|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${SONARR_PORT}
@@ -427,7 +455,7 @@ cat << EOF > "$HOME/.lighttpd/custom"
   ) )
 }
 
-\$HTTP["url"] =~ "^/jellyfin(\$|\/)" {
+$HTTP["url"] =~ "^/jellyfin(\\|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${JELLYFIN_PORT}
@@ -448,11 +476,12 @@ JELLYFIN_DATA_DIR="$HOME/.config/jellyfin"
 PUBLIC_IP=$(curl -fsS ifconfig.me 2>/dev/null || echo "unavailable")
 
 # shellcheck source=/dev/null
-source "$HOME/.bashrc"
+source "$HOME/.bashrc" || true
 
 echo ""
 echo "Starting applications"
-tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_DATA_DIR/log\"; nice -n 19 \"$DOTNET_ROOT_PATH\" \"$HOME/.bin/jellyfin/jellyfin.dll\""
+# Corrected: Point to dotnet binary, not the directory
+tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_DATA_DIR/log\"; nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""
 tmux new-session -d -s "sonarr" "$HOME/.bin/Sonarr/Sonarr --data=$HOME/.config/sonarr; exec $SHELL"
 tmux new-session -d -s "radarr" "$HOME/.bin/Radarr/Radarr -nobrowser -data=$HOME/.config/radarr; exec $SHELL"
 tmux new-session -d -s "prowlarr" "$HOME/.bin/Prowlarr/Prowlarr -nobrowser -data=$HOME/.config/prowlarr; exec $SHELL"
@@ -460,7 +489,7 @@ tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && /usr
 tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log"
 
 echo ""
-echo "Connect to running application use command 'tmux attach -t <app-name>'"
+echo "Connect to running application use command 'tmux attach -t <app-name>'
 echo "e.g to attach to radarr 'tmux attach -t radarr'"
 echo "Exit tmux session by pressing 'CTRL+b' then 'd'"
 echo ""
@@ -474,17 +503,21 @@ echo "SABNZBD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/"
 echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
 echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
 echo "JELLYFIN-ALTERNATE-URL = ${PUBLIC_IP}:${JELLYFIN_PORT}/public-${USERNAME}/jellyfin/"
+
 echo ""
 echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
 echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Jellyfin=$HOME/.config/jellyfin | Cloudplow=$HOME/.config/cloudplow"
 echo "Tmux sessions running: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+
 echo ""
 echo "To kill all applications use 'tmux kill-server'"
+
 echo ""
 echo "Restarting lighttpd"
 pkill -9 -u "$USERNAME" lighttpd > /dev/null 2>&1 || true
 pkill -9 -u "$USERNAME" php-cgi > /dev/null 2>&1 || true
 echo "It may take 1-2 minutes to restart lighttpd"
+
 
 echo ""
 echo "=== IMPORTANT WARNINGS ==="
