@@ -232,6 +232,20 @@ function pmssResolveUserResources(string $user, array $policyDefaults): array
     ];
 }
 
+function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
+{
+    if (!is_dir($homeDir)) {
+        return false;
+    }
+    if (is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www')) {
+        return false;
+    }
+    if (!file_exists($homeDir.'/.rtorrent.rc')) {
+        return false;
+    }
+    return true;
+}
+
 function pmssUpdatePhpIni(string $path, int $memoryLimitMb): void
 {
     $content = @file_get_contents($path);
@@ -308,7 +322,16 @@ function pmssUserConfigLighttpdMain(array $argv): int
     $policyDefaults = pmssLoadCgroupPolicyDefaults();
 
     foreach ($users as $thisUser) {
-        if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;   // Suspended or not torrent user
+        $thisUser = trim($thisUser);
+        if ($thisUser === '') {
+            continue;
+        }
+
+        $homeDir = "/home/{$thisUser}";
+        if (!pmssShouldConfigureLighttpdForHome($homeDir)) {
+            continue;
+        }
+
         $portFile = "{$portsDirectory}/lighttpd-{$thisUser}";
         if (file_exists($portFile)) {
             $serverPort = (int) file_get_contents($portFile);

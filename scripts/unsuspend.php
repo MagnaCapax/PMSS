@@ -29,6 +29,19 @@ if ($hasPlaceholder) {
 }
 
 if (is_dir($disabledRoot)) {
+    // Handle legacy conflicts where a non-placeholder www/ directory exists
+    // alongside www-disabled/. This can happen when newer scripts created a
+    // stub docroot for a suspended user. Preserve any unexpected content by
+    // moving it aside before restoring the original web root.
+    if (is_dir($activeRoot) && !$hasPlaceholder) {
+        $backup = $homeDir.'/www-conflicting-'.date('YmdHis');
+        if (@rename($activeRoot, $backup)) {
+            echo "Notice: moved existing {$activeRoot} to {$backup} before restore\n";
+        } else {
+            echo "Warning: existing {$activeRoot} may prevent restore; please inspect and clean up manually\n";
+        }
+    }
+
     if (!@rename($disabledRoot, $activeRoot)) {
         echo "Warning: failed to restore {$disabledRoot}\n";
     }

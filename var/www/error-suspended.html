@@ -1,0 +1,34 @@
+<div class="container">
+  <span class="error-message">Account Suspended</span>
+  <br />
+  <div class="content-container">
+    <div id="image-container">
+      <img alt="Account Suspended" />
+    </div>
+
+    <div class="error-description">
+      <p>
+        This account is currently suspended and access to its services is
+        temporarily disabled.
+      </p>
+      <p>
+        If you believe this is a mistake or need assistance restoring access,
+        please open a support ticket.
+      </p>
+      <p>
+        <a href="https://pulsedmedia.com/clients/supporttickets.php">
+          pulsedmedia.com/clients/supporttickets.php
+        </a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Reuse the shared error page stylesheet for consistent styling.
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.type = 'text/css';
+  link.href = '/css/error-styles.css';
+  document.head.appendChild(link);
+</script>

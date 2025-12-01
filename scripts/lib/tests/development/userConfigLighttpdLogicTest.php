@@ -63,4 +63,40 @@ class UserConfigLighttpdLogicTest extends TestCase
         $this->assertEquals(500, \pmssParseSizeToMiB('500M'));
         $this->assertEquals(1, \pmssParseSizeToMiB('1024K'));
     }
+
+    public function testShouldConfigureLighttpdSkipsNonExistingHome(): void
+    {
+        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome('/tmp/pmss-nonexistent-home'));
+    }
+
+    public function testShouldConfigureLighttpdSkipsSuspendedUsers(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-lighttpd-suspended-'.uniqid('', true);
+        $home = $base.'/user';
+        @mkdir($home.'/www-disabled', 0755, true);
+
+        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome($home));
+    }
+
+    public function testShouldConfigureLighttpdSkipsMissingWebRoot(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-lighttpd-missing-www-'.uniqid('', true);
+        $home = $base.'/user';
+        @mkdir($home, 0755, true);
+
+        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome($home));
+    }
+
+    public function testShouldConfigureLighttpdRequiresRtorrentConfig(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-lighttpd-rtorrent-'.uniqid('', true);
+        $home = $base.'/user';
+        @mkdir($home.'/www', 0755, true);
+
+        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome($home));
+
+        // Add .rtorrent.rc and expect the helper to allow configuration.
+        file_put_contents($home.'/.rtorrent.rc', "dummy");
+        $this->assertTrue(\pmssShouldConfigureLighttpdForHome($home));
+    }
 }

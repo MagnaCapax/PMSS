@@ -1,0 +1,8 @@
+location /user-##username/ {
+        return 302 /error-suspended.html;
+}
+
+location /public-##username/ {
+        return 302 /error-suspended.html;
+}
+

@@ -15,7 +15,8 @@ $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
 if (count($users) == 0) die("No users setup - nothing to do\n");
 
-$template = file_get_contents("/etc/seedbox/config/template.nginx-user");
+$userTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user");
+$suspendedTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user-suspended");
 
 // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
 if (!is_dir('/etc/nginx')) {
@@ -87,15 +88,49 @@ if (!file_exists("/etc/nginx/users")) {
 
 foreach($users AS $thisUser) {
     #TODO(user-logs): log per-user web config regeneration to /var/log/pmss/user-<username>.log
+    $thisUser = trim($thisUser);
+    if ($thisUser === '') {
+        continue;
+    }
+
+    $homeDir = "/home/{$thisUser}";
+    if (!is_dir($homeDir)) {
+        continue;
+    }
+
     $portFile = "/etc/seedbox/runtime/ports/lighttpd-{$thisUser}";
-    if (!file_exists("/home/{$thisUser}/.rtorrent.rc")) continue;
-   
+
+    // When a user is suspended, nginx should serve a static suspended page
+    // instead of proxying to their per-user lighttpd instance.
+    if (is_dir($homeDir.'/www-disabled')) {
+        if ($suspendedTemplate === false || $suspendedTemplate === '') {
+            // No dedicated suspended template found; skip generating a per-user
+            // config so nginx falls back to generic defaults.
+            continue;
+        }
+        $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
+        file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
+        continue;
+    }
+
+    if (!file_exists($homeDir.'/.rtorrent.rc')) {
+        continue;
+    }
+
     passthru("/scripts/util/configureLighttpd.php {$thisUser}");
     $serverPort = trim( file_get_contents($portFile) );
-    $delugePort = (int) file_get_Contents("/home/{$thisUser}/.delugePort");
+    $delugePort = (int) file_get_Contents($homeDir."/.delugePort");
     if (empty($serverPort)) continue;
     
-    $userConfig = str_replace(array("##username", "##serverPort", "##delugeWebPort"), array($thisUser, $serverPort, $delugePort + 1), $template);
+    if ($userTemplate === false || $userTemplate === '') {
+        continue;
+    }
+
+    $userConfig = str_replace(
+        array("##username", "##serverPort", "##delugeWebPort"),
+        array($thisUser, $serverPort, $delugePort + 1),
+        $userTemplate
+    );
     
     file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
     
