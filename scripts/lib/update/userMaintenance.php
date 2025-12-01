@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/runtime/commands.php';
+require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
 
@@ -82,7 +83,8 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
             // #TODO Remove this fix block by end of 2027.
             // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
-            // uncap them so users are no longer pinned to 85% of a single core.
+            // bump them to a host-based quota derived from total CPU threads so
+            // users are no longer capped to 85% of a single core.
             $uinfo = posix_getpwnam($user);
             if ($uinfo && isset($uinfo['uid'])) {
                 $uid = (int)$uinfo['uid'];
@@ -99,10 +101,12 @@ if (!function_exists('pmssUpdateAllUsers')) {
                     }
                 }
                 if ($needsFix) {
+                    $threads = pmssTotalCpuThreads();
+                    $newQuota = ($threads > 0) ? ($threads * 85) : 600;
                     $slice = 'user-'.$uid.'.slice';
                     runStep(
                         "Fixing legacy 85% CPUQuota for {$user}",
-                        'systemctl set-property '.escapeshellarg($slice).' CPUQuota=infinity'
+                        'systemctl set-property '.escapeshellarg($slice).' CPUQuota='.$newQuota.'%'
                     );
                 }
             }
