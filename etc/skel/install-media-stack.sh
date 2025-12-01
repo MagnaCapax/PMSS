@@ -403,7 +403,7 @@ EOF
 # Lighttpd config (use $HOSTNAME)
 mkdir -p "$HOME/.lighttpd"
 cat << EOF > "$HOME/.lighttpd/custom"
-$HTTP["url"] =~ "^/sabnzbd(\\|/)" {
+$HTTP["url"] =~ "^/sabnzbd(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${SABNZBD_PORT}
@@ -418,7 +418,7 @@ $HTTP["url"] =~ "^/sabnzbd(\\|/)" {
   ) )
 }
 
-$HTTP["url"] =~ "^/radarr(\\|/)" {
+$HTTP["url"] =~ "^/radarr(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${RADARR_PORT}
@@ -433,7 +433,7 @@ $HTTP["url"] =~ "^/radarr(\\|/)" {
   ) )
 }
 
-$HTTP["url"] =~ "^/prowlarr(\\|/)" {
+$HTTP["url"] =~ "^/prowlarr(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${PROWLARR_PORT}
@@ -448,7 +448,7 @@ $HTTP["url"] =~ "^/prowlarr(\\|/)" {
   ) )
 }
 
-$HTTP["url"] =~ "^/sonarr(\\|/)" {
+$HTTP["url"] =~ "^/sonarr(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${SONARR_PORT}
@@ -463,7 +463,7 @@ $HTTP["url"] =~ "^/sonarr(\\|/)" {
   ) )
 }
 
-$HTTP["url"] =~ "^/jellyfin(\\|/)" {
+$HTTP["url"] =~ "^/jellyfin(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => ${JELLYFIN_PORT}
@@ -497,7 +497,7 @@ tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && /usr
 tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log"
 
 echo ""
-echo "Connect to running application use command 'tmux attach -t <app-name>'
+echo "Connect to running application use command 'tmux attach -t <app-name>'"
 echo "e.g to attach to radarr 'tmux attach -t radarr'"
 echo "Exit tmux session by pressing 'CTRL+b' then 'd'"
 echo ""
