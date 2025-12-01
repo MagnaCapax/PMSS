@@ -795,9 +795,12 @@ function bootstrapMain(array $argv): void
         'pin'          => $spec['pin'],
     ]);
 
-    maybeRunDistUpgrade($options['dist_upgrade']);
-    if ($options['dist_upgrade']) {
+    $distUpgradeHelper = '/scripts/util/update-dist-upgrade.php';
+    if ($options['dist_upgrade'] && file_exists($distUpgradeHelper)) {
+        maybeRunDistUpgrade($options['dist_upgrade']);
         return;
+    } elseif ($options['dist_upgrade']) {
+        logmsg('[INFO] Dist-upgrade helper missing; fetching snapshot to provision it...');
     }
 
     // If we just restarted from a self-update, the new code is already staged.
@@ -837,6 +840,11 @@ function bootstrapMain(array $argv): void
         if (maybeSelfUpdate($argv, $options['dry_run'], $options['skip_self_update'], $originalHash)) {
             return;
         }
+    }
+
+    if ($options['dist_upgrade']) {
+        maybeRunDistUpgrade($options['dist_upgrade']);
+        return;
     }
 
     if ($options['scripts_only']) {
