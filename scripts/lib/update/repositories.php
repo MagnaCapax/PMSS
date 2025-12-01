@@ -30,7 +30,21 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
      */
     function pmssEnsureMediaareaRepository(): void
     {
-        // No-op
+        // Aggressively remove legacy MediaArea list files. These now conflict with
+        // the main /etc/apt/sources.list which includes the repo directly.
+        // We must ensure zero MediaArea files remain in sources.list.d.
+        $targets = [
+            '/etc/apt/sources.list.d/mediaarea.list',
+            '/etc/apt/sources.list.d/mediaarea.sources'
+        ];
+        foreach ($targets as $target) {
+            if (file_exists($target)) {
+                logmsg('[INFO] Removing legacy MediaArea repository file: ' . $target);
+                if (!@unlink($target)) {
+                    logmsg('[WARN] Failed to unlink ' . $target);
+                }
+            }
+        }
     }
 }
 
