@@ -144,10 +144,76 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         pmssRunAndLog($user, 'systemctl status user@.service (post)', 'systemctl --no-pager -l status user@'.$uid.'.service || true', false);
 
         // Start rootless Docker for the user and verify.
+        pmssEnsureDockerDependencies($user);
         pmssRunAndLog($user, 'systemctl --user start docker.service', 'systemctl --user start docker.service', true);
         pmssRunAndLog($user, 'systemctl --user status docker.service', 'systemctl --user --no-pager -l status docker.service || true', true);
         $dockerHost = 'unix:///run/user/'.$uid.'/docker.sock';
         pmssRunAndLog($user, 'docker ps', 'DOCKER_HOST='.escapeshellarg($dockerHost).' docker ps || true', true);
+    }
+}
+
+if (!function_exists('pmssEnsureDockerDependencies')) {
+    /**
+     * Verify Docker dependencies for a user: subuid/subgid and daemon.json storage-driver.
+     */
+    function pmssEnsureDockerDependencies(string $user): void
+    {
+        // 1. Check subuid/subgid
+        $subuid = @file_get_contents('/etc/subuid');
+        $subgid = @file_get_contents('/etc/subgid');
+        if ($subuid === false || strpos($subuid, $user.':') === false) {
+            pmssUserLog($user, '[WARN] User missing from /etc/subuid; rootless Docker may fail.');
+        }
+        if ($subgid === false || strpos($subgid, $user.':') === false) {
+            pmssUserLog($user, '[WARN] User missing from /etc/subgid; rootless Docker may fail.');
+        }
+
+        // 2. Enforce fuse-overlayfs on Debian < 12
+        $distroVersion = (int)(getenv('PMSS_DISTRO_VERSION') ?: 0);
+        if ($distroVersion >= 12) {
+            return;
+        }
+
+        // Resolve home directory
+        $uinfo = posix_getpwnam($user);
+        if (!$uinfo) return;
+        $home = $uinfo['dir'];
+        $uid  = $uinfo['uid'];
+        $gid  = $uinfo['gid'];
+
+        $configDir  = $home.'/.config/docker';
+        $configFile = $configDir.'/daemon.json';
+
+        if (!is_dir($configDir)) {
+            if (!mkdir($configDir, 0700, true)) {
+                pmssUserLog($user, '[WARN] Failed to create ~/.config/docker');
+                return;
+            }
+            chown($configDir, $uid);
+            chgrp($configDir, $gid);
+        }
+
+        $current = @file_get_contents($configFile);
+        $data = $current ? json_decode($current, true) : [];
+        if (!is_array($data)) $data = [];
+
+        // If storage-driver is already set, respect it.
+        if (isset($data['storage-driver'])) {
+            return;
+        }
+
+        // Otherwise, enforce fuse-overlayfs
+        $data['storage-driver'] = 'fuse-overlayfs';
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        
+        if (file_put_contents($configFile, $json) !== false) {
+            chown($configFile, $uid);
+            chgrp($configFile, $gid);
+            chmod($configFile, 0600);
+            pmssUserLog($user, '[INFO] Configured Docker storage-driver: fuse-overlayfs');
+        } else {
+            pmssUserLog($user, '[WARN] Failed to write daemon.json');
+        }
     }
 }
 
