@@ -116,7 +116,15 @@ PROWLARR_PORT=$(random_open_port)
 SONARR_PORT=$(random_open_port)
 JELLYFIN_PORT=$(random_open_port)
 USERNAME=$(whoami)
-HOTNAME=$(hostname)
+HOSTNAME=$(hostname)
+
+# Guardrail: Check for python3-venv
+if ! python3 -m venv --help >/dev/null 2>&1; then
+  echo "Error: 'python3-venv' is missing."
+  echo "This script requires Python 3 virtual environment support."
+  echo "Please ask support to install 'python3-venv' or 'python3-full'."
+  exit 1
+fi
 
 # Kill existing tmux sessions per app first
 echo "Stopping existing sessions..."
