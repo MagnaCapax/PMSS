@@ -49,4 +49,13 @@ function userApplyDiskQuota(array $user): void
         $filesBurst
     );
     userRunCommand('Applying disk quota', $cmd);
+
+    // Immediately refresh the user-visible quota status file
+    $quotaFile = "/home/{$user['name']}/.quota";
+    $refreshCmd = sprintf(
+        'rm -f %1$s; quota -u %2$s -s >> %1$s; chmod o+r %1$s',
+        escapeshellarg($quotaFile),
+        escapeshellarg($user['name'])
+    );
+    userRunCommand('Refreshing quota status file', $refreshCmd);
 }
