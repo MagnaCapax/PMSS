@@ -3,9 +3,9 @@
  * Lightweight wrapper providing persistence for user metadata.
  */
 
-// Note: file name is intentionally lowercased (`userFilesystem.php`) to match
-// the on-disk path; do not change the case or the require will fail on
-// case-sensitive filesystems.
+// Note: file name and class name are intentionally lowercased
+// (`userFilesystem.php` / `userFilesystem`) to match autoloader
+// expectations on case-sensitive filesystems.
 require_once __DIR__.'/userFilesystem.php';
 require_once __DIR__.'/UserValidator.php';
 require_once __DIR__.'/UserChecksum.php';
@@ -82,7 +82,7 @@ class UserRepository
 
     public function pruneStaleEntries(): void
     {
-        $homeUsers = UserFilesystem::listHomeUsers();
+        $homeUsers = userFilesystem::listHomeUsers();
         $changed   = false;
         foreach (array_keys($this->users) as $username) {
             if (!in_array($username, $homeUsers, true)) {

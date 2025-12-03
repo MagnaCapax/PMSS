@@ -3,7 +3,7 @@
  * Helpers for enumerating users from filesystem and passwd database.
  */
 
-class UserFilesystem
+class userFilesystem
 {
     /**
      * Enumerate home directory names living directly under /home.

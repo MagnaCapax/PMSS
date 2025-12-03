@@ -136,7 +136,7 @@ class users extends UserRepository
      */
     public static function listHomeDirectories(): array
     {
-        return UserFilesystem::listHomeDirectories();
+        return userFilesystem::listHomeDirectories();
     }
 
     /**
@@ -144,7 +144,7 @@ class users extends UserRepository
      */
     public static function listPasswdUsers(): array
     {
-        return UserFilesystem::listPasswdUsers();
+        return userFilesystem::listPasswdUsers();
     }
 
     /**
@@ -152,7 +152,7 @@ class users extends UserRepository
      */
     public static function listHomeUsers(): array
     {
-        return UserFilesystem::listHomeUsers();
+        return userFilesystem::listHomeUsers();
     }
 
     /**
