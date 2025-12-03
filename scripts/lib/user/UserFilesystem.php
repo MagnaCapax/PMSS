@@ -17,6 +17,7 @@ class UserFilesystem
         if ($directory = @opendir($homeDir)) {
             try {
                 while (false !== ($entry = readdir($directory))) {
+                    // Skip dot files and backup directories
                     if ($entry === '.' || $entry === '..' || strpos($entry, 'backup-') === 0 || strpos($entry, 'root-backup-') === 0) {
                         continue;
                     }
