@@ -25,7 +25,7 @@
  * | ------------------ | ------- |
  * | `<spec>`           | Optional version identifier. Accepts `git/<branch>[:YYYY-MM-DD]`, `release[:tag]`, or `main` to reuse the last recorded spec. |
  * | `--dry-run`        | Exercise fetch/staging logic without copying files or running phase 2. Implies JSON/profile logging when configured. |
- * | `--scripts-only`   | Deploy refreshed `/scripts` and `/etc/skel` content, skip `update-step2.php`. Useful for emergency hotfixes. |
+ * | `--scripts-only`   | Deploy refreshed `/scripts` and `/etc/skel` content, skip `update-step2.php`. Useful for emergency hotfixes and MUST NOT invoke apt/apt-get or any other package manager commands. |
  * | `--repo=<url>`     | Override the git remote used for `git/*` specs. Combined with `--branch` to pin alternate forks. |
  * | `--branch=<name>`  | Branch used with `--repo`. Defaults to `main` when unspecified. |
  * | `--dist-upgrade`   | Run `scripts/util/update-dist-upgrade.php` to perform a Debian release upgrade, then exit. |
@@ -210,6 +210,7 @@ function usage(string $script): void
     echo "  {$script} release:2025-07-12   # explicit tagged release\n";
     echo "  {$script} --repo=https://git/url.git --branch=beta\n";
     echo "  {$script} --dist-upgrade=11         # upgrade Debian release (explicit target required)\n";
+    echo "  {$script} --scripts-only            # refresh scripts/skel only; never runs apt/apt-get\n";
 }
 
 /**
@@ -748,6 +749,9 @@ function checkDiskSpace(): void
 
 function runAutoremove(): void
 {
+    // Guardrail: this helper performs package removals via apt-get and must
+    // NEVER be invoked from `--scripts-only` flows. Scripts-only runs are
+    // explicitly defined to avoid any package manager side effects.
     $cmd = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none '
         .'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold '
         .'autoremove -y';
@@ -773,12 +777,26 @@ function maybeRunDistUpgrade($distUpgrade): void
 function bootstrapMain(array $argv): void
 {
     ensureRoot();
-    normalizeAptSources();
 
     $startTime    = microtime(true);
     $originalHash = currentUpdaterHash();
 
     $options = parseArguments($argv);
+
+    // Invariant: scripts-only mode is for emergency script refreshes and must
+    // never modify package state. Refuse conflicting flag combinations early.
+    if ($options['scripts_only'] && $options['dist_upgrade']) {
+        fatal('Cannot combine --scripts-only with --dist-upgrade; scripts-only must never modify packages.', EXIT_PARSE);
+    }
+
+    // Only normalize apt sources for full update or dist-upgrade flows. Scripts
+    // refreshes intentionally leave apt configuration untouched.
+    if (!$options['scripts_only']) {
+        normalizeAptSources();
+    } else {
+        logmsg('[INFO] Skipping apt sources normalization for --scripts-only run');
+    }
+
     $specRaw = normaliseSpec($options['spec']);
     if ($specRaw === '') {
         fatal("Invalid source spec '{$options['spec']}'", EXIT_PARSE);
@@ -850,10 +868,6 @@ function bootstrapMain(array $argv): void
     if ($options['scripts_only']) {
         logmsg('Skipping update-step2.php (--scripts-only)');
         logEvent('update_step2_skipped', ['reason' => 'scripts_only']);
-        if (!$options['dry_run']) {
-            logmsg('Running apt autoremove for scripts-only update');
-            runAutoremove();
-        }
     } else {
         runUpdateStep2($options['dry_run']);
     }

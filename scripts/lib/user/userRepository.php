@@ -3,7 +3,10 @@
  * Lightweight wrapper providing persistence for user metadata.
  */
 
-require_once __DIR__.'/UserFilesystem.php';
+// Note: file name is intentionally lowercased (`userFilesystem.php`) to match
+// the on-disk path; do not change the case or the require will fail on
+// case-sensitive filesystems.
+require_once __DIR__.'/userFilesystem.php';
 require_once __DIR__.'/UserValidator.php';
 require_once __DIR__.'/UserChecksum.php';
 

@@ -1,7 +1,9 @@
 <?php
 namespace PMSS\Tests;
 
-require_once dirname(__DIR__, 2).'/user/UserFilesystem.php';
+// Match the on-disk path for the filesystem helper; the file name is
+// `userFilesystem.php` even though the class is `UserFilesystem`.
+require_once dirname(__DIR__, 2).'/user/userFilesystem.php';
 
 class UserRepositoryListTest extends TestCase
 {
