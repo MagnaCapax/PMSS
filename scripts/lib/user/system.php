@@ -22,7 +22,6 @@ function userConfigureSystemdSlice(array $user): void
         $user['name'],
         '--apply',
         '--memory-high=' . $user['memory'],
-        '--memory-max=' . ($user['memory'] * 2),
     ];
 
     if (!empty($user['CPUWeight']) && $user['CPUWeight'] > 0) {

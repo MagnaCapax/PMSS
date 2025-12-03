@@ -124,7 +124,11 @@ function computeSetProps(array $opts, int $sysMemMiB): array {
             $props['MemoryHigh'] = $memoryHighMiB.'M';
         }
         $memoryMax = (int)$opts['memory-max'];
-        $memoryMax = max($memoryHighMiB, min($memoryMax, $maxCap));
+        
+        // Apply clamp: Max cannot exceed High + 2048 MiB
+        $headroomCap = $memoryHighMiB + 2048;
+        $memoryMax = max($memoryHighMiB, min($memoryMax, $maxCap, $headroomCap));
+        
         $props['MemoryMax'] = $memoryMax.'M';
     } elseif ($memoryHighMiB !== null) {
         // Derived Max: 1.5x High, but capped at High + 2048 MiB (2GB) headroom
