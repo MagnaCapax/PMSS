@@ -578,7 +578,7 @@ function stageSnapshot(string $tmp, bool $dryRun): void
     }
 
     runFatal('chmod -R o-rwx /scripts /root /etc/skel /etc/seedbox', EXIT_COPY);
-    runFatal('find /scripts -maxdepth 1 -type f -name "*.php" -exec chmod 0750 {} +', EXIT_COPY);
+    runFatal('find /scripts -type f -name "*.php" -exec chmod 0750 {} +', EXIT_COPY);
     runFatal('chmod 0750 /scripts/update.php', EXIT_COPY);
     flattenScriptsLayout();
 }

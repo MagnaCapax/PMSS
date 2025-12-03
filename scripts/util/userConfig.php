@@ -9,19 +9,19 @@
  * runs.
  */
 
-require_once '/scripts/lib/user/traffic.php';
-require_once '/scripts/lib/user/rtorrent.php';
-require_once '/scripts/lib/user/deluge.php';
-require_once '/scripts/lib/user/qbittorrent.php';
-require_once '/scripts/lib/user/integrations.php';
-require_once '/scripts/lib/user/config.php';
-require_once '/scripts/lib/user/system.php';
-require_once '/scripts/lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/user/traffic.php';
+require_once __DIR__.'/../lib/user/rtorrent.php';
+require_once __DIR__.'/../lib/user/deluge.php';
+require_once __DIR__.'/../lib/user/qbittorrent.php';
+require_once __DIR__.'/../lib/user/integrations.php';
+require_once __DIR__.'/../lib/user/system.php';
+require_once __DIR__.'/../lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/user/helpers.php';
 
 /**
  * Main entry point for user configuration changes.
  */
-require_once '/scripts/lib/user/helpers.php';
+
 
 $usage = 'Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT]';
 if (empty($argv[1]) || empty($argv[2]) || empty($argv[3])) {
