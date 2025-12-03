@@ -1,7 +1,7 @@
 <?php
 namespace PMSS\Tests;
 
-require_once dirname(__DIR__, 2).'/user/UserRepository.php';
+require_once dirname(__DIR__, 2).'/user/userRepository.php';
 
 class UserRepositoryDbTest extends TestCase
 {

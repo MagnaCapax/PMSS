@@ -17,7 +17,13 @@ abstract class TestCase
         });
         foreach ($methods as $method) {
             try {
+                if (method_exists($this, 'setUp')) {
+                    $this->setUp();
+                }
                 $this->$method();
+                if (method_exists($this, 'tearDown')) {
+                    $this->tearDown();
+                }
                 $this->results[] = [true, $method, null];
             } catch (SkipTest $e) {
                 $this->results[] = ['skip', $method, $e->getMessage()];

@@ -24,7 +24,8 @@ instead of restating details.
 - Repo control: templates live under `etc/seedbox/config/template.sources.*`; detection trusts `VERSION_CODENAME` and overrides via `PMSS_OS_RELEASE_PATH` (tests) + `PMSS_APT_SOURCES_PATH` (temp files).
 - Profiling: `runStep()` + `pmssRecordProfile()` emit JSON/summary; opt-in files via `PMSS_JSON_LOG` and `PMSS_PROFILE_OUTPUT`.
 - `scripts/`: sysadmin tooling intended for daily operations and automation entry points (e.g., `update.php`, service maintenance wrappers). Assume anything here may be invoked by cron/remote orchestration—keep interfaces stable.
-- `scripts/util/`: lower-frequency utilities, programmatic helpers, or one-off provisioning actions; review carefully before adding new dependencies.
+- `scripts/lib/update/apps/`: installer modules only. These may perform one-time application bootstrap (e.g., initial directory creation, registering services), but must not own ongoing configuration logic or cron scheduling. Package state is driven by dpkg selection baselines, not per-app queues.
+- `scripts/util/`: lower-frequency utilities, programmatic helpers, or one-off provisioning actions; review carefully before adding new dependencies. Long-lived configuration behaviour (nginx, WireGuard, cgroups, etc.) belongs here, driven by templates under `etc/seedbox/config`.
 - Always sandbox destructive shelling—use `runStep()` wrappers so timing, stdout/stderr, and JSON logs stay consistent.
 - Tests split: `scripts/lib/tests/development` (unit-style) vs. `scripts/lib/tests/production` (post-provision probes).
 
@@ -215,6 +216,7 @@ rofanity.
 ## Package Baseline
 - **dpkg Selections**: The file `scripts/lib/update/dpkg/selections.txt` is a direct capture from a production system. Do **not** edit it without explicit approval—the list must remain in sync with live hosts.
 - **Release Baselines**: Per-release snapshots (`scripts/lib/update/dpkg/selections-debian10.txt`, `scripts/lib/update/dpkg/selections-debian11.txt`, `scripts/lib/update/dpkg/selections-debian12.txt`) mirror production environments. Treat these files as immutable: never hand-edit, trim, or reorder entries. When a refresh is required, capture a new baseline with `dpkg --get-selections`, scrub `deinstall` rows, and land the update only with platform sign-off.
+- **Apps and packages**: Application installers under `scripts/lib/update/apps/` must not queue packages directly. Package presence is governed by the dpkg baseline files above and any transitional queues in legacy modules should be treated as debt, not a pattern to extend.
 - Refer to `docs/dpkg-baseline.md` for the exact capture process when adding support for a new distro (Debian 13, Ubuntu, etc.).
 - Architecture docs and these guardrails are mandatory reading—don’t start coding until you understand both.
 - #TODO Consolidate package management around the dpkg baselines (no per-app queues) so every host installs the exact same package set and the update flow stays idempotent.

@@ -14,7 +14,9 @@
 namespace PMSS\Tests\Production;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/util/userConfigCgroup.php';
+require_once dirname(__DIR__, 2).'/cgroup/Manager.php';
+
+use PMSS\Cgroup\Manager;
 
 class CgroupWeightTest extends \PMSS\Tests\TestCase
 {
@@ -74,7 +76,7 @@ class CgroupWeightTest extends \PMSS\Tests\TestCase
             $ramBytes = (int)$props['MemoryHigh'];
             $ramMiB   = (int)($ramBytes / 1024 / 1024);
             
-            $expected = \calculateCgroupWeightFromMemory($ramMiB);
+            $expected = Manager::calculateWeightFromMemory($ramMiB);
             
             // 7. Assert
             $this->assertEquals($expected, (int)$props['CPUWeight'], "CPUWeight mismatch for $user (RAM: {$ramMiB}MiB)");

@@ -30,7 +30,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/systemPrep.php** – Cgroups, systemd slices, base permissions, locale setup.
 - **scripts/lib/update/services/** – Runtime templates (rc.local, systemd, sshd), legacy service disablement, mediainfo installer, security tweaks.
 - **scripts/lib/update/user/** – User maintenance (quota skeleton, permissions, ruTorrent refresh).
-- **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2.
+- **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
 
 ## Package Strategy
 - Per-release bootstrap baselines live under `scripts/lib/update/dpkg/`; the installer only ensures core tools. Apps (Radarr, SabNZBd, etc.) are built via update-step2 modules.
@@ -51,6 +51,7 @@ Development tests must avoid network/system changes; production tests and the CL
 ## Config Templates
 - `/etc/seedbox/config/template.*` (rc.local, systemd.conf, nginx, proftpd, etc.) are copied by service helpers.
 - `/etc/seedbox/config/template.sources.<suite>` defines apt sources for each distro.
+- Generated configs under `/etc` must be idempotent: invoking the matching `scripts/util/*Config*.php` multiple times converges on the same safe state without accumulating duplicate directives or diverging permissions.
 - `etc/skel/www` is read-only for agents—never modify it without explicit user instruction.
 
 ## Logs & Profile

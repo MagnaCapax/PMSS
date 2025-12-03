@@ -7,7 +7,6 @@
  * persistence and filesystem concerns to specialised classes so callers can
  * reason about users at a higher level.
  */
-	
 require_once __DIR__.'/user/userRepository.php';
 require_once __DIR__.'/user/userFilesystem.php';
 
