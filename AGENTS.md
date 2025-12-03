@@ -102,10 +102,16 @@ instead of restating details.
 - Make small, focused changes; keep diffs coherent and easy to review.
 - Validate locally before pushing: run `php -l` on changed PHP files, `php scripts/lib/tests/development/Runner.php`, and the testing scripts under `scripts/testing/` as applicable.
 - Keep generated or ephemeral files out of commits; honor `.gitignore` and repository conventions.
-- When behavior or contracts change, ship code + tests + docs and, when appropriate, an ADR in the same PR.
-
-## Git / PR Workflow
-- Commit messages: describe what changed, why, and notable side effects. Reference ADRs or docs when relevant.
+- When behavior or contracts change, ship code + tests + docs and, when appropriate, an ADR in the same PR.                      
+                                                                                                                                 
+## Git Safety & Concurrency                                                                                                      
+- **Multi-Tenant Environment**: Assume the user or other agents are working in the same directory simultaneously.                
+- **Sacred Working Directory**: NEVER discard unstaged changes (`git restore`, `git checkout <file>`, `git reset`, `git clean`) unless explicitly ordered by the user.
+- **Targeted Commits**: ALWAYS use `git add <specific_file>` instead of `git add .` or `git commit -a`.                          
+- **Ignore Noise**: If you see modified files unrelated to your task, ignore them. Do not touch them.                            
+- **Explicit Confirmation**: If a file blocks your progress, ASK the user before overwriting or reverting it.                    
+                                                                                                                                 
+## Git / PR Workflow- Commit messages: describe what changed, why, and notable side effects. Reference ADRs or docs when relevant.
 - Prefer linear history (`rebase`) and avoid force pushes on shared branches.
 - Use PR templates to verify checklists (tests run, docs updated, ADR linked when required).
 - Before merge: CI must pass (lint, tests, basic bash checks). Production-impacting changes should include a dry-run validation note.
