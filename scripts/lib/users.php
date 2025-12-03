@@ -8,8 +8,8 @@
  * reason about users at a higher level.
  */
 	
-require_once __DIR__.'/user/UserRepository.php';
-require_once __DIR__.'/user/UserFilesystem.php';
+require_once __DIR__.'/user/userRepository.php';
+require_once __DIR__.'/user/userFilesystem.php';
 
 class users extends UserRepository
 {
