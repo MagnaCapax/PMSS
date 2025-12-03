@@ -87,8 +87,17 @@ class UserFilesystem
             $combined[$user] = true;
         }
         $names = array_keys($combined);
-        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
-        return $names;
+        
+        // Filter out users that do not exist in the system user database
+        $valid = [];
+        foreach ($names as $name) {
+            if (posix_getpwnam($name) !== false) {
+                $valid[] = $name;
+            }
+        }
+        
+        sort($valid, SORT_NATURAL | SORT_FLAG_CASE);
+        return $valid;
     }
 
     /**
