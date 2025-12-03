@@ -20,6 +20,8 @@ if [[ "${PMSS_LINT_EXEC:-0}" == "1" ]]; then
   echo "exec-bit lint"
   bash scripts/testing/exec-bit-lint.sh
 fi
+echo "static include check"
+scripts/testing/static-include-check.php
 if [[ "${PMSS_LINT_DOCBLOCK:-0}" == "1" ]]; then
   echo "docblock lint"
   bash scripts/testing/docblock-lint.sh

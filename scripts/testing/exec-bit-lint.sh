@@ -17,6 +17,11 @@ must_exec=(
   scripts/cli/adr-list.sh
 )
 
+# Recursively find .php files in util and cron that should be executable
+while IFS= read -r -d '' file; do
+  must_exec+=("$file")
+done < <(find scripts/util scripts/cron -type f -name "*.php" -print0)
+
 for f in "${must_exec[@]}"; do
   if [[ ! -f "$f" ]]; then
     echo "[exec-lint] missing: $f" >&2; fail=1; continue
