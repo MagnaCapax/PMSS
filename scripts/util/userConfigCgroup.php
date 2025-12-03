@@ -156,13 +156,13 @@ function computeSetProps(array $opts, int $sysMemMiB): array {
     if (isset($opts['cpu-quota-percent'])) {
         $quota = $opts['cpu-quota-percent'];
         if (is_string($quota) && strtolower($quota) === 'infinity') {
-            $props['CPUQuota'] = 'infinity';
+            $props['CPUQuota'] = '';
         } else {
             $pct = (int)$quota;
             if ($pct > 0) {
                 $props['CPUQuota'] = $pct.'%';
             } elseif ($pct === 0) {
-                $props['CPUQuota'] = 'infinity';
+                $props['CPUQuota'] = '';
             }
         }
     }
