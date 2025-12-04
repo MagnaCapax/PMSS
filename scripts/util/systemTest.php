@@ -111,6 +111,67 @@ foreach ($configPaths as $label => $path) {
     }
 }
 
+// Validate that the config-backed localnet file matches rtorrent expectations.
+// rtorrentConfig appends an ipv4_filter.load reference when /etc/seedbox/config/localnet
+// is readable; directory or file permission regressions can break that silently.
+$localnetConfig = '/etc/seedbox/config/localnet';
+if (is_file($localnetConfig)) {
+    $issues = [];
+    $filePerms = @fileperms($localnetConfig);
+    if ($filePerms === false) {
+        $issues[] = 'unable to read localnet file permissions';
+    } else {
+        $mode = $filePerms & 0777;
+        if (($mode & 0004) === 0) {
+            $issues[] = sprintf(
+                '%s mode %o missing world-read (rtorrent users may not read filter)',
+                $localnetConfig,
+                $mode
+            );
+        }
+    }
+
+    foreach (['/etc/seedbox', '/etc/seedbox/config'] as $dir) {
+        if (!is_dir($dir)) {
+            $issues[] = $dir.' missing';
+            continue;
+        }
+        $dirPerms = @fileperms($dir);
+        if ($dirPerms === false) {
+            $issues[] = 'unable to read permissions for '.$dir;
+            continue;
+        }
+        $dirMode = $dirPerms & 0777;
+        if (($dirMode & 0001) === 0) {
+            $issues[] = sprintf(
+                '%s mode %o missing world-exec (users cannot traverse to localnet)',
+                $dir,
+                $dirMode
+            );
+        }
+    }
+
+    if (!empty($issues)) {
+        $checks[] = [
+            'name'   => 'Seedbox localnet (config)',
+            'status' => 'WARN',
+            'detail' => implode('; ', $issues),
+        ];
+    } else {
+        $checks[] = [
+            'name'   => 'Seedbox localnet (config)',
+            'status' => 'OK',
+            'detail' => $localnetConfig.' readable via 0664 + traversable dirs',
+        ];
+    }
+} else {
+    $checks[] = [
+        'name'   => 'Seedbox localnet (config)',
+        'status' => 'WARN',
+        'detail' => $localnetConfig.' missing',
+    ];
+}
+
 // Validate sources list contains detected codename if possible.
 if ($codename !== '' && is_file('/etc/apt/sources.list')) {
     $sources = file_get_contents('/etc/apt/sources.list');

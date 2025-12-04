@@ -866,6 +866,15 @@ function bootstrapMain(array $argv): void
     }
 
     if ($options['scripts_only']) {
+        // Scripts-only runs refresh /scripts and /etc trees but intentionally
+        // skip the full phase 2 orchestrator. We still need to converge
+        // skeleton and configuration permissions so services like rTorrent
+        // continue to see readable config under /etc/seedbox after the
+        // initial hardening in stageSnapshot().
+        if (!$options['dry_run'] && file_exists('/scripts/util/setupSkelPermissions.php')) {
+            logmsg('[INFO] Refreshing skeleton/config permissions for --scripts-only run');
+            runSoft(escapeshellarg(PHP_BINARY).' /scripts/util/setupSkelPermissions.php');
+        }
         logmsg('Skipping update-step2.php (--scripts-only)');
         logEvent('update_step2_skipped', ['reason' => 'scripts_only']);
     } else {

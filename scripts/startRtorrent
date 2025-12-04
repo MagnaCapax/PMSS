@@ -1,21 +1,61 @@
 #!/usr/bin/php
 <?php
-if ($argc != 2) die("Usage: startRtorrent USERNAME\n");
-$user = $argv[1];
+require_once __DIR__.'/lib/logger.php';
 
-// Check user is valid
-if (!file_exists('/home/' . $user)) die("Invalid username\n");
-if (!is_dir('/home/' . $user)) die("User home is not a directory!\n");
-if (!file_exists('/home/' . $user . '/.rtorrent.rc')) die("User does not have rtorrent configuration - rTorrent maybe disabled\n");
-
-// Check if session directory exists - if not create it
-if (!file_exists('/home/' . $user . '/session')) {
-	passthru("cd /home/{$user}; su {$user} -c 'mkdir session'");
+if ($argc !== 2) {
+    logmsg('Usage: startRtorrent USERNAME');
+    exit(1);
 }
 
-// Finally execute rTorrent
-if (!file_exists('/home/' . $user . '/.rtorrentExecute.php')) {	// If old version of master gui
-	passthru("cd /home/{$user}; rm -rf session/rtorrent.*; su {$user} -c 'screen -S rtorrent -fa -d -m rtorrent'; cd -;");
-} else passthru("cd /home/{$user}; su {$user} -c 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php'");	// This is for newer versions
+$user = $argv[1];
 
-passthru("ps aux|grep {$user}"); // Output running processes
+// Basic sanity checks so operators get immediate feedback instead of silent exits.
+if (!file_exists('/home/' . $user)) {
+    logmsg("Invalid username: {$user}");
+    exit(1);
+}
+if (!is_dir('/home/' . $user)) {
+    logmsg("User home is not a directory: /home/{$user}");
+    exit(1);
+}
+
+$userConfig = '/home/' . $user . '/.rtorrent.rc';
+if (!file_exists($userConfig)) {
+    logmsg('User does not have rtorrent configuration - rTorrent maybe disabled');
+    exit(1);
+}
+
+// Check that the optional localnet filter file is readable for the user.
+// When it exists but is not readable rTorrent will exit with:
+//   "Could not open ip filter file: /etc/seedbox/config/localnet"
+$localnet = '/etc/seedbox/config/localnet';
+if (file_exists($localnet)) {
+    $checkCmd = "su {$user} -c 'test -r {$localnet}'";
+    $output = [];
+    $rc = 0;
+    exec($checkCmd, $output, $rc);
+    if ($rc !== 0) {
+        logmsg("[WARN] {$localnet} exists but is not readable by {$user}; rTorrent will likely fail with a localnet ip filter error.");
+        logmsg("[HINT] Run '/scripts/util/setupSkelPermissions.php' as root or check: ls -ld /etc/seedbox /etc/seedbox/config {$localnet}");
+    }
+}
+
+// Check if session directory exists - if not create it.
+if (!file_exists('/home/' . $user . '/session')) {
+    logmsg("Creating rTorrent session directory for {$user}");
+    passthru("cd /home/{$user}; su {$user} -c 'mkdir session'");
+}
+
+// Finally execute rTorrent inside a screen session.
+if (!file_exists('/home/' . $user . '/.rtorrentExecute.php')) {
+    // If old version of master GUI, call rTorrent directly.
+    logmsg("Starting rTorrent for {$user} (legacy mode)");
+    passthru("cd /home/{$user}; rm -rf session/rtorrent.*; su {$user} -c 'screen -S rtorrent -fa -d -m rtorrent'; cd -;");
+} else {
+    // Newer versions use .rtorrentExecute.php wrapper.
+    logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
+    passthru("cd /home/{$user}; su {$user} -c 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php'");
+}
+
+// Output running processes so operators can see whether rTorrent or the wrapper stayed up.
+passthru("ps aux|grep {$user}");
