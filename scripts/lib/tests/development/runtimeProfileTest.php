@@ -80,4 +80,72 @@ class RuntimeProfileTest extends TestCase
         $this->assertTrue(!file_exists($tmpProfile), 'No file should be written when profile is empty');
         @unlink($tmpProfile);
     }
+
+    public function testProfileSummaryIncludesStatusCountsAndJsonEvent(): void
+    {
+        $this->resetState();
+
+        // Route JSON events to a temp file so we can inspect the payload.
+        $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
+        putenv('PMSS_JSON_LOG='.$tmpJson);
+        if (function_exists('\\pmssResetJsonLogPath')) {
+            \pmssResetJsonLogPath();
+        }
+
+        pmssRecordProfile([
+            'description' => 'ok-step',
+            'command' => 'true',
+            'status' => 'OK',
+            'rc' => 0,
+            'duration' => 0.1,
+            'dry_run' => false,
+            'stdout_excerpt' => '',
+            'stderr_excerpt' => '',
+        ]);
+        pmssRecordProfile([
+            'description' => 'err-step',
+            'command' => 'false',
+            'status' => 'ERR',
+            'rc' => 1,
+            'duration' => 0.2,
+            'dry_run' => false,
+            'stdout_excerpt' => '',
+            'stderr_excerpt' => '',
+        ]);
+        pmssRecordProfile([
+            'description' => 'skip-step',
+            'command' => '',
+            'status' => 'SKIP',
+            'rc' => 0,
+            'duration' => 0.3,
+            'dry_run' => true,
+            'stdout_excerpt' => '',
+            'stderr_excerpt' => '',
+        ]);
+
+        pmssProfileSummary();
+
+        // The JSON log should contain a profile_summary event with status_counts.
+        $this->assertTrue(file_exists($tmpJson));
+        $lines = file($tmpJson, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        $summaryEvents = [];
+        foreach ($lines as $line) {
+            $decoded = json_decode($line, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            if (($decoded['event'] ?? '') === 'profile_summary') {
+                $summaryEvents[] = $decoded;
+            }
+        }
+        $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
+        $last = end($summaryEvents);
+        $this->assertTrue(isset($last['status_counts']) && is_array($last['status_counts']));
+        $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
+        $this->assertEquals(1, $last['status_counts']['ERR'] ?? null);
+        $this->assertEquals(1, $last['status_counts']['SKIP'] ?? null);
+
+        @unlink($tmpJson);
+        putenv('PMSS_JSON_LOG');
+    }
 }

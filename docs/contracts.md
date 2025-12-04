@@ -111,7 +111,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssInitProfileStore(): void → ensures `$GLOBALS['PMSS_PROFILE']` exists.
 - pmssRecordProfile(array $entry): void → appends entry and emits JSON `step` event.
-- pmssProfileSummary(): void → logs top 5 durations; writes full JSON to `PMSS_PROFILE_OUTPUT` or `(<PMSS_JSON_LOG>.profile.json)`.
+- pmssProfileSummary(): void → logs status counts and top 5 durations; writes full JSON to `PMSS_PROFILE_OUTPUT` or `(<PMSS_JSON_LOG>.profile.json)`.
 
 ---
 
