@@ -1136,6 +1136,7 @@ monodoc-base					install
 monodoc-http					install
 monodoc-manual					install
 moreutils					install
+mosh						install
 mount						install
 mp3diags					install
 mtr						install

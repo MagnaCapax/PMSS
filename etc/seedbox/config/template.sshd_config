@@ -77,8 +77,8 @@ Subsystem       sftp    /usr/lib/openssh/sftp-server
 # AllowAgentForwarding yes
 # AllowTcpForwarding yes
 # Compression delayed
-# ClientAliveInterval 60
-# ClientAliveCountMax 3
+ClientAliveInterval 30
+ClientAliveCountMax 20
 
 # Optional banner (if you have one)
 # Banner /etc/issue.net

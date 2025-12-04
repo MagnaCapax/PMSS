@@ -1132,6 +1132,7 @@ mono-xsp4-base	install
 monodoc-base	install
 monodoc-http	install
 monodoc-manual	install
+mosh	install
 mount	install
 mp3diags	install
 mtr	install
