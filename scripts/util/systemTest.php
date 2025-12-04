@@ -152,9 +152,11 @@ if (is_file($localnetConfig)) {
     }
 
     if (!empty($issues)) {
+        // Treat broken permissions on an existing localnet config as an error:
+        // rtorrent relies on this file being readable from unprivileged users.
         $checks[] = [
             'name'   => 'Seedbox localnet (config)',
-            'status' => 'WARN',
+            'status' => 'ERR',
             'detail' => implode('; ', $issues),
         ];
     } else {
