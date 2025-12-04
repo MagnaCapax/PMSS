@@ -91,8 +91,9 @@ This section is intended to be copy-pasteable for end users.
 7. **Treat the VPN as untrusted and lock down services**
 
    - Keep the WireGuard interface marked as a *Public/Untrusted* network in your
-     OS. All tenants share the `10.90.90.0/24` overlay; do not treat it as a
-     trusted LAN.
+     OS. All tenants share the `10.90.90.0/24` overlay; the server drops direct
+     peer-to-peer traffic on `wg0`, but you must still treat the VPN as
+     untrusted and apply your own firewalling.
    - Configure your local firewall to only expose the services you want reachable
      over the VPN.
    - The server enforces NAT and forwarding centrally, so only ports you expose

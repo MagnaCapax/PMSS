@@ -73,12 +73,15 @@ $inputRules = [
     '-A INPUT -i wg+ -j ACCEPT',
 ];
 
-// Allow overlay forwarding while keeping stateful checks intact.
+// Allow overlay forwarding while keeping stateful checks intact. Prevent
+// WireGuard peers from talking directly to each other on wg0 so the overlay
+// remains centrally controlled and tenant-to-tenant traffic is blocked.
 $forwardRules = [
     '-A FORWARD -i tun+ -o tun+ -j DROP',
     '-A FORWARD -i tun+ -j ACCEPT',
     '-A FORWARD -i tun+ -o ##IFACE## -m state --state RELATED,ESTABLISHED -j ACCEPT',
     '-A FORWARD -i ##IFACE## -o tun+ -m state --state RELATED,ESTABLISHED -j ACCEPT',
+    '-A FORWARD -i wg0 -o wg0 -j DROP',
     '-A FORWARD -i wg+ -o ##IFACE## -j ACCEPT',
     '-A FORWARD -i ##IFACE## -o wg+ -m state --state RELATED,ESTABLISHED -j ACCEPT',
 ];
