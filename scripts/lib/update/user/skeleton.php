@@ -11,6 +11,7 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         '.rtorrentExecute.php',
         '.rtorrentRestart.php',
         '.bashrc',
+        'install-media-stack.sh',
         '.qbittorrentPort.py',
         '.delugePort.py',
         '.scriptsInc.php',

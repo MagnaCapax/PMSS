@@ -74,6 +74,7 @@ run(sprintf(
 
 $chmodItems = [
     ["/home/{$thisUser}", 0770],
+    ["/home/{$thisUser}/.bin", 0750, true],
     ["/home/{$thisUser}/.viminfo", 0640],
     ["/home/{$thisUser}/.quota", 0640],
     ["/home/{$thisUser}/.profile", 0640],

@@ -147,6 +147,7 @@ EOF
 }
 
 
-export PATH=~/bin:$PATH
+# Ensure user-local bins take precedence
+export PATH=$HOME/.bin:$HOME/bin:$PATH
 
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
