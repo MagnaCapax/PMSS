@@ -41,23 +41,13 @@ Every URL may be overridden via CLI flags (below). The script verifies each URL 
 
 ## Installing the Installer
 
-Run from your home directory (self‑updates by default). If the file exists in your home (deployed by the skeleton), run:
-
-```
-bash ~/install-media-stack.sh
-```
-
-Run directly from GitHub (always get the latest main). Use this if the script isn’t present in your home yet:
-
-```
-wget -qO - https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh | bash
-```
-
+- Run locally (self‑updates by default):
+  - `bash install-media-stack.sh`
+- Or run the latest from GitHub (if the file isn’t present yet):
+  - `wget -qO - https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh | bash`
+  
 To skip self‑update (use whatever version you already have locally):
-
-```
-bash ~/install-media-stack.sh --skip-update
-```
+  - `bash install-media-stack.sh --skip-update`
 
 ## CLI
 Run `install-media-stack.sh --help` for the latest usage. Full options:
@@ -96,13 +86,13 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
   - `wget -qO - https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh | bash`
 
 - Dry‑run (URL checks only):
-  - `bash ~/install-media-stack.sh --verify-only`
+  - `bash install-media-stack.sh --verify-only`
 
 - Pin Radarr on Debian 11 x64:
-  - `bash ~/install-media-stack.sh --radarr-pin=v5.10.4.9218`
+  - `bash install-media-stack.sh --radarr-pin=v5.10.4.9218`
 
 - Override all URLs explicitly:
-  - `bash ~/install-media-stack.sh \
+  - `bash install-media-stack.sh \
       --sonarr-url=https://services.sonarr.tv/.../Sonarr.main.linux-x64.tar.gz \
       --radarr-url=https://radarr.servarr.com/.../Radarr.linux-x64.tar.gz \
       --prowlarr-url=https://prowlarr.servarr.com/.../Prowlarr.linux-x64.tar.gz \
