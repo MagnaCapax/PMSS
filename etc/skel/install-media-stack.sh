@@ -56,7 +56,7 @@ OVR_RADARR_URL=""; OVR_RADARR_BRANCH=""; OVR_RADARR_VERSION=""
 OVR_PROWLARR_URL=""; OVR_PROWLARR_BRANCH=""
 OVR_SAB_URL=""; OVR_SAB_VERSION=""
 OVR_JELLYFIN_URL=""
-OVR_FFMPEG_PATH=""
+OVR_JELLYFIN_FFMPEG=""
 
 print_usage() {
   cat <<USAGE
@@ -79,7 +79,7 @@ Overrides:
   --sab-version=TAG           Override SABnzbd tag (advisory)
 
   --jellyfin-url=URL          Use exact URL for Jellyfin server tar.gz
-  --ffmpeg-path=PATH          Set Jellyfin FFmpegPath in system.xml to PATH
+  --jellyfin-ffmpeg=PATH      Set Jellyfin FFmpegPath in system.xml to PATH
 
 Modes:
   --dry-run                   Verify endpoints and show actions; do not modify system
@@ -104,7 +104,7 @@ for arg in "$@"; do
     --sab-url=*) OVR_SAB_URL=${arg#*=} ;;
     --sab-version=*) OVR_SAB_VERSION=${arg#*=} ;;
     --jellyfin-url=*) OVR_JELLYFIN_URL=${arg#*=} ;;
-    --ffmpeg-path=*) OVR_FFMPEG_PATH=${arg#*=} ;;
+    --jellyfin-ffmpeg=*) OVR_JELLYFIN_FFMPEG=${arg#*=} ;;
     --skip-update) : ;; # handled above
     *) ;;
   esac
@@ -567,23 +567,23 @@ sed -i -e "s/\(<PublicPort>\)[^<]*\(</PublicPort>\)/\1$JELLYFIN_PORT\2/g" "$data
 sed -i -e "s/\(<HttpServerPortNumber>\)[^<]*\(</HttpServerPortNumber>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
 sed -i -e "s/<BaseUrl \/>/<BaseUrl><\/BaseUrl>/" "$datadir/network.xml"
 sed -i -e "s/\(<BaseUrl>\)[^<]*\(</BaseUrl>\)/\1/public-${USERNAME}/${app}\2/g" "$datadir/network.xml"
-if [[ -n "$OVR_FFMPEG_PATH" ]]; then
+if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
   syscfg="$datadir/system.xml"
   if [[ $DRY_RUN -eq 1 ]]; then
-    log_info "[dry-run] would set Jellyfin FFmpegPath to '$OVR_FFMPEG_PATH' in $syscfg"
+    log_info "[dry-run] would set Jellyfin FFmpegPath to '$OVR_JELLYFIN_FFMPEG' in $syscfg"
   else
     if [ ! -f "$syscfg" ]; then
       cat > "$syscfg" <<SYSXML
 <?xml version="1.0" encoding="utf-8"?>
 <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <FFmpegPath>$OVR_FFMPEG_PATH</FFmpegPath>
+  <FFmpegPath>$OVR_JELLYFIN_FFMPEG</FFmpegPath>
 </ServerConfiguration>
 SYSXML
     else
       if grep -q "<FFmpegPath>" "$syscfg"; then
-        sed -i -e "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${OVR_FFMPEG_PATH}</FFmpegPath>|g" "$syscfg"
+        sed -i -e "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>|g" "$syscfg"
       else
-        sed -i -e "s|</ServerConfiguration>|  <FFmpegPath>${OVR_FFMPEG_PATH}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
+        sed -i -e "s|</ServerConfiguration>|  <FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
       fi
     fi
   fi

@@ -72,6 +72,14 @@ run(sprintf(
     escapeshellarg("/home/{$thisUser}/.local")
 ));
 
+// Ensure ~/.bin exists with safe permissions and ownership
+$binDir = "/home/{$thisUser}/.bin";
+if (!is_dir($binDir)) {
+    run(sprintf('mkdir -p %s', escapeshellarg($binDir)));
+    chownPath($binDir, "{$thisUser}:{$thisUser}");
+    chmodPath($binDir, 0750, true);
+}
+
 $chmodItems = [
     ["/home/{$thisUser}", 0770],
     ["/home/{$thisUser}/.bin", 0750, true],
