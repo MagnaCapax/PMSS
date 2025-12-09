@@ -26,18 +26,22 @@
 # #TODO: Click status → attempt restart (if allowed)
 #
 
-# Always self-update unless explicitly skipped
-if [[ "${1:-}" != "--skip-update" ]]; then
+# Self-update unless explicitly skipped, but only when running interactively (TTY)
+if [[ "${1:-}" != "--skip-update" ]] && [[ -t 0 ]]; then
   REMOTE_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/install-media-stack.sh"
-  if command -v wget >/dev/null 2>&1; then
-    wget -qO - "$REMOTE_RAW_URL" | bash -s -- --skip-update "$@"
-  elif command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$REMOTE_RAW_URL" | bash -s -- --skip-update "$@"
-  else
-    echo "Error: wget or curl is required for self-update." >&2
-    exit 1
+  tmp=$(mktemp) || true
+  if [[ -n "$tmp" ]]; then
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL "$REMOTE_RAW_URL" -o "$tmp" || true
+    elif command -v wget >/dev/null 2>&1; then
+      wget -q "$REMOTE_RAW_URL" -O "$tmp" || true
+    fi
+    if [[ -s "$tmp" ]]; then
+      chmod +x "$tmp" 2>/dev/null || true
+      exec "$tmp" --skip-update "$@"
+    fi
+    rm -f "$tmp" 2>/dev/null || true
   fi
-  exit 0
 fi
 
 set -euo pipefail # Exit on error, undefined vars, pipe failures
@@ -567,6 +571,33 @@ sed -i -e "s/\(<PublicPort>\)[^<]*\(</PublicPort>\)/\1$JELLYFIN_PORT\2/g" "$data
 sed -i -e "s/\(<HttpServerPortNumber>\)[^<]*\(</HttpServerPortNumber>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
 sed -i -e "s/<BaseUrl \/>/<BaseUrl><\/BaseUrl>/" "$datadir/network.xml"
 sed -i -e "s/\(<BaseUrl>\)[^<]*\(</BaseUrl>\)/\1/public-${USERNAME}/${app}\2/g" "$datadir/network.xml"
+syscfg="$datadir/system.xml"
+if [ ! -f "$syscfg" ]; then
+  cat > "$syscfg" <<SYSXML
+<?xml version="1.0" encoding="utf-8"?>
+<ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>
+  <PublicPort>$JELLYFIN_PORT</PublicPort>
+  <HttpServerPortNumber>$JELLYFIN_PORT</HttpServerPortNumber>
+</ServerConfiguration>
+SYSXML
+else
+  if grep -q "<BaseUrl>" "$syscfg"; then
+    sed -i -e "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$syscfg"
+  else
+    sed -i -e "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
+  fi
+  if grep -q "<PublicPort>" "$syscfg"; then
+    sed -i -e "s|<PublicPort>[^<]*</PublicPort>|<PublicPort>${JELLYFIN_PORT}</PublicPort>|g" "$syscfg"
+  else
+    sed -i -e "s|</ServerConfiguration>|  <PublicPort>${JELLYFIN_PORT}</PublicPort>\n</ServerConfiguration>|" "$syscfg"
+  fi
+  if grep -q "<HttpServerPortNumber>" "$syscfg"; then
+    sed -i -e "s|<HttpServerPortNumber>[^<]*</HttpServerPortNumber>|<HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>|g" "$syscfg"
+  else
+    sed -i -e "s|</ServerConfiguration>|  <HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>\n</ServerConfiguration>|" "$syscfg"
+  fi
+fi
 if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
   syscfg="$datadir/system.xml"
   if [[ $DRY_RUN -eq 1 ]]; then
@@ -594,7 +625,7 @@ echo ""
 # Aliases (Sonarr fix, PATH added above)
 cat <<'EOF' >>"$HOME"/.bashrc
 # PMSS Media stack aliases (updated Nov 2025)
-alias jellyfin='tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'
+alias jellyfin='tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'
 alias sonarr='tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""'
 alias radarr='tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Radarr/Radarr.dll\" --nobrowser --data=\"$HOME/.config/radarr\""'
 alias prowlarr='tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Prowlarr/Prowlarr.dll\" --nobrowser --data=\"$HOME/.config/prowlarr\""'
@@ -695,7 +726,7 @@ echo ""
 log_step "Starting applications"
 # Corrected: Point to dotnet binary, not the directory
 if [[ $DRY_RUN -eq 0 ]]; then
-  tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_DATA_DIR/log\"; nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""
+tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_DATA_DIR/log\"; nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""
   tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; \"$DOTNET_ROOT_PATH/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""
   tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; \"$DOTNET_ROOT_PATH/dotnet\" \"$HOME/.bin/Radarr/Radarr.dll\" --nobrowser --data=\"$HOME/.config/radarr\""
   tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; \"$DOTNET_ROOT_PATH/dotnet\" \"$HOME/.bin/Prowlarr/Prowlarr.dll\" --nobrowser --data=\"$HOME/.config/prowlarr\""
@@ -739,6 +770,14 @@ else
   log_info "[dry-run] would restart lighttpd/php-cgi"
 fi
 
+echo ""
+echo "================== SECURITY WARNING =================="
+echo "Jellyfin first-run requires creating an admin account."
+echo "Set a STRONG admin password immediately after opening:"
+echo "  https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+echo "Services are bound to 127.0.0.1 via per-user lighttpd,"
+echo "but do NOT expose them publicly without authentication."
+echo "======================================================="
 echo ""
 echo "=== IMPORTANT WARNINGS ==="
 echo "This script installs EXTRA FEATURES AS-IS. NO GUARANTEES OR SUPPORT FROM PULSED MEDIA."
