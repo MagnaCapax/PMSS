@@ -2,6 +2,7 @@
 /** MOTD generator (class-based). */
 
 require_once __DIR__.'/../update.php';
+require_once __DIR__.'/../update/distro.php';
 
 class Motd
 {
@@ -18,6 +19,22 @@ class Motd
         [$host,$ip,$cpu,$ram,$storage] = self::sysBasics();
         [$pmssVersion,$updateDate] = self::versionInfo();
         [$uptime,$kernel,$netSpeed] = self::runtimeInfo();
+        $distro = self::distroInfo();
+        // Light color accents for readability (opt-out via PMSS_MOTD_COLOR=0)
+        if (self::colorEnabled()) {
+            $host       = self::c($host, '1;36');   // bold cyan
+            $ip         = self::c($ip, '32');       // green
+            $cpu        = self::c($cpu, '37');      // white
+            $ram        = self::c($ram, '36');      // cyan
+            $storage    = self::c($storage, '35');  // magenta
+            $pmssVersion= self::c($pmssVersion, '1;34'); // bold blue
+            $kernel     = self::c($kernel, '34');   // blue
+            $distro     = self::c($distro, '1;35'); // bold magenta
+            $ns = trim($netSpeed);
+            $netSpeed   = ($ns !== '' && strcasecmp($ns, 'unknown') !== 0 && strcasecmp($ns, 'n/a') !== 0)
+                ? self::c($ns, '32')                // green when detected
+                : self::c('Unknown', '33');         // yellow when unknown
+        }
         [$wg,$ovpn] = self::serviceStatuses();
         $storageWarn = self::storageWarnings();
 
@@ -35,6 +52,7 @@ class Motd
             '%NETWORK_SPEED%'   => $netSpeed,
             '%WIREGUARD_STATUS%'=> $wg,
             '%OPENVPN_STATUS%'  => $ovpn,
+            '%DISTRO%'          => $distro,
         ];
         foreach ($repl as $k => $v) $tpl = str_replace($k, $v, $tpl);
         
@@ -78,16 +96,73 @@ class Motd
     private static function aptLastUpdate(): string
     {
         $f = '/var/lib/apt/periodic/update-success-stamp';
-        return is_file($f) ? trim((string) shell_exec("stat -c '%y' ".escapeshellarg($f))) : 'Not available';
+        if (!is_file($f)) return 'Not available';
+        $ts = @filemtime($f);
+        if ($ts === false || $ts <= 0) return 'Not available';
+        // Show date only to avoid noisy fractional seconds/timezones
+        return date('Y-m-d', $ts);
     }
 
     private static function runtimeInfo(): array
     {
         $uptime  = trim((string) shell_exec('uptime -p'));
         $kernel  = trim((string) shell_exec('uname -r'));
-        $nsRaw   = shell_exec("ethtool eth0 2>/dev/null | grep 'Speed:'");
-        $net     = ($nsRaw && preg_match('/Speed:\s+(\S+)/', $nsRaw, $m)) ? $m[1] : 'N/A';
+        // Discover the primary interface via routing table
+        $iface   = trim((string) shell_exec("ip -o route get 1 2>/dev/null | awk '/ dev / {for(i=1;i<=NF;i++) if (\\$i==\"dev\") {print \\\$(i+1); exit}}'"));
+        if ($iface === '') {
+            $iface = trim((string) shell_exec("ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if (\\$i==\"dev\") {print \\\$(i+1); exit}}'"));
+        }
+        $net = 'Unknown';
+        if ($iface !== '') {
+            // Prefer sysfs when available
+            $sysSpeed = "/sys/class/net/".$iface."/speed";
+            if (@is_file($sysSpeed)) {
+                $val = trim((string) @file_get_contents($sysSpeed));
+                if ($val !== '' && ctype_digit(str_replace(['-','+'], '', $val))) {
+                    $intVal = (int) $val;
+                    if ($intVal > 0) {
+                        $net = $intVal.'Mb/s';
+                    }
+                }
+            }
+            // Fallback to ethtool on detected interface
+            if ($net === 'Unknown') {
+                $nsRaw = shell_exec('ethtool '.escapeshellarg($iface)." 2>/dev/null | grep 'Speed:'");
+                if ($nsRaw && preg_match('/Speed:\\s+(\\S+)/', $nsRaw, $m)) {
+                    $net = $m[1];
+                }
+            }
+        }
         return [$uptime,$kernel,$net];
+    }
+
+    private static function colorEnabled(): bool
+    {
+        $v = getenv('PMSS_MOTD_COLOR');
+        // Default to enabled; allow explicit opt-out
+        if ($v === false || $v === '') return true;
+        $v = strtolower((string) $v);
+        return $v === '1' || $v === 'true' || $v === 'yes' || $v === 'on';
+    }
+
+    private static function c(string $text, string $code): string
+    {
+        return "\e[{$code}m{$text}\e[0m";
+    }
+
+    private static function distroInfo(): string
+    {
+        // Prefer codename mapping to ensure correct major version
+        $info = \pmssDetectDistro();
+        $name = $info['name'] ?? '';
+        $ver  = (int) ($info['version'] ?? 0);
+        $code = $info['codename'] ?? '';
+        if ($name === '') $name = 'debian';
+        $name = ucfirst(strtolower($name));
+        if ($ver > 0 && $code !== '') return sprintf('%s %d (%s)', $name, $ver, $code);
+        if ($ver > 0) return sprintf('%s %d', $name, $ver);
+        if ($code !== '') return sprintf('%s (%s)', $name, $code);
+        return $name;
     }
 
     private static function serviceStatuses(): array

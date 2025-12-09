@@ -18,7 +18,7 @@ VPN Services:
 
 
 PMSS Version: %PMSS_VERSION%
-Last Update: %UPDATE_DATE%  APT Update/Upgrade: %APT_LAST_UPDATE%
+OS: %DISTRO%  APT Update/Upgrade: %APT_LAST_UPDATE%
 Kernel: %KERNEL_VERSION%
 
 -----
@@ -28,8 +28,11 @@ Install *ARR + Jellyfin Media Package: https://pulsedmedia.com/clients/announcem
 WireGuard: https://github.com/MagnaCapax/PMSS/blob/main/docs/wireguard.md
 LinuxServer.io containers: https://github.com/MagnaCapax/PMSS/blob/main/docs/linuxserver.io.md
 
-Docker rootless is installed by default for all accounts.
 List containers: `docker ps`
 Restart Docker: `systemctl --user restart docker`
-For usage tips run `docker-help`. The daemon is monitored by a cron job to
-ensure it stays running.
+For usage tips run `docker-help`.
+
+Documentation:
+Wiki: https://wiki.pulsedmedia.com/index.php/Main_Page
+Knowledgebase: https://pulsedmedia.com/clients/index.php/knowledgebase
+PMSS (Seedbox) Software Documentation: https://github.com/MagnaCapax/PMSS/tree/main/docs
