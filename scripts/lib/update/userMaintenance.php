@@ -188,8 +188,9 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
         // operator would invoke it manually:
         //   curl -fsSL https://get.docker.com/rootless | sh
         // Run this inside a user shell so any environment tweaks it performs
-        // are applied to the correct home directory.
-        $installCmd = 'curl -fsSL https://get.docker.com/rootless | sh';
+        // are applied to the correct home directory. Ensure sysadmin tools
+        // (sysctl, etc.) are on PATH so the helper does not fail mid-run.
+        $installCmd = 'export PATH=$PATH:/usr/sbin:/sbin; curl -fsSL https://get.docker.com/rootless | sh';
         $wrapped = sprintf(
             'machinectl shell %1$s@ /bin/bash -lc %2$s',
             escapeshellarg($user),

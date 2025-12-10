@@ -147,8 +147,21 @@ EOF
 }
 
 
+# Ensure system admin tools (sysctl, ip, etc.) are available in user shells
+export PATH=$PATH:/usr/sbin:/sbin
+
 # Ensure user-local bins take precedence
 export PATH=$HOME/.bin:$HOME/bin:$PATH
+
+# Prefer the per-user systemd runtime directory when available so rootless
+# daemons and other user services can attach to the correct socket.
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    _uid="$(id -u 2>/dev/null || echo '')"
+    if [ -n "$_uid" ] && [ -w "/run/user/$_uid" ]; then
+        export XDG_RUNTIME_DIR="/run/user/$_uid"
+    fi
+    unset _uid
+fi
 
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 
