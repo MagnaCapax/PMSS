@@ -1,36 +1,98 @@
 <?php
 /**
-* PMSS: Master GUI, Index. Frameloader + auto-updater
-*
-* Copyright (C) 2010-2023 Magna Capax Finland Oy
-*
-**/
-$framesUrl = 'https://pulsedmedia.com/remote/guiFrames.php?v=2';
-$context = stream_context_create(array(
-    'http' => array(
-        'timeout'    => 5,
-        'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
-    )
-));
-$remoteFrames = @file_get_contents($framesUrl, false, $context);
-if ($remoteFrames === false || $remoteFrames === '') {
-    include 'welcome.php';
-    include 'info.php';
-    die();
+ * PMSS: Master GUI, index frame loader.
+ *
+ * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ *
+ * Responsibilities:
+ *  - Fetch remote frame definitions from pulsedmedia.com when available.
+ *  - Fallback to a local tab set when remote frames cannot be loaded.
+ *  - Merge per-user custom tabs from ~/.customFrames (one tab per line).
+ *
+ * Copyright (C) 2010-2025 Magna Capax Finland Oy
+ */
+
+$htmlHead = '';
+$frames   = array();
+$useLocalFrames = false;
+
+// Remote frames can be disabled explicitly for debugging or fully offline
+// deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1.
+if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
+    $framesUrl = 'https://pulsedmedia.com/remote/guiFrames.php?v=2';
+    $context = stream_context_create(array(
+        'http' => array(
+            'timeout'    => 5,
+            'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
+        )
+    ));
+
+    $remoteFrames = @file_get_contents($framesUrl, false, $context);
+    if ($remoteFrames !== false && $remoteFrames !== '') {
+        $decoded = @base64_decode($remoteFrames, true);
+        if ($decoded !== false) {
+            $framesCode = @unserialize($decoded);
+            if (is_string($framesCode) && $framesCode !== '') {
+                $frames = eval($framesCode);
+                if (!is_array($frames)) {
+                    $frames = array();
+                    $useLocalFrames = true;
+                }
+            } else {
+                $useLocalFrames = true;
+            }
+        } else {
+            $useLocalFrames = true;
+        }
+    } else {
+        $useLocalFrames = true;
+    }
+} else {
+    $useLocalFrames = true;
 }
-$decoded = @base64_decode($remoteFrames, true);
-if ($decoded === false) {
-    include 'welcome.php';
-    include 'info.php';
-    die();
+
+if ($useLocalFrames) {
+    // Minimal local tab set used when remote frames are unavailable.
+    // This keeps the familiar tabbed GUI layout even when pulsedmedia.com
+    // is unreachable or remote frames are explicitly disabled.
+    $htmlHead = <<<EOF
+<title>PM Seedbox</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.1/jquery.min.js"></script>
+        <script src="https://static.pulsedmedia.com/jquery.tabs.pack.js"></script>
+        <link rel="stylesheet" href="https://static.pulsedmedia.com/jquery.tabs.css" type="text/css" media="print, projection, screen">
+    <!--[if lte IE 7]>
+    <link rel="stylesheet" href="https://static.pulsedmedia.com/jquery.tabs-ie.css" type="text/css" media="projection, screen">
+    <![endif]-->
+EOF;
+
+    $frames = array(
+        'welcome' => array(
+            'url'      => 'welcome.php',
+            'linkText' => 'welcome',
+            'title'    => 'Welcome to your seedbox. Basic information',
+        ),
+        'rutorrent' => array(
+            'url'      => 'rutorrent/',
+            'linkText' => 'ruTorrent',
+            'title'    => 'ruTorrent - Torrent web UI',
+        ),
+        'filemanager' => array(
+            'url'      => (file_exists('filemanager.php') ? 'filemanager.php' : 'ajax/'),
+            'linkText' => 'File manager',
+            'title'    => 'Manage your files',
+        ),
+        'info' => array(
+            'url'      => 'info.php',
+            'linkText' => 'info',
+            'title'    => 'Information, quota, server RAM',
+        ),
+        'wiki' => array(
+            'url'      => 'https://wiki.pulsedmedia.com',
+            'linkText' => 'wiki',
+            'title'    => 'Pulsed Media Wiki',
+        ),
+    );
 }
-$framesCode = @unserialize($decoded);
-if (!is_string($framesCode) || $framesCode === '') {
-    include 'welcome.php';
-    include 'info.php';
-    die();
-}
-$frames = eval($framesCode);
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
@@ -87,15 +149,14 @@ hr {background-color: #4b4b4b;}
 
 <?php
 // Load custom frames from ~/.customFrames
-// File formatting:
-# This file is used for custom tabs in the web interface.
-# Format is:
-# appname|tooltip|label|url
-# |       |       |     |
-# |       |       |     \--- URL to the application
-# |       |       \--------- Tab label
-# |       \----------------- Hover text
-# \------------------------- Internal name, must be alphanumeric and not start with a number
+// Each non-comment line defines one additional tab in the GUI:
+//   appname|tooltip|label|url
+//   |       |       |     |
+//   |       |       |     \--- URL to the application
+//   |       |       \--------- Tab label
+//   |       \----------------- Hover text (tooltip)
+//   \------------------------- Internal name, must be alphanumeric and
+//                              must not start with a number.
 
 if (file_exists('../.customFrames')) {
     $file = new SplFileObject('../.customFrames');
@@ -175,7 +236,7 @@ function setHeights() {
 $('#tabs').tabs({ onShow: function() { setHeights(); } });
 
 setHeights();
-setInterval('setHeights();', 500);
+setInterval('setHeights();', 300);
 
 function loadFrame(frameId, frameSrc) {
  var frameIds = frameId + frameSrc;

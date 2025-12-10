@@ -5,6 +5,8 @@
  * Live `systemctl` status for WG/OpenVPN, accurate Docker detection,
  * traffic chart (2+ days), taller CGroup block, responsive layout.
  *
+ * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ *
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  *
  * @author  Pulsed Media Dev Team
@@ -148,7 +150,19 @@ pre {
 
     <div class="info-line">
         <span class="label">IP:</span>
-        <span class="value"><?php echo htmlspecialchars(file_get_contents('https://pulsedmedia.com/remote/myip.php')); ?></span>
+        <span class="value">
+<?php
+$ipUrl = 'https://pulsedmedia.com/remote/myip.php';
+$ipContext = stream_context_create(array(
+    'http' => array(
+        'timeout'    => 5,
+        'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
+    )
+));
+$ip = @file_get_contents($ipUrl, false, $ipContext);
+echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
+?>
+        </span>
     </div>
 
     <?php
@@ -222,7 +236,9 @@ echo "Memory usage:\n";
 $meminfo = @file_get_contents('/proc/meminfo');
 if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
     $info = array_combine($m[1], $m[2]);
-    $fmt = fn($k) => $info[$k] ?? 0;
+    $fmt = function ($k) use ($info) {
+        return isset($info[$k]) ? $info[$k] : 0;
+    };
     echo sprintf("Memory total:     %6s MiB\n", round($fmt('MemTotal') / 1024, 0));
     echo sprintf("Memory available: %6s MiB\n", round($fmt('MemAvailable') / 1024, 0));
     echo sprintf("Swap total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));

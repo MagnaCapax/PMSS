@@ -3,6 +3,8 @@
  * PMSS: User Frontend Welcome Page
  * This is the actual index / first page user sees with all the buttons etc.
  *
+ * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ *
  * #TODO Major refactoring; https://github.com/MagnaCapax/PMSS/issues/64
  *
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
@@ -99,8 +101,19 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
             <div class="full_body">
                 <div class="portfoliobox">
                     <div class="portfolioimg">
-                        <?= @file_get_contents('https://pulsedmedia.com/remote/welcomeHeadingText.php'); ?>
                         <?php
+                        $welcomeHeadingUrl = 'https://pulsedmedia.com/remote/welcomeHeadingText.php';
+                        $welcomeContext = stream_context_create(array(
+                            'http' => array(
+                                'timeout'    => 5,
+                                'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
+                            )
+                        ));
+                        $welcomeHeading = @file_get_contents($welcomeHeadingUrl, false, $welcomeContext);
+                        if ($welcomeHeading !== false) {
+                            echo $welcomeHeading;
+                        }
+
                         if (file_exists('/etc/seedbox/config/vendorWelcome')) {
                             echo @file_get_contents('/etc/seedbox/config/vendorWelcome');
                         }
@@ -251,13 +264,31 @@ EOF;
                         <h6>Announcements</h6>
                         <ul>
 <?php
-$rssFeed = new SimpleXMLElement('http://pulsedmedia.com/clients/announcementsrss.php', LIBXML_NOCDATA, true);
-$rssFeed = json_decode(json_encode($rssFeed), true);
-$rssFeed['channel']['item'] = array_slice($rssFeed['channel']['item'], 0, 4, true);
-
-foreach ($rssFeed['channel']['item'] as $thisItem) {
-    $thisItem['pubDate'] = date('d/m', strtotime($thisItem['pubDate']));
-    echo "<li>({$thisItem['pubDate']}) <a href=\"{$thisItem['link']}\" target=\"_blank\">" . htmlspecialchars($thisItem['title']) . "</a></li>\n";
+$rssUrl = 'http://pulsedmedia.com/clients/announcementsrss.php';
+$rssContext = stream_context_create(array(
+    'http' => array(
+        'timeout'    => 5,
+        'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
+    )
+));
+$rssRaw = @file_get_contents($rssUrl, false, $rssContext);
+if ($rssRaw !== false) {
+    $rssXml = @simplexml_load_string($rssRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if ($rssXml !== false) {
+        $rssFeed = json_decode(json_encode($rssXml), true);
+        if (isset($rssFeed['channel']['item']) && is_array($rssFeed['channel']['item'])) {
+            $items = array_slice($rssFeed['channel']['item'], 0, 4, true);
+            foreach ($items as $thisItem) {
+                if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {
+                    continue;
+                }
+                $thisItem['pubDate'] = date('d/m', strtotime($thisItem['pubDate']));
+                $title = htmlspecialchars($thisItem['title']);
+                $link  = $thisItem['link'];
+                echo "<li>({$thisItem['pubDate']}) <a href=\"{$link}\" target=\"_blank\">{$title}</a></li>\n";
+            }
+        }
+    }
 }
 ?>
                         </ul>

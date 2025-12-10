@@ -1,3 +1,16 @@
+<?php
+/**
+ * PMSS: Seedbox information page.
+ *
+ * Renders the info view used by the main GUI tab frame. Shows server and
+ * account statistics via stats.php and provides a lightweight, responsive
+ * layout for the seedbox information view.
+ *
+ * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ *
+ * Copyright (C) 2010-2025 Magna Capax Finland Oy
+ */
+?>
 <!doctype html>
 <html lang="en">
   <head>
