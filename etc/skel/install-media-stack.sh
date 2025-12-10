@@ -538,7 +538,7 @@ fi
 sed -i -e "s/\(<PublicPort>\)[^<]*\(</PublicPort>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
 sed -i -e "s/\(<HttpServerPortNumber>\)[^<]*\(</HttpServerPortNumber>\)/\1$JELLYFIN_PORT\2/g" "$datadir/network.xml"
 sed -i -e "s/<BaseUrl \/>/<BaseUrl><\/BaseUrl>/" "$datadir/network.xml"
-sed -i -e "s/\(<BaseUrl>\)[^<]*\(</BaseUrl>\)/\1/public-${USERNAME}/${app}\2/g" "$datadir/network.xml"
+sed -i -e "s/\(<BaseUrl>\)[^<]*\(</BaseUrl>\)/\1\/public-${USERNAME}\/${app}\2/g" "$datadir/network.xml"
 syscfg="$datadir/system.xml"
 if [ ! -f "$syscfg" ]; then
   cat > "$syscfg" <<SYSXML
