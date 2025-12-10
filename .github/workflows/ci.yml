@@ -108,7 +108,15 @@ jobs:
           curl -sSL -o tools/phploc.phar https://phar.phpunit.de/phploc.phar
           bash scripts/testing/phploc.sh || true
 
+      - name: Install PHPStan (advisory)
+        run: |
+          mkdir -p tools
+          curl -sSL -o tools/phpstan.phar https://github.com/phpstan/phpstan/releases/download/1.10.66/phpstan.phar
+          chmod +x tools/phpstan.phar
+
       - name: PHPStan (advisory, level 3)
+        env:
+          PMSS_PHPSTAN_BIN: tools/phpstan.phar
         run: |
           # Run at a slightly higher strictness; still advisory and allowed to skip
           ALLOW_TOOL_SKIP=1 bash scripts/testing/phpstan.sh --level=3 || true
