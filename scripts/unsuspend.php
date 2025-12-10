@@ -2,12 +2,34 @@
 <?php
 /**
  * Restore access for a previously suspended account.
+ *
+ * Re-enables the Unix account, restores the original web root from
+ * /home/<user>/www-disabled when present, and restarts rTorrent for the user.
+ *
+ * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
  */
+require_once __DIR__.'/lib/userLifecycle.php';
 
 $usage = 'unsuspend.php USERNAME';
 $username = $argv[1] ?? '';
 if ($username === '') {
     die($usage."\n");
+}
+
+if (!pmssValidateUsername($username)) {
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'unsuspend',
+            'validate',
+            $username,
+            array(
+                'status'  => 'ERR',
+                'message' => 'Rejected username due to validation failure',
+            )
+        )
+    );
+    die("Invalid username: {$username}\n");
 }
 
 $homeDir = "/home/{$username}";
@@ -47,7 +69,18 @@ if (is_dir($disabledRoot)) {
     }
 }
 
-passthru('/scripts/startRtorrent '.escapeshellarg($username));
+pmssUserWriteLogs(
+    pmssUserBaseContext(
+        'unsuspend',
+        'start_rtorrent',
+        $username,
+        array(
+            'status'   => 'INFO',
+            'home_dir' => $homeDir,
+        )
+    )
+);
+pmssUserLifecycleStep('unsuspend', $username, 'start_rtorrent', '/scripts/startRtorrent '.escapeshellarg($username), false);
 
 /**
  * Delete the placeholder landing page tree.

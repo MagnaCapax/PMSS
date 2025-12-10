@@ -2,12 +2,35 @@
 <?php
 /**
  * Disable a user account and present a friendly suspended landing page.
+ *
+ * Locks the Unix account, sets an immediate expiry, and swaps the web root
+ * to a suspended notice while preserving the original content under
+ * /home/<user>/www-disabled.
+ *
+ * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
  */
+require_once __DIR__.'/lib/userLifecycle.php';
 
 $usage = 'suspend.php USERNAME';
 $username = $argv[1] ?? '';
 if ($username === '') {
     die($usage."\n");
+}
+
+if (!pmssValidateUsername($username)) {
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'suspend',
+            'validate',
+            $username,
+            array(
+                'status'  => 'ERR',
+                'message' => 'Rejected username due to validation failure',
+            )
+        )
+    );
+    die("Invalid username: {$username}\n");
 }
 
 $homeDir = "/home/{$username}";
@@ -19,13 +42,36 @@ if (!is_dir($homeDir)) {
 }
 
 if (is_dir($disabledRoot)) {
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'suspend',
+            'already_suspended',
+            $username,
+            array(
+                'status'  => 'SKIP',
+                'message' => 'User already suspended',
+            )
+        )
+    );
     die("User already suspended\n");
 }
 
-passthru('usermod -L '.escapeshellarg($username));
-passthru('usermod --expiredate 1 '.escapeshellarg($username));
-passthru('ps aux|grep '.escapeshellarg($username));
-passthru('killall -9 -u '.escapeshellarg($username));
+pmssUserWriteLogs(
+    pmssUserBaseContext(
+        'suspend',
+        'start',
+        $username,
+        array(
+            'status'   => 'INFO',
+            'home_dir' => $homeDir,
+        )
+    )
+);
+
+pmssUserLifecycleStep('suspend', $username, 'lock_account', 'usermod -L '.escapeshellarg($username), false);
+pmssUserLifecycleStep('suspend', $username, 'set_expiry', 'usermod --expiredate 1 '.escapeshellarg($username), false);
+pmssUserLifecycleStep('suspend', $username, 'list_processes', 'ps aux|grep '.escapeshellarg($username), false);
+pmssUserLifecycleStep('suspend', $username, 'kill_processes', 'killall -9 -u '.escapeshellarg($username), false);
 
 if (is_dir($activeRoot)) {
     if (!@rename($activeRoot, $disabledRoot)) {
@@ -67,6 +113,17 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): void
     @chgrp($publicDir.'/index.html', $username);
     @chown($marker, $username);
     @chgrp($marker, $username);
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'suspend',
+            'end',
+            $username,
+            array(
+                'status'   => 'OK',
+                'home_dir' => $homeDir,
+            )
+        )
+    );
 }
 
 /**

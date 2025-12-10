@@ -8,10 +8,12 @@ require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
 
+// Per-user logging for update-step2 helpers now relies on the shared
+// pmssUserLog() helper from scripts/lib/user/log.php. For legacy callers that
+// still expect pmss-update-user-<username>.log, we keep this compat layer so
+// those files remain available while the primary source of truth moves to
+// /var/log/pmss/users/<username>.log and users.log/users.jsonl.
 if (!function_exists('pmssUserLogPath')) {
-    /**
-     * Return the per-user update log path, ensuring the directory exists.
-     */
     function pmssUserLogPath(string $user): string
     {
         $dir = '/var/log/pmss';
@@ -24,9 +26,13 @@ if (!function_exists('pmssUserLogPath')) {
 }
 
 if (!function_exists('pmssUserLog')) {
-    /** Append a timestamped line to the user's update log. */
     function pmssUserLog(string $user, string $message): void
     {
+        // Primary channel: shared per-user log + users.log/users.jsonl
+        if (function_exists('\pmssUserLog')) {
+            \pmssUserLog($user, $message);
+        }
+        // Legacy compatibility: mirror to pmss-update-user-<username>.log
         $path = pmssUserLogPath($user);
         $ts   = date('[Y-m-d H:i:s] ');
         @file_put_contents($path, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);

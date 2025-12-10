@@ -5,15 +5,45 @@
  *
  * Centralises firewall and FireQOS updates so update.php can invoke it
  * repeatedly while keeping tenant-specific overrides intact.
+ *
+ * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
  */
 
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/networkInfo.php';
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/network/fireqos.php';
+require_once '/scripts/lib/userLifecycle.php';
 // Collect tenant usernames for FireQOS shaping.
 $usersRaw = trim((string) shell_exec('/scripts/listUsers.php'));
 $users    = $usersRaw === '' ? [] : array_filter(explode("\n", $usersRaw), 'strlen');
+
+// Defensive validation: ensure usernames from listUsers conform to the core
+// regex so any anomalies are surfaced via users.log and excluded from shaping.
+$validatedUsers = [];
+foreach ($users as $u) {
+    $u = trim($u);
+    if ($u === '') {
+        continue;
+    }
+    if (!pmssValidateUsername($u)) {
+        pmssUserWriteLogs(
+            pmssUserBaseContext(
+                'network',
+                'validate',
+                $u,
+                [
+                    'status'  => 'ERR',
+                    'message' => 'Skipping invalid username in setupNetwork',
+                ]
+            )
+        );
+        continue;
+    }
+    $validatedUsers[] = $u;
+}
+$users = $validatedUsers;
 
 // Retrieve persisted interface selections and LAN bypass ranges.
 $networkConfig = networkLoadConfig();

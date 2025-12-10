@@ -46,3 +46,6 @@ This document tracks small, stability‑focused improvements and medium‑term r
 
 - Cgroup & Resource Control (Architecture & Findings)
   - See [docs/analysis/cgroup-architecture.md](analysis/cgroup-architecture.md) for deep dive.
+
+- Atomic updates for /scripts and /etc/seedbox
+  - Move the update process toward atomic replacement of the `/scripts` and `/etc/seedbox` trees (e.g., stage into a versioned directory then swap via rename) so cron and long-running jobs never see partially-removed libraries. The 2025 `/home` wipe incident showed how mid-update removals of `/scripts/lib/user/*.php` turned `listUsers.php` output into fatal/error text, which legacy consumers like `updateQuotas.php` treated as usernames and fed directly into destructive shell commands. Atomic updates plus strict output validation reduce the odds of similar cascades.

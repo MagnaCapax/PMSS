@@ -14,7 +14,7 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 - `docblock-lint.sh` — requires docblocks for classes and public methods in first-party PHP. Opt-in via `PMSS_LINT_DOCBLOCK=1`.
 - `phpstan.sh` — static analysis wrapper (uses `phpstan.neon.dist`). Opt-in via `PMSS_LINT_PHPSTAN=1`.
 - `classname-lint.sh` — checks class name matches file basename (tests and first-party libs). Opt-in via `PMSS_LINT_CLASS=1`.
-- `sharp-edges-lint.sh` — flags raw `rm -rf`/`mv`/`chmod -R`/`chown -R`/`chgrp -R` outside wrappers. Runs by default in advisory mode.
+- `sharp-edges-lint.sh` — flags raw `rm -rf`/`mv`/`chmod -R`/`chown -R`/`chgrp -R` outside wrappers. Runs by default in advisory mode, but **always fails** when it detects catastrophic patterns such as `rm -rf /`, `rm -rf /home`, `rm -rf /home/$var`, or `rm -rf $var` without quoting.
 - `net-edges-lint.sh` — flags raw `curl`/`wget`/`nc`/`telnet` usage outside `runStep()`; runs by default in advisory mode.
 - `check-tools.sh` — prints availability of optional tools (phpstan, shellcheck, shfmt, rg) for predictable local runs.
 

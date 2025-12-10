@@ -5,6 +5,9 @@
  *
  * Queries live systemd slice configuration to show actual applied limits
  * for RAM, CPU, and Disk I/O.
+ *
+ * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
  */
 
 if (posix_getuid() !== 0) {
@@ -13,6 +16,7 @@ if (posix_getuid() !== 0) {
 }
 
 require_once __DIR__.'/../lib/cli/OptionParser.php';
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 $parsed = pmssParseCliTokens($argv);
 $outputJsonl = (bool)pmssCliOption($parsed, 'jsonl');
@@ -42,7 +46,23 @@ $allData = [];
 
 foreach ($users as $user) {
     $user = trim($user);
-    if ($user === '') continue;
+    if ($user === '') {
+        continue;
+    }
+    if (!pmssValidateUsername($user)) {
+        pmssUserWriteLogs(
+            pmssUserBaseContext(
+                'resources',
+                'validate',
+                $user,
+                [
+                    'status'  => 'ERR',
+                    'message' => 'Skipping invalid username in userResourcesList',
+                ]
+            )
+        );
+        continue;
+    }
 
     $info = posix_getpwnam($user);
     if (!$info) continue;

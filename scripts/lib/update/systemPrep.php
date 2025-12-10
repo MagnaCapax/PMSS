@@ -322,17 +322,25 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         // Append per-mount device throttles and weights from policy
         if (isset($policy['mounts']) && is_array($policy['mounts'])) {
             $append = [];
+            $skippedDeviceWeights = false;
             foreach ($policy['mounts'] as $mount => $def) {
                 if (!is_array($def)) continue;
                 $src = trim((string)@shell_exec('findmnt -no SOURCE '.escapeshellarg($mount).' 2>/dev/null'));
                 if ($src === '') continue;
                 if (isset($def['ioWeight']) && is_numeric($def['ioWeight'])) {
-                    $append[] = 'IODeviceWeight='.$src.' '.(int)$def['ioWeight'];
+                    if ($mode === 'v2') {
+                        $append[] = 'IODeviceWeight='.$src.' '.(int)$def['ioWeight'];
+                    } else {
+                        $skippedDeviceWeights = true;
+                    }
                 }
                 if (isset($def['readBw']))  { $append[] = 'IOReadBandwidthMax='.$src.' '.$def['readBw']; }
                 if (isset($def['writeBw'])) { $append[] = 'IOWriteBandwidthMax='.$src.' '.$def['writeBw']; }
             }
             if (!empty($append)) { $raw .= "\n".implode("\n", $append)."\n"; }
+            if ($skippedDeviceWeights) {
+                $log('[SKIP] Per-device IO weights skipped on cgroup v1 (blkio.weight_device unsupported)');
+            }
         }
 
         // Atomic write to avoid race conditions where the file is briefly missing

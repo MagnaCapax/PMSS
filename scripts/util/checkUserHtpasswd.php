@@ -1,10 +1,20 @@
 #!/usr/bin/php
 <?php
-# PMSS
-# Copyright (C) Magna Capax Finland Oy 2010-2023
-#TODO Check if this is still used, since transition happened years ago
+/**
+ * Synchronise legacy global lighttpd htpasswd entries to per-user instances.
+ *
+ * Intended for transitional environments where a global /etc/lighttpd/.htpasswd
+ * file may still contain valid credentials. Modern deployments should favour
+ * per-user auth from the start.
+ *
+ * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
+ */
+// TODO Check if this is still used, since transition happened years ago
 
-//Some kind of htpasswd synchronization from times when lighttpd global instance transition to per user instances
+// Some kind of htpasswd synchronization from times when lighttpd global instance transition to per-user instances
+
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 $usersRaw = trim((string)shell_exec('/scripts/listUsers.php'));
 if ($usersRaw === '') {
@@ -27,7 +37,25 @@ $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
 foreach ($users as $thisUser) {
     #TODO(user-logs): log per-user htpasswd sync operations to /var/log/pmss/user-<username>.log
-    if ($thisUser === '') { continue; }
+    $thisUser = trim($thisUser);
+    if ($thisUser === '') {
+        continue;
+    }
+    if (!pmssValidateUsername($thisUser)) {
+        pmssUserWriteLogs(
+            pmssUserBaseContext(
+                'htpasswd',
+                'validate',
+                $thisUser,
+                [
+                    'status'  => 'ERR',
+                    'message' => 'Skipping invalid username in checkUserHtpasswd',
+                ]
+            )
+        );
+        continue;
+    }
+
     $thisUserDir = "/home/{$thisUser}";
     if (file_exists($thisUserDir . '/.lighttpd/.htpasswd')) {
         $userHtpasswdContents = @file_get_contents($thisUserDir . '/.lighttpd/.htpasswd');
@@ -37,7 +65,13 @@ foreach ($users as $thisUser) {
     foreach ($passwords as $thisPassword) {
         if (strpos($thisPassword, $thisUser.':') === 0) {
             file_put_contents($thisUserDir . '/.lighttpd/.htpasswd', $thisPassword."\n", FILE_APPEND);
-            passthru("chown {$thisUser}:{$thisUser} {$thisUserDir}/.lighttpd/.htpasswd");
+            pmssUserLifecycleStep(
+                'htpasswd',
+                $thisUser,
+                'chown_htpasswd',
+                'chown '.escapeshellarg($thisUser.':'.$thisUser).' '.escapeshellarg($thisUserDir.'/.lighttpd/.htpasswd'),
+                false
+            );
         }
     }
 }

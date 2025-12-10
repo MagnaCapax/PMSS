@@ -28,7 +28,23 @@ if ($user['password'] == 'rand') $user['password'] = '';
 require_once 'lib/runtime.php';
 require_once 'lib/rtorrentConfig.php';
 require_once 'lib/users.php';
+require_once 'lib/userLifecycle.php';
 $userDb = new users();
+
+if (!pmssValidateUsername($user['name'])) {
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'add',
+            'validate',
+            $user['name'],
+            array(
+                'status'  => 'ERR',
+                'message' => 'Rejected username due to validation failure',
+            )
+        )
+    );
+    die("Invalid username: {$user['name']}\n");
+}
 
 /**
  * Append a message to the provisioning log and console for traceability.
@@ -41,6 +57,17 @@ function logProvisionMessage(string $message): void
     $prefix = date('Y-m-d H:i:s') . " ({$user['name']}): ";
     @file_put_contents('/var/log/pmss/addUser.log', $prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
     echo $message.PHP_EOL;
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'add',
+            'log',
+            $user['name'],
+            array(
+                'status'  => 'INFO',
+                'message' => $message,
+            )
+        )
+    );
 }
 
 /**
