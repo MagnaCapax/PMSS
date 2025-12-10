@@ -184,23 +184,26 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
             return;
         }
 
-        // Guard on the helper binary so we do not emit confusing errors when
-        // rootless extras are not installed on a host.
-        $helper = '/usr/bin/dockerd-rootless-setuptool.sh';
-        if (!is_file($helper) || !is_executable($helper)) {
-            pmssUserLog($user, '[SKIP] dockerd-rootless-setuptool.sh missing or not executable; skipping rootless Docker install');
-            return;
-        }
-
-        // Mirror the behaviour used during new-user provisioning, invoking the
-        // helper inside the user context via machinectl. All output is logged
-        // to the per-user update log for troubleshooting.
-        $cmd = sprintf(
-            'machinectl shell %1$s@ %2$s',
+        // Use Docker\'s official rootless install script in the same way an
+        // operator would invoke it manually:
+        //   curl -fsSL https://get.docker.com/rootless | sh
+        // Run this inside a user shell so any environment tweaks it performs
+        // are applied to the correct home directory.
+        $installCmd = 'curl -fsSL https://get.docker.com/rootless | sh';
+        $wrapped = sprintf(
+            'machinectl shell %1$s@ /bin/bash -lc %2$s',
             escapeshellarg($user),
-            escapeshellarg($helper.' install')
+            escapeshellarg($installCmd)
         );
-        pmssRunAndLog($user, 'dockerd-rootless-setuptool install', $cmd, false);
+        pmssRunAndLog($user, 'docker.com rootless install script', $wrapped, false);
+
+        // After running the installer, verify that the user unit was created.
+        clearstatcache();
+        if (is_file($unit)) {
+            pmssUserLog($user, '[OK] Rootless Docker unit docker.service created for user');
+        } else {
+            pmssUserLog($user, '[WARN] Rootless Docker install script completed but docker.service is still missing');
+        }
     }
 }
 
