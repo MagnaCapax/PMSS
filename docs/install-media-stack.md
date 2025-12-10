@@ -11,7 +11,7 @@ It installs:
 All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to `https://<host>/public-<user>/<app>/`.
 
 ## Key Properties
-- Self‑updating: fetches latest script from GitHub on each run; skip with `--skip-update`.
+- Self‑updating (interactive): when run in a TTY, fetches the latest script from GitHub and re‑execs it; skip with `--skip-update`. Non‑interactive runs (e.g. `wget … | bash`) use the fetched script as‑is.
 - Monolithic but structured: single file with small helpers for clarity and reuse.
 - Idempotent: re‑runs converge to the same state; dry‑run exists for verification.
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
@@ -30,10 +30,10 @@ Note: Jellyfin benefits from recent ffmpeg for hardware transcoding. Today the s
 - .NET 8 ASP.NET runtime is installed to `~/.bin/dotnet` by this script
 
 ## Endpoints Used
-- Sonarr v4: `https://services.sonarr.tv/v1/download/<branch>/latest?version=4&os=linux&arch=<x64|arm64|arm>`
-- Radarr: `https://radarr.servarr.com/v1/update/<branch>/updatefile?os=linux&arch=<arch>`
+- Sonarr v4: `https://services.sonarr.tv/v1/download/<branch>/latest?version=4&os=linux&runtime=netcore&arch=<x64|arm64|arm>`
+- Radarr: `https://radarr.servarr.com/v1/update/<branch>/updatefile?os=linux&arch=<arch>` (default branch: `master`)
   - If GLIBC < 2.33 and x64: pin `https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz`
-- Prowlarr: `https://prowlarr.servarr.com/v1/update/<branch>/updatefile?os=linux&arch=<arch>`
+- Prowlarr: `https://prowlarr.servarr.com/v1/update/<branch>/updatefile?os=linux&runtime=netcore&arch=<arch>` (default branch: `master`)
 - Jellyfin: `https://repo.jellyfin.org/files/server/linux/latest-stable/<arch>/` (scraped for latest tarball), or explicit override
 - SABnzbd: latest GitHub release `-src` asset
 
@@ -64,13 +64,13 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 
 - Radarr
   - `--radarr-url=URL`     Use exact URL
-  - `--radarr-branch=BR`   Override branch (default: `main`)
+  - `--radarr-branch=BR`   Override branch (default: `master`; stable)
   - `--radarr-version=TAG` Version tag (e.g., `v5.10.4.9218`) – x64 convenience
   - `--radarr-pin=TAG`     Alias for `--radarr-version`
 
 - Prowlarr
   - `--prowlarr-url=URL`   Use exact URL
-  - `--prowlarr-branch=BR` Override branch (default: `main`)
+  - `--prowlarr-branch=BR` Override branch (default: `master`; stable)
 
 - Jellyfin
   - `--jellyfin-url=URL`   Use exact URL for server tarball
@@ -181,7 +181,7 @@ Compiling from source (advanced):
 Notes:
 - *ARR apps don’t require ffmpeg; only Jellyfin uses it.
 - The installer intentionally does not manage ffmpeg. Keep this a separate, explicit step for clarity and security.
- - You can also pass `--ffmpeg-path=/home/<user>/.bin/ffmpeg` to stamp Jellyfin’s FFmpeg path automatically in your user config.
+ - You can also pass `--jellyfin-ffmpeg=/home/<user>/.bin/ffmpeg` to stamp Jellyfin’s FFmpeg path automatically in your user config.
 
 ## Rationale (Design Notes)
 - Monolithic script to simplify distribution and self‑update while staying easy to audit.
