@@ -12,6 +12,9 @@ if (!function_exists('logmsg')) {
     // so the common library is two levels up.
     require_once __DIR__.'/../../update.php';
 }
+if (!function_exists('runStep')) {
+    require_once __DIR__.'/../runtime/commands.php';
+}
 
 function wgLog(string $message): void
 {
@@ -501,41 +504,49 @@ function wgEnableService(): void
         wgLog('systemd unavailable; skipping wg-quick@wg0 enable');
         return;
     }
-    exec('systemctl enable --now wg-quick@wg0', $_, $rc);
+    $rc = runStep('[wireguard] Enabling wg-quick@wg0', 'systemctl enable --now wg-quick@wg0');
     if ($rc !== 0) {
         wgLog('wg-quick@wg0 failed to start (rc='.$rc.')');
     }
 }
 
-if (!defined('PMSS_WIREGUARD_NO_ENTRYPOINT')) {
+/**
+ * Provision WireGuard configuration and service.
+ */
+function pmssWireguardConfigure(?callable $logger = null): void
+{
+    $log = pmssSelectLogger($logger);
+    if (function_exists('requireRoot')) {
+        requireRoot();
+    }
+
     if (!is_dir(wgConfigDir())) {
         @mkdir(wgConfigDir(), 0750, true);
     }
 
     if (!wgSupports()) {
-        wgLog('WireGuard tooling missing; ensure packages are installed via pmssInstallWireguardPackages()');
+        $log('[wireguard] wg binary not available on PATH; skipping configure');
         return;
     }
 
     [$privKey, $pubKey] = wgEnsureKeys(wgConfigDir());
     if ($privKey === '' || $pubKey === '') {
+        $log('[wireguard] Failed to ensure keys; aborting configure');
         return;
     }
 
     $listenPort = 51820;
     wireguardWriteConfig($privKey, $listenPort);
 
-    $hostname = trim((string)file_get_contents('/etc/hostname'));
+    $hostname = trim((string) @file_get_contents('/etc/hostname'));
     [$endpoint, $endpointSource] = wgResolveEndpoint($hostname);
     if ($endpoint === '') {
-        // Ensure users still receive usable details even when endpoint discovery fails.
-        wgLog('Unable to determine public endpoint; falling back to hostname '.$hostname);
+        $log('[wireguard] Unable to determine public endpoint; falling back to hostname '.$hostname);
         $endpoint = $hostname;
     } else {
-        wgLog(sprintf('Using %s endpoint %s', $endpointSource, $endpoint));
+        $log(sprintf('[wireguard] Using %s endpoint %s', $endpointSource, $endpoint));
     }
 
-    // Keep the README in sync so operators and users see the current endpoint.
     $guide = wgWriteReadme($hostname, $endpoint, $pubKey, $listenPort);
     wgDistributeToUsers($guide);
     wgEnableService();
