@@ -49,6 +49,14 @@ If you need docker-compose, download the latest binary into `~/bin` and make it 
 
 The default skeleton under `/etc/skel` provides a `~/bin/docker-install-wireguard.sh` helper and wires `~/bin` (and `~/.bin` when present) into `PATH` via `~/.bashrc`, so new accounts have the script available immediately after provisioning.
 
+For operators, per-user Docker can be controlled via:
+
+```
+/scripts/util/dockerUserService.php USER {start|stop|restart|status}
+```
+
+This helper prefers the systemd user unit when available and falls back to starting `dockerd-rootless.sh` directly when the user bus is unavailable, logging actions to `/var/log/pmss/pmss-update-user-USER.log`.
+
 ## Troubleshooting
 
 If `docker ps` fails with a socket error like:
