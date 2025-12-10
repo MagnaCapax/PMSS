@@ -7,6 +7,16 @@
     <link href="https://static.pulsedmedia.com/wc/css/screen.css" rel="stylesheet" media="screen" />
     <!-- Chart.js v4 (UMD build exposes global Chart) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+      .portfoliobox {
+        margin-left: 10px;
+        margin-right: 10px;
+      }
+      #stats {
+        margin-left: 0;
+        margin-right: 0;
+      }
+    </style>
   </head>
 <body>
 	<div id="wrap">

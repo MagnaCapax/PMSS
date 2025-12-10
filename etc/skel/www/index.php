@@ -5,10 +5,32 @@
 * Copyright (C) 2010-2023 Magna Capax Finland Oy
 *
 **/
-if (!($frames = @file_get_contents('https://pulsedmedia.com/remote/guiFrames.php?v=2')) ) {
-  include 'welcome.php'; include 'info.php'; die();
-} else
- $frames = eval( unserialize( base64_decode( $frames ) ) );
+$framesUrl = 'https://pulsedmedia.com/remote/guiFrames.php?v=2';
+$context = stream_context_create(array(
+    'http' => array(
+        'timeout'    => 5,
+        'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
+    )
+));
+$remoteFrames = @file_get_contents($framesUrl, false, $context);
+if ($remoteFrames === false || $remoteFrames === '') {
+    include 'welcome.php';
+    include 'info.php';
+    die();
+}
+$decoded = @base64_decode($remoteFrames, true);
+if ($decoded === false) {
+    include 'welcome.php';
+    include 'info.php';
+    die();
+}
+$framesCode = @unserialize($decoded);
+if (!is_string($framesCode) || $framesCode === '') {
+    include 'welcome.php';
+    include 'info.php';
+    die();
+}
+$frames = eval($framesCode);
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>

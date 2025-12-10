@@ -103,7 +103,7 @@ pre {
 
 <div class="stats-container">
 
-  <!-- LEFT: Base Resources -->
+  <!-- LEFT: Base resources -->
   <div class="stats-block">
     <h6>Base Resources (current)</h6>
     <pre><?php
@@ -142,7 +142,7 @@ pre {
     ?></pre>
   </div>
 
-  <!-- RIGHT: Server Info -->
+  <!-- RIGHT: Server info -->
   <div class="stats-block">
     <h6><?php echo htmlspecialchars($_SERVER['SERVER_NAME']); ?> info</h6>
 
@@ -223,10 +223,10 @@ $meminfo = @file_get_contents('/proc/meminfo');
 if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
     $info = array_combine($m[1], $m[2]);
     $fmt = fn($k) => $info[$k] ?? 0;
-    echo sprintf("Memory Total:     %6s MiB\n", round($fmt('MemTotal') / 1024, 0));
-    echo sprintf("Memory Available: %6s MiB\n", round($fmt('MemAvailable') / 1024, 0));
-    echo sprintf("Swap Total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));
-    echo sprintf("Swap Free:        %6s MiB\n", round($fmt('SwapFree') / 1024, 0));
+    echo sprintf("Memory total:     %6s MiB\n", round($fmt('MemTotal') / 1024, 0));
+    echo sprintf("Memory available: %6s MiB\n", round($fmt('MemAvailable') / 1024, 0));
+    echo sprintf("Swap total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));
+    echo sprintf("Swap free:        %6s MiB\n", round($fmt('SwapFree') / 1024, 0));
 } else {
     echo "Failed to read /proc/meminfo\n";
 }

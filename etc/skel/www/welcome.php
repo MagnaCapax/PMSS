@@ -45,7 +45,7 @@ if (file_exists('/etc/seedbox/config/vendor')) {
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title><?= htmlspecialchars($vendor['name']); ?> Seedbox</title>
+    <title><?= $vendor['name']; ?> Seedbox</title>
     <!-- Stylesheets -->
     <link href="https://static.pulsedmedia.com/wc/css/screen.css" rel="stylesheet" type="text/css" media="screen" />
     <!-- Javascript -->
@@ -234,12 +234,14 @@ if ($vendor['pulsedBox'] == true) {
                             }
                         }
 
+                        echo passthru('systemctl status user-$(\'/usr/bin/id\' -u).slice|grep -m1  "Memory: "');
+
                         if (@file_exists('../.billingId')) {
                             $billingId = (int)@file_get_contents('../.billingId');
                             if ($billingId > 0) {
                                 echo <<<EOF
                                 <h6>Need more resources?</h6>
-                                <p>Need more Diskspace, Traffic or RAM?</p>
+                        <p>Need more disk space, traffic, or RAM?</p>
                                 <p>You can upgrade fast and easy — activation usually within few minutes! Just check out your <a href="https://pulsedmedia.com/clients/upgrade.php?type=configoptions&id={$billingId}" target="_blank">Upgrade Options!</a></p>
 EOF;
                             }
@@ -286,7 +288,7 @@ foreach ($rssFeed['channel']['item'] as $thisItem) {
 <?php
 function bonusQuotaDisplay($bonusQuota) {
     if ($bonusQuota != 0) {
-        return '<b>BONUS QUOTA:</b> ' . number_format($bonusQuota) . ' GB<br />';
+        return '<b>BONUS QUOTA:</b> ' . number_format($bonusQuota) . ' GiB<br />';
     }
     return '';
 }
