@@ -6,6 +6,7 @@
 
 require_once __DIR__.'/../lib/update/logging.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/update/distro.php';
 
 logMessage('Making ProFTPD configuration');
 
@@ -24,7 +25,13 @@ if (!is_dir($proftpdDir)) {
 }
 
 $hostname = sanitizeHostname($hostnameRaw);
-$tlsBlock = buildTlsConfiguration($hostname);
+$distroVersion = 0;
+$detected = \pmssDetectDistro();
+if (is_array($detected) && isset($detected['version'])) {
+    $distroVersion = (int) $detected['version'];
+}
+
+$tlsBlock = buildTlsConfiguration($hostname, $distroVersion);
 
 $rendered = str_replace(
     ['%SERVERNAME%', '%TLS_CONFIGURATION%'],
@@ -73,7 +80,7 @@ function sanitizeHostname(string $raw): string
 /**
  * Build the TLS configuration block when certificates are available.
  */
-function buildTlsConfiguration(string $hostname): string
+function buildTlsConfiguration(string $hostname, int $distroVersion = 0): string
 {
     $candidates = [];
     $trimmed = trim($hostname);
@@ -88,10 +95,16 @@ function buildTlsConfiguration(string $hostname): string
 
     foreach ($candidates as $base) {
         if (file_exists($base.'/cert.pem') && file_exists($base.'/privkey.pem') && file_exists($base.'/fullchain.pem')) {
+            // Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
+            $tlsProtocol = '    TLSProtocol                   TLSv1.2 TLSv1.3';
+            if ($distroVersion > 0 && $distroVersion <= 10) {
+                $tlsProtocol = '    TLSProtocol                   TLSv1.2';
+            }
+
             return implode("\n", [
                 '    TLSEngine                     on',
                 '    TLSLog                        /var/log/proftpd/tls.log',
-                '    TLSProtocol                   TLSv1.2 TLSv1.3',
+                $tlsProtocol,
                 '    TLSCipherSuite                HIGH:!aNULL:!MD5:!3DES',
                 '    TLSOptions                    NoSessionReuseRequired',
                 '    TLSRenegotiate                none',

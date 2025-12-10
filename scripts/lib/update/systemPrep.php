@@ -390,7 +390,26 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
         $locale = 'en_US.UTF-8';
         $enabled = pmssLocaleEnabledInGen($locale);
         if (!$enabled) {
-            runStep('Enabling '.$locale.' in /etc/locale.gen', "sed -i 's/# \?".$locale." UTF-8/".$locale." UTF-8/g' /etc/locale.gen");
+            $line = $locale.' UTF-8';
+            $gen  = @file_get_contents('/etc/locale.gen');
+            if ($gen === false) {
+                // Best effort: create file with the required locale line
+                @file_put_contents('/etc/locale.gen', $line."\n");
+                logMessage('[WARN] /etc/locale.gen missing; created with '.$line);
+            } else {
+                if (strpos($gen, $line) === false) {
+                    // Append the desired locale line if not present at all
+                    if (@file_put_contents('/etc/locale.gen', rtrim($gen, "\r\n")."\n".$line."\n") === false) {
+                        logMessage('[WARN] Unable to append '.$line.' to /etc/locale.gen');
+                    } else {
+                        logMessage('Appended '.$line.' to /etc/locale.gen');
+                    }
+                } else {
+                    // Un-comment the existing line if commented out
+                    runStep('Enabling '.$locale.' in /etc/locale.gen',
+                        "sed -i 's/^# *".$locale." UTF-8/".$locale." UTF-8/' /etc/locale.gen");
+                }
+            }
         }
 
         $has = pmssHasLocale($locale);
