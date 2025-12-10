@@ -7,6 +7,22 @@
  * systemctl for rootless Docker so operators can start/stop/restart/status
  * a tenant's Docker without retyping the environment boilerplate.
  *
+ * There are two rootless Docker launch modes in the fleet:
+ *   1) systemd user-service mode – docker-ce-rootless-extras plus
+ *      dockerd-rootless-setuptool.sh install create a docker.service unit
+ *      under the user's systemd instance (systemctl --user ...). This path
+ *      is not widely deployed yet and is treated as informational only.
+ *   2) non-systemd rootless mode – the upstream get.docker.com/rootless
+ *      script (or equivalent) installs dockerd-rootless.sh and expects the
+ *      daemon to be started directly from the user's shell with XDG_RUNTIME_DIR
+ *      and PATH set appropriately. This is the dominant mode today.
+ *
+ * To favour robustness, this helper defaults to the non-systemd rootless
+ * mode and only uses systemd user-service state for reporting or when an
+ * explicit, healthy docker.service unit exists. In particular, start()
+ * prefers verifying/launching dockerd-rootless.sh and will not "force" a
+ * systemd unit start on hosts where that path is incomplete.
+ *
  * Usage:
  *   /scripts/util/userDocker.php USER start
  *   /scripts/util/userDocker.php USER stop
@@ -114,15 +130,19 @@ if ($action === 'stop' || $action === 'restart') {
 
 // START
 if ($action === 'start' || $action === 'restart') {
-    if ($hasUserBus && $serviceExists) {
-        pmssUserLog($user, 'userDocker: starting via systemd user service');
-        userDockerRunAs($user, 'systemctl --user start docker.service');
-        echo "Docker start requested for {$user} via systemd user service\n";
+    // Default to non-systemd rootless mode for robustness: if the socket is
+    // already present, assume the daemon is running and avoid spawning a
+    // duplicate instance. Only when the socket is missing do we attempt to
+    // launch dockerd-rootless.sh directly. Systemd user-service mode remains
+    // observable via status() but is not the primary start path yet.
+    if (file_exists($dockerSock)) {
+        pmssUserLog($user, 'userDocker: docker socket already present; assuming daemon running, skipping start');
+        echo "Docker socket already present for {$user}; assuming running\n";
         exit(0);
     }
 
-    // No usable systemd user unit/bus: start dockerd-rootless.sh in the same way
-    // the watchdog does, ensuring PATH and XDG_RUNTIME_DIR are sane.
+    // Start dockerd-rootless.sh in the same way the watchdog and manual
+    // workflows do, ensuring PATH and XDG_RUNTIME_DIR are sane.
     pmssUserLog($user, 'userDocker: starting rootless daemon via dockerd-rootless.sh (no systemd user unit/bus)');
     $envCmd = sprintf(
         'XDG_RUNTIME_DIR=%s PATH=$PATH:/usr/sbin:/sbin:$HOME/bin nohup dockerd-rootless.sh >/dev/null 2>&1 &',
