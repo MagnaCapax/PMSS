@@ -3,7 +3,7 @@
  * WireGuard provisioning for PMSS deployments.
  */
 
-require_once __DIR__.'/update/users.php';
+require_once __DIR__.'/users.php';
 require_once __DIR__.'/networkInfo.php';
 
 if (!function_exists('logmsg')) {
