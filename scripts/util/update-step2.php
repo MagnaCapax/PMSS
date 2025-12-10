@@ -114,6 +114,7 @@ logmsg('update-step2.php starting');
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'start']);
 
 pmssConfigureAptNonInteractive('logmsg');
+pmssCleanupMediaareaBootstrapPackage();
 
 // --- PACKAGE PHASE: DO NOT REORDER ---------------------------------------------------------
 // Everything below depends on distro packages being in a good state. Toolchains, service
