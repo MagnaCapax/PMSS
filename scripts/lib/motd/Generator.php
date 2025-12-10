@@ -108,9 +108,9 @@ class Motd
         $uptime  = trim((string) shell_exec('uptime -p'));
         $kernel  = trim((string) shell_exec('uname -r'));
         // Discover the primary interface via routing table
-        $iface   = trim((string) shell_exec("ip -o route get 1 2>/dev/null | awk '/ dev / {for(i=1;i<=NF;i++) if (\\$i==\"dev\") {print \\\$(i+1); exit}}'"));
+        $iface = self::parseIfaceFromRoute(trim((string) shell_exec('ip -o route get 1 2>/dev/null')));
         if ($iface === '') {
-            $iface = trim((string) shell_exec("ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if (\\$i==\"dev\") {print \\\$(i+1); exit}}'"));
+            $iface = self::parseIfaceFromRoute(trim((string) shell_exec('ip route show default 2>/dev/null')));
         }
         $net = 'Unknown';
         if ($iface !== '') {
@@ -148,6 +148,20 @@ class Motd
     private static function c(string $text, string $code): string
     {
         return "\e[{$code}m{$text}\e[0m";
+    }
+
+    private static function parseIfaceFromRoute(string $line): string
+    {
+        if ($line === '') return '';
+        $parts = preg_split('/\s+/', $line);
+        if (!$parts) return '';
+        $count = count($parts);
+        for ($idx = 0; $idx < $count; $idx++) {
+            if ($parts[$idx] === 'dev' && isset($parts[$idx + 1])) {
+                return $parts[$idx + 1];
+            }
+        }
+        return '';
     }
 
     private static function distroInfo(): string
