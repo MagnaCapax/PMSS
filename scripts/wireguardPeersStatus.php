@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/php -q
 <?php
 /**
  * WireGuard peer status helper.
@@ -167,4 +167,3 @@ foreach ($peers as $peer) {
         .str_pad($tx, 14)
         .$endpoint."\n";
 }
-
