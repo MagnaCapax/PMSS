@@ -4,6 +4,7 @@
  * Render and apply the ProFTPD configuration using project templates.
  */
 
+require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/logging.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/update/distro.php';
