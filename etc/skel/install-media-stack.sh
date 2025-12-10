@@ -177,14 +177,18 @@ extract_tgz(){
 }
 
 # Central configuration (keep multi-use constants here)
-SERVARR_BRANCH="main"
+SONARR_BRANCH="main"
+RADARR_BRANCH="master"
+PROWLARR_BRANCH="master"
 SONARR_DL_BASE="https://services.sonarr.tv/v1/download"
 SONARR_MAJOR="4"
 RADARR_UPDATE_BASE="https://radarr.servarr.com/v1/update"
 PROWLARR_UPDATE_BASE="https://prowlarr.servarr.com/v1/update"
 
 # Apply arg overrides for branch/version
-if [[ -n "$OVR_SONARR_BRANCH" ]]; then SERVARR_BRANCH="$OVR_SONARR_BRANCH"; fi
+if [[ -n "$OVR_SONARR_BRANCH" ]]; then SONARR_BRANCH="$OVR_SONARR_BRANCH"; fi
+if [[ -n "$OVR_RADARR_BRANCH" ]]; then RADARR_BRANCH="$OVR_RADARR_BRANCH"; fi
+if [[ -n "$OVR_PROWLARR_BRANCH" ]]; then PROWLARR_BRANCH="$OVR_PROWLARR_BRANCH"; fi
 if [[ -n "$OVR_SONARR_VERSION" ]]; then SONARR_MAJOR="$OVR_SONARR_VERSION"; fi
 
 if ! command -v ss >/dev/null 2>&1; then
@@ -366,12 +370,12 @@ sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
 echo "${app^^} configured"
 echo ""
 
-# Install Radarr (branch/main, endpoint fix; Debian 11 fallback)
+# Install Radarr (branch master; Debian 11 fallback)
 app="radarr"
 echo "Installing ${app^^}..."
 installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
-branch="$SERVARR_BRANCH"
+branch="$RADARR_BRANCH"
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 GLIBC_VER=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
@@ -415,18 +419,18 @@ sed -i -e "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddres
 echo "${app^^} configured"
 echo ""
 
-# Install Prowlarr (branch/main for consistency)
+# Install Prowlarr (branch master)
 app="prowlarr"
 log_step "Installing ${app^^}..."
 installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
-branch="$SERVARR_BRANCH" # Stable
+branch="$PROWLARR_BRANCH" # Stable
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 if [[ -n "$OVR_PROWLARR_URL" ]]; then
   DLURL="$OVR_PROWLARR_URL"
 else
-  DLURL="${PROWLARR_UPDATE_BASE}/${branch}/updatefile?os=linux&arch=${SERVARR_ARCH}"
+  DLURL="${PROWLARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
 fi
 log_info "Prowlarr URL: $DLURL"
 
@@ -452,12 +456,12 @@ sed -i -e "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddres
 echo "${app^^} configured"
 echo ""
 
-# Install Sonarr (services.sonarr.tv download API)
+# Install Sonarr (services.sonarr.tv download API; branch main)
 app="sonarr"
 log_step "Installing ${app^^}..."
 installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
-branch="$SERVARR_BRANCH"
+branch="$SONARR_BRANCH"
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 if [[ -n "$OVR_SONARR_URL" ]]; then
