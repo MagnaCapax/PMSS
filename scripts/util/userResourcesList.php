@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php
 /**
  * Display comprehensive resource limits for all users.

@@ -3,7 +3,7 @@
  * PMSS: User Frontend Welcome Page
  * This is the actual index / first page user sees with all the buttons etc.
  *
- * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ * Original concept and implementation: Aleksi Ursin, circa 2010–2015.
  *
  * #TODO Major refactoring; https://github.com/MagnaCapax/PMSS/issues/64
  *

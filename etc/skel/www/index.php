@@ -2,7 +2,7 @@
 /**
  * PMSS: Master GUI, index frame loader.
  *
- * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ * Original concept and implementation: Aleksi Ursin, circa 2010–2015.
  *
  * Responsibilities:
  *  - Fetch remote frame definitions from pulsedmedia.com when available.

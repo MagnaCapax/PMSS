@@ -6,7 +6,7 @@
  * account statistics via stats.php and provides a lightweight, responsive
  * layout for the seedbox information view.
  *
- * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ * Original concept and implementation: Aleksi Ursin, circa 2010–2015.
  *
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  */

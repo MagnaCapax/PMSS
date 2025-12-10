@@ -5,7 +5,7 @@
  * Live `systemctl` status for WG/OpenVPN, accurate Docker detection,
  * traffic chart (2+ days), taller CGroup block, responsive layout.
  *
- * Original concept and implementation: Aleksi Ursin, 2010–2011.
+ * Original concept and implementation: Aleksi Ursin, circa 2010–2015.
  *
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  *
