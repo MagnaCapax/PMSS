@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/scripts/lib/userLifecycle.php';
+require_once dirname(__DIR__, 3).'/lib/userLifecycle.php';
 
 class UsernameValidationTest extends TestCase
 {
@@ -31,4 +31,3 @@ class UsernameValidationTest extends TestCase
         }
     }
 }
-
