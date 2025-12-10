@@ -8,7 +8,9 @@ require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../../networkInfo.php';
 
 if (!function_exists('logmsg')) {
-    require_once __DIR__.'/../update.php';
+    // Load shared updater helpers. This file lives in /scripts/lib/update/apps,
+    // so the common library is two levels up.
+    require_once __DIR__.'/../../update.php';
 }
 
 function wgLog(string $message): void
