@@ -35,59 +35,8 @@ foreach ($users as $user) {
         continue;
     }
 
-    // Resolve UID for this user so we can derive the per-user runtime path.
-    $uid = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
-    if ($uid === '' || !ctype_digit($uid)) {
-        logDockerMessage("Skipping {$user}: unable to resolve UID");
-        continue;
-    }
-    $dockerSock = "/run/user/{$uid}/docker.sock";
-
-    // First attempt to query systemd user instance; if the bus is not
-    // accessible we fall back to checking the socket directly and starting
-    // dockerd-rootless.sh without systemd.
-    $statusCmd = sprintf(
-        'su %s -c %s',
-        escapeshellarg($user),
-        escapeshellarg('systemctl --user is-active docker.service 2>&1')
-    );
-    $rawStatus = trim((string) shell_exec($statusCmd));
-    $hasUserBus = ($rawStatus !== '' && strpos($rawStatus, 'Failed to connect to bus') === false);
-    $status = $hasUserBus ? $rawStatus : '';
-
-    if ($hasUserBus && $status === 'active') {
-        logDockerMessage("Docker already running for {$user} via systemd user service");
-        continue;
-    }
-
-    // If there is no usable systemd user bus but the Docker socket exists,
-    // assume the daemon is already running in non-systemd rootless mode.
-    if (!$hasUserBus && file_exists($dockerSock)) {
-        logDockerMessage("Docker socket present for {$user} without systemd user bus; assuming running");
-        continue;
-    }
-
-    if ($hasUserBus) {
-        logDockerMessage("Starting Docker for {$user} via systemd user service");
-        $startCmd = sprintf(
-            "su %s -c %s >/dev/null 2>&1",
-            escapeshellarg($user),
-            escapeshellarg('systemctl --user start docker.service')
-        );
-        runCommand($startCmd, false, 'logDockerMessage');
-        pmssUserLog($user, 'watchdog: systemctl --user start docker.service');
-    } else {
-        logDockerMessage("Starting rootless Docker for {$user} via dockerd-rootless.sh (no systemd user bus)");
-        $inner = sprintf(
-            'XDG_RUNTIME_DIR=%s PATH=$PATH:/usr/sbin:/sbin:$HOME/bin nohup dockerd-rootless.sh >/dev/null 2>&1 &',
-            "/run/user/{$uid}"
-        );
-        $startCmd = sprintf(
-            'su %s -c %s',
-            escapeshellarg($user),
-            escapeshellarg($inner)
-        );
-        runCommand($startCmd, false, 'logDockerMessage');
-        pmssUserLog($user, 'watchdog: started dockerd-rootless.sh (no systemd user bus)');
-    }
+    // Delegate start logic to userDocker helper so systemd and non-systemd
+    // rootless modes are handled consistently and logged per user.
+    $cmd = sprintf('php /scripts/util/userDocker.php %s start', escapeshellarg($user));
+    runCommand($cmd, false, 'logDockerMessage');
 }

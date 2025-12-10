@@ -150,12 +150,13 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         pmssRunAndLog($user, 'systemctl start user@.service', 'systemctl start user@'.$uid.'.service', false);
         pmssRunAndLog($user, 'systemctl status user@.service (post)', 'systemctl --no-pager -l status user@'.$uid.'.service || true', false);
 
-        // Start rootless Docker for the user and verify.
+        // Start rootless Docker for the user via the shared helper so both
+        // systemd and non-systemd rootless modes are handled consistently.
         pmssEnsureDockerDependencies($user);
-        pmssRunAndLog($user, 'systemctl --user start docker.service', 'systemctl --user start docker.service', true);
-        pmssRunAndLog($user, 'systemctl --user status docker.service', 'systemctl --user --no-pager -l status docker.service || true', true);
-        $dockerHost = 'unix:///run/user/'.$uid.'/docker.sock';
-        pmssRunAndLog($user, 'docker ps', 'DOCKER_HOST='.escapeshellarg($dockerHost).' docker ps || true', true);
+        $startCmd = sprintf('php /scripts/util/userDocker.php %s start', escapeshellarg($user));
+        pmssRunAndLog($user, 'userDocker start', $startCmd, false);
+        $statusCmd = sprintf('php /scripts/util/userDocker.php %s status', escapeshellarg($user));
+        pmssRunAndLog($user, 'userDocker status', $statusCmd, false);
     }
 }
 
