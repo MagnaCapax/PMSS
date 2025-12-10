@@ -52,7 +52,7 @@ The default skeleton under `/etc/skel` provides a `~/bin/docker-install-wireguar
 For operators, per-user Docker can be controlled via:
 
 ```
-/scripts/util/userDocker.php USER {start|stop|restart|status}
+/scripts/userDocker.php USER {start|stop|restart|status}
 ```
 
 This helper prefers the systemd user unit when available and falls back to starting `dockerd-rootless.sh` directly when the user bus is unavailable, logging actions to `/var/log/pmss/pmss-update-user-USER.log`.
