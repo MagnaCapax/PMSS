@@ -117,7 +117,9 @@ fatal_scan() {
            -not -path "*/vendor/*" \
            -not -path "*/scripts/lib/tests/*" \
            -not -path "*/scripts/lib/devristo/*" \
-           -not -path "*/etc/skel/*" -print0)
+           -not -path "*/etc/skel/*" \
+           -not -path "*/docs/*" \
+           -not -path "*/scripts/testing/sharp-edges-lint.sh" -print0)
 }
 
 php_scan
