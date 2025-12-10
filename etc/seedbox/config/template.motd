@@ -29,7 +29,6 @@ WireGuard: https://github.com/MagnaCapax/PMSS/blob/main/docs/wireguard.md
 LinuxServer.io containers: https://github.com/MagnaCapax/PMSS/blob/main/docs/linuxserver.io.md
 
 List containers: `docker ps`
-Restart Docker: `systemctl --user restart docker`
 For usage tips run `docker-help`.
 
 Documentation:

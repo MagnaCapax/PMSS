@@ -116,21 +116,21 @@ docker-help() {
 Rootless Docker Usage
 =====================
 
-Docker runs in user mode on this system. Useful commands:
+Docker runs in user mode on this system. The daemon is managed for you by the
+platform (update-time hooks and cron watchdogs); in normal use you only need
+the standard Docker CLI:
 
-    systemctl --user start docker.service   # start daemon
-    systemctl --user restart docker.service # restart daemon
-    docker ps                               # list running containers
-    docker images                           # list downloaded images
-    docker pull IMAGE                       # fetch image
-    docker run IMAGE                        # run container
+    docker ps           # list running containers
+    docker images       # list downloaded images
+    docker pull IMAGE   # fetch image
+    docker run IMAGE    # run container
 
-The environment variable `DOCKER_HOST` points at your user daemon:
+The environment variable DOCKER_HOST points at your user daemon:
 
-    export DOCKER_HOST=unix:///run/user/\$(id -u)/docker.sock
+    export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 
-If you require docker-compose, download the latest binary to ~/bin
-and make it executable.
+If you require docker-compose, download the latest binary to ~/bin and make it
+executable.
 
 See https://docs.docker.com/engine/security/rootless/ for limitations.
 
@@ -142,7 +142,7 @@ Install the linuxserver.io Wireguard container with:
 
 The script lives in ~/bin and defaults to a random free port if you do not
 specify one. After launch, fetch client configs with
-`docker container exec wireguard /app/show-peer 1`.
+    docker container exec wireguard /app/show-peer 1
 EOF
 }
 

@@ -11,17 +11,21 @@
  *   1) systemd user-service mode – docker-ce-rootless-extras plus
  *      dockerd-rootless-setuptool.sh install create a docker.service unit
  *      under the user's systemd instance (systemctl --user ...). This path
- *      is not widely deployed yet and is treated as informational only.
+ *      exists on some hosts but is not universally deployed.
  *   2) non-systemd rootless mode – the upstream get.docker.com/rootless
  *      script (or equivalent) installs dockerd-rootless.sh and expects the
  *      daemon to be started directly from the user's shell with XDG_RUNTIME_DIR
  *      and PATH set appropriately. This is the dominant mode today.
  *
- * To favour robustness, this helper defaults to the non-systemd rootless
- * mode and only uses systemd user-service state for reporting or when an
- * explicit, healthy docker.service unit exists. In particular, start()
- * prefers verifying/launching dockerd-rootless.sh and will not "force" a
- * systemd unit start on hosts where that path is incomplete.
+ * To favour robustness, this helper **defaults to the non-systemd rootless
+ * mode** and only uses systemd user-service state for reporting or, when
+ * available, a polite stop. In particular, start()/restart:
+ *   - First verify whether the per-user Docker socket already exists.
+ *   - When the socket is missing, launch dockerd-rootless.sh with the same
+ *     XDG_RUNTIME_DIR and PATH tweaks that the watchdog and installer use.
+ *   - Deliberately do **not** attempt `systemctl --user start docker.service`
+ *     until we have explicit test coverage for that path on the current
+ *     distro mix.
  *
  * Usage:
  *   /scripts/util/userDocker.php USER start
@@ -30,11 +34,11 @@
  *   /scripts/util/userDocker.php USER status
  *
  * The script:
- *   - Prefers the systemd user service when a usable user bus exists.
- *   - Falls back to running dockerd-rootless.sh directly when systemd user
- *     bus access fails, using the same XDG_RUNTIME_DIR and PATH tweaks that
- *     the watchdog and installer rely on.
- *   - Logs actions to the per-user PMSS log via pmssUserLog().
+ *   - Reports systemd user-service state when a usable user bus exists, but
+ *     treats it as advisory rather than the primary control surface.
+ *   - Starts the daemon via dockerd-rootless.sh using a guarded non-systemd
+ *     path that has been verified to work on Debian 10/11 rootless hosts.
+ *   - Logs every action to the per-user PMSS log via pmssUserLog().
  */
 
 if (PHP_SAPI !== 'cli') {

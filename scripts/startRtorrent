@@ -1,5 +1,14 @@
 #!/usr/bin/php
 <?php
+/**
+ * Start a per-user rTorrent instance inside a detached screen session.
+ *
+ * This launcher has been in production since around 2010 and is relied on by
+ * multiple automation entry points (e.g. unsuspend flows and instance checks).
+ *
+ * @author  Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
+ */
 require_once __DIR__.'/lib/logger.php';
 
 if ($argc !== 2) {

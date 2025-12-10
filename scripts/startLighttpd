@@ -2,7 +2,10 @@
 <?php
 # Pulsed Media Seedbox Management Software "PMSS"
 /**
- * Bootstrap a tenant-specific lighttpd instance.
+ * Start a per-user lighttpd instance for a tenant.
+ *
+ * This launcher has its roots in the original per-user web stack introduced
+ * around 2010 and is still used by cron watchdogs and user maintenance flows.
  *
  * Preconditions:
  *   - `/home/<user>/.lighttpd.conf` exists and references per-user sockets.
@@ -13,8 +16,20 @@
  *   - Required subdirectories (`.lighttpd`, `.lighttpd/upload`, optional `.lighttpd/compress`)
  *     exist with user ownership when referenced by config.
  *   - User lighttpd process launched; script prints `ps` output for visibility.
+ *
+ * @author  Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
  */
 
+/**
+ * Ensure that a given directory exists for the user, creating it via `su`.
+ *
+ * The directory is created as the target user so subsequent file writes by
+ * lighttpd or PHP processes do not hit permission errors.
+ *
+ * @param string $user Username used with `su` when creating the directory.
+ * @param string $dir  Absolute directory path that should exist.
+ */
 function pmssEnsureUserDir(string $user, string $dir): void
 {
     if (is_dir($dir)) {
@@ -28,6 +43,14 @@ function pmssEnsureUserDir(string $user, string $dir): void
     passthru($cmd);
 }
 
+/**
+ * Remove any stale socket files matching the given glob pattern.
+ *
+ * This prevents lighttpd/php-cgi startup from failing due to leftover sockets
+ * after crashes or unclean shutdowns.
+ *
+ * @param string $pattern Glob pattern for per-user socket files.
+ */
 function pmssClearSocketFiles(string $pattern): void
 {
     $sockets = glob($pattern);

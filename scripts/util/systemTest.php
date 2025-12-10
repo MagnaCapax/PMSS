@@ -25,12 +25,34 @@ function pmssExec(string $command): string
 
 /**
  * Normalize a status tuple for display.
+ *
+ * When stdout is a TTY, apply simple ANSI colour coding so OK/WARN/ERR lines
+ * stand out for operators skimming large outputs. JSON mode bypasses this
+ * helper entirely.
  */
 function renderStatus(array $result): void
 {
-    $label  = str_pad('['.$result['status'].']', 9);
+    $status = strtoupper((string)$result['status']);
+    $label  = '['.$status.']';
     $detail = $result['detail'] !== '' ? ' - '.$result['detail'] : '';
-    echo $label.$result['name'].$detail.PHP_EOL;
+
+    $colour = '';
+    $reset  = '';
+    if (function_exists('posix_isatty') ? posix_isatty(STDOUT) : true) {
+        if ($status === 'OK') {
+            $colour = "\033[32m"; // green
+        } elseif ($status === 'WARN') {
+            $colour = "\033[33m"; // yellow
+        } elseif ($status === 'ERR') {
+            $colour = "\033[31m"; // red
+        }
+        if ($colour !== '') {
+            $reset = "\033[0m";
+        }
+    }
+
+    $labelPadded = str_pad($label, 9);
+    echo $colour.$labelPadded.$reset.$result['name'].$detail.PHP_EOL;
 }
 
 /**
@@ -289,6 +311,25 @@ foreach ($symlinkTargets as $label => [$link, $expected]) {
             'WARN',
             sprintf('%s missing', $link)
         );
+    }
+}
+
+// Fold in the componentStatus view so operators get a single, richer picture.
+// The helper already focuses on binaries/configs; here we simply import its
+// JSON output when available and prefix entries so name clashes remain obvious.
+$componentJson = pmssExec('php /scripts/util/componentStatus.php --json 2>/dev/null');
+if ($componentJson !== '') {
+    $decoded = json_decode($componentJson, true);
+    if (is_array($decoded) && isset($decoded['results']) && is_array($decoded['results'])) {
+        foreach ($decoded['results'] as $entry) {
+            if (!isset($entry['name'], $entry['status'])) {
+                continue;
+            }
+            $name   = 'Component: '.$entry['name'];
+            $status = (string)$entry['status'];
+            $detail = isset($entry['detail']) ? (string)$entry['detail'] : '';
+            $checks[] = pmssStatus($name, $status, $detail);
+        }
     }
 }
 

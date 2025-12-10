@@ -1,12 +1,20 @@
 # Rootless Docker Basics
 
-PMSS provisions rootless Docker for each account so you can run containers without `sudo` once your per-user daemon is running. Useful commands:
+PMSS provisions rootless Docker for each account so you can run containers without `sudo` once your per-user daemon is running. On current hosts the daemon is managed in **non-systemd rootless mode** (via `dockerd-rootless.sh`) and kept alive by platform tooling; most users only need the standard Docker CLI:
 
 ```
-systemctl --user start docker.service   # start daemon
-systemctl --user restart docker.service # restart daemon
-docker ps                               # running containers
-docker images                           # downloaded images
+docker ps         # running containers
+docker images     # downloaded images
+docker pull IMG   # fetch image
+docker run IMG    # run container
+```
+
+Rootless Docker is started automatically when needed (by update-time hooks and cron watchdogs). If `docker ps` reports a socket error, wait a minute for the watchdog to kick in or contact support rather than trying to run `dockerd-rootless.sh` manually.
+
+To ensure Docker commands talk to the correct daemon, the `DOCKER_HOST` environment variable is set in your `~/.bashrc`:
+
+```
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 ```
 
 Pull images and run containers normally:
@@ -22,13 +30,6 @@ linuxserver.io Wireguard container. Invoke it with an optional port:
 docker-install-wireguard.sh 51820
 ```
 
-
-To ensure Docker commands talk to the correct daemon, the `DOCKER_HOST` environment variable is set in your `~/.bashrc`:
-
-```
-export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
-```
-
 ## Storage drivers on PMSS
 
 On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast and space-efficient:
@@ -37,11 +38,7 @@ On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast a
 - Debian 12+: PMSS does not force a driver; Docker’s own defaults apply unless you explicitly set `storage-driver` in `daemon.json`.
 - Custom drivers: if `daemon.json` already contains `storage-driver` (for example `overlay2` or `vfs`), PMSS leaves it untouched and logs that it is reusing the existing configuration. `vfs` is supported but slow and space-heavy, and should generally be considered a last resort.
 
-If you ever need to change the driver, edit `~/.config/docker/daemon.json` and restart Docker with:
-
-```
-systemctl --user restart docker.service
-```
+If you ever need to change the driver, edit `~/.config/docker/daemon.json` and restart Docker. On PMSS the daemon is normally managed for you; reach out to support if you believe a driver change is required so they can coordinate it with platform tooling.
 
 ## Additional tools
 
@@ -55,7 +52,7 @@ For operators, per-user Docker can be controlled via:
 /scripts/userDocker.php USER {start|stop|restart|status}
 ```
 
-This helper prefers the systemd user unit when available and falls back to starting `dockerd-rootless.sh` directly when the user bus is unavailable, logging actions to `/var/log/pmss/pmss-update-user-USER.log`.
+This helper **defaults to starting `dockerd-rootless.sh` directly** (non-systemd rootless mode) once it has confirmed the per-user Docker socket is not already present. Systemd user units are treated as advisory: their state is reported by `status` and, when available, used for a polite `stop`, but are not relied on for `start`/`restart` until they have dedicated test coverage on the current distro mix. All actions are logged to `/var/log/pmss/pmss-update-user-USER.log`.
 
 ## Troubleshooting
 
