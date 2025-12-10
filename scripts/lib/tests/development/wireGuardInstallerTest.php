@@ -7,7 +7,7 @@ if (!defined('PMSS_WIREGUARD_NO_ENTRYPOINT')) {
     define('PMSS_WIREGUARD_NO_ENTRYPOINT', true);
 }
 
-require_once dirname(__DIR__, 2).'/update/apps/wireguard.php';
+require_once dirname(__DIR__, 2).'/wireguard.php';
 
 class WireGuardInstallerTest extends TestCase
 {

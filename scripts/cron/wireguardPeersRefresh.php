@@ -12,7 +12,7 @@
 
 define('PMSS_WIREGUARD_NO_ENTRYPOINT', true);
 
-require_once __DIR__.'/../lib/update/apps/wireguard.php';
+require_once __DIR__.'/../lib/wireguard.php';
 
 if (!wgSupports()) {
     // WireGuard tooling missing; nothing to do.
@@ -56,4 +56,3 @@ if (is_dir('/run/systemd/system')) {
         wgLog('wireguardPeersRefresh: '.$cmd.' failed (rc='.$rc2.')');
     }
 }
-

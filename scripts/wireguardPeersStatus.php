@@ -9,7 +9,7 @@
 
 define('PMSS_WIREGUARD_NO_ENTRYPOINT', true);
 
-require_once __DIR__.'/lib/update/apps/wireguard.php';
+require_once __DIR__.'/lib/wireguard.php';
 
 /**
  * Parse wg0.conf and extract peers with user tags, public keys, and AllowedIPs.
