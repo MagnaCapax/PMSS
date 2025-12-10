@@ -138,6 +138,13 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         // Enable linger to allow user@UID to run without active login.
         pmssRunAndLog($user, 'loginctl enable-linger', 'loginctl enable-linger '.escapeshellarg($user), false);
 
+        // Ensure rootless Docker is installed for users that predate the
+        // rollout. This is a guarded migration: if the unit already exists
+        // or the helper binary is missing, we log and skip.
+        if (function_exists('pmssEnsureRootlessDockerInstalled')) {
+            pmssEnsureRootlessDockerInstalled($user);
+        }
+
         // Check and (re)start the per-user systemd instance.
         pmssRunAndLog($user, 'systemctl status user@.service (pre)', 'systemctl --no-pager -l status user@'.$uid.'.service || true', false);
         pmssRunAndLog($user, 'systemctl start user@.service', 'systemctl start user@'.$uid.'.service', false);
@@ -149,6 +156,51 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         pmssRunAndLog($user, 'systemctl --user status docker.service', 'systemctl --user --no-pager -l status docker.service || true', true);
         $dockerHost = 'unix:///run/user/'.$uid.'/docker.sock';
         pmssRunAndLog($user, 'docker ps', 'DOCKER_HOST='.escapeshellarg($dockerHost).' docker ps || true', true);
+    }
+}
+
+if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
+    /**
+     * Run dockerd-rootless-setuptool.sh for users that do not yet have a
+     * per-user docker.service unit. This is intended as a migration helper
+     * for existing tenants to match the behaviour of new-account provisioning.
+     */
+    function pmssEnsureRootlessDockerInstalled(string $user): void
+    {
+        $uinfo = posix_getpwnam($user);
+        if (!$uinfo || !isset($uinfo['dir'])) {
+            pmssUserLog($user, '[WARN] Unable to resolve passwd entry; skipping rootless Docker install');
+            return;
+        }
+
+        $home    = $uinfo['dir'];
+        $unitDir = $home.'/.config/systemd/user';
+        $unit    = $unitDir.'/docker.service';
+
+        // If the user already has a docker.service unit, assume the rootless
+        // install has been performed (either by PMSS or manually).
+        if (is_file($unit)) {
+            pmssUserLog($user, '[SKIP] Rootless Docker systemd unit already present');
+            return;
+        }
+
+        // Guard on the helper binary so we do not emit confusing errors when
+        // rootless extras are not installed on a host.
+        $helper = '/usr/bin/dockerd-rootless-setuptool.sh';
+        if (!is_file($helper) || !is_executable($helper)) {
+            pmssUserLog($user, '[SKIP] dockerd-rootless-setuptool.sh missing or not executable; skipping rootless Docker install');
+            return;
+        }
+
+        // Mirror the behaviour used during new-user provisioning, invoking the
+        // helper inside the user context via machinectl. All output is logged
+        // to the per-user update log for troubleshooting.
+        $cmd = sprintf(
+            'machinectl shell %1$s@ %2$s',
+            escapeshellarg($user),
+            escapeshellarg($helper.' install')
+        );
+        pmssRunAndLog($user, 'dockerd-rootless-setuptool install', $cmd, false);
     }
 }
 

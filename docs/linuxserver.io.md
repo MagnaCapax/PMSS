@@ -845,12 +845,12 @@ This is the **canonical** way to access your seedbox over VPN. Use it when you:
 
 ### 6.2 linuxserver.io WireGuard container (optional)
 
-The default skeleton includes a helper script `install-wireguard.sh` in `~/bin`
+The default skeleton includes a helper script `docker-install-wireguard.sh` in `~/bin`
 and it is mentioned in [`docs/docker-help.md`](./docker-help.md). It launches
 the linuxserver.io WireGuard container under your user:
 
 ```bash
-install-wireguard.sh [PORT]
+docker-install-wireguard.sh [PORT]
 ```
 
 Characteristics:

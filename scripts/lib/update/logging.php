@@ -4,7 +4,7 @@
  */
 
 if (!defined('PMSS_LOG_FILE')) {
-    define('PMSS_LOG_FILE', '/var/log/pmss-update.log');
+    define('PMSS_LOG_FILE', '/var/log/pmss/update.log');
 }
 
 if (!isset($GLOBALS['PMSS_JSON_LOG_PATH'])) {

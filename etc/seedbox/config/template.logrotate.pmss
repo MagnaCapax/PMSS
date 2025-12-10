@@ -1,4 +1,4 @@
-/var/log/pmss-update.log /var/log/pmss-update.jsonl /var/log/pmss-update.profile.json /var/log/pmss/userDbCleanup.log /var/log/pmss/checkWireguard.log {
+/var/log/pmss-update.log /var/log/pmss-update.jsonl /var/log/pmss-update.profile.json /var/log/pmss/update.log /var/log/pmss/userDbCleanup.log /var/log/pmss/checkWireguard.log {
     daily
     rotate 7
     missingok

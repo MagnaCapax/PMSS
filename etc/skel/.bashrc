@@ -138,7 +138,7 @@ Wireguard container
 -------------------
 Install the linuxserver.io Wireguard container with:
 
-    install-wireguard.sh [PORT]
+    docker-install-wireguard.sh [PORT]
 
 The script lives in ~/bin and defaults to a random free port if you do not
 specify one. After launch, fetch client configs with
@@ -151,3 +151,8 @@ EOF
 export PATH=$HOME/.bin:$HOME/bin:$PATH
 
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+
+# User-specific extensions (optional)
+if [ -f "$HOME/.bashrc.user" ]; then
+    . "$HOME/.bashrc.user"
+fi

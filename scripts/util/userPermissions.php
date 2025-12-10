@@ -72,8 +72,15 @@ run(sprintf(
     escapeshellarg("/home/{$thisUser}/.local")
 ));
 
-// Ensure ~/.bin exists with safe permissions and ownership
-$binDir = "/home/{$thisUser}/.bin";
+// Ensure ~/.bin and ~/bin exist with safe permissions and ownership
+$binDirHidden = "/home/{$thisUser}/.bin";
+if (!is_dir($binDirHidden)) {
+    run(sprintf('mkdir -p %s', escapeshellarg($binDirHidden)));
+    chownPath($binDirHidden, "{$thisUser}:{$thisUser}");
+    chmodPath($binDirHidden, 0750, true);
+}
+
+$binDir = "/home/{$thisUser}/bin";
 if (!is_dir($binDir)) {
     run(sprintf('mkdir -p %s', escapeshellarg($binDir)));
     chownPath($binDir, "{$thisUser}:{$thisUser}");
@@ -83,11 +90,13 @@ if (!is_dir($binDir)) {
 $chmodItems = [
     ["/home/{$thisUser}", 0770],
     ["/home/{$thisUser}/.bin", 0750, true],
+    ["/home/{$thisUser}/bin", 0750, true],
     ["/home/{$thisUser}/.viminfo", 0640],
     ["/home/{$thisUser}/.quota", 0640],
     ["/home/{$thisUser}/.profile", 0640],
     ["/home/{$thisUser}/.bash_history", 0640],
     ["/home/{$thisUser}/.bashrc", 0640],
+    ["/home/{$thisUser}/.bashrc.user", 0640],
     ["/home/{$thisUser}/.tmp", 0770],
     ["/home/{$thisUser}/.config", 0770, true],
     ["/home/{$thisUser}/.trafficData", 0640],
