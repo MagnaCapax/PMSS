@@ -35,6 +35,9 @@
 
 declare(strict_types=1);
 
+// Allow more headroom during large updates but still cap to avoid host-wide OOM.
+@ini_set('memory_limit', '4096M');
+
 const DEFAULT_REPO          = 'https://github.com/MagnaCapax/PMSS';
 const CURL_UA               = 'PMSS-Updater (+https://pulsedmedia.com)';
 const VERSION_DIR           = '/etc/seedbox/config';
@@ -724,7 +727,34 @@ function runUpdateStep2(bool $dryRun): void
     $start = microtime(true);
     passthru(PHP_BINARY.' /scripts/util/update-step2.php', $rc);
     $duration = round(microtime(true) - $start, 3);
-    logEvent('update_step2_end', ['status' => $rc === 0 ? 'ok' : 'error', 'rc' => $rc, 'duration' => $duration]);
+
+    // Interpret non-zero exit codes, including 128+signal (e.g. SIGKILL → 137).
+    $status  = $rc === 0 ? 'ok' : 'error';
+    $details = ['status' => $status, 'rc' => $rc, 'duration' => $duration];
+    if ($rc !== 0 && $rc >= 128 && $rc <= 255) {
+        $signal = $rc - 128;
+        $name   = '';
+        if ($signal === 9) {
+            $name = 'SIGKILL';
+        } elseif ($signal === 15) {
+            $name = 'SIGTERM';
+        }
+        $details['signal']      = $signal;
+        $details['signal_name'] = $name;
+
+        $human = 'terminated by signal '.$signal.($name !== '' ? ' ('.$name.')' : '');
+        logmsg(sprintf('[ERROR] update-step2.php was %s; check kernel logs for OOM/kill entries', $human));
+        logEvent('update_step2_signal', [
+            'rc'          => $rc,
+            'signal'      => $signal,
+            'signal_name' => $name,
+            'duration'    => $duration,
+        ]);
+        logmsg('Partial step/profile data (if any) are under:');
+        logmsg('  - JSON:   '.JSON_LOG);
+        logmsg('  - Profile: '.JSON_LOG.'.profile.json');
+    }
+    logEvent('update_step2_end', $details);
     if ($rc !== 0) {
         fatal('update-step2.php exited with status '.$rc, $rc);
     }

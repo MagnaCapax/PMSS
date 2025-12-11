@@ -150,6 +150,9 @@ $findParts[] = '-path '.escapeshellarg("/home/{$thisUser}/.local").' -prune -o';
 foreach ($excludes as $ex) {
     $findParts[] = '-not -path '.escapeshellarg($ex);
 }
+// Skip symbolic links so broken symlinks (e.g. ~/www/watch) do not cause chown
+// dereference errors or non-zero rc noise in logs.
+$findParts[] = '-not -type l';
 $findParts[] = '-exec chown';
 $findParts[] = escapeshellarg("{$thisUser}:{$thisUser}");
 $findParts[] = '{}';

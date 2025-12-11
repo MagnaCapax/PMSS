@@ -12,6 +12,40 @@ require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/apps/packages/helpers.php';
 
+if (!function_exists('pmssPruneLegacyMediaArea')) {
+    /**
+     * Remove lingering MediaArea apt sources and cached bootstrap packages.
+     *
+     * Older repo-mediaarea packages now use control.tar.zst and are not needed
+     * since we ship our own apt templates. Best-effort cleanup keeps dpkg
+     * baseline apply from tripping over stale .list files or cached .debs.
+     */
+    function pmssPruneLegacyMediaArea(): void
+    {
+        runStep('Removing legacy MediaArea apt list files', 'rm -f /etc/apt/sources.list.d/mediaarea*.list');
+        runStep('Removing legacy MediaArea apt preferences/keys', 'rm -f /etc/apt/preferences.d/mediaarea* /etc/apt/trusted.gpg.d/mediaarea*.gpg');
+
+        $sources = '/etc/apt/sources.list';
+        if (is_readable($sources)) {
+            $data = @file_get_contents($sources);
+            if ($data !== false && stripos($data, 'mediaarea') !== false) {
+                $backup = $sources.'.pmss-backup-'.date('YmdHis');
+                @copy($sources, $backup);
+                $mutated = preg_replace('/^(.*mediaarea.*)$/mi', '# PMSS-disabled mediaarea: $1', $data);
+                if ($mutated !== null && $mutated !== $data) {
+                    @file_put_contents($sources, $mutated);
+                }
+            }
+        }
+
+        runStep('Purging legacy MediaArea package', aptCmd('purge -y repo-mediaarea || true'));
+        runStep(
+            'Removing cached MediaArea packages',
+            'rm -f /var/cache/apt/archives/repo-mediaarea_*.deb /var/lib/apt/lists/*mediaarea*'
+        );
+    }
+}
+
 if (!function_exists('pmssConfigureAptNonInteractive')) {
     /**
      * Ensure apt operates in fully non-interactive mode.
@@ -97,6 +131,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         }
 
         if (!$skipUpdate) {
+            pmssPruneLegacyMediaArea();
             runStep('Refreshing apt cache before dpkg selection', aptCmd('update'));
         }
         runStep('Refreshing dpkg availability database', 'apt-cache dumpavail | dpkg --merge-avail');

@@ -81,11 +81,36 @@ if (!function_exists('pmssUpdateAllUsers')) {
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
         $count = count($users);
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
+        $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
 
         foreach ($users as $user) {
-            if (trim($user) === '') {
+            $userTrim = trim($user);
+            if ($userTrim === '') {
                 continue;
             }
+
+            $phases = [];
+            if (function_exists('pmssUpdateUserEnvironment')) {
+                $phases[] = 'Environment (HTTP/ruTorrent/permissions)';
+            }
+            if (function_exists('pmssEnsureLingerAndDocker')) {
+                $phases[] = 'Linger/systemd/rootless Docker';
+            }
+
+            if ($isTty) {
+                echo PHP_EOL."\033[35mUpdating user {$userTrim}\033[0m".PHP_EOL;
+                foreach ($phases as $phase) {
+                    echo "  \033[33m* {$phase}\033[0m".PHP_EOL;
+                }
+            } else {
+                if (!empty($phases)) {
+                    logMessage(sprintf('Updating user %s phases: %s', $userTrim, implode(', ', $phases)));
+                } else {
+                    logMessage(sprintf('Updating user %s', $userTrim));
+                }
+            }
+
+            $userStart = microtime(true);
 
             // #TODO Remove this fix block by end of 2027.
             // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
@@ -117,7 +142,25 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 }
             }
 
-            pmssUpdateUserEnvironment($user, $rutorrentIndexSha);
+            pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
+            // Keep all per-user runtime wiring in the same loop for observability and simplicity.
+            if (function_exists('pmssEnsureLingerAndDocker')) {
+                pmssEnsureLingerAndDocker($userTrim);
+            }
+
+            $userDuration = microtime(true) - $userStart;
+            if (function_exists('pmssRecordProfile')) {
+                pmssRecordProfile([
+                    'description'    => 'updateUser '.$userTrim,
+                    'command'        => '',
+                    'status'         => 'OK',
+                    'rc'             => 0,
+                    'duration'       => round($userDuration, 4),
+                    'dry_run'        => false,
+                    'stdout_excerpt' => '',
+                    'stderr_excerpt' => '',
+                ]);
+            }
         }
     }
 }
@@ -134,6 +177,8 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
      */
     function pmssEnsureLingerAndDocker(string $user): void
     {
+        // #TODO fold linger/Docker kick into pmssUpdateUserEnvironment so we only
+        // traverse the user list once and share the same validation.
         if (!is_dir('/run/systemd/system')) {
             pmssUserLog($user, '[SKIP] systemd not available on this host');
             return;
@@ -145,6 +190,11 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         }
 
         pmssUserLog($user, sprintf('== Linger/Docker kick for %s (uid=%s) on host %s ==', $user, $uid, gethostname()));
+        if (function_exists('posix_isatty') && posix_isatty(STDOUT)) {
+            echo "\033[36m[LINGER/DOCKER] {$user}\033[0m".PHP_EOL;
+        } else {
+            logMessage('[LINGER/DOCKER] '.$user);
+        }
 
         // Enable linger to allow user@UID to run without active login.
         pmssRunAndLog($user, 'loginctl enable-linger', 'loginctl enable-linger '.escapeshellarg($user), false);
@@ -286,11 +336,17 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
 }
 
 if (!function_exists('pmssEnsureLingerAndDockerAllUsers')) {
-    /** Apply linger/systemd/docker kick to all managed users with per-user logs. */
+    /**
+     * Apply linger/systemd/docker kick to all managed users with per-user logs.
+     *
+     * #TODO(docker-linger-split): fold this into pmssUpdateAllUsers to reuse the
+     * same validated user list and avoid multiple traversals.
+     */
     function pmssEnsureLingerAndDockerAllUsers(): void
     {
         $list = users::listHomeUsers();
         sort($list, SORT_NATURAL | SORT_FLAG_CASE);
+        logMessage(sprintf('[START] Linger/Docker sweep for %d user(s)', count($list)));
         foreach ($list as $user) {
             if ($user === '') continue;
             pmssEnsureLingerAndDocker($user);
@@ -301,6 +357,8 @@ if (!function_exists('pmssEnsureLingerAndDockerAllUsers')) {
 if (!function_exists('pmssRefreshSkeletonAndCron')) {
     /**
      * Re-apply skeleton permissions and critical cron/FTP settings.
+     * #TODO(skel-placement): revisit timing; /scripts/update.php already stages
+     * /etc/skel early. Consider staging/atomic swap instead of mid-update refresh.
      */
     function pmssRefreshSkeletonAndCron(): void
     {
@@ -352,6 +410,8 @@ if (!function_exists('pmssInstallLogrotatePolicy')) {
 if (!function_exists('pmssRestoreUserCrontabs')) {
     /**
      * Restore the default user crontabs from the template.
+     * #TODO(cron-ownership): move to per-user loop and eventually drop this so
+     * users can manage their own crontabs; guardrails should live in root cron.
      */
     function pmssRestoreUserCrontabs(): void
     {

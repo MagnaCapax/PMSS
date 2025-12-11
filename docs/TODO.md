@@ -49,3 +49,5 @@ This document tracks small, stability‑focused improvements and medium‑term r
 
 - Atomic updates for /scripts and /etc/seedbox
   - Move the update process toward atomic replacement of the `/scripts` and `/etc/seedbox` trees (e.g., stage into a versioned directory then swap via rename) so cron and long-running jobs never see partially-removed libraries. The 2025 `/home` wipe incident showed how mid-update removals of `/scripts/lib/user/*.php` turned `listUsers.php` output into fatal/error text, which legacy consumers like `updateQuotas.php` treated as usernames and fed directly into destructive shell commands. Atomic updates plus strict output validation reduce the odds of similar cascades.
+- Single per-user loop in update-step2
+  - Refactor per-user maintenance so all user work (permissions, linger/docker kick, crontab refresh, etc.) happens inside one validated loop. Today multiple helpers (pmssUpdateAllUsers, pmssEnsureLingerAndDockerAllUsers, pmssRestoreUserCrontabs) each traverse user lists separately, increasing runtime and risk of drift. Fold the extra sweeps into the main loop and simplify orchestration.

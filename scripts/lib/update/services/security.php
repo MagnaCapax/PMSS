@@ -20,6 +20,7 @@ if (!function_exists('pmssRemoveAutodlConfig')) {
 if (!function_exists('pmssEnsureTestfile')) {
     /**
      * Ensure the standard download speed test file exists.
+     * #TODO(testfile): consider templating/host-wide CDN instead of local 100MiB dd.
      */
     function pmssEnsureTestfile(): void
     {
@@ -34,10 +35,11 @@ if (!function_exists('pmssEnsureTestfile')) {
 if (!function_exists('pmssRestrictAtopBinary')) {
     /**
      * Restrict atop execution permissions to privileged users.
+     * #TODO(atop): evaluate whether this belongs in package templating instead.
      */
     function pmssRestrictAtopBinary(): void
     {
-        @chmod('/usr/bin/atop', 0750);
+        runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
     }
 }
 

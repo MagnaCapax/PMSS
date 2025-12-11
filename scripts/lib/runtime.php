@@ -8,6 +8,7 @@
  */
 
 const PMSS_RUNTIME_FALLBACK_LOG = '/var/log/pmss/runtime.log';
+const PMSS_COMMAND_TIMEOUT_DEFAULT = 300;
 
 if (!function_exists('logMessage')) {
     /**
@@ -25,12 +26,32 @@ if (!function_exists('logMessage')) {
 if (!function_exists('runCommand')) {
     /**
      * Execute a shell command while keeping failures non-fatal.
+     *
+     * Streams stdout/stderr live, keeps only a tail of output in memory for
+     * runStep() excerpts, and emits an interactive banner so operators can see
+     * which command is in-flight when running manually.
      */
     function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null): int
     {
         $log = $logger ?? 'logMessage';
-        if ($verbose) {
-            $log('[CMD] '.$cmd);
+        $isInteractive = function_exists('posix_isatty') && posix_isatty(STDOUT);
+        $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
+        $timeoutSec = PMSS_COMMAND_TIMEOUT_DEFAULT;
+        if ($timeoutEnv !== false && $timeoutEnv !== '' && ctype_digit($timeoutEnv)) {
+            $val = (int) $timeoutEnv;
+            if ($val > 0) {
+                $timeoutSec = $val;
+            }
+        }
+        $announceStart = $isInteractive || $verbose;
+        if ($announceStart) {
+            $prefix = $isInteractive ? "\033[36m[EXEC]\033[0m " : '[CMD] ';
+            echo $prefix.$cmd.PHP_EOL;
+        }
+        $debugRun = getenv('PMSS_RUNCOMMAND_DEBUG');
+        $log('[CMD start] '.$cmd);
+        if ($verbose || ($debugRun !== false && $debugRun !== '')) {
+            $log(sprintf('[CMD] memory usage before=%0.2f MiB', memory_get_usage(true) / 1048576));
         }
 
         $descriptor = [
@@ -53,7 +74,9 @@ if (!function_exists('runCommand')) {
 
         $stdout = '';
         $stderr = '';
-        $streams = [$pipes[1], $pipes[2]];
+        $maxBuffer = 1048576; // keep ~1MiB tail per stream to avoid RSS explosion
+        $startedAt = microtime(true);
+        $timedOut = false;
 
         while (!feof($pipes[1]) || !feof($pipes[2])) {
             $read = [];
@@ -74,17 +97,38 @@ if (!function_exists('runCommand')) {
                 }
                 if ($stream === $pipes[1]) {
                     $stdout .= $chunk;
+                    if (strlen($stdout) > $maxBuffer) {
+                        $stdout = substr($stdout, -$maxBuffer);
+                    }
                     echo $chunk;
+                    fflush(STDOUT);
                 } else {
                     $stderr .= $chunk;
+                    if (strlen($stderr) > $maxBuffer) {
+                        $stderr = substr($stderr, -$maxBuffer);
+                    }
                     fwrite(STDERR, $chunk);
+                    fflush(STDERR);
                 }
+            }
+            if ((microtime(true) - $startedAt) > $timeoutSec) {
+                $timedOut = true;
+                break;
             }
         }
 
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $exitCode = proc_close($process);
+
+        if ($timedOut) {
+            // Best-effort termination; do not abort the whole script.
+            if (function_exists('proc_terminate')) {
+                @proc_terminate($process);
+            }
+            $exitCode = 124;
+        } else {
+            $exitCode = proc_close($process);
+        }
 
         $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = [
             'stdout' => $stdout,
@@ -96,7 +140,18 @@ if (!function_exists('runCommand')) {
             if ($excerpt !== '') {
                 $excerpt = ' :: '.preg_replace('/\s+/', ' ', substr($excerpt, 0, 300));
             }
-            $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd.$excerpt);
+            if ($timedOut) {
+                $banner = $isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ';
+                $msg = $banner.'Command timed out after '.$timeoutSec.'s: '.$cmd;
+                fwrite(STDERR, $msg.PHP_EOL);
+                echo $msg.PHP_EOL;
+                $log($msg);
+            } else {
+                $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd.$excerpt);
+            }
+        }
+        if ($verbose || ($debugRun !== false && $debugRun !== '')) {
+            $log(sprintf('[CMD] memory usage after =%0.2f MiB', memory_get_usage(true) / 1048576));
         }
         return $exitCode;
     }

@@ -21,6 +21,9 @@
  * Keep local changes minimal or contribute them upstream.
  */
 
+// Cap PHP memory use so we fail fast with a PHP fatal instead of a host-wide OOM kill.
+@ini_set('memory_limit', '4096M');
+
 // Module load order mirrors the runtime sequence. Keep shared runtime helpers
 // first, followed by environment detection, repository setup, system prep, web
 // stack, service bundles, user refresh, networking, and finally bootstrap
@@ -232,10 +235,6 @@ pmssAdjustLighttpdSecurity();
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
 pmssUpdateAllUsers($rutorrentIndexSha);
 // #TODO(user-logs): per-user environment updates could append summary lines to /var/log/pmss/user-<username>.log
-// Ensure user linger/systemd and rootless Docker are enabled and running; logs go to per-user files.
-if (function_exists('pmssEnsureLingerAndDockerAllUsers')) {
-    pmssEnsureLingerAndDockerAllUsers();
-}
 
 pmssEnsureAuthorizedKeysDirective();
 pmssEnsureTestfile();

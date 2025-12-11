@@ -19,6 +19,16 @@ if (!function_exists('runStep')) {
         pmssInitProfileStore();
         $dryRun  = getenv('PMSS_DRY_RUN') === '1';
         $started = microtime(true);
+        $isTty   = function_exists('posix_isatty') && posix_isatty(STDOUT);
+        // Emit a start banner for interactive operators so hangs show which step is running.
+        if ($isTty) {
+            $cBlue = "\033[34m";
+            $cReset = "\033[0m";
+            echo $cBlue.'[START] '.$description.$cReset.PHP_EOL;
+        } else {
+            // Persist start markers to the log for non-interactive runs.
+            logMessage('[START] '.$description.' :: '.$command);
+        }
         $rc      = $dryRun ? 0 : runCommand($command, false);
 
         $duration    = microtime(true) - $started;

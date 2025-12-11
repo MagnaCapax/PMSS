@@ -29,6 +29,8 @@ if (!function_exists('pmssApplyRuntimeTemplates')) {
 if (!function_exists('pmssEnsureAuthorizedKeysDirective')) {
     /**
      * Guarantee sshd honours per-user AuthorizedKeysFile entries.
+     * #TODO(sshd-template): migrate this into the sshd_config template flow and
+     * drop once userPermissions + template cover permissions and directives.
      */
     function pmssEnsureAuthorizedKeysDirective(): void
     {
@@ -38,6 +40,7 @@ if (!function_exists('pmssEnsureAuthorizedKeysDirective')) {
         if ($config === false) {
             return;
         }
+        logMessage('[START] Ensuring sshd AuthorizedKeysFile directive is enabled');
         $updated = str_replace('#AuthorizedKeysFile', 'AuthorizedKeysFile', $config);
         if ($config === $updated) {
             return;
