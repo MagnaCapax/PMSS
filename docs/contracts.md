@@ -223,9 +223,9 @@ Sub-handlers:
 
 - pmssResetCorePermissions(): void → `chmod -R 755 /etc/seedbox` and `chmod -R 750 /scripts`.
 
-- pmssEnsureLocaleBaseline(): void → ensures `en_US.UTF-8` locale and default env, calls `generateMotd()`.
+- pmssEnsureLocaleBaseline(): void → ensures `en_US.UTF-8` base locale, `fi_FI.UTF-8` for time formatting, sets system timezone to `Europe/Helsinki`, and calls `generateMotd()`.
 
-- pmssReapplyLocaleDefinitions(): void → uncomments en_US.UTF-8 in `/etc/locale.gen`, `locale-gen`, and updates `/etc/default/locale` to `LANG=en_US.UTF-8`.
+- pmssReapplyLocaleDefinitions(): void → reuses the baseline helper to reassert locale/timezone configuration on legacy installs.
 
 - pmssEnsureLegacySysctlBaseline(?callable $logger=null): void → writes legacy BFQ/sysctl defaults to `/etc/sysctl.d/1-pmss-defaults.conf` and runs `sysctl --system`.
 
