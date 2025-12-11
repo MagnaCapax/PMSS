@@ -7,36 +7,7 @@ require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
-
-// Per-user logging for update-step2 helpers now relies on the shared
-// pmssUserLog() helper from scripts/lib/user/log.php. For legacy callers that
-// still expect pmss-update-user-<username>.log, we keep this compat layer so
-// those files remain available while the primary source of truth moves to
-// /var/log/pmss/users/<username>.log and users.log/users.jsonl.
-if (!function_exists('pmssUserLogPath')) {
-    function pmssUserLogPath(string $user): string
-    {
-        $dir = '/var/log/pmss';
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $user);
-        return rtrim($dir, '/').'/pmss-update-user-'.$safe.'.log';
-    }
-}
-
-if (!function_exists('pmssUserLog')) {
-    function pmssUserLog(string $user, string $message): void
-    {
-        // Legacy compatibility: mirror to pmss-update-user-<username>.log only.
-        // #TODO(user-logs): replace this shim with the shared logger in scripts/lib/user/log.php
-        // once that helper is always loaded before userMaintenance.php. Avoid
-        // calling pmssUserLog recursively; this shim must remain self-contained.
-        $path = pmssUserLogPath($user);
-        $ts   = date('[Y-m-d H:i:s] ');
-        @file_put_contents($path, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
-    }
-}
+require_once __DIR__.'/../user/log.php';
 
 if (!function_exists('pmssRunAndLog')) {
     /**
