@@ -136,7 +136,7 @@ We moved decisively to strengthen the PM Software Stack:
   * The legacy `/etc/cron.d/updateQuotas` entry is unlinked at update start to prevent any recurrence of the quota refresh regression (see this incident). A TODO remains to remove this guard around 2030-12 once the fleet is fully refreshed.
   * The `/scripts` and `/etc/skel` wipes use a simple `rm -rf` on fixed paths (including dotfiles) with no user input, plus a TODO to move to staged + atomic swap to eliminate partial-tree windows.
 
-The initial corrective measures (core fix to `updateQuotas.php`, `listUsers.php`, logging, and guardrails) were landed in commit [229c1e7a11230af7ed9e73cf42369d7878f589b2](https://github.com/MagnaCapax/PMSS/commit/229c1e7a11230af7ed9e73cf42369d7878f589b2). Additional hardening to the updater (cron disable/unlink and simplified wipes) follows in subsequent changes.
+The initial corrective measures (core fix to `updateQuotas.php`, `listUsers.php`, logging, and guardrails) were landed in commit [229c1e7a11230af7ed9e73cf42369d7878f589b2](https://github.com/MagnaCapax/PMSS/commit/229c1e7a11230af7ed9e73cf42369d7878f589b2). Additional hardening to the updater (cron disable/unlink and simplified wipes) followed in [31872d1e29917bf8eece14510142d507b4b23ea9](https://github.com/MagnaCapax/PMSS/commit/31872d1e29917bf8eece14510142d507b4b23ea9).
 
   
 ### Server Updates
