@@ -537,18 +537,27 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 {
     ensureSnapshot($tmp);
 
+    // #TODO move /scripts and /etc/seedbox updates to staged + atomic swap (see docs/TODO.md)
+    // so no process ever sees a partially refreshed tree.
+
     $trees = [
         'scripts' => function (string $source) {
             if (!is_dir('/scripts')) {
                 @mkdir('/scripts', 0755, true);
             }
-            // Remove previous contents without tripping over missing glob matches.
-            runFatal('find /scripts -mindepth 1 -maxdepth 1 -exec rm -rf {} +', EXIT_COPY);
+            if (!is_dir($source)) {
+                fatal("Staged scripts source missing: {$source}", EXIT_COPY);
+            }
+            // Remove previous contents before copying in the new tree.
+            runFatal('rm -rf /scripts/* /scripts/.[!.]* /scripts/..?*', EXIT_COPY);
             runFatal(sprintf('cp -a %s/. %s', escapeshellarg($source), escapeshellarg('/scripts')), EXIT_COPY);
         },
         'etc' => function (string $source) {
-            if (is_dir($source.'/skel') && is_dir('/etc/skel')) {
-                runFatal('find /etc/skel -mindepth 1 -maxdepth 1 -exec rm -rf {} +', EXIT_COPY);
+            if (is_dir($source)) {
+                // Only wipe skel when the snapshot provides one and the target exists.
+                if (is_dir($source.'/skel') && is_dir('/etc/skel')) {
+                    runFatal('rm -rf /etc/skel/* /etc/skel/.[!.]* /etc/skel/..?*', EXIT_COPY);
+                }
             }
             // Intentionally using cp -rpu here so locally-newer files under /etc
             // are not overwritten by the snapshot. This is desired behavior to
@@ -812,6 +821,22 @@ function bootstrapMain(array $argv): void
         'branch'       => $spec['branch'],
         'pin'          => $spec['pin'],
     ]);
+
+    // Disable root cronjobs for update; update-step2 will reapply the template.
+    $rootCron = '/etc/cron.d/pmss';
+    if (file_exists($rootCron)) {
+        @unlink($rootCron);
+        logmsg('[INFO] Disabled /etc/cron.d/pmss during update; template will be reapplied in update-step2');
+    }
+
+    // Remove legacy updateQuotas cron to prevent recurrence of the 2025-12-08 /home wipe.
+    // See incident report: docs/incidents/2025-12-08-home-wipe-updateQuotas-listUsers.md
+    // #TODO remove this unlink around 2030-12 once the fleet is fully refreshed.
+    $legacyQuotaCron = '/etc/cron.d/updateQuotas';
+    if (file_exists($legacyQuotaCron)) {
+        @unlink($legacyQuotaCron);
+        logmsg('[INFO] Removed legacy updateQuotas cron entry to prevent quota-refresh regression');
+    }
 
     $distUpgradeHelper = '/scripts/util/update-dist-upgrade.php';
     if ($options['dist_upgrade'] && file_exists($distUpgradeHelper)) {

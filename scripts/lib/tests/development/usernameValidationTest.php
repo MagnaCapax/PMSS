@@ -8,7 +8,7 @@ class UsernameValidationTest extends TestCase
 {
     public function testValidUsernamesPass(): void
     {
-        $valid = ['a', 'abc', 'User123', 'abcdefg8'];
+        $valid = ['a', 'abc', 'user123', 'abcdefg8'];
         foreach ($valid as $name) {
             $this->assertTrue(\pmssValidateUsername($name), 'Expected valid username: '.$name);
         }
@@ -24,6 +24,7 @@ class UsernameValidationTest extends TestCase
             'user name',  // space
             'toolong89x', // longer than 8 chars
             'slash/user', // slash
+            'User123',    // uppercase not allowed
             '..',         // path-like
         ];
         foreach ($invalid as $name) {

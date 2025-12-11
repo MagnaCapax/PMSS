@@ -17,8 +17,8 @@ if (!defined('PMSS_USER_LOG_JSON')) {
 /**
  * Validate a username according to PMSS constraints.
  *
- * - Only ASCII letters and digits allowed.
- * - Must start with a letter.
+ * - Only lowercase ASCII letters and digits allowed.
+ * - Must start with a lowercase letter.
  * - Maximum length 8 characters.
  */
 function pmssUsernameIsValid(string $username): bool
@@ -26,7 +26,7 @@ function pmssUsernameIsValid(string $username): bool
     if ($username === '') {
         return false;
     }
-    return (bool) preg_match('/^[A-Za-z][A-Za-z0-9]{0,7}$/', $username);
+    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $username);
 }
 
 /**
@@ -163,4 +163,3 @@ function pmssUserTerminateStep($username, $step, $command, $dryRun)
 {
     return pmssUserLifecycleStep('terminate', $username, $step, $command, $dryRun);
 }
-
