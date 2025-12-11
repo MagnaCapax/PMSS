@@ -39,9 +39,12 @@ if (!function_exists('pmssPruneLegacyMediaArea')) {
         }
 
         runStep('Purging legacy MediaArea package', aptCmd('purge -y repo-mediaarea || true'));
+        runStep('Holding legacy MediaArea package to block reinstalls', 'apt-mark hold repo-mediaarea || true');
         runStep(
             'Removing cached MediaArea packages',
-            'rm -f /var/cache/apt/archives/repo-mediaarea_*.deb /var/lib/apt/lists/*mediaarea*'
+            'rm -f /var/cache/apt/archives/repo-mediaarea_*.deb '
+            .'/var/cache/apt/archives/partial/repo-mediaarea_*.deb '
+            .'/var/lib/apt/lists/*mediaarea* /var/lib/apt/lists/partial/*mediaarea*'
         );
     }
 }

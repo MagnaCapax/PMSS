@@ -244,6 +244,9 @@ pmssPostUpdateWebRefresh();
 pmssRefreshSkeletonAndCron();
 pmssInstallLogrotatePolicy();
 pmssRestoreUserCrontabs();
+// #TODO(per-user-loop): migrate the global web stack refresh/cron/authorized
+// keys tasks above into the single per-user orchestrator so we do not run
+// separate all-user sweeps.
 
 pmssEnsureNetworkTemplate('logmsg');
 pmssApplyNetworkConfig();

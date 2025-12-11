@@ -28,11 +28,10 @@ if (!function_exists('pmssUserLogPath')) {
 if (!function_exists('pmssUserLog')) {
     function pmssUserLog(string $user, string $message): void
     {
-        // Primary channel: shared per-user log + users.log/users.jsonl
-        if (function_exists('\pmssUserLog')) {
-            \pmssUserLog($user, $message);
-        }
-        // Legacy compatibility: mirror to pmss-update-user-<username>.log
+        // Legacy compatibility: mirror to pmss-update-user-<username>.log only.
+        // #TODO(user-logs): replace this shim with the shared logger in scripts/lib/user/log.php
+        // once that helper is always loaded before userMaintenance.php. Avoid
+        // calling pmssUserLog recursively; this shim must remain self-contained.
         $path = pmssUserLogPath($user);
         $ts   = date('[Y-m-d H:i:s] ');
         @file_put_contents($path, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
@@ -96,6 +95,9 @@ if (!function_exists('pmssUpdateAllUsers')) {
             if (function_exists('pmssEnsureLingerAndDocker')) {
                 $phases[] = 'Linger/systemd/rootless Docker';
             }
+            // #TODO(per-user-loop): fold remaining global sweeps (web refresh,
+            // cron restoration, authorized_keys updates) into this orchestrator
+            // so every per-user action is visible here.
 
             if ($isTty) {
                 echo PHP_EOL."\033[35mUpdating user {$userTrim}\033[0m".PHP_EOL;
