@@ -63,7 +63,21 @@ if (!function_exists('runCommand')) {
         $bash = '/bin/bash -lc ' . escapeshellarg($cmd);
         $process = proc_open($bash, $descriptor, $pipes);
         if (!is_resource($process)) {
-            $log('[WARN] Failed to launch command: '.$cmd);
+            $hint = '';
+            $pidsMaxPaths = [
+                '/sys/fs/cgroup/pids.max',           // unified cgroup v2
+                '/sys/fs/cgroup/pids/pids.max',      // cgroup v1
+            ];
+            foreach ($pidsMaxPaths as $p) {
+                if (is_readable($p)) {
+                    $val = trim((string) @file_get_contents($p));
+                    if ($val !== '') {
+                        $hint = ' (pids.max='.$val.')';
+                        break;
+                    }
+                }
+            }
+            $log('[WARN] Failed to launch command: '.$cmd.$hint.'; possible process limit exhaustion (check pids.max / ulimit -u)');
             $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
             return 1;
         }

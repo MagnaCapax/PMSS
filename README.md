@@ -67,10 +67,18 @@ wget -qO /scripts/update.php https://raw.githubusercontent.com/MagnaCapax/PMSS/m
 The updater will now refresh itself from GitHub at the start of every run, so it
 is usually enough to simply execute `/scripts/update.php` once installed.
 
-To upgrade the underlying Debian release automatically, run the updater with the
-`--updatedistro` flag. This executes `scripts/util/update-distro.php` which
-performs a dist-upgrade (Debian&nbsp;10→11 or 11→12) using the recommended
-commands.
+Supported flags for `update.php`:
+- `<spec>`: `git/<branch>[:YYYY-MM-DD]`, `release[:tag]`, or `main` (reuse last recorded spec)
+- `--repo=<url>` / `--branch=<name>`: override git remote/branch for `git/*` specs
+- `--dry-run`: fetch/stage without copying files or running phase 2
+- `--scripts-only`: deploy `/scripts` + `/etc/skel` only; never runs apt
+- `--dist-upgrade=<target>`: run `scripts/util/update-dist-upgrade.php` (Debian 10→11 or 11→12); **cannot** be combined with `--scripts-only`
+- `--help`: print usage/examples
+
+To upgrade the underlying Debian release automatically, run
+`/scripts/update.php --dist-upgrade=<target>` with an explicit target
+(`11`/`bullseye` or `12`/`bookworm`). The dist-upgrade helper runs the
+recommended commands and exits without executing phase 2.
 
 Need to refresh only the new scripts and skeleton without running the
 heavyweight configuration pass? Invoke `/scripts/update.php` with
