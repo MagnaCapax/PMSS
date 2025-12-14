@@ -4,6 +4,7 @@ namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
+require_once __DIR__ . '/../runtime.php';
 
 class Manager
 {
@@ -250,9 +251,8 @@ class Manager
 
     private function applyDefaults(array &$opt): void
     {
-        $cfgDir = getenv('PMSS_CONFIG_DIR');
-        if (!is_string($cfgDir) || $cfgDir==='') { $cfgDir = '/etc/seedbox/config'; }
-        $policyFile = rtrim($cfgDir,'/').'/cgroup.policy.php';
+        $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+        $policyFile = $cfgDir.'/cgroup.policy.php';
         $policy = [];
         // This file read is direct; ideally should be via SystemInterface if we want to mock policy
         // But for now we rely on filesystem if it exists.

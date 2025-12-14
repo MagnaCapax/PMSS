@@ -6,6 +6,7 @@
 // Note: file name and class name are intentionally lowercased
 // (`userFilesystem.php` / `userFilesystem`) to match autoloader
 // expectations on case-sensitive filesystems.
+require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/userFilesystem.php';
 require_once __DIR__.'/UserValidator.php';
 require_once __DIR__.'/UserChecksum.php';
@@ -124,10 +125,6 @@ class UserRepository
 
     private function usersDbPath(): string
     {
-        $override = getenv('PMSS_USERS_DB_FILE');
-        if (is_string($override) && $override !== '') {
-            return $override;
-        }
-        return self::USERS_DB_FILE;
+        return pmssResolvePathFromEnv('PMSS_USERS_DB_FILE', self::USERS_DB_FILE);
     }
 }

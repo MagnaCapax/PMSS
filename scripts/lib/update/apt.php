@@ -4,17 +4,14 @@
  */
 
 require_once __DIR__.'/logging.php';
+require_once __DIR__.'/../runtime.php';
 
 /**
  * Return the target path for the primary apt sources file (testable override).
  */
 function pmssAptSourcesPath(): string
 {
-    $override = getenv('PMSS_APT_SOURCES_PATH');
-    if (is_string($override) && $override !== '') {
-        return $override;
-    }
-    return '/etc/apt/sources.list';
+    return pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
 }
 
 /**
@@ -23,13 +20,8 @@ function pmssAptSourcesPath(): string
 function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): string
 {
     $log = pmssSelectLogger($logger);
-    $base = getenv('PMSS_CONFIG_DIR');
     // Allow tests and recovery scripts to point at alternate config roots.
-    if (is_string($base) && $base !== '') {
-        $configRoot = rtrim($base, '/');
-    } else {
-        $configRoot = '/etc/seedbox/config';
-    }
+    $configRoot = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     $path = $configRoot."/template.sources.$codename";
 
     if (!file_exists($path)) {

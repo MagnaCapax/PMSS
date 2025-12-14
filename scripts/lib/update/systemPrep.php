@@ -5,6 +5,7 @@
 
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
+require_once __DIR__.'/../runtime.php';
 
 if (!function_exists('pmssHasLocale')) {
     /**
@@ -258,20 +259,14 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         // Drop-in management must target /etc paths only; avoid vendor dirs.
 
         $mode = pmssCgroupMode();
-        $dropDir = getenv('PMSS_SYSTEMD_USER_SLICE_DIR');
-        if (!is_string($dropDir) || $dropDir === '') {
-            $dropDir = '/etc/systemd/system/user-.slice.d';
-        }
+        $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_SLICE_DIR', '/etc/systemd/system/user-.slice.d');
         $target  = $dropDir.'/15-pmss.conf';
         if (!is_dir($dropDir)) {
             runStep('Creating user-.slice drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropDir));
         }
 
         // Render template based on cgroup mode
-        $cfgDir = getenv('PMSS_CONFIG_DIR');
-        if (!is_string($cfgDir) || $cfgDir === '') {
-            $cfgDir = '/etc/seedbox/config';
-        }
+        $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
         $tpl = $mode === 'v2'
             ? $cfgDir.'/template.cgroup.user-slice.v2.conf'
             : $cfgDir.'/template.cgroup.user-slice.v1.conf';
@@ -284,7 +279,7 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         $totalMiB     = pmssTotalMemMiB();
         $minHighMiB   = 250; // minimum MemoryHigh
         // Allow policy override via PHP array file: cgroup.policy.php returning ['memoryHighMiB'=>..,'memoryMaxMiB'=>..,'cpuWeight'=>..,'ioWeight'=>..,'tasksMax'=>..]
-        $policyFile = rtrim($cfgDir,'/').'/cgroup.policy.php';
+        $policyFile = $cfgDir.'/cgroup.policy.php';
         $policy = [];
         if (file_exists($policyFile)) {
             $loaded = @include $policyFile;

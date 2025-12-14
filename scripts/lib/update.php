@@ -19,11 +19,8 @@ $GLOBALS['PMSS_OS_RELEASE_CACHE'] = $GLOBALS['PMSS_OS_RELEASE_CACHE'] ?? [];
  */
 function pmssOsReleasePath(): string
 {
-    $override = getenv('PMSS_OS_RELEASE_PATH');
-    if (is_string($override) && $override !== '') {
-        return $override;
-    }
-    return '/etc/os-release';
+    // Allow tests to override os-release location while keeping default stable.
+    return pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release');
 }
 
 /**
@@ -31,11 +28,7 @@ function pmssOsReleasePath(): string
  */
 function pmssSkeletonBase(): string
 {
-    $override = getenv('PMSS_SKEL_DIR');
-    if (is_string($override) && $override !== '') {
-        return rtrim($override, '/');
-    }
-    return '/etc/skel';
+    return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel');
 }
 
 /**
@@ -286,14 +279,8 @@ if (!function_exists('updateAptSources')) {
 
 /** Generate /etc/motd using the template and system details */
 function generateMotd(): void {
-    $motdTemplatePath = getenv('PMSS_MOTD_TEMPLATE_PATH');
-    if ($motdTemplatePath === false || $motdTemplatePath === '') {
-        $motdTemplatePath = '/etc/seedbox/config/template.motd';
-    }
-    $motdOutputPath = getenv('PMSS_MOTD_OUTPUT_PATH');
-    if ($motdOutputPath === false || $motdOutputPath === '') {
-        $motdOutputPath = '/etc/motd';
-    }
+    $motdTemplatePath = pmssResolvePathFromEnv('PMSS_MOTD_TEMPLATE_PATH', '/etc/seedbox/config/template.motd');
+    $motdOutputPath   = pmssResolvePathFromEnv('PMSS_MOTD_OUTPUT_PATH', '/etc/motd');
     $motdTemplate     = @file_get_contents($motdTemplatePath);
     if ($motdTemplate === false) return;
 
@@ -304,14 +291,11 @@ function generateMotd(): void {
     $storageInfo    = trim(shell_exec("df -h /home | awk 'NR==2 {print \$2}'"));
 
     $pmssVersion = getPmssVersion();
-    $runtimeDir = getenv('PMSS_RUNTIME_DIR');
-    if ($runtimeDir === false || $runtimeDir === '') {
-        $runtimeDir = '/var/run/pmss';
-    }
+    $runtimeDir = pmssResolvePathFromEnv('PMSS_RUNTIME_DIR', '/var/run/pmss');
     if (!is_dir($runtimeDir)) {
         @mkdir($runtimeDir, 0770, true);
     }
-    $versionCache = rtrim($runtimeDir, '/').'/version';
+    $versionCache = $runtimeDir.'/version';
     file_put_contents($versionCache, $pmssVersion);
     $runtimeVersion = trim(@file_get_contents($versionCache));
     $updateDate = file_exists('/var/run/pmss/updated') ? trim(file_get_contents('/var/run/pmss/updated')) : 'not set';

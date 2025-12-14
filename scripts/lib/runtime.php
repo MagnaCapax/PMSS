@@ -10,6 +10,17 @@
 const PMSS_RUNTIME_FALLBACK_LOG = '/var/log/pmss/runtime.log';
 const PMSS_COMMAND_TIMEOUT_DEFAULT = 300;
 
+if (!function_exists('pmssResolvePathFromEnv')) {
+    // Resolve a filesystem path from an environment variable with a default.
+    function pmssResolvePathFromEnv(string $envKey, string $default): string
+    {
+        $value = getenv($envKey);
+        $value = ($value === false || $value === '') ? $default : $value;
+        $value = rtrim($value, '/');
+        return $value !== '' ? $value : rtrim($default, '/');
+    }
+}
+
 if (!function_exists('logMessage')) {
     /**
      * Write a timestamped message to the preferred log file and stdout.

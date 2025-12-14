@@ -5,6 +5,7 @@
 
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/networkInfo.php';
+require_once __DIR__.'/runtime.php';
 
 if (!function_exists('logmsg')) {
     require_once __DIR__.'/update.php';
@@ -23,11 +24,7 @@ function wgLog(string $message): void
  */
 function wgConfigDir(): string
 {
-    $override = getenv('PMSS_WG_CONFIG_DIR');
-    if ($override !== false && $override !== '') {
-        return rtrim($override, '/');
-    }
-    return '/etc/wireguard';
+    return pmssResolvePathFromEnv('PMSS_WG_CONFIG_DIR', '/etc/wireguard');
 }
 
 /**
@@ -43,11 +40,7 @@ function wgConfigPath(string $file): string
  */
 function wgHomeBase(): string
 {
-    $override = getenv('PMSS_WG_HOME_BASE');
-    if ($override !== false && $override !== '') {
-        return rtrim($override, '/');
-    }
-    return '/home';
+    return pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
 }
 
 /**

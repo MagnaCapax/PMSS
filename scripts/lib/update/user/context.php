@@ -3,6 +3,8 @@
  * Context builders for per-user update routines.
  */
 
+require_once __DIR__.'/../../runtime.php';
+
 /**
  * Build the shared per-user context array used by update-step2 user helpers.
  *
@@ -18,24 +20,16 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
 {
     // Allow tests and development tooling to override the home root while
     // keeping the default `/home` behaviour for production.
-    $homeRoot = getenv('PMSS_HOME_DIR');
-    if ($homeRoot === false || $homeRoot === '') {
-        $homeRoot = '/home';
-    }
-    $homeRoot = rtrim($homeRoot, '/');
-    if ($homeRoot === '') {
-        $homeRoot = '/home';
-    }
+    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 
     $home = "{$homeRoot}/{$user}";
     if (!is_dir($home)) {
         return null;
     }
-    if (!file_exists("{$home}/.rtorrent.rc")) {
-        return null;
-    }
-    if (!file_exists("{$home}/data")) {
-        return null;
+    foreach (['.rtorrent.rc', 'data'] as $required) {
+        if (!file_exists("{$home}/{$required}")) {
+            return null;
+        }
     }
     if (is_dir("{$home}/www-disabled")) {
         // Suspended users are intentionally skipped during updates to avoid

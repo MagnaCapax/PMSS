@@ -3,13 +3,11 @@
  * Shared utilities for user update helpers.
  */
 
+require_once __DIR__.'/../../runtime.php';
+
 function pmssUserSkelBase(): string
 {
-    $override = getenv('PMSS_SKEL_DIR');
-    if (is_string($override) && $override !== '') {
-        return rtrim($override, '/');
-    }
-    return '/etc/skel';
+    return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel');
 }
 
 function pmssUserSkelPath(string $relative): string

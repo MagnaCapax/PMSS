@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../../runtime.php';
 
 if (!function_exists('pmssEnsureQuotaOptions')) {
     /**
@@ -95,10 +96,7 @@ if (!function_exists('pmssEnsureDefaultQuotaMount')) {
      */
     function pmssEnsureDefaultQuotaMount(): void
     {
-        $mount = getenv('PMSS_QUOTA_MOUNT');
-        if ($mount === false || trim($mount) === '') {
-            $mount = '/home';
-        }
+        $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
         pmssEnsureQuotaOptions($mount, null, 'logMessage');
     }
 }

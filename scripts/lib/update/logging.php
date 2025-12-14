@@ -15,8 +15,8 @@ if (!function_exists('pmssJsonLogPath')) {
     function pmssJsonLogPath(): string
     {
         if ($GLOBALS['PMSS_JSON_LOG_PATH'] === null) {
-            $candidate = getenv('PMSS_JSON_LOG') ?: '';
-            $GLOBALS['PMSS_JSON_LOG_PATH'] = $candidate !== '' ? $candidate : '';
+            $candidate = getenv('PMSS_JSON_LOG');
+            $GLOBALS['PMSS_JSON_LOG_PATH'] = $candidate ? $candidate : '';
         }
         return $GLOBALS['PMSS_JSON_LOG_PATH'];
     }

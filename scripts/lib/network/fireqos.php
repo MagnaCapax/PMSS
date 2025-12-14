@@ -2,9 +2,6 @@
 /**
  * FireQOS configuration helpers.
  */
-
-require_once __DIR__.'/../runtime.php';
-
 function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string
 {
     $templatePath = getenv('PMSS_FIREQOS_TEMPLATE') ?: '/etc/seedbox/config/template.fireqos';

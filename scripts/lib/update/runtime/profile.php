@@ -95,13 +95,8 @@ if (!function_exists('pmssProfileSummary')) {
             'status_counts' => $counts,
         ]);
 
-        $profileOutput = getenv('PMSS_PROFILE_OUTPUT') ?: '';
-        if ($profileOutput === '') {
-            $jsonLogPath = getenv('PMSS_JSON_LOG') ?: '';
-            if ($jsonLogPath !== '') {
-                $profileOutput = $jsonLogPath.'.profile.json';
-            }
-        }
+        $profileOutput = getenv('PMSS_PROFILE_OUTPUT')
+            ?: (($jsonLogPath = (getenv('PMSS_JSON_LOG') ?: '')) !== '' ? $jsonLogPath.'.profile.json' : '');
         if ($profileOutput === '') {
             return;
         }

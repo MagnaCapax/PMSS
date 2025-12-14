@@ -3,6 +3,8 @@
  * Network configuration helpers shared by setup scripts.
  */
 
+require_once __DIR__.'/../runtime.php';
+
 function networkLoadConfig(): array
 {
     $path = networkConfigPath();
@@ -33,18 +35,10 @@ function networkLoadLocalnets(): array
 
 function networkConfigPath(): string
 {
-    $override = getenv('PMSS_NETWORK_CONFIG');
-    if (is_string($override) && $override !== '') {
-        return $override;
-    }
-    return '/etc/seedbox/config/network';
+    return pmssResolvePathFromEnv('PMSS_NETWORK_CONFIG', '/etc/seedbox/config/network');
 }
 
 function networkLocalnetPath(): string
 {
-    $override = getenv('PMSS_LOCALNET_FILE');
-    if (is_string($override) && $override !== '') {
-        return $override;
-    }
-    return '/etc/seedbox/config/localnet';
+    return pmssResolvePathFromEnv('PMSS_LOCALNET_FILE', '/etc/seedbox/config/localnet');
 }

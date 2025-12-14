@@ -48,15 +48,7 @@ TXT;
  */
 function pmssUserTransferHomeRoot(): string
 {
-    $homeRoot = getenv('PMSS_HOME_DIR');
-    if ($homeRoot === false || $homeRoot === '') {
-        $homeRoot = '/home';
-    }
-    $homeRoot = rtrim($homeRoot, '/');
-    if ($homeRoot === '') {
-        $homeRoot = '/home';
-    }
-    return $homeRoot;
+    return pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 }
 
 /**

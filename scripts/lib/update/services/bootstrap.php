@@ -6,6 +6,7 @@
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/quota.php';
+require_once __DIR__.'/../../runtime.php';
 
 if (!function_exists('pmssEnvFlagEnabled')) {
     /**
@@ -71,8 +72,7 @@ if (!function_exists('pmssConfigureQuotaMount')) {
             return;
         }
 
-        $mount = getenv('PMSS_QUOTA_MOUNT');
-        $mount = $mount === false || trim($mount) === '' ? '/home' : trim($mount);
+        $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
         pmssEnsureQuotaOptions($mount, null, $log);
         if (is_dir($mount)) {
             runStep('Remounting '.$mount.' to refresh quota options', sprintf('mount -o remount %s', escapeshellarg($mount)));

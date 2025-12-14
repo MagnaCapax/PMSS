@@ -108,7 +108,12 @@ if (!function_exists('pmssEnsureDockerRepository')) {
         $codename = getenv('PMSS_DISTRO_CODENAME') ?: '';
         $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
         if ($codename === '') {
-            $codename = $version === 11 ? 'bullseye' : ($version === 12 ? 'bookworm' : ($version === 13 ? 'trixie' : ''));
+            $map = [
+                11 => 'bullseye',
+                12 => 'bookworm',
+                13 => 'trixie',
+            ];
+            $codename = $map[$version] ?? '';
         }
         if ($codename === '') {
             logmsg('[WARN] Skipping Docker repository setup: unknown suite');
