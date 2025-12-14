@@ -47,9 +47,22 @@ $ddSize = '1G';
 $devRuntime = 30;
 $requireIdle=false; $idleLatencyMs=100; $idleUtilPct=85; $showLast=false;
 
-for ($i=1; $i<count($argv); $i++) {
+function consumeCliValue(?string $value, ?string $next, int &$i): ?string
+{
+    if ($value !== null) {
+        return $value;
+    }
+    if ($next !== null && strpos($next, '--') !== 0) {
+        $i++;
+        return $next;
+    }
+    return null;
+}
+
+$argvCount = count($argv);
+for ($i=1; $i<$argvCount; $i++) {
     $arg = $argv[$i];
-    $next = ($i+1 < count($argv)) ? $argv[$i+1] : null;
+    $next = ($i+1 < $argvCount) ? $argv[$i+1] : null;
     $kv = null;
     if (strpos($arg, '=') !== false) {
         $kv = explode('=', $arg, 2);
@@ -58,40 +71,40 @@ for ($i=1; $i<count($argv); $i++) {
     $val = $kv ? $kv[1] : null;
     switch ($key) {
         case '--target':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $targetDir = $val;
             break;
         case '--size':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $fileSize = $val;
             break;
         case '--runtime':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $runtime = (int)$val;
             break;
         case '--json':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $jsonLog = $val;
             break;
         case '--label':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $label = $val;
             break;
         case '--devices':
             $testDevices = true; break;
         case '--dd-size':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $ddSize = $val; break;
         case '--device-runtime':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $devRuntime = (int)$val; break;
         case '--require-idle':
             $requireIdle = true; break;
         case '--idle-latency-ms':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $idleLatencyMs = (int)$val; break;
         case '--idle-util':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) { $val = $next; $i++; }
+            $val = consumeCliValue($val, $next, $i);
             if ($val !== null) $idleUtilPct = (int)$val; break;
         case '--show-last':
             $showLast = true; break;

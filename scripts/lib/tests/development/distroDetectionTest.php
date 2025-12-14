@@ -9,6 +9,18 @@ require_once dirname(__DIR__, 2).'/update/apt.php';
 
 class DistroDetectionTest extends TestCase
 {
+    public function testVersionFromCodenameMapsKnownReleases(): void
+    {
+        $this->assertEquals(8, \pmssVersionFromCodename('jessie'));
+        $this->assertEquals(9, \pmssVersionFromCodename('stretch'));
+        $this->assertEquals(10, \pmssVersionFromCodename('buster'));
+        $this->assertEquals(11, \pmssVersionFromCodename('bullseye'));
+        $this->assertEquals(12, \pmssVersionFromCodename('bookworm'));
+        $this->assertEquals(13, \pmssVersionFromCodename('trixie'));
+        $this->assertEquals(0, \pmssVersionFromCodename('unknown'));
+        $this->assertEquals(11, \pmssVersionFromCodename('Bullseye'));
+    }
+
     /**
      * Ensure codename mapping overrides a mismatched VERSION_ID.
      */

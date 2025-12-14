@@ -60,21 +60,16 @@ if (!function_exists('pmssVersionFromCodename')) {
      */
     function pmssVersionFromCodename(string $codename): int
     {
-        switch (strtolower($codename)) {
-            case 'jessie':
-                return 8;
-            case 'stretch':
-                return 9;
-            case 'buster':
-                return 10;
-            case 'bullseye':
-                return 11;
-            case 'bookworm':
-                return 12;
-            case 'trixie':
-                return 13;
-            default:
-                return 0;
-        }
+        static $map = [
+            'jessie'   => 8,
+            'stretch'  => 9,
+            'buster'   => 10,
+            'bullseye' => 11,
+            'bookworm' => 12,
+            'trixie'   => 13,
+        ];
+
+        $key = strtolower($codename);
+        return isset($map[$key]) ? $map[$key] : 0;
     }
 }

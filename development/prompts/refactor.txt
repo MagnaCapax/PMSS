@@ -4,6 +4,19 @@ Goal: Apply small, behaviour-preserving refactors that simplify PMSS while keepi
 
 Primary objective: reduce cognitive load and code footprint (fewer branches, less duplication, fewer concepts), while staying fully backward compatible.
 
+Definition (what “refactoring” means here):
+- Change internal structure without changing externally observable behaviour.
+- “Externally observable” includes: CLI flags/semantics, env var names, exit codes, log/JSON field names and formats, file paths, operational ordering, and updater topology.
+
+Why we refactor (the deeper purpose):
+- Reduce cost of change (make future work cheaper and safer).
+- Reduce risk (fewer branches/duplication → fewer failure modes and review misses).
+- Increase leverage (one correct change fixes all call sites).
+- Make correctness provable (tests/control snapshots become feasible and meaningful).
+
+Non-goals (do NOT do these in a refactor run):
+- Feature work, rewrites, interface changes, “style cleanups”, or broad renames/moves that do not delete code.
+
 Read first (do not proceed until read):
 - AGENTS.md (rails / Constitution / doctrine; treat as binding guard rails).
 - AGENTS.local.md (host-specific local rails).
@@ -42,7 +55,7 @@ Hard rails (must follow all of these):
   - Do not change updater topology or semantics: install.sh → scripts/update.php (bootstrap) → scripts/util/update-step2.php (orchestration).
 - Minimal, local edits:
   - Prefer a single file or tight cluster of files in one subsystem.
-  - Aim to touch at most ~3–5 files and keep total additions + deletions within a few hundred lines.
+  - Aim to touch at most ~5–8 files and keep total additions + deletions within ~800 lines.
   - Don’t reorder unless it deletes code: avoid alphabetizing arrays, moving blocks, or reshuffling files unless it measurably reduces duplication/LOC or removes complexity.
   - If a refactor cannot be completed safely within this budget, do not start it.
 - Deletion and DRY as primary goals:
@@ -62,7 +75,7 @@ Refactor style guidance:
   - When a file grows beyond roughly 150–200 lines of real code, consider splitting cohesive pieces into focused helpers.
   - Keep new files small and single-purpose; prefer many tiny modules over monoliths.
 - Choose a small set of high-value targets:
-  - Prefer 2–5 small, behaviour-preserving refactors per run that can be bundled into one larger commit message (still within the change budget).
+  - Prefer 3–7 small, behaviour-preserving refactors per run that can be bundled into one larger commit message (still within the change budget).
   - You MAY choose a slightly larger refactor if (and only if) it stays within the hard rails and the change budget and measurably reduces cognitive load/duplication.
   - Avoid broad, cross-cutting changes or sweeping renames in a single run.
 - Look for:
@@ -109,11 +122,19 @@ Danger audit (required preflight; keyed to PMSS history):
 Workflow (do this now):
 1) Read AGENTS.md, AGENTS.local.md, any nested AGENTS.md in scope, docs/architecture.md, docs/update.md, docs/refactoring.md, and relevant docs/adr/* files.
 2) Inspect the recent commits, changed files, and complexity/LOC snapshots listed below.
-3) Pick 2–5 refactor/deletion opportunities that fit the rails above, and bundle them into one coherent change set.
-4) Declare invariants (3–7 bullets) for the target area BEFORE editing:
+3) Pick 3–7 refactor/deletion opportunities that fit the rails above, and bundle them into one coherent change set.
+4) Non-goals check (gate):
+   - Explicitly state you are NOT doing feature work, rewrites, interface changes, or “style cleanups”.
+   - If any chosen refactor would require those, drop it from this run.
+5) Refactor intent (required; BEFORE editing):
+   - For each chosen refactor, state:
+     - Purpose (choose 1–2): cost-of-change, risk reduction, leverage, provability.
+     - Metric(s) (choose 1+): duplicated blocks removed, max nesting reduced, LOC delta, tests added/expanded.
+   - Gate: if you cannot map a refactor to a purpose + metric, drop it from this run.
+6) Declare invariants (3–7 bullets) for the target area BEFORE editing:
    - Examples: CLI output format stable; JSON fields stable; exit codes stable; step ordering stable; file paths stable; log markers stable.
    - If you cannot state the invariants, stop and choose a different target.
-5) Implement the change with minimal edits:
+7) Implement the change with minimal edits:
    - Keep behaviour and outputs identical.
    - Prefer deletion and DRY improvements; avoid adding new features or modes.
    - Keep changes local to the chosen scope.
@@ -122,16 +143,15 @@ Workflow (do this now):
    - Before/after control tests (behaviour lock):
      - When you refactor non-trivial logic and it is feasible, add a dev test that snapshots representative inputs/outputs (including edge cases) so behaviour is pinned through the refactor.
      - If a hermetic before/after test is not feasible, shrink the refactor until it is testable; if it is still not testable, SKIP that refactor in this run (or stop and require explicit operator approval to proceed YOLO/untested).
-6) Run local verification:
+8) Run local verification:
    - php -l on each changed PHP file.
    - php scripts/lib/tests/development/Runner.php when touching scripts/lib PHP helpers or CLI PHP entrypoints.
    - scripts/testing/php-lint-compat.sh
    - scripts/testing/test-php.sh
    - scripts/testing/test-bash.sh
    - scripts/testing/php73-compat-scan.sh
-7) Prepare a single, larger commit message that groups multiple small refactors (bundle several behaviour-preserving cleanups into one commit to reduce commit noise), but do NOT commit unless the operator explicitly instructs you to. Do not create new branches or push from this flow.
-8) Summarise in your response (review-first):
-   - Include a patch/diff (unified diff) so review is fast.
+9) Prepare a single, larger commit message that groups multiple small refactors (bundle several behaviour-preserving cleanups into one commit to reduce commit noise), but do NOT commit unless the operator explicitly instructs you to. Do not create new branches or push from this flow.
+10) Summarise in your response (review-first):
    - List every changed file and why it changed (1 line each).
    - What you simplified or deleted, and why it reduces cognitive load / code footprint.
    - Why it is safe and behaviour-preserving (call out any invariants you relied on).
@@ -144,5 +164,5 @@ Operate with SpaceX/Tesla-style discipline:
 - Favour small, iterative improvements that steadily reduce complexity and increase reliability.
 
 Change budget for this run (hard limit):
-- Limit this refactor to at most 5 files and a few hundred total changed lines (additions + deletions).
+- Limit this refactor to at most 8 files and ~800 total changed lines (additions + deletions).
 - If you reach this budget, stop and return the patch; do not start additional refactors in this iteration.

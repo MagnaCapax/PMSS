@@ -21,4 +21,15 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertEquals('trixie', \pmssCodenameForMajor('13'));
         $this->assertEquals('', \pmssCodenameForMajor('99'));
     }
+
+    public function testResolveTargetVersionAcceptsNumbersAndCodenames(): void
+    {
+        $this->assertEquals('10', \pmssResolveTargetVersion('10'));
+        $this->assertEquals('10', \pmssResolveTargetVersion('buster'));
+        $this->assertEquals('11', \pmssResolveTargetVersion('bullseye'));
+        $this->assertEquals('12', \pmssResolveTargetVersion('Bookworm'));
+        $this->assertEquals('13', \pmssResolveTargetVersion('TRIXIE'));
+        $this->assertEquals('', \pmssResolveTargetVersion(''));
+        $this->assertEquals('', \pmssResolveTargetVersion('nonesuch'));
+    }
 }

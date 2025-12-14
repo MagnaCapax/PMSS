@@ -93,6 +93,35 @@ class DistroRepoSelectionTest extends TestCase
         $this->clearEnv('PMSS_APT_SOURCES_PATH');
     }
 
+    public function testUpdateAptSourcesEolSuiteLogsTestModeSkip(): void
+    {
+        $initial = "deb http://mirror.invalid bullseye main\n";
+        $target = $this->tempFile('sources', $initial);
+        putenv('PMSS_APT_SOURCES_PATH='.$target);
+
+        $template = "deb http://mirror.example buster main\n";
+        $currentHash = sha1($initial);
+        $logs = [];
+        $logger = function (string $msg) use (&$logs): void {
+            $logs[] = $msg;
+        };
+
+        \updateAptSources('debian', 10, $currentHash, [
+            'buster'   => $template,
+            'bullseye' => '',
+            'jessie'   => '',
+            'bookworm' => '',
+            'trixie'   => '',
+        ], $logger);
+
+        $this->assertEquals($template, file_get_contents($target));
+        $this->assertTrue((bool)array_filter($logs, static function ($m) {
+            return strpos($m, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)') !== false;
+        }), 'Expected EOL post-hook to log test-mode skip');
+
+        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+    }
+
     /**
      * Helper to write a temporary os-release fixture.
      */

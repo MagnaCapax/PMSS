@@ -61,7 +61,7 @@ function pmssRunDistUpgrade(?string $target = null): int
  */
 function pmssResolveTargetVersion(string $input): string
 {
-    $map = [
+    static $map = [
         '10'       => '10', 'buster'   => '10',
         '11'       => '11', 'bullseye' => '11',
         '12'       => '12', 'bookworm' => '12',
@@ -75,16 +75,13 @@ function pmssResolveTargetVersion(string $input): string
  */
 function pmssDetermineUpgradePath(string $current): array
 {
-    switch ($current) {
-        case '10':
-            return ['10', '11'];
-        case '11':
-            return ['11', '12'];
-        case '12':
-            return ['12', '13'];
-        default:
-            return [null, null];
-    }
+    static $map = [
+        '10' => ['10', '11'],
+        '11' => ['11', '12'],
+        '12' => ['12', '13'],
+    ];
+
+    return $map[$current] ?? [null, null];
 }
 
 /**
@@ -99,11 +96,12 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
         return;
     }
 
+    static $paths = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'];
     $sedPairs = [
-        [sprintf("s/\\<%s\\>/%s/g", $from, $to), '/etc/apt/sources.list'],
-        [sprintf("s#%s/updates#%s-security#g", $to, $to), '/etc/apt/sources.list'],
-        [sprintf("s/\\<%s\\>/%s/g", $from, $to), '/etc/apt/sources.list.d/*.list'],
-        [sprintf("s#%s/updates#%s-security#g", $to, $to), '/etc/apt/sources.list.d/*.list'],
+        [sprintf("s/\\<%s\\>/%s/g", $from, $to), $paths[0]],
+        [sprintf("s#%s/updates#%s-security#g", $to, $to), $paths[0]],
+        [sprintf("s/\\<%s\\>/%s/g", $from, $to), $paths[1]],
+        [sprintf("s#%s/updates#%s-security#g", $to, $to), $paths[1]],
     ];
 
     foreach ($sedPairs as [$expr, $path]) {
@@ -114,15 +112,16 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
     // Older Buster hosts may have been pointed at archive.debian.org; that host
     // does not serve bullseye-security. Rewrite any archived security entries
     // to security.debian.org explicitly.
-    $paths = ['/etc/apt/sources.list', '/etc/apt/sources.list.d/*.list'];
-    foreach ($paths as $path) {
-        runCommand("sed -i -E 's@https?://archive\\.debian\\.org/debian-security@http://security.debian.org/debian-security@g' {$path}");
-    }
-
-    // Prefer active mirrors for the main archive after the upgrade. Switch
-    // archive.debian.org back to deb.debian.org for bullseye entries.
-    foreach ($paths as $path) {
-        runCommand("sed -i -E 's@https?://archive\\.debian\\.org/debian@http://deb.debian.org/debian@g' {$path}");
+    static $rewritePairs = [
+        // Prefer the live security host after upgrade.
+        "sed -i -E 's@https?://archive\\.debian\\.org/debian-security@http://security.debian.org/debian-security@g' %s",
+        // Prefer active mirrors for the main archive after the upgrade.
+        "sed -i -E 's@https?://archive\\.debian\\.org/debian@http://deb.debian.org/debian@g' %s",
+    ];
+    foreach ($rewritePairs as $cmdFormat) {
+        foreach ($paths as $path) {
+            runCommand(sprintf($cmdFormat, $path));
+        }
     }
 }
 
@@ -138,27 +137,41 @@ function pmssExecuteUpgrade(): void
     runCommand("$env apt-get update", true);
 
     // Upgrade packages (step 1)
-    $rc = runCommand("$env apt-get upgrade -y $opts", true);
-    if ($rc !== 0) {
-        logMessage('dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)');
-        runCommand('dpkg --configure -a', true);
-        runCommand("$env apt-get -f install -y", true);
-        runCommand("$env apt-get update", true);
-        runCommand("$env apt-get upgrade -y $opts", true);
-    }
+    pmssRunUpgradeWithRecovery(
+        "$env apt-get upgrade -y $opts",
+        $env,
+        'dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)'
+    );
 
     // Dist-upgrade (step 2)
-    $rc = runCommand("$env apt-get full-upgrade -y $opts", true);
-    if ($rc !== 0) {
-        logMessage('dist-upgrade: full-upgrade failed, attempting recovery');
-        runCommand('dpkg --configure -a', true);
-        runCommand("$env apt-get -f install -y", true);
-        runCommand("$env apt-get update", true);
-        runCommand("$env apt-get full-upgrade -y $opts", true);
-    }
+    pmssRunUpgradeWithRecovery(
+        "$env apt-get full-upgrade -y $opts",
+        $env,
+        'dist-upgrade: full-upgrade failed, attempting recovery'
+    );
 
     // Autoremove residuals
     runCommand("$env apt-get autoremove -y", true);
+}
+
+/**
+ * Wrap an apt action with the standard dpkg/apt recovery sequence.
+ *
+ * Keep the recovery ordering and the exact log messages stable; operators and
+ * tests rely on these markers when dist-upgrades wedge dpkg.
+ */
+function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage): void
+{
+    $rc = runCommand($command, true);
+    if ($rc === 0) {
+        return;
+    }
+
+    logMessage($recoveryMessage);
+    runCommand('dpkg --configure -a', true);
+    runCommand("$env apt-get -f install -y", true);
+    runCommand("$env apt-get update", true);
+    runCommand($command, true);
 }
 
 /**
@@ -190,16 +203,12 @@ function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void
  */
 function pmssCodenameForMajor(string $major): string
 {
-    switch ($major) {
-        case '10':
-            return 'buster';
-        case '11':
-            return 'bullseye';
-        case '12':
-            return 'bookworm';
-        case '13':
-            return 'trixie';
-        default:
-            return '';
-    }
+    static $map = [
+        '10' => 'buster',
+        '11' => 'bullseye',
+        '12' => 'bookworm',
+        '13' => 'trixie',
+    ];
+
+    return $map[$major] ?? '';
 }

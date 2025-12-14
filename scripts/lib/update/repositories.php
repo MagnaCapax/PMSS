@@ -33,15 +33,15 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
         // Aggressively remove legacy MediaArea list files. These now conflict with
         // the main /etc/apt/sources.list which includes the repo directly.
         // We must ensure zero MediaArea files remain in sources.list.d.
-        $targets = [
+        static $targets = [
             '/etc/apt/sources.list.d/mediaarea.list',
-            '/etc/apt/sources.list.d/mediaarea.sources'
+            '/etc/apt/sources.list.d/mediaarea.sources',
         ];
         foreach ($targets as $target) {
-            if (file_exists($target)) {
-                logmsg('[INFO] Removing legacy MediaArea repository file: ' . $target);
+            if (is_file($target)) {
+                logmsg('[INFO] Removing legacy MediaArea repository file: '.$target);
                 if (!@unlink($target)) {
-                    logmsg('[WARN] Failed to unlink ' . $target);
+                    logmsg('[WARN] Failed to unlink '.$target);
                 }
             }
         }
@@ -81,7 +81,9 @@ if (!function_exists('pmssEnsureDockerRepository')) {
     function pmssEnsureDockerRepository(): void
     {
         $keyringDir = rtrim((string) (getenv('PMSS_APT_KEYRING_DIR') ?: '/etc/apt/keyrings'), '/');
-        if ($keyringDir === '') { $keyringDir = '/etc/apt/keyrings'; }
+        if ($keyringDir === '') {
+            $keyringDir = '/etc/apt/keyrings';
+        }
         $keyringPath = $keyringDir.'/docker.gpg';
         $sourcesDir  = '/etc/apt/sources.list.d';
         $deb822Path  = $sourcesDir.'/docker.sources';
@@ -108,7 +110,7 @@ if (!function_exists('pmssEnsureDockerRepository')) {
         $codename = getenv('PMSS_DISTRO_CODENAME') ?: '';
         $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
         if ($codename === '') {
-            $map = [
+            static $map = [
                 11 => 'bullseye',
                 12 => 'bookworm',
                 13 => 'trixie',
@@ -193,7 +195,8 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
         }
 
         $templates = [];
-        foreach (['jessie', 'buster', 'bullseye', 'bookworm', 'trixie'] as $suite) {
+        static $suites = ['jessie', 'buster', 'bullseye', 'bookworm', 'trixie'];
+        foreach ($suites as $suite) {
             $templates[$suite] = loadRepoTemplate($suite, $log);
         }
 

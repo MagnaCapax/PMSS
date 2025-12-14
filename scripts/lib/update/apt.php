@@ -102,17 +102,21 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
         return;
     }
 
-    switch ($distroName) {
-        case 'debian':
+    $handlers = [
+        'debian' => static function () use ($distroVersion, $currentHash, $repos, $log): void {
             pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
-            return;
-        case 'ubuntu':
+        },
+        'ubuntu' => static function () use ($log): void {
             $log('Ubuntu is not supported yet.');
-            return;
-        default:
-            $log("Unsupported distro: $distroName");
-            return;
+        },
+    ];
+
+    if (isset($handlers[$distroName])) {
+        $handlers[$distroName]();
+        return;
     }
+
+    $log("Unsupported distro: $distroName");
 }
 
 /**
@@ -120,41 +124,36 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
  */
 function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $repos, callable $log): void
 {
-    switch ($version) {
-        case 8:
-            pmssApplyAptTemplate('Jessie', $repos['jessie'] ?? '', $currentHash, $log, function () use ($log) {
-                if (!defined('PMSS_TEST_MODE')) {
-                    passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-                    passthru('apt-get clean;');
-                } else {
-                    $log('PMSS_TEST_MODE: skipping apt conf/clean (Jessie)');
-                }
-            });
-            return;
-        case 10:
-            pmssApplyAptTemplate('Buster', $repos['buster'] ?? '', $currentHash, $log, function () use ($log) {
-                // EOL suites lack valid Release timestamps; relax the check.
-                if (!defined('PMSS_TEST_MODE')) {
-                    passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-                    passthru('apt-get clean;');
-                } else {
-                    $log('PMSS_TEST_MODE: skipping apt conf/clean (Buster)');
-                }
-            });
-            return;
-        case 11:
-            pmssApplyAptTemplate('Bullseye', $repos['bullseye'] ?? '', $currentHash, $log);
-            return;
-        case 12:
-            pmssApplyAptTemplate('Bookworm', $repos['bookworm'] ?? '', $currentHash, $log);
-            return;
-        case 13:
-            pmssApplyAptTemplate('Trixie', $repos['trixie'] ?? '', $currentHash, $log);
-            return;
-        default:
-            $log("Unsupported Debian version: $version");
-            return;
+    static $targets = [
+        8  => ['label' => 'Jessie',   'repo' => 'jessie',   'eol' => true],
+        10 => ['label' => 'Buster',   'repo' => 'buster',   'eol' => true],
+        11 => ['label' => 'Bullseye', 'repo' => 'bullseye', 'eol' => false],
+        12 => ['label' => 'Bookworm', 'repo' => 'bookworm', 'eol' => false],
+        13 => ['label' => 'Trixie',   'repo' => 'trixie',   'eol' => false],
+    ];
+
+    $target = $targets[$version] ?? null;
+    if ($target === null) {
+        $log("Unsupported Debian version: $version");
+        return;
     }
+
+    $label = $target['label'];
+    $template = $repos[$target['repo']] ?? '';
+    $post = null;
+    if ($target['eol']) {
+        $post = function () use ($log, $label): void {
+            // EOL suites lack valid Release timestamps; relax the check.
+            if (!defined('PMSS_TEST_MODE')) {
+                passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+                passthru('apt-get clean;');
+            } else {
+                $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
+            }
+        };
+    }
+
+    pmssApplyAptTemplate($label, $template, $currentHash, $log, $post);
 }
 
 /**

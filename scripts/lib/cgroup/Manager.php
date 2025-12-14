@@ -279,48 +279,69 @@ class Manager
     private function expandProfiles(array &$opt): void
     {
         if (isset($opt['cpu-profile']) && !isset($opt['cpu-weight'])) {
-            switch ($opt['cpu-profile']) {
-                case 'low':     $opt['cpu-weight'] = '50'; break;
-                case 'high':    $opt['cpu-weight'] = '300'; break;
-                default:        $opt['cpu-weight'] = '100'; break;
-            }
+            static $cpuWeights = [
+                'low'  => '50',
+                'high' => '300',
+            ];
+            $opt['cpu-weight'] = $cpuWeights[$opt['cpu-profile']] ?? '100';
         }
         if (isset($opt['tasks-profile']) && !isset($opt['tasks-max'])) {
-            switch ($opt['tasks-profile']) {
-                case 'low':     $opt['tasks-max'] = '1024'; break;
-                case 'high':    $opt['tasks-max'] = '8192'; break;
-                default:        $opt['tasks-max'] = '4096'; break;
-            }
+            static $tasksMax = [
+                'low'  => '1024',
+                'high' => '8192',
+            ];
+            $opt['tasks-max'] = $tasksMax[$opt['tasks-profile']] ?? '4096';
         }
         if (isset($opt['mem-profile'])) {
             if (!isset($opt['memory-high'])) {
-                switch ($opt['mem-profile']) {
-                    case 'low':     $opt['memory-high'] = '250'; break;
-                    case 'heavy':   $opt['memory-high'] = '1024'; break;
-                    default:        $opt['memory-high'] = '500'; break;
-                }
+                static $memoryHigh = [
+                    'low'   => '250',
+                    'heavy' => '1024',
+                ];
+                $opt['memory-high'] = $memoryHigh[$opt['mem-profile']] ?? '500';
             }
         }
     }
 
     private function applyIoProfile(string $profile, string $dev, array &$opt, array &$pairs): void
     {
-        switch ($profile) {
-            case 'hdd':
-                if (!isset($opt['io-weight'])) { $opt['io-weight'] = '200'; }
-                $pairs[] = 'IOReadBandwidthMax='.$dev.' 5M';
-                $pairs[] = 'IOWriteBandwidthMax='.$dev.' 10M';
-                $pairs[] = 'IOReadIOPSMax='.$dev.' 100';
-                $pairs[] = 'IOWriteIOPSMax='.$dev.' 100';
-                break;
-            case 'nvme':
-                if (!isset($opt['io-weight'])) { $opt['io-weight'] = '200'; }
-                break;
-            case 'bulk':
-                if (!isset($opt['io-weight'])) { $opt['io-weight'] = '500'; }
-                if (!isset($opt['cpu-weight'])) { $opt['cpu-weight'] = '300'; }
-                if (!isset($opt['tasks-max'])) { $opt['tasks-max'] = '8192'; }
-                break;
+        static $profiles = [
+            'hdd' => [
+                'defaults' => ['io-weight' => '200'],
+                'pairs'    => [
+                    'IOReadBandwidthMax=%s 5M',
+                    'IOWriteBandwidthMax=%s 10M',
+                    'IOReadIOPSMax=%s 100',
+                    'IOWriteIOPSMax=%s 100',
+                ],
+            ],
+            'nvme' => [
+                'defaults' => ['io-weight' => '200'],
+                'pairs'    => [],
+            ],
+            'bulk' => [
+                'defaults' => [
+                    'io-weight'  => '500',
+                    'cpu-weight' => '300',
+                    'tasks-max'  => '8192',
+                ],
+                'pairs' => [],
+            ],
+        ];
+
+        $entry = $profiles[$profile] ?? null;
+        if (!is_array($entry)) {
+            return;
+        }
+
+        foreach ($entry['defaults'] as $key => $value) {
+            if (!isset($opt[$key])) {
+                $opt[$key] = $value;
+            }
+        }
+
+        foreach ($entry['pairs'] as $pair) {
+            $pairs[] = sprintf($pair, $dev);
         }
     }
 

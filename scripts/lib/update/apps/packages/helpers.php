@@ -343,14 +343,11 @@ function pmssInstallProftpdStack(int $distroVersion): void
  */
 function pmssBackportSuite(int $distroVersion): ?string
 {
-    switch ($distroVersion) {
-        case 10:
-            return 'buster-backports';
-        case 11:
-            return 'bullseye-backports';
-        case 12:
-            return 'bookworm-backports';
-        default:
-            return null;
-    }
+    static $map = [
+        10 => 'buster-backports',
+        11 => 'bullseye-backports',
+        12 => 'bookworm-backports',
+    ];
+
+    return $map[$distroVersion] ?? null;
 }
