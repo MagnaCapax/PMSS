@@ -1,0 +1,9 @@
+Context to open (paths in this workspace):
+ - AGENTS.md
+ - AGENTS.local.md
+ - docs/architecture.md
+ - docs/update.md
+ - docs/install.md
+ - docs/refactoring.md
+ - docs/contracts.md
+ - docs/adr/

@@ -21,7 +21,7 @@ Must Follow:
 
 Absolutes:
 - NEVER CREATE GIT BRANCHES.
-- Commit the fix after applying it: stage all and commit with a clear, focused message (e.g., `git add -A && git commit -m "ci: <scope> — <short reason>"`). Do not push.
+- Do not commit or push unless the operator explicitly instructs you to.
 - ABSOLUTELY NO ZFS — unacceptable for our workload (poor 100% random I/O performance and elevated data-loss risk). Do not propose or introduce it here.
 - Keep diffs small, idempotent, backward‑compatible; reuse existing helpers; no aliases; context‑first naming.
  
@@ -35,7 +35,7 @@ Workflow (Do This Now):
   * scripts/testing/test-bash.sh
   * scripts/testing/php73-compat-scan.sh
 - From the CI logs, locate the latest LOC snapshot emitted by scripts/testing/loc.sh (look for "PMSS lines of code (excluding third-party trees)" and the advisory complexity sections) and use that to understand category growth and hotspots; do not re-run loc.sh unless explicitly requested.
-- Commit the fix (no branches, no push):
-  * git add -A && git commit -m "ci: <scope> — <short reason>"
+- If the operator asks you to commit (no branches, no push):
+  * `git add <specific_files>` (never `git add -A`) then `git commit -m "ci: <scope> — <short reason>"`
 
 Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch, the verification commands you ran, and a brief summary of the latest LOC snapshot from the CI logs (key category totals and any notable hotspots based on the loc.sh output).

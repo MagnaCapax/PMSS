@@ -66,6 +66,8 @@
 !/.github/
 !/.github/**
 !/CONTRIBUTING.md
+!/development/
+!/development/**
 
 # Additionally, do not ignore .gitignore file itself
 !.gitignore

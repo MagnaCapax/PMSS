@@ -11,10 +11,14 @@ cd "$ROOT_DIR"
 fail=0
 
 must_exec=(
-  scripts/cli/ci.sh
-  scripts/cli/ci-logs.sh
-  scripts/cli/ci-codex.sh
-  scripts/cli/adr-list.sh
+  development/codex.sh
+  development/codex-run.sh
+  development/refactor-codex.sh
+  development/ci.sh
+  development/ci-logs.sh
+  development/ci-codex.sh
+  development/adr-list.sh
+  development/fix-exec-bits.sh
 )
 
 # Recursively find .php files in util and cron that should be executable
@@ -37,4 +41,3 @@ if [[ $fail -ne 0 ]]; then
   exit 1
 fi
 echo "exec-bit-lint: OK"
-

@@ -12,18 +12,20 @@ echo "[ci] starting CI prompt assembly…" >&1
 #  - If --exec is provided, pipes to your assistant CLI (e.g., Codex)
 #
 # Usage:
-#  scripts/cli/ci.sh                 # build prompt; prints location
-#  scripts/cli/ci.sh --exec 'codex chat --input -'
-#  scripts/cli/ci.sh --job smoke     # include smoke logs instead of build
-#  scripts/cli/ci.sh --prompt "..."   # custom prompt
+#  development/ci.sh                 # build prompt; prints location
+#  development/ci.sh --exec 'codex chat --input -'
+#  development/ci.sh --job smoke     # include smoke logs instead of build
+#  development/ci.sh --prompt "..."   # custom prompt
+#  development/ci.sh --dry-run        # assemble prompt only; do not invoke assistant
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/../.." && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
 
 job=""
 exec_cmd=""
 custom_prompt=""
+dry_run=0
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
 	--prompt)
 		custom_prompt=${2:-}
 		shift 2 || true
+		;;
+	--dry-run)
+		dry_run=1
+		shift || true
 		;;
 	-h | --help)
 		sed -n '1,80p' "$0"
@@ -54,9 +60,10 @@ args=()
 [[ -n "$job" ]] && args+=(--job "$job")
 [[ -n "$custom_prompt" ]] && args+=(--prompt "$custom_prompt")
 [[ -n "$exec_cmd" ]] && args+=(--exec "$exec_cmd")
+[[ "$dry_run" == "1" ]] && args+=(--dry-run)
 
 set +e
-bash "$ROOT/scripts/cli/ci-codex.sh" "${args[@]}"
+bash "$HERE/ci-codex.sh" "${args[@]}"
 rc=$?
 set -e
 echo "[ci] ci-codex.sh exited with rc=$rc" >&1

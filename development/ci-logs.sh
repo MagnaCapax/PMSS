@@ -8,16 +8,16 @@ set -euo pipefail
 #   gh auth login     (once)
 #
 # Usage:
-#   scripts/cli/ci-logs.sh latest             # stream logs for the latest run (non-interactive)
-#   scripts/cli/ci-logs.sh smoke              # stream only the 'smoke' job logs from the latest run
-#   scripts/cli/ci-logs.sh job-name <name>    # stream a job by name from the latest run (e.g., build)
-#   scripts/cli/ci-logs.sh last-artifacts     # download all artifacts for the latest run into ./ci-artifacts/
-#   scripts/cli/ci-logs.sh codex [--job <name>] [--prompt "..."] [--exec 'codex chat --input -']
-#   scripts/cli/ci-logs.sh run <run-id>       # stream logs for a specific run id
-#   scripts/cli/ci-logs.sh job <job-id>       # stream logs for a specific job id
+#   development/ci-logs.sh latest             # stream logs for the latest run (non-interactive)
+#   development/ci-logs.sh smoke              # stream only the 'smoke' job logs from the latest run
+#   development/ci-logs.sh job-name <name>    # stream a job by name from the latest run (e.g., build)
+#   development/ci-logs.sh last-artifacts     # download all artifacts for the latest run into ./ci-artifacts/
+#   development/ci-logs.sh codex [--job <name>] [--prompt "..."] [--exec 'codex chat --input -']
+#   development/ci-logs.sh run <run-id>       # stream logs for a specific run id
+#   development/ci-logs.sh job <job-id>       # stream logs for a specific job id
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/../.." && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -67,7 +67,7 @@ case "$cmd" in
 		;;
 	codex)
 		# proxy to ci-codex.sh to assemble prompt and send to your assistant
-		bash "$ROOT/scripts/cli/ci-codex.sh" "$@"
+		bash "$HERE/ci-codex.sh" "$@"
 		;;
 	help | -h | --help)
 		sed -n '1,40p' "$0" | sed -n '1,20p'

@@ -11,7 +11,7 @@ check_no_readme_adr_links() {
   if [[ -f "$ROOT_DIR/README.md" ]]; then
     hits=$(grep -n "docs/adr/" "$ROOT_DIR/README.md" || true)
     if [[ -n "$hits" ]]; then
-      echo "doctrine lint: README links to docs/adr (forbidden). Use scripts/cli/adr-list.sh or directory browsing instead." >&2
+      echo "doctrine lint: README links to docs/adr (forbidden). Use development/adr-list.sh or directory browsing instead." >&2
       echo "$hits" >&2
       FAIL=$((FAIL+1))
     fi

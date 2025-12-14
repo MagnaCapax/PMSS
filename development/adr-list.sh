@@ -4,14 +4,14 @@ set -euo pipefail
 # adr-list.sh — list and filter ADRs for quick discovery
 #
 # Usage:
-#   scripts/cli/adr-list.sh [--category architecture|security|data|domain] [--paths] [keywords...]
+#   development/adr-list.sh [--category architecture|security|data|domain] [--paths] [keywords...]
 #
 # Behavior:
 # - Prints lines: "NNNN Title — [category] — path"
 # - --paths: print only file paths
 # - keywords: case-insensitive filter across filename slug, title, and optional Tags line
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ADR_DIR="$ROOT_DIR/docs/adr"
 CATEGORY=""
 ONLY_PATHS=0

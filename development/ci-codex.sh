@@ -3,8 +3,8 @@ set -euo pipefail
 set -o errtrace
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/../.." && pwd)"
-source "$ROOT/scripts/cli/lib/codex-common.sh"
+ROOT="$(cd "$HERE/.." && pwd)"
+source "$HERE/lib/codex-common.sh"
 
 # Optional debug: PMSS_CI_CODEX_DEBUG=1 enables bash -x tracing
 codex_enable_debug PMSS_CI_CODEX_DEBUG "ci-codex"
@@ -21,10 +21,10 @@ echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 #   - A local assistant CLI to receive the prompt. Provide via --exec (e.g., --exec 'codex')
 #
 # Usage:
-#   scripts/cli/ci-codex.sh                          # assemble prompt + logs into ci-codex/prompt.txt
-#   scripts/cli/ci-codex.sh --job smoke               # include only 'smoke' job logs in the prompt
-#   scripts/cli/ci-codex.sh --prompt "text..."        # use custom high-level prompt text
-#   scripts/cli/ci-codex.sh --exec 'codex'             # send prompt to Codex CLI directly
+#   development/ci-codex.sh                          # assemble prompt + logs into ci-codex/prompt.txt
+#   development/ci-codex.sh --job smoke               # include only 'smoke' job logs in the prompt
+#   development/ci-codex.sh --prompt "text..."        # use custom high-level prompt text
+#   development/ci-codex.sh --exec 'codex'             # send prompt to Codex CLI directly
 #
 # The default prompt:
 #   "Last CI Integration Logs are here. If issues or code fails, please fix them.
@@ -46,11 +46,10 @@ ARTIFACT_LINES=${ARTIFACT_LINES:-200}
 MAX_ARTIFACT_FILES=${MAX_ARTIFACT_FILES:-6}
 PMSS_CI_WAIT_SECS=${PMSS_CI_WAIT_SECS:-300}
 
-DEFAULT_PROMPT="$(cat "$ROOT/scripts/cli/prompts/ci.txt")"
-
 job_name=""
 custom_prompt=""
 exec_cmd=""
+dry_run=0
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -65,6 +64,10 @@ while [[ $# -gt 0 ]]; do
 	--exec)
 		exec_cmd=${2:-}
 		shift 2 || true
+		;;
+	--dry-run)
+		dry_run=1
+		shift || true
 		;;
 	-h | --help)
 		sed -n '1,60p' "$0"
@@ -199,62 +202,21 @@ if [[ $any_logs -eq 0 ]]; then
 	exit 1
 fi
 
-# Build the prompt file (header/instructions only). Context paths are listed for the assistant to open.
-prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
-{
-	echo "$prompt_text"
-	echo
-	echo "Context to open (paths in this workspace):"
-	echo " - $SUMMARY (CI summary)"
-	for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
-		[[ -s "$jl" ]] || continue
-		echo " - $jl"
-	done
-	if [[ -n "$latest_art" ]]; then
-		echo " - $latest_art (newest artifact file)"
-	fi
-	echo
-	echo "Do not inline these; read them directly from disk."
-} >"$PROMPT"
-
-codex_append_local_notes "$ROOT/.codex-prompt" "$PROMPT"
-
-prompt_bytes=$(wc -c <"$PROMPT" | tr -d ' ')
-prompt_lines=$(wc -l <"$PROMPT" | tr -d ' ')
-echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
-
-# Invoke Codex with the main prompt string only; the prompt lists the file paths to read
-prompt_str=$(cat "$PROMPT")
-if [[ -n "$exec_cmd" && "$exec_cmd" != "codex" ]]; then
-	echo "[ci-codex] unsupported --exec value ('$exec_cmd'); defaulting to 'codex'" >&1
+codex_args=(run --prompt-file "$HERE/prompts/ci.txt" --outdir "$OUTDIR" --context "$SUMMARY")
+for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
+	[[ -s "$jl" ]] || continue
+	codex_args+=(--context "$jl")
+done
+if [[ -n "$latest_art" ]]; then
+	codex_args+=(--context "$latest_art")
 fi
-if command -v codex >/dev/null 2>&1; then
-	echo "[ci-codex] invoking: codex [prompt-string]" >&1
-	codex "$prompt_str" || {
-		echo "[ci-codex] codex invocation failed. Run manually:" >&1
-		echo "  codex \"\$(cat '$PROMPT')\"" >&1
-		exit 1
-	}
-else
-	echo "[ci-codex] Codex CLI not found. Run manually:" >&1
-	echo "  codex \"\$(cat '$PROMPT')\"" >&1
+if [[ -n "$custom_prompt" ]]; then
+	codex_args+=(--prompt "$custom_prompt")
 fi
-
-# Auto-commit any changes created by the assistant (no branches, no push)
-PMSS_CI_AUTOCOMMIT=${PMSS_CI_AUTOCOMMIT:-1}
-if [[ "$PMSS_CI_AUTOCOMMIT" == "1" ]]; then
-	if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-		echo "[ci-codex] auto-commit: checking for changes" >&1
-		if [[ -n "$(git -C "$ROOT" status --porcelain)" ]]; then
-			msg="ci-codex: apply assistant changes for run $run_id"
-			git -C "$ROOT" add -A
-			git -C "$ROOT" commit -m "$msg" && echo "[ci-codex] auto-commit: committed changes" >&1 || echo "[ci-codex] auto-commit: commit failed" >&1
-		else
-			echo "[ci-codex] auto-commit: no changes to commit" >&1
-		fi
-	else
-		echo "[ci-codex] auto-commit: git not available or not inside a repo" >&1
-	fi
-else
-	echo "[ci-codex] auto-commit disabled (PMSS_CI_AUTOCOMMIT=0)" >&1
+if [[ -n "$exec_cmd" ]]; then
+	codex_args+=(--exec "$exec_cmd")
 fi
+if [[ "$dry_run" == "1" ]]; then
+	codex_args+=(--dry-run)
+fi
+bash "$HERE/codex-run.sh" "${codex_args[@]}"

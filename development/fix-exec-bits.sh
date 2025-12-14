@@ -3,11 +3,11 @@ set -euo pipefail
 
 # fix-exec-bits.sh — set executable bits on known CLI scripts
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 targets=(
-	scripts/cli/*.sh
+	development/*.sh
 	scripts/testing/*.sh
 )
 
