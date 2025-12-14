@@ -88,32 +88,45 @@ codex_scan_git_diff_for_dangers() {
 	local fail="${PMSS_CODEX_DANGER_FAIL:-0}"
 
 	command -v git >/dev/null 2>&1 || return 0
+	command -v awk >/dev/null 2>&1 || return 0
 	git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
 
-	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs\\.|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*\\|[[:space:]]*sh|wget[[:space:]].*\\|[[:space:]]*sh)'
+	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh)'
 	local found=0
 
-	# Scan both staged and unstaged diffs; report only added lines.
-	local diff
-	for diff in "git -C \"$repo_root\" diff --no-color" "git -C \"$repo_root\" diff --cached --no-color"; do
-		# shellcheck disable=SC2086
-		eval $diff \
-			| awk -v re="$patterns" '
-				/^\\+\\+\\+ b\\// { file=substr($0,7); next }
-				/^\\+\\+\\+/ { next }
-				/^\\+/ {
-					line=substr($0,2)
-					if (line ~ re) {
-						printf("%s: +%s\\n", (file ? file : "<unknown>"), line)
-					}
+	if git -C "$repo_root" diff --no-color \
+		| awk -v re="$patterns" '
+			/^[+][+][+] b[/]/ { file=substr($0,7); next }
+			/^[+][+][+]/ { next }
+			/^[+]/ {
+				line=substr($0,2)
+				if (line ~ re) {
+					printf("%s: +%s\n", (file ? file : "<unknown>"), line)
+					found=1
 				}
-			' \
-			| sed 's/^/[codex-run] DANGER: /' >&2 && true
+			}
+			END { exit (found ? 0 : 1) }
+		' \
+		| sed 's/^/[codex-run] DANGER: /' >&2; then
+		found=1
+	fi
 
-		if eval $diff | awk -v re="$patterns" 'BEGIN{c=0} /^\\+\\+\\+ b\\//{next} /^\\+\\+\\+/{next} /^\\+/{line=substr($0,2); if (line ~ re) c++} END{exit (c>0)?0:1}'; then
-			found=1
-		fi
-	done
+	if git -C "$repo_root" diff --cached --no-color \
+		| awk -v re="$patterns" '
+			/^[+][+][+] b[/]/ { file=substr($0,7); next }
+			/^[+][+][+]/ { next }
+			/^[+]/ {
+				line=substr($0,2)
+				if (line ~ re) {
+					printf("%s: +%s\n", (file ? file : "<unknown>"), line)
+					found=1
+				}
+			}
+			END { exit (found ? 0 : 1) }
+		' \
+		| sed 's/^/[codex-run] DANGER: /' >&2; then
+		found=1
+	fi
 
 	if [[ "$found" == "1" ]]; then
 		echo "[codex-run] DANGER: suspicious new patterns detected in git diff output" >&2
