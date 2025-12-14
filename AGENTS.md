@@ -59,7 +59,7 @@ instead of restating details.
 - Treat `etc/skel/www` as read-only for now; remote updates coordinate that tree, so plan changes separately before touching it.
 - Keep the directory tree architectural: group code by responsibility (`/scripts/lib` for shared helpers, `/scripts/lib/update` for updater-specific code). Adjust include/require paths when relocating files.
 - Keep per-host automation idempotent so reruns converge systems to the same state; the only acceptable drift comes from staggered rolling upgrades.
-- Check for an `agents.local.md` in the repo root before changing code locally and follow any host-specific guidance there.
+- Check for an `AGENTS.local.md` in the repo root before changing code locally and follow any host-specific guidance there.
 - Review the `docs/` directory and related Markdown guides before changing code so behaviour and documentation stay in sync.
 - Bundle tests by function, covering small input variances and extreme edge cases while keeping them hermetic—tests must never mutate the real filesystem.
 

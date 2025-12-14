@@ -51,53 +51,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-DEFAULT_PROMPT=$(
-	cat <<'PMSSPROMPT'
-PMSS Codex Session — Strict Rails Mode
-
-Goal: Start a safe PMSS development session with the correct guard rails loaded.
-
-Read first (do not proceed until read):
-- AGENTS.md (rails / Constitution / doctrine; treat as binding).
-- agents.local.md (host-specific local rails).
-- Any nested AGENTS.md covering files you touch (most-specific instructions win).
-- docs/architecture.md (updater topology and responsibilities).
-- docs/update.md and docs/install.md (workflow; invariants; do-not-break constraints).
-- docs/refactoring.md (Linux-kernel-style refactor guidance).
-- docs/adr/* (Accepted ADRs are constraints; consult relevant ones).
-- docs/contracts.md (script/function behavior contracts; treat as canonical).
-
-Hard rails (must follow):
-- Stability over perfection; minimal diffs; never break old users.
-- PHP 7.3 compatibility for all PHP code.
-- Skel WWW lockdown: never touch etc/skel/www (or its contents) unless explicitly instructed.
-- Treat bundled vendor/third-party trees as read-only unless explicitly approved.
-- Do not edit scripts/lib/update/dpkg/selections*.txt without explicit platform sign-off.
-- No new external deps/tools/configs unless explicitly approved.
-- Prefer established helpers and patterns (runStep(), JSON logging/profile) to keep observability stable.
-
-Refactor tactics (behaviour-preserving):
-- Prefer tables/config arrays over branching when behaviour is identical.
-- Reduce nesting via guard clauses / early returns / extracted helpers (keep outputs stable).
-
-When proposing or applying changes:
-- Declare invariants (3–7 bullets) before editing (CLI output, JSON fields, log markers, ordering, exit codes, paths).
-- Do a danger audit for the touched subsystem:
-  - /home operations, cron+partial-update windows, shell command composition, internal tool output parsing, dpkg/apt sequencing, structured logging stability.
-- Prefer deletion-first only when you can prove unreferenced via repo search; otherwise keep compatibility shims only when absolutely necessary.
-
-Verification expectations (run as applicable after changes):
-- php -l on changed PHP files
-- php scripts/lib/tests/development/Runner.php
-- scripts/testing/php-lint-compat.sh
-- scripts/testing/test-php.sh
-- scripts/testing/test-bash.sh
-- scripts/testing/php73-compat-scan.sh
-- If touching scripts/lib/update/**: scripts/testing/doctrine-lint.sh and scripts/testing/docblock-lint.sh
-
-Start by asking what task we are solving, then inspect only the minimal relevant code and docs before editing anything.
-PMSSPROMPT
-)
+DEFAULT_PROMPT="$(cat "$ROOT/scripts/cli/prompts/codex.txt")"
 
 prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 
@@ -106,7 +60,7 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 	echo
 	echo "Context to open (paths in this workspace):"
 	echo " - AGENTS.md"
-	echo " - agents.local.md"
+	echo " - AGENTS.local.md"
 	echo " - docs/architecture.md"
 	echo " - docs/update.md"
 	echo " - docs/install.md"

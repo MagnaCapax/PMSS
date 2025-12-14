@@ -73,7 +73,7 @@
 # And do not ignore gitkeep files to keep empty directories
 !.gitkeep
 
-agents.local.md
+AGENTS.local.md
 
 # Explicitly ignore local assistant config/state and CI scratch
 .codex
