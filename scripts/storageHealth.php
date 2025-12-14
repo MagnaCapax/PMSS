@@ -17,11 +17,12 @@ require_once __DIR__.'/lib/storageHealth.php';
 function pmssStorageHealthUsage(): void
 {
     echo "\nStorage health report\n";
-    echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>]\n\n";
+    echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
     echo "  --json <path>   JSON Lines input (default ".pmssStorageHealthDefaultJsonPath().")\n";
     echo "  --raw           Print the latest JSON entries (per device) and exit\n";
     echo "  --only-problems Show only warn/fail entries\n";
     echo "  --device <id>   Filter to one device (kname like sda, or path like /dev/sda)\n";
+    echo "  --user-notice[=<path>]  Write/clear a user-facing performance notice when perf is limited\n";
     echo "  --help          Show this help\n\n";
 }
 
@@ -223,6 +224,9 @@ $jsonPath = pmssStorageHealthDefaultJsonPath();
 $raw = false;
 $onlyProblems = false;
 $deviceFilter = null;
+$userNoticePath = '';
+$userNoticeRequested = false;
+$defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
 
 $argc = count($argv);
 for ($i = 1; $i < $argc; $i++) {
@@ -258,6 +262,14 @@ for ($i = 1; $i < $argc; $i++) {
             if ($val !== null && $val !== '') {
                 $deviceFilter = $val;
             }
+            break;
+        case '--user-notice':
+            $userNoticeRequested = true;
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
+                $val = $next;
+                $i++;
+            }
+            $userNoticePath = $val !== null && $val !== '' ? $val : $defaultNoticePath;
             break;
         case '--help':
         case '-h':
@@ -320,6 +332,24 @@ if ($onlyProblems) {
     $raid = array_values(array_filter($raid, $filterProblems));
 }
 
+$perfStatus = pmssStorageHealthPerformanceStatus($raid);
+
+if ($userNoticeRequested && $userNoticePath !== '') {
+    if ($perfStatus !== null) {
+        pmssStorageHealthEnsureParentDir($userNoticePath);
+        $payload = [
+            'timestamp' => $latestTs !== '' ? $latestTs : date('c'),
+            'status' => $perfStatus['status'],
+            'reason' => $perfStatus['reason'],
+            'array' => $perfStatus['array'],
+        ];
+        @file_put_contents($userNoticePath, json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL);
+        @chmod($userNoticePath, 0644);
+    } elseif (is_file($userNoticePath)) {
+        @unlink($userNoticePath);
+    }
+}
+
 if ($raw) {
     $all = array_merge($smart, $nvme, $raid);
     foreach ($all as $entry) {
@@ -331,6 +361,12 @@ if ($raw) {
 if (empty($smart) && empty($nvme) && empty($raid)) {
     echo "No storage health entries found in {$jsonPath}\n";
     exit(1);
+}
+
+if ($perfStatus !== null) {
+    echo pmssStorageHealthColor('warn', 'Performance Limited').": {$perfStatus['reason']}\n\n";
+} else {
+    echo "Performance status: OK\n\n";
 }
 
 pmssStorageHealthPrintTable($smart, $nvme, $raid, $latestTs !== '' ? $latestTs : 'unknown', $jsonPath);

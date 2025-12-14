@@ -203,12 +203,17 @@ class Motd
         $path = getenv('PMSS_HEALTH_LOG_PATH') ?: '/var/log/pmss/storage-health.jsonl';
         if (!is_file($path)) return '';
         $fh = @fopen($path,'r'); if (!$fh) return '';
-        $raidWarn = null; $nvmeCrit=[]; $lastSmart=[];
+        $raidWarn = null; $nvmeCrit=[]; $lastSmart=[]; $raidPerf=null;
         while (($line=fgets($fh))!==false) {
             $j = json_decode($line,true); if (!is_array($j)) continue;
             $k = $j['kind'] ?? '';
             if ($k==='smart') { $lastSmart[$j['device'] ?? '']=$j; }
-            elseif ($k==='raid') { if (($j['severity'] ?? 'ok')!=='ok') $raidWarn=$j; }
+            elseif ($k==='raid') {
+                if (($j['severity'] ?? 'ok')!=='ok') $raidWarn=$j;
+                if (in_array('rebuild_in_progress', (array)($j['flags'] ?? []), true)) {
+                    $raidPerf = 'RAID '.($j['array'] ?? 'md').' resync in progress';
+                }
+            }
             elseif ($k==='nvme') { if ((int)($j['metrics']['critical_warnings'] ?? 0) > 0) $nvmeCrit[] = $j['device'] ?? 'nvme'; }
         }
         fclose($fh);
@@ -217,6 +222,7 @@ class Motd
             $arr=$raidWarn['array'] ?? 'md'; $flags=implode(',',(array)($raidWarn['flags']??[]));
             $lines[] = "RAID $arr: ".($flags!==''?$flags:($raidWarn['state']??'warn'));
         }
+        if ($raidPerf) $lines[] = 'Performance limited: '.$raidPerf;
         if (!empty($nvmeCrit)) $lines[] = 'NVMe critical warning: '.implode(', ', array_unique($nvmeCrit));
         foreach ($lastSmart as $dev=>$s) {
             if (in_array('udma_crc_increase',(array)($s['flags']??[]),true)) $lines[] = 'SATA UDMA CRC increased: '.$dev;

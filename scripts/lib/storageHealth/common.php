@@ -74,3 +74,34 @@ if (!function_exists('pmssStorageHealthSeverityMax')) {
     }
 }
 
+if (!function_exists('pmssStorageHealthPerformanceStatus')) {
+    /**
+     * Detect performance-limiting conditions (e.g., RAID resync/rebuild).
+     *
+     * @param array<int, array<string,mixed>> $raidEntries
+     * @return array<string,string>|null ['status','reason','array']
+     */
+    function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
+    {
+        foreach ($raidEntries as $entry) {
+            $flags = (array) ($entry['flags'] ?? []);
+            $arrayName = (string) ($entry['array'] ?? 'md');
+            if (in_array('rebuild_in_progress', $flags, true)) {
+                return [
+                    'status' => 'performance_limited',
+                    'reason' => "RAID {$arrayName} resync in progress",
+                    'array' => $arrayName,
+                ];
+            }
+            if (in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok') {
+                return [
+                    'status' => 'performance_limited',
+                    'reason' => "RAID {$arrayName} degraded",
+                    'array' => $arrayName,
+                ];
+            }
+        }
+        return null;
+    }
+}
+
