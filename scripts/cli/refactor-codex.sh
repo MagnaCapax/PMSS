@@ -115,17 +115,6 @@ Goal: Apply small, behaviour-preserving refactors that simplify PMSS while keepi
 
 Primary objective: reduce cognitive load and code footprint (fewer branches, less duplication, fewer concepts), while staying fully backward compatible.
 
-Operator-gated safety (mandatory):
-- Treat the repository as read-only until the operator explicitly approves applying changes.
-- If the operator has not explicitly asked you to apply changes yet:
-  - Do not modify files.
-  - Output must include:
-    - A short target selection rationale (why these files).
-    - A unified diff patch (apply-able).
-    - A verification command list to run after applying.
-  - Do not run commands beyond read-only inspection in this proposal-only phase.
-  - Stop after presenting the patch and ask for explicit approval phrase: "APPLY PATCH".
-
 Read first (do not proceed until read):
 - AGENTS.md (rails / Constitution / doctrine; treat as binding guard rails).
 - agents.local.md (host-specific local rails).
