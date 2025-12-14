@@ -8,8 +8,8 @@ return [
     'cpuWeight'        => 100,
     'ioWeight'         => 100,
 
-    // Process/thread cap under the user slice
-    'tasksMax'         => 512,
+    // Process/thread cap under the user slice. When omitted, PMSS derives a
+    // default from host capacity (CPU threads / RAM GiB) in systemPrep.php.
 
     // Memory controls (MiB)
     'memoryHighMiB'    => 500,    // soft throttle at 500 MiB (min enforced as 250)

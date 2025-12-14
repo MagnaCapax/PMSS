@@ -1,0 +1,90 @@
+<?php
+namespace PMSS\Tests;
+
+require_once dirname(__DIR__, 2).'/storageHealth.php';
+
+class StorageHealthSmartctlParsingTest extends TestCase
+{
+    public function testAtaSmartPassedParsesMetrics(): void
+    {
+        $out = implode("\n", [
+            'SMART overall-health self-assessment test result: PASSED',
+            '  5 Reallocated_Sector_Ct   0x0033   100   100   010    Pre-fail  Always       -       0',
+            '197 Current_Pending_Sector  0x0012   100   100   000    Old_age   Always       -       0',
+            '199 UDMA_CRC_Error_Count    0x003e   200   200   000    Old_age   Always       -       1',
+            '194 Temperature_Celsius     0x0022   034   040   000    Old_age   Always       -       34',
+            '  9 Power_On_Hours          0x0032   099   099   000    Old_age   Always       -       12345',
+        ])."\n";
+
+        $disk = ['path' => '/dev/sda', 'kname' => 'sda', 'model' => 'TEST', 'serial' => 'X', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('ok', $entry['severity']);
+        $this->assertTrue($entry['ok']);
+        $this->assertEquals('PASSED', $entry['metrics']['health']);
+        $this->assertEquals(0, $entry['metrics']['reallocated']);
+        $this->assertEquals(0, $entry['metrics']['pending']);
+        $this->assertEquals(1, $entry['metrics']['udma_crc']);
+        $this->assertEquals(34, $entry['metrics']['temp_c']);
+        $this->assertEquals(12345, $entry['metrics']['power_on_hours']);
+    }
+
+    public function testScsiSmartOkUsesHealthStatusAndGrownDefects(): void
+    {
+        $out = implode("\n", [
+            'SMART Health Status: OK',
+            'Current Drive Temperature: 35 C',
+            'Elements in grown defect list: 0',
+            'Non-medium error count: 12',
+        ])."\n";
+
+        $disk = ['path' => '/dev/sdb', 'kname' => 'sdb', 'model' => 'TEST', 'serial' => 'Y', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('ok', $entry['severity']);
+        $this->assertTrue($entry['ok']);
+        $this->assertEquals('OK', $entry['metrics']['health']);
+        $this->assertEquals(0, $entry['metrics']['reallocated']);
+        $this->assertEquals(35, $entry['metrics']['temp_c']);
+        $this->assertEquals(12, $entry['metrics']['link_errors']);
+    }
+
+    public function testUnknownHealthDoesNotFailByDefault(): void
+    {
+        $out = "Some output without explicit health lines\n";
+        $disk = ['path' => '/dev/sdc', 'kname' => 'sdc', 'model' => 'TEST', 'serial' => 'Z', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('warn', $entry['severity']);
+        $this->assertTrue(in_array('health_unknown', $entry['flags'], true));
+    }
+
+    public function testFailedHealthBecomesFailSeverity(): void
+    {
+        $out = "SMART Health Status: FAILED\n";
+        $disk = ['path' => '/dev/sdd', 'kname' => 'sdd', 'model' => 'TEST', 'serial' => 'W', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('fail', $entry['severity']);
+        $this->assertTrue(in_array('health_not_ok', $entry['flags'], true));
+    }
+
+    public function testStandbyIsOk(): void
+    {
+        $out = "Device is in STANDBY mode\n";
+        $disk = ['path' => '/dev/sde', 'kname' => 'sde', 'model' => 'TEST', 'serial' => 'V', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('ok', $entry['severity']);
+        $this->assertTrue($entry['ok']);
+        $this->assertTrue(in_array('standby', $entry['flags'], true));
+        $this->assertEquals('STANDBY', $entry['metrics']['health']);
+    }
+
+    public function testSeverityMaxUsesRankOrder(): void
+    {
+        $this->assertEquals('warn', \pmssStorageHealthSeverityMax('ok', 'warn'));
+        $this->assertEquals('fail', \pmssStorageHealthSeverityMax('warn', 'fail'));
+        $this->assertEquals('fail', \pmssStorageHealthSeverityMax('fail', 'ok'));
+    }
+}

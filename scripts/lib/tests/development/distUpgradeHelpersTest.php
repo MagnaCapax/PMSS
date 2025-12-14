@@ -29,6 +29,11 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertEquals('11', \pmssResolveTargetVersion('bullseye'));
         $this->assertEquals('12', \pmssResolveTargetVersion('Bookworm'));
         $this->assertEquals('13', \pmssResolveTargetVersion('TRIXIE'));
+        $this->assertEquals('', \pmssResolveTargetVersion('jessie'));
+        $this->assertEquals('', \pmssResolveTargetVersion('stretch'));
+        $this->assertEquals('', \pmssResolveTargetVersion('8'));
+        $this->assertEquals('', \pmssResolveTargetVersion('9'));
+        $this->assertEquals('', \pmssResolveTargetVersion('10 '));
         $this->assertEquals('', \pmssResolveTargetVersion(''));
         $this->assertEquals('', \pmssResolveTargetVersion('nonesuch'));
     }

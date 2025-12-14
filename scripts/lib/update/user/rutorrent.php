@@ -3,6 +3,8 @@
  * ruTorrent maintenance tasks.
  */
 
+require_once __DIR__.'/utils.php';
+
 function pmssUserUpdateThemes(array $ctx): void
 {
     $user    = $ctx['user'];

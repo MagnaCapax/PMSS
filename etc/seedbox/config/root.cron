@@ -39,6 +39,7 @@ SHELL=/bin/bash
 */5 * * * *   root    /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
 */5 * * * *    root    /scripts/cron/diskIostat.php >> /var/log/pmss/iostatLog.log 2>&1
 */15 * * * *    root    /scripts/cron/cpuStat.php >> /var/log/pmss/cpuStat.log 2>&1
+0 */6 * * *   root    /scripts/cron/storageHealthSnapshot.php >> /var/log/pmss/storageHealthSnapshot.log 2>&1
 7 * * * *   root    sleep 45; /scripts/cron/trafficLimits.php >> /var/log/pmss/trafficLimits.log 2>&1
 25,55 * * * *   root    /bin/sleep 20; /scripts/cron/trafficStats.php >> /var/log/pmss/trafficStats.log 2>&1
 */5 * * * *   root    /scripts/cron/checkWireguard.php >> /var/log/pmss/checkWireguard.log 2>&1

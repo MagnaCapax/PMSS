@@ -25,6 +25,10 @@ if (!is_dir($skelDir.'/www/rutorrent/plugins/unpack')) {
     @mkdir($skelDir.'/www/rutorrent/plugins/unpack', 0755, true);
     @mkdir($skelDir.'/www/rutorrent/plugins/theme/themes', 0755, true);
 }
+if (!is_dir($skelDir.'/.irssi')) {
+    @mkdir($skelDir.'/.irssi', 0755, true);
+}
+@file_put_contents($skelDir.'/.irssi/config', 'test');
 @file_put_contents($skelDir.'/.rtorrent.rc.custom', 'test');
 
 @mkdir($testRoot, 0755, true);

@@ -3,6 +3,8 @@
  * Permission refresh routines for user environments.
  */
 
+require_once __DIR__.'/utils.php';
+
 function pmssUserRefreshPermissions(array $ctx): void
 {
     $user    = $ctx['user'];
@@ -16,10 +18,12 @@ function pmssUserRefreshPermissions(array $ctx): void
         $rcCustomSha = sha1((string)file_get_contents($rcCustomPath));
         if ($rcCustomSha === 'dcf21704d49910d1670b3fdd04b37e640b755889' ||
             $rcCustomSha === 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a') {
+            $skelRcCustom = pmssUserSkelPath('.rtorrent.rc.custom');
+            $skelRcCustomArg = $skelRcCustom === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustom : escapeshellarg($skelRcCustom);
             runUserStep(
                 $user,
                 'Updating .rtorrent.rc.custom from skeleton',
-                sprintf('cp /etc/skel/.rtorrent.rc.custom %s/', escapeshellarg($home))
+                sprintf('cp %s %s/', $skelRcCustomArg, escapeshellarg($home))
             );
         }
     }

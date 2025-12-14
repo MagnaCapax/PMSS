@@ -3,6 +3,8 @@
  * ruTorrent plugin maintenance helpers.
  */
 
+require_once __DIR__.'/utils.php';
+
 function pmssUserEnsurePlugins(array $ctx): void
 {
     $user    = $ctx['user'];

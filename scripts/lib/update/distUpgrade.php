@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/../update.php';
+require_once __DIR__.'/distro.php';
 
 /**
  * Entry point used by util/update-dist-upgrade.php.
@@ -61,13 +62,30 @@ function pmssRunDistUpgrade(?string $target = null): int
  */
 function pmssResolveTargetVersion(string $input): string
 {
-    static $map = [
-        '10'       => '10', 'buster'   => '10',
-        '11'       => '11', 'bullseye' => '11',
-        '12'       => '12', 'bookworm' => '12',
-        '13'       => '13', 'trixie'   => '13',
+    $key = strtolower($input);
+    if ($key === '') {
+        return '';
+    }
+
+    // Dist-upgrade currently supports Debian 10–13 only; keep strict allowlist
+    // semantics so older codenames and unexpected numeric strings remain rejected.
+    static $allowed = [
+        '10' => true,
+        '11' => true,
+        '12' => true,
+        '13' => true,
     ];
-    return $map[strtolower($input)] ?? '';
+
+    if (isset($allowed[$key])) {
+        return $key;
+    }
+
+    $mapped = pmssVersionFromCodename($key);
+    if ($mapped === 0) {
+        return '';
+    }
+    $mappedKey = (string) $mapped;
+    return isset($allowed[$mappedKey]) ? $mappedKey : '';
 }
 
 /**
@@ -203,12 +221,15 @@ function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void
  */
 function pmssCodenameForMajor(string $major): string
 {
-    static $map = [
-        '10' => 'buster',
-        '11' => 'bullseye',
-        '12' => 'bookworm',
-        '13' => 'trixie',
+    static $allowed = [
+        '10' => true,
+        '11' => true,
+        '12' => true,
+        '13' => true,
     ];
+    if (!isset($allowed[$major])) {
+        return '';
+    }
 
-    return $map[$major] ?? '';
+    return pmssDebianCodenameFromMajor((int) $major);
 }

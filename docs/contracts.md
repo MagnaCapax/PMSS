@@ -143,8 +143,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssApplyAptTemplate(string $label, string $template, string $currentHash, callable $log, ?callable $post=null): void
   - Writes template via `pmssSafeWriteSources` when hash differs; runs post-hook if provided.
 
-- pmssEnsureRepositoryPrerequisites(): void → currently ensures MediaArea keyring package.
-- pmssEnsureMediaareaRepository(): void → configures MediaArea repository via manual `.list` + ASCII key; avoids vendor `.deb` to preserve compatibility on Debian 10/11.
+- pmssEnsureRepositoryPrerequisites(): void → ensures third-party repo prerequisites (currently Docker deb822 + keyring, Sonarr trusted key) exist before `apt-get update`.
+- pmssEnsureMediaareaRepository(): void → legacy shim; removes old MediaArea `.list/.sources` files from `sources.list.d` to avoid duplicate/invalid entries.
 - pmssQueryPackageStatus(string $package): string → returns `dpkg-query -W` status or `''`.
 - pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger=null): array
   - `mode=reuse` (unknown version) or `mode=update` with current hash and loaded templates.

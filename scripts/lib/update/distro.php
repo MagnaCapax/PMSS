@@ -5,6 +5,45 @@
 
 require_once __DIR__.'/runtime/commands.php';
 
+if (!function_exists('pmssDebianCodenameToMajorMap')) {
+    /**
+     * Debian codename → major mapping.
+     *
+     * Keep this as the single source of truth; other modules should reuse it
+     * rather than duplicating release tables.
+     */
+    function pmssDebianCodenameToMajorMap(): array
+    {
+        static $map = [
+            'jessie'   => 8,
+            'stretch'  => 9,
+            'buster'   => 10,
+            'bullseye' => 11,
+            'bookworm' => 12,
+            'trixie'   => 13,
+        ];
+
+        return $map;
+    }
+}
+
+if (!function_exists('pmssDebianCodenameFromMajor')) {
+    /**
+     * Debian major → codename mapping.
+     *
+     * Best-effort helper for internal consumers; callers must apply their own
+     * allowlists (e.g. dist-upgrade only supports 10–13 today).
+     */
+    function pmssDebianCodenameFromMajor(int $major): string
+    {
+        static $reverse = null;
+        if ($reverse === null) {
+            $reverse = array_flip(pmssDebianCodenameToMajorMap());
+        }
+        return isset($reverse[$major]) ? (string) $reverse[$major] : '';
+    }
+}
+
 if (!function_exists('pmssDetectDistro')) {
     /**
      * Detect distro name, major version, and codename with safe fallbacks.
@@ -60,16 +99,8 @@ if (!function_exists('pmssVersionFromCodename')) {
      */
     function pmssVersionFromCodename(string $codename): int
     {
-        static $map = [
-            'jessie'   => 8,
-            'stretch'  => 9,
-            'buster'   => 10,
-            'bullseye' => 11,
-            'bookworm' => 12,
-            'trixie'   => 13,
-        ];
-
         $key = strtolower($codename);
-        return isset($map[$key]) ? $map[$key] : 0;
+        $map = pmssDebianCodenameToMajorMap();
+        return isset($map[$key]) ? (int) $map[$key] : 0;
     }
 }

@@ -3,6 +3,8 @@
  * HTTP-related maintenance for user environments.
  */
 
+require_once __DIR__.'/utils.php';
+
 /**
  * Configure per-user HTTP stack pieces (lighttpd vhost, ruTorrent temp paths).
  *
@@ -42,7 +44,9 @@ function pmssUserConfigureHttp(array $ctx): void
     $irssiDir = "{$home}/.irssi";
     if (!is_dir($irssiDir)) {
         runUserStep($user, 'Creating irssi configuration directory', sprintf('mkdir -p %s', escapeshellarg($irssiDir)));
-        runUserStep($user, 'Copying irssi skeleton config', sprintf('cp /etc/skel/.irssi/config %s/', escapeshellarg($irssiDir)));
+        $skelConfig = pmssUserSkelPath('.irssi/config');
+        $skelConfigArg = $skelConfig === '/etc/skel/.irssi/config' ? $skelConfig : escapeshellarg($skelConfig);
+        runUserStep($user, 'Copying irssi skeleton config', sprintf('cp %s %s/', $skelConfigArg, escapeshellarg($irssiDir)));
         runUserStep($user, 'Adjusting irssi configuration ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($irssiDir)));
     }
 

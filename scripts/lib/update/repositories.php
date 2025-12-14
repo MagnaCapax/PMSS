@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/apt.php';
+require_once __DIR__.'/distro.php';
 require_once __DIR__.'/runtime/commands.php';
 
 if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
@@ -80,10 +81,7 @@ if (!function_exists('pmssEnsureDockerRepository')) {
      */
     function pmssEnsureDockerRepository(): void
     {
-        $keyringDir = rtrim((string) (getenv('PMSS_APT_KEYRING_DIR') ?: '/etc/apt/keyrings'), '/');
-        if ($keyringDir === '') {
-            $keyringDir = '/etc/apt/keyrings';
-        }
+        $keyringDir = pmssResolvePathFromEnv('PMSS_APT_KEYRING_DIR', '/etc/apt/keyrings');
         $keyringPath = $keyringDir.'/docker.gpg';
         $sourcesDir  = '/etc/apt/sources.list.d';
         $deb822Path  = $sourcesDir.'/docker.sources';
@@ -110,12 +108,11 @@ if (!function_exists('pmssEnsureDockerRepository')) {
         $codename = getenv('PMSS_DISTRO_CODENAME') ?: '';
         $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
         if ($codename === '') {
-            static $map = [
-                11 => 'bullseye',
-                12 => 'bookworm',
-                13 => 'trixie',
-            ];
-            $codename = $map[$version] ?? '';
+            // Docker apt repo is only supported for current suites (11+); keep
+            // Debian 10 and unknown versions on the legacy "skip" path.
+            if ($version >= 11) {
+                $codename = pmssDebianCodenameFromMajor($version);
+            }
         }
         if ($codename === '') {
             logmsg('[WARN] Skipping Docker repository setup: unknown suite');

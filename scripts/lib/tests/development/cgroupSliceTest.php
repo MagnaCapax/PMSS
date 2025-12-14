@@ -20,6 +20,24 @@ class cgroupSliceTest extends TestCase
         return $path;
     }
 
+    private function renderSlice(string $tplBody, int $cpuThreads, int $memMiB): string
+    {
+        $cfgDir = $this->tempDir('cfg-tasks');
+        $drop   = $this->tempDir('drop-tasks');
+
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
+        $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', 'ignored');
+
+        putenv('PMSS_CGROUP_MODE=v2');
+        putenv('PMSS_CONFIG_DIR='.$cfgDir);
+        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
+        putenv('PMSS_TOTAL_CPU_THREADS='.(string)$cpuThreads);
+        putenv('PMSS_TOTAL_MEM_MIB='.(string)$memMiB);
+
+        \pmssEnsureSystemdSlices('logmsg');
+        return (string)file_get_contents($drop.'/15-pmss.conf');
+    }
+
     public function testV2RenderingReplacesPlaceholders(): void
     {
         $cfgDir = $this->tempDir('cfg');
@@ -131,5 +149,26 @@ class cgroupSliceTest extends TestCase
         // This should not throw; simply not create the target.
         \pmssEnsureSystemdSlices('logmsg');
         $this->assertTrue(!file_exists($drop.'/15-pmss.conf'));
+    }
+
+    public function testTasksMaxDefaultScalesWithHostCapacity(): void
+    {
+        $tplBody = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
+
+        // Clamp floor: 512 * max(1, 1) = 512 → 2048
+        $out = $this->renderSlice($tplBody, 1, 1024);
+        $this->assertTrue(strpos($out, 'TasksMax=2048') !== false, 'TasksMax floor clamp not applied');
+
+        // CPU dominates: 512 * max(8, 2) = 4096
+        $out = $this->renderSlice($tplBody, 8, 2048);
+        $this->assertTrue(strpos($out, 'TasksMax=4096') !== false, 'TasksMax did not scale with CPU threads');
+
+        // RAM dominates: 512 * max(2, 16) = 8192
+        $out = $this->renderSlice($tplBody, 2, 16384);
+        $this->assertTrue(strpos($out, 'TasksMax=8192') !== false, 'TasksMax did not scale with RAM GiB');
+
+        // Clamp ceiling: 512 * max(64, 256) = 131072 → 16384
+        $out = $this->renderSlice($tplBody, 64, 262144);
+        $this->assertTrue(strpos($out, 'TasksMax=16384') !== false, 'TasksMax ceiling clamp not applied');
     }
 }

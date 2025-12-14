@@ -294,11 +294,21 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         $calcMax      = min($calcMax, $maxCapMiB);
         $cpuWeight    = isset($policy['cpuWeight']) && is_numeric($policy['cpuWeight']) ? (int)$policy['cpuWeight'] : 200;
         $ioWeight     = isset($policy['ioWeight']) && is_numeric($policy['ioWeight']) ? (int)$policy['ioWeight'] : 200;
-        $tasksMax     = isset($policy['tasksMax']) && is_numeric($policy['tasksMax']) ? (int)$policy['tasksMax'] : 512;
+
+        // Derive a reasonable default per-user TasksMax based on host capacity.
+        // systemd TasksMax counts tasks (threads), not just processes.
+        $cpuThreads = pmssTotalCpuThreads();
+        $memGiB = $totalMiB > 0 ? (int)ceil($totalMiB / 1024) : 0;
+        $scaleBase = max($cpuThreads, $memGiB);
+        $defaultTasksMax = 512 * $scaleBase;
+        $defaultTasksMax = max(2048, min(16384, $defaultTasksMax));
+        $tasksMax = $defaultTasksMax;
+        if (isset($policy['tasksMax']) && is_numeric($policy['tasksMax'])) {
+            $tasksMax = (int)$policy['tasksMax'];
+        }
 
         // Calculate default CPUQuota: 85% of total logical cores (threads).
         // Fallback to 600% (6 cores) if detection fails.
-        $cpuThreads   = pmssTotalCpuThreads();
         $defaultQuota = ($cpuThreads > 0) ? ($cpuThreads * 85) : 600;
 
         $cpuQuotaVal = $defaultQuota;
