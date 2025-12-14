@@ -387,6 +387,58 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
             'Reloading systemd manager configuration (root slice)',
             'Reloading systemd manager configuration (root slice, test mode)'
         );
+
+        // Apply updated TasksMax limits to already-running slices without
+        // persisting per-user overrides. systemctl daemon-reload does not
+        // retroactively reconfigure active slice cgroups, so older hosts may
+        // remain stuck on legacy defaults (e.g. 250/512) until reboot.
+        if (!$skipSystemctl) {
+            runStep(
+                'Unlimiting root user slice runtime TasksMax',
+                "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity"
+            );
+
+            $rc = runCommand("systemctl list-units --type=slice 'user-*.slice' --state=active --no-legend --no-pager", false, $log);
+            $stdout = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
+            if ($rc === 0 && is_string($stdout) && trim($stdout) !== '') {
+                foreach (preg_split('/\r?\n/', trim($stdout)) as $line) {
+                    $line = trim((string) $line);
+                    if ($line === '') {
+                        continue;
+                    }
+                    $parts = preg_split('/\s+/', $line);
+                    if (!is_array($parts) || count($parts) === 0) {
+                        continue;
+                    }
+                    $unit = (string) $parts[0];
+                    if ($unit === 'user-0.slice' || preg_match('/^user-\d+\.slice$/', $unit) !== 1) {
+                        continue;
+                    }
+
+                    $showRc = runCommand('systemctl show '.escapeshellarg($unit).' -p TasksMax', false, $log);
+                    $tasksLine = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
+                    $tasksLine = trim(is_string($tasksLine) ? $tasksLine : '');
+                    if ($showRc !== 0 || $tasksLine === '' || strpos($tasksLine, 'TasksMax=') !== 0) {
+                        continue;
+                    }
+                    $current = trim(substr($tasksLine, strlen('TasksMax=')));
+                    if ($current === '' || strtolower($current) === 'infinity' || !ctype_digit($current)) {
+                        continue;
+                    }
+                    $currentInt = (int) $current;
+                    if ($currentInt > 0 && $currentInt <= 512 && $tasksMax > $currentInt) {
+                        runStep(
+                            'Refreshing user slice runtime TasksMax :: '.$unit,
+                            sprintf(
+                                "systemctl set-property --runtime %s TasksMax=%d",
+                                escapeshellarg($unit),
+                                $tasksMax
+                            )
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
