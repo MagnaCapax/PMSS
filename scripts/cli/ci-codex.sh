@@ -217,6 +217,8 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 	echo "Do not inline these; read them directly from disk."
 } >"$PROMPT"
 
+codex_append_local_notes "$ROOT/.codex-prompt" "$PROMPT"
+
 prompt_bytes=$(wc -c <"$PROMPT" | tr -d ' ')
 prompt_lines=$(wc -l <"$PROMPT" | tr -d ' ')
 echo "[ci-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1

@@ -4,6 +4,8 @@ Goal: Make required CI jobs pass with the smallest coherent change.
 
 Read First (ABSOLUTE — do not proceed until read):
 - AGENTS.md (entire file; rails/Constitution/Doctrine).
+- AGENTS.local.md (host-specific local rails).
+- Any nested AGENTS.md covering files you touch (most-specific instructions win).
 - docs/architecture.md and docs/update.md (provisioning flow, updater topology).
 - docs/adr/* (governing decisions; when present, they apply).
 

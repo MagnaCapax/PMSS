@@ -282,13 +282,15 @@ PMSSREFACTORPROMPT
 		if [[ -f "$PHPLC_LOG" ]]; then
 			echo " - $PHPLC_LOG (phploc aggregate metrics)"
 		fi
-		echo
-		echo "Do not inline these; read them directly from disk."
-	} >"$PROMPT"
+			echo
+			echo "Do not inline these; read them directly from disk."
+		} >"$PROMPT"
 
-prompt_bytes=$(wc -c <"$PROMPT" | tr -d ' ')
-prompt_lines=$(wc -l <"$PROMPT" | tr -d ' ')
-echo "[refactor-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
+	codex_append_local_notes "$ROOT/.codex-prompt" "$PROMPT"
+
+	prompt_bytes=$(wc -c <"$PROMPT" | tr -d ' ')
+	prompt_lines=$(wc -l <"$PROMPT" | tr -d ' ')
+	echo "[refactor-codex] prompt written: $PROMPT (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
 
 prompt_str=$(cat "$PROMPT")
 if [[ -n "$exec_cmd" && "$exec_cmd" != "codex" ]]; then

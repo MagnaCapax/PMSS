@@ -25,3 +25,16 @@ codex_count_nonempty_files() {
 	done
 	echo "$count"
 }
+
+# Append local operator notes (optional) to a prompt file.
+# Usage: codex_append_local_notes "/abs/path/to/.codex-prompt" "/abs/path/to/prompt.txt"
+codex_append_local_notes() {
+	local notes_file="$1" prompt_file="$2"
+	[[ -f "$notes_file" ]] || return 0
+
+	{
+		echo
+		echo "Local Operator Notes ($(basename "$notes_file")):"
+		cat "$notes_file"
+	} >>"$prompt_file"
+}

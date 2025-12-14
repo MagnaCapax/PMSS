@@ -21,7 +21,7 @@ echo "[codex] start: assembling strict-rails context and invoking assistant" >&1
 #   scripts/cli/codex.sh --exec 'codex'       # choose assistant executable (default: codex)
 #
 # Local prompt extension (optional, ignored by git):
-#   - If $ROOT/.codex-prompt exists, it is appended to the prompt under "Local Operator Notes".
+#   - If $ROOT/.codex-prompt exists, it is appended at the end of the prompt.
 
 TMP="${TMPDIR:-/tmp}"
 OUTDIR="$(mktemp -d "${TMP%/}/pmss-codex-XXXXXXXX")"
@@ -67,16 +67,11 @@ prompt_text=${custom_prompt:-$DEFAULT_PROMPT}
 	echo " - docs/refactoring.md"
 	echo " - docs/contracts.md"
 	echo " - docs/adr/"
-
-	if [[ -f "$ROOT/.codex-prompt" ]]; then
-		echo
-		echo "Local Operator Notes (.codex-prompt):"
-		cat "$ROOT/.codex-prompt"
-	fi
-
 	echo
 	echo "Do not inline these; read them directly from disk."
 } >"$PROMPT"
+
+codex_append_local_notes "$ROOT/.codex-prompt" "$PROMPT"
 
 prompt_bytes=$(wc -c <"$PROMPT" | tr -d ' ')
 prompt_lines=$(wc -l <"$PROMPT" | tr -d ' ')
