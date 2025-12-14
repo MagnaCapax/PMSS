@@ -34,6 +34,266 @@ if (!function_exists('logMessage')) {
     }
 }
 
+if (!function_exists('pmssOutputIndicatesForkFailure')) {
+    /**
+     * Detect common fork-related failure strings in captured command output.
+     *
+     * This is intentionally broad and best-effort: it is used only to decide
+     * whether to emit additional diagnostics, not to change control flow.
+     */
+    function pmssOutputIndicatesForkFailure(string $stdout, string $stderr): bool
+    {
+        $haystack = $stdout."\n".$stderr;
+        return preg_match('/\b(Cannot fork|fork failed|Unable to fork|Resource temporarily unavailable)\b/i', $haystack) === 1;
+    }
+}
+
+if (!function_exists('pmssDumpForkDiagnostics')) {
+    /**
+     * Emit a best-effort diagnostics snapshot for fork/proc exhaustion scenarios.
+     *
+     * Must not spawn new processes (do not shell out); keep it safe to call
+     * during partial resource exhaustion incidents.
+     */
+    function pmssDumpForkDiagnostics(string $context, ?callable $logger = null): void
+    {
+        $now = microtime(true);
+        $lastAt = $GLOBALS['PMSS_LAST_FORK_DIAG_AT'] ?? 0.0;
+        $lastCtx = $GLOBALS['PMSS_LAST_FORK_DIAG_CONTEXT'] ?? '';
+        if ($context === $lastCtx && ($now - (float) $lastAt) < 1.0) {
+            return;
+        }
+        $GLOBALS['PMSS_LAST_FORK_DIAG_AT'] = $now;
+        $GLOBALS['PMSS_LAST_FORK_DIAG_CONTEXT'] = $context;
+
+        $log = $logger ?? 'logMessage';
+        $prefix = '[FORK] diag: ';
+
+        $pid = function_exists('getmypid') ? getmypid() : null;
+        $euid = function_exists('posix_geteuid') ? posix_geteuid() : null;
+        $uid = function_exists('posix_getuid') ? posix_getuid() : null;
+        $line = $prefix.'context='.trim($context);
+        if ($pid !== null) {
+            $line .= ' pid='.$pid;
+        }
+        if ($euid !== null || $uid !== null) {
+            $line .= sprintf(' uid=%s euid=%s', $uid !== null ? (string) $uid : 'n/a', $euid !== null ? (string) $euid : 'n/a');
+        }
+        $log($line);
+
+        $readTrim = static function (string $path, int $maxBytes = 4096): ?string {
+            if (!is_readable($path)) {
+                return null;
+            }
+            $data = @file_get_contents($path, false, null, 0, $maxBytes);
+            if ($data === false) {
+                return null;
+            }
+            $data = trim((string) $data);
+            return $data !== '' ? $data : null;
+        };
+
+        // Kernel/global counters.
+        $procCount = null;
+        $dir = @opendir('/proc');
+        if ($dir !== false) {
+            $count = 0;
+            while (false !== ($entry = readdir($dir))) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+                if (!ctype_digit($entry)) {
+                    continue;
+                }
+                $count++;
+            }
+            closedir($dir);
+            $procCount = $count;
+        }
+        $pidMax = $readTrim('/proc/sys/kernel/pid_max');
+        $threadsMax = $readTrim('/proc/sys/kernel/threads-max');
+        $loadavg = $readTrim('/proc/loadavg');
+        $logLine = $prefix.sprintf(
+            'kernel procs=%s pid_max=%s threads_max=%s loadavg=%s',
+            $procCount !== null ? (string) $procCount : 'n/a',
+            $pidMax ?? 'n/a',
+            $threadsMax ?? 'n/a',
+            $loadavg ?? 'n/a'
+        );
+        $log($logLine);
+
+        // RLIMITs (prefer /proc/self/limits since it is always available).
+        $limitsRaw = $readTrim('/proc/self/limits', 16384);
+        if ($limitsRaw !== null) {
+            $maxProc = null;
+            $maxFiles = null;
+            $lines = preg_split('/\r?\n/', $limitsRaw);
+            if (is_array($lines)) {
+                foreach ($lines as $l) {
+                    if ($maxProc === null && strpos($l, 'Max processes') === 0) {
+                        $maxProc = preg_replace('/\s+/', ' ', trim($l));
+                    }
+                    if ($maxFiles === null && strpos($l, 'Max open files') === 0) {
+                        $maxFiles = preg_replace('/\s+/', ' ', trim($l));
+                    }
+                    if ($maxProc !== null && $maxFiles !== null) {
+                        break;
+                    }
+                }
+            }
+            if ($maxProc !== null || $maxFiles !== null) {
+                $limitLine = $prefix.'rlimits'
+                    .($maxProc !== null ? ' | '.$maxProc : '')
+                    .($maxFiles !== null ? ' | '.$maxFiles : '');
+                $log($limitLine);
+            }
+        }
+
+        // System memory pressure snapshot (to help distinguish EAGAIN vs ENOMEM causes).
+        $meminfoRaw = $readTrim('/proc/meminfo', 16384);
+        if ($meminfoRaw !== null) {
+            $wanted = ['MemTotal', 'MemAvailable', 'SwapTotal', 'SwapFree', 'CommitLimit', 'Committed_AS'];
+            $vals = [];
+            foreach ($wanted as $k) {
+                if (preg_match('/^'.$k.':\s+([0-9]+)\s+kB$/m', $meminfoRaw, $m)) {
+                    $vals[$k] = (int) $m[1];
+                }
+            }
+            if (!empty($vals)) {
+                $fmtKb = static function (int $kb): string {
+                    $mib = $kb / 1024.0;
+                    return sprintf('%0.1fMiB', $mib);
+                };
+                $memLine = $prefix.'mem'
+                    .(isset($vals['MemAvailable']) ? ' avail='.$fmtKb($vals['MemAvailable']) : '')
+                    .(isset($vals['MemTotal']) ? ' total='.$fmtKb($vals['MemTotal']) : '')
+                    .(isset($vals['SwapFree']) ? ' swap_free='.$fmtKb($vals['SwapFree']) : '')
+                    .(isset($vals['SwapTotal']) ? ' swap_total='.$fmtKb($vals['SwapTotal']) : '')
+                    .(isset($vals['Committed_AS']) ? ' committed='.$fmtKb($vals['Committed_AS']) : '')
+                    .(isset($vals['CommitLimit']) ? ' commit_limit='.$fmtKb($vals['CommitLimit']) : '');
+                $log($memLine);
+            }
+        }
+
+        // Cgroup pressure snapshot (pids + memory), walking up the hierarchy to catch parent limits.
+        $cgPath = null;
+        $cgLines = @file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($cgLines)) {
+            foreach ($cgLines as $cgLine) {
+                // v2 line format: "0::/user.slice/…/session-XYZ.scope"
+                $parts = explode(':', $cgLine, 3);
+                if (count($parts) === 3 && $parts[0] === '0') {
+                    $cgPath = $parts[2];
+                    break;
+                }
+            }
+            if ($cgPath === null && count($cgLines) > 0) {
+                $parts = explode(':', $cgLines[count($cgLines) - 1], 3);
+                if (count($parts) === 3) {
+                    $cgPath = $parts[2];
+                }
+            }
+        }
+
+        if (is_string($cgPath) && $cgPath !== '') {
+            $cgPath = '/'.ltrim($cgPath, '/');
+            $cgDirsFor = static function (string $path): array {
+                $path = '/'.ltrim($path, '/');
+                return [
+                    // cgroup v2 unified hierarchy
+                    '/sys/fs/cgroup'.$path,
+                    // cgroup v1 pids controller mount
+                    '/sys/fs/cgroup/pids'.$path,
+                    // common alternate mount used in some setups
+                    '/sys/fs/cgroup/unified'.$path,
+                ];
+            };
+
+            $ancestors = [];
+            $cursor = $cgPath;
+            for ($i = 0; $i < 10; $i++) {
+                $ancestors[] = $cursor;
+                if ($cursor === '/' || $cursor === '') {
+                    break;
+                }
+                $parent = dirname($cursor);
+                $cursor = $parent === '.' ? '/' : $parent;
+            }
+
+            foreach ($ancestors as $path) {
+                $dirs = $cgDirsFor($path);
+                $pickedDir = null;
+                foreach ($dirs as $dirPath) {
+                    if (is_dir($dirPath) && is_readable($dirPath.'/cgroup.procs')) {
+                        $pickedDir = $dirPath;
+                        break;
+                    }
+                }
+                if ($pickedDir === null) {
+                    continue;
+                }
+
+                $pidsMax = $readTrim($pickedDir.'/pids.max');
+                $pidsCur = $readTrim($pickedDir.'/pids.current');
+                $pidsEvents = $readTrim($pickedDir.'/pids.events');
+                $memMax = $readTrim($pickedDir.'/memory.max');
+                $memCur = $readTrim($pickedDir.'/memory.current');
+                $memEvents = $readTrim($pickedDir.'/memory.events');
+
+                $procsInCgroup = null;
+                $procsRaw = $readTrim($pickedDir.'/cgroup.procs', 262144);
+                if ($procsRaw !== null) {
+                    $trimmed = trim($procsRaw);
+                    $procsInCgroup = $trimmed === '' ? 0 : (substr_count($trimmed, "\n") + 1);
+                }
+
+                if ($pidsMax === null && $pidsCur === null && $memMax === null && $memCur === null) {
+                    continue;
+                }
+
+                $fmtBytes = static function (?string $val): string {
+                    if ($val === null) {
+                        return 'n/a';
+                    }
+                    if ($val === 'max') {
+                        return 'max';
+                    }
+                    if (!ctype_digit($val)) {
+                        return $val;
+                    }
+                    $bytes = (float) $val;
+                    $mib = $bytes / 1048576.0;
+                    return sprintf('%0.1fMiB', $mib);
+                };
+
+                $pidsEventsMax = null;
+                if ($pidsEvents !== null && preg_match('/^max\\s+([0-9]+)$/m', $pidsEvents, $m)) {
+                    $pidsEventsMax = $m[1];
+                }
+                $memEventsOom = null;
+                if ($memEvents !== null && preg_match('/^oom\\s+([0-9]+)$/m', $memEvents, $m)) {
+                    $memEventsOom = $m[1];
+                }
+                $memEventsOomKill = null;
+                if ($memEvents !== null && preg_match('/^oom_kill\\s+([0-9]+)$/m', $memEvents, $m)) {
+                    $memEventsOomKill = $m[1];
+                }
+
+                $cgLineOut = $prefix.'cgroup'
+                    .' path='.$path
+                    .' dir='.$pickedDir
+                    .($procsInCgroup !== null ? ' procs='.$procsInCgroup : '')
+                    .(($pidsCur !== null || $pidsMax !== null) ? sprintf(' pids=%s/%s', $pidsCur ?? 'n/a', $pidsMax ?? 'n/a') : '')
+                    .($pidsEventsMax !== null ? ' pids.events.max='.$pidsEventsMax : '')
+                    .(($memCur !== null || $memMax !== null) ? sprintf(' mem=%s/%s', $fmtBytes($memCur), $fmtBytes($memMax)) : '')
+                    .($memEventsOom !== null ? ' mem.events.oom='.$memEventsOom : '')
+                    .($memEventsOomKill !== null ? ' mem.events.oom_kill='.$memEventsOomKill : '');
+                $log($cgLineOut);
+            }
+        }
+    }
+}
+
 if (!function_exists('runCommand')) {
     /**
      * Execute a shell command while keeping failures non-fatal.
@@ -174,6 +434,7 @@ if (!function_exists('runCommand')) {
             $isTty = function_exists('posix_isatty') && posix_isatty(STDERR);
             $banner = $isTty ? "\033[1;31m[FORK]\033[0m " : '[FORK] ';
             fwrite(STDERR, $banner.$message.PHP_EOL);
+            pmssDumpForkDiagnostics('proc_open failed: '.$cmd, $log);
             $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
             return 1;
         }

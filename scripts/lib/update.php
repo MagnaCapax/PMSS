@@ -111,10 +111,17 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
         echo "Failed to copy {$sourceFile} to {$targetFile}\n";
         return;
     }
-    // Set file permissions to 755.
-    passthru("chmod 755 " . escapeshellarg($targetFile));
-    // Change owner and group to the specified user.
-    passthru("chown " . escapeshellarg($user) . ":" . escapeshellarg($user) . " " . escapeshellarg($targetFile));
+    // Avoid shelling out for simple chmod/chown: fork failures are one of the
+    // most common incident triggers during high-load updates.
+    if (!@chmod($targetFile, 0755)) {
+        logMessage("[WARN] Failed to chmod 0755: {$targetFile}");
+    }
+    if (!@chown($targetFile, (string) $user)) {
+        logMessage("[WARN] Failed to chown {$user}: {$targetFile}");
+    }
+    if (!@chgrp($targetFile, (string) $user)) {
+        logMessage("[WARN] Failed to chgrp {$user}: {$targetFile}");
+    }
 }
 
 /**

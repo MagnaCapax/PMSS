@@ -40,14 +40,24 @@ if (!function_exists('runStep')) {
         $stderrShort = $stderr !== '' ? preg_replace('/\s+/', ' ', trim(substr($stderr, 0, 300))) : '';
         $stdoutShort = $stdout !== '' ? preg_replace('/\s+/', ' ', trim(substr($stdout, 0, 300))) : '';
 
+        // Fork failures may occur inside nested scripts (e.g. find/chown) while the
+        // wrapper command itself still exits rc=0. Detect known strings and emit a
+        // non-shell diagnostics snapshot so we have the cgroup/rlimit context.
+        if (!$dryRun && function_exists('pmssOutputIndicatesForkFailure') && pmssOutputIndicatesForkFailure($stdout, $stderr)) {
+            pmssDumpForkDiagnostics('runStep: '.$description.' :: '.$command, 'logMessage');
+        }
+
         // ANSI colors
         $cRed    = "\033[31m";
         $cGreen  = "\033[32m";
         $cYellow = "\033[33m";
 
-        $color = $cGreen;
-        if ($status === 'ERR') $color = $cRed;
-        if ($status === 'SKIP') $color = $cYellow;
+        $statusColors = [
+            'OK'   => $cGreen,
+            'ERR'  => $cRed,
+            'SKIP' => $cYellow,
+        ];
+        $color = $statusColors[$status] ?? $cGreen;
 
         // Colorize the status block: [STATUS ... rc=N]
         $statusBlock = sprintf('[%s%s%s %.3fs rc=%s%d%s]', 
