@@ -18,8 +18,7 @@ function pmssUserRefreshPermissions(array $ctx): void
         $rcCustomSha = sha1((string)file_get_contents($rcCustomPath));
         if ($rcCustomSha === 'dcf21704d49910d1670b3fdd04b37e640b755889' ||
             $rcCustomSha === 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a') {
-            $skelRcCustom = pmssUserSkelPath('.rtorrent.rc.custom');
-            $skelRcCustomArg = $skelRcCustom === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustom : escapeshellarg($skelRcCustom);
+            $skelRcCustomArg = pmssUserSkelCommandArg('.rtorrent.rc.custom');
             runUserStep(
                 $user,
                 'Updating .rtorrent.rc.custom from skeleton',

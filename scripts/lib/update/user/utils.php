@@ -14,3 +14,21 @@ function pmssUserSkelPath(string $relative): string
 {
     return pmssUserSkelBase().'/'.$relative;
 }
+
+/**
+ * Return a shell-ready argument for a skel path.
+ *
+ * Keep legacy command strings stable: when PMSS_SKEL_DIR is the default
+ * `/etc/skel`, older scripts historically passed the path unquoted in the
+ * generated `cp` command. When overridden, we must escape the custom path.
+ */
+function pmssUserSkelCommandArg(string $relative): string
+{
+    $path = pmssUserSkelPath($relative);
+    $default = '/etc/skel/'.$relative;
+    if ($path === $default) {
+        return $path;
+    }
+
+    return escapeshellarg($path);
+}

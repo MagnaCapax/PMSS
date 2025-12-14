@@ -194,7 +194,7 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
         $templates = [];
         static $suites = ['jessie', 'buster', 'bullseye', 'bookworm', 'trixie'];
         foreach ($suites as $suite) {
-            $templates[$suite] = loadRepoTemplate($suite, $log);
+            $templates[$suite] = pmssLoadRepoTemplate($suite, $log);
         }
 
         return [
@@ -215,21 +215,25 @@ if (!function_exists('pmssRefreshRepositories')) {
         pmssEnsureRepositoryPrerequisites();
         $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $logger);
         $aptUpdate = aptCmd('update');
-        if ($plan['mode'] === 'reuse') {
-            runStep('Refreshing apt package index (existing sources)', $aptUpdate);
-            return true;
+        $needsUpdate = $plan['mode'] !== 'reuse';
+        if ($needsUpdate) {
+            $log = pmssSelectLogger($logger);
+            pmssUpdateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], $log);
         }
 
-        $log = pmssSelectLogger($logger);
-        updateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], $log);
-        runStep('Refreshing apt package index', $aptUpdate);
-        
-        // Touch the periodic stamp so tools like MOTD know the index is fresh
-        @mkdir('/var/lib/apt/periodic', 0755, true);
-        @touch('/var/lib/apt/periodic/update-success-stamp');
+        $desc = $needsUpdate ? 'Refreshing apt package index' : 'Refreshing apt package index (existing sources)';
+        runStep($desc, $aptUpdate);
+
+        if ($needsUpdate) {
+            // Touch the periodic stamp so tools like MOTD know the index is fresh
+            @mkdir('/var/lib/apt/periodic', 0755, true);
+            @touch('/var/lib/apt/periodic/update-success-stamp');
+        }
         return true;
     }
+}
 
+if (!function_exists('pmssAutoremovePackages')) {
     function pmssAutoremovePackages(): void
     {
         runStep('Removing packages no longer required', aptCmd('autoremove -y'));

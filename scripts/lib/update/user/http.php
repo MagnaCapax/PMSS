@@ -44,8 +44,7 @@ function pmssUserConfigureHttp(array $ctx): void
     $irssiDir = "{$home}/.irssi";
     if (!is_dir($irssiDir)) {
         runUserStep($user, 'Creating irssi configuration directory', sprintf('mkdir -p %s', escapeshellarg($irssiDir)));
-        $skelConfig = pmssUserSkelPath('.irssi/config');
-        $skelConfigArg = $skelConfig === '/etc/skel/.irssi/config' ? $skelConfig : escapeshellarg($skelConfig);
+        $skelConfigArg = pmssUserSkelCommandArg('.irssi/config');
         runUserStep($user, 'Copying irssi skeleton config', sprintf('cp %s %s/', $skelConfigArg, escapeshellarg($irssiDir)));
         runUserStep($user, 'Adjusting irssi configuration ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($irssiDir)));
     }

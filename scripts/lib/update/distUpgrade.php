@@ -67,16 +67,7 @@ function pmssResolveTargetVersion(string $input): string
         return '';
     }
 
-    // Dist-upgrade currently supports Debian 10–13 only; keep strict allowlist
-    // semantics so older codenames and unexpected numeric strings remain rejected.
-    static $allowed = [
-        '10' => true,
-        '11' => true,
-        '12' => true,
-        '13' => true,
-    ];
-
-    if (isset($allowed[$key])) {
+    if (pmssDistUpgradeIsAllowedMajor($key)) {
         return $key;
     }
 
@@ -85,7 +76,25 @@ function pmssResolveTargetVersion(string $input): string
         return '';
     }
     $mappedKey = (string) $mapped;
-    return isset($allowed[$mappedKey]) ? $mappedKey : '';
+    return pmssDistUpgradeIsAllowedMajor($mappedKey) ? $mappedKey : '';
+}
+
+/**
+ * Dist-upgrade currently supports Debian 10–13 only.
+ *
+ * Keep this strict allowlist stable so older codenames and unexpected numeric
+ * strings remain rejected.
+ */
+function pmssDistUpgradeIsAllowedMajor(string $major): bool
+{
+    static $allowed = [
+        '10' => true,
+        '11' => true,
+        '12' => true,
+        '13' => true,
+    ];
+
+    return isset($allowed[$major]);
 }
 
 /**
@@ -221,13 +230,7 @@ function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void
  */
 function pmssCodenameForMajor(string $major): string
 {
-    static $allowed = [
-        '10' => true,
-        '11' => true,
-        '12' => true,
-        '13' => true,
-    ];
-    if (!isset($allowed[$major])) {
+    if (!pmssDistUpgradeIsAllowedMajor($major)) {
         return '';
     }
 
