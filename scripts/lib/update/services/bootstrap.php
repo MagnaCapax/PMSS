@@ -76,6 +76,7 @@ if (!function_exists('pmssConfigureQuotaMount')) {
         pmssEnsureQuotaOptions($mount, null, $log);
         if (is_dir($mount)) {
             runStep('Remounting '.$mount.' to refresh quota options', sprintf('mount -o remount %s', escapeshellarg($mount)));
+            pmssWarnUnexpectedQuotaFiles($mount, $log);
             return;
         }
         $log('[WARN] Skipping remount for '.$mount.' (mount path not found)');

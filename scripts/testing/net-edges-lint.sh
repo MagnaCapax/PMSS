@@ -8,9 +8,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 STRICT="${PMSS_LINT_NET_STRICT:-0}"
+PATTERN='curl\b|wget\b|\bnc\b|telnet\b'
 VIOL=0
 
-php_scan() {
+scanMatches() {
+  local file="$1"
+  grep -nE "$PATTERN" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true
+}
+
+phpScan() {
   local file raw
   while IFS= read -r -d '' file; do
     while IFS= read -r raw; do
@@ -20,7 +26,7 @@ php_scan() {
       fi
       echo "PHP net edge: $file: ${raw}" >&2
       VIOL=$((VIOL+1))
-    done < <(grep -nE "curl\b|wget\b|\bnc\b|telnet\b" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.php" \
            -not -path "*/vendor/*" \
            -not -path "*/scripts/lib/tests/*" \
@@ -28,20 +34,20 @@ php_scan() {
            -not -path "*/etc/skel/*" -print0)
 }
 
-sh_scan() {
+shScan() {
   local file raw
   while IFS= read -r -d '' file; do
     while IFS= read -r raw; do
       echo "Shell net edge: $file: ${raw}" >&2
       VIOL=$((VIOL+1))
-    done < <(grep -nE "curl\b|wget\b|\bnc\b|telnet\b" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.sh" \
            -not -path "*/vendor/*" \
            -not -path "*/etc/skel/*" -print0)
 }
 
-php_scan
-sh_scan
+phpScan
+shScan
 
 if [[ $VIOL -gt 0 ]]; then
   echo "net-edges lint: $VIOL issue(s) found" >&2
@@ -50,4 +56,3 @@ if [[ $VIOL -gt 0 ]]; then
   fi
 fi
 echo "net-edges lint: OK (advisory)"
-

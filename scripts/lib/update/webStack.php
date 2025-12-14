@@ -38,7 +38,7 @@ if (!function_exists('pmssConfigureWebStack')) {
         runStep('Checking lighttpd per-user instances', '/scripts/cron/checkLighttpdInstances.php');
         runStep('Setting /home directory permissions', 'chmod 751 /home');
         // Quota state files reject chmod; prune them so the find commands stay noise-free.
-        $prune = '\( -name "aquota.user" -o -name "aquota.group" -o -name "lost+found" \)';
+        $prune = '\( -name "aquota.*" -o -name "lost+found" \)';
         runStep(
             'Hardening /home tenant directories',
             'find /home -mindepth 1 -maxdepth 1 '.$prune.' -prune -o -type d -exec chmod 700 {} +'

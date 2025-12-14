@@ -11,6 +11,26 @@ if (!file_exists("/home/{$thisUser}")) die("User does not exist\n");
 $userList = file_get_contents('/etc/passwd');
 if (strpos($userList, $thisUser) === false) die("No such user\n");
 
+function pmssPasswdUserIds(string $username): ?array
+{
+    $lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return null;
+    }
+    $prefix = $username.':';
+    foreach ($lines as $line) {
+        if (strpos($line, $prefix) !== 0) {
+            continue;
+        }
+        $parts = explode(':', $line);
+        if (count($parts) < 4) {
+            return null;
+        }
+        return ['uid' => (int)$parts[2], 'gid' => (int)$parts[3]];
+    }
+    return null;
+}
+
 function run(string $cmd): int
 {
     $rc = 0;
@@ -66,6 +86,26 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
 
 // Safer traversal without relying on xargs delimiters; applies to each directory in place.
 // Skip ~/.local entirely to avoid interfering with per-user application data (e.g. Docker overlays).
+$userIds = pmssPasswdUserIds($thisUser);
+if (is_array($userIds)) {
+    $homeOwner = @fileowner("/home/{$thisUser}");
+    $homeGroup = @filegroup("/home/{$thisUser}");
+    if ($homeOwner !== false && $homeGroup !== false &&
+        ($homeOwner !== $userIds['uid'] || $homeGroup !== $userIds['gid'])) {
+        fwrite(
+            STDERR,
+            sprintf(
+                "[WARN] Fixing home directory ownership for %s (uid=%s gid=%s expected uid=%s gid=%s)\n",
+                "/home/{$thisUser}",
+                $homeOwner,
+                $homeGroup,
+                $userIds['uid'],
+                $userIds['gid']
+            )
+        );
+        chownPath("/home/{$thisUser}", $userIds['uid'].':'.$userIds['gid']);
+    }
+}
 run(sprintf(
     'find %s -path %s -prune -o -type d -exec chmod 750 {} +',
     escapeshellarg('/home/'.$thisUser),

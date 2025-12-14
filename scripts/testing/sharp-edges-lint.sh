@@ -20,24 +20,31 @@ PATTERN='rm\s+-rf|chmod\s+-R|chown\s+-R|chgrp\s+-R|\bmv\b'
 VIOL=0
 FATAL_VIOL=0
 
-scan_matches() {
+scanMatches() {
   local file="$1"
   grep -nE "$PATTERN" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true
 }
 
-report_violation() {
+reportViolation() {
   local kind="$1" file="$2" raw="$3"
   echo "${kind} sharp edge: $file: ${raw}" >&2
   VIOL=$((VIOL+1))
 }
 
-report_fatal() {
+reportFatal() {
   local file="$1" raw="$2"
   echo "FATAL sharp edge: $file: ${raw}" >&2
   FATAL_VIOL=$((FATAL_VIOL+1))
 }
 
-php_scan() {
+reportFatalMatches() {
+  local file="$1" regex="$2" raw
+  while IFS= read -r raw; do
+    reportFatal "$file" "$raw"
+  done < <(grep -nE "$regex" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+}
+
+phpScan() {
   local file raw
   while IFS= read -r -d '' file; do
     # grep candidate lines
@@ -46,8 +53,8 @@ php_scan() {
       if grep -Eq "runStep\s*\(.*(${PATTERN}).*\)" <<<"$raw"; then
         continue
       fi
-      report_violation "PHP" "$file" "$raw"
-    done < <(scan_matches "$file")
+      reportViolation "PHP" "$file" "$raw"
+    done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.php" \
            -not -path "*/vendor/*" \
            -not -path "*/scripts/lib/tests/*" \
@@ -55,12 +62,12 @@ php_scan() {
            -not -path "*/etc/skel/*" -print0)
 }
 
-sh_scan() {
+shScan() {
   local file
   while IFS= read -r -d '' file; do
     while IFS= read -r raw; do
-      report_violation "Shell" "$file" "$raw"
-    done < <(scan_matches "$file")
+      reportViolation "Shell" "$file" "$raw"
+    done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.sh" \
            -not -path "*/vendor/*" \
            -not -path "*/etc/skel/*" -print0)
@@ -71,60 +78,49 @@ sh_scan() {
 # - rm -rf / (root) or rm -rf /home (full home tree)
 # - rm -rf /home/$var (dynamic home targets without safeguards)
 # - rm -rf $var (unquoted variable argument in shell/strings)
-fatal_scan() {
-  local file raw
-  while IFS= read -r -d '' file; do
+fatalScan() {
+  local file regex
+  local fatalRegexes=(
     # rm -rf / (root) — spaces or end-of-line after slash
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+/([[:space:];]|$)' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+/([[:space:];]|$)'
 
     # rm -rf /home (full home tree)
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+/home([[:space:];]|$)' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+/home([[:space:];]|$)'
 
     # rm -rf /home/ (full home tree with trailing slash or wildcard)
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+/home/([[:space:];]|$|\*)' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+/home/([[:space:];]|$|\*)'
 
     # rm -rf "/home" or "/home/..." (quoted home path)
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+\"/home' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+\"/home'
 
     # rm -rf /home/$var (dynamic home path without explicit quoting helper)
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+/home/\$[A-Za-z_][A-Za-z0-9_]*' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+/home/\$[A-Za-z_][A-Za-z0-9_]*'
 
     # rm -rf $var (unquoted variable argument)
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+\$[A-Za-z_][A-Za-z0-9_]*([[:space:];]|$)' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+\$[A-Za-z_][A-Za-z0-9_]*([[:space:];]|$)'
 
     # rm -rf $HOME or paths derived directly from $HOME
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+\$HOME([/[:space:];]|$)' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+[$]HOME([/[:space:];]|$)'
 
     # rm -rf ~ or ~/...
-    while IFS= read -r raw; do
-      report_fatal "$file" "$raw"
-    done < <(grep -nE 'rm[[:space:]]+-rf[[:space:]]+~([/[:space:];]|$)' "$file" | cut -d: -f1-2 --output-delimiter=': ' || true)
+    'rm[[:space:]]+-rf[[:space:]]+~([/[:space:];]|$)'
+  )
+  while IFS= read -r -d '' file; do
+    for regex in "${fatalRegexes[@]}"; do
+      reportFatalMatches "$file" "$regex"
+    done
   done < <(find "$ROOT_DIR" -type f \
-           -not -path "*/vendor/*" \
-           -not -path "*/scripts/lib/tests/*" \
-           -not -path "*/scripts/lib/devristo/*" \
+	           -not -path "*/vendor/*" \
+	           -not -path "*/scripts/lib/tests/*" \
+	           -not -path "*/scripts/lib/devristo/*" \
            -not -path "*/etc/skel/*" \
            -not -path "*/docs/*" \
            -not -path "*/scripts/testing/sharp-edges-lint.sh" -print0)
 }
 
-php_scan
-sh_scan
-fatal_scan
+phpScan
+shScan
+fatalScan
 
 if [[ $FATAL_VIOL -gt 0 ]]; then
   echo "sharp-edges lint: $FATAL_VIOL fatal issue(s) found" >&2

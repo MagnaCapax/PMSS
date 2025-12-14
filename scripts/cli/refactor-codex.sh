@@ -113,12 +113,27 @@ PMSS Refactor Assist — Strict Rails Mode
 
 Goal: Apply small, behaviour-preserving refactors that simplify PMSS while keeping all existing safety and update rails intact.
 
+Primary objective: reduce cognitive load and code footprint (fewer branches, less duplication, fewer concepts), while staying fully backward compatible.
+
+Operator-gated safety (mandatory):
+- Treat the repository as read-only until the operator explicitly approves applying changes.
+- If the operator has not explicitly asked you to apply changes yet:
+  - Do not modify files.
+  - Output must include:
+    - A short target selection rationale (why these files).
+    - A unified diff patch (apply-able).
+    - A verification command list to run after applying.
+  - Do not run commands beyond read-only inspection in this proposal-only phase.
+  - Stop after presenting the patch and ask for explicit approval phrase: "APPLY PATCH".
+
 Read first (do not proceed until read):
-- AGENTS.md (rails / Constitution / engineering doctrine, including overwrite and refactor rules).
+- AGENTS.md (rails / Constitution / doctrine; treat as binding guard rails).
+- agents.local.md (host-specific local rails).
+- Any nested AGENTS.md covering the files you touch (most-specific instructions win).
 - docs/architecture.md (bootstrap/update topology, module responsibilities).
 - docs/update.md (install.sh → scripts/update.php → scripts/util/update-step2.php flow and invariants).
 - docs/refactoring.md (Linux kernel style guidance, ~150 LOC per file targets, when to split helpers).
-- docs/adr/* (Accepted ADRs relevant to the target area).
+- docs/adr/* (Treat Accepted ADRs as constraints; consider those relevant to your target area).
 
 Core engineering principles to honour (do not dilute them):
 - KISS / DRY / YAGNI: keep implementations small and boring; reuse existing helpers; do not build abstractions or flags you do not need right now.
@@ -129,12 +144,17 @@ Core engineering principles to honour (do not dilute them):
 - No aliases: keep names and env keys consistent with existing ones; do not add synonyms.
 
 Scope for this refactor:
-- Focus on files touched in the last N commits and the candidate file list assembled below.
+- Prefer older/stable areas over very recent commits by default (recently-touched files are often in-flight and under active change).
+- Use recent commits as *context*, not as the primary scope constraint, unless explicitly requested.
 - Optionally narrow the scope via a target subtree (for example, scripts/lib/update or scripts/util).
-- Use LOC/complexity snapshots to pick the highest-value small target within that set.
-- Do not roam outside this scope unless strictly necessary to achieve DRY within the allowed change budget.
+- Use LOC/complexity snapshots to pick the highest-value small target (high complexity/duplication) within the chosen scope.
+- Keep scope tight; do not roam unless strictly necessary to achieve DRY within the allowed change budget.
 
 Hard rails (must follow all of these):
+- Compatibility baseline:
+  - PHP 7.3 only: do not use newer language features (no `match`, no nullsafe `?->`, no typed properties, no constructor property promotion, etc.).
+- Dependency surface freeze:
+  - Do not add new external deps/tools/configs or new project-level tooling unless the operator explicitly approves.
 - No behaviour changes:
   - Do not change CLI flags, argument semantics, env variables, JSON field names, log formats, or exit codes.
   - Treat existing scripts under scripts/, util tools, and tests as behavioural contracts.
@@ -145,6 +165,7 @@ Hard rails (must follow all of these):
 - Minimal, local edits:
   - Prefer a single file or tight cluster of files in one subsystem.
   - Aim to touch at most ~3–5 files and keep total additions + deletions within a few hundred lines.
+  - Don’t reorder unless it deletes code: avoid alphabetizing arrays, moving blocks, or reshuffling files unless it measurably reduces duplication/LOC or removes complexity.
   - If a refactor cannot be completed safely within this budget, do not start it.
 - Deletion and DRY as primary goals:
   - Remove unused helpers, dead code paths, or redundant wrappers when you can prove they are unreferenced.
@@ -162,34 +183,85 @@ Refactor style guidance:
 - Follow docs/refactoring.md:
   - When a file grows beyond roughly 150–200 lines of real code, consider splitting cohesive pieces into focused helpers.
   - Keep new files small and single-purpose; prefer many tiny modules over monoliths.
-- Choose a small, high-value target:
-  - Prefer a file or helper that appears in recent commits and shows high complexity or duplication.
+- Choose a small set of high-value targets:
+  - Prefer 2–5 small, behaviour-preserving refactors per run that can be bundled into one larger commit message (still within the change budget).
+  - You MAY choose a slightly larger refactor if (and only if) it stays within the hard rails and the change budget and measurably reduces cognitive load/duplication.
   - Avoid broad, cross-cutting changes or sweeping renames in a single run.
 - Look for:
   - Obvious duplication that can be replaced with a data table or a small helper.
+  - Prefer tables/config arrays over branching:
+    - When logic repeats the same structure with different literals (e.g., codename→version, service→commands, file→mode),
+      prefer a single map/table and a lookup over long if/elseif ladders, when behaviour is identical.
+    - This reduces duplication, shrinks code/token footprint, and reduces “forgot to update one branch” bugs.
+  - Reduce nesting:
+    - Prefer guard clauses and early returns to keep the happy path flat and readable.
+    - Extract small helpers when a nested block mixes concerns (validation vs. I/O vs. orchestration) or exceeds ~4 nesting levels.
+    - Keep behaviour identical: guards must not change side effects, log formats, or exit codes.
   - Overly nested conditionals that can be simplified without changing logic.
   - Trivial wrappers that add no clarity; consider inlining them when safe.
+- Deletion safety (prove before you delete):
+  - Before deleting a function/file/code path, prove it is unreferenced in this repo:
+    - Use ripgrep (`rg`) to find call sites, includes/requires, and CLI entrypoints.
+    - Check runtime entrypoints and schedulers: `scripts/`, `scripts/util/`, `scripts/cron/`, `etc/seedbox/config/root.cron`.
+    - Check documentation contracts and incident context: `docs/contracts.md`, `docs/incidents/*`, and relevant `docs/adr/*`.
+  - Backwards-compat safety net (ONLY if absolutely necessary):
+    - Prefer deletion.
+    - Add a shim wrapper only if you found concrete references/callers you cannot migrate safely within the change budget.
+    - If a shim is required, keep it tiny and behavior-identical (same signature/output), and add a clear `#TODO(deprecate)` note to remove it later once the caller set is retired.
+  - If you cannot prove it is unreferenced within the allowed time/budget, do not delete it in this run.
 - Cognitive load:
   - Optimise for readability under fatigue; fewer concepts and flows are better.
 
+Commenting and docblocks (Linux-kernel-style intent):
+- Maintain roughly ~1 meaningful line of commentary per ~10 lines of code (explain WHY and invariants, not what the code obviously does).
+- Prefer small file-level docblocks that explain responsibility, inputs/outputs, side effects, and key safety invariants.
+- Add docblocks for new public helpers (and for any non-obvious internal helper) so future refactors can stay safe.
+- Keep names descriptive and context-first; avoid 1-letter variables; avoid deep nesting (extract helpers instead).
+- When touching first-party runtime libraries/utilities, do not regress docblock lint expectations; run `scripts/testing/docblock-lint.sh` when applicable.
+
+Danger audit (required preflight; keyed to PMSS history):
+- Read relevant `docs/adr/*` and `docs/incidents/*` for the subsystem you touch; treat them as constraints and failure-mode context.
+- `/home` operations: any deletes/writes under `/home/<user>` must be guarded (validate username, realpath invariants, avoid chained shell).
+- Cron + updates: assume partial-tree windows; avoid creating tooling that breaks if `/scripts/lib/*` disappears mid-update.
+- Shell command composition: never build multi-command strings with untrusted bits; use existing helpers/escapes; split commands; keep one action per call.
+- Internal tool output: treat as untrusted; validate at each boundary (usernames, paths, JSON).
+- dpkg/apt sequencing: never move package-phase ordering; don’t insert steps between dpkg baseline/apply and the mandated apt refresh/install sequence.
+- Structured logging: if touching runtime logging/`runStep()`/JSON emitters, do not change required fields or markers; ensure start markers remain present.
+
 Workflow (do this now):
-1) Read AGENTS.md, docs/architecture.md, docs/update.md, docs/refactoring.md, and relevant docs/adr/* files.
+1) Read AGENTS.md, agents.local.md, any nested AGENTS.md in scope, docs/architecture.md, docs/update.md, docs/refactoring.md, and relevant docs/adr/* files.
 2) Inspect the recent commits, changed files, and complexity/LOC snapshots listed below.
-3) Pick one small refactor or deletion opportunity that fits the rails above.
-4) Implement the change with minimal edits:
+3) Pick 2–5 refactor/deletion opportunities that fit the rails above, and bundle them into one coherent change set.
+4) Declare invariants (3–7 bullets) for the target area BEFORE editing:
+   - Examples: CLI output format stable; JSON fields stable; exit codes stable; step ordering stable; file paths stable; log markers stable.
+   - If you cannot state the invariants, stop and choose a different target.
+5) Implement the change with minimal edits:
    - Keep behaviour and outputs identical.
    - Prefer deletion and DRY improvements; avoid adding new features or modes.
    - Keep changes local to the chosen scope.
-5) Run local verification:
+   - If you touch risky surfaces (username parsing, filesystem deletes, shell commands):
+     - Add/extend hermetic tests (aim 5+ cases) covering invalid/edge inputs and failure modes.
+   - Before/after control tests (behaviour lock):
+     - When you refactor non-trivial logic and it is feasible, add a dev test that snapshots representative inputs/outputs (including edge cases) so behaviour is pinned through the refactor.
+     - If a hermetic before/after test is not feasible, shrink the refactor until it is testable; if it is still not testable, SKIP that refactor in this run (or stop and require explicit operator approval to proceed YOLO/untested).
+6) Run local verification:
    - php -l on each changed PHP file.
    - php scripts/lib/tests/development/Runner.php when touching scripts/lib PHP helpers or CLI PHP entrypoints.
+   - scripts/testing/php-lint-compat.sh
    - scripts/testing/test-php.sh
    - scripts/testing/test-bash.sh
    - scripts/testing/php73-compat-scan.sh
-6) Stage and commit with a clear, focused message before finishing. Do not create new branches or push from this flow.
-7) Summarise in your response:
-   - What you simplified or deleted.
-   - Why it is safe and behaviour-preserving.
+   - If you touched `scripts/lib/update/**`:
+     - scripts/testing/doctrine-lint.sh
+     - scripts/testing/docblock-lint.sh
+7) Prepare a single, larger commit message that groups multiple small refactors (bundle several behaviour-preserving cleanups into one commit to reduce commit noise), but do NOT commit unless the operator explicitly instructs you to. Do not create new branches or push from this flow.
+8) Summarise in your response (review-first):
+   - Include a patch/diff (unified diff) so review is fast.
+   - List every changed file and why it changed (1 line each).
+   - What you simplified or deleted, and why it reduces cognitive load / code footprint.
+   - Why it is safe and behaviour-preserving (call out any invariants you relied on).
+   - Refactor scorecard (best-effort):
+     - LOC delta (added/removed), functions removed, duplicated blocks removed, max nesting reduced.
    - Which verification commands you ran.
 
 Operate with SpaceX/Tesla-style discipline:
@@ -197,7 +269,7 @@ Operate with SpaceX/Tesla-style discipline:
 - Favour small, iterative improvements that steadily reduce complexity and increase reliability.
 
 Change budget for this run (hard limit):
-- Limit this refactor to at most 3 files and 200 total changed lines (additions + deletions).
+- Limit this refactor to at most 5 files and a few hundred total changed lines (additions + deletions).
 - If you reach this budget, stop and return the patch; do not start additional refactors in this iteration.
 PMSSREFACTORPROMPT
 )

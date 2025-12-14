@@ -49,8 +49,9 @@ if (!function_exists('runCommand')) {
             echo $prefix.$cmd.PHP_EOL;
         }
         $debugRun = getenv('PMSS_RUNCOMMAND_DEBUG');
+        $logMemoryUsage = $verbose || ($debugRun !== false && $debugRun !== '');
         $log('[CMD start] '.$cmd);
-        if ($verbose || ($debugRun !== false && $debugRun !== '')) {
+        if ($logMemoryUsage) {
             $log(sprintf('[CMD] memory usage before=%0.2f MiB', memory_get_usage(true) / 1048576));
         }
 
@@ -248,7 +249,7 @@ if (!function_exists('runCommand')) {
                 $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd.$excerpt);
             }
         }
-        if ($verbose || ($debugRun !== false && $debugRun !== '')) {
+        if ($logMemoryUsage) {
             $log(sprintf('[CMD] memory usage after =%0.2f MiB', memory_get_usage(true) / 1048576));
         }
         return $exitCode;

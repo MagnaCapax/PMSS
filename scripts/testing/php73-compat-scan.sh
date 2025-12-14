@@ -28,20 +28,16 @@ fi
 fail=0
 
 scan() {
-  local pattern="$1" label="$2"
+  local pattern="$1" label="$2" out
   if [[ "$IS_RG" -eq 1 ]]; then
     out=$("${SEARCHER[@]}" "${EXCLUDES[@]}" "$pattern" "${paths[@]}" || true)
   else
     out=$("${SEARCHER[@]}" "${EXCLUDES[@]}" -E "$pattern" "${paths[@]}" || true)
   fi
-  if [[ -n "${out:-}" ]]; then
-    if [[ -n "$out" ]]; then
-      echo "[FAIL] $label found:" >&2
-      echo "$out" >&2
-      fail=1
-    else
-      echo "[OK] $label not found" >&2
-    fi
+  if [[ -n "$out" ]]; then
+    echo "[FAIL] $label found:" >&2
+    echo "$out" >&2
+    fail=1
   fi
 }
 

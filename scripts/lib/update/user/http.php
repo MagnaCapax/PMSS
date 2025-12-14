@@ -3,13 +3,21 @@
  * HTTP-related maintenance for user environments.
  */
 
+/**
+ * Configure per-user HTTP stack pieces (lighttpd vhost, ruTorrent temp paths).
+ *
+ * Suspension handling: callers must only invoke this when the user context is
+ * non-null (pmssBuildUserContext filters out suspended users via `www-disabled`).
+ *
+ * @param array $ctx Per-user context from pmssBuildUserContext().
+ */
 function pmssUserConfigureHttp(array $ctx): void
 {
     $user    = $ctx['user'];
     $home    = $ctx['home'];
     $userEsc = $ctx['user_esc'];
 
-    runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/configureLighttpd.php %s', $userEsc));
+    runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
 
     $phpIniPath = "{$home}/.lighttpd/php.ini";
     if (file_exists($phpIniPath)) {

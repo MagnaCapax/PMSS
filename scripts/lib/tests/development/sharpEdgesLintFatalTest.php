@@ -9,14 +9,14 @@ class SharpEdgesLintFatalTest extends TestCase
     {
         $path = 'scripts/testing/sharp-edges-lint.sh';
         $src  = (string) file_get_contents($path);
-        $this->assertStringContainsString('fatal_scan()', $src, 'sharp-edges-lint.sh must define fatal_scan()');
+        $this->assertStringContainsString('fatalScan()', $src, 'scripts/testing/sharp-edges-lint.sh must define fatalScan()');
         $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/([[:space:];]|$)", $src);
         $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/home([[:space:];]|$)", $src);
         $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/home/([[:space:];]|$|\\*)", $src);
         $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+\\\"/home", $src);
         $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+/home/\\$[A-Za-z_][A-Za-z0-9_]*", $src);
         $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+\\$[A-Za-z_][A-Za-z0-9_]*([[:space:];]|$)", $src);
-        $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+\\$HOME", $src);
+        $this->assertStringContainsString('rm[[:space:]]+-rf[[:space:]]+[$]HOME', $src);
         $this->assertStringContainsString("rm[[:space:]]+-rf[[:space:]]+~", $src);
     }
 

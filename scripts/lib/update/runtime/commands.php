@@ -20,10 +20,10 @@ if (!function_exists('runStep')) {
         $dryRun  = getenv('PMSS_DRY_RUN') === '1';
         $started = microtime(true);
         $isTty   = function_exists('posix_isatty') && posix_isatty(STDOUT);
+        $cReset  = "\033[0m";
         // Emit a start banner for interactive operators so hangs show which step is running.
         if ($isTty) {
             $cBlue = "\033[34m";
-            $cReset = "\033[0m";
             echo $cBlue.'[START] '.$description.$cReset.PHP_EOL;
         } else {
             // Persist start markers to the log for non-interactive runs.
@@ -41,11 +41,9 @@ if (!function_exists('runStep')) {
         $stdoutShort = $stdout !== '' ? preg_replace('/\s+/', ' ', trim(substr($stdout, 0, 300))) : '';
 
         // ANSI colors
-        $cReset  = "\033[0m";
         $cRed    = "\033[31m";
         $cGreen  = "\033[32m";
         $cYellow = "\033[33m";
-        $cCyan   = "\033[36m";
 
         $color = $cGreen;
         if ($status === 'ERR') $color = $cRed;
@@ -89,19 +87,6 @@ if (!function_exists('runUserStep')) {
     }
 }
 
-if (!function_exists('runStepSequence')) {
-    /**
-     * Execute multiple commands under a shared description banner.
-     */
-    function runStepSequence(string $description, array $commands): void
-    {
-        logMessage($description);
-        foreach ($commands as $cmd) {
-            runStep($description, $cmd);
-        }
-    }
-}
-
 if (!function_exists('aptCmd')) {
     /**
      * Compose a reusable apt-get command prefix.
@@ -131,16 +116,6 @@ if (!function_exists('pmssBuildCommand')) {
     }
 }
 
-if (!function_exists('runStepCmd')) {
-    /**
-     * Execute a command composed from argv parts with safe quoting under runStep().
-     */
-    function runStepCmd(string $description, string $program, array $args): int
-    {
-        return runStep($description, pmssBuildCommand($program, $args));
-    }
-}
-
 if (!function_exists('pmssLogStatus')) {
     /**
      * Log a status line with duration/rc in the same format as runStep(), without executing a command.
@@ -149,12 +124,13 @@ if (!function_exists('pmssLogStatus')) {
     {
         pmssInitProfileStore();
         $dur = $duration !== null ? $duration : 0.0;
-        $message  = sprintf('[%s %.3fs rc=%d] %s', strtoupper($status), $dur, $rc, $description);
+        $statusUpper = strtoupper($status);
+        $message  = sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description);
         logMessage($message);
         pmssRecordProfile([
             'description'    => $description,
             'command'        => '',
-            'status'         => strtoupper($status),
+            'status'         => $statusUpper,
             'rc'             => $rc,
             'duration'       => round($dur, 4),
             'dry_run'        => false,

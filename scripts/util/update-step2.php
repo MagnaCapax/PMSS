@@ -141,15 +141,19 @@ $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effective
 // the stop/disable/mask sequence twice so hosts drifting between bullseye and
 // bookworm converge reliably. Success = units masked and no apache2 processes
 // left running. Failure is tolerated but logged via runStep.
-runStep('Stopping Apache httpd (legacy)', 'systemctl stop apache2 || true');
-runStep('Disabling Apache httpd service', 'systemctl disable apache2 || true');
-runStep('Masking Apache httpd service', 'systemctl mask apache2 || true');
+if (!function_exists('pmssStopDisableMaskApacheLegacy')) {
+    function pmssStopDisableMaskApacheLegacy(): void
+    {
+        runStep('Stopping Apache httpd (legacy)', 'systemctl stop apache2 || true');
+        runStep('Disabling Apache httpd service', 'systemctl disable apache2 || true');
+        runStep('Masking Apache httpd service', 'systemctl mask apache2 || true');
+    }
+}
+pmssStopDisableMaskApacheLegacy();
 // Remove legacy Apache packages; keep apache2-utils. It provides htpasswd (used by
 // lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
 runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));
-runStep('Stopping Apache httpd (legacy)', 'systemctl stop apache2 || true');
-runStep('Disabling Apache httpd service', 'systemctl disable apache2 || true');
-runStep('Masking Apache httpd service', 'systemctl mask apache2 || true');
+pmssStopDisableMaskApacheLegacy();
 if ($repoLogMessage !== '') {
     logmsg($repoLogMessage);
 }

@@ -3,7 +3,15 @@
 /**
  * Nginx server config
  *
- * Creates nginx config for reverse proxying.
+ * Creates nginx config for reverse proxying per-user lighttpd instances.
+ *
+ * Suspension handling:
+ * - The canonical suspended marker is `/home/<user>/www-disabled`. When present,
+ *   nginx uses the suspended template instead of proxying.
+ *
+ * This script intentionally stays focused on nginx config generation. It will
+ * only invoke per-user lighttpd config regeneration when required to discover
+ * a missing lighttpd port assignment on legacy hosts.
  *
  * @author Aleksi Ursin
  * @copyright NuCode 2015-2023 - All Rights reserved.
@@ -11,9 +19,76 @@
  * @version 1.1
  **/
 
-$users = shell_exec('/scripts/listUsers.php');
-$users = explode("\n", trim($users));
-if (count($users) == 0) die("No users setup - nothing to do\n");
+require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/cli/optionParser.php';
+
+$usage = <<<TXT
+Usage:
+  /scripts/util/createNginxConfig.php [--user USERNAME] [--restart]
+  /scripts/util/createNginxConfig.php USERNAME [--restart]
+
+Options:
+  --user, -u USERNAME  Only regenerate nginx config for USERNAME (keeps other user configs intact)
+  --restart, -r        Restart nginx after writing configs
+  --help, -h           Show this help
+
+TXT;
+
+$parsed = pmssParseCliTokens($argv);
+if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
+    echo $usage;
+    exit(0);
+}
+
+$requestedUser = strtolower(trim((string) pmssCliOption($parsed, 'user', 'u', '')));
+$positionals = $parsed['arguments'] ?? [];
+if ($requestedUser === '' && count($positionals) === 1) {
+    $requestedUser = strtolower(trim((string) $positionals[0]));
+} elseif (count($positionals) > 1) {
+    fwrite(STDERR, $usage);
+    exit(1);
+}
+
+$restartNginx = pmssCliOption($parsed, 'restart', 'r', false) !== false;
+
+if ($requestedUser !== '' && !pmssValidateUsername($requestedUser)) {
+    fwrite(STDERR, "Invalid username: {$requestedUser}\n");
+    exit(1);
+}
+
+// Treat internal tool output as untrusted: validate every username and require
+// a clean exit code so broken environments do not emit garbage as user data.
+$userLines = [];
+$userRc = 0;
+exec('/scripts/listUsers.php 2>/dev/null', $userLines, $userRc);
+if ($userRc !== 0) {
+    fwrite(STDERR, "Error: /scripts/listUsers.php failed (rc={$userRc}); aborting.\n");
+    exit(1);
+}
+if (empty($userLines)) {
+    die("No users setup - nothing to do\n");
+}
+
+$usersFiltered = [];
+foreach ($userLines as $name) {
+    $name = strtolower(trim((string)$name));
+    if ($name === '' || !pmssValidateUsername($name)) {
+        continue;
+    }
+    $usersFiltered[$name] = true;
+}
+$users = array_keys($usersFiltered);
+sort($users, SORT_NATURAL | SORT_FLAG_CASE);
+
+$singleUser = false;
+if ($requestedUser !== '') {
+    if (!in_array($requestedUser, $users, true)) {
+        fwrite(STDERR, "Username not found: {$requestedUser}\n");
+        exit(1);
+    }
+    $users = [$requestedUser];
+    $singleUser = true;
+}
 
 $userTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user");
 $suspendedTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user-suspended");
@@ -77,7 +152,7 @@ if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
 
 if (!file_exists("/etc/nginx/users")) {
     mkdir("/etc/nginx/users", 0751);
-} else {
+} elseif (!$singleUser) {
     $existingConfigs = glob('/etc/nginx/users/*');
     if ($existingConfigs !== false) {
         foreach ($existingConfigs as $oldConfig) {
@@ -90,6 +165,9 @@ foreach($users AS $thisUser) {
     #TODO(user-logs): log per-user web config regeneration to /var/log/pmss/user-<username>.log
     $thisUser = trim($thisUser);
     if ($thisUser === '') {
+        continue;
+    }
+    if (!pmssValidateUsername($thisUser)) {
         continue;
     }
 
@@ -106,6 +184,9 @@ foreach($users AS $thisUser) {
         if ($suspendedTemplate === false || $suspendedTemplate === '') {
             // No dedicated suspended template found; skip generating a per-user
             // config so nginx falls back to generic defaults.
+            if ($singleUser) {
+                @unlink("/etc/nginx/users/{$thisUser}");
+            }
             continue;
         }
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
@@ -117,10 +198,19 @@ foreach($users AS $thisUser) {
         continue;
     }
 
-    passthru("/scripts/util/configureLighttpd.php {$thisUser}");
-    $serverPort = trim( file_get_contents($portFile) );
+    $serverPort = 0;
+    if (is_readable($portFile)) {
+        $serverPort = (int) trim((string) file_get_contents($portFile));
+    }
+    $needsLighttpdRefresh = ($serverPort < 1024 || $serverPort > 65535) || !is_file($homeDir.'/.lighttpd.conf');
+    if ($needsLighttpdRefresh) {
+        passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
+        $serverPort = (int) trim((string) @file_get_contents($portFile));
+    }
     $delugePort = (int) file_get_Contents($homeDir."/.delugePort");
-    if (empty($serverPort)) continue;
+    if ($serverPort < 1024 || $serverPort > 65535) {
+        continue;
+    }
     
     if ($userTemplate === false || $userTemplate === '') {
         continue;
@@ -143,4 +233,9 @@ if ($newConfigs !== false && count($newConfigs) > 0) {
 }
 passthru('chmod 640 /etc/nginx/*.conf');
 
-echo "## Done! You should restart nginx:\n/etc/init.d/nginx restart\n";
+if ($restartNginx) {
+    passthru('systemctl restart nginx || /etc/init.d/nginx restart || true');
+    echo "## Done! nginx restarted\n";
+} else {
+    echo "## Done! You should restart nginx:\nsystemctl restart nginx || /etc/init.d/nginx restart\n";
+}

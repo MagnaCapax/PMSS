@@ -186,10 +186,11 @@ function normalizeAptSources(): void
         if ($data === false) {
             continue;
         }
-        if (strpos($data, 'buster') !== false) {
-            @copy($list, $list.'.pmss-backup-'.date('YmdHis'));
+        // Only act on active (non-comment) buster entries; otherwise we'd rewrite the
+        // same file on every update and spam the system with stale backup artifacts.
+        if (preg_match('/^[ \t]*[^#\r\n].*\\bbuster\\b/im', $data) === 1) {
             $mutated = preg_replace('/^([^#].*)/m', '# PMSS(suite-mismatch): disabled: $1', $data);
-            if ($mutated !== null) {
+            if ($mutated !== null && $mutated !== $data) {
                 @file_put_contents($list, $mutated);
                 logmsg('[INFO] Disabled stale buster entry in '.basename($list));
             }

@@ -28,10 +28,10 @@ if (!function_exists('pmssPruneLegacyMediaArea')) {
         $sources = '/etc/apt/sources.list';
         if (is_readable($sources)) {
             $data = @file_get_contents($sources);
-            if ($data !== false && stripos($data, 'mediaarea') !== false) {
+            if ($data !== false && preg_match('/^[ \t]*[^#\r\n].*mediaarea/im', $data) === 1) {
                 $backup = $sources.'.pmss-backup-'.date('YmdHis');
                 @copy($sources, $backup);
-                $mutated = preg_replace('/^(.*mediaarea.*)$/mi', '# PMSS-disabled mediaarea: $1', $data);
+                $mutated = preg_replace('/^([ \t]*)([^#\r\n].*mediaarea.*)$/im', '$1# PMSS-disabled mediaarea: $2', $data);
                 if ($mutated !== null && $mutated !== $data) {
                     @file_put_contents($sources, $mutated);
                 }
@@ -44,7 +44,8 @@ if (!function_exists('pmssPruneLegacyMediaArea')) {
             'Removing cached MediaArea packages',
             'rm -f /var/cache/apt/archives/repo-mediaarea_*.deb '
             .'/var/cache/apt/archives/partial/repo-mediaarea_*.deb '
-            .'/var/lib/apt/lists/*mediaarea* /var/lib/apt/lists/partial/*mediaarea*'
+            .'/var/lib/apt/lists/*mediaarea* /var/lib/apt/lists/partial/*mediaarea* '
+            .'/etc/apt/sources.list.d/*.list.pmss-backup-*'
         );
     }
 }

@@ -152,6 +152,11 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
     {
         // #TODO fold linger/Docker kick into pmssUpdateUserEnvironment so we only
         // traverse the user list once and share the same validation.
+        $homeDir = "/home/{$user}";
+        if (is_dir($homeDir.'/www-disabled')) {
+            pmssUserLog($user, '[SKIP] User appears suspended; skipping linger/Docker wiring');
+            return;
+        }
         if (!is_dir('/run/systemd/system')) {
             pmssUserLog($user, '[SKIP] systemd not available on this host');
             return;

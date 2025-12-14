@@ -150,9 +150,12 @@ runProvisionStep(
 
 runProvisionStep(
     'Configure lighttpd vhost',
-    sprintf('/scripts/util/configureLighttpd.php %s', escapeshellarg($user['name']))
+    sprintf('/scripts/util/userConfigLighttpd.php %s', escapeshellarg($user['name']))
 );
-runProvisionStep('Regenerate nginx config', '/scripts/util/createNginxConfig.php');
+runProvisionStep(
+    'Regenerate nginx config',
+    sprintf('/scripts/util/createNginxConfig.php --user %s', escapeshellarg($user['name']))
+);
 
 
 #passthru("/scripts/util/recreateLighttpdConfig.php");

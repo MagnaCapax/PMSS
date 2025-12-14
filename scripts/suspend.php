@@ -5,7 +5,8 @@
  *
  * Locks the Unix account, sets an immediate expiry, and swaps the web root
  * to a suspended notice while preserving the original content under
- * /home/<user>/www-disabled.
+ * /home/<user>/www-disabled. Also refreshes nginx user config so the UI
+ * reflects the suspension immediately.
  *
  * @author    Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
@@ -18,6 +19,7 @@ if ($username === '') {
     die($usage."\n");
 }
 
+// Validate inputs early so we never feed garbage to usermod or log files.
 if (!pmssValidateUsername($username)) {
     pmssUserWriteLogs(
         pmssUserBaseContext(
@@ -41,6 +43,7 @@ if (!is_dir($homeDir)) {
     die("User home {$homeDir} missing\n");
 }
 
+// Canonical suspended detection: only the presence of www-disabled matters.
 if (is_dir($disabledRoot)) {
     pmssUserWriteLogs(
         pmssUserBaseContext(
@@ -73,35 +76,86 @@ pmssUserLifecycleStep('suspend', $username, 'set_expiry', 'usermod --expiredate 
 pmssUserLifecycleStep('suspend', $username, 'list_processes', 'ps aux|grep '.escapeshellarg($username), false);
 pmssUserLifecycleStep('suspend', $username, 'kill_processes', 'killall -9 -u '.escapeshellarg($username), false);
 
+// Best-effort archive of the original web root. We only create a placeholder
+// landing page if the original content is safely moved aside.
 if (is_dir($activeRoot)) {
     if (!@rename($activeRoot, $disabledRoot)) {
         echo "Warning: failed to archive {$activeRoot}, attempting to continue\n";
     }
 }
 
-pmssCreateSuspendedLanding($homeDir, $username);
+// The canonical suspended marker is www-disabled. Ensure it exists even when the
+// user did not have a www/ directory at suspend time (rare legacy state).
+if (!is_dir($disabledRoot)) {
+    if (@mkdir($disabledRoot, 0755, true)) {
+        @chown($disabledRoot, $username);
+        @chgrp($disabledRoot, $username);
+    }
+}
+
+// Create placeholder landing only when we did not leave an existing www/ in place.
+$landingCreated = false;
+$landingMessage = '';
+if (!is_dir($activeRoot)) {
+    $landingCreated = pmssCreateSuspendedLanding($homeDir, $username);
+    if (!$landingCreated) {
+        $landingMessage = 'Suspended landing page could not be written';
+    }
+} else {
+    $landingMessage = 'Existing www/ not replaced; please inspect manually';
+}
+
+pmssUserLifecycleStep(
+    'suspend',
+    $username,
+    'refresh_nginx_config',
+    'php /scripts/util/createNginxConfig.php --user '.escapeshellarg($username),
+    false
+);
+// Prefer systemd when available but keep init.d fallback for older hosts.
+$restartRc = pmssUserLifecycleStep('suspend', $username, 'restart_nginx_systemctl', 'systemctl restart nginx', false);
+if ($restartRc !== 0) {
+    pmssUserLifecycleStep('suspend', $username, 'restart_nginx_init', '/etc/init.d/nginx restart', false);
+}
+
+pmssUserWriteLogs(
+    pmssUserBaseContext(
+        'suspend',
+        'end',
+        $username,
+        array(
+            'status'         => $landingMessage === '' ? 'OK' : 'WARN',
+            'home_dir'       => $homeDir,
+            'landing_created'=> $landingCreated,
+            'message'        => $landingMessage === '' ? 'User suspended' : $landingMessage,
+        )
+    )
+);
 
 /**
- * Generate the suspended landing page and marker files.
+ * Generate the suspended landing page content.
+ *
+ * @return bool True when both index.html files were written successfully.
  */
-function pmssCreateSuspendedLanding(string $homeDir, string $username): void
+function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
 {
     $suspendRoot = $homeDir.'/www';
     $publicDir = $suspendRoot.'/public';
-    $marker = $suspendRoot.'/.pmss-suspended';
 
     if (!is_dir($suspendRoot) && !@mkdir($suspendRoot, 0755, true)) {
         echo "Failed to create {$suspendRoot}\n";
-        return;
+        return false;
     }
     if (!is_dir($publicDir)) {
-        @mkdir($publicDir, 0755, true);
+        if (!@mkdir($publicDir, 0755, true)) {
+            echo "Failed to create {$publicDir}\n";
+            return false;
+        }
     }
 
     $html = pmssRenderSuspendedHtml($username);
-    @file_put_contents($suspendRoot.'/index.html', $html);
-    @file_put_contents($publicDir.'/index.html', $html);
-    @file_put_contents($marker, (string)time());
+    $rootResult = @file_put_contents($suspendRoot.'/index.html', $html);
+    $publicResult = @file_put_contents($publicDir.'/index.html', $html);
 
     @chown($suspendRoot, $username);
     @chgrp($suspendRoot, $username);
@@ -111,19 +165,8 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): void
     @chgrp($suspendRoot.'/index.html', $username);
     @chown($publicDir.'/index.html', $username);
     @chgrp($publicDir.'/index.html', $username);
-    @chown($marker, $username);
-    @chgrp($marker, $username);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'suspend',
-            'end',
-            $username,
-            array(
-                'status'   => 'OK',
-                'home_dir' => $homeDir,
-            )
-        )
-    );
+
+    return $rootResult !== false && $publicResult !== false;
 }
 
 /**

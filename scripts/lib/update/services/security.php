@@ -28,7 +28,8 @@ if (!function_exists('pmssEnsureTestfile')) {
         if (file_exists($path) && filesize($path) === 104857600) {
             return;
         }
-        runStep('Generating /var/www/testfile sample', 'dd if=/dev/urandom of=/var/www/testfile bs=1M count=100 status=none');
+        $command = 'dd if=/dev/urandom of='.$path.' bs=1M count=100 status=none';
+        runStep('Generating /var/www/testfile sample', $command);
     }
 }
 

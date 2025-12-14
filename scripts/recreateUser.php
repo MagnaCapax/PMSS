@@ -102,8 +102,8 @@ run(sprintf(
     $quotaGiB
 ));
 run('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($userName));
-run('/scripts/util/createNginxConfig.php');
-run('/scripts/util/configureLighttpd.php ' . escapeshellarg($userName));
+run('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
+run('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
 run('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 
 /* ===== 8. Restore data (if we had any) ===== */
