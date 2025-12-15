@@ -34,6 +34,7 @@ SHELL=/bin/bash
 
 
 #*/4 * * * * root /usr/bin/php -q /scripts/cron/checkHttpd.php >> /var/log/pmss/checkHttpd.log 2>&1
+* * * * *   root sleep 25; /scripts/cron/systemdServicesGuard.php >> /var/log/pmss/systemdServicesGuard.log 2>&1
 * * * * *   root /scripts/cron/updateQuotas.php >> /var/log/pmss/updateQuotas.log 2>&1
 */5 * * * * root /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1
 */5 * * * *   root    /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
@@ -53,4 +54,5 @@ SHELL=/bin/bash
 @reboot root    sleep 10; /scripts/cron/checkInstances.php >> /var/log/pmss/checkInstances.log 2>&1
 @reboot root    sleep 15; /scripts/util/motdGenerate.php >> /var/log/pmss/motdGenerate.log 2>&1
 @reboot root    sleep 20; /scripts/cron/cgroupRootCheck.php >> /var/log/pmss/cgroupRootCheck.log 2>&1
+@reboot root    sleep 25; /scripts/cron/systemdServicesGuard.php >> /var/log/pmss/systemdServicesGuard.log 2>&1
 0 */2 * * *   root    /scripts/cron/cgroupRootCheck.php >> /var/log/pmss/cgroupRootCheck.log 2>&1

@@ -73,6 +73,7 @@ debian-archive-keyring	install
 debian-faq	install
 debianutils	install
 deluge-common	install
+deluge-console	install
 deluge-web	install
 deluged	install
 dialog	install

@@ -25,6 +25,10 @@ healthy between full update runs:
   and `wg-quick@wg0` stays active. Logs to
   `/var/log/pmss/checkWireguard.log`.
   `*/5 * * * * root /scripts/cron/checkWireguard.php >> /var/log/pmss/checkWireguard.log 2>&1`
+- **System service hardening guard** – Reasserts that unwanted system-wide
+  daemons stay stopped/disabled/masked (e.g. apache2/deluged/deluge-web/exim4/transmission-daemon/redis-server).
+  Logs to `/var/log/pmss/systemdServicesGuard.log`.
+  `* * * * * root sleep 25; /scripts/cron/systemdServicesGuard.php >> /var/log/pmss/systemdServicesGuard.log 2>&1`
 - **User database cleanup** – Prunes stale entries from
   `/etc/seedbox/runtime/users.json` to keep provisioning data accurate. Logs to
   `/var/log/pmss/userDbCleanup.log`.
@@ -54,6 +58,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `trafficLimits.php` – Refresh per-user traffic throttling configuration.
 - `trafficLog.php` – Capture recent traffic counters for aggregation.
 - `trafficStats.php` – Fold raw logs into long-term statistics.
+- `systemdServicesGuard.php` – Enforce stop/disable/mask policy for system services.
 - `updateQuotas.php` – Refresh user disk quota information.
 - `userTrackerCleaner.php` – Remove obsolete trackers from torrents.
 

@@ -41,6 +41,7 @@ require_once __DIR__.'/../lib/update/systemPrep.php';
 require_once __DIR__.'/../lib/update/webStack.php';
 require_once __DIR__.'/../lib/update/services/runtime.php';
 require_once __DIR__.'/../lib/update/services/legacy.php';
+require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/mediainfo.php';
 require_once __DIR__.'/../lib/update/services/certificates.php';
 require_once __DIR__.'/../lib/update/services/security.php';
@@ -137,18 +138,17 @@ runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-b
 $repoRefreshed = pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
 pmssCompletePendingDpkg();
 $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, $repoRefreshed);
+
+// System-wide services must not run on seedbox hosts. Stop/disable early so
+// package installs cannot leave attack surface exposed for the rest of the run.
+pmssStopDisableMaskSeedboxSystemServices();
+// Ensure the boot-time guard is installed/enabled so masked services cannot
+// start during the next reboot even if systemd enablement drifts.
+pmssEnsureSystemdServicesGuardBootUnit();
 // Legacy hosts occasionally re-enable Apache during package recovery; perform
 // the stop/disable/mask sequence twice so hosts drifting between bullseye and
 // bookworm converge reliably. Success = units masked and no apache2 processes
 // left running. Failure is tolerated but logged via runStep.
-if (!function_exists('pmssStopDisableMaskApacheLegacy')) {
-    function pmssStopDisableMaskApacheLegacy(): void
-    {
-        runStep('Stopping Apache httpd (legacy)', 'systemctl stop apache2 || true');
-        runStep('Disabling Apache httpd service', 'systemctl disable apache2 || true');
-        runStep('Masking Apache httpd service', 'systemctl mask apache2 || true');
-    }
-}
 pmssStopDisableMaskApacheLegacy();
 // Remove legacy Apache packages; keep apache2-utils. It provides htpasswd (used by
 // lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
@@ -226,11 +226,15 @@ foreach ($apps as $app) {
     include_once $app;
 }
 
+// Reapply system service disablement after app installers in case any package
+// postinst scripts (re)started daemons mid-update.
+pmssStopDisableMaskSeedboxSystemServices();
+
 pmssEnsureLetsEncryptConfig();
 pmssRemoveAutodlConfig();
 
 // Legacy daemons that should never run globally.
-$legacyServices = ['btsync', 'rslsync', 'pyload', 'sabnzbdplus', 'lighttpd'];
+$legacyServices = ['btsync', 'rslsync', 'pyload', 'sabnzbdplus'];
 pmssDisableLegacyServices($legacyServices, $distroVersion);
 pmssAdjustLighttpdSecurity();
 

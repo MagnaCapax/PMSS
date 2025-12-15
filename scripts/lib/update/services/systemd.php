@@ -1,0 +1,157 @@
+<?php
+/**
+ * Systemd service hardening for seedbox hosts.
+ *
+ * PMSS runs most user-facing daemons per-user (under /home/<user>) and relies
+ * on nginx as the shared front-end. System-wide units for apps like Deluge
+ * should remain stopped/disabled to reduce attack surface.
+ */
+
+require_once __DIR__.'/../runtime/commands.php';
+require_once __DIR__.'/../runtime/processes.php';
+
+if (!function_exists('pmssStopDisableMaskSystemdUnit')) {
+    /**
+     * Stop + disable (and optionally mask) a unit, fail-soft.
+     *
+     * This helper is intentionally tolerant: on some hosts the unit may not be
+     * installed, and `systemctl` may be unavailable in containers.
+     */
+    function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask): void
+    {
+        $dryRun = getenv('PMSS_DRY_RUN') === '1';
+        if (!$dryRun && function_exists('pmssSystemdAvailable') && !pmssSystemdAvailable()) {
+            pmssLogStatus('SKIP', "Stopping {$label} system service (systemd unavailable)");
+            pmssLogStatus('SKIP', "Disabling {$label} system service (systemd unavailable)");
+            if ($mask) {
+                pmssLogStatus('SKIP', "Masking {$label} system service (systemd unavailable)");
+            }
+            return;
+        }
+        if (!$dryRun && function_exists('pmssSystemdUnitExists') && !pmssSystemdUnitExists($unit)) {
+            pmssLogStatus('SKIP', "Stopping {$label} system service (unit {$unit} missing)");
+            pmssLogStatus('SKIP', "Disabling {$label} system service (unit {$unit} missing)");
+            if ($mask) {
+                pmssLogStatus('SKIP', "Masking {$label} system service (unit {$unit} missing)");
+            }
+            return;
+        }
+        $unitEsc = escapeshellarg($unit);
+        runStep("Stopping {$label} system service", 'systemctl stop '.$unitEsc.' || true');
+        runStep("Disabling {$label} system service", 'systemctl disable '.$unitEsc.' || true');
+        if ($mask) {
+            runStep("Masking {$label} system service", 'systemctl mask '.$unitEsc.' || true');
+        }
+    }
+}
+
+if (!function_exists('pmssEnsureSystemdServicesGuardBootUnit')) {
+    /**
+     * Install and enable the boot-time systemd hardening guard unit.
+     *
+     * This is defense-in-depth: the unit runs early in boot (before basic.target)
+     * so distro-provided services cannot start before PMSS reasserts stop/disable/mask
+     * policy via scripts/cron/systemdServicesGuard.php.
+     */
+    function pmssEnsureSystemdServicesGuardBootUnit(): void
+    {
+        $dryRun = getenv('PMSS_DRY_RUN') === '1';
+        if (!$dryRun && function_exists('pmssSystemdAvailable') && !pmssSystemdAvailable()) {
+            pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (systemd unavailable)');
+            return;
+        }
+
+        $cfgDir = function_exists('pmssResolvePathFromEnv')
+            ? pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')
+            : '/etc/seedbox/config';
+
+        $template = $cfgDir.'/template.systemd.pmss-systemd-services-guard.service';
+        if (!is_file($template)) {
+            pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (template missing: '.$template.')');
+            return;
+        }
+
+        $target = '/etc/systemd/system/pmss-systemd-services-guard.service';
+        runStep(
+            'Installing PMSS boot-time systemd services guard unit',
+            sprintf('install -m 0644 %s %s', escapeshellarg($template), escapeshellarg($target))
+        );
+        runStep('Reloading systemd unit files (PMSS services guard)', 'systemctl daemon-reload || true');
+        runStep('Enabling PMSS boot-time services guard unit', 'systemctl enable pmss-systemd-services-guard.service || true');
+    }
+}
+
+if (!function_exists('pmssSeedboxSystemServiceSpecs')) {
+    /**
+     * Specs for system-wide services that must stay disabled on seedbox hosts.
+     *
+     * Keep this list conservative and system-wide only. Per-user instances are
+     * managed by PMSS cron/util scripts and must not be impacted.
+     *
+     * @return array<int, array{unit:string,label:string,mask:bool}>
+     */
+    function pmssSeedboxSystemServiceSpecs(): array
+    {
+        return [
+            ['unit' => 'lighttpd', 'label' => 'lighttpd', 'mask' => true],
+            ['unit' => 'deluged', 'label' => 'Deluge daemon', 'mask' => true],
+            ['unit' => 'deluge-web', 'label' => 'Deluge Web UI', 'mask' => true],
+            ['unit' => 'transmission-daemon', 'label' => 'Transmission daemon', 'mask' => true],
+            ['unit' => 'redis-server', 'label' => 'Redis server', 'mask' => true],
+            ['unit' => 'memcached', 'label' => 'Memcached', 'mask' => true],
+            ['unit' => 'rpcbind', 'label' => 'rpcbind', 'mask' => true],
+            ['unit' => 'rpcbind.socket', 'label' => 'rpcbind socket', 'mask' => true],
+            ['unit' => 'nfs-kernel-server', 'label' => 'NFS kernel server', 'mask' => true],
+            ['unit' => 'nfs-server', 'label' => 'NFS server', 'mask' => true],
+            ['unit' => 'nfs-idmapd', 'label' => 'NFS idmapd', 'mask' => true],
+            ['unit' => 'rpc-statd', 'label' => 'rpc-statd', 'mask' => true],
+            ['unit' => 'smbd', 'label' => 'Samba smbd', 'mask' => true],
+            ['unit' => 'nmbd', 'label' => 'Samba nmbd', 'mask' => true],
+            ['unit' => 'samba', 'label' => 'Samba (meta)', 'mask' => true],
+            ['unit' => 'avahi-daemon', 'label' => 'Avahi mDNS', 'mask' => true],
+            ['unit' => 'avahi-daemon.socket', 'label' => 'Avahi mDNS socket', 'mask' => true],
+            ['unit' => 'cups', 'label' => 'CUPS printing', 'mask' => true],
+            ['unit' => 'cups.socket', 'label' => 'CUPS socket', 'mask' => true],
+            ['unit' => 'cups.path', 'label' => 'CUPS path', 'mask' => true],
+            ['unit' => 'cups-browsed', 'label' => 'CUPS browsed', 'mask' => true],
+            // Docker must run rootless per-user; the system daemon must stay off.
+            ['unit' => 'docker.service', 'label' => 'Docker (system)', 'mask' => true],
+            ['unit' => 'docker.socket', 'label' => 'Docker socket (system)', 'mask' => true],
+            ['unit' => 'containerd', 'label' => 'containerd (system)', 'mask' => true],
+            // Exim4 is pulled in indirectly; PMSS does not use a system MTA.
+            ['unit' => 'exim4', 'label' => 'Exim4 MTA', 'mask' => true],
+            // qBittorrent-nox typically runs per-user; this is a no-op on hosts without a unit.
+            ['unit' => 'qbittorrent-nox', 'label' => 'qBittorrent (system)', 'mask' => true],
+        ];
+    }
+}
+
+if (!function_exists('pmssStopDisableMaskApacheLegacy')) {
+    /**
+     * Apache must never run on seedbox hosts (nginx + per-user lighttpd do).
+     * We mask it so package recoveries cannot restart it mid-update.
+     */
+    function pmssStopDisableMaskApacheLegacy(): void
+    {
+        pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
+    }
+}
+
+if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
+    /**
+     * Stop/disable known risky system-wide services.
+     *
+     * Note: per-user instances are started via PMSS cron/util scripts and are
+     * not impacted by masking system-level units.
+     */
+    function pmssStopDisableMaskSeedboxSystemServices(): void
+    {
+        foreach (pmssSeedboxSystemServiceSpecs() as $spec) {
+            pmssStopDisableMaskSystemdUnit(
+                (string) $spec['unit'],
+                (string) $spec['label'],
+                (bool) $spec['mask']
+            );
+        }
+    }
+}

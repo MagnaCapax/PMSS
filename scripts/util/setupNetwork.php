@@ -99,6 +99,10 @@ $bogonRules = array_map(
 $inputRules = [
     '-A INPUT -i ##IFACE## -m state --state NEW -p udp --dport 1194 -j ACCEPT',
     '-A INPUT -i ##IFACE## -m state --state NEW -p udp --dport 51820 -j ACCEPT',
+    // Defense-in-depth: block common default Web UI ports for distro-provided torrent services.
+    // PMSS runs these apps per-user on random high ports and proxies via nginx/lighttpd.
+    '-A INPUT -i ##IFACE## -p tcp --dport 8080 -j DROP',
+    '-A INPUT -i ##IFACE## -p tcp --dport 8112 -j DROP',
     '-A INPUT -i tun+ -j ACCEPT',
     '-A INPUT -i wg+ -j ACCEPT',
 ];
