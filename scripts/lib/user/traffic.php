@@ -10,7 +10,7 @@
  *     the user array for holistic resource adjustments.
  */
 
-require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/helpers.php';
 
 /**
  * Apply or refresh the user-specific traffic cap.

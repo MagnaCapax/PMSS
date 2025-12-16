@@ -3,7 +3,7 @@
  * qBittorrent configuration helpers.
  */
 
-require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/helpers.php';
 
 function userConfigureQbittorrent(array $user): void
 {

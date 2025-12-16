@@ -3,7 +3,7 @@
  * System-level configuration helpers for user provisioning.
  */
 
-require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/helpers.php';
 
 function userEnsureShell(array $user): void
 {
