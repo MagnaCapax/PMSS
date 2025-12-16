@@ -159,11 +159,13 @@ ci_api_download_zip() {
 	local url="$1" out_zip="$2"
 	local headers="$OUTDIR/ci-download.headers"
 	local location=""
+	local rc=0
 
 	ci_shell_disable_xtrace
 	local token="${GITHUB_TOKEN:-}"
 
 	: >"$headers"
+	rm -f "$out_zip" >/dev/null 2>&1 || true
 	if [[ -n "$token" ]]; then
 		curl -fsS \
 			-H "Authorization: Bearer $token" \
@@ -171,23 +173,34 @@ ci_api_download_zip() {
 			-H "X-GitHub-Api-Version: 2022-11-28" \
 			-D "$headers" \
 			-o "$out_zip" \
-			"$url" || true
+			"$url" || rc=$?
 	else
 		curl -fsS \
 			-H "Accept: application/vnd.github+json" \
 			-H "X-GitHub-Api-Version: 2022-11-28" \
 			-D "$headers" \
 			-o "$out_zip" \
-			"$url" || true
+			"$url" || rc=$?
 	fi
 
-	location="$(awk -F': ' 'tolower($1)=="location"{gsub("\r","",$2); print $2; exit}' "$headers" 2>/dev/null || true)"
+	location="$(awk 'BEGIN{IGNORECASE=1} $0 ~ /^location:/ { sub(/^location:[ \t]*/, "", $0); gsub("\r", "", $0); print $0; exit }' "$headers" 2>/dev/null || true)"
 	ci_shell_restore_xtrace
+
+	if [[ $rc -ne 0 ]]; then
+		rm -f "$out_zip" >/dev/null 2>&1 || true
+		return $rc
+	fi
 
 	if [[ -n "$location" ]]; then
 		curl -fsSL "$location" -o "$out_zip" || return 1
 	fi
-	[[ -s "$out_zip" ]]
+	if [[ ! -s "$out_zip" ]]; then
+		return 1
+	fi
+
+	# Defensive: GitHub API failures can still produce a non-empty JSON body. Ensure
+	# the output looks like a zip before callers try to unzip it.
+	head -c 2 "$out_zip" 2>/dev/null | grep -q '^PK'
 }
 
 ci_unzip_to_file() {
