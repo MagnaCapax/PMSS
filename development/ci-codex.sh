@@ -256,6 +256,12 @@ repo_full=""
 api_base="https://api.github.com"
 
 if [[ "$fetch_mode" == "gh" ]]; then
+	origin_url="$(git config --get remote.origin.url 2>/dev/null || true)"
+	repo_full="$(ci_parse_github_repo "$origin_url" 2>/dev/null || true)"
+	if ! ci_validate_github_repo "$repo_full"; then
+		repo_full=""
+	fi
+
 	echo "[ci-codex] discovering latest run..." >&1
 	run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
 else
@@ -373,10 +379,42 @@ fi
 fetch_job_log() {
 	local name="$1" out="$2"
 	if [[ "$fetch_mode" == "gh" ]]; then
-		local id
-		id=$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId") || true
+		local id jobs_json job_id zip_path token
+
+		# Newer gh versions expose a jobs field directly; older ones do not.
+		id="$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId" 2>/dev/null || true)"
+
+		# Fallback for older gh: query the REST API for job ids, then fetch logs.
+		if [[ -z "$id" && -n "$repo_full" ]]; then
+			jobs_json="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
+			PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
+				$j=json_decode(stream_get_contents(STDIN), true);
+				$name=getenv("PMSS_CI_JOB_NAME") ?: "";
+				foreach (($j["jobs"] ?? []) as $job) {
+					if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
+				}
+			' 2>/dev/null || true)"
+			id="$job_id"
+		fi
+
 		if [[ -n "$id" ]]; then
-			gh run view --job "$id" --log >"$out" || true
+			gh run view --job "$id" --log >"$out" 2>/dev/null || true
+		fi
+
+		# If gh cannot emit job logs, fall back to downloading the zipped REST logs.
+		if [[ -n "$id" && ! -s "$out" && -n "$repo_full" ]]; then
+			zip_path="$OUTDIR/job-${id}.zip"
+			token="${GITHUB_TOKEN:-}"
+			if [[ -z "$token" ]]; then
+				ci_shell_disable_xtrace
+				token="$(gh auth token 2>/dev/null || true)"
+				ci_shell_restore_xtrace
+			fi
+			if [[ -n "$token" ]]; then
+				if GITHUB_TOKEN="$token" ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$id/logs" "$zip_path" >/dev/null 2>&1; then
+					ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
+				fi
+			fi
 		fi
 		return 0
 	fi
