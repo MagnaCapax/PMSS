@@ -15,8 +15,9 @@ echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 
 # ci-codex.sh — Fetch latest CI logs and feed them to a coding assistant (Codex CLI or similar).
 #
-# Requirements:
-#   - GitHub CLI (gh) installed and authenticated: gh auth login
+# Requirements (one of):
+#   - GitHub CLI (`gh`) installed and authenticated: gh auth login
+#   - `curl` available; for private repos set `GITHUB_TOKEN` (classic PAT with `repo` + `actions:read`)
 # Optional:
 #   - A local assistant CLI to receive the prompt. Provide via --exec (e.g., --exec 'codex')
 #
@@ -50,6 +51,7 @@ job_name=""
 custom_prompt=""
 exec_cmd=""
 dry_run=0
+autocommit=0
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -69,6 +71,10 @@ while [[ $# -gt 0 ]]; do
 		dry_run=1
 		shift || true
 		;;
+	--autocommit)
+		autocommit=1
+		shift || true
+		;;
 	-h | --help)
 		sed -n '1,60p' "$0"
 		exit 0
@@ -82,35 +88,198 @@ done
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-if ! have gh; then
-	echo "[ci-codex] GitHub CLI not found. Install gh and run 'gh auth login'" >&1
-	exit 1
-fi
-
-echo "[ci-codex] gh: $(command -v gh)" >&1 || true
-gh --version 2>/dev/null | sed 's/^/[ci-codex] /' >&1 || true
-
 mkdir -p "$OUTDIR" "$ARTDIR"
 
 echo "[ci-codex] workspace: $OUTDIR" >&1
 echo "[ci-codex] artifact dir: $ARTDIR" >&1
 
-echo "[ci-codex] discovering latest run..." >&1
-run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
+CI_CODEX_SAVED_XTRACE=0
+ci_shell_disable_xtrace() {
+	CI_CODEX_SAVED_XTRACE=0
+	case "$-" in
+	*x*)
+		CI_CODEX_SAVED_XTRACE=1
+		set +x
+		;;
+	esac
+}
+
+ci_shell_restore_xtrace() {
+	if [[ "${CI_CODEX_SAVED_XTRACE:-0}" == "1" ]]; then
+		set -x
+	fi
+	CI_CODEX_SAVED_XTRACE=0
+}
+
+ci_parse_github_repo() {
+	local url="$1"
+	url="${url%.git}"
+	if [[ "$url" =~ ^git@github[.]com:(.+/.+)$ ]]; then
+		echo "${BASH_REMATCH[1]}"
+		return 0
+	fi
+	if [[ "$url" =~ ^https?://github[.]com/(.+/.+)$ ]]; then
+		echo "${BASH_REMATCH[1]}"
+		return 0
+	fi
+	if [[ "$url" =~ ^ssh://git@github[.]com/(.+/.+)$ ]]; then
+		echo "${BASH_REMATCH[1]}"
+		return 0
+	fi
+	return 1
+}
+
+ci_validate_github_repo() {
+	local repo="$1"
+	[[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+}
+
+ci_api_get_json() {
+	local url="$1"
+	ci_shell_disable_xtrace
+	local token="${GITHUB_TOKEN:-}"
+	if [[ -n "$token" ]]; then
+		curl -fsSL \
+			-H "Authorization: Bearer $token" \
+			-H "Accept: application/vnd.github+json" \
+			-H "X-GitHub-Api-Version: 2022-11-28" \
+			"$url"
+	else
+		curl -fsSL \
+			-H "Accept: application/vnd.github+json" \
+			-H "X-GitHub-Api-Version: 2022-11-28" \
+			"$url"
+	fi
+	local rc=$?
+	ci_shell_restore_xtrace
+	return $rc
+}
+
+ci_api_download_zip() {
+	local url="$1" out_zip="$2"
+	local headers="$OUTDIR/ci-download.headers"
+	local location=""
+
+	ci_shell_disable_xtrace
+	local token="${GITHUB_TOKEN:-}"
+
+	: >"$headers"
+	if [[ -n "$token" ]]; then
+		curl -fsS \
+			-H "Authorization: Bearer $token" \
+			-H "Accept: application/vnd.github+json" \
+			-H "X-GitHub-Api-Version: 2022-11-28" \
+			-D "$headers" \
+			-o "$out_zip" \
+			"$url" || true
+	else
+		curl -fsS \
+			-H "Accept: application/vnd.github+json" \
+			-H "X-GitHub-Api-Version: 2022-11-28" \
+			-D "$headers" \
+			-o "$out_zip" \
+			"$url" || true
+	fi
+
+	location="$(awk -F': ' 'tolower($1)=="location"{gsub("\r","",$2); print $2; exit}' "$headers" 2>/dev/null || true)"
+	ci_shell_restore_xtrace
+
+	if [[ -n "$location" ]]; then
+		curl -fsSL "$location" -o "$out_zip" || return 1
+	fi
+	[[ -s "$out_zip" ]]
+}
+
+ci_unzip_to_file() {
+	local zip="$1" out="$2"
+	local tmp_extract
+	tmp_extract="$(mktemp -d "${TMP%/}/pmss-ci-zip-XXXXXXXX")"
+	if unzip -qq "$zip" -d "$tmp_extract" >/dev/null 2>&1; then
+		find "$tmp_extract" -type f 2>/dev/null | sort | while read -r f; do
+			printf '\n=== %s ===\n' "$(basename "$f")"
+			cat "$f"
+			printf '\n'
+		done >"$out"
+	fi
+	rm -rf "$tmp_extract" >/dev/null 2>&1 || true
+	[[ -s "$out" ]]
+}
+
+github_token_present=0
+ci_shell_disable_xtrace
+[[ -n "${GITHUB_TOKEN:-}" ]] && github_token_present=1
+ci_shell_restore_xtrace
+if [[ "$github_token_present" == "1" ]]; then
+	case "$-" in
+	*x*)
+		echo "[ci-codex] NOTE: disabling xtrace to avoid leaking GITHUB_TOKEN" >&1
+		set +x
+		;;
+	esac
+fi
+
+fetch_mode="gh"
+if have gh; then
+	echo "[ci-codex] gh: $(command -v gh)" >&1 || true
+	gh --version 2>/dev/null | sed 's/^/[ci-codex] /' >&1 || true
+elif have curl; then
+	fetch_mode="curl"
+	echo "[ci-codex] gh not found; using GitHub API via curl (set GITHUB_TOKEN for private repos)" >&1
+else
+	echo "[ci-codex] ERROR: neither 'gh' nor 'curl' is available; cannot fetch CI logs" >&2
+	exit 1
+fi
+
+run_id=""
+repo_full=""
+api_base="https://api.github.com"
+
+if [[ "$fetch_mode" == "gh" ]]; then
+	echo "[ci-codex] discovering latest run..." >&1
+	run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
+else
+	origin_url="$(git config --get remote.origin.url 2>/dev/null || true)"
+	repo_full="$(ci_parse_github_repo "$origin_url" 2>/dev/null || true)"
+	if ! ci_validate_github_repo "$repo_full"; then
+		echo "[ci-codex] ERROR: could not derive GitHub repo from origin URL: $origin_url" >&2
+		echo "[ci-codex] Install gh (recommended) or set origin to a github.com remote." >&2
+		exit 1
+	fi
+
+	echo "[ci-codex] discovering latest run via API for $repo_full..." >&1
+	runs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs?per_page=1" 2>/dev/null || true)"
+	run_id="$(printf '%s' "$runs_json" | php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["workflow_runs"][0]["id"] ?? "";' 2>/dev/null || true)"
+fi
+
 if [[ -z "$run_id" ]]; then
-	echo "[ci-codex] no workflow runs found" >&2
+	echo "[ci-codex] no workflow runs found (or auth missing)" >&2
+	if [[ "$fetch_mode" == "curl" && "$github_token_present" == "0" ]]; then
+		echo "[ci-codex] Hint: set GITHUB_TOKEN (classic PAT with repo+actions read) for private repos." >&2
+	fi
 	exit 1
 fi
 
 echo "[ci-codex] latest run id: $run_id" >&1
 
 echo "[ci-codex] waiting for run completion (timeout ${PMSS_CI_WAIT_SECS}s)…" >&1
-status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 deadline=$(($(date +%s) + PMSS_CI_WAIT_SECS))
+if [[ "$fetch_mode" == "gh" ]]; then
+	status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
+else
+	status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null \
+		| php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
+	[[ -n "$status" ]] || status="queued"
+fi
 while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
 	echo "[ci-codex] run status: $status (waiting)" >&1
 	sleep 5
-	status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
+	if [[ "$fetch_mode" == "gh" ]]; then
+		status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
+	else
+		status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null \
+			| php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
+		[[ -n "$status" ]] || status="queued"
+	fi
 done
 echo "[ci-codex] run status now: $status" >&1
 
@@ -119,9 +288,29 @@ echo "[ci-codex] downloading artifacts to $ARTDIR" >&1
 mkdir -p "$ARTDIR"
 art_count=0
 for attempt in {1..10}; do
-	if gh run download "$run_id" --dir "$ARTDIR" >/dev/null 2>&1; then
-		:
+	if [[ "$fetch_mode" == "gh" ]]; then
+		gh run download "$run_id" --dir "$ARTDIR" >/dev/null 2>&1 || true
+	else
+		arts_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/artifacts?per_page=100" 2>/dev/null || true)"
+		printf '%s' "$arts_json" | php -r '
+			$j=json_decode(stream_get_contents(STDIN), true);
+			foreach (($j["artifacts"] ?? []) as $a) {
+				$id=$a["id"] ?? "";
+				$name=$a["name"] ?? "";
+				if ($id && $name) { echo $id . "\t" . $name . "\n"; }
+			}
+		' 2>/dev/null | while IFS=$'\t' read -r art_id art_name; do
+			[[ -n "$art_id" && -n "$art_name" ]] || continue
+			safe_name="$(printf '%s' "$art_name" | tr -cs 'A-Za-z0-9_.-' '_' | sed 's/^_\\+//; s/_\\+$//')"
+			zip_path="$OUTDIR/artifact-${art_id}.zip"
+			extract_dir="$ARTDIR/${safe_name:-artifact-$art_id}"
+			mkdir -p "$extract_dir"
+			if ci_api_download_zip "$api_base/repos/$repo_full/actions/artifacts/$art_id/zip" "$zip_path" >/dev/null 2>&1; then
+				unzip -qq "$zip_path" -d "$extract_dir" >/dev/null 2>&1 || true
+			fi
+		done
 	fi
+
 	art_count=$(find "$ARTDIR" -type f 2>/dev/null | wc -l | tr -d ' ')
 	if [[ "$art_count" -gt 0 || $attempt -ge 10 ]]; then
 		break
@@ -132,8 +321,28 @@ done
 echo "[ci-codex] artifacts downloaded: $art_count file(s)" >&1
 
 # Prepare CI summary and capture latest artifact path for reference
-gh run view "$run_id" >"$SUMMARY" || true
 latest_art=""
+if [[ "$fetch_mode" == "gh" ]]; then
+	gh run view "$run_id" >"$SUMMARY" || true
+else
+	run_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null || true)"
+	printf '%s' "$run_json" | php -r '
+		$j=json_decode(stream_get_contents(STDIN), true);
+		$fields=[
+			"workflow" => $j["name"] ?? "",
+			"status" => $j["status"] ?? "",
+			"conclusion" => $j["conclusion"] ?? "",
+			"event" => $j["event"] ?? "",
+			"branch" => $j["head_branch"] ?? "",
+			"sha" => $j["head_sha"] ?? "",
+			"url" => $j["html_url"] ?? "",
+			"created_at" => $j["created_at"] ?? "",
+			"updated_at" => $j["updated_at"] ?? "",
+		];
+		foreach ($fields as $k => $v) { if ($v !== "") { echo $k . ": " . $v . "\n"; } }
+	' 2>/dev/null >"$SUMMARY" || true
+	[[ -s "$SUMMARY" ]] || printf 'repo: %s\nrun_id: %s\n' "$repo_full" "$run_id" >"$SUMMARY"
+fi
 if compgen -G "$ARTDIR/*" >/dev/null; then
 	latest_art=$(find "$ARTDIR" -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
 fi
@@ -142,16 +351,42 @@ fi
 # Fetch logs for a requested job, or both 'build' and 'smoke' by default
 fetch_job_log() {
 	local name="$1" out="$2"
-	local id
-	id=$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId") || true
-	if [[ -n "$id" ]]; then
-		gh run view --job "$id" --log >"$out" || true
+	if [[ "$fetch_mode" == "gh" ]]; then
+		local id
+		id=$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId") || true
+		if [[ -n "$id" ]]; then
+			gh run view --job "$id" --log >"$out" || true
+		fi
+		return 0
+	fi
+
+	local jobs_json job_id zip_path
+	jobs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
+	PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
+		$j=json_decode(stream_get_contents(STDIN), true);
+		$name=getenv("PMSS_CI_JOB_NAME") ?: "";
+		foreach (($j["jobs"] ?? []) as $job) {
+			if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
+		}
+	' 2>/dev/null || true)"
+	[[ -n "$job_id" ]] || return 0
+	zip_path="$OUTDIR/job-${job_id}.zip"
+	if ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$job_id/logs" "$zip_path" >/dev/null 2>&1; then
+		ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
 	fi
 }
 
 fetch_run_log() {
 	local out="$1"
-	gh run view "$run_id" --log >"$out" || true
+	if [[ "$fetch_mode" == "gh" ]]; then
+		gh run view "$run_id" --log >"$out" || true
+		return 0
+	fi
+	local zip_path
+	zip_path="$OUTDIR/run-${run_id}.zip"
+	if ci_api_download_zip "$api_base/repos/$repo_full/actions/runs/$run_id/logs" "$zip_path" >/dev/null 2>&1; then
+		ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
+	fi
 }
 
 if [[ -n "$job_name" ]]; then
@@ -218,5 +453,8 @@ if [[ -n "$exec_cmd" ]]; then
 fi
 if [[ "$dry_run" == "1" ]]; then
 	codex_args+=(--dry-run)
+fi
+if [[ "$autocommit" == "1" ]]; then
+	codex_args+=(--autocommit)
 fi
 bash "$HERE/codex-run.sh" "${codex_args[@]}"

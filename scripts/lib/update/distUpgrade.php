@@ -9,13 +9,13 @@ require_once __DIR__.'/distro.php';
 /**
  * Entry point used by util/update-dist-upgrade.php.
  */
-function pmssRunDistUpgrade(?string $target = null): int
+function pmssRunDistUpgrade(?string $maxTarget = null): int
 {
     requireRoot();
 
-    if ($target === null) {
-        logMessage('Safety error: You must explicitly specify the target Debian major version (e.g., 11 or bullseye).');
-        logMessage('Usage: scripts/util/update-dist-upgrade.php <target>');
+    if ($maxTarget === null) {
+        logMessage('Safety error: You must explicitly specify the maximum Debian major version (e.g., 11 or bullseye).');
+        logMessage('Usage: scripts/util/update-dist-upgrade.php <maxTarget>');
         return 1;
     }
 
@@ -26,22 +26,28 @@ function pmssRunDistUpgrade(?string $target = null): int
     }
 
     $current = getDistroVersion();
-    $targetMajor = pmssResolveTargetVersion($target);
+    $maxMajor = pmssResolveTargetVersion($maxTarget);
 
-    if ($targetMajor === '') {
-        logMessage("Unknown target version: $target");
+    if ($maxMajor === '') {
+        logMessage("Unknown maximum version: $maxTarget");
         return 1;
     }
 
-    [$from, $next] = pmssDetermineUpgradePath($current);
-    if ($from === null || $next === null) {
-        logMessage('No upgrade recipe for Debian '.$current);
+    $plan = pmssResolveDistUpgradeStep($current, $maxMajor);
+    if ($plan['message'] !== '') {
+        logMessage($plan['message']);
+    }
+    if ($plan['action'] === 'noop') {
         return 0;
     }
+    if ($plan['action'] !== 'upgrade') {
+        return 1;
+    }
 
-    if ($targetMajor !== $next) {
-        logMessage(sprintf('Safety halt: Current version is %s. The next logical upgrade is to %s, but you requested %s.', $current, $next, $targetMajor));
-        logMessage('Skipping versions is not supported.');
+    $from = $plan['from'];
+    $next = $plan['to'];
+    if ($from === null || $next === null) {
+        logMessage('dist-upgrade internal error: upgrade plan missing version data');
         return 1;
     }
 
@@ -55,6 +61,63 @@ function pmssRunDistUpgrade(?string $target = null): int
     pmssRewriteSources($from, $next);
     pmssExecuteUpgrade();
     return 0;
+}
+
+/**
+ * Determine the safe, single-step dist-upgrade action for the current Debian major,
+ * capped at the requested maximum.
+ *
+ * @return array{action:string, from:?string, to:?string, message:string}
+ */
+function pmssResolveDistUpgradeStep(string $currentMajor, string $maxMajor): array
+{
+    [$from, $next] = pmssDetermineUpgradePath($currentMajor);
+    if ($from === null || $next === null) {
+        return [
+            'action'  => 'noop',
+            'from'    => null,
+            'to'      => null,
+            'message' => 'No upgrade recipe for Debian '.$currentMajor,
+        ];
+    }
+
+    $currentMajorInt = (int) $currentMajor;
+    $maxMajorInt     = (int) $maxMajor;
+
+    if ($currentMajorInt > $maxMajorInt) {
+        return [
+            'action'  => 'error',
+            'from'    => $from,
+            'to'      => null,
+            'message' => sprintf('Safety halt: Current version is %s but the requested maximum is %s.', $currentMajor, $maxMajor),
+        ];
+    }
+    if ($currentMajorInt === $maxMajorInt) {
+        return [
+            'action'  => 'noop',
+            'from'    => $from,
+            'to'      => null,
+            'message' => sprintf('No dist-upgrade required: current version is %s and requested maximum is %s.', $currentMajor, $maxMajor),
+        ];
+    }
+
+    if ((int) $next > $maxMajorInt) {
+        return [
+            'action'  => 'error',
+            'from'    => $from,
+            'to'      => null,
+            'message' => sprintf('Safety halt: Current version is %s. The next logical upgrade is to %s, but your maximum is %s.', $currentMajor, $next, $maxMajor),
+        ];
+    }
+
+    return [
+        'action'  => 'upgrade',
+        'from'    => $from,
+        'to'      => $next,
+        'message' => $maxMajor !== $next
+            ? sprintf('Requested maximum is %s; performing safe incremental upgrade to %s.', $maxMajor, $next)
+            : '',
+    ];
 }
 
 /**

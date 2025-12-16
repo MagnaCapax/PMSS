@@ -7,21 +7,21 @@ ROOT="$(cd "$HERE/.." && pwd)"
 source "$HERE/lib/codex-common.sh"
 
 # Optional debug: PMSS_REFACTOR_CODEX_DEBUG=1 enables bash -x tracing.
-codex_enable_debug PMSS_REFACTOR_CODEX_DEBUG "refactor-codex"
-codex_set_error_trap "refactor-codex"
+codex_enable_debug PMSS_REFACTOR_CODEX_DEBUG "codex-refactor"
+codex_set_error_trap "codex-refactor"
 
-echo "[refactor-codex] start: assembling refactor context and invoking assistant" >&1
+echo "[codex-refactor] start: assembling refactor context and invoking assistant" >&1
 
-# refactor-codex.sh — Collect refactor candidate context (best-effort), then launch
+# codex-refactor.sh — Collect refactor candidate context (best-effort), then launch
 # a coding assistant with the strict refactor prompt.
 #
 # Usage:
-#   development/refactor-codex.sh
-#   development/refactor-codex.sh --commits 25
-#   development/refactor-codex.sh --target scripts/lib/update
-#   development/refactor-codex.sh --prompt "Refactor X (behaviour-preserving)"
-#   development/refactor-codex.sh --exec 'codex'
-#   development/refactor-codex.sh --dry-run
+#   development/codex-refactor.sh
+#   development/codex-refactor.sh --commits 25
+#   development/codex-refactor.sh --target scripts/lib/update
+#   development/codex-refactor.sh --prompt "Refactor X (behaviour-preserving)"
+#   development/codex-refactor.sh --exec 'codex'
+#   development/codex-refactor.sh --dry-run
 
 TMP="${TMPDIR:-/tmp}"
 OUTDIR="$(mktemp -d "${TMP%/}/pmss-refactor-codex-XXXXXXXX")"
@@ -36,6 +36,7 @@ target=""
 exec_cmd=""
 custom_prompt=""
 dry_run=0
+autocommit=0
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -59,33 +60,37 @@ while [[ $# -gt 0 ]]; do
 		dry_run=1
 		shift || true
 		;;
+	--autocommit)
+		autocommit=1
+		shift || true
+		;;
 	-h | --help)
 		sed -n '1,120p' "$0"
 		exit 0
 		;;
 	*)
-		echo "[refactor-codex] unknown option: $1" >&2
+		echo "[codex-refactor] unknown option: $1" >&2
 		exit 2
 		;;
 	esac
 done
 
 if ! [[ "$commits" =~ ^[0-9]+$ ]] || [[ "$commits" -le 0 ]]; then
-	echo "[refactor-codex] invalid --commits value: $commits" >&2
+	echo "[codex-refactor] invalid --commits value: $commits" >&2
 	exit 2
 fi
 
-echo "[refactor-codex] output directory: $OUTDIR" >&1
+echo "[codex-refactor] output directory: $OUTDIR" >&1
 
 # Gather recent commits and touched files (best-effort).
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-	echo "[refactor-codex] collecting last $commits commits…" >&1
+	echo "[codex-refactor] collecting last $commits commits…" >&1
 	git -C "$ROOT" log -n "$commits" --pretty=format:'%h %s' >"$COMMITS_SUMMARY" || true
 	git -C "$ROOT" log -n "$commits" --name-only --pretty=format:'--- %H' \
 		| awk '/^--- / { next } NF { print }' \
 		| sort -u >"$COMMITS_FILES" || true
 else
-	echo "[refactor-codex] not inside a git repository; skipping commit context" >&1
+	echo "[codex-refactor] not inside a git repository; skipping commit context" >&1
 fi
 
 # Build a candidate file list from recent commits, optionally narrowed by target.
@@ -103,11 +108,11 @@ fi
 
 # Ensure advisory complexity snapshots exist (best-effort).
 if [[ -x "$ROOT/development/loc.sh" ]]; then
-	echo "[refactor-codex] generating LOC snapshot via development/loc.sh" >&1
+	echo "[codex-refactor] generating LOC snapshot via development/loc.sh" >&1
 	"$ROOT/development/loc.sh" >"$LOC_LOG" 2>&1 || true
 fi
 if [[ -x "$ROOT/scripts/testing/phploc.sh" ]]; then
-	echo "[refactor-codex] generating phploc snapshot via scripts/testing/phploc.sh" >&1
+	echo "[codex-refactor] generating phploc snapshot via scripts/testing/phploc.sh" >&1
 	bash "$ROOT/scripts/testing/phploc.sh" >"$PHPLC_LOG" 2>&1 || true
 fi
 
@@ -118,9 +123,10 @@ codex_args=(run --prompt-file "$HERE/prompts/refactor.txt" --outdir "$OUTDIR")
 [[ -s "$LOC_LOG" ]] && codex_args+=(--context "$LOC_LOG")
 [[ -s "$PHPLC_LOG" ]] && codex_args+=(--context "$PHPLC_LOG")
 [[ "$dry_run" == "1" ]] && codex_args+=(--dry-run)
+[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
 [[ -n "$custom_prompt" ]] && codex_args+=(--prompt "$custom_prompt")
 [[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
 
 bash "$HERE/codex-run.sh" "${codex_args[@]}"
 
-echo "[refactor-codex] done" >&1
+echo "[codex-refactor] done" >&1

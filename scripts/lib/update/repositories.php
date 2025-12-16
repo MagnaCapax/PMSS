@@ -234,8 +234,5 @@ if (!function_exists('pmssRefreshRepositories')) {
 }
 
 if (!function_exists('pmssAutoremovePackages')) {
-    function pmssAutoremovePackages(): void
-    {
-        runStep('Removing packages no longer required', aptCmd('autoremove -y'));
-    }
+    function pmssAutoremovePackages(): void { runStep('Removing packages no longer required', aptCmd('autoremove -y')); }
 }

@@ -259,6 +259,7 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         // Drop-in management must target /etc paths only; avoid vendor dirs.
         // Some legacy hosts still carry a vendor drop-in at:
         //   /usr/lib/systemd/system/user-.slice.d/99-pmss.conf
+        //   /lib/systemd/system/user-.slice.d/99-pmss.conf
         // which can override PMSS settings (including TasksMax) and can even
         // reappear after dpkg updates. Remove it when found.
         $sawLegacyVendorDropin = false;

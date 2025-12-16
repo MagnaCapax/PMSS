@@ -18,20 +18,20 @@ These wrappers exist because assistants do not reliably auto-discover PMSS guard
   - Starts a new general-purpose Codex session for PMSS work.
   - Thin wrapper around `development/codex-run.sh`.
 
-- `development/refactor-codex.sh`
+- `development/codex-refactor.sh`
   - Refactor-oriented session: collects local candidate context (recent commits + LOC/phploc snapshots),
     then launches Codex with the strict refactor rails prompt.
   - Delegates prompt rendering + invocation to `development/codex-run.sh`.
 
 - `development/ci-codex.sh`
-  - CI triage session: fetches latest GitHub Actions run logs/artifacts via `gh`,
+  - CI triage session: fetches latest GitHub Actions run logs/artifacts via `gh` (or `curl` + `GITHUB_TOKEN` fallback),
     then launches Codex with the CI rails prompt.
   - Delegates prompt rendering + invocation to `development/codex-run.sh`.
 
 - `development/prompts/*.txt`
   - The canonical default prompts for the wrappers above.
   - These prompts are intentionally explicit about PMSS invariants and do-not-touch rules.
-  - `development/prompts/context-header.txt` + `development/prompts/context-footer.txt` are the shared “rails context” blocks appended to all sessions (plus any extra per-run context files).
+  - Shared “Context to open” rails block is injected by `development/lib/codex-common.sh` for every session (plus any extra per-run context files).
 
 - `development/lib/codex-common.sh`
   - Shared, dependency-free helpers sourced by the wrapper scripts.
@@ -81,10 +81,10 @@ development/codex-run.sh run --prompt-file development/prompts/codex.txt --dry-r
 Refactor session:
 
 ```bash
-development/refactor-codex.sh
+development/codex-refactor.sh
 ```
 
-CI triage session (requires `gh auth login`):
+CI triage session (uses `gh auth login` when available; otherwise uses `curl` + `GITHUB_TOKEN`):
 
 ```bash
 development/ci-codex.sh
@@ -94,7 +94,7 @@ Override the top-level prompt text (keeps the same rails baseline):
 
 ```bash
 development/codex.sh --prompt "Do X in Y"
-development/refactor-codex.sh --prompt "Refactor Z (behaviour-preserving)"
+development/codex-refactor.sh --prompt "Refactor Z (behaviour-preserving)"
 development/ci-codex.sh --prompt "Fix the failing CI job"
 ```
 

@@ -28,7 +28,7 @@
  * | `--scripts-only`   | Deploy refreshed `/scripts` and `/etc/skel` content, skip `update-step2.php`. Useful for emergency hotfixes and MUST NOT invoke apt/apt-get or any other package manager commands. |
  * | `--repo=<url>`     | Override the git remote used for `git/*` specs. Combined with `--branch` to pin alternate forks. |
  * | `--branch=<name>`  | Branch used with `--repo`. Defaults to `main` when unspecified. |
- * | `--dist-upgrade`   | Run `scripts/util/update-dist-upgrade.php` to perform a Debian release upgrade, then exit. |
+ * | `--dist-upgrade=<max>` | Run `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade capped at the requested maximum, then exit. |
  * | `--skip-self-update` | Internal flag injected during self-refresh to avoid recursion; operators should not pass it manually. |
  * | `--help`           | Print usage examples and exit without making changes. |
  */
@@ -207,13 +207,13 @@ function ensureRoot(): void
 
 function usage(string $script): void
 {
-    echo "Usage: {$script} [<spec>] [--repo=<url>] [--branch=<name>] [--dry-run] [--dist-upgrade=<target>] [--scripts-only]\n";
+    echo "Usage: {$script} [<spec>] [--repo=<url>] [--branch=<name>] [--dry-run] [--dist-upgrade=<max>] [--scripts-only]\n";
     echo "Examples:\n";
     echo "  {$script}                      # update from git/main (default repo)\n";
     echo "  {$script} git/dev:2025-01-03   # dev branch pinned to a date\n";
     echo "  {$script} release:2025-07-12   # explicit tagged release\n";
     echo "  {$script} --repo=https://git/url.git --branch=beta\n";
-    echo "  {$script} --dist-upgrade=11         # upgrade Debian release (explicit target required)\n";
+    echo "  {$script} --dist-upgrade=11         # dist-upgrade one major step, capped at Debian 11\n";
     echo "  {$script} --scripts-only            # refresh scripts/skel only; never runs apt/apt-get\n";
 }
 
@@ -225,7 +225,7 @@ function usage(string $script): void
  *
  * Inputs:
  *  - argv array from PHP entrypoint (index 0 is the script path)
- *  - Accepts: <spec>, --dry-run, --dist-upgrade=<ver>, --scripts-only,
+ *  - Accepts: <spec>, --dry-run, --dist-upgrade=<max>, --scripts-only,
  *             --repo=<url>, --branch=<name>, and internal --skip-self-update
  * Behavior:
  *  - Synthesizes `spec` when --repo/--branch are supplied
@@ -807,7 +807,7 @@ function maybeRunDistUpgrade($distUpgrade): void
         return;
     }
     if ($distUpgrade === true) {
-        fatal("You must specify a target version for dist-upgrade (e.g. --dist-upgrade=11 or --dist-upgrade=bullseye).", EXIT_PARSE);
+        fatal("You must specify a maximum version for dist-upgrade (e.g. --dist-upgrade=11 or --dist-upgrade=bullseye).", EXIT_PARSE);
     }
     logEvent('dist_upgrade_start', ['target' => $distUpgrade]);
     runFatal('/scripts/util/update-dist-upgrade.php ' . escapeshellarg($distUpgrade), EXIT_DIST);

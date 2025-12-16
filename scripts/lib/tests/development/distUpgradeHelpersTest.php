@@ -37,4 +37,28 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertEquals('', \pmssResolveTargetVersion(''));
         $this->assertEquals('', \pmssResolveTargetVersion('nonesuch'));
     }
+
+    public function testResolveDistUpgradeStepHonorsMaximum(): void
+    {
+        $plan = \pmssResolveDistUpgradeStep('10', '12');
+        $this->assertEquals('upgrade', $plan['action']);
+        $this->assertEquals('10', $plan['from']);
+        $this->assertEquals('11', $plan['to']);
+        $this->assertStringContainsString('Requested maximum is 12', $plan['message']);
+
+        $plan = \pmssResolveDistUpgradeStep('11', '13');
+        $this->assertEquals('upgrade', $plan['action']);
+        $this->assertEquals('11', $plan['from']);
+        $this->assertEquals('12', $plan['to']);
+
+        $plan = \pmssResolveDistUpgradeStep('11', '11');
+        $this->assertEquals('noop', $plan['action']);
+        $this->assertEquals(null, $plan['to']);
+        $this->assertStringContainsString('No dist-upgrade required', $plan['message']);
+
+        $plan = \pmssResolveDistUpgradeStep('12', '11');
+        $this->assertEquals('error', $plan['action']);
+        $this->assertEquals(null, $plan['to']);
+        $this->assertStringContainsString('Safety halt', $plan['message']);
+    }
 }

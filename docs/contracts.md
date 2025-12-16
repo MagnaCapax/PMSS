@@ -21,7 +21,7 @@ or tests.
 Signature: refer to file for full source; highlights below.
 
 - parseArguments(array $argv): array
-  - Inputs: CLI args; supports `<spec>`, `--dry-run`, `--dist-upgrade`, `--scripts-only`,
+  - Inputs: CLI args; supports `<spec>`, `--dry-run`, `--dist-upgrade=<max>`, `--scripts-only`,
     `--repo=<url>`, `--branch=<name>`, and internal `--skip-self-update`.
   - Output: array keys: `dry_run` (bool), `dist_upgrade` (bool), `scripts_only` (bool),
     `skip_self_update` (bool), `spec` (string), `repo` (?string), `branch` (?string).
@@ -78,8 +78,8 @@ Signature: refer to file for full source; highlights below.
 
 - runAutoremove(): void → `apt-get autoremove -y` with non-interactive dpkg opts; `fatal(EXIT_COPY)` on failure.
 
-- maybeRunDistUpgrade(bool $distUpgrade): void
-  - If true, runs `/scripts/util/update-dist-upgrade.php` and logs start/end events.
+- maybeRunDistUpgrade(bool|string $distUpgrade): void
+  - If enabled, runs `/scripts/util/update-dist-upgrade.php <max>` and logs start/end events.
 
 - bootstrapMain(array $argv): void
   - Orchestrator: ensure root → parse/normalize/parse spec → dist-upgrade (optional) →

@@ -13,7 +13,7 @@ fail=0
 must_exec=(
   development/codex.sh
   development/codex-run.sh
-  development/refactor-codex.sh
+  development/codex-refactor.sh
   development/ci.sh
   development/ci-logs.sh
   development/ci-codex.sh

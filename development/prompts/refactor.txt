@@ -1,213 +1,221 @@
-PMSS Refactor Assist — Strict Rails Mode
+PMSS Refactor Assist — Strict Rails + Compression-First Mode
 
-Goal: Apply small, behaviour-preserving refactors that simplify PMSS while keeping all existing safety and update rails intact.
+Context:
+PMSS is a Debian overlay OS for seedbox management. Scripts are operational contracts.
+Refactoring here means: improve internals WITHOUT changing externally observable behaviour.
 
-Primary objective: reduce cognitive load and code footprint (fewer branches, less duplication, fewer concepts), while staying fully backward compatible.
+Goal:
+Apply small, behaviour-preserving refactors that simplify PMSS while keeping all safety + updater rails intact.
 
-Compression & Indirection Rails (NEW — HARD)
+Primary objective (hard):
+- Reduce runtime footprint AND reduce cognitive load.
+- “Reduce cognitive load” must NOT be paid for with more concepts/indirection.
 
-This run is a COMPRESSION RUN by default.
-
-Hard goals (must hold):
-- Runtime footprint must not increase (scripts runtime buckets; tests/docs excluded), unless the operator explicitly approves a “safety expansion” run.
-- Do not add new runtime files unless they delete more runtime LOC than they add within the same run.
-- Do not add new exported runtime symbols (global functions/classes) unless you delete >= the same number of exported symbols in the same run.
-
-Indirection budget:
-- Avoid creating new helper files/functions/classes for tiny duplication.
-- Local duplication is allowed when the duplicated block is:
-  - <= 4 lines AND occurs in <= 4 places, OR
-  - extracting it would increase runtime LOC or add a new require/include hop.
-- Prefer inlining / removing indirection over extracting:
-  - If a helper is trivial or just wraps another call, inline it and delete the helper.
-- No “helpers.php” dumping grounds: prefer existing subsystem modules/classes; avoid new global helper files unless the ROI test is met.
-
-Helper ROI test (mechanical gate):
-- Before extracting any helper/class, estimate:
-  - saved_lines = call_sites * duplicated_lines
-  - cost_lines  = helper_body + docblock + require/include + wrapper/shim overhead
-- If saved_lines <= cost_lines + 5, DO NOT extract. Keep local duplication or use a table-driven refactor.
-
-Helper pruning (required during compression runs):
-- If you find helpers used <= 4 call sites AND <= ~10 LOC body, prefer deleting them by inlining at call sites, unless the helper encodes a critical safety invariant that must not drift.
-
-Run types (pick one; default is compression):
-- Compression Run (default): enforce the gates above; add tests only when required to delete/refactor safely.
-- Safety Expansion Run (explicit, operator-approved): allowed to add runtime LOC/files/symbols when it materially improves safety/guardrails or testability.
-
-File length guidance:
-- ~150 LOC is a guideline, not a target. Never split files solely to hit a line count.
-- Split only when it reduces cognitive load, nesting, or duplication without increasing concepts/files.
-
-Comments:
-- Comments are for invariants, hazards, and WHY. Do not add comments to satisfy ratios.
-- Prefer deleting redundant comments and making code self-explanatory.
-
-Beauty lever:
-- When two solutions are behaviour-equivalent, choose the one with fewer concepts (fewer files, fewer exported symbols, fewer call indirections), even if that means tolerating small local duplication.
+Secondary objective (soft):
+- Improve readability ONLY when it also reduces runtime footprint or deletes concepts.
 
 Definition (what “refactoring” means here):
 - Change internal structure without changing externally observable behaviour.
-- “Externally observable” includes: CLI flags/semantics, env var names, exit codes, log/JSON field names and formats, file paths, operational ordering, and updater topology.
+- “Externally observable” includes: CLI flags/semantics, env var names, exit codes, log/JSON field names and formats,
+  file paths, operational ordering, and updater topology.
 
-Why we refactor (the deeper purpose):
-- Reduce cost of change (make future work cheaper and safer).
-- Reduce risk (fewer branches/duplication → fewer failure modes and review misses).
-- Increase leverage (one correct change fixes all call sites).
-- Make correctness provable (tests/control snapshots become feasible and meaningful).
+Updater topology is sacred:
+install.sh → scripts/update.php (bootstrap) → scripts/util/update-step2.php (orchestration)
 
-Non-goals (do NOT do these in a refactor run):
-- Feature work, rewrites, interface changes, “style cleanups”, or broad renames/moves that do not delete code.
+----------------------------------------------------------------------
+RUN MODES (PICK ONE)
+----------------------------------------------------------------------
 
-Read first (do not proceed until read):
-- AGENTS.md (rails / Constitution / doctrine; treat as binding guard rails).
-- AGENTS.local.md (host-specific local rails).
-- Any nested AGENTS.md covering the files you touch (most-specific instructions win).
-- docs/architecture.md (bootstrap/update topology, module responsibilities).
-- docs/update.md (install.sh → scripts/update.php → scripts/util/update-step2.php flow and invariants).
-- docs/refactoring.md (Linux kernel style guidance; ~150 LOC per file is a preference guideline, not a hard rule; when to split helpers).
-- docs/adr/* (Treat Accepted ADRs as constraints; consider those relevant to your target area).
+Run types (pick one):
 
-Core engineering principles to honour (do not dilute them):
-- KISS / DRY / YAGNI: keep implementations small and boring; reuse existing helpers; do not build abstractions or flags you do not need right now.
-- Deletion-First: prefer removing dead or redundant code over adding new layers; "the best part is no part".
-- Pit of Success: make the safe, correct path the default; never make dangerous paths easier or quieter.
-- One flow, no special cases: keep a single explicit path per operation; avoid adding alternate modes unless an ADR requires it.
-- Minimal edits: keep diffs small, coherent, and tightly scoped; avoid drive-by changes.
-- No aliases: keep names and env keys consistent with existing ones; do not add synonyms.
+1) Compression Run (default):
+   - Hard: runtime LOC and concept count must not increase.
+   - Small scope (1–3 targets).
 
-Scope for this refactor:
-- Prefer older/stable areas over very recent commits by default (recently-touched files are often in-flight and under active change).
-- Use recent commits as *context*, not as the primary scope constraint, unless explicitly requested.
-- Optionally narrow the scope via a target subtree (for example, scripts/lib/update or scripts/util).
-- Use LOC/complexity snapshots to pick the highest-value small target (high complexity/duplication) within the chosen scope.
-- Keep scope tight; do not roam unless strictly necessary to achieve DRY within the allowed change budget.
+2) Safety Expansion Run (operator-approved):
+   - Allowed to add runtime LOC when it materially improves safety rails/testability.
+   - Still no behavior changes.
 
-Hard rails (must follow all of these):
-- Compatibility baseline:
-  - PHP 7.3 only: do not use newer language features (no `match`, no nullsafe `?->`, no typed properties, no constructor property promotion, etc.).
-- Dependency surface freeze:
-  - Do not add new external deps/tools/configs or new project-level tooling unless the operator explicitly approves.
-- No behaviour changes:
-  - Do not change CLI flags, argument semantics, env variables, JSON field names, log formats, or exit codes.
-  - Treat existing scripts under scripts/, util tools, and tests as behavioural contracts.
-- No safety regressions:
-  - Do not introduce new destructive operations or weaken existing guards around filesystem, packages, or users.
-  - Never modify etc/skel/www or third-party/vendor trees, or the dpkg baseline files under scripts/lib/update/dpkg/selections*.txt.
-  - Do not change updater topology or semantics: install.sh → scripts/update.php (bootstrap) → scripts/util/update-step2.php (orchestration).
-- Minimal, local edits:
-  - Prefer a single file or tight cluster of files in one subsystem.
-  - Aim to touch at most ~5–8 files and keep total additions + deletions within ~800 lines.
-  - Don’t reorder unless it deletes code: avoid alphabetizing arrays, moving blocks, or reshuffling files unless it measurably reduces duplication/LOC or removes complexity.
-  - If a refactor cannot be completed safely within this budget, do not start it.
-- Deletion and DRY as primary goals:
-  - Remove unused helpers, dead code paths, or redundant wrappers when you can prove they are unreferenced.
-  - Consolidate near-duplicate logic into small shared helpers when it deletes code or reduces risk; do not add new flows.
-  - DRY is not an absolute. Prefer DRY only when it reduces total runtime footprint or eliminates meaningful risk. Avoid over-abstracting trivial duplications.
-  - Do not add new modes, flags, or configuration knobs as part of this refactor.
-- No interface/layout changes:
-  - Do not move or rename public entrypoints, config file locations, or JSON structures.
-  - Only adjust docs to better describe existing behaviour; do not introduce new semantics.
-- Tests and verification:
-  - Do not relax or delete tests that encode behaviour.
-  - You may add tests around code you simplify, but they must keep or tighten expectations.
-  - Keep refactors hermetic: no new network calls or destructive actions in dev tests.
+3) Architectural Simplification Run (operator-approved):
+   - Goal: reduce concepts/branching across a subsystem by restructuring internals (still behavior-preserving).
+   - Budget increase: up to 20 files and 2000 changed lines.
+   - Must end net-negative in:
+     - concepts (files + exported symbols + require hops), AND
+     - runtime LOC OR complexity (measured by your snapshot tooling).
+   - Must include a behavior lock:
+     - either characterization tests or snapshot tests around the affected boundary.
+   - No “parallel implementations” left in-tree at end (no permanent old+new).
 
-Refactor style guidance:
-- Follow docs/refactoring.md:
-  - File size is a guideline: ~150 LOC is a preference, not a strict rule. Do not split files unless it reduces nesting/duplication and does not increase concept count.
-  - Prefer cohesive modules. New modules/files are expensive; only introduce them when they enable net deletion (LOC and/or concepts). Otherwise keep logic local and boring.
-- Choose a small set of high-value targets:
-  - Prefer 3–7 small, behaviour-preserving refactors per run that can be bundled into one larger commit message (still within the change budget).
-  - You MAY choose a slightly larger refactor if (and only if) it stays within the hard rails and the change budget and measurably reduces cognitive load/duplication.
-  - Avoid broad, cross-cutting changes or sweeping renames in a single run.
-- Look for:
-  - Obvious duplication that can be replaced with a data table or a small helper.
-  - Prefer tables/config arrays over branching:
-    - When logic repeats the same structure with different literals (e.g., codename→version, service→commands, file→mode),
-      prefer a single map/table and a lookup over long if/elseif ladders, when behaviour is identical.
-    - This reduces duplication, shrinks code/token footprint, and reduces “forgot to update one branch” bugs.
-  - Reduce nesting:
-    - Prefer guard clauses and early returns to keep the happy path flat and readable.
-    - If simplifying nesting would require introducing a new helper that fails the Helper ROI test, keep the code inline and just use guard clauses.
-    - Extract small helpers when a nested block mixes concerns (validation vs. I/O vs. orchestration) or exceeds ~4 nesting levels.
-    - Keep behaviour identical: guards must not change side effects, log formats, or exit codes.
-  - Overly nested conditionals that can be simplified without changing logic.
-  - Trivial wrappers that add no clarity; consider inlining them when safe.
-- Deletion safety (prove before you delete):
-  - Before deleting a function/file/code path, prove it is unreferenced in this repo:
-    - Use ripgrep (`rg`) to find call sites, includes/requires, and CLI entrypoints.
-    - Check runtime entrypoints and schedulers: `scripts/`, `scripts/util/`, `scripts/cron/`, `etc/seedbox/config/root.cron`.
-    - Check documentation contracts and incident context: `docs/contracts.md`, `docs/incidents/*`, and relevant `docs/adr/*`.
-  - Backwards-compat safety net (ONLY if absolutely necessary):
-    - Prefer deletion.
-    - Add a shim wrapper only if you found concrete references/callers you cannot migrate safely within the change budget.
-    - If a shim is required, keep it tiny and behavior-identical (same signature/output), and add a clear `#TODO(deprecate)` note to remove it later once the caller set is retired.
-  - If you cannot prove it is unreferenced within the allowed time/budget, do not delete it in this run.
-- Cognitive load:
-  - Optimise for readability under fatigue; fewer concepts and flows are better.
+----------------------------------------------------------------------
+COMPRESSION RUN — HARD GATES (MUST HOLD)
+----------------------------------------------------------------------
 
-Commenting and docblocks (Linux-kernel-style intent):
-- Comments are for invariants, hazards, and WHY; do not narrate the obvious or add filler to satisfy ratios.
-- Prefer deleting redundant comments and making code self-explanatory.
-- Prefer small file-level docblocks that explain responsibility, inputs/outputs, side effects, and key safety invariants.
-- Add docblocks for new public helpers (and for any non-obvious internal helper) so future refactors can stay safe.
-- Keep names descriptive and context-first; avoid 1-letter variables; avoid deep nesting (extract helpers instead).
-- When touching first-party runtime libraries/utilities, do not regress docblock lint expectations; run `scripts/testing/docblock-lint.sh` when applicable.
+GATE 1: Runtime footprint must NOT increase.
+- “Runtime” = scripts/* EXCLUDING:
+  - scripts/lib/tests/*
+  - tests/*
+  - scripts/testing/*
+  - docs/*, development/*, .github/*
+If runtime LOC increases: STOP. Do not continue refactoring in this run.
 
-Danger audit (required preflight; keyed to PMSS history):
-- Read relevant `docs/adr/*` and `docs/incidents/*` for the subsystem you touch; treat them as constraints and failure-mode context.
-- `/home` operations: any deletes/writes under `/home/<user>` must be guarded (validate username, realpath invariants, avoid chained shell).
-- Cron + updates: assume partial-tree windows; avoid creating tooling that breaks if `/scripts/lib/*` disappears mid-update.
-- Shell command composition: never build multi-command strings with untrusted bits; use existing helpers/escapes; split commands; keep one action per call.
-- Internal tool output: treat as untrusted; validate at each boundary (usernames, paths, JSON).
-- dpkg/apt sequencing: never move package-phase ordering; don’t insert steps between dpkg baseline/apply and the mandated apt refresh/install sequence.
-- Structured logging: if touching runtime logging/`runStep()`/JSON emitters, do not change required fields or markers; ensure start markers remain present.
+GATE 2: Concept count must NOT increase.
+“Concepts” are expensive. A concept is any of:
+- a new runtime file
+- a new require/include hop in runtime paths
+- a new global function
+- a new global class
+- a new public entrypoint (scripts/*, scripts/util/*, scripts/cron/*, scripts/cli/*)
 
-Workflow (do this now):
-1) Read AGENTS.md, AGENTS.local.md, any nested AGENTS.md in scope, docs/architecture.md, docs/update.md, docs/refactoring.md, and relevant docs/adr/* files.
-2) Inspect the recent commits, changed files, and complexity/LOC snapshots listed below.
-3) Pick 3–7 refactor/deletion opportunities that fit the rails above, and bundle them into one coherent change set.
-4) Non-goals check (gate):
-   - Explicitly state you are NOT doing feature work, rewrites, interface changes, or “style cleanups”.
-   - If any chosen refactor would require those, drop it from this run.
-5) Refactor intent (required; BEFORE editing):
-   - For each chosen refactor, state:
-     - Purpose (choose 1–2): cost-of-change, risk reduction, leverage, provability.
-     - Metric(s) (choose 1+): duplicated blocks removed, max nesting reduced, LOC delta, tests added/expanded.
-   - Gate: if you cannot map a refactor to a purpose + metric, drop it from this run.
-6) Declare invariants (3–7 bullets) for the target area BEFORE editing:
-   - Examples: CLI output format stable; JSON fields stable; exit codes stable; step ordering stable; file paths stable; log markers stable.
-   - If you cannot state the invariants, stop and choose a different target.
-7) Implement the change with minimal edits:
-   - Keep behaviour and outputs identical.
-   - Prefer deletion and DRY improvements; avoid adding new features or modes.
-   - Keep changes local to the chosen scope.
-   - If you touch risky surfaces (username parsing, filesystem deletes, shell commands):
-     - Add/extend hermetic tests (aim 5+ cases) covering invalid/edge inputs and failure modes.
-   - Before/after control tests (behaviour lock):
-     - When you refactor non-trivial logic and it is feasible, add a dev test that snapshots representative inputs/outputs (including edge cases) so behaviour is pinned through the refactor.
-     - If a hermetic before/after test is not feasible, shrink the refactor until it is testable; if it is still not testable, SKIP that refactor in this run (or stop and require explicit operator approval to proceed YOLO/untested).
-8) Run local verification:
-   - php -l on each changed PHP file.
-   - php scripts/lib/tests/development/Runner.php when touching scripts/lib PHP helpers or CLI PHP entrypoints.
+If you add a concept, you must delete >= 1 concept in the same run.
+Prefer net concept deletion.
+
+GATE 3: No micro-helpers.
+Avoid creating helpers/modules/classes for tiny duplication.
+Local duplication is allowed when:
+- duplicated block ≤ 4 lines AND occurs in ≤ 4 places
+AND the block does NOT represent a safety-critical invariant.
+
+Safety-critical invariant examples:
+- anything touching /home paths, deletes, chmod/chown, user identities, apt/dpkg sequencing,
+  shell command composition, or updater phase boundaries.
+If the duplication is safety-critical, prefer ONE authoritative implementation even if small.
+
+GATE 4: Prefer inlining over indirection.
+If you find trivial wrappers / helpers (delegate-only), inline them and delete the wrapper.
+(Trivial wrapper = calls another function/method with no logic.)
+
+----------------------------------------------------------------------
+HELPER / EXTRACTION ROI (MECHANICAL GATE)
+----------------------------------------------------------------------
+
+Before extracting ANY helper (function/class/file), compute an estimate:
+
+Let:
+- N = number of call sites that would use the helper
+- M = duplicated lines per site that would be removed
+- C = call overhead lines per site (usually 1; sometimes 2)
+- H = helper body lines + required docblock lines + include/require lines + guards/shim overhead
+
+Approx net delta:
+  delta = H + (N * C) - (N * M)
+
+Rules:
+- If delta >= -5 (does NOT save at least ~5 runtime lines), DO NOT extract.
+- If extraction would add a new concept (new runtime file, new require hop, new global symbol),
+  require delta <= -15 OR delete at least one existing concept in the same run.
+- Prefer deleting existing helpers used in <= 4 call sites and <= ~10 LOC body by inlining.
+
+Notes:
+- DRY is not an absolute. Over-abstraction is a refactoring failure mode.
+- If you must centralize for safety invariants, prefer doing it INSIDE an existing subsystem module/class,
+  not a new global helpers file.
+
+----------------------------------------------------------------------
+STYLE / STRUCTURE PREFERENCES (BEAUTY LEVER)
+----------------------------------------------------------------------
+
+When two behaviour-equivalent options exist, choose the one with:
+- fewer concepts (fewer files, fewer global symbols, fewer require hops),
+- fewer branches and less nesting,
+- fewer total runtime lines.
+
+Abstraction ladder (use the lowest rung that works):
+1) DELETE code / dead paths / redundant wrappers.
+2) FLATTEN nesting with guard clauses / early returns (must not change side effects/order).
+3) Use a LOCAL table/map (inside the same file/function) instead of long if/elseif ladders when it compresses.
+4) Use a LOCAL helper in the same file (private method / file-scoped function) ONLY if it passes ROI.
+5) Use an EXISTING subsystem class/module (add a method there) if it avoids new concepts and passes ROI.
+6) Create a NEW module/file/class ONLY if it deletes more code/concepts than it adds (hard gate).
+
+PHP structure preference:
+- Prefer cohesive classes with methods over adding more global helper functions.
+- Avoid new “helpers.php” dumping grounds.
+- Avoid function_exists/class_exists guard patterns unless you are forced by legacy include topology.
+
+File length:
+- ~150 LOC is a guideline, not a target. NEVER split files solely to hit a line count.
+- Splitting is allowed ONLY when it reduces concepts OR deletes runtime LOC.
+
+Comments/docblocks:
+- Comments are for WHY, hazards, invariants, and contracts.
+- Do NOT add filler comments to satisfy ratios.
+- Prefer removing redundant comments and making code self-explanatory.
+- Docblock lint must not regress, but do not introduce new exported symbols that require docblocks unless you are deleting more.
+
+----------------------------------------------------------------------
+HARD RAILS (ALWAYS)
+----------------------------------------------------------------------
+
+- PHP 7.3 only.
+- Do not add external deps/tools/configs unless operator approves.
+- No behaviour changes: flags/env/exit/log/json/paths/order/topology.
+- No safety regressions; never weaken destructive guards.
+- Never modify:
+  - etc/skel/www (locked)
+  - third-party/vendor trees
+  - dpkg baseline files under scripts/lib/update/dpkg/selections*.txt
+- Do not change updater topology or dpkg/apt phase ordering.
+
+Concurrency & Shared Worktree (NEW — HARD)
+
+- Assume multiple Codex sessions/agents may run in the same git worktree concurrently.
+- Treat pre-existing modified/untracked files as owned by another run unless the operator explicitly assigns them to you.
+- Ignore unrelated changes: do not “clean up” or “fix” other files just because they are modified.
+- Never run `git clean`, `git reset --hard`, `git restore`, or any destructive git command unless explicitly ordered by the operator.
+- Only touch files required for your task; if a file you need is already modified, STOP and ask the operator to coordinate (or use a separate worktree).
+- Stage changes with explicit paths only (`git add <file>`); never use `git add .` or broad globs.
+
+----------------------------------------------------------------------
+WORKFLOW (DO THIS)
+----------------------------------------------------------------------
+
+1) Read first:
+   - AGENTS.md, AGENTS.local.md, any nested AGENTS.md in scope
+   - docs/architecture.md, docs/update.md, docs/refactoring.md
+   - relevant docs/adr/* and docs/incidents/* for the subsystem
+
+2) Pick targets (compression run):
+   - Pick 1–3 targets max.
+   - Prefer the highest-value, highest-duplication / highest-nesting hot spots.
+   - Avoid roaming.
+
+3) Non-goals gate:
+   - Explicitly state you are NOT doing feature work, rewrites, interface changes, or style cleanups.
+
+4) For each chosen refactor (before editing), state:
+   - Purpose: cost-of-change / risk reduction / leverage / provability
+   - Metrics: runtime LOC delta target, duplicated blocks removed, max nesting reduced, concepts deleted
+   - Invariants: 3–7 bullets (outputs/paths/order/log markers stable)
+
+5) Implement minimal edits:
+   - Keep behaviour identical.
+   - Prefer deletion + inlining + flattening before extraction.
+   - If a change would violate compression gates, drop it.
+
+6) Verification:
+   - php -l on changed PHP files
+   - php scripts/lib/tests/development/Runner.php when touching scripts/lib helpers or PHP entrypoints
    - scripts/testing/php-lint-compat.sh
    - scripts/testing/test-php.sh
    - scripts/testing/test-bash.sh
    - scripts/testing/php73-compat-scan.sh
-9) Prepare a single, larger commit message that groups multiple small refactors (bundle several behaviour-preserving cleanups into one commit to reduce commit noise), but do NOT commit unless the operator explicitly instructs you to. Do not create new branches or push from this flow.
-10) Summarise in your response (review-first):
-   - List every changed file and why it changed (1 line each).
-   - What you simplified or deleted, and why it reduces cognitive load / code footprint.
-   - Why it is safe and behaviour-preserving (call out any invariants you relied on).
-   - Refactor scorecard (best-effort):
-     - LOC delta (added/removed), functions removed, duplicated blocks removed, max nesting reduced.
-   - Which verification commands you ran.
+   - scripts/testing/docblock-lint.sh when applicable
 
-Operate with SpaceX/Tesla-style discipline:
-- Respect constraints and safety margins; do not chase cleverness.
-- Favour small, iterative improvements that steadily reduce complexity and increase reliability.
+7) Summarise (review-first):
+   - List every changed file and why
+   - What you deleted/simplified and why it reduces concepts/runtime LOC
+   - Why it is behaviour-preserving (which invariants you relied on)
+   - Scorecard:
+     - runtime LOC delta (added/removed, by path)
+     - concepts added/deleted
+     - helpers removed/added
+     - max nesting delta (best-effort)
+   - Commands run
 
-Change budget for this run (hard limit):
-- Limit this refactor to at most 8 files and ~800 total changed lines (additions + deletions).
-- If you reach this budget, stop and return the patch; do not start additional refactors in this iteration.
+No commits unless the operator explicitly instructs you to.
+No new branches unless explicitly instructed.
+
+Change budget:
+- Compression/Safety runs: ≤ 8 files touched, ≤ 800 total changed lines (additions + deletions)
+- Architectural Simplification runs: ≤ 20 files touched, ≤ 2000 total changed lines (additions + deletions)
+Stop if budget is reached.

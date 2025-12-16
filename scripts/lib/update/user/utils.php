@@ -5,15 +5,9 @@
 
 require_once __DIR__.'/../../runtime.php';
 
-function pmssUserSkelBase(): string
-{
-    return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel');
-}
+function pmssUserSkelBase(): string { return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel'); }
 
-function pmssUserSkelPath(string $relative): string
-{
-    return pmssUserSkelBase().'/'.$relative;
-}
+function pmssUserSkelPath(string $relative): string { return pmssUserSkelBase().'/'.$relative; }
 
 /**
  * Return a shell-ready argument for a skel path.

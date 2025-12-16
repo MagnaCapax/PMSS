@@ -2,10 +2,6 @@
 # Shared helpers for Codex-oriented CLI wrappers.
 # Keep lightweight and dependency-free so scripts can source this safely.
 
-CODEX_COMMON_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CODEX_PROMPT_CONTEXT_HEADER="$CODEX_COMMON_HERE/../prompts/context-header.txt"
-CODEX_PROMPT_CONTEXT_FOOTER="$CODEX_COMMON_HERE/../prompts/context-footer.txt"
-
 # Enable bash -x tracing when the given env var is set to 1.
 codex_enable_debug() {
 	local env_var="$1" prefix="$2"
@@ -61,11 +57,18 @@ codex_write_prompt() {
 	local prompt_file="$1" notes_file="$2" prompt_text="$3"
 	shift 3 || true
 
-	codex_require_nonempty_file "$CODEX_PROMPT_CONTEXT_HEADER" "[codex] missing prompt context header"
-	codex_require_nonempty_file "$CODEX_PROMPT_CONTEXT_FOOTER" "[codex] missing prompt context footer"
-
 	printf '%s\n\n' "$prompt_text" >"$prompt_file"
-	cat "$CODEX_PROMPT_CONTEXT_HEADER" >>"$prompt_file"
+	cat <<'EOF' >>"$prompt_file"
+Context to open (paths in this workspace):
+ - AGENTS.md
+ - AGENTS.local.md
+ - docs/architecture.md
+ - docs/update.md
+ - docs/install.md
+ - docs/refactoring.md
+ - docs/contracts.md
+ - docs/adr/
+EOF
 
 	local p
 	for p in "$@"; do
@@ -74,7 +77,10 @@ codex_write_prompt() {
 	done
 	printf '\n' >>"$prompt_file"
 
-	cat "$CODEX_PROMPT_CONTEXT_FOOTER" >>"$prompt_file"
+	cat <<'EOF' >>"$prompt_file"
+
+Do not inline these; read them directly from disk.
+EOF
 
 	codex_append_local_notes "$notes_file" "$prompt_file"
 }

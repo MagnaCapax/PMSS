@@ -195,7 +195,7 @@ if ($packageErrors > 0) {
 }
 
 runStep('Attempting apt fix-broken install (post-package phase)', aptCmd('--fix-broken install -y'));
-pmssAutoremovePackages();
+runStep('Removing packages no longer required', aptCmd('autoremove -y'));
 
 $GLOBALS['PMSS_PACKAGES_READY'] = true;
 putenv('PMSS_PACKAGE_PHASE=complete');

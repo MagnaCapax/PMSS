@@ -98,7 +98,7 @@ function checkFile(string $path): void
 
 function verifyPath(string $sourceFile, int $line, string $target, bool $isRelative): void
 {
-    global $errors;
+    global $errors, $rootDir;
 
     if ($isRelative) {
         $sourceDir = dirname($sourceFile);
@@ -108,9 +108,19 @@ function verifyPath(string $sourceFile, int $line, string $target, bool $isRelat
             $errors[] = "File: $sourceFile:$line\n  Target: $target (Relative)\n  Resolved: $logical (MISSING)";
         }
     } else {
-        if (!file_exists($target)) {
-             $errors[] = "File: $sourceFile:$line\n  Target: $target (Absolute)\n  Status: MISSING";
+        // Absolute include paths are used in production because PMSS stages this repo under
+        // `/scripts` and `/etc/seedbox`. For repo-local CI checks we only validate includes
+        // that should exist inside the repository tree (not runtime-generated configs).
+        if (strpos($target, '/scripts/') === 0) {
+            $mapped = $rootDir . $target;
+            if (!file_exists($mapped)) {
+                $errors[] = "File: $sourceFile:$line\n  Target: $target (Absolute)\n  Resolved: $mapped (MISSING)";
+            }
+            return;
         }
+        // Anything else (e.g. `/etc/seedbox/config/network`) is environment-dependent and
+        // may not exist in the repo checkout; skip it here.
+        return;
     }
 }
 

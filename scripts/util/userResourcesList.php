@@ -15,7 +15,7 @@ if (posix_getuid() !== 0) {
     exit(1);
 }
 
-require_once __DIR__.'/../lib/cli/OptionParser.php';
+require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 $parsed = pmssParseCliTokens($argv);

@@ -20,6 +20,7 @@ usage() {
 #   development/codex-run.sh run --prompt-file development/prompts/codex.txt
 #   development/codex-run.sh run --prompt-file development/prompts/codex.txt --dry-run
 #   development/codex-run.sh run --prompt-file development/prompts/codex.txt --exec 'codex'
+#   development/codex-run.sh run --prompt-file development/prompts/refactor.txt --autocommit
 
 cmd=${1:-}
 shift || true
@@ -41,6 +42,7 @@ custom_prompt=""
 exec_cmd="codex"
 outdir=""
 dry_run=0
+autocommit=0
 declare -a extra_context=()
 
 while [[ $# -gt 0 ]]; do
@@ -64,6 +66,10 @@ while [[ $# -gt 0 ]]; do
 	--context)
 		extra_context+=("${2:-}")
 		shift 2 || true
+		;;
+	--autocommit)
+		autocommit=1
+		shift || true
 		;;
 	--dry-run)
 		dry_run=1
@@ -93,6 +99,34 @@ else
 fi
 
 codex_write_prompt "$prompt_out" "$ROOT/.codex-prompt" "$prompt_text" "${extra_context[@]}"
+
+if [[ "$autocommit" == "1" ]]; then
+	cat <<'EOF' >>"$prompt_out"
+
+Autocommit Mode (operator-approved only)
+
+If (and only if) the operator explicitly enables Autocommit Mode for this run:
+
+- Commits are allowed ONLY when ALL are true:
+  - Compression gates passed (runtime LOC not up; concept count not up).
+  - All required verification commands in the prompt have passed.
+  - `git status --porcelain` shows only the intended changes.
+  - The summary includes the scorecard (runtime LOC delta, concepts delta, helpers pruned).
+
+- Commit format (required):
+  - Subject: "refactor(compression): <subsystem> — runtime -X LOC, concepts -Y"
+  - Body must include:
+    - invariants relied on,
+    - commands run,
+    - what was deleted.
+
+- Stop conditions (required):
+  - If two consecutive runs cannot find a target that satisfies gates, STOP the loop.
+  - If any gate fails, STOP (do not attempt “fix forward” automatically).
+
+---- ****  Autocommit is explicitly operator approved with arguments, never the defualt.
+EOF
+fi
 
 prompt_bytes=$(wc -c <"$prompt_out" | tr -d ' ')
 prompt_lines=$(wc -l <"$prompt_out" | tr -d ' ')
