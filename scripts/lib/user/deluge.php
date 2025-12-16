@@ -3,7 +3,7 @@
  * Deluge configuration helpers.
  */
 
-require_once __DIR__.'/helpers.php';
+require_once __DIR__.'/../update/runtime/commands.php';
 
 function userConfigureDeluge(array $user, array $configuration): void
 {
