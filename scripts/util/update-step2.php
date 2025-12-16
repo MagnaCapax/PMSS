@@ -52,6 +52,14 @@ require_once __DIR__.'/../lib/motd/Generator.php';
 
 requireRoot();
 
+// Preflight: ensure root can keep forking during long updates even if legacy
+// TasksMax caps are present. This is safe to run before the package phase and
+// avoids "Cannot fork" cascades when the updater runs inside user-0.slice.
+runStep(
+    'Ensuring root user slice TasksMax is unlimited (preflight)',
+    "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity"
+);
+
 $distribution  = pmssDetectDistro();
 $distroName    = $distribution['name'];
 $distroVersion = $distribution['version'];

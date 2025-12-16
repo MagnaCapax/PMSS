@@ -27,11 +27,10 @@ class SystemdSliceRootOverrideWrittenTest extends TestCase
         putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
         putenv('PMSS_TOTAL_MEM_MIB=1024');
         \pmssEnsureSystemdSlices('logmsg');
-        $rootDrop = $base.'/user-0.slice.d/99-pmss-unlimited.conf';
+        $rootDrop = $base.'/user-0.slice.d/99-zz-pmss-unlimited.conf';
         $this->assertTrue(file_exists($rootDrop), 'Root override missing');
         $data = (string)file_get_contents($rootDrop);
         $this->assertStringContainsString('MemoryHigh=infinity', $data);
         $this->assertStringContainsString('TasksMax=infinity', $data);
     }
 }
-

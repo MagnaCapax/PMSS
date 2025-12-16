@@ -257,6 +257,28 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         };
 
         // Drop-in management must target /etc paths only; avoid vendor dirs.
+        // Some legacy hosts still carry a vendor drop-in at:
+        //   /usr/lib/systemd/system/user-.slice.d/99-pmss.conf
+        // which can override PMSS settings (including TasksMax) and can even
+        // reappear after dpkg updates. Remove it when found.
+        $sawLegacyVendorDropin = false;
+        if (!$skipSystemctl) {
+            $legacyVendorDropins = [
+                '/usr/lib/systemd/system/user-.slice.d/99-pmss.conf',
+                '/lib/systemd/system/user-.slice.d/99-pmss.conf',
+            ];
+            foreach ($legacyVendorDropins as $legacyPath) {
+                if (!is_file($legacyPath)) {
+                    continue;
+                }
+                $sawLegacyVendorDropin = true;
+                if (@unlink($legacyPath)) {
+                    $log('[WARN] Removed legacy vendor systemd drop-in '.$legacyPath);
+                } else {
+                    $log('[WARN] Unable to remove legacy vendor systemd drop-in '.$legacyPath);
+                }
+            }
+        }
 
         $mode = pmssCgroupMode();
         $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_SLICE_DIR', '/etc/systemd/system/user-.slice.d');
@@ -368,6 +390,25 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
              return;
         }
 
+        // If we observed the legacy vendor drop-in, create an /etc shadow with
+        // the same filename. systemd merges drop-ins by filename across all
+        // search paths, so /etc will override /usr/lib and prevent the 250 cap
+        // from creeping back in after package updates.
+        if ($sawLegacyVendorDropin) {
+            $shadow = "# PMSS: override legacy vendor TasksMax cap (shadow 99-pmss.conf)\n[Slice]\nTasksMax=".$tasksMax."\n";
+            $shadowPath = $dropDir.'/99-pmss.conf';
+            $existing = @file_get_contents($shadowPath);
+            $needsWrite = $existing === false || trim((string) $existing) !== trim($shadow);
+            if ($needsWrite) {
+                if (@file_put_contents($shadowPath, $shadow) !== false) {
+                    @chmod($shadowPath, 0644);
+                    $log('Installed '.$shadowPath.' TasksMax override (legacy vendor drop-in shadow)');
+                } else {
+                    $log('[WARN] Failed to write '.$shadowPath.' TasksMax override (legacy vendor drop-in shadow)');
+                }
+            }
+        }
+
         $reloadSystemd(
             'Reloading systemd manager configuration',
             'Reloading systemd manager configuration (test mode)'
@@ -379,10 +420,16 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         if (!is_dir($rootDir)) {
             @mkdir($rootDir, 0755, true);
         }
-        $rootDrop = $rootDir.'/99-pmss-unlimited.conf';
+        // Use a suffix that sorts after legacy 99-pmss.conf drop-ins so root
+        // remains unlimited even when a stale vendor file exists.
+        $rootDrop = $rootDir.'/99-zz-pmss-unlimited.conf';
         $rootConf = "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n";
         @file_put_contents($rootDrop, $rootConf);
         @chmod($rootDrop, 0644);
+        $legacyRootDrop = $rootDir.'/99-pmss-unlimited.conf';
+        if (is_file($legacyRootDrop)) {
+            @unlink($legacyRootDrop);
+        }
         $reloadSystemd(
             'Reloading systemd manager configuration (root slice)',
             'Reloading systemd manager configuration (root slice, test mode)'
