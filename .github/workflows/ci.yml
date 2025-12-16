@@ -100,7 +100,7 @@ jobs:
 
       - name: LOC snapshot
         run: |
-          scripts/testing/loc.sh || true
+          development/loc.sh || true
 
       - name: PHP LOC metrics (advisory)
         run: |

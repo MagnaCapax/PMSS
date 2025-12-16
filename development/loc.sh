@@ -3,7 +3,7 @@ set -euo pipefail
 
 # LOC summary for PMSS that excludes third-party payloads so totals reflect only
 # in-repo code we maintain.
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 EXCLUDE_RELATIVE=(
 	"etc/skel/www"
 	"var/www"
@@ -167,14 +167,15 @@ echo "Advisory complexity (Bash only)"
 echo "-------------------------------"
 
 declare -a BASH_FILES=()
-for rel in "${TRACKED_FILES[@]}"; do
-	# Exclude third-party trees and non-.sh files
-	if is_excluded_relative "$rel"; then
-		continue
-	fi
-	[[ "$rel" == *.sh ]] || continue
-	BASH_FILES+=("$rel")
-done
+	for rel in "${TRACKED_FILES[@]}"; do
+		# Exclude third-party trees and non-.sh files
+		if is_excluded_relative "$rel"; then
+			continue
+		fi
+		[[ "$rel" == *.sh ]] || continue
+		[[ -f "$ROOT_DIR/$rel" ]] || continue
+		BASH_FILES+=("$rel")
+	done
 
 total_complex=0
 declare -a COMPLEX_ROWS=()
@@ -226,13 +227,14 @@ echo "Advisory complexity (PHP heuristic)"
 echo "-----------------------------------"
 
 declare -a PHP_FILES=()
-for rel in "${TRACKED_FILES[@]}"; do
-	if is_excluded_relative "$rel"; then
-		continue
-	fi
-	[[ "$rel" == *.php ]] || continue
-	PHP_FILES+=("$rel")
-done
+	for rel in "${TRACKED_FILES[@]}"; do
+		if is_excluded_relative "$rel"; then
+			continue
+		fi
+		[[ "$rel" == *.php ]] || continue
+		[[ -f "$ROOT_DIR/$rel" ]] || continue
+		PHP_FILES+=("$rel")
+	done
 
 php_total_complex=0
 declare -a PHP_COMPLEX_ROWS=()

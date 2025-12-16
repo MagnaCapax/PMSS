@@ -10,7 +10,7 @@ Derive basic trends from JSON logs where possible. Do not add new runtime depend
 
 ## Code Metrics (Advisory)
 
-- LOC + Complexity Snapshot: `scripts/testing/loc.sh`
+- LOC + Complexity Snapshot: `development/loc.sh`
   - Prints LOC by category and two advisory complexity sections:
     - Bash heuristic complexity (counts control-flow tokens)
     - PHP heuristic complexity (dependency‑free, per‑file density /100loc)

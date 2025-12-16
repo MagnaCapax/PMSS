@@ -4,6 +4,48 @@ Goal: Apply small, behaviour-preserving refactors that simplify PMSS while keepi
 
 Primary objective: reduce cognitive load and code footprint (fewer branches, less duplication, fewer concepts), while staying fully backward compatible.
 
+Compression & Indirection Rails (NEW — HARD)
+
+This run is a COMPRESSION RUN by default.
+
+Hard goals (must hold):
+- Runtime footprint must not increase (scripts runtime buckets; tests/docs excluded), unless the operator explicitly approves a “safety expansion” run.
+- Do not add new runtime files unless they delete more runtime LOC than they add within the same run.
+- Do not add new exported runtime symbols (global functions/classes) unless you delete >= the same number of exported symbols in the same run.
+
+Indirection budget:
+- Avoid creating new helper files/functions/classes for tiny duplication.
+- Local duplication is allowed when the duplicated block is:
+  - <= 4 lines AND occurs in <= 4 places, OR
+  - extracting it would increase runtime LOC or add a new require/include hop.
+- Prefer inlining / removing indirection over extracting:
+  - If a helper is trivial or just wraps another call, inline it and delete the helper.
+- No “helpers.php” dumping grounds: prefer existing subsystem modules/classes; avoid new global helper files unless the ROI test is met.
+
+Helper ROI test (mechanical gate):
+- Before extracting any helper/class, estimate:
+  - saved_lines = call_sites * duplicated_lines
+  - cost_lines  = helper_body + docblock + require/include + wrapper/shim overhead
+- If saved_lines <= cost_lines + 5, DO NOT extract. Keep local duplication or use a table-driven refactor.
+
+Helper pruning (required during compression runs):
+- If you find helpers used <= 4 call sites AND <= ~10 LOC body, prefer deleting them by inlining at call sites, unless the helper encodes a critical safety invariant that must not drift.
+
+Run types (pick one; default is compression):
+- Compression Run (default): enforce the gates above; add tests only when required to delete/refactor safely.
+- Safety Expansion Run (explicit, operator-approved): allowed to add runtime LOC/files/symbols when it materially improves safety/guardrails or testability.
+
+File length guidance:
+- ~150 LOC is a guideline, not a target. Never split files solely to hit a line count.
+- Split only when it reduces cognitive load, nesting, or duplication without increasing concepts/files.
+
+Comments:
+- Comments are for invariants, hazards, and WHY. Do not add comments to satisfy ratios.
+- Prefer deleting redundant comments and making code self-explanatory.
+
+Beauty lever:
+- When two solutions are behaviour-equivalent, choose the one with fewer concepts (fewer files, fewer exported symbols, fewer call indirections), even if that means tolerating small local duplication.
+
 Definition (what “refactoring” means here):
 - Change internal structure without changing externally observable behaviour.
 - “Externally observable” includes: CLI flags/semantics, env var names, exit codes, log/JSON field names and formats, file paths, operational ordering, and updater topology.
@@ -23,7 +65,7 @@ Read first (do not proceed until read):
 - Any nested AGENTS.md covering the files you touch (most-specific instructions win).
 - docs/architecture.md (bootstrap/update topology, module responsibilities).
 - docs/update.md (install.sh → scripts/update.php → scripts/util/update-step2.php flow and invariants).
-- docs/refactoring.md (Linux kernel style guidance, ~150 LOC per file targets, when to split helpers).
+- docs/refactoring.md (Linux kernel style guidance; ~150 LOC per file is a preference guideline, not a hard rule; when to split helpers).
 - docs/adr/* (Treat Accepted ADRs as constraints; consider those relevant to your target area).
 
 Core engineering principles to honour (do not dilute them):
@@ -60,7 +102,8 @@ Hard rails (must follow all of these):
   - If a refactor cannot be completed safely within this budget, do not start it.
 - Deletion and DRY as primary goals:
   - Remove unused helpers, dead code paths, or redundant wrappers when you can prove they are unreferenced.
-  - Consolidate near-duplicate logic into small shared helpers instead of adding new flows.
+  - Consolidate near-duplicate logic into small shared helpers when it deletes code or reduces risk; do not add new flows.
+  - DRY is not an absolute. Prefer DRY only when it reduces total runtime footprint or eliminates meaningful risk. Avoid over-abstracting trivial duplications.
   - Do not add new modes, flags, or configuration knobs as part of this refactor.
 - No interface/layout changes:
   - Do not move or rename public entrypoints, config file locations, or JSON structures.
@@ -72,8 +115,8 @@ Hard rails (must follow all of these):
 
 Refactor style guidance:
 - Follow docs/refactoring.md:
-  - When a file grows beyond roughly 150–200 lines of real code, consider splitting cohesive pieces into focused helpers.
-  - Keep new files small and single-purpose; prefer many tiny modules over monoliths.
+  - File size is a guideline: ~150 LOC is a preference, not a strict rule. Do not split files unless it reduces nesting/duplication and does not increase concept count.
+  - Prefer cohesive modules. New modules/files are expensive; only introduce them when they enable net deletion (LOC and/or concepts). Otherwise keep logic local and boring.
 - Choose a small set of high-value targets:
   - Prefer 3–7 small, behaviour-preserving refactors per run that can be bundled into one larger commit message (still within the change budget).
   - You MAY choose a slightly larger refactor if (and only if) it stays within the hard rails and the change budget and measurably reduces cognitive load/duplication.
@@ -86,6 +129,7 @@ Refactor style guidance:
     - This reduces duplication, shrinks code/token footprint, and reduces “forgot to update one branch” bugs.
   - Reduce nesting:
     - Prefer guard clauses and early returns to keep the happy path flat and readable.
+    - If simplifying nesting would require introducing a new helper that fails the Helper ROI test, keep the code inline and just use guard clauses.
     - Extract small helpers when a nested block mixes concerns (validation vs. I/O vs. orchestration) or exceeds ~4 nesting levels.
     - Keep behaviour identical: guards must not change side effects, log formats, or exit codes.
   - Overly nested conditionals that can be simplified without changing logic.
@@ -104,7 +148,8 @@ Refactor style guidance:
   - Optimise for readability under fatigue; fewer concepts and flows are better.
 
 Commenting and docblocks (Linux-kernel-style intent):
-- Maintain roughly ~1 meaningful line of commentary per ~10 lines of code (explain WHY and invariants, not what the code obviously does).
+- Comments are for invariants, hazards, and WHY; do not narrate the obvious or add filler to satisfy ratios.
+- Prefer deleting redundant comments and making code self-explanatory.
 - Prefer small file-level docblocks that explain responsibility, inputs/outputs, side effects, and key safety invariants.
 - Add docblocks for new public helpers (and for any non-obvious internal helper) so future refactors can stay safe.
 - Keep names descriptive and context-first; avoid 1-letter variables; avoid deep nesting (extract helpers instead).

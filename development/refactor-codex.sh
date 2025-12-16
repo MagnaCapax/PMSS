@@ -102,9 +102,9 @@ if [[ -s "$COMMITS_FILES" ]]; then
 fi
 
 # Ensure advisory complexity snapshots exist (best-effort).
-if [[ -x "$ROOT/scripts/testing/loc.sh" ]]; then
-	echo "[refactor-codex] generating LOC snapshot via scripts/testing/loc.sh" >&1
-	bash "$ROOT/scripts/testing/loc.sh" >"$LOC_LOG" 2>&1 || true
+if [[ -x "$ROOT/development/loc.sh" ]]; then
+	echo "[refactor-codex] generating LOC snapshot via development/loc.sh" >&1
+	"$ROOT/development/loc.sh" >"$LOC_LOG" 2>&1 || true
 fi
 if [[ -x "$ROOT/scripts/testing/phploc.sh" ]]; then
 	echo "[refactor-codex] generating phploc snapshot via scripts/testing/phploc.sh" >&1

@@ -36,4 +36,4 @@ PMSS_LINT_NET_STRICT=0 bash scripts/testing/net-edges-lint.sh
 echo "OK: all checks"
 echo
 echo "LOC snapshot"
-scripts/testing/loc.sh || true
+development/loc.sh || true

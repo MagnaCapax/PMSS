@@ -34,7 +34,7 @@ Workflow (Do This Now):
   * scripts/testing/test-php.sh
   * scripts/testing/test-bash.sh
   * scripts/testing/php73-compat-scan.sh
-- From the CI logs, locate the latest LOC snapshot emitted by scripts/testing/loc.sh (look for "PMSS lines of code (excluding third-party trees)" and the advisory complexity sections) and use that to understand category growth and hotspots; do not re-run loc.sh unless explicitly requested.
+- From the CI logs, locate the latest LOC snapshot emitted by development/loc.sh (look for "PMSS lines of code (excluding third-party trees)" and the advisory complexity sections) and use that to understand category growth and hotspots; do not re-run loc.sh unless explicitly requested.
 - If the operator asks you to commit (no branches, no push):
   * `git add <specific_files>` (never `git add -A`) then `git commit -m "ci: <scope> — <short reason>"`
 
