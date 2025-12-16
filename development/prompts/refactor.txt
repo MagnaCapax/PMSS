@@ -162,7 +162,7 @@ Concurrency & Shared Worktree (NEW — HARD)
 - Treat pre-existing modified/untracked files as owned by another run unless the operator explicitly assigns them to you.
 - Ignore unrelated changes: do not “clean up” or “fix” other files just because they are modified.
 - Never run `git clean`, `git reset --hard`, `git restore`, or any destructive git command unless explicitly ordered by the operator.
-- Only touch files required for your task; if a file you need is already modified, STOP and ask the operator to coordinate (or use a separate worktree).
+- Only touch files required for your task; treat already-modified files as off-limits unless the operator explicitly assigns them to you for this run (or use a separate worktree).
 - Stage changes with explicit paths only (`git add <file>`); never use `git add .` or broad globs.
 
 ----------------------------------------------------------------------
