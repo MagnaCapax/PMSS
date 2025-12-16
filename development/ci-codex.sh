@@ -139,8 +139,12 @@ ci_api_get_json() {
 	ci_shell_disable_xtrace
 	local token="${GITHUB_TOKEN:-}"
 	if [[ -n "$token" ]]; then
+		local auth_header="Authorization: token $token"
+		if [[ "$token" == github_pat_* ]]; then
+			auth_header="Authorization: Bearer $token"
+		fi
 		curl -fsSL \
-			-H "Authorization: Bearer $token" \
+			-H "$auth_header" \
 			-H "Accept: application/vnd.github+json" \
 			-H "X-GitHub-Api-Version: 2022-11-28" \
 			"$url"
@@ -167,8 +171,12 @@ ci_api_download_zip() {
 	: >"$headers"
 	rm -f "$out_zip" >/dev/null 2>&1 || true
 	if [[ -n "$token" ]]; then
+		local auth_header="Authorization: token $token"
+		if [[ "$token" == github_pat_* ]]; then
+			auth_header="Authorization: Bearer $token"
+		fi
 		curl -fsS \
-			-H "Authorization: Bearer $token" \
+			-H "$auth_header" \
 			-H "Accept: application/vnd.github+json" \
 			-H "X-GitHub-Api-Version: 2022-11-28" \
 			-D "$headers" \
