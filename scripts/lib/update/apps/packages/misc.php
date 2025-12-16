@@ -9,14 +9,14 @@ function pmssInstallSabnzbd(): void
 {
     if (!file_exists('/usr/bin/sabnzbdplus')) {
         echo "## Installing Sabnzbdplus\n";
-        pmssQueuePackage('sabnzbdplus');
+        pmssQueuePackages(['sabnzbdplus']);
     }
 }
 
 function pmssInstallMiscTools(): void
 {
     if (!file_exists('/usr/bin/mkvextract')) {
-        pmssQueuePackage('mkvtoolnix');
+        pmssQueuePackages(['mkvtoolnix']);
     }
 
     if (!file_exists('/usr/sbin/openvpn')) {
@@ -26,7 +26,7 @@ function pmssInstallMiscTools(): void
     pmssQueuePackages(['sudo', 'expect']);
 
     if (!file_exists('/sbin/ipset')) {
-        pmssQueuePackage('ipset');
+        pmssQueuePackages(['ipset']);
     }
 }
 
@@ -38,14 +38,15 @@ function pmssInstallWireguardPackages(): void
     // userland tools. Avoid queueing the legacy DKMS package which can wedge
     // kernel upgrades with BUILD_EXCLUSIVE errors.
     if ($distroVersion >= 12) {
-        if (!pmssPackagesInstalled(['wireguard-tools'])) {
+        if (pmssPackageStatus('wireguard-tools') !== 'install ok installed') {
             pmssQueuePackages(['wireguard', 'wireguard-tools']);
         }
         return;
     }
 
     // Skip queueing when the runtime already has the necessary tooling in place.
-    if (pmssPackagesInstalled(['wireguard-tools']) && pmssPackagesInstalled(['wireguard-dkms'])) {
+    if (pmssPackageStatus('wireguard-tools') === 'install ok installed'
+        && pmssPackageStatus('wireguard-dkms') === 'install ok installed') {
         return;
     }
 

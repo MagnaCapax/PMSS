@@ -42,11 +42,6 @@ function pmssQueuePackages(array $packages, ?string $target = null): void
 //       present-but-not-in-baseline and missing-from-host to help converge
 //       systems before removing the queue entirely.
 
-function pmssQueuePackage(string $package, ?string $target = null): void
-{
-    pmssQueuePackages([$package], $target);
-}
-
 function pmssFlushPackageQueue(): void
 {
     global $PMSS_PACKAGE_QUEUE;
@@ -57,7 +52,19 @@ function pmssFlushPackageQueue(): void
         return;
     }
 
+    $logNotice = function (string $message): void {
+        if (function_exists('logmsg')) {
+            logmsg($message);
+        } else {
+            echo $message."\n";
+        }
+    };
+
     foreach ($PMSS_PACKAGE_QUEUE as $target => $packages) {
+        $isDefaultTarget = $target === PMSS_PACKAGE_QUEUE_DEFAULT;
+        $missingContext = $isDefaultTarget ? 'default queue' : ('queue '.$target);
+        $installContext = $isDefaultTarget ? 'package queue' : ('package queue '.$target);
+
         $packages = array_values(array_unique(array_filter($packages)));
         if (empty($packages)) {
             continue;
@@ -65,9 +72,8 @@ function pmssFlushPackageQueue(): void
 
         [$installable, $missing] = pmssFilterAvailablePackages($packages);
         if (!empty($missing)) {
-            $context = $target === PMSS_PACKAGE_QUEUE_DEFAULT ? 'default queue' : ('queue '.$target);
-            $message = sprintf('Skipping unavailable packages in %s: %s', $context, implode(', ', $missing));
-            pmssLogPackageNotice('[WARN] '.$message);
+            $message = sprintf('Skipping unavailable packages in %s: %s', $missingContext, implode(', ', $missing));
+            $logNotice('[WARN] '.$message);
             $PMSS_PACKAGE_WARNINGS[] = $message;
         }
         if (empty($installable)) {
@@ -75,22 +81,17 @@ function pmssFlushPackageQueue(): void
         }
 
         $pkgArgs = implode(' ', array_map('escapeshellarg', $installable));
-        if ($target === PMSS_PACKAGE_QUEUE_DEFAULT) {
-            $cmd = aptCmd('install -y '.$pkgArgs);
-            $label = 'Installing packages';
-        } else {
-            $cmd = aptCmd('install -y -t '.escapeshellarg($target).' '.$pkgArgs);
-            $label = 'Installing packages ('.$target.')';
-        }
+        $label = $isDefaultTarget ? 'Installing packages' : ('Installing packages ('.$target.')');
+        $targetArg = $isDefaultTarget ? '' : (' -t '.escapeshellarg($target));
+        $cmd = aptCmd('install -y'.$targetArg.' '.$pkgArgs);
 
         $rc = runStep($label, $cmd);
         if ($rc !== 0) {
-            $context = $target === PMSS_PACKAGE_QUEUE_DEFAULT ? 'package queue' : 'package queue '.$target;
-            runStep('Attempting apt fix-broken install ('.$context.')', aptCmd('--fix-broken install -y'));
+            runStep('Attempting apt fix-broken install ('.$installContext.')', aptCmd('--fix-broken install -y'));
             $retryRc = runStep($label.' retry', $cmd);
             if ($retryRc !== 0) {
-                $message = sprintf('Final package install failure in %s: %s', $context, implode(', ', $installable));
-                pmssLogPackageNotice('[ERROR] '.$message);
+                $message = sprintf('Final package install failure in %s: %s', $installContext, implode(', ', $installable));
+                $logNotice('[ERROR] '.$message);
                 $PMSS_PACKAGE_ERRORS[] = $message;
             }
         }
@@ -105,43 +106,28 @@ function pmssFlushPackageQueue(): void
         $PMSS_POST_INSTALL_COMMANDS = [];
     }
 
-    if (!empty($PMSS_PACKAGE_WARNINGS)) {
-        $summary = array_values(array_unique($PMSS_PACKAGE_WARNINGS));
-        pmssLogPackageNotice('[WARN] Package queue warnings: '.implode(' | ', $summary));
-        putenv('PMSS_PACKAGE_INSTALL_WARNINGS='.count($summary));
+    $summary = !empty($PMSS_PACKAGE_WARNINGS) ? array_values(array_unique($PMSS_PACKAGE_WARNINGS)) : [];
+    if (!empty($summary)) {
+        $logNotice('[WARN] Package queue warnings: '.implode(' | ', $summary));
+    }
+    putenv('PMSS_PACKAGE_INSTALL_WARNINGS='.count($summary));
+    if (!empty($summary)) {
         $PMSS_PACKAGE_WARNINGS = [];
-    } else {
-        putenv('PMSS_PACKAGE_INSTALL_WARNINGS=0');
     }
 
-    if (!empty($PMSS_PACKAGE_ERRORS)) {
-        $summary = array_values(array_unique($PMSS_PACKAGE_ERRORS));
-        pmssLogPackageNotice('[ERROR] Package queue errors: '.implode(' | ', $summary));
+    $summary = !empty($PMSS_PACKAGE_ERRORS) ? array_values(array_unique($PMSS_PACKAGE_ERRORS)) : [];
+    if (!empty($summary)) {
+        $logNotice('[ERROR] Package queue errors: '.implode(' | ', $summary));
         if (function_exists('pmssLogJson')) {
             pmssLogJson([
                 'event'   => 'package_queue_failure',
                 'issues'  => $summary,
             ]);
         }
-        putenv('PMSS_PACKAGE_INSTALL_ERRORS='.count($summary));
-        $PMSS_PACKAGE_ERRORS = [];
-    } else {
-        putenv('PMSS_PACKAGE_INSTALL_ERRORS=0');
     }
-}
-
-function pmssQueuePostInstallCommand(string $description, string $command): void
-{
-    global $PMSS_POST_INSTALL_COMMANDS;
-    $PMSS_POST_INSTALL_COMMANDS[] = [$description, $command];
-}
-
-function pmssLogPackageNotice(string $message): void
-{
-    if (function_exists('logmsg')) {
-        logmsg($message);
-    } else {
-        echo $message."\n";
+    putenv('PMSS_PACKAGE_INSTALL_ERRORS='.count($summary));
+    if (!empty($summary)) {
+        $PMSS_PACKAGE_ERRORS = [];
     }
 }
 
@@ -153,33 +139,6 @@ function pmssPackageStatus(string $package): string
     $cmd = 'dpkg-query -W -f=\'${Status}\' '.escapeshellarg($package).' 2>/dev/null';
     exec($cmd, $output, $rc);
     return $rc === 0 && isset($output[0]) ? trim($output[0]) : '';
-}
-
-/**
- * True when a package exists but is not fully configured.
- */
-function pmssPackagesNeedCleanup(array $packages): bool
-{
-    foreach ($packages as $pkg) {
-        $status = pmssPackageStatus($pkg);
-        if ($status !== '' && $status !== 'install ok installed') {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * Confirm that every package is cleanly installed.
- */
-function pmssPackagesInstalled(array $packages): bool
-{
-    foreach ($packages as $pkg) {
-        if (pmssPackageStatus($pkg) !== 'install ok installed') {
-            return false;
-        }
-    }
-    return true;
 }
 
 /**
@@ -315,11 +274,20 @@ function pmssInstallProftpdStack(int $distroVersion): void
 
     // Only queue a reconfigure if dpkg reports half-configured state.
     $proftpdPkgs = ['proftpd-core', 'proftpd-mod-crypto', 'proftpd-mod-wrap', 'proftpd-basic'];
-    if (pmssPackagesNeedCleanup($proftpdPkgs)) {
-        pmssQueuePostInstallCommand(
+    $needsCleanup = false;
+    foreach ($proftpdPkgs as $pkg) {
+        $status = pmssPackageStatus($pkg);
+        if ($status !== '' && $status !== 'install ok installed') {
+            $needsCleanup = true;
+            break;
+        }
+    }
+    if ($needsCleanup) {
+        global $PMSS_POST_INSTALL_COMMANDS;
+        $PMSS_POST_INSTALL_COMMANDS[] = [
             'Reconfiguring proftpd packages',
-            'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true'
-        );
+            'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true',
+        ];
     } else {
         if (function_exists('logmsg')) {
             logmsg('[SKIP] ProFTPD packages already configured');

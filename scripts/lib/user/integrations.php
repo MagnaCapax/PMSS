@@ -3,7 +3,7 @@
  * Helper utilities for optional integrations such as rclone.
  */
 
-require_once __DIR__.'/helpers.php';
+require_once __DIR__.'/../update/runtime/commands.php';
 
 /**
  * Ensure helper ports and directories exist for rclone integrations.

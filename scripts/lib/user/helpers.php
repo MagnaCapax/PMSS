@@ -8,3 +8,4 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
+

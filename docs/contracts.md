@@ -273,12 +273,8 @@ iptables helpers:
 ## Package Queue (transitional)
 
 - pmssQueuePackages(array $packages, ?string $target=null): void → queue package names under `__default__` or suite (e.g., `buster-backports`), deduped.
-- pmssQueuePackage(string $package, ?string $target=null): void → convenience wrapper.
 - pmssFlushPackageQueue(): void → install each queue; split available vs missing with `apt-cache policy`, run `apt-get install` (with `-t <suite>`), retry with `--fix-broken`; run post-install commands; set env counters `PMSS_PACKAGE_INSTALL_WARNINGS|ERRORS`, log JSON event on errors.
-- pmssQueuePostInstallCommand(string $description, string $command): void → enqueue a command run after successful installs.
 - pmssPackageStatus(string $package): string → dpkg status string or `''`.
-- pmssPackagesNeedCleanup(array $packages): bool → true if any non‑installed status present.
-- pmssPackagesInstalled(array $packages): bool → true if all are `install ok installed`.
 - pmssPackageAvailable(string $package): bool → parses `apt-cache policy` for Candidate != `(none)` (cached).
 - pmssInstallBestEffort(array $items, string $label=''): void → from each list item (string or list of fallbacks) picks the first available and queues.
 - pmssInstallProftpdStack(int $distroVersion): void → queues proftpd stack (+nftables for >=10), unmask unit pre-install, and enqueues a `dpkg --configure` recovery command.
