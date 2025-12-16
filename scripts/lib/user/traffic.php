@@ -26,7 +26,7 @@ function userApplyTrafficLimit(array $user): void
         escapeshellarg($user['name']),
         escapeshellarg($user['trafficLimit'])
     );
-    userRunCommand('Updating traffic limit', $cmd);
+    runStep('Updating traffic limit', $cmd);
 }
 
 /**
@@ -48,7 +48,7 @@ function userApplyDiskQuota(array $user): void
         $filesLimit,
         $filesBurst
     );
-    userRunCommand('Applying disk quota', $cmd);
+    runStep('Applying disk quota', $cmd);
 
     // Immediately refresh the user-visible quota status file
     $quotaFile = "/home/{$user['name']}/.quota";
@@ -57,5 +57,5 @@ function userApplyDiskQuota(array $user): void
         escapeshellarg($quotaFile),
         escapeshellarg($user['name'])
     );
-    userRunCommand('Refreshing quota status file', $refreshCmd);
+    runStep('Refreshing quota status file', $refreshCmd);
 }

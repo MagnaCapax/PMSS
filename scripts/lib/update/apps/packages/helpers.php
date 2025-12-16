@@ -17,21 +17,10 @@ const PMSS_PACKAGE_QUEUE_DEFAULT = '__default__';
 //     after all queues flush successfully.
 //   - PMSS_PACKAGE_WARNINGS / ERRORS: strings describing skipped or failed
 //     packages; summarised into environment variables for update-step2.
-if (!isset($GLOBALS['PMSS_PACKAGE_QUEUE'])) {
-    $GLOBALS['PMSS_PACKAGE_QUEUE'] = [];
-}
-
-if (!isset($GLOBALS['PMSS_POST_INSTALL_COMMANDS'])) {
-    $GLOBALS['PMSS_POST_INSTALL_COMMANDS'] = [];
-}
-
-if (!isset($GLOBALS['PMSS_PACKAGE_WARNINGS'])) {
-    $GLOBALS['PMSS_PACKAGE_WARNINGS'] = [];
-}
-
-if (!isset($GLOBALS['PMSS_PACKAGE_ERRORS'])) {
-    $GLOBALS['PMSS_PACKAGE_ERRORS'] = [];
-}
+$GLOBALS['PMSS_PACKAGE_QUEUE'] = $GLOBALS['PMSS_PACKAGE_QUEUE'] ?? [];
+$GLOBALS['PMSS_POST_INSTALL_COMMANDS'] = $GLOBALS['PMSS_POST_INSTALL_COMMANDS'] ?? [];
+$GLOBALS['PMSS_PACKAGE_WARNINGS'] = $GLOBALS['PMSS_PACKAGE_WARNINGS'] ?? [];
+$GLOBALS['PMSS_PACKAGE_ERRORS'] = $GLOBALS['PMSS_PACKAGE_ERRORS'] ?? [];
 
 function pmssQueuePackages(array $packages, ?string $target = null): void
 {

@@ -71,8 +71,6 @@ class rtorrentConfig {
 		if (!isset($config['scgiPort'])) $config['scgiPort'] = $this->_configPortPrivate('scgi', 4000, 24000);
 		if (!isset($config['dhtPort']) or empty($config['dhtPort'])) $config['dhtPort'] = $this->_configPortPrivate('dht', 24001, 44000);
 		if (!isset($config['listenPort']) or (empty($config['listenPort']))) $config['listenPort'] = $this->_configPortPrivate('listen', 44001, 64000);
-		if ( !($config['dht'] == 'no' || $config['dht'] == 'yes' || $config['dht'] == 'auto') ) $dht = 'disabled';
-		if ( !($config['pex'] == 'no' || $config['pex'] == 'yes' || $config['pex'] == 'auto') ) $pex = 'no';
 			
 		$resourceConfig = $this->_resourceConfig;
 		$template = $this->_template;
@@ -83,17 +81,20 @@ class rtorrentConfig {
 		$maximumPeers = floor($resourceConfig['peers']['maximum'] * $blocks);
 		$uploadSlots = floor( $resourceConfig['uploadSlots'] * $blocks );
 		
-		
-		$configFile = str_replace('##minimumPeers', $minimumPeers, $template);
-		$configFile = str_replace('##maximumPeers', $maximumPeers, $configFile);
-        $configFile = str_replace('##uploadSlotsGlobal', $uploadSlots * 6, $configFile);
-		$configFile = str_replace('##uploadSlots', $uploadSlots, $configFile);
-		$configFile = str_replace('##scgiPort', $config['scgiPort'], $configFile);
-        $configFile = str_replace('##dhtPort', $config['dhtPort'], $configFile);
-        $configFile = str_replace('##listenPort', $config['listenPort'], $configFile);
-		$configFile = str_replace('##pex', $config['pex'], $configFile);
-		$configFile = str_replace('##dht', $config['dht'], $configFile);
-		$configFile = str_replace('##memoryMax', $config['ram'] . 'M', $configFile);
+
+		$replacements = [
+			'##minimumPeers'      => $minimumPeers,
+			'##maximumPeers'      => $maximumPeers,
+			'##uploadSlotsGlobal' => $uploadSlots * 6,
+			'##uploadSlots'       => $uploadSlots,
+			'##scgiPort'          => $config['scgiPort'],
+			'##dhtPort'           => $config['dhtPort'],
+			'##listenPort'        => $config['listenPort'],
+			'##pex'               => $config['pex'],
+			'##dht'               => $config['dht'],
+			'##memoryMax'         => $config['ram'] . 'M',
+		];
+		$configFile = str_replace(array_keys($replacements), array_values($replacements), $template);
 	
 		// Config for localnets, add preferred ipv4 filtering if defined
 		if (is_readable('/etc/seedbox/config/localnet')) {

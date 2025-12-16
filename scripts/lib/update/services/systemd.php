@@ -20,27 +20,30 @@ if (!function_exists('pmssStopDisableMaskSystemdUnit')) {
     function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask): void
     {
         $dryRun = getenv('PMSS_DRY_RUN') === '1';
+        $actions = [
+            ['label' => "Stopping {$label} system service", 'command' => 'systemctl stop %s || true'],
+            ['label' => "Disabling {$label} system service", 'command' => 'systemctl disable %s || true'],
+        ];
+        if ($mask) {
+            $actions[] = ['label' => "Masking {$label} system service", 'command' => 'systemctl mask %s || true'];
+        }
+
         if (!$dryRun && function_exists('pmssSystemdAvailable') && !pmssSystemdAvailable()) {
-            pmssLogStatus('SKIP', "Stopping {$label} system service (systemd unavailable)");
-            pmssLogStatus('SKIP', "Disabling {$label} system service (systemd unavailable)");
-            if ($mask) {
-                pmssLogStatus('SKIP', "Masking {$label} system service (systemd unavailable)");
+            foreach ($actions as $action) {
+                pmssLogStatus('SKIP', $action['label'].' (systemd unavailable)');
             }
             return;
         }
         if (!$dryRun && function_exists('pmssSystemdUnitExists') && !pmssSystemdUnitExists($unit)) {
-            pmssLogStatus('SKIP', "Stopping {$label} system service (unit {$unit} missing)");
-            pmssLogStatus('SKIP', "Disabling {$label} system service (unit {$unit} missing)");
-            if ($mask) {
-                pmssLogStatus('SKIP', "Masking {$label} system service (unit {$unit} missing)");
+            foreach ($actions as $action) {
+                pmssLogStatus('SKIP', $action['label'].' (unit '.$unit.' missing)');
             }
             return;
         }
+
         $unitEsc = escapeshellarg($unit);
-        runStep("Stopping {$label} system service", 'systemctl stop '.$unitEsc.' || true');
-        runStep("Disabling {$label} system service", 'systemctl disable '.$unitEsc.' || true');
-        if ($mask) {
-            runStep("Masking {$label} system service", 'systemctl mask '.$unitEsc.' || true');
+        foreach ($actions as $action) {
+            runStep($action['label'], sprintf($action['command'], $unitEsc));
         }
     }
 }

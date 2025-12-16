@@ -15,8 +15,6 @@ require_once __DIR__.'/../lib/user/deluge.php';
 require_once __DIR__.'/../lib/user/qbittorrent.php';
 require_once __DIR__.'/../lib/user/integrations.php';
 require_once __DIR__.'/../lib/user/system.php';
-require_once __DIR__.'/../lib/update/runtime/commands.php';
-require_once __DIR__.'/../lib/user/helpers.php';
 
 /**
  * Main entry point for user configuration changes.

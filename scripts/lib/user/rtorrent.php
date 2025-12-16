@@ -55,6 +55,6 @@ function userRestartRtorrentIfRunning(array $user): void
     $pidChunk = explode(':+', (string)file_get_contents($lockFile));
     $pid = (int) $pidChunk;
     if ($pid > 0) {
-        userRunCommand('Restarting rTorrent', sprintf('kill -9 %d', $pid));
+        runStep('Restarting rTorrent', sprintf('kill -9 %d', $pid));
     }
 }

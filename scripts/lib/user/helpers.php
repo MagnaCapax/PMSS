@@ -1,14 +1,10 @@
 <?php
 /**
- * Shared helpers for user configuration routines.
+ * Runtime bootstrap for user configuration helpers.
+ *
+ * Historically this module exposed a `userRunCommand()` wrapper around the
+ * shared `runStep()` runner. That alias has been removed so user provisioning
+ * helpers share the same command runner name as the updater.
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-
-/**
- * Run a shell command with optional logging while keeping failures non-fatal.
- */
-function userRunCommand(string $description, string $command): int
-{
-    return runStep($description, $command);
-}

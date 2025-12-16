@@ -14,15 +14,15 @@ function userConfigureDeluge(array $user, array $configuration): void
     $sessionDir    = "$home/.sessionDeluge";
 
     if (!file_exists($configDir)) {
-        userRunCommand('Creating Deluge config dir', sprintf('mkdir -p %s', escapeshellarg($configDir)));
+        runStep('Creating Deluge config dir', sprintf('mkdir -p %s', escapeshellarg($configDir)));
     }
     if (!file_exists($unfinishedDir)) {
-        userRunCommand('Creating Deluge unfinished dir', sprintf('mkdir -p %s', escapeshellarg($unfinishedDir)));
-        userRunCommand('Fixing Deluge unfinished ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($unfinishedDir)));
+        runStep('Creating Deluge unfinished dir', sprintf('mkdir -p %s', escapeshellarg($unfinishedDir)));
+        runStep('Fixing Deluge unfinished ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($unfinishedDir)));
     }
     if (!file_exists($sessionDir)) {
-        userRunCommand('Creating Deluge session dir', sprintf('mkdir -p %s', escapeshellarg($sessionDir)));
-        userRunCommand('Fixing Deluge session ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($sessionDir)));
+        runStep('Creating Deluge session dir', sprintf('mkdir -p %s', escapeshellarg($sessionDir)));
+        runStep('Fixing Deluge session ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($sessionDir)));
     }
 
     $scgiPort    = $configuration['config']['scgiPort'] ?? 5000;
@@ -50,16 +50,16 @@ function userConfigureDeluge(array $user, array $configuration): void
     file_put_contents("$home/.delugePort", $delugePort);
 
     if (!file_exists("$configDir/auth")) {
-        userRunCommand('Provisioning Deluge auth template', sprintf('cp %s %s',
+        runStep('Provisioning Deluge auth template', sprintf('cp %s %s',
             escapeshellarg('/etc/seedbox/config/template.deluge.auth'),
             escapeshellarg("$configDir/auth")
         ));
     }
     if (!file_exists("$configDir/web.conf")) {
-        userRunCommand('Provisioning Deluge web template', sprintf('cp %s %s',
+        runStep('Provisioning Deluge web template', sprintf('cp %s %s',
             escapeshellarg('/etc/seedbox/config/template.deluge.web.conf'),
             escapeshellarg("$configDir/web.conf")
         ));
     }
-    userRunCommand('Fixing Deluge ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg("$home/.config/")));
+    runStep('Fixing Deluge ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg("$home/.config/")));
 }

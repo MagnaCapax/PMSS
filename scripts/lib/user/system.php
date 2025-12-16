@@ -10,7 +10,7 @@ function userEnsureShell(array $user): void
     if (!file_exists('/bin/bash')) {
         return;
     }
-    userRunCommand('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg($user['name'])));
+    runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg($user['name'])));
 }
 
 function userConfigureSystemdSlice(array $user): void
@@ -53,7 +53,7 @@ function userConfigureSystemdSlice(array $user): void
         $args[] = '--cpu-quota-percent=' . $quotaVal;
     }
 
-    userRunCommand(
+    runStep(
         'Configuring cgroups',
         pmssBuildCommand('php', $args)
     );
@@ -61,9 +61,9 @@ function userConfigureSystemdSlice(array $user): void
 
 function userEnableLingerAndDocker(array $user): void
 {
-    userRunCommand('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
-    userRunCommand('Installing systemd-container tools', 'apt-get install -y systemd-container');
-    userRunCommand(
+    runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
+    runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');
+    runStep(
         'Configuring rootless Docker',
         sprintf('machinectl shell %1$s@ /usr/bin/dockerd-rootless-setuptool.sh install', escapeshellarg($user['name']))
     );
