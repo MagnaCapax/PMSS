@@ -303,7 +303,7 @@ if (!function_exists('runCommand')) {
      * runStep() excerpts, and emits an interactive banner so operators can see
      * which command is in-flight when running manually.
      */
-    function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null): int
+    function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null, bool $inheritTty = false): int
     {
         $log = $logger ?? 'logMessage';
         $isInteractive = function_exists('posix_isatty') && posix_isatty(STDOUT);
@@ -334,11 +334,24 @@ if (!function_exists('runCommand')) {
             $log(sprintf('[CMD] memory usage before=%0.2f MiB', memory_get_usage(true) / 1048576));
         }
 
-        $descriptor = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
+        $useInheritedIO = false;
+        if ($inheritTty && function_exists('posix_isatty')) {
+            $useInheritedIO = posix_isatty(STDIN) && posix_isatty(STDOUT) && posix_isatty(STDERR);
+        }
+
+        if ($useInheritedIO) {
+            $descriptor = [
+                0 => STDIN,
+                1 => STDOUT,
+                2 => STDERR,
+            ];
+        } else {
+            $descriptor = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+        }
         // Use a single command string for PHP 7.3 compatibility.
         $bash = '/bin/bash -lc '.escapeshellarg($cmd);
         $process = proc_open($bash, $descriptor, $pipes);
@@ -445,6 +458,50 @@ if (!function_exists('runCommand')) {
             pmssDumpForkDiagnostics('proc_open failed: '.$cmd, $log);
             $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
             return 1;
+        }
+
+        if ($useInheritedIO) {
+            $startedAt = microtime(true);
+            $timedOut = false;
+
+            while (true) {
+                $status = proc_get_status($process);
+                if (!is_array($status) || empty($status['running'])) {
+                    break;
+                }
+                if ((microtime(true) - $startedAt) > $timeoutSec) {
+                    $timedOut = true;
+                    break;
+                }
+                usleep(200000);
+            }
+
+            if ($timedOut) {
+                if (function_exists('proc_terminate')) {
+                    @proc_terminate($process);
+                }
+                $exitCode = 124;
+            } else {
+                $exitCode = proc_close($process);
+            }
+
+            $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => ''];
+
+            if ($exitCode !== 0) {
+                if ($timedOut) {
+                    $banner = $isInteractive ? "\033[1;31m[TIMEOUT]\033[0m " : '[TIMEOUT] ';
+                    $msg = $banner.'Command timed out after '.$timeoutSec.'s: '.$cmd;
+                    fwrite(STDERR, $msg.PHP_EOL);
+                    echo $msg.PHP_EOL;
+                    $log($msg);
+                } else {
+                    $log('[WARN] Command failed (rc='.$exitCode.'): '.$cmd);
+                }
+            }
+            if ($logMemoryUsage) {
+                $log(sprintf('[CMD] memory usage after =%0.2f MiB', memory_get_usage(true) / 1048576));
+            }
+            return $exitCode;
         }
 
         fclose($pipes[0]);

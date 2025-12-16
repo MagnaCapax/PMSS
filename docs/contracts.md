@@ -94,9 +94,10 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Runtime Execution & Profiling
 
-- runCommand(string $cmd, bool $verbose=false, ?callable $logger=null): int
+- runCommand(string $cmd, bool $verbose=false, ?callable $logger=null, bool $inheritTty=false): int
   - Spawns `/bin/bash -lc <cmd>` via `proc_open`, streams stdout/stderr, returns rc.
   - Exposes `$GLOBALS['PMSS_LAST_COMMAND_OUTPUT']` with `stdout`/`stderr`.
+  - When `$inheritTty=true` and stdin/stdout/stderr are TTYs, inherits the terminal for interactive prompts; output capture is disabled (`stdout`/`stderr` set to empty strings).
   - On non-zero rc, logs warning with 300-char stderr excerpt.
 
 - runStep(string $description, string $command): int

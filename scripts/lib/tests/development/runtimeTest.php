@@ -24,5 +24,15 @@ class RuntimeTest extends TestCase
         $this->assertTrue(is_string($err));
     }
 
+    public function testRunCommandInheritTtyModeDoesNotBreakCallers(): void
+    {
+        $rc = \runCommand('true', false, function (string $m): void {}, true);
+        $this->assertEquals(0, $rc);
+        $output = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] ?? null;
+        $this->assertTrue(is_array($output));
+        $this->assertTrue(array_key_exists('stdout', $output));
+        $this->assertTrue(array_key_exists('stderr', $output));
+    }
+
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
 }

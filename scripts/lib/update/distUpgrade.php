@@ -212,32 +212,49 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
 }
 
 /**
- * Execute the apt dist-upgrade sequence in noninteractive mode.
+ * Execute the apt dist-upgrade sequence.
+ *
+ * Default behaviour is noninteractive (safe for automation). Operators may set
+ * `PMSS_DIST_UPGRADE_INTERACTIVE=1` when running from a real TTY to allow debconf
+ * prompts during the upgrade.
  */
 function pmssExecuteUpgrade(): void
 {
-    $env = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
+    $hasTty = $interactiveRequested
+        && function_exists('posix_isatty')
+        && posix_isatty(STDIN)
+        && posix_isatty(STDOUT)
+        && posix_isatty(STDERR);
+    if ($interactiveRequested && !$hasTty) {
+        logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
+    }
+    $frontend = $hasTty ? 'readline' : 'noninteractive';
+    $inheritTty = $hasTty;
+    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     // Update package lists
-    runCommand("$env apt-get update", true);
+    runCommand("$env apt-get update", true, null, $inheritTty);
 
     // Upgrade packages (step 1)
     pmssRunUpgradeWithRecovery(
         "$env apt-get upgrade -y $opts",
         $env,
-        'dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)'
+        'dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)',
+        $inheritTty
     );
 
     // Dist-upgrade (step 2)
     pmssRunUpgradeWithRecovery(
         "$env apt-get full-upgrade -y $opts",
         $env,
-        'dist-upgrade: full-upgrade failed, attempting recovery'
+        'dist-upgrade: full-upgrade failed, attempting recovery',
+        $inheritTty
     );
 
     // Autoremove residuals
-    runCommand("$env apt-get autoremove -y", true);
+    runCommand("$env apt-get autoremove -y", true, null, $inheritTty);
 }
 
 /**
@@ -246,17 +263,17 @@ function pmssExecuteUpgrade(): void
  * Keep the recovery ordering and the exact log messages stable; operators and
  * tests rely on these markers when dist-upgrades wedge dpkg.
  */
-function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage): void
+function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage, bool $inheritTty = false): void
 {
-    if (runCommand($command, true) === 0) {
+    if (runCommand($command, true, null, $inheritTty) === 0) {
         return;
     }
 
     logMessage($recoveryMessage);
-    runCommand('dpkg --configure -a', true);
-    runCommand("$env apt-get -f install -y", true);
-    runCommand("$env apt-get update", true);
-    runCommand($command, true);
+    runCommand('dpkg --configure -a', true, null, $inheritTty);
+    runCommand("$env apt-get -f install -y", true, null, $inheritTty);
+    runCommand("$env apt-get update", true, null, $inheritTty);
+    runCommand($command, true, null, $inheritTty);
 }
 
 /**
