@@ -19,10 +19,5 @@ function pmssUserSkelPath(string $relative): string { return pmssUserSkelBase().
 function pmssUserSkelCommandArg(string $relative): string
 {
     $path = pmssUserSkelPath($relative);
-    $default = '/etc/skel/'.$relative;
-    if ($path === $default) {
-        return $path;
-    }
-
-    return escapeshellarg($path);
+    return $path === '/etc/skel/'.$relative ? $path : escapeshellarg($path);
 }

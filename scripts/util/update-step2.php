@@ -52,9 +52,8 @@ require_once __DIR__.'/../lib/motd/Generator.php';
 
 requireRoot();
 
-// Preflight: ensure root can keep forking during long updates even if legacy
-// TasksMax caps are present. This is safe to run before the package phase and
-// avoids "Cannot fork" cascades when the updater runs inside user-0.slice.
+// Preflight: ensure root can keep forking during long updates even if legacy TasksMax caps are present.
+// Safe before the package phase; avoids "Cannot fork" cascades inside user-0.slice.
 runStep(
     'Ensuring root user slice TasksMax is unlimited (preflight)',
     "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity"
@@ -105,7 +104,6 @@ if (!function_exists('logmsg')) {
         $timestamp = date('[Y-m-d H:i:s] ');
         $primary   = '/var/log/pmss-update.log';
         $fallback  = '/tmp/pmss-update.log';
-
         @file_put_contents($primary, $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX)
      || @file_put_contents($fallback, $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
         fwrite(STDERR, $message.PHP_EOL);

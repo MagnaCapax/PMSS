@@ -14,15 +14,7 @@ if (!function_exists('pmssDebianCodenameToMajorMap')) {
      */
     function pmssDebianCodenameToMajorMap(): array
     {
-        static $map = [
-            'jessie'   => 8,
-            'stretch'  => 9,
-            'buster'   => 10,
-            'bullseye' => 11,
-            'bookworm' => 12,
-            'trixie'   => 13,
-        ];
-
+        static $map = ['jessie' => 8, 'stretch' => 9, 'buster' => 10, 'bullseye' => 11, 'bookworm' => 12, 'trixie' => 13];
         return $map;
     }
 }
@@ -36,11 +28,9 @@ if (!function_exists('pmssDebianCodenameFromMajor')) {
      */
     function pmssDebianCodenameFromMajor(int $major): string
     {
-        static $reverse = null;
-        if ($reverse === null) {
-            $reverse = array_flip(pmssDebianCodenameToMajorMap());
-        }
-        return isset($reverse[$major]) ? (string) $reverse[$major] : '';
+        static $reverse;
+        $reverse = is_array($reverse) ? $reverse : array_flip(pmssDebianCodenameToMajorMap());
+        return $reverse[$major] ?? '';
     }
 }
 
@@ -97,10 +87,5 @@ if (!function_exists('pmssVersionFromCodename')) {
     /**
      * Map Debian release codenames to their major version numbers.
      */
-    function pmssVersionFromCodename(string $codename): int
-    {
-        $key = strtolower($codename);
-        $map = pmssDebianCodenameToMajorMap();
-        return isset($map[$key]) ? (int) $map[$key] : 0;
-    }
+    function pmssVersionFromCodename(string $codename): int { return (int) (pmssDebianCodenameToMajorMap()[strtolower($codename)] ?? 0); }
 }

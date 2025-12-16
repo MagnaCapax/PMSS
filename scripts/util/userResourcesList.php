@@ -76,12 +76,12 @@ foreach ($users as $user) {
         'memory_high' => parseBytes($props['MemoryHigh']),
         'memory_max' => parseBytes($props['MemoryMax']),
         'cpu_weight' => ($props['CPUWeight'] !== '[not set]') ? (int)$props['CPUWeight'] : null,
-        'cpu_quota_percent' => parseCpuQuota($props, true),
+        'cpu_quota_percent' => parseCpuQuota($props),
         'io_weight' => ($props['IOWeight'] !== '[not set]') ? (int)$props['IOWeight'] : null,
         'io_read_bandwidth' => parseBytes($props['IOReadBandwidthMax']),
         'io_write_bandwidth' => parseBytes($props['IOWriteBandwidthMax']),
-        'io_read_iops' => parseIOPS($props['IOReadIOPSMax'], true),
-        'io_write_iops' => parseIOPS($props['IOWriteIOPSMax'], true),
+        'io_read_iops' => parseIOPS($props['IOReadIOPSMax']),
+        'io_write_iops' => parseIOPS($props['IOWriteIOPSMax']),
     ];
 
     if ($outputJsonl) {
@@ -95,12 +95,12 @@ foreach ($users as $user) {
             formatBytes($props['MemoryHigh']),
             formatBytes($props['MemoryMax']),
             $resourceData['cpu_weight'] ?? '-',
-            formatCpuQuota($props, false),
+            formatCpuQuota($props),
             $resourceData['io_weight'] ?? '-',
             formatBytes($props['IOReadBandwidthMax']),
             formatBytes($props['IOWriteBandwidthMax']),
-            formatIOPS($props['IOReadIOPSMax'], false),
-            formatIOPS($props['IOWriteIOPSMax'], false)
+            formatIOPS($props['IOReadIOPSMax']),
+            formatIOPS($props['IOWriteIOPSMax'])
         );
     }
 }
@@ -162,15 +162,12 @@ function parseBytes($val): ?int {
     return $bytes;
 }
 
-function formatCpuQuota(array $props, bool $forJson = false): string {
-    $quota = parseCpuQuota($props, true); // Get raw value for consistent parsing
-    if ($quota === null) {
-        return $forJson ? 'null' : '-';
-    }
-    return $quota . '%';
+function formatCpuQuota(array $props): string {
+    $quota = parseCpuQuota($props);
+    return $quota === null ? '-' : $quota.'%';
 }
 
-function parseCpuQuota(array $props, bool $raw = false): ?int {
+function parseCpuQuota(array $props): ?int {
     // Try straightforward v2 property first
     if ($props['CPUQuota'] !== '[not set]') {
         $val = $props['CPUQuota'];
@@ -188,15 +185,12 @@ function parseCpuQuota(array $props, bool $raw = false): ?int {
     return null;
 }
 
-function formatIOPS($val, bool $forJson = false): string {
-    $iops = parseIOPS($val, true);
-    if ($iops === null) {
-        return $forJson ? 'null' : '-';
-    }
-    return (string)$iops;
+function formatIOPS($val): string {
+    $iops = parseIOPS($val);
+    return $iops === null ? '-' : (string)$iops;
 }
 
-function parseIOPS($val, bool $raw = false): ?int {
+function parseIOPS($val): ?int {
     if ($val === '[not set]') return null;
     // systemd IO props are often "path value", e.g. "/dev/sda 100".
     // For JSON, we want the numeric value.

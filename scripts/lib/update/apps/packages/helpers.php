@@ -26,9 +26,7 @@ function pmssQueuePackages(array $packages, ?string $target = null): void
 {
     global $PMSS_PACKAGE_QUEUE;
     $key = $target ?? PMSS_PACKAGE_QUEUE_DEFAULT;
-    if (!isset($PMSS_PACKAGE_QUEUE[$key])) {
-        $PMSS_PACKAGE_QUEUE[$key] = [];
-    }
+    if (!isset($PMSS_PACKAGE_QUEUE[$key])) { $PMSS_PACKAGE_QUEUE[$key] = []; }
     foreach ($packages as $pkg) {
         $pkg = trim($pkg);
         if ($pkg !== '' && !in_array($pkg, $PMSS_PACKAGE_QUEUE[$key], true)) {
@@ -44,10 +42,7 @@ function pmssQueuePackages(array $packages, ?string $target = null): void
 
 function pmssFlushPackageQueue(): void
 {
-    global $PMSS_PACKAGE_QUEUE;
-    global $PMSS_POST_INSTALL_COMMANDS;
-    global $PMSS_PACKAGE_WARNINGS;
-    global $PMSS_PACKAGE_ERRORS;
+    global $PMSS_PACKAGE_QUEUE, $PMSS_POST_INSTALL_COMMANDS, $PMSS_PACKAGE_WARNINGS, $PMSS_PACKAGE_ERRORS;
     if (empty($PMSS_PACKAGE_QUEUE)) {
         return;
     }
@@ -65,7 +60,7 @@ function pmssFlushPackageQueue(): void
         $missingContext = $isDefaultTarget ? 'default queue' : ('queue '.$target);
         $installContext = $isDefaultTarget ? 'package queue' : ('package queue '.$target);
 
-        $packages = array_values(array_unique(array_filter($packages)));
+        $packages = array_unique(array_filter($packages));
         if (empty($packages)) {
             continue;
         }
@@ -109,11 +104,9 @@ function pmssFlushPackageQueue(): void
     $summary = !empty($PMSS_PACKAGE_WARNINGS) ? array_values(array_unique($PMSS_PACKAGE_WARNINGS)) : [];
     if (!empty($summary)) {
         $logNotice('[WARN] Package queue warnings: '.implode(' | ', $summary));
-    }
-    putenv('PMSS_PACKAGE_INSTALL_WARNINGS='.count($summary));
-    if (!empty($summary)) {
         $PMSS_PACKAGE_WARNINGS = [];
     }
+    putenv('PMSS_PACKAGE_INSTALL_WARNINGS='.count($summary));
 
     $summary = !empty($PMSS_PACKAGE_ERRORS) ? array_values(array_unique($PMSS_PACKAGE_ERRORS)) : [];
     if (!empty($summary)) {
@@ -124,11 +117,9 @@ function pmssFlushPackageQueue(): void
                 'issues'  => $summary,
             ]);
         }
-    }
-    putenv('PMSS_PACKAGE_INSTALL_ERRORS='.count($summary));
-    if (!empty($summary)) {
         $PMSS_PACKAGE_ERRORS = [];
     }
+    putenv('PMSS_PACKAGE_INSTALL_ERRORS='.count($summary));
 }
 
 /**
@@ -186,14 +177,13 @@ if (!function_exists('pmssAvailablePackageSet')) {
             $set = [];
             return $set;
         }
-        $tmp = [];
+        $set = [];
         foreach ($out as $name) {
             $name = strtolower(trim($name));
             if ($name !== '') {
-                $tmp[$name] = true;
+                $set[$name] = true;
             }
         }
-        $set = $tmp;
         return $set;
     }
 }
@@ -288,10 +278,8 @@ function pmssInstallProftpdStack(int $distroVersion): void
             'Reconfiguring proftpd packages',
             'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true',
         ];
-    } else {
-        if (function_exists('logmsg')) {
-            logmsg('[SKIP] ProFTPD packages already configured');
-        }
+    } elseif (function_exists('logmsg')) {
+        logmsg('[SKIP] ProFTPD packages already configured');
     }
 }
 

@@ -31,11 +31,13 @@ function pmssInstallSystemUtilities(int $distroVersion): void
     pmssInstallBestEffort([
         'libncurses-dev',
     ], 'ncurses development headers');
-    pmssQueuePackages(['python3-pycurl', 'python3-crypto', 'python3-cheetah']);
     // apache2-utils is required system-wide (htpasswd, ab). Lighttpd user
     // auth and other tooling depend on htpasswd; do NOT remove.
-    pmssQueuePackages(['zip', 'unzip', 'bwm-ng', 'sysstat', 'apache2-utils', 'irssi', 'iotop', 'ethtool']);
-    pmssQueuePackages(['unrar-free', 'unp']);
+    pmssQueuePackages([
+        'python3-pycurl', 'python3-crypto', 'python3-cheetah',
+        'zip', 'unzip', 'bwm-ng', 'sysstat', 'apache2-utils', 'irssi', 'iotop', 'ethtool',
+        'unrar-free', 'unp',
+    ]);
 }
 
 function pmssInstallMediaAndNetworkTools(int $distroVersion): void
@@ -47,15 +49,16 @@ function pmssInstallMediaAndNetworkTools(int $distroVersion): void
 
     pmssQueuePackages(['libzen0v5', 'sox', 'tmux', 'tree', 'ncdu', 'weechat', 'php-xml', 'php-zip', 'php-sqlite3', 'php-mbstring', 'qbittorrent-nox']);
 
-    pmssQueuePackages(['zsh', 'atop', 'php-cgi', 'php-cli']);
-    pmssQueuePackages(['aria2', 'htop', 'mtr', 'mktorrent']);
-    pmssQueuePackages(['genisoimage', 'xorriso']);
-    pmssQueuePackages(['uidmap']);
-    pmssQueuePackages(['net-tools', 'nicstat']);
-    pmssQueuePackages(['restic', 'borgbackup', 'borgmatic', 'borgbackup-doc', 'backupninja']);
-
-    pmssQueuePackages(['links', 'elinks', 'lynx', 'ethtool', 'zip', 'p7zip-full', 'smartmontools', 'flac', 'lame', 'lame-doc', 'mp3diags', 'gcc', 'g++', 'gettext', 'fuse3', 'glib-networking', 'libglib2.0-dev', 'libfuse-dev', 'apt-transport-https', 'pigz']);
-    pmssQueuePackages(['python3-cheetah']);
+    pmssQueuePackages([
+        'zsh', 'atop', 'php-cgi', 'php-cli',
+        'aria2', 'htop', 'mtr', 'mktorrent',
+        'genisoimage', 'xorriso',
+        'uidmap',
+        'net-tools', 'nicstat',
+        'restic', 'borgbackup', 'borgmatic', 'borgbackup-doc', 'backupninja',
+        'links', 'elinks', 'lynx', 'ethtool', 'zip', 'p7zip-full', 'smartmontools', 'flac', 'lame', 'lame-doc', 'mp3diags', 'gcc', 'g++', 'gettext', 'fuse3', 'glib-networking', 'libglib2.0-dev', 'libfuse-dev', 'apt-transport-https', 'pigz',
+        'python3-cheetah',
+    ]);
 
     // #TODO revisit curl/libcurl upgrades once a consistent backports policy is defined.
     pmssQueuePackages(['unionfs-fuse', 'sshfs', 's3fs']);

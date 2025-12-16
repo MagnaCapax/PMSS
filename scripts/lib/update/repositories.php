@@ -11,15 +11,7 @@ if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
     /**
      * Ensure external repositories have their prerequisites (keys/config) in place before apt update.
      */
-    function pmssEnsureRepositoryPrerequisites(): void
-    {
-        pmssEnsureDockerRepository();
-        pmssEnsureSonarrKey();
-        // #TODO Provide a unified third-party repo bootstrap that accepts
-        //       (name, url, suites, components, key-url/keyring) and writes a
-        //       deb822 .sources file with signed-by keyring under
-        //       /etc/apt/keyrings.
-    }
+    function pmssEnsureRepositoryPrerequisites(): void { pmssEnsureDockerRepository(); pmssEnsureSonarrKey(); }
 }
 
 if (!function_exists('pmssEnsureMediaareaRepository')) {
@@ -34,10 +26,7 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
         // Aggressively remove legacy MediaArea list files. These now conflict with
         // the main /etc/apt/sources.list which includes the repo directly.
         // We must ensure zero MediaArea files remain in sources.list.d.
-        static $targets = [
-            '/etc/apt/sources.list.d/mediaarea.list',
-            '/etc/apt/sources.list.d/mediaarea.sources',
-        ];
+        static $targets = ['/etc/apt/sources.list.d/mediaarea.list', '/etc/apt/sources.list.d/mediaarea.sources'];
         foreach ($targets as $target) {
             if (is_file($target)) {
                 logmsg('[INFO] Removing legacy MediaArea repository file: '.$target);
@@ -119,8 +108,7 @@ if (!function_exists('pmssEnsureDockerRepository')) {
             return;
         }
 
-        $arch = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
-        if ($arch === '') { $arch = 'amd64'; }
+        $arch = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null')) ?: 'amd64';
 
         $deb822 = "Types: deb\n".
                  "URIs: https://download.docker.com/linux/debian\n".
@@ -160,12 +148,7 @@ if (!function_exists('pmssQueryPackageStatus')) {
     /**
      * Return dpkg status string (install ok installed, etc.) for a package.
      */
-    function pmssQueryPackageStatus(string $package): string
-    {
-        $cmd = 'dpkg-query -W -f=${Status} '.escapeshellarg($package).' 2>/dev/null';
-        exec($cmd, $output, $rc);
-        return $rc === 0 && isset($output[0]) ? trim($output[0]) : '';
-    }
+    function pmssQueryPackageStatus(string $package): string { exec('dpkg-query -W -f=${Status} '.escapeshellarg($package).' 2>/dev/null', $output, $rc); return $rc === 0 && isset($output[0]) ? trim($output[0]) : ''; }
 }
 
 if (!function_exists('pmssRepositoryUpdatePlan')) {

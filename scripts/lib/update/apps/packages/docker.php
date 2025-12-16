@@ -11,9 +11,6 @@ function pmssInstallDockerPackages(int $distroVersion): void
         'docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-buildx-plugin', 'docker-compose-plugin',
         'dbus-user-session', 'slirp4netns', 'uidmap',
     ];
-    if ($distroVersion < 12) {
-        $pkgs[] = 'fuse-overlayfs';
-    }
+    if ($distroVersion < 12) { $pkgs[] = 'fuse-overlayfs'; }
     pmssQueuePackages($pkgs);
 }
-

@@ -134,12 +134,8 @@ function pmssResolveTargetVersion(string $input): string
         return $key;
     }
 
-    $mapped = pmssVersionFromCodename($key);
-    if ($mapped === 0) {
-        return '';
-    }
-    $mappedKey = (string) $mapped;
-    return pmssDistUpgradeIsAllowedMajor($mappedKey) ? $mappedKey : '';
+    $mapped = (string) pmssVersionFromCodename($key);
+    return pmssDistUpgradeIsAllowedMajor($mapped) ? $mapped : '';
 }
 
 /**
@@ -252,8 +248,7 @@ function pmssExecuteUpgrade(): void
  */
 function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage): void
 {
-    $rc = runCommand($command, true);
-    if ($rc === 0) {
+    if (runCommand($command, true) === 0) {
         return;
     }
 
@@ -293,9 +288,5 @@ function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void
  */
 function pmssCodenameForMajor(string $major): string
 {
-    if (!pmssDistUpgradeIsAllowedMajor($major)) {
-        return '';
-    }
-
-    return pmssDebianCodenameFromMajor((int) $major);
+    return pmssDistUpgradeIsAllowedMajor($major) ? pmssDebianCodenameFromMajor((int) $major) : '';
 }
