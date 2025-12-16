@@ -13,7 +13,7 @@ abstract class TestCase
     public function run(): array
     {
         $methods = array_filter(get_class_methods($this), static function ($method) {
-            return str_starts_with($method, 'test');
+            return strpos($method, 'test') === 0;
         });
         foreach ($methods as $method) {
             try {

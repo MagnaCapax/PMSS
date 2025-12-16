@@ -56,7 +56,7 @@ class RepositoryPrerequisitesTest extends TestCase
             }
             $base = basename($path);
             // Ignore intentional test keyring dirs (pmss-mediaarea-keyring-*)
-            if (str_starts_with($base, 'pmss-mediaarea-keyring-')) {
+            if (strpos($base, 'pmss-mediaarea-keyring-') === 0) {
                 return false;
             }
             return true;

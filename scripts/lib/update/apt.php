@@ -102,20 +102,14 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
         return;
     }
 
-    $handlers = [
-        'debian' => static function () use ($distroVersion, $currentHash, $repos, $log): void {
-            pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
-        },
-        'ubuntu' => static function () use ($log): void {
-            $log('Ubuntu is not supported yet.');
-        },
-    ];
-
-    if (isset($handlers[$distroName])) {
-        $handlers[$distroName]();
+    if ($distroName === 'debian') {
+        pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
         return;
     }
-
+    if ($distroName === 'ubuntu') {
+        $log('Ubuntu is not supported yet.');
+        return;
+    }
     $log("Unsupported distro: $distroName");
 }
 
@@ -140,18 +134,15 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
 
     $label = $target['label'];
     $template = $repos[$target['repo']] ?? '';
-    $post = null;
-    if ($target['eol']) {
-        $post = function () use ($log, $label): void {
-            // EOL suites lack valid Release timestamps; relax the check.
-            if (!defined('PMSS_TEST_MODE')) {
-                passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-                passthru('apt-get clean;');
-            } else {
-                $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
-            }
-        };
-    }
+    $post = $target['eol'] ? function () use ($log, $label): void {
+        // EOL suites lack valid Release timestamps; relax the check.
+        if (!defined('PMSS_TEST_MODE')) {
+            passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+            passthru('apt-get clean;');
+        } else {
+            $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
+        }
+    } : null;
 
     pmssApplyAptTemplate($label, $template, $currentHash, $log, $post);
 }
