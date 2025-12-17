@@ -434,8 +434,10 @@ fi
 					# gh 2.4.x lacks `gh auth token`; fall back to parsing `gh auth status --show-token`.
 					token="$(gh auth token 2>/dev/null || true)"
 					if [[ -z "$token" ]]; then
-						token="$(gh auth status --show-token 2>/dev/null \
-							| awk 'BEGIN{IGNORECASE=1} $0 ~ /^[[:space:]]*token:[[:space:]]/ {print $2; exit}' || true)"
+						# gh auth status prints to stderr and prefixes status lines with symbols (✓),
+						# so match any line containing "Token:" and grab the last field.
+						token="$(gh auth status --show-token 2>&1 \
+							| awk 'BEGIN{IGNORECASE=1} /token:[[:space:]]/ {print $NF; exit}' || true)"
 					fi
 					ci_shell_restore_xtrace
 				fi
@@ -470,7 +472,30 @@ fi
 fetch_run_log() {
 	local out="$1"
 	if [[ "$fetch_mode" == "gh" ]]; then
-		gh run view "$run_id" --log >"$out" || true
+		local zip_path token
+
+		# gh 2.4.x often emits empty output for `--log` when stdout is redirected.
+		gh run view "$run_id" --log >"$out" 2>/dev/null || true
+		if [[ -s "$out" ]]; then
+			return 0
+		fi
+
+		[[ -n "$repo_full" ]] || return 0
+		zip_path="$OUTDIR/run-${run_id}.zip"
+		token="${GITHUB_TOKEN:-}"
+		if [[ -z "$token" ]]; then
+			ci_shell_disable_xtrace
+			token="$(gh auth status --show-token 2>&1 \
+				| awk 'BEGIN{IGNORECASE=1} /token:[[:space:]]/ {print $NF; exit}' || true)"
+			ci_shell_restore_xtrace
+		fi
+		if [[ -n "$token" ]]; then
+			ci_shell_disable_xtrace
+			if GITHUB_TOKEN="$token" ci_api_download_zip "$api_base/repos/$repo_full/actions/runs/$run_id/logs" "$zip_path" >/dev/null 2>&1; then
+				ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
+			fi
+			ci_shell_restore_xtrace
+		fi
 		return 0
 	fi
 	local zip_path
