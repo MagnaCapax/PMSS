@@ -11,10 +11,10 @@ $stat1 = explode(" ", preg_replace("!cpu +!", "", $stat1[0]));
 $stat2 = explode(" ", preg_replace("!cpu +!", "", $stat2[0])); 
 
 $diff = array(); 
-$diff['user'] = $stat2[0] - $stat1[0]; 
-$diff['nice'] = $stat2[1] - $stat1[1]; 
-$diff['sys'] = $stat2[2] - $stat1[2]; 
-$diff['idle'] = $stat2[3] - $stat1[3]; 
+$diff['user'] = (int) $stat2[0] - (int) $stat1[0]; 
+$diff['nice'] = (int) $stat2[1] - (int) $stat1[1]; 
+$diff['sys'] = (int) $stat2[2] - (int) $stat1[2]; 
+$diff['idle'] = (int) $stat2[3] - (int) $stat1[3]; 
 $total = array_sum($diff); 
 $cpu = array(); 
 foreach($diff as $x=>$y) $cpu[$x] = round($y / $total * 100, 1);

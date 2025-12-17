@@ -32,13 +32,14 @@ if (file_exists('/etc/seedbox/config/localnet')) {
     }
 } else {
     file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n"); // #TODO Refactor hardcoded value
-}
-// Provides $link and $linkSpeed variables used for threshold checks
-require_once '/scripts/lib/networkInfo.php';
+	}
+	// Provides $link and $linkSpeed variables used for threshold checks
+	require_once '/scripts/lib/networkInfo.php';
+	$linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (float) $linkSpeed : null;
 
-    // Collect the current iptables stats and then reset the counters
-$usage = `/sbin/iptables -nvx -L OUTPUT | grep -v " MARK "; /sbin/iptables -Z OUTPUT`;
-if (empty($usage)) die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
+	    // Collect the current iptables stats and then reset the counters
+	$usage = `/sbin/iptables -nvx -L OUTPUT | grep -v " MARK "; /sbin/iptables -Z OUTPUT`;
+	if (empty($usage)) die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
 
 // Debian 11 iptables -Z output doesn't work anymore .... we might miss a tiny fraction this way, but atleast not exponential growth
 $monitoringRules = shell_exec('/scripts/util/makeMonitoringRules.php');
@@ -74,20 +75,22 @@ foreach($users AS $thisUser) {
     $thisUserTrafficLocal = (int) trim( $thisUserTrafficLocal );
 
 
-	// Do not log if usage was MORE than linkspeed for the past 5 minutes.
-    if ($thisUserTraffic > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
-        file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
-        continue;  
-    }
-    // Note: variable name typo caused undefined output; use the correct value
-    if ($thisUserTrafficLocal > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
-        file_put_contents(
-            $logdir . 'error.log',
-            date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n",
-            FILE_APPEND
-        );
-        continue;
-    }
+		// Do not log if usage was MORE than linkspeed for the past 5 minutes.
+	    if ($linkSpeed !== null && $linkSpeed > 0) {
+	        if ($thisUserTraffic > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
+	            file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
+	            continue;  
+	        }
+	        // Note: variable name typo caused undefined output; use the correct value
+	        if ($thisUserTrafficLocal > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
+	            file_put_contents(
+	                $logdir . 'error.log',
+	                date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n",
+	                FILE_APPEND
+	            );
+	            continue;
+	        }
+	    }
 
 
 

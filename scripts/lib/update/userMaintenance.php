@@ -1,5 +1,7 @@
 <?php
-/** User maintenance helpers for update-step2. */
+/**
+ * User maintenance helpers for update-step2.
+ */
 
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/systemPrep.php';
@@ -8,7 +10,9 @@ require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../user/log.php';
 
 if (!function_exists('pmssRunAndLog')) {
-    /** Run a shell command and log stdout/stderr + rc to the user's log file. */
+    /**
+     * Run a shell command (optionally as the user) and log stdout/stderr + rc to the user's log file.
+     */
     function pmssRunAndLog(string $user, string $label, string $command, bool $asUser = false): int
     {
         $inner = $asUser ? sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($command)) : $command;
@@ -34,13 +38,18 @@ if (!function_exists('pmssRunAndLog')) {
 }
 
 if (!function_exists('pmssUpdateAllUsers')) {
-    /** Refresh user environments and per-user runtime wiring for update-step2. */
+    /**
+     * Refresh ruTorrent and skeleton data for every provisioned user.
+     *
+     * #TODO(user-maint): keep this as a simple foreach(users) orchestrator;
+     * avoid accumulating extra cross-cutting concerns here beyond logging and
+     * the temporary CPUQuota fix block.
+     */
     function pmssUpdateAllUsers(string $rutorrentIndexSha): void
     {
         $users = users::listHomeUsers();
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
-        $count = count($users);
-        logMessage(sprintf('Per-user maintenance: %d user(s) to process', $count));
+        logMessage(sprintf('Per-user maintenance: %d user(s) to process', count($users)));
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
 
         foreach ($users as $user) {
@@ -50,13 +59,11 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
 
             $phases = [];
-            if (function_exists('pmssUpdateUserEnvironment')) {
-                $phases[] = 'Environment (HTTP/ruTorrent/permissions)';
-            }
-            if (function_exists('pmssEnsureLingerAndDocker')) {
-                $phases[] = 'Linger/systemd/rootless Docker';
-            }
-            // #TODO(per-user-loop): fold global sweeps (web/cron/authorized_keys) into this orchestrator.
+            if (function_exists('pmssUpdateUserEnvironment')) $phases[] = 'Environment (HTTP/ruTorrent/permissions)';
+            if (function_exists('pmssEnsureLingerAndDocker')) $phases[] = 'Linger/systemd/rootless Docker';
+            // #TODO(per-user-loop): fold remaining global sweeps (web refresh,
+            // cron restoration, authorized_keys updates) into this orchestrator
+            // so every per-user action is visible here.
 
             if ($isTty) {
                 echo PHP_EOL."\033[35mUpdating user {$userTrim}\033[0m".PHP_EOL;
@@ -73,7 +80,10 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
             $userStart = microtime(true);
 
-            // #TODO remove by end of 2027: bump legacy per-user CPUQuota=85% to host-scaled quota.
+            // #TODO Remove this fix block by end of 2027.
+            // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
+            // bump them to a host-based quota derived from total CPU threads so
+            // users are no longer capped to 85% of a single core.
             $uinfo = posix_getpwnam($user);
             if ($uinfo && isset($uinfo['uid'])) {
                 $uid = (int)$uinfo['uid'];
@@ -124,12 +134,20 @@ if (!function_exists('pmssUpdateAllUsers')) {
 }
 
 if (!function_exists('pmssEnsureLingerAndDocker')) {
-    /** Enable linger, (re)start user@UID systemd, and kick rootless Docker for a user. */
+    /**
+     * Enable linger, (re)start user@UID systemd instance, and kick rootless Docker for a user.
+     * Logs detailed command output to pmss-update-user-<username>.log.
+     *
+     * #TODO(docker-linger-split): Refactor into separate helpers so linger/systemd
+     * setup and Docker start/status are handled by distinct functions. This will
+     * make it easier to evolve Docker launch behaviour independently of user
+     * session wiring.
+     */
     function pmssEnsureLingerAndDocker(string $user): void
     {
-        // #TODO(per-user-loop): fold this into pmssUpdateUserEnvironment so we traverse users once.
-        $homeDir = "/home/{$user}";
-        if (is_dir($homeDir.'/www-disabled')) {
+        // #TODO fold linger/Docker kick into pmssUpdateUserEnvironment so we only
+        // traverse the user list once and share the same validation.
+        if (is_dir("/home/{$user}/www-disabled")) {
             pmssUserLog($user, '[SKIP] User appears suspended; skipping linger/Docker wiring');
             return;
         }
@@ -153,10 +171,10 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         // Enable linger to allow user@UID to run without active login.
         pmssRunAndLog($user, 'loginctl enable-linger', 'loginctl enable-linger '.escapeshellarg($user), false);
 
-        // Guarded migration: ensure rootless Docker exists for older users.
-        if (function_exists('pmssEnsureRootlessDockerInstalled')) {
-            pmssEnsureRootlessDockerInstalled($user);
-        }
+        // Ensure rootless Docker is installed for users that predate the
+        // rollout. This is a guarded migration: if the unit already exists
+        // or the helper binary is missing, we log and skip.
+        pmssEnsureRootlessDockerInstalled($user);
 
         // Check and (re)start the per-user systemd instance.
         pmssRunAndLog($user, 'systemctl status user@.service (pre)', 'systemctl --no-pager -l status user@'.$uid.'.service || true', false);
@@ -174,7 +192,11 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
 }
 
 if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
-    /** Run Docker's official rootless installer for users missing docker.service. */
+    /**
+     * Run dockerd-rootless-setuptool.sh for users that do not yet have a
+     * per-user docker.service unit. This is intended as a migration helper
+     * for existing tenants to match the behaviour of new-account provisioning.
+     */
     function pmssEnsureRootlessDockerInstalled(string $user): void
     {
         $uinfo = posix_getpwnam($user);
@@ -194,7 +216,12 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
             return;
         }
 
-        // Run Docker's official rootless installer inside a user shell.
+        // Use Docker\'s official rootless install script in the same way an
+        // operator would invoke it manually:
+        //   curl -fsSL https://get.docker.com/rootless | sh
+        // Run this inside a user shell so any environment tweaks it performs
+        // are applied to the correct home directory. Ensure sysadmin tools
+        // (sysctl, etc.) are on PATH so the helper does not fail mid-run.
         $installCmd = 'export PATH=$PATH:/usr/sbin:/sbin; curl -fsSL https://get.docker.com/rootless | sh';
         $wrapped = sprintf(
             'machinectl shell %1$s@ /bin/bash -lc %2$s',
@@ -214,10 +241,12 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
 }
 
 if (!function_exists('pmssEnsureDockerDependencies')) {
-    /** Verify Docker dependencies for a user (subuid/subgid + storage-driver). */
+    /**
+     * Verify Docker dependencies for a user: subuid/subgid and daemon.json storage-driver.
+     */
     function pmssEnsureDockerDependencies(string $user): void
     {
-        // Check subuid/subgid.
+        // 1. Check subuid/subgid
         $subuid = @file_get_contents('/etc/subuid');
         $subgid = @file_get_contents('/etc/subgid');
         if ($subuid === false || strpos($subuid, $user.':') === false) {
@@ -227,13 +256,13 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
             pmssUserLog($user, '[WARN] User missing from /etc/subgid; rootless Docker may fail.');
         }
 
-        // Enforce fuse-overlayfs on Debian < 12.
+        // 2. Enforce fuse-overlayfs on Debian < 12
         $distroVersion = (int)(getenv('PMSS_DISTRO_VERSION') ?: 0);
         if ($distroVersion >= 12) {
             return;
         }
 
-        // Resolve home directory.
+        // Resolve home directory
         $uinfo = posix_getpwnam($user);
         if (!$uinfo) return;
         $home = $uinfo['dir'];
@@ -256,10 +285,12 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         $data = $current ? json_decode($current, true) : [];
         if (!is_array($data)) $data = [];
 
+        // If storage-driver is already set, respect it.
         if (isset($data['storage-driver'])) {
             return;
         }
 
+        // Otherwise, enforce fuse-overlayfs
         $data['storage-driver'] = 'fuse-overlayfs';
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
@@ -274,22 +305,12 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
     }
 }
 
-if (!function_exists('pmssEnsureLingerAndDockerAllUsers')) {
-    /** Apply linger/systemd/docker kick to all managed users with per-user logs. */
-    function pmssEnsureLingerAndDockerAllUsers(): void
-    {
-        $list = users::listHomeUsers();
-        sort($list, SORT_NATURAL | SORT_FLAG_CASE);
-        logMessage(sprintf('[START] Linger/Docker sweep for %d user(s)', count($list)));
-        foreach ($list as $user) {
-            if ($user === '') continue;
-            pmssEnsureLingerAndDocker($user);
-        }
-    }
-}
-
 if (!function_exists('pmssRefreshSkeletonAndCron')) {
-    /** Re-apply skeleton permissions and critical cron/FTP settings. */
+    /**
+     * Re-apply skeleton permissions and critical cron/FTP settings.
+     * #TODO(skel-placement): revisit timing; /scripts/update.php already stages
+     * /etc/skel early. Consider staging/atomic swap instead of mid-update refresh.
+     */
     function pmssRefreshSkeletonAndCron(): void
     {
         runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
@@ -298,29 +319,10 @@ if (!function_exists('pmssRefreshSkeletonAndCron')) {
     }
 }
 
-if (!function_exists('pmssApplyCgroupDefaultsAllUsers')) {
-    /** Apply cgroup defaults for all managed users (respecting existing settings). */
-    function pmssApplyCgroupDefaultsAllUsers(): void
-    {
-        $list = users::listHomeUsers();
-        sort($list, SORT_NATURAL | SORT_FLAG_CASE);
-        $count = count($list);
-        logMessage(sprintf('Applying cgroup defaults for %d user(s)', $count));
-        foreach ($list as $user) {
-            if ($user === '') {
-                continue;
-            }
-            runUserStep(
-                $user,
-                'Applying cgroup properties (defaults, respect-existing)',
-                pmssBuildCommand('php', ['/scripts/util/userConfigCgroup.php', $user, '--apply', '--defaults', '--respect-existing'])
-            );
-        }
-    }
-}
-
 if (!function_exists('pmssInstallLogrotatePolicy')) {
-    /** Deploy the logrotate policy for update logs when available. */
+    /**
+     * Deploy the logrotate policy for update logs when available.
+     */
     function pmssInstallLogrotatePolicy(): void
     {
         $template = '/etc/seedbox/config/template.logrotate.pmss';
@@ -333,7 +335,11 @@ if (!function_exists('pmssInstallLogrotatePolicy')) {
 }
 
 if (!function_exists('pmssRestoreUserCrontabs')) {
-    /** Restore the default user crontabs from the template. */
+    /**
+     * Restore the default user crontabs from the template.
+     * #TODO(cron-ownership): move to per-user loop and eventually drop this so
+     * users can manage their own crontabs; guardrails should live in root cron.
+     */
     function pmssRestoreUserCrontabs(): void
     {
         // Only restore crontabs for users that still exist in /etc/passwd.

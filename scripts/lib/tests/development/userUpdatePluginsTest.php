@@ -50,13 +50,13 @@ class UserUpdatePluginsTest extends TestCase
                 if (strpos($description, 'Installing unpack plugin') === false) {
                     continue;
                 }
-                $cmd = isset($entry['command']) ? (string) $entry['command'] : null;
-                break;
-            }
-            $this->assertEquals($expectedCmd, $cmd ?? '');
-        } finally {
-            if ($previousSkel === false) {
-                putenv('PMSS_SKEL_DIR');
+	                $cmd = isset($entry['command']) ? (string) $entry['command'] : null;
+	                break;
+	            }
+	            $this->assertEquals($expectedCmd, (string) $cmd);
+	        } finally {
+	            if ($previousSkel === false) {
+	                putenv('PMSS_SKEL_DIR');
             } else {
                 putenv('PMSS_SKEL_DIR='.$previousSkel);
             }

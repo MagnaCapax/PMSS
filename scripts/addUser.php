@@ -124,13 +124,13 @@ if (file_exists('/bin/bash')) { // Set shell
 
 // Record core attributes in the runtime database before provisioning services.
 // Then to DB :)
-$userDb->addUser( $user['name'], array(
-    'rtorrentRam' => $user['memory'],
-    'quota' => $user['quota'],
-    'quotaBurst' => round( $user['quota'] * 1.25 ),
-    'rtorrentPort' => 0,    #TODO Choose port here and use that for the userConfig :)
-    'suspended' => false
-));
+	$userDb->addUser( $user['name'], array(
+	    'rtorrentRam' => $user['memory'],
+	    'quota' => $user['quota'],
+	    'quotaBurst' => round(((float) $user['quota']) * 1.25),
+	    'rtorrentPort' => 0,    #TODO Choose port here and use that for the userConfig :)
+	    'suspended' => false
+	));
 
 // Assign HTTP server port
 runProvisionStep(

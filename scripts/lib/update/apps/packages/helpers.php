@@ -1,5 +1,7 @@
 <?php
-/** Helper utilities for package installation routines. */
+/**
+ * Helper utilities for package installation routines.
+ */
 
 require_once __DIR__.'/../../runtime/commands.php';
 
@@ -8,7 +10,13 @@ putenv('APT_LISTCHANGES_FRONTEND=none');
 
 const PMSS_PACKAGE_QUEUE_DEFAULT = '__default__';
 
-// Shared global state: PMSS_PACKAGE_QUEUE + PMSS_POST_INSTALL_COMMANDS + PMSS_PACKAGE_WARNINGS/ERRORS.
+// Global state shared between installer helpers:
+//   - PMSS_PACKAGE_QUEUE: keyed by target suite (default/backports) with unique
+//     package names to install.
+//   - PMSS_POST_INSTALL_COMMANDS: array of [description, command] pairs executed
+//     after all queues flush successfully.
+//   - PMSS_PACKAGE_WARNINGS / ERRORS: strings describing skipped or failed
+//     packages; summarised into environment variables for update-step2.
 $GLOBALS['PMSS_PACKAGE_QUEUE'] = $GLOBALS['PMSS_PACKAGE_QUEUE'] ?? [];
 $GLOBALS['PMSS_POST_INSTALL_COMMANDS'] = $GLOBALS['PMSS_POST_INSTALL_COMMANDS'] ?? [];
 $GLOBALS['PMSS_PACKAGE_WARNINGS'] = $GLOBALS['PMSS_PACKAGE_WARNINGS'] ?? [];
@@ -27,7 +35,10 @@ function pmssQueuePackages(array $packages, ?string $target = null): void
     }
 }
 
-// #TODO retire this queue once dpkg baselines are authoritative for every package on every host.
+// #TODO Retire this queue once dpkg baselines are authoritative for every
+//       package on every host. Add a diff summary step that logs packages
+//       present-but-not-in-baseline and missing-from-host to help converge
+//       systems before removing the queue entirely.
 
 function pmssFlushPackageQueue(): void
 {
@@ -112,7 +123,9 @@ function pmssFlushPackageQueue(): void
     putenv('PMSS_PACKAGE_INSTALL_ERRORS='.count($summary));
 }
 
-/** Return dpkg status string for a package (or '' when missing). */
+/**
+ * Return the dpkg status string for a package or an empty string when missing.
+ */
 function pmssPackageStatus(string $package): string
 {
     $cmd = 'dpkg-query -W -f=\'${Status}\' '.escapeshellarg($package).' 2>/dev/null';
@@ -120,7 +133,9 @@ function pmssPackageStatus(string $package): string
     return $rc === 0 ? trim($output[0] ?? '') : '';
 }
 
-/** Determine whether a package is available in the current apt cache. */
+/**
+ * Determine if a package is available in the current apt cache.
+ */
 function pmssPackageAvailable(string $package): bool
 {
     static $cache = [];
@@ -129,7 +144,7 @@ function pmssPackageAvailable(string $package): bool
         return $cache[$package];
     }
 
-    if (!is_array($availableSet)) {
+    if ($availableSet === null) {
         $out = [];
         exec('apt-cache pkgnames 2>/dev/null', $out, $rc);
         $availableSet = [];
@@ -163,7 +178,9 @@ function pmssPackageAvailable(string $package): bool
     return $cache[$package] = true;
 }
 
-/** Queue packages, allowing each entry to specify fallback candidates. */
+/**
+ * Install packages, allowing each entry to specify fallback candidates.
+ */
 function pmssInstallBestEffort(array $items, string $label = ''): void
 {
     $selection = [];
@@ -190,8 +207,13 @@ function pmssInstallBestEffort(array $items, string $label = ''): void
 }
 
 /**
- * Install ProFTPD with recovery for half-installed states.
- * Hazard: ProFTPD postinst can wedge dpkg (hostname/TLS); keep guarded unmask+retry flow intact.
+ * Install the ProFTPD stack with recovery for half-installed states.
+ *
+ * ProFTPD routinely wedges dpkg when hostname lookups or TLS material are
+ * missing. A failed post-install script leaves the entire package manager in a
+ * broken state, so we unmask the unit up front and retry configuration with a
+ * reduced package set. Keep this guarded flow intact unless ProFTPD finally
+ * stops treating minor config issues as fatal errors.
  */
 function pmssInstallProftpdStack(int $distroVersion): void
 {

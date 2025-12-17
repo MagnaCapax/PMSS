@@ -21,13 +21,14 @@ require_once __DIR__.'/../lib/openvpn.php';
 requireRoot();
 
 $hostname = trim((string) @file_get_contents('/etc/hostname'));
-if ($hostname === '') {
-    $hostname = 'localhost';
-}
-$slug = pmssOpenvpnSlugFromHostname($hostname);
-
-$openvpnDir   = '/etc/openvpn';
-$easyRsaDir   = $openvpnDir.'/easy-rsa';
+	if ($hostname === '') {
+	    $hostname = 'localhost';
+	}
+	$slug = pmssOpenvpnSlugFromHostname($hostname);
+	$fqdn = pmssOpenvpnFqdnFromHostname($hostname);
+	
+	$openvpnDir   = '/etc/openvpn';
+	$easyRsaDir   = $openvpnDir.'/easy-rsa';
 $easyRsaShare = '/usr/share/easy-rsa';
 $serverConf   = $openvpnDir.'/openvpn.conf';
 $tplServer    = '/etc/seedbox/config/template.openvpn.server.config';

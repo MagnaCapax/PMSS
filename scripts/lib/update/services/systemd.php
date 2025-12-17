@@ -28,7 +28,7 @@ if (!function_exists('pmssStopDisableMaskSystemdUnit')) {
             $actions[] = ['label' => "Masking {$label} system service", 'command' => 'systemctl mask %s || true'];
         }
 
-        if (!$dryRun && function_exists('pmssSystemdAvailable') && !pmssSystemdAvailable()) {
+        if (!$dryRun && !is_dir('/run/systemd/system')) {
             foreach ($actions as $action) {
                 pmssLogStatus('SKIP', $action['label'].' (systemd unavailable)');
             }
@@ -59,7 +59,7 @@ if (!function_exists('pmssEnsureSystemdServicesGuardBootUnit')) {
     function pmssEnsureSystemdServicesGuardBootUnit(): void
     {
         $dryRun = getenv('PMSS_DRY_RUN') === '1';
-        if (!$dryRun && function_exists('pmssSystemdAvailable') && !pmssSystemdAvailable()) {
+        if (!$dryRun && !is_dir('/run/systemd/system')) {
             pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (systemd unavailable)');
             return;
         }

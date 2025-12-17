@@ -36,15 +36,16 @@ class rtorrentConfig {
 		 *
 		 * @return void
 		 */
-		function __construct($resourceConfig = array(), $template = null) {
-		if (count($resourceConfig) == 0) {
-			$resourceConfig = $this->loadDefaultResourceConfig();
-		}
-		if ($template == null or empty($template ) )
-		    $template = $this->loadDefaultTemplate();
-		
-		$this->_template = $template;
-		$this->_resourceConfig = $resourceConfig;
+			function __construct($resourceConfig = array(), $template = null) {
+			if (count($resourceConfig) == 0) {
+				$resourceConfig = $this->loadDefaultResourceConfig();
+			}
+			if ($template === null || $template === '') {
+			    $template = $this->loadDefaultTemplate();
+			}
+			
+			$this->_template = $template;
+			$this->_resourceConfig = $resourceConfig;
 
 		$this->_checkResourceConfig();
 	}
@@ -151,13 +152,14 @@ class rtorrentConfig {
 		 * @return bool|null True when a new config is written, false when the
 		 *                   write fails, and null when no change was required.
 		 */
-		public function idempotentConfig($user, $config) {
-		$file = '/home/' . $user . '/.rtorrent.rc';
-		#TODO Check mtime + permissions first. if root and no "other" write permission + mtime exceeds 2-3 months, we can be 99.9% certain it's right
-                $data = file_get_contents( $file );
-		
-		if ($data !== $config) return $this->writeConfig($user, $config);
-	}
+			public function idempotentConfig($user, $config) {
+			$file = '/home/' . $user . '/.rtorrent.rc';
+			#TODO Check mtime + permissions first. if root and no "other" write permission + mtime exceeds 2-3 months, we can be 99.9% certain it's right
+	                $data = file_get_contents( $file );
+			
+			if ($data !== $config) return $this->writeConfig($user, $config);
+			return null;
+		}
     
 	    /**
 	     * Read a user's configuration file via the high-level helper.

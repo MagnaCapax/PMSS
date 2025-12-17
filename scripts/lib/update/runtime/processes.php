@@ -34,23 +34,13 @@ if (!function_exists('pmssWaitForProcessExit')) {
     }
 }
 
-if (!function_exists('pmssSystemdAvailable')) {
-    /**
-     * Detect whether systemd is managing this host.
-     */
-    function pmssSystemdAvailable(): bool
-    {
-        return is_dir('/run/systemd/system');
-    }
-}
-
 if (!function_exists('pmssSystemdUnitExists')) {
     /**
      * True when systemd knows about the requested unit.
      */
     function pmssSystemdUnitExists(string $unit): bool
     {
-        if (!pmssSystemdAvailable()) {
+        if (!is_dir('/run/systemd/system')) {
             return false;
         }
         $candidate = $unit;
@@ -81,7 +71,7 @@ if (!function_exists('enableUnitIfPresent')) {
      */
     function enableUnitIfPresent(string $unit, string $description): void
     {
-        if (!pmssSystemdAvailable()) {
+        if (!is_dir('/run/systemd/system')) {
             logmsg("[SKIP] {$description} (systemd unavailable)");
             return;
         }
@@ -112,7 +102,7 @@ if (!function_exists('killProcess')) {
 
         if ($systemdUnit !== null && pmssSystemdUnitExists($systemdUnit)) {
             runStep($description.' (stop unit)', 'systemctl stop '.escapeshellarg($systemdUnit).' 2>/dev/null');
-        } elseif ($systemdUnit !== null && !pmssSystemdAvailable()) {
+        } elseif ($systemdUnit !== null && !is_dir('/run/systemd/system')) {
             logmsg("[WARN] {$description} (systemd unavailable for unit {$systemdUnit})");
         }
 
@@ -137,7 +127,7 @@ if (!function_exists('disableUnitIfPresent')) {
      */
     function disableUnitIfPresent(string $unit, string $description): void
     {
-        if (!pmssSystemdAvailable()) {
+        if (!is_dir('/run/systemd/system')) {
             logmsg("[SKIP] {$description} (systemd unavailable)");
             return;
         }

@@ -12,6 +12,21 @@
 $serverHostname = isset($serverHostname) && $serverHostname !== ''
     ? (string)$serverHostname
     : trim((string) @file_get_contents('/etc/hostname'));
+$debianVersion = isset($debianVersion) ? $debianVersion : array('0');
+if (is_string($debianVersion)) {
+    $debianVersion = explode('.', $debianVersion);
+}
+if (!is_array($debianVersion) || !isset($debianVersion[0])) {
+    $debianVersion = array('0');
+}
+$users = isset($users) ? $users : array();
+if (is_string($users)) {
+    $users = preg_split('/\\r?\\n/', trim($users));
+    $users = $users === false ? array() : $users;
+}
+if (!is_array($users)) {
+    $users = array();
+}
 $openvpnClientConfigHostname = $serverHostname;
 if (strpos($openvpnClientConfigHostname, '.pulsedmedia.com') === false) $openvpnClientConfigHostname .= '.pulsedmedia.com';
 $openvpnClientConfigFilename = str_replace('.', '-', $openvpnClientConfigHostname);

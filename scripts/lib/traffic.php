@@ -45,11 +45,11 @@ class trafficStatistics {
         if (strpos($thisLine, ': ') === false) return false;
         $thisLine = explode(': ', $thisLine);
         
-        if (count($thisLine) != 2) return false;    // Erroneous data, too many parts :
-        $thisTime = strtotime( trim($thisLine[0]) );
-        $thisData = trim($thisLine[1]) / 1024 / 1024;   // Transform from bytes to megabytes
-        
-        if ($thisData > 150000 ) { return false; }    // Pruning erroneous data, 7500Mb in max 6 minutes or so? Yeap.
+	        if (count($thisLine) != 2) return false;    // Erroneous data, too many parts :
+	        $thisTime = strtotime( trim($thisLine[0]) );
+	        $thisData = (float) trim($thisLine[1]) / 1024 / 1024;   // Transform from bytes to megabytes
+	        
+	        if ($thisData > 150000 ) { return false; }    // Pruning erroneous data, 7500Mb in max 6 minutes or so? Yeap.
         
         return array(
             'data' => $thisData,

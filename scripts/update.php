@@ -205,7 +205,7 @@ function ensureRoot(): void
     }
 }
 
-function usage(string $script): void
+function updateUsage(string $script): void
 {
     echo "Usage: {$script} [<spec>] [--repo=<url>] [--branch=<name>] [--dry-run] [--dist-upgrade=<max>] [--scripts-only]\n";
     echo "Examples:\n";
@@ -248,7 +248,7 @@ function parseArguments(array $argv): array
 
     foreach (array_slice($argv, 1) as $arg) {
         if ($arg === '--help' || $arg === '-h') {
-            usage($argv[0]);
+            updateUsage($argv[0]);
             exit(0);
         }
         if ($arg === '--dry-run') {

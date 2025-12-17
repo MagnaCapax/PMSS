@@ -1,9 +1,18 @@
 <?php
-/** HTTP-related maintenance for user environments. */
+/**
+ * HTTP-related maintenance for user environments.
+ */
 
 require_once __DIR__.'/context.php';
 
-/** Configure per-user HTTP stack pieces (ctx must be non-null; suspended users are filtered by context builder). */
+/**
+ * Configure per-user HTTP stack pieces (lighttpd vhost, ruTorrent temp paths).
+ *
+ * Suspension handling: callers must only invoke this when the user context is
+ * non-null (pmssBuildUserContext filters out suspended users via `www-disabled`).
+ *
+ * @param array $ctx Per-user context from pmssBuildUserContext().
+ */
 function pmssUserConfigureHttp(array $ctx): void
 {
     $user    = $ctx['user'];

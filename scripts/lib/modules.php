@@ -16,6 +16,8 @@
 class modules {
     /** @var string Subdirectory name for module lookup */
     var $baseName;
+    /** @var array Capability hooks (legacy, currently unused). */
+    var $capabilities;
     /** @var array Loaded module instances keyed by class name */
     var $modules;
     
@@ -34,6 +36,7 @@ class modules {
     public function __construct($baseName, $capabilities = array())
     {
         $this->baseName = $baseName;
+        $this->capabilities = $capabilities;
     }
     
     /**

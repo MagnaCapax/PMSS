@@ -10,6 +10,7 @@ Apply small, behaviour-preserving refactors that simplify PMSS while keeping all
 Primary objective (hard):
 - Reduce runtime footprint AND reduce cognitive load.
 - “Reduce cognitive load” must NOT be paid for with more concepts/indirection.
+- Compression credit must come from deleting or simplifying executable code paths; comment-only/whitespace-only reductions do not count.
 
 Secondary objective (soft):
 - Improve readability ONLY when it also reduces runtime footprint or deletes concepts.
@@ -45,6 +46,27 @@ Run types (pick one):
    - Must include a behavior lock:
      - either characterization tests or snapshot tests around the affected boundary.
    - No “parallel implementations” left in-tree at end (no permanent old+new).
+
+----------------------------------------------------------------------
+Compression & Indirection Rails (NEW — HARD)
+----------------------------------------------------------------------
+
+Comment & Docblock Integrity (NEW — HARD)
+
+- Comments/docblocks are NOT a compression lever.
+- Do not change, delete, collapse, or rewrap comments/docblocks just to hit LOC targets.
+- Comment/docblock edits are allowed ONLY when:
+  (a) the surrounding code changed and the comment must be updated to stay correct, OR
+  (b) the comment is factually wrong / misleading / unsafe, OR
+  (c) the comment became truly redundant because the surrounding code was refactored to be self-explanatory (not for LOC credit).
+- Never remove contract detail from exported/public symbols:
+  - keep @param/@return/@throws tags when present; do not collapse multi-line PHPDoc that contains tags.
+- No comment-only churn:
+  - If a diff hunk touches only comments/whitespace (no code), revert it unless it satisfies (a), (b), or (c) above.
+- Style:
+  - Use // for single-line comments.
+  - Use /* ... */ for non-PHPDoc block comments.
+  - Use /** ... */ only for real PHPDoc blocks (functions/files that need doc tooling).
 
 ----------------------------------------------------------------------
 COMPRESSION RUN — HARD GATES (MUST HOLD)
@@ -136,11 +158,10 @@ File length:
 - ~150 LOC is a guideline, not a target. NEVER split files solely to hit a line count.
 - Splitting is allowed ONLY when it reduces concepts OR deletes runtime LOC.
 
-Comments/docblocks:
-- Comments are for WHY, hazards, invariants, and contracts.
-- Do NOT add filler comments to satisfy ratios.
-- Prefer removing redundant comments and making code self-explanatory.
-- Docblock lint must not regress, but do not introduce new exported symbols that require docblocks unless you are deleting more.
+Comments:
+- Comments exist to preserve invariants, hazards, and WHY.
+- Do not add filler comments for ratios.
+- Do not delete or compress comments to achieve LOC goals; only remove comments if they are truly redundant AFTER code was made self-explanatory.
 
 ----------------------------------------------------------------------
 HARD RAILS (ALWAYS)
@@ -156,14 +177,15 @@ HARD RAILS (ALWAYS)
   - dpkg baseline files under scripts/lib/update/dpkg/selections*.txt
 - Do not change updater topology or dpkg/apt phase ordering.
 
-Concurrency & Shared Worktree (NEW — HARD)
+Parallel Runs (ABSURDLY SIMPLE)
 
-- Assume multiple Codex sessions/agents may run in the same git worktree concurrently.
-- Treat pre-existing modified/untracked files as owned by another run unless the operator explicitly assigns them to you.
-- Ignore unrelated changes: do not “clean up” or “fix” other files just because they are modified.
-- Never run `git clean`, `git reset --hard`, `git restore`, or any destructive git command unless explicitly ordered by the operator.
-- Only touch files required for your task; treat already-modified files as off-limits unless the operator explicitly assigns them to you for this run (or use a separate worktree).
-- Stage changes with explicit paths only (`git add <file>`); never use `git add .` or broad globs.
+- You MAY run multiple Codex runs in the same checkout.
+- Rule: never edit a file that is already dirty.
+  - Before touching a file: if it appears in `git status --porcelain`, SKIP it.
+- Each run MUST declare a SCOPE (subtree/glob) and touch only that scope.
+- If “dirty files at start” includes anything in the SCOPE → choose different SCOPE or skip run.
+- Never `git add .` or `git commit -a`. Stage only files you changed.
+- Autocommit only if the only dirty files in the repo are the files you touched (per `git status --porcelain`); otherwise DO NOT commit (just stop and print the patch).
 
 ----------------------------------------------------------------------
 WORKFLOW (DO THIS)
@@ -203,6 +225,8 @@ WORKFLOW (DO THIS)
 
 7) Summarise (review-first):
    - List every changed file and why
+   - Dirty files at start (`git status --porcelain`)
+   - Dirty files at end (`git status --porcelain`)
    - What you deleted/simplified and why it reduces concepts/runtime LOC
    - Why it is behaviour-preserving (which invariants you relied on)
    - Scorecard:

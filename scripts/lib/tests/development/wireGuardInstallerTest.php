@@ -113,13 +113,13 @@ class WireGuardInstallerTest extends TestCase
 
         $homeBase = $this->createTempDir();
 
-        $this->withEnv([
-            'PMSS_WG_CONFIG_DIR' => $dir,
-            'PMSS_WG_HOME_BASE'  => $homeBase,
-            'PMSS_WG_USER_LIST'  => 'dummy',
-        ], function () use ($config): void {
-            \wireguardWriteConfig('dummy', 12345);
-        });
+	        $this->withEnv([
+	            'PMSS_WG_CONFIG_DIR' => $dir,
+	            'PMSS_WG_HOME_BASE'  => $homeBase,
+	            'PMSS_WG_USER_LIST'  => 'dummy',
+	        ], function (): void {
+	            \wireguardWriteConfig('dummy', 12345);
+	        });
 
         $contents = (string) file_get_contents($config);
         $this->assertStringContainsString('PrivateKey = dummy', $contents);
@@ -195,12 +195,12 @@ class WireGuardInstallerTest extends TestCase
         @mkdir($homeBase.'/alice', 0755, true);
         @mkdir($homeBase.'/bob', 0755, true);
 
-        $this->withEnv([
-            'PMSS_WG_HOME_BASE' => $homeBase,
-            'PMSS_WG_USER_LIST' => 'alice,bob',
-        ], function () use ($homeBase): void {
-            \wgDistributeToUsers('sample');
-        });
+	        $this->withEnv([
+	            'PMSS_WG_HOME_BASE' => $homeBase,
+	            'PMSS_WG_USER_LIST' => 'alice,bob',
+	        ], function (): void {
+	            \wgDistributeToUsers('sample');
+	        });
 
         foreach (['alice', 'bob'] as $user) {
             $file = $homeBase.'/'.$user.'/wireguard.txt';

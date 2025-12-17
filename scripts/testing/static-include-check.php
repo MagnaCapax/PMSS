@@ -24,15 +24,15 @@ foreach ($iterator as $file) {
     // Skip vendor
     if (strpos($file->getPathname(), '/vendor/') !== false) continue;
 
-    $scanned++;
-    checkFile($file->getPathname());
+	$scanned++;
+	checkFile($file->getPathname(), $errors, $rootDir);
 }
 
-function checkFile(string $path): void
+function checkFile(string $path, array &$errors, string $rootDir): void
 {
-    $content = file_get_contents($path);
-    $tokens = token_get_all($content);
-    $count = count($tokens);
+	$content = file_get_contents($path);
+	$tokens = token_get_all($content);
+	$count = count($tokens);
 
     for ($i = 0; $i < $count; $i++) {
         $t = $tokens[$i];
@@ -55,14 +55,14 @@ function checkFile(string $path): void
 
             if ($j >= $count) break;
 
-            // Case 1: Absolute/String Literal: require 'foo.php';
-            if (is_array($tokens[$j]) && $tokens[$j][0] === T_CONSTANT_ENCAPSED_STRING) {
-                $str = str_replace(['"', "'"], '', $tokens[$j][1]);
-                // Only check absolute paths (start with /)
-                if (isset($str[0]) && $str[0] === '/') {
-                    verifyPath($path, $tokens[$j][2], $str, false);
-                }
-            }
+			// Case 1: Absolute/String Literal: require 'foo.php';
+			if (is_array($tokens[$j]) && $tokens[$j][0] === T_CONSTANT_ENCAPSED_STRING) {
+				$str = str_replace(['"', "'"], '', $tokens[$j][1]);
+				// Only check absolute paths (start with /)
+				if (isset($str[0]) && $str[0] === '/') {
+					verifyPath($path, $tokens[$j][2], $str, false, $errors, $rootDir);
+				}
+			}
             
             // Case 2: __DIR__ . 'string': require __DIR__ . '/foo.php';
             elseif (is_array($tokens[$j]) && $tokens[$j][0] === T_DIR) {
@@ -81,29 +81,27 @@ function checkFile(string $path): void
                             if (is_array($nextL) && in_array($nextL[0], [T_WHITESPACE, T_COMMENT])) {
                                 $l++; continue;
                             }
-                            if (is_array($nextL) && $nextL[0] === T_CONSTANT_ENCAPSED_STRING) {
-                                $str = str_replace(['"', "'"], '', $nextL[1]);
-                                verifyPath($path, $t[2], $str, true);
-                            }
-                            break; 
-                        }
-                        break;
+							if (is_array($nextL) && $nextL[0] === T_CONSTANT_ENCAPSED_STRING) {
+								$str = str_replace(['"', "'"], '', $nextL[1]);
+								verifyPath($path, $t[2], $str, true, $errors, $rootDir);
+							}
+							break; 
+						}
+						break;
                     }
                     break;
                 }
             }
         }
-    }
+	}
 }
 
-function verifyPath(string $sourceFile, int $line, string $target, bool $isRelative): void
+function verifyPath(string $sourceFile, int $line, string $target, bool $isRelative, array &$errors, string $rootDir): void
 {
-    global $errors, $rootDir;
-
-    if ($isRelative) {
-        $sourceDir = dirname($sourceFile);
-        $resolved = realpath($sourceDir . $target);
-        if ($resolved === false) {
+	if ($isRelative) {
+		$sourceDir = dirname($sourceFile);
+		$resolved = realpath($sourceDir . $target);
+		if ($resolved === false) {
             $logical = $sourceDir . $target;
             $errors[] = "File: $sourceFile:$line\n  Target: $target (Relative)\n  Resolved: $logical (MISSING)";
         }
