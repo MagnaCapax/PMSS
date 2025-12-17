@@ -22,6 +22,81 @@ $parsed = pmssParseCliTokens($argv);
 $outputJsonl = (bool)pmssCliOption($parsed, 'jsonl');
 $outputJson = !$outputJsonl && (bool)pmssCliOption($parsed, 'json');
 
+$notSet = '[not set]';
+$sliceKeys = [
+    'MemoryHigh', 'MemoryMax',
+    'CPUWeight', 'IOWeight',
+    'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota',
+    'IOReadBandwidthMax', 'IOWriteBandwidthMax',
+    'IOReadIOPSMax', 'IOWriteIOPSMax',
+];
+
+$getSliceProperties = static function (string $slice) use ($notSet, $sliceKeys): array {
+    $cmd = 'systemctl show '.escapeshellarg($slice).' -p '.implode(' -p ', $sliceKeys);
+    $out = shell_exec($cmd);
+
+    $data = array_fill_keys($sliceKeys, $notSet);
+    if (!$out) {
+        return $data;
+    }
+
+    foreach (explode("\n", trim($out)) as $line) {
+        $parts = explode('=', $line, 2);
+        if (count($parts) !== 2) {
+            continue;
+        }
+        $key = $parts[0];
+        $val = trim($parts[1]);
+        if ($val === '' || $val === 'infinity' || $val === $notSet || (ctype_digit($val) && $val > 999999999999999)) {
+            $data[$key] = $notSet;
+            continue;
+        }
+        $data[$key] = $val;
+    }
+
+    return $data;
+};
+
+$formatBytes = static function ($val) use ($notSet): string {
+    if ($val === $notSet) {
+        return '-';
+    }
+    $bytes = (int) $val;
+    if ($bytes === 0) {
+        return '-';
+    }
+
+    $units = ['B', 'K', 'M', 'G', 'T'];
+    $pow = (int) floor(log($bytes) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    $bytes /= (1 << (10 * $pow));
+
+    return round($bytes, 1).$units[$pow];
+};
+
+$parseCpuQuota = static function (array $props) use ($notSet): ?int {
+    if ($props['CPUQuota'] !== $notSet) {
+        $val = $props['CPUQuota'];
+        if (strpos($val, '%') !== false) {
+            return (int) round((float) $val);
+        }
+    }
+    if ($props['CPUQuotaPerSecUSec'] !== $notSet && $props['CPUQuotaPeriodUSec'] !== $notSet) {
+        $period = (int) $props['CPUQuotaPeriodUSec'];
+        if ($period > 0) {
+            return (int) round(((int) $props['CPUQuotaPerSecUSec'] / $period) * 100);
+        }
+    }
+    return null;
+};
+
+$parseIOPS = static function ($val) use ($notSet): ?int {
+    if ($val === $notSet) {
+        return null;
+    }
+    return preg_match('/([0-9]+)$/', $val, $matches) === 1 ? (int) $matches[1] : null;
+};
+
 $usersRaw = shell_exec('/scripts/listUsers.php');
 if ($usersRaw === null || trim($usersRaw) === '') {
     if ($outputJson) {
@@ -68,20 +143,23 @@ foreach ($users as $user) {
     if (!$info) continue;
 
     $slice = "user-{$info['uid']}.slice";
-    $props = getSliceProperties($slice);
+    $props = $getSliceProperties($slice);
+    $cpuQuotaPercent = $parseCpuQuota($props);
+    $readIops = $parseIOPS($props['IOReadIOPSMax']);
+    $writeIops = $parseIOPS($props['IOWriteIOPSMax']);
 
     $resourceData = [
         'user' => $user,
         'uid' => $info['uid'],
-        'memory_high' => parseBytes($props['MemoryHigh']),
-        'memory_max' => parseBytes($props['MemoryMax']),
+        'memory_high' => ($props['MemoryHigh'] === $notSet || (int) $props['MemoryHigh'] === 0) ? null : (int) $props['MemoryHigh'],
+        'memory_max' => ($props['MemoryMax'] === $notSet || (int) $props['MemoryMax'] === 0) ? null : (int) $props['MemoryMax'],
         'cpu_weight' => ($props['CPUWeight'] !== '[not set]') ? (int)$props['CPUWeight'] : null,
-        'cpu_quota_percent' => parseCpuQuota($props),
+        'cpu_quota_percent' => $cpuQuotaPercent,
         'io_weight' => ($props['IOWeight'] !== '[not set]') ? (int)$props['IOWeight'] : null,
-        'io_read_bandwidth' => parseBytes($props['IOReadBandwidthMax']),
-        'io_write_bandwidth' => parseBytes($props['IOWriteBandwidthMax']),
-        'io_read_iops' => parseIOPS($props['IOReadIOPSMax']),
-        'io_write_iops' => parseIOPS($props['IOWriteIOPSMax']),
+        'io_read_bandwidth' => ($props['IOReadBandwidthMax'] === $notSet || (int) $props['IOReadBandwidthMax'] === 0) ? null : (int) $props['IOReadBandwidthMax'],
+        'io_write_bandwidth' => ($props['IOWriteBandwidthMax'] === $notSet || (int) $props['IOWriteBandwidthMax'] === 0) ? null : (int) $props['IOWriteBandwidthMax'],
+        'io_read_iops' => $readIops,
+        'io_write_iops' => $writeIops,
     ];
 
     if ($outputJsonl) {
@@ -92,110 +170,19 @@ foreach ($users as $user) {
         printf(
             "%-15s %-8s %-8s %-8s %-10s %-10s %-12s %-12s %-12s %-12s\n",
             substr($user, 0, 15),
-            formatBytes($props['MemoryHigh']),
-            formatBytes($props['MemoryMax']),
+            $formatBytes($props['MemoryHigh']),
+            $formatBytes($props['MemoryMax']),
             $resourceData['cpu_weight'] ?? '-',
-            formatCpuQuota($props),
+            $cpuQuotaPercent === null ? '-' : $cpuQuotaPercent.'%',
             $resourceData['io_weight'] ?? '-',
-            formatBytes($props['IOReadBandwidthMax']),
-            formatBytes($props['IOWriteBandwidthMax']),
-            formatIOPS($props['IOReadIOPSMax']),
-            formatIOPS($props['IOWriteIOPSMax'])
+            $formatBytes($props['IOReadBandwidthMax']),
+            $formatBytes($props['IOWriteBandwidthMax']),
+            $readIops === null ? '-' : (string) $readIops,
+            $writeIops === null ? '-' : (string) $writeIops
         );
     }
 }
 
 if ($outputJson) {
     echo json_encode($allData, JSON_PRETTY_PRINT) . "\n";
-}
-
-function getSliceProperties(string $slice): array {
-    $keys = [
-        'MemoryHigh', 'MemoryMax',
-        'CPUWeight', 'IOWeight',
-        'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota', // v2 quota
-        'IOReadBandwidthMax', 'IOWriteBandwidthMax',
-        'IOReadIOPSMax', 'IOWriteIOPSMax'
-    ];
-
-    $cmd = 'systemctl show ' . escapeshellarg($slice) . ' -p ' . implode(' -p ', $keys);
-    $out = shell_exec($cmd);
-    
-    $data = array_fill_keys($keys, '[not set]');
-    
-    if ($out) {
-        foreach (explode("\n", trim($out)) as $line) {
-            $parts = explode('=', $line, 2);
-            if (count($parts) === 2) {
-                $val = trim($parts[1]);
-                // systemd often returns "infinity" or "18446744073709551615" for unset limits
-                if ($val === '' || $val === 'infinity' || $val === '[not set]') {
-                    $data[$parts[0]] = '[not set]';
-                } elseif (ctype_digit($val) && $val > 999999999999999) { // huge int
-                     $data[$parts[0]] = '[not set]';
-                } else {
-                    $data[$parts[0]] = $val;
-                }
-            }
-        }
-    }
-    return $data;
-}
-
-function formatBytes($val): string {
-    if ($val === '[not set]') return '-';
-    $bytes = (int)$val;
-    if ($bytes === 0) return '-';
-    
-    $units = ['B', 'K', 'M', 'G', 'T'];
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    $bytes /= (1 << (10 * $pow));
-    
-    return round($bytes, 1) . $units[$pow];
-}
-
-function parseBytes($val): ?int {
-    if ($val === '[not set]') return null;
-    $bytes = (int)$val;
-    if ($bytes === 0) return null;
-    return $bytes;
-}
-
-function formatCpuQuota(array $props): string {
-    $quota = parseCpuQuota($props);
-    return $quota === null ? '-' : $quota.'%';
-}
-
-function parseCpuQuota(array $props): ?int {
-    // Try straightforward v2 property first
-    if ($props['CPUQuota'] !== '[not set]') {
-        $val = $props['CPUQuota'];
-        if (strpos($val, '%') !== false) {
-            return (int)round((float)$val);
-        }
-    }
-    // Try calculating from period
-    if ($props['CPUQuotaPerSecUSec'] !== '[not set]' && $props['CPUQuotaPeriodUSec'] !== '[not set]') {
-         $p = (int)$props['CPUQuotaPeriodUSec'];
-         if ($p > 0) {
-             return (int)round(((int)$props['CPUQuotaPerSecUSec'] / $p) * 100);
-         }
-    }
-    return null;
-}
-
-function formatIOPS($val): string {
-    $iops = parseIOPS($val);
-    return $iops === null ? '-' : (string)$iops;
-}
-
-function parseIOPS($val): ?int {
-    if ($val === '[not set]') return null;
-    // systemd IO props are often "path value", e.g. "/dev/sda 100".
-    // For JSON, we want the numeric value.
-    if (preg_match('/([0-9]+)$/', $val, $matches)) {
-        return (int)$matches[1];
-    }
-    return null;
 }
