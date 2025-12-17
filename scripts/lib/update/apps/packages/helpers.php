@@ -17,10 +17,9 @@ const PMSS_PACKAGE_QUEUE_DEFAULT = '__default__';
 //     after all queues flush successfully.
 //   - PMSS_PACKAGE_WARNINGS / ERRORS: strings describing skipped or failed
 //     packages; summarised into environment variables for update-step2.
-$GLOBALS['PMSS_PACKAGE_QUEUE'] = $GLOBALS['PMSS_PACKAGE_QUEUE'] ?? [];
-$GLOBALS['PMSS_POST_INSTALL_COMMANDS'] = $GLOBALS['PMSS_POST_INSTALL_COMMANDS'] ?? [];
-$GLOBALS['PMSS_PACKAGE_WARNINGS'] = $GLOBALS['PMSS_PACKAGE_WARNINGS'] ?? [];
-$GLOBALS['PMSS_PACKAGE_ERRORS'] = $GLOBALS['PMSS_PACKAGE_ERRORS'] ?? [];
+foreach (['PMSS_PACKAGE_QUEUE', 'PMSS_POST_INSTALL_COMMANDS', 'PMSS_PACKAGE_WARNINGS', 'PMSS_PACKAGE_ERRORS'] as $key) {
+    $GLOBALS[$key] = $GLOBALS[$key] ?? [];
+}
 
 function pmssQueuePackages(array $packages, ?string $target = null): void
 {
@@ -102,25 +101,21 @@ function pmssFlushPackageQueue(): void
         $PMSS_POST_INSTALL_COMMANDS = [];
     }
 
-    $summary = !empty($PMSS_PACKAGE_WARNINGS) ? array_unique($PMSS_PACKAGE_WARNINGS) : [];
-    if (!empty($summary)) {
-        $logNotice('[WARN] Package queue warnings: '.implode(' | ', $summary));
-        $PMSS_PACKAGE_WARNINGS = [];
-    }
-    putenv('PMSS_PACKAGE_INSTALL_WARNINGS='.count($summary));
-
-    $summary = !empty($PMSS_PACKAGE_ERRORS) ? array_unique($PMSS_PACKAGE_ERRORS) : [];
-    if (!empty($summary)) {
-        $logNotice('[ERROR] Package queue errors: '.implode(' | ', $summary));
-        if (function_exists('pmssLogJson')) {
-            pmssLogJson([
-                'event'   => 'package_queue_failure',
-                'issues'  => $summary,
-            ]);
+    foreach (['PMSS_PACKAGE_WARNINGS' => 'PMSS_PACKAGE_INSTALL_WARNINGS', 'PMSS_PACKAGE_ERRORS' => 'PMSS_PACKAGE_INSTALL_ERRORS'] as $bucket => $envName) {
+        $summary = !empty($GLOBALS[$bucket]) ? array_unique($GLOBALS[$bucket]) : [];
+        if (!empty($summary)) {
+            $isError = $bucket === 'PMSS_PACKAGE_ERRORS';
+            $logNotice(($isError ? '[ERROR] Package queue errors: ' : '[WARN] Package queue warnings: ').implode(' | ', $summary));
+            if ($isError && function_exists('pmssLogJson')) {
+                pmssLogJson([
+                    'event'   => 'package_queue_failure',
+                    'issues'  => $summary,
+                ]);
+            }
+            $GLOBALS[$bucket] = [];
         }
-        $PMSS_PACKAGE_ERRORS = [];
+        putenv($envName.'='.count($summary));
     }
-    putenv('PMSS_PACKAGE_INSTALL_ERRORS='.count($summary));
 }
 
 /**

@@ -30,8 +30,6 @@ Signature: refer to file for full source; highlights below.
 - storedSpec(): string
   - Reads `/etc/seedbox/config/version`, strips `@<timestamp>`, trims. Empty when missing.
 
-- defaultSpec(): string → `git/main`.
-
 - normaliseSpec(string $spec): string
   - Accepts loose input (e.g., `git main`, `release 2025-01-01`, bare `dev` branch,
     URLs) and returns normalized spec (`git/...` or `release:...`) or `''` if invalid.

@@ -52,13 +52,6 @@ const EXIT_FETCH = 12;
 const EXIT_COPY  = 13;
 const EXIT_DIST  = 14;
 
-if (!function_exists('str_starts_with')) {
-    function str_starts_with(string $haystack, string $needle): bool
-    {
-        return $needle === '' ? false : strpos($haystack, $needle) === 0;
-    }
-}
-
 /**
  * Minimal logger – writes both to stdout and a file so rescue scenarios still log.
  */
@@ -255,7 +248,7 @@ function parseArguments(array $argv): array
             $options['dry_run'] = true;
             continue;
         }
-        if (str_starts_with($arg, '--dist-upgrade=')) {
+        if (strncmp($arg, '--dist-upgrade=', 15) === 0) {
             $options['dist_upgrade'] = substr($arg, 15);
             continue;
         }
@@ -271,11 +264,11 @@ function parseArguments(array $argv): array
             $options['scripts_only'] = true;
             continue;
         }
-        if (str_starts_with($arg, '--repo=')) {
+        if (strncmp($arg, '--repo=', 7) === 0) {
             $options['repo'] = trim(substr($arg, 7));
             continue;
         }
-        if (str_starts_with($arg, '--branch=')) {
+        if (strncmp($arg, '--branch=', 9) === 0) {
             $options['branch'] = trim(substr($arg, 9));
             continue;
         }
@@ -311,11 +304,6 @@ function storedSpec(): string
         $raw = substr($raw, 0, $pos);
     }
     return trim($raw);
-}
-
-function defaultSpec(): string
-{
-    return 'git/main';
 }
 
 /**

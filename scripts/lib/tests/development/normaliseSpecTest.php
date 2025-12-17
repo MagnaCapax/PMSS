@@ -39,6 +39,11 @@ class NormaliseSpecTest extends TestCase
 
     public function testDefaultSpecFormat(): void
     {
-        $this->assertEquals('git/main', defaultSpec());
+        if (is_file(\VERSION_FILE)) {
+            throw new SkipTest('VERSION_FILE exists on this host; default spec depends on stored spec');
+        }
+
+        $parsed = \parseArguments(['update.php']);
+        $this->assertEquals('git/main', $parsed['spec'] ?? '');
     }
 }
