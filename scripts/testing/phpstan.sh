@@ -31,5 +31,45 @@ if [[ -f "$ROOT_DIR/phpstan.neon.dist" ]]; then
   ARGS+=("-c" "$ROOT_DIR/phpstan.neon.dist")
 fi
 
+cd "$ROOT_DIR"
+
+has_target=0
+after_double_dash=0
+skip_next=0
+for ((i = 1; i <= $#; i++)); do
+  arg="${!i}"
+  if ((skip_next)); then
+    skip_next=0
+    continue
+  fi
+  if [[ "$arg" == "--" ]]; then
+    after_double_dash=1
+    continue
+  fi
+  if ((after_double_dash)); then
+    has_target=1
+    break
+  fi
+
+  case "$arg" in
+    -c|--configuration|--autoload-file|--memory-limit|--error-format|--level)
+      skip_next=1
+      continue
+      ;;
+    -*)
+      continue
+      ;;
+  esac
+
+  if [[ -d "$arg" || "$arg" == *.php ]]; then
+    has_target=1
+    break
+  fi
+done
+
+if ((has_target == 0)); then
+  set -- "$@" scripts
+fi
+
 # Forward any extra arguments to allow CI/local overrides (e.g., --level=3)
 exec "$PHAR_BIN" "${ARGS[@]}" "$@"
