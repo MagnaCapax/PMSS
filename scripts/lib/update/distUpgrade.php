@@ -146,13 +146,7 @@ function pmssResolveTargetVersion(string $input): string
  */
 function pmssDistUpgradeIsAllowedMajor(string $major): bool
 {
-    static $allowed = [
-        '10' => true,
-        '11' => true,
-        '12' => true,
-        '13' => true,
-    ];
-
+    static $allowed = ['10' => true, '11' => true, '12' => true, '13' => true];
     return isset($allowed[$major]);
 }
 
@@ -161,12 +155,7 @@ function pmssDistUpgradeIsAllowedMajor(string $major): bool
  */
 function pmssDetermineUpgradePath(string $current): array
 {
-    static $map = [
-        '10' => ['10', '11'],
-        '11' => ['11', '12'],
-        '12' => ['12', '13'],
-    ];
-
+    static $map = ['10' => ['10', '11'], '11' => ['11', '12'], '12' => ['12', '13']];
     return $map[$current] ?? [null, null];
 }
 

@@ -54,10 +54,7 @@ requireRoot();
 
 // Preflight: ensure root can keep forking during long updates even if legacy TasksMax caps are present.
 // Safe before the package phase; avoids "Cannot fork" cascades inside user-0.slice.
-runStep(
-    'Ensuring root user slice TasksMax is unlimited (preflight)',
-    "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity"
-);
+runStep('Ensuring root user slice TasksMax is unlimited (preflight)', "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity");
 
 $distribution  = pmssDetectDistro();
 $distroName    = $distribution['name'];
@@ -102,20 +99,14 @@ if (!function_exists('logmsg')) {
     function logmsg(string $message): void
     {
         $timestamp = date('[Y-m-d H:i:s] ');
-        $primary   = '/var/log/pmss-update.log';
-        $fallback  = '/tmp/pmss-update.log';
-        @file_put_contents($primary, $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX)
-     || @file_put_contents($fallback, $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        @file_put_contents('/var/log/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX) || @file_put_contents('/tmp/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
         fwrite(STDERR, $message.PHP_EOL);
     }
 }
 
 $GLOBALS['PMSS_PACKAGES_READY'] = false;
-// PMSS_PACKAGE_PHASE advertises coarse progress to sub-processes. Current
-// values: `initializing` (pre-package work) and `complete` (package queues and
-// baselines finished). Future phases may slot in between; consumers should
-// treat unknown values as "in progress". Always flip the flag after logging the
-// matching step so external monitors keep ordering intact.
+// PMSS_PACKAGE_PHASE advertises coarse progress (`initializing`/`complete`); unknown values mean "in progress".
+// Flip it after logging the matching step so external monitors keep ordering intact.
 putenv('PMSS_PACKAGE_PHASE=initializing');
 
 $effectiveRepoVersion = $repoVersion > 0 ? $repoVersion : $reportedVersion;
@@ -141,9 +132,9 @@ pmssPruneLegacyMediaArea();
 runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
 // Ensure core packaging tools are current before bootstrapping third-party repos
 // This is now handled by the main repo refresh + dpkg baseline to avoid redundant updates.
-$repoRefreshed = pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
+pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
 pmssCompletePendingDpkg();
-$dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, $repoRefreshed);
+$dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true);
 
 // System-wide services must not run on seedbox hosts. Stop/disable early so
 // package installs cannot leave attack surface exposed for the rest of the run.
@@ -160,9 +151,7 @@ pmssStopDisableMaskApacheLegacy();
 // lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
 runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));
 pmssStopDisableMaskApacheLegacy();
-if ($repoLogMessage !== '') {
-    logmsg($repoLogMessage);
-}
+if ($repoLogMessage !== '') { logmsg($repoLogMessage); }
 if (!$dpkgBaselineOk) {
     logmsg('[WARN] Dpkg baseline application reported issues; attempting recovery');
     runStep('Attempting apt fix-broken install (dpkg baseline recovery)', aptCmd('--fix-broken install -y'));
@@ -173,8 +162,6 @@ if (!$dpkgBaselineOk) {
     }
 }
 
-require_once __DIR__.'/../lib/update/users.php';
-
 // #TODO Finish migration: once dpkg baselines cover all apps on all hosts,
 //       replace queued installs with a diff-summary report and remove the
 //       per-app package queue entirely.
@@ -184,13 +171,8 @@ pmssFlushPackageQueue();
 $packageWarnings = (int) (getenv('PMSS_PACKAGE_INSTALL_WARNINGS') ?: 0);
 $packageErrors   = (int) (getenv('PMSS_PACKAGE_INSTALL_ERRORS') ?: 0);
 
-if ($packageWarnings > 0) {
-    logmsg(sprintf('[WARN] Package phase completed with %d warning(s); see earlier log entries for details', $packageWarnings));
-}
-if ($packageErrors > 0) {
-    logmsg(sprintf('[ERROR] Package phase could not install %d item(s); continuing with caution', $packageErrors));
-    pmssLogJson(['event' => 'package_phase', 'status' => 'warn', 'reason' => 'queue_failures', 'count' => $packageErrors]);
-}
+if ($packageWarnings > 0) { logmsg(sprintf('[WARN] Package phase completed with %d warning(s); see earlier log entries for details', $packageWarnings)); }
+if ($packageErrors > 0) { logmsg(sprintf('[ERROR] Package phase could not install %d item(s); continuing with caution', $packageErrors)); pmssLogJson(['event' => 'package_phase', 'status' => 'warn', 'reason' => 'queue_failures', 'count' => $packageErrors]); }
 
 runStep('Attempting apt fix-broken install (post-package phase)', aptCmd('--fix-broken install -y'));
 runStep('Removing packages no longer required', aptCmd('autoremove -y'));
@@ -268,10 +250,7 @@ pmssApplyNetworkConfig();
 pmssApplySecurityHardening();
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
-$legacyAppVersionDir = '/etc/seedbox/config/app-versions';
-if (is_dir($legacyAppVersionDir)) {
-    runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg($legacyAppVersionDir));
-}
+if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
 
 // Mark the end of phase 2 so log parsing knows we finished cleanly.
 // Refresh MOTD at the very end so VPN/service status reflects final state.
@@ -286,20 +265,16 @@ try {
 
     logmsg('Update logs saved to:');
     logmsg('  - Text:   '.$plainLog);
-    if ($jsonLog !== '') {
-        logmsg('  - JSON:   '.$jsonLog);
-    }
-    if ($profileOut !== '') {
-        logmsg('  - Profile: '.$profileOut);
-    }
+    if ($jsonLog !== '') { logmsg('  - JSON:   '.$jsonLog); }
+    if ($profileOut !== '') { logmsg('  - Profile: '.$profileOut); }
 } catch (\Throwable $e) {
-        // Fail-soft: logging paths are best-effort only.
-    }
-    
-    // Record successful completion for MOTD/monitoring
-    @file_put_contents('/var/run/pmss/updated', date('Y-m-d H:i:s'));
-    @chmod('/var/run/pmss/updated', 0644);
-    
-    pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
-    logmsg('update-step2.php completed');
+    // Fail-soft: logging paths are best-effort only.
+}
+
+// Record successful completion for MOTD/monitoring
+@file_put_contents('/var/run/pmss/updated', date('Y-m-d H:i:s'));
+@chmod('/var/run/pmss/updated', 0644);
+
+pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
+logmsg('update-step2.php completed');
 logmsg('Completed at: '.date('Y-m-d H:i:s'));

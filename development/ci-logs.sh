@@ -27,6 +27,40 @@ if ! have gh; then
 	exit 1
 fi
 
+latest_run_id() {
+	gh run list --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true
+}
+
+job_id_from_run_by_name() {
+	local run_id="$1" name="$2"
+	local jobid=""
+
+	# Newer gh versions expose a jobs field directly; older ones do not.
+	jobid=$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId" 2>/dev/null || true)
+	if [[ -z "$jobid" ]]; then
+		jobid=$(gh run view "$run_id" 2>/dev/null | awk -v want="$name" '
+			{
+				line=$0
+				sub(/^[^A-Za-z0-9_-]+[[:space:]]*/, "", line)
+				split(line, parts, /[[:space:]]+/)
+				if (parts[1] != want) next
+				if (match($0, /\(ID[[:space:]]+[0-9]+\)/)) {
+					id=substr($0, RSTART, RLENGTH)
+					gsub(/[^0-9]/, "", id)
+					print id
+					exit
+				}
+			}
+		' 2>/dev/null || true)
+	fi
+	if [[ -z "$jobid" ]]; then
+		jobid=$(gh api -H "Accept: application/vnd.github+json" \
+			"repos/{owner}/{repo}/actions/runs/$run_id/jobs?per_page=100" \
+			--jq ".jobs[] | select(.name == \"$name\").id" 2>/dev/null || true)
+	fi
+	printf '%s' "$jobid"
+}
+
 cmd=${1:-latest}
 shift || true
 
@@ -45,13 +79,17 @@ case "$cmd" in
 	job-name)
 		name=${1:-}
 		if [[ -z "$name" ]]; then echo "usage: ci-logs.sh job-name <name>" >&2; exit 2; fi
-		jobid=$(gh run view --latest --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId")
+		runid=$(latest_run_id)
+		if [[ -z "$runid" ]]; then echo "[ci-logs] no runs found" >&2; exit 1; fi
+		jobid=$(job_id_from_run_by_name "$runid" "$name")
 		if [[ -z "$jobid" ]]; then echo "[ci-logs] job '$name' not found in latest run" >&2; exit 3; fi
 		gh run view --job "$jobid" --log
 		;;
 	smoke)
 		# convenience alias for the 'smoke' job
-		jobid=$(gh run view --latest --json jobs --jq '.jobs[] | select(.name == "smoke").databaseId')
+		runid=$(latest_run_id)
+		if [[ -z "$runid" ]]; then echo "[ci-logs] no runs found" >&2; exit 1; fi
+		jobid=$(job_id_from_run_by_name "$runid" "smoke")
 		if [[ -z "$jobid" ]]; then echo "[ci-logs] smoke job not found in latest run" >&2; exit 3; fi
 		gh run view --job "$jobid" --log
 		;;

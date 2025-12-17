@@ -21,7 +21,6 @@ class A00_JsonLogPathTest extends TestCase
         $path = $this->tmpFile();
         file_put_contents($path, '');
         putenv('PMSS_JSON_LOG='.$path);
-        \pmssResetJsonLogPath();
         $this->assertEquals($path, \pmssJsonLogPath());
         \pmssLogJson(['event' => 'edge', 'val' => 1]);
         $raw = trim(file_get_contents($path));
@@ -42,7 +41,7 @@ class A00_JsonLogPathTest extends TestCase
 
     private function resetJsonLogPath(): void
     {
-        \pmssResetJsonLogPath();
+        $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         putenv('PMSS_JSON_LOG');
     }
 }

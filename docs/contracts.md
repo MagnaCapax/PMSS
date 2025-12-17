@@ -146,11 +146,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssEnsureRepositoryPrerequisites(): void → ensures third-party repo prerequisites (currently Docker deb822 + keyring, Sonarr trusted key) exist before `apt-get update`.
 - pmssEnsureMediaareaRepository(): void → legacy shim; removes old MediaArea `.list/.sources` files from `sources.list.d` to avoid duplicate/invalid entries.
+- pmssEnsureSonarrKey(): void → installs `/etc/apt/trusted.gpg.d/sonarr.gpg` so `apt-get update` does not fail for Sonarr sources.
+- pmssEnsureDockerRepository(): void → ensures Docker deb822 source + keyring exist under `/etc/apt/sources.list.d/docker.sources` and `/etc/apt/keyrings/docker.gpg`.
 - pmssQueryPackageStatus(string $package): string → returns `dpkg-query -W` status or `''`.
 - pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger=null): array
   - `mode=reuse` (unknown version) or `mode=update` with current hash and loaded templates.
-- pmssRefreshRepositories(string $distroName, int $distroVersion, ?callable $logger=null): void
-  - Ensures prereqs, computes plan; `apt-get update` either way, with template write on update.
+- pmssRefreshRepositories(string $distroName, int $distroVersion, ?callable $logger=null): bool
+  - Ensures Docker/Sonarr repo prerequisites, computes plan; runs `apt-get update` either way, with template write on update.
 - pmssAutoremovePackages(): void → `apt-get autoremove -y` via `runStep`.
 
 ---
@@ -276,20 +278,14 @@ iptables helpers:
 - pmssQueuePackages(array $packages, ?string $target=null): void → queue package names under `__default__` or suite (e.g., `buster-backports`), deduped.
 - pmssFlushPackageQueue(): void → install each queue; split available vs missing with `apt-cache policy`, run `apt-get install` (with `-t <suite>`), retry with `--fix-broken`; run post-install commands; set env counters `PMSS_PACKAGE_INSTALL_WARNINGS|ERRORS`, log JSON event on errors.
 - pmssPackageStatus(string $package): string → dpkg status string or `''`.
-- pmssPackageAvailable(string $package): bool → parses `apt-cache policy` for Candidate != `(none)` (cached).
+- pmssPackageAvailable(string $package): bool → checks cached `apt-cache pkgnames` set (fast path), falls back to `apt-cache policy` (cached).
 - pmssInstallBestEffort(array $items, string $label=''): void → from each list item (string or list of fallbacks) picks the first available and queues.
 - pmssInstallProftpdStack(int $distroVersion): void → queues proftpd stack (+nftables for >=10), unmask unit pre-install, and enqueues a `dpkg --configure` recovery command.
-- pmssBackportSuite(int $distroVersion): ?string → maps 10/11/12 to backports suite; else null.
 
 System/app groups:
-- pmssInstallBaseTools(): void → queues `lighttpd` + `lighttpd-mod-webdav`.
 - pmssInstallSystemUtilities(int $distroVersion): void → queues standard utility packages (ncurses/python3 family/zip/unzip/irssi/etc.); logs warn when v<10 and returns.
 - pmssInstallMediaAndNetworkTools(int $distroVersion): void → queues media/network/backup tooling; kernels/firmware from backports on v=10.
-- pmssInstallPythonToolchain(int $distroVersion): void → queues python3 toolchain packages.
 - pmssInstallZncStack(int $distroVersion): void → queues `znc` and related packages; logs warn and returns on v<10.
-- pmssInstallSabnzbd(): void → queues `sabnzbdplus` if binary missing.
-- pmssInstallMiscTools(): void → queues mkvtoolnix, openvpn/easy-rsa when missing, `sudo`, `expect`, `ipset` if needed.
-- pmssInstallWireguardPackages(): void → on Debian 12+ queues `wireguard`/`wireguard-tools` only when tools are missing (kernel module is in-tree); on older releases also queues `wireguard-dkms` unless both tools are already installed.
 
 ---
 

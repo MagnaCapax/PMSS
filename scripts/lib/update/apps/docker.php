@@ -1,18 +1,6 @@
 <?php
-if (!function_exists('dockerRootlessShellExec')) {
-    function dockerRootlessShellExec(string $command): string
-    {
-        $output = shell_exec($command);
-        if (function_exists('logmsg')) {
-            logmsg('[docker] Command \'' . $command . '\' output: ' . trim($output));
-        }
-        return $output;
-    }
-}
 
-if (function_exists('logmsg')) {
-    logmsg('[docker] Starting Docker rootless configuration');
-}
+function_exists('logmsg') && logmsg('[docker] Starting Docker rootless configuration');
 
 // Disable Docker system service and remove stray socket
 runStep('[docker] Docker: disabling system service', 'systemctl disable --now docker.service docker.socket');
@@ -25,18 +13,17 @@ runStep('[docker] Docker: applying sysctl configuration', 'sysctl --system');
 // Debian 10 and 11 require additional rootless helpers
 $version = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
 if ($version > 0 && $version < 12) {
-    $arch = trim((string) dockerRootlessShellExec('uname -m 2>/dev/null'));
-    if ($arch === '') { $arch = 'x86_64'; }
-    
+    $archOutput = shell_exec('uname -m 2>/dev/null');
+    function_exists('logmsg') && logmsg("[docker] Command 'uname -m 2>/dev/null' output: ".trim((string) $archOutput));
+    $arch = trim((string) $archOutput) ?: 'x86_64';
+
     // #TODO: Generalize this to a version-managed dependency system
     $url  = 'https://github.com/rootless-containers/slirp4netns/releases/download/v1.3.2/slirp4netns-'.$arch;
-    
+
     runStep('[docker] Docker: downloading slirp4netns helper ('.$arch.')', 'curl -fsSL -o slirp4netns '.escapeshellarg($url));
     runStep('[docker] Docker: installing slirp4netns helper', 'install slirp4netns /usr/local/bin/');
     @unlink('slirp4netns');
     runStep('[docker] Docker: creating iptables symlink', 'ln -sf /usr/sbin/iptables /usr/local/bin/iptables');
 }
 
-if (function_exists('logmsg')) {
-    logmsg('[docker] Docker rootless configuration complete');
-}
+function_exists('logmsg') && logmsg('[docker] Docker rootless configuration complete');

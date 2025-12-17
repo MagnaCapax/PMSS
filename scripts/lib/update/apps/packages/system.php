@@ -12,11 +12,6 @@
 
 require_once __DIR__.'/helpers.php';
 
-function pmssInstallBaseTools(): void
-{
-    pmssQueuePackages(['lighttpd', 'lighttpd-mod-webdav']);
-}
-
 function pmssInstallSystemUtilities(int $distroVersion): void
 {
     if ($distroVersion < 10) {
@@ -25,12 +20,8 @@ function pmssInstallSystemUtilities(int $distroVersion): void
     }
 
     pmssQueuePackages(['screen', 'mc', 'wget', 'gawk', 'subversion', 'libtool', 'sqlite', 'locate', 'ntpdate', 'build-essential', 'pkg-config', 'autoconf', 'automake', 'python3', 'python3-pip', 'python3-venv', 'python3-dev']);
-    pmssInstallBestEffort([
-        'libncurses6',
-    ], 'ncurses runtime');
-    pmssInstallBestEffort([
-        'libncurses-dev',
-    ], 'ncurses development headers');
+    pmssInstallBestEffort(['libncurses6'], 'ncurses runtime');
+    pmssInstallBestEffort(['libncurses-dev'], 'ncurses development headers');
     // apache2-utils is required system-wide (htpasswd, ab). Lighttpd user
     // auth and other tooling depend on htpasswd; do NOT remove.
     pmssQueuePackages([
@@ -47,9 +38,8 @@ function pmssInstallMediaAndNetworkTools(int $distroVersion): void
         return;
     }
 
-    pmssQueuePackages(['libzen0v5', 'sox', 'tmux', 'tree', 'ncdu', 'weechat', 'php-xml', 'php-zip', 'php-sqlite3', 'php-mbstring', 'qbittorrent-nox']);
-
     pmssQueuePackages([
+        'libzen0v5', 'sox', 'tmux', 'tree', 'ncdu', 'weechat', 'php-xml', 'php-zip', 'php-sqlite3', 'php-mbstring', 'qbittorrent-nox',
         'zsh', 'atop', 'php-cgi', 'php-cli',
         'aria2', 'htop', 'mtr', 'mktorrent',
         'genisoimage', 'xorriso',
@@ -58,19 +48,16 @@ function pmssInstallMediaAndNetworkTools(int $distroVersion): void
         'restic', 'borgbackup', 'borgmatic', 'borgbackup-doc', 'backupninja',
         'links', 'elinks', 'lynx', 'ethtool', 'zip', 'p7zip-full', 'smartmontools', 'flac', 'lame', 'lame-doc', 'mp3diags', 'gcc', 'g++', 'gettext', 'fuse3', 'glib-networking', 'libglib2.0-dev', 'libfuse-dev', 'apt-transport-https', 'pigz',
         'python3-cheetah',
+        // #TODO revisit curl/libcurl upgrades once a consistent backports policy is defined.
+        'unionfs-fuse', 'sshfs', 's3fs',
+        'ranger', 'nethack-console',
+        'libmozjs-52-0', 'libmozjs-60-0',
+        'libarchive-zip-perl', 'libnet-ssleay-perl', 'libhtml-parser-perl', 'libxml-libxml-perl', 'libjson-perl', 'libjson-xs-perl', 'libxml-libxslt-perl',
+        'lftp',
+        'nginx', 'ntp',
     ]);
-
-    // #TODO revisit curl/libcurl upgrades once a consistent backports policy is defined.
-    pmssQueuePackages(['unionfs-fuse', 'sshfs', 's3fs']);
-    pmssQueuePackages(['ranger', 'nethack-console']);
-
-    pmssQueuePackages(['libmozjs-52-0', 'libmozjs-60-0']);
 
     if ($distroVersion == 10) {
         pmssQueuePackages(['linux-image-amd64', 'firmware-bnx2', 'firmware-bnx2x'], 'buster-backports');
     }
-
-    pmssQueuePackages(['libarchive-zip-perl', 'libnet-ssleay-perl', 'libhtml-parser-perl', 'libxml-libxml-perl', 'libjson-perl', 'libjson-xs-perl', 'libxml-libxslt-perl']);
-    pmssQueuePackages(['lftp']);
-    pmssQueuePackages(['nginx', 'ntp']);
 }

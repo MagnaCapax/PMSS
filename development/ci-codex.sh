@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
 set -euo pipefail
 set -o errtrace
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
+cd "$ROOT"
+# shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
 
 # Optional debug: PMSS_CI_CODEX_DEBUG=1 enables bash -x tracing
@@ -38,7 +41,6 @@ OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 RUNLOG="$OUTDIR/job-run.log"
-PROMPT="$OUTDIR/prompt.txt"
 SUMMARY="$OUTDIR/ci-summary.txt"
 
 # Render caps to keep prompt readable
@@ -374,53 +376,83 @@ if compgen -G "$ARTDIR/*" >/dev/null; then
 	latest_art=$(find "$ARTDIR" -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
 fi
 
-# Optionally capture a specific job log
-# Fetch logs for a requested job, or both 'build' and 'smoke' by default
-fetch_job_log() {
-	local name="$1" out="$2"
-	if [[ "$fetch_mode" == "gh" ]]; then
-		local id jobs_json job_id zip_path token
+	# Optionally capture a specific job log
+	# Fetch logs for a requested job, or both 'build' and 'smoke' by default
+	fetch_job_log() {
+		local name="$1" out="$2"
+		if [[ "$fetch_mode" == "gh" ]]; then
+			local id jobs_json job_id zip_path token
 
-		# Newer gh versions expose a jobs field directly; older ones do not.
-		id="$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId" 2>/dev/null || true)"
+			# Newer gh versions expose a jobs field directly; older ones do not.
+			id="$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId" 2>/dev/null || true)"
 
-		# Fallback for older gh: query the REST API for job ids, then fetch logs.
-		if [[ -z "$id" && -n "$repo_full" ]]; then
-			jobs_json="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
-			PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
-				$j=json_decode(stream_get_contents(STDIN), true);
-				$name=getenv("PMSS_CI_JOB_NAME") ?: "";
-				foreach (($j["jobs"] ?? []) as $job) {
-					if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
-				}
-			' 2>/dev/null || true)"
-			id="$job_id"
-		fi
-
-		if [[ -n "$id" ]]; then
-			gh run view --job "$id" --log >"$out" 2>/dev/null || true
-		fi
-
-		# If gh cannot emit job logs, fall back to downloading the zipped REST logs.
-		if [[ -n "$id" && ! -s "$out" && -n "$repo_full" ]]; then
-			zip_path="$OUTDIR/job-${id}.zip"
-			token="${GITHUB_TOKEN:-}"
-			if [[ -z "$token" ]]; then
-				ci_shell_disable_xtrace
-				token="$(gh auth token 2>/dev/null || true)"
-				ci_shell_restore_xtrace
+			# Fallback for older gh: query the REST API for job ids, then fetch logs.
+			if [[ -z "$id" && -n "$repo_full" ]]; then
+				jobs_json="$(gh api -H "Accept: application/vnd.github+json" "/repos/$repo_full/actions/runs/$run_id/jobs" 2>/dev/null || true)"
+				if [[ -z "$jobs_json" ]]; then
+					jobs_json="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo_full/actions/runs/$run_id/jobs" 2>/dev/null || true)"
+				fi
+				# shellcheck disable=SC2034
+				PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
+					$j=json_decode(stream_get_contents(STDIN), true);
+					$name=getenv("PMSS_CI_JOB_NAME") ?: "";
+					foreach (($j["jobs"] ?? []) as $job) {
+						if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
+					}
+				' 2>/dev/null || true)"
+				id="$job_id"
 			fi
-			if [[ -n "$token" ]]; then
-				if GITHUB_TOKEN="$token" ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$id/logs" "$zip_path" >/dev/null 2>&1; then
-					ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
+
+			# Last resort for old gh: parse job ids from the plain `gh run view` summary we already captured.
+			if [[ -z "$id" && -s "$SUMMARY" ]]; then
+				id="$(awk -v want="$name" '
+					{
+						line=$0
+						sub(/^[^A-Za-z0-9_-]+[[:space:]]*/, "", line)
+						split(line, parts, /[[:space:]]+/)
+						if (parts[1] != want) next
+						if (match($0, /\(ID[[:space:]]+[0-9]+\)/)) {
+							id=substr($0, RSTART, RLENGTH)
+							gsub(/[^0-9]/, "", id)
+							print id
+							exit
+						}
+					}
+				' "$SUMMARY" 2>/dev/null || true)"
+			fi
+
+			if [[ -n "$id" ]]; then
+				gh run view --job "$id" --log >"$out" 2>/dev/null || true
+			fi
+
+			# If gh cannot emit job logs, fall back to downloading the zipped REST logs.
+			if [[ -n "$id" && ! -s "$out" && -n "$repo_full" ]]; then
+				zip_path="$OUTDIR/job-${id}.zip"
+				token="${GITHUB_TOKEN:-}"
+				if [[ -z "$token" ]]; then
+					ci_shell_disable_xtrace
+					# gh 2.4.x lacks `gh auth token`; fall back to parsing `gh auth status --show-token`.
+					token="$(gh auth token 2>/dev/null || true)"
+					if [[ -z "$token" ]]; then
+						token="$(gh auth status --show-token 2>/dev/null \
+							| awk 'BEGIN{IGNORECASE=1} $0 ~ /^[[:space:]]*token:[[:space:]]/ {print $2; exit}' || true)"
+					fi
+					ci_shell_restore_xtrace
+				fi
+				if [[ -n "$token" ]]; then
+					ci_shell_disable_xtrace
+					if GITHUB_TOKEN="$token" ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$id/logs" "$zip_path" >/dev/null 2>&1; then
+						ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
+					fi
+					ci_shell_restore_xtrace
 				fi
 			fi
+			return 0
 		fi
-		return 0
-	fi
 
-	local jobs_json job_id zip_path
-	jobs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
+		local jobs_json job_id zip_path
+		jobs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
+		# shellcheck disable=SC2034
 	PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
 		$j=json_decode(stream_get_contents(STDIN), true);
 		$name=getenv("PMSS_CI_JOB_NAME") ?: "";

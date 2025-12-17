@@ -47,13 +47,9 @@ function pmssFlushPackageQueue(): void
         return;
     }
 
-    $logNotice = function (string $message): void {
-        if (function_exists('logmsg')) {
-            logmsg($message);
-        } else {
-            echo $message."\n";
-        }
-    };
+    $logNotice = function_exists('logmsg')
+        ? 'logmsg'
+        : function (string $message): void { echo $message."\n"; };
 
     foreach ($PMSS_PACKAGE_QUEUE as $target => $packages) {
         $isDefaultTarget = $target === PMSS_PACKAGE_QUEUE_DEFAULT;
@@ -65,7 +61,13 @@ function pmssFlushPackageQueue(): void
             continue;
         }
 
-        [$installable, $missing] = pmssFilterAvailablePackages($packages);
+        $installable = [];
+        $missing     = [];
+        foreach ($packages as $pkg) {
+            if (!pmssPackageAvailable($pkg)) { $missing[] = $pkg; continue; }
+            // Skip packages already installed to reduce apt noise and runtime.
+            if (pmssPackageStatus($pkg) !== 'install ok installed') { $installable[] = $pkg; }
+        }
         if (!empty($missing)) {
             $message = sprintf('Skipping unavailable packages in %s: %s', $missingContext, implode(', ', $missing));
             $logNotice('[WARN] '.$message);
@@ -77,8 +79,7 @@ function pmssFlushPackageQueue(): void
 
         $pkgArgs = implode(' ', array_map('escapeshellarg', $installable));
         $label = $isDefaultTarget ? 'Installing packages' : ('Installing packages ('.$target.')');
-        $targetArg = $isDefaultTarget ? '' : (' -t '.escapeshellarg($target));
-        $cmd = aptCmd('install -y'.$targetArg.' '.$pkgArgs);
+        $cmd = aptCmd('install -y'.($isDefaultTarget ? '' : (' -t '.escapeshellarg($target))).' '.$pkgArgs);
 
         $rc = runStep($label, $cmd);
         if ($rc !== 0) {
@@ -101,14 +102,14 @@ function pmssFlushPackageQueue(): void
         $PMSS_POST_INSTALL_COMMANDS = [];
     }
 
-    $summary = !empty($PMSS_PACKAGE_WARNINGS) ? array_values(array_unique($PMSS_PACKAGE_WARNINGS)) : [];
+    $summary = !empty($PMSS_PACKAGE_WARNINGS) ? array_unique($PMSS_PACKAGE_WARNINGS) : [];
     if (!empty($summary)) {
         $logNotice('[WARN] Package queue warnings: '.implode(' | ', $summary));
         $PMSS_PACKAGE_WARNINGS = [];
     }
     putenv('PMSS_PACKAGE_INSTALL_WARNINGS='.count($summary));
 
-    $summary = !empty($PMSS_PACKAGE_ERRORS) ? array_values(array_unique($PMSS_PACKAGE_ERRORS)) : [];
+    $summary = !empty($PMSS_PACKAGE_ERRORS) ? array_unique($PMSS_PACKAGE_ERRORS) : [];
     if (!empty($summary)) {
         $logNotice('[ERROR] Package queue errors: '.implode(' | ', $summary));
         if (function_exists('pmssLogJson')) {
@@ -129,7 +130,7 @@ function pmssPackageStatus(string $package): string
 {
     $cmd = 'dpkg-query -W -f=\'${Status}\' '.escapeshellarg($package).' 2>/dev/null';
     exec($cmd, $output, $rc);
-    return $rc === 0 && isset($output[0]) ? trim($output[0]) : '';
+    return $rc === 0 ? trim($output[0] ?? '') : '';
 }
 
 /**
@@ -138,15 +139,31 @@ function pmssPackageStatus(string $package): string
 function pmssPackageAvailable(string $package): bool
 {
     static $cache = [];
+    static $availableSet = null;
     if (array_key_exists($package, $cache)) {
         return $cache[$package];
     }
+
+    if (!is_array($availableSet)) {
+        $out = [];
+        exec('apt-cache pkgnames 2>/dev/null', $out, $rc);
+        $availableSet = [];
+        if ($rc === 0 && !empty($out)) {
+            foreach ($out as $name) {
+                $name = strtolower(trim($name));
+                if ($name !== '') {
+                    $availableSet[$name] = true;
+                }
+            }
+        }
+    }
+
     // Fast path: consult a prebuilt set of available package names.
     $nameOnly = strtolower(preg_replace('/:.+$/', '', $package));
-    $set = pmssAvailablePackageSet();
-    if (!empty($set)) {
-        return $cache[$package] = isset($set[$nameOnly]);
+    if (!empty($availableSet)) {
+        return $cache[$package] = isset($availableSet[$nameOnly]);
     }
+
     // Fallback: query apt-cache policy (slower, per package)
     $cmd = 'apt-cache policy '.escapeshellarg($package).' 2>/dev/null';
     exec($cmd, $output, $rc);
@@ -159,33 +176,6 @@ function pmssPackageAvailable(string $package): bool
         }
     }
     return $cache[$package] = true;
-}
-
-if (!function_exists('pmssAvailablePackageSet')) {
-    /**
-     * Build and cache a set of all available package names (lowercased), once per run.
-     */
-    function pmssAvailablePackageSet(): array
-    {
-        static $set = null;
-        if (is_array($set)) {
-            return $set;
-        }
-        $out = [];
-        exec('apt-cache pkgnames 2>/dev/null', $out, $rc);
-        if ($rc !== 0 || empty($out)) {
-            $set = [];
-            return $set;
-        }
-        $set = [];
-        foreach ($out as $name) {
-            $name = strtolower(trim($name));
-            if ($name !== '') {
-                $set[$name] = true;
-            }
-        }
-        return $set;
-    }
 }
 
 /**
@@ -206,7 +196,7 @@ function pmssInstallBestEffort(array $items, string $label = ''): void
             $selection[] = $item;
         }
     }
-    $selection = array_values(array_unique($selection));
+    $selection = array_unique($selection);
     if (empty($selection)) {
         if ($label !== '') {
             echo "Notice: No packages available for {$label}\n";
@@ -214,32 +204,6 @@ function pmssInstallBestEffort(array $items, string $label = ''): void
         return;
     }
     pmssQueuePackages($selection);
-}
-
-/**
- * Filter a package list into installable vs. missing entries.
- */
-function pmssFilterAvailablePackages(array $packages): array
-{
-    $installable = [];
-    $missing     = [];
-
-    foreach ($packages as $pkg) {
-        if ($pkg === '') {
-            continue;
-        }
-        if (pmssPackageAvailable($pkg)) {
-            // Skip packages already installed to reduce apt noise and runtime.
-            if (pmssPackageStatus($pkg) === 'install ok installed') {
-                continue;
-            }
-            $installable[] = $pkg;
-        } else {
-            $missing[] = $pkg;
-        }
-    }
-
-    return [$installable, $missing];
 }
 
 /**
@@ -264,35 +228,16 @@ function pmssInstallProftpdStack(int $distroVersion): void
 
     // Only queue a reconfigure if dpkg reports half-configured state.
     $proftpdPkgs = ['proftpd-core', 'proftpd-mod-crypto', 'proftpd-mod-wrap', 'proftpd-basic'];
-    $needsCleanup = false;
     foreach ($proftpdPkgs as $pkg) {
         $status = pmssPackageStatus($pkg);
         if ($status !== '' && $status !== 'install ok installed') {
-            $needsCleanup = true;
-            break;
+            global $PMSS_POST_INSTALL_COMMANDS;
+            $PMSS_POST_INSTALL_COMMANDS[] = [
+                'Reconfiguring proftpd packages',
+                'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true',
+            ];
+            return;
         }
     }
-    if ($needsCleanup) {
-        global $PMSS_POST_INSTALL_COMMANDS;
-        $PMSS_POST_INSTALL_COMMANDS[] = [
-            'Reconfiguring proftpd packages',
-            'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true',
-        ];
-    } elseif (function_exists('logmsg')) {
-        logmsg('[SKIP] ProFTPD packages already configured');
-    }
-}
-
-/**
- * Resolve the correct backports suite for the given Debian major version.
- */
-function pmssBackportSuite(int $distroVersion): ?string
-{
-    static $map = [
-        10 => 'buster-backports',
-        11 => 'bullseye-backports',
-        12 => 'bookworm-backports',
-    ];
-
-    return $map[$distroVersion] ?? null;
+    if (function_exists('logmsg')) { logmsg('[SKIP] ProFTPD packages already configured'); }
 }

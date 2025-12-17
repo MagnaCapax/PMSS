@@ -19,6 +19,7 @@ class RuntimeProfileTest extends TestCase
     {
         $GLOBALS['PMSS_TEST_LOGS'] = [];
         unset($GLOBALS['PMSS_PROFILE']);
+        $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         putenv('PMSS_JSON_LOG');
         putenv('PMSS_PROFILE_OUTPUT');
     }
@@ -88,9 +89,6 @@ class RuntimeProfileTest extends TestCase
         // Route JSON events to a temp file so we can inspect the payload.
         $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
         putenv('PMSS_JSON_LOG='.$tmpJson);
-        if (function_exists('\\pmssResetJsonLogPath')) {
-            \pmssResetJsonLogPath();
-        }
 
         pmssRecordProfile([
             'description' => 'ok-step',

@@ -125,7 +125,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
 
         $selections = null;
         foreach ($candidates as $candidate) {
-            if ($candidate !== null && is_readable($candidate)) {
+            if (is_readable($candidate)) {
                 $selections = $candidate;
                 break;
             }
@@ -171,11 +171,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                     $package = $parts[0];
                     $state   = $parts[1];
                 } else {
-                    if (function_exists('pmssLogStatus')) {
-                        pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0);
-                    } elseif (function_exists('logmsg')) {
-                        logmsg(sprintf('[WARN] Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed));
-                    }
+                    pmssLogStatus('WARN', sprintf('Ignoring malformed dpkg selection line %d: %s', $idx + 1, $trimmed), 0);
                     $warnings = true;
                     continue;
                 }
@@ -187,7 +183,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 // BUILD_EXCLUSIVE failures during kernel upgrades. Force its
                 // selection state to "deinstall" so dselect-upgrade removes it.
                 if ($runtimeVersion >= 12 && $lower === 'wireguard-dkms') {
-                $sanitised[] = $package."\tdeinstall";
+                    $sanitised[] = $package."\tdeinstall";
                     $warnings = true;
                     $droppedObsolete[] = $package;
                     continue;
@@ -212,8 +208,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
                 if (preg_match('/^php[0-9]+\.[0-9]+\-/i', $package)) { $warnings = true; $droppedObsolete[] = $package; continue; }
                 if (preg_match('/^python3\.[0-9]+\-/i', $package)) { $warnings = true; $droppedObsolete[] = $package; continue; }
                 if (!preg_match('/^[a-z0-9.+:-]+$/i', $package) || !preg_match('/^(install|hold|purge|deinstall)$/i', $state)) {
-                    if (function_exists('pmssLogStatus')) { pmssLogStatus('WARN', sprintf('Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed), 0); }
-                    elseif (function_exists('logmsg')) { logmsg(sprintf('[WARN] Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed)); }
+                    pmssLogStatus('WARN', sprintf('Invalid dpkg selection entry at line %d: %s', $idx + 1, $trimmed), 0);
                     $warnings = true;
                     continue;
                 }
@@ -234,26 +229,23 @@ if (!function_exists('pmssApplyDpkgSelections')) {
             }
 
             // Aggregate summary logs instead of per-package noise
-            if (!empty($droppedUnavailable) && function_exists('pmssLogStatus')) {
+            if (!empty($droppedUnavailable)) {
                 $sample = array_slice($droppedUnavailable, 0, 10);
                 pmssLogStatus('SKIP', sprintf('Baseline: dropped %d unavailable packages (first %d: %s)', count($droppedUnavailable), count($sample), implode(', ', $sample)), 0, microtime(true)-$t0);
             }
-            if (!empty($droppedKernel) && function_exists('pmssLogStatus')) {
+            if (!empty($droppedKernel)) {
                 pmssLogStatus('SKIP', sprintf('Baseline: dropped %d versioned kernel packages', count($droppedKernel)), 0, 0.0);
             }
-            if (!empty($droppedObsolete) && function_exists('pmssLogStatus')) {
+            if (!empty($droppedObsolete)) {
                 pmssLogStatus('SKIP', sprintf('Baseline: dropped %d obsolete entries (legacy names)', count($droppedObsolete)), 0, 0.0);
             }
-            if ($shortFormSeen && function_exists('pmssLogStatus')) {
+            if ($shortFormSeen) {
                 pmssLogStatus('INFO', 'Baseline: detected short-form dpkg selection entries; treating as \"install\" state', 0, 0.0);
             }
         }
 
         $cmd = sprintf('dpkg --set-selections < %s', escapeshellarg($selectionPath));
-        $rc = runStep('Applying dpkg selection baseline', $cmd);
-        if ($rc !== 0) {
-            $success = false;
-        }
+        $success = $success && (runStep('Applying dpkg selection baseline', $cmd) === 0);
 
         $installCmd = aptCmd('dselect-upgrade -y');
         $rc = runStep('Installing packages from selection baseline', $installCmd);
@@ -271,8 +263,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         }
 
         if ($warnings) {
-            if (function_exists('pmssLogStatus')) { pmssLogStatus('WARN', 'Dpkg selection baseline contained ignored entries; proceeding with remaining packages', 0); }
-            elseif (function_exists('logmsg')) { logmsg('[WARN] Dpkg selection baseline contained ignored entries; proceeding with remaining packages'); }
+            pmssLogStatus('WARN', 'Dpkg selection baseline contained ignored entries; proceeding with remaining packages', 0);
         }
 
         return $success;

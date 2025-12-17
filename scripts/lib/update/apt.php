@@ -9,10 +9,7 @@ require_once __DIR__.'/../runtime.php';
 /**
  * Return the target path for the primary apt sources file (testable override).
  */
-function pmssAptSourcesPath(): string
-{
-    return pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
-}
+function pmssAptSourcesPath(): string { return pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list'); }
 
 /**
  * Load an APT sources template from the config directory.
@@ -24,16 +21,8 @@ function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): strin
     $configRoot = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     $path = $configRoot."/template.sources.$codename";
 
-    if (!file_exists($path)) {
-        $log("Repository template missing: $path");
-        return '';
-    }
-
-    $data = trim((string)@file_get_contents($path));
-    if ($data === '') {
-        $log("Repository template empty: $path");
-        return '';
-    }
+    if (!file_exists($path)) { $log("Repository template missing: $path"); return ''; }
+    if (($data = trim((string) @file_get_contents($path))) === '') { $log("Repository template empty: $path"); return ''; }
 
     return $data."\n";
 }
@@ -47,33 +36,26 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
     $target = pmssAptSourcesPath();
     $backup = $target.'.pmss-backup';
 
-    if ($content === '') {
-        $log("[WARN] Empty repository content for $label, skipping");
-        return false;
-    }
+    if ($content === '') { $log("[WARN] Empty repository content for $label, skipping"); return false; }
 
     // Guard against directory targets (test overrides or misconfiguration).
     // In that case we avoid writing into the directory itself, emit a warning,
     // and persist the intended content only to the backup path so callers can
     // inspect what would have been written without touching the real tree.
     if (is_dir($target)) {
-        if (@file_put_contents($backup, $content, LOCK_EX) === false) {
-            $log("[WARN] Target sources path is a directory for $label and backup write failed, skipping update");
-        } else {
-            $log("[WARN] Target sources path is a directory for $label, wrote backup and skipped update");
-        }
+        $log(@file_put_contents($backup, $content, LOCK_EX) === false
+            ? "[WARN] Target sources path is a directory for $label and backup write failed, skipping update"
+            : "[WARN] Target sources path is a directory for $label, wrote backup and skipped update");
         return false;
     }
 
     $current = @file_get_contents($target);
     $dir = dirname($target);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
-    if ($current !== false && @file_put_contents($backup, $current, LOCK_EX) === false) {
-        $log("[WARN] Unable to create backup $backup before updating $label");
-    } elseif ($current !== false) {
-        $log("Backup for sources.list written to $backup");
+    is_dir($dir) || @mkdir($dir, 0755, true);
+    if ($current !== false) {
+        $log(@file_put_contents($backup, $current, LOCK_EX) === false
+            ? "[WARN] Unable to create backup $backup before updating $label"
+            : "Backup for sources.list written to $backup");
     }
 
     if (@file_put_contents($target, $content, LOCK_EX) === false) {
@@ -126,22 +108,19 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
         13 => ['label' => 'Trixie',   'repo' => 'trixie',   'eol' => false],
     ];
 
-    $target = $targets[$version] ?? null;
-    if ($target === null) {
-        $log("Unsupported Debian version: $version");
-        return;
-    }
+    if (!isset($targets[$version])) { $log("Unsupported Debian version: $version"); return; }
+    $target = $targets[$version];
 
     $label = $target['label'];
     $template = $repos[$target['repo']] ?? '';
     $post = $target['eol'] ? function () use ($log, $label): void {
         // EOL suites lack valid Release timestamps; relax the check.
-        if (!defined('PMSS_TEST_MODE')) {
-            passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-            passthru('apt-get clean;');
-        } else {
+        if (defined('PMSS_TEST_MODE')) {
             $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
+            return;
         }
+        passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+        passthru('apt-get clean;');
     } : null;
 
     pmssApplyAptTemplate($label, $template, $currentHash, $log, $post);
@@ -158,9 +137,7 @@ function pmssApplyAptTemplate(string $label, string $template, string $currentHa
     }
     $hash = sha1($template);
     if ($currentHash !== $hash && pmssSafeWriteSources($template, $label, $log)) {
-        if ($post) {
-            $post();
-        }
+        $post && $post();
         $log("Applied Debian {$label} repository config");
     } else {
         $log("Debian {$label} repositories already correct");

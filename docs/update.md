@@ -90,12 +90,11 @@ flow. Future work aims to retire ad-hoc apt queues so the dpkg baseline becomes
 the sole source of package state. When in doubt, update the baseline snapshot
 instead of injecting additional installs elsewhere in the run.
 
-`pmssEnsureRepositoryPrerequisites()` runs ahead of each `apt update` to make
-sure external signing keys (notably MediaArea for `mediainfo`) are ready before
-the templates add their sources. ProFTPD remains a notorious dpkg failure mode
-when hostnames or TLS assets are missing, so `pmssInstallProftpdStack()` keeps
-the unit unmasked and retries `dpkg --configure` to stop the package manager
-from wedging mid-run.
+`pmssRefreshRepositories()` ensures external repo prerequisites (currently the
+Docker deb822+keyring and Sonarr trusted key) exist before it runs `apt update`.
+ProFTPD remains a notorious dpkg failure mode when hostnames or TLS assets are
+missing, so `pmssInstallProftpdStack()` keeps the unit unmasked and retries
+`dpkg --configure` to stop the package manager from wedging mid-run.
 
 ### App Installer Matrix
 

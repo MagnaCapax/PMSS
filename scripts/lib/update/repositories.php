@@ -8,32 +8,20 @@ require_once __DIR__.'/distro.php';
 require_once __DIR__.'/runtime/commands.php';
 
 if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
-    /**
-     * Ensure external repositories have their prerequisites (keys/config) in place before apt update.
-     */
     function pmssEnsureRepositoryPrerequisites(): void { pmssEnsureDockerRepository(); pmssEnsureSonarrKey(); }
 }
 
 if (!function_exists('pmssEnsureMediaareaRepository')) {
     /**
-     * Legacy shim: MediaArea repository bootstrap was retired.
-     *
-     * Keep the function defined for backward compatibility; it intentionally
-     * performs no work.
+     * Legacy cleanup: remove stale MediaArea list files.
      */
     function pmssEnsureMediaareaRepository(): void
     {
-        // Aggressively remove legacy MediaArea list files. These now conflict with
-        // the main /etc/apt/sources.list which includes the repo directly.
-        // We must ensure zero MediaArea files remain in sources.list.d.
-        static $targets = ['/etc/apt/sources.list.d/mediaarea.list', '/etc/apt/sources.list.d/mediaarea.sources'];
-        foreach ($targets as $target) {
-            if (is_file($target)) {
-                logmsg('[INFO] Removing legacy MediaArea repository file: '.$target);
-                if (!@unlink($target)) {
-                    logmsg('[WARN] Failed to unlink '.$target);
-                }
-            }
+        // Remove legacy MediaArea list files; they now conflict with sources.list.
+        foreach (['/etc/apt/sources.list.d/mediaarea.list', '/etc/apt/sources.list.d/mediaarea.sources'] as $target) {
+            if (!is_file($target)) { continue; }
+            logmsg('[INFO] Removing legacy MediaArea repository file: '.$target);
+            @unlink($target) || logmsg('[WARN] Failed to unlink '.$target);
         }
     }
 }
@@ -45,15 +33,9 @@ if (!function_exists('pmssEnsureSonarrKey')) {
     function pmssEnsureSonarrKey(): void
     {
         $keyPath = '/etc/apt/trusted.gpg.d/sonarr.gpg';
-        if (is_file($keyPath)) {
-            return;
-        }
+        if (is_file($keyPath)) { return; }
 
-        $fetch = sprintf(
-            'curl -fsSL %s | gpg --dearmor -o %s',
-            escapeshellarg('https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xEBFF6B99D9B78493'),
-            escapeshellarg($keyPath)
-        );
+        $fetch = sprintf('curl -fsSL %s | gpg --dearmor -o %s', escapeshellarg('https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xEBFF6B99D9B78493'), escapeshellarg($keyPath));
         if (runStep('Fetching Sonarr repository key', $fetch) === 0) {
             @chmod($keyPath, 0644);
             logmsg('Sonarr key installed at '.$keyPath.' (fingerprint EBFF6B99D9B78493)');
@@ -75,16 +57,10 @@ if (!function_exists('pmssEnsureDockerRepository')) {
         $sourcesDir  = '/etc/apt/sources.list.d';
         $deb822Path  = $sourcesDir.'/docker.sources';
 
-        if (!is_dir($keyringDir)) {
-            runStep('Ensuring apt keyring directory exists', sprintf('install -m 0755 -d %s', escapeshellarg($keyringDir)));
-        }
+        if (!is_dir($keyringDir)) { runStep('Ensuring apt keyring directory exists', sprintf('install -m 0755 -d %s', escapeshellarg($keyringDir))); }
 
         if (!is_file($keyringPath)) {
-            $fetchCmd = sprintf(
-                'curl -fsSL %s | gpg --dearmor -o %s',
-                escapeshellarg('https://download.docker.com/linux/debian/gpg'),
-                escapeshellarg($keyringPath)
-            );
+            $fetchCmd = sprintf('curl -fsSL %s | gpg --dearmor -o %s', escapeshellarg('https://download.docker.com/linux/debian/gpg'), escapeshellarg($keyringPath));
             if (runStep('Fetching Docker repository key', $fetchCmd) === 0) {
                 runStep('Setting permissions on Docker repository key', sprintf('chmod 0644 %s', escapeshellarg($keyringPath)));
             } else {
@@ -96,12 +72,9 @@ if (!function_exists('pmssEnsureDockerRepository')) {
 
         $codename = getenv('PMSS_DISTRO_CODENAME') ?: '';
         $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
-        if ($codename === '') {
-            // Docker apt repo is only supported for current suites (11+); keep
-            // Debian 10 and unknown versions on the legacy "skip" path.
-            if ($version >= 11) {
-                $codename = pmssDebianCodenameFromMajor($version);
-            }
+        // Docker apt repo is only supported for current suites (11+); keep Debian 10 and unknown versions on the legacy "skip" path.
+        if ($codename === '' && $version >= 11) {
+            $codename = pmssDebianCodenameFromMajor($version);
         }
         if ($codename === '') {
             logmsg('[WARN] Skipping Docker repository setup: unknown suite');
@@ -123,23 +96,18 @@ if (!function_exists('pmssEnsureDockerRepository')) {
 
         // Disable legacy docker.list entries to prevent duplicate targets.
         $legacyList = $sourcesDir.'/docker.list';
-        if (is_file($legacyList)) {
-            $data = @file_get_contents($legacyList);
-            if ($data !== false) {
-                $lines = preg_split('/\r?\n/', $data);
-                $changed = false;
-                foreach ($lines as $i => $line) {
-                    $trim = ltrim($line);
-                    if ($trim !== '' && $trim[0] !== '#') {
-                        $lines[$i] = '# PMSS(disable, switched to deb822): '.$line;
-                        $changed = true;
-                    }
-                }
-                if ($changed) {
-                    @file_put_contents($legacyList, implode(PHP_EOL, $lines).PHP_EOL);
-                    logmsg('Disabled legacy Docker entry in docker.list');
-                }
+        if (($data = @file_get_contents($legacyList)) === false) { return; }
+        $lines = preg_split('/\r?\n/', $data);
+        $changed = false;
+        foreach ($lines as $i => $line) {
+            if (($trim = ltrim($line)) !== '' && $trim[0] !== '#') {
+                $lines[$i] = '# PMSS(disable, switched to deb822): '.$line;
+                $changed = true;
             }
+        }
+        if ($changed) {
+            @file_put_contents($legacyList, implode(PHP_EOL, $lines).PHP_EOL);
+            logmsg('Disabled legacy Docker entry in docker.list');
         }
     }
 }
@@ -161,30 +129,20 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
     function pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger = null): array
     {
         $log = pmssSelectLogger($logger);
-        $sourcesPath = pmssAptSourcesPath();
-        $currentData = @file_get_contents($sourcesPath);
+        $currentData = @file_get_contents(pmssAptSourcesPath());
         $currentHash = $currentData !== false ? sha1($currentData) : '';
 
         if ($distroVersion <= 0) {
             $log(sprintf('Repository version unresolved for %s; reusing existing sources', $distroName));
-            return [
-                'mode'          => 'reuse',
-                'current_hash'  => $currentHash,
-                'templates'     => [],
-            ];
+            return ['mode' => 'reuse', 'current_hash' => $currentHash, 'templates' => []];
         }
 
         $templates = [];
-        static $suites = ['jessie', 'buster', 'bullseye', 'bookworm', 'trixie'];
-        foreach ($suites as $suite) {
+        foreach (['jessie', 'buster', 'bullseye', 'bookworm', 'trixie'] as $suite) {
             $templates[$suite] = pmssLoadRepoTemplate($suite, $log);
         }
 
-        return [
-            'mode'         => 'update',
-            'current_hash' => $currentHash,
-            'templates'    => $templates,
-        ];
+        return ['mode' => 'update', 'current_hash' => $currentHash, 'templates' => $templates];
     }
 }
 
@@ -195,17 +153,16 @@ if (!function_exists('pmssRefreshRepositories')) {
      */
     function pmssRefreshRepositories(string $distroName, int $distroVersion, ?callable $logger = null): bool
     {
-        pmssEnsureRepositoryPrerequisites();
+        pmssEnsureDockerRepository();
+        pmssEnsureSonarrKey();
         $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $logger);
-        $aptUpdate = aptCmd('update');
         $needsUpdate = $plan['mode'] !== 'reuse';
         if ($needsUpdate) {
             $log = pmssSelectLogger($logger);
             pmssUpdateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], $log);
         }
 
-        $desc = $needsUpdate ? 'Refreshing apt package index' : 'Refreshing apt package index (existing sources)';
-        runStep($desc, $aptUpdate);
+        runStep($needsUpdate ? 'Refreshing apt package index' : 'Refreshing apt package index (existing sources)', aptCmd('update'));
 
         if ($needsUpdate) {
             // Touch the periodic stamp so tools like MOTD know the index is fresh

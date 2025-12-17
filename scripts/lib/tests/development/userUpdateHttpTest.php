@@ -53,9 +53,7 @@ class UserUpdateHttpTest extends TestCase
         putenv('PMSS_DRY_RUN=1');
         putenv('PMSS_JSON_LOG='.$jsonLog);
         putenv('PMSS_SKEL_DIR');
-        if (function_exists('\\pmssResetJsonLogPath')) {
-            \pmssResetJsonLogPath();
-        }
+        $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 
         $cmd = null;
         try {
@@ -63,9 +61,7 @@ class UserUpdateHttpTest extends TestCase
             $cmd = $this->findStepCommand($jsonLog, 'Copying irssi skeleton config');
         } finally {
             $this->restoreEnv($previous);
-            if (function_exists('\\pmssResetJsonLogPath')) {
-                \pmssResetJsonLogPath();
-            }
+            $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
             $this->cleanup($home);
         }
         @unlink($jsonLog);
@@ -95,9 +91,7 @@ class UserUpdateHttpTest extends TestCase
         putenv('PMSS_DRY_RUN=1');
         putenv('PMSS_JSON_LOG='.$jsonLog);
         putenv('PMSS_SKEL_DIR='.$skel);
-        if (function_exists('\\pmssResetJsonLogPath')) {
-            \pmssResetJsonLogPath();
-        }
+        $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
 
         $cmd = null;
         try {
@@ -105,9 +99,7 @@ class UserUpdateHttpTest extends TestCase
             $cmd = $this->findStepCommand($jsonLog, 'Copying irssi skeleton config');
         } finally {
             $this->restoreEnv($previous);
-            if (function_exists('\\pmssResetJsonLogPath')) {
-                \pmssResetJsonLogPath();
-            }
+            $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
             $this->cleanup($home);
             $this->cleanup($skel);
         }
