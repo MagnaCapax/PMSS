@@ -3,7 +3,6 @@
  * Package bootstrapper – orchestrates installer stacks defined under packages/.
  */
 
-require_once __DIR__.'/packages/helpers.php';
 require_once __DIR__.'/packages/system.php';
 require_once __DIR__.'/packages/python.php';
 
@@ -28,13 +27,10 @@ $pmssWireguardDistroVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
 // On Debian 12+ WireGuard is built into the kernel, so we only require the
 // userland tools. Avoid queueing the legacy DKMS package which can wedge
 // kernel upgrades with BUILD_EXCLUSIVE errors.
-if ($pmssWireguardDistroVersion >= 12) {
-    if (pmssPackageStatus('wireguard-tools') !== 'install ok installed') {
-        pmssQueuePackages(['wireguard', 'wireguard-tools']);
-    }
-} elseif (pmssPackageStatus('wireguard-tools') !== 'install ok installed'
-    || pmssPackageStatus('wireguard-dkms') !== 'install ok installed') {
-    pmssQueuePackages(['wireguard', 'wireguard-tools', 'wireguard-dkms']);
+$pmssWireguardNeedsDkms = $pmssWireguardDistroVersion < 12;
+if (pmssPackageStatus('wireguard-tools') !== 'install ok installed'
+    || ($pmssWireguardNeedsDkms && pmssPackageStatus('wireguard-dkms') !== 'install ok installed')) {
+    pmssQueuePackages($pmssWireguardNeedsDkms ? ['wireguard', 'wireguard-tools', 'wireguard-dkms'] : ['wireguard', 'wireguard-tools']);
 }
 $dockerPackages = ['docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-buildx-plugin', 'docker-compose-plugin', 'dbus-user-session', 'slirp4netns', 'uidmap'];
 if ($version < 12) { $dockerPackages[] = 'fuse-overlayfs'; }

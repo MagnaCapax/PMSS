@@ -3,7 +3,6 @@
  * Helpers for per-user maintenance during update-step2.
  */
 
-require_once __DIR__.'/user/utils.php';
 require_once __DIR__.'/user/context.php';
 require_once __DIR__.'/user/http.php';
 require_once __DIR__.'/user/skeleton.php';

@@ -202,7 +202,8 @@ Sub-handlers:
 - pmssUserEnsurePlugins(array $ctx): void → removes deprecated `cpuload`, ensures `unpack` plugin exists and has proper perms.
 - pmssUserMaintainRetracker(array $ctx): void → removes legacy `retrackers.dat`, creates torrents and RSS settings dirs.
 - pmssUserRefreshPermissions(array $ctx): void → runs `/scripts/util/userPermissions.php <user>`; refreshes `~/.rtorrent.rc.custom` from skel if hash matches legacy list.
-- pmssUserSkelBase()/pmssUserSkelPath(): string helpers returning skel base (`PMSS_SKEL_DIR` or `/etc/skel`) and path join.
+- pmssUserSkelPath(string $relative): string → returns `PMSS_SKEL_DIR` (default `/etc/skel`) joined with `$relative`.
+- pmssUserSkelCommandArg(string $relative): string → returns raw `/etc/skel/<relative>` when default, otherwise escapes the overridden path for shell commands.
 
 ---
 

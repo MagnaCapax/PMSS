@@ -3,7 +3,7 @@
  * HTTP-related maintenance for user environments.
  */
 
-require_once __DIR__.'/utils.php';
+require_once __DIR__.'/context.php';
 
 /**
  * Configure per-user HTTP stack pieces (lighttpd vhost, ruTorrent temp paths).
