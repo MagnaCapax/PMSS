@@ -49,6 +49,6 @@ if (!function_exists('logMessage')) {
 if (!function_exists('pmssSelectLogger')) {
     function pmssSelectLogger(?callable $logger = null): callable
     {
-        return ($logger !== null && is_callable($logger)) ? $logger : 'logMessage';
+        return $logger ?? 'logMessage';
     }
 }

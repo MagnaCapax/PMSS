@@ -144,16 +144,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssApplyAptTemplate(string $label, string $template, string $currentHash, callable $log, ?callable $post=null): void
   - Writes template via `pmssSafeWriteSources` when hash differs; runs post-hook if provided.
 
-- pmssEnsureRepositoryPrerequisites(): void → ensures third-party repo prerequisites (currently Docker deb822 + keyring, Sonarr trusted key) exist before `apt-get update`.
 - pmssEnsureMediaareaRepository(): void → legacy shim; removes old MediaArea `.list/.sources` files from `sources.list.d` to avoid duplicate/invalid entries.
 - pmssEnsureSonarrKey(): void → installs `/etc/apt/trusted.gpg.d/sonarr.gpg` so `apt-get update` does not fail for Sonarr sources.
 - pmssEnsureDockerRepository(): void → ensures Docker deb822 source + keyring exist under `/etc/apt/sources.list.d/docker.sources` and `/etc/apt/keyrings/docker.gpg`.
-- pmssQueryPackageStatus(string $package): string → returns `dpkg-query -W` status or `''`.
 - pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger=null): array
   - `mode=reuse` (unknown version) or `mode=update` with current hash and loaded templates.
 - pmssRefreshRepositories(string $distroName, int $distroVersion, ?callable $logger=null): bool
   - Ensures Docker/Sonarr repo prerequisites, computes plan; runs `apt-get update` either way, with template write on update.
-- pmssAutoremovePackages(): void → `apt-get autoremove -y` via `runStep`.
 
 ---
 

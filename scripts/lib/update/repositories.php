@@ -7,10 +7,6 @@ require_once __DIR__.'/apt.php';
 require_once __DIR__.'/distro.php';
 require_once __DIR__.'/runtime/commands.php';
 
-if (!function_exists('pmssEnsureRepositoryPrerequisites')) {
-    function pmssEnsureRepositoryPrerequisites(): void { pmssEnsureDockerRepository(); pmssEnsureSonarrKey(); }
-}
-
 if (!function_exists('pmssEnsureMediaareaRepository')) {
     /**
      * Legacy cleanup: remove stale MediaArea list files.
@@ -112,13 +108,6 @@ if (!function_exists('pmssEnsureDockerRepository')) {
     }
 }
 
-if (!function_exists('pmssQueryPackageStatus')) {
-    /**
-     * Return dpkg status string (install ok installed, etc.) for a package.
-     */
-    function pmssQueryPackageStatus(string $package): string { exec('dpkg-query -W -f=${Status} '.escapeshellarg($package).' 2>/dev/null', $output, $rc); return $rc === 0 && isset($output[0]) ? trim($output[0]) : ''; }
-}
-
 if (!function_exists('pmssRepositoryUpdatePlan')) {
     /**
      * Build a dry-run friendly plan describing how repository configuration should evolve.
@@ -171,8 +160,4 @@ if (!function_exists('pmssRefreshRepositories')) {
         }
         return true;
     }
-}
-
-if (!function_exists('pmssAutoremovePackages')) {
-    function pmssAutoremovePackages(): void { runStep('Removing packages no longer required', aptCmd('autoremove -y')); }
 }
