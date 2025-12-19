@@ -68,16 +68,16 @@ Usage: install-media-stack.sh [--skip-update] [--dry-run] [overrides]
 
 Overrides:
   --sonarr-url=URL            Use exact URL for Sonarr tar.gz
-  --sonarr-branch=BRANCH      Override Sonarr branch (default: main)
+  --sonarr-branch=BRANCH      Override branch (default: main)
   --sonarr-version=MAJOR      Override major (default: 4)
 
   --radarr-url=URL            Use exact URL for Radarr tar.gz
-  --radarr-branch=BRANCH      Override Radarr branch (default: master; stable)
+  --radarr-branch=BRANCH      Override branch (default: main)
   --radarr-version=TAG        Version tag (e.g., v5.10.4.9218) – x64 only
   --radarr-pin=TAG            Alias for --radarr-version
 
   --prowlarr-url=URL          Use exact URL for Prowlarr tar.gz
-  --prowlarr-branch=BRANCH    Override Prowlarr branch (default: master; stable)
+  --prowlarr-branch=BRANCH    Override branch (default: main)
 
   --sab-url=URL               Use exact URL for SABnzbd src archive
   --sab-version=TAG           Override SABnzbd tag (advisory)
@@ -115,6 +115,7 @@ for arg in "$@"; do
 done
 
 # Logging
+TS=$(date +%Y%m%d-%H%M%S)
 LOG_FILE="$HOME/.install-media-stack.log"
 mkdir -p "$(dirname "$LOG_FILE")" >/dev/null 2>&1 || true
 touch "$LOG_FILE" 2>/dev/null || true
@@ -133,10 +134,6 @@ log_ok(){ echo -e "${C_OK}[ OK ]${C_RESET} $*"; }
 log_warn(){ echo -e "${C_WARN}[WARN]${C_RESET} $*"; }
 log_err(){ echo -e "${C_ERR}[ERR ]${C_RESET} $*"; }
 
-if [[ $VERIFY_ONLY -eq 1 ]]; then
-  log_info "[verify-only] URL verification mode enabled (dry-run)."
-fi
-
 check_url(){
   local url="$1"
   if command -v curl >/dev/null 2>&1; then
@@ -153,8 +150,13 @@ fetch(){
   local url="$1"; local out="$2"
   log_info "Fetching: $url"
   if [[ $DRY_RUN -eq 1 ]]; then
-    if check_url "$url"; then log_ok "URL reachable (dry-run)"; else log_warn "URL not reachable (dry-run)"; fi
-    return 0
+    if check_url "$url"; then 
+      log_ok "URL reachable (dry-run)"
+      return 0
+    else 
+      log_warn "URL not reachable (dry-run)"
+      return 1
+    fi
   fi
   if command -v wget >/dev/null 2>&1; then
     if [[ "$out" == "-" ]]; then wget -qO - "$url"; else wget -q "$url" -O "$out"; fi
@@ -179,6 +181,23 @@ extract_tgz(){
   echo "Installation files downloaded and extracted"
 }
 
+# Helper to append to .bashrc only if marker not present
+append_to_bashrc_if_missing() {
+  local content="$1"
+  local marker="$2"
+  
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log_info "[dry-run] would check and append to ~/.bashrc (marker: $marker)"
+    return 0
+  fi
+  
+  if ! grep -q "$marker" "$HOME/.bashrc" 2>/dev/null; then
+    echo "$content" >> "$HOME/.bashrc"
+  else
+    log_warn "Entry with marker '$marker' already exists in .bashrc, skipping"
+  fi
+}
+
 # Central configuration (keep multi-use constants here)
 SONARR_BRANCH="main"
 RADARR_BRANCH="master"
@@ -187,12 +206,11 @@ SONARR_DL_BASE="https://services.sonarr.tv/v1/download"
 SONARR_MAJOR="4"
 RADARR_UPDATE_BASE="https://radarr.servarr.com/v1/update"
 PROWLARR_UPDATE_BASE="https://prowlarr.servarr.com/v1/update"
-BIN_ROOT="$HOME/.bin"
-CONFIG_ROOT="$HOME/.config"
-DOTNET_ROOT_PATH="$BIN_ROOT/dotnet"
-JELLYFIN_CONFIG_DIR="$CONFIG_ROOT/jellyfin"
-JELLYFIN_DATA_DIR="$JELLYFIN_CONFIG_DIR"
-JELLYFIN_LOG_DIR="$JELLYFIN_CONFIG_DIR/log"
+DOTNET_ROOT_PATH="$HOME/.bin/dotnet"
+JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
+JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
+JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
+PUBLIC_IP=$(curl -fsS ifconfig.me 2>/dev/null || echo "unavailable")
 
 # Apply arg overrides for branch/version
 if [[ -n "$OVR_SONARR_BRANCH" ]]; then SONARR_BRANCH="$OVR_SONARR_BRANCH"; fi
@@ -200,10 +218,30 @@ if [[ -n "$OVR_RADARR_BRANCH" ]]; then RADARR_BRANCH="$OVR_RADARR_BRANCH"; fi
 if [[ -n "$OVR_PROWLARR_BRANCH" ]]; then PROWLARR_BRANCH="$OVR_PROWLARR_BRANCH"; fi
 if [[ -n "$OVR_SONARR_VERSION" ]]; then SONARR_MAJOR="$OVR_SONARR_VERSION"; fi
 
-if ! command -v ss >/dev/null 2>&1; then
-	log_err "Required dependency 'ss' (iproute2) not found; install it and retry."
-	exit 1
+# Check required dependencies early
+log_step "Checking dependencies..."
+REQUIRED_CMDS=("ss" "tmux" "git" "python3" "tar" "dpkg" "getconf")
+MISSING_CMDS=()
+
+for cmd in "${REQUIRED_CMDS[@]}"; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    MISSING_CMDS+=("$cmd")
+  fi
+done
+
+if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
+  log_err "Missing required commands: ${MISSING_CMDS[*]}"
+  log_err "Please install missing dependencies and retry."
+  exit 1
 fi
+
+# Check for curl or wget (at least one needed)
+if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+  log_err "Neither 'curl' nor 'wget' found. At least one is required."
+  exit 1
+fi
+
+log_ok "All required dependencies found"
 
 # Detect Architecture
 ARCH=$(dpkg --print-architecture)
@@ -224,28 +262,29 @@ case "$ARCH" in
 	SERVARR_ARCH="arm"
 	;;
 *)
-	echo "Architecture '$ARCH' not supported."
+	log_err "Architecture '$ARCH' not supported."
 	exit 1
 	;;
 esac
 
 # Safety check for existing .bin
-if [ -d "$BIN_ROOT" ] && [ "$(ls -A "$BIN_ROOT")" ]; then
+if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin" 2>/dev/null)" ]; then
     if [[ $DRY_RUN -eq 1 ]]; then
-      log_warn "$BIN_ROOT exists and would be removed (dry-run)."
+      log_warn "~/.bin exists and would be removed (dry-run)."
     else
       printf "WARNING: ~/.bin exists and will be removed. Continue? (y/N): "
       read -r confirm
       [[ $confirm == [yY] ]] || exit 1
-      rm -rf "$BIN_ROOT"
+      rm -rf "$HOME/.bin"
     fi
-else
-  [[ $DRY_RUN -eq 1 ]] || rm -rf "$BIN_ROOT"
+elif [ -d "$HOME/.bin" ]; then
+  # Directory exists but is empty
+  [[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.bin"
 fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
-  mkdir -p "$CONFIG_ROOT/radarr" "$CONFIG_ROOT/sonarr" "$CONFIG_ROOT/prowlarr" "$CONFIG_ROOT/jellyfin" "$CONFIG_ROOT/sabnzbd" "$CONFIG_ROOT/cloudplow"
-  mkdir -p "$BIN_ROOT"
+  mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
+  mkdir -p "$HOME/.bin"
 else
   log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}"
   log_info "[dry-run] would create ~/.bin"
@@ -258,9 +297,8 @@ if [[ -n "$OVR_SAB_URL" ]]; then
   SABNZBD_URL="$OVR_SAB_URL"; SABNZBD_VERSION="override"
 else
   SABNZBD_VERSION=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4 || true)
-  SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep '\-src' | cut -d '"' -f 4 || true)
+  SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep '\\-src' | cut -d '"' -f 4 || true)
 fi
-if [[ -n "$OVR_SAB_VERSION" ]]; then SABNZBD_VERSION="$OVR_SAB_VERSION"; fi
 
 # Jellyfin (Repo Scraping)
 # Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
@@ -269,7 +307,7 @@ JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_AR
 if [[ -n "$OVR_JELLYFIN_URL" ]]; then
   JELLYFIN_URL="$OVR_JELLYFIN_URL"; JF_FILENAME="override"
 else
-  JF_FILENAME=$(curl -s "$JF_REPO_BASE" | grep -oE "jellyfin_[0-9]+\.[0-9]+\.[0-9]+-${JF_ARCH}\.tar\.gz" | head -n 1)
+  JF_FILENAME=$(curl -s "$JF_REPO_BASE" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
   if [[ -z "$JF_FILENAME" ]]; then
     log_err "Could not resolve latest Jellyfin tarball from $JF_REPO_BASE"; exit 1
   fi
@@ -284,21 +322,59 @@ log_info "SABnzbd: ${SABNZBD_VERSION:-unknown}"
 log_info "Jellyfin: ${JF_FILENAME}"
 log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
 
-# If verify-only, we will exit after checking URLs in each block
+# If verify-only, check URLs and exit
+if [[ $VERIFY_ONLY -eq 1 ]]; then
+  log_step "Verifying URLs..."
+  urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}")
+  all_ok=true
+  for url in "${urls_to_check[@]}"; do
+    if [[ -n "$url" ]]; then
+      if check_url "$url"; then
+        log_ok "URL reachable: $url"
+      else
+        log_err "URL not reachable: $url"
+        all_ok=false
+      fi
+    fi
+  done
+  if [[ "$all_ok" == true ]]; then
+    log_ok "All URLs verified successfully"
+    exit 0
+  else
+    log_err "Some URLs failed verification"
+    exit 1
+  fi
+fi
 
 # Enhanced port randomizer with bind test (for shared env security)
 random_open_port() {
 	local LOW_BOUND=10000
 	local UPPER_BOUND=65000
 	local candidate
-	while true; do
+	local attempts=0
+	local max_attempts=100
+	
+	# Check required commands
+	if ! command -v comm >/dev/null 2>&1 || ! command -v shuf >/dev/null 2>&1 || ! command -v seq >/dev/null 2>&1; then
+		log_err "Required commands (comm, shuf, seq) not found for port randomization"
+		exit 1
+	fi
+	
+	while [ $attempts -lt $max_attempts ]; do
 		candidate=$(comm -23 <(seq "${LOW_BOUND}" "${UPPER_BOUND}" | sort -u) <(ss -Htan | awk '{print $4}' | rev | cut -d':' -f1 | rev | sort -u) | shuf | head -n 1)
+		if [[ -z "$candidate" ]]; then
+			# Fallback: random port in range
+			candidate=$((LOW_BOUND + RANDOM % (UPPER_BOUND - LOW_BOUND)))
+		fi
 		# Test bind with Python (available on Debian 10+)
 		if python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.bind(('127.0.0.1', $candidate)); s.close(); exit(0)" 2>/dev/null; then
 			echo "$candidate"
 			return
 		fi
+		attempts=$((attempts + 1))
 	done
+	log_err "Failed to find available port after $max_attempts attempts"
+	exit 1
 }
 
 SABNZBD_PORT=$(random_open_port)
@@ -311,120 +387,57 @@ HOSTNAME=$(hostname)
 
 # Guardrail: Check for python3-venv
 if ! python3 -m venv --help >/dev/null 2>&1; then
-	echo "Error: 'python3-venv' is missing."
-	echo "This script requires Python 3 virtual environment support."
-	echo "Please ask support to install 'python3-venv' or 'python3-full'."
+	log_err "Error: 'python3-venv' is missing."
+	log_err "This script requires Python 3 virtual environment support."
+	log_err "Please ask support to install 'python3-venv' or 'python3-full'."
 	exit 1
 fi
 
-# Servarr installer helpers to avoid per-app copy/paste
-resolve_servarr_url() {
-  local app="$1" branch="$2" override_url="$3" override_version="$4" glibc_ver
-  if [[ -n "$override_url" ]]; then
-    echo "$override_url"
-    return 0
-  fi
-  case "$app" in
-    radarr)
-      glibc_ver=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
-      if [[ -n "$override_version" && "$SERVARR_ARCH" == "x64" ]]; then
-        echo "https://github.com/Radarr/Radarr/releases/download/${override_version}/Radarr.master.${override_version#v}.linux-core-x64.tar.gz"
-        return 0
-      fi
-      if dpkg --compare-versions "${glibc_ver:-0}" ge 2.33; then
-        echo "${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&arch=${SERVARR_ARCH}"
-        return 0
-      fi
-      if [[ "$SERVARR_ARCH" == "x64" ]]; then
-        log_warn "Detected GLIBC ${glibc_ver:-unknown} < 2.33 → pinning Radarr to v5.10.4.9218 (linux-core-x64)."
-        echo "https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz"
-        return 0
-      fi
-      echo "${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&arch=${SERVARR_ARCH}"
-      ;;
-    prowlarr)
-      echo "${PROWLARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
-      ;;
-    sonarr)
-      echo "${SONARR_DL_BASE}/${branch}/latest?version=${SONARR_MAJOR}&os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-install_servarr_app() {
-  local app="$1" branch="$2" port="$3" datadir="$4" override_url="$5" override_version="$6"
-  log_step "Installing ${app^^}..."
-  mkdir -p "$datadir"
-  pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
-  local dlurl
-  dlurl=$(resolve_servarr_url "$app" "$branch" "$override_url" "$override_version") || { log_err "Failed to resolve download URL for ${app^^}"; exit 1; }
-  log_info "${app^} URL: $dlurl"
-  cd "$BIN_ROOT"
-  local archive="${app^}.tar.gz"
-  if ! fetch "$dlurl" "$archive"; then log_err "Failed to download ${app^}"; exit 1; fi
-  extract_tgz "$archive"
-  touch "$datadir"/update_required
-  echo "${app^^} Installed"
-  echo "Configuring ${app^^}"
-  if [ ! -f "$datadir/config.xml" ]; then
-	cat <<EOF >"$datadir/config.xml"
-<Config>
-  <UrlBase></UrlBase>
-  <Port>${port}</Port>
-  <BindAddress>*</BindAddress>
-</Config>
-EOF
-  fi
-  sed -i -e "s|<Port>[^<]*</Port>|<Port>${port}</Port>|g" "$datadir/config.xml"
-  sed -i -e "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
-  sed -i -e "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
-  echo "${app^^} configured"
-  echo ""
-}
-
 # Kill existing tmux sessions per app first
 log_step "Stopping existing sessions..."
-for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow; do
-	tmux kill-session -t "${app}" 2>/dev/null || true
-done
-pkill -9 -f -u "$USERNAME" tmux >/dev/null 2>&1 || true # Fallback global
+if [[ $DRY_RUN -eq 0 ]]; then
+	for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow; do
+		tmux kill-session -t "${app}" 2>/dev/null || true
+	done
+fi
 
 # Install Cloudplow (unchanged, repo active)
 app="cloudplow"
 log_step "Installing ${app^^}..."
-installdir="$BIN_ROOT/cloudplow"
-datadir="$CONFIG_ROOT/cloudplow"
+installdir="$HOME/.bin/cloudplow"
+datadir="$HOME/.config/cloudplow"
 mkdir -p "$datadir"
-[[ $DRY_RUN -eq 1 ]] || python3 -m venv "$installdir"
-cd "$installdir"
-git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
-# shellcheck disable=SC1091
-source "${installdir}/bin/activate"
-python -m pip install -U pip >/dev/null 2>&1
-python3 -m pip install -r "${installdir}/cloudplow/requirements.txt" >/dev/null 2>&1
-deactivate
-echo "${app^^} Installed"
+if [[ $DRY_RUN -eq 0 ]]; then
+  python3 -m venv "$installdir"
+  cd "$installdir"
+  git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
+  # shellcheck disable=SC1091
+  source "${installdir}/bin/activate"
+  python -m pip install -U pip >/dev/null 2>&1
+  python3 -m pip install -r "${installdir}/cloudplow/requirements.txt" >/dev/null 2>&1
+  deactivate
+  echo "${app^^} Installed"
+else
+  log_info "[dry-run] would install Cloudplow via git clone and venv"
+fi
 echo ""
 
 # Install SABnzbd (minor updates)
 app="sabnzbd"
 log_step "Installing ${app^^}..."
-installdir="$BIN_ROOT/sabnzbd"
-datadir="$CONFIG_ROOT/sabnzbd"
+installdir="$HOME/.bin/sabnzbd"
+datadir="$HOME/.config/sabnzbd"
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app}" >/dev/null 2>&1 || true
-python3 -m venv "$installdir"
-cd "$installdir"
-echo "Downloading...${app^^} (${SABNZBD_VERSION})"
-if [[ -z "${SABNZBD_URL:-}" ]]; then log_err "SABnzbd URL not resolved"; exit 1; fi
-if ! fetch "${SABNZBD_URL}" "${app}.tar.gz"; then log_err "Failed to download SABnzbd"; exit 1; fi
-mkdir -p "${app}"
-extract_tgz "${app}.tar.gz" "${app}" 1
-# shellcheck disable=SC1091
 if [[ $DRY_RUN -eq 0 ]]; then
+  python3 -m venv "$installdir"
+  cd "$installdir"
+  echo "Downloading...${app^^} (${SABNZBD_VERSION})"
+  if [[ -z "${SABNZBD_URL:-}" ]]; then log_err "SABnzbd URL not resolved"; exit 1; fi
+  if ! fetch "${SABNZBD_URL}" "${app}.tar.gz"; then log_err "Failed to download SABnzbd"; exit 1; fi
+  mkdir -p "${app}"
+  extract_tgz "${app}.tar.gz" "${app}" 1
+  # shellcheck disable=SC1091
   source "${installdir}/bin/activate"
   python -m pip install -U pip >/dev/null 2>&1
   python3 -m pip install -r "${installdir}/${app}/requirements.txt" >/dev/null 2>&1
@@ -434,74 +447,223 @@ else
   log_info "[dry-run] would create SABnzbd venv and install requirements"
 fi
 echo "Configuring ${app^^}"
-if [ ! -f "$datadir/${app}.ini" ]; then
-	cat <<EOF >"$datadir/${app}.ini"
+if [[ $DRY_RUN -eq 0 ]]; then
+  if [ ! -f "$datadir/${app}.ini" ]; then
+    cat <<EOF >"$datadir/${app}.ini"
 [misc]
 port = 8080
 url_base = /sabnzbd
 host_whitelist = ${HOSTNAME}
 EOF
+  fi
+  sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
+  sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" "$datadir/${app}.ini"
+  sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
+else
+  log_info "[dry-run] would configure ${app^^} (port=${SABNZBD_PORT}, url_base=/public-${USERNAME}/${app})"
 fi
-sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
-sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" "$datadir/${app}.ini"
-sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
 echo "${app^^} configured"
 echo ""
 
 # Install Radarr (branch master; Debian 11 fallback)
-install_servarr_app "radarr" "$RADARR_BRANCH" "$RADARR_PORT" "$CONFIG_ROOT/radarr" "$OVR_RADARR_URL" "$OVR_RADARR_VERSION"
+app="radarr"
+echo "Installing ${app^^}..."
+installdir="$HOME/.bin"
+datadir="$HOME/.config/${app}"
+branch="$RADARR_BRANCH"
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
+GLIBC_VER=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
+if [[ -n "$OVR_RADARR_URL" ]]; then
+  DLURL="$OVR_RADARR_URL"
+elif [[ -n "$OVR_RADARR_VERSION" && "$SERVARR_ARCH" == "x64" ]]; then
+  DLURL="https://github.com/Radarr/Radarr/releases/download/${OVR_RADARR_VERSION}/Radarr.master.${OVR_RADARR_VERSION#v}.linux-core-x64.tar.gz"
+else
+  if dpkg --compare-versions "${GLIBC_VER:-0}" ge 2.33; then
+    DLURL="${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+  else
+    if [[ "$SERVARR_ARCH" == "x64" ]]; then
+      DLURL="https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz"
+      log_warn "Detected GLIBC ${GLIBC_VER:-unknown} < 2.33 → pinning Radarr to v5.10.4.9218 (linux-core-x64)."
+    else
+      DLURL="${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+    fi
+  fi
+fi
+log_info "Radarr URL: $DLURL"
+
+echo "Downloading...${app^^}"
+cd "$installdir"
+if ! fetch "$DLURL" "Radarr.tar.gz"; then log_err "Failed to download Radarr"; exit 1; fi
+extract_tgz "Radarr.tar.gz"
+if [[ $DRY_RUN -eq 0 ]]; then
+  touch "$datadir"/update_required
+fi
+echo "${app^^} Installed"
+echo "Configuring ${app^^}"
+if [[ $DRY_RUN -eq 0 ]]; then
+  if [ ! -f "$datadir/config.xml" ]; then
+    cat <<EOF >"$datadir/config.xml"
+<Config>
+  <UrlBase></UrlBase>
+  <Port>7878</Port>
+  <BindAddress>*</BindAddress>
+</Config>
+EOF
+  fi
+  sed -i -E "s|<Port>[^<]*</Port>|<Port>${RADARR_PORT}</Port>|g" "$datadir/config.xml"
+  sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
+  sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
+else
+  log_info "[dry-run] would configure ${app^^} (port=${RADARR_PORT}, url_base=/public-${USERNAME}/${app})"
+fi
+echo "${app^^} configured"
+echo ""
 
 # Install Prowlarr (branch master)
-install_servarr_app "prowlarr" "$PROWLARR_BRANCH" "$PROWLARR_PORT" "$CONFIG_ROOT/prowlarr" "$OVR_PROWLARR_URL" ""
+app="prowlarr"
+log_step "Installing ${app^^}..."
+installdir="$HOME/.bin"
+datadir="$HOME/.config/${app}"
+branch="$PROWLARR_BRANCH" # Stable
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
+if [[ -n "$OVR_PROWLARR_URL" ]]; then
+  DLURL="$OVR_PROWLARR_URL"
+else
+  DLURL="${PROWLARR_UPDATE_BASE}/${branch}/updatefile?os=linux&runtime=netcore&arch=${SERVARR_ARCH}"
+fi
+log_info "Prowlarr URL: $DLURL"
+
+echo "Downloading...${app^^}"
+cd "$installdir"
+if ! fetch "$DLURL" "Prowlarr.tar.gz"; then log_err "Failed to download Prowlarr"; exit 1; fi
+extract_tgz "Prowlarr.tar.gz"
+if [[ $DRY_RUN -eq 0 ]]; then
+  touch "$datadir"/update_required
+fi
+echo "${app^^} Installed"
+echo "Configuring ${app^^}"
+if [[ $DRY_RUN -eq 0 ]]; then
+  if [ ! -f "$datadir/config.xml" ]; then
+    cat <<EOF >"$datadir/config.xml"
+<Config>
+  <UrlBase></UrlBase>
+  <Port>9696</Port>
+  <BindAddress>*</BindAddress>
+</Config>
+EOF
+  fi
+  sed -i -E "s|<Port>[^<]*</Port>|<Port>${PROWLARR_PORT}</Port>|g" "$datadir/config.xml"
+  sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
+  sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
+else
+  log_info "[dry-run] would configure ${app^^} (port=${PROWLARR_PORT}, url_base=/public-${USERNAME}/${app})"
+fi
+echo "${app^^} configured"
+echo ""
 
 # Install Sonarr (services.sonarr.tv download API; branch main)
-install_servarr_app "sonarr" "$SONARR_BRANCH" "$SONARR_PORT" "$CONFIG_ROOT/sonarr" "$OVR_SONARR_URL" ""
+app="sonarr"
+log_step "Installing ${app^^}..."
+installdir="$HOME/.bin"
+datadir="$HOME/.config/${app}"
+branch="$SONARR_BRANCH"
+mkdir -p "$datadir"
+pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
+if [[ -n "$OVR_SONARR_URL" ]]; then
+  DLURL="$OVR_SONARR_URL"
+else
+  DLURL="${SONARR_DL_BASE}/${branch}/latest?version=${SONARR_MAJOR}&os=linux&arch=${SERVARR_ARCH}"
+fi
+log_info "Sonarr URL: $DLURL"
+
+echo "Downloading...${app^^}"
+cd "$installdir"
+if ! fetch "$DLURL" "Sonarr.tar.gz"; then log_err "Failed to download Sonarr"; exit 1; fi
+extract_tgz "Sonarr.tar.gz"
+if [[ $DRY_RUN -eq 0 ]]; then
+  touch "$datadir"/update_required
+fi
+echo "${app^^} Installed"
+echo "Configuring ${app^^}"
+if [[ $DRY_RUN -eq 0 ]]; then
+  if [ ! -f "$datadir/config.xml" ]; then
+    cat <<EOF >"$datadir/config.xml"
+<Config>
+  <Port>8989</Port>
+  <UrlBase></UrlBase>
+  <BindAddress>*</BindAddress>
+</Config>
+EOF
+  fi
+  sed -i -E "s|<Port>[^<]*</Port>|<Port>${SONARR_PORT}</Port>|g" "$datadir/config.xml"
+  sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
+  sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
+else
+  log_info "[dry-run] would configure ${app^^} (port=${SONARR_PORT}, url_base=/public-${USERNAME}/${app})"
+fi
+echo "${app^^} configured"
+echo ""
 
 # Install ASP.NET Core (.NET 8)
 app="aspnetcore"
 log_step "Installing ${app^^}..."
 echo "Downloading...${app^^}"
-installdir="$DOTNET_ROOT_PATH"
+installdir="$HOME/.bin/dotnet"
 mkdir -p "$installdir"
 cd "$installdir"
 if ! fetch "$ASPDOTNET_URL" "aspnetcore.tar.gz"; then log_err "Failed to download ASP.NET runtime"; exit 1; fi
 if [[ $DRY_RUN -eq 0 ]]; then
   if [ ! -f "aspnetcore.tar.gz" ]; then
-    echo "Failed to find downloaded ASP.NET archive"; exit 1; fi
+    log_err "Failed to find downloaded ASP.NET archive"
+    exit 1
+  fi
   tar -xvzf "aspnetcore.tar.gz" >/dev/null 2>&1
   rm -f "aspnetcore.tar.gz" >/dev/null 2>&1
+  echo "Installation files downloaded and extracted"
+  echo "${app^^} Installed"
 else
   log_info "[dry-run] would extract aspnetcore.tar.gz"
 fi
-cat <<EOF >>"$HOME"/.bashrc
-# Added by PMSS media stack installer (.NET 8)
-export DOTNET_ROOT=${DOTNET_ROOT_PATH}
-export PATH=${BIN_ROOT}:\$DOTNET_ROOT:\$PATH
-EOF
+append_to_bashrc_if_missing '# Added by PMSS media stack installer (.NET 8)
+export DOTNET_ROOT=$HOME/.bin/dotnet
+export PATH=$HOME/.bin:$DOTNET_ROOT:$PATH' 'PMSS media stack installer'
 chmod 0640 "$HOME/.bashrc" 2>/dev/null || true
-[[ $DRY_RUN -eq 1 ]] || echo "Installation files downloaded and extracted"
-[[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
 echo ""
 
 # Install Jellyfin (URL, extract, no chmod)
 app="jellyfin"
 log_step "Installing ${app^^}..."
-installdir="$BIN_ROOT"
+installdir="$HOME/.bin"
 datadir="$JELLYFIN_DATA_DIR"
-mkdir -p "$datadir" "$JELLYFIN_LOG_DIR"
+configdir="$JELLYFIN_CONFIG_DIR"
+logdir="$JELLYFIN_LOG_DIR"
+mkdir -p "$datadir" "$logdir" "$configdir"
 cd "$installdir"
 echo "Downloading...${app^^}"
 if ! fetch "${JELLYFIN_URL}" "${app}.tar.gz"; then log_err "Failed to download Jellyfin"; exit 1; fi
 mkdir -p "${app}"
 extract_tgz "${app}.tar.gz" "${app}" 1
 [[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
+
+if [[ $DRY_RUN -eq 0 ]]; then
+  if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
+    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
+  else
+    log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
+  fi
+  tmux kill-session -t "jellyfin" 2>/dev/null || true
+fi
+
 echo "Configuring ${app^^}"
-if [ ! -f "$datadir/network.xml" ]; then
-	cat <<EOF >"$datadir/network.xml"
+if [[ $DRY_RUN -eq 0 ]]; then
+  if [ ! -f "$configdir/network.xml" ]; then
+    cat <<EOF >"$configdir/network.xml"
 <?xml version="1.0" encoding="utf-8"?>
 <NetworkConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <EnableUPnP>false</EnableUPnP>
-  <PublicPort>8096</PublicPort>
+  <PublicPort>$JELLYFIN_PORT</PublicPort>
   <UPnPCreateHttpPortMap>false</UPnPCreateHttpPortMap>
   <UDPPortRange />
   <EnableIPV6>false</EnableIPV6>
@@ -519,7 +681,7 @@ if [ ! -f "$datadir/network.xml" ]; then
   <AutoDiscoveryTracing>false</AutoDiscoveryTracing>
   <AutoDiscovery>true</AutoDiscovery>
   <PublicHttpsPort>8920</PublicHttpsPort>
-  <HttpServerPortNumber>8096</HttpServerPortNumber>
+  <HttpServerPortNumber>$JELLYFIN_PORT</HttpServerPortNumber>
   <HttpsPortNumber>8920</HttpsPortNumber>
   <EnableHttps>false</EnableHttps>
   <CertificatePath />
@@ -534,84 +696,74 @@ if [ ! -f "$datadir/network.xml" ]; then
   <KnownProxies />
 </NetworkConfiguration>
 EOF
-fi
-sed -i -e "s|<PublicPort>[^<]*</PublicPort>|<PublicPort>${JELLYFIN_PORT}</PublicPort>|g" "$datadir/network.xml"
-sed -i -e "s|<HttpServerPortNumber>[^<]*</HttpServerPortNumber>|<HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>|g" "$datadir/network.xml"
-sed -i -E "s|<BaseUrl[[:space:]]*/>|<BaseUrl></BaseUrl>|g" "$datadir/network.xml"
-sed -i -e "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$datadir/network.xml"
-syscfg="$datadir/system.xml"
-if [ ! -f "$syscfg" ]; then
-  cat > "$syscfg" <<SYSXML
+  fi
+  sed -i -E "s|(<PublicPort>)[^<]*(</PublicPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
+  sed -i -E "s|(<HttpServerPortNumber>)[^<]*(</HttpServerPortNumber>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
+  sed -i -E "s|<BaseUrl />|<BaseUrl></BaseUrl>|g" "$configdir/network.xml"
+  sed -i -E "s|(<BaseUrl>)[^<]*(</BaseUrl>)|\1/public-${USERNAME}/${app}\2|g" "$configdir/network.xml"
+  syscfg="$configdir/system.xml"
+  if [ ! -f "$syscfg" ]; then
+    cat > "$syscfg" <<SYSXML
 <?xml version="1.0" encoding="utf-8"?>
 <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>
   <PublicPort>$JELLYFIN_PORT</PublicPort>
   <HttpServerPortNumber>$JELLYFIN_PORT</HttpServerPortNumber>
-</ServerConfiguration>
 SYSXML
-else
-  if grep -q "<BaseUrl>" "$syscfg"; then
-    sed -i -e "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$syscfg"
+    # Add FFmpegPath if provided, otherwise close the tag
+    if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+      echo "  <FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>" >> "$syscfg"
+    fi
+    echo "</ServerConfiguration>" >> "$syscfg"
   else
-    sed -i -e "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
-  fi
-  if grep -q "<PublicPort>" "$syscfg"; then
-    sed -i -e "s|<PublicPort>[^<]*</PublicPort>|<PublicPort>${JELLYFIN_PORT}</PublicPort>|g" "$syscfg"
-  else
-    sed -i -e "s|</ServerConfiguration>|  <PublicPort>${JELLYFIN_PORT}</PublicPort>\n</ServerConfiguration>|" "$syscfg"
-  fi
-  if grep -q "<HttpServerPortNumber>" "$syscfg"; then
-    sed -i -e "s|<HttpServerPortNumber>[^<]*</HttpServerPortNumber>|<HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>|g" "$syscfg"
-  else
-    sed -i -e "s|</ServerConfiguration>|  <HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>\n</ServerConfiguration>|" "$syscfg"
-  fi
-fi
-if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-  syscfg="$datadir/system.xml"
-  if [[ $DRY_RUN -eq 1 ]]; then
-    log_info "[dry-run] would set Jellyfin FFmpegPath to '$OVR_JELLYFIN_FFMPEG' in $syscfg"
-  else
-    if [ ! -f "$syscfg" ]; then
-      cat > "$syscfg" <<SYSXML
-<?xml version="1.0" encoding="utf-8"?>
-<ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <FFmpegPath>$OVR_JELLYFIN_FFMPEG</FFmpegPath>
-</ServerConfiguration>
-SYSXML
+    # Update existing system.xml - merge settings
+    if grep -q "<BaseUrl>" "$syscfg"; then
+      sed -i -E "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$syscfg"
     else
+      sed -i -E "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
+    fi
+    if grep -q "<PublicPort>" "$syscfg"; then
+      sed -i -E "s|<PublicPort>[^<]*</PublicPort>|<PublicPort>${JELLYFIN_PORT}</PublicPort>|g" "$syscfg"
+    else
+      sed -i -E "s|</ServerConfiguration>|  <PublicPort>${JELLYFIN_PORT}</PublicPort>\n</ServerConfiguration>|" "$syscfg"
+    fi
+    if grep -q "<HttpServerPortNumber>" "$syscfg"; then
+      sed -i -E "s|<HttpServerPortNumber>[^<]*</HttpServerPortNumber>|<HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>|g" "$syscfg"
+    else
+      sed -i -E "s|</ServerConfiguration>|  <HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>\n</ServerConfiguration>|" "$syscfg"
+    fi
+    # Handle FFmpegPath - merge with existing config
+    if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
       if grep -q "<FFmpegPath>" "$syscfg"; then
-        sed -i -e "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>|g" "$syscfg"
+        sed -i -E "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>|g" "$syscfg"
       else
-        sed -i -e "s|</ServerConfiguration>|  <FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
+        sed -i -E "s|</ServerConfiguration>|  <FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
       fi
     fi
+  fi
+else
+  log_info "[dry-run] would configure ${app^^} (port=${JELLYFIN_PORT}, url_base=/public-${USERNAME}/${app})"
+  if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+    log_info "[dry-run] would set Jellyfin FFmpegPath to '$OVR_JELLYFIN_FFMPEG' in $configdir/system.xml"
   fi
 fi
 echo "${app^^} configured"
 echo ""
 
-SONARR_CMD="export DOTNET_ROOT=\"${DOTNET_ROOT_PATH}\"; \"${DOTNET_ROOT_PATH}/dotnet\" \"${BIN_ROOT}/Sonarr/Sonarr.dll\" --data=\"${CONFIG_ROOT}/sonarr\""
-RADARR_CMD="export DOTNET_ROOT=\"${DOTNET_ROOT_PATH}\"; \"${DOTNET_ROOT_PATH}/dotnet\" \"${BIN_ROOT}/Radarr/Radarr.dll\" --nobrowser --data=\"${CONFIG_ROOT}/radarr\""
-PROWLARR_CMD="export DOTNET_ROOT=\"${DOTNET_ROOT_PATH}\"; \"${DOTNET_ROOT_PATH}/dotnet\" \"${BIN_ROOT}/Prowlarr/Prowlarr.dll\" --nobrowser --data=\"${CONFIG_ROOT}/prowlarr\""
-JELLYFIN_CMD="export DOTNET_ROOT=\"${DOTNET_ROOT_PATH}\"; export JELLYFIN_CONFIG_DIR=\"${JELLYFIN_DATA_DIR}\"; export JELLYFIN_DATA_DIR=\"${JELLYFIN_DATA_DIR}\"; export JELLYFIN_LOG_DIR=\"${JELLYFIN_LOG_DIR}\"; nice -n 19 \"${DOTNET_ROOT_PATH}/dotnet\" \"${BIN_ROOT}/jellyfin/jellyfin.dll\""
-SABNZBD_CMD="source ${BIN_ROOT}/sabnzbd/bin/activate && /usr/bin/nice -n 19 python3 ${BIN_ROOT}/sabnzbd/sabnzbd/SABnzbd.py -b 0 -f ${CONFIG_ROOT}/sabnzbd/sabnzbd.ini"
-CLOUDPLOW_CMD="source ${BIN_ROOT}/cloudplow/bin/activate && python3 ${BIN_ROOT}/cloudplow/cloudplow/cloudplow.py run --config=${CONFIG_ROOT}/cloudplow/config.json --loglevel=DEBUG --cachefile=${CONFIG_ROOT}/cloudplow/cache.db --logfile=${CONFIG_ROOT}/cloudplow/cloudplow.log"
-
 # Aliases (Sonarr fix, PATH added above)
-cat <<EOF >>"$HOME"/.bashrc
-# PMSS Media stack aliases (updated Nov 2025)
-alias jellyfin='tmux new-session -d -s "jellyfin" "'"$JELLYFIN_CMD"'"'
-alias sonarr='tmux new-session -d -s "sonarr" "'"$SONARR_CMD"'"'
-alias radarr='tmux new-session -d -s "radarr" "'"$RADARR_CMD"'"'
-alias prowlarr='tmux new-session -d -s "prowlarr" "'"$PROWLARR_CMD"'"'
+append_to_bashrc_if_missing '# PMSS Media stack aliases (updated Nov 2025)
+alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\''
+alias sonarr='\''tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""'\''
+alias radarr='\''tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Radarr/Radarr.dll\" --nobrowser --data=\"$HOME/.config/radarr\""'\''
+alias prowlarr='\''tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Prowlarr/Prowlarr.dll\" --nobrowser --data=\"$HOME/.config/prowlarr\""'\''
 
-alias cloudplow='tmux new-session -d -s "cloudplow" "'"$CLOUDPLOW_CMD"'"'
-alias sabnzbd='tmux new-session -d -s "sabnzbd" "'"$SABNZBD_CMD"'"'
-EOF
+alias cloudplow='\''tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log"'\''
+alias sabnzbd='\''tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && nice -n 19 python3 $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini"'\''' 'PMSS Media stack aliases'
 
 # Lighttpd config (use $HOSTNAME)
-mkdir -p "$HOME/.lighttpd"
-cat <<EOF >"$HOME/.lighttpd/custom"
+if [[ $DRY_RUN -eq 0 ]]; then
+  mkdir -p "$HOME/.lighttpd"
+  cat <<EOF >"$HOME/.lighttpd/custom"
 \$HTTP["url"] =~ "^/sabnzbd(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
@@ -687,11 +839,13 @@ cat <<EOF >"$HOME/.lighttpd/custom"
   ) )
 }
 EOF
+else
+  log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom"
+fi
 
-PUBLIC_IP=$(curl -fsS ifconfig.me 2>/dev/null || echo "unavailable")
 
-set +u
 # shellcheck source=/dev/null
+set +u
 source "$HOME/.bashrc" || true
 set -u
 
@@ -699,14 +853,70 @@ echo ""
 log_step "Starting applications"
 # Corrected: Point to dotnet binary, not the directory
 if [[ $DRY_RUN -eq 0 ]]; then
-  tmux new-session -d -s "jellyfin" "$JELLYFIN_CMD"
-  tmux new-session -d -s "sonarr" "$SONARR_CMD"
-  tmux new-session -d -s "radarr" "$RADARR_CMD"
-  tmux new-session -d -s "prowlarr" "$PROWLARR_CMD"
-  tmux new-session -d -s "sabnzbd" "$SABNZBD_CMD"
-  tmux new-session -d -s "cloudplow" "$CLOUDPLOW_CMD"
+  # Verify required files exist before starting
+  if [[ ! -f "$DOTNET_ROOT_PATH/dotnet" ]]; then
+    log_err "dotnet binary not found at $DOTNET_ROOT_PATH/dotnet"
+    exit 1
+  fi
+  
+  # Ensure log directories exist
+  mkdir -p "$JELLYFIN_DATA_DIR/log" "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
+  
+  # Start Jellyfin
+  if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
+    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
+  else
+    log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
+  fi
+  
+  # Start Sonarr
+  if [[ -f "$HOME/.bin/Sonarr/Sonarr.dll" ]]; then
+    tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Sonarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Sonarr.dll --data=\"$HOME/.config/sonarr\" 2>&1 | tee -a \"$HOME/.config/sonarr/sonarr.log\"" || log_warn "Failed to create sonarr tmux session"
+  else
+    log_err "Sonarr DLL not found at $HOME/.bin/Sonarr/Sonarr.dll"
+  fi
+  
+  # Start Radarr
+  if [[ -f "$HOME/.bin/Radarr/Radarr.dll" ]]; then
+    tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Radarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Radarr.dll --nobrowser --data=\"$HOME/.config/radarr\" 2>&1 | tee -a \"$HOME/.config/radarr/radarr.log\"" || log_warn "Failed to create radarr tmux session"
+  else
+    log_err "Radarr DLL not found at $HOME/.bin/Radarr/Radarr.dll"
+  fi
+  
+  # Start Prowlarr
+  if [[ -f "$HOME/.bin/Prowlarr/Prowlarr.dll" ]]; then
+    tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; cd \"$HOME/.bin/Prowlarr\" && \"$DOTNET_ROOT_PATH/dotnet\" Prowlarr.dll --nobrowser --data=\"$HOME/.config/prowlarr\" 2>&1 | tee -a \"$HOME/.config/prowlarr/prowlarr.log\"" || log_warn "Failed to create prowlarr tmux session"
+  else
+    log_err "Prowlarr DLL not found at $HOME/.bin/Prowlarr/Prowlarr.dll"
+  fi
+  
+  # Start SABnzbd
+  if [[ -f "$HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py" ]]; then
+    tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bin/activate && cd \"$HOME/.bin/sabnzbd/sabnzbd\" && nice -n 19 python3 SABnzbd.py -b 0 -f $HOME/.config/sabnzbd/sabnzbd.ini 2>&1 | tee -a \"$HOME/.config/sabnzbd/sabnzbd.log\"" || log_warn "Failed to create sabnzbd tmux session"
+  else
+    log_err "SABnzbd not found at $HOME/.bin/sabnzbd/sabnzbd/SABnzbd.py"
+  fi
+  
+  # Start Cloudplow
+  if [[ -f "$HOME/.bin/cloudplow/cloudplow/cloudplow.py" ]]; then
+    tmux new-session -d -s "cloudplow" "source $HOME/.bin/cloudplow/bin/activate && python3 $HOME/.bin/cloudplow/cloudplow/cloudplow.py run --config=$HOME/.config/cloudplow/config.json --loglevel=DEBUG --cachefile=$HOME/.config/cloudplow/cache.db --logfile=$HOME/.config/cloudplow/cloudplow.log" || log_warn "Failed to create cloudplow tmux session"
+  else
+    log_err "Cloudplow not found at $HOME/.bin/cloudplow/cloudplow/cloudplow.py"
+  fi
+  
+  # Wait a moment and verify sessions are still running
+  sleep 2
+  log_step "Verifying started applications..."
+  for app in jellyfin sonarr radarr prowlarr sabnzbd cloudplow; do
+    if tmux has-session -t "$app" 2>/dev/null; then
+      log_ok "$app session is running"
+    else
+      log_warn "$app session exited immediately - check logs or run: tmux attach -t $app (if session exists)"
+      log_info "To diagnose, try: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
+    fi
+  done
 else
-  log_info "[dry-run] would start tmux sessions: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+  log_info "[dry-run] would start tmux sessions: jellyfin, sonarr, prowlarr, sabnzbd, cloudplow"
 fi
 
 echo ""

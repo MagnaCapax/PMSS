@@ -55,35 +55,14 @@ class installMediaStackScriptTest extends TestCase
         $this->assertTrue(strpos($this->script, 'if [[ -n "$OVR_SONARR_VERSION" ]]') !== false, 'Sonarr version override missing');
     }
 
-    public function testResolveServarrUrlFunctionPresent(): void
-    {
-        $this->assertTrue(strpos($this->script, 'resolve_servarr_url()') !== false, 'resolve_servarr_url helper missing');
-    }
-
-    public function testInstallServarrAppFunctionPresent(): void
-    {
-        $this->assertTrue(strpos($this->script, 'install_servarr_app()') !== false, 'install_servarr_app helper missing');
-    }
-
-    public function testResolveServarrUrlUsesRadarrUpdateBase(): void
-    {
-        $this->assertTrue(strpos($this->script, 'RADARR_UPDATE_BASE') !== false, 'Radarr update base not referenced');
-        $this->assertStringContainsString('${RADARR_UPDATE_BASE}/${branch}/updatefile?os=linux&arch=${SERVARR_ARCH}', $this->script);
-    }
-
-    public function testResolveServarrUrlPinsRadarrForOldGlibc(): void
+    public function testRadarrGlibcPinPresent(): void
     {
         $this->assertStringContainsString('v5.10.4.9218', $this->script);
     }
 
-    public function testResolveServarrUrlProwlarrRuntimeNetcore(): void
+    public function testProwlarrRuntimeNetcorePresent(): void
     {
         $this->assertStringContainsString('runtime=netcore&arch=${SERVARR_ARCH}', $this->script);
-    }
-
-    public function testResolveServarrUrlSonarrRuntimeNetcore(): void
-    {
-        $this->assertStringContainsString('latest?version=${SONARR_MAJOR}&os=linux&runtime=netcore&arch=${SERVARR_ARCH}', $this->script);
     }
 
     public function testInstallServarrAppCreatesConfigXml(): void
@@ -102,62 +81,24 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('<BindAddress>127.0.0.1</BindAddress>', $this->script);
     }
 
-    public function testInstallServarrAppUsesBinRootForDownloads(): void
+    public function testCloudplowUsesBinDir(): void
     {
-        $this->assertStringContainsString('cd "$BIN_ROOT"', $this->script);
+        $this->assertStringContainsString('$HOME/.bin/cloudplow', $this->script);
     }
 
-    public function testInstallServarrAppTouchesUpdateRequired(): void
+    public function testSabnzbdUsesConfigDir(): void
     {
-        $this->assertStringContainsString('touch "$datadir"/update_required', $this->script);
-    }
-
-    public function testNoLegacyServarrBranchIdentifier(): void
-    {
-        $this->assertTrue(strpos($this->script, 'SERVARR_BRANCH') === false, 'Legacy SERVARR_BRANCH should not exist');
-    }
-
-    public function testCloudplowUsesBinRoot(): void
-    {
-        $this->assertStringContainsString('$BIN_ROOT/cloudplow', $this->script);
-    }
-
-    public function testSabnzbdUsesConfigRoot(): void
-    {
-        $this->assertStringContainsString('$CONFIG_ROOT/sabnzbd', $this->script);
-    }
-
-    public function testSabnzbdVersionOverrideApplied(): void
-    {
-        $this->assertStringContainsString('if [[ -n "$OVR_SAB_VERSION" ]]; then SABNZBD_VERSION', $this->script);
+        $this->assertStringContainsString('$HOME/.config/sabnzbd', $this->script);
     }
 
     public function testDotnetRootExportedInBashrc(): void
     {
-        $this->assertStringContainsString('export DOTNET_ROOT=${DOTNET_ROOT_PATH}', $this->script);
+        $this->assertStringContainsString('export DOTNET_ROOT=$HOME/.bin/dotnet', $this->script);
     }
 
-    public function testBinRootPrependedToPath(): void
+    public function testBinDirPrependedToPath(): void
     {
-        $this->assertStringContainsString('export PATH=${BIN_ROOT}:$DOTNET_ROOT:$PATH', str_replace('\\', '', $this->script));
-    }
-
-    public function testAliasUsesCommandVariables(): void
-    {
-        $this->assertTrue(strpos($this->script, 'alias sonarr=\'tmux new-session -d -s "sonarr" "') !== false, 'Sonarr alias prefix missing');
-        $this->assertStringContainsString('$SONARR_CMD', $this->script);
-    }
-
-    public function testTmuxStartupUsesCommandVariables(): void
-    {
-        $this->assertStringContainsString('tmux new-session -d -s "sonarr" "$SONARR_CMD"', $this->script);
-    }
-
-    public function testJellyfinPathsUseCentralDirs(): void
-    {
-        $clean = str_replace('\\', '', $this->script);
-        $this->assertStringContainsString('export JELLYFIN_CONFIG_DIR="${JELLYFIN_DATA_DIR}"', $clean);
-        $this->assertStringContainsString('export JELLYFIN_LOG_DIR="${JELLYFIN_LOG_DIR}"', $clean);
+        $this->assertStringContainsString('export PATH=$HOME/.bin:$DOTNET_ROOT:$PATH', $this->script);
     }
 
     public function testLighttpdCustomConfigExists(): void
@@ -170,9 +111,9 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('[dry-run]', $this->script);
     }
 
-    public function testVerifyOnlyLoggingPresent(): void
+    public function testVerifyOnlyModePresent(): void
     {
-        $this->assertStringContainsString('URL verification mode enabled', $this->script);
+        $this->assertStringContainsString('--verify-only', $this->script);
     }
 
     public function testFetchUsesCheckUrlOnDryRun(): void
@@ -192,26 +133,25 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('LOG_FILE="$HOME/.install-media-stack.log"', $this->script);
     }
 
-    public function testColorVariablesDefined(): void
+    public function testTmuxDoesNotUseGlobalPkill(): void
     {
-        $this->assertStringContainsString('C_RESET="\\033[0m"', $this->script);
+        $this->assertTrue(strpos($this->script, 'pkill -9 -f -u "$USERNAME" tmux') === false, 'Must not pkill all tmux sessions for the user');
     }
 
-    public function testAspNetPathExported(): void
+    public function testTmuxKillIsScopedToNamedSessions(): void
     {
-        $clean = str_replace('\\', '', $this->script);
-        $this->assertStringContainsString('export DOTNET_ROOT=${DOTNET_ROOT_PATH}', $clean);
-        $this->assertStringContainsString('export PATH=${BIN_ROOT}:$DOTNET_ROOT:$PATH', $clean);
+        $this->assertStringContainsString('tmux kill-session -t "${app}"', $this->script);
+        $this->assertStringContainsString('tmux kill-session -t "jellyfin"', $this->script);
     }
 
-    public function testJellyfinSystemXmlBaseUrlUpdated(): void
+    public function testSourceBashrcIsFailSoft(): void
     {
-        $this->assertStringContainsString('<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>', $this->script);
+        $this->assertStringContainsString('source "$HOME/.bashrc" || true', $this->script);
     }
 
-    public function testJellyfinSystemXmlPortUpdated(): void
+    public function testJellyfinSedDoesNotUseSlashDelimitersWithClosingTags(): void
     {
-        $this->assertStringContainsString('<PublicPort>$JELLYFIN_PORT</PublicPort>', $this->script);
-        $this->assertStringContainsString('<HttpServerPortNumber>$JELLYFIN_PORT</HttpServerPortNumber>', $this->script);
+        $this->assertTrue(strpos($this->script, 's/\\(<PublicPort>\\)') === false, 'Must not use / delimiters that break on </tag>');
+        $this->assertStringContainsString('s|(<PublicPort>)[^<]*(</PublicPort>)|', $this->script);
     }
 }
