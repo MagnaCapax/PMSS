@@ -31,7 +31,7 @@ require_once 'lib/users.php';
 require_once 'lib/userLifecycle.php';
 $userDb = new users();
 
-if (!pmssValidateUsername($user['name'])) {
+if (!pmssValidateUsernameForCreate($user['name'])) {
     pmssUserWriteLogs(
         pmssUserBaseContext(
             'add',

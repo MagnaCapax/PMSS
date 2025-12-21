@@ -30,11 +30,32 @@ function pmssUsernameIsValid(string $username): bool
 }
 
 /**
+ * Validate a username for new-user provisioning (stricter than legacy checks).
+ *
+ * Provisioning creates fresh system users, configures services, and writes
+ * state under /home. Historically PMSS allowed 1–2 character usernames, but
+ * going forward we require a minimum of 3 characters for newly created users
+ * while keeping legacy operations compatible with any existing short names.
+ */
+function pmssUsernameIsValidForCreate(string $username): bool
+{
+    return pmssUsernameIsValid($username) && strlen($username) >= 3;
+}
+
+/**
  * Back-compat alias for validation helper used in legacy scripts/tests.
  */
 function pmssValidateUsername(string $username): bool
 {
     return pmssUsernameIsValid($username);
+}
+
+/**
+ * Provisioning wrapper matching the legacy "Validate*" naming convention.
+ */
+function pmssValidateUsernameForCreate(string $username): bool
+{
+    return pmssUsernameIsValidForCreate($username);
 }
 
 /**

@@ -13,10 +13,10 @@ Arguments:
 - **DISK_QUOTA_IN_GB** – storage quota
 - **trafficLimitGB** (optional) – monthly traffic cap
 
-Usernames are normalised to lowercase and must match `[a-z][a-z0-9]{0,7}`—a
-leading letter followed by up to seven lowercase letters or digits. This keeps
-Unix account names predictable for admins and avoids shell injection edge cases
-elsewhere in the tooling.
+Usernames are normalised to lowercase and must match `[a-z][a-z0-9]{2,7}`—a
+leading letter followed by 2–7 lowercase letters or digits (3–8 characters
+total). This keeps Unix account names predictable for admins and avoids shell
+injection edge cases elsewhere in the tooling.
 
 On success the script:
 - creates the Unix user and home directory
