@@ -8,7 +8,7 @@
  */
 
 const PMSS_RUNTIME_FALLBACK_LOG = '/var/log/pmss/runtime.log';
-const PMSS_COMMAND_TIMEOUT_DEFAULT = 300;
+const PMSS_COMMAND_TIMEOUT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_APT_DEFAULT = 1200;
 
 if (!function_exists('pmssResolvePathFromEnv')) {
@@ -309,18 +309,17 @@ if (!function_exists('runCommand')) {
         $isInteractive = function_exists('posix_isatty') && posix_isatty(STDOUT);
         $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
         $timeoutSec = PMSS_COMMAND_TIMEOUT_DEFAULT;
-        $timeoutFromEnv = false;
         if ($timeoutEnv !== false && $timeoutEnv !== '' && ctype_digit($timeoutEnv)) {
             $val = (int) $timeoutEnv;
             if ($val > 0) {
                 $timeoutSec = $val;
-                $timeoutFromEnv = true;
             }
         }
         // APT/dpkg operations legitimately take a long time (especially dist-upgrades).
-        // Use a higher default for these commands so we don't kill them mid-flight.
-        if (!$timeoutFromEnv && preg_match('/\b(apt-get|apt|dpkg)\b/i', $cmd) === 1) {
-            $timeoutSec = PMSS_COMMAND_TIMEOUT_APT_DEFAULT;
+        // Always apply a sane floor even when PMSS_COMMAND_TIMEOUT is set lower.
+        $isAptDpkgCommand = preg_match('/\b(apt-get|apt|dpkg)\b/i', $cmd) === 1;
+        if ($isAptDpkgCommand) {
+            $timeoutSec = max($timeoutSec, PMSS_COMMAND_TIMEOUT_APT_DEFAULT);
         }
         $announceStart = $isInteractive || $verbose;
         if ($announceStart) {
@@ -353,7 +352,16 @@ if (!function_exists('runCommand')) {
             ];
         }
         // Use a single command string for PHP 7.3 compatibility.
-        $bash = '/bin/bash -lc '.escapeshellarg($cmd);
+        // For apt/dpkg, prefer exec when safe so timeouts terminate the real child process.
+        $cmdForShell = $cmd;
+        if ($isAptDpkgCommand
+            && strpos($cmd, ';') === false
+            && strpos($cmd, '&&') === false
+            && strpos($cmd, '||') === false
+            && strpos($cmd, '|') === false) {
+            $cmdForShell = 'exec '.$cmd;
+        }
+        $bash = '/bin/bash -lc '.escapeshellarg($cmdForShell);
         $process = proc_open($bash, $descriptor, $pipes);
         if (!is_resource($process)) {
             // Simple one-shot retry for transient fork failures under load.

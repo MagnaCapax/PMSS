@@ -50,7 +50,7 @@ We choose **Option C**:
   - Per-user helpers emit explicit banners when kicking linger/Docker so hangs can be correlated to a specific user.
 
 - Harden `runCommand()` as the central shell runner:
-  - Add a default timeout of **300 seconds** (APT/dpkg commands default to **1200 seconds**), configurable via `PMSS_COMMAND_TIMEOUT`.
+  - Add a default timeout of **1200 seconds** (failsafe), configurable via `PMSS_COMMAND_TIMEOUT`.
   - Tail-limit in-memory stdout/stderr buffers (~1 MiB per stream) while still streaming live output.
   - On timeout, terminate the child process best-effort, return a non-zero rc, and log a large `[TIMEOUT]` banner in both the console and logs, but **do not abort** the overall update (soft-fail doctrine).
 
@@ -59,7 +59,7 @@ We choose **Option C**:
   - One clear per-user loop for update-step2; easier to reason about what happens “per account” and in what order.
   - Start markers and timeout banners make it obvious which command or user a hung updater is stuck on.
   - Tail-limited buffers in `runCommand()` reduce the risk of a single noisy command exhausting PHP memory.
-  - 300s timeout ensures this never gets completely hung anymore. No single shell tasks should take more than a few seconds, at worst 60 seconds.
+  - 1200s timeout is a last-resort failsafe to avoid permanently hung runs without breaking legitimate long-running maintenance (e.g. dist-upgrades).
 
 
 

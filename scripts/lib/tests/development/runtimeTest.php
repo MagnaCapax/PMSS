@@ -7,6 +7,12 @@ require_once dirname(__DIR__, 3).'/update.php';
 
 class RuntimeTest extends TestCase
 {
+    public function testDefaultCommandTimeoutIs1200Seconds(): void
+    {
+        $this->assertTrue(defined('PMSS_COMMAND_TIMEOUT_DEFAULT'));
+        $this->assertEquals(1200, constant('PMSS_COMMAND_TIMEOUT_DEFAULT'));
+    }
+
     public function testRunCommandEchoSuccessCapturesStdout(): void
     {
         $captured = [];
@@ -32,6 +38,22 @@ class RuntimeTest extends TestCase
         $this->assertTrue(is_array($output));
         $this->assertTrue(array_key_exists('stdout', $output));
         $this->assertTrue(array_key_exists('stderr', $output));
+    }
+
+    public function testRunCommandAptTimeoutFloorIgnoresLowerEnvTimeout(): void
+    {
+        $prev = getenv('PMSS_COMMAND_TIMEOUT');
+        putenv('PMSS_COMMAND_TIMEOUT=1');
+        try {
+            $rc = \runCommand('echo apt-get; sleep 2', false, function (string $m): void {});
+        } finally {
+            if ($prev === false) {
+                putenv('PMSS_COMMAND_TIMEOUT');
+            } else {
+                putenv('PMSS_COMMAND_TIMEOUT='.$prev);
+            }
+        }
+        $this->assertEquals(0, $rc);
     }
 
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
