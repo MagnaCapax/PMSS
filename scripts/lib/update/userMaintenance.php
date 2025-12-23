@@ -269,6 +269,29 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         $uid  = $uinfo['uid'];
         $gid  = $uinfo['gid'];
 
+        // Resolve fuse-overlayfs availability once per run.
+        static $fuseOverlayfsAvailable = null;
+        static $fuseOverlayfsPath = null;
+        if ($fuseOverlayfsAvailable === null) {
+            $candidates = ['/usr/bin/fuse-overlayfs', '/usr/local/bin/fuse-overlayfs'];
+            foreach ($candidates as $candidate) {
+                if (is_file($candidate) && is_executable($candidate)) {
+                    $fuseOverlayfsPath = $candidate;
+                    break;
+                }
+            }
+
+            if ($fuseOverlayfsPath === null) {
+                $fuseOverlayfsAvailable = false;
+            } else {
+                $out = [];
+                $rc = 1;
+                @exec(escapeshellarg($fuseOverlayfsPath).' --version >/dev/null 2>&1', $out, $rc);
+                $fuseOverlayfsAvailable = ($rc === 0);
+            }
+        }
+        $fuseOverlayfsStatus = $fuseOverlayfsAvailable ? 'available' : ($fuseOverlayfsPath === null ? 'missing' : 'unusable');
+
         $configDir  = $home.'/.config/docker';
         $configFile = $configDir.'/daemon.json';
 
@@ -284,9 +307,44 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         $current = @file_get_contents($configFile);
         $data = $current ? json_decode($current, true) : [];
         if (!is_array($data)) $data = [];
+        $expectedConfig = json_encode(
+            ['storage-driver' => 'fuse-overlayfs'],
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+        );
 
-        // If storage-driver is already set, respect it.
+        // If storage-driver is already set, respect it unless it is our default.
         if (isset($data['storage-driver'])) {
+            if ($data['storage-driver'] !== 'fuse-overlayfs') {
+                return;
+            }
+
+            if ($fuseOverlayfsAvailable) {
+                return;
+            }
+
+            $isDefaultOnly = (count($data) === 1);
+            $matchesDefault = ($current !== false && trim($current) === trim($expectedConfig));
+            if ($isDefaultOnly && $matchesDefault && is_file($configFile)) {
+                $realHome = realpath($home);
+                $realConfig = realpath($configFile);
+                if ($realHome === false || $realConfig === false || strpos($realConfig, $realHome.'/') !== 0) {
+                    pmssUserLog($user, '[WARN] Refusing to remove daemon.json outside expected home path');
+                    return;
+                }
+
+                if (@unlink($configFile)) {
+                    pmssUserLog($user, '[WARN] Removed daemon.json storage-driver because fuse-overlayfs is unavailable');
+                } else {
+                    pmssUserLog($user, '[WARN] Failed to remove daemon.json after fuse-overlayfs check');
+                }
+            } else {
+                pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; leaving existing daemon.json untouched', $fuseOverlayfsStatus));
+            }
+            return;
+        }
+
+        if (!$fuseOverlayfsAvailable) {
+            pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping storage-driver enforcement', $fuseOverlayfsStatus));
             return;
         }
 
