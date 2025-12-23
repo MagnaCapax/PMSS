@@ -44,7 +44,7 @@ function userConfigureSystemdSlice(array $user): void
     if (!empty($user['IOWriteIOPS'])) {
         $args[] = '--io-write-iops=' . $user['IOWriteIOPS'];
     }
-    if (array_key_exists('cpuQuotaPercent', $user) && $user['cpuQuotaPercent'] !== '' && $user['cpuQuotaPercent'] !== null) {
+    if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
         $quotaVal = $user['cpuQuotaPercent'];
         $quotaLabel = (is_string($quotaVal) && strtolower((string)$quotaVal) === 'infinity')
             ? 'infinity'

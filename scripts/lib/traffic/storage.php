@@ -12,9 +12,8 @@ class TrafficStorage
     public function __construct(array $paths = [])
     {
         $this->homeDir    = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
-        $baseRuntime      = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
-        $this->runtimeDir = $baseRuntime;
-        $this->statsDir   = rtrim($paths['stats_dir'] ?? $baseRuntime.'/trafficStats', '/');
+        $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+        $this->statsDir   = rtrim($paths['stats_dir'] ?? $this->runtimeDir.'/trafficStats', '/');
     }
 
     /** Ensure runtime directories exist before writing. */

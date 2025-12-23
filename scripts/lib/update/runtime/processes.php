@@ -41,7 +41,6 @@ function pmssSystemdUnitExists(string $unit): bool
     if (!preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $candidate)) {
         $candidate .= '.service';
     }
-    $output = [];
     exec('systemctl list-unit-files '.escapeshellarg($candidate).' 2>/dev/null', $output, $status);
     if ($status === 0) {
         foreach ($output as $line) {

@@ -67,8 +67,7 @@ class TrafficStatsProcessor
     /** Discover users by scanning the traffic log directory. */
     public function discoverUsers(): array
     {
-        $users = array_filter(glob($this->trafficDir.'/*'), 'is_file');
-        $users = array_map('basename', $users);
+        $users = array_map('basename', array_filter(glob($this->trafficDir.'/*'), 'is_file'));
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
         return $users;
     }
@@ -95,8 +94,7 @@ class TrafficStatsProcessor
     {
         $path = $this->trafficDir.'/'.$username;
         $homePath = $this->homeDir.'/'.$username;
-        return file_exists($path)
-            && is_readable($path)
+        return is_readable($path)
             && $this->userExistsInPasswd($username)
             && is_dir($homePath);
     }

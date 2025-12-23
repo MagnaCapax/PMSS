@@ -48,7 +48,7 @@ class modules {
      */
     public function seekModules() {
         $directory = '/etc/seedbox/modules/' . $this->baseName;
-        if (!file_exists($directory) || !is_dir($directory)) {
+        if (!is_dir($directory)) {
             return;
         }
         

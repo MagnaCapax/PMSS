@@ -40,7 +40,6 @@ class trafficStatistics {
      *                     or false when the line cannot be parsed safely.
      */
     public function parseLine($thisLine) {
-        $thisLine = trim( $thisLine );        
         $thisLine = explode(': ', $thisLine);
         
 	        if (count($thisLine) != 2) return false;    // Erroneous data, too many parts :

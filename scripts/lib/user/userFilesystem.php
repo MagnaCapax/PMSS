@@ -87,11 +87,9 @@ class userFilesystem
         foreach (self::listPasswdUsers() as $user) {
             $combined[$user] = true;
         }
-        $names = array_keys($combined);
-        
         // Filter out users that do not exist in the system user database
         $valid = [];
-        foreach ($names as $name) {
+        foreach (array_keys($combined) as $name) {
             if (posix_getpwnam($name) !== false) {
                 $valid[] = $name;
             }
