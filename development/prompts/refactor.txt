@@ -186,7 +186,7 @@ Parallel Runs (ABSURDLY SIMPLE)
 - Dirty files outside the SCOPE do not block the run; ignore them and do not touch them.
 - If “dirty files at start” includes anything in the SCOPE → choose different SCOPE or skip run.
 - Never `git add .` or `git commit -a`. Stage only files you changed.
-- Autocommit only if the only dirty files in the repo are the files you touched (per `git status --porcelain`); otherwise DO NOT commit (just stop and print the patch).
+- Autocommit only if the only dirty files within the SCOPE are the files you touched (per `git status --porcelain`); dirty files outside the SCOPE do not block, and must remain untouched.
 
 ----------------------------------------------------------------------
 WORKFLOW (DO THIS)
