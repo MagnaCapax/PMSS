@@ -16,7 +16,6 @@ if (!function_exists('runStep')) {
      */
     function runStep(string $description, string $command): int
     {
-        pmssInitProfileStore();
         $dryRun  = getenv('PMSS_DRY_RUN') === '1';
         $started = microtime(true);
         $isTty   = function_exists('posix_isatty') && posix_isatty(STDOUT);
@@ -132,7 +131,6 @@ if (!function_exists('pmssLogStatus')) {
      */
     function pmssLogStatus(string $status, string $description, int $rc = 0, ?float $duration = null): void
     {
-        pmssInitProfileStore();
         $dur = $duration !== null ? $duration : 0.0;
         $statusUpper = strtoupper($status);
         $message  = sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description);

@@ -61,17 +61,13 @@ class TrafficStatsProcessor
     /** Detect whether we are running in worker mode for a specific user. */
     public function detectWorkerUser(array $argv): ?string
     {
-        if (isset($argv[1])) {
-            return $this->sanitizeUser($argv[1]);
-        }
-        return null;
+        return isset($argv[1]) ? $this->sanitizeUser($argv[1]) : null;
     }
 
     /** Discover users by scanning the traffic log directory. */
     public function discoverUsers(): array
     {
-        $pattern = $this->trafficDir.'/*';
-        $users = array_filter(glob($pattern), 'is_file');
+        $users = array_filter(glob($this->trafficDir.'/*'), 'is_file');
         $users = array_map('basename', $users);
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
         return $users;

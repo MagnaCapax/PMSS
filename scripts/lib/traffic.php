@@ -41,8 +41,6 @@ class trafficStatistics {
      */
     public function parseLine($thisLine) {
         $thisLine = trim( $thisLine );        
-        if (empty($thisLine)) return false;
-        if (strpos($thisLine, ': ') === false) return false;
         $thisLine = explode(': ', $thisLine);
         
 	        if (count($thisLine) != 2) return false;    // Erroneous data, too many parts :
