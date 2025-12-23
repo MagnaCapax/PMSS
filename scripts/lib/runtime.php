@@ -353,13 +353,25 @@ if (!function_exists('runCommand')) {
         }
         // Use a single command string for PHP 7.3 compatibility.
         // For apt/dpkg, prefer exec when safe so timeouts terminate the real child process.
+        // Context: output capture existed at least by 8e3bd4b (pre-Dec) with unbounded buffers.
+        // a2ca2bbf6bf added timeouts + tail-capped buffers for hung/noisy commands, and
+        // cc05325aaf1 added exec for apt/dpkg; exec+env broke DEBIAN_FRONTEND-prefixed
+        // commands (rc=127), so we insert exec after env assignments here.
+        // If regressions continue (e.g., interactive dist-upgrade), re-evaluate rolling back
+        // these runtime changes instead of piling on more workarounds.
+        // References: docs/adr/0006-update-step2-user-loop-and-observability.md,
+        // docs/contracts.md (runCommand contract/timeout/buffering notes).
         $cmdForShell = $cmd;
         if ($isAptDpkgCommand
             && strpos($cmd, ';') === false
             && strpos($cmd, '&&') === false
             && strpos($cmd, '||') === false
             && strpos($cmd, '|') === false) {
-            $cmdForShell = 'exec '.$cmd;
+            if (preg_match('/^(\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)+)(.+)$/', $cmd, $match)) {
+                $cmdForShell = rtrim($match[1]).' exec '.ltrim($match[2]);
+            } else {
+                $cmdForShell = 'exec '.$cmd;
+            }
         }
         $bash = '/bin/bash -lc '.escapeshellarg($cmdForShell);
         $process = proc_open($bash, $descriptor, $pipes);

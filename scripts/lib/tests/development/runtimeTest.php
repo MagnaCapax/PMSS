@@ -56,5 +56,17 @@ class RuntimeTest extends TestCase
         $this->assertEquals(0, $rc);
     }
 
+    public function testRunCommandAptExecHandlesLeadingEnvAssignments(): void
+    {
+        $rc = \runCommand(
+            'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none echo apt-get',
+            false,
+            function (string $m): void {}
+        );
+        $this->assertEquals(0, $rc);
+        $out = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
+        $this->assertTrue(strpos($out, 'apt-get') !== false);
+    }
+
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
 }
