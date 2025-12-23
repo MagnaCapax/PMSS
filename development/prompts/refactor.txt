@@ -180,9 +180,10 @@ HARD RAILS (ALWAYS)
 Parallel Runs (ABSURDLY SIMPLE)
 
 - You MAY run multiple Codex runs in the same checkout.
-- Rule: never edit a file that is already dirty.
-  - Before touching a file: if it appears in `git status --porcelain`, SKIP it.
 - Each run MUST declare a SCOPE (subtree/glob) and touch only that scope.
+- Rule: never edit a file that is already dirty (within your SCOPE).
+  - Before touching a file: if it appears in `git status --porcelain` AND is inside the SCOPE, SKIP it.
+- Dirty files outside the SCOPE do not block the run; ignore them and do not touch them.
 - If “dirty files at start” includes anything in the SCOPE → choose different SCOPE or skip run.
 - Never `git add .` or `git commit -a`. Stage only files you changed.
 - Autocommit only if the only dirty files in the repo are the files you touched (per `git status --porcelain`); otherwise DO NOT commit (just stop and print the patch).
