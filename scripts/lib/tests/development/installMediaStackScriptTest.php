@@ -151,7 +151,8 @@ class installMediaStackScriptTest extends TestCase
 
     public function testJellyfinSedDoesNotUseSlashDelimitersWithClosingTags(): void
     {
-        $this->assertTrue(strpos($this->script, 's/\\(<PublicPort>\\)') === false, 'Must not use / delimiters that break on </tag>');
-        $this->assertStringContainsString('s|(<PublicPort>)[^<]*(</PublicPort>)|', $this->script);
+        $this->assertTrue(strpos($this->script, 's/\\(<PublicHttpPort>\\)') === false, 'Must not use / delimiters that break on </tag>');
+        $this->assertStringContainsString('s|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|', $this->script);
+        $this->assertStringContainsString('s|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|', $this->script);
     }
 }

@@ -663,7 +663,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 <?xml version="1.0" encoding="utf-8"?>
 <NetworkConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <EnableUPnP>false</EnableUPnP>
-  <PublicPort>$JELLYFIN_PORT</PublicPort>
+  <PublicHttpPort>$JELLYFIN_PORT</PublicHttpPort>
   <UPnPCreateHttpPortMap>false</UPnPCreateHttpPortMap>
   <UDPPortRange />
   <EnableIPV6>false</EnableIPV6>
@@ -681,7 +681,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
   <AutoDiscoveryTracing>false</AutoDiscoveryTracing>
   <AutoDiscovery>true</AutoDiscovery>
   <PublicHttpsPort>8920</PublicHttpsPort>
-  <HttpServerPortNumber>$JELLYFIN_PORT</HttpServerPortNumber>
+  <InternalHttpPort>$JELLYFIN_PORT</InternalHttpPort>
   <HttpsPortNumber>8920</HttpsPortNumber>
   <EnableHttps>false</EnableHttps>
   <CertificatePath />
@@ -697,8 +697,8 @@ if [[ $DRY_RUN -eq 0 ]]; then
 </NetworkConfiguration>
 EOF
   fi
-  sed -i -E "s|(<PublicPort>)[^<]*(</PublicPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
-  sed -i -E "s|(<HttpServerPortNumber>)[^<]*(</HttpServerPortNumber>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
+  sed -i -E "s|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
+  sed -i -E "s|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
   sed -i -E "s|<BaseUrl />|<BaseUrl></BaseUrl>|g" "$configdir/network.xml"
   sed -i -E "s|(<BaseUrl>)[^<]*(</BaseUrl>)|\1/public-${USERNAME}/${app}\2|g" "$configdir/network.xml"
   syscfg="$configdir/system.xml"
@@ -707,8 +707,6 @@ EOF
 <?xml version="1.0" encoding="utf-8"?>
 <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>
-  <PublicPort>$JELLYFIN_PORT</PublicPort>
-  <HttpServerPortNumber>$JELLYFIN_PORT</HttpServerPortNumber>
 SYSXML
     # Add FFmpegPath if provided, otherwise close the tag
     if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
@@ -721,16 +719,6 @@ SYSXML
       sed -i -E "s|<BaseUrl>[^<]*</BaseUrl>|<BaseUrl>/public-${USERNAME}/${app}</BaseUrl>|g" "$syscfg"
     else
       sed -i -E "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
-    fi
-    if grep -q "<PublicPort>" "$syscfg"; then
-      sed -i -E "s|<PublicPort>[^<]*</PublicPort>|<PublicPort>${JELLYFIN_PORT}</PublicPort>|g" "$syscfg"
-    else
-      sed -i -E "s|</ServerConfiguration>|  <PublicPort>${JELLYFIN_PORT}</PublicPort>\n</ServerConfiguration>|" "$syscfg"
-    fi
-    if grep -q "<HttpServerPortNumber>" "$syscfg"; then
-      sed -i -E "s|<HttpServerPortNumber>[^<]*</HttpServerPortNumber>|<HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>|g" "$syscfg"
-    else
-      sed -i -E "s|</ServerConfiguration>|  <HttpServerPortNumber>${JELLYFIN_PORT}</HttpServerPortNumber>\n</ServerConfiguration>|" "$syscfg"
     fi
     # Handle FFmpegPath - merge with existing config
     if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
@@ -763,6 +751,12 @@ alias sabnzbd='\''tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bi
 # Lighttpd config (use $HOSTNAME)
 if [[ $DRY_RUN -eq 0 ]]; then
   mkdir -p "$HOME/.lighttpd"
+  if [[ -f "$HOME/.lighttpd/custom" ]]; then
+    backup_stamp=$(date +%Y%m%d)
+    if ! cp "$HOME/.lighttpd/custom" "$HOME/.lighttpd/backup.custom.${backup_stamp}" 2>/dev/null; then
+      log_warn "Failed to backup existing lighttpd custom config"
+    fi
+  fi
   cat <<EOF >"$HOME/.lighttpd/custom"
 \$HTTP["url"] =~ "^/sabnzbd(\$|/)" {
   proxy.server = ( "" => ( (
