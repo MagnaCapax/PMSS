@@ -1,15 +1,15 @@
 # Debian Bookworm repository definition followed by the updater.
-deb http://www.nic.funet.fi/debian/ bookworm main non-free contrib
-deb-src http://www.nic.funet.fi/debian/ bookworm main non-free contrib
+deb http://www.nic.funet.fi/debian/ bookworm main non-free contrib non-free-firmware
+deb-src http://www.nic.funet.fi/debian/ bookworm main non-free contrib non-free-firmware
 
-deb http://security.debian.org/debian-security bookworm-security main non-free contrib
-deb-src http://security.debian.org/debian-security bookworm-security main non-free contrib
+deb http://security.debian.org/debian-security bookworm-security main non-free contrib non-free-firmware
+deb-src http://security.debian.org/debian-security bookworm-security main non-free contrib non-free-firmware
 
 # Bookworm updates deliver general bug fixes between point releases.
-deb http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib
-deb-src http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib
+deb http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib non-free-firmware
+deb-src http://www.nic.funet.fi/debian/ bookworm-updates main non-free contrib non-free-firmware
 
-deb http://www.nic.funet.fi/debian/ bookworm-backports main non-free contrib
+deb http://www.nic.funet.fi/debian/ bookworm-backports main non-free contrib non-free-firmware
 
 # MediaArea repository
 deb https://mediaarea.net/repo/deb/debian bookworm main

@@ -12,7 +12,6 @@ UseIPv6                         off
 ServerName                      "%SERVERNAME%"
 ServerType                      standalone
 DeferWelcome                    off
-MultilineRFC2228                on
 DefaultServer                   on
 ShowSymlinks                    on
 
@@ -31,6 +30,7 @@ DenyFilter                      \*.*/
 DefaultRoot                     ~
 
 # Network Settings
+DefaultAddress                  0.0.0.0
 Port                            21
 MaxInstances                    70
 MaxClientsPerUser               16

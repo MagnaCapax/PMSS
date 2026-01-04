@@ -25,6 +25,7 @@ FORCE_NONINTERACTIVE=false
 SKIP_UPGRADE=false
 RUN_UPDATE=true
 SCRIPTS_ONLY=false
+PROMPT_TTY=""
 
 # Simple colour-aware logging helpers.
 if [ -t 1 ]; then
@@ -175,15 +176,43 @@ if [ "$SCRIPTS_ONLY" = true ]; then
 	UPDATE_ARGS+=("--scripts-only")
 fi
 
-# Auto-disable interactive editors when stdin is not a TTY (common for piped installs).
+# Detect a controlling TTY for interactive prompts/editors.
+#
+# Note: stdin is *not* a TTY for the documented one-liner:
+#   wget -qO- .../install.sh | bash -s -- git/main
+# In interactive SSH sessions we still have /dev/tty, so we use that for prompts.
+if exec 3<>/dev/tty 2>/dev/null; then
+	PROMPT_TTY="/dev/tty"
+	exec 3<&- 3>&-
+fi
+
+run_editor() {
+	local target="$1"
+
+	if [ -n "$PROMPT_TTY" ] && [ ! -t 0 ]; then
+		if exec 3<> "$PROMPT_TTY" 2>/dev/null; then
+			nano "$target" <&3 >&3
+			local rc=$?
+			exec 3<&- 3>&-
+			return $rc
+		fi
+	fi
+
+	nano "$target"
+	return $?
+}
+
+# Auto-disable interactive editors when no controlling TTY is available.
 if [ "$FORCE_NONINTERACTIVE" = true ]; then
 	log_info "Non-interactive mode requested; skipping hostname and quota editors"
 	skip_hostname_edit=true
 	skip_quota_edit=true
-elif [ ! -t 0 ]; then
-	log_info "Non-interactive stdin detected; skipping hostname and quota editors (use flags to override)"
+elif [ -z "$PROMPT_TTY" ]; then
+	log_info "No controlling TTY detected; skipping hostname and quota editors (use flags to override)"
 	skip_hostname_edit=true
 	skip_quota_edit=true
+elif [ ! -t 0 ]; then
+	log_info "Piped stdin detected; using ${PROMPT_TTY} for hostname and quota prompts"
 fi
 
 parse_version_string() {
@@ -282,12 +311,14 @@ preflight_checks() {
 		exit 1
 	fi
 
-	if command -v curl >/dev/null 2>&1; then
-		if ! curl -fsI https://github.com >/dev/null 2>&1; then
+	if command -v wget >/dev/null 2>&1; then
+		if ! wget -q --spider https://github.com >/dev/null 2>&1; then
 			log_warn "GitHub reachability check failed; installer may not fetch updates"
 		fi
 	else
-		log_warn "curl not available; skipping GitHub reachability check"
+		# Prefer wget here: it is already used by the documented one-liner installer.
+		# curl -fsI https://github.com >/dev/null 2>&1
+		log_warn "wget not available; skipping GitHub reachability check"
 	fi
 }
 
@@ -382,7 +413,7 @@ elif [[ "$skip_hostname_edit" == true ]]; then
 	log_info "Skipping hostname confirmation"
 else
 	log_step "Review hostname (press Ctrl+X to exit nano)"
-	nano /etc/hostname
+	run_editor /etc/hostname
 fi
 
 # Setup fstab for quota and /home array
@@ -390,15 +421,37 @@ log_step "Rechecking kernel quota support"
 append_unique_block \
     /etc/fstab \
     "#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1" \
-    $'\nproc            /proc           proc    defaults,hidepid=2        0       0\n\n# You may need on target devices:\n#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n'
+    $'\n# PMSS: quota/performance mount options sample for /home (edit the /home mount line)\n#usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n#defaults,nofail,lazytime,noatime,commit=30,usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1\n# Optional (risky on hosts without a protected write cache): nobarrier\n'
 
 quota_options="usrjquota=aquota.user,grpjquota=aquota.group,jqfmt=vfsv1"
-perf_options="noatime,nofail"
+perf_options_base="nofail,noatime,lazytime"
 
 # Return 0 if /etc/fstab contains a non-comment line for the mount point
 fstab_has_mount() {
     local mp="$1"
     grep -Eq "^[[:space:]]*[^#]+[[:space:]]+${mp//\//\/}[[:space:]]+" /etc/fstab
+}
+
+fstab_mount_fstype() {
+	local mp="$1"
+	awk -v mp="$mp" '
+        /^[ \t]*#/ { next }
+        NF < 3 { next }
+        $2 == mp { print $3; exit }
+    ' /etc/fstab
+}
+
+fstab_perf_options_for_mount() {
+	local mp="$1"
+	local options="$perf_options_base"
+	local fstype
+
+	fstype="$(fstab_mount_fstype "$mp")"
+	if [ "$fstype" = "ext4" ] || [ "$fstype" = "ext3" ]; then
+		options="${options},commit=30"
+	fi
+
+	printf '%s' "$options"
 }
 
 # Return 0 if fstab line for mount contains known quota options
@@ -422,7 +475,7 @@ ensure_fstab_options() {
 
     awk -v mp="$mount_point" -v reqcsv="$required_csv" '
         BEGIN {
-            split(reqcsv, req, ",");
+            reqn = split(reqcsv, req, ",");
         }
         /^[ \t]*#/ { print; next }
         NF < 2 { print; next }
@@ -435,25 +488,22 @@ ensure_fstab_options() {
                 }
                 n = split(opts, cur, ",");
                 delete have;
-                keep_defaults = 0;
+                newopts = "";
                 for (i = 1; i <= n; i++) {
-                    if (cur[i] == "") continue;
-                    if (cur[i] == "defaults") { keep_defaults = 1; continue; }
-                    have[cur[i]] = 1;
+                    o = cur[i];
+                    if (o == "") continue;
+                    if (o in have) continue;
+                    have[o] = 1;
+                    if (newopts == "") newopts = o; else newopts = newopts","o;
                 }
-                # Add required
-                for (i in req) {
+                # Append required options in a deterministic order.
+                for (i = 1; i <= reqn; i++) {
                     o = req[i];
                     if (o == "" ) continue;
                     if (!(o in have)) {
                         have[o] = 1;
+                        if (newopts == "") newopts = o; else newopts = newopts","o;
                     }
-                }
-                # Rebuild options list
-                newopts = "";
-                if (keep_defaults) newopts = "defaults";
-                for (o in have) {
-                    if (newopts == "") newopts = o; else newopts = newopts","o;
                 }
                 $4 = newopts;
                 # Rebuild standard six columns with tabs
@@ -480,8 +530,141 @@ ensure_fstab_options() {
     return 0
 }
 
+ensure_grub_cmdline_option() {
+    local option="$1"
+    local file="/etc/default/grub"
+
+    if [ -z "$option" ]; then
+        return 1
+    fi
+
+    if [ ! -f "$file" ]; then
+        log_warn "/etc/default/grub not found; unable to persist required boot option: ${option}"
+        return 0
+    fi
+
+    append_unique_block \
+        "$file" \
+        "# PMSS: required boot parameters" \
+        $'\n# PMSS: required boot parameters\n# - /proc hidepid=2 is enabled for tenant privacy.\n# - Rootless Docker is expected to work under this default.\n#\n# Ensure this exists in GRUB_CMDLINE_LINUX_DEFAULT (or GRUB_CMDLINE_LINUX):\n# systemd.unified_cgroup_hierarchy=0\n#\n# After editing, run: update-grub && reboot\n'
+
+    if grep -E '^GRUB_CMDLINE_LINUX(_DEFAULT)?="' "$file" | grep -Fq "$option"; then
+        return 0
+    fi
+
+    local tmpfile backup
+    tmpfile=$(mktemp)
+    if grep -Eq '^GRUB_CMDLINE_LINUX_DEFAULT="' "$file"; then
+        sed -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
+    elif grep -Eq '^GRUB_CMDLINE_LINUX="' "$file"; then
+        sed -E "s/^(GRUB_CMDLINE_LINUX=\"[^\"]*)\"/\\1 ${option}\"/" "$file" >"$tmpfile"
+    else
+        cat "$file" >"$tmpfile"
+        printf '\nGRUB_CMDLINE_LINUX_DEFAULT="%s"\n' "$option" >>"$tmpfile"
+    fi
+
+    if cmp -s "$file" "$tmpfile"; then
+        rm -f "$tmpfile"
+        return 0
+    fi
+
+    backup="/etc/default/grub.pmss-backup-$(date +%Y%m%d%H%M%S)"
+    cp "$file" "$backup" 2>/dev/null || true
+    mv "$tmpfile" "$file"
+    chmod 0644 "$file" 2>/dev/null || true
+    log_info "Updated /etc/default/grub (backup: ${backup##*/})"
+    return 0
+}
+
+ensure_proc_hidepid() {
+    local tmpfile backup
+    tmpfile=$(mktemp)
+
+    awk '
+        BEGIN { touched=0 }
+        /^[ \t]*#/ { print; next }
+        NF < 2 { print; next }
+        {
+            if ($2 == "/proc" && $3 == "proc") {
+                opts = $4;
+                if (opts == "" || opts == "-" ) {
+                    opts = "defaults";
+                }
+                n = split(opts, cur, ",");
+                newopts = "";
+                seen = 0;
+                for (i = 1; i <= n; i++) {
+                    o = cur[i];
+                    if (o == "") continue;
+                    if (o ~ /^hidepid=/) {
+                        if (seen == 0) {
+                            o = "hidepid=2";
+                            seen = 1;
+                        } else {
+                            continue;
+                        }
+                    }
+                    if (newopts == "") newopts = o; else newopts = newopts","o;
+                }
+                if (seen == 0) {
+                    if (newopts == "") newopts = "hidepid=2"; else newopts = newopts",hidepid=2";
+                }
+                $4 = newopts;
+                out = $1"\t"$2"\t"$3"\t"$4;
+                if (NF >= 5) out = out"\t"$5; else out = out"\t0";
+                if (NF >= 6) out = out"\t"$6; else out = out"\t0";
+                print out;
+                touched = 1;
+                next;
+            }
+        }
+        { print }
+    ' /etc/fstab >"$tmpfile"
+
+    if cmp -s /etc/fstab "$tmpfile"; then
+        rm -f "$tmpfile"
+        return 0
+    fi
+
+    backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
+    cp /etc/fstab "$backup" 2>/dev/null || true
+    mv "$tmpfile" /etc/fstab
+    log_info "Updated /etc/fstab /proc options (backup: ${backup##*/})"
+    return 0
+}
+
+if fstab_has_mount "/proc"; then
+    ensure_proc_hidepid || true
+else
+    backup="/etc/fstab.pmss-backup-$(date +%Y%m%d%H%M%S)"
+    cp /etc/fstab "$backup" 2>/dev/null || true
+    printf '\nproc\t/proc\tproc\tdefaults,hidepid=2\t0\t0\n' >>/etc/fstab
+    log_info "Added /proc mount with hidepid=2 to /etc/fstab (backup: ${backup##*/})"
+fi
+
+# Best-effort remount to apply hidepid immediately.
+mount -o remount,hidepid=2 /proc 2>/dev/null || true
+
+ensure_grub_cmdline_option "systemd.unified_cgroup_hierarchy=0" || true
+if [ -f /etc/default/grub ] && [ "$FORCE_NONINTERACTIVE" != true ] && [ -n "$PROMPT_TTY" ]; then
+    log_step "Review /etc/default/grub (press Ctrl+X to exit nano)"
+    run_editor /etc/default/grub
+fi
+
+if [ -f /etc/default/grub ] && command -v update-grub >/dev/null 2>&1; then
+    log_step "Updating GRUB configuration"
+    run_cmd update-grub
+else
+    log_warn "update-grub not available; run update-grub (or grub-mkconfig) manually after editing /etc/default/grub"
+fi
+
+if [ -r /proc/cmdline ] && ! grep -q 'systemd.unified_cgroup_hierarchy=0' /proc/cmdline 2>/dev/null; then
+    log_warn "Boot parameter systemd.unified_cgroup_hierarchy=0 will apply after reboot (required for rootless Docker with hidepid=2)"
+fi
+
 if [[ -n "$quota_mountpoint" ]]; then
-    ensure_fstab_options "$quota_mountpoint" "$perf_options,$quota_options" || true
+    required_options="$(fstab_perf_options_for_mount "$quota_mountpoint"),$quota_options"
+    ensure_fstab_options "$quota_mountpoint" "$required_options" || true
 elif [[ "$skip_quota_edit" == true ]]; then
     log_info "Skipping quota configuration as requested"
 else
@@ -490,11 +673,13 @@ else
         if fstab_mount_has_quota "/home"; then
             log_info "Quota already configured in /etc/fstab for /home; skipping editor"
         else
-            ensure_fstab_options "/home" "$perf_options,$quota_options" || true
+            required_options="$(fstab_perf_options_for_mount "/home"),$quota_options"
+            ensure_fstab_options "/home" "$required_options" || true
         fi
     else
         log_step "Review /etc/fstab quota options (Ctrl+X to exit editor)"
-        nano /etc/fstab
+        log_warn "PMSS expects /home to be a dedicated filesystem (with quotas). Configure it now."
+        run_editor /etc/fstab
     fi
 fi
 

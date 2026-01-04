@@ -1,9 +1,17 @@
 # PMSS Installer Notes
 
-The legacy `install.sh` script remains intentionally minimal:
+`install.sh` is a thin bootstrapper; keep it stable and conservative.
+Responsibilities are intentionally limited to:
 
 1. Ensure core tooling (`bash`, `php` CLI, `git`, `curl`, `wget`, `ca-certificates`, `rsync`).
-2. Pull the repository into `/scripts`, `/etc`, and `/var`.
-3. Hand off to `/scripts/update.php` with any operator-supplied arguments.
+2. Capture essential initial host config when an operator is present (hostname and `/etc/fstab` quota guidance).
+3. Apply the minimum multi-tenant hardening required by the update workflow:
+   - `/proc` mounted with `hidepid=2`.
+   - `systemd.unified_cgroup_hierarchy=0` present in `/etc/default/grub` (reboot required) so rootless Docker remains compatible with `hidepid=2`.
+4. Pull the repository into `/scripts`, `/etc`, and `/var`, then hand off to `/scripts/update.php`.
 
-The script has been stable in production for over a decade—avoid adding new logic or altering the workflow without explicit coordination.
+Interactivity contract:
+- The documented pipe installer (`wget -qO- .../install.sh | bash -s -- ...`) must still be able to prompt in SSH/console sessions by using the controlling TTY (`/dev/tty`) when present.
+- For unattended runs, use `--non-interactive` (or `--skip-hostname` / `--skip-quota`) to suppress prompts.
+
+Do not move heavyweight orchestration into `install.sh`; it belongs in `update.php` and `update-step2.php`.

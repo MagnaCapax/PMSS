@@ -47,19 +47,25 @@ if ($tlsBlock === '') {
 
 $logDir = '/var/log/proftpd';
 $runDir = '/var/run/proftpd';
+$daemonUser = 'proftpd';
+$daemonGroup = 'nogroup';
 
-if (!is_dir($logDir) && !@mkdir($logDir, 0750, true)) {
-    logMessage("Warning: Unable to create {$logDir}");
-}
-if (!is_dir($runDir) && !@mkdir($runDir, 0750, true)) {
-    logMessage("Warning: Unable to create {$runDir}");
-}
+ensureWritableDirectory($logDir, 0750, $daemonUser, $daemonGroup);
+ensureWritableDirectory($runDir, 0750, $daemonUser, $daemonGroup);
 
 if (@file_put_contents('/etc/proftpd/proftpd.conf', $rendered) === false) {
     logMessage('Failed to write /etc/proftpd/proftpd.conf');
     exit(1);
 }
 logMessage('Wrote /etc/proftpd/proftpd.conf');
+
+if (trim((string) @shell_exec('command -v proftpd 2>/dev/null')) !== '') {
+    $testRc = runStep('Validating ProFTPD configuration', 'proftpd -t -c /etc/proftpd/proftpd.conf');
+    if ($testRc !== 0) {
+        logMessage('[WARN] ProFTPD config test failed; skipping restart to avoid stopping a working daemon');
+        exit(0);
+    }
+}
 
 if (is_dir('/run/systemd/system')) {
     runStep('Restarting ProFTPD (systemd)', 'systemctl restart proftpd');
@@ -120,4 +126,16 @@ function buildTlsConfiguration(string $hostname, int $distroVersion = 0): string
     }
 
     return '';
+}
+
+function ensureWritableDirectory(string $path, int $mode, string $owner, string $group): void
+{
+    if (!is_dir($path) && !@mkdir($path, $mode, true)) {
+        logMessage("Warning: Unable to create {$path}");
+        return;
+    }
+
+    @chmod($path, $mode);
+    @chown($path, $owner);
+    @chgrp($path, $group);
 }

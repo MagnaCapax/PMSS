@@ -143,13 +143,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssApplyAptTemplate(string $label, string $template, string $currentHash, callable $log, ?callable $post=null): void
   - Writes template via `pmssSafeWriteSources` when hash differs; runs post-hook if provided.
 
-- pmssEnsureMediaareaRepository(): void → legacy shim; removes old MediaArea `.list/.sources` files from `sources.list.d` to avoid duplicate/invalid entries.
+- pmssEnsureMediaareaRepository(): void → removes legacy MediaArea `.list/.sources` files and ensures the MediaArea signing key exists at `/etc/apt/trusted.gpg.d/mediaarea.asc` (override: `PMSS_APT_MEDIAAREA_KEY_PATH`); best-effort fetch unless `PMSS_DRY_RUN=1`.
 - pmssEnsureSonarrKey(): void → installs `/etc/apt/trusted.gpg.d/sonarr.gpg` so `apt-get update` does not fail for Sonarr sources.
 - pmssEnsureDockerRepository(): void → ensures Docker deb822 source + keyring exist under `/etc/apt/sources.list.d/docker.sources` and `/etc/apt/keyrings/docker.gpg`.
 - pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger=null): array
   - `mode=reuse` (unknown version) or `mode=update` with current hash and loaded templates.
 - pmssRefreshRepositories(string $distroName, int $distroVersion, ?callable $logger=null): bool
-  - Ensures Docker/Sonarr repo prerequisites, computes plan; runs `apt-get update` either way, with template write on update.
+  - Ensures MediaArea/Docker/Sonarr repo prerequisites, computes plan; runs `apt-get update` either way, with template write on update; updates `/var/lib/apt/periodic/update-success-stamp` only on success.
 
 ---
 
