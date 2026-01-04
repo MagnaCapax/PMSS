@@ -10,22 +10,25 @@ This document explains the rTorrent tracker cleaner used on PMSS hosts: what it 
 ## Scope & Safety
 - Only non‑private torrents are processed. Torrents with the BitTorrent `private` flag present are skipped entirely.
 - A timestamped backup of every original `.torrent` is written before any change.
+- If backup verification fails (permissions, full disk, or path safety), the cleaner stops for that user without modifying torrents.
 - A per‑user log lists which torrents were modified.
 - You can disable the cleaner per user with a simple opt‑out file.
 
 ## What It Does
-- Scans at most 20 `.torrent` files per run for up to 2 users per pass to limit I/O impact.
+- Scans at most 500 `.torrent` files per run for one user per pass to limit I/O impact.
 - For eligible torrents, removes a small list of known problematic public trackers (see list below).
+- Stops after 30 minutes or 500 modified torrents in a single run.
 - Appends a short note to the torrent comment indicating a cleanup occurred.
 
 Paths and behavior (per user):
 - Session files: `/home/<user>/session/*.torrent`
 - Backups: `/home/<user>/session/backups/YYYY-mm-dd_HHMM/<file>.torrent`
 - Change log: `/home/<user>/.trackerCleaner.log`
+- Verbose log: `/home/<user>/.logs/trackerCleaner.log` (per-torrent details, removals, and backup paths)
 - Opt‑out: create file `/home/<user>/.trackerCleanerDisable`
 
 Scheduling:
-- The cleaner runs from root’s crontab and is staggered to avoid I/O spikes. It’s designed as a slow, incremental background task.
+- The cleaner runs from root’s crontab every two hours by default and is staggered to avoid I/O spikes. It’s designed as a slow, incremental background task.
 
 ## User Control
 - Opt‑out completely:
@@ -45,19 +48,36 @@ The cleaner targets these known problematic public trackers:
 ```
 udp://public.popcorn-tracker.org:6969/announce
 http://sub4all.org
+udp://tracker.openbittorrent.com:80/announce
 udp://tracker.publicbt.com
 udp://tracker.ccc.de
-udp://tracker.opentrackr.org
 http://tracker.tntvillage.scambioetico.org
 http://exodus.desync.com
 http://tracker.ftfansub.net
 http://nyaa.tracker.wf
 udp://tracker.istole.it
-udp://open.demonii.com
 udp://mgtracker.org
 ```
 
 Note: a blanket removal of all UDP trackers is not enabled. The cleaner uses the explicit list above.
+
+Additional domain scrub (URL varies):
+- Any tracker URL containing one of the following is removed:
+  - `legittorrents.info`
+  - `tracker.openbittorrent.com`
+  - `tracker.leechers-paradise.org`
+  - `tracker.coppersurfer.tk`
+  - `9.rarbg.`
+  - `10.rarbg.`
+  - `tracker.eddie4.nl`
+  - `tracker.supertracker.net`
+  - `concen.org`
+  - `tracker.tfile.me`
+  - `tracker.cyberia.is`
+
+Re-enabled (functional again) 2025-12-21:
+- `udp://tracker.opentrackr.org`
+- `udp://open.demonii.com`
 
 ## Operational History (summary)
 - 2017: Blog post discussing public‑tracker behavior and performance trade‑offs: https://blog.pulsedmedia.com/2017/10/faster-public-torrents-with-pulsed-media-seedboxes/

@@ -5,7 +5,7 @@ SHELL=/bin/bash
 # m h  dom mon dow   command
 */2 * * * *    root /scripts/cron/checkInstances.php >> /var/log/pmss/checkInstances.log 2>&1
 * * * * *    root sleep 45; /scripts/cron/checkLighttpdInstances.php >> /var/log/pmss/checkLighttpdInstances.log 2>&1
-5 * * * *    root sleep 75; /scripts/cron/userTrackerCleaner.php >> /var/log/pmss/userTrackerCleaner.log 2>&1
+5 */2 * * *    root sleep 75; /scripts/cron/userTrackerCleaner.php >> /var/log/pmss/userTrackerCleaner.log 2>&1
 * * * * *    root sleep 45; /scripts/cron/checkDelugeInstances.php >> /var/log/pmss/checkDelugeInstances.log 2>&1
 */2 * * * *    root sleep 17; /scripts/cron/checkRcloneInstances.php >> /var/log/pmss/checkRcloneInstances.log 2>&1
 */2 * * * *    root sleep 27; /scripts/cron/checkQbittorrentInstances.php >> /var/log/pmss/checkQbittorrentInstances.log 2>&1
