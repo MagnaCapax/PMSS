@@ -297,7 +297,7 @@ if [[ -n "$OVR_SAB_URL" ]]; then
   SABNZBD_URL="$OVR_SAB_URL"; SABNZBD_VERSION="override"
 else
   SABNZBD_VERSION=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'tag_name' | cut -d '"' -f 4 || true)
-  SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep '\\-src' | cut -d '"' -f 4 || true)
+  SABNZBD_URL=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep -E 'browser_download_url' | grep -- '-src' | cut -d '"' -f 4 || true)
 fi
 
 # Jellyfin (Repo Scraping)
