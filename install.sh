@@ -25,7 +25,6 @@ FORCE_NONINTERACTIVE=false
 SKIP_UPGRADE=false
 RUN_UPDATE=true
 SCRIPTS_ONLY=false
-PROMPT_TTY=""
 
 # Simple colour-aware logging helpers.
 if [ -t 1 ]; then
@@ -176,43 +175,33 @@ if [ "$SCRIPTS_ONLY" = true ]; then
 	UPDATE_ARGS+=("--scripts-only")
 fi
 
-# Detect a controlling TTY for interactive prompts/editors.
-#
-# Note: stdin is *not* a TTY for the documented one-liner:
-#   wget -qO- .../install.sh | bash -s -- git/main
-# In interactive SSH sessions we still have /dev/tty, so we use that for prompts.
-if exec 3<>/dev/tty 2>/dev/null; then
-	PROMPT_TTY="/dev/tty"
-	exec 3<&- 3>&-
-fi
-
 run_editor() {
 	local target="$1"
 
-	if [ -n "$PROMPT_TTY" ] && [ ! -t 0 ]; then
-		if exec 3<> "$PROMPT_TTY" 2>/dev/null; then
-			nano "$target" <&3 >&3
-			local rc=$?
-			exec 3<&- 3>&-
-			return $rc
-		fi
+	if [ -t 0 ]; then
+		nano "$target"
+		return $?
 	fi
 
-	nano "$target"
-	return $?
+	# stdin is *not* a TTY for the documented one-liner:
+	#   wget -qO- .../install.sh | bash -s -- git/main
+	# In interactive SSH sessions we still have a controlling TTY, so use /dev/tty for prompts.
+	if exec 3<>/dev/tty 2>/dev/null; then
+		nano "$target" <&3 >&3 2>&3
+		local rc=$?
+		exec 3<&- 3>&-
+		return $rc
+	fi
+
+	log_warn "No controlling TTY available; skipping editor for ${target}"
+	log_warn "Run inside an interactive SSH session (or use ssh -t) or pass --non-interactive / --hostname / --quota-mount."
+	return 1
 }
 
-# Auto-disable interactive editors when no controlling TTY is available.
 if [ "$FORCE_NONINTERACTIVE" = true ]; then
 	log_info "Non-interactive mode requested; skipping hostname and quota editors"
 	skip_hostname_edit=true
 	skip_quota_edit=true
-elif [ -z "$PROMPT_TTY" ]; then
-	log_info "No controlling TTY detected; skipping hostname and quota editors (use flags to override)"
-	skip_hostname_edit=true
-	skip_quota_edit=true
-elif [ ! -t 0 ]; then
-	log_info "Piped stdin detected; using ${PROMPT_TTY} for hostname and quota prompts"
 fi
 
 parse_version_string() {
@@ -646,7 +635,7 @@ fi
 mount -o remount,hidepid=2 /proc 2>/dev/null || true
 
 ensure_grub_cmdline_option "systemd.unified_cgroup_hierarchy=0" || true
-if [ -f /etc/default/grub ] && [ "$FORCE_NONINTERACTIVE" != true ] && [ -n "$PROMPT_TTY" ]; then
+if [ -f /etc/default/grub ] && [ "$FORCE_NONINTERACTIVE" != true ]; then
     log_step "Review /etc/default/grub (press Ctrl+X to exit nano)"
     run_editor /etc/default/grub
 fi

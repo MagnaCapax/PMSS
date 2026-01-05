@@ -37,7 +37,7 @@ Release:
 wget -qO- https://github.com/MagnaCapax/PMSS/raw/main/install.sh | bash
 ```
 To pin a specific version, pass it as the first argument (e.g. `| bash -s -- git/main` for the latest main branch or `| bash -s -- release:2023-07-22` for a tagged release).
-When installing via a pipe in an interactive SSH session, `install.sh` uses `/dev/tty` so hostname and quota prompts still work; use `--non-interactive` to suppress prompts.
+When installing via a pipe in an interactive SSH session, `install.sh` uses `/dev/tty` so hostname and quota prompts still work; use `--non-interactive` to suppress prompts. If you run the one-liner via `ssh host "..."`, add `ssh -t` so a TTY exists.
 Note: `install.sh` enables `/proc` `hidepid=2` for multi-tenant privacy and ensures `systemd.unified_cgroup_hierarchy=0` is present in `/etc/default/grub` for rootless Docker compatibility; reboot after install for the boot parameter to apply.
 
 git/main "testing":

@@ -12,6 +12,7 @@ Responsibilities are intentionally limited to:
 
 Interactivity contract:
 - The documented pipe installer (`wget -qO- .../install.sh | bash -s -- ...`) must still be able to prompt in SSH/console sessions by using the controlling TTY (`/dev/tty`) when present.
+- When running the installer via an `ssh host "..."` remote command, force a pseudo-TTY with `ssh -t` (otherwise no prompts are possible).
 - For unattended runs, use `--non-interactive` (or `--skip-hostname` / `--skip-quota`) to suppress prompts.
 
 Do not move heavyweight orchestration into `install.sh`; it belongs in `update.php` and `update-step2.php`.
