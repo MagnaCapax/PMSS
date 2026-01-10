@@ -137,9 +137,13 @@ log_err(){ echo -e "${C_ERR}[ERR ]${C_RESET} $*"; }
 check_url(){
   local url="$1"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsIL "$url" >/dev/null 2>&1
+    # Prefer HEAD to avoid downloading large artifacts, but some APIs reject HEAD
+    # (observed with Radarr endpoints). Fall back to a tiny GET.
+    curl -fsIL --max-time 10 "$url" >/dev/null 2>&1 && return 0
+    curl -fsSL --max-time 10 -r 0-0 -o /dev/null "$url" >/dev/null 2>&1
   elif command -v wget >/dev/null 2>&1; then
-    wget -q --spider "$url" >/dev/null 2>&1
+    wget -q --spider --timeout=10 "$url" >/dev/null 2>&1 && return 0
+    wget -q -O /dev/null --timeout=10 --tries=1 --max-redirect=5 "$url" >/dev/null 2>&1
   else
     return 1
   fi
