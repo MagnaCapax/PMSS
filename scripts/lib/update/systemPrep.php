@@ -395,17 +395,17 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
         // the same filename. systemd merges drop-ins by filename across all
         // search paths, so /etc will override /usr/lib and prevent the 250 cap
         // from creeping back in after package updates.
-        if ($sawLegacyVendorDropin) {
-            $shadow = "# PMSS: override legacy vendor TasksMax cap (shadow 99-pmss.conf)\n[Slice]\nTasksMax=".$tasksMax."\n";
-            $shadowPath = $dropDir.'/99-pmss.conf';
+        $shadowPath = $dropDir.'/99-pmss.conf';
+        if ($sawLegacyVendorDropin || is_file($shadowPath)) {
+            $shadow = "# PMSS: override legacy TasksMax cap (shadow 99-pmss.conf)\n[Slice]\nTasksMax=".$tasksMax."\n";
             $existing = @file_get_contents($shadowPath);
             $needsWrite = $existing === false || trim((string) $existing) !== trim($shadow);
             if ($needsWrite) {
                 if (@file_put_contents($shadowPath, $shadow) !== false) {
                     @chmod($shadowPath, 0644);
-                    $log('Installed '.$shadowPath.' TasksMax override (legacy vendor drop-in shadow)');
+                    $log('Installed '.$shadowPath.' TasksMax override (legacy shadow)');
                 } else {
-                    $log('[WARN] Failed to write '.$shadowPath.' TasksMax override (legacy vendor drop-in shadow)');
+                    $log('[WARN] Failed to write '.$shadowPath.' TasksMax override (legacy shadow)');
                 }
             }
         }
@@ -474,7 +474,7 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
                         continue;
                     }
                     $currentInt = (int) $current;
-                    if ($currentInt > 0 && $currentInt <= 512 && $tasksMax > $currentInt) {
+                    if ($currentInt > 0 && $currentInt < 2048 && $tasksMax > $currentInt) {
                         runStep(
                             'Refreshing user slice runtime TasksMax :: '.$unit,
                             sprintf(
@@ -508,7 +508,7 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
     function pmssEnsureLocaleBaseline(): void
     {
         $langLocale = 'en_US.UTF-8';
-        $timeLocale = 'fi_FI.UTF-8';
+        $timeLocale = 'en_US.UTF-8';
 
         foreach ([$langLocale, $timeLocale] as $locale) {
             $enabled = pmssLocaleEnabledInGen($locale);

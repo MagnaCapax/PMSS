@@ -219,11 +219,11 @@ Sub-handlers:
 
 - pmssEnsureCgroupsConfigured(?callable $logger=null): void → appends cgroup mount to `/etc/fstab` if missing, installs `cgroup-bin`, mounts path, attempts to raise root slice PID limit.
 
-- pmssEnsureSystemdSlices(?callable $logger=null): void → writes user slice override template to `/usr/lib/systemd/system/user-.slice.d/15-pmss.conf` and `daemon-reload`.
+- pmssEnsureSystemdSlices(?callable $logger=null): void → writes user slice override template to `/etc/systemd/system/user-.slice.d/15-pmss.conf` (never vendor paths) and runs `daemon-reload`.
 
 - pmssResetCorePermissions(): void → `chmod -R 755 /etc/seedbox` and `chmod -R 750 /scripts`.
 
-- pmssEnsureLocaleBaseline(): void → ensures `en_US.UTF-8` base locale, `fi_FI.UTF-8` for time formatting, sets system timezone to `Europe/Helsinki`, and calls `generateMotd()`.
+- pmssEnsureLocaleBaseline(): void → ensures `en_US.UTF-8` base locale (including `LC_TIME`), sets system timezone to `Europe/Helsinki`, and calls `Motd::motdGenerate()`.
 
 - pmssReapplyLocaleDefinitions(): void → reuses the baseline helper to reassert locale/timezone configuration on legacy installs.
 
