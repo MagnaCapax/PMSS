@@ -38,7 +38,8 @@
  *     treats it as advisory rather than the primary control surface.
  *   - Starts the daemon via dockerd-rootless.sh using a guarded non-systemd
  *     path that has been verified to work on Debian 10/11 rootless hosts.
- *   - Logs every action to the per-user PMSS log via pmssUserLog().
+ *   - Logs per-user actions via pmssUserLog(); noisy no-op runs are logged
+ *     only when `--debug` is passed.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -49,13 +50,20 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/log.php';
 
-if ($argc < 3) {
-    fwrite(STDERR, "Usage: /scripts/util/userDocker.php USER {start|stop|restart|status}\n");
+$args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
+$debug = in_array('--debug', $args, true);
+$args = array_values(array_filter($args, static function ($arg) {
+    return $arg !== '--debug';
+}));
+$effectiveArgc = count($args);
+
+if ($effectiveArgc < 3) {
+    fwrite(STDERR, "Usage: /scripts/util/userDocker.php USER {start|stop|restart|status} [--debug]\n");
     exit(1);
 }
 
-$user = $argv[1];
-$action = strtolower($argv[2]);
+$user = $args[1];
+$action = strtolower($args[2]);
 $valid = ['start', 'stop', 'restart', 'status'];
 if (!in_array($action, $valid, true)) {
     fwrite(STDERR, "Invalid action: {$action}\n");
@@ -72,7 +80,9 @@ if ($info === false || !isset($info['uid'])) {
 $uid = (int) $info['uid'];
 $dockerSock = "/run/user/{$uid}/docker.sock";
 
-pmssUserLog($user, sprintf('userDocker: action=%s requested', $action));
+if ($debug) {
+    pmssUserLog($user, sprintf('userDocker: action=%s requested', $action));
+}
 
 // Helper to execute a command as the target user via su.
 function userDockerRunAs(string $user, string $cmd): string
@@ -140,7 +150,9 @@ if ($action === 'start' || $action === 'restart') {
     // launch dockerd-rootless.sh directly. Systemd user-service mode remains
     // observable via status() but is not the primary start path yet.
     if (file_exists($dockerSock)) {
-        pmssUserLog($user, 'userDocker: docker socket already present; assuming daemon running, skipping start');
+        if ($debug) {
+            pmssUserLog($user, 'userDocker: docker socket already present; assuming daemon running, skipping start');
+        }
         echo "Docker socket already present for {$user}; assuming running\n";
         exit(0);
     }

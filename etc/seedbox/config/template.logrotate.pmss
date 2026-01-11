@@ -1,4 +1,4 @@
-/var/log/pmss-update.log /var/log/pmss-update.jsonl /var/log/pmss-update.profile.json /var/log/pmss/update.log /var/log/pmss/userDbCleanup.log {
+/var/log/pmss-update.log /var/log/pmss-update.jsonl /var/log/pmss-update.profile.json /var/log/pmss/update.log {
     daily
     rotate 7
     missingok
@@ -9,7 +9,31 @@
     sharedscripts
 }
 
+/var/log/pmss/userDbCleanup.log {
+    daily
+    rotate 7
+    minsize 1M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    sharedscripts
+}
+
 /var/log/pmss/checkWireguard.log {
+    daily
+    rotate 7
+    minsize 1M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    sharedscripts
+}
+
+/var/log/pmss/user/*.log /var/log/pmss/users/*.log {
     daily
     rotate 7
     minsize 1M

@@ -2,7 +2,7 @@
 /**
  * Per-user action logging helper.
  *
- * Appends timestamped lines to /var/log/pmss/users/<username>.log and mirrors
+ * Appends timestamped lines to /var/log/pmss/user/<username>.log and mirrors
  * entries into the consolidated users.log/users.jsonl stream when available.
  * Keep this helper dependency-free so it can be used from cron scripts easily.
  */
@@ -10,12 +10,33 @@
 if (!function_exists('pmssUserLogFile')) {
     function pmssUserLogFile(string $user): string
     {
-        $dir = '/var/log/pmss/users';
+        $base = '/var/log/pmss';
+        $dir = $base.'/user';
+        $legacyDir = $base.'/users';
         if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+            if (is_dir($legacyDir) && !file_exists($dir)) {
+                @rename($legacyDir, $dir);
+            }
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+        }
+
+        if (!is_dir($dir)) {
+            $dir = $legacyDir;
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
         }
         $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $user);
-        return rtrim($dir, '/').'/'.$safe.'.log';
+        $path = rtrim($dir, '/').'/'.$safe.'.log';
+
+        $legacyFlat = $base.'/user-'.$safe.'.log';
+        if (!file_exists($path) && is_file($legacyFlat)) {
+            @rename($legacyFlat, $path);
+        }
+
+        return $path;
     }
 }
 
