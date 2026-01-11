@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 echo date('Y-m-d H:i:s') . ': Checking quota and fixing' . "\n";
 

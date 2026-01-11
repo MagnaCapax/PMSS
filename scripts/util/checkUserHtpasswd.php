@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Synchronise legacy global lighttpd htpasswd entries to per-user instances.

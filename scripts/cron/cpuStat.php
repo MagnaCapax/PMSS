@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 // Gather iostat information from disks
 $cpuStatLogFile = '/var/run/pmss/cpustat';

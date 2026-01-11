@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Cron watchdog ensuring each user retains a web GUI entry point.

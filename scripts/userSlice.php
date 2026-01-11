@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * userSlice.php USERNAME
@@ -87,4 +87,3 @@ if (!empty($cgroup)) {
 }
 
 exit(0);
-

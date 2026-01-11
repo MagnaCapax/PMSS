@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Normalise legacy user home permissions for ruTorrent and Lighttpd artefacts.

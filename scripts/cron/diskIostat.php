@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 $debianVersion = file_get_contents('/etc/debian_version');
 // Are we running debian 7/8 or Debian 10?

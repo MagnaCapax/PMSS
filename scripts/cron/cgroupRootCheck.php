@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Ensure root (user-0.slice) is not limited by memory/tasks policies.

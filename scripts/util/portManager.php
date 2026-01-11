@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 $usage = "Usage: portManager.php [view|assign|release] USER [SERVICE]\n";
 if ($argc < 3) die($usage);

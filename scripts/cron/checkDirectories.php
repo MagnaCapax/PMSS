@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 // Checks and creates required temp directories used by other cron jobs.
 const LOG_FILE     = '/var/log/pmss/checkDirectories.log';
@@ -30,5 +30,4 @@ foreach($requiredDirectories AS $thisDir) {
     // Directories need the execute bit to be traversable
     chmod($thisDir, 0700);
 }
-
 

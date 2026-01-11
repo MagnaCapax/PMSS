@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 // Ensure rootless Docker daemon is running for each user
 

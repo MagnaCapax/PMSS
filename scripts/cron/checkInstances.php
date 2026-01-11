@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 // Check that rTorrent instances are running, start if not
 echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";

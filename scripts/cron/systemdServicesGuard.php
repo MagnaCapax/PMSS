@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Enforce that unwanted system-wide services stay stopped/disabled/masked.

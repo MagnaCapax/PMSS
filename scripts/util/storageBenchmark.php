@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * storageBenchmark.php — Non-destructive storage benchmark (fio wrapper)

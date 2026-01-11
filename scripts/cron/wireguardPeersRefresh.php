@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Periodic WireGuard peer refresh based on per-user ~/.wireguard-public-key files.

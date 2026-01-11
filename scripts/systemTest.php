@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * systemTest.php
@@ -14,4 +14,3 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__.'/util/systemTest.php';
-

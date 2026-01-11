@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 $logFileDirectory = '/var/run/pmss/smart';
 // Get list of blockdevices

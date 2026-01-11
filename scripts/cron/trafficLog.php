@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 // Cron job log file paths match the cron schedule in root.cron
 const LOG_FILE     = '/var/log/pmss/trafficLog.log';

@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Tracker cleanup script — remove known bad/dead trackers from rTorrent sessions.

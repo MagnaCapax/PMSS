@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * userDocker.php USER ACTION
@@ -20,4 +20,3 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__.'/util/userDocker.php';
-

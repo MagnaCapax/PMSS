@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /* Check traffic limits */
 require_once '/scripts/lib/rtorrentXmlrpc.php';

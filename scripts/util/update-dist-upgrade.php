@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Thin wrapper that triggers the Debian dist-upgrade helpers.

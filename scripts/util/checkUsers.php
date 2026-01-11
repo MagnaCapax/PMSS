@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Compare PMSS user database entries against home directories and /etc/passwd.

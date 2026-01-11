@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
  * Storage health snapshot (SMART/NVMe + mdadm) to JSONL (safe for cron).

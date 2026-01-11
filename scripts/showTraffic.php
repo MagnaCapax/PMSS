@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 require_once '/scripts/lib/traffic.php';
 $trafficStatistics = new trafficStatistics;

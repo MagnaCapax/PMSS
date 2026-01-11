@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 // Local key is to receive commands
 if (!file_exists('/etc/seedbox/config/api.localKey')) {
@@ -43,4 +43,3 @@ if (!file_exists('/etc/seedbox/config/api.remoteKey')) {
  chmod('/etc/seedbox/config/api.remoteKey', '600');
 }
     
-

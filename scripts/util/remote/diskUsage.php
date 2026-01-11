@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 
 $df = shell_exec('df /home | awk \'{ print $2,$3,$4 }\' | tail -n 1');

@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 // Configure Ip tables rules for monitoring network traffic usage
 
@@ -48,5 +48,4 @@ if ($localnets !== false &&
         echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -j ACCEPT\n";
 
     }
-
 
