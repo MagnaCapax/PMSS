@@ -2,7 +2,7 @@
 /**
  * Per-user action logging helper.
  *
- * Appends timestamped lines to /var/log/pmss/user/<username>.log and mirrors
+ * Appends timestamped lines to /var/log/pmss/users/<username>.log and mirrors
  * entries into the consolidated users.log/users.jsonl stream when available.
  * Keep this helper dependency-free so it can be used from cron scripts easily.
  */
@@ -11,8 +11,8 @@ if (!function_exists('pmssUserLogFile')) {
     function pmssUserLogFile(string $user): string
     {
         $base = '/var/log/pmss';
-        $dir = $base.'/user';
-        $legacyDir = $base.'/users';
+        $dir = $base.'/users';
+        $legacyDir = $base.'/user';
         if (!is_dir($dir)) {
             if (is_dir($legacyDir) && !file_exists($dir)) {
                 @rename($legacyDir, $dir);

@@ -22,7 +22,7 @@ Long-running PMSS operations should emit structured logs for traceability.
 - JSON events: `/var/log/pmss-update.jsonl`
 - Per-user action logs:
   - Consolidated stream: `/var/log/pmss/users.log` + `/var/log/pmss/users.jsonl` (JSONL), emitted via `userLifecycle` helpers.
-  - Per-user files: `/var/log/pmss/user/<username>.log` (best-effort text lines for actions taken on behalf of users).
+  - Per-user files: `/var/log/pmss/users/<username>.log` (best-effort text lines for actions taken on behalf of users).
 
 ## Runbooks
 See `docs/runbooks/update-failures.md` for quick diagnosis steps.

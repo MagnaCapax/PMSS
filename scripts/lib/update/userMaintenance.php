@@ -136,7 +136,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
 if (!function_exists('pmssEnsureLingerAndDocker')) {
     /**
      * Enable linger, (re)start user@UID systemd instance, and kick rootless Docker for a user.
-     * Logs detailed command output to `/var/log/pmss/user/<username>.log` via `pmssUserLog()`.
+     * Logs detailed command output to `/var/log/pmss/users/<username>.log` via `pmssUserLog()`.
      *
      * #TODO(docker-linger-split): Refactor into separate helpers so linger/systemd
      * setup and Docker start/status are handled by distinct functions. This will
