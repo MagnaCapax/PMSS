@@ -103,6 +103,51 @@ function pmssCheckRtorrentPgrepFull(string $user, string $pattern): array
 }
 
 /**
+ * Locate executor-related processes, separating the php wrapper from the
+ * detached screen session.
+ *
+ * Healthy rTorrent typically includes BOTH:
+ * - screen (comm: SCREEN) and
+ * - php (comm: php/phpX.Y) running .rtorrentExecute.php
+ *
+ * @return array{php:int[],screen:int[],all:int[]}
+ */
+function pmssCheckRtorrentExecutorPids(string $user): array
+{
+    $out = [];
+    $rc = 0;
+    @exec('ps -u '.escapeshellarg($user).' -o pid=,comm=,args=', $out, $rc);
+    if ($rc !== 0) {
+        return ['php' => [], 'screen' => [], 'all' => []];
+    }
+
+    $php = [];
+    $screen = [];
+    $all = [];
+    foreach ($out as $line) {
+        $line = trim((string) $line);
+        if ($line === '' || strpos($line, 'rtorrentExecute.php') === false) {
+            continue;
+        }
+        if (!preg_match('/^(\\d+)\\s+(\\S+)\\s+(.+)$/', $line, $m)) {
+            continue;
+        }
+        $pid = (int) $m[1];
+        if ($pid <= 0) {
+            continue;
+        }
+        $comm = strtolower((string) $m[2]);
+        $all[] = $pid;
+        if (strpos($comm, 'php') === 0) {
+            $php[] = $pid;
+        } elseif (strpos($comm, 'screen') !== false) {
+            $screen[] = $pid;
+        }
+    }
+    return ['php' => $php, 'screen' => $screen, 'all' => $all];
+}
+
+/**
  * Capture a process snapshot for a user.
  *
  * @return string[]
@@ -215,27 +260,33 @@ foreach ($usersOut as $line) {
         continue;
     }
 
-    $executorPids = pmssCheckRtorrentPgrepFull($user, 'rtorrentExecute\\.php');
+    $executor = pmssCheckRtorrentExecutorPids($user);
+    $executorPhpPids = $executor['php'];
+    $executorScreenPids = $executor['screen'];
+    $executorAllPids = $executor['all'];
     $rtorrentPids = pmssCheckRtorrentPgrepExact($user, 'rtorrent');
+    $executorPresent = !empty($executorPhpPids);
 
     $missingState = $stateDir.'/checkRtorrent-executor-present-rtorrent-missing-'.$user.'.ts';
-    if (!empty($rtorrentPids) || empty($executorPids)) {
+    if (!empty($rtorrentPids) || !$executorPresent) {
         if (is_file($missingState)) {
             @unlink($missingState);
         }
     }
 
     // Multiple executor/rtorrent processes are always anomalous; converge to one.
-    if (count($executorPids) > 1 || count($rtorrentPids) > 1) {
+    if (count($executorPhpPids) > 1 || count($executorScreenPids) > 1 || count($rtorrentPids) > 1) {
         pmssCheckRtorrentLog(
-            "Anomaly for {$user}: executors=".count($executorPids).' rtorrent='.count($rtorrentPids).'; restarting cleanly',
+            "Anomaly for {$user}: php_exec=".count($executorPhpPids).' screen_exec='.count($executorScreenPids)
+                .' rtorrent='.count($rtorrentPids).'; restarting cleanly',
             true,
             $debug
         );
         if (function_exists('pmssUserLog')) {
             pmssUserLog(
                 $user,
-                'checkRtorrent: anomaly detected; restarting (executors='.count($executorPids).' rtorrent='.count($rtorrentPids).')'
+                'checkRtorrent: anomaly detected; restarting (php_exec='.count($executorPhpPids)
+                    .' screen_exec='.count($executorScreenPids).' rtorrent='.count($rtorrentPids).')'
             );
         }
 
@@ -246,11 +297,11 @@ foreach ($usersOut as $line) {
         }
 
         // Stop processes (best-effort): terminate then hard-kill after a grace period.
-        pmssCheckRtorrentKillPids(array_merge($rtorrentPids, $executorPids), SIGTERM);
+        pmssCheckRtorrentKillPids(array_merge($rtorrentPids, $executorAllPids), SIGTERM);
         sleep(3);
         $rtorrentPids = pmssCheckRtorrentPgrepExact($user, 'rtorrent');
-        $executorPids = pmssCheckRtorrentPgrepFull($user, 'rtorrentExecute\\.php');
-        pmssCheckRtorrentKillPids(array_merge($rtorrentPids, $executorPids), SIGKILL);
+        $executorAllPids = pmssCheckRtorrentExecutorPids($user)['all'];
+        pmssCheckRtorrentKillPids(array_merge($rtorrentPids, $executorAllPids), SIGKILL);
         sleep(1);
 
         $rc = 0;
@@ -267,7 +318,7 @@ foreach ($usersOut as $line) {
     }
 
     // No executor and no rTorrent: start.
-    if (empty($executorPids) && empty($rtorrentPids)) {
+    if (!$executorPresent && empty($rtorrentPids)) {
         pmssCheckRtorrentLog("rTorrent missing for {$user}; starting", true, $debug);
         if (function_exists('pmssUserLog')) {
             pmssUserLog($user, 'checkRtorrent: rTorrent missing; starting');
@@ -294,7 +345,7 @@ foreach ($usersOut as $line) {
 
     // Executor present but rTorrent missing: likely a transient crash/restart
     // window. Only intervene if it persists for multiple cron runs.
-    if (!empty($executorPids) && empty($rtorrentPids)) {
+    if ($executorPresent && empty($rtorrentPids)) {
         $now = time();
         $firstSeen = 0;
         if (is_file($missingState)) {
@@ -332,10 +383,10 @@ foreach ($usersOut as $line) {
         }
 
         // Kill executor processes only; rTorrent is already missing.
-        pmssCheckRtorrentKillPids($executorPids, SIGTERM);
+        pmssCheckRtorrentKillPids($executorAllPids, SIGTERM);
         sleep(3);
-        $executorPids = pmssCheckRtorrentPgrepFull($user, 'rtorrentExecute\\.php');
-        pmssCheckRtorrentKillPids($executorPids, SIGKILL);
+        $executorAllPids = pmssCheckRtorrentExecutorPids($user)['all'];
+        pmssCheckRtorrentKillPids($executorAllPids, SIGKILL);
         sleep(1);
 
         $rc = 0;

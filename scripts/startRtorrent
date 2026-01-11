@@ -74,7 +74,7 @@ if ($rc === 0 && !empty($rtorrentPids)) {
 
 $executorPids = [];
 $rc = 0;
-@exec('pgrep -u '.escapeshellarg($user).' -f rtorrentExecute\\.php', $executorPids, $rc);
+@exec('pgrep -u '.escapeshellarg($user).' -f '.escapeshellarg('php.*rtorrentExecute\\.php'), $executorPids, $rc);
 if ($rc === 0 && !empty($executorPids)) {
     logmsg("Executor already running for {$user} but rtorrent missing; refusing to start another executor");
     exit(0);
