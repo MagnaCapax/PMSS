@@ -21,10 +21,11 @@
     sharedscripts
 }
 
-/var/log/pmss/checkWireguard.log {
-    daily
+/var/log/pmss/check*.log {
+    monthly
     rotate 7
     minsize 1M
+    maxsize 64M
     missingok
     notifempty
     compress

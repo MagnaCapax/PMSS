@@ -1,111 +1,28 @@
 #!/usr/bin/env php
 <?php
-// Check that rTorrent instances are running, start if not
-echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
+/**
+ * Back-compat wrapper.
+ *
+ * Historically this watchdog was named checkInstances.php. It has been renamed
+ * to checkRtorrent.php to better reflect its responsibility. Keep this entry
+ * point so older cron templates and custom automation do not break.
+ */
 
-// Get & parse users list
-$users = shell_exec('/scripts/listUsers.php');
-$users = explode("\n", trim($users));
-$changedConfig = array();
-
-
-foreach($users AS $thisUser) {    // Loop users checking their instances
-    #TODO(user-logs): log per-user start/kill actions to /var/log/pmss/user-<username>.log
-    if (empty($thisUser)) continue;
-    $escapedUser = escapeshellarg($thisUser);
-    
-        // if user is suspended, skip it
-    if (file_exists("/home/{$thisUser}/www-disabled") or 
-        !file_exists("/home/{$thisUser}/www") ) {
-            echo "User: {$thisUser} is suspended\n";
-            passthru('killall -9 -u ' . $escapedUser);  // Ensure nothing for the user is running
-            #TODO(user-logs): record suspension cleanup in per-user log
-            continue;  //Suspended
-    }
-    //echo "Checking: {$thisUser}\n";
-    
-    $rtorrentLock = null;
-    $start = false;
-    $pid = null;
-    
-    $instances = shell_exec('pgrep -u ' . $escapedUser . ' -f rtorrentExecute.php');
-    $rtorrentMain = trim((string)shell_exec('pgrep -u ' . $escapedUser . ' -x rtorrent'));
-    //echo "Instances:\n{$instances}\n";
-
-    // Let's check socket file
-    if (!file_exists("/home/{$thisUser}/.rtorrent.socket")) {
-        if (!empty($instances)) {
-            shell_exec('killall -9 -u ' . $escapedUser . ' ' . escapeshellarg('rtorrent main'));
-        }
-        $instances = '';
-    }
-
-    if(empty($instances)) {    // No instances at all? Ok time to start rTorrent!
-        if (!empty($rtorrentMain)) {
-            echo "rTorrent running for user {$thisUser} but executor missing; skip duplicate start\n";
-            continue;
-        }
-        start($thisUser);
-        #TODO(user-logs): record restart in per-user log
-        continue;
-    }
-    if (empty($rtorrentMain)) {
-        echo "Executor present but rTorrent missing for user {$thisUser}; restarting\n";
-        start($thisUser);
-        continue;
-    }
-   
-/* DO WE REALLY need to check also pid file? removed for now -Aleksi 24/02/2021
- 
-        // User got processes, let's check via lock file and ensure it is actually running
-    if (file_exists("/home/{$thisUser}/session/rtorrent.lock")) {
-         $rtorrentLock = file_get_contents("/home/{$thisUser}/session/rtorrent.lock");
-         //echo "rTorrentLock: {$rtorrentLock}\n";
-         
-         if (!empty($rtorrentLock)) {
-                // The fileformat is actually simple  :)
-             $pid = explode(':+', trim($rtorrentLock) );
-             $pid = $pid[1];
-             //echo("PID:" . $pid . "\nInstances: " . $instances . "\n");
-
-             if (strpos($instances, $pid) === false) {    // No running instance found!
-                 start($thisUser);
-             }
-         } else {
-            echo "No certainty, killall!\n";
-            passthru('killall -u ' . $escapedUser);
-            sleep(3); // We got to wait to make certain kill was success.
-            
-            start($thisUser);
-            continue;
-        }
-    } else {    // Process is running, but no (valid or otherwise) lock file
-        
-        echo "No lock file found! Killall, restart.\n";
-        #TODO(user-logs): record lockfile mismatch and restart in per-user log
-        passthru('killall -9 -u ' . $escapedUser . ' ' . escapeshellarg('rtorrent main'));
-        passthru('killall -9 -u ' . $escapedUser . ' ' . escapeshellarg('/usr/local/bin/rtorrent'));
-        sleep(3);
-        start($thisUser);
-    }
-
-*/
-
-    
-    // Check .rtorrent.rc ownership
-    if (file_exists("/home/{$thisUser}/.rtorrent.rc")) {
-        $owner = posix_getpwuid( fileowner("/home/{$thisUser}/.rtorrent.rc") );
-        if ($owner['name'] != 'root') $changedConfig[] = $thisUser . ' -> ' . $owner['name'];
-    }
-
+$target = __DIR__.'/checkRtorrent.php';
+if (!is_file($target)) {
+    fwrite(STDERR, date('c')." ERROR: {$target} missing; cannot run rTorrent watchdog\n");
+    exit(1);
 }
 
-if (count($changedConfig) != 0) {
-    file_put_contents('/root/changedConfigs', implode("\n", $changedConfig));
-} elseif (file_exists('/root/changedConfigs')) unlink('/root/changedConfigs');
+$args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
+array_shift($args);
 
-function start($user) {    // this actually calls the function to start rTorrent :)
-    echo "Starting rTorrent for user: {$user}\n";
-    passthru('/scripts/startRtorrent ' . escapeshellarg($user));
-    sleep(1);
+$cmd = escapeshellarg($target);
+foreach ($args as $arg) {
+    $cmd .= ' '.escapeshellarg((string) $arg);
 }
+
+$rc = 0;
+passthru($cmd, $rc);
+exit($rc);
+

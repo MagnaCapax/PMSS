@@ -48,7 +48,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `checkDelugeInstances.php` – Ensure Deluge daemons stay running when enabled.
 - `checkDirectories.php` – Repair expected directory hierarchy if it drifts.
 - `checkGui.php` – Verify the management GUI responds.
-- `checkInstances.php` – Monitor rTorrent instances and restart as needed.
+- `checkRtorrent.php` – Monitor rTorrent instances and restart as needed.
 - `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair.
 - `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
 - `checkRcloneInstances.php` – Maintain rclone mount processes.

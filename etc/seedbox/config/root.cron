@@ -3,7 +3,7 @@ SHELL=/bin/bash
 
 
 # m h  dom mon dow   command
-*/2 * * * *    root /scripts/cron/checkInstances.php >> /var/log/pmss/checkInstances.log 2>&1
+*/2 * * * *    root /scripts/cron/checkRtorrent.php >> /var/log/pmss/checkRtorrent.log 2>&1
 * * * * *    root sleep 45; /scripts/cron/checkLighttpdInstances.php >> /var/log/pmss/checkLighttpdInstances.log 2>&1
 5 */2 * * *    root sleep 75; /scripts/cron/userTrackerCleaner.php >> /var/log/pmss/userTrackerCleaner.log 2>&1
 * * * * *    root sleep 45; /scripts/cron/checkDelugeInstances.php >> /var/log/pmss/checkDelugeInstances.log 2>&1
@@ -51,7 +51,7 @@ SHELL=/bin/bash
 @reboot root    /scripts/cron/checkDirectories.php >> /dev/null 2>&1
 @reboot root    sleep 1; /scripts/util/setupNetwork.php >> /var/log/pmss/setupNetwork.log 2>&1
 @reboot root    sleep 5; /scripts/cron/checkLighttpdInstances.php >> /var/log/pmss/checkLighttpdInstances.log 2>&1
-@reboot root    sleep 10; /scripts/cron/checkInstances.php >> /var/log/pmss/checkInstances.log 2>&1
+@reboot root    sleep 10; /scripts/cron/checkRtorrent.php >> /var/log/pmss/checkRtorrent.log 2>&1
 @reboot root    sleep 15; /scripts/util/motdGenerate.php >> /var/log/pmss/motdGenerate.log 2>&1
 @reboot root    sleep 20; /scripts/cron/cgroupRootCheck.php >> /var/log/pmss/cgroupRootCheck.log 2>&1
 @reboot root    sleep 25; /scripts/cron/systemdServicesGuard.php >> /var/log/pmss/systemdServicesGuard.log 2>&1

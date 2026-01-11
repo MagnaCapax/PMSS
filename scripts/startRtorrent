@@ -18,20 +18,66 @@ if ($argc !== 2) {
 
 $user = $argv[1];
 
-// Basic sanity checks so operators get immediate feedback instead of silent exits.
-if (!file_exists('/home/' . $user)) {
+// Validate username defensively even when invoked from internal scripts.
+// Treat any internal tool output as untrusted (ADR 0005).
+$userLifecycleLib = __DIR__.'/lib/userLifecycle.php';
+$validUser = false;
+if (is_file($userLifecycleLib)) {
+    require_once $userLifecycleLib;
+    if (function_exists('pmssValidateUsername')) {
+        $validUser = pmssValidateUsername($user);
+    }
+}
+if (!$validUser) {
+    $validUser = (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $user);
+}
+if (!$validUser) {
     logmsg("Invalid username: {$user}");
     exit(1);
 }
-if (!is_dir('/home/' . $user)) {
-    logmsg("User home is not a directory: /home/{$user}");
+
+$home = '/home/'.$user;
+
+// Basic sanity checks so operators get immediate feedback instead of silent exits.
+if (!is_dir($home)) {
+    logmsg("User home is not a directory: {$home}");
     exit(1);
 }
 
-$userConfig = '/home/' . $user . '/.rtorrent.rc';
+$userConfig = $home.'/.rtorrent.rc';
 if (!file_exists($userConfig)) {
     logmsg('User does not have rtorrent configuration - rTorrent maybe disabled');
     exit(1);
+}
+
+// Make start idempotent and race-safe: multiple cron/watchdog invocations must
+// converge to a single screen+executor+rTorrent process set.
+$lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
+$lockPath = $lockBase.'/pmss-startRtorrent-'.$user.'.lock';
+$lockHandle = @fopen($lockPath, 'c');
+if ($lockHandle === false) {
+    logmsg("[WARN] Failed to open lock file {$lockPath}; refusing to start rTorrent");
+    exit(1);
+}
+if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    logmsg("[INFO] Another startRtorrent is already running for {$user}; skipping");
+    exit(0);
+}
+
+$rtorrentPids = [];
+$rc = 0;
+@exec('pgrep -u '.escapeshellarg($user).' -x rtorrent', $rtorrentPids, $rc);
+if ($rc === 0 && !empty($rtorrentPids)) {
+    logmsg("rTorrent already running for {$user}; skipping start");
+    exit(0);
+}
+
+$executorPids = [];
+$rc = 0;
+@exec('pgrep -u '.escapeshellarg($user).' -f rtorrentExecute\\.php', $executorPids, $rc);
+if ($rc === 0 && !empty($executorPids)) {
+    logmsg("Executor already running for {$user} but rtorrent missing; refusing to start another executor");
+    exit(0);
 }
 
 // Check that the optional localnet filter file is readable for the user.
@@ -39,7 +85,7 @@ if (!file_exists($userConfig)) {
 //   "Could not open ip filter file: /etc/seedbox/config/localnet"
 $localnet = '/etc/seedbox/config/localnet';
 if (file_exists($localnet)) {
-    $checkCmd = "su {$user} -c 'test -r {$localnet}'";
+    $checkCmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('test -r '.$localnet);
     $output = [];
     $rc = 0;
     exec($checkCmd, $output, $rc);
@@ -50,21 +96,58 @@ if (file_exists($localnet)) {
 }
 
 // Check if session directory exists - if not create it.
-if (!file_exists('/home/' . $user . '/session')) {
+if (!is_dir($home.'/session')) {
     logmsg("Creating rTorrent session directory for {$user}");
-    passthru("cd /home/{$user}; su {$user} -c 'mkdir session'");
+    @mkdir($home.'/session', 0755, true);
+    @chown($home.'/session', $user);
+    if (function_exists('posix_getpwnam')) {
+        $pw = @posix_getpwnam($user);
+        if (is_array($pw) && isset($pw['gid'])) {
+            @chgrp($home.'/session', (int) $pw['gid']);
+        }
+    }
 }
 
 // Finally execute rTorrent inside a screen session.
-if (!file_exists('/home/' . $user . '/.rtorrentExecute.php')) {
+$executor = $home.'/.rtorrentExecute.php';
+if (!file_exists($executor)) {
     // If old version of master GUI, call rTorrent directly.
     logmsg("Starting rTorrent for {$user} (legacy mode)");
-    passthru("cd /home/{$user}; rm -rf session/rtorrent.*; su {$user} -c 'screen -S rtorrent -fa -d -m rtorrent'; cd -;");
+    $sessionPrefix = $home.'/session/rtorrent.';
+    $candidates = glob($sessionPrefix.'*');
+    if (is_array($candidates)) {
+        foreach ($candidates as $path) {
+            if (strpos($path, $sessionPrefix) !== 0) {
+                continue;
+            }
+            if (is_file($path) || is_link($path)) {
+                @unlink($path);
+            }
+        }
+    }
+    $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m rtorrent');
+    passthru($cmd);
 } else {
     // Newer versions use .rtorrentExecute.php wrapper.
     logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
-    passthru("cd /home/{$user}; su {$user} -c 'screen -S rtorrent -fa -d -m ./.rtorrentExecute.php'");
+    $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m ./.rtorrentExecute.php');
+    passthru($cmd);
 }
 
-// Output running processes so operators can see whether rTorrent or the wrapper stayed up.
-passthru("ps aux|grep {$user}");
+// Output a small process snapshot so operators can see whether rTorrent or the
+// wrapper stayed up, without relying on grep parsing.
+$psLines = [];
+$psRc = 0;
+@exec('ps -u '.escapeshellarg($user).' -o pid=,ppid=,stat=,lstart=,comm=,args=', $psLines, $psRc);
+if ($psRc === 0 && !empty($psLines)) {
+    logmsg('Process snapshot (rtorrent/screen/php wrapper):');
+    foreach ($psLines as $line) {
+        $haystack = strtolower($line);
+        if (strpos($haystack, 'rtorrent') === false
+            && strpos($haystack, 'rtorrentexecute') === false
+            && strpos($haystack, 'screen') === false) {
+            continue;
+        }
+        logmsg(trim($line));
+    }
+}

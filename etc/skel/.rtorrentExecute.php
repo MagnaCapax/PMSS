@@ -1,41 +1,50 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /**
-* PMSS: Start rTorrent
+* PMSS: Start and supervise rTorrent
 *
 * Copyright (C) 2010-2024 Magna Capax Finland Oy
 **/
 require_once '.scriptsInc.php';
 
+// Ensure we never run multiple executors for the same user. Multiple executors
+// will spawn multiple rtorrent processes and corrupt the session directory.
+$lockHandle = @fopen('.rtorrentExecute.lock', 'c');
+if ($lockHandle === false) {
+  writeLog('ERROR: failed to open .rtorrentExecute.lock (executor exiting)');
+  exit(1);
+}
+if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+  writeLog('executor already running; exiting');
+  exit(0);
+}
+
 writeLog('executor started');
-sleep(round(Rand(2,8))); // avoid flooding a bit.
+sleep((int) round(rand(2, 8))); // avoid flooding a bit.
 
-// Infinite Loop -- Always keep watching that pesky little flaky rTorrent
-while(1==1) {
-  writeLog('executing rTorrent');
-  file_put_contents('.rtorrentExecuteRun', time());
+// Resolve UID for safe pgrep usage (avoid relying on `whoami` parsing).
+$uid = function_exists('posix_getuid') ? (int) posix_getuid() : (int) getmyuid();
 
-  // rtorrent running?
-  $rtorrentRunning = (int) trim(shell_exec('pgrep -u$(whoami) -c "rtorrent main"'));
-  if ($rtorrentRunning == 1) { writeLog("rtorrent running, executor likely too. Discontinuing"); die(); }	// rtorrent running
+// Infinite loop: start rTorrent and restart when it exits.
+while (true) {
+  file_put_contents('.rtorrentExecuteRun', (string) time());
 
-  //Multiple processes?
-  if ($rtorrentRunning >= 1) {
-    writeLog('multiple rtorrent processes, killing all processes');
-    shell_exec('killall -u$(whoami) "rtorrent main"; sleep 3; killall -u$(whoami) "rtorrent main"; sleep 3;');
+  // If rTorrent is already running (started elsewhere), do not start another.
+  $rtorrentPids = [];
+  $rc = 0;
+  @exec('pgrep -u '.(int) $uid.' -x rtorrent', $rtorrentPids, $rc);
+  if ($rc === 0 && !empty($rtorrentPids)) {
+    writeLog('rtorrent already running; refusing to start a duplicate instance (executor exiting)');
+    exit(0);
   }
 
   // Clear process runtime of the session, otherwise ... issues.
   system('rm -rf ~/session/rtorrent.*');
 
-  // Actually start rtorrent -- but not via nohup, therefore keeping this rtorrent execute script running too for quick restarts
-  passthru('rtorrent');
-  writeLog('rTorrent shutdown... Sleeping 5 seconds and restarting');
+  writeLog('starting rtorrent');
+  $rtorrentRc = 0;
+  passthru('rtorrent', $rtorrentRc);
+  writeLog('rtorrent exited (rc='.$rtorrentRc.'); sleeping 5 seconds then restarting');
   sleep(5); // avoid overloading the server
-
-  $lastRun = file_get_contents('.rtorrentExecuteRun');
-  if ( (time() - $lastRun) < 15 ) die(writeLog('There as another executor running, exiting... or we are in infinite restart loop') );
-
-  
 }
 
