@@ -24,7 +24,9 @@ Typical workflow:
    treated as a trusted LAN, and routing between tenants is controlled centrally.
 
 A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded and
-`wg-quick@wg0` remains active. Logs are available in `/var/log/pmss/checkWireguard.log`.
+`wg-quick@wg0` remains active. Logs are written to `/var/log/pmss/checkWireguard.log`
+when taking action (module load/restart); use `checkWireguard.php --debug` to
+also log healthy checks.
 
 Endpoint detection prefers resolving the host's FQDN and falls back to a public
 IP lookup plus interface inspection. Make sure the hostname resolves externally

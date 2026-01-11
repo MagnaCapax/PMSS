@@ -22,8 +22,8 @@ healthy between full update runs:
   exit unexpectedly. Logs to `/var/log/pmss/rootlessDocker.log`.
   `*/5 * * * * root /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1`
 - **WireGuard health check** – Ensures the WireGuard kernel module is loaded
-  and `wg-quick@wg0` stays active. Logs to
-  `/var/log/pmss/checkWireguard.log`.
+  and `wg-quick@wg0` stays active. Logs to `/var/log/pmss/checkWireguard.log`
+  when taking action (module load/restart) or when `--debug` is passed.
   `*/5 * * * * root /scripts/cron/checkWireguard.php >> /var/log/pmss/checkWireguard.log 2>&1`
 - **System service hardening guard** – Reasserts that unwanted system-wide
   daemons stay stopped/disabled/masked (e.g. apache2/deluged/deluge-web/exim4/transmission-daemon/redis-server).

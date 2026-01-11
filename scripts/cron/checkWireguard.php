@@ -5,10 +5,15 @@
  */
 // #TODO(user-logs): when taking user-impacting actions, log to per-user logs if a mapping exists
 
+$args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
+$debug = in_array('--debug', $args, true);
+
 $logPrefix = date('c') . ' ';
 $config = '/etc/wireguard/wg0.conf';
 if (!file_exists($config)) {
-    echo $logPrefix . "wireguard config missing; skipping check\n";
+    if ($debug) {
+        echo $logPrefix . "wireguard config missing; skipping check\n";
+    }
     exit(0);
 }
 
@@ -25,7 +30,9 @@ if ($moduleStatus !== 0) {
 if (is_dir('/run/systemd/system')) {
     exec('systemctl is-active --quiet wg-quick@wg0', $out, $status);
     if ($status === 0) {
-        echo $logPrefix . "wg-quick@wg0 active\n";
+        if ($debug) {
+            echo $logPrefix . "wg-quick@wg0 active\n";
+        }
         exit(0);
     }
     echo $logPrefix . "wg-quick@wg0 inactive, attempting restart\n";
@@ -46,6 +53,8 @@ if (is_dir('/run/systemd/system')) {
             echo $logPrefix . "failed to bring up wg0 (rc={$rc})\n";
         }
     } else {
-        echo $logPrefix . "wg show reports interface active\n";
+        if ($debug) {
+            echo $logPrefix . "wg show reports interface active\n";
+        }
     }
 }

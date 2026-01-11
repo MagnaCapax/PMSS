@@ -124,8 +124,8 @@ class installMediaStackScriptTest extends TestCase
 
     public function testCheckUrlUsesCurlOrWget(): void
     {
-        $this->assertStringContainsString('curl -fsIL "$url"', $this->script);
-        $this->assertStringContainsString('wget -q --spider "$url"', $this->script);
+        $this->assertStringContainsString('curl -fsIL --max-time 10 "$url"', $this->script);
+        $this->assertStringContainsString('wget -q --spider --timeout=10 "$url"', $this->script);
     }
 
     public function testLogFilePathSetOnce(): void
