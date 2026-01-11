@@ -50,6 +50,18 @@ if (!file_exists($userConfig)) {
     exit(1);
 }
 
+/**
+ * Detect whether a file looks like the current flock-protected executor.
+ */
+function pmssRtorrentExecutorHasLock(string $path): bool
+{
+    $data = @file_get_contents($path);
+    if (!is_string($data) || $data === '') {
+        return false;
+    }
+    return strpos($data, '.rtorrentExecute.lock') !== false && strpos($data, 'flock(') !== false;
+}
+
 // Make start idempotent and race-safe: multiple cron/watchdog invocations must
 // converge to a single screen+executor+rTorrent process set.
 $lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
@@ -64,20 +76,70 @@ if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
     exit(0);
 }
 
+// If the executor script exists but is missing the lock guard, refresh it from
+// /etc/skel so watchdog-driven starts do not spawn duplicate rTorrent processes.
+$executor = $home.'/.rtorrentExecute.php';
+$skelExecutor = '/etc/skel/.rtorrentExecute.php';
+if (is_file($executor) && is_file($skelExecutor) && !is_link($executor)) {
+    $executorHasLock = pmssRtorrentExecutorHasLock($executor);
+    $skelHasLock = pmssRtorrentExecutorHasLock($skelExecutor);
+    if (!$executorHasLock && $skelHasLock) {
+        if (@copy($skelExecutor, $executor)) {
+            @chmod($executor, 0755);
+            @chown($executor, $user);
+            if (function_exists('posix_getpwnam')) {
+                $pw = @posix_getpwnam($user);
+                if (is_array($pw) && isset($pw['gid'])) {
+                    @chgrp($executor, (int) $pw['gid']);
+                }
+            }
+            logmsg("[INFO] Refreshed {$executor} from {$skelExecutor} (added lock guard)");
+        } else {
+            logmsg("[WARN] Failed to refresh {$executor} from {$skelExecutor}");
+        }
+    }
+}
+
 $rtorrentPids = [];
-$rc = 0;
-@exec('pgrep -u '.escapeshellarg($user).' -x rtorrent', $rtorrentPids, $rc);
-if ($rc === 0 && !empty($rtorrentPids)) {
+$rtorrentRc = 0;
+$rtorrentOut = [];
+@exec('pgrep -u '.escapeshellarg($user).' -x rtorrent 2>&1', $rtorrentOut, $rtorrentRc);
+if ($rtorrentRc === 0) {
+    foreach ($rtorrentOut as $line) {
+        $pid = (int) trim((string) $line);
+        if ($pid > 0) {
+            $rtorrentPids[] = $pid;
+        }
+    }
+}
+if (!empty($rtorrentPids)) {
     logmsg("rTorrent already running for {$user}; skipping start");
     exit(0);
 }
+if ($rtorrentRc !== 0 && $rtorrentRc !== 1) {
+    logmsg("[WARN] Failed to check rTorrent process state for {$user} (rc={$rtorrentRc}): ".implode(' | ', $rtorrentOut));
+    exit(1);
+}
 
 $executorPids = [];
-$rc = 0;
-@exec('pgrep -u '.escapeshellarg($user).' -f '.escapeshellarg('php.*rtorrentExecute\\.php'), $executorPids, $rc);
-if ($rc === 0 && !empty($executorPids)) {
+$executorRc = 0;
+$executorOut = [];
+@exec('pgrep -u '.escapeshellarg($user).' -f '.escapeshellarg('rtorrentExecute\\.php').' 2>&1', $executorOut, $executorRc);
+if ($executorRc === 0) {
+    foreach ($executorOut as $line) {
+        $pid = (int) trim((string) $line);
+        if ($pid > 0) {
+            $executorPids[] = $pid;
+        }
+    }
+}
+if (!empty($executorPids)) {
     logmsg("Executor already running for {$user} but rtorrent missing; refusing to start another executor");
     exit(0);
+}
+if ($executorRc !== 0 && $executorRc !== 1) {
+    logmsg("[WARN] Failed to check executor process state for {$user} (rc={$executorRc}): ".implode(' | ', $executorOut));
+    exit(1);
 }
 
 // Check that the optional localnet filter file is readable for the user.
@@ -109,7 +171,6 @@ if (!is_dir($home.'/session')) {
 }
 
 // Finally execute rTorrent inside a screen session.
-$executor = $home.'/.rtorrentExecute.php';
 if (!file_exists($executor)) {
     // If old version of master GUI, call rTorrent directly.
     logmsg("Starting rTorrent for {$user} (legacy mode)");
