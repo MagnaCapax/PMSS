@@ -15,6 +15,24 @@
  * #TODO: Hover on status → show systemctl logs
  * #TODO: Click status → attempt restart (if allowed)
  */
+
+// Fail-soft: data collection must never abort page rendering. Show notes and
+// keep going if commands or files are unavailable.
+if (!function_exists('pmssInfoShellExec')) {
+    function pmssInfoShellExec($command, $label)
+    {
+        if (!function_exists('shell_exec')) {
+            return array('output' => null, 'error' => $label . ' unavailable: shell_exec disabled');
+        }
+
+        $output = shell_exec($command);
+        if ($output === null) {
+            return array('output' => '', 'error' => null);
+        }
+
+        return array('output' => $output, 'error' => null);
+    }
+}
 ?>
 
 <style>
@@ -109,35 +127,48 @@ pre {
   <div class="stats-block">
     <h6>Base Resources (current)</h6>
     <pre><?php
-    $uid = trim(shell_exec('/usr/bin/id -u'));
-    if (!$uid || !is_numeric($uid)) {
-        echo "Error: Could not determine user ID.\n";
+    $uid = null;
+    $uidResult = pmssInfoShellExec('/usr/bin/id -u', 'User ID');
+    if ($uidResult['error'] !== null) {
+        echo $uidResult['error'] . "\n";
     } else {
-        $output = shell_exec('systemctl status user-' . escapeshellarg($uid) . '.slice 2>&1');
-        if (!$output) {
-            echo "Failed to retrieve slice status.\n";
+        $uid = trim($uidResult['output']);
+        if ($uid === '' || !is_numeric($uid)) {
+            echo "Error: Could not determine user ID.\n";
+            $uid = null;
         } else {
-            $lines = explode("\n", $output);
-            $cgroupSection = [];
-            $mainSection = [];
-            $inCgroup = false;
-
-            foreach ($lines as $line) {
-                if (strpos($line, 'CGroup:') === 0) {
-                    $inCgroup = true;
-                    $cgroupSection[] = $line;
-                    continue;
-                }
-                if ($inCgroup && trim($line) && $line[0] === ' ') {
-                    $cgroupSection[] = $line;
+            $sliceUnit = 'user-' . $uid . '.slice';
+            $statusResult = pmssInfoShellExec('systemctl status ' . escapeshellarg($sliceUnit) . ' 2>&1', 'User slice status');
+            if ($statusResult['error'] !== null) {
+                echo $statusResult['error'] . "\n";
+            } else {
+                $output = $statusResult['output'];
+                if (!$output) {
+                    echo "Failed to retrieve slice status.\n";
                 } else {
-                    $mainSection[] = $line;
-                }
-            }
+                    $lines = explode("\n", $output);
+                    $cgroupSection = [];
+                    $mainSection = [];
+                    $inCgroup = false;
 
-            echo implode("\n", $mainSection);
-            if (!empty($cgroupSection)) {
-                echo "\n" . implode("\n", $cgroupSection);
+                    foreach ($lines as $line) {
+                        if (strpos($line, 'CGroup:') === 0) {
+                            $inCgroup = true;
+                            $cgroupSection[] = $line;
+                            continue;
+                        }
+                        if ($inCgroup && trim($line) && $line[0] === ' ') {
+                            $cgroupSection[] = $line;
+                        } else {
+                            $mainSection[] = $line;
+                        }
+                    }
+
+                    echo implode("\n", $mainSection);
+                    if (!empty($cgroupSection)) {
+                        echo "\n" . implode("\n", $cgroupSection);
+                    }
+                }
             }
         }
     }
@@ -146,7 +177,7 @@ pre {
 
   <!-- RIGHT: Server info -->
   <div class="stats-block">
-    <h6><?php echo htmlspecialchars($_SERVER['SERVER_NAME']); ?> info</h6>
+    <h6><?php echo htmlspecialchars(isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'server'); ?> info</h6>
 
     <div class="info-line">
         <span class="label">IP:</span>
@@ -170,34 +201,58 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
     $wgStatus = 'inactive';
     $ovpnStatus = 'inactive';
 
-    $wgOut = shell_exec('systemctl is-active wg-quick@wg0 2>/dev/null');
-    if (trim($wgOut) === 'active') {
+    $wgResult = pmssInfoShellExec('systemctl is-active wg-quick@wg0 2>/dev/null', 'WireGuard status');
+    if ($wgResult['error'] !== null) {
+        $wgStatus = 'error';
+    } elseif (trim($wgResult['output']) === 'active') {
         $wgStatus = 'active';
     }
 
-    $ovpnOut = shell_exec('systemctl is-active openvpn 2>/dev/null');
-    if (trim($ovpnOut) === 'active') {
+    $ovpnResult = pmssInfoShellExec('systemctl is-active openvpn 2>/dev/null', 'OpenVPN status');
+    if ($ovpnResult['error'] !== null) {
+        $ovpnStatus = 'error';
+    } elseif (trim($ovpnResult['output']) === 'active') {
         $ovpnStatus = 'active';
     }
 
     // === App Status via ps aux | grep (hidepid safe) ===
-    $username = trim(shell_exec('whoami'));
-    $psOutput = shell_exec('ps aux | grep -E "(rtorrent|deluged|rclone)" | grep -v grep');
-    $apps = [
-        'rTorrent' => (stripos($psOutput, 'rtorrent') !== false) ? 'active' : 'stopped',
-        'Deluge'   => (stripos($psOutput, 'deluged') !== false) ? 'active' : 'stopped',
-        'rclone'   => (stripos($psOutput, 'rclone') !== false) ? 'active' : 'stopped',
-    ];
+    $usernameResult = pmssInfoShellExec('whoami', 'Username');
+    $username = ($usernameResult['output'] !== null) ? trim($usernameResult['output']) : '';
+
+    $psResult = pmssInfoShellExec('ps aux | grep -E "(rtorrent|deluged|rclone)" | grep -v grep', 'App status');
+    if ($psResult['error'] !== null) {
+        $apps = [
+            'rTorrent' => 'error',
+            'Deluge'   => 'error',
+            'rclone'   => 'error',
+        ];
+    } else {
+        $psOutput = $psResult['output'];
+        $apps = [
+            'rTorrent' => (stripos($psOutput, 'rtorrent') !== false) ? 'active' : 'stopped',
+            'Deluge'   => (stripos($psOutput, 'deluged') !== false) ? 'active' : 'stopped',
+            'rclone'   => (stripos($psOutput, 'rclone') !== false) ? 'active' : 'stopped',
+        ];
+    }
 
     // === Docker Rootless Status ===
     $dockerStatus = 'inactive';
-    $dockerSock = "/run/user/$uid/docker.sock";
-    if (file_exists($dockerSock)) {
-        $dockerStatus = 'active';
+    if ($uid === null) {
+        $dockerStatus = 'error';
     } else {
-        $dockerOutput = shell_exec('docker ps --no-trunc 2>&1');
-        if (strpos($dockerOutput, 'docker ps') === false && trim($dockerOutput) === '') {
+        $dockerSock = "/run/user/$uid/docker.sock";
+        if (file_exists($dockerSock)) {
             $dockerStatus = 'active';
+        } else {
+            $dockerResult = pmssInfoShellExec('docker ps --no-trunc 2>&1', 'Docker status');
+            if ($dockerResult['error'] !== null) {
+                $dockerStatus = 'error';
+            } else {
+                $dockerOutput = $dockerResult['output'];
+                if (strpos($dockerOutput, 'docker ps') === false && trim($dockerOutput) === '') {
+                    $dockerStatus = 'active';
+                }
+            }
         }
     }
     $apps['Docker'] = $dockerStatus;
@@ -230,7 +285,12 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
 
     <pre style="margin-top:16px; font-size:0.9em;">
 <?php
-echo trim(shell_exec('uptime')) . "\n\n";
+$uptimeResult = pmssInfoShellExec('uptime', 'Uptime');
+if ($uptimeResult['error'] !== null) {
+    echo $uptimeResult['error'] . "\n\n";
+} else {
+    echo trim($uptimeResult['output']) . "\n\n";
+}
 echo "Memory usage:\n";
 
 $meminfo = @file_get_contents('/proc/meminfo');

@@ -41,7 +41,15 @@
                 
 
 <div id="stats">
- <?php include 'stats.php'; ?>
+ <?php
+ $statsPath = __DIR__ . '/stats.php';
+ // Fail-soft: keep rendering even if stats.php is missing or unreadable.
+ if (is_file($statsPath)) {
+     include $statsPath;
+ } else {
+     echo '<pre>Stats unavailable: missing stats.php.</pre>';
+ }
+ ?>
 </div>
 
                 

@@ -12,17 +12,18 @@ echo "[php73-compat-scan]" >&2
 
 paths=(
   scripts
+  etc/skel/www
 )
 
 # Build ripgrep or grep command
 if command -v rg >/dev/null 2>&1; then
   IS_RG=1
   SEARCHER=(rg -n -H --hidden --no-ignore --glob '*.php')
-  EXCLUDES=(--glob '!vendor/**' --glob '!scripts/lib/tests/**' --glob '!etc/skel/www/**')
+  EXCLUDES=(--glob '!vendor/**' --glob '!scripts/lib/tests/**')
 else
   IS_RG=0
   SEARCHER=(grep -RIn)
-  EXCLUDES=(--exclude-dir=vendor --exclude-dir=scripts/lib/tests --exclude-dir=etc/skel/www --include='*.php')
+  EXCLUDES=(--exclude-dir=vendor --exclude-dir=scripts/lib/tests --include='*.php')
 fi
 
 fail=0
@@ -52,7 +53,7 @@ scan "\\sfn\\s*\\(" "Arrow functions (PHP 7.4)"
 scan "^\\s*(public|protected|private)\\s+[A-Za-z_\\\\?][A-Za-z0-9_\\\\|?]*\\s+\\\\\$[A-Za-z_]" "Typed properties (PHP 7.4)"
 scan "\\?->" "Nullsafe operator (PHP 8.0)"
 scan "\\?\\?=" "Null-coalescing assignment (PHP 7.4)"
-scan "\\bmatch\\s*\\(" "match expression (PHP 8.0)"
+scan "(^|[[:space:](=,;?])match\\s*\\(" "match expression (PHP 8.0)"
 scan ":\\s*(mixed|static)\\b" "Return type mixed/static (PHP 8.0)"
 scan "function[^(]*\(([^)]*\|[^)]*)\)" "Union types in parameters (PHP 8.0)"
 
