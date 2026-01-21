@@ -23,7 +23,7 @@ These wrappers exist because assistants do not reliably auto-discover PMSS guard
     then launches Codex with the strict refactor rails prompt.
   - Delegates prompt rendering + invocation to `development/codex-run.sh`.
 
-- `development/ci-codex.sh`
+- `development/codex-ci.sh`
   - CI triage session: fetches latest GitHub Actions run logs/artifacts via `gh` (or `curl` + `GITHUB_TOKEN` fallback),
     then launches Codex with the CI rails prompt.
   - Delegates prompt rendering + invocation to `development/codex-run.sh`.
@@ -87,7 +87,7 @@ development/codex-refactor.sh
 CI triage session (uses `gh auth login` when available; otherwise uses `curl` + `GITHUB_TOKEN`):
 
 ```bash
-development/ci-codex.sh
+development/codex-ci.sh
 ```
 
 Override the top-level prompt text (keeps the same rails baseline):
@@ -95,7 +95,7 @@ Override the top-level prompt text (keeps the same rails baseline):
 ```bash
 development/codex.sh --prompt "Do X in Y"
 development/codex-refactor.sh --prompt "Refactor Z (behaviour-preserving)"
-development/ci-codex.sh --prompt "Fix the failing CI job"
+development/codex-ci.sh --prompt "Fix the failing CI job"
 ```
 
 ## Safety and conventions

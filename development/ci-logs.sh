@@ -65,53 +65,80 @@ cmd=${1:-latest}
 shift || true
 
 case "$cmd" in
-	latest)
-		echo "[ci-logs] streaming latest run logs (non-interactive)..." >&2
-		gh run view --latest --log || { echo "[ci-logs] no runs found" >&2; exit 1; }
-		;;
-	last-artifacts)
-		outdir="${1:-ci-artifacts}"
-		mkdir -p "$outdir"
-		echo "[ci-logs] downloading artifacts for latest run into $outdir" >&2
-		gh run download --latest --dir "$outdir" || { echo "[ci-logs] failed to download artifacts" >&2; exit 1; }
-		ls -la "$outdir" || true
-		;;
-	job-name)
-		name=${1:-}
-		if [[ -z "$name" ]]; then echo "usage: ci-logs.sh job-name <name>" >&2; exit 2; fi
-		runid=$(latest_run_id)
-		if [[ -z "$runid" ]]; then echo "[ci-logs] no runs found" >&2; exit 1; fi
-		jobid=$(job_id_from_run_by_name "$runid" "$name")
-		if [[ -z "$jobid" ]]; then echo "[ci-logs] job '$name' not found in latest run" >&2; exit 3; fi
-		gh run view --job "$jobid" --log
-		;;
-	smoke)
-		# convenience alias for the 'smoke' job
-		runid=$(latest_run_id)
-		if [[ -z "$runid" ]]; then echo "[ci-logs] no runs found" >&2; exit 1; fi
-		jobid=$(job_id_from_run_by_name "$runid" "smoke")
-		if [[ -z "$jobid" ]]; then echo "[ci-logs] smoke job not found in latest run" >&2; exit 3; fi
-		gh run view --job "$jobid" --log
-		;;
-	run)
-		runid=${1:-}
-		if [[ -z "$runid" ]]; then echo "usage: ci-logs.sh run <run-id>" >&2; exit 2; fi
-		gh run view "$runid" --log
-		;;
-	job)
-		jobid=${1:-}
-		if [[ -z "$jobid" ]]; then echo "usage: ci-logs.sh job <job-id>" >&2; exit 2; fi
-		gh run view --job "$jobid" --log
-		;;
-	codex)
-		# proxy to ci-codex.sh to assemble prompt and send to your assistant
-		bash "$HERE/ci-codex.sh" "$@"
-		;;
-	help | -h | --help)
-		sed -n '1,40p' "$0" | sed -n '1,20p'
-		;;
-	*)
-		echo "[ci-logs] unknown command: $cmd" >&2
+latest)
+	echo "[ci-logs] streaming latest run logs (non-interactive)..." >&2
+	gh run view --latest --log || {
+		echo "[ci-logs] no runs found" >&2
+		exit 1
+	}
+	;;
+last-artifacts)
+	outdir="${1:-ci-artifacts}"
+	mkdir -p "$outdir"
+	echo "[ci-logs] downloading artifacts for latest run into $outdir" >&2
+	gh run download --latest --dir "$outdir" || {
+		echo "[ci-logs] failed to download artifacts" >&2
+		exit 1
+	}
+	ls -la "$outdir" || true
+	;;
+job-name)
+	name=${1:-}
+	if [[ -z "$name" ]]; then
+		echo "usage: ci-logs.sh job-name <name>" >&2
 		exit 2
-		;;
+	fi
+	runid=$(latest_run_id)
+	if [[ -z "$runid" ]]; then
+		echo "[ci-logs] no runs found" >&2
+		exit 1
+	fi
+	jobid=$(job_id_from_run_by_name "$runid" "$name")
+	if [[ -z "$jobid" ]]; then
+		echo "[ci-logs] job '$name' not found in latest run" >&2
+		exit 3
+	fi
+	gh run view --job "$jobid" --log
+	;;
+smoke)
+	# convenience alias for the 'smoke' job
+	runid=$(latest_run_id)
+	if [[ -z "$runid" ]]; then
+		echo "[ci-logs] no runs found" >&2
+		exit 1
+	fi
+	jobid=$(job_id_from_run_by_name "$runid" "smoke")
+	if [[ -z "$jobid" ]]; then
+		echo "[ci-logs] smoke job not found in latest run" >&2
+		exit 3
+	fi
+	gh run view --job "$jobid" --log
+	;;
+run)
+	runid=${1:-}
+	if [[ -z "$runid" ]]; then
+		echo "usage: ci-logs.sh run <run-id>" >&2
+		exit 2
+	fi
+	gh run view "$runid" --log
+	;;
+job)
+	jobid=${1:-}
+	if [[ -z "$jobid" ]]; then
+		echo "usage: ci-logs.sh job <job-id>" >&2
+		exit 2
+	fi
+	gh run view --job "$jobid" --log
+	;;
+codex)
+	# proxy to codex-ci.sh to assemble prompt and send to your assistant
+	bash "$HERE/codex-ci.sh" "$@"
+	;;
+help | -h | --help)
+	sed -n '1,40p' "$0" | sed -n '1,20p'
+	;;
+*)
+	echo "[ci-logs] unknown command: $cmd" >&2
+	exit 2
+	;;
 esac

@@ -10,13 +10,13 @@ cd "$ROOT"
 source "$HERE/lib/codex-common.sh"
 
 # Optional debug: PMSS_CI_CODEX_DEBUG=1 enables bash -x tracing
-codex_enable_debug PMSS_CI_CODEX_DEBUG "ci-codex"
+codex_enable_debug PMSS_CI_CODEX_DEBUG "codex-ci"
 
-codex_set_error_trap "ci-codex"
+codex_set_error_trap "codex-ci"
 
-echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
+echo "[codex-ci] start: assembling CI context and invoking Codex" >&1
 
-# ci-codex.sh — Fetch latest CI logs and feed them to a coding assistant (Codex CLI or similar).
+# codex-ci.sh — Fetch latest CI logs and feed them to a coding assistant (Codex CLI or similar).
 #
 # Requirements (one of):
 #   - GitHub CLI (`gh`) installed and authenticated: gh auth login
@@ -25,10 +25,10 @@ echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 #   - A local assistant CLI to receive the prompt. Provide via --exec (e.g., --exec 'codex')
 #
 # Usage:
-#   development/ci-codex.sh                          # assemble prompt + logs into ci-codex/prompt.txt
-#   development/ci-codex.sh --job smoke               # include only 'smoke' job logs in the prompt
-#   development/ci-codex.sh --prompt "text..."        # use custom high-level prompt text
-#   development/ci-codex.sh --exec 'codex'             # send prompt to Codex CLI directly
+#   development/codex-ci.sh                          # assemble prompt + logs into codex-ci/prompt.txt
+#   development/codex-ci.sh --job smoke               # include only 'smoke' job logs in the prompt
+#   development/codex-ci.sh --prompt "text..."        # use custom high-level prompt text
+#   development/codex-ci.sh --exec 'codex'             # send prompt to Codex CLI directly
 #
 # The default prompt:
 #   "Last CI Integration Logs are here. If issues or code fails, please fix them.
@@ -37,7 +37,7 @@ echo "[ci-codex] start: assembling CI context and invoking Codex" >&1
 
 # Create a throwaway workspace under the system temp dir (avoid repo clutter)
 TMP="${TMPDIR:-/tmp}"
-OUTDIR="$(mktemp -d "${TMP%/}/pmss-ci-codex-XXXXXXXX")"
+OUTDIR="$(mktemp -d "${TMP%/}/pmss-codex-ci-XXXXXXXX")"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 RUNLOG="$OUTDIR/job-run.log"
@@ -82,7 +82,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	*)
-		echo "[ci-codex] unknown option: $1" >&2
+		echo "[codex-ci] unknown option: $1" >&2
 		exit 2
 		;;
 	esac
@@ -92,8 +92,8 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 mkdir -p "$OUTDIR" "$ARTDIR"
 
-echo "[ci-codex] workspace: $OUTDIR" >&1
-echo "[ci-codex] artifact dir: $ARTDIR" >&1
+echo "[codex-ci] workspace: $OUTDIR" >&1
+echo "[codex-ci] artifact dir: $ARTDIR" >&1
 
 CI_CODEX_SAVED_XTRACE=0
 ci_shell_disable_xtrace() {
@@ -235,7 +235,7 @@ ci_shell_restore_xtrace
 if [[ "$github_token_present" == "1" ]]; then
 	case "$-" in
 	*x*)
-		echo "[ci-codex] NOTE: disabling xtrace to avoid leaking GITHUB_TOKEN" >&1
+		echo "[codex-ci] NOTE: disabling xtrace to avoid leaking GITHUB_TOKEN" >&1
 		set +x
 		;;
 	esac
@@ -243,13 +243,13 @@ fi
 
 fetch_mode="gh"
 if have gh; then
-	echo "[ci-codex] gh: $(command -v gh)" >&1 || true
-	gh --version 2>/dev/null | sed 's/^/[ci-codex] /' >&1 || true
+	echo "[codex-ci] gh: $(command -v gh)" >&1 || true
+	gh --version 2>/dev/null | sed 's/^/[codex-ci] /' >&1 || true
 elif have curl; then
 	fetch_mode="curl"
-	echo "[ci-codex] gh not found; using GitHub API via curl (set GITHUB_TOKEN for private repos)" >&1
+	echo "[codex-ci] gh not found; using GitHub API via curl (set GITHUB_TOKEN for private repos)" >&1
 else
-	echo "[ci-codex] ERROR: neither 'gh' nor 'curl' is available; cannot fetch CI logs" >&2
+	echo "[codex-ci] ERROR: neither 'gh' nor 'curl' is available; cannot fetch CI logs" >&2
 	exit 1
 fi
 
@@ -264,56 +264,56 @@ if [[ "$fetch_mode" == "gh" ]]; then
 		repo_full=""
 	fi
 
-	echo "[ci-codex] discovering latest run..." >&1
+	echo "[codex-ci] discovering latest run..." >&1
 	run_id=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
 else
 	origin_url="$(git config --get remote.origin.url 2>/dev/null || true)"
 	repo_full="$(ci_parse_github_repo "$origin_url" 2>/dev/null || true)"
 	if ! ci_validate_github_repo "$repo_full"; then
-		echo "[ci-codex] ERROR: could not derive GitHub repo from origin URL: $origin_url" >&2
-		echo "[ci-codex] Install gh (recommended) or set origin to a github.com remote." >&2
+		echo "[codex-ci] ERROR: could not derive GitHub repo from origin URL: $origin_url" >&2
+		echo "[codex-ci] Install gh (recommended) or set origin to a github.com remote." >&2
 		exit 1
 	fi
 
-	echo "[ci-codex] discovering latest run via API for $repo_full..." >&1
+	echo "[codex-ci] discovering latest run via API for $repo_full..." >&1
 	runs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs?per_page=1" 2>/dev/null || true)"
 	run_id="$(printf '%s' "$runs_json" | php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["workflow_runs"][0]["id"] ?? "";' 2>/dev/null || true)"
 fi
 
 if [[ -z "$run_id" ]]; then
-	echo "[ci-codex] no workflow runs found (or auth missing)" >&2
+	echo "[codex-ci] no workflow runs found (or auth missing)" >&2
 	if [[ "$fetch_mode" == "curl" && "$github_token_present" == "0" ]]; then
-		echo "[ci-codex] Hint: set GITHUB_TOKEN (classic PAT with repo+actions read) for private repos." >&2
+		echo "[codex-ci] Hint: set GITHUB_TOKEN (classic PAT with repo+actions read) for private repos." >&2
 	fi
 	exit 1
 fi
 
-echo "[ci-codex] latest run id: $run_id" >&1
+echo "[codex-ci] latest run id: $run_id" >&1
 
-echo "[ci-codex] waiting for run completion (timeout ${PMSS_CI_WAIT_SECS}s)…" >&1
+echo "[codex-ci] waiting for run completion (timeout ${PMSS_CI_WAIT_SECS}s)…" >&1
 deadline=$(($(date +%s) + PMSS_CI_WAIT_SECS))
 if [[ "$fetch_mode" == "gh" ]]; then
 	status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 else
-	status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null \
-		| php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
+	status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null |
+		php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
 	[[ -n "$status" ]] || status="queued"
 fi
 while [[ "$status" != "completed" && $(date +%s) -lt $deadline ]]; do
-	echo "[ci-codex] run status: $status (waiting)" >&1
+	echo "[codex-ci] run status: $status (waiting)" >&1
 	sleep 5
 	if [[ "$fetch_mode" == "gh" ]]; then
 		status=$(gh run view "$run_id" --json status --jq .status 2>/dev/null || echo queued)
 	else
-		status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null \
-			| php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
+		status="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id" 2>/dev/null |
+			php -r '$j=json_decode(stream_get_contents(STDIN), true); echo $j["status"] ?? "";' 2>/dev/null || true)"
 		[[ -n "$status" ]] || status="queued"
 	fi
 done
-echo "[ci-codex] run status now: $status" >&1
+echo "[codex-ci] run status now: $status" >&1
 
 # Download artifacts (best-effort)
-echo "[ci-codex] downloading artifacts to $ARTDIR" >&1
+echo "[codex-ci] downloading artifacts to $ARTDIR" >&1
 mkdir -p "$ARTDIR"
 art_count=0
 for attempt in {1..10}; do
@@ -344,10 +344,10 @@ for attempt in {1..10}; do
 	if [[ "$art_count" -gt 0 || $attempt -ge 10 ]]; then
 		break
 	fi
-	echo "[ci-codex] artifacts not ready (attempt $attempt); waiting…" >&1
+	echo "[codex-ci] artifacts not ready (attempt $attempt); waiting…" >&1
 	sleep 5
 done
-echo "[ci-codex] artifacts downloaded: $art_count file(s)" >&1
+echo "[codex-ci] artifacts downloaded: $art_count file(s)" >&1
 
 # Prepare CI summary and capture latest artifact path for reference
 latest_art=""
@@ -376,36 +376,36 @@ if compgen -G "$ARTDIR/*" >/dev/null; then
 	latest_art=$(find "$ARTDIR" -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
 fi
 
-	# Optionally capture a specific job log
-	# Fetch logs for a requested job, or both 'build' and 'smoke' by default
-	fetch_job_log() {
-		local name="$1" out="$2"
-		if [[ "$fetch_mode" == "gh" ]]; then
-			local id jobs_json job_id zip_path token
+# Optionally capture a specific job log
+# Fetch logs for a requested job, or both 'build' and 'smoke' by default
+fetch_job_log() {
+	local name="$1" out="$2"
+	if [[ "$fetch_mode" == "gh" ]]; then
+		local id jobs_json job_id zip_path token
 
-			# Newer gh versions expose a jobs field directly; older ones do not.
-			id="$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId" 2>/dev/null || true)"
+		# Newer gh versions expose a jobs field directly; older ones do not.
+		id="$(gh run view "$run_id" --json jobs --jq ".jobs[] | select(.name == \"$name\").databaseId" 2>/dev/null || true)"
 
-			# Fallback for older gh: query the REST API for job ids, then fetch logs.
-			if [[ -z "$id" && -n "$repo_full" ]]; then
-				jobs_json="$(gh api -H "Accept: application/vnd.github+json" "/repos/$repo_full/actions/runs/$run_id/jobs" 2>/dev/null || true)"
-				if [[ -z "$jobs_json" ]]; then
-					jobs_json="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo_full/actions/runs/$run_id/jobs" 2>/dev/null || true)"
-				fi
-				# shellcheck disable=SC2034
-				PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
+		# Fallback for older gh: query the REST API for job ids, then fetch logs.
+		if [[ -z "$id" && -n "$repo_full" ]]; then
+			jobs_json="$(gh api -H "Accept: application/vnd.github+json" "/repos/$repo_full/actions/runs/$run_id/jobs" 2>/dev/null || true)"
+			if [[ -z "$jobs_json" ]]; then
+				jobs_json="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo_full/actions/runs/$run_id/jobs" 2>/dev/null || true)"
+			fi
+			# shellcheck disable=SC2034
+			PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
 					$j=json_decode(stream_get_contents(STDIN), true);
 					$name=getenv("PMSS_CI_JOB_NAME") ?: "";
 					foreach (($j["jobs"] ?? []) as $job) {
 						if (($job["name"] ?? "") === $name) { echo $job["id"] ?? ""; break; }
 					}
 				' 2>/dev/null || true)"
-				id="$job_id"
-			fi
+			id="$job_id"
+		fi
 
-			# Last resort for old gh: parse job ids from the plain `gh run view` summary we already captured.
-			if [[ -z "$id" && -s "$SUMMARY" ]]; then
-				id="$(awk -v want="$name" '
+		# Last resort for old gh: parse job ids from the plain `gh run view` summary we already captured.
+		if [[ -z "$id" && -s "$SUMMARY" ]]; then
+			id="$(awk -v want="$name" '
 					{
 						line=$0
 						sub(/^[^A-Za-z0-9_-]+[[:space:]]*/, "", line)
@@ -419,42 +419,42 @@ fi
 						}
 					}
 				' "$SUMMARY" 2>/dev/null || true)"
-			fi
-
-			if [[ -n "$id" ]]; then
-				gh run view --job "$id" --log >"$out" 2>/dev/null || true
-			fi
-
-			# If gh cannot emit job logs, fall back to downloading the zipped REST logs.
-			if [[ -n "$id" && ! -s "$out" && -n "$repo_full" ]]; then
-				zip_path="$OUTDIR/job-${id}.zip"
-				token="${GITHUB_TOKEN:-}"
-				if [[ -z "$token" ]]; then
-					ci_shell_disable_xtrace
-					# gh 2.4.x lacks `gh auth token`; fall back to parsing `gh auth status --show-token`.
-					token="$(gh auth token 2>/dev/null || true)"
-					if [[ -z "$token" ]]; then
-						# gh auth status prints to stderr and prefixes status lines with symbols (✓),
-						# so match any line containing "Token:" and grab the last field.
-						token="$(gh auth status --show-token 2>&1 \
-							| awk 'BEGIN{IGNORECASE=1} /token:[[:space:]]/ {print $NF; exit}' || true)"
-					fi
-					ci_shell_restore_xtrace
-				fi
-				if [[ -n "$token" ]]; then
-					ci_shell_disable_xtrace
-					if GITHUB_TOKEN="$token" ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$id/logs" "$zip_path" >/dev/null 2>&1; then
-						ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
-					fi
-					ci_shell_restore_xtrace
-				fi
-			fi
-			return 0
 		fi
 
-		local jobs_json job_id zip_path
-		jobs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
-		# shellcheck disable=SC2034
+		if [[ -n "$id" ]]; then
+			gh run view --job "$id" --log >"$out" 2>/dev/null || true
+		fi
+
+		# If gh cannot emit job logs, fall back to downloading the zipped REST logs.
+		if [[ -n "$id" && ! -s "$out" && -n "$repo_full" ]]; then
+			zip_path="$OUTDIR/job-${id}.zip"
+			token="${GITHUB_TOKEN:-}"
+			if [[ -z "$token" ]]; then
+				ci_shell_disable_xtrace
+				# gh 2.4.x lacks `gh auth token`; fall back to parsing `gh auth status --show-token`.
+				token="$(gh auth token 2>/dev/null || true)"
+				if [[ -z "$token" ]]; then
+					# gh auth status prints to stderr and prefixes status lines with symbols (✓),
+					# so match any line containing "Token:" and grab the last field.
+					token="$(gh auth status --show-token 2>&1 |
+						awk 'BEGIN{IGNORECASE=1} /token:[[:space:]]/ {print $NF; exit}' || true)"
+				fi
+				ci_shell_restore_xtrace
+			fi
+			if [[ -n "$token" ]]; then
+				ci_shell_disable_xtrace
+				if GITHUB_TOKEN="$token" ci_api_download_zip "$api_base/repos/$repo_full/actions/jobs/$id/logs" "$zip_path" >/dev/null 2>&1; then
+					ci_unzip_to_file "$zip_path" "$out" >/dev/null 2>&1 || true
+				fi
+				ci_shell_restore_xtrace
+			fi
+		fi
+		return 0
+	fi
+
+	local jobs_json job_id zip_path
+	jobs_json="$(ci_api_get_json "$api_base/repos/$repo_full/actions/runs/$run_id/jobs?per_page=100" 2>/dev/null || true)"
+	# shellcheck disable=SC2034
 	PMSS_CI_JOB_NAME="$name" job_id="$(printf '%s' "$jobs_json" | php -r '
 		$j=json_decode(stream_get_contents(STDIN), true);
 		$name=getenv("PMSS_CI_JOB_NAME") ?: "";
@@ -485,8 +485,8 @@ fetch_run_log() {
 		token="${GITHUB_TOKEN:-}"
 		if [[ -z "$token" ]]; then
 			ci_shell_disable_xtrace
-			token="$(gh auth status --show-token 2>&1 \
-				| awk 'BEGIN{IGNORECASE=1} /token:[[:space:]]/ {print $NF; exit}' || true)"
+			token="$(gh auth status --show-token 2>&1 |
+				awk 'BEGIN{IGNORECASE=1} /token:[[:space:]]/ {print $NF; exit}' || true)"
 			ci_shell_restore_xtrace
 		fi
 		if [[ -n "$token" ]]; then
@@ -506,10 +506,10 @@ fetch_run_log() {
 }
 
 if [[ -n "$job_name" ]]; then
-	echo "[ci-codex] fetching job logs for '$job_name'" >&1
+	echo "[codex-ci] fetching job logs for '$job_name'" >&1
 	fetch_job_log "$job_name" "$JOBLOG"
 else
-	echo "[ci-codex] fetching job logs for 'build' and 'smoke'" >&1
+	echo "[codex-ci] fetching job logs for 'build' and 'smoke'" >&1
 	fetch_job_log "build" "$OUTDIR/job-build.log"
 	fetch_job_log "smoke" "$OUTDIR/job-smoke.log"
 fi
@@ -527,21 +527,21 @@ for attempt in {1..10}; do
 	if [[ $nonempty_logs -gt 0 || $attempt -ge 10 ]]; then
 		break
 	fi
-	echo "[ci-codex] job logs not ready (attempt $attempt); waiting…" >&1
+	echo "[codex-ci] job logs not ready (attempt $attempt); waiting…" >&1
 	sleep 5
 done
-echo "[ci-codex] job logs present: $nonempty_logs file(s)" >&1
+echo "[codex-ci] job logs present: $nonempty_logs file(s)" >&1
 
-echo "[ci-codex] fetching full run log" >&1
+echo "[codex-ci] fetching full run log" >&1
 for attempt in {1..5}; do
 	fetch_run_log "$RUNLOG"
 	if [[ -s "$RUNLOG" || $attempt -ge 5 ]]; then
 		break
 	fi
-	echo "[ci-codex] run log not ready (attempt $attempt); waiting…" >&1
+	echo "[codex-ci] run log not ready (attempt $attempt); waiting…" >&1
 	sleep 3
 done
-[[ -s "$RUNLOG" ]] || echo "[ci-codex] WARNING: full run log is empty; check gh auth/network" >&1
+[[ -s "$RUNLOG" ]] || echo "[codex-ci] WARNING: full run log is empty; check gh auth/network" >&1
 
 # If nothing was retrieved, fail fast so callers notice missing QA context.
 any_logs=0
@@ -549,7 +549,7 @@ for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
 	[[ -s "$jl" ]] && any_logs=$((any_logs + 1))
 done
 if [[ $any_logs -eq 0 ]]; then
-	echo "[ci-codex] ERROR: no CI logs could be fetched; aborting" >&2
+	echo "[codex-ci] ERROR: no CI logs could be fetched; aborting" >&2
 	exit 1
 fi
 

@@ -63,8 +63,8 @@ args=()
 [[ "$dry_run" == "1" ]] && args+=(--dry-run)
 
 set +e
-bash "$HERE/ci-codex.sh" "${args[@]}"
+bash "$HERE/codex-ci.sh" "${args[@]}"
 rc=$?
 set -e
-echo "[ci] ci-codex.sh exited with rc=$rc" >&1
+echo "[ci] codex-ci.sh exited with rc=$rc" >&1
 exit $rc
