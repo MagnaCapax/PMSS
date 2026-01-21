@@ -64,6 +64,30 @@ run_cmd() {
 	return $?
 }
 
+pmssDetectExistingInstall() {
+	if [ -f /etc/seedbox/config/version ] || [ -f /etc/seedbox/config/version.meta ]; then
+		return 0
+	fi
+
+	if [ -f /scripts/update.php ] || [ -f /scripts/util/update-step2.php ] || [ -d /scripts/lib/update ]; then
+		return 0
+	fi
+
+	if [ -d /etc/seedbox/config ] && compgen -G "/etc/seedbox/config/template.*" >/dev/null; then
+		return 0
+	fi
+
+	if [ -f /var/log/pmss-update.jsonl ] || [ -f /var/log/pmss-update.log ]; then
+		return 0
+	fi
+
+	if [ -f /scripts/util/systemTest.php ]; then
+		return 0
+	fi
+
+	return 1
+}
+
 # Installer runtime flags, populated from CLI switches.
 hostname_override=
 skip_hostname_edit=false
@@ -173,6 +197,28 @@ else
 fi
 if [ "$SCRIPTS_ONLY" = true ]; then
 	UPDATE_ARGS+=("--scripts-only")
+fi
+
+if pmssDetectExistingInstall; then
+	log_warn "ALREADY INSTALLED -- UPDATING"
+
+	if [ "$RUN_UPDATE" != true ]; then
+		log_info "Skipping update.php hand-off (--skip-update)"
+		exit 0
+	fi
+
+	if [ ! -f /scripts/update.php ]; then
+		log_warn "PMSS markers found but /scripts/update.php is missing; continuing with bootstrap installer"
+	else
+		# Preserve the recorded update spec by not passing a new one from install.sh.
+		UPDATE_ARGS=("$@")
+		if [ "$SCRIPTS_ONLY" = true ]; then
+			UPDATE_ARGS+=("--scripts-only")
+		fi
+
+		run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
+		exit $?
+	fi
 fi
 
 run_editor() {
