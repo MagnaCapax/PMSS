@@ -42,4 +42,11 @@ nohup /scripts/listUsers.php | while read -r U; do
     #TODO(user-logs): consider writing to /var/log/pmss/user-<username>.log when reliable
 done >> /dev/null 2>&1 &
 
+# If /home is in fstab but not mounted yet, retry once after boot settles.
+if ! grep -qE '[[:space:]]/home[[:space:]]' /proc/mounts; then
+    if grep -qE '^[^#].*[[:space:]]/home[[:space:]]' /etc/fstab; then
+        nohup bash -c 'sleep 30; grep -qE "[[:space:]]/home[[:space:]]" /proc/mounts || mount /home' >> /dev/null 2>&1 &
+    fi
+fi
+
 exit 0
