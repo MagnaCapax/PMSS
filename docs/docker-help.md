@@ -52,7 +52,7 @@ For operators, per-user Docker can be controlled via:
 /scripts/userDocker.php USER {start|stop|restart|status}
 ```
 
-This helper **defaults to starting `dockerd-rootless.sh` directly** (non-systemd rootless mode) once it has confirmed the per-user Docker socket is not already present. Systemd user units are treated as advisory: their state is reported by `status` and, when available, used for a polite `stop`, but are not relied on for `start`/`restart` until they have dedicated test coverage on the current distro mix. All actions are logged to `/var/log/pmss/pmss-update-user-USER.log`.
+This helper **defaults to starting `dockerd-rootless.sh` directly** (non-systemd rootless mode) once it has confirmed no rootless Docker process is running. Systemd user units are treated as advisory: their *presence on disk* is reported by `status` and, when available, used for a polite `stop`, but the helper does not query the user bus (to avoid hangs) or rely on systemd for `start`/`restart` until it has dedicated test coverage on the current distro mix. Actions are logged to `/var/log/pmss/users/<username>.log` (and mirrored into `/var/log/pmss/users.log`/`.jsonl` when available).
 
 ## Troubleshooting
 
@@ -67,6 +67,13 @@ check whether the daemon is running:
 ```
 systemctl --user status docker.service
 journalctl --user -u docker.service --no-pager -n 50
+
+If `systemctl --user` hangs or you are not in a real user session, use:
+
+```
+/scripts/userDocker.php USER status
+ps -u USER -o pid,cmd | grep dockerd
+```
 ```
 
 If `systemctl --user` complains about missing `$DBUS_SESSION_BUS_ADDRESS` or `$XDG_RUNTIME_DIR`, you are not in a real user session. Log in directly as the user (for example `ssh user@host`) and re-run the commands, or contact support so the host-level rootless Docker configuration can be checked.
