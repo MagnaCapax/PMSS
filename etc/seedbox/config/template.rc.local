@@ -32,6 +32,8 @@ done
 mount -o remount,hidepid=2 /proc;
 chmod 741 /home;
 chmod 740 /home/* /var/run/utmp /var/log/wtmp;
+# NOTE(safety): listUsers.php output is NOT implicitly trusted (mid-update failures can emit garbage).
+# userPermissions.php MUST validate usernames before touching /home paths (see ADR 0004/0005).
 nohup /scripts/listUsers.php | xargs -n1 /scripts/util/userPermissions.php >> /dev/null 2>&1 &
 
 # Ensure per-user systemd instances are started so user services (e.g., rootless Docker) can run
