@@ -318,6 +318,9 @@ function normaliseSpec(string $spec): string
     if ($spec === '') {
         return '';
     }
+    if (preg_match('/^release[\/:]$/i', $spec) === 1) {
+        return 'release';
+    }
     if (preg_match('/^(git|release)([\/:]).+/i', $spec)) {
         return $spec;
     }
@@ -327,6 +330,9 @@ function normaliseSpec(string $spec): string
     }
     if (preg_match('/^release\s*(.*)$/i', $spec, $m)) {
         $rest = trim($m[1]);
+        if ($rest === ':' || $rest === '/') {
+            return 'release';
+        }
         return $rest === '' ? 'release' : 'release:'.$rest;
     }
     if (preg_match('#^(https?|ssh)://#', $spec)) {
@@ -347,7 +353,8 @@ function normaliseSpec(string $spec): string
  */
 function parseSpec(string $spec): array
 {
-    if (strcasecmp(trim($spec), 'release') === 0) {
+    $spec = trim($spec);
+    if (strcasecmp($spec, 'release') === 0 || preg_match('/^release[\/:]$/i', $spec) === 1) {
         return [
             'type'   => 'release',
             'repo'   => DEFAULT_REPO,

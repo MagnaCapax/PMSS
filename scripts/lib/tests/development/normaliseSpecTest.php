@@ -21,6 +21,12 @@ class NormaliseSpecTest extends TestCase
         $this->assertEquals('release:2025-07-12', normaliseSpec('release 2025-07-12'));
     }
 
+    public function testNormalisesReleaseEmptyDelimiterForms(): void
+    {
+        $this->assertEquals('release', normaliseSpec('release:'));
+        $this->assertEquals('release', normaliseSpec('release/'));
+    }
+
     public function testKeepsFullGitSpec(): void
     {
         $this->assertEquals('git/dev:2024-07-01', normaliseSpec('git/dev:2024-07-01'));
