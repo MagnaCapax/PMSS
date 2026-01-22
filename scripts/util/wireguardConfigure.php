@@ -8,8 +8,6 @@
  * and enables the wg-quick@wg0 service.
  */
 
-require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/update/logging.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/wireguard.php';
 

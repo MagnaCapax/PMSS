@@ -13,6 +13,16 @@ echo date('Y-m-d H:i:s') . ': Checking Deluge instances' . "\n";
 $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
 
+$startDeluged = static function (string $user): void {
+    echo "Start deluged for user: {$user}\n";
+    passthru("su {$user} -c 'cd ~; deluged -l /home/{$user}/.delugeLog -L info'");
+};
+
+$startDelugeWeb = static function (string $user): void {
+    echo "Start deluge-web for user: {$user}\n";
+    passthru("su {$user} -c 'cd ~; deluge-web -l /home/{$user}/.delugeWebLog -L info'");
+};
+
 foreach($users AS $thisUser) {    // Loop users checking their instances
     #TODO(user-logs): log per-user start/kill actions to /var/log/pmss/user-<username>.log
     if (empty($thisUser)) continue;
@@ -27,22 +37,11 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     if (!file_exists("/home/{$thisUser}/.delugeEnable")) continue;  // Deluge not enabled
     
     $instances = shell_exec("pgrep -u{$thisUser} deluged");
-    if (empty($instances)) startDeluged($thisUser);
+    if (empty($instances)) $startDeluged($thisUser);
     #TODO(user-logs): record deluged start in per-user log
  
     $instancesWeb = shell_exec("pgrep -u{$thisUser} deluge-web");
-    if (empty($instancesWeb)) startDelugeWeb($thisUser);
+    if (empty($instancesWeb)) $startDelugeWeb($thisUser);
     #TODO(user-logs): record deluge-web start in per-user log
 
-}
-
-
-function startDeluged($user) {    // start the user's Deluge daemon
-    echo "Start deluged for user: {$user}\n";
-    passthru("su {$user} -c 'cd ~; deluged -l /home/{$user}/.delugeLog -L info'");
-}
-
-function startDelugeWeb($user) {
-    echo "Start deluge-web for user: {$user}\n";
-    passthru("su {$user} -c 'cd ~; deluge-web -l /home/{$user}/.delugeWebLog -L info'");
 }

@@ -4,7 +4,6 @@ namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
-require_once __DIR__ . '/../runtime.php';
 
 class Manager
 {

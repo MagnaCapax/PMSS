@@ -10,7 +10,6 @@ declare(strict_types=1);
  * packages.
  */
 
-require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/openvpn.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
 

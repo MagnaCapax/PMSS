@@ -13,7 +13,6 @@ if (!is_dir($logFileDirectory)) die("{$logFileDirectory} is normal file and not 
 if (!is_writeable($logFileDirectory)) die("{$logFileDirectory} is not writeable\n");
 
 // Get smart stats
-$deviceSmart = array();
 foreach($devices AS $thisDevice) {
     $thisDeviceData = array();
     //$data = `smartctl -a /dev/{$thisDevice}`;

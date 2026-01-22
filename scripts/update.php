@@ -347,6 +347,15 @@ function normaliseSpec(string $spec): string
  */
 function parseSpec(string $spec): array
 {
+    if (strcasecmp(trim($spec), 'release') === 0) {
+        return [
+            'type'   => 'release',
+            'repo'   => DEFAULT_REPO,
+            'branch' => '',
+            'pin'    => '',
+        ];
+    }
+
     if (!preg_match('/^(git|release)([\/:])(.*)$/i', $spec, $m)) {
         fatal("Unable to parse source spec '{$spec}'", EXIT_PARSE);
     }

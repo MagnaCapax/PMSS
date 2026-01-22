@@ -13,8 +13,6 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 // Update & check user quota information
-const LOG_FILE     = '/var/log/pmss/updateQuotas.log';
-const FALLBACK_LOG = '/tmp/updateQuotas.log';
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';

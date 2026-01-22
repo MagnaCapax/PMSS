@@ -26,36 +26,35 @@ if ($userName === '' || $limitRaw === null || $limitRaw === true) {
     die('need user name. '.$usage."\n");
 }
 
-$user = [
-    'name' => $userName,
-    'trafficLimit' => (int)$limitRaw,
-];
+$trafficLimit = (int) $limitRaw;
+
+$setTrafficLimitFile = static function (string $userTrafficFile, int $trafficLimit): void {
+    if ($trafficLimit === 0) {
+        if (file_exists($userTrafficFile)) {
+            unlink($userTrafficFile);
+        }
+        return;
+    }
+
+    if ($trafficLimit > 0) {
+        file_put_contents($userTrafficFile, $trafficLimit);
+    }
+};
 
 // Check if user exists
 $userList = file_get_contents('/etc/passwd');
-if (strpos($userList, $user['name']) === false
-    || !file_exists("/home/{$user['name']}")
-    || !is_dir("/home/{$user['name']}") ) {
+if (strpos($userList, $userName) === false
+    || !file_exists("/home/{$userName}")
+    || !is_dir("/home/{$userName}") ) {
     die("No such user\n");
 }
 
 //Save the configured limit
-$userTrafficFile = "/etc/seedbox/runtime/trafficLimits/{$user['name']}";
-setTrafficLimitFile($userTrafficFile, $user['trafficLimit']);
-setTrafficLimitFile("/home/{$user['name']}/.trafficLimit", $user['trafficLimit']);
+$userTrafficFile = "/etc/seedbox/runtime/trafficLimits/{$userName}";
+$setTrafficLimitFile($userTrafficFile, $trafficLimit);
+$setTrafficLimitFile("/home/{$userName}/.trafficLimit", $trafficLimit);
 
 if (file_exists($userTrafficFile)) {
     chmod($userTrafficFile, 0600);
 }
-echo "Traffic limit for {$user['name']} set at {$user['trafficLimit']}\n";
-
-
-function setTrafficLimitFile($userTrafficFile, $trafficLimit) {
-    if ($trafficLimit == 0) {
-        if (file_exists($userTrafficFile)) {
-            unlink($userTrafficFile);
-        }
-    } elseif ($trafficLimit > 0) {
-        file_put_contents($userTrafficFile, (int)$trafficLimit);
-    }
-}
+echo "Traffic limit for {$userName} set at {$trafficLimit}\n";

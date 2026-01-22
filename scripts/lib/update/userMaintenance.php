@@ -363,35 +363,6 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
     }
 }
 
-if (!function_exists('pmssRefreshSkeletonAndCron')) {
-    /**
-     * Re-apply skeleton permissions and critical cron/FTP settings.
-     * #TODO(skel-placement): revisit timing; /scripts/update.php already stages
-     * /etc/skel early. Consider staging/atomic swap instead of mid-update refresh.
-     */
-    function pmssRefreshSkeletonAndCron(): void
-    {
-        runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
-        runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
-        runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
-    }
-}
-
-if (!function_exists('pmssInstallLogrotatePolicy')) {
-    /**
-     * Deploy the logrotate policy for update logs when available.
-     */
-    function pmssInstallLogrotatePolicy(): void
-    {
-        $template = '/etc/seedbox/config/template.logrotate.pmss';
-        if (!file_exists($template)) {
-            return;
-        }
-        runStep('Installing logrotate policy for PMSS update logs', sprintf('cp %s /etc/logrotate.d/pmss-update', escapeshellarg($template)));
-        runStep('Setting permissions on PMSS logrotate policy', 'chmod 644 /etc/logrotate.d/pmss-update');
-    }
-}
-
 if (!function_exists('pmssRestoreUserCrontabs')) {
     /**
      * Restore the default user crontabs from the template.

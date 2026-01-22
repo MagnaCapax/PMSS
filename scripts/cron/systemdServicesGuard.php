@@ -8,7 +8,6 @@
  * This is a drift guard against package manager actions and manual starts.
  */
 
-require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/runtime/processes.php';
 

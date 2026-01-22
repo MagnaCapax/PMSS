@@ -238,8 +238,17 @@ pmssEnsureTestfile();
 pmssRestrictAtopBinary();
 
 pmssPostUpdateWebRefresh();
-pmssRefreshSkeletonAndCron();
-pmssInstallLogrotatePolicy();
+
+runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
+runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
+runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
+
+$logrotateTemplate = '/etc/seedbox/config/template.logrotate.pmss';
+if (file_exists($logrotateTemplate)) {
+    runStep('Installing logrotate policy for PMSS update logs', sprintf('cp %s /etc/logrotate.d/pmss-update', escapeshellarg($logrotateTemplate)));
+    runStep('Setting permissions on PMSS logrotate policy', 'chmod 644 /etc/logrotate.d/pmss-update');
+}
+
 pmssRestoreUserCrontabs();
 // #TODO(per-user-loop): migrate the global web stack refresh/cron/authorized
 // keys tasks above into the single per-user orchestrator so we do not run

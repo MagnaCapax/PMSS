@@ -7,79 +7,6 @@ require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../runtime.php';
 
-if (!function_exists('pmssHasLocale')) {
-    /**
-     * Return true when the given locale (e.g., en_US.UTF-8) is generated.
-     */
-    function pmssHasLocale(string $locale): bool
-    {
-        $out = [];
-        @exec('locale -a 2>/dev/null', $out);
-        if (empty($out)) {
-            return false;
-        }
-        $needle1 = strtolower($locale);
-        $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
-        foreach ($out as $line) {
-            $val = strtolower(trim($line));
-            if ($val === $needle1 || $val === $needle2) {
-                return true;
-            }
-        }
-        return false;
-    }
-}
-
-if (!function_exists('pmssLocaleEnabledInGen')) {
-    /**
-     * True when /etc/locale.gen has an uncommented line for the locale.
-     */
-    function pmssLocaleEnabledInGen(string $locale): bool
-    {
-        $data = @file_get_contents('/etc/locale.gen');
-        if ($data === false) {
-            return false;
-        }
-        foreach (preg_split('/\r?\n/', $data) as $line) {
-            $trim = trim($line);
-            if ($trim === '') continue;
-            if ($trim[0] === '#') continue;
-            if (stripos($trim, $locale.' UTF-8') === 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-}
-
-if (!function_exists('pmssDefaultLocaleMatches')) {
-    /**
-     * Check if /etc/default/locale sets LANG (and optionally LC_TIME) to the target.
-     */
-    function pmssDefaultLocaleMatches(string $langTarget, ?string $timeTarget = null): bool
-    {
-        $data = @file_get_contents('/etc/default/locale');
-        if ($data === false) {
-            return false;
-        }
-        $lang = null;
-        $lcTime = null;
-        foreach (preg_split('/\r?\n/', $data) as $line) {
-            $line = trim($line);
-            if ($line === '' || $line[0] === '#') continue;
-            if (stripos($line, 'LANG=') === 0)     { $lang   = trim(substr($line, 5)); }
-            if (stripos($line, 'LC_TIME=') === 0)  { $lcTime = trim(substr($line, 8)); }
-        }
-        if ($lang !== $langTarget) {
-            return false;
-        }
-        if ($timeTarget !== null && $lcTime !== $timeTarget) {
-            return false;
-        }
-        return true;
-    }
-}
-
 if (!function_exists('pmssCgroupMode')) {
     /**
      * Detect cgroup mode: 'v2', 'v1', or 'unknown'.
@@ -511,10 +438,25 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
         $timeLocale = 'en_US.UTF-8';
 
         foreach ([$langLocale, $timeLocale] as $locale) {
-            $enabled = pmssLocaleEnabledInGen($locale);
+            $enabled = false;
+            $gen = @file_get_contents('/etc/locale.gen');
+            if (is_string($gen)) {
+                foreach (preg_split('/\r?\n/', $gen) as $line) {
+                    $trim = trim($line);
+                    if ($trim === '') {
+                        continue;
+                    }
+                    if ($trim[0] === '#') {
+                        continue;
+                    }
+                    if (stripos($trim, $locale.' UTF-8') === 0) {
+                        $enabled = true;
+                        break;
+                    }
+                }
+            }
             if (!$enabled) {
                 $line = $locale.' UTF-8';
-                $gen  = @file_get_contents('/etc/locale.gen');
                 if ($gen === false) {
                     // Best effort: create file with the required locale line
                     @file_put_contents('/etc/locale.gen', $line."\n");
@@ -535,7 +477,20 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
                 }
             }
 
-            $has = pmssHasLocale($locale);
+            $out = [];
+            @exec('locale -a 2>/dev/null', $out);
+            $has = false;
+            if (!empty($out)) {
+                $needle1 = strtolower($locale);
+                $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
+                foreach ($out as $line) {
+                    $val = strtolower(trim((string) $line));
+                    if ($val === $needle1 || $val === $needle2) {
+                        $has = true;
+                        break;
+                    }
+                }
+            }
             if (!$has || !$enabled) {
                 runStep('Generating '.$locale.' locale', 'locale-gen '.$locale);
             } else {
@@ -543,7 +498,26 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
             }
         }
 
-        if (!pmssDefaultLocaleMatches($langLocale, $timeLocale)) {
+        $defaultMatches = false;
+        $data = @file_get_contents('/etc/default/locale');
+        if (is_string($data)) {
+            $lang = null;
+            $lcTime = null;
+            foreach (preg_split('/\r?\n/', $data) as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') {
+                    continue;
+                }
+                if (stripos($line, 'LANG=') === 0) {
+                    $lang = trim(substr($line, 5));
+                }
+                if (stripos($line, 'LC_TIME=') === 0) {
+                    $lcTime = trim(substr($line, 8));
+                }
+            }
+            $defaultMatches = ($lang === $langLocale && $lcTime === $timeLocale);
+        }
+        if (!$defaultMatches) {
             runStep(
                 'Setting default system locale',
                 'update-locale LANG='.$langLocale.' LC_TIME='.$timeLocale

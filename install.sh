@@ -188,7 +188,8 @@ if [ $# -gt 0 ]; then
 	SOURCE_SPEC="$1"
 	shift
 else
-	SOURCE_SPEC=""
+	# Default to the latest published release when no spec is provided.
+	SOURCE_SPEC="release"
 fi
 if [ -n "$SOURCE_SPEC" ]; then
 	UPDATE_ARGS=("$SOURCE_SPEC" "$@")
@@ -253,10 +254,46 @@ fi
 parse_version_string() {
 	local input_string="$1"
 
-	if [[ $input_string =~ (^git|^release)\/(.*?)[:]?([0-9]{4}-[0-9]{2}-[0-9]{2})?[\ ]?([0-9]{2}[:][0-9]{2})?$ ]]; then
-		type="${BASH_REMATCH[1]}"
-		url="${BASH_REMATCH[2]}"
-		date="${BASH_REMATCH[3]}"
+	type=
+	url=
+	date=
+	repository=
+	branch=
+
+	# Trim whitespace; installer specs are expected to be compact.
+	input_string="${input_string#"${input_string%%[![:space:]]*}"}"
+	input_string="${input_string%"${input_string##*[![:space:]]}"}"
+
+	if [ -z "$input_string" ]; then
+		return 0
+	fi
+
+	# Support explicit "release" (latest) and "release:<tag>" / "release/<tag>".
+	if [[ "$input_string" == "release" || "$input_string" == "release:" || "$input_string" == "release/" ]]; then
+		type="release"
+		log_info "Spec type: $type"
+		return 0
+	fi
+
+	if [[ "$input_string" =~ ^release[/:](.+)$ ]]; then
+		type="release"
+		url="${BASH_REMATCH[1]}"
+		log_info "Spec type: $type"
+		log_info "Spec tag: $url"
+		return 0
+	fi
+
+	# Support legacy "git/<branch>[:YYYY-MM-DD]" and optional custom repo syntax.
+	if [[ "$input_string" =~ ^git[/:](.*)$ ]]; then
+		type="git"
+		url="${BASH_REMATCH[1]}"
+
+		# Strip optional date pin (install.sh does not pin itself, but must not mis-parse it as a branch).
+		if [[ "$url" =~ ^(.+):([0-9]{4}-[0-9]{2}-[0-9]{2})([[:space:]]+[0-9]{2}:[0-9]{2})?$ ]]; then
+			url="${BASH_REMATCH[1]}"
+			date="${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+		fi
+
 		log_info "Spec type: $type"
 		log_info "Spec URL: $url"
 		log_info "Spec date: $date"
@@ -265,20 +302,24 @@ parse_version_string() {
 			branch="${BASH_REMATCH[2]}"
 			log_info "Repository: $repository"
 			log_info "Branch: $branch"
+			return 0
+		fi
 
-		elif [[ $url =~ (^[a-zA-Z]*?)[:]?$ ]]; then
+		if [[ $url =~ (^[a-zA-Z0-9._-]+)[:]?$ ]]; then
 			repository=$DEFAULT_REPOSITORY
 			branch="${BASH_REMATCH[1]}"
 			log_info "Repository: $repository"
 			log_info "Branch: $branch"
-		else
-			log_warn "Spec URL didn't match expected format, using defaults"
-			repository=$DEFAULT_REPOSITORY
-			branch="main"
+			return 0
 		fi
-	else
-		log_warn "Invalid version spec, using defaults"
+
+		log_warn "Spec URL didn't match expected format, using defaults"
+		repository=$DEFAULT_REPOSITORY
+		branch="main"
+		return 0
 	fi
+
+	log_warn "Invalid version spec, using defaults"
 }
 
 # Idempotently append a snippet to a file if it's not already present.
@@ -362,7 +403,7 @@ print_summary() {
 	if [ "$type" = "git" ]; then
 		spec_display="${type}/${repository}:${branch}${date:+:$date}"
 	else
-		spec_display="${type}${url:+/${url}}${date:+:$date}"
+		spec_display="${type}${url:+:$url}"
 	fi
 
 	log_step "Install summary"
@@ -738,10 +779,9 @@ rm -rf PMSS*
 echo
 parse_version_string "$SOURCE_SPEC"
 if [ -z "$type" ]; then
-	type="git"
-	repository="$DEFAULT_REPOSITORY"
-	branch="main"
-	log_info "Defaulting to git/main"
+	type="release"
+	url=
+	log_info "Defaulting to latest release"
 fi
 
 if [ "$type" = "git" ]; then
@@ -756,7 +796,11 @@ if [ "$type" = "git" ]; then
 	SOURCE="$type/$repository:$branch"
 	VERSION="$SOURCE"
 else
-	VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
+	if [ -n "$url" ]; then
+		VERSION="$url"
+	else
+		VERSION=$(wget https://api.github.com/repos/MagnaCapax/PMSS/releases/latest -O - | awk -F \" -v RS="," '/tag_name/ {print $(NF-1)}')
+	fi
 	wget "https://api.github.com/repos/MagnaCapax/PMSS/tarball/${VERSION}" -O PMSS.tar.gz
 	mkdir PMSS && tar -xzf PMSS.tar.gz -C PMSS --strip-components 1
 	rsync -a --ignore-missing-args PMSS/{var,scripts,etc} /

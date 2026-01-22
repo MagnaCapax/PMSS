@@ -22,9 +22,6 @@ if ($usersRaw === '') {
 }
 
 $users = array_filter(explode("\n", $usersRaw), 'strlen');
-if (empty($users)) {
-    die("No users setup - nothing to do\n");
-}
 
 $globalHtpasswd = '/etc/lighttpd/.htpasswd';
 $globalContents = @file_get_contents($globalHtpasswd);

@@ -80,29 +80,6 @@ function pmssCheckRtorrentPgrepExact(string $user, string $comm): array
 }
 
 /**
- * List PIDs for a user by matching the full command line.
- *
- * @return int[]
- */
-function pmssCheckRtorrentPgrepFull(string $user, string $pattern): array
-{
-    $out = [];
-    $rc = 1;
-    @exec('pgrep -u '.escapeshellarg($user).' -f '.escapeshellarg($pattern), $out, $rc);
-    if ($rc !== 0) {
-        return [];
-    }
-    $pids = [];
-    foreach ($out as $line) {
-        $pid = (int) trim((string) $line);
-        if ($pid > 0) {
-            $pids[] = $pid;
-        }
-    }
-    return $pids;
-}
-
-/**
  * Locate executor-related processes, separating the php wrapper from the
  * detached screen session.
  *

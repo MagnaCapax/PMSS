@@ -12,7 +12,6 @@
 
 require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
-require_once __DIR__.'/../lib/runtime.php';
 
 function v($k){ $o=@shell_exec('systemctl show user-0.slice -p '.$k.' 2>/dev/null'); if($o===null)return ''; $o=trim($o); $pos=strpos($o,'='); return $pos!==false?substr($o,$pos+1):$o; }
 

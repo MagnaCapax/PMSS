@@ -19,13 +19,7 @@ $cacheUsers = array_keys($db->getUsers());
 $homeUsers = users::listHomeDirectories();
 $passwdUsers = users::listPasswdUsers();
 
-$set = static function (array $list): array {
-    $set = [];
-    foreach ($list as $item) {
-        $set[$item] = true;
-    }
-    return $set;
-};
+$set = static function (array $list): array { return array_fill_keys($list, true); };
 
 $dbSet = $set($cacheUsers);
 $homeSet = $set($homeUsers);

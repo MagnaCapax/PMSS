@@ -1,8 +1,6 @@
 #!/usr/bin/env php
 <?php
 // Checks and creates required temp directories used by other cron jobs.
-const LOG_FILE     = '/var/log/pmss/checkDirectories.log';
-const FALLBACK_LOG = '/tmp/checkDirectories.log';
 
 require_once '/scripts/lib/logger.php';
 $logger = new Logger(__FILE__);
@@ -30,4 +28,3 @@ foreach($requiredDirectories AS $thisDir) {
     // Directories need the execute bit to be traversable
     chmod($thisDir, 0700);
 }
-

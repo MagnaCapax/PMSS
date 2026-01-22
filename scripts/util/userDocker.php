@@ -88,31 +88,24 @@ if ($debug) {
     pmssUserLog($user, sprintf('userDocker: action=%s requested', $action));
 }
 
-// Helper to resolve the timeout binary when available (Debian coreutils).
-function userDockerTimeoutBinary(): ?string
-{
-    static $resolved = false;
-    static $binary = null;
-    if ($resolved) {
-        return $binary;
-    }
-    $resolved = true;
-    $candidates = ['/usr/bin/timeout', '/bin/timeout'];
-    foreach ($candidates as $candidate) {
-        if (is_file($candidate) && is_executable($candidate)) {
-            $binary = $candidate;
-            break;
-        }
-    }
-    return $binary;
-}
-
 // Helper to execute a command as the target user via su, with an optional timeout.
 function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null, ?int &$rc = null): string
 {
+    static $timeoutBinResolved = false;
+    static $timeoutBin = null;
+
     $wrapper = sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($cmd));
     if ($timeoutSeconds !== null && $timeoutSeconds > 0) {
-        $timeoutBin = userDockerTimeoutBinary();
+        if (!$timeoutBinResolved) {
+            $timeoutBinResolved = true;
+            $candidates = ['/usr/bin/timeout', '/bin/timeout'];
+            foreach ($candidates as $candidate) {
+                if (is_file($candidate) && is_executable($candidate)) {
+                    $timeoutBin = $candidate;
+                    break;
+                }
+            }
+        }
         if ($timeoutBin !== null) {
             $wrapper = sprintf(
                 '%s %s %s',

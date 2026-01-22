@@ -11,7 +11,19 @@ echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
 // Get & parse users list
 $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
-$changedConfig = array();
+
+$startLighttpd = static function (string $user): void {
+    echo "Start lighttpd for user: {$user}\n";
+    passthru('/scripts/startLighttpd ' . $user);
+};
+
+$restartLighttpd = static function (string $user) use ($startLighttpd): void {
+    echo "Killing (if any) lighttpd for user: {$user}\n";
+    shell_exec("killall -15 -u {$user} lighttpd; killall -15 -u {$user} php-cgi; sleep 5; killall -9 -u {$user} lighttpd; killall -9 -u {$user} php-cgi;");
+    usleep(50000);   // brief pause before relaunch
+    $startLighttpd($user);
+    #TODO(user-logs): record lighttpd restart in per-user log
+};
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
     if (empty($thisUser)) continue;
@@ -30,7 +42,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     // If socket connection fails or no php-cgi instance is found
     if (empty($instancesPhpCgi)) {        
             echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
-            restartLighttpd($thisUser);
+            $restartLighttpd($thisUser);
             continue;
 
     }
@@ -50,7 +62,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             continue;
         }
     }
-    if ($socketError == true) { restartLighttpd($thisUser); continue; }
+    if ($socketError == true) { $restartLighttpd($thisUser); continue; }
 
 
 
@@ -65,22 +77,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     */
 
     if(empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
-        startLighttpd($thisUser);
+        $startLighttpd($thisUser);
         continue;
     }
 
-}
-
-
-function startLighttpd($thisUser) {    // this actually calls the function to start Lighttpd :)
-    echo "Start lighttpd for user: {$thisUser}\n";
-    passthru('/scripts/startLighttpd ' . $thisUser);
-}
-
-function restartLighttpd($thisUser) {    // Kill any php-cgi or lighttpd process for user, make sure no double launch
-    echo "Killing (if any) lighttpd for user: {$thisUser}\n";
-    shell_exec("killall -15 -u {$thisUser} lighttpd; killall -15 -u {$thisUser} php-cgi; sleep 5; killall -9 -u {$thisUser} lighttpd; killall -9 -u {$thisUser} php-cgi;");
-    usleep(50000);   // brief pause before relaunch
-    startLighttpd($thisUser);
-    #TODO(user-logs): record lighttpd restart in per-user log
 }

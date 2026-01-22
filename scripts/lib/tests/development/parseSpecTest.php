@@ -6,6 +6,15 @@ require_once dirname(__DIR__, 3).'/update.php';
 
 class ParseSpecTest extends TestCase
 {
+    public function testParsesReleaseLatestWithoutTag(): void
+    {
+        $parsed = parseSpec('release');
+        $this->assertEquals('release', $parsed['type']);
+        $this->assertEquals(DEFAULT_REPO, $parsed['repo']);
+        $this->assertEquals('', $parsed['branch']);
+        $this->assertEquals('', $parsed['pin']);
+    }
+
     public function testParsesGitBranchWithDate(): void
     {
         $parsed = parseSpec('git/main:2025-05-11');

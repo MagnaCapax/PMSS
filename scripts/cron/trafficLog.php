@@ -1,8 +1,6 @@
 #!/usr/bin/env php
 <?php
 // Cron job log file paths match the cron schedule in root.cron
-const LOG_FILE     = '/var/log/pmss/trafficLog.log';
-const FALLBACK_LOG = '/tmp/trafficLog.log';
 
 require_once '/scripts/lib/logger.php';
 $logger = new Logger(__FILE__);

@@ -50,18 +50,6 @@ if (!file_exists($userConfig)) {
     exit(1);
 }
 
-/**
- * Detect whether a file looks like the current flock-protected executor.
- */
-function pmssRtorrentExecutorHasLock(string $path): bool
-{
-    $data = @file_get_contents($path);
-    if (!is_string($data) || $data === '') {
-        return false;
-    }
-    return strpos($data, '.rtorrentExecute.lock') !== false && strpos($data, 'flock(') !== false;
-}
-
 // Make start idempotent and race-safe: multiple cron/watchdog invocations must
 // converge to a single screen+executor+rTorrent process set.
 $lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
@@ -81,8 +69,11 @@ if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
 $executor = $home.'/.rtorrentExecute.php';
 $skelExecutor = '/etc/skel/.rtorrentExecute.php';
 if (is_file($executor) && is_file($skelExecutor) && !is_link($executor)) {
-    $executorHasLock = pmssRtorrentExecutorHasLock($executor);
-    $skelHasLock = pmssRtorrentExecutorHasLock($skelExecutor);
+    $executorData = @file_get_contents($executor);
+    $executorHasLock = is_string($executorData) && $executorData !== '' && strpos($executorData, '.rtorrentExecute.lock') !== false && strpos($executorData, 'flock(') !== false;
+
+    $skelData = @file_get_contents($skelExecutor);
+    $skelHasLock = is_string($skelData) && $skelData !== '' && strpos($skelData, '.rtorrentExecute.lock') !== false && strpos($skelData, 'flock(') !== false;
     if (!$executorHasLock && $skelHasLock) {
         if (@copy($skelExecutor, $executor)) {
             @chmod($executor, 0755);

@@ -9,8 +9,6 @@ declare(strict_types=1);
  * Supports machine-readable output via `--json`.
  */
 
-require_once __DIR__.'/../lib/runtime.php';
-
 $options = getopt('', ['json']);
 $wantJson = isset($options['json']);
 $results = [];

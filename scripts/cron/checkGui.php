@@ -18,9 +18,7 @@ require_once __DIR__.'/../lib/users.php';
 $logger = new Logger(__FILE__);
 
 // Get & parse users list using the robust library method
-$users = users::listHomeUsers();
-
-foreach($users as $thisUser) {    // Loop users checking their instances
+foreach(users::listHomeUsers() as $thisUser) {    // Loop users checking their instances
     if (empty($thisUser)) continue;
     
     // User suspended check

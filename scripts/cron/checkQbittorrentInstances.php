@@ -6,6 +6,11 @@ echo date('Y-m-d H:i:s') . ': Checking qBittorrent instances' . "\n";
 $users = shell_exec('/scripts/listUsers.php');
 $users = explode("\n", trim($users));
 
+$startQbittorrent = static function (string $user): void {
+    echo "Start qBittorrent for user: {$user}\n";
+    passthru("su {$user} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'");
+};
+
 foreach($users AS $thisUser) {    // Loop users checking their instances
     #TODO(user-logs): log per-user start/kill actions to /var/log/pmss/user-<username>.log
     if (empty($thisUser)) continue;
@@ -21,14 +26,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     
     // pgrep returns running qbittorrent-nox processes owned by the user
     $instances = shell_exec('pgrep -u' . $thisUser . ' qbittorrent-nox');
-    if (empty($instances)) startQbittorrent($thisUser);
+    if (empty($instances)) $startQbittorrent($thisUser);
     #TODO(user-logs): record qbittorrent start in per-user log
  
 
-}
-
-
-function startQbittorrent($user) {    // this actually calls the function to start rTorrent :)
-    echo "Start qBittorrent for user: {$user}\n";
-    passthru("su {$user} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'");
 }

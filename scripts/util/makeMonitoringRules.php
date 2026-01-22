@@ -6,7 +6,6 @@ $users = trim( `/scripts/listUsers.php` );
 if (empty($users)) exit;
 
 $users = explode("\n", $users);
-if (count($users) == 0) die("No users setup - nothing to do\n");
 $users[] = 'www-data';
 
 $mark = 1;
@@ -48,4 +47,3 @@ if ($localnets !== false &&
         echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -j ACCEPT\n";
 
     }
-
