@@ -181,20 +181,19 @@ class Motd
 
     private static function serviceStatuses(): array
     {
-        $color = static function (string $text, string $color): string { return "\e[{$color}m{$text}\e[0m"; };
-        $svc = static function (string $service, ?string $configPath, string $name) use ($color): string {
+        $svc = static function (string $service, ?string $configPath): string {
             if ($configPath !== null && !file_exists($configPath)) {
-                return $color('not configured','33');
+                return self::c('not configured', '33');
             }
-            if (!is_dir('/run/systemd/system')) return $color('unknown','33');
+            if (!is_dir('/run/systemd/system')) return self::c('unknown', '33');
             exec('systemctl is-active --quiet '.escapeshellarg($service), $o, $rc);
-            if ($rc === 0) return $color('active','32');
+            if ($rc === 0) return self::c('active', '32');
             exec('systemctl is-enabled --quiet '.escapeshellarg($service), $o, $en);
-            return $en !== 0 ? $color('disabled','33') : $color('inactive','31');
+            return $en !== 0 ? self::c('disabled', '33') : self::c('inactive', '31');
         };
         return [
-            $svc('wg-quick@wg0','/etc/wireguard/wg0.conf','WireGuard'),
-            $svc('openvpn@openvpn','/etc/openvpn/openvpn.conf','OpenVPN'),
+            $svc('wg-quick@wg0', '/etc/wireguard/wg0.conf'),
+            $svc('openvpn@openvpn', '/etc/openvpn/openvpn.conf'),
         ];
     }
 
