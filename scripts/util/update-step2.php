@@ -52,6 +52,28 @@ require_once __DIR__.'/../lib/motd/Generator.php';
 
 requireRoot();
 
+// Ensure the root cron template is restored even if the updater exits early.
+// Phase 1 disables `/etc/cron.d/pmss` to avoid cron activity while the tree is
+// partially refreshed; if phase 2 crashes, we still want cron back on the next boot.
+$pmssRootCronRestored = false;
+register_shutdown_function(function () use (&$pmssRootCronRestored): void {
+    if ($pmssRootCronRestored) {
+        return;
+    }
+    if (getenv('PMSS_DRY_RUN') === '1') {
+        return;
+    }
+    $helper = '/scripts/util/setupRootCron.php';
+    if (!is_file($helper)) {
+        return;
+    }
+    if (function_exists('runStep')) {
+        runStep('Restoring root cron configuration (shutdown)', $helper);
+        return;
+    }
+    @passthru($helper);
+});
+
 // Preflight: ensure root can keep forking during long updates even if legacy TasksMax caps are present.
 // Safe before the package phase; avoids "Cannot fork" cascades inside user-0.slice.
 runStep('Ensuring root user slice TasksMax is unlimited (preflight)', "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity");
@@ -231,7 +253,6 @@ pmssAdjustLighttpdSecurity();
 // template changes.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
 pmssUpdateAllUsers($rutorrentIndexSha);
-// #TODO(user-logs): per-user environment updates could append summary lines to /var/log/pmss/user-<username>.log
 
 pmssEnsureAuthorizedKeysDirective();
 pmssEnsureTestfile();
@@ -240,7 +261,6 @@ pmssRestrictAtopBinary();
 pmssPostUpdateWebRefresh();
 
 runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
-runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
 runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
 
 $logrotateTemplate = '/etc/seedbox/config/template.logrotate.pmss';
@@ -262,10 +282,17 @@ pmssApplySecurityHardening();
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
 
 // Mark the end of phase 2 so log parsing knows we finished cleanly.
-// Refresh MOTD at the very end so VPN/service status reflects final state.
-// Consolidated on the Motd class generator for determinism
-Motd::motdGenerate();
 pmssProfileSummary();
+
+// Restore root cron at the very end. Phase 1 disables it to avoid cron activity
+// during a partial-update window; we want it back for normal operations.
+runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php');
+$pmssRootCronRestored = true;
+
+// Record successful completion for MOTD/monitoring.
+@file_put_contents('/var/run/pmss/updated', date('Y-m-d H:i:s'));
+@chmod('/var/run/pmss/updated', 0644);
+
 // Surface log locations for operators to review after updates.
 try {
     $plainLog   = defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : '/var/log/pmss-update.log';
@@ -280,9 +307,9 @@ try {
     // Fail-soft: logging paths are best-effort only.
 }
 
-// Record successful completion for MOTD/monitoring
-@file_put_contents('/var/run/pmss/updated', date('Y-m-d H:i:s'));
-@chmod('/var/run/pmss/updated', 0644);
+// Refresh MOTD at the very end so service status reflects final state.
+// Consolidated on the Motd class generator for determinism.
+Motd::motdGenerate();
 
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
 logmsg('update-step2.php completed');

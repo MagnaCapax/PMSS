@@ -493,6 +493,36 @@ function runSoft(string $command): void
     }
 }
 
+/**
+ * Best-effort restore of PMSS root cron after updates that temporarily disable it.
+ *
+ * During phase 1 we remove `/etc/cron.d/pmss` to avoid cron activity while the
+ * tree is partially refreshed. Some flows (dist-upgrade) exit before phase 2,
+ * so we must restore the cron template here as well.
+ */
+function restoreRootCronBestEffort(string $context): void
+{
+    $helper   = '/scripts/util/setupRootCron.php';
+    $template = '/etc/seedbox/config/root.cron';
+    $target   = '/etc/cron.d/pmss';
+
+    if (!file_exists($helper)) {
+        logmsg('[WARN] setupRootCron.php missing; cannot restore root cron after '.$context);
+        return;
+    }
+    if (!file_exists($template)) {
+        logmsg('[WARN] root.cron template missing; cannot restore root cron after '.$context);
+        return;
+    }
+    if (file_exists($target)) {
+        logmsg('[INFO] Root cron already present; no restore needed after '.$context);
+        return;
+    }
+
+    logmsg('[INFO] Restoring root cron after '.$context);
+    runSoft($helper);
+}
+
 function ensureSnapshot(string $tmp): void
 {
     $required = [
@@ -807,8 +837,25 @@ function maybeRunDistUpgrade($distUpgrade): void
         fatal("You must specify a maximum version for dist-upgrade (e.g. --dist-upgrade=11 or --dist-upgrade=bullseye).", EXIT_PARSE);
     }
     logEvent('dist_upgrade_start', ['target' => $distUpgrade]);
-    runFatal('/scripts/util/update-dist-upgrade.php ' . escapeshellarg($distUpgrade), EXIT_DIST);
-    logEvent('dist_upgrade_end');
+    $cmd = '/scripts/util/update-dist-upgrade.php ' . escapeshellarg($distUpgrade);
+    logmsg('[RUN] '.$cmd);
+    passthru($cmd, $rc);
+    logEvent('dist_upgrade_end', ['rc' => $rc]);
+
+    // Dist-upgrade flow exits before phase 2; ensure root cron is restored even
+    // though phase 1 disabled it to avoid partial-update windows.
+    restoreRootCronBestEffort('dist-upgrade');
+
+    if ($rc !== 0) {
+        fatal('dist-upgrade helper exited with status '.$rc, EXIT_DIST);
+    }
+
+    // Best-effort refresh of MOTD after a successful dist-upgrade run. This
+    // gives operators immediate visibility without requiring a reboot.
+    $motd = '/scripts/util/motdGenerate.php';
+    if (file_exists($motd)) {
+        runSoft($motd);
+    }
 }
 
 function bootstrapMain(array $argv): void

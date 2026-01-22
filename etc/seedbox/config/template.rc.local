@@ -39,7 +39,9 @@ nohup /scripts/listUsers.php | while read -r U; do
     [ -z "$U" ] && continue
     UID_NUM=$(id -u "$U" 2>/dev/null) || continue
     systemctl start "user@${UID_NUM}.service" || true
-    #TODO(user-logs): consider writing to /var/log/pmss/user-<username>.log when reliable
+    if command -v php >/dev/null 2>&1 && [ -f /scripts/lib/user/log.php ]; then
+        php -r 'require "/scripts/lib/user/log.php"; if (function_exists("pmssUserLog") && isset($argv[1])) { pmssUserLog($argv[1], "rc.local: ensured user@ service running"); }' "$U" >/dev/null 2>&1 || true
+    fi
 done >> /dev/null 2>&1 &
 
 # If /home is in fstab but not mounted yet, retry once after boot settles.
@@ -47,6 +49,18 @@ if ! grep -qE '[[:space:]]/home[[:space:]]' /proc/mounts; then
     if grep -qE '^[^#].*[[:space:]]/home[[:space:]]' /etc/fstab; then
         nohup bash -c 'sleep 30; grep -qE "[[:space:]]/home[[:space:]]" /proc/mounts || mount /home' >> /dev/null 2>&1 &
     fi
+fi
+
+# If an update run removed `/etc/cron.d/pmss` mid-flight, restore the template
+# without restarting cron (restarting cron can re-trigger @reboot jobs).
+if [ -f /etc/seedbox/config/root.cron ]; then
+    install -m 0644 /etc/seedbox/config/root.cron /etc/cron.d/pmss >/dev/null 2>&1 || true
+fi
+
+# Refresh MOTD at boot so service/network status reflects current runtime state.
+if command -v php >/dev/null 2>&1 && [ -x /scripts/util/motdGenerate.php ]; then
+    mkdir -p /var/log/pmss >/dev/null 2>&1 || true
+    /scripts/util/motdGenerate.php >> /var/log/pmss/motdGenerate.log 2>&1 || true
 fi
 
 exit 0
