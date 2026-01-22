@@ -2,14 +2,31 @@
 <?php
 # Set user folder permissions
 
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
+
+$pmssUserLifecyclePath = __DIR__.'/../lib/userLifecycle.php';
+if (is_file($pmssUserLifecyclePath)) {
+    require_once $pmssUserLifecyclePath;
+}
+
 $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
     
 $thisUser = $argv[1];
-#TODO(user-logs): log major permission/ownership corrections to /var/log/pmss/user-<username>.log
-if (!file_exists("/home/{$thisUser}")) die("User does not exist\n");
-$userList = file_get_contents('/etc/passwd');
-if (strpos($userList, $thisUser) === false) die("No such user\n");
+if (function_exists('pmssValidateUsername') && !pmssValidateUsername($thisUser)) {
+    die("Invalid username\n");
+}
+if (!is_dir("/home/{$thisUser}")) die("User does not exist\n");
+
+function pmssMaybeUserLog(string $user, string $message): void
+{
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, $message);
+    }
+}
 
 function pmssPasswdUserIds(string $username): ?array
 {
@@ -30,6 +47,8 @@ function pmssPasswdUserIds(string $username): ?array
     }
     return null;
 }
+
+if (pmssPasswdUserIds($thisUser) === null) die("No such user\n");
 
 function run(string $cmd): int
 {
@@ -104,6 +123,16 @@ if (is_array($userIds)) {
             )
         );
         chownPath("/home/{$thisUser}", $userIds['uid'].':'.$userIds['gid']);
+        pmssMaybeUserLog(
+            $thisUser,
+            sprintf(
+                'userPermissions: fixed home ownership (uid=%s gid=%s, was uid=%s gid=%s)',
+                $userIds['uid'],
+                $userIds['gid'],
+                $homeOwner,
+                $homeGroup
+            )
+        );
     }
 }
 run(sprintf(
@@ -118,6 +147,7 @@ if (!is_dir($binDirHidden)) {
     run(sprintf('mkdir -p %s', escapeshellarg($binDirHidden)));
     chownPath($binDirHidden, "{$thisUser}:{$thisUser}");
     chmodPath($binDirHidden, 0750, true);
+    pmssMaybeUserLog($thisUser, 'userPermissions: created ~/.bin with safe ownership');
 }
 
 $binDir = "/home/{$thisUser}/bin";
@@ -125,6 +155,7 @@ if (!is_dir($binDir)) {
     run(sprintf('mkdir -p %s', escapeshellarg($binDir)));
     chownPath($binDir, "{$thisUser}:{$thisUser}");
     chmodPath($binDir, 0750, true);
+    pmssMaybeUserLog($thisUser, 'userPermissions: created ~/bin with safe ownership');
 }
 
 $chmodItems = [
