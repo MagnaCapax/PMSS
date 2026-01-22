@@ -13,4 +13,11 @@ require_once __DIR__.'/../lib/wireguard.php';
 
 requireRoot();
 
-pmssWireguardConfigure('logMessage');
+if (!function_exists('logmsg')) {
+    function logmsg(string $message): void
+    {
+        logMessage($message);
+    }
+}
+
+pmssWireguardConfigure('logmsg');
