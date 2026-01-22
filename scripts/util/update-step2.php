@@ -45,6 +45,7 @@ require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/mediainfo.php';
 require_once __DIR__.'/../lib/update/services/certificates.php';
 require_once __DIR__.'/../lib/update/services/security.php';
+require_once __DIR__.'/../lib/update/services/journald.php';
 require_once __DIR__.'/../lib/update/userMaintenance.php';
 require_once __DIR__.'/../lib/update/networking.php';
 require_once __DIR__.'/../lib/update/services/bootstrap.php';
@@ -205,6 +206,7 @@ pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
 
 pmssMigrateLegacyLocalnet();
 pmssApplyRuntimeTemplates();
+pmssApplyJournaldLimits('logmsg');
 pmssApplyHostnameConfig('logmsg');
 pmssConfigureQuotaMount('logmsg');
 pmssEnsureLegacySysctlBaseline('logmsg');

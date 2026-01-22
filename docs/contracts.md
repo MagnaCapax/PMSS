@@ -215,6 +215,10 @@ Sub-handlers:
   - Installs `rc.local`, systemd `system.conf`, and `sshd_config` from templates;
     sets perms and ownership; reexecs systemd and restarts sshd; runs rc.local.
 
+- pmssApplyJournaldLimits(?callable $logger=null): void
+  - Renders `/etc/systemd/journald.conf.d/pmss-limits.conf` from template;
+    sizes caps based on root filesystem; restarts systemd-journald.
+
 - pmssEnsureAuthorizedKeysDirective(): void → ensures `AuthorizedKeysFile` is not commented in `sshd_config`, backs up previous config, restarts SSH via init.d.
 
 - pmssEnsureCgroupsConfigured(?callable $logger=null): void → appends cgroup mount to `/etc/fstab` if missing, installs `cgroup-bin`, mounts path, attempts to raise root slice PID limit.
