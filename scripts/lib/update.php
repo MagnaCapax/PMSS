@@ -51,7 +51,7 @@ function updateUserFile($file, $user) {
     //       Preserve existing mode/owner when content is unchanged.
     // #TODO Add hermetic tests covering safe-write behavior.
     if (empty($file) || empty($user) || !file_exists("/home/{$user}")) {
-        logMessage("[user:${user}] updateUserFile skipped (invalid params or home missing): {$file}");
+        logMessage("[user:{$user}] updateUserFile skipped (invalid params or home missing): {$file}");
         return;
     }
 
@@ -59,12 +59,12 @@ function updateUserFile($file, $user) {
     $targetFile = "/home/{$user}/" . $file;
 
     if (!file_exists($sourceFile)) {
-        logMessage("[user:${user}] Source skeleton missing for {$file}");
+        logMessage("[user:{$user}] Source skeleton missing for {$file}");
         return;
     }
 
     if (!is_file($sourceFile)) {
-        logMessage("[user:${user}] Source skeleton path is not a regular file: {$file}");
+        logMessage("[user:{$user}] Source skeleton path is not a regular file: {$file}");
         return;
     }
     
@@ -72,27 +72,27 @@ function updateUserFile($file, $user) {
         // #TODO Defensive directory creation: ensure parent directory exists with
         // sane permissions and log when created to improve idempotence.
         copyToUserSpace($sourceFile, $targetFile, $user);
-        logMessage("[user:${user}] Added skeleton file: {$file}");
+        logMessage("[user:{$user}] Added skeleton file: {$file}");
     } else {
         if (!is_file($targetFile)) {
-            logMessage("[user:${user}] Target path is not a regular file, skipping: {$file}");
+            logMessage("[user:{$user}] Target path is not a regular file, skipping: {$file}");
             return;
         }
         $sourceContent = file_get_contents($sourceFile);
         $targetContent = file_get_contents($targetFile);
         if ($sourceContent === false || $targetContent === false) {
-            logMessage("[user:${user}] Error reading file contents for comparison: {$file}");
+            logMessage("[user:{$user}] Error reading file contents for comparison: {$file}");
             return;
         }
         $sourceChecksum = sha1($sourceContent);
         $targetChecksum = sha1($targetContent);
         if ($sourceChecksum !== $targetChecksum) {
             if (!unlink($targetFile)) {
-                logMessage("[user:${user}] Failed to remove old file: {$targetFile}");
+                logMessage("[user:{$user}] Failed to remove old file: {$targetFile}");
                 return;
             }
             copyToUserSpace($sourceFile, $targetFile, $user);
-            logMessage("[user:${user}] Updated skeleton file: {$file}");
+            logMessage("[user:{$user}] Updated skeleton file: {$file}");
         }
     }
 }
