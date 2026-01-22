@@ -43,27 +43,6 @@ function pmssEnsureUserDir(string $user, string $dir): void
     passthru($cmd);
 }
 
-/**
- * Remove any stale socket files matching the given glob pattern.
- *
- * This prevents lighttpd/php-cgi startup from failing due to leftover sockets
- * after crashes or unclean shutdowns.
- *
- * @param string $pattern Glob pattern for per-user socket files.
- */
-function pmssClearSocketFiles(string $pattern): void
-{
-    $sockets = glob($pattern);
-    if ($sockets === false) {
-        return;
-    }
-    foreach ($sockets as $socket) {
-        if (is_file($socket) || is_link($socket)) {
-            @unlink($socket);
-        }
-    }
-}
-
 if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
 $user = $argv[1];
 
@@ -83,7 +62,14 @@ pmssEnsureUserDir($user, $uploadDir);
 if ($deflateEnabled) {
     pmssEnsureUserDir($user, $lighttpdDir.'/compress');
 }
-pmssClearSocketFiles($lighttpdDir.'/php.socket*');
+$sockets = glob($lighttpdDir.'/php.socket*');
+if ($sockets !== false) {
+    foreach ($sockets as $socket) {
+        if (is_file($socket) || is_link($socket)) {
+            @unlink($socket);
+        }
+    }
+}
 
 passthru("cd /home/{$user}; su {$user} -c '/usr/sbin/lighttpd -f /home/{$user}/.lighttpd.conf'");	// This is for newer versions
 

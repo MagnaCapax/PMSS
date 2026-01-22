@@ -24,7 +24,11 @@ if (!is_dir($proftpdDir)) {
     exit(0);
 }
 
-$hostname = sanitizeHostname($hostnameRaw);
+$hostname = strtolower(trim($hostnameRaw));
+$hostname = preg_replace('/[^a-z0-9.-]/', '', $hostname);
+if ($hostname === '') {
+    $hostname = 'localhost';
+}
 $distroVersion = 0;
 $detected = \pmssDetectDistro();
 if (is_array($detected) && isset($detected['version'])) {
@@ -71,16 +75,6 @@ if (is_dir('/run/systemd/system')) {
     runStep('Restarting ProFTPD (sysvinit)', '/etc/init.d/proftpd restart');
 } else {
     logMessage('ProFTPD service manager not found; skipped restart');
-}
-
-/**
- * Normalise the hostname for template substitution.
- */
-function sanitizeHostname(string $raw): string
-{
-    $hostname = strtolower(trim($raw));
-    $hostname = preg_replace('/[^a-z0-9.-]/', '', $hostname);
-    return $hostname === '' ? 'localhost' : $hostname;
 }
 
 /**

@@ -19,11 +19,9 @@ $cacheUsers = array_keys($db->getUsers());
 $homeUsers = users::listHomeDirectories();
 $passwdUsers = users::listPasswdUsers();
 
-$set = static function (array $list): array { return array_fill_keys($list, true); };
-
-$dbSet = $set($cacheUsers);
-$homeSet = $set($homeUsers);
-$passwdSet = $set($passwdUsers);
+$dbSet = array_fill_keys($cacheUsers, true);
+$homeSet = array_fill_keys($homeUsers, true);
+$passwdSet = array_fill_keys($passwdUsers, true);
 
 $dbOnly = array_values(array_diff(array_keys($dbSet), array_keys($homeSet + $passwdSet)));
 $homeOnly = array_values(array_diff(array_keys($homeSet), array_keys($dbSet)));

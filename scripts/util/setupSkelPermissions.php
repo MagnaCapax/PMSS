@@ -16,26 +16,6 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 requireRoot();
 
 /**
- * Apply directory hardening steps when the target exists; log a skip otherwise.
- */
-function pmssHardenDirectoryPermissions(
-    string $path,
-    string $contentMessage,
-    string $contentCommand,
-    string $directoryMessage,
-    string $directoryCommand,
-    array &$exitCodes
-): void {
-    if (!is_dir($path)) {
-        logmsg(sprintf('Skipping %s permission adjustments; directory missing', $path));
-        return;
-    }
-
-    $exitCodes[] = runStep($contentMessage, $contentCommand);
-    $exitCodes[] = runStep($directoryMessage, $directoryCommand);
-}
-
-/**
  * Enforce root ownership on a target path when present.
  */
 function pmssEnsureRootOwnership(string $path, array &$exitCodes): void
@@ -108,14 +88,14 @@ $permissionTargets = [
 $exitCodes = [];
 
 foreach ($permissionTargets as $path => $target) {
-    pmssHardenDirectoryPermissions(
-        $path,
-        $target['content'][0],
-        $target['content'][1],
-        $target['directory'][0],
-        $target['directory'][1],
-        $exitCodes
-    ); // not using 775 because there might be places where the perms differ and need to differ
+    if (!is_dir($path)) {
+        logmsg(sprintf('Skipping %s permission adjustments; directory missing', $path));
+        continue;
+    }
+
+    $exitCodes[] = runStep($target['content'][0], $target['content'][1]);
+    $exitCodes[] = runStep($target['directory'][0], $target['directory'][1]);
+    // not using 775 because there might be places where the perms differ and need to differ
 }
 
 foreach ($permissionTargets as $path => $target) {

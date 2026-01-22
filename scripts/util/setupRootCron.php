@@ -18,17 +18,15 @@ if (!is_readable($source)) {
     exit(1);
 }
 
-$exitCodes = [];
-$exitCodes[] = runStep(
+$failed = runStep(
     'Deploying root cron template',
     sprintf(
         'install -m 0644 %s %s',
         escapeshellarg($source),
         escapeshellarg($target)
     )
-);
-$exitCodes[] = runStep('Reloading cron daemon', '/etc/init.d/cron force-reload');
-$exitCodes[] = runStep('Restarting cron daemon', '/etc/init.d/cron restart');
+) !== 0;
+$failed = runStep('Reloading cron daemon', '/etc/init.d/cron force-reload') !== 0 || $failed;
+$failed = runStep('Restarting cron daemon', '/etc/init.d/cron restart') !== 0 || $failed;
 
-$failed = array_filter($exitCodes, static function ($rc) { return $rc !== 0; });
 exit($failed ? 1 : 0);

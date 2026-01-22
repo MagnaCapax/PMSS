@@ -6,14 +6,6 @@
 
 require_once __DIR__.'/../lib/storageHealth.php';
 
-function pmssStorageHealthSnapshotUsage(): void
-{
-    echo "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\n";
-    echo "Usage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n";
-    echo "  --json <path>   JSON Lines output (default ".pmssStorageHealthDefaultJsonPath().")\n";
-    echo "  --quiet         Suppress the success message (cron-friendly)\n\n";
-}
-
 function pmssStorageHealthSnapshotMain(array $argv): int
 {
     $logPath = pmssStorageHealthDefaultJsonPath();
@@ -44,7 +36,10 @@ function pmssStorageHealthSnapshotMain(array $argv): int
                 break;
             case '--help':
             case '-h':
-                pmssStorageHealthSnapshotUsage();
+                echo "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\n";
+                echo "Usage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n";
+                echo "  --json <path>   JSON Lines output (default ".pmssStorageHealthDefaultJsonPath().")\n";
+                echo "  --quiet         Suppress the success message (cron-friendly)\n\n";
                 return 0;
         }
     }

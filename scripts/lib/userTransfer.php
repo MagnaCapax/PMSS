@@ -43,14 +43,6 @@ TXT;
 }
 
 /**
- * Read the PMSS home root (default /home), allowing tests to override via env.
- */
-function pmssUserTransferHomeRoot(): string
-{
-    return pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
-}
-
-/**
  * Validate a hostname (or IPv4 address) without permitting shell metacharacters.
  */
 function pmssUserTransferHostnameIsValid(string $hostname): bool
@@ -306,6 +298,14 @@ function pmssUserTransferPasswdRecord(string $user): ?array
         ];
     }
     return null;
+}
+
+/**
+ * Return the configured home root for user transfers.
+ */
+function pmssUserTransferHomeRoot(): string
+{
+    return pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 }
 
 /**

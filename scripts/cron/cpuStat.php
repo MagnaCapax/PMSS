@@ -3,12 +3,9 @@
 // Gather iostat information from disks
 $cpuStatLogFile = '/var/run/pmss/cpustat';
 
-$stat1 = file('/proc/stat'); 
+$stat1 = explode(" ", preg_replace("!cpu +!", "", file('/proc/stat')[0])); 
 sleep(120); 
-$stat2 = file('/proc/stat'); 
-
-$stat1 = explode(" ", preg_replace("!cpu +!", "", $stat1[0])); 
-$stat2 = explode(" ", preg_replace("!cpu +!", "", $stat2[0])); 
+$stat2 = explode(" ", preg_replace("!cpu +!", "", file('/proc/stat')[0])); 
 
 $diff['user'] = (int) $stat2[0] - (int) $stat1[0]; 
 $diff['nice'] = (int) $stat2[1] - (int) $stat1[1]; 

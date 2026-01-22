@@ -22,10 +22,12 @@ $logDockerMessage = static function (string $message) use ($logger, $legacyLog, 
 
 $logDockerMessage('Checking rootless Docker services');
 
-$users = explode("\n", trim(shell_exec('/scripts/listUsers.php')));
+$users = array_filter(
+    explode("\n", trim(shell_exec('/scripts/listUsers.php'))),
+    static function ($user) { return !empty($user); }
+);
 
 foreach ($users as $user) {
-    if (empty($user)) continue;
     if (file_exists("/home/{$user}/www-disabled") || !file_exists("/home/{$user}/www")) {
         $logDockerMessage("User {$user} is suspended");
         continue;

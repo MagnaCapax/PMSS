@@ -59,8 +59,7 @@ shell_exec($cmd);
 
 $htpasswdFile = "/home/{$username}/.lighttpd/.htpasswd";
 
-if (file_exists("/home/{$username}/.lighttpd/.htpasswd")) $htpasswdCommand = 'htpasswd -b -m';
-    else $htpasswdCommand = 'htpasswd -c -b -m';
+$htpasswdCommand = file_exists($htpasswdFile) ? 'htpasswd -b -m' : 'htpasswd -c -b -m';
 
 shell_exec(sprintf(
     '%s %s %s %s',

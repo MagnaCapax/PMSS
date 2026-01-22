@@ -171,18 +171,6 @@ function pmssCheckRtorrentKillPids(array $pids, int $signal): void
     }
 }
 
-/**
- * Ensure state directory exists for per-user anomaly tracking.
- */
-function pmssCheckRtorrentStateDir(): string
-{
-    $dir = '/run/pmss';
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
-    return $dir;
-}
-
 // Avoid concurrent watchdog executions (cron overlap, manual runs).
 $lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkRtorrent.lock';
 $lockHandle = @fopen($lockPath, 'c');
@@ -202,7 +190,10 @@ if ($usersRc !== 0) {
 }
 
 $changedConfig = [];
-$stateDir = pmssCheckRtorrentStateDir();
+$stateDir = '/run/pmss';
+if (!is_dir($stateDir)) {
+    @mkdir($stateDir, 0755, true);
+}
 
 foreach ($usersOut as $line) {
     $user = trim((string) $line);

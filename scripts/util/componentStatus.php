@@ -13,26 +13,21 @@ $options = getopt('', ['json']);
 $wantJson = isset($options['json']);
 $results = [];
 
-function statusEntry(string $name, string $status, string $detail = ''): array
-{
-    return compact('name', 'status', 'detail');
-}
-
 // OS codename and sources alignment.
 $os = parse_ini_file('/etc/os-release') ?: [];
 $codename = strtolower(trim($os['VERSION_CODENAME'] ?? ''));
 if ($codename === '') {
-    $results[] = statusEntry('os.codename', 'WARN', 'VERSION_CODENAME missing');
+    $results[] = ['name' => 'os.codename', 'status' => 'WARN', 'detail' => 'VERSION_CODENAME missing'];
 } else {
-    $results[] = statusEntry('os.codename', 'OK', $codename);
+    $results[] = ['name' => 'os.codename', 'status' => 'OK', 'detail' => $codename];
 }
 
 $sourcesPath = '/etc/apt/sources.list';
 if (is_file($sourcesPath)) {
     $matches = $codename === '' ? true : stripos((string)file_get_contents($sourcesPath), $codename) !== false;
-    $results[] = statusEntry('apt.sources', $matches ? 'OK' : 'WARN', $matches ? 'contains '.$codename : 'codename mismatch');
+    $results[] = ['name' => 'apt.sources', 'status' => $matches ? 'OK' : 'WARN', 'detail' => $matches ? 'contains '.$codename : 'codename mismatch'];
 } else {
-    $results[] = statusEntry('apt.sources', 'WARN', 'missing sources.list');
+    $results[] = ['name' => 'apt.sources', 'status' => 'WARN', 'detail' => 'missing sources.list'];
 }
 
 $binaries = [
@@ -47,7 +42,7 @@ $binaries = [
 foreach ($binaries as $binary) {
     $path = trim((string)@shell_exec('command -v '.escapeshellarg($binary)));
     $status = $path !== '' ? 'OK' : 'WARN';
-    $results[] = statusEntry('bin.'.$binary, $status, $path);
+    $results[] = ['name' => 'bin.'.$binary, 'status' => $status, 'detail' => $path];
 }
 
 $paths = [
@@ -59,7 +54,7 @@ $paths = [
 
 foreach ($paths as $name => $path) {
     $exists = is_dir($path) || is_file($path);
-    $results[] = statusEntry($name, $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
+    $results[] = ['name' => $name, 'status' => $exists ? 'OK' : 'WARN', 'detail' => $exists ? $path : 'missing'];
 }
 
 if ($wantJson) {

@@ -26,14 +26,9 @@ function pmssStorageHealthUsage(): void
     echo "  --help          Show this help\n\n";
 }
 
-function pmssStorageHealthIsTty(): bool
-{
-    return function_exists('posix_isatty') && posix_isatty(STDOUT);
-}
-
 function pmssStorageHealthColor(string $severity, string $text): string
 {
-    if (!pmssStorageHealthIsTty()) {
+    if (!function_exists('posix_isatty') || !posix_isatty(STDOUT)) {
         return $text;
     }
     $code = '0';

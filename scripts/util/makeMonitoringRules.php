@@ -21,15 +21,13 @@ if (file_exists('/etc/seedbox/config/localnet')) {
     file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n"); // #TODO Refactor hardcoded value
 }
 
-
+$hasLocalnets = ($localnets !== false && count($localnets) > 0);
 
 foreach($users AS $thisUser) {
     $thisUid = trim( shell_exec("id -u {$thisUser}") );
     if (empty($thisUid)) continue;	// User does not exist anymore
 
-    if ($localnets !== false &&
-        count($localnets) > 0) {
-        
+    if ($hasLocalnets) {
         foreach($localnets AS $thisLocalNet) {
             echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";
 	}
@@ -41,9 +39,8 @@ foreach($users AS $thisUser) {
 
 }
 
-if ($localnets !== false &&
-    count($localnets) > 0)
+if ($hasLocalnets) {
     foreach($localnets AS $thisLocalNet) {
         echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -j ACCEPT\n";
-
     }
+}

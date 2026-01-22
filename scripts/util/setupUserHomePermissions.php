@@ -56,25 +56,11 @@ if (file_exists($rtorrentRc)) {
     );
 }
 
-pmssUserLifecycleStep(
-    'permissions',
-    $userName,
-    'chown_rutorrent_conf',
-    'chown root:root '.escapeshellarg($rutorrentConf),
-    false
-);
-pmssUserLifecycleStep(
-    'permissions',
-    $userName,
-    'chmod_rutorrent_conf',
-    'chmod 775 '.escapeshellarg($rutorrentConf),
-    false
-);
-
-pmssUserLifecycleStep(
-    'permissions',
-    $userName,
-    'chmod_lighttpd_custom',
-    'chmod 750 '.escapeshellarg($lighttpdDir),
-    false
-);
+$steps = [
+    ['chown_rutorrent_conf', 'chown root:root '.escapeshellarg($rutorrentConf)],
+    ['chmod_rutorrent_conf', 'chmod 775 '.escapeshellarg($rutorrentConf)],
+    ['chmod_lighttpd_custom', 'chmod 750 '.escapeshellarg($lighttpdDir)],
+];
+foreach ($steps as $step) {
+    pmssUserLifecycleStep('permissions', $userName, $step[0], $step[1], false);
+}

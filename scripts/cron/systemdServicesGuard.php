@@ -19,12 +19,6 @@ if (!is_dir('/run/systemd/system')) {
     exit(0);
 }
 
-function pmssSystemdUnitState(string $subcommand, string $unit): string
-{
-    $out = @shell_exec('systemctl '.$subcommand.' '.escapeshellarg($unit).' 2>/dev/null');
-    return trim(is_string($out) ? $out : '');
-}
-
 $specs = pmssSeedboxSystemServiceSpecs();
 $specs[] = ['unit' => 'apache2', 'label' => 'Apache httpd (legacy)', 'mask' => true];
 
@@ -40,8 +34,8 @@ foreach ($specs as $spec) {
     $label = (string) ($spec['label'] ?? $unit);
     $shouldMask = (bool) ($spec['mask'] ?? false);
 
-    $active = pmssSystemdUnitState('is-active', $unit);
-    $enabled = pmssSystemdUnitState('is-enabled', $unit);
+    $active = trim((string) @shell_exec('systemctl is-active '.escapeshellarg($unit).' 2>/dev/null'));
+    $enabled = trim((string) @shell_exec('systemctl is-enabled '.escapeshellarg($unit).' 2>/dev/null'));
 
     $needsHardening = ($active === 'active' || $active === 'activating');
     if (!$needsHardening) {

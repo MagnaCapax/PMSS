@@ -23,38 +23,6 @@ function pmssExec(string $command): string
 }
 
 /**
- * Normalize a status tuple for display.
- *
- * When stdout is a TTY, apply simple ANSI colour coding so OK/WARN/ERR lines
- * stand out for operators skimming large outputs. JSON mode bypasses this
- * helper entirely.
- */
-function renderStatus(array $result): void
-{
-    $status = strtoupper((string)$result['status']);
-    $label  = '['.$status.']';
-    $detail = $result['detail'] !== '' ? ' - '.$result['detail'] : '';
-
-    $colour = '';
-    $reset  = '';
-    if (function_exists('posix_isatty') ? posix_isatty(STDOUT) : true) {
-        if ($status === 'OK') {
-            $colour = "\033[32m"; // green
-        } elseif ($status === 'WARN') {
-            $colour = "\033[33m"; // yellow
-        } elseif ($status === 'ERR') {
-            $colour = "\033[31m"; // red
-        }
-        if ($colour !== '') {
-            $reset = "\033[0m";
-        }
-    }
-
-    $labelPadded = str_pad($label, 9);
-    echo $colour.$labelPadded.$reset.$result['name'].$detail.PHP_EOL;
-}
-
-/**
  * Build a normalized check result structure.
  *
  * Centralizing this helper keeps the returned array shape consistent and
@@ -350,8 +318,29 @@ if ($format === 'json') {
 echo "\nPMSS System Check (".date('Y-m-d H:i:s').")\n";
 echo str_repeat('-', 60)."\n";
 
+$isTty = function_exists('posix_isatty') ? posix_isatty(STDOUT) : true;
 foreach ($checks as $result) {
-    renderStatus($result);
+    $status = strtoupper((string)$result['status']);
+    $label  = '['.$status.']';
+    $detail = $result['detail'] !== '' ? ' - '.$result['detail'] : '';
+
+    $colour = '';
+    $reset  = '';
+    if ($isTty) {
+        if ($status === 'OK') {
+            $colour = "\033[32m"; // green
+        } elseif ($status === 'WARN') {
+            $colour = "\033[33m"; // yellow
+        } elseif ($status === 'ERR') {
+            $colour = "\033[31m"; // red
+        }
+        if ($colour !== '') {
+            $reset = "\033[0m";
+        }
+    }
+
+    $labelPadded = str_pad($label, 9);
+    echo $colour.$labelPadded.$reset.$result['name'].$detail.PHP_EOL;
 }
 
 echo str_repeat('-', 60)."\n";

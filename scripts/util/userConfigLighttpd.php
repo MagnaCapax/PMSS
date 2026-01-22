@@ -18,55 +18,6 @@ const PMSS_PHP_MEMORY_MAX_MB = 1024;
 const PMSS_PHP_THREADS_MIN = 3;
 const PMSS_PHP_THREADS_MAX = 48;
 
-function pmssDetectDebianVersion(): int
-{
-    $path = getenv('PMSS_OS_RELEASE_PATH');
-    if ($path === false || $path === '') {
-        $path = '/etc/os-release';
-    }
-    if (!is_readable($path)) {
-        return 0;
-    }
-    $data = @file_get_contents($path);
-    if ($data === false) {
-        return 0;
-    }
-    if (preg_match('/^VERSION_ID=\"?([0-9]+)/m', $data, $matches)) {
-        return (int) $matches[1];
-    }
-    return 0;
-}
-
-function pmssNormalizeCompressionConfig(string $template, int $distroVersion): string
-{
-    // Debian 11/12 ship mod_deflate; compress.* triggers deprecation on bookworm.
-    if ($distroVersion < 11) {
-        return $template;
-    }
-
-    return str_replace(
-        array('compress.cache-dir', 'compress.filetype', '"mod_compress"'),
-        array('deflate.cache-dir', 'deflate.mimetypes', '"mod_deflate"'),
-        $template
-    );
-}
-
-function pmssLoadCgroupPolicyDefaults(): array
-{
-    $policyFile = '/etc/seedbox/config/cgroup.policy.php';
-    if (is_readable($policyFile)) {
-        $data = include $policyFile;
-        if (is_array($data)) {
-            return $data;
-        }
-    }
-    return [
-        'memoryHighMiB'   => 500,
-        'memoryMaxMiB'    => 750,
-        'cpuQuotaPercent' => 100,
-    ];
-}
-
 function pmssParseSizeToMiB($value): ?int
 {
     $raw = trim((string)$value);
@@ -316,10 +267,41 @@ function pmssUserConfigLighttpdMain(array $argv): int
     }
     if (!file_exists('/root/backups')) `mkdir /root/backups`;
     $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
-    $template = pmssNormalizeCompressionConfig($template, pmssDetectDebianVersion());
+
+    $osReleasePath = getenv('PMSS_OS_RELEASE_PATH');
+    if ($osReleasePath === false || $osReleasePath === '') {
+        $osReleasePath = '/etc/os-release';
+    }
+    $distroVersion = 0;
+    if (is_readable($osReleasePath)) {
+        $osReleaseData = @file_get_contents($osReleasePath);
+        if ($osReleaseData !== false
+            && preg_match('/^VERSION_ID=\"?([0-9]+)/m', $osReleaseData, $matches)) {
+            $distroVersion = (int) $matches[1];
+        }
+    }
+    // Debian 11/12 ship mod_deflate; compress.* triggers deprecation on bookworm.
+    if ($distroVersion >= 11) {
+        $template = str_replace(
+            array('compress.cache-dir', 'compress.filetype', '"mod_compress"'),
+            array('deflate.cache-dir', 'deflate.mimetypes', '"mod_deflate"'),
+            $template
+        );
+    }
     $deflateEnabled = (bool) preg_match('/^[ \t]*deflate\./m', $template);
 
-    $policyDefaults = pmssLoadCgroupPolicyDefaults();
+    $policyDefaults = [
+        'memoryHighMiB'   => 500,
+        'memoryMaxMiB'    => 750,
+        'cpuQuotaPercent' => 100,
+    ];
+    $policyFile = '/etc/seedbox/config/cgroup.policy.php';
+    if (is_readable($policyFile)) {
+        $data = include $policyFile;
+        if (is_array($data)) {
+            $policyDefaults = $data;
+        }
+    }
 
     foreach ($users as $thisUser) {
         $thisUser = trim($thisUser);

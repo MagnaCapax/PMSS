@@ -8,13 +8,12 @@ $users = explode("\n", $users);
 if (count($users) == 0) die();
 
 foreach($users AS $thisUser) {
-    if (!file_exists("/home/{$thisUser}/.trafficData"))
-            $userTrafficData[$thisUser]['normal'] = 0;
-        else $userTrafficData[$thisUser]['normal'] = round( unserialize( file_get_contents("/home/{$thisUser}/.trafficData") )['raw']['month'] );
-    
-    if (!file_exists("/home/{$thisUser}/.trafficDataLocal"))
-            $userTrafficData[$thisUser]['local'] = 0;
-        else $userTrafficData[$thisUser]['local'] = round( unserialize( file_get_contents("/home/{$thisUser}/.trafficDataLocal") )['raw']['month'] );
+    $userTrafficData[$thisUser]['normal'] = file_exists("/home/{$thisUser}/.trafficData")
+        ? round(unserialize(file_get_contents("/home/{$thisUser}/.trafficData"))['raw']['month'])
+        : 0;
+    $userTrafficData[$thisUser]['local'] = file_exists("/home/{$thisUser}/.trafficDataLocal")
+        ? round(unserialize(file_get_contents("/home/{$thisUser}/.trafficDataLocal"))['raw']['month'])
+        : 0;
     
     
     //$data = unserialize( file_get_contents("/home/{$thisUser}/.trafficData") );
