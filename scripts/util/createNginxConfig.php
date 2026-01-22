@@ -21,6 +21,10 @@
 
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 
 $usage = <<<TXT
 Usage:
@@ -162,7 +166,6 @@ if (!file_exists("/etc/nginx/users")) {
 }
 
 foreach($users AS $thisUser) {
-    #TODO(user-logs): log per-user web config regeneration to /var/log/pmss/user-<username>.log
     $thisUser = trim($thisUser);
     if ($thisUser === '') {
         continue;
@@ -191,6 +194,9 @@ foreach($users AS $thisUser) {
         }
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
         file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'nginx config regenerated (suspended template)');
+        }
         continue;
     }
 
@@ -223,6 +229,9 @@ foreach($users AS $thisUser) {
     );
     
     file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($thisUser, 'nginx config regenerated');
+    }
     
 }
 

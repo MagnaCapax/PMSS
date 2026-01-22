@@ -3,6 +3,10 @@
 /* Check traffic limits */
 require_once '/scripts/lib/rtorrentXmlrpc.php';
 require_once '/scripts/lib/rtorrentConfig.php';
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 if (!file_exists('/var/run/pmss/trafficLimits')) `mkdir -p /var/run/pmss/trafficLimits`;
 
 $trafficLimitPeriod = 3 * 24 * 60 * 60;     // 3 days limiting period
@@ -15,7 +19,6 @@ if (count($users) == 0) die("No users in this system!\n");
 
 $trafficData = array();
 foreach($users AS $thisUser) {
-    #TODO(user-logs): log per-user throttling enable/disable actions to /var/log/pmss/user-<username>.log
     $userTrafficLimitFile = "/etc/seedbox/runtime/trafficLimits/{$thisUser}";
     $trafficDataFile = "/home/{$thisUser}/.trafficData";
     if (!file_exists($trafficDataFile) or
@@ -102,6 +105,16 @@ foreach ($trafficData AS $thisUser => $thisData) {
 
         chmod( $userTrafficLimitEnabledFile, 0600);
         setRatelimit($thisUser, $thisData['trafficLimit']);    // Apply rate limiting
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog(
+                $thisUser,
+                sprintf(
+                    'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB)',
+                    $thisData['trafficLimit'],
+                    $thisData['traffic']
+                )
+            );
+        }
         
     } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
         
@@ -110,7 +123,9 @@ foreach ($trafficData AS $thisUser => $thisData) {
         
         if ($trafficLimitEnabledTime > $trafficLimitPeriod) {   // Time to remove the limit
             unlink( $userTrafficLimitEnabledFile );
-            #TODO(user-logs): record throttle removal in per-user log
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
+            }
             setRateLimit($thisUser, $thisData['trafficLimit'], false);
 			// Do it second time as removal does not always work for some reason
 			sleep(1);

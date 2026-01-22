@@ -16,6 +16,10 @@
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 $logger = new Logger(__FILE__);
 
 $logger->msg('Updating quota information');
@@ -25,7 +29,6 @@ $users = explode("\n", trim($users));
 $changedConfig = array();
 
 foreach ($users as $thisUser) {
-#TODO(user-logs): log quota refresh success/failure to /var/log/pmss/user-<username>.log for support traceability
 #TODO Check that quota is working
     $thisUser = trim($thisUser);
     if ($thisUser === '') {
@@ -95,6 +98,9 @@ foreach ($users as $thisUser) {
                 )
             )
         );
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, sprintf('quota refresh failed (rc=%d)', $ret));
+        }
     } else {
         $content = implode(PHP_EOL, $outputLines).PHP_EOL;
         if (@file_put_contents($quotaFile, $content) !== false) {
@@ -111,5 +117,8 @@ foreach ($users as $thisUser) {
                 )
             )
         );
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'quota refreshed');
+        }
     }
 }

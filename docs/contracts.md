@@ -121,6 +121,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssLogJson(array $payload): void → appends JSONL with added `ts` if path configured.
 - logMessage(string $message, array $context=[]): void → writes to `PMSS_LOG_FILE` or fallback; also emits a JSON `log` event when JSON logging is configured.
 - pmssSelectLogger(?callable $logger=null): callable → returns the given logger or `logMessage`.
+- pmssUserLog(string $user, string $message): void → appends to `/var/log/pmss/users/<user>.log` (migrates legacy `/var/log/pmss/user`), no-ops when not running as root; mirrors to `users.log`/`users.jsonl` when lifecycle helpers are available.
 
 ---
 

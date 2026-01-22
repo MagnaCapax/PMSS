@@ -4,6 +4,10 @@
 
 require_once '/scripts/lib/logger.php';
 $logger = new Logger(__FILE__);
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 /**
  * Collect traffic usage statistics
  *
@@ -55,7 +59,6 @@ chmod($thisUsageFile, 0600);
 $logger->msg("Collecting data");
 
 foreach($users AS $thisUser) {
-    #TODO(user-logs): log per-user traffic anomalies and threshold actions into /var/log/pmss/user-<username>.log
     $thisUid = trim( shell_exec("id -u {$thisUser}") );
     $thisUserTraffic = 0;
     $thisUserTrafficLocal = 0;
@@ -77,6 +80,9 @@ foreach($users AS $thisUser) {
 	    if ($linkSpeed !== null && $linkSpeed > 0) {
 	        if ($thisUserTraffic > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
 	            file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
+                if (function_exists('pmssUserLog')) {
+                    pmssUserLog($thisUser, sprintf('traffic anomaly: usage exceeds 90%% link max (%d bytes)', $thisUserTraffic));
+                }
 	            continue;  
 	        }
 	        // Note: variable name typo caused undefined output; use the correct value
@@ -86,6 +92,9 @@ foreach($users AS $thisUser) {
 	                date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n",
 	                FILE_APPEND
 	            );
+                if (function_exists('pmssUserLog')) {
+                    pmssUserLog($thisUser, sprintf('traffic anomaly: local usage exceeds 90%% link max (%d bytes)', $thisUserTrafficLocal));
+                }
 	            continue;
 	        }
 	    }

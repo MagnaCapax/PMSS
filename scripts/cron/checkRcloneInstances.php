@@ -1,6 +1,10 @@
 #!/usr/bin/env php
 <?php
 echo date('Y-m-d H:i:s') . ': Checking Rclone instances' . "\n";
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 
 // Get & parse users list
 $users = shell_exec('/scripts/listUsers.php');
@@ -10,16 +14,20 @@ $startRclone = static function (string $user): void {
     echo "Start rclone for user: {$user}\n";
     $port = (int) file_get_contents("/home/{$user}/.rclonePort");
     passthru("su {$user} -c 'cd ~; nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &'");
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, 'rclone start requested');
+    }
 };
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    #TODO(user-logs): log per-user start/kill actions to /var/log/pmss/user-<username>.log
     if (empty($thisUser)) continue;
     if (file_exists("/home/{$thisUser}/www-disabled") or 
         !file_exists("/home/{$thisUser}/www")) {
             echo "User: {$thisUser} is suspended\n";
             passthru("killall -9 -u {$thisUser}");
-            #TODO(user-logs): record suspension cleanup in per-user log
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'rclone stopped due to suspension');
+            }
             continue;  //Suspended
     }
 
@@ -28,7 +36,5 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     
     $instances = shell_exec('pgrep -u' . $thisUser . ' rclone');
     if (empty($instances)) $startRclone($thisUser);
-    #TODO(user-logs): record rclone start in per-user log
- 
 
 }

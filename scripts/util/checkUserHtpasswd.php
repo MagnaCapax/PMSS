@@ -15,6 +15,10 @@
 // Some kind of htpasswd synchronization from times when lighttpd global instance transition to per-user instances
 
 require_once __DIR__.'/../lib/userLifecycle.php';
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 
 $usersRaw = trim((string)shell_exec('/scripts/listUsers.php'));
 if ($usersRaw === '') {
@@ -33,7 +37,6 @@ if ($globalContents === false || trim($globalContents) === '') {
 $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
 foreach ($users as $thisUser) {
-    #TODO(user-logs): log per-user htpasswd sync operations to /var/log/pmss/user-<username>.log
     $thisUser = trim($thisUser);
     if ($thisUser === '') {
         continue;
@@ -69,6 +72,9 @@ foreach ($users as $thisUser) {
                 'chown '.escapeshellarg($thisUser.':'.$thisUser).' '.escapeshellarg($thisUserDir.'/.lighttpd/.htpasswd'),
                 false
             );
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'htpasswd sync: appended legacy credential to per-user .htpasswd');
+            }
         }
     }
 }

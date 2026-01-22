@@ -6,7 +6,10 @@ This script manages and monitors user-specific lighttpd and php-cgi processes.
 */
 
 echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
-// #TODO(user-logs): record start/restart actions to /var/log/pmss/user-<username>.log via pmssUserLog()
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 
 // Get & parse users list
 $users = shell_exec('/scripts/listUsers.php');
@@ -15,14 +18,19 @@ $users = explode("\n", trim($users));
 $startLighttpd = static function (string $user): void {
     echo "Start lighttpd for user: {$user}\n";
     passthru('/scripts/startLighttpd ' . $user);
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, 'lighttpd start requested');
+    }
 };
 
 $restartLighttpd = static function (string $user) use ($startLighttpd): void {
     echo "Killing (if any) lighttpd for user: {$user}\n";
     shell_exec("killall -15 -u {$user} lighttpd; killall -15 -u {$user} php-cgi; sleep 5; killall -9 -u {$user} lighttpd; killall -9 -u {$user} php-cgi;");
     usleep(50000);   // brief pause before relaunch
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, 'lighttpd restart requested');
+    }
     $startLighttpd($user);
-    #TODO(user-logs): record lighttpd restart in per-user log
 };
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
@@ -32,6 +40,9 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         !file_exists("/home/{$thisUser}/www")) {
             echo "User: {$thisUser} is suspended\n";
             passthru("killall -9 -u {$thisUser}");
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'lighttpd stopped due to suspension');
+            }
             continue;  //Suspended
     }
 

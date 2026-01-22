@@ -117,6 +117,9 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
 
             $userDuration = microtime(true) - $userStart;
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
+            }
             if (function_exists('pmssRecordProfile')) {
                 pmssRecordProfile([
                     'description'    => 'updateUser '.$userTrim,

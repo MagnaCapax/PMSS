@@ -19,6 +19,10 @@ include '/scripts/lib/devristo/Torrent.php';
 include '/scripts/lib/devristo/Bee.php';
 include '/scripts/lib/devristo/File.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
+$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
+if (is_file($pmssUserLogPath)) {
+    require_once $pmssUserLogPath;
+}
 use Devristo\Torrent\Torrent;
 
 function pmssTrackerCleanerTimestamp(): string
@@ -204,7 +208,6 @@ $anyWork = false;
 $anyChanges = false;
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    #TODO(user-logs): log per-user cleaner actions (suspension kills, tracker changes) to /var/log/pmss/user-<username>.log
     $thisUser = trim($thisUser);
     if ($thisUser === '') {
         continue;
@@ -247,6 +250,9 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
                 'killall -9 -u '.escapeshellarg($thisUser),
                 false
 	            );  // Ensure nothing for the user is running
+                if (function_exists('pmssUserLog')) {
+                    pmssUserLog($thisUser, 'tracker cleaner: suspended user processes killed');
+                }
 	            $userVerboseLog .= pmssTrackerCleanerTimestamp()." user_skip reason=suspended\n";
 	            pmssTrackerCleanerWriteUserVerboseLog($thisUser, $userVerboseLog);
 	            continue;  //Suspended
@@ -546,6 +552,16 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
    $userVerboseLog .= pmssTrackerCleanerTimestamp()
        ." run_end user={$thisUser} processed={$userProcessedTorrents} private={$userPrivateTorrents} changed={$userChangedTorrents}{$runSuffix}\n";
    pmssTrackerCleanerWriteUserVerboseLog($thisUser, $userVerboseLog);
+   if (function_exists('pmssUserLog')) {
+       $summary = sprintf(
+           'tracker cleaner: processed=%d private=%d changed=%d%s',
+           $userProcessedTorrents,
+           $userPrivateTorrents,
+           $userChangedTorrents,
+           $stopReason !== '' ? ' stop_reason='.$stopReason : ''
+       );
+       pmssUserLog($thisUser, $summary);
+   }
 
    if ($stopReason !== '') {
        break;

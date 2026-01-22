@@ -14,6 +14,34 @@ if (!defined('PMSS_USER_LOG_JSON')) {
     define('PMSS_USER_LOG_JSON', '/var/log/pmss/users.jsonl');
 }
 
+if (!function_exists('pmssUserLogAllowed')) {
+    function pmssUserLogAllowed(): bool
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $uid = null;
+        if (function_exists('posix_geteuid')) {
+            $uid = @posix_geteuid();
+        } else {
+            $status = @file_get_contents('/proc/self/status');
+            if ($status !== false && preg_match('/^Uid:\\s+(\\d+)/m', $status, $matches)) {
+                $uid = (int) $matches[1];
+            }
+        }
+
+        if ($uid === null) {
+            $cached = false;
+            return $cached;
+        }
+
+        $cached = ($uid === 0);
+        return $cached;
+    }
+}
+
 /**
  * Validate a username according to PMSS constraints.
  *
@@ -95,6 +123,9 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
  */
 function pmssUserWriteLogs(array $payload): void
 {
+    if (!pmssUserLogAllowed()) {
+        return;
+    }
     if (!isset($payload['ts'])) {
         $payload['ts'] = date('c');
     }

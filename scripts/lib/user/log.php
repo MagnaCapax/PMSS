@@ -7,6 +7,34 @@
  * Keep this helper dependency-free so it can be used from cron scripts easily.
  */
 
+if (!function_exists('pmssUserLogAllowed')) {
+    function pmssUserLogAllowed(): bool
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $uid = null;
+        if (function_exists('posix_geteuid')) {
+            $uid = @posix_geteuid();
+        } else {
+            $status = @file_get_contents('/proc/self/status');
+            if ($status !== false && preg_match('/^Uid:\\s+(\\d+)/m', $status, $matches)) {
+                $uid = (int) $matches[1];
+            }
+        }
+
+        if ($uid === null) {
+            $cached = false;
+            return $cached;
+        }
+
+        $cached = ($uid === 0);
+        return $cached;
+    }
+}
+
 if (!function_exists('pmssUserLogFile')) {
     function pmssUserLogFile(string $user): string
     {
@@ -43,6 +71,9 @@ if (!function_exists('pmssUserLogFile')) {
 if (!function_exists('pmssUserLog')) {
     function pmssUserLog(string $user, string $message): void
     {
+        if (!pmssUserLogAllowed()) {
+            return;
+        }
         $path = pmssUserLogFile($user);
         $ts   = date('[Y-m-d H:i:s] ');
         @file_put_contents($path, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
