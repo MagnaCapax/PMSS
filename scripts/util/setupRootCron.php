@@ -12,6 +12,7 @@ requireRoot();
 
 $source = '/etc/seedbox/config/root.cron';
 $target = '/etc/cron.d/pmss';
+$obsoleteQuotaCron = '/etc/cron.d/updateQuotas';
 
 if (!is_readable($source)) {
     logmsg('Root cron template missing; aborting without changes');
@@ -26,6 +27,15 @@ $failed = runStep(
         escapeshellarg($target)
     )
 ) !== 0;
+
+// Guardrail: PMSS cron entries must be deployed via /etc/cron.d/pmss (root.cron).
+// If a stray /etc/cron.d/updateQuotas entry exists from historical/manual changes,
+// remove it so quota refresh runs only under the unified PMSS cron template.
+$failed = runStep(
+    'Removing obsolete updateQuotas cron.d entry',
+    'rm -f '.escapeshellarg($obsoleteQuotaCron)
+) !== 0 || $failed;
+
 $failed = runStep('Reloading cron daemon', '/etc/init.d/cron force-reload') !== 0 || $failed;
 $failed = runStep('Restarting cron daemon', '/etc/init.d/cron restart') !== 0 || $failed;
 

@@ -1013,12 +1013,13 @@ function bootstrapMain(array $argv): void
         logmsg('[INFO] Disabled /etc/cron.d/pmss during update; template will be reapplied in update-step2');
     }
 
-    // Remove legacy updateQuotas cron to prevent recurrence of the 2025-12-08 /home wipe.
+    // Remove /etc/cron.d/updateQuotas if present: PMSS cron entries must be in /etc/cron.d/pmss
+    // (deployed from /etc/seedbox/config/root.cron). This is a safety guard to prevent any
+    // recurrence of the 2025-12-08 /home wipe class when cron runs during partial-update windows.
     // See incident report: docs/incidents/2025-12-08-home-wipe-updateQuotas-listUsers.md
-    // #TODO remove this unlink around 2030-12 once the fleet is fully refreshed.
-    $legacyQuotaCron = '/etc/cron.d/updateQuotas';
-    if (file_exists($legacyQuotaCron)) {
-        @unlink($legacyQuotaCron);
+    $obsoleteQuotaCron = '/etc/cron.d/updateQuotas';
+    if (file_exists($obsoleteQuotaCron)) {
+        @unlink($obsoleteQuotaCron);
         logmsg('[INFO] Removed legacy updateQuotas cron entry to prevent quota-refresh regression');
     }
 
