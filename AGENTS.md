@@ -171,8 +171,8 @@ rofanity.
   1. **Comment the issue** with commit hash and brief explanation of what was done: `gh issue comment <number> --body "Commit <hash>: <summary of changes>"`.
   2. **Add `complete-verify` label** to signal work is done and ready for operator verification: `gh issue edit <number> --add-label complete-verify`.
   3. **Review existing labels** and adjust if needed (e.g., remove `in-progress` if present, ensure category labels are accurate).
-  4. **Do NOT close the issue** — operator will close after verification.
-  5. **Push commits** to remote before marking complete.
+  4. **Push commits** to remote before marking `complete-verify`.
+- **Never Close Issues**: Agents must NEVER close GitHub issues. Only the operator closes issues after verification. Use `complete-verify` label to signal completion.
 
 
 
