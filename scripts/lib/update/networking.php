@@ -48,12 +48,3 @@ PHP;
     }
 }
 
-if (!function_exists('pmssApplyNetworkConfig')) {
-    /**
-     * Reapply the active network configuration.
-     */
-    function pmssApplyNetworkConfig(): void
-    {
-        runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
-    }
-}

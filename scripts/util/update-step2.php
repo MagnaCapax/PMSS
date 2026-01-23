@@ -413,7 +413,7 @@ pmssRestoreUserCrontabs();
 // separate all-user sweeps.
 
 pmssEnsureNetworkTemplate('logmsg');
-pmssApplyNetworkConfig();
+runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
 runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /usr/bin/netstat /usr/bin/who /usr/bin/w');
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
