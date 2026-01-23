@@ -177,7 +177,43 @@ if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	# Append extra assistant CLI args (shell-escaped) to the exec string.
 	# This keeps agent selection stable while allowing per-run tuning like:
 	#   ... -- --approval-mode yolo
-	for exec_extra_arg in "${exec_extra_args[@]}"; do
+	claude_force_danger=0
+	normalized_exec_extra_args=()
+	for ((i = 0; i < ${#exec_extra_args[@]}; i++)); do
+		case "${exec_extra_args[$i]}" in
+		--yolo | -y)
+			# Gemini-style flag; Claude does not support it. Map to the closest
+			# equivalent (explicitly bypass permission prompts) when agent=claude.
+			if [[ "$agent" == "claude" ]]; then
+				claude_force_danger=1
+			else
+				normalized_exec_extra_args+=("${exec_extra_args[$i]}")
+			fi
+			;;
+		--approval-mode)
+			# Gemini-only. If operator asked for yolo and agent=claude, map.
+			if [[ "$agent" == "claude" && "${exec_extra_args[$((i + 1))]:-}" == "yolo" ]]; then
+				claude_force_danger=1
+				i=$((i + 1))
+			else
+				normalized_exec_extra_args+=("${exec_extra_args[$i]}")
+				if [[ -n "${exec_extra_args[$((i + 1))]:-}" ]]; then
+					normalized_exec_extra_args+=("${exec_extra_args[$((i + 1))]}")
+					i=$((i + 1))
+				fi
+			fi
+			;;
+		*)
+			normalized_exec_extra_args+=("${exec_extra_args[$i]}")
+			;;
+		esac
+	done
+
+	if [[ "$claude_force_danger" == "1" && "$agent" == "claude" ]]; then
+		normalized_exec_extra_args+=(--dangerously-skip-permissions)
+	fi
+
+	for exec_extra_arg in "${normalized_exec_extra_args[@]}"; do
 		printf -v exec_extra_q '%q' "$exec_extra_arg"
 		exec_cmd+=" $exec_extra_q"
 	done
