@@ -119,7 +119,9 @@ instead of restating details.
 - **Ignore Noise**: If you see modified files unrelated to your task, ignore them. Do not touch them.                            
 - **Explicit Confirmation**: If a file blocks your progress, ASK the user before overwriting or reverting it.                    
                                                                                                                                  
-## Git / PR Workflow- Commit messages: describe what changed, why, and notable side effects. Reference ADRs or docs when relevant.
+## Git / PR Workflow
+
+- Commit messages: describe what changed, why, and notable side effects. Reference ADRs or docs when relevant.
 - Prefer linear history (`rebase`) and avoid force pushes on shared branches.
 - Use PR templates to verify checklists (tests run, docs updated, ADR linked when required).
 - Before merge: CI must pass (lint, tests, basic bash checks). Production-impacting changes should include a dry-run validation note.
