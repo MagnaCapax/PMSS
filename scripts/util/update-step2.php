@@ -376,7 +376,8 @@ foreach ($apps as $app) {
 pmssStopDisableMaskSeedboxSystemServices();
 
 pmssEnsureLetsEncryptConfig();
-pmssRemoveAutodlConfig();
+// Drop obsolete global autodl configuration
+if (file_exists('/etc/autodl.cfg')) { unlink('/etc/autodl.cfg'); }
 
 // Legacy daemons that should never run globally.
 $legacyServices = ['btsync', 'rslsync', 'pyload', 'sabnzbdplus'];
@@ -391,7 +392,7 @@ pmssUpdateAllUsers($rutorrentIndexSha);
 
 pmssEnsureAuthorizedKeysDirective();
 pmssEnsureTestfile();
-pmssRestrictAtopBinary();
+runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
 pmssPostUpdateWebRefresh();
 
@@ -411,7 +412,7 @@ pmssRestoreUserCrontabs();
 
 pmssEnsureNetworkTemplate('logmsg');
 pmssApplyNetworkConfig();
-pmssApplySecurityHardening();
+runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /usr/bin/netstat /usr/bin/who /usr/bin/w');
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }

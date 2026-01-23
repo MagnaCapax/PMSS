@@ -5,18 +5,6 @@
 
 require_once __DIR__.'/../runtime/commands.php';
 
-if (!function_exists('pmssRemoveAutodlConfig')) {
-    /**
-     * Drop obsolete global autodl configuration file if it exists.
-     */
-    function pmssRemoveAutodlConfig(): void
-    {
-        if (file_exists('/etc/autodl.cfg')) {
-            unlink('/etc/autodl.cfg');
-        }
-    }
-}
-
 if (!function_exists('pmssEnsureTestfile')) {
     /**
      * Ensure the standard download speed test file exists.
@@ -33,23 +21,3 @@ if (!function_exists('pmssEnsureTestfile')) {
     }
 }
 
-if (!function_exists('pmssRestrictAtopBinary')) {
-    /**
-     * Restrict atop execution permissions to privileged users.
-     * #TODO(atop): evaluate whether this belongs in package templating instead.
-     */
-    function pmssRestrictAtopBinary(): void
-    {
-        runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
-    }
-}
-
-if (!function_exists('pmssApplySecurityHardening')) {
-    /**
-     * Apply quick hardening tweaks for logs and network utilities.
-     */
-    function pmssApplySecurityHardening(): void
-    {
-        runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /usr/bin/netstat /usr/bin/who /usr/bin/w');
-    }
-}
