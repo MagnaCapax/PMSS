@@ -23,7 +23,7 @@ class UpdateStep2SystemServiceHardeningWiringTest extends TestCase
             'Expected boot-time systemd guard unit installation to be wired'
         );
         $this->assertTrue(
-            substr_count($src, 'pmssStopDisableMaskApacheLegacy();') >= 1,
+            substr_count($src, "pmssStopDisableMaskSystemdUnit('apache2'") >= 1,
             'Expected Apache hardening helper to be invoked'
         );
     }

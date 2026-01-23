@@ -15,6 +15,10 @@ function pmssUserEnsurePlugins(array $ctx): void
         runUserStep($user, 'Removing deprecated cpuload plugin', sprintf('rm -rf %s', escapeshellarg("{$home}/www/rutorrent/plugins/cpuload")));
     }
 
+    if (file_exists("{$home}/www/rutorrent/plugins/diskspace")) {
+        runUserStep($user, 'Removing deprecated diskspace plugin', sprintf('rm -rf %s', escapeshellarg("{$home}/www/rutorrent/plugins/diskspace")));
+    }
+
     $unpackPath = "{$home}/www/rutorrent/plugins/unpack";
     if (!file_exists($unpackPath)) {
         $source = pmssUserSkelPath('www/rutorrent/plugins/unpack');
@@ -22,6 +26,16 @@ function pmssUserEnsurePlugins(array $ctx): void
         runUserStep($user, 'Installing unpack plugin', sprintf('cp -Rp %s %s', escapeshellarg($source), $unpackArg));
         runUserStep($user, 'Adjusting unpack plugin ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, $unpackArg));
         runUserStep($user, 'Setting unpack plugin permissions', sprintf('chmod -R 755 %s', $unpackArg));
+    }
+
+    $hddQuotaPath = "{$home}/www/rutorrent/plugins/hddquota";
+    if (!file_exists($hddQuotaPath)) {
+        $source = pmssUserSkelPath('www/rutorrent/plugins/hddquota');
+        $quotaArg = escapeshellarg($hddQuotaPath);
+        runUserStep($user, 'Installing hddquota plugin', sprintf('cp -Rp %s %s', escapeshellarg($source), $quotaArg));
+        runUserStep($user, 'Adjusting hddquota plugin ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, $quotaArg));
+        // Use 755 permissions (standard) instead of the 777 used by the legacy script
+        runUserStep($user, 'Setting hddquota plugin permissions', sprintf('chmod -R 755 %s', $quotaArg));
     }
 }
 

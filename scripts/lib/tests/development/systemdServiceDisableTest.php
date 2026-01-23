@@ -46,21 +46,4 @@ class SystemdServiceDisableTest extends TestCase
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.service'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.socket'") !== false);
     }
-
-    public function testApacheLegacyHelperMasksApache(): void
-    {
-        $this->reset();
-        putenv('PMSS_DRY_RUN=1');
-        pmssStopDisableMaskApacheLegacy();
-        putenv('PMSS_DRY_RUN');
-
-        $commands = array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
-
-        $joined = implode("\n", $commands);
-        $this->assertTrue(strpos($joined, "systemctl stop 'apache2'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl disable 'apache2'") !== false);
-        $this->assertTrue(strpos($joined, "systemctl mask 'apache2'") !== false);
-    }
 }
