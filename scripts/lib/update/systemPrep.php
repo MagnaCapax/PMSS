@@ -417,17 +417,6 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
     }
 }
 
-if (!function_exists('pmssResetCorePermissions')) {
-    /**
-     * Normalise permissions on key configuration directories.
-     */
-    function pmssResetCorePermissions(): void
-    {
-        runStep('Resetting /etc/seedbox permissions', 'chmod -R 755 /etc/seedbox');
-        runStep('Resetting /scripts permissions', 'chmod -R 750 /scripts');
-    }
-}
-
 if (!function_exists('pmssEnsureLocaleBaseline')) {
     /**
      * Make sure essential locale assets exist before other services start.

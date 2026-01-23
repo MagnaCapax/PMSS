@@ -347,7 +347,8 @@ runStep('Restricting world access to /home', 'chmod o-rw /home');
 // --- Basic system preparation ---
 pmssEnsureCgroupsConfigured('logmsg');
 pmssEnsureSystemdSlices('logmsg');
-pmssResetCorePermissions();
+runStep('Resetting /etc/seedbox permissions', 'chmod -R 755 /etc/seedbox');
+runStep('Resetting /scripts permissions', 'chmod -R 750 /scripts');
 pmssEnsureLocaleBaseline();
 
 // Web stack hardening and per-user HTTP refresh.
