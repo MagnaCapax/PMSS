@@ -89,6 +89,7 @@ General session:
 development/agentic.sh
 development/agentic.sh --agent claude
 development/agentic.sh --agent gemini
+development/agentic.sh --agent gemini -- --approval-mode yolo
 ```
 
 ## Gemini CLI notes
@@ -116,6 +117,11 @@ keep approval mode `default` but avoid approving every trivial command, run
 Gemini with `--allowed-tools ...` (tool names come from Gemini's approval UI),
 or set that in your local `development/assistants/gemini` profile.
 
+Claude permission prompts: Claude Code also prompts per session by default.
+You can reduce prompt spam by passing `--permission-mode acceptEdits` and an
+`--allowed-tools ...` list (see `claude --help` for tool syntax), or set that
+in your local `development/assistants/claude` profile.
+
 Direct runner usage (advanced):
 
 ```bash
@@ -129,6 +135,7 @@ Refactor session:
 
 ```bash
 development/agentic-refactor.sh
+development/agentic-refactor.sh --agent gemini -- --approval-mode yolo
 ```
 
 CI triage session (uses `gh auth login` when available; otherwise uses `curl` + `GITHUB_TOKEN`):

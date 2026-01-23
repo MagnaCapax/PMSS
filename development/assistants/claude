@@ -3,4 +3,10 @@
 # Weaknesses: Slower, more expensive
 # Safety: Generally stays on rails
 # Docs: https://code.claude.com/docs
-claude
+#
+# Claude defaults to prompting for tool permissions per session. Keep the safer
+# permission model (no bypass), but allow common dev commands to avoid repeated
+# confirmations for basics like git/gh/rg/ls/cat plus curl/wget for web fetches.
+#
+# Note: keep the allowed tools list quoted to avoid shell glob expansion.
+claude --permission-mode acceptEdits --allowed-tools 'Bash(git:*) Bash(gh:*) Bash(rg:*) Bash(ls:*) Bash(cat:*) Bash(sed:*) Bash(awk:*) Bash(head:*) Bash(tail:*) Bash(curl:*) Bash(wget:*) Bash(find:*) Bash(stat:*) Read Edit'

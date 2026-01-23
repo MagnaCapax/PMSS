@@ -9,4 +9,7 @@
 #
 # Note: tool names are Gemini-internal; adjust based on the approval prompt UI
 # if your Gemini version uses different identifiers.
-gemini -i --allowed-tools shell --allowed-tools read_file --allowed-tools write_file --allowed-tools edit_file --allowed-tools apply_patch --allowed-tools list_directory --allowed-tools search
+#
+# Interactive mode: -i/--prompt-interactive requires a prompt string argument
+# (and cannot be used with stdin piping), so we use ##PROMPT## here.
+gemini --allowed-tools shell --allowed-tools read_file --allowed-tools write_file --allowed-tools edit_file --allowed-tools apply_patch --allowed-tools list_directory --allowed-tools search -i ##PROMPT##

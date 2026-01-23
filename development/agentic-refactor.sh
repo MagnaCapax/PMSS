@@ -38,6 +38,7 @@ commits=10
 target=""
 agent=""
 exec_cmd=""
+declare -a exec_extra_args=()
 custom_prompt=""
 dry_run=0
 autocommit=0
@@ -98,12 +99,45 @@ while [[ $# -gt 0 ]]; do
 		autocommit=1
 		shift || true
 		;;
+	--yolo | -y)
+		exec_extra_args+=("$1")
+		shift || true
+		;;
+	--approval-mode)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--allowed-tools)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--permission-mode)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--dangerously-skip-permissions)
+		exec_extra_args+=("$1")
+		shift || true
+		;;
+	--)
+		shift || true
+		if [[ $# -gt 0 ]]; then
+			exec_extra_args+=("$@")
+		fi
+		break
+		;;
 	-h | --help)
 		sed -n '1,120p' "$0"
 		exit 0
 		;;
 	*)
-		echo "[agentic-refactor] unknown option: $1" >&2
+		if [[ "$1" == --* ]]; then
+			echo "[agentic-refactor] unknown option: $1" >&2
+			echo "[agentic-refactor] hint: pass assistant CLI args after '--', e.g.:" >&2
+			echo "  development/agentic-refactor.sh --agent=gemini -- --approval-mode yolo" >&2
+		else
+			echo "[agentic-refactor] unknown option: $1" >&2
+		fi
 		exit 2
 		;;
 	esac
@@ -137,6 +171,16 @@ if [[ -z "$exec_cmd" ]]; then
 		echo "Or use --exec to specify a custom command." >&2
 		exit 2
 	fi
+fi
+
+if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
+	# Append extra assistant CLI args (shell-escaped) to the exec string.
+	# This keeps agent selection stable while allowing per-run tuning like:
+	#   ... -- --approval-mode yolo
+	for exec_extra_arg in "${exec_extra_args[@]}"; do
+		printf -v exec_extra_q '%q' "$exec_extra_arg"
+		exec_cmd+=" $exec_extra_q"
+	done
 fi
 
 echo "[agentic-refactor] output directory: $OUTDIR" >&1

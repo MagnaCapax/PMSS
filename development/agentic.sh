@@ -17,11 +17,12 @@ exec_cmd=""
 verbose=0
 declare -a passthrough=()
 declare -a extra_context=()
+declare -a exec_extra_args=()
 
 usage() {
 	cat <<EOF
 Usage:
-  development/agentic.sh [--agent NAME] [--exec CMD] [--verbose] [--help] [-- <codex-run args>]
+  development/agentic.sh [--agent NAME] [--exec CMD] [--verbose] [--help] [-- <assistant args>]
 
 Options:
   --agent NAME     Select assistant profile (default: ${default_agent})
@@ -41,6 +42,8 @@ Examples:
   development/agentic.sh --agent=codex --dry-run
   development/agentic.sh --agent=claude --prompt "Summarize changes"
   development/agentic.sh --exec "codex" --dry-run
+  development/agentic.sh --agent=gemini -- --approval-mode yolo
+  development/agentic.sh --agent=gemini --approval-mode yolo
 EOF
 }
 
@@ -89,6 +92,33 @@ while [[ $# -gt 0 ]]; do
 		passthrough+=("$1")
 		shift || true
 		;;
+	--yolo | -y)
+		exec_extra_args+=("$1")
+		shift || true
+		;;
+	--approval-mode)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--allowed-tools)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--permission-mode)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--dangerously-skip-permissions)
+		exec_extra_args+=("$1")
+		shift || true
+		;;
+	--)
+		shift || true
+		if [[ $# -gt 0 ]]; then
+			exec_extra_args+=("$@")
+		fi
+		break
+		;;
 	-h | --help)
 		usage
 		exit 0
@@ -123,6 +153,14 @@ if [[ -z "$exec_cmd" ]]; then
 		echo "Or use --exec to specify a custom command." >&2
 		exit 2
 	fi
+fi
+
+if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
+	# Append extra assistant CLI args (shell-escaped) to the exec string.
+	for exec_extra_arg in "${exec_extra_args[@]}"; do
+		printf -v exec_extra_q '%q' "$exec_extra_arg"
+		exec_cmd+=" $exec_extra_q"
+	done
 fi
 
 if [[ -f "$ROOT/AGENTS.${agent}.md" ]]; then
