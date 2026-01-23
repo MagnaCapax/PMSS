@@ -83,6 +83,10 @@ Signature: refer to file for full source; highlights below.
   - Orchestrator: ensure root → parse/normalize/parse spec → dist-upgrade (optional) →
     workdir fetch → stage → record version → cleanup → self-update handoff →
     run phase 2 or scripts-only path → log completion with duration.
+- Update lock: uses `PMSS_UPDATE_LOCK_FILE=/var/run/pmss/update.lock` with an
+  exclusive flock; sets `PMSS_UPDATE_LOCK_ENV=1` when held so child re-exec
+  skips re-acquiring. Emits JSON events `update_lock_wait`, `update_lock_acquired`,
+  and `update_lock_released`.
 
 Environment flags consumed: none directly (phase 2 uses many).
 
@@ -188,7 +192,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): void
   - Builds context (`pmssBuildUserContext`), returns early when invalid.
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh, plugins,
-    retracker cleanup, permissions. Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
+    retracker cleanup, permissions, then linger/systemd/rootless Docker wiring.
+    Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
 
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
@@ -295,8 +300,9 @@ System/app groups:
 
 - pmssOsReleasePath(): string → `PMSS_OS_RELEASE_PATH` or `/etc/os-release`.
 - pmssSkeletonBase()/pmssSkeletonPath(string $relative): string → `PMSS_SKEL_DIR` or `/etc/skel` and joined path.
-- updateUserFile(string $file, string $user): void → copies a skeleton file into `/home/<user>/<file>` when missing or checksum differs; sets mode 755 and `chown user:user`.
-- copyToUserSpace(string $sourceFile, string $targetFile, string $user): void → copy + chmod 755 + chown user.
+- pmssUserHomeRoot(): string → `PMSS_HOME_DIR` or `/home`, used by user file helpers for test overrides.
+- updateUserFile(string $file, string $user): void → copies a skeleton file into `/home/<user>/<file>` when missing or checksum differs; ensures parent directories exist, writes via temp-file + rename, sets mode 755 and `chown user:user`.
+- copyToUserSpace(string $sourceFile, string $targetFile, string $user): void → atomic copy via temp + rename, chmod 755, chown/chgrp user.
 - updateRutorrentConfig(string $username, int $scgiPort): void → renders ruTorrent templates with user paths and writes `conf/{config.php,access.ini}`.
 - getOsReleaseData(): array → cached `parse_ini_file` of `pmssOsReleasePath()`.
 - getDistroName(): string, getDistroVersion(): string, getDistroCodename(): string → wrappers around `getOsReleaseData()`.
@@ -396,7 +402,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Side-effects: Writes files under `/home/<user>/.lighttpd/` and lighttpd config directories.
 
 - scripts/util/createNginxConfig.php
-  - Behavior: Regenerates nginx global and per-user config from templates.
+  - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
+  - Subdomains: `USERNAME.<host>` proxies to `/public-<user>/`; SHA256 host (`sha256(username.billingId.hostname).<host>`) proxies to `/user-<user>/` with HTTP→HTTPS redirect; hash vhost skipped if `.billingId` missing/invalid.
   - Side-effects: Writes under `/etc/nginx/` and reloads/restarts nginx via callers.
 
 - scripts/util/checkUserHtpasswd.php
@@ -429,6 +436,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/update-step2.php
   - Behavior: Legacy consolidated phase-2 script (superseded by modular `lib/update/*`), retained for compatibility. Do not extend unless migrating behavior into modules.
+  - Preflight: checks disk space on `/` and `/home` (fatal if <3 GiB), dpkg lock availability, APT cache writability, and basic network reachability; logs `preflight_ok` or `preflight_error` JSON events.
+  - Respects `PMSS_UPDATE_LOCK_ENV`; when absent, acquires the global update lock (`PMSS_UPDATE_LOCK_FILE`).
 
 ---
 

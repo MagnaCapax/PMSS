@@ -1,3 +1,5 @@
+# Private area: keep /user-##username/ locked behind auth and do not
+# expose it via public subdomain routing.
 location /user-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/user-##username/;
         proxy_set_header Upgrade $http_upgrade;

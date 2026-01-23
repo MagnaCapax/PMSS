@@ -21,6 +21,7 @@
 
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
+require_once __DIR__.'/../lib/nginxUserHosts.php';
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
@@ -111,6 +112,9 @@ if (!is_dir('/etc/nginx/sites-available')) {
 // Configure site default
 //passthru("cp /etc/seedbox/config/template.nginx-site-default /etc/nginx/sites-available/default");
 $serverHostname = trim(file_get_contents('/etc/hostname'));
+$subdomainBase = strtolower($serverHostname);
+$subdomainEnabled = pmssNginxUserHostIsValidFqdn($subdomainBase);
+$subdomainConfigDir = '/etc/nginx/conf.d';
 $nginxConfigSiteDefault = @file_get_contents('/etc/seedbox/config/template.nginx-site-default');
 $nginxConfigSiteDefaultSsl = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl');
 $nginxConfigSiteDefaultSslLetsEncrypt = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl-lets-encrypt');
@@ -132,6 +136,14 @@ if (file_exists("{$certificatePath}/fullchain.pem") &&
 	$nginxConfigSiteDefaultSsl = str_replace('||SERVER_HOSTNAME||', $serverHostname, $nginxConfigSiteDefaultSslLetsEncrypt);
 
 
+}
+
+$nginxSslBlock = '';
+if ($nginxConfigSiteDefaultSsl !== false) {
+    $sslCandidate = trim((string)$nginxConfigSiteDefaultSsl);
+    if ($sslCandidate !== '') {
+        $nginxSslBlock = rtrim($sslCandidate)."\n";
+    }
 }
 
 // Create config and save it :)
@@ -165,6 +177,148 @@ if (!file_exists("/etc/nginx/users")) {
     }
 }
 
+if ($subdomainEnabled && !is_dir($subdomainConfigDir)) {
+    @mkdir($subdomainConfigDir, 0755, true);
+}
+if ($subdomainEnabled) {
+    $managedPattern = $subdomainConfigDir.'/pmss-user-*.conf';
+    if (!$singleUser) {
+        $existingSubdomains = glob($managedPattern);
+        if ($existingSubdomains !== false) {
+            foreach ($existingSubdomains as $oldConfig) {
+                @unlink($oldConfig);
+            }
+        }
+    } elseif ($requestedUser !== '') {
+        @unlink($subdomainConfigDir.'/pmss-user-'.$requestedUser.'.conf');
+        @unlink($subdomainConfigDir.'/pmss-user-'.$requestedUser.'-hash.conf');
+    }
+} elseif ($subdomainBase !== '') {
+    fwrite(STDERR, "Skipping nginx subdomain vhosts (invalid hostname: {$subdomainBase})\n");
+}
+
+$publicSubdomainTemplate = <<<'NGINX'
+# PMSS public subdomain for ##user## (maps to /public-##user##/).
+server {
+    listen 80;
+    server_name ##host##;
+
+    location / {
+        proxy_pass http://127.0.0.1:##port##/public-##user##/;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+        limit_rate_after 100m;
+        limit_rate 32768k;
+        limit_conn addr 8;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ##host##;
+
+##ssl_block##
+    location / {
+        proxy_pass http://127.0.0.1:##port##/public-##user##/;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+        limit_rate_after 100m;
+        limit_rate 32768k;
+        limit_conn addr 8;
+    }
+}
+NGINX;
+
+$privateSubdomainTemplate = <<<'NGINX'
+# PMSS private subdomain for ##user## (maps to /user-##user##/).
+# Private area: do not add public locations to this vhost.
+server {
+    listen 80;
+    server_name ##host##;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ##host##;
+
+##ssl_block##
+    location / {
+        proxy_pass http://127.0.0.1:##port##/user-##user##/;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+        limit_rate_after 1024m;
+        limit_rate 102400k;
+        limit_conn addr 16;
+        error_page 502 /error-502.html;
+    }
+
+    location = /error-502.html {
+        root /var/www;
+        internal;
+    }
+}
+NGINX;
+
+$publicSuspendedTemplate = <<<'NGINX'
+# PMSS suspended subdomain for ##user##.
+server {
+    listen 80;
+    server_name ##host##;
+    root /var/www;
+
+    location = /error-suspended.html {
+        root /var/www;
+    }
+    location / {
+        return 302 /error-suspended.html;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name ##host##;
+    root /var/www;
+
+##ssl_block##
+    location = /error-suspended.html {
+        root /var/www;
+    }
+    location / {
+        return 302 /error-suspended.html;
+    }
+}
+NGINX;
+
+$privateSuspendedTemplate = <<<'NGINX'
+# PMSS suspended private subdomain for ##user##.
+server {
+    listen 80;
+    server_name ##host##;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ##host##;
+    root /var/www;
+
+##ssl_block##
+    location = /error-suspended.html {
+        root /var/www;
+    }
+    location / {
+        return 302 /error-suspended.html;
+    }
+}
+NGINX;
+
 foreach($users AS $thisUser) {
     $thisUser = trim($thisUser);
     if ($thisUser === '') {
@@ -180,10 +334,11 @@ foreach($users AS $thisUser) {
     }
 
     $portFile = "/etc/seedbox/runtime/ports/lighttpd-{$thisUser}";
+    $isSuspended = is_dir($homeDir.'/www-disabled');
 
     // When a user is suspended, nginx should serve a static suspended page
     // instead of proxying to their per-user lighttpd instance.
-    if (is_dir($homeDir.'/www-disabled')) {
+    if ($isSuspended) {
         if ($suspendedTemplate === false || $suspendedTemplate === '') {
             // No dedicated suspended template found; skip generating a per-user
             // config so nginx falls back to generic defaults.
@@ -191,6 +346,26 @@ foreach($users AS $thisUser) {
                 @unlink("/etc/nginx/users/{$thisUser}");
             }
             continue;
+        }
+        if ($subdomainEnabled) {
+            $publicHost = $thisUser.'.'.$subdomainBase;
+            $publicConfig = str_replace(
+                array('##host##', '##user##', '##ssl_block##'),
+                array($publicHost, $thisUser, $nginxSslBlock),
+                $publicSuspendedTemplate
+            );
+            file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig);
+
+            $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
+            if ($billingId !== null) {
+                $hashHost = pmssNginxUserHashHostname($thisUser, $billingId, $subdomainBase);
+                $hashConfig = str_replace(
+                    array('##host##', '##user##', '##ssl_block##'),
+                    array($hashHost, $thisUser, $nginxSslBlock),
+                    $privateSuspendedTemplate
+                );
+                file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig);
+            }
         }
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
         file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
@@ -217,6 +392,27 @@ foreach($users AS $thisUser) {
     if ($serverPort < 1024 || $serverPort > 65535) {
         continue;
     }
+
+    if ($subdomainEnabled) {
+        $publicHost = $thisUser.'.'.$subdomainBase;
+        $publicConfig = str_replace(
+            array('##host##', '##user##', '##port##', '##ssl_block##'),
+            array($publicHost, $thisUser, (string)$serverPort, $nginxSslBlock),
+            $publicSubdomainTemplate
+        );
+        file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig);
+
+        $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
+        if ($billingId !== null) {
+            $hashHost = pmssNginxUserHashHostname($thisUser, $billingId, $subdomainBase);
+            $hashConfig = str_replace(
+                array('##host##', '##user##', '##port##', '##ssl_block##'),
+                array($hashHost, $thisUser, (string)$serverPort, $nginxSslBlock),
+                $privateSubdomainTemplate
+            );
+            file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig);
+        }
+    }
     
     if ($userTemplate === false || $userTemplate === '') {
         continue;
@@ -239,6 +435,12 @@ foreach($users AS $thisUser) {
 $newConfigs = glob('/etc/nginx/users/*');
 if ($newConfigs !== false && count($newConfigs) > 0) {
     passthru('chmod 640 /etc/nginx/users/*');
+}
+if (is_dir($subdomainConfigDir)) {
+    $subdomainConfigs = glob($subdomainConfigDir.'/pmss-user-*.conf');
+    if ($subdomainConfigs !== false && count($subdomainConfigs) > 0) {
+        passthru('chmod 640 '.$subdomainConfigDir.'/pmss-user-*.conf');
+    }
 }
 passthru('chmod 640 /etc/nginx/*.conf');
 
