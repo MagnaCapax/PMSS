@@ -99,4 +99,27 @@ class UserConfigLighttpdLogicTest extends TestCase
         file_put_contents($home.'/.rtorrent.rc', "dummy");
         $this->assertTrue(\pmssShouldConfigureLighttpdForHome($home));
     }
+
+    public function testStripLighttpdWebdavConfigRemovesManagedBlock(): void
+    {
+        $template = <<<'LIGHTTPD'
+server.modules = (
+  "mod_access",
+  "mod_webdav",
+)
+
+# PMSS_WEBDAV_BEGIN
+$HTTP["url"] =~ "^/webdav-user($|/)" {
+    webdav.activate = "enable"
+    webdav.sqlite-db-name = "/home/user/.lighttpd/webdav.lock.db"
+}
+# PMSS_WEBDAV_END
+LIGHTTPD;
+
+        $stripped = \pmssStripLighttpdWebdavConfig($template);
+        $this->assertTrue(strpos($stripped, 'webdav.activate') === false);
+        $this->assertTrue(strpos($stripped, 'PMSS_WEBDAV_BEGIN') === false);
+        $this->assertTrue(strpos($stripped, 'mod_webdav') !== false);
+        $this->assertTrue(strpos($stripped, '#"mod_webdav",') !== false);
+    }
 }

@@ -5,7 +5,7 @@ server.modules              = (
         "mod_authn_file",
         "mod_alias",
         "mod_setenv",
-        #"mod_webdav",
+        "mod_webdav",
         "mod_fastcgi",
         "mod_proxy",
         # mod_deflate disabled (2025-11): single-tenant vhosts gain negligible benefit; revisit post-2028 and remove packages/config if still unused.
@@ -65,14 +65,36 @@ auth.require = (
         "realm" => "Password protected area",
         "require" => "user=##username"
     ) 
+ "/webdav-##username/" =>
+    (
+        "method" => "basic",
+        "realm" => "Password protected area",
+        "require" => "user=##username"
+    )
 )
 
 
 alias.url += (
  "/user-##username/" => "/home/##username/www/",
+ "/webdav-##username/" => "/home/##username/",
  "/public-##username/" => "/home/##username/www/public/",
  "/public/" => "/home/##username/www/public/"
 )
+
+# PMSS_WEBDAV_BEGIN
+$HTTP["url"] =~ "^/webdav-##username($|/)" {
+    webdav.activate = "enable"
+    webdav.sqlite-db-name = "/home/##username/.lighttpd/webdav.lock.db"
+    dir-listing.activate = "disable"
+
+    # Defense-in-depth: do not expose dotfiles via WebDAV (prevents users from
+    # breaking runtimes by editing internal config/state).
+    url.access-deny = ( "/." )
+}
+
+# Allow read access, but make www read-only to prevent common footguns.
+##PMSS_WEBDAV_WWW_POLICY##
+# PMSS_WEBDAV_END
 
 $HTTP["url"] =~ "^/user-##username/rclone/" {
   proxy.server = ( "" => ( (

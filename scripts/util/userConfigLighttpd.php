@@ -214,9 +214,10 @@ function pmssUpdatePhpIni(string $path, int $memoryLimitMb): void
 
 function pmssRenderLighttpdConfig(string $template, string $user, int $serverPort, int $rclonePort, int $qbittorrentPort, array $resources): string
 {
+    $webdavWwwPolicy = pmssWebdavWwwPolicyBlock($user);
     $config = str_replace(
-        array("##username", "##serverPort", "##rclonePort", "##qbittorrentPort"),
-        array($user, $serverPort, $rclonePort, $qbittorrentPort),
+        array("##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##"),
+        array($user, $serverPort, $rclonePort, $qbittorrentPort, $webdavWwwPolicy),
         $template
     );
 
@@ -234,6 +235,63 @@ function pmssRenderLighttpdConfig(string $template, string $user, int $serverPor
     );
 
     return $config;
+}
+
+function pmssWebdavWwwPolicyBlock(string $user): string
+{
+    // Default: keep ~/www read-only over WebDAV to prevent users from breaking the web stack.
+    // Allow writing to ~/www/public by default, and allow full ~/www write if the user opts in.
+    $marker = "/home/{$user}/.lighttpd/webdav.www-writable";
+    if (file_exists($marker)) {
+        return <<<LIGHTTPD
+\$HTTP["url"] =~ "^/webdav-{$user}/www(\$|/)" {
+    webdav.is-readonly = "disable"
+}
+LIGHTTPD;
+    }
+
+    return <<<LIGHTTPD
+\$HTTP["url"] =~ "^/webdav-{$user}/www(\$|/)" {
+    webdav.is-readonly = "enable"
+}
+\$HTTP["url"] =~ "^/webdav-{$user}/www/public(\$|/)" {
+    webdav.is-readonly = "disable"
+}
+LIGHTTPD;
+}
+
+function pmssLighttpdWebdavModulePresent(): bool
+{
+    // Debian packages typically install into /usr/lib/lighttpd or /usr/lib/*/lighttpd.
+    $paths = glob('/usr/lib*/lighttpd/mod_webdav.so');
+    if (is_array($paths) && count($paths) > 0) {
+        return true;
+    }
+    return false;
+}
+
+function pmssStripLighttpdWebdavConfig(string $template): string
+{
+    // Strip the managed WebDAV block (if present) to keep lighttpd start-safe on hosts
+    // where the module is missing or was manually removed.
+    $template = preg_replace(
+        '/^\\s*#\\s*PMSS_WEBDAV_BEGIN\\s*$.*^\\s*#\\s*PMSS_WEBDAV_END\\s*$\\s*/ms',
+        '',
+        $template
+    );
+
+    // Comment out the module line if present.
+    $template = preg_replace(
+        '/^(\\s*)\"mod_webdav\",\\s*$/m',
+        '${1}#"mod_webdav",',
+        $template,
+        1
+    );
+
+    // Remove placeholder that would otherwise leak into lighttpd.conf.
+    $template = str_replace('##PMSS_WEBDAV_WWW_POLICY##', '', $template);
+
+    return (string)$template;
 }
 
 function pmssUserConfigLighttpdMain(array $argv): int
@@ -290,6 +348,10 @@ function pmssUserConfigLighttpdMain(array $argv): int
     }
     $deflateEnabled = (bool) preg_match('/^[ \t]*deflate\./m', $template);
 
+    if (!pmssLighttpdWebdavModulePresent()) {
+        $template = pmssStripLighttpdWebdavConfig($template);
+    }
+
     $policyDefaults = [
         'memoryHighMiB'   => 500,
         'memoryMaxMiB'    => 750,
@@ -327,6 +389,11 @@ function pmssUserConfigLighttpdMain(array $argv): int
             passthru("cp -Rp /etc/skel/.lighttpd /home/{$thisUser}/");
             passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd -R");
             passthru("chmod 751 /home/{$thisUser}/.lighttpd -R");
+        }
+        $webdavLock = "/home/{$thisUser}/.lighttpd/webdav.lock.db";
+        if (!file_exists($webdavLock)) {
+            @touch($webdavLock);
+            @chmod($webdavLock, 0600);
         }
         if (!file_exists("/home/{$thisUser}/www/public")) {
             passthru("mkdir -p /home/{$thisUser}/www/public");

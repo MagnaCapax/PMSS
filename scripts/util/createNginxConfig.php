@@ -213,6 +213,10 @@ server {
         limit_rate 32768k;
         limit_conn addr 8;
     }
+
+    location /webdav-##user##/ {
+        return 301 https://$host$request_uri;
+    }
 }
 
 server {
@@ -229,6 +233,25 @@ server {
         limit_rate_after 100m;
         limit_rate 32768k;
         limit_conn addr 8;
+    }
+
+    location /webdav-##user##/ {
+        proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
+        proxy_set_header Authorization $http_authorization;
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+
+        # WebDAV: allow large uploads, keep idle timeouts bounded.
+        client_max_body_size 0;
+        client_body_timeout 300s;
+        send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_request_buffering off;
+
+        limit_rate_after 100m;
+        limit_rate 102400k;
+        limit_conn addr 16;
     }
 }
 NGINX;
@@ -254,6 +277,26 @@ server {
         include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
         limit_rate_after 1024m;
+        limit_rate 102400k;
+        limit_conn addr 16;
+        error_page 502 /error-502.html;
+    }
+
+    location /webdav-##user##/ {
+        proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
+        proxy_set_header Authorization $http_authorization;
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+
+        # WebDAV: allow large uploads, keep idle timeouts bounded.
+        client_max_body_size 0;
+        client_body_timeout 300s;
+        send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_request_buffering off;
+
+        limit_rate_after 100m;
         limit_rate 102400k;
         limit_conn addr 16;
         error_page 502 /error-502.html;

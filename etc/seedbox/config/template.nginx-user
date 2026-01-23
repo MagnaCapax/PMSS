@@ -25,6 +25,29 @@ location /public-##username/ {
         limit_conn addr 8;
 }
 
+location /webdav-##username/ {
+        if ($scheme = http) {
+                return 301 https://$host$request_uri;
+        }
+        proxy_pass http://127.0.0.1:##serverPort/webdav-##username/;
+        proxy_set_header Authorization $http_authorization;
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+
+        # WebDAV: allow large uploads, keep idle timeouts bounded.
+        client_max_body_size 0;
+        client_body_timeout 300s;
+        send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_request_buffering off;
+
+        limit_rate_after 100m;
+        limit_rate 102400k;
+        limit_conn addr 16;
+        error_page 502 /error-502.html;
+}
+
 location /deluge-##username/ {
     proxy_pass http://127.0.0.1:##delugeWebPort/;
     include /etc/nginx/proxy_params;
