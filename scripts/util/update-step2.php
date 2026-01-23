@@ -40,7 +40,6 @@ require_once __DIR__.'/../lib/update/repositories.php';
 require_once __DIR__.'/../lib/update/systemPrep.php';
 require_once __DIR__.'/../lib/update/webStack.php';
 require_once __DIR__.'/../lib/update/services/runtime.php';
-require_once __DIR__.'/../lib/update/services/legacy.php';
 require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/journald.php';
 require_once __DIR__.'/../lib/update/userMaintenance.php';
@@ -300,11 +299,11 @@ pmssEnsureSystemdServicesGuardBootUnit();
 // the stop/disable/mask sequence twice so hosts drifting between bullseye and
 // bookworm converge reliably. Success = units masked and no apache2 processes
 // left running. Failure is tolerated but logged via runStep.
-pmssStopDisableMaskApacheLegacy();
+pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
 // Remove legacy Apache packages; keep apache2-utils. It provides htpasswd (used by
 // lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
 runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));
-pmssStopDisableMaskApacheLegacy();
+pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
 if ($repoLogMessage !== '') { logmsg($repoLogMessage); }
 if (!$dpkgBaselineOk) {
     logmsg('[WARN] Dpkg baseline application reported issues; attempting recovery');
@@ -378,8 +377,16 @@ runStep('Updating Let\'s Encrypt configuration', '/scripts/util/setupLetsEncrypt
 if (file_exists('/etc/autodl.cfg')) { unlink('/etc/autodl.cfg'); }
 
 // Legacy daemons that should never run globally.
-$legacyServices = ['btsync', 'rslsync', 'pyload', 'sabnzbdplus'];
-pmssDisableLegacyServices($legacyServices, $distroVersion);
+foreach (['btsync', 'rslsync', 'pyload', 'sabnzbdplus'] as $legacySvc) {
+    if (file_exists('/etc/init.d/'.$legacySvc)) {
+        runStep("Stopping legacy service {$legacySvc}", "/etc/init.d/{$legacySvc} stop");
+    }
+    if ($reportedVersion < 10) {
+        runStep("Disabling {$legacySvc} in sysvinit", "update-rc.d {$legacySvc} disable");
+    } else {
+        disableUnitIfPresent($legacySvc, "Disabling {$legacySvc} systemd unit");
+    }
+}
 pmssAdjustLighttpdSecurity();
 
 // Per-user updates ensure ruTorrent stays consistent. The SHA tracks the

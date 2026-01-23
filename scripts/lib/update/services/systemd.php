@@ -129,17 +129,6 @@ if (!function_exists('pmssSeedboxSystemServiceSpecs')) {
     }
 }
 
-if (!function_exists('pmssStopDisableMaskApacheLegacy')) {
-    /**
-     * Apache must never run on seedbox hosts (nginx + per-user lighttpd do).
-     * We mask it so package recoveries cannot restart it mid-update.
-     */
-    function pmssStopDisableMaskApacheLegacy(): void
-    {
-        pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
-    }
-}
-
 if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
     /**
      * Stop/disable known risky system-wide services.
