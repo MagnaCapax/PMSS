@@ -90,17 +90,6 @@ if (!function_exists('pmssEnsureQuotaOptions')) {
     }
 }
 
-if (!function_exists('pmssEnsureDefaultQuotaMount')) {
-    /**
-     * Apply quota options to the default mount (env override PMSS_QUOTA_MOUNT).
-     */
-    function pmssEnsureDefaultQuotaMount(): void
-    {
-        $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
-        pmssEnsureQuotaOptions($mount, null, 'logMessage');
-    }
-}
-
 if (!function_exists('pmssWarnUnexpectedQuotaFiles')) {
     /**
      * Warn if quota state files under the mount point have unexpected names.
