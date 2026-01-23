@@ -7,6 +7,7 @@ $stat1 = explode(" ", preg_replace("!cpu +!", "", file('/proc/stat')[0]));
 sleep(120); 
 $stat2 = explode(" ", preg_replace("!cpu +!", "", file('/proc/stat')[0])); 
 
+$cpu = array();
 $diff['user'] = (int) $stat2[0] - (int) $stat1[0]; 
 $diff['nice'] = (int) $stat2[1] - (int) $stat1[1]; 
 $diff['sys'] = (int) $stat2[2] - (int) $stat1[2]; 
