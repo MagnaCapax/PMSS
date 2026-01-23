@@ -195,30 +195,34 @@ Parallel Runs (ABSURDLY SIMPLE)
 WORKFLOW (DO THIS)
 ----------------------------------------------------------------------
 
-1) Read first:
-   - AGENTS.md, AGENTS.local.md, any nested AGENTS.md in scope
-   - docs/architecture.md, docs/update.md, docs/refactoring.md
-   - relevant docs/adr/* and docs/incidents/* for the subsystem
+1) Startup reads (before proceeding):
+   - AGENTS.md (rails / Constitution / doctrine; treat as binding).
+   - AGENTS.local.md (host-specific local rails, if exists).
 
-2) Pick targets (compression run):
+2) Task-relevant reads (based on refactor scope):
+   - Any nested AGENTS.md covering files you touch (most-specific instructions win).
+   - Relevant docs under docs/ (architecture, update, refactoring, etc.).
+   - Relevant ADRs under docs/adr/ and incidents under docs/incidents/ for the subsystem.
+
+3) Pick targets (compression run):
    - Pick 1–3 targets max.
    - Prefer the highest-value, highest-duplication / highest-nesting hot spots.
    - Avoid roaming.
 
-3) Non-goals gate:
+4) Non-goals gate:
    - Explicitly state you are NOT doing feature work, rewrites, interface changes, or style cleanups.
 
-4) For each chosen refactor (before editing), state:
+5) For each chosen refactor (before editing), state:
    - Purpose: cost-of-change / risk reduction / leverage / provability
    - Metrics: runtime LOC delta target, duplicated blocks removed, max nesting reduced, concepts deleted
    - Invariants: 3–7 bullets (outputs/paths/order/log markers stable)
 
-5) Implement minimal edits:
+6) Implement minimal edits:
    - Keep behaviour identical.
    - Prefer deletion + inlining + flattening before extraction.
    - If a change would violate compression gates, drop it.
 
-6) Verification:
+7) Verification:
    - php -l on changed PHP files
    - php scripts/lib/tests/development/Runner.php when touching scripts/lib helpers or PHP entrypoints
    - scripts/testing/php-lint-compat.sh
@@ -227,7 +231,7 @@ WORKFLOW (DO THIS)
    - scripts/testing/php73-compat-scan.sh
    - scripts/testing/docblock-lint.sh when applicable
 
-7) Summarise (review-first):
+8) Summarise (review-first):
    - List every changed file and why
    - Dirty files at start (`git status --porcelain`)
    - Dirty files at end (`git status --porcelain`)

@@ -2,15 +2,16 @@ PMSS Codex Session — Strict Rails Mode
 
 Goal: Start a safe PMSS development session with the correct guard rails loaded.
 
-Read first (do not proceed until read):
+Startup reads (before proceeding):
 - AGENTS.md (rails / Constitution / doctrine; treat as binding).
-- AGENTS.local.md (host-specific local rails).
+- AGENTS.local.md (host-specific local rails, if exists).
+
+Task-relevant reads (consult AFTER learning the task, based on scope):
 - Any nested AGENTS.md covering files you touch (most-specific instructions win).
-- docs/architecture.md (updater topology and responsibilities).
-- docs/update.md and docs/install.md (workflow; invariants; do-not-break constraints).
-- docs/refactoring.md (Linux-kernel-style refactor guidance).
-- docs/adr/* (Accepted ADRs are constraints; consult relevant ones).
-- docs/contracts.md (script/function behavior contracts; treat as canonical).
+- Relevant docs under docs/ (architecture, update, install, refactoring, contracts, etc.).
+- Relevant ADRs under docs/adr/ for the subsystem you're modifying.
+
+Do NOT bulk-read all docs or ADRs upfront. Ask the task first, then read what's relevant.
 
 Hard rails (must follow):
 - Stability over perfection; minimal diffs; never break old users.
