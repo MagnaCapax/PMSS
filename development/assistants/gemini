@@ -1,0 +1,12 @@
+# Context: 1M tokens (HUGE - can ingest entire codebases)
+# Strengths: Fast, cheap, massive context
+# Weaknesses: Goes off-rails, makes unauthorized changes, deletes things
+# Safety: Default runs without --yolo; add it manually if needed
+# Docs: https://geminicli.com/docs
+#
+# Approval mode defaults to "default" (prompts for approval). To reduce prompt
+# spam while keeping approval mode default, allow common safe tools.
+#
+# Note: tool names are Gemini-internal; adjust based on the approval prompt UI
+# if your Gemini version uses different identifiers.
+gemini -i --allowed-tools shell --allowed-tools read_file --allowed-tools write_file --allowed-tools edit_file --allowed-tools apply_patch --allowed-tools list_directory --allowed-tools search

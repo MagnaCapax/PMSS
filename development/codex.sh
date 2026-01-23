@@ -8,4 +8,4 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 #   development/codex.sh --prompt "Do X"
 #   development/codex.sh --exec codex
 
-bash "$HERE/codex-run.sh" run --prompt-file "$HERE/prompts/codex.txt" "$@"
+bash "$HERE/agentic.sh" --agent=codex "$@"

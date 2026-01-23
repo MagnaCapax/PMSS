@@ -154,10 +154,34 @@ codex_invoke() {
 		exit 127
 	fi
 
-	local prompt prompt_q
+	local prompt prompt_q prompt_file_q exec_cmd_final inline_prompt
 	prompt="$(cat "$prompt_file")"
 	printf -v prompt_q '%q' "$prompt"
+	printf -v prompt_file_q '%q' "$prompt_file"
+	exec_cmd_final="$exec_cmd"
+	inline_prompt=0
 
-	echo "[codex] invoking: $exec_cmd [prompt-string]" >&1
-	eval "$exec_cmd $prompt_q"
+	if [[ "$exec_cmd_final" == *"##PROMPT_FILE##"* ]]; then
+		exec_cmd_final="${exec_cmd_final//##PROMPT_FILE##/$prompt_file_q}"
+		inline_prompt=1
+	fi
+	if [[ "$exec_cmd_final" == *"##PROMPT##"* ]]; then
+		exec_cmd_final="${exec_cmd_final//##PROMPT##/$prompt_q}"
+		inline_prompt=1
+	fi
+	if [[ "$exec_cmd_final" == *"##PROMPT_STDIN##"* ]]; then
+		exec_cmd_final="${exec_cmd_final//##PROMPT_STDIN##/}"
+		echo "[codex] invoking: $exec_cmd_final [prompt-stdin]" >&1
+		eval "$exec_cmd_final < $prompt_file"
+		return
+	fi
+
+	if [[ "$inline_prompt" == "1" ]]; then
+		echo "[codex] invoking: $exec_cmd_final [prompt-inline]" >&1
+		eval "$exec_cmd_final"
+		return
+	fi
+
+	echo "[codex] invoking: $exec_cmd_final [prompt-string]" >&1
+	eval "$exec_cmd_final $prompt_q"
 }

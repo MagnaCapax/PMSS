@@ -1,12 +1,24 @@
 # PMSS Codex CLI Helpers (`development/`)
 
 This directory contains small wrapper scripts that assemble **strict-rails prompts**
-and feed them to an assistant CLI (typically `codex`).
+and feed them to an assistant CLI (codex/claude/gemini).
 
 These wrappers exist because assistants do not reliably auto-discover PMSS guard rails
 (`AGENTS.md`, workflow docs, ADRs) unless we inject them into the initial session context.
 
 ## Layout
+
+- `development/agentic.sh`
+  - Main entrypoint for assistant sessions; choose `--agent` (defaults to `codex`).
+  - Uses per-agent profiles under `development/assistants/`.
+
+- `development/agentic-refactor.sh`
+  - Refactor-oriented session (same flow as the legacy codex wrapper).
+  - Accepts `--agent` and uses the strict refactor rails prompt.
+
+- `development/agentic-ci.sh`
+  - CI triage session (same flow as the legacy codex wrapper).
+  - Accepts `--agent` and uses the CI rails prompt.
 
 - `development/codex-run.sh`
   - Shared runner used by the wrappers below.
@@ -15,18 +27,22 @@ These wrappers exist because assistants do not reliably auto-discover PMSS guard
   - Supports `--dry-run` to write the assembled prompt but skip invocation.
 
 - `development/codex.sh`
-  - Starts a new general-purpose Codex session for PMSS work.
-  - Thin wrapper around `development/codex-run.sh`.
+  - Compatibility shim for `development/agentic.sh --agent=codex`.
 
 - `development/codex-refactor.sh`
-  - Refactor-oriented session: collects local candidate context (recent commits + LOC/phploc snapshots),
-    then launches Codex with the strict refactor rails prompt.
-  - Delegates prompt rendering + invocation to `development/codex-run.sh`.
+  - Compatibility shim for `development/agentic-refactor.sh --agent=codex`.
 
 - `development/codex-ci.sh`
-  - CI triage session: fetches latest GitHub Actions run logs/artifacts via `gh` (or `curl` + `GITHUB_TOKEN` fallback),
-    then launches Codex with the CI rails prompt.
-  - Delegates prompt rendering + invocation to `development/codex-run.sh`.
+  - Compatibility shim for `development/agentic-ci.sh --agent=codex`.
+
+- `development/assistants/*`
+  - Per-agent profiles (plain text templates with a single command line).
+  - First non-comment line is the exec template.
+  - Default guidance: keep these as the bare binary name (e.g. `codex`, `claude`, `gemini`) and let `development/codex-run.sh` decide how to pass the prompt.
+  - Advanced (supported, but not the default): placeholders may be used in a profile command line:
+    - `##PROMPT##` (inline prompt arg)
+    - `##PROMPT_FILE##` (path to prompt file)
+    - `##PROMPT_STDIN##` (stdin redirection; varies by CLI and may break interactive modes)
 
 - `development/prompts/*.txt`
   - The canonical default prompts for the wrappers above.
@@ -56,6 +72,10 @@ Two local-only (gitignored) files exist for per-machine or per-operator notes:
   - This is referenced by `AGENTS.md` and is expected to live at repo root.
   - Gitignored (local only).
 
+- `AGENTS.<agent>.local.md`
+  - Optional per-agent rails for the selected assistant.
+  - Gitignored (local only).
+
 - `.codex-prompt`
   - Optional Codex-only notes appended to the end of prompts produced by these wrappers.
   - Useful for local environment quirks, personal workflow, temporary guard rails, etc.
@@ -66,8 +86,35 @@ Two local-only (gitignored) files exist for per-machine or per-operator notes:
 General session:
 
 ```bash
-development/codex.sh
+development/agentic.sh
+development/agentic.sh --agent claude
+development/agentic.sh --agent gemini
 ```
+
+## Gemini CLI notes
+
+Gemini CLI respects `.gitignore` filtering by default. Since `AGENTS.local.md` and
+`AGENTS.*.local.md` are intentionally gitignored, Gemini may refuse to read them
+unless you explicitly allow them.
+
+Create a local-only `.geminiignore` in the repo root (this file is gitignored by
+PMSS on purpose so each developer can tune it):
+
+```gitignore
+!AGENTS.md
+!AGENTS.*.md
+!AGENTS.local.md
+!AGENTS.*.local.md
+```
+
+Interactive mode: Gemini's `-i/--prompt-interactive` requires a real TTY. If you
+see errors about interactive mode not being allowed when input is "piped", run
+Gemini without `-i` or re-run from an interactive terminal session.
+
+Approval prompts: Gemini defaults to prompting for tool approval. If you want to
+keep approval mode `default` but avoid approving every trivial command, run
+Gemini with `--allowed-tools ...` (tool names come from Gemini's approval UI),
+or set that in your local `development/assistants/gemini` profile.
 
 Direct runner usage (advanced):
 
@@ -81,21 +128,21 @@ development/codex-run.sh run --prompt-file development/prompts/codex.txt --dry-r
 Refactor session:
 
 ```bash
-development/codex-refactor.sh
+development/agentic-refactor.sh
 ```
 
 CI triage session (uses `gh auth login` when available; otherwise uses `curl` + `GITHUB_TOKEN`):
 
 ```bash
-development/codex-ci.sh
+development/agentic-ci.sh
 ```
 
 Override the top-level prompt text (keeps the same rails baseline):
 
 ```bash
-development/codex.sh --prompt "Do X in Y"
-development/codex-refactor.sh --prompt "Refactor Z (behaviour-preserving)"
-development/codex-ci.sh --prompt "Fix the failing CI job"
+development/agentic.sh --prompt "Do X in Y"
+development/agentic-refactor.sh --prompt "Refactor Z (behaviour-preserving)"
+development/agentic-ci.sh --prompt "Fix the failing CI job"
 ```
 
 ## Safety and conventions

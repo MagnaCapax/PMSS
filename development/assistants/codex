@@ -1,0 +1,7 @@
+# Context: ~128k tokens
+# Strengths: Good balance, native sandboxing
+# Weaknesses: OpenAI ecosystem lock-in
+# Cost: $$ (varies by plan)
+# Safety: Generally reliable
+# Docs: https://developers.openai.com/codex
+codex

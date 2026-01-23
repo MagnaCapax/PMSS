@@ -12,6 +12,47 @@ codex_set_error_trap "codex-run"
 
 TMP="${TMPDIR:-/tmp}"
 
+# Colorize a single line when stdout is a TTY.
+codex_color_line() {
+	local color="$1"
+	shift || true
+	local msg="$*"
+	if [[ -t 1 ]]; then
+		printf '\033[%sm%s\033[0m\n' "$color" "$msg"
+	else
+		printf '%s\n' "$msg"
+	fi
+}
+
+# Render a dry-run preview without inlining full prompt text.
+codex_exec_preview() {
+	local exec_cmd="$1" prompt_file="$2"
+	local exec_cmd_final inline_prompt prompt_file_q mode
+	exec_cmd_final="$exec_cmd"
+	inline_prompt=0
+	mode="prompt-string"
+
+	printf -v prompt_file_q '%q' "$prompt_file"
+	if [[ "$exec_cmd_final" == *"##PROMPT_FILE##"* ]]; then
+		exec_cmd_final="${exec_cmd_final//##PROMPT_FILE##/$prompt_file_q}"
+		inline_prompt=1
+	fi
+	if [[ "$exec_cmd_final" == *"##PROMPT##"* ]]; then
+		exec_cmd_final="${exec_cmd_final//##PROMPT##/<PROMPT>}"
+		inline_prompt=1
+	fi
+	if [[ "$exec_cmd_final" == *"##PROMPT_STDIN##"* ]]; then
+		exec_cmd_final="${exec_cmd_final//##PROMPT_STDIN##/}"
+		mode="prompt-stdin"
+	elif [[ "$inline_prompt" == "1" ]]; then
+		mode="prompt-inline"
+	fi
+	# Trim trailing whitespace left by placeholder removal.
+	exec_cmd_final="${exec_cmd_final%"${exec_cmd_final##*[![:space:]]}"}"
+
+	printf '%s [%s]' "$exec_cmd_final" "$mode"
+}
+
 usage() {
 	sed -n '1,120p' "$0"
 }
@@ -133,6 +174,8 @@ prompt_lines=$(wc -l <"$prompt_out" | tr -d ' ')
 echo "[codex-run] prompt written: $prompt_out (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
 
 if [[ "$dry_run" == "1" ]]; then
+	exec_preview="$(codex_exec_preview "$exec_cmd" "$prompt_out")"
+	codex_color_line "33" "[codex-run] would invoke: $exec_preview"
 	echo "[codex-run] dry-run: not invoking assistant (--dry-run)" >&1
 	exit 0
 fi

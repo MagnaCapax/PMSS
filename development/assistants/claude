@@ -1,0 +1,6 @@
+# Context: 200k tokens
+# Strengths: Follows instructions precisely, good at complex refactors
+# Weaknesses: Slower, more expensive
+# Safety: Generally stays on rails
+# Docs: https://code.claude.com/docs
+claude
