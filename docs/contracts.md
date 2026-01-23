@@ -235,13 +235,9 @@ Sub-handlers:
 
 - pmssEnsureLocaleBaseline(): void → ensures `en_US.UTF-8` base locale (including `LC_TIME`), sets system timezone to `Europe/Helsinki`, and calls `Motd::motdGenerate()`.
 
-- pmssReapplyLocaleDefinitions(): void → reuses the baseline helper to reassert locale/timezone configuration on legacy installs.
-
 - pmssEnsureLegacySysctlBaseline(?callable $logger=null): void → writes legacy BFQ/sysctl defaults to `/etc/sysctl.d/1-pmss-defaults.conf` and runs `sysctl --system`.
 
 - pmssConfigureRootShellDefaults(?callable $logger=null): void → ensures `/root/.bashrc` contains `alias ls=...` and `PATH=$PATH:/scripts`.
-
-- pmssProtectHomePermissions(): void → `chmod o-rw /home`.
 
 - pmssStopDisableMaskSeedboxSystemServices(): void → stops/disables/masks system-wide daemons that must never run on seedbox hosts (e.g. lighttpd, deluged/deluge-web, transmission-daemon, redis-server, memcached, rpcbind/nfs-kernel-server, smbd, exim4, docker.service). Fail-soft; safe when units are missing.
 - pmssEnsureSystemdServicesGuardBootUnit(): void → installs/enables `pmss-systemd-services-guard.service` so the systemd hardening guard runs early at boot (before basic.target).

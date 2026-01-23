@@ -542,16 +542,6 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
     }
 }
 
-if (!function_exists('pmssReapplyLocaleDefinitions')) {
-    /**
-     * Reapply locale configuration to catch legacy installations.
-     */
-    function pmssReapplyLocaleDefinitions(): void
-    {
-        // Reuse the same idempotent logic as the baseline to avoid repeated work.
-        pmssEnsureLocaleBaseline();
-    }
-}
 
 if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
     /**
@@ -638,12 +628,3 @@ if (!function_exists('pmssConfigureRootShellDefaults')) {
     }
 }
 
-if (!function_exists('pmssProtectHomePermissions')) {
-    /**
-     * Match the historical chmod applied by install.sh to /home.
-     */
-    function pmssProtectHomePermissions(): void
-    {
-        runStep('Restricting world access to /home', 'chmod o-rw /home');
-    }
-}

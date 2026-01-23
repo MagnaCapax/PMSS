@@ -345,7 +345,7 @@ pmssApplyHostnameConfig('logmsg');
 pmssConfigureQuotaMount('logmsg');
 pmssEnsureLegacySysctlBaseline('logmsg');
 pmssConfigureRootShellDefaults('logmsg');
-pmssProtectHomePermissions();
+runStep('Restricting world access to /home', 'chmod o-rw /home');
 
 // --- Basic system preparation ---
 pmssEnsureCgroupsConfigured('logmsg');
@@ -355,7 +355,6 @@ pmssEnsureLocaleBaseline();
 
 // Web stack hardening and per-user HTTP refresh.
 pmssConfigureWebStack($distroVersion);
-pmssReapplyLocaleDefinitions();
 
 // Configure OpenVPN via dedicated utility for better logging/observability.
 runStep('Configuring OpenVPN', 'php /scripts/util/configureOpenvpn.php');
