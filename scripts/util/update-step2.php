@@ -43,8 +43,6 @@ require_once __DIR__.'/../lib/update/services/runtime.php';
 require_once __DIR__.'/../lib/update/services/legacy.php';
 require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/mediainfo.php';
-require_once __DIR__.'/../lib/update/services/certificates.php';
-require_once __DIR__.'/../lib/update/services/security.php';
 require_once __DIR__.'/../lib/update/services/journald.php';
 require_once __DIR__.'/../lib/update/userMaintenance.php';
 require_once __DIR__.'/../lib/update/networking.php';
@@ -375,7 +373,7 @@ foreach ($apps as $app) {
 // postinst scripts (re)started daemons mid-update.
 pmssStopDisableMaskSeedboxSystemServices();
 
-pmssEnsureLetsEncryptConfig();
+runStep('Updating Let\'s Encrypt configuration', '/scripts/util/setupLetsEncrypt.php noreplies@pulsedmedia.com');
 // Drop obsolete global autodl configuration
 if (file_exists('/etc/autodl.cfg')) { unlink('/etc/autodl.cfg'); }
 
@@ -391,7 +389,11 @@ $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/i
 pmssUpdateAllUsers($rutorrentIndexSha);
 
 pmssEnsureAuthorizedKeysDirective();
-pmssEnsureTestfile();
+// Ensure the standard download speed test file exists
+$testfilePath = '/var/www/testfile';
+if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
+    runStep('Generating /var/www/testfile sample', 'dd if=/dev/urandom of='.$testfilePath.' bs=1M count=100 status=none');
+}
 runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
 pmssPostUpdateWebRefresh();
