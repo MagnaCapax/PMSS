@@ -6,7 +6,7 @@ require_once __DIR__.'/../update/distro.php';
 
 class Motd
 {
-    // TODO(complexity-refactor): Shell-outs and substitution are intertwined.
+    // TODO(complexity-refactor): Shell-outs and substitution are intertwined. (GH #126)
     // Extract IO (shell/system reads) from formatting, and isolate template
     // replacements into a pure function to simplify testing and reduce paths.
     public static function motdGenerate(): void

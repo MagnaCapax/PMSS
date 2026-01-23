@@ -183,6 +183,48 @@ HARD RAILS (ALWAYS)
   - dpkg baseline files under scripts/lib/update/dpkg/selections*.txt
 - Do not change updater topology or dpkg/apt phase ordering.
 
+----------------------------------------------------------------------
+FILE / FUNCTION DELETION PROTOCOL (HARD GATE)
+----------------------------------------------------------------------
+
+Before deleting ANY file or function, you MUST complete ALL of these checks:
+
+REFERENCE AUDIT (mandatory):
+1. grep -r for the function name across ALL of scripts/, install.sh, and development/
+2. grep -r for the filename (basename) in case it's loaded via include/require string
+3. Check if the file is loaded via glob patterns (e.g., foreach glob('apps/*.php'))
+4. Check shell scripts: install.sh, scripts/update.php, scripts/util/update-step2.php, scripts/cron/*, scripts/cli/*
+5. Check systemd units and crontab templates under etc/
+
+CONTEXT AUDIT (mandatory):
+1. Read the file's docblock header - look for:
+   - Invocation contexts (install.sh, cron, CLI, update-step2)
+   - External callers documented
+   - @since tags indicating long-standing infrastructure
+   - @see links to documentation/changelogs
+2. A comment about a DEPRECATED FEATURE INSIDE a file does NOT mean the file itself is dead
+   - Example: "Compatibility fix for systems where quota was compiled from source" is about a SHIM inside the file, not the file's purpose
+3. Check if the function/file is infrastructure vs feature code:
+   - Infrastructure (quotas, permissions, network, certificates) often has external callers not visible in PHP
+   - Feature code (apps, services) is more likely to be self-contained
+
+DELETION ALLOWED only when ALL of these are true:
+- ZERO runtime references found in PHP code (grep audit)
+- NOT called from shell scripts (install.sh, update.php, cron/*, cli/*)
+- NOT loaded by glob patterns or dynamic includes
+- Docblock does NOT document external callers
+- NOT infrastructure code with potential shell/cron callers
+- File/function is clearly orphaned (e.g., explicitly skipped in loading loop, or feature was removed)
+
+DELETION BLOCKED when ANY of these are true:
+- Any runtime reference exists
+- Docblock mentions install.sh, cron, CLI, or external invocation
+- File is under scripts/util/ (often called from shell scripts)
+- File handles: quotas, permissions, certificates, network config, apt/dpkg
+- Uncertain about external callers — ask operator
+
+When in doubt: DO NOT DELETE. Mark as potential dead code in your summary and let operator decide.
+
 Parallel Runs (ABSURDLY SIMPLE)
 
 - You MAY run multiple Codex runs in the same checkout.

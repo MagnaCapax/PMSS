@@ -150,6 +150,7 @@ Every step flows through the shared `runStep()` helper which logs to
 - Move toward a thinner top-level orchestrator that launches each unit of work
   under a profiling wrapper. No bare function calls or shell execs should be
   outside the profiling layer so JSON/profile output reflects every step.
+  Tracked in GH issue #120.
 
 ## Usage Examples
 

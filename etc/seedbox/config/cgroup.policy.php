@@ -28,11 +28,11 @@ return [
             'nvme' => ['ioWeight'=>200],
             'bulk' => ['ioWeight'=>500, 'cpuWeight'=>300, 'tasksMax'=>8192],
         ],
-        // #TODO: cpu/mem/tasks profiles can be extended here if needed
+        // #TODO: cpu/mem/tasks profiles can be extended here if needed (GH #121)
     ],
 
-    // #TODO Implement: per-device IO scheduling hints (e.g., BFQ vs NVMe), enabling IOWeight only when effective
-    // #TODO Implement: per-user burst allowances (temporary MemoryMax raise for a time-boxed operation)
-    // #TODO Implement: network IO shaping hints per user (integrated with existing QoS) for fair sharing
-    // #TODO Implement: per-user file descriptor soft/hard caps via systemd LimitNOFILE
+    // #TODO Implement: per-device IO scheduling hints (e.g., BFQ vs NVMe), enabling IOWeight only when effective (GH #121)
+    // #TODO Implement: per-user burst allowances (temporary MemoryMax raise for a time-boxed operation) (GH #121)
+    // #TODO Implement: network IO shaping hints per user (integrated with existing QoS) for fair sharing (GH #121)
+    // #TODO Implement: per-user file descriptor soft/hard caps via systemd LimitNOFILE (GH #121)
 ];

@@ -5,9 +5,9 @@
  *
  * Usage: ./userTrafficLimit.php --user=<username> --limit=<MiB>
  */
-# TODO Add per user max bandwidth limit
-# TODO Comment steps better
-# TODO Make common command variables parser which has more optional settings like --bandwidth 100M
+# TODO Add per user max bandwidth limit (GH #127)
+# TODO Comment steps better (GH #127)
+# TODO Make common command variables parser which has more optional settings like --bandwidth 100M (GH #127)
 
 require_once '/scripts/lib/cli/optionParser.php';
 

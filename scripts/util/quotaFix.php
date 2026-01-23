@@ -1,46 +1,88 @@
 #!/usr/bin/env php
 <?php
 /**
- * Quota integrity fixer.
+ * Quota integrity recalculation utility.
  *
- * Linux kernel quotas are not infallible and can drift out of sync over time or
- * after crashes. This utility forces a full recalculation of quota usage to ensure
- * limits are enforcing the correct values.
+ * Linux kernel quotas can drift out of sync over time, after crashes, or when
+ * files are modified outside normal I/O paths. This utility forces a full
+ * recalculation of quota usage to ensure enforcement matches actual disk state.
  *
- * History:
- *  - First introduced: 2011-03-27
- *  - Reference: https://wiki.pulsedmedia.com/index.php/PM_Software_Stack_Changelog_2011-2014
+ * Invocation contexts:
+ *   - install.sh: Run during initial installation to establish baseline
+ *   - update-step2: Run during updates to correct any accumulated drift
+ *   - Manual: Operators can invoke directly when quota reports look wrong
+ *   - Cron: May be scheduled for periodic recalculation on busy hosts
  *
- * @author Aleksi Ursin
- * @copyright 2011-2026 Pulsed Media
+ * Operations performed:
+ *   1. Report current quota state (repquota -as)
+ *   2. Disable quotas temporarily (quotaoff -av)
+ *   3. Remove stale check files (/home/aquota*new)
+ *   4. Recalculate quota usage from disk (quotacheck -avugmn)
+ *   5. Re-enable quotas (quotaon -av)
+ *   6. Report final state for comparison
+ *
+ * Exit codes:
+ *   0 - Success (quota recalculation completed)
+ *   1 - Failure (not root or quota commands failed)
+ *
+ * @since 2011-03-27
+ * @see https://wiki.pulsedmedia.com/index.php/PM_Software_Stack_Changelog_2011-2014
  */
 
-echo date('Y-m-d H:i:s') . ': Checking quota and fixing' . "\n";
+require_once __DIR__.'/../lib/runtime.php';
 
-// Compatibility fix for systems where quota was compiled from source.
-// Ensures /usr/bin/quota points to the source-installed binary if present.
-if (file_exists('/usr/local/bin/quota')) {
-    shell_exec('rm -rf /usr/bin/quota');
-    shell_exec('ln -s /usr/local/bin/quota /usr/bin/quota');
+requireRoot();
+
+$exitCode = 0;
+
+logMessage('[quotaFix] Starting quota integrity check');
+
+// 1. Report current status before any changes
+logMessage('[quotaFix] Current quota state:');
+$before = shell_exec('repquota -as 2>&1');
+echo $before;
+
+// 2. Disable quotas to allow safe recalculation
+logMessage('[quotaFix] Disabling quotas for recalculation');
+$offResult = shell_exec('quotaoff -av 2>&1');
+echo $offResult;
+
+// 3. Remove any stale/interrupted check files from previous runs
+logMessage('[quotaFix] Cleaning stale quota check files');
+$staleFiles = glob('/home/aquota*new');
+if ($staleFiles !== false && count($staleFiles) > 0) {
+    foreach ($staleFiles as $stale) {
+        @unlink($stale);
+        logMessage('[quotaFix] Removed stale file: ' . $stale);
+    }
+} else {
+    logMessage('[quotaFix] No stale files found');
 }
 
-// 1. Report current status
-echo shell_exec('repquota -as');
+// 4. Perform full quota recalculation
+// Flags: -a (all filesystems), -v (verbose), -u (user quotas),
+//        -g (group quotas), -m (don't remount ro), -n (use first found quota file)
+logMessage('[quotaFix] Recalculating quota usage from disk (this may take time on large filesystems)');
+$checkResult = shell_exec('quotacheck -avugmn 2>&1');
+echo $checkResult;
+if ($checkResult === null || strpos($checkResult, 'Cannot') !== false) {
+    logMessage('[quotaFix] WARNING: quotacheck may have encountered issues');
+    $exitCode = 1;
+}
 
-// 2. Turn off quota to allow check
-echo shell_exec('quotaoff -av');
+// 5. Brief stabilization pause
+usleep(500000);
 
-// 3. Clean up any stale/interrupted check files
-echo shell_exec('rm -rf /home/aquota*new');
-
-// 4. Perform the check (force, verbose, user/group, no-remount)
-echo shell_exec('quotacheck -avugmn');
-
-// 5. Stabilize
-sleep(1);
-
-// 6. Re-enable quota
-echo shell_exec('quotaon -av');
+// 6. Re-enable quotas
+logMessage('[quotaFix] Re-enabling quotas');
+$onResult = shell_exec('quotaon -av 2>&1');
+echo $onResult;
 
 // 7. Report final status for visual comparison
-echo shell_exec('repquota -as');
+logMessage('[quotaFix] Final quota state:');
+$after = shell_exec('repquota -as 2>&1');
+echo $after;
+
+logMessage('[quotaFix] Quota integrity check complete');
+
+exit($exitCode);

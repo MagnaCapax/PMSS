@@ -6,7 +6,7 @@
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/runtime/processes.php';
 // #TODO Create services/systemd.php with helpers stopIfPresent()/restartIfPresent()
-//       and refactor scattered stop/restart logic across modules to use it.
+//       and refactor scattered stop/restart logic across modules to use it. (GH #128)
 
 if (!function_exists('pmssConfigureWebStack')) {
     /**

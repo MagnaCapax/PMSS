@@ -16,8 +16,8 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  *
  * #TODO Replace HTTP downloads and ad-hoc compiles with a reproducible,
- *       package-based approach (dpkg baselines or managed repository).
- * #TODO Refactor to use runStep wrappers and verify downloads via checksums.
+ *       package-based approach (dpkg baselines or managed repository). (GH #132)
+ * #TODO Refactor to use runStep wrappers and verify downloads via checksums. (GH #132)
  */
 
 $rtorrentVersion = shell_exec('rtorrent -h');
@@ -39,7 +39,7 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     
     shell_exec('rm -rf /usr/local/lib/libtorrent*; ldconfig;'); // Clean up old libtorrent installed files
     
-    // Ensure build/runtime dependencies exist. #TODO migrate to shared package helper.
+    // Ensure build/runtime dependencies exist. #TODO migrate to shared package helper. (GH #132)
     runCommand('apt-get install -y libudns0 libudns-dev libcppunit-dev');
 
     echo "**** Remove old rtorrent packages\n";
@@ -57,7 +57,7 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     
     
     echo "**** get new packages\n";
-    // #TODO Switch to HTTPS and add checksum/GPG verification.
+    // #TODO Switch to HTTPS and add checksum/GPG verification. (GH #132)
     passthru("cd /tmp; wget http://pulsedmedia.com/remote/pkg/rtorrent-{$rtorrentVersionTarget}.tar.gz; wget http://pulsedmedia.com/remote/pkg/libtorrent-{$rtorrentVersionTargetLib}.tar.gz");
         
     echo "**** uncompressing ...\n";

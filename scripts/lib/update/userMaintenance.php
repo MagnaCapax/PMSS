@@ -67,9 +67,8 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 $label .= ')';
                 $phases[] = $label;
             }
-            // #TODO(per-user-loop): fold remaining global sweeps (web refresh,
-            // cron restoration, authorized_keys updates) into this orchestrator
-            // so every per-user action is visible here.
+            // #TODO(per-user-loop): fold remaining global sweeps (web refresh, cron restoration,
+            // authorized_keys updates) into this orchestrator so every per-user action is visible here. (GH #124)
 
             if ($isTty) {
                 echo PHP_EOL."\033[35mUpdating user {$userTrim}\033[0m".PHP_EOL;
@@ -365,4 +364,3 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         }
     }
 }
-

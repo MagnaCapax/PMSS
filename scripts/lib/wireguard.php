@@ -114,7 +114,7 @@ function wgValidatePublicIp(string $candidate): ?string
  */
 function wgFetchExternalEndpoint(): ?string
 {
-    // #TODO Replace with an internal endpoint discovery helper instead of calling out.
+    // #TODO Replace with an internal endpoint discovery helper instead of calling out. (GH #123)
     $override = getenv('PMSS_WG_EXTERNAL_IP');
     if ($override !== false) {
         return $override === '' ? null : wgValidatePublicIp($override);

@@ -1,7 +1,7 @@
 <?php
-// #TODO Refactor this installer to use virtualenv instead of system-wide pip.
-// #TODO Pin Python package versions explicitly; avoid unbounded upgrades.
-// #TODO Replace passthru/backticks with runStep wrappers for consistent logging.
+// #TODO Refactor this installer to use virtualenv instead of system-wide pip. (GH #125)
+// #TODO Pin Python package versions explicitly; avoid unbounded upgrades. (GH #125)
+// #TODO Replace passthru/backticks with runStep wrappers for consistent logging. (GH #125)
 if (empty($debianVersion)) $debianVersion = (string) @file_get_contents('/etc/debian_version');
 
 echo "#### Deluge install // update\n";

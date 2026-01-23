@@ -11,7 +11,7 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/pythonVenv.php';
 
 $dryRun = getenv('PMSS_DRY_RUN') === '1';
-// #TODO Pin acd_cli to a specific commit/tag to avoid unbounded upgrades.
+// #TODO Pin acd_cli to a specific commit/tag to avoid unbounded upgrades. (GH #129)
 
 $venvDir = '/opt/acd_cli';
 $cliBin  = $venvDir.'/bin/acd_cli';

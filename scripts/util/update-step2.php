@@ -7,7 +7,7 @@
  * (/scripts/update.php) refreshes itself. Tasks include repository setup,
  * service configuration, user environment maintenance and security tweaks.
  *
- * #TODO profiling
+ * #TODO profiling (GH #120)
  * In a future refactor, launch this sequence from a thinner orchestrator and
  * ensure EVERY unit of work is wrapped in profiling/structured logging. That
  * means no bare function calls or shell execs without runStep/pmssRecordProfile
@@ -315,7 +315,7 @@ if (!$dpkgBaselineOk) {
     }
 }
 
-// #TODO Finish migration: once dpkg baselines cover all apps on all hosts,
+// #TODO Finish migration: once dpkg baselines cover all apps on all hosts, (GH #122)
 //       replace queued installs with a diff-summary report and remove the
 //       per-app package queue entirely.
 include_once '/scripts/lib/update/apps/packages.php';
@@ -339,6 +339,7 @@ pmssApplyRuntimeTemplates();
 pmssApplyJournaldLimits('logmsg');
 pmssApplyHostnameConfig('logmsg');
 pmssConfigureQuotaMount('logmsg');
+runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
 pmssEnsureLegacySysctlBaseline('logmsg');
 pmssConfigureRootShellDefaults('logmsg');
 runStep('Restricting world access to /home', 'chmod o-rw /home');
@@ -416,7 +417,7 @@ if (file_exists($logrotateTemplate)) {
 
 // Restore crontabs for users that still exist in /etc/passwd
 runStep('Restoring default crontab for all users', 'bash -lc '.escapeshellarg('/scripts/listUsers.php | while read -r U; do id "$U" >/dev/null 2>&1 && crontab -u "$U" /etc/seedbox/config/user.crontab.default; done'));
-// #TODO(per-user-loop): migrate the global web stack refresh/cron/authorized
+// #TODO(per-user-loop): migrate the global web stack refresh/cron/authorized (GH #124)
 // keys tasks above into the single per-user orchestrator so we do not run
 // separate all-user sweeps.
 
