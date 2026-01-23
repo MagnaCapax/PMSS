@@ -12,10 +12,14 @@ instead of restating details.
 - **Before touching any code**, read `docs/architecture.md`, the related workflow docs in `docs/update.md` / `docs/install.md`, and the refactoring guide in `docs/refactoring.md`. These describe the provisioning hierarchy (install → update.php → update-step2) and must be understood prior to making changes.
 
 - **Purpose**: PMSS is Pulsed Media's distro overlay for seedboxing, data hoarding, streaming etc. working on top of Debian distro and this repo is overlayed on top of the distro to manage the multi-tenant environment.
-- **Supported OS**: Production targets Debian 10 (buster) and Debian 11 (bullseye); Debian 12 (bookworm) is currently under validation.
+- **Supported OS**: Production targets Debian 10 (buster) and Debian 11 (bullseye); Debian 12 (bookworm) is currently under validation; Debian 13 (trixie) is experimental.
+  - #TODO #Debian13: capture `scripts/lib/update/dpkg/selections-debian13.txt` from a converged host and validate key installers before promoting support status.
 - **Current Freeze**: Do not modify `etc/skel/www` or its subdirectories until further notice; work in that area is paused.
 - **Skel WWW Lockdown**: Never touch `etc/skel/www` (or its contents) unless the user explicitly instructs you to. Treat it as read-only even during refactors or test scaffolding.
 - **Third-Party Libraries**: Treat bundled upstream or vendor code (e.g., ruTorrent front-end, Devristo helpers) as read-only unless explicit approval to update or replace is granted.
+- **Repository Policy Freeze (IMPORTANT)**:
+  - Do not change MediaArea repository handling right now (it works; avoid churn).
+  - Do not implement a general migration of Debian apt sources to deb822 (`*.sources`) without explicit operator instruction/ADR; see `docs/adr/0008-reject-deb822-apt-sources-migration.md`. (Docker deb822 is already in use; keep as-is.)
 - **Updater Topology**: `update-step2.php` executes after the full repository tree is present, so it may depend on shared libraries under `scripts/lib/update`. In contrast `update.php` must remain a mostly self-contained bootstrapper—assume it might be the only file available during break-glass installs, so keep it focused on argument parsing, fetching the requested snapshot, and handing off to `update-step2.php`.
 - **Distro Selection**: `pmssDetectDistro()` (in `scripts/lib/update/distro.php`) reads `/etc/os-release`, trusts `VERSION_CODENAME` when available, maps that to the corresponding Debian major version, and only falls back to `VERSION_ID` or `lsb_release` when the codename is missing. Any mismatches log a warning and favour the codename so the correct repo template is chosen.
 
@@ -39,6 +43,7 @@ instead of restating details.
 ## Engineering Doctrine (Repository Constitution)
 - Stability over perfection: bias toward proven patterns; avoid churn that puts
   user workflows at risk. Prefer incremental improvements.
+- Proven mechanisms over novelty: Prefer stable, robust, simple mechanisms that have worked for decades over new formats, features, or approaches that add complexity without meaningful operational benefit. Do not adopt new standards just because they exist or are "the new way" — require demonstrated PMSS-specific benefit before any migration. Buzzword-driven changes that complicate debugging, increase failure modes, or break backwards compatibility are rejected unless they solve a concrete problem we actually have.
 - Deletion‑First: prefer removing code paths/knobs over adding new ones; unify flows instead of special‑casing; prune dead code/config promptly. The best part is no part; refactoring wins.
 - Minimal Edits: keep diffs small, coherent, and reviewable; prefer changes that reduce complexity/LOC. Refactor toward clarity before adding features.
 - One Flow, No Special Cases: keep a single, explicit update path. Any exception requires an ADR and a removal plan.
@@ -107,6 +112,8 @@ instead of restating details.
                                                                                                                                  
 ## Git Safety & Concurrency                                                                                                      
 - **Multi-Tenant Environment**: Assume the user or other agents are working in the same directory simultaneously.                
+- **Multi-Agent Sessions**: Multiple agents/runs may operate in the same checkout. Do not halt just because unrelated dirty files exist—ignore them and do not touch them.
+- **Avoid Stepping On Toes**: Before editing a file, if it is already dirty and in your intended scope, skip it and pick a different target; if you must edit it, ask the operator first.
 - **Sacred Working Directory**: NEVER discard unstaged changes (`git restore`, `git checkout <file>`, `git reset`, `git clean`) unless explicitly ordered by the user.
 - **Targeted Commits**: ALWAYS use `git add <specific_file>` instead of `git add .` or `git commit -a`.                          
 - **Ignore Noise**: If you see modified files unrelated to your task, ignore them. Do not touch them.                            

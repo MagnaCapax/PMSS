@@ -20,6 +20,9 @@ Hard rails (must follow):
 - Do not edit scripts/lib/update/dpkg/selections*.txt without explicit platform sign-off.
 - No new external deps/tools/configs unless explicitly approved.
 - Prefer established helpers and patterns (runStep(), JSON logging/profile) to keep observability stable.
+- Repository policy freeze:
+  - Do not change MediaArea repository handling now that it works.
+  - Do not implement a general deb822 migration for Debian apt sources without explicit operator instruction/ADR (see `docs/adr/0008-reject-deb822-apt-sources-migration.md`; Docker deb822 is already in use; keep as-is).
 
 Refactor tactics (behaviour-preserving):
 - Prefer tables/config arrays over branching when behaviour is identical.

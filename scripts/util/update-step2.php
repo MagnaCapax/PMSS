@@ -134,6 +134,11 @@ putenv('PMSS_PACKAGE_PHASE=initializing');
 
 $effectiveRepoVersion = $repoVersion > 0 ? $repoVersion : $reportedVersion;
 
+logmsg('Update-step2 log: /var/log/pmss-update.log (fallback /tmp/pmss-update.log)');
+$jsonPath = function_exists('pmssJsonLogPath') ? pmssJsonLogPath() : (getenv('PMSS_JSON_LOG') ?: '');
+if ($jsonPath !== '') {
+    logmsg('JSON events: '.$jsonPath);
+}
 logmsg('update-step2.php starting');
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'start']);
 

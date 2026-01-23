@@ -187,6 +187,7 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
         }
 
         $templates = [];
+        // NOTE: Base Debian repos use sources.list templates, NOT deb822. See @docs/adr/0008-reject-deb822-apt-sources-migration.md
         foreach (['jessie', 'buster', 'bullseye', 'bookworm', 'trixie'] as $suite) {
             $templates[$suite] = pmssLoadRepoTemplate($suite, $log);
         }

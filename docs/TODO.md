@@ -11,6 +11,20 @@ This document tracks small, stability‑focused improvements and medium‑term r
 - Test hooks and hermeticity
   - Expand environment overrides to direct helpers to temp paths (e.g., PMSS_CONFIG_DIR, PMSS_RUNTIME_DIR, PMSS_SKEL_DIR, PMSS_OS_RELEASE_PATH) so dev tests cover more flows without touching the system. Add examples to scripts/lib/tests/common.
 
+- Debian 13 (trixie) experimental support
+  - #TODO #Debian13: capture `scripts/lib/update/dpkg/selections-debian13.txt` from a converged trixie host and verify baseline replay on a second host before promoting support status.
+  - #TODO #Debian13: audit Debian-version gating in installers; confirm trixie behavior and adjust only if needed:
+    - `scripts/lib/update/apps/deluge.php` (Debian 10 pip path vs apt; verify apt packages on 13).
+    - `scripts/lib/update/apps/docker.php` (rootless helper path for <12; verify 13 package set/assumptions).
+    - `scripts/lib/update/apps/packages/system.php` (package lists currently documented for 11/12).
+    - `scripts/lib/update/apps/packages.php` (wireguard dkms gating, docker package set).
+    - `scripts/lib/update/apps/rtorrent.php` (debian_version[0] logic; confirm 13 target versions).
+    - `scripts/lib/update/apps/openvpn.php` / `scripts/lib/update/apps/vnstat.php` (legacy Debian 8 branches; ensure no 13 assumptions).
+    - `scripts/lib/update/apps/pyload.php` / `scripts/lib/update/apps/packages/python.php` (package availability on 13).
+
+- Repository signing hygiene
+  - #TODO #Security: audit external repository entries for `signed-by=` adoption to gain key-scoping security without a deb822 migration (Docker, MediaArea, Sonarr, etc.).
+
 - Single‑run locking
   - Add a global lock (flock on /var/run/pmss-update.lock) to prevent overlapping update.php / update-step2.php executions. Emit JSON events for lock wait/acquire/release. This prevents concurrent dpkg and service races.
 

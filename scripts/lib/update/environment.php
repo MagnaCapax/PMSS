@@ -116,11 +116,26 @@ if (!function_exists('pmssApplyDpkgSelections')) {
     function pmssApplyDpkgSelections(?int $distroVersion = null, bool $skipUpdate = false): bool
     {
         $baseDir = __DIR__.'/dpkg';
+        $baselines = [];
+        foreach (glob($baseDir.'/selections-debian*.txt') ?: [] as $path) {
+            if (preg_match('/selections-debian([0-9]+)\\.txt$/', $path, $match)) {
+                $baselines[(int) $match[1]] = $path;
+            }
+        }
+        $latestBaseline = $baselines ? max(array_keys($baselines)) : null;
+
         $candidates = [];
         if ($distroVersion !== null) {
-            $candidates[] = sprintf('%s/selections-debian%d.txt', $baseDir, $distroVersion);
+            $candidates[] = $baselines[$distroVersion] ?? sprintf('%s/selections-debian%d.txt', $baseDir, $distroVersion);
         }
-        $candidates[] = $baseDir.'/selections-debian11.txt';
+        // Default to the newest baseline we have when the target release is newer than expected.
+        // #TODO #Debian13: capture and ship selections-debian13.txt (platform sign-off required).
+        if ($latestBaseline !== null) {
+            $latestPath = $baselines[$latestBaseline];
+            if (!in_array($latestPath, $candidates, true)) {
+                $candidates[] = $latestPath;
+            }
+        }
         $candidates[] = $baseDir.'/selections.txt';
 
         $selections = null;

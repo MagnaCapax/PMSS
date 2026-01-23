@@ -146,6 +146,7 @@ function normalizeAptSources(): void
         return;
     }
 
+    // NOTE: Base Debian repos use sources.list templates, NOT deb822. See @docs/adr/0008-reject-deb822-apt-sources-migration.md
     $sourcesPath = '/etc/apt/sources.list';
     $current     = @file_get_contents($sourcesPath) ?: '';
 
@@ -871,6 +872,9 @@ function bootstrapMain(array $argv): void
 
     $startTime    = microtime(true);
     $originalHash = currentUpdaterHash();
+
+    logmsg('Update log: /var/log/pmss/update.log (fallback /tmp/update.log)');
+    logmsg('JSON events: '.JSON_LOG);
 
     $options = parseArguments($argv);
 

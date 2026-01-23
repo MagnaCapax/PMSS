@@ -179,9 +179,26 @@ Dry-run a release update to inspect logging only:
   pattern: one focused responsibility per file, concise docblocks, and reuse of
   the runtime helpers for logging.
 
+### Interactive capture (development)
+
+To capture the full interactive run while keeping output visible, use `script`:
+
+```
+script -q -c "/scripts/update.php release" /tmp/pmss-update.typescript
+```
+
+For remote runs, force a TTY:
+
+```
+ssh -t root@HOST "script -q -c '/scripts/update.php release' /tmp/pmss-update.typescript"
+```
+
+Phase 1 logs to `/var/log/pmss/update.log` and emits JSON to `/var/log/pmss-update.jsonl`. Phase 2 logs to `/var/log/pmss-update.log` and uses `PMSS_JSON_LOG` (set by `update.php`) for JSON events. When running `update-step2.php` standalone, set `PMSS_JSON_LOG=/var/log/pmss-update.jsonl` to keep JSON output consistent.
+
 ### Release Strategy
 - Rolling updates by default: the fleet intentionally runs a mix of versions across hosts; updates roll forward progressively and can be paused.
 - Coexistence across distros: Debian 10 and 11 hosts are operated side‑by‑side; update logic must remain compatible with both baselines.
+- Debian 13 (trixie) is experimental; do not assume full support until the dpkg baseline is captured and validated.
 - Script rollbacks: scripts and configs can be reverted independently of package state; keep pre‑change backups and version metadata for quick rollback.
 
 Keeping the bootstrap minimal and the second phase modular allows PMSS to update

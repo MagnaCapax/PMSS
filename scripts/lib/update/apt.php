@@ -76,8 +76,9 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
     array $repos, ?callable $logger = null): void
 {
     $log = pmssSelectLogger($logger);
-    // #TODO Convert to deb822 sources (`/etc/apt/sources.list.d/*.sources`) and
-    //       use `/etc/apt/keyrings` with `signed-by` for all external repos.
+    // NOTE: Base Debian repos use sources.list templates, NOT deb822. See @docs/adr/0008-reject-deb822-apt-sources-migration.md
+    // Do not implement `/etc/apt/sources.list.d/*.sources` for the main Debian templates
+    // without explicit operator instruction/ADR. (Docker deb822 is already in use.)
 
     if ($distroVersion <= 0) {
         $log(sprintf('Skipping repository update for %s: unknown version', $distroName));

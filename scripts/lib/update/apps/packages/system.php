@@ -7,6 +7,8 @@
  *     buster-backports when available.
  *   - 11 (bullseye) and 12 (bookworm): reuse the same package lists; helpers
  *     rely on dpkg baselines to keep drift minimal.
+ *   - #TODO #Debian13: validate whether these lists remain correct on Debian 13 (trixie)
+ *     once the Debian 13 dpkg baseline is captured.
  *   - <10: installers log a warning and skip execution.
  */
 

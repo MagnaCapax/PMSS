@@ -53,6 +53,15 @@ log_step() { local msg="==> $*"; echo -e "${COLOR_BLUE}${msg}${COLOR_RESET}"; lo
 log_info() { local msg="--> $*"; echo -e "${COLOR_GREEN}${msg}${COLOR_RESET}"; log_file "$msg"; }
 log_warn() { local msg="WARN $*"; echo -e "${COLOR_YELLOW}${msg}${COLOR_RESET}"; log_file "$msg"; }
 log_error() { local msg="ERR  $*"; echo -e "${COLOR_RED}${msg}${COLOR_RESET}"; log_file "$msg"; }
+
+log_info "Installer log file: ${LOG_FILE}"
+tty_in="no"
+tty_out="no"
+tty_ctl="no"
+[ -t 0 ] && tty_in="yes"
+[ -t 1 ] && tty_out="yes"
+[ -r /dev/tty ] && [ -w /dev/tty ] && tty_ctl="yes"
+log_info "TTY status: stdin=${tty_in} stdout=${tty_out} controlling=/dev/tty:${tty_ctl}"
 run_cmd() {
 	if [ "$DRY_RUN" = true ]; then
 		log_step "[DRY-RUN] Skipping: $*"
@@ -217,6 +226,7 @@ if pmssDetectExistingInstall; then
 			UPDATE_ARGS+=("--scripts-only")
 		fi
 
+		log_info "Handing off to /scripts/update.php (logs: /var/log/pmss/update.log, /var/log/pmss-update.jsonl)"
 		run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
 		exit $?
 	fi
@@ -826,6 +836,7 @@ run_cmd apt update
 
 if [ "$RUN_UPDATE" = true ]; then
 	log_step "Handing off to /scripts/update.php"
+	log_info "Update logs: /var/log/pmss/update.log (bootstrap), /var/log/pmss-update.log (phase 2), /var/log/pmss-update.jsonl (JSON)"
 	run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
 	run_cmd /scripts/util/setupRootCron.php
 	run_cmd /scripts/util/setupSkelPermissions.php

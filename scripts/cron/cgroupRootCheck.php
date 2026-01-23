@@ -15,14 +15,11 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 function v($k){ $o=@shell_exec('systemctl show user-0.slice -p '.$k.' 2>/dev/null'); if($o===null)return ''; $o=trim($o); $pos=strpos($o,'='); return $pos!==false?substr($o,$pos+1):$o; }
 
-$memHigh = v('MemoryHigh');
-$memMax  = v('MemoryMax');
-$tasks   = v('TasksMax');
-
 $fixes=[];
-if ($memHigh !== '' && strtolower($memHigh) !== 'infinity') { $fixes['MemoryHigh']='infinity'; }
-if ($memMax  !== '' && strtolower($memMax)  !== 'infinity') { $fixes['MemoryMax']='infinity'; }
-if ($tasks   !== '' && strtolower($tasks)   !== 'infinity') { $fixes['TasksMax']='infinity'; }
+foreach (['MemoryHigh', 'MemoryMax', 'TasksMax'] as $prop) {
+    $value = v($prop);
+    if ($value !== '' && strtolower($value) !== 'infinity') { $fixes[$prop]='infinity'; }
+}
 
 if ($fixes) {
     // In test mode, allow running without root to exercise logging paths

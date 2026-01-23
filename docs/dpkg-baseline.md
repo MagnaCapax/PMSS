@@ -4,6 +4,8 @@ When onboarding a new distro (e.g. Debian 13, Ubuntu derivatives), follow this
 process to generate the immutable `scripts/lib/update/dpkg/selections-<distro>.txt`
 manifest.
 
+> #TODO #Debian13: capture and land `scripts/lib/update/dpkg/selections-debian13.txt` with platform sign-off.
+
 1. **Provision a clean host** with the target OS and run the current PMSS
    updater (`install.sh` + `/scripts/update.php git/main`). Make sure the run
    completes without package queue warnings.

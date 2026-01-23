@@ -7,6 +7,7 @@ A quick map for agents touching this repository:
 - Testing philosophy: maintain fast dev-time suites that avoid network/system mutations, and plan for separate production probes that capture real-world health (package presence, service status) for logs once implemented.
 - Tests live under `scripts/lib/tests/development` (unit-style) and `scripts/lib/tests/production` (post-provision probes). Use the matching runner for each tier.
 - Never break old users: upgrades must be backward compatible and data-safe; treat the existing fleet as immutable requirements.
+- Debian 13 (trixie) is experimental; do not assume full support until a Debian 13 dpkg baseline is captured and validated.
 - Contracts and invariants: each module must declare its pre/postconditions (e.g., package phase leaves services runnable) and tests should enforce them.
 - Repo detection prefers `VERSION_CODENAME`; if neither codename nor numeric version is known the updater skips rewriting `sources.list` and logs a warning (preventing accidental downgrades).
 - `scripts/util/systemTest.php` offers a read-only CLI probe of system readiness (binary versions, config presence). Run it only on real hosts after provisioning.
@@ -35,6 +36,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 ## Package Strategy
 - Per-release bootstrap baselines live under `scripts/lib/update/dpkg/`; the installer only ensures core tools. Apps (Radarr, SabNZBd, etc.) are built via update-step2 modules.
 - Release-specific dpkg snapshots: `scripts/lib/update/dpkg/selections-debian10/11/12.txt`. Apply via `pmssApplyDpkgSelections()` once per run (update-step2 picks the codename-resolved version or logs if unavailable).
+- #TODO #Debian13: Debian 13 (trixie) is experimental; add `scripts/lib/update/dpkg/selections-debian13.txt` (captured from a real host) before promoting beyond experimental.
 - Dynamic installs use `pmssQueuePackages()` + `pmssFlushPackageQueue()`; per-app scripts queue what they need.
 - Always run repository refresh + package installation at the start of phase 2;
   no other orchestration steps may run before APT completes.

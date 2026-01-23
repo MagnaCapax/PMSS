@@ -15,4 +15,20 @@ Interactivity contract:
 - When running the installer via an `ssh host "..."` remote command, force a pseudo-TTY with `ssh -t` (otherwise no prompts are possible).
 - For unattended runs, use `--non-interactive` (or `--skip-hostname` / `--skip-quota`) to suppress prompts.
 
+## Development capture (interactive TTY)
+
+To capture the full interactive session (including prompts) while keeping output visible on screen, use `script` with a TTY:
+
+```
+script -q -c "bash install.sh release" /tmp/pmss-install.typescript
+```
+
+For a remote host, force a TTY and capture output on the host:
+
+```
+ssh -t root@HOST "script -q -c 'wget -qO- https://github.com/MagnaCapax/PMSS/raw/main/install.sh | bash -s -- release' /tmp/pmss-install.typescript"
+```
+
+Logs are also written to `/var/log/pmss-install.log`, and the update phase continues logging under `/var/log/pmss/update.log` and `/var/log/pmss-update.jsonl`.
+
 Do not move heavyweight orchestration into `install.sh`; it belongs in `update.php` and `update-step2.php`.

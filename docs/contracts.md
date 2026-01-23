@@ -163,7 +163,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Runs `dpkg --configure -a`. On error: unmask `proftpd.service` (systemd) and retry proftpd package configure.
 
 - pmssApplyDpkgSelections(?int $distroVersion=null): bool
-  - Picks selection file (`selections-debian<version>.txt`, fallback 11, then generic `selections.txt`).
+  - Picks selection file (`selections-debian<version>.txt`, fallback to newest available baseline, then generic `selections.txt`).
   - `apt-get update`, `apt-cache dumpavail | dpkg --merge-avail`.
   - Sanitizes lines to `pkg<TAB>state`, ignoring malformed entries; uses temp file.
   - `dpkg --set-selections < file` then `apt-get dselect-upgrade -y`; retries with `--fix-broken`.

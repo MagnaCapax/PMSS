@@ -40,23 +40,89 @@ function pmssSkeletonPath(string $relative): string
 }
 
 /**
+ * Resolve the base home directory for user files.
+ */
+function pmssUserHomeRoot(): string
+{
+    return pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
+}
+
+/**
+ * Ensure the parent directory for a user file exists with sane permissions.
+ */
+function pmssEnsureUserParentDir(string $targetFile, string $user, string $home): bool
+{
+    $parent = dirname($targetFile);
+    if ($parent === '' || $parent === '.' || $parent === '/') {
+        logMessage("[user:{$user}] Invalid parent directory for {$targetFile}");
+        return false;
+    }
+    if (is_dir($parent)) {
+        return true;
+    }
+    if (file_exists($parent)) {
+        logMessage("[user:{$user}] Parent path exists but is not a directory: {$parent}");
+        return false;
+    }
+
+    $prefix = rtrim($home, '/');
+    $relative = substr($parent, strlen($prefix));
+    $relative = ltrim($relative, '/');
+    if ($relative === '') {
+        return true;
+    }
+
+    $path = $prefix;
+    foreach (explode('/', $relative) as $segment) {
+        if ($segment === '') {
+            continue;
+        }
+        $path .= '/'.$segment;
+        if (is_dir($path)) {
+            continue;
+        }
+        if (file_exists($path)) {
+            logMessage("[user:{$user}] Cannot create directory, path exists: {$path}");
+            return false;
+        }
+        if (!@mkdir($path, 0755)) {
+            logMessage("[user:{$user}] Failed to create directory: {$path}");
+            return false;
+        }
+        @chmod($path, 0755);
+        @chown($path, (string) $user);
+        @chgrp($path, (string) $user);
+        logMessage("[user:{$user}] Created directory: {$path}");
+    }
+
+    return is_dir($parent);
+}
+
+/**
  * Update a user's file from the skeleton directory.
  *
  * @param string $file The filename relative to the skeleton base and the user's home.
  * @param string $user The username whose file should be updated.
  */
 function updateUserFile($file, $user) {
-    // #TODO Replace delete-then-copy with an atomic safe-write helper:
-    //       write to a temp file in the same directory then rename.
-    //       Preserve existing mode/owner when content is unchanged.
-    // #TODO Add hermetic tests covering safe-write behavior.
-    if (empty($file) || empty($user) || !file_exists("/home/{$user}")) {
+    if (empty($file) || empty($user)) {
         logMessage("[user:{$user}] updateUserFile skipped (invalid params or home missing): {$file}");
         return;
     }
 
+    $homeRoot = pmssUserHomeRoot();
+    $homeDir  = $homeRoot.'/'.$user;
+    if (!file_exists($homeDir)) {
+        logMessage("[user:{$user}] updateUserFile skipped (home missing): {$file}");
+        return;
+    }
+    if (!is_dir($homeDir)) {
+        logMessage("[user:{$user}] updateUserFile skipped (home not a directory): {$file}");
+        return;
+    }
+
     $sourceFile = pmssSkeletonPath($file);
-    $targetFile = "/home/{$user}/" . $file;
+    $targetFile = $homeDir.'/'.$file;
 
     if (!file_exists($sourceFile)) {
         logMessage("[user:{$user}] Source skeleton missing for {$file}");
@@ -68,9 +134,11 @@ function updateUserFile($file, $user) {
         return;
     }
     
+    if (!pmssEnsureUserParentDir($targetFile, $user, $homeDir)) {
+        return;
+    }
+
     if (!file_exists($targetFile)) {
-        // #TODO Defensive directory creation: ensure parent directory exists with
-        // sane permissions and log when created to improve idempotence.
         copyToUserSpace($sourceFile, $targetFile, $user);
         logMessage("[user:{$user}] Added skeleton file: {$file}");
     } else {
@@ -87,10 +155,6 @@ function updateUserFile($file, $user) {
         $sourceChecksum = sha1($sourceContent);
         $targetChecksum = sha1($targetContent);
         if ($sourceChecksum !== $targetChecksum) {
-            if (!unlink($targetFile)) {
-                logMessage("[user:{$user}] Failed to remove old file: {$targetFile}");
-                return;
-            }
             copyToUserSpace($sourceFile, $targetFile, $user);
             logMessage("[user:{$user}] Updated skeleton file: {$file}");
         }
@@ -107,12 +171,40 @@ function updateUserFile($file, $user) {
  * @return void
  */
 function copyToUserSpace($sourceFile, $targetFile, $user) {
-    if (!copy($sourceFile, $targetFile)) {
-        echo "Failed to copy {$sourceFile} to {$targetFile}\n";
+    $parent = dirname($targetFile);
+    if (!is_dir($parent)) {
+        logMessage("[user:{$user}] Failed to copy; parent directory missing: {$parent}");
         return;
     }
-    // Avoid shelling out for simple chmod/chown: fork failures are one of the
-    // most common incident triggers during high-load updates.
+
+    $tempFile = @tempnam($parent, 'pmss-userfile-');
+    if ($tempFile === false) {
+        logMessage("[user:{$user}] Failed to create temp file in {$parent}");
+        return;
+    }
+    if (!copy($sourceFile, $tempFile)) {
+        @unlink($tempFile);
+        logMessage("[user:{$user}] Failed to copy {$sourceFile} to temp file for {$targetFile}");
+        return;
+    }
+
+    if (!@chmod($tempFile, 0755)) {
+        logMessage("[WARN] Failed to chmod 0755: {$targetFile}");
+    }
+    if (!@chown($tempFile, (string) $user)) {
+        logMessage("[WARN] Failed to chown {$user}: {$targetFile}");
+    }
+    if (!@chgrp($tempFile, (string) $user)) {
+        logMessage("[WARN] Failed to chgrp {$user}: {$targetFile}");
+    }
+
+    if (!@rename($tempFile, $targetFile)) {
+        @unlink($tempFile);
+        logMessage("[user:{$user}] Failed to move temp file into place: {$targetFile}");
+        return;
+    }
+
+    // Avoid shelling out for simple chmod/chown: fork failures are common during updates.
     if (!@chmod($targetFile, 0755)) {
         logMessage("[WARN] Failed to chmod 0755: {$targetFile}");
     }

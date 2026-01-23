@@ -59,8 +59,14 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
 
             $phases = [];
-            if (function_exists('pmssUpdateUserEnvironment')) $phases[] = 'Environment (HTTP/ruTorrent/permissions)';
-            if (function_exists('pmssEnsureLingerAndDocker')) $phases[] = 'Linger/systemd/rootless Docker';
+            if (function_exists('pmssUpdateUserEnvironment')) {
+                $label = 'Environment (HTTP/ruTorrent/permissions';
+                if (function_exists('pmssEnsureLingerAndDocker')) {
+                    $label .= ' + linger/systemd/rootless Docker';
+                }
+                $label .= ')';
+                $phases[] = $label;
+            }
             // #TODO(per-user-loop): fold remaining global sweeps (web refresh,
             // cron restoration, authorized_keys updates) into this orchestrator
             // so every per-user action is visible here.
@@ -111,10 +117,6 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
 
             pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
-            // Keep all per-user runtime wiring in the same loop for observability and simplicity.
-            if (function_exists('pmssEnsureLingerAndDocker')) {
-                pmssEnsureLingerAndDocker($userTrim);
-            }
 
             $userDuration = microtime(true) - $userStart;
             if (function_exists('pmssUserLog')) {
@@ -148,8 +150,6 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
      */
     function pmssEnsureLingerAndDocker(string $user): void
     {
-        // #TODO fold linger/Docker kick into pmssUpdateUserEnvironment so we only
-        // traverse the user list once and share the same validation.
         if (is_dir("/home/{$user}/www-disabled")) {
             pmssUserLog($user, '[SKIP] User appears suspended; skipping linger/Docker wiring');
             return;
