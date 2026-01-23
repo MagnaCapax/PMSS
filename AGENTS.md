@@ -157,6 +157,10 @@ rofanity.
 
 - **Append, Don't Clutter:** Add sections to existing documentation rather than spawning new micro-files unless the content is a formal ADR.
 
+- **GitHub Issues (Optional via `gh`):** Prefer GitHub issues for trackable work items over adding more entries to `docs/TODO.md`.
+- **`gh` Availability/Auth:** Always check `gh auth status` first; if `gh` is missing or not authenticated, note it and proceed without failing.
+- **Common Commands:** `gh issue list`, `gh issue create --title "..." --body "..."`, `gh issue close <number>`, `gh label list`.
+
 
 
 
