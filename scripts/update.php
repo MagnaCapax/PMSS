@@ -46,6 +46,8 @@ const VERSION_META          = VERSION_DIR.'/version.meta';
 const JSON_LOG              = '/var/log/pmss-update.jsonl';
 const SELF_UPDATE_SKIP_FLAG = '--skip-self-update';
 const SCRIPTS_ONLY_FLAG     = '--scripts-only';
+define('PMSS_UPDATE_LOCK_FILE', '/var/run/pmss/update.lock');
+define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');
 
 const EXIT_PARSE = 11;
 const EXIT_FETCH = 12;
@@ -98,6 +100,60 @@ function fatal(string $message, int $code): void
     logmsg('[ERROR] '.$message);
     logEvent('fatal', ['message' => $message, 'code' => $code]);
     exit($code);
+}
+
+/**
+ * Acquire a global update lock to prevent overlapping runs.
+ */
+function pmssAcquireUpdateLock(): void
+{
+    if (getenv(PMSS_UPDATE_LOCK_ENV) === '1') {
+        return;
+    }
+
+    $dir = dirname(PMSS_UPDATE_LOCK_FILE);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    $fh = @fopen(PMSS_UPDATE_LOCK_FILE, 'c');
+    if ($fh === false) {
+        fatal('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE, EXIT_COPY);
+    }
+
+    logEvent('update_lock_wait', ['path' => PMSS_UPDATE_LOCK_FILE]);
+    if (!flock($fh, LOCK_EX)) {
+        fatal('Unable to acquire update lock (flock failed)', EXIT_COPY);
+    }
+
+    $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
+    putenv(PMSS_UPDATE_LOCK_ENV.'=1');
+    logEvent('update_lock_acquired', ['path' => PMSS_UPDATE_LOCK_FILE]);
+
+    register_shutdown_function('pmssReleaseUpdateLock');
+}
+
+/**
+ * Release the global update lock.
+ */
+function pmssReleaseUpdateLock(): void
+{
+    static $released = false;
+
+    if ($released) {
+        return;
+    }
+    if (getenv(PMSS_UPDATE_LOCK_ENV) !== '1') {
+        return;
+    }
+
+    if (isset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'])) {
+        @flock($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'], LOCK_UN);
+        @fclose($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
+        unset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
+    }
+    putenv(PMSS_UPDATE_LOCK_ENV);
+    $released = true;
+    logEvent('update_lock_released', ['path' => PMSS_UPDATE_LOCK_FILE]);
 }
 
 /**
@@ -576,50 +632,91 @@ function stageSnapshot(string $tmp, bool $dryRun): void
 {
     ensureSnapshot($tmp);
 
-    // #TODO move /scripts and /etc/seedbox updates to staged + atomic swap (see docs/TODO.md)
-    // so no process ever sees a partially refreshed tree.
+    $runId = bin2hex(random_bytes(4));
 
-    $trees = [
-        'scripts' => function (string $source) {
-            if (!is_dir('/scripts')) {
-                @mkdir('/scripts', 0755, true);
+    // Stage /scripts with an atomic rename swap.
+    $scriptsSource = $tmp.'/scripts';
+    if (!directoryHasContent($scriptsSource)) {
+        logmsg("[WARN] Snapshot scripts tree missing or empty, skipping copy");
+        logEvent('tree_skipped', ['tree' => 'scripts']);
+    } elseif ($dryRun) {
+        logmsg("[DRY RUN] Would atomically swap /scripts from {$scriptsSource}");
+    } else {
+        $scriptsStaging = '/scripts.pmss-staging-'.$runId;
+        $scriptsBackup  = '/scripts.pmss-backup-'.$runId;
+        runSoft('rm -rf '.escapeshellarg($scriptsStaging));
+        runFatal(sprintf('cp -a %s/. %s', escapeshellarg($scriptsSource), escapeshellarg($scriptsStaging)), EXIT_COPY);
+
+        if (file_exists('/scripts') && !is_dir('/scripts')) {
+            fatal('/scripts exists but is not a directory', EXIT_COPY);
+        }
+        if (is_dir('/scripts') && !@rename('/scripts', $scriptsBackup)) {
+            fatal('Failed to rename /scripts to backup for atomic swap', EXIT_COPY);
+        }
+        if (!@rename($scriptsStaging, '/scripts')) {
+            fatal('Failed to rename staged /scripts into place', EXIT_COPY);
+        }
+        runSoft('rm -rf '.escapeshellarg($scriptsBackup));
+    }
+
+    // Stage /etc tree with atomic swap for /etc/seedbox and overlay for the rest.
+    $etcSource = $tmp.'/etc';
+    if (!directoryHasContent($etcSource)) {
+        logmsg("[WARN] Snapshot etc tree missing or empty, skipping copy");
+        logEvent('tree_skipped', ['tree' => 'etc']);
+    } elseif ($dryRun) {
+        logmsg("[DRY RUN] Would atomically swap /etc/seedbox and overlay other /etc files from {$etcSource}");
+    } else {
+        if (is_dir($etcSource.'/skel') && is_dir('/etc/skel')) {
+            runFatal('rm -rf /etc/skel/* /etc/skel/.[!.]* /etc/skel/..?*', EXIT_COPY);
+        }
+
+        // Atomic swap for /etc/seedbox
+        $seedboxSource  = $etcSource.'/seedbox';
+        $seedboxStaging = '/etc/seedbox.pmss-staging-'.$runId;
+        $seedboxBackup  = '/etc/seedbox.pmss-backup-'.$runId;
+        $haveSeedboxSnapshot = directoryHasContent($seedboxSource);
+        if ($haveSeedboxSnapshot || is_dir('/etc/seedbox')) {
+            runSoft('rm -rf '.escapeshellarg($seedboxStaging));
+            if (is_dir('/etc/seedbox')) {
+                runFatal(sprintf('cp -a %s %s', escapeshellarg('/etc/seedbox'), escapeshellarg($seedboxStaging)), EXIT_COPY);
+            } else {
+                @mkdir($seedboxStaging, 0755, true);
             }
-            if (!is_dir($source)) {
-                fatal("Staged scripts source missing: {$source}", EXIT_COPY);
+            if ($haveSeedboxSnapshot) {
+                runFatal(sprintf('cp -a %s/. %s', escapeshellarg($seedboxSource), escapeshellarg($seedboxStaging)), EXIT_COPY);
             }
-            // Remove previous contents before copying in the new tree.
-            runFatal('rm -rf /scripts/* /scripts/.[!.]* /scripts/..?*', EXIT_COPY);
-            runFatal(sprintf('cp -a %s/. %s', escapeshellarg($source), escapeshellarg('/scripts')), EXIT_COPY);
-        },
-        'etc' => function (string $source) {
-            if (is_dir($source)) {
-                // Only wipe skel when the snapshot provides one and the target exists.
-                if (is_dir($source.'/skel') && is_dir('/etc/skel')) {
-                    runFatal('rm -rf /etc/skel/* /etc/skel/.[!.]* /etc/skel/..?*', EXIT_COPY);
+            if (is_dir('/etc/seedbox') && !@rename('/etc/seedbox', $seedboxBackup)) {
+                fatal('Failed to rename /etc/seedbox to backup for atomic swap', EXIT_COPY);
+            }
+            if (!@rename($seedboxStaging, '/etc/seedbox')) {
+                fatal('Failed to rename staged /etc/seedbox into place', EXIT_COPY);
+            }
+            runSoft('rm -rf '.escapeshellarg($seedboxBackup));
+        }
+
+        // Overlay remaining /etc content (excluding seedbox) to preserve local edits.
+        $entries = scandir($etcSource);
+        if (is_array($entries)) {
+            foreach ($entries as $entry) {
+                if ($entry === '.' || $entry === '..' || $entry === 'seedbox') {
+                    continue;
                 }
+                $path = $etcSource.'/'.$entry;
+                runFatal('cp -rpu '.escapeshellarg($path).' /etc', EXIT_COPY);
             }
-            // Intentionally using cp -rpu here so locally-newer files under /etc
-            // are not overwritten by the snapshot. This is desired behavior to
-            // preserve operator edits or newer timestamps.
-            runFatal('cp -rpu '.escapeshellarg($source).' /', EXIT_COPY);
-        },
-        'var' => function (string $source) {
-            runFatal('cp -a '.escapeshellarg($source).' /', EXIT_COPY);
-        },
-    ];
+        }
+    }
 
-    foreach ($trees as $name => $handler) {
-        $source = $tmp.'/'.$name;
-        if (!directoryHasContent($source)) {
-            logmsg("[WARN] Snapshot {$name} tree missing or empty, skipping copy");
-            logEvent('tree_skipped', ['tree' => $name]);
-            continue;
-        }
-        if ($dryRun) {
-            logmsg("[DRY RUN] Would copy {$name} from {$source}");
-            continue;
-        }
-        $handler($source);
+    // Stage /var as before.
+    $varSource = $tmp.'/var';
+    if (!directoryHasContent($varSource)) {
+        logmsg("[WARN] Snapshot var tree missing or empty, skipping copy");
+        logEvent('tree_skipped', ['tree' => 'var']);
+    } elseif ($dryRun) {
+        logmsg("[DRY RUN] Would copy var from {$varSource}");
+    } else {
+        runFatal('cp -a '.escapeshellarg($varSource).' /', EXIT_COPY);
     }
 
     if ($dryRun) {
@@ -869,6 +966,7 @@ function maybeRunDistUpgrade($distUpgrade): void
 function bootstrapMain(array $argv): void
 {
     ensureRoot();
+    pmssAcquireUpdateLock();
 
     $startTime    = microtime(true);
     $originalHash = currentUpdaterHash();
