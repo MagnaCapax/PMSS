@@ -78,6 +78,7 @@
 !/AGENTS.*.md
 AGENTS.*.local.md
 AGENTS.local.md
+!GEMINI.md
 
 # Explicitly ignore local assistant config/state and CI scratch
 .codex
