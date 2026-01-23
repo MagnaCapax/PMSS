@@ -82,6 +82,8 @@ alias.url += (
 )
 
 # PMSS_WEBDAV_BEGIN
+# Match /webdav-<user> exactly OR /webdav-<user>/* (end-of-string anchor or slash).
+# The ($|/) alternation ensures we don't match /webdav-<user>foo or similar.
 $HTTP["url"] =~ "^/webdav-##username($|/)" {
     webdav.activate = "enable"
     webdav.sqlite-db-name = "/home/##username/.lighttpd/webdav.lock.db"

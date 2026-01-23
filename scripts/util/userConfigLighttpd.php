@@ -10,6 +10,7 @@
  */
 
 require_once dirname(__DIR__).'/lib/update/systemPrep.php';
+require_once dirname(__DIR__).'/lib/userLifecycle.php';
 
 const PMSS_LIGHTTPD_CHILDREN_PER_PROC = 2;
 const PMSS_PHP_MEMORY_MIN_MB = 125;
@@ -239,6 +240,16 @@ function pmssRenderLighttpdConfig(string $template, string $user, int $serverPor
 
 function pmssWebdavWwwPolicyBlock(string $user): string
 {
+    // Defense-in-depth: validate username even though upstream should have validated.
+    // Reject invalid usernames to prevent regex injection or path traversal in lighttpd config.
+    // Valid PMSS usernames: ^[a-z][a-z0-9]{0,7}$ (1-8 chars, starts with letter, alphanumeric).
+    if (!pmssUsernameIsValid($user)) {
+        // Return safe empty block rather than generating config with untrusted input.
+        // Log a warning so operators can investigate how invalid input reached here.
+        error_log("pmssWebdavWwwPolicyBlock: rejected invalid username: " . substr($user, 0, 20));
+        return '# WebDAV www policy skipped: invalid username';
+    }
+
     // Default: keep ~/www read-only over WebDAV to prevent users from breaking the web stack.
     // Allow writing to ~/www/public by default, and allow full ~/www write if the user opts in.
     $marker = "/home/{$user}/.lighttpd/webdav.www-writable";
