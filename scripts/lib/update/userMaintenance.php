@@ -366,19 +366,3 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
     }
 }
 
-if (!function_exists('pmssRestoreUserCrontabs')) {
-    /**
-     * Restore the default user crontabs from the template.
-     * #TODO(cron-ownership): move to per-user loop and eventually drop this so
-     * users can manage their own crontabs; guardrails should live in root cron.
-     */
-    function pmssRestoreUserCrontabs(): void
-    {
-        // Only restore crontabs for users that still exist in /etc/passwd.
-        $command = sprintf(
-            'bash -lc %s',
-            escapeshellarg('/scripts/listUsers.php | while read -r U; do id "$U" >/dev/null 2>&1 && crontab -u "$U" /etc/seedbox/config/user.crontab.default; done')
-        );
-        runStep('Restoring default crontab for all users', $command);
-    }
-}

@@ -406,7 +406,8 @@ if (file_exists($logrotateTemplate)) {
     runStep('Setting permissions on PMSS logrotate policy', 'chmod 644 /etc/logrotate.d/pmss-update');
 }
 
-pmssRestoreUserCrontabs();
+// Restore crontabs for users that still exist in /etc/passwd
+runStep('Restoring default crontab for all users', 'bash -lc '.escapeshellarg('/scripts/listUsers.php | while read -r U; do id "$U" >/dev/null 2>&1 && crontab -u "$U" /etc/seedbox/config/user.crontab.default; done'));
 // #TODO(per-user-loop): migrate the global web stack refresh/cron/authorized
 // keys tasks above into the single per-user orchestrator so we do not run
 // separate all-user sweeps.
