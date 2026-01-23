@@ -160,6 +160,12 @@ rofanity.
 - **GitHub Issues (Optional via `gh`):** Prefer GitHub issues for trackable work items over adding more entries to `docs/TODO.md`.
 - **`gh` Availability/Auth:** Always check `gh auth status` first; if `gh` is missing or not authenticated, note it and proceed without failing.
 - **Common Commands:** `gh issue list`, `gh issue create --title "..." --body "..."`, `gh issue close <number>`, `gh label list`.
+- **Issue ↔ Commit Hygiene (when a clear match exists):**
+  - Search: `gh issue list --search "keywords"` (use specific terms from the change).
+  - Commit message: include `Refs #<number>` (links without auto-closing). Do not use `Fixes #` / `Closes #`.
+  - Optional status comment: `gh issue comment <number> --body "Addressed in commit <hash>: <summary>"` (keep it short; avoid spam).
+  - Optional label: only if it exists (check with `gh label list`), then `gh issue edit <number> --add-label needs-verification`.
+  - When in doubt, don’t link issues.
 
 
 
