@@ -101,6 +101,7 @@ run(sprintf(
     $ramMiB,
     $quotaGiB
 ));
+run('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($userName));
 run('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
 run('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
 run('/scripts/util/userPermissions.php ' . escapeshellarg($userName));

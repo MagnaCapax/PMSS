@@ -166,9 +166,13 @@ rofanity.
 - **Issue ↔ Commit Hygiene (when a clear match exists):**
   - Search: `gh issue list --search "keywords"` (use specific terms from the change).
   - Commit message: include `Refs #<number>` (links without auto-closing). Do not use `Fixes #` / `Closes #`.
-  - Optional status comment: `gh issue comment <number> --body "Addressed in commit <hash>: <summary>"` (keep it short; avoid spam).
-  - Optional label: only if it exists (check with `gh label list`), then `gh issue edit <number> --add-label needs-verification`.
-  - When in doubt, don’t link issues.
+  - When in doubt, don't link issues.
+- **Task Completion Workflow (MUST when work addresses an issue):**
+  1. **Comment the issue** with commit hash and brief explanation of what was done: `gh issue comment <number> --body "Commit <hash>: <summary of changes>"`.
+  2. **Add `complete-verify` label** to signal work is done and ready for operator verification: `gh issue edit <number> --add-label complete-verify`.
+  3. **Review existing labels** and adjust if needed (e.g., remove `in-progress` if present, ensure category labels are accurate).
+  4. **Do NOT close the issue** — operator will close after verification.
+  5. **Push commits** to remote before marking complete.
 
 
 
