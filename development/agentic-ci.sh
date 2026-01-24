@@ -153,6 +153,27 @@ mkdir -p "$OUTDIR" "$ARTDIR"
 echo "[codex-ci] workspace: $OUTDIR" >&1
 echo "[codex-ci] artifact dir: $ARTDIR" >&1
 
+if [[ "$dry_run" == "1" ]]; then
+	{
+		echo "[codex-ci] dry-run: skipping GitHub API, artifact download, and log fetch"
+		echo "[codex-ci] dry-run: this run only assembles the prompt scaffolding"
+		echo
+		echo "Selected agent: $agent"
+		echo "Selected exec: $exec_cmd"
+		[[ -n "$job_name" ]] && echo "Requested job: $job_name"
+	} >"$SUMMARY"
+
+	codex_args=(run --prompt-file "$HERE/prompts/ci.txt" --outdir "$OUTDIR" --context "$SUMMARY" --dry-run)
+	[[ -f "$ROOT/AGENTS.${agent}.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.md")
+	[[ -f "$ROOT/AGENTS.${agent}.local.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.local.md")
+	[[ -n "$custom_prompt" ]] && codex_args+=(--prompt "$custom_prompt")
+	[[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
+	[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
+
+	bash "$HERE/codex-run.sh" "${codex_args[@]}"
+	exit 0
+fi
+
 CI_CODEX_SAVED_XTRACE=0
 ci_shell_disable_xtrace() {
 	CI_CODEX_SAVED_XTRACE=0
