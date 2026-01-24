@@ -14,13 +14,10 @@ if (is_string($out) && preg_match('/deluge\s+([0-9.]+)/i', $out, $m)) {
 }
 
 // Debian 10 uses a pip/build route for v2.0.5; make it idempotent.
-$needPipInstall = false;
-if (substr($debianVersion, 0, 2) === '10') {
+$isDebian10 = (substr($debianVersion, 0, 2) === '10');
+if ($isDebian10) {
     $targetVersion = '2.0.5';
     if ($currentVersion !== $targetVersion) {
-        $needPipInstall = true;
-    }
-    if ($needPipInstall) {
         echo "\t*** Deluge pip install (target {$targetVersion})\n";
         passthru('pip install --upgrade twisted[tls] chardet mako pyxdg pillow slimit pygame certifi pyasn1==0.4.6 ');
         passthru('pip install --upgrade pillow');

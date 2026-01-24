@@ -15,16 +15,16 @@
 // #TODO Migrate to dpkg baseline/repo-driven install; verify downloads and
 //      refactor to runStep wrappers for consistent JSON logging. (GH #131)
 
-if (!file_exists('/usr/bin/btsync1.4')) {
-    // #TODO Switch to HTTPS and checksum validation. (GH #131)
-    echo "*** BTSync 1.4 not present, downloading and adding!\n";
-    passthru("wget http://pulsedmedia.com/remote/pkg/btsync -O /usr/bin/btsync1.4; chmod 755 /usr/bin/btsync1.4");
-}
-
-if (!file_exists('/usr/bin/btsync2.2')) {
-    // #TODO Switch to HTTPS and checksum validation. (GH #131)
-    echo "*** BTSync 2.2 not present, downloading and adding!\n";
-    passthru("wget http://pulsedmedia.com/remote/pkg/btsync2.2 -O /usr/bin/btsync2.2; chmod 755 /usr/bin/btsync2.2");
+$legacyBinaries = [
+    ['version' => '1.4', 'url' => 'http://pulsedmedia.com/remote/pkg/btsync', 'path' => '/usr/bin/btsync1.4'],
+    ['version' => '2.2', 'url' => 'http://pulsedmedia.com/remote/pkg/btsync2.2', 'path' => '/usr/bin/btsync2.2'],
+];
+// #TODO Switch to HTTPS and checksum validation. (GH #131)
+foreach ($legacyBinaries as $legacy) {
+    if (!file_exists($legacy['path'])) {
+        echo "*** BTSync {$legacy['version']} not present, downloading and adding!\n";
+        passthru("wget {$legacy['url']} -O {$legacy['path']}; chmod 755 {$legacy['path']}");
+    }
 }
 
 $btsyncPath = '/usr/bin/btsync';
