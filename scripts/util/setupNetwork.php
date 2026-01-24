@@ -85,7 +85,7 @@ $bogonSources = [
 
 // Guard against TCP SACK exploits on ingress.
 $tcpsackRules = [
-    '-A INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j LOG --log-prefix "tcpsack: " --log-level 4',
+    '-A INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -m limit --limit 2/second --limit-burst 10 -j LOG --log-prefix "tcpsack: " --log-level 4',
     '-A INPUT -p tcp --tcp-flags SYN SYN -m tcpmss --mss 1:500 -j DROP',
 ];
 
