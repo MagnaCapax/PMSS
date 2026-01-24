@@ -14,15 +14,13 @@ function pmssUserRefreshPermissions(array $ctx): void
     runUserStep($user, 'Refreshing user permissions', sprintf('/scripts/util/userPermissions.php %s', $userEsc));
 
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
-    if (file_exists($rcCustomPath)) {
-        $rcCustomSha = sha1((string)file_get_contents($rcCustomPath));
-        if (in_array($rcCustomSha, ['dcf21704d49910d1670b3fdd04b37e640b755889', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
-            $skelRcCustomArg = pmssUserSkelCommandArg('.rtorrent.rc.custom');
-            runUserStep(
-                $user,
-                'Updating .rtorrent.rc.custom from skeleton',
-                sprintf('cp %s %s/', $skelRcCustomArg, escapeshellarg($home))
-            );
-        }
+    if (file_exists($rcCustomPath)
+        && in_array(sha1((string)file_get_contents($rcCustomPath)), ['dcf21704d49910d1670b3fdd04b37e640b755889', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
+        $skelRcCustomArg = pmssUserSkelCommandArg('.rtorrent.rc.custom');
+        runUserStep(
+            $user,
+            'Updating .rtorrent.rc.custom from skeleton',
+            sprintf('cp %s %s/', $skelRcCustomArg, escapeshellarg($home))
+        );
     }
 }

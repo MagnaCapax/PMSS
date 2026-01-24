@@ -41,10 +41,10 @@ function pmssUserUpgradeRutorrent(array $ctx): void
     $expectedSha = $ctx['rutorrent_index_sha'];
     $currentIndex= "{$home}/www/rutorrent/index.html";
 
-    if ($expectedSha === '' || !file_exists($currentIndex)) {
-        return;
-    }
-    if (file_exists("{$home}/www/oldRutorrent-3") || $expectedSha === sha1(file_get_contents($currentIndex))) {
+    if ($expectedSha === ''
+        || !file_exists($currentIndex)
+        || file_exists("{$home}/www/oldRutorrent-3")
+        || $expectedSha === sha1(file_get_contents($currentIndex))) {
         return;
     }
 

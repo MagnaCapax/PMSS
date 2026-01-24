@@ -33,12 +33,10 @@ function pmssUserMaintainRetracker(array $ctx): void
 
     $userShareDir = "{$home}/www/rutorrent/share/users/{$user}";
     $retrackerConfigPath = "{$userShareDir}/settings";
-    if (file_exists("{$retrackerConfigPath}/retrackers.dat")) {
-        $retrackCurrent = trim((string)file_get_contents("{$retrackerConfigPath}/retrackers.dat"));
-        $hash = sha1($retrackCurrent);
-        if (in_array($hash, ['9958caa274c2df67ea6702772821856365bc1201', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
-            unlink("{$retrackerConfigPath}/retrackers.dat");
-        }
+    $retrackerFile = "{$retrackerConfigPath}/retrackers.dat";
+    if (file_exists($retrackerFile)
+        && in_array(sha1(trim((string)file_get_contents($retrackerFile))), ['9958caa274c2df67ea6702772821856365bc1201', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
+        unlink($retrackerFile);
     }
 
     if (!file_exists($userShareDir.'/torrents') && file_exists($userShareDir)) {
