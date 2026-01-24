@@ -154,8 +154,11 @@ echo "[codex-ci] workspace: $OUTDIR" >&1
 echo "[codex-ci] artifact dir: $ARTDIR" >&1
 
 if [[ "$dry_run" == "1" ]]; then
+	echo "[codex-ci] dry-run: skipping GitHub API, artifact download, and log fetch" >&1
+	echo "[codex-ci] dry-run: would run (best-effort):" >&1
+	echo "  gh run list / gh run view / gh run download / GitHub API curl fallback" >&1
+
 	{
-		echo "[codex-ci] dry-run: skipping GitHub API, artifact download, and log fetch"
 		echo "[codex-ci] dry-run: this run only assembles the prompt scaffolding"
 		echo
 		echo "Selected agent: $agent"

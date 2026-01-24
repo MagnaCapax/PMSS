@@ -219,22 +219,37 @@ if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	done
 fi
 
+# In dry-run mode, avoid running git/phploc/gh/etc. Only show what would run and
+# let codex-run.sh print the final assistant invocation.
+if [[ "$dry_run" == "1" ]]; then
+	echo "[agentic-refactor] dry-run: skipping git/loc/phploc collection" >&1
+	echo "[agentic-refactor] dry-run: would run (best-effort):" >&1
+	echo "  git -C '$ROOT' log -n '$commits' --pretty=format:'%h %s'" >&1
+	echo "  git -C '$ROOT' log -n '$commits' --name-only --pretty=format:'--- %H' | awk ... | sort -u" >&1
+	echo "  '$ROOT/development/loc.sh' > '$LOC_LOG'" >&1
+	echo "  bash '$ROOT/scripts/testing/phploc.sh' > '$PHPLC_LOG'" >&1
+fi
+
 echo "[agentic-refactor] output directory: $OUTDIR" >&1
 
 # Gather recent commits and touched files (best-effort).
-if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if [[ "$dry_run" != "1" ]] && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 	echo "[agentic-refactor] collecting last $commits commits…" >&1
 	git -C "$ROOT" log -n "$commits" --pretty=format:'%h %s' >"$COMMITS_SUMMARY" || true
 	git -C "$ROOT" log -n "$commits" --name-only --pretty=format:'--- %H' \
 		| awk '/^--- / { next } NF { print }' \
 		| sort -u >"$COMMITS_FILES" || true
 else
-	echo "[agentic-refactor] not inside a git repository; skipping commit context" >&1
+	if [[ "$dry_run" == "1" ]]; then
+		echo "[agentic-refactor] dry-run: skipping commit context collection" >&1
+	else
+		echo "[agentic-refactor] not inside a git repository; skipping commit context" >&1
+	fi
 fi
 
 # Build a candidate file list from recent commits, optionally narrowed by target.
 : >"$CANDIDATES"
-if [[ -s "$COMMITS_FILES" ]]; then
+if [[ "$dry_run" != "1" && -s "$COMMITS_FILES" ]]; then
 	if [[ -n "$target" ]]; then
 		awk -v t="$target" 'index($0, t) > 0' "$COMMITS_FILES" >"$CANDIDATES" || true
 		if [[ ! -s "$CANDIDATES" ]]; then
@@ -246,11 +261,11 @@ if [[ -s "$COMMITS_FILES" ]]; then
 fi
 
 # Ensure advisory complexity snapshots exist (best-effort).
-if [[ -x "$ROOT/development/loc.sh" ]]; then
+if [[ "$dry_run" != "1" && -x "$ROOT/development/loc.sh" ]]; then
 	echo "[agentic-refactor] generating LOC snapshot via development/loc.sh" >&1
 	"$ROOT/development/loc.sh" >"$LOC_LOG" 2>&1 || true
 fi
-if [[ -x "$ROOT/scripts/testing/phploc.sh" ]]; then
+if [[ "$dry_run" != "1" && -x "$ROOT/scripts/testing/phploc.sh" ]]; then
 	echo "[agentic-refactor] generating phploc snapshot via scripts/testing/phploc.sh" >&1
 	bash "$ROOT/scripts/testing/phploc.sh" >"$PHPLC_LOG" 2>&1 || true
 fi
