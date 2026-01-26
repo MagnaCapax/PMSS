@@ -21,6 +21,13 @@ echo `apt-get remove watchdog -y`;
 
 return;
 
+/*
+ * RETAIN UNTIL 06/2030: Sample watchdog configuration for potential re-evaluation.
+ * #TODO Figure out why this kept failing; hardware watchdog should be very reliable.
+ *       Possible causes: kernel module issues, incorrect timeout tuning, or
+ *       interaction with cgroup/systemd resource limits.
+ */
+
 /**
 
 # Install

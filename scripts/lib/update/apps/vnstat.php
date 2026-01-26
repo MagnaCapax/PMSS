@@ -34,12 +34,8 @@ if (file_exists('/etc/vnstat.conf')) {	// Fix some default configs! Especially o
 
 
 if ($debianMajor === 8 && $link !== '') {
-    #Fix VNSTAT backup issue & not updating Deb8. The base install seems a bit broken
+    // Fix VNSTAT backup issue & not updating on Deb8 where base install seems broken.
     `vnstat -u -i {$link}`;
     `chown -R vnstat:vnstat /var/lib/vnstat`;
     `/etc/init.d/vnstat restart`;
-
-    passthru("chown vnstat:vnstat /var/lib/vnstat -R; chown vnstat:vnstat /var/lib/vnstat/* -R;");
-
-
 }

@@ -13,13 +13,6 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     echo "\nChecking: {$thisUser}\n";
 
     $userPath = "/home/{$thisUser}/www/rutorrent/plugins/";
-    //echo "Path: {$userPath}\n";
-    
- /*   if (file_exists($userPath . 'cpuload')) {
-        echo "Cpu load exists - deleting!\n";
-        shell_exec("rm -rf {$userPath}cpuload");
-    }
-*/
 
     if (file_exists($userPath . 'diskspace')) {
         echo "Disk space exists - deleting!\n";
