@@ -19,12 +19,14 @@ if (!defined('SIGKILL')) {
 }
 
 /**
- * List PIDs for a user's process by exact command name.
+ * List PIDs for a user's process by command name.
  *
- * Uses pgrep with -x (exact match) to avoid matching substrings.
+ * Uses pgrep with start-anchored pattern. Note: rtorrent may report as
+ * "rtorrent main" on some systems, so we use ^pattern to match process
+ * names starting with the given string (avoids matching .rtorrentExecute).
  *
  * @param string $user System username.
- * @param string $comm Process command name to match.
+ * @param string $comm Process command name to match (anchored at start).
  *
  * @return int[] Array of matching PIDs.
  */
@@ -32,7 +34,7 @@ function rtorrentProcessPgrepExact(string $user, string $comm): array
 {
     $out = [];
     $rc = 1;
-    @exec('pgrep -u '.escapeshellarg($user).' -x '.escapeshellarg($comm), $out, $rc);
+    @exec('pgrep -u '.escapeshellarg($user).' '.escapeshellarg('^'.$comm), $out, $rc);
     if ($rc !== 0) {
         return [];
     }
@@ -82,7 +84,8 @@ function rtorrentProcessExecutorPids(string $user): array
         }
         $comm = strtolower((string) $m[2]);
         $all[] = $pid;
-        if (strpos($comm, 'php') === 0) {
+        // comm may show 'php' or script name '.rtorrentexecute' (lowercased)
+        if (strpos($comm, 'php') === 0 || strpos($comm, '.rtorrentexecute') === 0) {
             $php[] = $pid;
         } elseif (strpos($comm, 'screen') !== false) {
             $screen[] = $pid;

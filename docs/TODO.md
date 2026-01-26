@@ -14,6 +14,10 @@ Active work items are tracked in GitHub issues to avoid duplication between this
 - #117: Strict error handling policy (must-succeed vs soft-fail + ADR)
 - #111: Debian 13 (trixie) validation roadmap (experimental → supported)
 
+## Code Quality Audits
+
+- [ ] Audit string matching patterns across codebase for truncation bugs and typos. Found `.rtorrentexecut` typo (missing 'e') in process.php; similar issues may exist in other `strpos()`, `preg_match()`, or filename pattern checks. Check process name matching, config file patterns, and path validations.
+
 ## Recently Completed
 
 - Single-run locking for updates is implemented (lock + JSON events) in `ab31f8b`.

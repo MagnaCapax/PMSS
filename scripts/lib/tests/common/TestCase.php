@@ -67,6 +67,11 @@ abstract class TestCase
         }
     }
 
+    protected function fail(string $message = ''): void
+    {
+        throw new \AssertionError($message !== '' ? $message : 'Test failed');
+    }
+
     protected function isSandbox(): bool
     {
         if (getenv('PMSS_SANDBOX') === '1') return true;
