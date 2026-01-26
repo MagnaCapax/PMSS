@@ -241,7 +241,6 @@ Sub-handlers:
 
 - pmssStopDisableMaskSeedboxSystemServices(): void → stops/disables/masks system-wide daemons that must never run on seedbox hosts (e.g. lighttpd, deluged/deluge-web, transmission-daemon, redis-server, memcached, rpcbind/nfs-kernel-server, smbd, exim4, docker.service). Fail-soft; safe when units are missing.
 - pmssEnsureSystemdServicesGuardBootUnit(): void → installs/enables `pmss-systemd-services-guard.service` so the systemd hardening guard runs early at boot (before basic.target).
-- pmssStopDisableMaskApacheLegacy(): void → stops/disables/masks `apache2` so it cannot be started during package recovery.
 
 - pmssDisableLegacyServices(array $services, int $distroVersion): void → stops/disables global daemons (sysvinit vs systemd handling).
 

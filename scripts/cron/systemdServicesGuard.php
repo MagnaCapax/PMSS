@@ -47,7 +47,7 @@ foreach ($specs as $spec) {
 
     $touched = true;
     if ($unit === 'apache2') {
-        pmssStopDisableMaskApacheLegacy();
+        pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
         continue;
     }
     pmssStopDisableMaskSystemdUnit($unit, $label, $shouldMask);

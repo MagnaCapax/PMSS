@@ -195,6 +195,8 @@ REFERENCE AUDIT (mandatory):
 3. Check if the file is loaded via glob patterns (e.g., foreach glob('apps/*.php'))
 4. Check shell scripts: install.sh, scripts/update.php, scripts/util/update-step2.php, scripts/cron/*, scripts/cli/*
 5. Check systemd units and crontab templates under etc/
+6. Check docs for the symbol (start with docs/contracts.md, then docs/) and update/remove stale contract references
+7. Check tests (scripts/lib/tests/, tests/) for symbol references and update/remove as needed
 
 CONTEXT AUDIT (mandatory):
 1. Read the file's docblock header - look for:
