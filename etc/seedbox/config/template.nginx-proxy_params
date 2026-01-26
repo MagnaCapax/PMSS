@@ -1,3 +1,12 @@
+# Default proxy parameters for nginx reverse proxy locations.
+#
+# IMPORTANT: WebDAV location blocks in createNginxConfig.php do NOT include
+# this file. They set headers explicitly because WebDAV requires longer timeouts
+# (300s vs 120s here). If you update headers here, also update the WebDAV blocks
+# in scripts/util/createNginxConfig.php to keep them in sync.
+#
+# See: fix commit 005b1fe (2026-01) for context on why WebDAV is separate.
+
 proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
