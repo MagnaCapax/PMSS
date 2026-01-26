@@ -12,14 +12,15 @@
  * @author    Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
-$usersLib = __DIR__.'/lib/users.php';
-$userFs   = __DIR__.'/lib/user/userFilesystem.php';
-$userRepo = __DIR__.'/lib/user/userRepository.php';
+$usersLib   = __DIR__.'/lib/users.php';
+$userFs     = __DIR__.'/lib/user/userFilesystem.php';
+$userRepo   = __DIR__.'/lib/user/userRepository.php';
+$homeMount  = __DIR__.'/lib/homeMount.php';
 
 // Fail fast with a single, clearly marked error when core dependencies are
 // missing or the environment lacks required extensions. This avoids emitting
 // PHP fatals/stack traces that downstream consumers might misinterpret.
-if (!is_file($usersLib) || !is_file($userFs) || !is_file($userRepo)) {
+if (!is_file($usersLib) || !is_file($userFs) || !is_file($userRepo) || !is_file($homeMount)) {
     fwrite(STDERR, "Error: listUsers.php dependencies missing; aborting.\n");
     exit(1);
 }
@@ -27,6 +28,15 @@ if (!function_exists('posix_getpwnam')) {
     fwrite(STDERR, "Error: posix_getpwnam() unavailable; listUsers.php cannot run safely.\n");
     exit(1);
 }
+
+require_once $homeMount;
+
+// Guard: PMSS requires /home to be a separately mounted filesystem. When /home
+// is unavailable (array failure, mount timeout), continuing would return an
+// incomplete user list causing downstream consumers to make incorrect decisions
+// (e.g., createNginxConfig.php wiping configs then producing zero replacements).
+// See commit history for background; credit to Chris M. (Canada) for reporting.
+pmssRequireHomeMounted('listUsers.php');
 
 require_once $usersLib;
 require_once __DIR__.'/lib/userLifecycle.php';

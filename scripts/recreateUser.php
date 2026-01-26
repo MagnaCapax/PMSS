@@ -28,6 +28,12 @@ if (substr(__FILE__, 0, 3) === "\xEF\xBB\xBF") {
 }
 
 /* ===== 1. CLI parsing ===== */
+require_once __DIR__.'/lib/homeMount.php';
+
+// Guard: PMSS requires /home to be a separately mounted filesystem. Recreating
+// a user when /home is unavailable would fail in confusing ways or corrupt state.
+pmssRequireHomeMounted('recreateUser.php');
+
 const USAGE = "Usage: recreateUser.php USERNAME MAX_RTORRENT_MEMORY_MiB DISK_QUOTA_GiB\n";
 
 [$_, $userName, $ramMiB, $quotaGiB] = array_pad($argv, 4, null);

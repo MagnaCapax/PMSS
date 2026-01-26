@@ -22,6 +22,14 @@
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/nginxUserHosts.php';
+require_once __DIR__.'/../lib/homeMount.php';
+
+// Guard: PMSS requires /home to be a separately mounted filesystem. When /home
+// is unavailable (array failure, mount timeout), this script would wipe existing
+// nginx user configs then produce zero replacements (because home dirs appear
+// missing), causing downtime until manual intervention. Abort early to preserve
+// working configs. Credit to Chris M. (Canada) for reporting this failure mode.
+pmssRequireHomeMounted('createNginxConfig.php');
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;

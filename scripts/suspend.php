@@ -12,6 +12,11 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 require_once __DIR__.'/lib/userLifecycle.php';
+require_once __DIR__.'/lib/homeMount.php';
+
+// Guard: PMSS requires /home to be a separately mounted filesystem. Suspending
+// a user when /home is unavailable would fail or act on stale paths.
+pmssRequireHomeMounted('suspend.php');
 
 $usage = 'suspend.php USERNAME';
 $username = $argv[1] ?? '';

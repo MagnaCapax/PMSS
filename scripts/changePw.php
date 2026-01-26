@@ -22,6 +22,11 @@ if ($username === '') {
 }
 
 require_once __DIR__.'/lib/userLifecycle.php';
+require_once __DIR__.'/lib/homeMount.php';
+
+// Guard: PMSS requires /home to be a separately mounted filesystem. Changing
+// a user's password when /home is unavailable would fail or write to stale paths.
+pmssRequireHomeMounted('changePw.php');
 
 if (!pmssValidateUsername($username)) {
     pmssUserWriteLogs(

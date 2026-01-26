@@ -17,6 +17,12 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/users.php';
+require_once __DIR__.'/lib/homeMount.php';
+
+// Guard: PMSS requires /home to be a separately mounted filesystem. Terminating
+// a user when /home is unavailable could lead to incomplete cleanup or acting on
+// stale state. Abort early with a clear message.
+pmssRequireHomeMounted('terminateUser.php');
 
 $continue = '-';
 $dryRun   = false;

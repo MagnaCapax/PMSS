@@ -29,6 +29,13 @@ require_once 'lib/runtime.php';
 require_once 'lib/rtorrentConfig.php';
 require_once 'lib/users.php';
 require_once 'lib/userLifecycle.php';
+require_once 'lib/homeMount.php';
+
+// Guard: PMSS requires /home to be a separately mounted filesystem. Creating
+// a user when /home is unavailable would write to the wrong location or fail
+// in confusing ways. Abort early with a clear message.
+pmssRequireHomeMounted('addUser.php');
+
 $userDb = new users();
 
 if (!pmssValidateUsernameForCreate($user['name'])) {
