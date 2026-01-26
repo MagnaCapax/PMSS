@@ -902,4 +902,174 @@ LIGHTTPD;
             $this->assertStringContainsString('invalid username', $policy);
         }
     }
+
+    // =========================================================================
+    // SECTION 9: CONFIGURATION SYNTAX VALIDATION
+    // =========================================================================
+
+    /**
+     * TEST 43: Lighttpd auth.require entries are comma-separated
+     *
+     * HARDENS: Lighttpd array syntax requires commas between entries.
+     * Missing commas cause "auth.require should have been a list of key => list" error.
+     *
+     * REGRESSION: Fixed in 2026-01 after WebDAV deployment broke user lighttpd.
+     */
+    public function testLighttpdAuthRequireEntriesAreCommaSeparated(): void
+    {
+        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
+        $template = file_get_contents($templatePath);
+
+        // Extract auth.require block
+        if (!preg_match('/auth\.require\s*=\s*\((.*?)\n\)/s', $template, $matches)) {
+            $this->fail('auth.require block not found in template');
+        }
+        $authBlock = $matches[1];
+
+        // Count path entries (lines containing "=>") and closing parens that end entries
+        // Each entry except the last must be followed by a comma
+        $entries = preg_match_all('/"\s*=>\s*\(/', $authBlock);
+        $commas = preg_match_all('/\)\s*,/', $authBlock);
+
+        // For N entries, we need N-1 commas between them
+        $this->assertEquals(
+            $entries - 1,
+            $commas,
+            "auth.require has $entries entries but only $commas commas - missing separator"
+        );
+    }
+
+    /**
+     * TEST 44: Lighttpd template produces valid syntax when rendered
+     *
+     * HARDENS: Rendered config must not have obvious syntax errors.
+     */
+    public function testLighttpdTemplateProducesValidSyntax(): void
+    {
+        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
+        $template = file_get_contents($templatePath);
+
+        // Render with test values
+        $rendered = str_replace(
+            array('##username', '##serverPort', '##rclonePort', '##qbittorrentPort', '##PMSS_WEBDAV_WWW_POLICY##'),
+            array('testuser', '30000', '30001', '30002', ''),
+            $template
+        );
+
+        // Check for common syntax errors: unbalanced parens in key blocks
+        $authRequireMatch = preg_match('/auth\.require\s*=\s*\(/', $rendered);
+        $this->assertEquals(1, $authRequireMatch, 'auth.require block must exist');
+
+        // Verify no "=> (" followed by ") /" without comma (the bug pattern)
+        // Pattern: closing paren, optional whitespace/newlines, then a path without comma
+        $hasSyntaxError = (bool)preg_match('/\)\s*\n\s*"\//', $rendered);
+        $this->assertTrue(
+            !$hasSyntaxError,
+            'Found closing paren followed by path without comma - syntax error'
+        );
+    }
+
+    /**
+     * TEST 45: Nginx WebDAV blocks do not duplicate proxy_params directives
+     *
+     * HARDENS: WebDAV location blocks must not include proxy_params AND set
+     * proxy_read_timeout explicitly, as this causes nginx to fail with
+     * "directive is duplicate" error.
+     *
+     * REGRESSION: Fixed in 2026-01 after WebDAV deployment broke nginx startup.
+     */
+    public function testNginxWebdavBlocksNoDuplicateDirectives(): void
+    {
+        $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
+        $script = file_get_contents($scriptPath);
+
+        // Extract WebDAV location blocks from the HEREDOC templates.
+        // Match from "location /webdav-" to the closing "}" with proper nesting.
+        preg_match_all('/location\s+\/webdav-[^{]+\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s', $script, $matches);
+
+        $this->assertGreaterThan(0, count($matches[1]), 'WebDAV location blocks must exist');
+
+        $proxyBlocksChecked = 0;
+        foreach ($matches[1] as $i => $locationBlock) {
+            // Skip redirect-only blocks (no proxy_pass means it's just a redirect)
+            if (strpos($locationBlock, 'proxy_pass') === false) {
+                continue;
+            }
+
+            $proxyBlocksChecked++;
+            $hasIncludeProxyParams = strpos($locationBlock, 'include /etc/nginx/proxy_params') !== false;
+            $hasExplicitTimeout = strpos($locationBlock, 'proxy_read_timeout') !== false;
+
+            // Either include proxy_params OR set timeout explicitly, not both
+            $hasDuplicate = $hasIncludeProxyParams && $hasExplicitTimeout;
+            $this->assertTrue(
+                !$hasDuplicate,
+                "WebDAV proxy block $i includes proxy_params AND sets proxy_read_timeout - duplicate directive"
+            );
+        }
+
+        $this->assertGreaterThan(0, $proxyBlocksChecked, 'Must have at least one WebDAV proxy block');
+    }
+
+    /**
+     * TEST 46: Nginx WebDAV blocks have required proxy headers
+     *
+     * HARDENS: When not including proxy_params, WebDAV blocks must set headers explicitly.
+     */
+    public function testNginxWebdavBlocksHaveRequiredHeaders(): void
+    {
+        $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
+        $script = file_get_contents($scriptPath);
+
+        // Match WebDAV location blocks with their full content
+        preg_match_all('/location\s+\/webdav-[^{]+\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s', $script, $matches);
+
+        $requiredHeaders = array(
+            'proxy_set_header Host',
+            'proxy_set_header X-Real-IP',
+            'proxy_set_header X-Forwarded-For',
+            'proxy_set_header Authorization',
+        );
+
+        $proxyBlocksChecked = 0;
+        foreach ($matches[1] as $i => $locationBlock) {
+            // Skip redirect-only blocks (no proxy_pass means it's just a redirect)
+            if (strpos($locationBlock, 'proxy_pass') === false) {
+                continue;
+            }
+
+            $proxyBlocksChecked++;
+            $hasIncludeProxyParams = strpos($locationBlock, 'include /etc/nginx/proxy_params') !== false;
+
+            // If not including proxy_params, must have explicit headers
+            if (!$hasIncludeProxyParams) {
+                foreach ($requiredHeaders as $header) {
+                    $this->assertStringContainsString(
+                        $header,
+                        $locationBlock,
+                        "WebDAV proxy block $i missing required header: $header"
+                    );
+                }
+            }
+        }
+
+        $this->assertGreaterThan(0, $proxyBlocksChecked, 'Must have at least one WebDAV proxy block');
+    }
+
+    /**
+     * TEST 47: proxy_params file contains proxy_read_timeout
+     *
+     * HARDENS: Documents that proxy_params sets timeout, so WebDAV blocks must not duplicate.
+     */
+    public function testProxyParamsContainsReadTimeout(): void
+    {
+        $proxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
+        $proxyParams = file_get_contents($proxyParamsPath);
+
+        $this->assertStringContainsString(
+            'proxy_read_timeout',
+            $proxyParams,
+            'proxy_params must contain proxy_read_timeout (WebDAV blocks must not include it AND set explicitly)'
+        );
+    }
 }

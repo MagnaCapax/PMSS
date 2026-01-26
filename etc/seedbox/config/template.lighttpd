@@ -64,7 +64,7 @@ auth.require = (
         "method" => "basic",
         "realm" => "Password protected area",
         "require" => "user=##username"
-    ) 
+    ),
  "/webdav-##username/" =>
     (
         "method" => "basic",

@@ -237,9 +237,12 @@ server {
 
     location /webdav-##user##/ {
         proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Authorization $http_authorization;
-        include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
+        proxy_buffering off;
 
         # WebDAV: allow large uploads, keep idle timeouts bounded.
         client_max_body_size 0;
@@ -284,9 +287,12 @@ server {
 
     location /webdav-##user##/ {
         proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Authorization $http_authorization;
-        include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
+        proxy_buffering off;
 
         # WebDAV: allow large uploads, keep idle timeouts bounded.
         client_max_body_size 0;
