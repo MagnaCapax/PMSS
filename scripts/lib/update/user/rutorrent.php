@@ -84,8 +84,6 @@ function pmssUserUpgradeRutorrent(array $ctx): void
         )
     );
     updateRutorrentConfig($user, 1);
-    runUserStep($user, 'Setting ruTorrent directory ownership', sprintf('chown %1$s:%1$s %2$s', $userEsc, escapeshellarg("{$home}/www/rutorrent")));
-    runUserStep($user, 'Setting ruTorrent recursive ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg("{$home}/www/rutorrent")));
-    runUserStep($user, 'Setting ruTorrent permissions', sprintf('chmod 751 %s', escapeshellarg("{$home}/www/rutorrent")));
-    runUserStep($user, 'Setting ruTorrent recursive permissions', sprintf('chmod -R 751 %s', escapeshellarg("{$home}/www/rutorrent")));
+    runUserStep($user, 'Setting ruTorrent ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg("{$home}/www/rutorrent")));
+    runUserStep($user, 'Setting ruTorrent permissions', sprintf('chmod -R 751 %s', escapeshellarg("{$home}/www/rutorrent")));
 }

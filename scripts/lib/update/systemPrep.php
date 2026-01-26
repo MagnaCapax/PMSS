@@ -426,7 +426,8 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
         $langLocale = 'en_US.UTF-8';
         $timeLocale = 'en_US.UTF-8';
 
-        foreach ([$langLocale, $timeLocale] as $locale) {
+        // Deduplicate locales to avoid redundant file reads and locale-gen calls.
+        foreach (array_unique([$langLocale, $timeLocale]) as $locale) {
             $enabled = false;
             $gen = @file_get_contents('/etc/locale.gen');
             if (is_string($gen)) {
