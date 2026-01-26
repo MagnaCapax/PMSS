@@ -26,7 +26,7 @@ if (!defined('SIGKILL')) {
  * names starting with the given string (avoids matching .rtorrentExecute).
  *
  * @param string $user System username.
- * @param string $comm Process command name to match (anchored at start).
+ * @param string $comm Process command name (start-anchored pgrep pattern).
  *
  * @return int[] Array of matching PIDs.
  */
