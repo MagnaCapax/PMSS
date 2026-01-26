@@ -1,22 +1,38 @@
 #!/usr/bin/env php
 <?php
 /**
- * checkRtorrent.php
+ * checkRtorrent.php - Cron watchdog for per-user rTorrent instances.
  *
- * Cron watchdog for per-user rTorrent instances.
+ * Monitors rTorrent health across all users and takes corrective action when
+ * processes are missing, duplicated, or unresponsive. Runs from system cron
+ * (typically every 2 minutes) and logs interventions to both stdout and
+ * per-user log files.
  *
- * Goals:
- * - Default quiet: log only when taking action or encountering anomalies.
- * - Prevent duplicate rTorrent/executor spawns by avoiding "executor present but
- *   rTorrent missing" immediate restarts (race window after crashes).
- * - Provide before/after per-user process snapshots when intervening so future
- *   incidents are diagnosable from logs.
+ * Health checks performed:
+ * - Process existence: rtorrent and executor processes running
+ * - Process count: detect and fix duplicate instances
+ * - SCGI responsiveness: verify xmlrpc socket accepts connections and responds
+ *
+ * State tracking (uses /run/pmss/ state files):
+ * - Executor-present-but-rtorrent-missing: 180s grace period
+ * - SCGI unresponsive: 120s grace period (2 consecutive cron runs)
+ *
+ * Logging:
+ * - Stdout: captured by cron for /var/log/pmss/cron/ or mail delivery
+ * - Per-user: /var/log/pmss/users/<username>.log via pmssUserLog()
  *
  * Usage:
  *   /scripts/cron/checkRtorrent.php [--debug]
+ *
+ * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
+ * @license   Proprietary
  */
 
 require_once __DIR__.'/../lib/user/log.php';
+require_once __DIR__.'/../lib/rtorrent/scgi.php';
+require_once __DIR__.'/../lib/rtorrent/process.php';
+
 $lifecycle = __DIR__.'/../lib/userLifecycle.php';
 if (is_file($lifecycle)) {
     require_once $lifecycle;
@@ -25,17 +41,18 @@ if (is_file($lifecycle)) {
 $args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
 $debug = in_array('--debug', $args, true);
 
-// Some hosts may not expose signal constants (pcntl); keep this script working
-// by defining numeric fallbacks.
-if (!defined('SIGTERM')) {
-    define('SIGTERM', 15);
-}
-if (!defined('SIGKILL')) {
-    define('SIGKILL', 9);
-}
+// Grace periods for transient conditions (seconds).
+define('PMSS_RTORRENT_MISSING_GRACE', 180);
+define('PMSS_RTORRENT_UNRESPONSIVE_GRACE', 120);
 
 /**
  * Emit a log line to stdout (captured by cron redirection).
+ *
+ * @param string $message Log message.
+ * @param bool   $force   Always log, even without debug mode.
+ * @param bool   $debug   Debug mode enabled.
+ *
+ * @return void
  */
 function pmssCheckRtorrentLog(string $message, bool $force = false, bool $debug = false): void
 {
@@ -47,6 +64,10 @@ function pmssCheckRtorrentLog(string $message, bool $force = false, bool $debug 
 
 /**
  * Validate a username using the shared validator when available.
+ *
+ * @param string $user Username to validate.
+ *
+ * @return bool True if valid.
  */
 function pmssCheckRtorrentUsernameIsValid(string $user): bool
 {
@@ -57,119 +78,23 @@ function pmssCheckRtorrentUsernameIsValid(string $user): bool
 }
 
 /**
- * List PIDs for a user's exact process name (comm).
+ * Log to both cron output and per-user log file.
  *
- * @return int[]
+ * @param string $user    Username for per-user log.
+ * @param string $message Log message.
+ * @param bool   $debug   Debug mode.
+ *
+ * @return void
  */
-function pmssCheckRtorrentPgrepExact(string $user, string $comm): array
+function pmssCheckRtorrentLogBoth(string $user, string $message, bool $debug): void
 {
-    $out = [];
-    $rc = 1;
-    @exec('pgrep -u '.escapeshellarg($user).' -x '.escapeshellarg($comm), $out, $rc);
-    if ($rc !== 0) {
-        return [];
+    pmssCheckRtorrentLog($message, true, $debug);
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, 'checkRtorrent: '.$message);
     }
-    $pids = [];
-    foreach ($out as $line) {
-        $pid = (int) trim((string) $line);
-        if ($pid > 0) {
-            $pids[] = $pid;
-        }
-    }
-    return $pids;
 }
 
-/**
- * Locate executor-related processes, separating the php wrapper from the
- * detached screen session.
- *
- * Healthy rTorrent typically includes BOTH:
- * - screen (comm: SCREEN) and
- * - php (comm: php/phpX.Y) running .rtorrentExecute.php
- *
- * @return array{php:int[],screen:int[],all:int[]}
- */
-function pmssCheckRtorrentExecutorPids(string $user): array
-{
-    $out = [];
-    $rc = 0;
-    @exec('ps -u '.escapeshellarg($user).' -o pid=,comm=,args=', $out, $rc);
-    if ($rc !== 0) {
-        return ['php' => [], 'screen' => [], 'all' => []];
-    }
-
-    $php = [];
-    $screen = [];
-    $all = [];
-    foreach ($out as $line) {
-        $line = trim((string) $line);
-        if ($line === '' || strpos($line, 'rtorrentExecute.php') === false) {
-            continue;
-        }
-        if (!preg_match('/^(\\d+)\\s+(\\S+)\\s+(.+)$/', $line, $m)) {
-            continue;
-        }
-        $pid = (int) $m[1];
-        if ($pid <= 0) {
-            continue;
-        }
-        $comm = strtolower((string) $m[2]);
-        $all[] = $pid;
-        if (strpos($comm, 'php') === 0) {
-            $php[] = $pid;
-        } elseif (strpos($comm, 'screen') !== false) {
-            $screen[] = $pid;
-        }
-    }
-    return ['php' => $php, 'screen' => $screen, 'all' => $all];
-}
-
-/**
- * Capture a process snapshot for a user.
- *
- * @return string[]
- */
-function pmssCheckRtorrentPsSnapshot(string $user): array
-{
-    $out = [];
-    $rc = 0;
-    @exec(
-        'ps -u '.escapeshellarg($user).' -o pid=,ppid=,stat=,lstart=,comm=,args=',
-        $out,
-        $rc
-    );
-    if ($rc !== 0) {
-        return ['[WARN] ps failed (rc='.$rc.')'];
-    }
-    $lines = [];
-    foreach ($out as $line) {
-        $line = trim((string) $line);
-        if ($line !== '') {
-            $lines[] = $line;
-        }
-    }
-    return $lines;
-}
-
-/**
- * Best-effort terminate PIDs. Keep implementation simple and safe.
- *
- * @param int[] $pids
- */
-function pmssCheckRtorrentKillPids(array $pids, int $signal): void
-{
-    foreach ($pids as $pid) {
-        $pid = (int) $pid;
-        if ($pid <= 0) {
-            continue;
-        }
-        if (function_exists('posix_kill')) {
-            @posix_kill($pid, $signal);
-        } else {
-            @exec('kill -'.(int) $signal.' '.(int) $pid);
-        }
-    }
-}
+// --- Main execution ---
 
 // Avoid concurrent watchdog executions (cron overlap, manual runs).
 $lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkRtorrent.lock';
@@ -195,183 +120,157 @@ if (!is_dir($stateDir)) {
     @mkdir($stateDir, 0755, true);
 }
 
+// Create logging callback for restart helper.
+$logCallback = function (string $msg, bool $force) use ($debug): void {
+    pmssCheckRtorrentLog($msg, $force, $debug);
+};
+
 foreach ($usersOut as $line) {
     $user = trim((string) $line);
     if ($user === '') {
         continue;
     }
     if (!pmssCheckRtorrentUsernameIsValid($user)) {
-        pmssCheckRtorrentLog("Skipping invalid username from listUsers output: {$user}", false, $debug);
+        pmssCheckRtorrentLog("Skipping invalid username: {$user}", false, $debug);
         continue;
     }
 
     $home = '/home/'.$user;
     if (!is_dir($home)) {
-        pmssCheckRtorrentLog("Skipping {$user}: home missing ({$home})", false, $debug);
+        pmssCheckRtorrentLog("Skipping {$user}: home missing", false, $debug);
         continue;
     }
 
-    // If user is suspended, stop any running processes and move on.
+    // Suspended users: kill all processes and skip.
     if (file_exists($home.'/www-disabled') || !is_dir($home.'/www')) {
         $null = [];
         $rc = 0;
         @exec('killall -9 -u '.escapeshellarg($user), $null, $rc);
-        pmssCheckRtorrentLog("User {$user} suspended; killall -9 -u {$user} (rc={$rc})", true, $debug);
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($user, "checkRtorrent: suspended cleanup (killall rc={$rc})");
-        }
+        pmssCheckRtorrentLogBoth($user, "suspended; cleanup (killall rc={$rc})", $debug);
         continue;
     }
 
-    // Only manage users with an rTorrent config.
+    // Only manage users with rTorrent config.
     if (!is_file($home.'/.rtorrent.rc')) {
         continue;
     }
 
-    $executor = pmssCheckRtorrentExecutorPids($user);
+    // Gather process state.
+    $executor = rtorrentProcessExecutorPids($user);
     $executorPhpPids = $executor['php'];
     $executorScreenPids = $executor['screen'];
     $executorAllPids = $executor['all'];
-    $rtorrentPids = pmssCheckRtorrentPgrepExact($user, 'rtorrent');
+    $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
     $executorPresent = !empty($executorPhpPids);
 
-    $missingState = $stateDir.'/checkRtorrent-executor-present-rtorrent-missing-'.$user.'.ts';
+    // State file paths.
+    $missingState = $stateDir.'/checkRtorrent-missing-'.$user.'.ts';
+    $unresponsiveState = $stateDir.'/checkRtorrent-unresponsive-'.$user.'.ts';
+
+    // Clear state if condition resolved.
     if (!empty($rtorrentPids) || !$executorPresent) {
-        if (is_file($missingState)) {
-            @unlink($missingState);
-        }
+        rtorrentProcessClearStaleState($missingState);
     }
 
-    // Multiple executor/rtorrent processes are always anomalous; converge to one.
+    // --- Anomaly: Multiple processes ---
     if (count($executorPhpPids) > 1 || count($executorScreenPids) > 1 || count($rtorrentPids) > 1) {
-        pmssCheckRtorrentLog(
-            "Anomaly for {$user}: php_exec=".count($executorPhpPids).' screen_exec='.count($executorScreenPids)
-                .' rtorrent='.count($rtorrentPids).'; restarting cleanly',
-            true,
+        pmssCheckRtorrentLogBoth(
+            $user,
+            'anomaly detected (php_exec='.count($executorPhpPids)
+                .' screen_exec='.count($executorScreenPids)
+                .' rtorrent='.count($rtorrentPids).'); restarting',
             $debug
         );
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog(
-                $user,
-                'checkRtorrent: anomaly detected; restarting (php_exec='.count($executorPhpPids)
-                    .' screen_exec='.count($executorScreenPids).' rtorrent='.count($rtorrentPids).')'
-            );
-        }
-
-        $before = pmssCheckRtorrentPsSnapshot($user);
-        pmssCheckRtorrentLog("Process snapshot BEFORE ({$user})", true, $debug);
-        foreach ($before as $row) {
-            pmssCheckRtorrentLog($row, true, $debug);
-        }
-
-        // Stop processes (best-effort): terminate then hard-kill after a grace period.
-        pmssCheckRtorrentKillPids(array_merge($rtorrentPids, $executorAllPids), SIGTERM);
-        sleep(3);
-        $rtorrentPids = pmssCheckRtorrentPgrepExact($user, 'rtorrent');
-        $executorAllPids = pmssCheckRtorrentExecutorPids($user)['all'];
-        pmssCheckRtorrentKillPids(array_merge($rtorrentPids, $executorAllPids), SIGKILL);
-        sleep(1);
-
-        $rc = 0;
-        @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
-        pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-
-        $after = pmssCheckRtorrentPsSnapshot($user);
-        pmssCheckRtorrentLog("Process snapshot AFTER ({$user})", true, $debug);
-        foreach ($after as $row) {
-            pmssCheckRtorrentLog($row, true, $debug);
-        }
-
+        rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
         continue;
     }
 
-    // No executor and no rTorrent: start.
+    // --- Missing: No executor and no rTorrent ---
     if (!$executorPresent && empty($rtorrentPids)) {
-        pmssCheckRtorrentLog("rTorrent missing for {$user}; starting", true, $debug);
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($user, 'checkRtorrent: rTorrent missing; starting');
-        }
-
-        $before = pmssCheckRtorrentPsSnapshot($user);
-        pmssCheckRtorrentLog("Process snapshot BEFORE ({$user})", true, $debug);
-        foreach ($before as $row) {
-            pmssCheckRtorrentLog($row, true, $debug);
-        }
-
+        pmssCheckRtorrentLogBoth($user, 'rTorrent missing; starting', $debug);
         $rc = 0;
         @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
         pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-
-        $after = pmssCheckRtorrentPsSnapshot($user);
-        pmssCheckRtorrentLog("Process snapshot AFTER ({$user})", true, $debug);
-        foreach ($after as $row) {
-            pmssCheckRtorrentLog($row, true, $debug);
-        }
-
         continue;
     }
 
-    // Executor present but rTorrent missing: likely a transient crash/restart
-    // window. Only intervene if it persists for multiple cron runs.
+    // --- Stale executor: Executor present but rTorrent missing ---
     if ($executorPresent && empty($rtorrentPids)) {
-        $now = time();
-        $firstSeen = 0;
-        if (is_file($missingState)) {
-            $firstSeen = (int) trim((string) @file_get_contents($missingState));
-        }
-        if ($firstSeen <= 0) {
-            @file_put_contents($missingState, (string) $now, LOCK_EX);
-            pmssCheckRtorrentLog("Executor present but rTorrent missing for {$user}; observing before restart", false, $debug);
-            continue;
-        }
+        $state = rtorrentProcessCheckStaleState($missingState, PMSS_RTORRENT_MISSING_GRACE);
 
-        $age = $now - $firstSeen;
-        if ($age < 180) {
+        if ($state['action'] === 'record') {
             pmssCheckRtorrentLog(
-                "Executor present but rTorrent missing for {$user}; waiting (age={$age}s)",
+                "Executor present but rTorrent missing for {$user}; observing",
                 false,
                 $debug
             );
             continue;
         }
 
-        pmssCheckRtorrentLog(
-            "Executor present but rTorrent missing for {$user}; stale for {$age}s, restarting cleanly",
-            true,
+        if ($state['action'] === 'wait') {
+            pmssCheckRtorrentLog(
+                "Executor present but rTorrent missing for {$user}; waiting (age={$state['age']}s)",
+                false,
+                $debug
+            );
+            continue;
+        }
+
+        // Stale - restart.
+        pmssCheckRtorrentLogBoth(
+            $user,
+            "executor present but rTorrent missing for {$state['age']}s; restarting",
             $debug
         );
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($user, "checkRtorrent: executor present but rTorrent missing; stale for {$age}s; restarting");
-        }
-
-        $before = pmssCheckRtorrentPsSnapshot($user);
-        pmssCheckRtorrentLog("Process snapshot BEFORE ({$user})", true, $debug);
-        foreach ($before as $row) {
-            pmssCheckRtorrentLog($row, true, $debug);
-        }
-
-        // Kill executor processes only; rTorrent is already missing.
-        pmssCheckRtorrentKillPids($executorAllPids, SIGTERM);
-        sleep(3);
-        $executorAllPids = pmssCheckRtorrentExecutorPids($user)['all'];
-        pmssCheckRtorrentKillPids($executorAllPids, SIGKILL);
-        sleep(1);
-
-        $rc = 0;
-        @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
-        pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-
-        $after = pmssCheckRtorrentPsSnapshot($user);
-        pmssCheckRtorrentLog("Process snapshot AFTER ({$user})", true, $debug);
-        foreach ($after as $row) {
-            pmssCheckRtorrentLog($row, true, $debug);
-        }
-
-        @unlink($missingState);
+        rtorrentProcessRestart($user, [], $executorAllPids, $logCallback, $debug);
+        rtorrentProcessClearStaleState($missingState);
         continue;
     }
 
-    // Check .rtorrent.rc ownership (legacy signal).
+    // --- SCGI Health Check: Process running, verify responsiveness ---
+    if (!empty($rtorrentPids) && count($rtorrentPids) === 1) {
+        $socketPath = rtorrentScgiSocketPath($user);
+        $responsive = rtorrentScgiPing($socketPath, 5);
+
+        if ($responsive) {
+            rtorrentProcessClearStaleState($unresponsiveState);
+            pmssCheckRtorrentLog("rTorrent healthy for {$user}", false, $debug);
+            continue;
+        }
+
+        // Unresponsive - check staleness.
+        $state = rtorrentProcessCheckStaleState($unresponsiveState, PMSS_RTORRENT_UNRESPONSIVE_GRACE);
+
+        if ($state['action'] === 'record') {
+            pmssCheckRtorrentLogBoth(
+                $user,
+                "SCGI unresponsive (socket={$socketPath}); observing",
+                $debug
+            );
+            continue;
+        }
+
+        if ($state['action'] === 'wait') {
+            pmssCheckRtorrentLog(
+                "SCGI still unresponsive for {$user}; waiting (age={$state['age']}s)",
+                false,
+                $debug
+            );
+            continue;
+        }
+
+        // Stale - restart.
+        pmssCheckRtorrentLogBoth(
+            $user,
+            "SCGI unresponsive for {$state['age']}s; restarting rtorrent",
+            $debug
+        );
+        rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
+        rtorrentProcessClearStaleState($unresponsiveState);
+        continue;
+    }
+
+    // --- Legacy: Check .rtorrent.rc ownership ---
     if (file_exists($home.'/.rtorrent.rc') && function_exists('posix_getpwuid')) {
         $owner = @posix_getpwuid(@fileowner($home.'/.rtorrent.rc'));
         if (is_array($owner) && isset($owner['name']) && $owner['name'] !== 'root') {
@@ -380,6 +279,7 @@ foreach ($usersOut as $line) {
     }
 }
 
+// Write changed config summary.
 if (count($changedConfig) !== 0) {
     file_put_contents('/root/changedConfigs', implode("\n", $changedConfig));
 } elseif (file_exists('/root/changedConfigs')) {

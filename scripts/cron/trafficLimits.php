@@ -1,7 +1,15 @@
 #!/usr/bin/env php
 <?php
-/* Check traffic limits */
-require_once '/scripts/lib/rtorrentXmlrpc.php';
+/**
+ * Traffic limits enforcement cron.
+ *
+ * Monitors per-user traffic usage and applies/removes throttling based on
+ * configured limits. Throttling is applied when usage exceeds limit and
+ * removed after a cooldown period (3 days by default).
+ *
+ * @author    Aleksi Ursin <aleksi@magnacapax.fi>
+ * @copyright 2010-2025 Magna Capax Finland Oy
+ */
 require_once '/scripts/lib/rtorrentConfig.php';
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
