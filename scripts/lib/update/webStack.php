@@ -32,9 +32,9 @@ if (!function_exists('pmssConfigureWebStack')) {
         }
 
         runStep('Refreshing lighttpd configuration', '/scripts/util/userConfigLighttpd.php');
-        runStep('Regenerating nginx configuration', '/scripts/util/createNginxConfig.php');
+        // nginx config regeneration moved to pmssPostUpdateWebRefresh() - no need to
+        // run twice. nginx stays stopped until final config refresh at end of update.
         runStep('Verifying user HTTP authentication files', '/scripts/util/checkUserHtpasswd.php');
-        runStep('Restarting nginx service', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
         runStep('Checking lighttpd per-user instances', '/scripts/cron/checkLighttpdInstances.php');
         runStep('Setting /home directory permissions', 'chmod 751 /home');
         // Quota state files reject chmod; prune them so the find commands stay noise-free.
@@ -86,13 +86,16 @@ if (!function_exists('pmssAdjustLighttpdSecurity')) {
 if (!function_exists('pmssPostUpdateWebRefresh')) {
     /**
      * Re-run web service configuration after application installers finish.
+     *
+     * This is the single authoritative nginx config regeneration point during updates.
+     * createNginxConfig.php validates config with nginx -t before restart, refusing
+     * to restart if config is broken (added 2026-01, issue #137).
      */
     function pmssPostUpdateWebRefresh(): void
     {
         runStep('Post-update lighttpd configuration refresh', '/scripts/util/userConfigLighttpd.php');
-        runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php');
+        runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
         runStep('Post-update htpasswd verification', '/scripts/util/checkUserHtpasswd.php');
-        runStep('Restarting nginx after configuration refresh', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
         runStep('Checking lighttpd instances after update', '/scripts/cron/checkLighttpdInstances.php');
     }
 }
