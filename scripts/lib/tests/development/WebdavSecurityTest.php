@@ -1072,4 +1072,138 @@ LIGHTTPD;
             'proxy_params must contain proxy_read_timeout (WebDAV blocks must not include it AND set explicitly)'
         );
     }
+
+    /**
+     * TEST 48: template.nginx-user WebDAV block does not duplicate proxy_read_timeout
+     *
+     * HARDENS: The external nginx user template must not include proxy_params AND
+     * set proxy_read_timeout explicitly, as this causes nginx to fail with
+     * "directive is duplicate" error.
+     *
+     * REGRESSION: Fixed in 2026-01 after issue #137 (WebDAV template not updated
+     * when createNginxConfig.php inline templates were fixed in commit 005b1fe).
+     */
+    public function testNginxUserTemplateWebdavNoDuplicateTimeout(): void
+    {
+        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
+        $template = file_get_contents($templatePath);
+
+        // Extract WebDAV location block - find from "location /webdav-" to the matching
+        // closing brace, handling nested braces (e.g., if blocks inside).
+        $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
+        $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
+
+        $hasIncludeProxyParams = strpos($webdavBlock, 'include /etc/nginx/proxy_params') !== false;
+        $hasExplicitTimeout = strpos($webdavBlock, 'proxy_read_timeout') !== false;
+
+        // Either include proxy_params OR set timeout explicitly, not both
+        $this->assertTrue(
+            !($hasIncludeProxyParams && $hasExplicitTimeout),
+            'template.nginx-user WebDAV block includes proxy_params AND sets proxy_read_timeout - duplicate directive causes nginx failure'
+        );
+    }
+
+    /**
+     * TEST 49: template.nginx-user WebDAV block has required proxy headers
+     *
+     * HARDENS: When not including proxy_params, WebDAV block must set headers explicitly.
+     */
+    public function testNginxUserTemplateWebdavHasRequiredHeaders(): void
+    {
+        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
+        $template = file_get_contents($templatePath);
+
+        // Extract WebDAV location block with nested brace handling.
+        $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
+        $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
+
+        $hasIncludeProxyParams = strpos($webdavBlock, 'include /etc/nginx/proxy_params') !== false;
+
+        // If not including proxy_params, must have explicit headers
+        if (!$hasIncludeProxyParams) {
+            $requiredHeaders = array(
+                'proxy_set_header Host',
+                'proxy_set_header X-Real-IP',
+                'proxy_set_header X-Forwarded-For',
+                'proxy_set_header Authorization',
+            );
+
+            foreach ($requiredHeaders as $header) {
+                $this->assertStringContainsString(
+                    $header,
+                    $webdavBlock,
+                    "template.nginx-user WebDAV block missing required header: $header"
+                );
+            }
+        }
+    }
+
+    /**
+     * Extract an nginx location block by path prefix, handling nested braces.
+     *
+     * @param string $config Full nginx config content
+     * @param string $pathPrefix Location path prefix to find (e.g., '/webdav-')
+     * @return string The location block content, or empty string if not found
+     */
+    private function extractNginxLocationBlock(string $config, string $pathPrefix): string
+    {
+        $pattern = '/location\s+' . preg_quote($pathPrefix, '/') . '[^{]*\{/';
+        if (!preg_match($pattern, $config, $matches, PREG_OFFSET_CAPTURE)) {
+            return '';
+        }
+
+        $startPos = $matches[0][1];
+        $openBracePos = strpos($config, '{', $startPos);
+        if ($openBracePos === false) {
+            return '';
+        }
+
+        // Count braces to find matching close
+        $depth = 1;
+        $pos = $openBracePos + 1;
+        $len = strlen($config);
+
+        while ($pos < $len && $depth > 0) {
+            $char = $config[$pos];
+            if ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+            }
+            $pos++;
+        }
+
+        if ($depth !== 0) {
+            return '';
+        }
+
+        return substr($config, $openBracePos + 1, $pos - $openBracePos - 2);
+    }
+
+    /**
+     * TEST 50: template.nginx-conf has server_names_hash_bucket_size set
+     *
+     * HARDENS: Servers with many users/subdomains need adequate hash bucket size.
+     * Default of 64 is insufficient; 128 is required for production.
+     *
+     * REGRESSION: Fixed in 2026-01 after issue #137 (nginx failing with
+     * "could not build server_names_hash" error on multi-user servers).
+     */
+    public function testNginxConfHasServerNamesHashBucketSize(): void
+    {
+        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-conf';
+        $template = file_get_contents($templatePath);
+
+        // Must be uncommented and set to at least 128
+        $this->assertTrue(
+            (bool)preg_match('/^\s*server_names_hash_bucket_size\s+(\d+)\s*;/m', $template, $matches),
+            'server_names_hash_bucket_size must be uncommented in template.nginx-conf'
+        );
+
+        $size = (int)$matches[1];
+        $this->assertTrue(
+            $size >= 128,
+            "server_names_hash_bucket_size must be at least 128 (found: $size)"
+        );
+    }
 }
