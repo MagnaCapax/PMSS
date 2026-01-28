@@ -351,6 +351,27 @@ if ($rc !== 0) {
     exit(1);
 }
 
+// Record per-user service ports assigned during configuration.
+$portFiles = [
+    'rclone' => $homePath.'/.rclonePort',
+    'qbittorrent' => $homePath.'/.qbittorrentPort',
+    'deluge' => $homePath.'/.delugePort',
+];
+foreach ($portFiles as $label => $path) {
+    if (!is_file($path)) {
+        continue;
+    }
+    $port = (int) trim((string) @file_get_contents($path));
+    if ($port <= 0) {
+        continue;
+    }
+    if ($label === 'deluge') {
+        logProvisionMessage('Assigned deluge ports: scgi='.$port.' web='.($port + 1));
+        continue;
+    }
+    logProvisionMessage('Assigned '.$label.' port: '.$port);
+}
+
 runProvisionStep(
     'Configure lighttpd vhost',
     sprintf('/scripts/util/userConfigLighttpd.php %s', escapeshellarg($user['name']))

@@ -11,6 +11,8 @@ Usage: portManager.php [view|assign|release] USER [SERVICE]
 - **release** – free the port assignment
 
 Port information is stored under `/etc/seedbox/runtime/ports` using files named `SERVICE-USER`.
+Assignments are guarded by a per-service lock to avoid concurrent collisions and
+mirrored to the shared user logs when available.
 
 Example:
 
