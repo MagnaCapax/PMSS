@@ -8,6 +8,16 @@ class UserConfigStoreTest extends TestCase
     /** @var string */
     private $tempDir = '';
 
+    private function configDirPath(): string
+    {
+        return $this->tempDir.'/seedbox/config';
+    }
+
+    private function legacyUsersJsonPath(): string
+    {
+        return $this->tempDir.'/seedbox/runtime/users.json';
+    }
+
     private function setUpTempDir(): void
     {
         $base = sys_get_temp_dir().'/pmss-userconfigstore-tests';
@@ -42,7 +52,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $payload = [
                 'ramMiB'       => 512,
                 'rtorrentPort' => 5000,
@@ -66,7 +76,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $payload = [
                 'rtorrentRam'  => 256,
                 'rtorrentPort' => 4100,
@@ -87,7 +97,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $payload = [
                 'ramMiB'       => 128,
                 'rtorrentPort' => 5001,
@@ -108,7 +118,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $payload = [
                 'ramMiB'       => 128,
                 'rtorrentPort' => 5000,
@@ -126,7 +136,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $this->assertTrue($store->set('dave', [
                 'ramMiB'     => 128,
                 'quota'      => 10,
@@ -141,9 +151,10 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            @mkdir($this->tempDir.'/users', 0755, true);
-            @file_put_contents($this->tempDir.'/users/alice.json', '{not-json');
-            $store = new \UserConfigStore($this->tempDir);
+            $usersDir = $this->configDirPath().'/users';
+            @mkdir($usersDir, 0755, true);
+            @file_put_contents($usersDir.'/alice.json', '{not-json');
+            $store = new \UserConfigStore($this->configDirPath());
             $this->assertTrue($store->get('alice') === null);
         } finally {
             $this->tearDownTempDir();
@@ -154,7 +165,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $usersDir = $this->tempDir.'/users';
+            $usersDir = $this->configDirPath().'/users';
             @mkdir($usersDir, 0755, true);
             $target = $this->tempDir.'/target.json';
             @file_put_contents($target, json_encode([
@@ -164,7 +175,7 @@ class UserConfigStoreTest extends TestCase
                 'quotaBurst' => 1,
             ]));
             @symlink($target, $usersDir.'/alice.json');
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $this->assertTrue($store->get('alice') === null, 'Symlinked user config must be ignored');
         } finally {
             $this->tearDownTempDir();
@@ -175,7 +186,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $payload = [
                 'ramMiB'       => 128,
                 'rtorrentPort' => 5000,
@@ -183,7 +194,7 @@ class UserConfigStoreTest extends TestCase
                 'quotaBurst'   => 12,
             ];
             $this->assertTrue($store->set('erin', $payload));
-            $userFile = $this->tempDir.'/users/erin.json';
+            $userFile = $this->configDirPath().'/users/erin.json';
             $this->assertTrue(is_file($userFile));
             $this->assertTrue($store->remove('erin'));
             $this->assertTrue(!file_exists($userFile));
@@ -196,7 +207,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->tempDir);
+            $store = new \UserConfigStore($this->configDirPath());
             $payload = [
                 'ramMiB'       => 128,
                 'rtorrentPort' => 5000,
@@ -211,5 +222,68 @@ class UserConfigStoreTest extends TestCase
             $this->tearDownTempDir();
         }
     }
-}
 
+    public function testGetFallsBackToLegacyAggregateWhenCanonicalMissing(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $legacyPath = $this->legacyUsersJsonPath();
+            @mkdir(dirname($legacyPath), 0755, true);
+            @file_put_contents($legacyPath, json_encode([
+                'alice' => [
+                    'ramMiB' => 256,
+                    'rtorrentPort' => 5000,
+                    'quota' => 10,
+                    'quotaBurst' => 12,
+                    'trafficLimit' => 999,
+                ],
+            ]));
+
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = $store->get('alice');
+            $this->assertTrue(is_array($payload));
+            $this->assertEquals(256, $payload['ramMiB']);
+            $this->assertEquals(0, $payload['trafficLimit']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testLoadAllMergesLegacyAndCanonicalPreferringCanonical(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $legacyPath = $this->legacyUsersJsonPath();
+            @mkdir(dirname($legacyPath), 0755, true);
+            @file_put_contents($legacyPath, json_encode([
+                'alice' => [
+                    'ramMiB' => 128,
+                    'rtorrentPort' => 4000,
+                    'quota' => 5,
+                    'quotaBurst' => 6,
+                ],
+                'bob' => [
+                    'ramMiB' => 256,
+                    'rtorrentPort' => 4001,
+                    'quota' => 10,
+                    'quotaBurst' => 12,
+                ],
+            ]));
+
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertTrue($store->set('bob', [
+                'ramMiB'       => 512,
+                'rtorrentPort' => 5000,
+                'quota'        => 20,
+                'quotaBurst'   => 25,
+            ]));
+
+            $all = $store->loadAll();
+            $this->assertEquals(['alice', 'bob'], array_keys($all));
+            $this->assertEquals(128, $all['alice']['ramMiB']);
+            $this->assertEquals(512, $all['bob']['ramMiB'], 'Canonical per-user file should override legacy aggregate');
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+}

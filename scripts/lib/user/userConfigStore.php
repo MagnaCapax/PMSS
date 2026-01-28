@@ -35,7 +35,9 @@ class UserConfigStore
     {
         $configDir = rtrim($configDir ?: '/etc/seedbox/config', '/');
         $this->userDir = $configDir.'/users';
-        $this->legacyAggregatePath = '/etc/seedbox/runtime/users.json';
+        // Legacy file lives alongside the config directory under /etc/seedbox/runtime.
+        // Derive it from the config dir so tests can point at a temp tree.
+        $this->legacyAggregatePath = rtrim(dirname($configDir), '/').'/runtime/users.json';
     }
 
     public function get(string $username): ?array
@@ -92,21 +94,23 @@ class UserConfigStore
 
     public function loadAll(): array
     {
-        $users = $this->loadFromUserDir();
-        if (!empty($users)) {
-            return $users;
-        }
-
         $legacy = $this->loadLegacyAggregateMap();
-        if (empty($legacy)) {
-            return [];
-        }
         $users = [];
         foreach ($legacy as $name => $payload) {
             if (!UserValidator::isValidUsername($name) || !is_array($payload)) {
                 continue;
             }
             $users[$name] = $this->normalise($payload);
+        }
+
+        // Overlay canonical per-user files on top of any legacy entries so mixed
+        // installs (partially migrated) continue to see a complete user list.
+        foreach ($this->loadFromUserDir() as $name => $payload) {
+            $users[$name] = $payload;
+        }
+
+        if (empty($users)) {
+            return [];
         }
         ksort($users, SORT_STRING);
         return $users;

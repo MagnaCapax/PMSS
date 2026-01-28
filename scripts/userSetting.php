@@ -54,10 +54,7 @@ if ($action === '' || $action === '--help' || $action === '-h') {
 $store = new UserConfigStore();
 
 if ($action === 'list') {
-    $users = $store->loadAll();
-    $names = array_keys($users);
-    sort($names, SORT_STRING);
-    foreach ($names as $name) {
+    foreach (array_keys($store->loadAll()) as $name) {
         echo $name."\n";
     }
     exit(0);
@@ -140,4 +137,3 @@ if ($action === 'set') {
 
 fwrite(STDERR, $usage);
 exit(1);
-

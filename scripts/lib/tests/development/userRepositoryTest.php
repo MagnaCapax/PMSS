@@ -8,6 +8,11 @@ class UserRepositoryTest extends TestCase
     /** @var string */
     private $tempDir;
 
+    private function configDirPath(): string
+    {
+        return $this->tempDir.'/seedbox/config';
+    }
+
     private function setUpTempDir(): void
     {
         $base = sys_get_temp_dir().'/pmss-userrepo-tests';
@@ -42,7 +47,7 @@ class UserRepositoryTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $repo = new \UserRepository($this->tempDir);
+            $repo = new \UserRepository($this->configDirPath());
             $this->assertEquals([], $repo->all());
 
             $payload = [
@@ -54,10 +59,10 @@ class UserRepositoryTest extends TestCase
             ];
             $this->assertTrue($repo->set('alice', $payload));
 
-            $userFile = $this->tempDir.'/users/alice.json';
+            $userFile = $this->configDirPath().'/users/alice.json';
             $this->assertTrue(is_file($userFile), 'Per-user file should be written');
 
-            $repo2 = new \UserRepository($this->tempDir);
+            $repo2 = new \UserRepository($this->configDirPath());
             $users = $repo2->all();
             $this->assertTrue(isset($users['alice']));
             $this->assertEquals(512, $users['alice']['ramMiB']);
@@ -71,7 +76,7 @@ class UserRepositoryTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $repo = new \UserRepository($this->tempDir);
+            $repo = new \UserRepository($this->configDirPath());
             $payload = [
                 'rtorrentRam'  => 256,
                 'rtorrentPort' => 4100,
@@ -92,7 +97,7 @@ class UserRepositoryTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $repo = new \UserRepository($this->tempDir);
+            $repo = new \UserRepository($this->configDirPath());
             $this->assertTrue($repo->set('badUser', [
                 'ramMiB'     => 128,
                 'quota'      => 40,
