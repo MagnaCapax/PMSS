@@ -58,45 +58,68 @@ function pmssUsernameIsValid(string $username): bool
 }
 
 /**
+ * Return the reserved username list for system/service accounts.
+ */
+function pmssReservedUsernames(): array
+{
+    static $reserved = null;
+    if ($reserved !== null) {
+        return $reserved;
+    }
+
+    $reserved = array(
+        // base-passwd/passwd.master (static UIDs 0-99)
+        '_apt', 'backup', 'bin', 'daemon', 'games', 'gnats', 'irc',
+        'list', 'lp', 'mail', 'man', 'news', 'nobody', 'proxy',
+        'root', 'sync', 'sys', 'uucp', 'www-data',
+
+        // base-passwd/group.master (static GIDs)
+        'adm', 'audio', 'cdrom', 'dialout', 'dip', 'disk', 'fax',
+        'floppy', 'kmem', 'nogroup', 'operator', 'plugdev', 'sasl',
+        'shadow', 'src', 'staff', 'sudo', 'tape', 'tty', 'users',
+        'utmp', 'video', 'voice',
+
+        // base-passwd/README reserved names
+        'alias', 'asterisk', 'ceph', 'ftn', 'grsec-proc', 'grsec-sock-all',
+        'grsec-sock-clt', 'grsec-sock-srv', 'grsec-tpe', 'haclient',
+        'hacluster', 'libvirt-qemu', 'mysql', 'netplan', 'opensrf',
+        'qmail', 'qmaild', 'qmaill', 'qmailp', 'qmailq', 'qmailr',
+        'qmails', 'slurm', 'tac-plus', 'vchkpw', 'vpopmail',
+
+        // Common package-created system users
+        'admin', 'apache', 'apache2', 'avahi', 'avahi-autoipd', 'bind',
+        'clamav', 'colord', 'crontab', 'cups', 'cupsys', 'dbus', 'dcc',
+        'Debian-exim', 'debian-deluged', 'dhcp', 'dictd', 'dnsmasq',
+        'docker', 'dovecot', 'elasticsearch', 'fetchmail', 'firebird',
+        'ftp', 'fuse', 'gdm', 'geoclue', 'git', 'gnome-initial-setup',
+        'haldaemon', 'hplilp', 'http', 'httpd', 'identd', 'input',
+        'jwhois', 'kernoops', 'klog', 'kvm', 'landscape', 'lightdm',
+        'lpadmin', 'lxd', 'maas', 'memcache', 'messagebus', 'mongodb',
+        'mosquitto', 'mythtv', 'nagios', 'netdev', 'nginx', 'ntp',
+        'ntpsec', 'polkitd', 'postfix', 'postgres', 'powerdev',
+        'proftpd', 'pulse', 'radvd', 'redis', 'render', 'rtkit',
+        'saned', 'sbuild', 'scanner', 'sgx', 'slocate', 'snap_daemon',
+        'speech-dispatcher', 'squid', 'ssh', 'sshd', 'ssl-cert',
+        'sslwrap', 'statd', 'stunnel4', 'syslog', 'systemd-coredump',
+        'systemd-network', 'systemd-resolve', 'systemd-timesync',
+        'tcpdump', 'telnetd', 'tftpd', 'tomcat', 'tomcat8', 'tomcat9',
+        'unbound', 'usbmux', 'uuidd', 'varnish', 'vnstat', 'whoopsie',
+        'www', 'zabbix', '_znc',
+
+        // PMSS-specific (would conflict with internal use)
+        'pmss', 'seedbox', 'rtorrent', 'deluge', 'qbittorrent',
+        'lighttpd', 'rutorrent',
+    );
+
+    return $reserved;
+}
+
+/**
  * Return true when a username is reserved for system/service accounts.
- *
- * Keep this list focused on common Debian system users to avoid future
- * collisions with package-owned accounts.
  */
 function pmssUsernameIsReserved(string $username): bool
 {
-    static $reserved = array(
-        'root',
-        'daemon',
-        'bin',
-        'sys',
-        'sync',
-        'games',
-        'man',
-        'lp',
-        'mail',
-        'news',
-        'uucp',
-        'proxy',
-        'www',
-        'backup',
-        'list',
-        'irc',
-        'gnats',
-        'nobody',
-        'sshd',
-        'dbus',
-        'rtkit',
-        'avahi',
-        'pulse',
-        'ntp',
-        'proftpd',
-        'syslog',
-        'polkitd',
-        'uuidd',
-    );
-
-    return in_array($username, $reserved, true);
+    return in_array($username, pmssReservedUsernames(), true);
 }
 
 /**
