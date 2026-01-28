@@ -42,7 +42,9 @@ class rtorrentConfig {
 			if (count($resourceConfig) == 0) {
 				$resourceConfig = $this->loadDefaultResourceConfig();
 			}
-			if (!is_string($template) || $template === '') {
+			// Treat whitespace-only templates as empty; otherwise we risk generating
+			// a minimal config (e.g. only ipv4_filter) that breaks rTorrent startup.
+			if (!is_string($template) || trim($template) === '') {
 			    $template = $this->loadDefaultTemplate();
 			}
 			
