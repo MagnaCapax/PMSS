@@ -479,7 +479,7 @@ function pmssUserConfigLighttpdMain(array $argv): int
     }
 
     if (isset($argv[1]) && !empty($argv[1])) {
-        $argUsername = strtolower($argv[1]);
+        $argUsername = pmssNormalizeUsername((string) $argv[1]);
         if (in_array($argUsername, $users, true)) {
             $users = array($argUsername);   // Only do this user
         } else {

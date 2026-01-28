@@ -196,13 +196,13 @@ function pmssUserTransferParseCli(array $argv): array
         throw new RuntimeException('Need arguments.'.PHP_EOL.pmssUserTransferUsage(), 1);
     }
 
-    $localUser = strtolower(trim((string) $positionals[0]));
+    $localUser = pmssNormalizeUsername((string) $positionals[0]);
     $remoteUser = $localUser;
     $hostname = '';
     if (count($positionals) === 2) {
         $hostname = trim((string) $positionals[1]);
     } else {
-        $remoteUser = strtolower(trim((string) $positionals[1]));
+        $remoteUser = pmssNormalizeUsername((string) $positionals[1]);
         $hostname = trim((string) $positionals[2]);
     }
 

@@ -62,10 +62,10 @@ if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
     exit(0);
 }
 
-$requestedUser = strtolower(trim((string) pmssCliOption($parsed, 'user', 'u', '')));
+$requestedUser = pmssNormalizeUsername((string) pmssCliOption($parsed, 'user', 'u', ''));
 $positionals = $parsed['arguments'] ?? [];
 if ($requestedUser === '' && count($positionals) === 1) {
-    $requestedUser = strtolower(trim((string) $positionals[0]));
+    $requestedUser = pmssNormalizeUsername((string) $positionals[0]);
 } elseif (count($positionals) > 1) {
     fwrite(STDERR, $usage);
     exit(1);
@@ -93,7 +93,7 @@ if (empty($userLines)) {
 
 $usersFiltered = [];
 foreach ($userLines as $name) {
-    $name = strtolower(trim((string)$name));
+    $name = pmssNormalizeUsername((string) $name);
     if ($name === '' || !pmssValidateUsername($name)) {
         continue;
     }

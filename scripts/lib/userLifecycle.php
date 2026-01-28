@@ -47,7 +47,7 @@ if (!function_exists('pmssUserLogAllowed')) {
  */
 function pmssNormalizeUsername(string $username): string
 {
-    return strtolower($username);
+    return strtolower(trim($username));
 }
 
 /**
