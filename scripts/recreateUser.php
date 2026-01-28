@@ -39,6 +39,7 @@ const USAGE = "Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB\n";
 [$_, $userName, $ramMiB, $quotaGiB] = array_pad($argv, 4, null);
 
 if ($argc !== 4) die(USAGE);
+$userName = strtolower((string) $userName);
 if (!preg_match('/^[a-z][a-z0-9_-]{0,31}$/', $userName))
     die("Invalid username\n");
 if (!ctype_digit($ramMiB) || (int)$ramMiB < 1)

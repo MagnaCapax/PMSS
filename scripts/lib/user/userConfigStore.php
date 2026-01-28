@@ -42,6 +42,7 @@ class UserConfigStore
 
     public function get(string $username): ?array
     {
+        $username = pmssNormalizeUsername($username);
         if (!UserValidator::isValidUsername($username)) {
             return null;
         }
@@ -62,6 +63,7 @@ class UserConfigStore
 
     public function set(string $username, array $payload): bool
     {
+        $username = pmssNormalizeUsername($username);
         if (!UserValidator::isValidUsername($username)) {
             return false;
         }
@@ -81,6 +83,7 @@ class UserConfigStore
 
     public function remove(string $username): bool
     {
+        $username = pmssNormalizeUsername($username);
         if (!UserValidator::isValidUsername($username)) {
             return false;
         }
@@ -118,6 +121,7 @@ class UserConfigStore
 
     public function setSuspended(string $username, bool $suspended): bool
     {
+        $username = pmssNormalizeUsername($username);
         $payload = $this->get($username);
         if (!is_array($payload)) {
             return false;
@@ -132,6 +136,7 @@ class UserConfigStore
 
     public function applyFallbacks(string $username, array $payload): array
     {
+        $username = pmssNormalizeUsername($username);
         $payload = $this->normalise($payload);
         if (empty($payload['ramMiB'])) {
             $payload['ramMiB'] = $this->resolveRamMiBFromSystemdSlice($username);
@@ -144,6 +149,7 @@ class UserConfigStore
 
     public function writeUserCache(string $username, array $payload): void
     {
+        $username = pmssNormalizeUsername($username);
         if (!UserValidator::isValidUsername($username)) {
             return;
         }

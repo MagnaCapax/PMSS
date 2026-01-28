@@ -21,7 +21,7 @@ if ($argc !== 2) {
     exit(1);
 }
 
-$user = $argv[1];
+$user = strtolower(trim((string) $argv[1]));
 
 // Validate username defensively even when invoked from internal scripts.
 // Treat any internal tool output as untrusted (ADR 0005).

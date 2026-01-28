@@ -24,6 +24,7 @@ if ($username === '') {
     die($usage."\n");
 }
 
+$username = pmssNormalizeUsername($username);
 // This script is invoked by operators/automation. Validate inputs early so we
 // never feed garbage to usermod or log files.
 if (!pmssValidateUsername($username)) {

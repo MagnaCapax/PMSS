@@ -25,6 +25,7 @@ if ($username === '') {
     die($usage."\n");
 }
 
+$username = pmssNormalizeUsername($username);
 // Validate inputs early so we never feed garbage to usermod or log files.
 if (!pmssValidateUsername($username)) {
     pmssUserWriteLogs(

@@ -15,7 +15,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 $usage = "Usage: setupUserHomePermissions.php USERNAME\n";
 if (empty($argv[1])) die($usage);
 
-$userName = $argv[1];
+$userName = pmssNormalizeUsername($argv[1]);
 
 if (!pmssValidateUsername($userName)) {
     pmssUserWriteLogs(

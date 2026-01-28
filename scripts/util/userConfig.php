@@ -41,6 +41,7 @@ $user = [
     'IOWriteIOPS' => isset($argv[10]) ? $argv[10] : null,
     'cpuQuotaPercent' => isset($argv[11]) ? $argv[11] : 0,
 ];
+$user['name'] = strtolower(trim((string) $user['name']));
 
 // Safely get the user ID
 $output = [];

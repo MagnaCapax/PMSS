@@ -28,6 +28,7 @@ require_once __DIR__.'/lib/homeMount.php';
 // a user's password when /home is unavailable would fail or write to stale paths.
 pmssRequireHomeMounted('changePw.php');
 
+$username = pmssNormalizeUsername($username);
 if (!pmssValidateUsername($username)) {
     pmssUserWriteLogs(
         pmssUserBaseContext(

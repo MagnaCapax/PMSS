@@ -26,6 +26,7 @@ if ($userName === '' || $limitRaw === null || $limitRaw === true) {
     die('need user name. '.$usage."\n");
 }
 
+$userName = strtolower($userName);
 $trafficLimit = (int) $limitRaw;
 
 // Check if user exists

@@ -15,7 +15,7 @@ if (is_file($pmssUserLifecyclePath)) {
 $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
     
-$thisUser = $argv[1];
+$thisUser = strtolower(trim((string) $argv[1]));
 if (function_exists('pmssValidateUsername') && !pmssValidateUsername($thisUser)) {
     die("Invalid username\n");
 }

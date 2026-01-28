@@ -39,6 +39,7 @@ pmssRequireHomeMounted('addUser.php');
 
 $userDb = new users();
 
+$user['name'] = pmssNormalizeUsername($user['name']);
 if (!pmssValidateUsernameForCreate($user['name'])) {
     pmssUserWriteLogs(
         pmssUserBaseContext(
