@@ -129,7 +129,10 @@ if (!is_dir('/etc/nginx/sites-available')) {
 
 // Configure site default
 //passthru("cp /etc/seedbox/config/template.nginx-site-default /etc/nginx/sites-available/default");
-$serverHostname = trim(file_get_contents('/etc/hostname'));
+$serverHostname = trim((string)@file_get_contents('/etc/hostname'));
+// /etc/hostname should be a single token; trim defensively to avoid whitespace surprises.
+$serverHostnameParts = preg_split('/\\s+/', $serverHostname);
+$serverHostname = is_array($serverHostnameParts) && isset($serverHostnameParts[0]) ? (string)$serverHostnameParts[0] : $serverHostname;
 $subdomainBase = strtolower($serverHostname);
 $subdomainEnabled = pmssNginxUserHostIsValidFqdn($subdomainBase);
 $subdomainConfigDir = '/etc/nginx/conf.d';
@@ -166,6 +169,17 @@ if ($nginxConfigSiteDefaultSsl !== false) {
 
 // Create config and save it :)
 if ($nginxConfigSiteDefault !== false) {
+    // Ensure requests to the base hostname (FQDN) land on the main vhost where
+    // user location blocks (including legacy Deluge redirects) are included.
+    // This prevents unexpected fallback to user subdomain vhosts on some hosts.
+    if ($subdomainEnabled && $subdomainBase !== '' && $subdomainBase !== 'localhost') {
+        $nginxConfigSiteDefault = str_replace(
+            'server_name localhost;',
+            'server_name localhost '.$subdomainBase.';',
+            $nginxConfigSiteDefault
+        );
+    }
+
     $nginxConfigSiteDefault = str_replace('||SSL_SETTINGS_CONFIGURED_HERE||', (string)$nginxConfigSiteDefaultSsl, $nginxConfigSiteDefault);
     @file_put_contents('/etc/nginx/sites-available/default', $nginxConfigSiteDefault);
 }

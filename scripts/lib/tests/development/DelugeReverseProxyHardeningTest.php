@@ -195,6 +195,16 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('return 308 /user-##user##/deluge/$1$is_args$args;', $block);
     }
 
+    public function testCreateNginxConfigAddsBaseHostnameToDefaultServerName(): void
+    {
+        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+
+        // Regression guard: base-host requests (FQDN) must land on the main vhost
+        // where /etc/nginx/users/* is included (legacy Deluge redirects live there).
+        $this->assertStringContainsString("'server_name localhost;'", $script);
+        $this->assertStringContainsString("'server_name localhost '.\$subdomainBase.';'", $script);
+    }
+
     public function testCreateNginxConfigPrivateSubdomainDoesNotExposePublicPrefix(): void
     {
         $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
