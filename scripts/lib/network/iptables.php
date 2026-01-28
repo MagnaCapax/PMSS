@@ -5,6 +5,48 @@
 
 require_once __DIR__.'/../runtime.php';
 
+/**
+ * Verify that the iptables owner match is available (xt_owner/ipt_owner).
+ *
+ * @return bool True when owner match can be used.
+ */
+function networkIptablesOwnerMatchAvailable(): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $moduleStatus = 1;
+    exec('lsmod | grep -q "^xt_owner\\b"', $null, $moduleStatus);
+    if ($moduleStatus !== 0) {
+        exec('modprobe xt_owner', $null, $rc);
+        if ($rc !== 0) {
+            exec('modprobe ipt_owner', $null, $rc);
+        }
+    }
+
+    $output = [];
+    $rc = 0;
+    exec('/sbin/iptables -m owner -h 2>&1', $output, $rc);
+    if ($rc !== 0) {
+        $message = trim(implode("\n", $output));
+        if ($message === '') {
+            $message = 'no output';
+        }
+        file_put_contents(
+            '/var/log/pmss/iptables.log',
+            date('c')." WARN owner match unavailable (rc={$rc}): {$message}\n",
+            FILE_APPEND
+        );
+        $cached = false;
+        return $cached;
+    }
+
+    $cached = true;
+    return $cached;
+}
+
 function networkRunIptables(string $rule): void
 {
     $cmd = '/sbin/iptables '.$rule;

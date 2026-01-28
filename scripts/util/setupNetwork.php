@@ -59,7 +59,12 @@ if ($interface === '') {
 }
 
 // Pull optional monitoring chain additions from helper script output.
-$monitoringCommands = networkParseMonitoringCommands(shell_exec('/scripts/util/makeMonitoringRules.php') ?: '');
+$monitoringCommands = [];
+if (networkIptablesOwnerMatchAvailable()) {
+    $monitoringCommands = networkParseMonitoringCommands(shell_exec('/scripts/util/makeMonitoringRules.php') ?: '');
+} else {
+    logMessage('iptables owner match unavailable; skipping per-user monitoring rules');
+}
 
 // Placeholder tokens used later for rule rendering.
 $replacements = [

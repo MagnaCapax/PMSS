@@ -2,6 +2,8 @@
 <?php
 // Configure Ip tables rules for monitoring network traffic usage
 
+require_once '/scripts/lib/network/iptables.php';
+
 $users = trim( `/scripts/listUsers.php` );
 if (empty($users)) exit;
 
@@ -9,6 +11,11 @@ $users = explode("\n", $users);
 $users[] = 'www-data';
 
 $mark = 1;
+
+// Owner match is required for per-user accounting; skip if unavailable.
+if (!networkIptablesOwnerMatchAvailable()) {
+    exit(0);
+}
 
 $localnets = ['185.148.0.0/22']; // #TODO Refactor hardcoded value
 // Multiple networks may be defined, one per line, to mark "local" traffic.
