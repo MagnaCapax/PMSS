@@ -204,6 +204,55 @@ function rtorrentProcessClearStaleState(string $stateFile): void
 }
 
 /**
+ * Quarantine a user's custom rTorrent config file.
+ *
+ * When /home/<user>/.rtorrent.rc.custom exists but is invalid, rTorrent can
+ * fail to start because the main template uses `try_import`. This helper moves
+ * the custom file aside (atomic rename) so the instance can start with the
+ * baseline config while preserving the customer's file for support review.
+ *
+ * Safety guards:
+ * - refuses to touch symlinks
+ * - refuses to move files not owned by root or the user (best-effort)
+ *
+ * @param string   $home   User home directory path.
+ * @param string   $user   Username.
+ * @param callable $logFn  Logging callback: function(string $message, bool $force).
+ *
+ * @return string|null Destination path when quarantined, null otherwise.
+ */
+function rtorrentCustomConfigQuarantine(string $home, string $user, callable $logFn): ?string
+{
+    $home = rtrim($home, '/');
+    $src = $home.'/.rtorrent.rc.custom';
+    if (!is_file($src) || is_link($src)) {
+        return null;
+    }
+
+    // Best-effort ownership guard: only allow root-owned or user-owned files.
+    if (function_exists('posix_getpwnam')) {
+        $pw = @posix_getpwnam($user);
+        $uid = (is_array($pw) && isset($pw['uid'])) ? (int) $pw['uid'] : null;
+        $owner = @fileowner($src);
+        if ($owner !== false && $uid !== null && (int) $owner !== 0 && (int) $owner !== $uid) {
+            $logFn("Refusing to quarantine {$src}: unexpected owner uid={$owner}", true);
+            return null;
+        }
+    }
+
+    $timestamp = date('Ymd_His');
+    $suffix = $timestamp.'-'.(int) getmypid();
+    $dst = $src.'.broken-'.$suffix;
+
+    if (@rename($src, $dst)) {
+        $logFn("Quarantined broken custom rTorrent config: {$src} -> {$dst}", true);
+        return $dst;
+    }
+    $logFn("Failed to quarantine custom rTorrent config: {$src}", true);
+    return null;
+}
+
+/**
  * Restart rTorrent for a user with full diagnostic logging.
  *
  * Performs graceful shutdown (SIGTERM), waits, then force kills (SIGKILL),

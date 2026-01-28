@@ -10,6 +10,11 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 require_once __DIR__.'/lib/logger.php';
+$userLogLib = __DIR__.'/lib/user/log.php';
+if (is_file($userLogLib)) {
+    require_once $userLogLib;
+}
+require_once __DIR__.'/lib/rtorrent/process.php';
 
 if ($argc !== 2) {
     logmsg('Usage: startRtorrent USERNAME');
@@ -37,6 +42,37 @@ if (!$validUser) {
 }
 
 $home = '/home/'.$user;
+
+/**
+ * Start rTorrent for the user (legacy direct start or executor wrapper).
+ */
+function pmssStartRtorrentLaunch(string $user, string $home, string $executor): void
+{
+    if (!file_exists($executor)) {
+        // If old version of master GUI, call rTorrent directly.
+        logmsg("Starting rTorrent for {$user} (legacy mode)");
+        $sessionPrefix = $home.'/session/rtorrent.';
+        $candidates = glob($sessionPrefix.'*');
+        if (is_array($candidates)) {
+            foreach ($candidates as $path) {
+                if (strpos($path, $sessionPrefix) !== 0) {
+                    continue;
+                }
+                if (is_file($path) || is_link($path)) {
+                    @unlink($path);
+                }
+            }
+        }
+        $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m rtorrent');
+        passthru($cmd);
+        return;
+    }
+
+    // Newer versions use .rtorrentExecute.php wrapper.
+    logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
+    $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m ./.rtorrentExecute.php');
+    passthru($cmd);
+}
 
 // Basic sanity checks so operators get immediate feedback instead of silent exits.
 if (!is_dir($home)) {
@@ -162,29 +198,7 @@ if (!is_dir($home.'/session')) {
 }
 
 // Finally execute rTorrent inside a screen session.
-if (!file_exists($executor)) {
-    // If old version of master GUI, call rTorrent directly.
-    logmsg("Starting rTorrent for {$user} (legacy mode)");
-    $sessionPrefix = $home.'/session/rtorrent.';
-    $candidates = glob($sessionPrefix.'*');
-    if (is_array($candidates)) {
-        foreach ($candidates as $path) {
-            if (strpos($path, $sessionPrefix) !== 0) {
-                continue;
-            }
-            if (is_file($path) || is_link($path)) {
-                @unlink($path);
-            }
-        }
-    }
-    $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m rtorrent');
-    passthru($cmd);
-} else {
-    // Newer versions use .rtorrentExecute.php wrapper.
-    logmsg("Starting rTorrent for {$user} via .rtorrentExecute.php");
-    $cmd = 'su - '.escapeshellarg($user).' -c '.escapeshellarg('screen -S rtorrent -fa -d -m ./.rtorrentExecute.php');
-    passthru($cmd);
-}
+pmssStartRtorrentLaunch($user, $home, $executor);
 
 // Output a small process snapshot so operators can see whether rTorrent or the
 // wrapper stayed up, without relying on grep parsing.
@@ -202,4 +216,62 @@ if ($psRc === 0 && !empty($psLines)) {
         }
         logmsg(trim($line));
     }
+}
+
+// If rTorrent did not stay up, a broken ~/.rtorrent.rc.custom can be the cause
+// (template uses try_import). Quarantine after repeated failures so we don't
+// disable custom config on a single transient start issue.
+sleep(1);
+$rtorrentPidsAfter = rtorrentProcessPgrepExact($user, 'rtorrent');
+if (!empty($rtorrentPidsAfter)) {
+    $stateFile = '/run/pmss/startRtorrent-customrc-fail-'.$user.'.ts';
+    rtorrentProcessClearStaleState($stateFile);
+    exit(0);
+}
+
+$stateDir = '/run/pmss';
+if (!is_dir($stateDir)) {
+    @mkdir($stateDir, 0755, true);
+}
+$stateFile = $stateDir.'/startRtorrent-customrc-fail-'.$user.'.ts';
+$state = rtorrentProcessCheckStaleState($stateFile, 120);
+
+if ($state['action'] !== 'stale') {
+    logmsg("[WARN] rTorrent not running after start for {$user}; will retry before quarantining .rtorrent.rc.custom");
+    exit(0);
+}
+
+logmsg("[WARN] rTorrent repeatedly failed to start for {$user} (age={$state['age']}s); quarantining .rtorrent.rc.custom");
+if (function_exists('pmssUserLog')) {
+    pmssUserLog($user, 'startRtorrent: repeated failures; quarantining .rtorrent.rc.custom');
+}
+
+$logFn = function (string $message, bool $force = true): void {
+    logmsg($message);
+};
+$quarantined = rtorrentCustomConfigQuarantine($home, $user, $logFn);
+rtorrentProcessClearStaleState($stateFile);
+if ($quarantined === null) {
+    exit(0);
+}
+if (function_exists('pmssUserLog')) {
+    pmssUserLog($user, 'startRtorrent: quarantined .rtorrent.rc.custom -> '.basename($quarantined));
+}
+
+// Clear any stuck wrapper/screen processes before retrying the start.
+$executorPids = rtorrentProcessExecutorPids($user)['all'];
+if (!empty($executorPids)) {
+    rtorrentProcessKillPids($executorPids, SIGKILL);
+    usleep(250000);
+}
+
+pmssStartRtorrentLaunch($user, $home, $executor);
+sleep(1);
+if (!empty(rtorrentProcessPgrepExact($user, 'rtorrent'))) {
+    logmsg("[OK] rTorrent started for {$user} after quarantining custom config");
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, 'startRtorrent: started after quarantining .rtorrent.rc.custom');
+    }
+} else {
+    logmsg("[WARN] rTorrent still not running for {$user} after quarantining custom config");
 }
