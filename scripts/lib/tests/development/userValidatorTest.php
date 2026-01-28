@@ -9,6 +9,7 @@ class UserValidatorTest extends TestCase
     {
         $this->assertTrue(\UserValidator::isValidUsername('alice_01'));
         $this->assertTrue(\UserValidator::isValidUsername('bob-02'));
+        $this->assertTrue(!\UserValidator::isValidUsername('Admin'));
         $this->assertTrue(!\UserValidator::isValidUsername('bad user'));
         $this->assertTrue(!\UserValidator::isValidUsername('evil!'));
     }

@@ -48,7 +48,7 @@ class ListUsersGarbageOutputTest extends TestCase
         }
 
         // The main guard against garbage lines is that only names accepted by
-        // pmssValidateUsername() (^[A-Za-z][A-Za-z0-9]{0,7}$) are used. Check
+        // pmssValidateUsername() (^[a-z][a-z0-9]{0,7}$) are used. Check
         // that our garbage examples would all be rejected by the validator.
         require_once __DIR__.'/../../userLifecycle.php';
         foreach ($garbageLines as $line) {
@@ -57,4 +57,3 @@ class ListUsersGarbageOutputTest extends TestCase
         }
     }
 }
-

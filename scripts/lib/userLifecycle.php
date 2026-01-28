@@ -43,6 +43,14 @@ if (!function_exists('pmssUserLogAllowed')) {
 }
 
 /**
+ * Normalise a username for consistent comparisons.
+ */
+function pmssNormalizeUsername(string $username): string
+{
+    return strtolower($username);
+}
+
+/**
  * Validate a username according to PMSS constraints.
  *
  * - Only lowercase ASCII letters and digits allowed.
@@ -54,7 +62,11 @@ function pmssUsernameIsValid(string $username): bool
     if ($username === '') {
         return false;
     }
-    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $username);
+    $normalized = pmssNormalizeUsername($username);
+    if ($normalized !== $username) {
+        return false;
+    }
+    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $normalized);
 }
 
 /**
@@ -119,7 +131,7 @@ function pmssReservedUsernames(): array
  */
 function pmssUsernameIsReserved(string $username): bool
 {
-    return in_array($username, pmssReservedUsernames(), true);
+    return in_array(pmssNormalizeUsername($username), pmssReservedUsernames(), true);
 }
 
 /**

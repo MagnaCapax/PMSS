@@ -3,13 +3,22 @@
  * Validation utilities for user metadata.
  */
 
+require_once dirname(__DIR__).'/userLifecycle.php';
+
 class UserValidator
 {
     public const REQUIRED_FIELDS = ['ramMiB', 'rtorrentPort', 'quota', 'quotaBurst'];
 
     public static function isValidUsername($username): bool
     {
-        return is_string($username) && preg_match('/^[a-zA-Z0-9._-]+$/', $username) === 1;
+        if (!is_string($username)) {
+            return false;
+        }
+        $normalized = pmssNormalizeUsername($username);
+        if ($normalized !== $username) {
+            return false;
+        }
+        return preg_match('/^[a-z0-9._-]+$/', $normalized) === 1;
     }
 
     public static function validatePayload(array $data): bool

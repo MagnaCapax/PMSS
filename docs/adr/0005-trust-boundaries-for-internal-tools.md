@@ -72,7 +72,7 @@ We adopt **Option B** and formalise the following trust boundary rules:
      - Trim whitespace.
      - Skip empty lines.
      - Re-validate using the core username validator:
-       - `pmssValidateUsername()` enforcing `^[A-Za-z][A-Za-z0-9]{0,7}$`.
+       - `pmssValidateUsername()` enforcing `^[a-z][a-z0-9]{0,7}$`.
    - Callers must not rely solely on upstream validation (e.g., addUser.php
      or listUsers.php) and must enforce their own checks before acting.
 
