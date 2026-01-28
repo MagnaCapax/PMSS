@@ -40,7 +40,6 @@ server {
 server {
 	listen 443 ssl default_server;
 	server_name localhost;
-	ssl on;
 
 	root /var/www;
 	index index.html index.htm;
