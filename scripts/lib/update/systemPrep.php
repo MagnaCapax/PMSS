@@ -536,10 +536,10 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
     /**
      * Recreate the legacy BFQ/sysctl configuration shipped with PMSS.
      */
-    function pmssEnsureLegacySysctlBaseline(?callable $logger = null): void
+    function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targetOverride = null, bool $reload = true): void
     {
         $log    = pmssSelectLogger($logger);
-        $target = '/etc/sysctl.d/1-pmss-defaults.conf';
+        $target = $targetOverride ?? '/etc/sysctl.d/1-pmss-defaults.conf';
 
         $lines = ['# Pulsed Media Config'];
 
@@ -562,6 +562,7 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
         $lines[] = 'fs.protected_regular = 2';
         $lines[] = 'fs.protected_fifos = 2';
         $lines[] = 'kernel.yama.ptrace_scope = 1';
+        $lines[] = 'kernel.kptr_restrict = 1';
 
         $content = implode("\n", $lines);
 
@@ -576,7 +577,11 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
             @mkdir(dirname($target), 0755, true);
         }
         @file_put_contents($target, $content.PHP_EOL);
-        runStep('Reloading sysctl configuration', 'sysctl --system');
+        if ($reload) {
+            runStep('Reloading sysctl configuration', 'sysctl --system');
+        } else {
+            $log('[SKIP] sysctl reload disabled');
+        }
         $log('Refreshed legacy sysctl defaults at '.$target);
     }
 }
