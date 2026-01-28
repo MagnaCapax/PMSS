@@ -14,8 +14,11 @@ if (is_file($pmssUserLifecyclePath)) {
 
 $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
-    
-$thisUser = strtolower(trim((string) $argv[1]));
+
+$userRaw = (string) $argv[1];
+$thisUser = function_exists('pmssNormalizeUsername')
+    ? pmssNormalizeUsername($userRaw)
+    : strtolower(trim($userRaw));
 if (function_exists('pmssValidateUsername') && !pmssValidateUsername($thisUser)) {
     die("Invalid username\n");
 }

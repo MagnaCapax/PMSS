@@ -29,6 +29,10 @@ if (substr(__FILE__, 0, 3) === "\xEF\xBB\xBF") {
 
 /* ===== 1. CLI parsing ===== */
 require_once __DIR__.'/lib/homeMount.php';
+$userLifecycleLib = __DIR__.'/lib/userLifecycle.php';
+if (is_file($userLifecycleLib)) {
+    require_once $userLifecycleLib;
+}
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Recreating
 // a user when /home is unavailable would fail in confusing ways or corrupt state.
@@ -39,7 +43,9 @@ const USAGE = "Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB\n";
 [$_, $userName, $ramMiB, $quotaGiB] = array_pad($argv, 4, null);
 
 if ($argc !== 4) die(USAGE);
-$userName = strtolower((string) $userName);
+$userName = function_exists('pmssNormalizeUsername')
+    ? pmssNormalizeUsername((string) $userName)
+    : strtolower((string) $userName);
 if (!preg_match('/^[a-z][a-z0-9_-]{0,31}$/', $userName))
     die("Invalid username\n");
 if (!ctype_digit($ramMiB) || (int)$ramMiB < 1)

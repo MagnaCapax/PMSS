@@ -10,6 +10,10 @@
 # TODO Make common command variables parser which has more optional settings like --bandwidth 100M (GH #127)
 
 require_once '/scripts/lib/cli/optionParser.php';
+$userLifecycle = '/scripts/lib/userLifecycle.php';
+if (is_file($userLifecycle)) {
+    require_once $userLifecycle;
+}
 
 $usage = 'Usage: ./userTrafficLimit.php --user=<username> --limit=<MiB>'; 
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
@@ -26,7 +30,9 @@ if ($userName === '' || $limitRaw === null || $limitRaw === true) {
     die('need user name. '.$usage."\n");
 }
 
-$userName = strtolower($userName);
+$userName = function_exists('pmssNormalizeUsername')
+    ? pmssNormalizeUsername($userName)
+    : strtolower(trim($userName));
 $trafficLimit = (int) $limitRaw;
 
 // Check if user exists
