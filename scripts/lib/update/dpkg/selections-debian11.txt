@@ -1453,7 +1453,7 @@ vnstat						install
 w3m						install
 w3m-img						install
 wamerican					install
-watchdog					deinstall
+watchdog					install
 weechat						install
 weechat-core					install
 weechat-curses					install

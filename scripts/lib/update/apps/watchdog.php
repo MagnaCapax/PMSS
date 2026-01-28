@@ -2,81 +2,50 @@
 /**
  * Watchdog management helper.
  *
- * This host classically disables the distribution watchdog service because the
- * daemon caused more downtime than it prevented in our deployments.  The script
- * keeps the old installation flow commented for reference while immediately
- * disabling/removing the service on execution.
- *
- * Coordinate before re-enabling watchdog support; any change to this flow
- * impacts error recovery policies across the fleet.
+ * Re-enable watchdog with a robust network check to avoid false positives.
  *
  * @author  Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 
-####   WATCHDOG CAUSES MORE DOWNTIME THAN IT SOLVES
-echo `systemctl stop watchdog; systemctl disable watchdog;`;
-echo `apt-get remove watchdog -y`;
+require_once __DIR__.'/../runtime/commands.php';
 
+// Template sources live under /etc/seedbox/config by convention.
+$configDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+$configTemplate = $configDir.'/template.watchdog.conf';
+$scriptTemplate = $configDir.'/template.watchdog.network-check.sh';
+$scriptDir = '/etc/watchdog.d';
+$scriptTarget = $scriptDir.'/network-check.sh';
 
-return;
-
-/*
- * RETAIN UNTIL 06/2030: Sample watchdog configuration for potential re-evaluation.
- * #TODO Figure out why this kept failing; hardware watchdog should be very reliable.
- *       Possible causes: kernel module issues, incorrect timeout tuning, or
- *       interaction with cgroup/systemd resource limits.
- */
-
-/**
-
-# Install
-if (!file_exists('/etc/watchdog.conf')) passthru('apt-get install watchdog -y');
-
-// Define the watchdog configuration parameters
-$watchdogConfig = [
-    'watchdog-device' => '/dev/watchdog',    // Watchdog device path
-    'watchdog-timeout' => '300',             // Watchdog timeout in seconds
-    'interval' => '1',                       // Watchdog check interval
-    'logtick' => '60',                       // Watchdog log tick interval
-    'ping' => ['185.148.0.2', '8.8.8.8'],    // #TODO Refactor hardcoded value
-    'ping-timeout' => '1800',                // Ping timeout in seconds
-    'max-load-1' => '100',                   // Maximum 1-minute load average
-    'max-load-15' => '60',                   // Maximum 15-minutes load average
-    // Uncomment following line to enable min-memory check
-    // 'min-memory' => '500',                // Minimum free memory in pages
-];
-
-// Check if the watchdog device exists
-if (!file_exists($watchdogConfig['watchdog-device'])) {
-    // If not, remove the watchdog related parameters
-    unset($watchdogConfig['watchdog-device']);
-    unset($watchdogConfig['watchdog-timeout']);
+if (!is_file($configTemplate) || !is_file($scriptTemplate)) {
+    logMessage('[WARN] Watchdog templates missing; skipping watchdog enablement.');
+    return;
 }
 
-$configContent = "";  // Initialize the configuration content string
+runStep('Ensuring watchdog script directory exists', 'mkdir -p '.$scriptDir);
+runStep('Installing watchdog configuration', 'install -m 0644 '.$configTemplate.' /etc/watchdog.conf');
+runStep('Installing watchdog network check', 'install -m 0755 '.$scriptTemplate.' '.$scriptTarget);
 
-// Construct the configuration content string
-foreach ($watchdogConfig as $key => $value) {
-    if($key == 'ping') {
-        // Add each IP address to ping in a separate line
-        foreach($value as $address) {
-            $configContent .= "ping = $address\n";
+// Prefer /dev/watchdog, but allow watchdog0 if that is what the kernel exposes.
+$device = '/dev/watchdog';
+if (!is_file($device) && is_file('/dev/watchdog0')) {
+    $device = '/dev/watchdog0';
+}
+
+if (!is_file($device)) {
+    logMessage('[WARN] Watchdog device missing; leaving service disabled.');
+    return;
+}
+
+if ($device !== '/dev/watchdog') {
+    $config = @file_get_contents('/etc/watchdog.conf');
+    if ($config !== false) {
+        $updated = preg_replace('/^watchdog-device\\s*=\\s*\\/dev\\/watchdog\\b/m', 'watchdog-device = '.$device, $config);
+        if ($updated !== null && $updated !== $config) {
+            file_put_contents('/etc/watchdog.conf', $updated);
         }
-    } else {
-        // Add other parameters to the configuration content
-        $configContent .= "$key = $value\n";
     }
 }
 
-// Write the configuration content to the watchdog configuration file
-file_put_contents("/etc/watchdog.conf", $configContent);
-
-
-
-# Enable and start
-passthru('systemctl enable watchdog; systemctl start watchdog;');
-
-echo "*** Watchdog successfully installed + configured\n";
-
-*/
+runStep('Unmasking watchdog service', 'systemctl unmask watchdog || true');
+runStep('Enabling watchdog service', 'systemctl enable --now watchdog');
