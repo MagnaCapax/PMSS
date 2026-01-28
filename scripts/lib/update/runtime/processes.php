@@ -58,9 +58,9 @@ function pmssSystemdUnitExists(string $unit): bool
 }
 
 /**
- * Enable a systemd unit only when it exists on the target host.
+ * Run a systemd unit action only when the unit is available on the host.
  */
-function enableUnitIfPresent(string $unit, string $description): void
+function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action): void
 {
     if (!is_dir('/run/systemd/system')) {
         logmsg("[SKIP] {$description} (systemd unavailable)");
@@ -70,8 +70,11 @@ function enableUnitIfPresent(string $unit, string $description): void
         logmsg("[SKIP] {$description} (unit {$unit} missing)");
         return;
     }
-    $candidate = preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit) ? $unit : $unit.'.service';
-    runStep($description, 'systemctl enable '.escapeshellarg($candidate));
+    $candidate = $unit;
+    if ($action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $candidate)) {
+        $candidate .= '.service';
+    }
+    runStep($description, 'systemctl '.$action.' '.escapeshellarg($candidate));
 }
 
 /**
@@ -106,20 +109,4 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
     if (!pmssWaitForProcessExit($name, 5)) {
         logmsg("[WARN] {$description} processes linger after SIGKILL");
     }
-}
-
-/**
- * Disable a systemd unit only when it exists on the target host.
- */
-function disableUnitIfPresent(string $unit, string $description): void
-{
-    if (!is_dir('/run/systemd/system')) {
-        logmsg("[SKIP] {$description} (systemd unavailable)");
-        return;
-    }
-    if (!pmssSystemdUnitExists($unit)) {
-        logmsg("[SKIP] {$description} (unit {$unit} missing)");
-        return;
-    }
-    runStep($description, 'systemctl disable '.escapeshellarg($unit));
 }

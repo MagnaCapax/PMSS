@@ -385,7 +385,7 @@ foreach (['btsync', 'rslsync', 'pyload', 'sabnzbdplus'] as $legacySvc) {
     if ($reportedVersion < 10) {
         runStep("Disabling {$legacySvc} in sysvinit", "update-rc.d {$legacySvc} disable");
     } else {
-        disableUnitIfPresent($legacySvc, "Disabling {$legacySvc} systemd unit");
+        pmssSystemdUnitActionIfPresent($legacySvc, "Disabling {$legacySvc} systemd unit", 'disable');
     }
 }
 pmssAdjustLighttpdSecurity();
