@@ -16,7 +16,7 @@ class UserValidatorTest extends TestCase
     public function testValidatePayloadRequiresFields(): void
     {
         $valid = [
-            'rtorrentRam'  => 128,
+            'ramMiB'       => 128,
             'rtorrentPort' => 5000,
             'quota'        => 20,
             'quotaBurst'   => 30,
@@ -24,6 +24,14 @@ class UserValidatorTest extends TestCase
         $this->assertTrue(\UserValidator::validatePayload($valid));
         unset($valid['quotaBurst']);
         $this->assertTrue(!\UserValidator::validatePayload($valid));
+
+        $legacy = [
+            'rtorrentRam'  => 128,
+            'rtorrentPort' => 5000,
+            'quota'        => 20,
+            'quotaBurst'   => 30,
+        ];
+        $this->assertTrue(\UserValidator::validatePayload($legacy));
     }
 
     public function testNormalisedPayloadSortsKeys(): void

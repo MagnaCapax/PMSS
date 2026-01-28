@@ -5,10 +5,7 @@
  * Canonical storage (per user, one file):
  *   /etc/seedbox/config/users/<username>.json
  *
- * Best-effort aggregate mirror (back-compat / inspection):
- *   /etc/seedbox/config/users.json
- *
- * Legacy fallback (read-only; used only when canonical/mirror is missing):
+ * Legacy fallback (read-only; used only when canonical is missing):
  *   /etc/seedbox/runtime/users.json
  *
  * Payload is a simple associative array. Unknown keys are preserved.
@@ -31,19 +28,13 @@ require_once __DIR__.'/UserValidator.php';
 class UserConfigStore
 {
     /** @var string */
-    private $configDir;
-    /** @var string */
     private $userDir;
-    /** @var string */
-    private $aggregatePath;
-    /** @var string */
     private $legacyAggregatePath;
 
     public function __construct(?string $configDir = null)
     {
-        $this->configDir = rtrim($configDir ?: '/etc/seedbox/config', '/');
-        $this->userDir = $this->configDir.'/users';
-        $this->aggregatePath = $this->configDir.'/users.json';
+        $configDir = rtrim($configDir ?: '/etc/seedbox/config', '/');
+        $this->userDir = $configDir.'/users';
         $this->legacyAggregatePath = '/etc/seedbox/runtime/users.json';
     }
 
@@ -55,12 +46,6 @@ class UserConfigStore
 
         $payload = $this->readJsonFile($this->userFilePath($username));
         if (!is_array($payload)) {
-            $aggregate = $this->loadAggregateMap($this->aggregatePath);
-            if (isset($aggregate[$username]) && is_array($aggregate[$username])) {
-                $payload = $aggregate[$username];
-            }
-        }
-        if (!is_array($payload)) {
             $legacy = $this->loadLegacyAggregateMap();
             if (isset($legacy[$username]) && is_array($legacy[$username])) {
                 $payload = $legacy[$username];
@@ -70,7 +55,7 @@ class UserConfigStore
             return null;
         }
 
-        return $this->normalise($username, $payload);
+        return $this->normalise($payload);
     }
 
     public function set(string $username, array $payload): bool
@@ -79,12 +64,9 @@ class UserConfigStore
             return false;
         }
 
-        $payload = $this->normalise($username, $payload);
+        $payload = $this->normalise($payload);
         if (!$this->validate($payload)) {
             error_log('UserConfigStore: refusing to write invalid payload for '.$username);
-            return false;
-        }
-        if (!$this->ensureUserDir()) {
             return false;
         }
 
@@ -92,7 +74,6 @@ class UserConfigStore
         if (!$this->writeJsonFileAtomic($path, $payload, 0640, 'root', 'root')) {
             return false;
         }
-        $this->updateAggregateMirror($username, $payload);
         return true;
     }
 
@@ -106,7 +87,6 @@ class UserConfigStore
         if (is_file($path) && !is_link($path) && !@unlink($path)) {
             $ok = false;
         }
-        $this->updateAggregateMirror($username, null);
         return $ok;
     }
 
@@ -114,19 +94,6 @@ class UserConfigStore
     {
         $users = $this->loadFromUserDir();
         if (!empty($users)) {
-            return $users;
-        }
-
-        $aggregate = $this->loadAggregateMap($this->aggregatePath);
-        if (!empty($aggregate)) {
-            $users = [];
-            foreach ($aggregate as $name => $payload) {
-                if (!UserValidator::isValidUsername($name) || !is_array($payload)) {
-                    continue;
-                }
-                $users[$name] = $this->normalise($name, $payload);
-            }
-            ksort($users, SORT_STRING);
             return $users;
         }
 
@@ -139,7 +106,7 @@ class UserConfigStore
             if (!UserValidator::isValidUsername($name) || !is_array($payload)) {
                 continue;
             }
-            $users[$name] = $this->normalise($name, $payload);
+            $users[$name] = $this->normalise($payload);
         }
         ksort($users, SORT_STRING);
         return $users;
@@ -161,22 +128,14 @@ class UserConfigStore
 
     public function applyFallbacks(string $username, array $payload): array
     {
-        // Fill missing/empty fields without dropping unknown keys.
+        $payload = $this->normalise($payload);
         if (empty($payload['ramMiB'])) {
-            if (isset($payload['rtorrentRam']) && is_numeric($payload['rtorrentRam'])) {
-                $payload['ramMiB'] = (int)$payload['rtorrentRam'];
-            } else {
-                $payload['ramMiB'] = $this->resolveRamMiBFromSystemdSlice($username);
-            }
+            $payload['ramMiB'] = $this->resolveRamMiBFromSystemdSlice($username);
         }
         if (empty($payload['billingId'])) {
             $payload['billingId'] = $this->readBillingId($username);
         }
-        $payload['trafficLimit'] = 0;
-        if (!array_key_exists('suspended', $payload)) {
-            $payload['suspended'] = false;
-        }
-        return $payload;
+        return $this->normalise($payload);
     }
 
     public function writeUserCache(string $username, array $payload): void
@@ -193,45 +152,21 @@ class UserConfigStore
             return;
         }
         if (!is_dir($configDir)) {
-            @mkdir($configDir, 0755, true);
+            if (@mkdir($configDir, 0755, true)) {
+                @chown($configDir, $username);
+                @chgrp($configDir, $username);
+            }
         }
 
-        $payload = $this->normalise($username, $payload);
+        $payload = $this->normalise($payload);
         $path = $configDir.'/pmss-user.json';
-        $tmp = @tempnam($configDir, 'pmss-user-');
-        if ($tmp === false) {
-            return;
-        }
-        $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($encoded === false) {
-            @unlink($tmp);
-            return;
-        }
-        if (@file_put_contents($tmp, $encoded, LOCK_EX) === false) {
-            @unlink($tmp);
-            return;
-        }
-        if (!@rename($tmp, $path)) {
-            @unlink($tmp);
-            return;
-        }
         // Root-owned, user-readable (group): cache for local tooling.
-        @chmod($path, 0640);
-        @chown($path, 'root');
-        @chgrp($path, $username);
+        $this->writeJsonFileAtomic($path, $payload, 0640, 'root', $username);
     }
 
     private function userFilePath(string $username): string
     {
         return $this->userDir.'/'.$username.'.json';
-    }
-
-    private function ensureUserDir(): bool
-    {
-        if (is_dir($this->userDir)) {
-            return true;
-        }
-        return @mkdir($this->userDir, 0750, true);
     }
 
     private function loadFromUserDir(): array
@@ -254,13 +189,13 @@ class UserConfigStore
             if (!is_array($payload)) {
                 continue;
             }
-            $users[$name] = $this->normalise($name, $payload);
+            $users[$name] = $this->normalise($payload);
         }
         ksort($users, SORT_STRING);
         return $users;
     }
 
-    private function normalise(string $username, array $payload): array
+    private function normalise(array $payload): array
     {
         // Additive back-compat: map legacy rtorrentRam -> ramMiB but keep rtorrentRam if present.
         if (!isset($payload['ramMiB']) && isset($payload['rtorrentRam']) && is_numeric($payload['rtorrentRam'])) {
@@ -280,9 +215,6 @@ class UserConfigStore
         if (!isset($payload['billingId']) || !is_numeric($payload['billingId'])) {
             $payload['billingId'] = 0;
         }
-        if (empty($payload['billingId'])) {
-            $payload['billingId'] = $this->readBillingId($username);
-        }
 
         if (!array_key_exists('suspended', $payload)) {
             $payload['suspended'] = false;
@@ -292,10 +224,6 @@ class UserConfigStore
 
         // Invariant: always write trafficLimit as 0.
         $payload['trafficLimit'] = 0;
-
-        if (empty($payload['ramMiB'])) {
-            $payload['ramMiB'] = $this->resolveRamMiBFromSystemdSlice($username);
-        }
 
         ksort($payload, SORT_STRING);
         return $payload;
@@ -328,19 +256,6 @@ class UserConfigStore
         return $data;
     }
 
-    private function loadAggregateMap(string $path): array
-    {
-        $data = $this->readJsonFile($path);
-        if (!is_array($data)) {
-            return [];
-        }
-        // Accept both the canonical "simple map" and legacy "schema/users" wrapper.
-        if (isset($data['users']) && is_array($data['users'])) {
-            $data = $data['users'];
-        }
-        return is_array($data) ? $data : [];
-    }
-
     private function loadLegacyAggregateMap(): array
     {
         $data = $this->readJsonFile($this->legacyAggregatePath);
@@ -351,26 +266,6 @@ class UserConfigStore
             return $data['users'];
         }
         return $data;
-    }
-
-    private function updateAggregateMirror(string $username, ?array $payload): void
-    {
-        $dir = dirname($this->aggregatePath);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0750, true);
-        }
-
-        $map = $this->loadAggregateMap($this->aggregatePath);
-        if ($payload === null) {
-            unset($map[$username]);
-        } else {
-            $map[$username] = $payload;
-        }
-        if (!is_array($map)) {
-            $map = [];
-        }
-        ksort($map, SORT_STRING);
-        $this->writeJsonFileAtomic($this->aggregatePath, $map, 0640, 'root', 'root');
     }
 
     private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
@@ -431,32 +326,16 @@ class UserConfigStore
             return 0;
         }
 
-        $limits = [];
+        $limits = array();
         foreach ($lines as $line) {
-            $line = trim((string)$line);
-            if ($line === '') {
+            $line = trim((string) $line);
+            if (!preg_match('/^(MemoryMax|MemoryHigh)=(\\d+)$/', $line, $m)) {
                 continue;
             }
-            $parts = explode('=', $line, 2);
-            if (count($parts) !== 2) {
-                continue;
-            }
-            $key = trim($parts[0]);
-            $value = trim($parts[1]);
-            if ($value === '' || strtolower($value) === 'infinity') {
-                continue;
-            }
-            if (ctype_digit($value)) {
-                $limits[$key] = (int)$value;
-            }
+            $limits[$m[1]] = (int) $m[2];
         }
 
-        $bytes = 0;
-        if (!empty($limits['MemoryMax'])) {
-            $bytes = $limits['MemoryMax'];
-        } elseif (!empty($limits['MemoryHigh'])) {
-            $bytes = $limits['MemoryHigh'];
-        }
+        $bytes = !empty($limits['MemoryMax']) ? $limits['MemoryMax'] : (!empty($limits['MemoryHigh']) ? $limits['MemoryHigh'] : 0);
         if ($bytes <= 0) {
             return 0;
         }
@@ -486,4 +365,3 @@ class UserConfigStore
         return $id > 0 ? $id : 0;
     }
 }
-

@@ -15,9 +15,9 @@ class UserRepository
     /** @var UserConfigStore */
     private $store;
 
-    public function __construct()
+    public function __construct(?string $configDir = null)
     {
-        $this->store = new UserConfigStore();
+        $this->store = new UserConfigStore($configDir);
     }
 
     public function __destruct()
@@ -64,4 +64,3 @@ class UserRepository
         }
     }
 }
-

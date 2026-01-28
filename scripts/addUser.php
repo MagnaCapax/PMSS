@@ -10,7 +10,7 @@
  */
 
 // Shell-facing usage string; keep the CLI contract explicit for operators.
-$usage = 'Usage: addUser.php USERNAME PASSWORD MAX_RAM_MB DISK_QUOTA_IN_GB [trafficLimitGB]';
+$usage = 'Usage: addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [trafficLimitGB]';
 if (empty($argv[1]) or
     empty($argv[2]) or
     empty($argv[3]) or 

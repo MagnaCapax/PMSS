@@ -421,7 +421,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/userPermissions.php <user>
   - Behavior: Fixes ownership/permissions under `/home/<user>` according to policy (chmod/chown); safe to re-run.
 
-- scripts/util/userConfig.php <user> <rtorrentRamMiB> <quotaGiB>
+- scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
 
 - scripts/util/portManager.php assign <user> lighttpd
@@ -442,10 +442,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/addUser.php USERNAME PASSWORD RAM_MiB QUOTA_GiB [trafficLimitGB]
   - Behavior: Creates Unix user with `/etc/skel`, sets password or generates one,
-    sets expiry far future, ensures bash shell, records to runtime users DB (`users` class),
+    sets expiry far future, ensures bash shell, records to per-user config store (`/etc/seedbox/config/users/<user>.json`),
     assigns lighttpd port, applies config (`userConfig.php`), configures per-user
     lighttpd, regenerates nginx, starts rTorrent and lighttpd, refreshes network,
-    installs default crontab, queues permission fix; optional traffic limit persists to runtime + user file.
+    installs default crontab, queues permission fix; optional traffic limit persists to runtime traffic files (user config store always writes `trafficLimit=0`).
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
   - Fail-fast: Aborts on existing user, orphaned home directory, failed `useradd`,
     failed `changePw.php`, or failed `userConfig.php` to avoid partial provisioning.

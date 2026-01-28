@@ -22,7 +22,7 @@ require_once __DIR__.'/../lib/user/userConfigStore.php';
  */
 
 
-$usage = 'Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT]';
+$usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT]';
 if (empty($argv[1]) || empty($argv[2]) || empty($argv[3])) {
     die('need user name. '.$usage."\n");
 }
@@ -126,6 +126,18 @@ userApplyTrafficLimit($user);
 
 // Compose a canonical rtorrent configuration and mirror it to companion apps.
 $configuration = userConfigureRtorrent($user);
+
+// Persist derived ports once rTorrent config is generated so they survive
+// re-runs and other tooling can read a single source of truth.
+$scgiPort = (int) ($configuration['config']['scgiPort'] ?? 0);
+if ($scgiPort > 0 && (!isset($payload['rtorrentPort']) || (int) $payload['rtorrentPort'] !== $scgiPort)) {
+    $payload['rtorrentPort'] = $scgiPort;
+    if ($store->set($user['name'], $payload)) {
+        $store->writeUserCache($user['name'], $payload);
+    } else {
+        fwrite(STDERR, "Warning: failed to persist rtorrentPort for {$user['name']}\n");
+    }
+}
 userConfigureRutorrent($user, $configuration);
 userEnsureRclonePort($user);
 userConfigureDeluge($user, $configuration);

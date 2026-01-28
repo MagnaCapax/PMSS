@@ -18,7 +18,6 @@ $skelDir     = $testRoot.'/skel';
 $networkCfg  = $testRoot.'/network.php';
 $localnetCfg = $testRoot.'/localnet';
 $fireqosTpl  = $testRoot.'/fireqos.tpl';
-$usersDb     = $testRoot.'/users.json';
 $aptKeyring  = $testRoot.'/apt-keyrings';
 
 if (!is_dir($skelDir.'/www/rutorrent/plugins/unpack')) {
@@ -40,7 +39,6 @@ putenv('PMSS_SKEL_DIR='.$skelDir);
 putenv('PMSS_NETWORK_CONFIG='.$networkCfg);
 putenv('PMSS_LOCALNET_FILE='.$localnetCfg);
 putenv('PMSS_FIREQOS_TEMPLATE='.$fireqosTpl);
-putenv('PMSS_USERS_DB_FILE='.$usersDb);
 putenv('PMSS_APT_KEYRING_DIR='.$aptKeyring);
 
 define('PMSS_TEST_MODE', true);
