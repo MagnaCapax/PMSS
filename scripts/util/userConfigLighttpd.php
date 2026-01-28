@@ -198,6 +198,36 @@ function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
     return true;
 }
 
+/**
+ * Ensure the WebDAV lock database is present and owned by the target user.
+ */
+function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
+{
+    $lighttpdDir = $homeDir.'/.lighttpd';
+    if (!is_dir($lighttpdDir) || is_link($lighttpdDir)) {
+        return;
+    }
+
+    $lockFile = $lighttpdDir.'/webdav.lock.db';
+    if (is_link($lockFile)) {
+        return;
+    }
+    if (!file_exists($lockFile)) {
+        @touch($lockFile);
+    }
+    if (!is_file($lockFile)) {
+        return;
+    }
+    @chmod($lockFile, 0600);
+
+    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+        @chown($lighttpdDir, $user);
+        @chgrp($lighttpdDir, $user);
+        @chown($lockFile, $user);
+        @chgrp($lockFile, $user);
+    }
+}
+
 function pmssUpdatePhpIni(string $path, int $memoryLimitMb): void
 {
     $content = @file_get_contents($path);
@@ -555,16 +585,13 @@ function pmssUserConfigLighttpdMain(array $argv): int
         }
 
         // Prepare directories and defaults
-        if (!file_exists("/home/{$thisUser}/.lighttpd")) {
+        $lighttpdDir = "/home/{$thisUser}/.lighttpd";
+        if (!file_exists($lighttpdDir)) {
             passthru("cp -Rp /etc/skel/.lighttpd /home/{$thisUser}/");
-            passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd -R");
-            passthru("chmod 751 /home/{$thisUser}/.lighttpd -R");
+            passthru("chown {$thisUser}:{$thisUser} {$lighttpdDir} -R");
+            passthru("chmod 751 {$lighttpdDir} -R");
         }
-        $webdavLock = "/home/{$thisUser}/.lighttpd/webdav.lock.db";
-        if (!file_exists($webdavLock)) {
-            @touch($webdavLock);
-            @chmod($webdavLock, 0600);
-        }
+        pmssEnsureWebdavLockDatabase($thisUser, $homeDir);
         if (!file_exists("/home/{$thisUser}/www/public")) {
             passthru("mkdir -p /home/{$thisUser}/www/public");
             passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/www/public");
