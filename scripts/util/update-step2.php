@@ -407,6 +407,7 @@ runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
 pmssPostUpdateWebRefresh();
 
+pmssConfigureTempTmpfsMount('logmsg');
 pmssConfigureTempMountNoexec('logmsg');
 
 runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');

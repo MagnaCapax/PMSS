@@ -76,7 +76,10 @@ Environment hints captured by `install.sh` are passed via `PMSS_HOSTNAME`,
 those flags when reapplying legacy hostname/quota defaults. Optional hardening
 can be enabled with `PMSS_HARDEN_TMP_NOEXEC=1` to add `noexec,nosuid,nodev` to
 `/tmp` and `/dev/shm` mounts (opt-in; may impact workflows that execute from
-`/tmp`).
+`/tmp`). To provision a dedicated tmpfs-backed `/tmp`, set
+`PMSS_HARDEN_TMP_TMPFS=1`; the default size is `2G` and can be overridden via
+`PMSS_TMPFS_TMP_SIZE` (e.g. `512M`). Enabling tmpfs overlays any existing `/tmp`
+contents, so plan for services that may have open handles.
 
 ### Package Phase Ordering
 
