@@ -21,6 +21,8 @@ class rtorrentConfig {
 	 */
 	private const RESOURCE_CONFIG_PATH = '/etc/seedbox/config/rtorrent.resources.json';
 	private const TEMPLATE_PATH = '/etc/seedbox/config/template.rtorrent.rc';
+	// Optional local override preserved across updates (not shipped in repo).
+	private const TEMPLATE_OVERRIDE_PATH = '/etc/seedbox/config/template.rtorrentrc';
 	protected $_resourceConfig;
 	protected $_template;
 	
@@ -40,7 +42,7 @@ class rtorrentConfig {
 			if (count($resourceConfig) == 0) {
 				$resourceConfig = $this->loadDefaultResourceConfig();
 			}
-			if ($template === null || $template === '') {
+			if (!is_string($template) || $template === '') {
 			    $template = $this->loadDefaultTemplate();
 			}
 			
@@ -300,12 +302,18 @@ class rtorrentConfig {
 	 */
 	private function loadDefaultTemplate(): string
 	{
-		$path = self::TEMPLATE_PATH;
-		$contents = @file_get_contents($path);
-		if ($contents === false) {
-			throw new RuntimeException('Unable to read rTorrent template: ' . $path);
+		$paths = [self::TEMPLATE_OVERRIDE_PATH, self::TEMPLATE_PATH];
+		foreach ($paths as $path) {
+			if (!is_file($path)) {
+				continue;
+			}
+			$contents = @file_get_contents($path);
+			if ($contents === false || trim($contents) === '') {
+				continue;
+			}
+			return $contents;
 		}
-		return $contents;
+		throw new RuntimeException('Unable to read rTorrent template: ' . self::TEMPLATE_PATH);
 	}
 	
 	protected function _log($level, $message) {

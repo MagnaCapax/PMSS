@@ -8,7 +8,7 @@ Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] 
 
 Parameters:
 - **USERNAME** – user to update
-- **MAX_RAM_MB** – memory limit for rTorrent
+- **MAX_RAM_MB** – account memory limit (used for cgroups and rTorrent tuning)
 - **DISK_QUOTA_IN_GB** – storage quota
 - **TRAFFIC_LIMIT_GB** (optional) – monthly traffic cap
 - **CPUWEIGHT** (optional) – systemd CPU weight (default 1000)

@@ -45,8 +45,11 @@ function userConfigureDeluge(array $user, array $configuration): void
     }
 
     $webTemplate = file_get_contents('/etc/seedbox/config/template.deluge.web.conf');
+    $webConfPath = "$configDir/web.conf";
+    $existingWebConfig = @file_get_contents($webConfPath);
     $webConfig   = str_replace(['##WEBPORT', '##USER'], [$delugePort + 1, $username], $webTemplate);
-    file_put_contents("$configDir/web.conf", $webConfig);
+    $webConfChanged = is_string($existingWebConfig) && $existingWebConfig !== $webConfig;
+    file_put_contents($webConfPath, $webConfig);
     file_put_contents("$home/.delugePort", $delugePort);
 
     if (!file_exists("$configDir/auth")) {
@@ -62,4 +65,13 @@ function userConfigureDeluge(array $user, array $configuration): void
         ));
     }
     runStep('Fixing Deluge ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg("$home/.config/")));
+
+    // If the web config changed, restart deluge-web so base/port changes take effect.
+    // Cron (checkDelugeInstances.php) will start it again when Deluge is enabled.
+    if ($webConfChanged && file_exists("$home/.delugeEnable")) {
+        runStep('Restarting Deluge Web UI (config changed)', sprintf(
+            'killall -u %s -TERM deluge-web 2>/dev/null || true',
+            escapeshellarg($username)
+        ));
+    }
 }

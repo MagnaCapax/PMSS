@@ -126,7 +126,7 @@ class ServiceIntentTest extends TestCase
             ],
             'rtorrent' => [
                 'binaries' => ['rtorrent'],
-                'configs'  => ['/usr/local/bin/rtorrent', '/etc/seedbox/config/template.rtorrentrc'],
+                'configs'  => ['/usr/local/bin/rtorrent', '/etc/seedbox/config/template.rtorrent.rc'],
             ],
             'watchdog' => [
                 'units'    => ['watchdog.service'],

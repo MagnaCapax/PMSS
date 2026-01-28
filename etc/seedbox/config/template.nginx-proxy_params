@@ -1,20 +1,21 @@
 # Default proxy parameters for nginx reverse proxy locations.
 #
-# IMPORTANT: WebDAV location blocks in createNginxConfig.php do NOT include
-# this file. They set headers explicitly because WebDAV requires longer timeouts
-# (300s vs 120s here). If you update headers here, also update the WebDAV blocks
-# in scripts/util/createNginxConfig.php to keep them in sync.
-#
-# See: fix commit 005b1fe (2026-01) for context on why WebDAV is separate.
+# Nginx is a lightweight reverse proxy in PMSS; per-user lighttpd handles the
+# heavy lifting for WebDAV and application traffic. Keep proxy headers and
+# timeouts centralized here to avoid per-location drift and duplication.
 
 proxy_set_header Host $host;
 proxy_set_header X-Real-IP $remote_addr;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-proxy_read_timeout 120s;
+proxy_set_header Authorization $http_authorization;
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+client_body_timeout 300s;
+send_timeout 300s;
 proxy_buffering off;
 
-
-#Enable in future version, deb8 repo is too old for this directive
+# Keep request buffering defaults for maximum nginx version compatibility.
+# (Debian 8-era nginx lacks proxy_request_buffering.)
 #proxy_request_buffering off;
 
 #proxy_pass_header       Authorization;

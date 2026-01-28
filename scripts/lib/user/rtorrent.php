@@ -19,10 +19,7 @@ function userConfigureRtorrent(array $user): array
         $resources = unserialize((string)file_get_contents($resourceFile));
     }
 
-    $templateFile = '/etc/seedbox/config/template.rtorrentrc';
-    $template = file_exists($templateFile) ? file_get_contents($templateFile) : null;
-
-    $rtorrentConfig = new rtorrentConfig($resources, $template);
+    $rtorrentConfig = new rtorrentConfig($resources);
     $configuration = $rtorrentConfig->createConfig([
         'ram' => $user['memory'],
         'dht' => file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.dht'),

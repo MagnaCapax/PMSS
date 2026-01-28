@@ -213,6 +213,160 @@ function pmssUpdatePhpIni(string $path, int $memoryLimitMb): void
     file_put_contents($path, $content);
 }
 
+function pmssSplitFirstJsonObject(string $content): ?array
+{
+    $len = strlen($content);
+    $i = 0;
+
+    while ($i < $len) {
+        $ch = $content[$i];
+        if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
+            $i++;
+            continue;
+        }
+        break;
+    }
+
+    if ($i >= $len || $content[$i] !== '{') {
+        return null;
+    }
+
+    $start = $i;
+    $depth = 0;
+    $inString = false;
+    $escape = false;
+
+    for (; $i < $len; $i++) {
+        $ch = $content[$i];
+        if ($inString) {
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+            if ($ch === '\\') {
+                $escape = true;
+                continue;
+            }
+            if ($ch === '"') {
+                $inString = false;
+            }
+            continue;
+        }
+
+        if ($ch === '"') {
+            $inString = true;
+            continue;
+        }
+        if ($ch === '{') {
+            $depth++;
+            continue;
+        }
+        if ($ch === '}') {
+            $depth--;
+            if ($depth === 0) {
+                $end = $i + 1;
+                return [
+                    substr($content, $start, $end - $start),
+                    substr($content, $end),
+                ];
+            }
+        }
+    }
+
+    return null;
+}
+
+function pmssDelugeReadWebConf(string $path): ?array
+{
+    $raw = @file_get_contents($path);
+    if (!is_string($raw)) {
+        return null;
+    }
+
+    $split = pmssSplitFirstJsonObject($raw);
+    if (!is_array($split) || count($split) !== 2) {
+        return null;
+    }
+
+    $meta = json_decode($split[0], true);
+    if (!is_array($meta) || json_last_error() !== JSON_ERROR_NONE) {
+        return null;
+    }
+
+    $config = json_decode(ltrim((string)$split[1]), true);
+    if (!is_array($config) || json_last_error() !== JSON_ERROR_NONE) {
+        return null;
+    }
+
+    return ['meta' => $meta, 'config' => $config];
+}
+
+function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string $owner): bool
+{
+    $existingMode = @fileperms($path);
+    $mode = is_int($existingMode) ? ($existingMode & 0777) : 0600;
+
+    $metaJson = json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($metaJson === false || $configJson === false) {
+        return false;
+    }
+
+    $tmp = $path.'.pmss-tmp';
+    if (file_put_contents($tmp, $metaJson.$configJson) === false) {
+        @unlink($tmp);
+        return false;
+    }
+
+    @chmod($tmp, $mode);
+    @chown($tmp, $owner);
+    @chgrp($tmp, $owner);
+
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        return false;
+    }
+
+    @chmod($path, $mode);
+    @chown($path, $owner);
+    @chgrp($path, $owner);
+
+    return true;
+}
+
+function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
+{
+    $legacy = "/deluge-{$user}/";
+    $canonical = "/user-{$user}/deluge/";
+    $deprecationDate = '2028-01-28';
+
+    return <<<LIGHTTPD
+# PMSS-managed: Deluge reverse proxy.
+# Legacy path {$legacy} kept for compatibility until at least {$deprecationDate}.
+
+\$HTTP["url"] =~ "^/user-{$user}/deluge(\\$|/)" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$webPort}
+  ) ) )
+}
+
+\$HTTP["url"] =~ "^/deluge-{$user}(\\$|/)" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$webPort}
+  ) ) ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/deluge-{$user}/"  => "{$canonical}",
+         "/deluge-{$user}" => "/user-{$user}/deluge"
+       )
+  )
+}
+
+LIGHTTPD;
+}
+
 function pmssRenderLighttpdConfig(string $template, string $user, int $serverPort, int $rclonePort, int $qbittorrentPort, array $resources): string
 {
     $webdavWwwPolicy = pmssWebdavWwwPolicyBlock($user);
@@ -442,7 +596,64 @@ function pmssUserConfigLighttpdMain(array $argv): int
         $qbittorrentPort = (int) trim(@file_get_contents("/home/{$thisUser}/.qbittorrentPort"));
         if ($qbittorrentPort < 1024 or $qbittorrentPort > 65500) {
             $qbittorrentPort = (int) round(rand(1500, 65500));
-            file_put_contents("/home/{$thisUser}/.qbittorrentPort", $rclonePort);
+            file_put_contents("/home/{$thisUser}/.qbittorrentPort", $qbittorrentPort);
+        }
+
+        // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/
+        // so nginx stays a lightweight reverse proxy.
+        $delugeWebPort = null;
+        $delugeWebConfPath = "/home/{$thisUser}/.config/deluge/web.conf";
+        $delugeParsed = null;
+        if (is_readable($delugeWebConfPath)) {
+            $delugeParsed = pmssDelugeReadWebConf($delugeWebConfPath);
+            if (is_array($delugeParsed) && isset($delugeParsed['config'], $delugeParsed['meta']) && is_array($delugeParsed['config']) && is_array($delugeParsed['meta'])) {
+                $port = $delugeParsed['config']['port'] ?? null;
+                if (is_int($port) && $port >= 1024 && $port <= 65535) {
+                    $delugeWebPort = $port;
+                }
+
+                $expectedBase = "/user-{$thisUser}/deluge/";
+                $expectedBaseNoSlash = "/user-{$thisUser}/deluge";
+                $legacyBase = "/deluge-{$thisUser}/";
+                $legacyBaseNoSlash = "/deluge-{$thisUser}";
+                $base = $delugeParsed['config']['base'] ?? null;
+                if (is_string($base) && ($base === $legacyBase || $base === $legacyBaseNoSlash || $base === $expectedBaseNoSlash) && $base !== $expectedBase) {
+                    $delugeParsed['config']['base'] = $expectedBase;
+                    if (pmssDelugeWriteWebConf($delugeWebConfPath, $delugeParsed['meta'], $delugeParsed['config'], $thisUser)) {
+                        // Apply base change on the next cron tick (checkDelugeInstances.php).
+                        passthru('killall -u '.escapeshellarg($thisUser).' -TERM deluge-web 2>/dev/null || true');
+                    }
+                }
+            }
+        }
+        if ($delugeWebPort === null) {
+            // Fallback (legacy hosts): derive deluge-web port from .delugePort.
+            $delugePort = (int) trim(@file_get_contents("/home/{$thisUser}/.delugePort"));
+            if ($delugePort >= 1024 && $delugePort <= 65535) {
+                $candidatePorts = [$delugePort + 1, $delugePort];
+                foreach ($candidatePorts as $candidate) {
+                    if ($candidate < 1024 || $candidate > 65535) {
+                        continue;
+                    }
+                    $sock = @fsockopen('127.0.0.1', $candidate, $errno, $errstr, 0.2);
+                    if (is_resource($sock)) {
+                        fclose($sock);
+                        $delugeWebPort = $candidate;
+                        break;
+                    }
+                }
+                if ($delugeWebPort === null) {
+                    $candidate = $delugePort + 1;
+                    $delugeWebPort = ($candidate >= 1024 && $candidate <= 65535) ? $candidate : $delugePort;
+                }
+            }
+        }
+        if ($delugeWebPort !== null) {
+            $delugeConfPath = "/home/{$thisUser}/.lighttpd/custom.d/pmss-deluge.conf";
+            file_put_contents($delugeConfPath, pmssDelugeLighttpdProxyFragment($thisUser, $delugeWebPort));
+            @chown($delugeConfPath, $thisUser);
+            @chgrp($delugeConfPath, $thisUser);
+            @chmod($delugeConfPath, 0640);
         }
 
         $resources = pmssResolveUserResources($thisUser, $policyDefaults);

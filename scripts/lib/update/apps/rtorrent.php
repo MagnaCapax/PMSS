@@ -78,18 +78,22 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     passthru('killall -9 /usr/local/bin/rtorrent');
 
 
-    if (file_exists('/etc/seedbox/config/template.rtorrentrc')) {
+    if (file_exists('/etc/seedbox/config/template.rtorrent.rc')) {
         echo "**** Updating local .rtorrent.rc template\n";
-        $localRtorrentRcTemplate = file_get_contents('/etc/seedbox/config/template.rtorrentrc');
-        $localRtorrentRcTemplate = str_replace(
-            array(
-                "umask = 0002\n",
-                "hash_interval = 300\n",
-                "hash_max_tries = 2\n",
-				"use_udp_trackers = yes\n",
-            ), '', $localRtorrentRcTemplate);
-            
-        file_put_contents('/etc/seedbox/config/template.rtorrentrc', $localRtorrentRcTemplate);
+        $localRtorrentRcTemplate = file_get_contents('/etc/seedbox/config/template.rtorrent.rc');
+        if (!is_string($localRtorrentRcTemplate) || $localRtorrentRcTemplate === '') {
+            echo "**** Skipping template update (failed to read template)\n";
+        } else {
+            $localRtorrentRcTemplate = str_replace(
+                array(
+                    "umask = 0002\n",
+                    "hash_interval = 300\n",
+                    "hash_max_tries = 2\n",
+					"use_udp_trackers = yes\n",
+                ), '', $localRtorrentRcTemplate);
+                
+            file_put_contents('/etc/seedbox/config/template.rtorrent.rc', $localRtorrentRcTemplate);
+        }
     }
     
 

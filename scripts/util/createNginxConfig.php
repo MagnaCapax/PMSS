@@ -114,6 +114,7 @@ if ($requestedUser !== '') {
 
 $userTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user");
 $suspendedTemplate = @file_get_contents("/etc/seedbox/config/template.nginx-user-suspended");
+$needsDelugeWebPort = is_string($userTemplate) && strpos($userTemplate, '##delugeWebPort') !== false;
 
 // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
 if (!is_dir('/etc/nginx')) {
@@ -254,19 +255,11 @@ server {
 
     location /webdav-##user##/ {
         proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Authorization $http_authorization;
+        include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
-        proxy_buffering off;
 
-        # WebDAV: allow large uploads, keep idle timeouts bounded.
+        # WebDAV: allow large uploads and stream request bodies to lighttpd.
         client_max_body_size 0;
-        client_body_timeout 300s;
-        send_timeout 300s;
-        proxy_read_timeout 300s;
-        proxy_send_timeout 300s;
         proxy_request_buffering off;
 
         limit_rate_after 100m;
@@ -290,6 +283,20 @@ server {
     server_name ##host##;
 
 ##ssl_block##
+    # When apps generate absolute /user-<user>/... URLs, avoid double-prefixing
+    # by proxying those paths as-is (without adding another /user-<user>/).
+    location ^~ /user-##user##/ {
+        proxy_pass http://127.0.0.1:##port##;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+        limit_rate_after 1024m;
+        limit_rate 102400k;
+        limit_conn addr 16;
+        error_page 502 /error-502.html;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:##port##/user-##user##/;
         proxy_set_header Upgrade $http_upgrade;
@@ -304,19 +311,11 @@ server {
 
     location /webdav-##user##/ {
         proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Authorization $http_authorization;
+        include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
-        proxy_buffering off;
 
-        # WebDAV: allow large uploads, keep idle timeouts bounded.
+        # WebDAV: allow large uploads and stream request bodies to lighttpd.
         client_max_body_size 0;
-        client_body_timeout 300s;
-        send_timeout 300s;
-        proxy_read_timeout 300s;
-        proxy_send_timeout 300s;
         proxy_request_buffering off;
 
         limit_rate_after 100m;
@@ -454,7 +453,6 @@ foreach($users AS $thisUser) {
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
         $serverPort = (int) trim((string) @file_get_contents($portFile));
     }
-    $delugePort = (int) file_get_Contents($homeDir."/.delugePort");
     if ($serverPort < 1024 || $serverPort > 65535) {
         continue;
     }
@@ -484,11 +482,18 @@ foreach($users AS $thisUser) {
         continue;
     }
 
-    $userConfig = str_replace(
-        array("##username", "##serverPort", "##delugeWebPort"),
-        array($thisUser, $serverPort, $delugePort + 1),
-        $userTemplate
-    );
+    $placeholders = array("##username", "##serverPort");
+    $replacements = array($thisUser, $serverPort);
+    if ($needsDelugeWebPort) {
+        // Backward compatibility: some older templates proxy /deluge-<user>/ directly
+        // to deluge-web (port is scgi+1). Keep supporting the placeholder.
+        $delugePort = (int) trim((string) @file_get_contents($homeDir.'/.delugePort'));
+        $delugeWebPort = ($delugePort >= 1024 && $delugePort <= 65534) ? ($delugePort + 1) : 1;
+        $placeholders[] = "##delugeWebPort";
+        $replacements[] = $delugeWebPort;
+    }
+
+    $userConfig = str_replace($placeholders, $replacements, $userTemplate);
     
     file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
     if (function_exists('pmssUserLog')) {

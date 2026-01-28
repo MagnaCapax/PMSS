@@ -3,13 +3,13 @@
 The `addUser.php` script provisions a seedbox account with the required quota and rTorrent settings.
 
 ```
-Usage: addUser.php USERNAME PASSWORD MAX_RTORRENT_MEMORY_IN_MB DISK_QUOTA_IN_GB [trafficLimitGB]
+Usage: addUser.php USERNAME PASSWORD MAX_RAM_MB DISK_QUOTA_IN_GB [trafficLimitGB]
 ```
 
 Arguments:
 - **USERNAME** – login name to create
 - **PASSWORD** – set the initial password (use `rand` for a random password)
-- **MAX_RTORRENT_MEMORY_IN_MB** – memory limit applied to rTorrent
+- **MAX_RAM_MB** – account memory limit (used for cgroups and rTorrent tuning)
 - **DISK_QUOTA_IN_GB** – storage quota
 - **trafficLimitGB** (optional) – monthly traffic cap
 
@@ -39,6 +39,6 @@ Example:
 /scripts/addUser.php alice rand 512 100 500
 ```
 
-This adds user `alice` with a random password, 512 MB rTorrent limit, 100 GB disk quota and a 500 GB monthly traffic limit.
+This adds user `alice` with a random password, 512 MB account RAM limit, 100 GB disk quota and a 500 GB monthly traffic limit.
 
 **Documentation quality**: The script itself is largely uncommented and could benefit from a more detailed explanation of the setup steps performed.

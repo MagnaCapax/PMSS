@@ -10,7 +10,7 @@
  */
 
 // Shell-facing usage string; keep the CLI contract explicit for operators.
-$usage = 'Usage: addUser.php USERNAME PASSWORD MAX_RTORRENT_MEMORY_IN_MB DISK_QUOTA_IN_GB [trafficLimitGB]';
+$usage = 'Usage: addUser.php USERNAME PASSWORD MAX_RAM_MB DISK_QUOTA_IN_GB [trafficLimitGB]';
 if (empty($argv[1]) or
     empty($argv[2]) or
     empty($argv[3]) or 
@@ -320,13 +320,14 @@ if (file_exists('/bin/bash')) { // Set shell
     );
 }
 
-// Record core attributes in the runtime database before provisioning services.
-// Then to DB :)
+// Record core attributes in the user config store before provisioning services.
 	$userDb->addUser( $user['name'], array(
-	    'rtorrentRam' => $user['memory'],
+	    'ramMiB' => $user['memory'],
 	    'quota' => $user['quota'],
 	    'quotaBurst' => round(((float) $user['quota']) * 1.25),
 	    'rtorrentPort' => 0,    #TODO Choose port here and use that for the userConfig :)
+	    'billingId' => 0,
+	    'trafficLimit' => 0,
 	    'suspended' => false
 	));
 

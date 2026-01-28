@@ -148,12 +148,10 @@ http {
             proxy_http_version 1.1;
             proxy_buffering off;
 
-            client_max_body_size 0;
             client_body_timeout 300s;
             send_timeout 300s;
             proxy_read_timeout 300s;
             proxy_send_timeout 300s;
-            proxy_request_buffering off;
         }
     }
 }
@@ -183,6 +181,8 @@ NGINX;
                     array('testuser', '30000', 'test.example.com', ''),
                     $block
                 );
+                // Remove proxy_params includes; we inline minimal proxy params below.
+                $rendered = str_replace('include /etc/nginx/proxy_params;', '', $rendered);
                 $serverBlocks .= $rendered."\n";
             }
         }
@@ -204,6 +204,12 @@ http {
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header Authorization \$http_authorization;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+    client_body_timeout 300s;
+    send_timeout 300s;
+    proxy_buffering off;
 
 $serverBlocks
 }

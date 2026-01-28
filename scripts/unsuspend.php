@@ -12,6 +12,7 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
+require_once __DIR__.'/lib/user/userConfigStore.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Unsuspending
 // a user when /home is unavailable would fail or act on stale paths.
@@ -46,6 +47,7 @@ $disabledRoot = "$homeDir/www-disabled";
 
 // Canonical suspended detection: only the presence of www-disabled matters.
 if (!is_dir($disabledRoot)) {
+    (new UserConfigStore())->setSuspended($username, false);
     die("User is not suspended\n");
 }
 
@@ -86,6 +88,8 @@ if (is_dir($activeRoot)) {
 if (!@rename($disabledRoot, $activeRoot)) {
     echo "Warning: failed to restore {$disabledRoot}\n";
 }
+// Best-effort: mirror the state in the user config store (marker is canonical).
+(new UserConfigStore())->setSuspended($username, is_dir($disabledRoot));
 
 pmssUserLifecycleStep(
     'unsuspend',

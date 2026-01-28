@@ -14,7 +14,7 @@ declare(strict_types=1);
  * This script has been refined since the early 2010s; coordinate any changes
  * with the platform team before altering the workflow.
  *
- * Usage: recreateUser.php USERNAME MAX_RTORRENT_MEMORY_MiB DISK_QUOTA_GiB
+ * Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB
  *
  * @author  Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
@@ -34,7 +34,7 @@ require_once __DIR__.'/lib/homeMount.php';
 // a user when /home is unavailable would fail in confusing ways or corrupt state.
 pmssRequireHomeMounted('recreateUser.php');
 
-const USAGE = "Usage: recreateUser.php USERNAME MAX_RTORRENT_MEMORY_MiB DISK_QUOTA_GiB\n";
+const USAGE = "Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB\n";
 
 [$_, $userName, $ramMiB, $quotaGiB] = array_pad($argv, 4, null);
 

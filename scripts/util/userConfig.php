@@ -15,6 +15,7 @@ require_once __DIR__.'/../lib/user/deluge.php';
 require_once __DIR__.'/../lib/user/qbittorrent.php';
 require_once __DIR__.'/../lib/user/integrations.php';
 require_once __DIR__.'/../lib/user/system.php';
+require_once __DIR__.'/../lib/user/userConfigStore.php';
 
 /**
  * Main entry point for user configuration changes.
@@ -64,6 +65,59 @@ if (!file_exists("/home/{$user['name']}")) {
 $userList = file_get_contents('/etc/passwd');
 if (strpos($userList, $user['name']) === false) {
     die("No such user in passwd list\n");
+}
+
+$presence = [
+    'trafficLimit'    => array_key_exists(4, $argv),
+    'CPUWeight'       => array_key_exists(5, $argv),
+    'IOWeight'        => array_key_exists(6, $argv),
+    'IOReadBW'        => array_key_exists(7, $argv),
+    'IOWriteBW'       => array_key_exists(8, $argv),
+    'IOReadIOPS'      => array_key_exists(9, $argv),
+    'IOWriteIOPS'     => array_key_exists(10, $argv),
+    'cpuQuotaPercent' => array_key_exists(11, $argv),
+];
+
+$store = new UserConfigStore();
+$existing = $store->get($user['name']) ?? [];
+
+$payload = $existing;
+$payload['ramMiB'] = $user['memory'];
+$payload['rtorrentPort'] = isset($existing['rtorrentPort']) ? (int) $existing['rtorrentPort'] : 0;
+$payload['quota'] = $user['quota'];
+$payload['quotaBurst'] = (int) round(((float) $user['quota']) * 1.25);
+$payload['trafficLimit'] = 0;
+if (!empty($presence['CPUWeight'])) {
+    $payload['CPUWeight'] = $user['CPUWeight'];
+}
+if (!empty($presence['IOWeight'])) {
+    $payload['IOWeight'] = $user['IOWeight'];
+}
+if (!empty($presence['IOReadBW'])) {
+    $payload['IOReadBW'] = $user['IOReadBW'];
+}
+if (!empty($presence['IOWriteBW'])) {
+    $payload['IOWriteBW'] = $user['IOWriteBW'];
+}
+if (!empty($presence['IOReadIOPS'])) {
+    $payload['IOReadIOPS'] = $user['IOReadIOPS'];
+}
+if (!empty($presence['IOWriteIOPS'])) {
+    $payload['IOWriteIOPS'] = $user['IOWriteIOPS'];
+}
+if (!empty($presence['cpuQuotaPercent'])) {
+    $payload['cpuQuotaPercent'] = $user['cpuQuotaPercent'];
+}
+if (!isset($payload['billingId'])) {
+    $payload['billingId'] = 0;
+}
+if ($payload['billingId'] === 0) {
+    $payload = $store->applyFallbacks($user['name'], $payload);
+}
+if (!$store->set($user['name'], $payload)) {
+    fwrite(STDERR, "Warning: failed to persist user config for {$user['name']}\n");
+} else {
+    $store->writeUserCache($user['name'], $payload);
 }
 
 // Write optional traffic caps before touching heavyweight services so limits

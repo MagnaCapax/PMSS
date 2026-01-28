@@ -656,7 +656,7 @@ LIGHTTPD;
      */
     public function testNginxForwardsAuthorizationHeader(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
+        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
         $template = file_get_contents($templatePath);
 
         $this->assertStringContainsString(
@@ -666,17 +666,23 @@ LIGHTTPD;
     }
 
     /**
-     * TEST 31: Nginx disables request buffering for large uploads
+     * TEST 31: Nginx proxy defaults support large uploads and long-lived requests
      *
-     * HARDENS: Nginx must not buffer entire request body.
+     * HARDENS: WebDAV and similar workflows involve large bodies and slow links.
+     * Keep nginx defaults permissive enough to avoid accidental 413/timeouts.
      */
-    public function testNginxDisablesRequestBuffering(): void
+    public function testNginxProxyDefaultsSupportLargeUploads(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
-        $template = file_get_contents($templatePath);
+        $proxyParamsPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-proxy_params';
+        $proxyParams = file_get_contents($proxyParamsPath);
 
-        $this->assertStringContainsString('proxy_request_buffering off;', $template);
-        $this->assertStringContainsString('client_max_body_size 0;', $template);
+        $this->assertStringContainsString('proxy_read_timeout 300s;', $proxyParams);
+        $this->assertStringContainsString('proxy_send_timeout 300s;', $proxyParams);
+        $this->assertStringContainsString('proxy_buffering off;', $proxyParams);
+
+        $nginxConfPath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-conf';
+        $nginxConf = file_get_contents($nginxConfPath);
+        $this->assertStringContainsString('client_max_body_size 8192M;', $nginxConf);
     }
 
     // =========================================================================
@@ -1012,24 +1018,18 @@ LIGHTTPD;
     }
 
     /**
-     * TEST 46: Nginx WebDAV blocks have required proxy headers
+     * TEST 46: Nginx WebDAV blocks include proxy_params
      *
-     * HARDENS: When not including proxy_params, WebDAV blocks must set headers explicitly.
+     * HARDENS: Keep WebDAV proxy blocks minimal and consistent by always
+     * including proxy_params.
      */
-    public function testNginxWebdavBlocksHaveRequiredHeaders(): void
+    public function testNginxWebdavBlocksIncludeProxyParams(): void
     {
         $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
         $script = file_get_contents($scriptPath);
 
         // Match WebDAV location blocks with their full content
         preg_match_all('/location\s+\/webdav-[^{]+\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s', $script, $matches);
-
-        $requiredHeaders = array(
-            'proxy_set_header Host',
-            'proxy_set_header X-Real-IP',
-            'proxy_set_header X-Forwarded-For',
-            'proxy_set_header Authorization',
-        );
 
         $proxyBlocksChecked = 0;
         foreach ($matches[1] as $i => $locationBlock) {
@@ -1039,18 +1039,11 @@ LIGHTTPD;
             }
 
             $proxyBlocksChecked++;
-            $hasIncludeProxyParams = strpos($locationBlock, 'include /etc/nginx/proxy_params') !== false;
-
-            // If not including proxy_params, must have explicit headers
-            if (!$hasIncludeProxyParams) {
-                foreach ($requiredHeaders as $header) {
-                    $this->assertStringContainsString(
-                        $header,
-                        $locationBlock,
-                        "WebDAV proxy block $i missing required header: $header"
-                    );
-                }
-            }
+            $this->assertStringContainsString(
+                'include /etc/nginx/proxy_params',
+                $locationBlock,
+                "WebDAV proxy block $i must include proxy_params"
+            );
         }
 
         $this->assertGreaterThan(0, $proxyBlocksChecked, 'Must have at least one WebDAV proxy block');
@@ -1104,11 +1097,12 @@ LIGHTTPD;
     }
 
     /**
-     * TEST 49: template.nginx-user WebDAV block has required proxy headers
+     * TEST 49: template.nginx-user WebDAV block includes proxy_params
      *
-     * HARDENS: When not including proxy_params, WebDAV block must set headers explicitly.
+     * HARDENS: Keep WebDAV proxy blocks minimal and consistent by always
+     * including proxy_params.
      */
-    public function testNginxUserTemplateWebdavHasRequiredHeaders(): void
+    public function testNginxUserTemplateWebdavIncludesProxyParams(): void
     {
         $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.nginx-user';
         $template = file_get_contents($templatePath);
@@ -1117,25 +1111,11 @@ LIGHTTPD;
         $webdavBlock = $this->extractNginxLocationBlock($template, '/webdav-');
         $this->assertNotEmpty($webdavBlock, 'WebDAV location block must exist in template');
 
-        $hasIncludeProxyParams = strpos($webdavBlock, 'include /etc/nginx/proxy_params') !== false;
-
-        // If not including proxy_params, must have explicit headers
-        if (!$hasIncludeProxyParams) {
-            $requiredHeaders = array(
-                'proxy_set_header Host',
-                'proxy_set_header X-Real-IP',
-                'proxy_set_header X-Forwarded-For',
-                'proxy_set_header Authorization',
-            );
-
-            foreach ($requiredHeaders as $header) {
-                $this->assertStringContainsString(
-                    $header,
-                    $webdavBlock,
-                    "template.nginx-user WebDAV block missing required header: $header"
-                );
-            }
-        }
+        $this->assertStringContainsString(
+            'include /etc/nginx/proxy_params',
+            $webdavBlock,
+            'template.nginx-user WebDAV block must include proxy_params'
+        );
     }
 
     /**
