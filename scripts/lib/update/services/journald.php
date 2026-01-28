@@ -82,11 +82,8 @@ if (!function_exists('pmssJournaldFormatSize')) {
             return (string)($bytes / $gib).'G';
         }
         $mib = 1024 * 1024;
-        $mibVal = (int)floor($bytes / $mib);
-        if ($mibVal < 1) {
-            $mibVal = 1;
-        }
-        return $mibVal.'M';
+        $mibVal = max(1, (int)floor($bytes / $mib));
+        return (string)$mibVal.'M';
     }
 }
 
@@ -124,9 +121,7 @@ if (!function_exists('pmssApplyJournaldLimits')) {
             '%%PMSS_JOURNALD_RATE_LIMIT_INTERVAL%%' => $policy['rate_limit_interval_sec'].'s',
             '%%PMSS_JOURNALD_RATE_LIMIT_BURST%%'    => (string)$policy['rate_limit_burst'],
         ];
-        foreach ($repl as $key => $value) {
-            $raw = str_replace($key, $value, $raw);
-        }
+        $raw = strtr($raw, $repl);
 
         $targetDir = pmssResolvePathFromEnv('PMSS_JOURNALD_CONF_DIR', '/etc/systemd/journald.conf.d');
         if (!is_dir($targetDir) && !@mkdir($targetDir, 0755, true)) {

@@ -11,7 +11,7 @@ if ($fetchedLatest) {
 }
 
 $currentRclone = pmssDetectRcloneVersion();
-if ($currentRclone !== null && $currentRclone !== $rcloneVersion && file_exists('/usr/bin/rclone')) {
+if ($currentRclone !== null && $currentRclone !== $rcloneVersion) {
     unlink('/usr/bin/rclone');    // This forces following code to install rclone .. thus updating it :)
 }
 
@@ -58,10 +58,7 @@ function pmssFetchLatestRcloneVersion(): ?string
     ];
     foreach ($sources as $url) {
         $payload = @file_get_contents($url);
-        if ($payload === false) {
-            continue;
-        }
-        if (preg_match('/v?(\d+\.\d+\.\d+)/', $payload, $match)) {
+        if ($payload !== false && preg_match('/v?(\d+\.\d+\.\d+)/', $payload, $match)) {
             return $match[1];
         }
     }

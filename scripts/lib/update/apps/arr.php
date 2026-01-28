@@ -164,10 +164,7 @@ function pmssArrExtract(string $archivePath, string $workDir, string $expectedDi
  */
 function pmssArrExtractVersionFromString(?string $payload): ?string
 {
-    if (!is_string($payload) || $payload === '') {
-        return null;
-    }
-    if (preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $payload, $match)) {
+    if (is_string($payload) && $payload !== '' && preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $payload, $match)) {
         return $match[1];
     }
     return null;

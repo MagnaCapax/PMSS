@@ -136,8 +136,7 @@ class Motd
     {
         $v = getenv('PMSS_MOTD_COLOR');
         // Default to enabled; allow explicit opt-out
-        if ($v === false || $v === '') return true;
-        return in_array(strtolower((string) $v), ['1', 'true', 'yes', 'on'], true);
+        return ($v === false || $v === '') ? true : in_array(strtolower((string) $v), ['1', 'true', 'yes', 'on'], true);
     }
 
     private static function c(string $text, string $code): string

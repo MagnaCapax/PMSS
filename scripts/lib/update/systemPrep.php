@@ -279,8 +279,7 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
             '%%USER_CGROUP_TASKS_MAX%%'   => (string)$tasksMax,
             '%%USER_CGROUP_CPU_QUOTA%%'   => ($cpuQuotaVal === 'infinity') ? 'infinity' : $cpuQuotaVal.'%',
         ];
-        $raw = (string)@file_get_contents($tpl);
-        foreach ($repl as $k => $v) { $raw = str_replace($k, $v, $raw); }
+        $raw = strtr((string)@file_get_contents($tpl), $repl);
         // Append per-mount device throttles and weights from policy
         if (isset($policy['mounts']) && is_array($policy['mounts'])) {
             $append = [];
@@ -617,4 +616,3 @@ if (!function_exists('pmssConfigureRootShellDefaults')) {
         $log('Appended root shell defaults: '.implode(', ', $updates));
     }
 }
-

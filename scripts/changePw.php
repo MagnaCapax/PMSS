@@ -109,8 +109,7 @@ function generatePassword(): string
  */
 function legacyPasswordSeed(): string
 {
-    $salts = file_get_contents('/etc/hostname');
-    $salts .= file_get_contents('/etc/debian_version');
+    $salts = file_get_contents('/etc/hostname').file_get_contents('/etc/debian_version');
     $salts3 = sha1($salts);
     $salts = sha1(sha1($salts) . md5(shell_exec('/scripts/listUsers.php')));
 

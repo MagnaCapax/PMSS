@@ -17,12 +17,9 @@ if (file_exists('/usr/local/bin/iprange')) {
 }
 
 $dependencies = ['build-essential', 'gcc', 'make', 'gawk'];
-$missing = [];
-foreach ($dependencies as $pkg) {
-    if (pmssPackageStatus($pkg) !== 'install ok installed') {
-        $missing[] = $pkg;
-    }
-}
+$missing = array_values(array_filter($dependencies, static function (string $pkg): bool {
+    return pmssPackageStatus($pkg) !== 'install ok installed';
+}));
 
 if (!empty($missing)) {
     $message = 'Skipping iprange build: missing toolchain packages '.implode(', ', $missing);

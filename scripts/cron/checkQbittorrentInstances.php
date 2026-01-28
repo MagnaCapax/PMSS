@@ -7,8 +7,7 @@ if (is_file($pmssUserLogPath)) {
 }
 
 // Get & parse users list
-$users = shell_exec('/scripts/listUsers.php');
-$users = array_filter(explode("\n", trim($users)));
+$users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
 
 $startQbittorrent = static function (string $user): void {
     echo "Start qBittorrent for user: {$user}\n";

@@ -8,10 +8,10 @@ $debianVersion = isset($debianVersion) ? $debianVersion : array('0');
 if (is_string($debianVersion)) {
     $debianVersion = explode('.', $debianVersion);
 }
-if (!is_array($debianVersion) || !isset($debianVersion[0])) {
+if (!is_array($debianVersion)) {
     $debianVersion = array('0');
 }
-$debianMajor = is_numeric($debianVersion[0]) ? (int) $debianVersion[0] : 0;
+$debianMajor = is_numeric($debianVersion[0] ?? '') ? (int) $debianVersion[0] : 0;
 
 #TODO This should be in the install script
 #TODO Use an actual config template

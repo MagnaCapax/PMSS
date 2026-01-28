@@ -14,8 +14,6 @@ $logger = function (string $message): void {
     }
 };
 
-$dryRun = getenv('PMSS_DRY_RUN') === '1';
-
 $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
 if ($python === '') {
     $logger('[WARN] Skipping FlexGet install: python3 missing from PATH');
@@ -39,6 +37,6 @@ if (is_file($cliBin)) {
     if (!is_link('/usr/local/bin/flexget') || readlink('/usr/local/bin/flexget') !== $cliBin) {
         runStep('Linking FlexGet CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/flexget')));
     }
-} elseif (!$dryRun) {
+} elseif (getenv('PMSS_DRY_RUN') !== '1') {
     $logger('[WARN] FlexGet binary missing after install');
 }

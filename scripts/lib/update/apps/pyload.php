@@ -20,7 +20,6 @@ if ($distroVersion > 0 && $distroVersion < 10) {
     return;
 }
 
-$dryRun = getenv('PMSS_DRY_RUN') === '1';
 $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
 if ($python === '') {
     $logger('[WARN] Skipping pyLoad setup: python3 missing from PATH');
@@ -43,6 +42,6 @@ if (is_file($cliBin)) {
     if (!is_link('/usr/local/bin/pyload') || readlink('/usr/local/bin/pyload') !== $cliBin) {
         runStep('Linking pyLoad CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/pyload')));
     }
-} elseif (!$dryRun) {
+} elseif (getenv('PMSS_DRY_RUN') !== '1') {
     $logger('[WARN] pyLoad binary missing after install');
 }

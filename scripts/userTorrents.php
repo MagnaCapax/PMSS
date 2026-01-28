@@ -12,8 +12,7 @@
 require_once __DIR__.'/lib/userLifecycle.php';
 
 // Get & parse users list
-$usersRaw = shell_exec('/scripts/listUsers.php');
-$users = $usersRaw === null ? [] : explode("\n", trim($usersRaw));
+$users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
 $changedConfig = array();
 
 foreach($users AS $thisUser) {    // Loop users checking their instances

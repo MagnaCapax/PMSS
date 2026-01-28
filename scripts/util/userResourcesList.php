@@ -97,8 +97,8 @@ $parseIOPS = static function ($val) use ($notSet): ?int {
     return preg_match('/([0-9]+)$/', $val, $matches) === 1 ? (int) $matches[1] : null;
 };
 
-$usersRaw = shell_exec('/scripts/listUsers.php');
-if ($usersRaw === null || trim($usersRaw) === '') {
+$usersRaw = trim((string) shell_exec('/scripts/listUsers.php'));
+if ($usersRaw === '') {
     if ($outputJson) {
         echo "[]\n";
     } elseif (!$outputJsonl) {
@@ -106,7 +106,7 @@ if ($usersRaw === null || trim($usersRaw) === '') {
     }
     exit(0);
 }
-$users = explode("\n", trim($usersRaw));
+$users = explode("\n", $usersRaw);
 
 if (!$outputJson && !$outputJsonl) {
     // Table Headers

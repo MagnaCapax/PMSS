@@ -10,7 +10,6 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/pythonVenv.php';
 
-$dryRun = getenv('PMSS_DRY_RUN') === '1';
 // #TODO Pin acd_cli to a specific commit/tag to avoid unbounded upgrades. (GH #129)
 
 $venvDir = '/opt/acd_cli';
@@ -30,6 +29,6 @@ if (pmssPythonVenvHasPackage($venv['python'], 'acdcli') && !$forceUpdate) {
 
 if (is_file($cliBin)) {
     runStep('Linking acd_cli CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/acd_cli')));
-} elseif (!$dryRun) {
+} elseif (getenv('PMSS_DRY_RUN') !== '1') {
     logmsg('[WARN] acd_cli binary not found in virtualenv after install');
 }

@@ -5,8 +5,7 @@ echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
 $accessIni = file_get_contents('/etc/seedbox/config/template.rutorrent.access');
 
 // Get & parse users list
-$users = shell_exec('/scripts/listUsers.php');
-$users = explode("\n", trim($users));
+$users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
     if (empty($thisUser)) continue;

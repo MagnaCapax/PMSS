@@ -12,8 +12,7 @@ if (is_file($pmssUserLogPath)) {
 }
 
 // Get & parse users list
-$users = shell_exec('/scripts/listUsers.php');
-$users = explode("\n", trim($users));
+$users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
 
 $startLighttpd = static function (string $user): void {
     echo "Start lighttpd for user: {$user}\n";
