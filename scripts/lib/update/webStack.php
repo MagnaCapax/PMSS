@@ -16,18 +16,18 @@ if (!function_exists('pmssConfigureWebStack')) {
     {
         // Stop nginx first so package upgrades and template refreshes never race against an active daemon.
         runStep('Stopping nginx prior to configuration refresh', 'systemctl stop nginx || /etc/init.d/nginx stop || true');
+        runStep($distroVersion < 10 ? 'Stopping lighttpd (init.d)' : 'Stopping lighttpd (systemd)', '/etc/init.d/lighttpd stop');
         if ($distroVersion < 10) {
-            runStep('Stopping lighttpd (init.d)', '/etc/init.d/lighttpd stop');
             runStep('Disabling lighttpd from sysvinit runlevels', 'update-rc.d lighttpd stop 2 3 4 5');
             runStep('Removing lighttpd sysvinit hooks', 'update-rc.d lighttpd remove');
-            killProcess('lighttpd', 'Terminating lingering lighttpd processes');
-            killProcess('php-cgi', 'Terminating lingering php-cgi processes');
+        } else {
+            disableUnitIfPresent('lighttpd', 'Disabling lighttpd systemd service');
+        }
+        killProcess('lighttpd', 'Terminating lingering lighttpd processes');
+        killProcess('php-cgi', 'Terminating lingering php-cgi processes');
+        if ($distroVersion < 10) {
             runStep('Ensuring nginx defaults set in sysvinit', 'update-rc.d nginx defaults');
         } else {
-            runStep('Stopping lighttpd (systemd)', '/etc/init.d/lighttpd stop');
-            disableUnitIfPresent('lighttpd', 'Disabling lighttpd systemd service');
-            killProcess('lighttpd', 'Terminating lingering lighttpd processes');
-            killProcess('php-cgi', 'Terminating lingering php-cgi processes');
             enableUnitIfPresent('nginx', 'Enabling nginx systemd service');
         }
 

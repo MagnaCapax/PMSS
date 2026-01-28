@@ -22,10 +22,7 @@ $logDockerMessage = static function (string $message) use ($logger, $legacyLog, 
 
 $logDockerMessage('Checking rootless Docker services');
 
-$users = array_filter(
-    explode("\n", trim(shell_exec('/scripts/listUsers.php'))),
-    static function ($user) { return !empty($user); }
-);
+$users = array_filter(explode("\n", trim(shell_exec('/scripts/listUsers.php'))));
 
 foreach ($users as $user) {
     if (file_exists("/home/{$user}/www-disabled") || !file_exists("/home/{$user}/www")) {

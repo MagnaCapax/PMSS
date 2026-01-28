@@ -42,8 +42,7 @@ function pmssPortManagerLog(string $user, string $action, string $service, ?int 
     );
 }
 
-$lockHandle = null;
-if (in_array($action, array('assign', 'release'), true)) {
+if ($action === 'assign' || $action === 'release') {
     $lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
     $lockPath = $lockBase.'/pmss-portManager-'.$service.'.lock';
     $lockHandle = @fopen($lockPath, 'c');

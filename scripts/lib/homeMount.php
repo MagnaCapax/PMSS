@@ -58,18 +58,7 @@ if (!function_exists('pmssIsHomeMounted')) {
 
         // /proc/mounts format: device mountpoint fstype options dump pass
         // We look for a line where mountpoint (field 2) is exactly "/home".
-        foreach (preg_split('/\r?\n/', $mounts) as $line) {
-            $line = trim($line);
-            if ($line === '') {
-                continue;
-            }
-            $fields = preg_split('/\s+/', $line);
-            if (isset($fields[1]) && $fields[1] === '/home') {
-                return true;
-            }
-        }
-
-        return false;
+        return preg_match('/^\\s*\\S+\\s+\\/home\\s+/m', $mounts) === 1;
     }
 }
 

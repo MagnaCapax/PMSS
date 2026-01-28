@@ -95,15 +95,14 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
         logmsg("[WARN] {$description} (systemd unavailable for unit {$systemdUnit})");
     }
 
-    $binaryArg = escapeshellarg($name);
-    runStep($description.' (SIGTERM)', 'pkill -TERM -x '.$binaryArg);
+    runStep($description.' (SIGTERM)', 'pkill -TERM -x '.escapeshellarg($name));
 
     if (pmssWaitForProcessExit($name, $timeoutSeconds)) {
         logmsg("[OK] {$description} (graceful stop)");
         return;
     }
 
-    runStep($description.' (SIGKILL)', 'pkill -KILL -x '.$binaryArg);
+    runStep($description.' (SIGKILL)', 'pkill -KILL -x '.escapeshellarg($name));
     if (!pmssWaitForProcessExit($name, 5)) {
         logmsg("[WARN] {$description} processes linger after SIGKILL");
     }

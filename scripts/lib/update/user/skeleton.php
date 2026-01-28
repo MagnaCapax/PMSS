@@ -35,9 +35,8 @@ function pmssUserApplySkeletonFiles(array $ctx): void
     $skelBase = pmssSkeletonBase();
     $quotaFiles = glob($skelBase.'/www/rutorrent/plugins/hddquota/*');
     if ($quotaFiles !== false) {
-        $prefix = $skelBase.'/';
         foreach ($quotaFiles as $file) {
-            $relative = strpos($file, $prefix) === 0 ? substr($file, strlen($prefix)) : str_replace('/etc/skel/', '', $file);
+            $relative = strpos($file, $skelBase.'/') === 0 ? substr($file, strlen($skelBase) + 1) : str_replace('/etc/skel/', '', $file);
             updateUserFile($relative, $user);
         }
     }

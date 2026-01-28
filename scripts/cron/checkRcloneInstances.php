@@ -8,7 +8,7 @@ if (is_file($pmssUserLogPath)) {
 
 // Get & parse users list
 $users = shell_exec('/scripts/listUsers.php');
-$users = explode("\n", trim($users));
+$users = array_filter(explode("\n", trim($users)));
 
 $startRclone = static function (string $user): void {
     echo "Start rclone for user: {$user}\n";
@@ -20,7 +20,6 @@ $startRclone = static function (string $user): void {
 };
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    if (empty($thisUser)) continue;
     if (file_exists("/home/{$thisUser}/www-disabled") or 
         !file_exists("/home/{$thisUser}/www")) {
             echo "User: {$thisUser} is suspended\n";

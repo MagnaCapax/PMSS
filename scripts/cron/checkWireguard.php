@@ -12,7 +12,7 @@ if (is_file($pmssUserLifecyclePath)) {
     require_once $pmssUserLifecyclePath;
 }
 
-$args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
+$args = $argv ?? ($_SERVER['argv'] ?? []);
 $debug = in_array('--debug', $args, true);
 
 $logPrefix = date('c') . ' ';

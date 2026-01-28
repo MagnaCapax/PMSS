@@ -25,8 +25,8 @@ $args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : [])
 array_shift($args);
 
 $cmd = escapeshellarg($target);
-foreach ($args as $arg) {
-    $cmd .= ' '.escapeshellarg((string) $arg);
+if (!empty($args)) {
+    $cmd .= ' '.implode(' ', array_map('escapeshellarg', $args));
 }
 
 $rc = 0;

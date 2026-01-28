@@ -19,10 +19,8 @@ $logger = new Logger(__FILE__);
 
 // Get & parse users list using the robust library method
 foreach(users::listHomeUsers() as $thisUser) {    // Loop users checking their instances
-    if (empty($thisUser)) continue;
-    
-    // User suspended check
-    if (file_exists("/home/{$thisUser}/www-disabled")) continue;
+    // User suspended check (skip empty usernames too).
+    if (empty($thisUser) || file_exists("/home/{$thisUser}/www-disabled")) continue;
 
     $file = "/home/{$thisUser}/www/index.php";
 

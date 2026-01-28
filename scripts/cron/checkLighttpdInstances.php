@@ -68,10 +68,6 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             $socketError = true;
             break;
         }
-
-        if ($socketError) {
-            continue;
-        }
     }
     if ($socketError == true) { $restartLighttpd($thisUser); continue; }
 
