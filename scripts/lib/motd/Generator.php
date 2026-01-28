@@ -61,6 +61,26 @@ class Motd
 
         if ($storageWarn !== '') $tpl .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
         file_put_contents($outPath, $tpl);
+        @chmod($outPath, 0644);
+        @chown($outPath, 'root');
+        @chgrp($outPath, 'root');
+
+        // Align PAM motd behavior so users see MOTD once (and non-root can read it).
+        if ($outPath === '/etc/motd') {
+            [$usesDynamic, $usesStatic] = self::detectPamMotd();
+            $dynamicPath = '/run/motd.dynamic';
+            if ($usesDynamic && !$usesStatic) {
+                file_put_contents($dynamicPath, $tpl);
+                @chmod($dynamicPath, 0644);
+                @chown($dynamicPath, 'root');
+                @chgrp($dynamicPath, 'root');
+            } elseif ($usesDynamic && $usesStatic) {
+                file_put_contents($dynamicPath, '');
+                @chmod($dynamicPath, 0644);
+                @chown($dynamicPath, 'root');
+                @chgrp($dynamicPath, 'root');
+            }
+        }
     }
 
     private static function sysBasics(): array
@@ -216,5 +236,38 @@ class Motd
             if (in_array('udma_crc_increase',(array)($s['flags']??[]),true)) $lines[] = 'SATA UDMA CRC increased: '.$dev;
         }
         return implode(' | ', $lines);
+    }
+
+    /**
+     * Detect whether PAM motd is configured to use dynamic/static outputs.
+     */
+    private static function detectPamMotd(): array
+    {
+        $path = '/etc/pam.d/sshd';
+        $data = @file_get_contents($path);
+        if (!is_string($data)) {
+            return [false, false];
+        }
+        $usesDynamic = false;
+        $usesStatic = false;
+        foreach (preg_split('/\r?\n/', $data) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') {
+                continue;
+            }
+            if (strpos($line, 'pam_motd.so') === false) {
+                continue;
+            }
+            if (strpos($line, 'motd=/run/motd.dynamic') !== false) {
+                $usesDynamic = true;
+                continue;
+            }
+            if (strpos($line, 'motd=') !== false) {
+                $usesStatic = true;
+                continue;
+            }
+            $usesStatic = true;
+        }
+        return [$usesDynamic, $usesStatic];
     }
 }
