@@ -1085,6 +1085,9 @@ function bootstrapMain(array $argv): void
             logmsg('[INFO] Refreshing skeleton/config permissions for --scripts-only run');
             runSoft(escapeshellarg(PHP_BINARY).' /scripts/util/setupSkelPermissions.php');
         }
+        if (!$options['dry_run']) {
+            restoreRootCronBestEffort('scripts-only');
+        }
         logmsg('Skipping update-step2.php (--scripts-only)');
         logEvent('update_step2_skipped', ['reason' => 'scripts_only']);
     } else {
