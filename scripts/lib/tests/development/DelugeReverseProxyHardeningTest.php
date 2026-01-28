@@ -182,6 +182,18 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('include /etc/nginx/proxy_params;', $script);
     }
 
+    public function testCreateNginxConfigPrivateSubdomainDelugeLegacyRedirectsExist(): void
+    {
+        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        $block = $this->extractHeredoc($script, '$privateSubdomainTemplate');
+
+        $this->assertStringContainsString('Keep for compatibility until at least 2028-01-28', $block);
+        $this->assertStringContainsString('location = /deluge-##user## {', $block);
+        $this->assertStringContainsString('location = /deluge-##user##/ {', $block);
+        $this->assertStringContainsString('location ~ ^/deluge-##user##/(.*)$ {', $block);
+        $this->assertStringContainsString('return 301 /user-##user##/deluge/$1$is_args$args;', $block);
+    }
+
     public function testCreateNginxConfigPrivateSubdomainDoesNotExposePublicPrefix(): void
     {
         $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
