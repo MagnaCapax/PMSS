@@ -120,7 +120,8 @@ function pmssReservedUsernames(): array
 
         // PMSS-specific (would conflict with internal use)
         'pmss', 'seedbox', 'rtorrent', 'deluge', 'qbittorrent',
-        'lighttpd', 'rutorrent',
+        'lighttpd', 'rutorrent', 'srvadmin', 'srvapi', 'pmcseed',
+        'pmcdn', 'srvmgmt',
     );
 
     return $reserved;

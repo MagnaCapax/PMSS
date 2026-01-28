@@ -36,7 +36,10 @@ class UsernameValidationTest extends TestCase
 
     public function testReservedListIncludesHighRiskNames(): void
     {
-        $mustInclude = ['root', 'www', 'nginx', 'mysql', 'postgres', 'redis', 'mongodb', 'apache', 'docker', 'messagebus', 'chrony', 'openvpn'];
+        $mustInclude = [
+            'root', 'www', 'nginx', 'mysql', 'postgres', 'redis', 'mongodb', 'apache', 'docker',
+            'messagebus', 'chrony', 'openvpn', 'srvadmin', 'srvapi', 'pmcseed', 'pmcdn', 'srvmgmt',
+        ];
         foreach ($mustInclude as $name) {
             $this->assertTrue(\pmssUsernameIsReserved($name), 'Expected reserved username to be listed: '.$name);
         }
