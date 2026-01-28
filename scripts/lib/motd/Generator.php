@@ -13,8 +13,7 @@ class Motd
     {
         $tplPath = getenv('PMSS_MOTD_TEMPLATE_PATH') ?: '/etc/seedbox/config/template.motd';
         $outPath = getenv('PMSS_MOTD_OUTPUT_PATH') ?: '/etc/motd';
-        $tpl      = @file_get_contents($tplPath);
-        if ($tpl === false) return;
+        if (($tpl = @file_get_contents($tplPath)) === false) return;
 
         [$host,$ip,$cpu,$ram,$storage] = self::sysBasics();
         [$pmssVersion,$updateDate] = self::versionInfo();
@@ -30,9 +29,9 @@ class Motd
             $pmssVersion= self::c($pmssVersion, '1;34'); // bold blue
             $kernel     = self::c($kernel, '34');   // blue
             $distro     = self::c($distro, '1;35'); // bold magenta
-            $ns = trim($netSpeed);
-            $netSpeed   = ($ns !== '' && strcasecmp($ns, 'unknown') !== 0 && strcasecmp($ns, 'n/a') !== 0)
-                ? self::c($ns, '32')                // green when detected
+            $netSpeed   = trim($netSpeed);
+            $netSpeed   = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
+                ? self::c($netSpeed, '32')           // green when detected
                 : self::c('Unknown', '33');         // yellow when unknown
         }
         [$wg,$ovpn] = self::serviceStatuses();
@@ -54,15 +53,13 @@ class Motd
             '%OPENVPN_STATUS%'  => $ovpn,
             '%DISTRO%'          => $distro,
         ];
-        foreach ($repl as $k => $v) $tpl = str_replace($k, $v, $tpl);
+        $tpl = strtr($tpl, $repl);
         
         // Clean up lines that might remain if the template still has %RUN_VERSION%
         $tpl = str_replace('Runtime Version: %RUN_VERSION%', '', $tpl);
         $tpl = preg_replace('/^\s*Runtime Version:.*$/m', '', $tpl);
 
-        if ($storageWarn !== '') {
-            $tpl .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
-        }
+        if ($storageWarn !== '') $tpl .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
         file_put_contents($outPath, $tpl);
     }
 
@@ -96,7 +93,6 @@ class Motd
     private static function aptLastUpdate(): string
     {
         $f = '/var/lib/apt/periodic/update-success-stamp';
-        if (!is_file($f)) return 'Not available';
         $ts = @filemtime($f);
         if ($ts === false || $ts <= 0) return 'Not available';
         // Show date only to avoid noisy fractional seconds/timezones
@@ -141,8 +137,7 @@ class Motd
         $v = getenv('PMSS_MOTD_COLOR');
         // Default to enabled; allow explicit opt-out
         if ($v === false || $v === '') return true;
-        $v = strtolower((string) $v);
-        return $v === '1' || $v === 'true' || $v === 'yes' || $v === 'on';
+        return in_array(strtolower((string) $v), ['1', 'true', 'yes', 'on'], true);
     }
 
     private static function c(string $text, string $code): string
@@ -155,13 +150,8 @@ class Motd
         if ($line === '') return '';
         $parts = preg_split('/\s+/', $line);
         if (!$parts) return '';
-        $count = count($parts);
-        for ($idx = 0; $idx < $count; $idx++) {
-            if ($parts[$idx] === 'dev' && isset($parts[$idx + 1])) {
-                return $parts[$idx + 1];
-            }
-        }
-        return '';
+        $idx = array_search('dev', $parts, true);
+        return ($idx !== false && isset($parts[$idx + 1])) ? $parts[$idx + 1] : '';
     }
 
     private static function distroInfo(): string

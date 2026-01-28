@@ -20,7 +20,7 @@ if (!file_exists('/var/run/pmss/trafficLimits')) `mkdir -p /var/run/pmss/traffic
 $trafficLimitPeriod = 3 * 24 * 60 * 60;     // 3 days limiting period
 
 $users = trim( `/scripts/listUsers.php` );
-$users = explode("\n", $users);
+$users = array_filter(explode("\n", $users));
 if (count($users) == 0) die("No users in this system!\n");
 
 //$networkConfig = include '/etc/seedbox/config/network';

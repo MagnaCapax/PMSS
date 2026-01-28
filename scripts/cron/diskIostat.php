@@ -2,8 +2,7 @@
 <?php
 $debianVersion = file_get_contents('/etc/debian_version');
 // Are we running debian 7/8 or Debian 10?
-if ($debianVersion[0] == 1) $debianVersion = 10;
-	else $debianVersion = 8;
+$debianVersion = $debianVersion[0] == 1 ? 10 : 8;
 
 // Gather iostat information from disks
 $iostatLogFile = '/var/run/pmss/iostat';
@@ -18,8 +17,9 @@ if (count($devices) == 0) die("No block devices detected\n");
 // Sample code:
 // iostat -xm 1 2 -g grp1 sda sdb sdc sdd | awk '/grp1/ { print $4,$5,$6,$7,$10,$13,$14}'
 // For debian 10 took r_await as that's what we are more interested, both read and write await is now exposed #TODO eventually this
-if ($debianVersion == 10) $iostat = `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $2,$3,$4,$5,$10,$15,$16}'`;
-	else $iostat = `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $4,$5,$6,$7,$10,$13,$14}'`;
+$iostat = $debianVersion == 10
+    ? `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $2,$3,$4,$5,$10,$15,$16}'`
+    : `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $4,$5,$6,$7,$10,$13,$14}'`;
 
 $iostatRaw = $iostat;
 

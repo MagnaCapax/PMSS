@@ -4,13 +4,12 @@
  * Nightly cleanup for the PMSS user database.
  */
 
-$args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
+$args = $argv ?? ($_SERVER['argv'] ?? []);
 $debug = in_array('--debug', $args, true);
 
 require_once __DIR__.'/../lib/users.php';
 
 $db = new users();
-$before = count($db->getUsers());
 $removed = $db->prune();
 $after = count($db->getUsers());
 

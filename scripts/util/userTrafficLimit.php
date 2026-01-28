@@ -12,7 +12,7 @@
 require_once '/scripts/lib/cli/optionParser.php';
 
 $usage = 'Usage: ./userTrafficLimit.php --user=<username> --limit=<MiB>'; 
-$parsed = pmssParseCliTokens($argv);
+$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
 
 if (pmssCliOption($parsed, 'help', 'h')) {
     echo $usage."\n";
@@ -30,9 +30,7 @@ $trafficLimit = (int) $limitRaw;
 
 // Check if user exists
 $userList = file_get_contents('/etc/passwd');
-if (strpos($userList, $userName) === false
-    || !file_exists("/home/{$userName}")
-    || !is_dir("/home/{$userName}") ) {
+if (strpos($userList, $userName) === false || !is_dir("/home/{$userName}")) {
     die("No such user\n");
 }
 
@@ -42,15 +40,14 @@ $targets = [
     $userTrafficFile,
     "/home/{$userName}/.trafficLimit",
 ];
-foreach ($targets as $target) {
-    if ($trafficLimit === 0) {
+if ($trafficLimit === 0) {
+    foreach ($targets as $target) {
         if (file_exists($target)) {
             unlink($target);
         }
-        continue;
     }
-
-    if ($trafficLimit > 0) {
+} elseif ($trafficLimit > 0) {
+    foreach ($targets as $target) {
         file_put_contents($target, $trafficLimit);
     }
 }

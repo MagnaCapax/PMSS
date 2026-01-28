@@ -29,4 +29,3 @@ if (empty($users)) {
 }
 
 $processor->spawnWorkers($_SERVER['argv'][0], $users);
-exit(0);

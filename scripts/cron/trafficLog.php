@@ -18,7 +18,7 @@ if (is_file($pmssUserLogPath)) {
 
 $logdir = '/var/log/pmss/traffic/';
 $users = trim( `/scripts/listUsers.php` );
-$users = explode("\n", $users);
+$users = array_filter(explode("\n", $users));
 if (count($users) == 0) exit;    // Nothing to collect
 $users[] = 'www-data';  // Add www-data instance, we want to see this account aswell
 

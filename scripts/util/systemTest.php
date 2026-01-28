@@ -18,8 +18,7 @@ require_once __DIR__.'/../lib/cli/optionParser.php';
  */
 function pmssExec(string $command): string
 {
-    $output = @shell_exec($command);
-    return $output === null ? '' : trim((string)$output);
+    return trim((string) @shell_exec($command));
 }
 
 /**
@@ -37,28 +36,23 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
     ];
 }
 
-$parsed = pmssParseCliTokens($argv);
+$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
 $format = strtolower((string) pmssCliOption($parsed, 'output', 'o', 'text'));
 $jsonFlag = pmssCliOption($parsed, 'json', 'j', false);
 $prettyFlag = pmssCliOption($parsed, 'pretty', 'p', false);
 $prettyFlag = $prettyFlag !== false && $prettyFlag !== null;
-if ($jsonFlag === true || $format === 'json') {
-    $format = 'json';
-} else {
-    $format = 'text';
-}
+$format = ($jsonFlag === true || $format === 'json') ? 'json' : 'text';
 
 $checks = [];
 
 // Detect OS codename for later comparisons.
 $osInfo    = parse_ini_file('/etc/os-release') ?: [];
 $codename  = strtolower(trim($osInfo['VERSION_CODENAME'] ?? ''));
-$checks[] = (function () use ($codename) {
-    if ($codename === '') {
-        return pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing');
-    }
-    return pmssStatus('OS codename', 'OK', $codename);
-})();
+if ($codename === '') {
+    $checks[] = pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing');
+} else {
+    $checks[] = pmssStatus('OS codename', 'OK', $codename);
+}
 
 $binaryChecks = [
     'rtorrent' => 'rtorrent -h 2>&1 | head -n 1',
@@ -83,19 +77,11 @@ $binaryChecks = [
 foreach ($binaryChecks as $binary => $infoCmd) {
     $exists = pmssExec('command -v '.escapeshellarg($binary));
     if ($exists === '') {
-        $checks[] = pmssStatus(
-            sprintf('Binary: %s', $binary),
-            'WARN',
-            'Not found in PATH'
-        );
+        $checks[] = pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
         continue;
     }
     $detail = pmssExec($infoCmd);
-    $checks[] = pmssStatus(
-        sprintf('Binary: %s', $binary),
-        'OK',
-        $detail !== '' ? $detail : 'present'
-    );
+    $checks[] = pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
 }
 
 $configPaths = [
@@ -108,11 +94,8 @@ $configPaths = [
 ];
 
 foreach ($configPaths as $label => $path) {
-    if (is_dir($path) || is_file($path)) {
-        $checks[] = pmssStatus($label, 'OK', $path);
-    } else {
-        $checks[] = pmssStatus($label, 'WARN', $path.' missing');
-    }
+    $exists = file_exists($path);
+    $checks[] = pmssStatus($label, $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
 }
 
 // Validate that the config-backed localnet file matches rtorrent expectations.
@@ -155,72 +138,45 @@ if (is_file($localnetConfig)) {
         }
     }
 
-    if (!empty($issues)) {
+    if ($issues) {
         // Treat broken permissions on an existing localnet config as an error:
         // rtorrent relies on this file being readable from unprivileged users.
-        $checks[] = pmssStatus(
-            'Seedbox localnet (config)',
-            'ERR',
-            implode('; ', $issues)
-        );
+        $checks[] = pmssStatus('Seedbox localnet (config)', 'ERR', implode('; ', $issues));
     } else {
-        $checks[] = pmssStatus(
-            'Seedbox localnet (config)',
-            'OK',
-            $localnetConfig.' readable via 0664 + traversable dirs'
-        );
+        $checks[] = pmssStatus('Seedbox localnet (config)', 'OK', $localnetConfig.' readable via 0664 + traversable dirs');
     }
 } else {
-    $checks[] = pmssStatus(
-        'Seedbox localnet (config)',
-        'WARN',
-        $localnetConfig.' missing'
-    );
+    $checks[] = pmssStatus('Seedbox localnet (config)', 'WARN', $localnetConfig.' missing');
 }
 
 // Validate sources list contains detected codename if possible.
 if ($codename !== '' && is_file('/etc/apt/sources.list')) {
     $sources = file_get_contents('/etc/apt/sources.list');
-    if ($sources !== false && stripos($sources, $codename) === false) {
-        $checks[] = pmssStatus(
-            'Sources codename match',
-            'WARN',
-            sprintf('%s not present in sources.list', $codename)
-        );
-    } else {
-        $checks[] = pmssStatus(
-            'Sources codename match',
-            'OK',
-            'sources.list references '.$codename
-        );
-    }
+    $matches = $sources !== false && stripos($sources, $codename) !== false;
+    $checks[] = pmssStatus(
+        'Sources codename match',
+        $matches ? 'OK' : 'WARN',
+        $matches ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename)
+    );
 }
 
 // Check OpenVPN client artifacts in /home (profile + CA), following installer naming.
-($checks[] = (function (): array {
-    $hostname = trim((string) @file_get_contents('/etc/hostname'));
-    if ($hostname === '') {
-        return ['name' => 'OpenVPN client artifacts', 'status' => 'WARN', 'detail' => 'hostname unknown'];
-    }
+$hostname = trim((string) @file_get_contents('/etc/hostname'));
+if ($hostname === '') {
+    $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown');
+} else {
     $slug = pmssOpenvpnSlugFromHostname($hostname);
     list($ovpn, $crt) = pmssOpenvpnArtifactPathsFromSlug($slug);
-    $ok   = $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);
+    $ok = $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);
     if ($ok) {
-        return pmssStatus(
-            'OpenVPN client artifacts',
-            'OK',
-            basename($ovpn).', '.basename($crt)
-        );
+        $checks[] = pmssStatus('OpenVPN client artifacts', 'OK', basename($ovpn).', '.basename($crt));
+    } else {
+        $missing = [];
+        if ($ovpn === '' || !is_file($ovpn)) { $missing[] = ($ovpn !== '' ? basename($ovpn) : 'openvpn-<slug>.ovpn'); }
+        if ($crt === ''  || !is_file($crt))  { $missing[] = ($crt  !== '' ? basename($crt)  : 'openvpn-<slug>.crt'); }
+        $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'missing: '.implode(', ', $missing));
     }
-    $missing = [];
-    if ($ovpn === '' || !is_file($ovpn)) { $missing[] = ($ovpn !== '' ? basename($ovpn) : 'openvpn-<slug>.ovpn'); }
-    if ($crt === ''  || !is_file($crt))  { $missing[] = ($crt  !== '' ? basename($crt)  : 'openvpn-<slug>.crt'); }
-    return pmssStatus(
-        'OpenVPN client artifacts',
-        'WARN',
-        'missing: '.implode(', ', $missing)
-    );
-})());
+}
 
 // MediaArea repo is configured via manual list + ASCII key; no repo-mediaarea package check.
 
@@ -232,15 +188,12 @@ $venvTargets = [
 ];
 
 foreach ($venvTargets as $label => $path) {
-    if (is_file($path) && is_executable($path)) {
-        $checks[] = pmssStatus($label, 'OK', $path);
-    } else {
-        $checks[] = pmssStatus(
-            $label,
-            'WARN',
-            $path.' missing or not executable'
-        );
-    }
+    $valid = is_file($path) && is_executable($path);
+    $checks[] = pmssStatus(
+        $label,
+        $valid ? 'OK' : 'WARN',
+        $valid ? $path : $path.' missing or not executable'
+    );
 }
 
 // Confirm CLI symlinks route to the corresponding virtualenv binaries.
@@ -254,30 +207,14 @@ foreach ($symlinkTargets as $label => [$link, $expected]) {
     if (is_link($link)) {
         $actual = readlink($link);
         if ($actual === $expected) {
-            $checks[] = pmssStatus(
-                $label,
-                'OK',
-                sprintf('%s -> %s', $link, $actual)
-            );
+            $checks[] = pmssStatus($label, 'OK', sprintf('%s -> %s', $link, $actual));
         } else {
-            $checks[] = pmssStatus(
-                $label,
-                'WARN',
-                sprintf('%s -> %s (expected %s)', $link, $actual, $expected)
-            );
+            $checks[] = pmssStatus($label, 'WARN', sprintf('%s -> %s (expected %s)', $link, $actual, $expected));
         }
     } elseif (is_file($link)) {
-        $checks[] = pmssStatus(
-            $label,
-            'WARN',
-            sprintf('%s present but not a symlink', $link)
-        );
+        $checks[] = pmssStatus($label, 'WARN', sprintf('%s present but not a symlink', $link));
     } else {
-        $checks[] = pmssStatus(
-            $label,
-            'WARN',
-            sprintf('%s missing', $link)
-        );
+        $checks[] = pmssStatus($label, 'WARN', sprintf('%s missing', $link));
     }
 }
 
@@ -287,16 +224,14 @@ foreach ($symlinkTargets as $label => [$link, $expected]) {
 $componentJson = pmssExec('php /scripts/util/componentStatus.php --json 2>/dev/null');
 if ($componentJson !== '') {
     $decoded = json_decode($componentJson, true);
-    if (is_array($decoded) && isset($decoded['results']) && is_array($decoded['results'])) {
-        foreach ($decoded['results'] as $entry) {
-            if (!isset($entry['name'], $entry['status'])) {
-                continue;
-            }
-            $name   = 'Component: '.$entry['name'];
-            $status = (string)$entry['status'];
-            $detail = isset($entry['detail']) ? (string)$entry['detail'] : '';
-            $checks[] = pmssStatus($name, $status, $detail);
+    foreach (is_array($decoded['results'] ?? null) ? $decoded['results'] : [] as $entry) {
+        if (!isset($entry['name'], $entry['status'])) {
+            continue;
         }
+        $name   = 'Component: '.$entry['name'];
+        $status = (string)$entry['status'];
+        $detail = (string) ($entry['detail'] ?? '');
+        $checks[] = pmssStatus($name, $status, $detail);
     }
 }
 
@@ -309,8 +244,7 @@ $summary = [
 ];
 
 if ($format === 'json') {
-    $flags = $prettyFlag ? JSON_PRETTY_PRINT : 0;
-    echo json_encode(['checks' => $checks, 'summary' => $summary], $flags).PHP_EOL;
+    echo json_encode(['checks' => $checks, 'summary' => $summary], $prettyFlag ? JSON_PRETTY_PRINT : 0).PHP_EOL;
     exit(0);
 }
 
@@ -321,8 +255,6 @@ echo str_repeat('-', 60)."\n";
 $isTty = function_exists('posix_isatty') ? posix_isatty(STDOUT) : true;
 foreach ($checks as $result) {
     $status = strtoupper((string)$result['status']);
-    $label  = '['.$status.']';
-    $detail = $result['detail'] !== '' ? ' - '.$result['detail'] : '';
 
     $colour = '';
     $reset  = '';
@@ -339,10 +271,9 @@ foreach ($checks as $result) {
         }
     }
 
-    $labelPadded = str_pad($label, 9);
-    echo $colour.$labelPadded.$reset.$result['name'].$detail.PHP_EOL;
+    $labelPadded = str_pad('['.$status.']', 9);
+    echo $colour.$labelPadded.$reset.$result['name'].($result['detail'] !== '' ? ' - '.$result['detail'] : '').PHP_EOL;
 }
 
 echo str_repeat('-', 60)."\n";
 echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", $summary['ok'], $summary['warn'], $summary['err']);
-exit(0);

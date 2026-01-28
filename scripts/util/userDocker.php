@@ -50,7 +50,7 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/log.php';
 
-$args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
+$args = $argv ?? ($_SERVER['argv'] ?? []);
 $debug = in_array('--debug', $args, true);
 $args = array_values(array_filter($args, static function ($arg) {
     return $arg !== '--debug';
