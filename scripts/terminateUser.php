@@ -341,6 +341,14 @@ pmssUserTerminateStep(
     $dryRun
 );
 
+// Remove stale per-user lock files left behind by lifecycle helpers.
+pmssUserTerminateStep(
+    $username,
+    'cleanup_lock_files',
+    'rm -f -- /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock',
+    $dryRun
+);
+
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 
 $overallDuration = microtime(true) - $overallStart;

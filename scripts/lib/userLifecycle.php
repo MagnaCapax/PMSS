@@ -66,7 +66,7 @@ function pmssUsernameIsValid(string $username): bool
     if ($normalized !== $username) {
         return false;
     }
-    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $normalized);
+    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized);
 }
 
 /**

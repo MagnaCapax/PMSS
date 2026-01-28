@@ -56,6 +56,7 @@ class UsernameValidationTest extends TestCase
             'toolong89x', // longer than 8 chars
             'slash/user', // slash
             'User123',    // uppercase not allowed
+            "user\n",     // trailing newline
             '..',         // path-like
         ];
         foreach ($invalid as $name) {
