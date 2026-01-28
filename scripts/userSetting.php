@@ -60,7 +60,7 @@ if ($action === 'list') {
     exit(0);
 }
 
-$user = $argv[2] ?? '';
+$user = pmssNormalizeUsername(trim((string) ($argv[2] ?? '')));
 if ($user === '' || !UserValidator::isValidUsername($user)) {
     fwrite(STDERR, "Invalid username\n");
     exit(1);

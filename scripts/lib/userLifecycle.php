@@ -101,7 +101,7 @@ function pmssReservedUsernames(): array
         // Common package-created system users
         'admin', 'apache', 'apache2', 'avahi', 'avahi-autoipd', 'bind',
         'clamav', 'chrony', 'colord', 'crontab', 'cups', 'cupsys', 'dbus', 'dcc',
-        'Debian-exim', 'debian-deluged', 'dhcp', 'dictd', 'dnsmasq',
+        'debian-exim', 'debian-deluged', 'dhcp', 'dictd', 'dnsmasq',
         'docker', 'dovecot', 'elasticsearch', 'fetchmail', 'firebird',
         'ftp', 'fuse', 'gdm', 'geoclue', 'git', 'gnome-initial-setup',
         'haldaemon', 'hplilp', 'http', 'httpd', 'identd', 'input',
