@@ -113,7 +113,7 @@ instead of restating details.
 ## Git Safety & Concurrency                                                                                                      
 - **Multi-Tenant Environment**: Assume the user or other agents are working in the same directory simultaneously.                
 - **Multi-Agent Sessions**: Multiple agents/runs may operate in the same checkout. Do not halt just because unrelated dirty files exist—ignore them and do not touch them.
-- **Multi-Agent Scope Rule**: When a run declares a scope, treat dirty files outside that scope as expected; do not halt. Only stop for unexpected changes inside the scope. Always report dirty files at start/end so operators can track concurrent activity.
+- **Multi-Agent Scope Rule**: When a run declares a scope, treat dirty files outside that scope as expected; do not halt. Only stop for unexpected changes inside the scope. Do not list dirty files unless you need to edit the same file, in which case ask for guidance.
 - **Halting Rule (IMPORTANT)**: Do not halt just because unrelated files are dirty. Only stop and ask for guidance when you need to edit a file that is already dirty.
 - **Avoid Stepping On Toes**: Before editing a file, if it is already dirty and in your intended scope, skip it and pick a different target; if you must edit it, ask the operator first.
 - **Sacred Working Directory**: NEVER discard unstaged changes (`git restore`, `git checkout <file>`, `git reset`, `git clean`) unless explicitly ordered by the user.
