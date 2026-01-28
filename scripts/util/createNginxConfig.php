@@ -258,9 +258,8 @@ server {
         include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
 
-        # WebDAV: allow large uploads and stream request bodies to lighttpd.
+        # WebDAV: allow large uploads.
         client_max_body_size 0;
-        proxy_request_buffering off;
 
         limit_rate_after 100m;
         limit_rate 102400k;
@@ -314,9 +313,8 @@ server {
         include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
 
-        # WebDAV: allow large uploads and stream request bodies to lighttpd.
+        # WebDAV: allow large uploads.
         client_max_body_size 0;
-        proxy_request_buffering off;
 
         limit_rate_after 100m;
         limit_rate 102400k;

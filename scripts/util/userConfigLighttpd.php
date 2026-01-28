@@ -282,6 +282,11 @@ function pmssDelugeReadWebConf(string $path): ?array
     if (!is_string($raw)) {
         return null;
     }
+    if (strpos($raw, "\0") !== false) {
+        // Deluge web.conf is expected to be plain text JSON (two objects).
+        // Treat NUL bytes as corruption/malicious input and refuse to parse.
+        return null;
+    }
 
     $split = pmssSplitFirstJsonObject($raw);
     if (!is_array($split) || count($split) !== 2) {

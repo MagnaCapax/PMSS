@@ -33,9 +33,8 @@ location /webdav-##username/ {
         include /etc/nginx/proxy_params;
         proxy_http_version 1.1;
 
-        # WebDAV: allow large uploads and stream request bodies to lighttpd.
+        # WebDAV: allow large uploads.
         client_max_body_size 0;
-        proxy_request_buffering off;
 
         limit_rate_after 100m;
         limit_rate 102400k;
@@ -43,13 +42,16 @@ location /webdav-##username/ {
         error_page 502 /error-502.html;
 }
 
-location /deluge-##username/ {
+location = /deluge-##username {
     # Legacy Deluge URL path. Keep for compatibility until at least 2028-01-28.
     # Canonical path is /user-##username/deluge/ (served by per-user lighttpd).
-    proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;
-    include /etc/nginx/proxy_params;
-    proxy_http_version 1.1;
-    limit_rate_after 500m;
-    limit_rate 32768k;
-    limit_conn addr 8;
+    return 301 /user-##username/deluge/$is_args$args;
+}
+
+location = /deluge-##username/ {
+    return 301 /user-##username/deluge/$is_args$args;
+}
+
+location ~ ^/deluge-##username/(.*)$ {
+    return 301 /user-##username/deluge/$1$is_args$args;
 }
