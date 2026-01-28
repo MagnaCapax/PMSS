@@ -5,6 +5,18 @@ require_once dirname(__DIR__, 2).'/rtorrentConfig.php';
 
 class rtorrentConfigCreateConfigTest extends TestCase
 {
+    private function calculatePiecesMemory(int $ramMiB): int
+    {
+        $ramMiB = max(0, (int)$ramMiB);
+        $gapMiB = (int) floor($ramMiB * 0.25);
+        $gapMiB = max(250, min(1000, $gapMiB));
+        $piecesMemoryMiB = $ramMiB - $gapMiB;
+        if ($piecesMemoryMiB < 170) {
+            $piecesMemoryMiB = 170;
+        }
+        return $piecesMemoryMiB;
+    }
+
     public function testCreateConfigRendersTemplateReplacements(): void
     {
         // createConfig() touches this real path when present; keep dev tests hermetic.
@@ -65,12 +77,56 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'listen='.$input['listenPort'],
             'pex='.$input['pex'],
             'dhtmode='.$input['dht'],
-            'mem='.$input['ram'].'M',
+            'mem='.$this->calculatePiecesMemory((int)$input['ram']).'M',
             '',
         ]);
 
         $this->assertEquals($expected, (string) $result['configFile']);
         $this->assertEquals($input, $result['config']);
     }
-}
 
+    public function testCreateConfigAppliesMemoryHeadroomGuardrails(): void
+    {
+        if (is_readable('/etc/seedbox/config/localnet')) {
+            throw new SkipTest('localnet config present on host; skipping rtorrentConfig memory guardrail test');
+        }
+
+        $resourceConfig = [
+            'ramBlock' => 250,
+            'peers' => [
+                'minimum' => 1,
+                'maximum' => 2,
+            ],
+            'uploadSlots' => 1,
+        ];
+        $template = "mem=##memoryMax\n";
+        $cfg = new \rtorrentConfig($resourceConfig, $template);
+
+        $base = [
+            'scgiPort'   => 5000,
+            'dhtPort'    => 5001,
+            'listenPort' => 5002,
+            'pex'        => 'auto',
+            'dht'        => 'yes',
+        ];
+
+        $cases = [
+            ['ram' => 250,  'expected' => 170],
+            ['ram' => 500,  'expected' => 250],
+            ['ram' => 1000, 'expected' => 750],
+            ['ram' => 2000, 'expected' => 1500],
+            ['ram' => 8000, 'expected' => 7000],
+        ];
+
+        foreach ($cases as $case) {
+            $input = $base;
+            $input['ram'] = $case['ram'];
+            $result = $cfg->createConfig($input);
+            $this->assertEquals(
+                'mem='.$case['expected'].'M'."\n",
+                (string) $result['configFile'],
+                'Unexpected pieces.memory.max for ram '.$case['ram']
+            );
+        }
+    }
+}

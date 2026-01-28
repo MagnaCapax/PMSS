@@ -81,7 +81,15 @@ class rtorrentConfig {
 		$minimumPeers = ceil($resourceConfig['peers']['minimum'] * $blocks);
 		$maximumPeers = floor($resourceConfig['peers']['maximum'] * $blocks);
 		$uploadSlots = floor( $resourceConfig['uploadSlots'] * $blocks );
-		
+
+		// Reserve headroom for lighttpd/php-cgi and wrappers inside the user slice.
+		$ramMiB = max(0, (int)$config['ram']);
+		$gapMiB = (int) floor($ramMiB * 0.25);
+		$gapMiB = max(250, min(1000, $gapMiB));
+		$piecesMemoryMiB = $ramMiB - $gapMiB;
+		if ($piecesMemoryMiB < 170) {
+			$piecesMemoryMiB = 170;
+		}
 
 		$replacements = [
 			'##minimumPeers'      => $minimumPeers,
@@ -93,7 +101,7 @@ class rtorrentConfig {
 			'##listenPort'        => $config['listenPort'],
 			'##pex'               => $config['pex'],
 			'##dht'               => $config['dht'],
-			'##memoryMax'         => $config['ram'] . 'M',
+			'##memoryMax'         => $piecesMemoryMiB . 'M',
 		];
 		$configFile = str_replace(array_keys($replacements), array_values($replacements), $template);
 	
