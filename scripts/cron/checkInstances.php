@@ -8,6 +8,13 @@
  * point so older cron templates and custom automation do not break.
  */
 
+// Avoid overlapping watchdog runs when cron is delayed or storage is saturated.
+$lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkInstances.lock';
+$lockHandle = @fopen($lockPath, 'c');
+if ($lockHandle === false || !@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    exit(0);
+}
+
 $target = __DIR__.'/checkRtorrent.php';
 if (!is_file($target)) {
     fwrite(STDERR, date('c')." ERROR: {$target} missing; cannot run rTorrent watchdog\n");
@@ -25,4 +32,3 @@ foreach ($args as $arg) {
 $rc = 0;
 passthru($cmd, $rc);
 exit($rc);
-
