@@ -27,6 +27,44 @@ class UsernameValidationTest extends TestCase
         }
     }
 
+    public function testCreateUsernamesRejectReservedNames(): void
+    {
+        $reserved = [
+            'root',
+            'daemon',
+            'bin',
+            'sys',
+            'sync',
+            'games',
+            'man',
+            'lp',
+            'mail',
+            'news',
+            'uucp',
+            'proxy',
+            'www',
+            'backup',
+            'list',
+            'irc',
+            'gnats',
+            'nobody',
+            'sshd',
+            'dbus',
+            'rtkit',
+            'avahi',
+            'pulse',
+            'ntp',
+            'proftpd',
+            'syslog',
+            'polkitd',
+            'uuidd',
+        ];
+
+        foreach ($reserved as $name) {
+            $this->assertTrue(!\pmssValidateUsernameForCreate($name), 'Expected reserved username to be rejected: '.$name);
+        }
+    }
+
     public function testInvalidUsernamesFail(): void
     {
         $invalid = [

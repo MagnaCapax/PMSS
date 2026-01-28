@@ -447,6 +447,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     lighttpd, regenerates nginx, starts rTorrent and lighttpd, refreshes network,
     installs default crontab, queues permission fix; optional traffic limit persists to runtime traffic files (user config store always writes `trafficLimit=0`).
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
+  - Guardrails: Rejects reserved system/service usernames to avoid future account collisions.
   - Fail-fast: Aborts on existing user, orphaned home directory, failed `useradd`,
     failed `changePw.php`, or failed `userConfig.php` to avoid partial provisioning.
   - Logs: `/var/log/pmss/addUser.log`, shared user logs (`/var/log/pmss/users.log`,

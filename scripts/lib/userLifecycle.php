@@ -58,6 +58,48 @@ function pmssUsernameIsValid(string $username): bool
 }
 
 /**
+ * Return true when a username is reserved for system/service accounts.
+ *
+ * Keep this list focused on common Debian system users to avoid future
+ * collisions with package-owned accounts.
+ */
+function pmssUsernameIsReserved(string $username): bool
+{
+    static $reserved = array(
+        'root',
+        'daemon',
+        'bin',
+        'sys',
+        'sync',
+        'games',
+        'man',
+        'lp',
+        'mail',
+        'news',
+        'uucp',
+        'proxy',
+        'www',
+        'backup',
+        'list',
+        'irc',
+        'gnats',
+        'nobody',
+        'sshd',
+        'dbus',
+        'rtkit',
+        'avahi',
+        'pulse',
+        'ntp',
+        'proftpd',
+        'syslog',
+        'polkitd',
+        'uuidd',
+    );
+
+    return in_array($username, $reserved, true);
+}
+
+/**
  * Validate a username for new-user provisioning (stricter than legacy checks).
  *
  * Provisioning creates fresh system users, configures services, and writes
@@ -67,7 +109,13 @@ function pmssUsernameIsValid(string $username): bool
  */
 function pmssUsernameIsValidForCreate(string $username): bool
 {
-    return pmssUsernameIsValid($username) && strlen($username) >= 3;
+    if (!pmssUsernameIsValid($username)) {
+        return false;
+    }
+    if (strlen($username) < 3) {
+        return false;
+    }
+    return !pmssUsernameIsReserved($username);
 }
 
 /**
