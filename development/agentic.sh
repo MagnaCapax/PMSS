@@ -4,6 +4,7 @@ set -o errtrace
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
+# shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
 
 codex_enable_debug PMSS_AGENTIC_DEBUG "agentic"
@@ -24,6 +25,9 @@ usage() {
 Usage:
   development/agentic.sh [--agent NAME] [--exec CMD] [--verbose] [--help] [-- <assistant args>]
 
+Purpose:
+  Run codex-run with the standard prompt and selected assistant.
+
 Options:
   --agent NAME     Select assistant profile (default: ${default_agent})
   --exec CMD       Override the profile command line
@@ -31,12 +35,28 @@ Options:
   -h, --help       Show this help
 
 Pass-through to codex-run:
-  --prompt-file, --prompt, --context, --dry-run, --autocommit, --outdir
+  --prompt-file PATH  Use a prompt file instead of the default
+  --prompt TEXT       Use custom prompt text instead of a file
+  --context PATH      Append extra context (repeatable)
+  --outdir DIR        Write prompt + artifacts to DIR (default: temp dir)
+  --dry-run           Build prompt and show the assistant command only
+  --autocommit        Enable autocommit rules in the prompt (operator-approved)
+
+Assistant CLI args (appended to the exec command):
+  --yolo, -y                     Convenience flag (maps to claude danger)
+  --approval-mode MODE           Assistant-specific approval mode
+  --allowed-tools LIST           Assistant-specific allowed tools list
+  --permission-mode MODE         Assistant-specific permission mode
+  --dangerously-skip-permissions Pass through as-is
 
 Available agents with profiles:
 EOF
-	agentic_list_agents | sed 's/^/  - /'
+	codex_list_agents "$ASSIST_DIR" | sed 's/^/  - /'
 	cat <<'EOF'
+
+Environment:
+  PMSS_AGENTIC_DEFAULT_AGENT  Default agent when --agent is omitted
+  PMSS_AGENTIC_DEBUG=1        Enable bash -x tracing
 
 Examples:
   development/agentic.sh --agent=codex --dry-run
@@ -45,28 +65,6 @@ Examples:
   development/agentic.sh --agent=gemini -- --approval-mode yolo
   development/agentic.sh --agent=gemini --approval-mode yolo
 EOF
-}
-
-agentic_list_agents() {
-	local f
-	if compgen -G "$ASSIST_DIR/*" >/dev/null; then
-		for f in "$ASSIST_DIR"/*; do
-			[[ -f "$f" ]] || continue
-			basename "$f"
-		done
-	fi
-}
-
-agentic_read_profile_cmd() {
-	local profile="$1" line=""
-	while IFS= read -r line || [[ -n "$line" ]]; do
-		line="${line%$'\r'}"
-		[[ -z "$line" ]] && continue
-		[[ "$line" =~ ^[[:space:]]*# ]] && continue
-		echo "$line"
-		return 0
-	done <"$profile"
-	return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -134,62 +132,15 @@ if [[ -z "$agent" ]]; then
 	agent="$default_agent"
 fi
 
-if [[ -z "$exec_cmd" ]]; then
-	profile="$ASSIST_DIR/$agent"
-	if [[ -f "$profile" ]]; then
-		exec_cmd="$(agentic_read_profile_cmd "$profile" || true)"
-		if [[ -z "$exec_cmd" ]]; then
-			echo "Error: Agent profile '$profile' has no command line." >&2
-			exit 2
-		fi
-	elif command -v "$agent" >/dev/null 2>&1; then
-		exec_cmd="$agent"
-	else
-		echo "Error: Agent '$agent' not available." >&2
-		echo >&2
-		echo "Available agents with profiles:" >&2
-		agentic_list_agents | sed 's/^/  - /' >&2
-		echo >&2
-		echo "Or use --exec to specify a custom command." >&2
-		exit 2
-	fi
-fi
+exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 
 if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	# Append extra assistant CLI args (shell-escaped) to the exec string.
-	claude_force_danger=0
 	normalized_exec_extra_args=()
-	for ((i = 0; i < ${#exec_extra_args[@]}; i++)); do
-		case "${exec_extra_args[$i]}" in
-		--yolo | -y)
-			if [[ "$agent" == "claude" ]]; then
-				claude_force_danger=1
-			else
-				normalized_exec_extra_args+=("${exec_extra_args[$i]}")
-			fi
-			;;
-		--approval-mode)
-			if [[ "$agent" == "claude" && "${exec_extra_args[$((i + 1))]:-}" == "yolo" ]]; then
-				claude_force_danger=1
-				i=$((i + 1))
-			else
-				normalized_exec_extra_args+=("${exec_extra_args[$i]}")
-				if [[ -n "${exec_extra_args[$((i + 1))]:-}" ]]; then
-					normalized_exec_extra_args+=("${exec_extra_args[$((i + 1))]}")
-					i=$((i + 1))
-				fi
-			fi
-			;;
-		*)
-			normalized_exec_extra_args+=("${exec_extra_args[$i]}")
-			;;
-		esac
-	done
-
-	if [[ "$claude_force_danger" == "1" && "$agent" == "claude" ]]; then
-		normalized_exec_extra_args+=(--dangerously-skip-permissions)
-	fi
-
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		normalized_exec_extra_args+=("$line")
+	done < <(codex_normalize_exec_extra_args "$agent" "${exec_extra_args[@]}")
 	for exec_extra_arg in "${normalized_exec_extra_args[@]}"; do
 		printf -v exec_extra_q '%q' "$exec_extra_arg"
 		exec_cmd+=" $exec_extra_q"

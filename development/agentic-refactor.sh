@@ -4,6 +4,7 @@ set -o errtrace
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
+# shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
 
 # Optional debug: PMSS_REFACTOR_CODEX_DEBUG=1 enables bash -x tracing.
@@ -24,6 +25,48 @@ echo "[agentic-refactor] start: assembling refactor context and invoking assista
 #   development/agentic-refactor.sh --agent codex
 #   development/agentic-refactor.sh --dry-run
 
+usage() {
+	cat <<EOF
+Usage:
+  development/agentic-refactor.sh [options] [-- <assistant args>]
+
+Purpose:
+  Collect refactor context (commits, candidate files, LOC snapshots) and launch
+  the refactor prompt via codex-run.
+
+Options:
+  --commits N     Number of recent commits to scan (default: ${commits})
+  --target PATH   Substring filter for candidate files (best-effort)
+  --agent NAME    Assistant profile (default: ${default_agent})
+  --exec CMD      Override assistant command line
+  --prompt TEXT   Override the default refactor prompt text
+  --dry-run       Skip git/loc/phploc collection; show planned actions only
+  --autocommit    Enable autocommit rules in the prompt (operator-approved)
+  -h, --help      Show this help
+
+Assistant CLI args (appended to the exec command):
+  --yolo, -y                     Convenience flag (maps to claude danger)
+  --approval-mode MODE           Assistant-specific approval mode
+  --allowed-tools LIST           Assistant-specific allowed tools list
+  --permission-mode MODE         Assistant-specific permission mode
+  --dangerously-skip-permissions Pass through as-is
+
+Outputs:
+  A temp workspace under \$TMPDIR with commit summaries, candidates, and prompt.
+
+Environment:
+  PMSS_AGENTIC_DEFAULT_AGENT  Default agent when --agent is omitted
+  PMSS_REFACTOR_CODEX_DEBUG=1 Enable bash -x tracing
+
+Examples:
+  development/agentic-refactor.sh --commits 25
+  development/agentic-refactor.sh --target scripts/lib/update
+  development/agentic-refactor.sh --prompt "Refactor X (behavior-preserving)"
+  development/agentic-refactor.sh --agent codex --dry-run
+  development/agentic-refactor.sh --agent gemini -- --approval-mode yolo
+EOF
+}
+
 TMP="${TMPDIR:-/tmp}"
 ASSIST_DIR="$HERE/assistants"
 default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
@@ -42,28 +85,6 @@ declare -a exec_extra_args=()
 custom_prompt=""
 dry_run=0
 autocommit=0
-
-agentic_list_agents() {
-	local f
-	if compgen -G "$ASSIST_DIR/*" >/dev/null; then
-		for f in "$ASSIST_DIR"/*; do
-			[[ -f "$f" ]] || continue
-			basename "$f"
-		done
-	fi
-}
-
-agentic_read_profile_cmd() {
-	local profile="$1" line=""
-	while IFS= read -r line || [[ -n "$line" ]]; do
-		line="${line%$'\r'}"
-		[[ -z "$line" ]] && continue
-		[[ "$line" =~ ^[[:space:]]*# ]] && continue
-		echo "$line"
-		return 0
-	done <"$profile"
-	return 1
-}
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -127,7 +148,7 @@ while [[ $# -gt 0 ]]; do
 		break
 		;;
 	-h | --help)
-		sed -n '1,120p' "$0"
+		usage
 		exit 0
 		;;
 	*)
@@ -152,67 +173,17 @@ if [[ -z "$agent" ]]; then
 	agent="$default_agent"
 fi
 
-if [[ -z "$exec_cmd" ]]; then
-	profile="$ASSIST_DIR/$agent"
-	if [[ -f "$profile" ]]; then
-		exec_cmd="$(agentic_read_profile_cmd "$profile" || true)"
-		if [[ -z "$exec_cmd" ]]; then
-			echo "Error: Agent profile '$profile' has no command line." >&2
-			exit 2
-		fi
-	elif command -v "$agent" >/dev/null 2>&1; then
-		exec_cmd="$agent"
-	else
-		echo "Error: Agent '$agent' not available." >&2
-		echo >&2
-		echo "Available agents with profiles:" >&2
-		agentic_list_agents | sed 's/^/  - /' >&2
-		echo >&2
-		echo "Or use --exec to specify a custom command." >&2
-		exit 2
-	fi
-fi
+exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 
 if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	# Append extra assistant CLI args (shell-escaped) to the exec string.
 	# This keeps agent selection stable while allowing per-run tuning like:
 	#   ... -- --approval-mode yolo
-	claude_force_danger=0
 	normalized_exec_extra_args=()
-	for ((i = 0; i < ${#exec_extra_args[@]}; i++)); do
-		case "${exec_extra_args[$i]}" in
-		--yolo | -y)
-			# Gemini-style flag; Claude does not support it. Map to the closest
-			# equivalent (explicitly bypass permission prompts) when agent=claude.
-			if [[ "$agent" == "claude" ]]; then
-				claude_force_danger=1
-			else
-				normalized_exec_extra_args+=("${exec_extra_args[$i]}")
-			fi
-			;;
-		--approval-mode)
-			# Gemini-only. If operator asked for yolo and agent=claude, map.
-			if [[ "$agent" == "claude" && "${exec_extra_args[$((i + 1))]:-}" == "yolo" ]]; then
-				claude_force_danger=1
-				i=$((i + 1))
-			else
-				normalized_exec_extra_args+=("${exec_extra_args[$i]}")
-				if [[ -n "${exec_extra_args[$((i + 1))]:-}" ]]; then
-					normalized_exec_extra_args+=("${exec_extra_args[$((i + 1))]}")
-					i=$((i + 1))
-				fi
-			fi
-			;;
-		*)
-			normalized_exec_extra_args+=("${exec_extra_args[$i]}")
-			;;
-		esac
-	done
-
-	if [[ "$claude_force_danger" == "1" && "$agent" == "claude" ]]; then
-		normalized_exec_extra_args+=(--dangerously-skip-permissions)
-	fi
-
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		normalized_exec_extra_args+=("$line")
+	done < <(codex_normalize_exec_extra_args "$agent" "${exec_extra_args[@]}")
 	for exec_extra_arg in "${normalized_exec_extra_args[@]}"; do
 		printf -v exec_extra_q '%q' "$exec_extra_arg"
 		exec_cmd+=" $exec_extra_q"

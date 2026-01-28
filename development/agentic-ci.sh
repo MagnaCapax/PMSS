@@ -35,6 +35,43 @@ echo "[codex-ci] start: assembling CI context and invoking Codex" >&1
 #    First read AGENTS.md, docs, and ADRs to understand the rails, and double
 #    check TODOs before any code changes. Maintain PHP 7.3 compatibility."
 
+usage() {
+	cat <<EOF
+Usage:
+  development/agentic-ci.sh [options]
+
+Purpose:
+  Fetch the latest CI logs/artifacts and feed them to the assistant prompt.
+
+Options:
+  --job NAME     Only include logs for jobs matching NAME
+  --prompt TEXT  Override the default CI prompt text
+  --agent NAME   Assistant profile (default: ${default_agent})
+  --exec CMD     Override assistant command line
+  --dry-run      Skip GitHub API/downloads; only assemble prompt scaffolding
+  --autocommit   Enable autocommit rules in the prompt (operator-approved)
+  -h, --help     Show this help
+
+Requirements:
+  - GitHub CLI (gh) authenticated, or curl + GITHUB_TOKEN for private repos.
+
+Environment:
+  PMSS_AGENTIC_DEFAULT_AGENT  Default agent when --agent is omitted
+  PMSS_CI_CODEX_DEBUG=1       Enable bash -x tracing
+  GITHUB_TOKEN               GitHub token for API access (private repos)
+  JOB_LOG_LINES              Max lines of job logs (default: ${JOB_LOG_LINES})
+  ARTIFACT_LINES             Max lines per artifact (default: ${ARTIFACT_LINES})
+  MAX_ARTIFACT_FILES         Max artifact files to include (default: ${MAX_ARTIFACT_FILES})
+  PMSS_CI_WAIT_SECS          Wait for run completion (default: ${PMSS_CI_WAIT_SECS})
+
+Examples:
+  development/agentic-ci.sh
+  development/agentic-ci.sh --job smoke
+  development/agentic-ci.sh --prompt "Fix CI failures"
+  development/agentic-ci.sh --agent=codex --dry-run
+EOF
+}
+
 # Create a throwaway workspace under the system temp dir (avoid repo clutter)
 TMP="${TMPDIR:-/tmp}"
 ASSIST_DIR="$HERE/assistants"
@@ -57,28 +94,6 @@ custom_prompt=""
 exec_cmd=""
 dry_run=0
 autocommit=0
-
-agentic_list_agents() {
-	local f
-	if compgen -G "$ASSIST_DIR/*" >/dev/null; then
-		for f in "$ASSIST_DIR"/*; do
-			[[ -f "$f" ]] || continue
-			basename "$f"
-		done
-	fi
-}
-
-agentic_read_profile_cmd() {
-	local profile="$1" line=""
-	while IFS= read -r line || [[ -n "$line" ]]; do
-		line="${line%$'\r'}"
-		[[ -z "$line" ]] && continue
-		[[ "$line" =~ ^[[:space:]]*# ]] && continue
-		echo "$line"
-		return 0
-	done <"$profile"
-	return 1
-}
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -111,7 +126,7 @@ while [[ $# -gt 0 ]]; do
 		shift || true
 		;;
 	-h | --help)
-		sed -n '1,60p' "$0"
+		usage
 		exit 0
 		;;
 	*)
@@ -125,26 +140,7 @@ if [[ -z "$agent" ]]; then
 	agent="$default_agent"
 fi
 
-if [[ -z "$exec_cmd" ]]; then
-	profile="$ASSIST_DIR/$agent"
-	if [[ -f "$profile" ]]; then
-		exec_cmd="$(agentic_read_profile_cmd "$profile" || true)"
-		if [[ -z "$exec_cmd" ]]; then
-			echo "Error: Agent profile '$profile' has no command line." >&2
-			exit 2
-		fi
-	elif command -v "$agent" >/dev/null 2>&1; then
-		exec_cmd="$agent"
-	else
-		echo "Error: Agent '$agent' not available." >&2
-		echo >&2
-		echo "Available agents with profiles:" >&2
-		agentic_list_agents | sed 's/^/  - /' >&2
-		echo >&2
-		echo "Or use --exec to specify a custom command." >&2
-		exit 2
-	fi
-fi
+exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 
 have() { command -v "$1" >/dev/null 2>&1; }
 

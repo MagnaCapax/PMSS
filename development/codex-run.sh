@@ -4,6 +4,7 @@ set -o errtrace
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
+# shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
 
 # Optional debug: PMSS_CODEX_RUN_DEBUG=1 enables bash -x tracing.
@@ -54,7 +55,41 @@ codex_exec_preview() {
 }
 
 usage() {
-	sed -n '1,120p' "$0"
+	cat <<'EOF'
+Usage:
+  development/codex-run.sh run --prompt-file PATH [options]
+
+Purpose:
+  Build a prompt file, append required rails/context, then invoke the assistant.
+
+Commands:
+  run  Build the prompt and invoke the assistant (or preview with --dry-run)
+
+Options:
+  --prompt-file PATH  Base prompt text file (required unless --prompt is used)
+  --prompt TEXT       Inline prompt text instead of a file
+  --context PATH      Append extra context files (repeatable)
+  --exec CMD          Assistant command line (default: codex)
+  --outdir DIR        Output directory for prompt + artifacts (default: temp dir)
+  --dry-run           Build prompt and show the command without invoking
+  --autocommit        Append autocommit rules into the prompt
+  -h, --help          Show this help
+
+Exec placeholders:
+  ##PROMPT_FILE##   Replaced with the prompt file path (quoted)
+  ##PROMPT##        Replaced with the prompt text (quoted)
+  ##PROMPT_STDIN##  Removed; prompt is piped via stdin
+
+Environment:
+  PMSS_CODEX_RUN_DEBUG=1  Enable bash -x tracing
+  PMSS_CODEX_DANGER_FAIL  Fail if dangerous diff patterns are detected (1=fail)
+  TMPDIR                 Temp directory root for prompt output
+
+Examples:
+  development/codex-run.sh run --prompt-file development/prompts/codex.txt
+  development/codex-run.sh run --prompt "Summarize changes" --dry-run
+  development/codex-run.sh run --prompt-file development/prompts/refactor.txt --exec "codex"
+EOF
 }
 
 # Usage:

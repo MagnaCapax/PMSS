@@ -17,6 +17,103 @@ codex_set_error_trap() {
 	trap 'echo "['"$prefix"'] ERROR rc=$? at line $LINENO while: $BASH_COMMAND" >&1' ERR
 }
 
+# List available assistant profiles under the given directory.
+codex_list_agents() {
+	local assist_dir="$1"
+	local f
+	if compgen -G "$assist_dir/*" >/dev/null; then
+		for f in "$assist_dir"/*; do
+			[[ -f "$f" ]] || continue
+			basename "$f"
+		done
+	fi
+}
+
+# Read the first non-empty, non-comment line from an agent profile file.
+codex_read_profile_cmd() {
+	local profile="$1" line=""
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		line="${line%$'\r'}"
+		[[ -z "$line" ]] && continue
+		[[ "$line" =~ ^[[:space:]]*# ]] && continue
+		echo "$line"
+		return 0
+	done <"$profile"
+	return 1
+}
+
+# Resolve the assistant exec command from profile/agent/override.
+codex_resolve_exec_cmd() {
+	local assist_dir="$1" agent="$2" exec_cmd="$3"
+	if [[ -n "$exec_cmd" ]]; then
+		printf '%s\n' "$exec_cmd"
+		return 0
+	fi
+
+	local profile="$assist_dir/$agent"
+	if [[ -f "$profile" ]]; then
+		exec_cmd="$(codex_read_profile_cmd "$profile" || true)"
+		if [[ -z "$exec_cmd" ]]; then
+			echo "Error: Agent profile '$profile' has no command line." >&2
+			return 2
+		fi
+	elif command -v "$agent" >/dev/null 2>&1; then
+		exec_cmd="$agent"
+	else
+		echo "Error: Agent '$agent' not available." >&2
+		echo >&2
+		echo "Available agents with profiles:" >&2
+		codex_list_agents "$assist_dir" | sed 's/^/  - /' >&2
+		echo >&2
+		echo "Or use --exec to specify a custom command." >&2
+		return 2
+	fi
+
+	printf '%s\n' "$exec_cmd"
+}
+
+# Normalize assistant CLI args (map yolo to Claude's danger flag).
+codex_normalize_exec_extra_args() {
+	local agent="$1"
+	shift || true
+	local -a args=("$@")
+	local -a normalized=()
+	local claude_force_danger=0
+
+	for ((i = 0; i < ${#args[@]}; i++)); do
+		case "${args[$i]}" in
+		--yolo | -y)
+			if [[ "$agent" == "claude" ]]; then
+				claude_force_danger=1
+			else
+				normalized+=("${args[$i]}")
+			fi
+			;;
+		--approval-mode)
+			if [[ "$agent" == "claude" && "${args[$((i + 1))]:-}" == "yolo" ]]; then
+				claude_force_danger=1
+				i=$((i + 1))
+			else
+				normalized+=("${args[$i]}")
+				if [[ -n "${args[$((i + 1))]:-}" ]]; then
+					normalized+=("${args[$((i + 1))]}")
+					i=$((i + 1))
+				fi
+			fi
+			;;
+		*)
+			normalized+=("${args[$i]}")
+			;;
+		esac
+	done
+
+	if [[ "$claude_force_danger" == "1" && "$agent" == "claude" ]]; then
+		normalized+=(--dangerously-skip-permissions)
+	fi
+
+	printf '%s\n' "${normalized[@]}"
+}
+
 # Require that the given path is a non-empty file.
 codex_require_nonempty_file() {
 	local path="$1" message="${2:-}"
