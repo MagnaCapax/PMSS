@@ -446,6 +446,12 @@ Automation often invokes these utilities; below are expected inputs and effects.
     assigns lighttpd port, applies config (`userConfig.php`), configures per-user
     lighttpd, regenerates nginx, starts rTorrent and lighttpd, refreshes network,
     installs default crontab, queues permission fix; optional traffic limit persists to runtime + user file.
+  - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
+  - Fail-fast: Aborts on existing user, orphaned home directory, failed `useradd`,
+    failed `changePw.php`, or failed `userConfig.php` to avoid partial provisioning.
+  - Logs: `/var/log/pmss/addUser.log`, shared user logs (`/var/log/pmss/users.log`,
+    `/var/log/pmss/users.jsonl`), and per-user logs under `/var/log/pmss/users/<user>.log`.
+    Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep.
 
 - scripts/changePw.php USERNAME [PASSWORD]
   - Behavior: Sets Unix password (generated if omitted) and per-user htpasswd; prints the password.

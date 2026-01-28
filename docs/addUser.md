@@ -24,6 +24,14 @@ On success the script:
 - writes rTorrent/ruTorrent configuration
 - enables quotas and traffic limits
 - starts rTorrent and lighttpd
+- emits a summary marker (`###ADDUSER:SUCCESS|FAIL|ERROR`) to stdout and `/var/log/pmss/addUser.log`
+
+Operational notes:
+- A per-user lock file prevents concurrent addUser runs for the same username.
+- Provisioning fails fast if the user already exists, the home directory is missing after `useradd`,
+  or critical steps (password + userConfig) fail.
+- Step outcomes are logged in `/var/log/pmss/addUser.log`, `/var/log/pmss/users.log`,
+  `/var/log/pmss/users.jsonl`, and per-user logs under `/var/log/pmss/users/<user>.log`.
 
 Example:
 

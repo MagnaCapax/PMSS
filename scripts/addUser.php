@@ -24,11 +24,12 @@ $user = array(
 );
 if (isset($argv[5])) $user['trafficLimit'] = (int) $argv[5];
 if ($user['password'] == 'rand') $user['password'] = '';
-    
+
 require_once 'lib/runtime.php';
 require_once 'lib/rtorrentConfig.php';
 require_once 'lib/users.php';
 require_once 'lib/userLifecycle.php';
+require_once 'lib/user/log.php';
 require_once 'lib/homeMount.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Creating
@@ -50,8 +51,54 @@ if (!pmssValidateUsernameForCreate($user['name'])) {
             )
         )
     );
+    if (function_exists('finalizeProvision')) {
+        finalizeProvision('ERROR', 'invalid_username', 1);
+    } elseif (function_exists('logProvisionMessage')) {
+        logProvisionMessage('FATAL: Invalid username; aborting provisioning');
+    }
     die("Invalid username: {$user['name']}\n");
 }
+
+// Avoid PHP timeouts in CLI runs and keep the process alive if the invoking
+// SSH session dies mid-provision.
+if (function_exists('set_time_limit')) {
+    @set_time_limit(0);
+}
+@ignore_user_abort(true);
+
+/**
+ * Best-effort detachment from a dying SSH session in non-interactive runs.
+ *
+ * When automation launches addUser.php without a TTY, a backend timeout can
+ * close the SSH channel and deliver SIGHUP/SIGPIPE. Ignoring those signals
+ * helps the provisioning continue while logs are written to disk.
+ */
+if (function_exists('posix_isatty')) {
+    $hasTty = @posix_isatty(STDIN) || @posix_isatty(STDOUT) || @posix_isatty(STDERR);
+    if (!$hasTty) {
+        if (function_exists('posix_setsid')) {
+            @posix_setsid();
+        }
+        if (function_exists('pcntl_signal')) {
+            if (defined('SIGHUP')) {
+                @pcntl_signal(SIGHUP, SIG_IGN);
+            }
+            if (defined('SIGPIPE')) {
+                @pcntl_signal(SIGPIPE, SIG_IGN);
+            }
+        }
+    }
+}
+
+// Provisioning runtime stats used for summary markers.
+$provisionStart = microtime(true);
+$provisionStats = [
+    'steps'      => 0,
+    'ok'         => 0,
+    'err'        => 0,
+    'last_error' => null,
+];
+$provisionFinalized = false;
 
 /**
  * Append a message to the provisioning log and console for traceability.
@@ -64,6 +111,9 @@ function logProvisionMessage(string $message): void
     $prefix = date('Y-m-d H:i:s') . " ({$user['name']}): ";
     @file_put_contents('/var/log/pmss/addUser.log', $prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
     echo $message.PHP_EOL;
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user['name'], $message);
+    }
     pmssUserWriteLogs(
         pmssUserBaseContext(
             'add',
@@ -84,18 +134,130 @@ function logProvisionMessage(string $message): void
  *
  * @param string $description Operator-facing label describing the action.
  * @param string $command     Full shell command executed through runCommand().
+ * @param string|null $logCommand Optional redacted command for logs.
  *
  * @return int Return code bubbled up from the child command.
  */
-function runProvisionStep(string $description, string $command): int
+function runProvisionStep(string $description, string $command, ?string $logCommand = null): int
 {
-    $result = runCommand($command, false, 'logProvisionMessage');
-    if ($result !== 0) {
-        logProvisionMessage($description . ' failed (rc=' . $result . ')');
-    } else {
-        logProvisionMessage($description . ' completed');
+    global $user, $provisionStats;
+
+    $logCommand = $logCommand ?? $command;
+    $logger = 'logProvisionMessage';
+    if ($logCommand !== $command) {
+        $logger = function (string $message) use ($command, $logCommand): void {
+            logProvisionMessage(str_replace($command, $logCommand, $message));
+        };
     }
+
+    $startedAt = microtime(true);
+    $result = runCommand($command, false, $logger);
+    $duration = round(microtime(true) - $startedAt, 4);
+    $provisionStats['steps']++;
+    if ($result !== 0) {
+        $provisionStats['err']++;
+        $provisionStats['last_error'] = $description . ' rc=' . $result;
+        logProvisionMessage($description . ' failed (rc=' . $result . ', duration=' . $duration . 's)');
+    } else {
+        $provisionStats['ok']++;
+        logProvisionMessage($description . ' completed (duration=' . $duration . 's)');
+    }
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'add',
+            'step',
+            $user['name'],
+            array(
+                'status'   => $result === 0 ? 'OK' : 'ERR',
+                'step'     => $description,
+                'command'  => $logCommand,
+                'rc'       => $result,
+                'duration' => $duration,
+            )
+        )
+    );
     return $result;
+}
+
+/**
+ * Emit a single-line status marker and structured summary for operators.
+ *
+ * @param string $status  SUCCESS|FAIL|ERROR marker.
+ * @param string $message Human-readable context (kept short for grep).
+ * @param int    $exitCode Intended exit code for the summary.
+ */
+function finalizeProvision(string $status, string $message, int $exitCode): void
+{
+    global $user, $provisionStart, $provisionStats, $provisionFinalized;
+    if ($provisionFinalized) {
+        return;
+    }
+    $provisionFinalized = true;
+
+    $duration = round(microtime(true) - $provisionStart, 3);
+    $summary = sprintf(
+        '###ADDUSER:%s user=%s duration=%ss steps_ok=%d steps_err=%d message=%s',
+        $status,
+        $user['name'],
+        $duration,
+        $provisionStats['ok'],
+        $provisionStats['err'],
+        $message
+    );
+    logProvisionMessage($summary);
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'add',
+            'summary',
+            $user['name'],
+            array(
+                'status'      => $status === 'SUCCESS' ? 'OK' : 'ERR',
+                'result'      => $status,
+                'message'     => $message,
+                'duration'    => $duration,
+                'exit_code'   => $exitCode,
+                'steps_ok'    => $provisionStats['ok'],
+                'steps_err'   => $provisionStats['err'],
+                'last_error'  => $provisionStats['last_error'],
+            )
+        )
+    );
+}
+
+// Prevent overlapping addUser runs for the same username to avoid UID/GID races.
+$lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
+$lockPath = $lockBase.'/pmss-addUser-'.$user['name'].'.lock';
+$lockHandle = @fopen($lockPath, 'c');
+if ($lockHandle === false) {
+    logProvisionMessage("FATAL: Unable to open lock file: {$lockPath}");
+    finalizeProvision('ERROR', 'lock_open_failed', 1);
+    exit(1);
+}
+if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    logProvisionMessage('FATAL: Another addUser is already running for this user');
+    finalizeProvision('ERROR', 'lock_busy', 1);
+    exit(1);
+}
+
+// Preflight: reject existing accounts or orphaned home directories.
+$homePath = "/home/{$user['name']}";
+$userExists = false;
+if (function_exists('posix_getpwnam')) {
+    $pw = @posix_getpwnam($user['name']);
+    $userExists = is_array($pw);
+} else {
+    $passwd = @file_get_contents('/etc/passwd');
+    $userExists = $passwd !== false && preg_match('/^'.preg_quote($user['name'], '/').':/m', $passwd) === 1;
+}
+if ($userExists) {
+    logProvisionMessage('FATAL: User already exists; refusing to overwrite');
+    finalizeProvision('ERROR', 'user_exists', 1);
+    exit(1);
+}
+if (is_dir($homePath)) {
+    logProvisionMessage('FATAL: Home directory exists without passwd entry; refusing to clobber');
+    finalizeProvision('ERROR', 'orphaned_home', 1);
+    exit(1);
 }
 
 // Get our server hostname, and do some cleanup just to be safe
@@ -104,14 +266,43 @@ $hostname = str_replace(array("\n", "\r", "\t"), array('','',''), $hostname);
 
 
 //Create the user
-runProvisionStep(
+$rc = runProvisionStep(
     'Create system user',
     sprintf('useradd --skel /etc/skel -m %s', escapeshellarg($user['name']))
 );
-runProvisionStep(
+if ($rc !== 0) {
+    logProvisionMessage('FATAL: Create system user failed; aborting provisioning');
+    finalizeProvision('FAIL', 'useradd_failed', 1);
+    exit(1);
+}
+$pwEntry = null;
+if (function_exists('posix_getpwnam')) {
+    $pwEntry = @posix_getpwnam($user['name']);
+}
+if (!is_dir($homePath)) {
+    logProvisionMessage('FATAL: Home directory missing after useradd; aborting provisioning');
+    finalizeProvision('FAIL', 'home_missing', 1);
+    exit(1);
+}
+if (is_array($pwEntry) && isset($pwEntry['uid'])) {
+    $homeOwner = @fileowner($homePath);
+    if ($homeOwner !== false && (int) $homeOwner !== (int) $pwEntry['uid']) {
+        logProvisionMessage('FATAL: Home directory owner mismatch after useradd; aborting provisioning');
+        finalizeProvision('FAIL', 'home_owner_mismatch', 1);
+        exit(1);
+    }
+}
+$safeChangePw = sprintf('/scripts/changePw.php %s [redacted]', escapeshellarg($user['name']));
+$rc = runProvisionStep(
     'Set initial password',
-    sprintf('/scripts/changePw.php %s %s', escapeshellarg($user['name']), escapeshellarg($user['password']))
+    sprintf('/scripts/changePw.php %s %s', escapeshellarg($user['name']), escapeshellarg($user['password'])),
+    $safeChangePw
 );
+if ($rc !== 0) {
+    logProvisionMessage('FATAL: Initial password update failed; aborting provisioning');
+    finalizeProvision('FAIL', 'password_failed', 1);
+    exit(1);
+}
 runProvisionStep(
     'Unlock user account',
     sprintf('usermod -U %s', escapeshellarg($user['name']))
@@ -146,7 +337,7 @@ runProvisionStep(
 );
 
 // Configure quota, rtorrent and ruTorrent.
-runProvisionStep(
+$rc = runProvisionStep(
     'Apply user configuration',
     sprintf('/scripts/util/userConfig.php %s %s %s',
         escapeshellarg($user['name']),
@@ -154,6 +345,11 @@ runProvisionStep(
         escapeshellarg($user['quota'])
     )
 );
+if ($rc !== 0) {
+    logProvisionMessage('FATAL: User configuration failed; aborting provisioning');
+    finalizeProvision('FAIL', 'user_config_failed', 1);
+    exit(1);
+}
 
 runProvisionStep(
     'Configure lighttpd vhost',
@@ -171,7 +367,7 @@ runProvisionStep(
 
 
 
-$userHomedirPath = "/home/{$user['name']}";
+$userHomedirPath = $homePath;
 
 // User data permissions
 #chdir("/home/{$user['name']}");
@@ -277,3 +473,5 @@ if (empty($user['trafficLimit'])) {
     @file_put_contents("/home/{$user['name']}/.trafficLimit", '0');
     @chmod("/home/{$user['name']}/.trafficLimit", 0664);
 }
+
+finalizeProvision('SUCCESS', 'completed', 0);
