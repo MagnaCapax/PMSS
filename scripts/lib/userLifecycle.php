@@ -88,7 +88,7 @@ function pmssReservedUsernames(): array
 
         // Common package-created system users
         'admin', 'apache', 'apache2', 'avahi', 'avahi-autoipd', 'bind',
-        'clamav', 'colord', 'crontab', 'cups', 'cupsys', 'dbus', 'dcc',
+        'clamav', 'chrony', 'colord', 'crontab', 'cups', 'cupsys', 'dbus', 'dcc',
         'Debian-exim', 'debian-deluged', 'dhcp', 'dictd', 'dnsmasq',
         'docker', 'dovecot', 'elasticsearch', 'fetchmail', 'firebird',
         'ftp', 'fuse', 'gdm', 'geoclue', 'git', 'gnome-initial-setup',
@@ -96,7 +96,7 @@ function pmssReservedUsernames(): array
         'jwhois', 'kernoops', 'klog', 'kvm', 'landscape', 'lightdm',
         'lpadmin', 'lxd', 'maas', 'memcache', 'messagebus', 'mongodb',
         'mosquitto', 'mythtv', 'nagios', 'netdev', 'nginx', 'ntp',
-        'ntpsec', 'polkitd', 'postfix', 'postgres', 'powerdev',
+        'ntpsec', 'openvpn', 'polkitd', 'postfix', 'postgres', 'powerdev',
         'proftpd', 'pulse', 'radvd', 'redis', 'render', 'rtkit',
         'saned', 'sbuild', 'scanner', 'sgx', 'slocate', 'snap_daemon',
         'speech-dispatcher', 'squid', 'ssh', 'sshd', 'ssl-cert',
