@@ -30,7 +30,7 @@ healthy between full update runs:
   Logs to `/var/log/pmss/systemdServicesGuard.log`.
   `* * * * * root sleep 25; /scripts/cron/systemdServicesGuard.php >> /var/log/pmss/systemdServicesGuard.log 2>&1`
 - **User database cleanup** – Prunes stale entries from
-  `/etc/seedbox/config/users.json` to keep provisioning data accurate. Logs to
+  `/etc/seedbox/config/users/*.json` to keep provisioning data accurate. Logs to
   `/var/log/pmss/userDbCleanup.log` when changes are made (or with `--debug`).
   `30 2 * * * root /scripts/cron/cleanupUserDb.php >> /var/log/pmss/userDbCleanup.log 2>&1`
 
