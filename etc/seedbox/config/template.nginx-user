@@ -45,13 +45,13 @@ location /webdav-##username/ {
 location = /deluge-##username {
     # Legacy Deluge URL path. Keep for compatibility until at least 2028-01-28.
     # Canonical path is /user-##username/deluge/ (served by per-user lighttpd).
-    return 301 /user-##username/deluge/$is_args$args;
+    return 308 /user-##username/deluge/$is_args$args;
 }
 
 location = /deluge-##username/ {
-    return 301 /user-##username/deluge/$is_args$args;
+    return 308 /user-##username/deluge/$is_args$args;
 }
 
 location ~ ^/deluge-##username/(.*)$ {
-    return 301 /user-##username/deluge/$1$is_args$args;
+    return 308 /user-##username/deluge/$1$is_args$args;
 }

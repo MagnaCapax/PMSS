@@ -349,14 +349,14 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 # PMSS-managed: Deluge reverse proxy.
 # Legacy path {$legacy} kept for compatibility until at least {$deprecationDate}.
 
-\$HTTP["url"] =~ "^/user-{$user}/deluge(\\$|/)" {
+\$HTTP["url"] =~ "^/user-{$user}/deluge($|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => {$webPort}
   ) ) )
 }
 
-\$HTTP["url"] =~ "^/deluge-{$user}(\\$|/)" {
+\$HTTP["url"] =~ "^/deluge-{$user}($|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => {$webPort}

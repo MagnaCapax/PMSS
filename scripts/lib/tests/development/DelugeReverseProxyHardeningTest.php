@@ -75,7 +75,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     }
 
     // =========================================================================
-    // SECTION 1: nginx legacy Deluge URL redirect (must be 301 to canonical)
+    // SECTION 1: nginx legacy Deluge URL redirect (must be 308 to canonical)
     // =========================================================================
 
     public function testNginxUserTemplateDelugeLegacyHasExactRedirectWithoutSlash(): void
@@ -83,7 +83,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
         $this->assertStringContainsString('location = /deluge-##username {', $template);
-        $this->assertStringContainsString('return 301 /user-##username/deluge/$is_args$args;', $template);
+        $this->assertStringContainsString('return 308 /user-##username/deluge/$is_args$args;', $template);
     }
 
     public function testNginxUserTemplateDelugeLegacyHasExactRedirectWithSlash(): void
@@ -91,7 +91,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
         $this->assertStringContainsString('location = /deluge-##username/ {', $template);
-        $this->assertStringContainsString('return 301 /user-##username/deluge/$is_args$args;', $template);
+        $this->assertStringContainsString('return 308 /user-##username/deluge/$is_args$args;', $template);
     }
 
     public function testNginxUserTemplateDelugeLegacyHasRegexRedirectForSubpaths(): void
@@ -99,16 +99,17 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
         $this->assertStringContainsString('location ~ ^/deluge-##username/(.*)$ {', $template);
-        $this->assertStringContainsString('return 301 /user-##username/deluge/$1$is_args$args;', $template);
+        $this->assertStringContainsString('return 308 /user-##username/deluge/$1$is_args$args;', $template);
     }
 
     public function testNginxUserTemplateDelugeLegacyRedirectPreservesQueryString(): void
     {
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
-        // All Deluge legacy redirects must preserve args to avoid breaking deep links.
-        preg_match_all('/^\\s*return\\s+301\\s+([^;]+);\\s*$/m', $template, $matches);
-        $this->assertTrue(!empty($matches[1]), 'Expected at least one return 301 directive');
+        // Deluge legacy redirects must preserve args to avoid breaking deep links.
+        // Use 308 (permanent + method-preserving) to avoid breaking Deluge's JSON RPC POSTs.
+        preg_match_all('/^\\s*return\\s+308\\s+([^;]+);\\s*$/m', $template, $matches);
+        $this->assertTrue(!empty($matches[1]), 'Expected at least one return 308 directive');
 
         $delugeReturns = 0;
         foreach ($matches[1] as $target) {
@@ -141,8 +142,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
         // The Deluge legacy redirect targets must be local paths (no scheme/host).
-        preg_match_all('/^\\s*return\\s+301\\s+([^;]+);\\s*$/m', $template, $matches);
-        $this->assertTrue(!empty($matches[1]), 'Expected at least one return 301 directive');
+        preg_match_all('/^\\s*return\\s+308\\s+([^;]+);\\s*$/m', $template, $matches);
+        $this->assertTrue(!empty($matches[1]), 'Expected at least one return 308 directive');
 
         foreach ($matches[1] as $target) {
             if (strpos($target, '/user-##username/deluge/') === false) {
@@ -191,7 +192,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('location = /deluge-##user## {', $block);
         $this->assertStringContainsString('location = /deluge-##user##/ {', $block);
         $this->assertStringContainsString('location ~ ^/deluge-##user##/(.*)$ {', $block);
-        $this->assertStringContainsString('return 301 /user-##user##/deluge/$1$is_args$args;', $block);
+        $this->assertStringContainsString('return 308 /user-##user##/deluge/$1$is_args$args;', $block);
     }
 
     public function testCreateNginxConfigPrivateSubdomainDoesNotExposePublicPrefix(): void
@@ -220,7 +221,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     {
         $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
 
-        $this->assertStringContainsString('^/user-testuser/deluge(\\$|/)', $fragment);
+        $this->assertStringContainsString('^/user-testuser/deluge($|/)', $fragment);
         $this->assertStringContainsString('"port" => 31111', $fragment);
         $this->assertStringContainsString('"host" => "127.0.0.1"', $fragment);
     }
@@ -229,7 +230,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     {
         $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
 
-        $this->assertStringContainsString('^/deluge-testuser(\\$|/)', $fragment);
+        $this->assertStringContainsString('^/deluge-testuser($|/)', $fragment);
         $this->assertStringContainsString('"map-urlpath"', $fragment);
         $this->assertStringContainsString('"/deluge-testuser/"  => "/user-testuser/deluge/"', $fragment);
         $this->assertStringContainsString('"/deluge-testuser" => "/user-testuser/deluge"', $fragment);

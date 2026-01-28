@@ -285,13 +285,13 @@ server {
     # Legacy Deluge URL path. Keep for compatibility until at least 2028-01-28.
     # Canonical path is /user-##user##/deluge/ (served by per-user lighttpd).
     location = /deluge-##user## {
-        return 301 /user-##user##/deluge/$is_args$args;
+        return 308 /user-##user##/deluge/$is_args$args;
     }
     location = /deluge-##user##/ {
-        return 301 /user-##user##/deluge/$is_args$args;
+        return 308 /user-##user##/deluge/$is_args$args;
     }
     location ~ ^/deluge-##user##/(.*)$ {
-        return 301 /user-##user##/deluge/$1$is_args$args;
+        return 308 /user-##user##/deluge/$1$is_args$args;
     }
 
     # When apps generate absolute /user-<user>/... URLs, avoid double-prefixing
