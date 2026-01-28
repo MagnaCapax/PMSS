@@ -957,8 +957,8 @@ LIGHTTPD;
 
         // Render with test values
         $rendered = str_replace(
-            array('##username', '##serverPort', '##rclonePort', '##qbittorrentPort', '##PMSS_WEBDAV_WWW_POLICY##'),
-            array('testuser', '30000', '30001', '30002', ''),
+            array('##username', '##serverPort', '##PMSS_WEBDAV_WWW_POLICY##'),
+            array('testuser', '30000', ''),
             $template
         );
 

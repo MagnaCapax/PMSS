@@ -402,6 +402,46 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 LIGHTTPD;
 }
 
+function pmssRcloneLighttpdProxyFragment(string $user, int $port): string
+{
+    return <<<LIGHTTPD
+# PMSS-managed: rclone reverse proxy.
+
+\$HTTP["url"] =~ "^/user-{$user}/rclone/" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$port}
+  ) ) )
+}
+
+LIGHTTPD;
+}
+
+function pmssQbittorrentLighttpdProxyFragment(string $user, int $port): string
+{
+    return <<<LIGHTTPD
+# PMSS-managed: qBittorrent reverse proxy.
+
+\$HTTP["url"] =~ "^/user-{$user}/qbittorrent/" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$port}
+  ) ) ),
+  proxy.forwarded = ( "for" => 1,
+                      "host" => 1,
+                      "by" => 1
+  ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/user-{$user}/qbittorrent/"  => "/",
+         "/user-{$user}/qbittorrent" => ""
+       )
+  )
+}
+
+LIGHTTPD;
+}
+
 function pmssRenderLighttpdConfig(string $template, string $user, int $serverPort, int $rclonePort, int $qbittorrentPort, array $resources): string
 {
     $webdavWwwPolicy = pmssWebdavWwwPolicyBlock($user);
@@ -602,6 +642,7 @@ function pmssUserConfigLighttpdMain(array $argv): int
             passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd/custom.d");
             passthru("chmod 750 /home/{$thisUser}/.lighttpd/custom.d");
         }
+        $customDir = "/home/{$thisUser}/.lighttpd/custom.d";
         $uploadDir = "/home/{$thisUser}/.lighttpd/upload";
         if (!is_dir($uploadDir)) {
             passthru("mkdir -p {$uploadDir}");
@@ -630,6 +671,19 @@ function pmssUserConfigLighttpdMain(array $argv): int
             $qbittorrentPort = (int) round(rand(1500, 65500));
             file_put_contents("/home/{$thisUser}/.qbittorrentPort", $qbittorrentPort);
         }
+
+        // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
+        $rcloneConfPath = "{$customDir}/pmss-rclone.conf";
+        file_put_contents($rcloneConfPath, pmssRcloneLighttpdProxyFragment($thisUser, $rclonePort));
+        @chown($rcloneConfPath, $thisUser);
+        @chgrp($rcloneConfPath, $thisUser);
+        @chmod($rcloneConfPath, 0640);
+
+        $qbittorrentConfPath = "{$customDir}/pmss-qbittorrent.conf";
+        file_put_contents($qbittorrentConfPath, pmssQbittorrentLighttpdProxyFragment($thisUser, $qbittorrentPort));
+        @chown($qbittorrentConfPath, $thisUser);
+        @chgrp($qbittorrentConfPath, $thisUser);
+        @chmod($qbittorrentConfPath, 0640);
 
         // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/
         // so nginx stays a lightweight reverse proxy.

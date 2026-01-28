@@ -98,33 +98,6 @@ $HTTP["url"] =~ "^/webdav-##username($|/)" {
 ##PMSS_WEBDAV_WWW_POLICY##
 # PMSS_WEBDAV_END
 
-$HTTP["url"] =~ "^/user-##username/rclone/" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => ##rclonePort
-  ) ) )
-}
-
-
-$HTTP["url"] =~ "^/user-##username/qbittorrent/" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => ##qbittorrentPort
-  ) ) ),
-  proxy.forwarded = ( "for" => 1,
-                      "host" => 1,
-                      "by" => 1
-  ),
-  proxy.header = (
-      "map-urlpath" => (
-         "/user-##username/qbittorrent/"  => "/",
-         "/user-##username/qbittorrent" => ""
-       )
-  )
-}
-
-
-
 $HTTP["url"] =~ "^/owncloud/data/" {
         url.access-deny = ("")
 }
