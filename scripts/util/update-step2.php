@@ -42,6 +42,7 @@ require_once __DIR__.'/../lib/update/webStack.php';
 require_once __DIR__.'/../lib/update/services/runtime.php';
 require_once __DIR__.'/../lib/update/services/systemd.php';
 require_once __DIR__.'/../lib/update/services/journald.php';
+require_once __DIR__.'/../lib/update/services/mountHardening.php';
 require_once __DIR__.'/../lib/update/userMaintenance.php';
 require_once __DIR__.'/../lib/update/networking.php';
 require_once __DIR__.'/../lib/update/services/bootstrap.php';
@@ -405,6 +406,8 @@ if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
 runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
 pmssPostUpdateWebRefresh();
+
+pmssConfigureTempMountNoexec('logmsg');
 
 runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
 runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');

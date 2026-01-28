@@ -73,7 +73,10 @@ scripts/lib/update/runtime/*           # shared runStep/logging/profile helpers
 
 Environment hints captured by `install.sh` are passed via `PMSS_HOSTNAME`,
 `PMSS_SKIP_HOSTNAME`, `PMSS_QUOTA_MOUNT`, and `PMSS_SKIP_QUOTA`; phase 2 honors
-those flags when reapplying legacy hostname/quota defaults.
+those flags when reapplying legacy hostname/quota defaults. Optional hardening
+can be enabled with `PMSS_HARDEN_TMP_NOEXEC=1` to add `noexec,nosuid,nodev` to
+`/tmp` and `/dev/shm` mounts (opt-in; may impact workflows that execute from
+`/tmp`).
 
 ### Package Phase Ordering
 
