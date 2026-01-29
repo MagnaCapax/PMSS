@@ -185,8 +185,8 @@ class Manager
             
             $props['MemoryMax'] = $memoryMax.'M';
         } elseif ($memoryHighMiB !== null) {
-            // Derived Max: 1.5x High, but capped at High + 2048 MiB (2GB) headroom
-            $derived = (int)floor($memoryHighMiB * 1.5);
+            // Derived Max: 1.25x High, but capped at High + 2048 MiB (2GB) headroom
+            $derived = (int)floor($memoryHighMiB * 1.25);
             $headroomCap = $memoryHighMiB + 2048;
             $memoryMax = min($derived, $headroomCap, $maxCap);
             $props['MemoryMax'] = $memoryMax.'M';

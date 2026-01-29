@@ -119,7 +119,7 @@ class CgroupUserConfigTest extends TestCase
 
     public function testMemoryDefaultCalculation()
     {
-        // 16GB RAM. Default High = 10% = 1638M. Max = 1.5x = 2457M.
+        // 16GB RAM. Default High = 10% = 1638M. Max = 1.25x = 2047M.
         // No apply, just check planned output.
         $res = $this->runMgr(['testuser', '--defaults']); 
         // Note: --defaults reads policy. If no policy, no defaults applied?
@@ -134,8 +134,8 @@ class CgroupUserConfigTest extends TestCase
         
         $res = $this->runMgr(['testuser', '--defaults']);
         $this->assertStringContainsString('MemoryHigh=1000M', $res['out']);
-        // Max should be derived: 1000 * 1.5 = 1500
-        $this->assertStringContainsString('MemoryMax=1500M', $res['out']);
+        // Max should be derived: 1000 * 1.25 = 1250
+        $this->assertStringContainsString('MemoryMax=1250M', $res['out']);
     }
 
     public function testMemoryClampEnforcement()
@@ -160,8 +160,8 @@ class CgroupUserConfigTest extends TestCase
         // High 100 (below 250 floor).
         $res = $this->runMgr(['testuser', '--memory-high=100']);
         $this->assertStringContainsString('MemoryHigh=250M', $res['out']);
-        // Max derived from clamped high: 250 * 1.5 = 375
-        $this->assertStringContainsString('MemoryMax=375M', $res['out']);
+        // Max derived from clamped high: 250 * 1.25 = 312
+        $this->assertStringContainsString('MemoryMax=312M', $res['out']);
     }
 
     public function testMemory95PercentCap()
@@ -318,8 +318,8 @@ class CgroupUserConfigTest extends TestCase
         $res = $this->runMgr(['testuser', '--memory-high=100']);
         // MaxCap is 0 or PHP_INT_MAX?
         // $maxCap = $sysMemMiB > 0 ? ... : PHP_INT_MAX;
-        // So it should fallback to High * 1.5 (150) or clamped to High+2GB.
-        // High 100 -> 250 floor. Max 375.
-        $this->assertStringContainsString('MemoryMax=375M', $res['out']);
+        // So it should fallback to High * 1.25 (125) or clamped to High+2GB.
+        // High 100 -> 250 floor. Max 312.
+        $this->assertStringContainsString('MemoryMax=312M', $res['out']);
     }
 }

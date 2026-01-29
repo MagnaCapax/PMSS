@@ -49,7 +49,7 @@ class UserCgroupUtilTest extends TestCase
         $p = $mgr->computeSetProps(['memory-high' => 500], $sys);
         $mh = (int)rtrim($p['MemoryHigh'],'M');
         $mm = (int)rtrim($p['MemoryMax'],'M');
-        $this->assertTrue($mm >= (int)floor($mh*1.4), 'expected ~1.5x high');
+        $this->assertEquals((int)floor($mh*1.25), $mm, 'expected 1.25x high');
         $this->assertTrue($mm <= (int)floor($sys*0.95));
     }
 

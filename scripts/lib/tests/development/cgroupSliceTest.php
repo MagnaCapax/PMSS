@@ -84,7 +84,7 @@ class cgroupSliceTest extends TestCase
         $high = (int)$m1[1];
         $this->assertTrue($high >= 250, 'MemoryHigh below minimum 250MiB');
 
-        // Large RAM: MemoryMax <= 95% and about 1.5x MemoryHigh
+        // Large RAM: MemoryMax <= 95% and about 1.25x MemoryHigh
         $drop3 = $this->tempDir('drop3');
         putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop3);
         putenv('PMSS_TOTAL_MEM_MIB=65536');
@@ -95,7 +95,7 @@ class cgroupSliceTest extends TestCase
         $mHigh = (int)$mh[1];
         $mMax  = (int)$mm[1];
         $this->assertTrue($mMax <= (int)floor(65536 * 0.95), 'MemoryMax exceeds 95% cap');
-        $this->assertTrue($mMax >= (int)floor($mHigh * 1.4), 'MemoryMax not close to 1.5x MemoryHigh');
+        $this->assertEquals((int)floor($mHigh * 1.25), $mMax, 'MemoryMax should default to 1.25x MemoryHigh');
     }
 
     public function testV1TemplateSelectedWhenModeV1(): void
