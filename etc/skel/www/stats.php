@@ -303,6 +303,16 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
     echo sprintf("Memory available: %6s MiB\n", round($fmt('MemAvailable') / 1024, 0));
     echo sprintf("Swap total:       %6s MiB\n", round($fmt('SwapTotal') / 1024, 0));
     echo sprintf("Swap free:        %6s MiB\n", round($fmt('SwapFree') / 1024, 0));
+
+    $psi = @file_get_contents('/proc/pressure/memory');
+    if ($psi && preg_match('/some avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $m)) {
+        echo sprintf("Memory pressure (some):  %s / %s / %s\n", $m[1], $m[2], $m[3]);
+        if (preg_match('/full avg10=([0-9.]+) avg60=([0-9.]+) avg300=([0-9.]+)/', $psi, $f)) {
+            echo sprintf("Memory pressure (full):  %s / %s / %s\n", $f[1], $f[2], $f[3]);
+        }
+    } else {
+        echo "Memory pressure: unavailable\n";
+    }
 } else {
     echo "Failed to read /proc/meminfo\n";
 }
