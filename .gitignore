@@ -68,6 +68,8 @@
 !/CONTRIBUTING.md
 !/development/
 !/development/**
+/development/prompts/
+/development/prompts/**
 
 # Additionally, do not ignore .gitignore file itself
 !.gitignore
