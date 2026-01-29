@@ -162,7 +162,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigPrivateSubdomainProxiesUserPrefixAsIs(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = \pmssNginxUserSubdomainTemplates()['private'];
 
         $this->assertStringContainsString('location ^~ /user-##user##/ {', $script);
         $this->assertStringContainsString('proxy_pass http://127.0.0.1:##port##;', $script);
@@ -170,7 +171,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigPrivateSubdomainStillPrefixesRootToUserArea(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = \pmssNginxUserSubdomainTemplates()['private'];
 
         $this->assertStringContainsString('location / {', $script);
         $this->assertStringContainsString('proxy_pass http://127.0.0.1:##port##/user-##user##/;', $script);
@@ -178,15 +180,16 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigPrivateSubdomainAsIsLocationUsesProxyParams(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = \pmssNginxUserSubdomainTemplates()['private'];
         $this->assertStringContainsString('location ^~ /user-##user##/', $script);
         $this->assertStringContainsString('include /etc/nginx/proxy_params;', $script);
     }
 
     public function testCreateNginxConfigPrivateSubdomainDelugeLegacyRedirectsExist(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
-        $block = $this->extractHeredoc($script, '$privateSubdomainTemplate');
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $block = \pmssNginxUserSubdomainTemplates()['private'];
 
         $this->assertStringContainsString('Keep for compatibility until at least 2028-01-28', $block);
         $this->assertStringContainsString('location = /deluge-##user## {', $block);
@@ -197,7 +200,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigAddsBaseHostnameToDefaultServerName(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        $script = $this->readRepoFile('scripts/lib/nginxConfig/setup.php');
 
         // Regression guard: base-host requests (FQDN) must land on the main vhost
         // where /etc/nginx/users/* is included (legacy Deluge redirects live there).
@@ -207,25 +210,26 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigPrivateSubdomainDoesNotExposePublicPrefix(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
-
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         // The private vhost is intended to expose only /user-<user>/ and /webdav-<user>/.
-        $block = $this->extractHeredoc($script, '$privateSubdomainTemplate');
+        $block = \pmssNginxUserSubdomainTemplates()['private'];
         $this->assertStringNotContainsString('/public-##user##/', $block);
     }
 
     public function testCreateNginxConfigStillSupportsLegacyDelugeWebPortPlaceholder(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        $setup = $this->readRepoFile('scripts/lib/nginxConfig/setup.php');
+        $generator = $this->readRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
 
         // Backward compat: older nginx user templates may still use ##delugeWebPort.
-        $this->assertStringContainsString('##delugeWebPort', $script);
-        $this->assertStringContainsString("strpos(\$userTemplate, '##delugeWebPort')", $script);
+        $this->assertStringContainsString('##delugeWebPort', $setup);
+        $this->assertStringContainsString("strpos(\$userTemplate, '##delugeWebPort')", $setup);
+        $this->assertStringContainsString('##delugeWebPort', $generator);
     }
 
     public function testCreateNginxConfigDelugeWebPortPlaceholderTreatsPortFileAsUntrusted(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        $script = $this->readRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
 
         // Regression guard: if we ever need to render a legacy template placeholder,
         // never trust user-owned/symlinked port files.
@@ -443,15 +447,6 @@ class DelugeReverseProxyHardeningTest extends TestCase
         return $path;
     }
 
-    private function extractHeredoc(string $source, string $variableName): string
-    {
-        $pattern = '/'.preg_quote($variableName, '/').'\\s*=\\s*<<<\\x27NGINX\\x27\\s*(.*?)\\s*NGINX;/s';
-        $matches = [];
-        preg_match($pattern, $source, $matches);
-        $this->assertTrue(isset($matches[1]) && is_string($matches[1]), "Failed to extract heredoc for {$variableName}");
-        return (string)$matches[1];
-    }
-
     // =========================================================================
     // SECTION 5: Template drift guards
     // =========================================================================
@@ -465,11 +460,14 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testCreateNginxConfigUsesCentralProxyParamsInWebdavBlocks(): void
     {
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $templates = \pmssNginxUserSubdomainTemplates();
 
         // If proxy headers/timeouts drift in per-location blocks, nginx can break (duplicate directives).
-        $this->assertStringContainsString('location /webdav-##user##/', $script);
-        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $script);
+        $this->assertStringContainsString('location /webdav-##user##/', $templates['public']);
+        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $templates['public']);
+        $this->assertStringContainsString('location /webdav-##user##/', $templates['private']);
+        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $templates['private']);
     }
 
     public function testWebdavLocationsAllowLargeUploads(): void
@@ -478,7 +476,9 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('location /webdav-##username/', $userTpl);
         $this->assertStringContainsString('client_max_body_size 0;', $userTpl);
 
-        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
-        $this->assertStringContainsString('client_max_body_size 0;', $script);
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $templates = \pmssNginxUserSubdomainTemplates();
+        $this->assertStringContainsString('client_max_body_size 0;', $templates['public']);
+        $this->assertStringContainsString('client_max_body_size 0;', $templates['private']);
     }
 }

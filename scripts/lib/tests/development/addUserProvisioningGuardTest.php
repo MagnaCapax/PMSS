@@ -14,7 +14,14 @@ class AddUserProvisioningGuardTest extends TestCase
 
     public function testAddUserEmitsSummaryMarker(): void
     {
-        $src = (string) file_get_contents('scripts/addUser.php');
-        $this->assertTrue(strpos($src, '###ADDUSER:') !== false, 'addUser.php must emit summary markers');
+        $src = (string) file_get_contents('scripts/lib/user/add/provisioningRuntime.php');
+        $this->assertTrue(strpos($src, '###ADDUSER:') !== false, 'addUser must emit summary markers');
+    }
+
+    public function testAddUserWrapperStaysSmall(): void
+    {
+        $lines = file('scripts/addUser.php', FILE_IGNORE_NEW_LINES);
+        $this->assertTrue(is_array($lines), 'addUser.php must be readable');
+        $this->assertTrue(count($lines) <= 200, 'addUser.php must stay under 200 lines');
     }
 }

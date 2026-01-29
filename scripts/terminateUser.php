@@ -155,7 +155,22 @@ echo "\n\t *** TERMINATE USER:  {$username} *** \n";
 
 while (!in_array($continue, array('Y', 'N'))) {
     echo "Do you want to continue (Y/N)? ";
-    $continue = strtoupper(trim(fgets(STDIN)));
+    $input = fgets(STDIN);
+    if ($input === false) {
+        pmssUserTerminateLog(
+            pmssUserTerminateContext(
+                $username,
+                'confirm',
+                array(
+                    'status'  => 'ERR',
+                    'message' => 'Unable to read confirmation input (EOF). Re-run with --confirm for non-interactive use.',
+                )
+            )
+        );
+        fwrite(STDERR, "Error: confirmation input unavailable (EOF). Re-run with --confirm.\n");
+        exit(1);
+    }
+    $continue = strtoupper(trim($input));
 }
 if ($continue == 'N') {
     pmssUserTerminateLog(

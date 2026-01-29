@@ -986,8 +986,8 @@ LIGHTTPD;
      */
     public function testNginxWebdavBlocksNoDuplicateDirectives(): void
     {
-        $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
-        $script = file_get_contents($scriptPath);
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = implode("\n", \pmssNginxUserSubdomainTemplates());
 
         // Extract WebDAV location blocks from the HEREDOC templates.
         // Match from "location /webdav-" to the closing "}" with proper nesting.
@@ -1025,8 +1025,8 @@ LIGHTTPD;
      */
     public function testNginxWebdavBlocksIncludeProxyParams(): void
     {
-        $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
-        $script = file_get_contents($scriptPath);
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = implode("\n", \pmssNginxUserSubdomainTemplates());
 
         // Match WebDAV location blocks with their full content
         preg_match_all('/location\s+\/webdav-[^{]+\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s', $script, $matches);

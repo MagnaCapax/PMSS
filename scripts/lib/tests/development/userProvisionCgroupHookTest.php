@@ -7,8 +7,11 @@ class UserProvisionCgroupHookTest extends TestCase
 {
     public function testAddUserReliesOnUserConfigForCgroups(): void
     {
-        $src = (string) file_get_contents('scripts/addUser.php');
-        $this->assertTrue(strpos($src, '/scripts/util/userConfig.php') !== false, 'addUser.php must invoke userConfig.php');
-        $this->assertTrue(strpos($src, 'userCgroup.php') === false, 'addUser.php should not call userCgroup.php directly');
+        $src = (string) file_get_contents('scripts/lib/user/add/userConfigApply.php');
+        $this->assertTrue(strpos($src, '/scripts/util/userConfig.php') !== false, 'addUser must invoke userConfig.php');
+
+        $entrypoint = (string) file_get_contents('scripts/addUser.php');
+        $this->assertTrue(strpos($entrypoint, 'userCgroup.php') === false, 'addUser.php should not call userCgroup.php directly');
+        $this->assertTrue(strpos($src, 'userCgroup.php') === false, 'addUser helpers should not call userCgroup.php directly');
     }
 }

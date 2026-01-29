@@ -165,14 +165,11 @@ NGINX;
      */
     private function extractNginxWebdavBlocks(): string
     {
-        $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
-        $script = file_get_contents($scriptPath);
-
-        // Extract the HEREDOC templates
-        preg_match_all('/<<<\'NGINX\'\s*(.*?)\s*NGINX;/s', $script, $matches);
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $templates = \pmssNginxUserSubdomainTemplates();
 
         $serverBlocks = '';
-        foreach ($matches[1] as $block) {
+        foreach ($templates as $block) {
             // Only include blocks that have server { } definitions
             if (strpos($block, 'server {') !== false) {
                 // Substitute placeholders
@@ -360,13 +357,9 @@ NGINX;
      */
     public function testNginxWebdavBlocksHaveBalancedBraces(): void
     {
-        $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
-        $script = file_get_contents($scriptPath);
-
-        // Extract HEREDOC templates
-        preg_match_all('/<<<\'NGINX\'\s*(.*?)\s*NGINX;/s', $script, $matches);
-
-        foreach ($matches[1] as $i => $block) {
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $templates = \pmssNginxUserSubdomainTemplates();
+        foreach (array_values($templates) as $i => $block) {
             $openBraces = substr_count($block, '{');
             $closeBraces = substr_count($block, '}');
 
@@ -386,8 +379,8 @@ NGINX;
      */
     public function testNoWebdavDuplicateTimeoutDirectives(): void
     {
-        $scriptPath = dirname(__DIR__, 3).'/util/createNginxConfig.php';
-        $script = file_get_contents($scriptPath);
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = implode("\n", \pmssNginxUserSubdomainTemplates());
 
         // Find all location blocks for webdav
         preg_match_all('/location\s+[^{]*webdav[^{]*\{([^}]+)\}/si', $script, $matches);

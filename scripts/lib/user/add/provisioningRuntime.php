@@ -1,0 +1,136 @@
+<?php
+/**
+ * addUser provisioning runtime helpers.
+ *
+ * These helpers are intentionally small wrappers around existing PMSS runtime
+ * utilities so `scripts/addUser.php` can stay concise without changing its
+ * external behaviour.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
+
+/**
+ * Append a message to the provisioning log and console for traceability.
+ *
+ * @param string $message Human-readable status printed for the operator.
+ */
+function logProvisionMessage(string $message): void
+{
+    global $user;
+    $prefix = date('Y-m-d H:i:s') . " ({$user['name']}): ";
+    @file_put_contents('/var/log/pmss/addUser.log', $prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+    echo $message.PHP_EOL;
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user['name'], $message);
+    }
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'add',
+            'log',
+            $user['name'],
+            array(
+                'status'  => 'INFO',
+                'message' => $message,
+            )
+        )
+    );
+}
+
+/**
+ * Run a shell command and log whether it succeeded without aborting.
+ * The 'continue on failure' behavior is intentional to allow as many
+ * provisioning steps as possible to complete.
+ *
+ * @param string $description Operator-facing label describing the action.
+ * @param string $command     Full shell command executed through runCommand().
+ * @param string|null $logCommand Optional redacted command for logs.
+ *
+ * @return int Return code bubbled up from the child command.
+ */
+function runProvisionStep(string $description, string $command, ?string $logCommand = null): int
+{
+    global $user, $provisionStats;
+
+    $logCommand = $logCommand ?? $command;
+    $logger = 'logProvisionMessage';
+    if ($logCommand !== $command) {
+        $logger = function (string $message) use ($command, $logCommand): void {
+            logProvisionMessage(str_replace($command, $logCommand, $message));
+        };
+    }
+
+    $startedAt = microtime(true);
+    $result = runCommand($command, false, $logger);
+    $duration = round(microtime(true) - $startedAt, 4);
+    $provisionStats['steps']++;
+    if ($result !== 0) {
+        $provisionStats['err']++;
+        $provisionStats['last_error'] = $description . ' rc=' . $result;
+        logProvisionMessage($description . ' failed (rc=' . $result . ', duration=' . $duration . 's)');
+    } else {
+        $provisionStats['ok']++;
+        logProvisionMessage($description . ' completed (duration=' . $duration . 's)');
+    }
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'add',
+            'step',
+            $user['name'],
+            array(
+                'status'   => $result === 0 ? 'OK' : 'ERR',
+                'step'     => $description,
+                'command'  => $logCommand,
+                'rc'       => $result,
+                'duration' => $duration,
+            )
+        )
+    );
+    return $result;
+}
+
+/**
+ * Emit a single-line status marker and structured summary for operators.
+ *
+ * @param string $status  SUCCESS|FAIL|ERROR marker.
+ * @param string $message Human-readable context (kept short for grep).
+ * @param int    $exitCode Intended exit code for the summary.
+ */
+function finalizeProvision(string $status, string $message, int $exitCode): void
+{
+    global $user, $provisionStart, $provisionStats, $provisionFinalized;
+    if ($provisionFinalized) {
+        return;
+    }
+    $provisionFinalized = true;
+
+    $duration = round(microtime(true) - $provisionStart, 3);
+    $summary = sprintf(
+        '###ADDUSER:%s user=%s duration=%ss steps_ok=%d steps_err=%d message=%s',
+        $status,
+        $user['name'],
+        $duration,
+        $provisionStats['ok'],
+        $provisionStats['err'],
+        $message
+    );
+    logProvisionMessage($summary);
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'add',
+            'summary',
+            $user['name'],
+            array(
+                'status'      => $status === 'SUCCESS' ? 'OK' : 'ERR',
+                'result'      => $status,
+                'message'     => $message,
+                'duration'    => $duration,
+                'exit_code'   => $exitCode,
+                'steps_ok'    => $provisionStats['ok'],
+                'steps_err'   => $provisionStats['err'],
+                'last_error'  => $provisionStats['last_error'],
+            )
+        )
+    );
+}
+

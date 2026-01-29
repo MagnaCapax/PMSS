@@ -34,6 +34,13 @@ require_once 'lib/users.php';
 require_once 'lib/userLifecycle.php';
 require_once 'lib/user/log.php';
 require_once 'lib/homeMount.php';
+require_once 'lib/user/add/provisioningRuntime.php';
+require_once 'lib/user/add/runtimeInit.php';
+require_once 'lib/user/add/systemUserCreate.php';
+require_once 'lib/user/add/userConfigApply.php';
+require_once 'lib/user/add/servicesStart.php';
+require_once 'lib/user/add/trafficLimitApply.php';
+require_once 'lib/user/add/postProvision.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Creating
 // a user when /home is unavailable would write to the wrong location or fail
@@ -60,39 +67,10 @@ if (!pmssValidateUsernameForCreate($user['name'])) {
     } elseif (function_exists('logProvisionMessage')) {
         logProvisionMessage('FATAL: Invalid username; aborting provisioning');
     }
-    die("Invalid username: {$user['name']}\n");
+	    die("Invalid username: {$user['name']}\n");
 }
 
-// Avoid PHP timeouts in CLI runs and keep the process alive if the invoking
-// SSH session dies mid-provision.
-if (function_exists('set_time_limit')) {
-    @set_time_limit(0);
-}
-@ignore_user_abort(true);
-
-/**
- * Best-effort detachment from a dying SSH session in non-interactive runs.
- *
- * When automation launches addUser.php without a TTY, a backend timeout can
- * close the SSH channel and deliver SIGHUP/SIGPIPE. Ignoring those signals
- * helps the provisioning continue while logs are written to disk.
- */
-if (function_exists('posix_isatty')) {
-    $hasTty = @posix_isatty(STDIN) || @posix_isatty(STDOUT) || @posix_isatty(STDERR);
-    if (!$hasTty) {
-        if (function_exists('posix_setsid')) {
-            @posix_setsid();
-        }
-        if (function_exists('pcntl_signal')) {
-            if (defined('SIGHUP')) {
-                @pcntl_signal(SIGHUP, SIG_IGN);
-            }
-            if (defined('SIGPIPE')) {
-                @pcntl_signal(SIGPIPE, SIG_IGN);
-            }
-        }
-    }
-}
+pmssAddUserRuntimeInit();
 
 // Provisioning runtime stats used for summary markers.
 $provisionStart = microtime(true);
@@ -103,130 +81,6 @@ $provisionStats = [
     'last_error' => null,
 ];
 $provisionFinalized = false;
-
-/**
- * Append a message to the provisioning log and console for traceability.
- *
- * @param string $message Human-readable status printed for the operator.
- */
-function logProvisionMessage(string $message): void
-{
-    global $user;
-    $prefix = date('Y-m-d H:i:s') . " ({$user['name']}): ";
-    @file_put_contents('/var/log/pmss/addUser.log', $prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
-    echo $message.PHP_EOL;
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user['name'], $message);
-    }
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'add',
-            'log',
-            $user['name'],
-            array(
-                'status'  => 'INFO',
-                'message' => $message,
-            )
-        )
-    );
-}
-
-/**
- * Run a shell command and log whether it succeeded without aborting.
- * The 'continue on failure' behavior is intentional to allow as many
- * provisioning steps as possible to complete.
- *
- * @param string $description Operator-facing label describing the action.
- * @param string $command     Full shell command executed through runCommand().
- * @param string|null $logCommand Optional redacted command for logs.
- *
- * @return int Return code bubbled up from the child command.
- */
-function runProvisionStep(string $description, string $command, ?string $logCommand = null): int
-{
-    global $user, $provisionStats;
-
-    $logCommand = $logCommand ?? $command;
-    $logger = 'logProvisionMessage';
-    if ($logCommand !== $command) {
-        $logger = function (string $message) use ($command, $logCommand): void {
-            logProvisionMessage(str_replace($command, $logCommand, $message));
-        };
-    }
-
-    $startedAt = microtime(true);
-    $result = runCommand($command, false, $logger);
-    $duration = round(microtime(true) - $startedAt, 4);
-    $provisionStats['steps']++;
-    if ($result !== 0) {
-        $provisionStats['err']++;
-        $provisionStats['last_error'] = $description . ' rc=' . $result;
-        logProvisionMessage($description . ' failed (rc=' . $result . ', duration=' . $duration . 's)');
-    } else {
-        $provisionStats['ok']++;
-        logProvisionMessage($description . ' completed (duration=' . $duration . 's)');
-    }
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'add',
-            'step',
-            $user['name'],
-            array(
-                'status'   => $result === 0 ? 'OK' : 'ERR',
-                'step'     => $description,
-                'command'  => $logCommand,
-                'rc'       => $result,
-                'duration' => $duration,
-            )
-        )
-    );
-    return $result;
-}
-
-/**
- * Emit a single-line status marker and structured summary for operators.
- *
- * @param string $status  SUCCESS|FAIL|ERROR marker.
- * @param string $message Human-readable context (kept short for grep).
- * @param int    $exitCode Intended exit code for the summary.
- */
-function finalizeProvision(string $status, string $message, int $exitCode): void
-{
-    global $user, $provisionStart, $provisionStats, $provisionFinalized;
-    if ($provisionFinalized) {
-        return;
-    }
-    $provisionFinalized = true;
-
-    $duration = round(microtime(true) - $provisionStart, 3);
-    $summary = sprintf(
-        '###ADDUSER:%s user=%s duration=%ss steps_ok=%d steps_err=%d message=%s',
-        $status,
-        $user['name'],
-        $duration,
-        $provisionStats['ok'],
-        $provisionStats['err'],
-        $message
-    );
-    logProvisionMessage($summary);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'add',
-            'summary',
-            $user['name'],
-            array(
-                'status'      => $status === 'SUCCESS' ? 'OK' : 'ERR',
-                'result'      => $status,
-                'message'     => $message,
-                'duration'    => $duration,
-                'exit_code'   => $exitCode,
-                'steps_ok'    => $provisionStats['ok'],
-                'steps_err'   => $provisionStats['err'],
-                'last_error'  => $provisionStats['last_error'],
-            )
-        )
-    );
-}
 
 // Prevent overlapping addUser runs for the same username to avoid UID/GID races.
 $lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
@@ -269,129 +123,8 @@ $hostname = trim( file_get_contents('/etc/hostname') );
 $hostname = str_replace(array("\n", "\r", "\t"), array('','',''), $hostname);
 
 
-//Create the user
-$rc = runProvisionStep(
-    'Create system user',
-    sprintf('useradd --skel /etc/skel -m %s', escapeshellarg($user['name']))
-);
-if ($rc !== 0) {
-    logProvisionMessage('FATAL: Create system user failed; aborting provisioning');
-    finalizeProvision('FAIL', 'useradd_failed', 1);
-    exit(1);
-}
-$pwEntry = null;
-if (function_exists('posix_getpwnam')) {
-    $pwEntry = @posix_getpwnam($user['name']);
-}
-if (!is_dir($homePath)) {
-    logProvisionMessage('FATAL: Home directory missing after useradd; aborting provisioning');
-    finalizeProvision('FAIL', 'home_missing', 1);
-    exit(1);
-}
-if (is_array($pwEntry) && isset($pwEntry['uid'])) {
-    $homeOwner = @fileowner($homePath);
-    if ($homeOwner !== false && (int) $homeOwner !== (int) $pwEntry['uid']) {
-        logProvisionMessage('FATAL: Home directory owner mismatch after useradd; aborting provisioning');
-        finalizeProvision('FAIL', 'home_owner_mismatch', 1);
-        exit(1);
-    }
-}
-$safeChangePw = sprintf('/scripts/changePw.php %s [redacted]', escapeshellarg($user['name']));
-$rc = runProvisionStep(
-    'Set initial password',
-    sprintf('/scripts/changePw.php %s %s', escapeshellarg($user['name']), escapeshellarg($user['password'])),
-    $safeChangePw
-);
-if ($rc !== 0) {
-    logProvisionMessage('FATAL: Initial password update failed; aborting provisioning');
-    finalizeProvision('FAIL', 'password_failed', 1);
-    exit(1);
-}
-runProvisionStep(
-    'Unlock user account',
-    sprintf('usermod -U %s', escapeshellarg($user['name']))
-);
-runProvisionStep(
-    'Set expiry far in future',
-    sprintf('usermod --expiredate 2100-01-01 %s', escapeshellarg($user['name']))
-);
-#passthru("usermod -G {$user['name']} www-data");
-
-if (file_exists('/bin/bash')) { // Set shell
-    runProvisionStep(
-        'Ensure bash shell',
-        sprintf('chsh -s /bin/bash %s', escapeshellarg($user['name']))
-    );
-}
-
-// Record core attributes in the user config store before provisioning services.
-	$userDb->addUser( $user['name'], array(
-	    'ramMiB' => $user['memory'],
-	    'quota' => $user['quota'],
-	    'quotaBurst' => round(((float) $user['quota']) * 1.25),
-	    'rtorrentPort' => 0,    #TODO Choose port here and use that for the userConfig :)
-	    'billingId' => 0,
-	    'trafficLimit' => 0,
-	    'suspended' => false
-	));
-
-// Assign HTTP server port
-runProvisionStep(
-    'Assign lighttpd port',
-    sprintf('/scripts/util/portManager.php assign %s lighttpd', escapeshellarg($user['name']))
-);
-
-// Configure quota, rtorrent and ruTorrent.
-$rc = runProvisionStep(
-    'Apply user configuration',
-    sprintf('/scripts/util/userConfig.php %s %s %s',
-        escapeshellarg($user['name']),
-        escapeshellarg($user['memory']),
-        escapeshellarg($user['quota'])
-    )
-);
-if ($rc !== 0) {
-    logProvisionMessage('FATAL: User configuration failed; aborting provisioning');
-    finalizeProvision('FAIL', 'user_config_failed', 1);
-    exit(1);
-}
-
-// Record per-user service ports assigned during configuration.
-$portFiles = [
-    'rclone' => $homePath.'/.rclonePort',
-    'qbittorrent' => $homePath.'/.qbittorrentPort',
-    'deluge' => $homePath.'/.delugePort',
-];
-foreach ($portFiles as $label => $path) {
-    if (!is_file($path)) {
-        continue;
-    }
-    $port = (int) trim((string) @file_get_contents($path));
-    if ($port <= 0) {
-        continue;
-    }
-    if ($label === 'deluge') {
-        logProvisionMessage('Assigned deluge ports: scgi='.$port.' web='.($port + 1));
-        continue;
-    }
-    logProvisionMessage('Assigned '.$label.' port: '.$port);
-}
-
-runProvisionStep(
-    'Configure lighttpd vhost',
-    sprintf('/scripts/util/userConfigLighttpd.php %s', escapeshellarg($user['name']))
-);
-runProvisionStep(
-    'Regenerate nginx config',
-    sprintf('/scripts/util/createNginxConfig.php --user %s', escapeshellarg($user['name']))
-);
-
-
-#passthru("/scripts/util/recreateLighttpdConfig.php");
-#passthru('/etc/init.d/lighttpd force-reload');      // restart lighttpd
-
-
-
+pmssAddUserSystemUserCreate($user, $homePath);
+pmssAddUserUserConfigApply($userDb, $user, $homePath);
 
 $userHomedirPath = $homePath;
 
@@ -411,27 +144,8 @@ if (file_exists('/etc/seedbox/modules/basic/addUser.php')) {
 }
 
 // Finally start rTorrent for the user
-runProvisionStep(
-    'Start rTorrent',
-    sprintf('/scripts/startRtorrent %s', escapeshellarg($user['name']))
-);
-runProvisionStep(
-    'Start lighttpd',
-    sprintf('/scripts/startLighttpd %s', escapeshellarg($user['name']))
-);
-runProvisionStep('Restart nginx', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
-runProvisionStep('Refresh network rules', '/scripts/util/setupNetwork.php');
-
-if (!empty($user['trafficLimit']) &&
-    $user['trafficLimit'] > 0) {
-    // Persist traffic caps for both automation (runtime) and the user directory.
-    if (!file_exists("/etc/seedbox/runtime/trafficLimits")) mkdir("/etc/seedbox/runtime/trafficLimits");
-    file_put_contents( "/etc/seedbox/runtime/trafficLimits/{$user['name']}", $user['trafficLimit'] );
-    chmod( "/etc/seedbox/runtime/trafficLimits/{$user['name']}", 0600  );  // Restrict permissions to this file
-    file_put_contents("/home/{$user['name']}/.trafficLimit", $user['trafficLimit']);
-    chmod( "/home/{$user['name']}/.trafficLimit", 0664  );  // Restrict permissions to this file
-    logProvisionMessage('Traffic limit set: ' . $user['trafficLimit']);
-}
+pmssAddUserServicesStart($user);
+pmssAddUserTrafficLimitApply($user);
 
 // Retracker config
 /*$retrackerConfigPath = $userHomedirPath . "/www/rutorrent/share/users/{$user['name']}/settings";
@@ -445,86 +159,6 @@ if (mkdir($retrackerConfigPath, 0777, true)) {
 }*/
 
 
-// Crontab for the user
-logProvisionMessage('Adding crontab');
-runProvisionStep(
-    'Install default crontab',
-    sprintf('crontab -u%s /etc/seedbox/config/user.crontab.default', escapeshellarg($user['name']))
-);
-
-// Setting file permissions
-runProvisionStep(
-    'Queue permissions fix',
-    sprintf('nohup /scripts/util/userPermissions.php %s >> /dev/null 2>&1 &', escapeshellarg($user['name']))
-);
-
-// Seed per-user quota file by invoking the same refresher used by cron to avoid duplication.
-// Then normalize permissions to 0640 to align with userPermissions policy.
-runProvisionStep('Seed quota file', 'php /scripts/cron/updateQuotas.php');
-runProvisionStep(
-    'Normalize quota file permissions',
-    sprintf('chmod 640 %s', escapeshellarg("/home/{$user['name']}/.quota"))
-);
-
-// Seed traffic files with zero values so first login does not show errors before cron populates them.
-// Format mirrors scripts/lib/traffic/storage.php consumers (serialized array with raw/display/daily keys).
-try {
-    $zeroRaw = ['month'=>0.0,'week'=>0.0,'day'=>0.0,'hour'=>0.0,'15min'=>0.0];
-    $zeroDisplay = ['month'=>'0MiB','week'=>'0MiB','day'=>'0MiB','hour'=>'0MiB','15min'=>'0MiB'];
-    $zeroTraffic = ['raw'=>$zeroRaw,'display'=>$zeroDisplay,'daily'=>[]];
-    $homeBase = "/home/{$user['name']}";
-    $runtimeStatsDir = '/var/run/pmss/trafficStats';
-    $chattrPath = null;
-    // Best-effort immutable toggle for traffic data files.
-    $setImmutable = static function (string $path, bool $enable) use (&$chattrPath): void {
-        if (!is_file($path)) {
-            return;
-        }
-        if ($chattrPath === null) {
-            $chattrPath = '';
-            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-                if (is_executable($candidate)) {
-                    $chattrPath = $candidate;
-                    break;
-                }
-            }
-        }
-        if ($chattrPath === '') {
-            return;
-        }
-        $flag = $enable ? '+i' : '-i';
-        @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
-    };
-    if (!is_dir($runtimeStatsDir)) @mkdir($runtimeStatsDir, 0755, true);
-    // Home files
-    $trafficPath = "$homeBase/.trafficData";
-    $setImmutable($trafficPath, false);
-    @file_put_contents($trafficPath, serialize($zeroTraffic));
-    @chown($trafficPath, 'root');
-    @chgrp($trafficPath, $user['name']);
-    @chmod($trafficPath, 0640);
-    $setImmutable($trafficPath, true);
-    $trafficLocalPath = "$homeBase/.trafficDataLocal";
-    $setImmutable($trafficLocalPath, false);
-    @file_put_contents($trafficLocalPath, serialize($zeroTraffic));
-    @chown($trafficLocalPath, 'root');
-    @chgrp($trafficLocalPath, $user['name']);
-    @chmod($trafficLocalPath, 0640);
-    $setImmutable($trafficLocalPath, true);
-    // Runtime cache
-    @file_put_contents("$runtimeStatsDir/{$user['name']}", serialize($zeroTraffic));
-    @chown("$runtimeStatsDir/{$user['name']}", 'root');
-    @chgrp("$runtimeStatsDir/{$user['name']}", 'root');
-    @chmod("$runtimeStatsDir/{$user['name']}", 0600);
-    logProvisionMessage('Seeded traffic files with zero values');
-} catch (\Throwable $e) {
-    logProvisionMessage('Seeding traffic files failed: '.$e->getMessage());
-}
-
-// Ensure .trafficLimit exists even when no limit is configured at creation time.
-if (empty($user['trafficLimit'])) {
-    @file_put_contents("/home/{$user['name']}/.trafficLimit", '0');
-    @chmod("/home/{$user['name']}/.trafficLimit", 0664);
-}
+pmssAddUserPostProvision($user, $homePath);
 
 finalizeProvision('SUCCESS', 'completed', 0);
