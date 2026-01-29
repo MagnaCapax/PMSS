@@ -96,10 +96,20 @@ class TrafficStatsProcessor
     public function validateUser(string $username): bool
     {
         $path = $this->trafficDir.'/'.$username;
-        $homePath = $this->homeDir.'/'.$username;
+        $baseUser = $this->normalizeUserForValidation($username);
+        $homePath = $this->homeDir.'/'.$baseUser;
         return is_readable($path)
-            && $this->userExistsInPasswd($username)
+            && $this->userExistsInPasswd($baseUser)
             && is_dir($homePath);
+    }
+
+    private function normalizeUserForValidation(string $username): string
+    {
+        $suffix = '-localnet';
+        if (substr($username, -strlen($suffix)) === $suffix) {
+            return substr($username, 0, -strlen($suffix));
+        }
+        return $username;
     }
 
     /** Process and persist traffic statistics for a single user. */

@@ -64,6 +64,44 @@ class TrafficStatsProcessorTest extends TestCase
         $this->assertTrue(isset($stub->saved[$user]['raw']['day']));
     }
 
+    public function testValidateUserAcceptsLocalnetSuffix(): void
+    {
+        $paths = $this->makePaths();
+        $processor = new \TrafficStatsProcessor(new StubTrafficStatistics(), $paths);
+        $processor->ensureRuntime();
+
+        $user = 'alice';
+        $this->createUserFixtures($paths, $user);
+        file_put_contents($paths['traffic_dir'].'/'.$user.'-localnet', 'seed');
+
+        $this->assertTrue($processor->validateUser($user.'-localnet'));
+    }
+
+    public function testProcessUserPersistsLocalnetData(): void
+    {
+        $stub = new StubTrafficStatistics();
+        $paths = $this->makePaths();
+        $processor = new \TrafficStatsProcessor($stub, $paths);
+        $processor->ensureRuntime();
+
+        $user = 'alice';
+        $this->createUserFixtures($paths, $user);
+        file_put_contents($paths['traffic_dir'].'/'.$user.'-localnet', 'seed');
+
+        $now = time();
+        $lines = [
+            date('Y-m-d H:i:s', $now - 120).': 1048576',
+            date('Y-m-d H:i:s', $now - 3600).': 1048576',
+        ];
+        $stub->map[$user.'-localnet'] = implode("\n", $lines);
+
+        $compare = $processor->buildCompareTimes();
+        $processor->processUser($user.'-localnet', $compare);
+
+        $this->assertTrue(isset($stub->saved[$user.'-localnet']));
+        $this->assertTrue(isset($stub->saved[$user.'-localnet']['raw']['day']));
+    }
+
     private function makeProcessor(): \TrafficStatsProcessor
     {
         return new \TrafficStatsProcessor(new StubTrafficStatistics(), $this->makePaths());
