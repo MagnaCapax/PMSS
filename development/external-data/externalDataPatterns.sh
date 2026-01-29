@@ -26,8 +26,9 @@ external_data_score_input() {
 	# Natural-language ratio (HTML tags stripped to reduce web noise).
 	stripped="$(printf '%s' "$input" | sed -E 's/<[^>]+>//g')"
 	total=$(printf '%s' "$stripped" | wc -c | tr -d ' ')
-	allowed_chars=$'A-Za-z0-9 .,:;!?"\'()/-\n\t'
-	allowed=$(printf '%s' "$stripped" | tr -cd "$allowed_chars" | wc -c | tr -d ' ')
+	# Keep '-' last to avoid tr range parsing issues (e.g. "/-\\n" warnings under some locales).
+	allowed_chars=$'A-Za-z0-9 .,:;!?"\'()\n\t/-'
+	allowed=$(printf '%s' "$stripped" | LC_ALL=C tr -cd "$allowed_chars" | wc -c | tr -d ' ')
 	ratio=$(awk -v a="$allowed" -v t="$total" 'BEGIN{ if (t==0) print 100; else printf "%.0f", (a*100)/t }')
 	if ((ratio < 60)); then add_signal low_text 3; elif ((ratio < 75)); then add_signal mixed_text 1; fi
 

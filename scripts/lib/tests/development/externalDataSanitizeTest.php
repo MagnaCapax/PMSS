@@ -17,10 +17,14 @@ class ExternalDataSanitizeTest extends TestCase
 
     public function setUp(): void
     {
-        $root = dirname(__DIR__, 3);
+        // Repo root: scripts/lib/tests/development -> ../../../../
+        $root = dirname(__DIR__, 4);
         $this->script = $root.'/development/external-data/externalDataSanitize.sh';
         if (!is_file($this->script)) {
             throw new SkipTest('externalDataSanitize.sh not found');
+        }
+        if (!is_executable($this->script)) {
+            throw new SkipTest('externalDataSanitize.sh not executable');
         }
         $this->env = array_merge($_ENV, [
             'PMSS_EXTERNAL_DATA_TIMESTAMP' => '2026-01-01T00:00:00Z',
@@ -44,6 +48,19 @@ class ExternalDataSanitizeTest extends TestCase
         $this->assertEquals(0, $rc1);
         $this->assertEquals(0, $rc2);
         $this->assertEquals($out1, $out2);
+    }
+
+    public function testHashChangesWhenEnvChanges(): void
+    {
+        [$rc1, $out1] = $this->runSanitize('Same input', [], [
+            'PMSS_EXTERNAL_DATA_TIMESTAMP' => '2026-01-01T00:00:00Z',
+        ]);
+        [$rc2, $out2] = $this->runSanitize('Same input', [], [
+            'PMSS_EXTERNAL_DATA_TIMESTAMP' => '2026-01-02T00:00:00Z',
+        ]);
+        $this->assertEquals(0, $rc1);
+        $this->assertEquals(0, $rc2);
+        $this->assertTrue($this->extractTagId($out1) !== $this->extractTagId($out2), 'Expected tag id to change when env changes');
     }
 
     public function testEncodedOutputHidesInput(): void
@@ -81,9 +98,10 @@ class ExternalDataSanitizeTest extends TestCase
     /**
      * @param string $input
      * @param array<int, string> $args
+     * @param array<string, string> $envOverrides
      * @return array{0:int,1:string,2:string}
      */
-    private function runSanitize(string $input, array $args): array
+    private function runSanitize(string $input, array $args, array $envOverrides = []): array
     {
         $cmd = array_merge([$this->script], $args);
         $descriptors = [
@@ -91,7 +109,8 @@ class ExternalDataSanitizeTest extends TestCase
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $proc = proc_open($cmd, $descriptors, $pipes, null, $this->env);
+        $env = array_merge($this->env, $envOverrides);
+        $proc = proc_open($cmd, $descriptors, $pipes, null, $env);
         if (!is_resource($proc)) {
             $this->fail('Failed to start externalDataSanitize.sh');
         }
@@ -104,5 +123,19 @@ class ExternalDataSanitizeTest extends TestCase
         $status = proc_close($proc);
 
         return [$status, $stdout, $stderr];
+    }
+
+    /**
+     * @param string $output
+     * @return string
+     */
+    private function extractTagId(string $output): string
+    {
+        if (preg_match('/<pmss-external-data id=\"([a-f0-9]{64})\">/', $output, $matches) === 1) {
+            return $matches[1];
+        }
+
+        $this->fail('Tag id not found in output');
+        return '';
     }
 }
