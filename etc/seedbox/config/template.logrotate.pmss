@@ -21,6 +21,18 @@
     sharedscripts
 }
 
+/var/log/pmss/system-stats.log {
+    daily
+    rotate 7
+    minsize 1M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    sharedscripts
+}
+
 /var/log/pmss/check*.log {
     monthly
     rotate 7
