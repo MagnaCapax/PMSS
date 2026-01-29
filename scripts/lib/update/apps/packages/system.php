@@ -55,7 +55,7 @@ function pmssInstallMediaAndNetworkTools(int $distroVersion): void
         'ranger', 'nethack-console',
         'libmozjs-52-0', 'libmozjs-60-0',
         'libarchive-zip-perl', 'libnet-ssleay-perl', 'libhtml-parser-perl', 'libxml-libxml-perl', 'libjson-perl', 'libjson-xs-perl', 'libxml-libxslt-perl',
-        'lftp',
+        'lftp', 'megatools',
         'nginx', 'ntp',
     ]);
 
