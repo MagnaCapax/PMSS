@@ -19,6 +19,7 @@ class ListUsersConsumersGuardTest extends TestCase
             'scripts/util/userConfigLighttpd.php',
             'scripts/userTorrents.php',
             'scripts/cron/userTrackerCleaner.php',
+            'scripts/cron/trafficIngressLog.php',
         ];
 
         foreach ($targets as $file) {

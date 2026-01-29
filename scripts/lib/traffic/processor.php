@@ -26,6 +26,8 @@ class TrafficStatsProcessor
     private $statsRuntimeDir;
     /** @var TrafficStorage */
     private $storage;
+    /** @var string */
+    private $trafficMode;
 
     public function __construct(trafficStatistics $stats, array $paths = [])
     {
@@ -35,10 +37,12 @@ class TrafficStatsProcessor
         $this->runtimeDir      = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->passwdFile      = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
         $this->statsRuntimeDir = $this->runtimeDir.'/trafficStats';
+        $this->trafficMode     = $paths['traffic_mode'] ?? 'egress';
         $this->storage         = new TrafficStorage([
             'home_dir'   => $this->homeDir,
             'runtime_dir'=> $this->runtimeDir,
             'stats_dir'  => $this->statsRuntimeDir,
+            'traffic_mode' => $this->trafficMode,
         ]);
     }
 

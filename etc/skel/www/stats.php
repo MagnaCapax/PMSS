@@ -334,77 +334,105 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
 
 <?php
 // === Traffic Usage ===
-if (!file_exists('../.trafficData')) {
-    echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Traffic data not available.</pre></div>';
-} else {
-    $trafficTime = filemtime('../.trafficData');
-    $trafficData = unserialize(file_get_contents('../.trafficData'));
+$trafficData = null;
+$trafficTime = null;
+$trafficDataError = null;
+$trafficIngressData = null;
+$trafficIngressTime = null;
+$trafficIngressError = null;
 
+if (file_exists('../.trafficData')) {
+    $trafficTime = @filemtime('../.trafficData');
+    $trafficData = @unserialize(@file_get_contents('../.trafficData'));
     if (!is_array($trafficData)) {
-        echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Invalid traffic data format.</pre></div>';
-    } else {
-        ?>
-        <div class="stats-block">
-            <h6>Traffic usage</h6>
-            <pre style="margin-bottom:12px;">
-Traffic consumption at <?php echo date('Y-m-d H:i:s', $trafficTime); ?>:
-Week: <?php echo $trafficData['display']['week']; ?>, Day: <?php echo $trafficData['display']['day']; ?>
-Past 30 days upload traffic: <?php echo $trafficData['display']['month']; ?>
-
-<?php
-if (file_exists('../.trafficLimit')) {
-    $limit = (int)trim(file_get_contents('../.trafficLimit'));
-    if ($limit > 0) {
-        echo "Traffic limit: " . number_format($limit) . " GiB\n";
+        $trafficDataError = 'Invalid traffic data format.';
+        $trafficData = null;
     }
 }
-?>
-            </pre>
 
-            <?php if (!empty($trafficData['daily']) && count($trafficData['daily']) >= 2): ?>
-                <div class="traffic-chart">
-                    <canvas id="trafficChart" width="600" height="250"></canvas>
-                </div>
-                <script>
-                document.addEventListener('DOMContentLoaded', () => {
-                    if (typeof Chart === 'undefined') return;
-                    const ctx = document.getElementById('trafficChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: <?php echo json_encode(array_keys($trafficData['daily'])); ?>,
-                            datasets: [{
-                                label: 'Daily Traffic (MiB)',
-                                data: <?php
-                                    $values = array_values($trafficData['daily']);
-                                    foreach ($values as &$v) $v = round((float)$v, 2);
-                                    echo json_encode($values);
-                                ?>,
-                                fill: true,
-                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                borderColor: 'rgb(75, 192, 192)',
-                                tension: 0.4,
-                                pointRadius: 3
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { position: 'top' },
-                                tooltip: { mode: 'index', intersect: false }
-                            },
-                            scales: {
-                                y: { beginAtZero: true }
-                            }
-                        }
-                    });
-                });
-                </script>
-            <?php else: ?>
-                <div class="docker-note">Chart requires 2+ days of data.</div>
-            <?php endif; ?>
-        </div>
-        <?php
+if (file_exists('../.trafficDataIngress')) {
+    $trafficIngressTime = @filemtime('../.trafficDataIngress');
+    $trafficIngressData = @unserialize(@file_get_contents('../.trafficDataIngress'));
+    if (!is_array($trafficIngressData)) {
+        $trafficIngressError = 'Invalid inbound traffic data format.';
+        $trafficIngressData = null;
     }
+}
+
+if ($trafficData === null && $trafficIngressData === null) {
+    echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Traffic data not available.</pre></div>';
+} else {
+    ?>
+    <div class="stats-block">
+        <h6>Traffic usage</h6>
+        <pre style="margin-bottom:12px;">
+<?php if ($trafficData !== null): ?>
+Traffic consumption at <?php echo date('Y-m-d H:i:s', (int)$trafficTime); ?>:
+Week: <?php echo $trafficData['display']['week']; ?>, Day: <?php echo $trafficData['display']['day']; ?>
+Past 30 days upload traffic: <?php echo $trafficData['display']['month']; ?>
+<?php if (file_exists('../.trafficLimit')): ?>
+<?php
+$limit = (int)trim(file_get_contents('../.trafficLimit'));
+if ($limit > 0) {
+    echo "Traffic limit: " . number_format($limit) . " GiB\n";
+}
+?>
+<?php endif; ?>
+<?php elseif ($trafficDataError !== null): ?>
+<?php echo $trafficDataError . "\n"; ?>
+<?php endif; ?>
+
+<?php if ($trafficIngressData !== null): ?>
+Inbound traffic at <?php echo date('Y-m-d H:i:s', (int)$trafficIngressTime); ?>:
+Past 30 days inbound traffic: <?php echo $trafficIngressData['display']['month']; ?>
+<?php elseif ($trafficIngressError !== null): ?>
+<?php echo $trafficIngressError . "\n"; ?>
+<?php endif; ?>
+        </pre>
+
+        <?php if ($trafficData !== null && !empty($trafficData['daily']) && count($trafficData['daily']) >= 2): ?>
+            <div class="traffic-chart">
+                <canvas id="trafficChart" width="600" height="250"></canvas>
+            </div>
+            <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                if (typeof Chart === 'undefined') return;
+                const ctx = document.getElementById('trafficChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode(array_keys($trafficData['daily'])); ?>,
+                        datasets: [{
+                            label: 'Daily Traffic (MiB)',
+                            data: <?php
+                                $values = array_values($trafficData['daily']);
+                                foreach ($values as &$v) $v = round((float)$v, 2);
+                                echo json_encode($values);
+                            ?>,
+                            fill: true,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.4,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            });
+            </script>
+        <?php elseif ($trafficData !== null): ?>
+            <div class="docker-note">Chart requires 2+ days of data.</div>
+        <?php endif; ?>
+    </div>
+    <?php
 }

@@ -12,6 +12,7 @@ class TrafficStorage
     private $runtimeDir;
     private $statsDir;
     private $chattrPath;
+    private $trafficMode;
 
     public function __construct(array $paths = [])
     {
@@ -19,6 +20,8 @@ class TrafficStorage
         $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->statsDir   = rtrim($paths['stats_dir'] ?? $this->runtimeDir.'/trafficStats', '/');
         $this->chattrPath = null;
+        $mode = $paths['traffic_mode'] ?? 'egress';
+        $this->trafficMode = in_array($mode, ['egress', 'ingress'], true) ? $mode : 'egress';
     }
 
     /** Ensure runtime directories exist before writing. */
@@ -35,13 +38,7 @@ class TrafficStorage
     /** Persist user traffic data to home directory and runtime cache. */
     public function save(string $user, array $data): void
     {
-        $targetUser = $user;
-        $filename   = '.trafficData';
-
-        if (strpos($user, '-localnet') !== false) {
-            $filename   = '.trafficDataLocal';
-            $targetUser = str_replace('-localnet', '', $user);
-        }
+        [$targetUser, $filename] = $this->resolveTrafficFilename($user);
 
         $serialized = serialize($data);
         $homePath   = $this->homeDir.'/'.$targetUser;
@@ -79,6 +76,32 @@ class TrafficStorage
         @chown($path, 'root');
         @chgrp($path, 'root');
         @chmod($path, 0600);
+    }
+
+    /**
+     * Resolve the traffic data filename and target user for the given label.
+     *
+     * Supports the existing "-localnet" suffix and a traffic mode selector.
+     *
+     * @return array{0:string,1:string} [targetUser, filename]
+     */
+    private function resolveTrafficFilename(string $user): array
+    {
+        $targetUser = $user;
+        $suffix = '';
+        $localSuffix = '-localnet';
+
+        if (substr($user, -strlen($localSuffix)) === $localSuffix) {
+            $suffix = 'Local';
+            $targetUser = substr($user, 0, -strlen($localSuffix));
+        }
+
+        $base = $this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData';
+        if ($suffix !== '') {
+            $base .= $suffix;
+        }
+
+        return [$targetUser, $base];
     }
 
     /**

@@ -203,6 +203,7 @@ $chmodItems = [
     ["/home/{$thisUser}/.tmp", 0770],
     ["/home/{$thisUser}/.config", 0770, true],
     ["/home/{$thisUser}/.trafficData", 0640],
+    ["/home/{$thisUser}/.trafficDataIngress", 0640],
     ["/home/{$thisUser}/.rtorrent.rc", 0644],
     ["/home/{$thisUser}/watch", 0750, true],
     ["/home/{$thisUser}/session", 0750, true],
@@ -225,6 +226,8 @@ $chownItems = [
     // The remaining tree is handled by a targeted find below.
     ["/home/{$thisUser}/.trafficData", "root:{$thisUser}"],
     ["/home/{$thisUser}/.trafficDataLocal", "root:{$thisUser}"],
+    ["/home/{$thisUser}/.trafficDataIngress", "root:{$thisUser}"],
+    ["/home/{$thisUser}/.trafficDataIngressLocal", "root:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings/retrackers.dat", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}", "{$thisUser}:{$thisUser}"],
@@ -236,6 +239,8 @@ $chownItems = [
 // Ensure traffic files are mutable while ownership and permissions are repaired.
 pmssSetImmutable("/home/{$thisUser}/.trafficData", false);
 pmssSetImmutable("/home/{$thisUser}/.trafficDataLocal", false);
+pmssSetImmutable("/home/{$thisUser}/.trafficDataIngress", false);
+pmssSetImmutable("/home/{$thisUser}/.trafficDataIngressLocal", false);
 
 foreach ($chmodItems as $item) {
     $path = $item[0];
@@ -248,6 +253,8 @@ foreach ($chmodItems as $item) {
 $excludes = [
     "/home/{$thisUser}/.trafficData",
     "/home/{$thisUser}/.trafficDataLocal",
+    "/home/{$thisUser}/.trafficDataIngress",
+    "/home/{$thisUser}/.trafficDataIngressLocal",
     "/home/{$thisUser}/.rtorrent.rc",
     "/home/{$thisUser}/www/rutorrent/conf/config.php",
 ];
@@ -275,6 +282,8 @@ foreach ($chownItems as $item) {
 
 pmssSetImmutable("/home/{$thisUser}/.trafficData", true);
 pmssSetImmutable("/home/{$thisUser}/.trafficDataLocal", true);
+pmssSetImmutable("/home/{$thisUser}/.trafficDataIngress", true);
+pmssSetImmutable("/home/{$thisUser}/.trafficDataIngressLocal", true);
 
 if (file_exists("/home/{$thisUser}/.ssh")) {
     chmodPath("/home/{$thisUser}/.ssh", 0750);

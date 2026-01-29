@@ -16,6 +16,23 @@ require_once __DIR__.'/traffic/storage.php';
  * append new samples without knowing the underlying file layout.
  */
 class trafficStatistics {
+    /** @var string */
+    private $trafficDir;
+    /** @var string */
+    private $homeDir;
+    /** @var string */
+    private $runtimeDir;
+    /** @var string */
+    private $trafficMode;
+
+    public function __construct(array $paths = [])
+    {
+        $this->trafficDir = rtrim($paths['traffic_dir'] ?? getenv('PMSS_TRAFFIC_DIR') ?: '/var/log/pmss/traffic', '/');
+        $this->homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
+        $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+        $mode = $paths['traffic_mode'] ?? 'egress';
+        $this->trafficMode = in_array($mode, ['egress', 'ingress'], true) ? $mode : 'egress';
+    }
 
 	/**
 	 * Fetch raw traffic log lines for a user from the PMSS log directory.
@@ -30,7 +47,12 @@ class trafficStatistics {
 	 * @return string Raw log slice, possibly empty when no data is available.
 	 */
 	public function getData($user, $timePeriod = 5050) {
-		return trim( `tail -n{$timePeriod} /var/log/pmss/traffic/{$user} 2>/dev/null` );
+        $lines = (int) $timePeriod;
+        if ($lines < 1) {
+            $lines = 1;
+        }
+        $path = escapeshellarg($this->trafficDir.'/'.$user);
+		return trim( `tail -n{$lines} {$path} 2>/dev/null` );
 	}
 	    
     /**
@@ -72,7 +94,11 @@ class trafficStatistics {
      * @return void
      */
     public function saveUserTraffic( $user, $data ) {
-        $storage = new \TrafficStorage();
+        $storage = new \TrafficStorage([
+            'home_dir'     => $this->homeDir,
+            'runtime_dir'  => $this->runtimeDir,
+            'traffic_mode' => $this->trafficMode,
+        ]);
         $storage->ensureRuntime();
         $storage->save($user, $data);
     }

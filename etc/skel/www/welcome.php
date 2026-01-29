@@ -240,7 +240,14 @@ if ($vendor['pulsedBox'] == true) {
                             $trafficLimit = (int)trim(@file_get_contents('../.trafficLimit'));
                             if (@file_exists('../.trafficData')) {
                                 $trafficData = @unserialize(trim(@file_get_contents('../.trafficData')));
-                                trafficCreateSection($trafficData, $trafficLimit);
+                                $trafficIngress = null;
+                                if (@file_exists('../.trafficDataIngress')) {
+                                    $trafficIngress = @unserialize(trim(@file_get_contents('../.trafficDataIngress')));
+                                    if (!is_array($trafficIngress)) {
+                                        $trafficIngress = null;
+                                    }
+                                }
+                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress);
                             } else {
                                 $trafficLimit = number_format($trafficLimit);
                                 echo "Traffic limit: {$trafficLimit} GiB<br />";
@@ -324,7 +331,7 @@ function bonusQuotaDisplay($bonusQuota) {
     return '';
 }
 
-function trafficCreateSection($trafficData, $trafficLimit) {
+function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null) {
     if (count($trafficData) == 0) return;
 
     $trafficUsed = round($trafficData['raw']['month']);
@@ -339,11 +346,17 @@ function trafficCreateSection($trafficData, $trafficLimit) {
 
     $titleText = "{$trafficUsed} / {$trafficLimit} GiB";
     $gauge = createGauge($titleText, $titleText, $percent);
+    $inboundLine = '';
+    if (is_array($trafficIngress) && isset($trafficIngress['raw']['month'])) {
+        $inboundUsed = round($trafficIngress['raw']['month'] / 1024) . " GiB";
+        $inboundLine = '<br />Inbound (30 days): '.$inboundUsed;
+    }
 
     echo <<<EOF
     <h6>Traffic Info</h6>
     {$gauge}
     {$warning}
+    {$inboundLine}
     This is rolling past 30 days, <a href="http://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
     <hr />
 EOF;

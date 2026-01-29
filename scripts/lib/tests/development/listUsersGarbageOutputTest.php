@@ -38,6 +38,7 @@ class ListUsersGarbageOutputTest extends TestCase
             'scripts/util/userResourcesList.php',
             'scripts/userTorrents.php',
             'scripts/cron/userTrackerCleaner.php',
+            'scripts/cron/trafficIngressLog.php',
         ];
 
         foreach ($targets as $file) {
