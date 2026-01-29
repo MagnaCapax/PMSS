@@ -16,6 +16,7 @@ class ListUsersConsumersGuardTest extends TestCase
             'scripts/util/setupNetwork.php',
             'scripts/util/checkUserHtpasswd.php',
             'scripts/util/userResourcesList.php',
+            'scripts/util/userConfigLighttpd.php',
             'scripts/userTorrents.php',
             'scripts/cron/userTrackerCleaner.php',
         ];
@@ -27,4 +28,3 @@ class ListUsersConsumersGuardTest extends TestCase
         }
     }
 }
-
