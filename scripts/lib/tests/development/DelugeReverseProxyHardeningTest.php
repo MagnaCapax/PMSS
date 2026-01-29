@@ -223,6 +223,17 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString("strpos(\$userTemplate, '##delugeWebPort')", $script);
     }
 
+    public function testCreateNginxConfigDelugeWebPortPlaceholderTreatsPortFileAsUntrusted(): void
+    {
+        $script = $this->readRepoFile('scripts/util/createNginxConfig.php');
+
+        // Regression guard: if we ever need to render a legacy template placeholder,
+        // never trust user-owned/symlinked port files.
+        $this->assertStringContainsString("'/.delugePort'", $script);
+        $this->assertStringContainsString('fileowner(', $script);
+        $this->assertStringContainsString('is_link(', $script);
+    }
+
     // =========================================================================
     // SECTION 3: lighttpd Deluge proxy fragment (canonical + legacy mapping)
     // =========================================================================

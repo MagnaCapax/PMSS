@@ -510,9 +510,33 @@ foreach($users AS $thisUser) {
     $replacements = array($thisUser, $serverPort);
     if ($needsDelugeWebPort) {
         // Backward compatibility: some older templates proxy /deluge-<user>/ directly
-        // to deluge-web (port is scgi+1). Keep supporting the placeholder.
-        $delugePort = (int) trim((string) @file_get_contents($homeDir.'/.delugePort'));
-        $delugeWebPort = ($delugePort >= 1024 && $delugePort <= 65534) ? ($delugePort + 1) : 1;
+        // to deluge-web (historically scgi+1). Keep supporting the placeholder, but
+        // treat the port file as untrusted input (must be root-owned + non-symlink).
+        $delugeWebPort = 1;
+        $delugePortPath = $homeDir.'/.delugePort';
+        if (is_file($delugePortPath) && !is_link($delugePortPath)) {
+            $owner = @fileowner($delugePortPath);
+            if ($owner !== false && (int)$owner === 0) {
+                $raw = @file_get_contents($delugePortPath);
+                if (is_string($raw)) {
+                    $raw = trim($raw);
+                    if ($raw !== '' && ctype_digit($raw)) {
+                        $delugePort = (int) $raw;
+                        if ($delugePort >= 1024 && $delugePort <= 65534) {
+                            $delugeWebPort = $delugePort + 1;
+                        } elseif (function_exists('pmssUserLog')) {
+                            pmssUserLog($thisUser, '[WARN] Ignoring invalid .delugePort value while rendering nginx template');
+                        }
+                    } elseif (function_exists('pmssUserLog')) {
+                        pmssUserLog($thisUser, '[WARN] Ignoring non-numeric .delugePort value while rendering nginx template');
+                    }
+                }
+            } elseif (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, '[WARN] Ignoring non-root-owned .delugePort while rendering nginx template');
+            }
+        } elseif (is_link($delugePortPath) && function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, '[WARN] Ignoring symlinked .delugePort while rendering nginx template');
+        }
         $placeholders[] = "##delugeWebPort";
         $replacements[] = $delugeWebPort;
     }
