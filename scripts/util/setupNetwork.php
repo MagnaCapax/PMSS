@@ -56,6 +56,29 @@ $link      = $networkConfig['interface'] ?? detectPrimaryInterface();
 $interface = $link;
 $linkSpeed = getLinkSpeed($link);
 
+// If no explicit interface is configured, avoid tunnel defaults (tun/wg/tap).
+if (empty($networkConfig['interface']) && preg_match('/^(tun|tap|wg)/', $interface)) {
+    $routes = trim((string) shell_exec('/sbin/ip route show default 2>/dev/null'));
+    $fallback = '';
+    if ($routes !== '') {
+        foreach (explode("\n", $routes) as $line) {
+            if (preg_match('/\\bdev\\s+(\\S+)/', $line, $matches)) {
+                $candidate = $matches[1];
+                if (!preg_match('/^(tun|tap|wg)/', $candidate)) {
+                    $fallback = $candidate;
+                    break;
+                }
+            }
+        }
+    }
+    if ($fallback !== '' && $fallback !== $interface) {
+        logMessage("setupNetwork: detected tunnel uplink {$interface}; using {$fallback} instead");
+        $interface = $fallback;
+        $link = $fallback;
+        $linkSpeed = getLinkSpeed($fallback);
+    }
+}
+
 if ($interface === '') {
     die("Error: Could not determine primary interface\n");
 }
