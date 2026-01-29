@@ -9,6 +9,19 @@ php scripts/lib/tests/development/Runner.php
 Runs the development suite (self-contained, no system changes). Ensure it
 passes before packaging or deploying changes.
 
+## Common Operational Scripts
+
+The repository is deployed under `/scripts` on production hosts. These helpers
+are frequently used during day-to-day operations:
+
+- `scripts/listUsers.php` - list managed tenant usernames (one per line).
+- `scripts/showTraffic.php` - show per-user traffic summary (`--json` available).
+- `scripts/userTrafficLimit.php` - set per-user traffic limit (expects validated units).
+- `scripts/userTorrents.php` - count torrents per user (`--by-client` for breakdown).
+- `scripts/addUser.php` - provision a new user account (creates services/config).
+- `scripts/suspend.php` / `scripts/unsuspend.php` - toggle user suspension state.
+- `scripts/terminateUser.php` - terminate a user account (`--confirm` required for non-interactive runs).
+
 ## 2. Dry-Run The Updater
 ```
 /scripts/update.php --dry-run --scriptonly --verbose
