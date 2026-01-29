@@ -1,6 +1,9 @@
 <?php
 /**
  * Linux md RAID parsing helpers (/proc/mdstat).
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!function_exists('pmssStorageHealthSnapshotRaid')) {

@@ -3,6 +3,9 @@
 /**
  * storageBenchmark.php — Non-destructive storage benchmark (fio wrapper)
  * Context-first naming (storage → benchmark) as per doctrine.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 // TODO(complexity-refactor): Separate CLI parsing + shelling from core
 // measurement/aggregation. Extract small, testable helpers for:

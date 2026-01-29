@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * PMSS script: recreate User.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 declare(strict_types=1);
 
 /**

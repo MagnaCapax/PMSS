@@ -1,4 +1,11 @@
 <?php
+/**
+ * Library helper: Generator.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
+
 /** MOTD generator (class-based). */
 
 require_once __DIR__.'/../update.php';

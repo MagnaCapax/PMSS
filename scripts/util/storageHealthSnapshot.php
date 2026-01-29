@@ -2,6 +2,9 @@
 <?php
 /**
  * Storage health snapshot (SMART/NVMe + mdadm) to JSONL (safe for cron).
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/storageHealth.php';

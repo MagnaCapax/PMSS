@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * PMSS script: show Traffic.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 require_once '/scripts/lib/traffic.php';
 $trafficStatistics = new trafficStatistics;
 /* Display per user traffic */

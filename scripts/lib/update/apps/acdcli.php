@@ -4,6 +4,9 @@
  *
  * Installs or refreshes acd_cli via pip so legacy automation keeps working
  * until the helper is migrated to a dedicated virtualenv.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../runtime/commands.php';

@@ -1,6 +1,9 @@
 <?php
 /**
  * Process and service helpers for update flows.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/commands.php';

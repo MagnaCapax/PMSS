@@ -2,6 +2,9 @@
 <?php
 /**
  * Compare PMSS user database entries against home directories and /etc/passwd.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/users.php';

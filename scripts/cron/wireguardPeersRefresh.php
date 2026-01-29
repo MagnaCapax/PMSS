@@ -8,6 +8,9 @@
  * - Restarts or starts wg-quick@wg0 when an update is applied
  *
  * Safe to run frequently; work is proportional to the number of keys.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 define('PMSS_WIREGUARD_NO_ENTRYPOINT', true);

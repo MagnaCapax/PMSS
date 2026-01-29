@@ -5,6 +5,8 @@
  *
  * @copyright (C) Magna Capax Finland Oy 2023
  * @author Aleksi
+ *
+ * @license GPL-3.0-only
  */
 
 require_once '/scripts/lib/traffic.php';

@@ -4,6 +4,9 @@
  *
  * Uses the shared Starr helper to ensure the packaged Sonarr build is installed
  * and refreshes legacy apt artefacts so upgrades stay clean.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once dirname(__DIR__, 2).'/runtime.php';

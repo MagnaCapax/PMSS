@@ -10,6 +10,8 @@
  *
  * @author    Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
+ *
+ * @license GPL-3.0-only
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';

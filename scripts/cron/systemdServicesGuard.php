@@ -6,6 +6,9 @@
  * Policy list: pmssSeedboxSystemServiceSpecs() + apache2 legacy hardening.
  * See scripts/lib/update/services/systemd.php for the current list.
  * This is a drift guard against package manager actions and manual starts.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/update/services/systemd.php';

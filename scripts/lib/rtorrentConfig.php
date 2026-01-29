@@ -8,6 +8,8 @@
  * @copyright NuCode 2010-2014 - All Rights reserved.
  * @since 5/10/2010
  * @version 0.9.1
+ *
+ * @license GPL-3.0-only
  */
 class rtorrentConfig {
     // TODO(complexity-refactor): This class aggregates IO, template rendering,

@@ -1,6 +1,9 @@
 <?php
 /**
  * System-level configuration helpers for user provisioning.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';

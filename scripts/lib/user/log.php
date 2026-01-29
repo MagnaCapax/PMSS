@@ -5,6 +5,9 @@
  * Appends timestamped lines to /var/log/pmss/users/<username>.log and mirrors
  * entries into the consolidated users.log/users.jsonl stream when available.
  * Keep this helper dependency-free so it can be used from cron scripts easily.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!function_exists('pmssUserLogAllowed')) {

@@ -3,6 +3,9 @@
 /**
  * Ensure root (user-0.slice) is not limited by memory/tasks policies.
  * Runs safely in cron; fixes limits if detected.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 // TODO(complexity-refactor): Extract tiny helpers for:
 //  - reading unit properties

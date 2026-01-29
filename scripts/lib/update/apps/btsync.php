@@ -11,6 +11,8 @@
  *
  * @author  Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
+ *
+ * @license GPL-3.0-only
  */
 // #TODO Migrate to dpkg baseline/repo-driven install; verify downloads and
 //      refactor to runStep wrappers for consistent JSON logging. (GH #131)

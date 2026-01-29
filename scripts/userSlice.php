@@ -12,6 +12,9 @@
  *   - systemctl status user-UID.slice (core fields + CGroup tree).
  *
  * This script is read-only and safe to run on production hosts.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (PHP_SAPI !== 'cli') {

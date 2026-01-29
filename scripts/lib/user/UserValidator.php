@@ -1,6 +1,9 @@
 <?php
 /**
  * Validation utilities for user metadata.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once dirname(__DIR__).'/userLifecycle.php';

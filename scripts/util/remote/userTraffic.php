@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Utility script: user Traffic.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 require_once '/scripts/lib/traffic.php';
 /* List per user traffic for programmatic fetch */
 

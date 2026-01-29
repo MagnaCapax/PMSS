@@ -31,6 +31,9 @@
  * | `--dist-upgrade=<max>` | Run `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade capped at the requested maximum, then exit. |
  * | `--skip-self-update` | Internal flag injected during self-refresh to avoid recursion; operators should not pass it manually. |
  * | `--help`           | Print usage examples and exit without making changes. |
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 declare(strict_types=1);

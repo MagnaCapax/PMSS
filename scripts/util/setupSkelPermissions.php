@@ -7,6 +7,9 @@
  *
  * Updated: 2025 — includes basic secrets hardening for common private key
  * locations to ensure minimum required permissions are applied.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 #TODO Wrong naming etc.
 

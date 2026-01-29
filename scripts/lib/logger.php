@@ -1,4 +1,11 @@
 <?php
+/**
+ * Library helper: logger.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
+
 /** Simple logging helper shared across cron scripts. */
 class Logger {
     /** @var string */

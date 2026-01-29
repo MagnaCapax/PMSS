@@ -5,6 +5,9 @@
  *
  * Root-only CLI helper to view or edit per-user config stored under:
  *   /etc/seedbox/config/users/<username>.json
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/lib/runtime.php';

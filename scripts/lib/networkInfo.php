@@ -9,6 +9,9 @@
  *
  * Verified to work on Debian 10, 11 and 12. Older releases like Debian 8
  * should also function provided `iproute2` and `ethtool` are available.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 /**

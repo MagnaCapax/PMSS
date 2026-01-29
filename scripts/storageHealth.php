@@ -5,6 +5,9 @@
  *
  * Operator-facing storage health report (TTY table) based on the JSONL
  * snapshots written by `scripts/cron/storageHealthSnapshot.php`.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (PHP_SAPI !== 'cli') {

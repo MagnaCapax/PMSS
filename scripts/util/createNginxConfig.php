@@ -17,6 +17,8 @@
  * @copyright NuCode 2015-2023 - All Rights reserved.
  * @since 31/03/2015
  * @version 1.1
+ *
+ * @license GPL-3.0-only
  **/
 
 require_once __DIR__.'/../lib/userLifecycle.php';

@@ -1,4 +1,10 @@
 <?php
+/**
+ * Library helper: Manager.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 
 namespace PMSS\Cgroup;
 

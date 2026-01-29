@@ -5,6 +5,9 @@
  *
  * Scans PHP files using token_get_all to find require/include statements
  * and verifies the targets exist.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 $rootDir = realpath(__DIR__ . '/../..');

@@ -1,6 +1,9 @@
 <?php
 /**
  * ruTorrent maintenance tasks.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/context.php';

@@ -6,6 +6,9 @@
  * complete pending dpkg work, apply the baseline selections, then flush any
  * queued installs before other modules execute. Keep this ordering intact—the
  * codebase is converging on the dpkg baseline as the sole package source.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/logging.php';

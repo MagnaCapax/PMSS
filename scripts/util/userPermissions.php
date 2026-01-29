@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Utility script: user Permissions.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 # Set user folder permissions
 
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';

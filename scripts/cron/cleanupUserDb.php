@@ -2,6 +2,9 @@
 <?php
 /**
  * Nightly cleanup for the PMSS user database.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 $args = $argv ?? ($_SERVER['argv'] ?? []);

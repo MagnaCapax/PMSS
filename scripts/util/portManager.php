@@ -2,6 +2,9 @@
 <?php
 /**
  * Port assignment helper for per-user services.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 $usage = "Usage: portManager.php [view|assign|release] USER [SERVICE]\n";

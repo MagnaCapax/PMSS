@@ -9,6 +9,8 @@
  *
  * @author    Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
+ *
+ * @license GPL-3.0-only
  */
 // We should not run this too often, can generate TONS of I/O operations; for example maths:
 // 30 users, with each 250+ torrents ALL PRIVATE (best case) is still going to be roughly 30*260 == 7800 IO requests

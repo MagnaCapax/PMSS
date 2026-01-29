@@ -6,6 +6,9 @@
  * exposing convenience methods that mirror historical helpers. It delegates
  * persistence and filesystem concerns to specialised classes so callers can
  * reason about users at a higher level.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 require_once __DIR__.'/user/userRepository.php';
 require_once __DIR__.'/user/userFilesystem.php';

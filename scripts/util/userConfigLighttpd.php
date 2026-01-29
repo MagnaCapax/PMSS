@@ -7,6 +7,9 @@
  * interface. The script keeps idempotent lighttpd configs, applies sensible
  * php-cgi limits derived from user cgroup settings, and adjusts php.ini
  * memory_limit with safe clamps.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once dirname(__DIR__).'/lib/update/systemPrep.php';

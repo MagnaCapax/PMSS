@@ -3,6 +3,9 @@
  * Shared OpenVPN helpers (slug/artifacts/configuration checks).
  *
  * PHP 7.3 compatible helpers used by systemTest and configureOpenvpn.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!function_exists('pmssOpenvpnFqdnFromHostname')) {

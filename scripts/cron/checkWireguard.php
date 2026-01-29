@@ -2,6 +2,9 @@
 <?php
 /**
  * Ensure the WireGuard service remains healthy.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {

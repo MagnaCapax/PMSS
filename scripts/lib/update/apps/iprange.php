@@ -1,6 +1,9 @@
 <?php
 /**
  * Compile iprange after the package phase completes.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/packages/helpers.php';

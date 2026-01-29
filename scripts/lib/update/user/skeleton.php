@@ -1,6 +1,9 @@
 <?php
 /**
  * Skeleton file maintenance for user accounts.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 function pmssUserApplySkeletonFiles(array $ctx): void

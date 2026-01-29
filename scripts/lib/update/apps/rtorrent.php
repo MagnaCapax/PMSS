@@ -18,6 +18,8 @@
  * #TODO Replace HTTP downloads and ad-hoc compiles with a reproducible,
  *       package-based approach (dpkg baselines or managed repository). (GH #132)
  * #TODO Refactor to use runStep wrappers and verify downloads via checksums. (GH #132)
+ *
+ * @license GPL-3.0-only
  */
 
 $rtorrentVersion = shell_exec('rtorrent -h');

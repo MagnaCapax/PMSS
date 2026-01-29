@@ -10,6 +10,9 @@
  * - create only directories (fail when a non-directory path exists)
  * - apply chmod + (when running as root) chown/chgrp on the leaf directory
  * - log only when changes were required
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!function_exists('pmssEnsureDir')) {

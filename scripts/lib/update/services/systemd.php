@@ -5,6 +5,9 @@
  * PMSS runs most user-facing daemons per-user (under /home/<user>) and relies
  * on nginx as the shared front-end. System-wide units for apps like Deluge
  * should remain stopped/disabled to reduce attack surface.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../runtime/commands.php';

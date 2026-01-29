@@ -1,4 +1,10 @@
 <?php
+/**
+ * Update app installer: syncthing.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Install syncthing
 
 $syncthingVersion = 'v1.18.2 "Fermium Flea"';

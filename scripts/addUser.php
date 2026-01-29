@@ -7,6 +7,9 @@
  * seedbox account. The script wraps useradd, skeleton configuration, service
  * wiring, and optional traffic limits into a single idempotent workflow so
  * freshly created users conform to the production baseline.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 // Shell-facing usage string; keep the CLI contract explicit for operators.

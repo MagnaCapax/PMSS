@@ -7,6 +7,9 @@
  * script targets the current server hostname, installs Certbot using the
  * distribution-appropriate channel, seeds renewal cron, and refreshes the nginx
  * configuration so HTTPS is ready immediately after provisioning.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/update.php';

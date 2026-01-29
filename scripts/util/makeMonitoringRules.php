@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Utility script: make Monitoring Rules.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Configure Ip tables rules for monitoring network traffic usage
 
 require_once '/scripts/lib/network/iptables.php';

@@ -4,6 +4,9 @@
  *
  * Provides shorthand helpers for parsing GNU-style long options, collapsed
  * short flags, and retrieving option values with sensible defaults.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 /**

@@ -4,6 +4,9 @@
  * Configure per-user traffic limits from the command line.
  *
  * Usage: ./userTrafficLimit.php --user=<username> --limit=<MiB>
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 # TODO Add per user max bandwidth limit (GH #127)
 # TODO Comment steps better (GH #127)

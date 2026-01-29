@@ -1,6 +1,9 @@
 <?php
 /**
  * Provides checksum generation for user datasets.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 class UserChecksum

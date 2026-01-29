@@ -4,6 +4,9 @@
  *
  * Centralises username validation and audit logging for add/suspend/unsuspend/
  * terminate flows so operators have a single place to review user changes.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!defined('PMSS_USER_LOG_TEXT')) {

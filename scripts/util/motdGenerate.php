@@ -6,6 +6,9 @@
  * Small standalone utility that invokes generateMotd() so operators and cron
  * can refresh /etc/motd without running the full updater. Follows the GNU
  * philosophy of small focused tools.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/runtime.php';

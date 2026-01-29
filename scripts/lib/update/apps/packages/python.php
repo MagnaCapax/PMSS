@@ -1,6 +1,9 @@
 <?php
 /**
  * Python ecosystems and related tooling.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/helpers.php';

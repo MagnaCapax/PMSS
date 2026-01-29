@@ -6,6 +6,9 @@
  * Historically this watchdog was named checkInstances.php. It has been renamed
  * to checkRtorrent.php to better reflect its responsibility. Keep this entry
  * point so older cron templates and custom automation do not break.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 // Avoid overlapping watchdog runs when cron is delayed or storage is saturated.

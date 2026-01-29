@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Utility script: check Rutorrent Plugins.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
 
 $accessIni = file_get_contents('/etc/seedbox/config/template.rutorrent.access');

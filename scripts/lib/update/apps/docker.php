@@ -1,4 +1,10 @@
 <?php
+/**
+ * Update app installer: docker.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 
 function_exists('logmsg') && logmsg('[docker] Starting Docker rootless configuration');
 

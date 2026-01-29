@@ -40,6 +40,9 @@
  *     path that has been verified to work on Debian 10/11 rootless hosts.
  *   - Logs per-user actions via pmssUserLog(); noisy no-op runs are logged
  *     only when `--debug` is passed.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (PHP_SAPI !== 'cli') {

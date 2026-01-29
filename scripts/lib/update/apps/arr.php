@@ -1,6 +1,9 @@
 <?php
 /**
  * Shared helpers for *ARR (Sonarr/Radarr) style application updaters.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 /**

@@ -3,6 +3,9 @@
 /**
  * Sync the root cron template and restart the daemon using the shared
  * runStep() helper so executions are logged consistently.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/logger.php';

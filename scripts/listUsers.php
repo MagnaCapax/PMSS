@@ -11,6 +11,8 @@
  *
  * @author    Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
+ *
+ * @license GPL-3.0-only
  */
 $usersLib   = __DIR__.'/lib/users.php';
 $userFs     = __DIR__.'/lib/user/userFilesystem.php';

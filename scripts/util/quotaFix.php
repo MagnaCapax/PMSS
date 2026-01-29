@@ -27,6 +27,9 @@
  *
  * @since 2011-03-27
  * @see https://wiki.pulsedmedia.com/index.php/PM_Software_Stack_Changelog_2011-2014
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/runtime.php';

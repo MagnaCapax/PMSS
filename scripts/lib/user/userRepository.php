@@ -5,6 +5,9 @@
  * This wrapper preserves the historical `UserRepository` API (all/get/set/remove)
  * while moving the durable storage to:
  *   /etc/seedbox/config/users/<username>.json
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/userFilesystem.php';

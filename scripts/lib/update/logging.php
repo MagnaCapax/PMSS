@@ -1,6 +1,9 @@
 <?php
 /**
  * Logging helpers shared by PMSS update routines.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!defined('PMSS_LOG_FILE')) {

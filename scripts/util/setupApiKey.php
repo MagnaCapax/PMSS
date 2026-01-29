@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Utility script: setup Api Key.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Local key is to receive commands
 if (!file_exists('/etc/seedbox/config/api.localKey')) {
  echo "# Creating API Local Key";

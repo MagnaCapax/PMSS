@@ -3,6 +3,9 @@
  * Shared helpers for managing Python 3 virtual environments in app installers.
  *
  * PHP 7.3 compatible; no typed properties or union types.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../runtime/commands.php';

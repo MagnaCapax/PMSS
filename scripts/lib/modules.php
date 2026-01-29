@@ -12,6 +12,9 @@
  * repository and the directory does not exist by default. It appears to be
  * an experimental or legacy feature kept for future expansion. The loader
  * contains logic errors and is not instantiated anywhere in the codebase.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 class modules {
     /** @var string Subdirectory name for module lookup */

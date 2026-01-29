@@ -1,4 +1,10 @@
 <?php
+/**
+ * Update app installer: vnstat.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Vnstat config + install
 require_once '/scripts/lib/networkInfo.php';
 

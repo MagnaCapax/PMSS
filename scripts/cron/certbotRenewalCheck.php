@@ -10,6 +10,9 @@
  * - 0: OK / NOOP
  * - 1: FAIL
  * - 2: UNKNOWN (log missing/unparseable)
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/certbotRenewal.php';

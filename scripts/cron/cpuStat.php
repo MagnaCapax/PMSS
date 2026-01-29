@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Cron task: cpu Stat.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Gather iostat information from disks
 $cpuStatLogFile = '/var/run/pmss/cpustat';
 

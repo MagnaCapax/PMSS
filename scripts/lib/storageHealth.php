@@ -4,6 +4,9 @@
  *
  * Keep this include stable: scripts should require this file rather than
  * reaching into submodules.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/storageHealth/common.php';

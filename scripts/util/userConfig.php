@@ -7,6 +7,9 @@
  * service configuration. It chains purpose-built helpers so the orchestration
  * layer remains concise while still enforcing the PMSS baseline on repeated
  * runs.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/user/traffic.php';

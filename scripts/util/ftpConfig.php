@@ -2,6 +2,9 @@
 <?php
 /**
  * Render and apply the ProFTPD configuration using project templates.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/update.php';

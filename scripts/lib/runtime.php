@@ -5,6 +5,9 @@
  * Provides consistent logging and command execution utilities so that
  * provisioning scripts can emit useful diagnostics without aborting on
  * recoverable errors.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 const PMSS_RUNTIME_FALLBACK_LOG = '/var/log/pmss/runtime.log';

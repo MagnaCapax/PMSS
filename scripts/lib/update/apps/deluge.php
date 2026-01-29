@@ -1,4 +1,10 @@
 <?php
+/**
+ * Update app installer: deluge.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // #TODO Refactor this installer to use virtualenv instead of system-wide pip. (GH #125)
 // #TODO Pin Python package versions explicitly; avoid unbounded upgrades. (GH #125)
 // #TODO Replace passthru/backticks with runStep wrappers for consistent logging. (GH #125)

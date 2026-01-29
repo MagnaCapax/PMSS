@@ -4,6 +4,9 @@
  * /scripts/lib/update.php
  *
  * Contains various functions, settings, etc. for use in /scripts/util/update-step2.php.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/rtorrentConfig.php';

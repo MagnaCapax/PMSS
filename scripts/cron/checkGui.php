@@ -10,6 +10,9 @@
  *
  * Future enhancements may add HTTP responsiveness probes; keep the watchdog
  * lightweight and idempotent so it can run every few minutes without churn.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/runtime.php';

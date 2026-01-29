@@ -10,6 +10,9 @@
  *   - #TODO #Debian13: validate whether these lists remain correct on Debian 13 (trixie)
  *     once the Debian 13 dpkg baseline is captured.
  *   - <10: installers log a warning and skip execution.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/helpers.php';

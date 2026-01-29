@@ -8,6 +8,9 @@
  *   - `quota` (int) – Disk quota in GiB; converted to blocks/inodes below.
  *   - `CPUWeight` / `IOWeight` (optional ints) – Set elsewhere but carried with
  *     the user array for holistic resource adjustments.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';

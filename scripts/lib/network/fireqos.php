@@ -1,6 +1,9 @@
 <?php
 /**
  * FireQOS configuration helpers.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string
 {

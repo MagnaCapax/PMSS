@@ -6,6 +6,9 @@
  * Cron helper that ensures each user with Deluge enabled has both the
  * daemon and web interface running. When either process is not found,
  * it is started under the user's account.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 echo date('Y-m-d H:i:s') . ': Checking Deluge instances' . "\n";
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';

@@ -1,6 +1,9 @@
 <?php
 /**
  * User maintenance helpers for update-step2.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/runtime/commands.php';

@@ -1,6 +1,9 @@
 <?php
 /**
  * Helpers for enumerating users from filesystem and passwd database.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 class userFilesystem

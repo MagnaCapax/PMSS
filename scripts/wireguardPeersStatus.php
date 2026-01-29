@@ -5,6 +5,9 @@
  *
  * Lists peers managed by PMSS (derived from wg0.conf) along with their
  * assigned /32 address and basic connection status from `wg show wg0 dump`.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 define('PMSS_WIREGUARD_NO_ENTRYPOINT', true);

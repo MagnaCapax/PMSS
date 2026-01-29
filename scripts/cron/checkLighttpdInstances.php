@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Cron task: check Lighttpd Instances.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 /*
 Pulsed Media Seedbox Management Software "PMSS"
 This script manages and monitors user-specific lighttpd and php-cgi processes.

@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Cron task: disk Smart.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 $logFileDirectory = '/var/run/pmss/smart';
 // Get list of blockdevices
 $devices = `ls /sys/block/|grep sd|grep -v loop|grep -v md`;

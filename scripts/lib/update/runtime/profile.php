@@ -6,6 +6,9 @@
  * orchestrator can stream JSON events, log human-readable summaries, and stash
  * full traces to disk for later debugging when updates behave oddly or run
  * slower than expected.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../logging.php';

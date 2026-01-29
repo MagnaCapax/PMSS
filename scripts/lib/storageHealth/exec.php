@@ -4,6 +4,9 @@
  *
  * This intentionally captures output instead of streaming: cron logs should not
  * be flooded with raw smartctl output.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!function_exists('pmssStorageHealthExecCapture')) {

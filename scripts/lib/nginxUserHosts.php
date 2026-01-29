@@ -4,6 +4,9 @@
  *
  * These helpers keep hostname validation and hash host derivation consistent
  * across nginx config generation without altering existing path-based routes.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/userTransfer.php';

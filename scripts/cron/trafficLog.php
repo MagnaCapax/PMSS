@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Cron task: traffic Log.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Cron job log file paths match the cron schedule in root.cron
 
 require_once '/scripts/lib/logger.php';

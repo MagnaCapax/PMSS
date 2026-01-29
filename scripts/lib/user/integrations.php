@@ -1,6 +1,9 @@
 <?php
 /**
  * Helper utilities for optional integrations such as rclone.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 /**

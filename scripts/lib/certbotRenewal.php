@@ -6,6 +6,9 @@
  * renewal summary messages emitted by certbot into /var/log/letsencrypt.
  *
  * PHP compatibility: 7.3+
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 /**

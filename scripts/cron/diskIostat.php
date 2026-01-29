@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Cron task: disk Iostat.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 $debianVersion = file_get_contents('/etc/debian_version');
 // Are we running debian 7/8 or Debian 10?
 $debianVersion = $debianVersion[0] == 1 ? 10 : 8;

@@ -21,6 +21,9 @@
  * - CPUWeight/IOWeight/IOReadBW/... pass-through for future resource controls.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/UserValidator.php';

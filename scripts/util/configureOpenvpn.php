@@ -8,6 +8,9 @@
  * - Seeds server configuration from template
  * - Generates/refreshes client .ovpn and CA exports under /home
  * - Restarts OpenVPN service as needed
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../lib/logger.php';

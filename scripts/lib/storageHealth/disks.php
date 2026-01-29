@@ -1,6 +1,9 @@
 <?php
 /**
  * Disk inventory helpers (lsblk parsing).
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!function_exists('pmssStorageHealthListDisksFromLsblk')) {

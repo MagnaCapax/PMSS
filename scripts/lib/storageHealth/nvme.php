@@ -1,6 +1,9 @@
 <?php
 /**
  * NVMe parsing + snapshot helpers.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (!function_exists('pmssStorageHealthSnapshotNvme')) {

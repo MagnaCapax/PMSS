@@ -1,6 +1,9 @@
 <?php
 /**
  * Context and skeleton helpers for per-user update routines.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../../runtime.php';

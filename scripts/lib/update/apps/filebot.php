@@ -1,4 +1,10 @@
 <?php
+/**
+ * Update app installer: filebot.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Let's install filebot!
 // #TODO Replace ad-hoc wget/dpkg flow with a repository/dpkg-baseline driven
 //       install. Prefer using runStep() for logging instead of passthru. (GH #133)

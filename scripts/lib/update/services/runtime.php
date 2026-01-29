@@ -1,6 +1,9 @@
 <?php
 /**
  * Runtime template management for system services.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../runtime/commands.php';

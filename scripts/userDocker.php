@@ -12,6 +12,9 @@
  *   /scripts/userDocker.php USER stop
  *   /scripts/userDocker.php USER restart
  *   /scripts/userDocker.php USER status
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 if (PHP_SAPI !== 'cli') {

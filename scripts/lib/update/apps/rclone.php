@@ -1,4 +1,10 @@
 <?php
+/**
+ * Update app installer: rclone.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 # Pulsed Media Seedbox Management Software "PMSS"
 # Rclone installer + update
 

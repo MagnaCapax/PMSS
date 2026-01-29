@@ -19,6 +19,9 @@
  *
  * This file is refreshed from GitHub by /scripts/update.php prior to each run.
  * Keep local changes minimal or contribute them upstream.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 // Cap PHP memory use so we fail fast with a PHP fatal instead of a host-wide OOM kill.

@@ -1,6 +1,9 @@
 <?php
 /**
  * Distribution detection and updater self-heal helpers.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/runtime/commands.php';

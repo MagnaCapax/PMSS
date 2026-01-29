@@ -1,6 +1,9 @@
 <?php
 /**
  * Bootstrap helpers migrated from install.sh.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
  */
 
 require_once __DIR__.'/../logging.php';

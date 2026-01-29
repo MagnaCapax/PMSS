@@ -1,5 +1,11 @@
 #!/usr/bin/env php
 <?php
+/**
+ * Cron task: check Rootless Docker.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
 // Ensure rootless Docker daemon is running for each user
 
 require_once '/scripts/lib/logger.php';
