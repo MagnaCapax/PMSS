@@ -8,12 +8,14 @@ class TrafficStorage
     private $homeDir;
     private $runtimeDir;
     private $statsDir;
+    private $chattrPath;
 
     public function __construct(array $paths = [])
     {
         $this->homeDir    = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
         $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->statsDir   = rtrim($paths['stats_dir'] ?? $this->runtimeDir.'/trafficStats', '/');
+        $this->chattrPath = null;
     }
 
     /** Ensure runtime directories exist before writing. */
@@ -43,8 +45,10 @@ class TrafficStorage
 
         if (is_dir($homePath)) {
             $userPath = $homePath.'/'.$filename;
+            $this->setImmutable($userPath, false);
             @file_put_contents($userPath, $serialized);
             $this->protectUserTrafficFile($userPath, $targetUser);
+            $this->setImmutable($userPath, true);
         }
 
         $runtimePath = $this->statsDir.'/'.$user;
@@ -72,5 +76,36 @@ class TrafficStorage
         @chown($path, 'root');
         @chgrp($path, 'root');
         @chmod($path, 0600);
+    }
+
+    /**
+     * Toggle immutable bit when supported (best-effort).
+     */
+    private function setImmutable(string $path, bool $enable): void
+    {
+        if (!is_file($path)) {
+            return;
+        }
+        $chattr = $this->chattrPath();
+        if ($chattr === '') {
+            return;
+        }
+        $flag = $enable ? '+i' : '-i';
+        @exec($chattr.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
+    }
+
+    private function chattrPath(): string
+    {
+        if ($this->chattrPath !== null) {
+            return $this->chattrPath;
+        }
+        $this->chattrPath = '';
+        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+            if (is_executable($candidate)) {
+                $this->chattrPath = $candidate;
+                break;
+            }
+        }
+        return $this->chattrPath;
     }
 }

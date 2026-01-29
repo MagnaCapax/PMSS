@@ -106,6 +106,29 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
     run(sprintf('chown %s%s %s', $flag, escapeshellarg($owner), $target));
 }
 
+// Best-effort immutable toggle for traffic data files.
+function pmssSetImmutable(string $path, bool $enable): void
+{
+    if (!file_exists($path)) {
+        return;
+    }
+    static $chattrPath = null;
+    if ($chattrPath === null) {
+        $chattrPath = '';
+        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+            if (is_executable($candidate)) {
+                $chattrPath = $candidate;
+                break;
+            }
+        }
+    }
+    if ($chattrPath === '') {
+        return;
+    }
+    $flag = $enable ? '+i' : '-i';
+    @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
+}
+
 // Safer traversal without relying on xargs delimiters; applies to each directory in place.
 // Skip ~/.local entirely to avoid interfering with per-user application data (e.g. Docker overlays).
 $userIds = pmssPasswdUserIds($thisUser);
@@ -204,6 +227,10 @@ $chownItems = [
     ["/home/{$thisUser}/www/rutorrent/conf/config.php", "root:root"],
 ];
 
+// Ensure traffic files are mutable while ownership and permissions are repaired.
+pmssSetImmutable("/home/{$thisUser}/.trafficData", false);
+pmssSetImmutable("/home/{$thisUser}/.trafficDataLocal", false);
+
 foreach ($chmodItems as $item) {
     $path = $item[0];
     $perm = $item[1];
@@ -239,6 +266,9 @@ foreach ($chownItems as $item) {
     $recursive = isset($item[2]) ? (bool)$item[2] : false;
     chownPath($path, $owner, $recursive);
 }
+
+pmssSetImmutable("/home/{$thisUser}/.trafficData", true);
+pmssSetImmutable("/home/{$thisUser}/.trafficDataLocal", true);
 
 if (file_exists("/home/{$thisUser}/.ssh")) {
     chmodPath("/home/{$thisUser}/.ssh", 0750);

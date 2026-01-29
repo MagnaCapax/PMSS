@@ -471,16 +471,43 @@ try {
     $zeroTraffic = ['raw'=>$zeroRaw,'display'=>$zeroDisplay,'daily'=>[]];
     $homeBase = "/home/{$user['name']}";
     $runtimeStatsDir = '/var/run/pmss/trafficStats';
+    $chattrPath = null;
+    // Best-effort immutable toggle for traffic data files.
+    $setImmutable = static function (string $path, bool $enable) use (&$chattrPath): void {
+        if (!is_file($path)) {
+            return;
+        }
+        if ($chattrPath === null) {
+            $chattrPath = '';
+            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+                if (is_executable($candidate)) {
+                    $chattrPath = $candidate;
+                    break;
+                }
+            }
+        }
+        if ($chattrPath === '') {
+            return;
+        }
+        $flag = $enable ? '+i' : '-i';
+        @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
+    };
     if (!is_dir($runtimeStatsDir)) @mkdir($runtimeStatsDir, 0755, true);
     // Home files
-    @file_put_contents("$homeBase/.trafficData", serialize($zeroTraffic));
-    @chown("$homeBase/.trafficData", 'root');
-    @chgrp("$homeBase/.trafficData", $user['name']);
-    @chmod("$homeBase/.trafficData", 0640);
-    @file_put_contents("$homeBase/.trafficDataLocal", serialize($zeroTraffic));
-    @chown("$homeBase/.trafficDataLocal", 'root');
-    @chgrp("$homeBase/.trafficDataLocal", $user['name']);
-    @chmod("$homeBase/.trafficDataLocal", 0640);
+    $trafficPath = "$homeBase/.trafficData";
+    $setImmutable($trafficPath, false);
+    @file_put_contents($trafficPath, serialize($zeroTraffic));
+    @chown($trafficPath, 'root');
+    @chgrp($trafficPath, $user['name']);
+    @chmod($trafficPath, 0640);
+    $setImmutable($trafficPath, true);
+    $trafficLocalPath = "$homeBase/.trafficDataLocal";
+    $setImmutable($trafficLocalPath, false);
+    @file_put_contents($trafficLocalPath, serialize($zeroTraffic));
+    @chown($trafficLocalPath, 'root');
+    @chgrp($trafficLocalPath, $user['name']);
+    @chmod($trafficLocalPath, 0640);
+    $setImmutable($trafficLocalPath, true);
     // Runtime cache
     @file_put_contents("$runtimeStatsDir/{$user['name']}", serialize($zeroTraffic));
     @chown("$runtimeStatsDir/{$user['name']}", 'root');
