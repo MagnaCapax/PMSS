@@ -174,9 +174,15 @@ EOF
 	done
 	printf '\n' >>"$prompt_file"
 
-	cat <<'EOF' >>"$prompt_file"
+cat <<'EOF' >>"$prompt_file"
 
 Do not inline these; read them directly from disk.
+
+Output safety checklist:
+- If output size is unknown or large, redirect to a file and summarize with tail/head/rg.
+- Avoid unbounded commands (recursive find/grep, full log dumps, verbose fsck).
+- Prefer bounded queries (git status --short, rg -n pattern path | head -50).
+- When in doubt, capture output to /tmp and extract a small excerpt.
 EOF
 
 	codex_append_local_notes "$notes_file" "$prompt_file"
