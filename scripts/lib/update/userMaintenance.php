@@ -8,6 +8,7 @@ require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../user/log.php';
+require_once __DIR__.'/../user/directories.php';
 
 if (!function_exists('pmssRunAndLog')) {
     /**
@@ -297,13 +298,10 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         $configDir  = $home.'/.config/docker';
         $configFile = $configDir.'/daemon.json';
 
-        if (!is_dir($configDir)) {
-            if (!mkdir($configDir, 0700, true)) {
-                pmssUserLog($user, '[WARN] Failed to create ~/.config/docker');
-                return;
-            }
-            chown($configDir, $uid);
-            chgrp($configDir, $gid);
+        $userLog = static function (string $message) use ($user): void { pmssUserLog($user, $message); };
+        if (!pmssEnsureUserHomeDir($user, $home, '.config/docker', 0700, $userLog, 0700)) {
+            pmssUserLog($user, '[WARN] Failed to ensure ~/.config/docker');
+            return;
         }
 
         $current = @file_get_contents($configFile);

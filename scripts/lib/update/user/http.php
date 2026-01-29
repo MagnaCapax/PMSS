@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__.'/context.php';
+require_once __DIR__.'/../../user/directories.php';
 
 /**
  * Configure per-user HTTP stack pieces (lighttpd vhost, ruTorrent temp paths).
@@ -18,6 +19,7 @@ function pmssUserConfigureHttp(array $ctx): void
     $user    = $ctx['user'];
     $home    = $ctx['home'];
     $userEsc = $ctx['user_esc'];
+    $userLog = function_exists('pmssUserLog') ? static function (string $message) use ($user): void { pmssUserLog($user, $message); } : null;
 
     runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
 
@@ -37,13 +39,12 @@ function pmssUserConfigureHttp(array $ctx): void
 
     $tmpDir = "{$home}/.tmp";
     if (!is_dir($tmpDir)) {
-        runUserStep($user, 'Creating ruTorrent temp directory', sprintf('mkdir -p %s', escapeshellarg($tmpDir)));
-        runUserStep($user, 'Adjusting ownership for ruTorrent temp directory', sprintf('chown %1$s:%1$s %2$s', $userEsc, escapeshellarg($tmpDir)));
+        pmssEnsureUserHomeDir($user, $home, '.tmp', 0755, $userLog);
     }
 
     $irssiDir = "{$home}/.irssi";
     if (!is_dir($irssiDir)) {
-        runUserStep($user, 'Creating irssi configuration directory', sprintf('mkdir -p %s', escapeshellarg($irssiDir)));
+        pmssEnsureUserHomeDir($user, $home, '.irssi', 0755, $userLog);
         $skelConfigArg = pmssUserSkelCommandArg('.irssi/config');
         runUserStep($user, 'Copying irssi skeleton config', sprintf('cp %s %s/', $skelConfigArg, escapeshellarg($irssiDir)));
         runUserStep($user, 'Adjusting irssi configuration ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($irssiDir)));
@@ -51,8 +52,7 @@ function pmssUserConfigureHttp(array $ctx): void
 
     $recycleDir = "{$home}/www/recycle";
     if (!is_dir($recycleDir)) {
-        runUserStep($user, 'Creating recycle directory', sprintf('mkdir -p %s', escapeshellarg($recycleDir)));
-        runUserStep($user, 'Adjusting recycle ownership', sprintf('chown %1$s:%1$s %2$s', $userEsc, escapeshellarg($recycleDir)));
-        runUserStep($user, 'Setting recycle permissions', sprintf('chmod 771 %s', escapeshellarg($recycleDir)));
+        // Note: parent directory mode should remain legacy defaults; only the recycle dir is 0771.
+        pmssEnsureUserHomeDir($user, $home, 'www/recycle', 0771, $userLog, 0755);
     }
 }
