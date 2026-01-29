@@ -150,8 +150,8 @@ EOF
 # Ensure system admin tools (sysctl, ip, etc.) are available in user shells
 export PATH=$PATH:/usr/sbin:/sbin
 
-# Ensure user-local bins take precedence
-export PATH=$HOME/.bin:$HOME/bin:$PATH
+# Ensure user-local bins are available after system paths
+export PATH=$PATH:$HOME/.bin:$HOME/bin
 
 # Prefer the per-user systemd runtime directory when available so rootless
 # daemons and other user services can attach to the correct socket.

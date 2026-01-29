@@ -116,7 +116,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Cloudplow (venv + pip requirements)
 - SABnzbd (venv + pip requirements)
 - Radarr, Prowlarr, Sonarr (download and extract into `~/.bin/<Name>`)
-- .NET 8 ASP.NET runtime (download to `~/.bin/dotnet`, exports PATH/DOTNET_ROOT in `~/.bashrc`)
+- .NET 8 ASP.NET runtime (download to `~/.bin/dotnet`, exports PATH/DOTNET_ROOT in `~/.bashrc` after system paths)
 - Jellyfin (download/extract to `~/.bin/jellyfin`)
 
 6) Configuration
@@ -167,7 +167,7 @@ Jellyfin depends on ffmpeg for transcoding. On older distros, the packaged ffmpe
 Steps (example with BtbN):
 1) Ensure your user bin exists: `mkdir -p ~/.bin`
 2) Download and extract a static ffmpeg build to `~/.bin/ffmpeg` and `chmod +x ~/.bin/ffmpeg`.
-3) The installer prepends `~/.bin` to your PATH in `~/.bashrc`, so Jellyfin can auto‑detect `ffmpeg` from PATH. Alternatively, set it explicitly in Jellyfin (Dashboard → Playback) to `/home/<user>/.bin/ffmpeg`.
+3) The installer appends `~/.bin` to your PATH in `~/.bashrc` after system paths, so Jellyfin can auto‑detect `ffmpeg` from PATH. Alternatively, set it explicitly in Jellyfin (Dashboard → Playback) to `/home/<user>/.bin/ffmpeg`.
 
 Hardware acceleration:
 - VAAPI/NVENC need matching user-accessible driver libraries. If you place libs under `~/.local/lib` or `~/.bin/lib`, export `LD_LIBRARY_PATH=$HOME/.local/lib:$HOME/.bin/lib:$LD_LIBRARY_PATH` before launching Jellyfin (the installer already sets DOTNET env; you can extend it in `~/.bashrc`).

@@ -44,7 +44,7 @@ If you ever need to change the driver, edit `~/.config/docker/daemon.json` and r
 
 If you need docker-compose, download the latest binary into `~/bin` and make it executable. The helper script `docker-install-wireguard.sh` defaults to a random port if none is supplied and prints the chosen port.
 
-The default skeleton under `/etc/skel` provides a `~/bin/docker-install-wireguard.sh` helper and wires `~/bin` (and `~/.bin` when present) into `PATH` via `~/.bashrc`, so new accounts have the script available immediately after provisioning.
+The default skeleton under `/etc/skel` provides a `~/bin/docker-install-wireguard.sh` helper and appends `~/bin` (and `~/.bin` when present) to `PATH` via `~/.bashrc` after system paths, so new accounts have the script available immediately after provisioning.
 
 For operators, per-user Docker can be controlled via:
 

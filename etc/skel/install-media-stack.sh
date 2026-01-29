@@ -632,7 +632,7 @@ else
 fi
 append_to_bashrc_if_missing '# Added by PMSS media stack installer (.NET 8)
 export DOTNET_ROOT=$HOME/.bin/dotnet
-export PATH=$HOME/.bin:$DOTNET_ROOT:$PATH' 'PMSS media stack installer'
+export PATH=$PATH:$DOTNET_ROOT:$HOME/.bin' 'PMSS media stack installer'
 chmod 0640 "$HOME/.bashrc" 2>/dev/null || true
 echo ""
 

@@ -696,7 +696,7 @@ If you choose to use it:
 - Install the `docker-compose` binary into `~/bin` and make it executable, as
   described in general Docker documentation.
 - Ensure `~/bin` is on your `PATH` (this is already true in the default PMSS
-  shell profile).
+  shell profile, appended after system paths).
 
 Example `docker-compose.yml` for a small dashboard:
 

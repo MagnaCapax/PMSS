@@ -96,9 +96,9 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('export DOTNET_ROOT=$HOME/.bin/dotnet', $this->script);
     }
 
-    public function testBinDirPrependedToPath(): void
+    public function testBinDirAppendedToPath(): void
     {
-        $this->assertStringContainsString('export PATH=$HOME/.bin:$DOTNET_ROOT:$PATH', $this->script);
+        $this->assertStringContainsString('export PATH=$PATH:$DOTNET_ROOT:$HOME/.bin', $this->script);
     }
 
     public function testLighttpdCustomConfigExists(): void
