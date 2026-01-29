@@ -20,7 +20,7 @@ if (!function_exists('pmssEnsureDir')) {
      * @param int           $mode       Desired mode for the leaf directory.
      * @param string|null   $ownerUser  Owner username (best-effort; only applied when running as root).
      * @param string|null   $ownerGroup Owner group (best-effort; only applied when running as root).
-     * @param callable|null $logger     Optional logger callback: fn(string $message): void
+     * @param callable|null $logger     Optional logger callback: function(string $message): void
      * @param int           $parentMode Mode for newly created parent directories (defaults to 0755).
      */
     function pmssEnsureDir(
@@ -31,7 +31,7 @@ if (!function_exists('pmssEnsureDir')) {
         ?callable $logger = null,
         int $parentMode = 0755
     ): bool {
-        $log = $logger ?: static function (string $_msg): void { };
+        $log = $logger ?: function (string $_msg): void { };
 
         $path = rtrim($path, '/');
         if ($path === '' || $path[0] !== '/') {
@@ -163,7 +163,7 @@ if (!function_exists('pmssEnsureUserHomeDir')) {
         ?callable $logger = null,
         int $parentMode = 0755
     ): bool {
-        $log = $logger ?: static function (string $_msg): void { };
+        $log = $logger ?: function (string $_msg): void { };
 
         $home = rtrim($home, '/');
         if ($home === '' || $home[0] !== '/' || !is_dir($home) || is_link($home)) {
@@ -194,4 +194,3 @@ if (!function_exists('pmssEnsureUserHomeDir')) {
         return pmssEnsureDir($path, $mode, $user, $user, $logger, $parentMode);
     }
 }
-
