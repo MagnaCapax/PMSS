@@ -35,6 +35,7 @@ SHELL=/bin/bash
 
 #*/4 * * * * root /usr/bin/php -q /scripts/cron/checkHttpd.php >> /var/log/pmss/checkHttpd.log 2>&1
 * * * * *   root sleep 25; /scripts/cron/systemdServicesGuard.php >> /var/log/pmss/systemdServicesGuard.log 2>&1
+15 */6 * * *   root    /scripts/cron/certbotRenewalCheck.php >> /var/log/pmss/certbotRenewalCheck.log 2>&1
 * * * * *   root /scripts/cron/updateQuotas.php >> /var/log/pmss/updateQuotas.log 2>&1
 */5 * * * * root /scripts/cron/checkRootlessDocker.php >> /var/log/pmss/rootlessDocker.log 2>&1
 */5 * * * *   root    /scripts/cron/trafficLog.php >> /var/log/pmss/trafficLog.log 2>&1
