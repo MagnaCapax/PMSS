@@ -7,6 +7,7 @@ require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
+require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/../user/directories.php';
 
@@ -42,9 +43,9 @@ if (!function_exists('pmssUpdateAllUsers')) {
     /**
      * Refresh ruTorrent and skeleton data for every provisioned user.
      *
-     * #TODO(user-maint): keep this as a simple foreach(users) orchestrator;
-     * avoid accumulating extra cross-cutting concerns here beyond logging and
-     * the temporary CPUQuota fix block.
+     * Keep this a simple foreach(users) orchestrator; avoid accumulating
+     * extra cross-cutting concerns beyond logging and the legacy CPUQuota
+     * fix block.
      */
     function pmssUpdateAllUsers(string $rutorrentIndexSha): void
     {
@@ -52,10 +53,28 @@ if (!function_exists('pmssUpdateAllUsers')) {
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', count($users)));
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
+        $cronTemplate = '/etc/seedbox/config/user.crontab.default';
+        $hasCrontabTemplate = is_file($cronTemplate);
+        $htpasswdHelper = '/scripts/util/checkUserHtpasswd.php';
+        $hasHtpasswdHelper = is_file($htpasswdHelper);
+        $lighttpdChecker = '/scripts/cron/checkLighttpdInstances.php';
+        $hasLighttpdChecker = is_file($lighttpdChecker);
+
+        $runUserMaintenance = static function (string $user, string $label, string $command): void {
+            $rc = runUserStep($user, $label, $command);
+            if ($rc !== 0 && function_exists('pmssUserLog')) {
+                pmssUserLog($user, sprintf('[WARN] %s failed (rc=%d)', $label, $rc));
+            }
+        };
 
         foreach ($users as $user) {
             $userTrim = trim($user);
             if ($userTrim === '') {
+                continue;
+            }
+            $normalized = pmssNormalizeUsername($userTrim);
+            if ($normalized !== $userTrim || !pmssValidateUsername($userTrim)) {
+                logMessage(sprintf('[WARN] Skipping invalid username during update-step2: %s', $userTrim));
                 continue;
             }
 
@@ -68,8 +87,15 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 $label .= ')';
                 $phases[] = $label;
             }
-            // #TODO(per-user-loop): fold remaining global sweeps (web refresh, cron restoration,
-            // authorized_keys updates) into this orchestrator so every per-user action is visible here. (GH #124)
+            if ($hasCrontabTemplate) {
+                $phases[] = 'Crontab restoration';
+            }
+            if ($hasHtpasswdHelper) {
+                $phases[] = 'Legacy htpasswd sync';
+            }
+            if ($hasLighttpdChecker) {
+                $phases[] = 'Lighttpd instance check';
+            }
 
             if ($isTty) {
                 echo PHP_EOL."\033[35mUpdating user {$userTrim}\033[0m".PHP_EOL;
@@ -117,6 +143,19 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
 
             pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
+
+            if ($hasCrontabTemplate) {
+                $command = pmssBuildCommand('crontab', ['-u', $userTrim, $cronTemplate]);
+                $runUserMaintenance($userTrim, 'Restoring default crontab', $command);
+            }
+            if ($hasHtpasswdHelper) {
+                $command = pmssBuildCommand($htpasswdHelper, [$userTrim]);
+                $runUserMaintenance($userTrim, 'Synchronizing per-user htpasswd', $command);
+            }
+            if ($hasLighttpdChecker) {
+                $command = pmssBuildCommand($lighttpdChecker, [$userTrim]);
+                $runUserMaintenance($userTrim, 'Checking lighttpd instance', $command);
+            }
 
             $userDuration = microtime(true) - $userStart;
             if (function_exists('pmssUserLog')) {

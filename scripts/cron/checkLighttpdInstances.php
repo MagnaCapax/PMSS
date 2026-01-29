@@ -5,14 +5,32 @@ Pulsed Media Seedbox Management Software "PMSS"
 This script manages and monitors user-specific lighttpd and php-cgi processes.
 */
 
-echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
 }
+require_once __DIR__.'/../lib/userLifecycle.php';
 
-// Get & parse users list
-$users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
+// Get & parse users list (optionally for a single user).
+$argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
+$singleUserMode = ($argUserRaw !== '');
+if (!$singleUserMode) {
+    echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
+}
+if ($singleUserMode) {
+    $argUser = pmssNormalizeUsername($argUserRaw);
+    if ($argUser !== $argUserRaw || !pmssValidateUsername($argUser)) {
+        fwrite(STDERR, "Invalid username\n");
+        exit(1);
+    }
+    if (function_exists('posix_getpwnam') && posix_getpwnam($argUser) === false) {
+        fwrite(STDERR, "User not found\n");
+        exit(1);
+    }
+    $users = [$argUser];
+} else {
+    $users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
+}
 
 $startLighttpd = static function (string $user): void {
     echo "Start lighttpd for user: {$user}\n";
@@ -34,6 +52,13 @@ $restartLighttpd = static function (string $user) use ($startLighttpd): void {
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
     if (empty($thisUser)) continue;
+    $thisUser = trim($thisUser);
+    if ($thisUser === '') continue;
+    $normalizedUser = pmssNormalizeUsername($thisUser);
+    if ($normalizedUser !== $thisUser || !pmssValidateUsername($thisUser)) {
+        echo "Skipping invalid username: {$thisUser}\n";
+        continue;
+    }
     #TODO Uh Oh next one should be separate script :) This is separate task altogether. Works here too as expected, just a bit confusing
     if (file_exists("/home/{$thisUser}/www-disabled") or 
         !file_exists("/home/{$thisUser}/www")) {

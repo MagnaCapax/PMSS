@@ -20,17 +20,40 @@ if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
 }
 
-$usersRaw = trim((string)shell_exec('/scripts/listUsers.php'));
-if ($usersRaw === '') {
-    die("No users setup - nothing to do\n");
+$argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
+$singleUserMode = ($argUserRaw !== '');
+$users = [];
+if ($singleUserMode) {
+    $argUser = function_exists('pmssNormalizeUsername')
+        ? pmssNormalizeUsername($argUserRaw)
+        : $argUserRaw;
+    if ($argUser !== $argUserRaw) {
+        fwrite(STDERR, "Invalid username\n");
+        exit(1);
+    }
+    if (function_exists('pmssValidateUsername') && !pmssValidateUsername($argUser)) {
+        fwrite(STDERR, "Invalid username\n");
+        exit(1);
+    }
+    if (function_exists('posix_getpwnam') && posix_getpwnam($argUser) === false) {
+        fwrite(STDERR, "User not found\n");
+        exit(1);
+    }
+    $users = [$argUser];
+} else {
+    $usersRaw = trim((string)shell_exec('/scripts/listUsers.php'));
+    if ($usersRaw === '') {
+        die("No users setup - nothing to do\n");
+    }
+    $users = array_filter(explode("\n", $usersRaw), 'strlen');
 }
-
-$users = array_filter(explode("\n", $usersRaw), 'strlen');
 
 $globalHtpasswd = '/etc/lighttpd/.htpasswd';
 $globalContents = @file_get_contents($globalHtpasswd);
 if ($globalContents === false || trim($globalContents) === '') {
-    echo "Global htpasswd file missing or empty, skipping synchronization\n";
+    if (!$singleUserMode) {
+        echo "Global htpasswd file missing or empty, skipping synchronization\n";
+    }
     exit(0);
 }
 

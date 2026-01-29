@@ -396,6 +396,7 @@ pmssAdjustLighttpdSecurity();
 // template changes.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
 pmssUpdateAllUsers($rutorrentIndexSha);
+// Per-user maintenance now owns crontab restores, htpasswd sync, and lighttpd instance checks.
 
 pmssEnsureAuthorizedKeysDirective();
 // Ensure the standard download speed test file exists
@@ -418,12 +419,6 @@ if (file_exists($logrotateTemplate)) {
     runStep('Installing logrotate policy for PMSS update logs', sprintf('cp %s /etc/logrotate.d/pmss-update', escapeshellarg($logrotateTemplate)));
     runStep('Setting permissions on PMSS logrotate policy', 'chmod 644 /etc/logrotate.d/pmss-update');
 }
-
-// Restore crontabs for users that still exist in /etc/passwd
-runStep('Restoring default crontab for all users', 'bash -lc '.escapeshellarg('/scripts/listUsers.php | while read -r U; do id "$U" >/dev/null 2>&1 && crontab -u "$U" /etc/seedbox/config/user.crontab.default; done'));
-// #TODO(per-user-loop): migrate the global web stack refresh/cron/authorized (GH #124)
-// keys tasks above into the single per-user orchestrator so we do not run
-// separate all-user sweeps.
 
 pmssEnsureNetworkTemplate('logmsg');
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');

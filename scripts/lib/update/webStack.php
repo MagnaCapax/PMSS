@@ -31,11 +31,10 @@ if (!function_exists('pmssConfigureWebStack')) {
             pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');
         }
 
-        runStep('Refreshing lighttpd configuration', '/scripts/util/userConfigLighttpd.php');
+        // Per-user lighttpd configuration, htpasswd sync, and instance checks
+        // are handled inside the consolidated per-user maintenance loop.
         // nginx config regeneration moved to pmssPostUpdateWebRefresh() - no need to
         // run twice. nginx stays stopped until final config refresh at end of update.
-        runStep('Verifying user HTTP authentication files', '/scripts/util/checkUserHtpasswd.php');
-        runStep('Checking lighttpd per-user instances', '/scripts/cron/checkLighttpdInstances.php');
         runStep('Setting /home directory permissions', 'chmod 751 /home');
         // Quota state files reject chmod; prune them so the find commands stay noise-free.
         $prune = '\( -name "aquota.*" -o -name "lost+found" \)';
@@ -85,17 +84,15 @@ if (!function_exists('pmssAdjustLighttpdSecurity')) {
 
 if (!function_exists('pmssPostUpdateWebRefresh')) {
     /**
-     * Re-run web service configuration after application installers finish.
+     * Re-run global web service configuration after application installers finish.
      *
-     * This is the single authoritative nginx config regeneration point during updates.
+     * Per-user lighttpd refresh and auth sync now run inside the per-user
+     * maintenance loop; keep this focused on the global nginx config regeneration.
      * createNginxConfig.php validates config with nginx -t before restart, refusing
      * to restart if config is broken (added 2026-01, issue #137).
      */
     function pmssPostUpdateWebRefresh(): void
     {
-        runStep('Post-update lighttpd configuration refresh', '/scripts/util/userConfigLighttpd.php');
         runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
-        runStep('Post-update htpasswd verification', '/scripts/util/checkUserHtpasswd.php');
-        runStep('Checking lighttpd instances after update', '/scripts/cron/checkLighttpdInstances.php');
     }
 }
