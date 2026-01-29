@@ -351,8 +351,20 @@ function getDistroCodename(): string
  * @return string The version string or "unknown" if not found.
  */
 function getPmssVersion($versionFile = '/etc/seedbox/config/version') {
-    if (file_exists($versionFile) && filesize($versionFile) > 0) {
-        return trim(file_get_contents($versionFile));
+    $paths = array($versionFile, '/etc/seedbox/runtime/version');
+    foreach ($paths as $path) {
+        if ($path === '' || !is_file($path)) {
+            continue;
+        }
+        $size = @filesize($path);
+        if (!is_int($size) || $size <= 0) {
+            continue;
+        }
+        $data = @file_get_contents($path);
+        if (!is_string($data)) {
+            continue;
+        }
+        return trim($data);
     }
     return 'unknown';
 }

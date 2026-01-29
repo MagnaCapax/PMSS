@@ -46,6 +46,7 @@ const CURL_UA               = 'PMSS-Updater (+https://pulsedmedia.com)';
 const VERSION_DIR           = '/etc/seedbox/config';
 const VERSION_FILE          = VERSION_DIR.'/version';
 const VERSION_META          = VERSION_DIR.'/version.meta';
+const VERSION_RUNTIME_FILE  = '/etc/seedbox/runtime/version';
 const JSON_LOG              = '/var/log/pmss-update.jsonl';
 const SELF_UPDATE_SKIP_FLAG = '--skip-self-update';
 const SCRIPTS_ONLY_FLAG     = '--scripts-only';
@@ -780,6 +781,14 @@ function recordVersion(string $spec, array $details, bool $dryRun): void
 
     @file_put_contents(VERSION_FILE, $line.PHP_EOL);
     @file_put_contents(VERSION_META, json_encode($details, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+
+    // Backwards-compatibility: some tooling expects /etc/seedbox/runtime/version.
+    // #TODO(Q4/2027): remove this compatibility write once all consumers use VERSION_FILE.
+    if (!is_dir(dirname(VERSION_RUNTIME_FILE))) {
+        @mkdir(dirname(VERSION_RUNTIME_FILE), 0755, true);
+    }
+    @file_put_contents(VERSION_RUNTIME_FILE, $line.PHP_EOL);
+
     // #TODO Ensure consistent permissions (0640) on version metadata and any
     //       future config artifacts written here.
 }
