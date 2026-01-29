@@ -108,7 +108,86 @@ fi
 
 
 alias arrinfo='echo "RADARR-URL = https://$(hostname)/public-$(whoami)/radarr/" && echo "SONARR-URL = https://$(hostname)/public-$(whoami)/sonarr/" && echo "PROWLARR-URL = https://$(hostname)/public-$(whoami)/prowlarr/" && echo "JELLYFIN-URL = https://$(hostname)/public-$(whoami)/jellyfin/web/index.html" && echo ""'
-alias passwordChange='newPassword=$(< /dev/urandom tr -dc A-NP-Za-km-np-z2-9 | head -c${1:-10};echo;); echo -e "$newPassword\n$newPassword" | passwd $(whoami); htpasswd -b -m $( [ -f ~/.lighttpd/.htpasswd ] || echo -n "-c" ) ~/.lighttpd/.htpasswd $(whoami) $newPassword; echo "New password is: $newPassword"'
+passwordChange() {
+    local length=16
+    local newPassword=""
+    local user
+    user="$(whoami)"
+
+    if [[ $# -gt 0 ]]; then
+        if [[ "$1" =~ ^[0-9]+$ ]]; then
+            length="$1"
+        else
+            newPassword="$1"
+        fi
+    fi
+
+    if [[ -z "$newPassword" ]]; then
+        if [[ "$length" -lt 12 ]]; then
+            length=12
+        fi
+        newPassword=$(< /dev/urandom tr -dc A-NP-Za-km-np-z2-9 | head -c"${length}"; echo)
+    fi
+
+    if ! pmssPasswordValidate "$newPassword"; then
+        return 1
+    fi
+
+    if ! printf '%s\n%s\n' "$newPassword" "$newPassword" | passwd "$user"; then
+        echo "Error: password change failed."
+        return 1
+    fi
+
+    if command -v htpasswd >/dev/null 2>&1; then
+        local htpasswdFile="$HOME/.lighttpd/.htpasswd"
+        local htpasswdFlags="-b -m"
+        if [[ ! -f "$htpasswdFile" ]]; then
+            htpasswdFlags="$htpasswdFlags -c"
+        fi
+        if ! htpasswd $htpasswdFlags "$htpasswdFile" "$user" "$newPassword"; then
+            echo "Warning: htpasswd update failed."
+        fi
+    fi
+
+    echo "New password is: $newPassword"
+}
+
+pmssPasswordValidate() {
+    local password="$1"
+    local lower
+
+    if [[ ${#password} -lt 12 ]]; then
+        echo "Error: password must be at least 12 characters."
+        return 1
+    fi
+
+    if [[ "$password" =~ [[:space:]] ]]; then
+        echo "Error: password must not contain whitespace."
+        return 1
+    fi
+
+    if ! [[ "$password" =~ [a-z] ]]; then
+        echo "Error: password must include lowercase letters."
+        return 1
+    fi
+    if ! [[ "$password" =~ [A-Z] ]]; then
+        echo "Error: password must include uppercase letters."
+        return 1
+    fi
+    if ! [[ "$password" =~ [0-9] ]]; then
+        echo "Error: password must include numbers."
+        return 1
+    fi
+
+    lower=$(printf '%s' "$password" | tr 'A-Z' 'a-z')
+    case "$lower" in
+        password|password123|letmein|qwerty|admin|welcome|iloveyou|monkey|dragon|sunshine|football|baseball|abc123|123456|1234567|12345678|123456789|1234567890)
+            echo "Error: password is too common."
+            return 1
+            ;;
+    esac
+    return 0
+}
 
 # Display rootless Docker usage instructions
 docker-help() {
