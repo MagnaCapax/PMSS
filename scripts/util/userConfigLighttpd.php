@@ -11,6 +11,7 @@
 
 require_once dirname(__DIR__).'/lib/update/systemPrep.php';
 require_once dirname(__DIR__).'/lib/userLifecycle.php';
+require_once dirname(__DIR__).'/lib/user/directories.php';
 
 const PMSS_LIGHTTPD_CHILDREN_PER_PROC = 2;
 const PMSS_PHP_MEMORY_MIN_MB = 125;
@@ -18,6 +19,59 @@ const PMSS_PHP_MEMORY_MAX_MB = 1024;
 // Minimum/maximum total php-cgi threads per user (max-procs * children).
 const PMSS_PHP_THREADS_MIN = 3;
 const PMSS_PHP_THREADS_MAX = 48;
+
+function pmssRunningAsRoot(): bool
+{
+    return function_exists('posix_geteuid') && @posix_geteuid() === 0;
+}
+
+function pmssAtomicWriteFile(string $path, string $content): bool
+{
+    if (strpos($path, "\0") !== false) {
+        return false;
+    }
+    if (is_link($path)) {
+        return false;
+    }
+    if (file_exists($path) && !is_file($path)) {
+        return false;
+    }
+
+    $dir = dirname($path);
+    if (!is_dir($dir) || is_link($dir)) {
+        return false;
+    }
+
+    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
+    if ($tmp === false) {
+        return false;
+    }
+
+    if (@file_put_contents($tmp, $content) === false) {
+        @unlink($tmp);
+        return false;
+    }
+
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        return false;
+    }
+
+    return true;
+}
+
+function pmssWriteUserFile(string $path, string $content, string $owner, int $mode): bool
+{
+    if (!pmssAtomicWriteFile($path, $content)) {
+        return false;
+    }
+    @chmod($path, $mode);
+    if (pmssRunningAsRoot()) {
+        @chown($path, $owner);
+        @chgrp($path, $owner);
+    }
+    return true;
+}
 
 function pmssParseSizeToMiB($value): ?int
 {
@@ -189,12 +243,59 @@ function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
     if (!is_dir($homeDir)) {
         return false;
     }
+    if (is_link($homeDir)) {
+        return false;
+    }
     if (is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www')) {
         return false;
     }
     if (!file_exists($homeDir.'/.rtorrent.rc')) {
         return false;
     }
+    return true;
+}
+
+function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool
+{
+    if (!pmssValidateUsername($user)) {
+        return false;
+    }
+    if (!is_dir($homeDir) || is_link($homeDir)) {
+        return false;
+    }
+
+    if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd', 0751)) {
+        return false;
+    }
+    if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd/custom.d', 0750)) {
+        return false;
+    }
+    if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd/upload', 0751)) {
+        return false;
+    }
+    if ($deflateEnabled) {
+        if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd/compress', 0751)) {
+            return false;
+        }
+    }
+    if (!pmssEnsureUserHomeDir($user, $homeDir, 'www/public', 0751)) {
+        return false;
+    }
+
+    // Ensure the optional user-controlled include exists so lighttpd start doesn't fail.
+    $customFile = $homeDir.'/.lighttpd/custom';
+    if (is_link($customFile)) {
+        return false;
+    }
+    if (file_exists($customFile) && !is_file($customFile)) {
+        return false;
+    }
+    if (!file_exists($customFile)) {
+        if (!pmssWriteUserFile($customFile, '', $user, 0751)) {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -230,6 +331,9 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
 
 function pmssUpdatePhpIni(string $path, int $memoryLimitMb): void
 {
+    if (is_link($path) || !is_file($path)) {
+        return;
+    }
     $content = @file_get_contents($path);
     if ($content === false) {
         return;
@@ -240,7 +344,7 @@ function pmssUpdatePhpIni(string $path, int $memoryLimitMb): void
     } else {
         $content = rtrim($content, "\n")."\n".$memoryLine."\n";
     }
-    file_put_contents($path, $content);
+    pmssAtomicWriteFile($path, $content);
 }
 
 function pmssSplitFirstJsonObject(string $content): ?array
@@ -347,7 +451,14 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
         return false;
     }
 
-    $tmp = $path.'.pmss-tmp';
+    $dir = dirname($path);
+    if (!is_dir($dir) || is_link($dir)) {
+        return false;
+    }
+    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
+    if ($tmp === false) {
+        return false;
+    }
     if (file_put_contents($tmp, $metaJson.$configJson) === false) {
         @unlink($tmp);
         return false;
@@ -541,15 +652,32 @@ function pmssUserConfigLighttpdMain(array $argv): int
         fwrite(STDERR, "#### WARNING: DEPRECATED COMMAND (use ".basename(__FILE__).")\n");
     }
 
-    $users = shell_exec('/scripts/listUsers.php');
-    $users = explode("\n", trim($users));
+    $rawUsers = shell_exec('/scripts/listUsers.php');
+    $users = [];
+    foreach (explode("\n", trim((string)$rawUsers)) as $rawUser) {
+        $rawUser = trim($rawUser);
+        if ($rawUser === '') {
+            continue;
+        }
+        $normalized = pmssNormalizeUsername($rawUser);
+        if (!pmssValidateUsername($normalized)) {
+            fwrite(STDERR, "Skipping invalid username from listUsers: ".substr($normalized, 0, 20)."\n");
+            continue;
+        }
+        $users[] = $normalized;
+    }
+    $users = array_values(array_unique($users));
     if (count($users) === 0) {
         fwrite(STDERR, "No users setup - nothing to do\n");
         return 0;
     }
 
-    if (isset($argv[1]) && !empty($argv[1])) {
-        $argUsername = pmssNormalizeUsername((string) $argv[1]);
+    if (isset($argv[1]) && $argv[1] !== '') {
+        $argUsername = pmssNormalizeUsername((string)$argv[1]);
+        if (!pmssValidateUsername($argUsername)) {
+            fwrite(STDERR, "Invalid username\n");
+            return 1;
+        }
         if (in_array($argUsername, $users, true)) {
             $users = array($argUsername);   // Only do this user
         } else {
@@ -560,10 +688,14 @@ function pmssUserConfigLighttpdMain(array $argv): int
 
     $portsDirectory = '/etc/seedbox/runtime/ports';
     if (!file_exists($portsDirectory))  {
-        mkdir($portsDirectory, 0600, true);
-        passthru("chmod 600 {$portsDirectory}");
+        @mkdir($portsDirectory, 0600, true);
     }
-    if (!file_exists('/root/backups')) `mkdir /root/backups`;
+    if (is_dir($portsDirectory) && !is_link($portsDirectory)) {
+        @chmod($portsDirectory, 0600);
+    }
+    if (!file_exists('/root/backups')) {
+        @mkdir('/root/backups', 0755, true);
+    }
     $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
 
     $osReleasePath = getenv('PMSS_OS_RELEASE_PATH');
@@ -606,8 +738,8 @@ function pmssUserConfigLighttpdMain(array $argv): int
     }
 
     foreach ($users as $thisUser) {
-        $thisUser = trim($thisUser);
-        if ($thisUser === '') {
+        if (!pmssValidateUsername($thisUser)) {
+            fwrite(STDERR, "Skipping invalid username: ".substr($thisUser, 0, 20)."\n");
             continue;
         }
 
@@ -621,42 +753,16 @@ function pmssUserConfigLighttpdMain(array $argv): int
             $serverPort = (int) file_get_contents($portFile);
         } else {
             // Allocate a unique port using portManager utility
-            $serverPort = (int) trim(shell_exec("/scripts/util/portManager.php assign {$thisUser} lighttpd"));
+            $serverPort = (int) trim((string)shell_exec('/scripts/util/portManager.php assign '.escapeshellarg($thisUser).' lighttpd'));
         }
 
-        // Prepare directories and defaults
-        $lighttpdDir = "/home/{$thisUser}/.lighttpd";
-        if (!file_exists($lighttpdDir)) {
-            passthru("cp -Rp /etc/skel/.lighttpd /home/{$thisUser}/");
-            passthru("chown {$thisUser}:{$thisUser} {$lighttpdDir} -R");
-            passthru("chmod 751 {$lighttpdDir} -R");
+        // Prepare directories and defaults.
+        if (!pmssPrepareLighttpdUserDirectories($thisUser, $homeDir, $deflateEnabled)) {
+            fwrite(STDERR, "[user:{$thisUser}] lighttpd directory preparation failed; skipping\n");
+            continue;
         }
         pmssEnsureWebdavLockDatabase($thisUser, $homeDir);
-        if (!file_exists("/home/{$thisUser}/www/public")) {
-            passthru("mkdir -p /home/{$thisUser}/www/public");
-            passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/www/public");
-            passthru("chmod 751 /home/{$thisUser}/www/public -R");
-        }
-        if (!file_exists("/home/{$thisUser}/.lighttpd/custom.d")) {
-            passthru("mkdir /home/{$thisUser}/.lighttpd/custom.d");
-            passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd/custom.d");
-            passthru("chmod 750 /home/{$thisUser}/.lighttpd/custom.d");
-        }
         $customDir = "/home/{$thisUser}/.lighttpd/custom.d";
-        $uploadDir = "/home/{$thisUser}/.lighttpd/upload";
-        if (!is_dir($uploadDir)) {
-            passthru("mkdir -p {$uploadDir}");
-            passthru("chown {$thisUser}:{$thisUser} {$uploadDir}");
-            passthru("chmod 751 {$uploadDir}");
-        }
-        if ($deflateEnabled) {
-            $compressDir = "/home/{$thisUser}/.lighttpd/compress";
-            if (!is_dir($compressDir)) {
-                passthru("mkdir -p {$compressDir}");
-                passthru("chown {$thisUser}:{$thisUser} {$compressDir}");
-                passthru("chmod 751 {$compressDir}");
-            }
-        }
 
         // Rclone port
         $rclonePort = (int) trim(@file_get_contents("/home/{$thisUser}/.rclonePort"));
@@ -674,16 +780,14 @@ function pmssUserConfigLighttpdMain(array $argv): int
 
         // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
         $rcloneConfPath = "{$customDir}/pmss-rclone.conf";
-        file_put_contents($rcloneConfPath, pmssRcloneLighttpdProxyFragment($thisUser, $rclonePort));
-        @chown($rcloneConfPath, $thisUser);
-        @chgrp($rcloneConfPath, $thisUser);
-        @chmod($rcloneConfPath, 0640);
+        if (!pmssWriteUserFile($rcloneConfPath, pmssRcloneLighttpdProxyFragment($thisUser, $rclonePort), $thisUser, 0640)) {
+            fwrite(STDERR, "[user:{$thisUser}] Failed to write rclone lighttpd fragment\n");
+        }
 
         $qbittorrentConfPath = "{$customDir}/pmss-qbittorrent.conf";
-        file_put_contents($qbittorrentConfPath, pmssQbittorrentLighttpdProxyFragment($thisUser, $qbittorrentPort));
-        @chown($qbittorrentConfPath, $thisUser);
-        @chgrp($qbittorrentConfPath, $thisUser);
-        @chmod($qbittorrentConfPath, 0640);
+        if (!pmssWriteUserFile($qbittorrentConfPath, pmssQbittorrentLighttpdProxyFragment($thisUser, $qbittorrentPort), $thisUser, 0640)) {
+            fwrite(STDERR, "[user:{$thisUser}] Failed to write qbittorrent lighttpd fragment\n");
+        }
 
         // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/
         // so nginx stays a lightweight reverse proxy.
@@ -736,10 +840,9 @@ function pmssUserConfigLighttpdMain(array $argv): int
         }
         if ($delugeWebPort !== null) {
             $delugeConfPath = "/home/{$thisUser}/.lighttpd/custom.d/pmss-deluge.conf";
-            file_put_contents($delugeConfPath, pmssDelugeLighttpdProxyFragment($thisUser, $delugeWebPort));
-            @chown($delugeConfPath, $thisUser);
-            @chgrp($delugeConfPath, $thisUser);
-            @chmod($delugeConfPath, 0640);
+            if (!pmssWriteUserFile($delugeConfPath, pmssDelugeLighttpdProxyFragment($thisUser, $delugeWebPort), $thisUser, 0640)) {
+                fwrite(STDERR, "[user:{$thisUser}] Failed to write deluge lighttpd fragment\n");
+            }
         }
 
         $resources = pmssResolveUserResources($thisUser, $policyDefaults);
@@ -751,15 +854,29 @@ function pmssUserConfigLighttpdMain(array $argv): int
             $qbittorrentPort,
             $resources
         );
-        file_put_contents("/home/{$thisUser}/.lighttpd.conf", $thisUserConfig);
-        passthru("chown {$thisUser}:{$thisUser} /home/{$thisUser}/.lighttpd.conf; chmod 741 /home/{$thisUser}/.lighttpd.conf");
+        if (!pmssWriteUserFile("/home/{$thisUser}/.lighttpd.conf", $thisUserConfig, $thisUser, 0741)) {
+            fwrite(STDERR, "[user:{$thisUser}] Failed to write .lighttpd.conf; skipping user\n");
+            continue;
+        }
 
         $phpIniPath = "/home/{$thisUser}/.lighttpd/php.ini";
+        if (is_link($phpIniPath) || (file_exists($phpIniPath) && !is_file($phpIniPath))) {
+            fwrite(STDERR, "[user:{$thisUser}] Refusing to operate on unsafe php.ini path; skipping user\n");
+            continue;
+        }
         if (!file_exists($phpIniPath)) {
-            passthru("cp -p /etc/skel/.lighttpd/php.ini {$phpIniPath}");
+            $skelPhpIni = @file_get_contents('/etc/skel/.lighttpd/php.ini');
+            if (!is_string($skelPhpIni) || !pmssWriteUserFile($phpIniPath, $skelPhpIni, $thisUser, 0751)) {
+                fwrite(STDERR, "[user:{$thisUser}] Failed to seed php.ini; skipping user\n");
+                continue;
+            }
         }
         pmssUpdatePhpIni($phpIniPath, $resources['memoryLimit']);
-        passthru("chown {$thisUser}:{$thisUser} {$phpIniPath}; chmod 751 {$phpIniPath}");
+        @chmod($phpIniPath, 0751);
+        if (pmssRunningAsRoot()) {
+            @chown($phpIniPath, $thisUser);
+            @chgrp($phpIniPath, $thisUser);
+        }
 
         echo sprintf(
             "[user:%s] lighttpd configured (port=%d, php_memory=%dM, max-procs=%d, children=%d, cpu-quota=%d%%)\n",

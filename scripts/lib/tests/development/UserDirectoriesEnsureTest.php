@@ -95,6 +95,23 @@ class UserDirectoriesEnsureTest extends TestCase
         $this->assertTrue(is_link($target));
     }
 
+    public function testRejectsSymlinkedParentDirectory(): void
+    {
+        $home = $this->tempDir.'/home';
+        $this->assertTrue(@mkdir($home, 0755, true) || is_dir($home));
+
+        $elsewhere = $this->tempDir.'/elsewhere';
+        $this->assertTrue(@mkdir($elsewhere, 0700, true) || is_dir($elsewhere));
+
+        $symlinked = $home.'/.lighttpd';
+        @symlink($elsewhere, $symlinked);
+
+        $ok = \pmssEnsureUserHomeDir($this->user, $home, '.lighttpd/custom.d', 0750);
+        $this->assertTrue($ok === false);
+        $this->assertTrue(is_link($symlinked));
+        $this->assertTrue(!is_dir($elsewhere.'/custom.d'), 'must not create directories via symlinked parent');
+    }
+
     public function testConvergesLeafModeWhenDirectoryExists(): void
     {
         $home = $this->tempDir.'/home';
@@ -110,4 +127,3 @@ class UserDirectoriesEnsureTest extends TestCase
         $this->assertTrue($mode !== false && (($mode & 0777) === 0755), 'Expected leaf mode to converge to 0755');
     }
 }
-

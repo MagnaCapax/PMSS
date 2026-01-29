@@ -79,12 +79,12 @@ if (!function_exists('pmssEnsureDir')) {
                 continue;
             }
             $current .= '/'.$segment;
-            if (is_dir($current)) {
-                continue;
-            }
             if (is_link($current)) {
                 $log('[WARN] Refusing to ensure dir; parent is a symlink: '.$current);
                 return false;
+            }
+            if (is_dir($current)) {
+                continue;
             }
             if (file_exists($current)) {
                 $log('[WARN] Refusing to ensure dir; parent path exists and is not a directory: '.$current);
