@@ -28,6 +28,7 @@ phpScan() {
       VIOL=$((VIOL+1))
     done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.php" \
+           -not -path "*/.git/*" \
            -not -path "*/vendor/*" \
            -not -path "*/scripts/lib/tests/*" \
            -not -path "*/scripts/lib/devristo/*" \
@@ -42,8 +43,10 @@ shScan() {
       VIOL=$((VIOL+1))
     done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.sh" \
+           -not -path "*/.git/*" \
            -not -path "*/vendor/*" \
-           -not -path "*/etc/skel/*" -print0)
+           -not -path "*/etc/skel/*" \
+           -not -path "*/scripts/testing/net-edges-lint.sh" -print0)
 }
 
 phpScan

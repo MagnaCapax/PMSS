@@ -9,7 +9,7 @@ set -euo pipefail
 # - For PHP: allow when the command string is passed via runStep(...,
 #   "<cmd>") — these are already captured by our logging/JSON wrappers.
 # - For shell: flag direct uses; this is advisory in mixed repos but can be
-#   made strict when enabled via PMSS_LINT_SHARP=1.
+#   made strict when enabled via PMSS_LINT_SHARP_STRICT=1.
 #
 # Exclusions:
 # - tests/, vendor/, etc/skel/, scripts/lib/devristo/
@@ -56,6 +56,7 @@ phpScan() {
       reportViolation "PHP" "$file" "$raw"
     done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.php" \
+           -not -path "*/.git/*" \
            -not -path "*/vendor/*" \
            -not -path "*/scripts/lib/tests/*" \
            -not -path "*/scripts/lib/devristo/*" \
@@ -69,8 +70,10 @@ shScan() {
       reportViolation "Shell" "$file" "$raw"
     done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.sh" \
+           -not -path "*/.git/*" \
            -not -path "*/vendor/*" \
-           -not -path "*/etc/skel/*" -print0)
+           -not -path "*/etc/skel/*" \
+           -not -path "*/scripts/testing/sharp-edges-lint.sh" -print0)
 }
 
 # Fatal patterns – always fail CI regardless of STRICT mode.
@@ -110,6 +113,7 @@ fatalScan() {
       reportFatalMatches "$file" "$regex"
     done
   done < <(find "$ROOT_DIR" -type f \
+	           -not -path "*/.git/*" \
 	           -not -path "*/vendor/*" \
 	           -not -path "*/scripts/lib/tests/*" \
 	           -not -path "*/scripts/lib/devristo/*" \
