@@ -183,6 +183,66 @@ Notes:
 - The installer intentionally does not manage ffmpeg. Keep this a separate, explicit step for clarity and security.
  - You can also pass `--jellyfin-ffmpeg=/home/<user>/.bin/ffmpeg` to stamp Jellyfin’s FFmpeg path automatically in your user config.
 
+## Alternative: Docker Rootless (Not Recommended for Shared Hosting)
+
+Docker rootless mode allows running containers without root privileges. While this sounds appealing for shared hosting, testing has shown significant issues on PMSS infrastructure.
+
+### Why Docker Rootless Doesn't Work Well on PMSS
+
+1. **cgroup Delegation Issues**: Proxmox VMs have limited cgroup v2 delegation, causing containers to fail with "Permission denied" errors during startup.
+
+2. **Higher Resource Usage**: Docker daemon alone uses ~180 MB. Combined with container isolation overhead, memory usage is 20-30% higher than native installs.
+
+3. **System Configuration Required**: Docker rootless requires root-level setup (subuid/subgid, linger, cgroup delegation) that shared hosting users cannot perform.
+
+4. **Reliability**: Containers often get stuck in "Created" or "Dead" states on PMSS servers.
+
+### Resource Comparison
+
+| Metric | Native Install | Docker Rootless |
+|--------|----------------|-----------------|
+| Memory (full stack) | ~900 MB | ~1.1+ GB |
+| Disk usage | ~500 MB | ~2.5 GB (images) |
+| Setup complexity | Low (single script) | High |
+| Admin intervention | None | Required |
+| Reliability on PMSS | High | Low |
+
+### If You Still Want to Try Docker
+
+For dedicated/baremetal servers where an admin can configure the system, Docker rootless setup requires:
+
+```bash
+# Admin steps (as root):
+apt install docker-ce docker-ce-rootless-extras
+echo "<username>:100000:65536" >> /etc/subuid
+echo "<username>:100000:65536" >> /etc/subgid
+loginctl enable-linger <username>
+
+# Create cgroup delegation override
+mkdir -p /etc/systemd/system/user@.service.d/
+cat > /etc/systemd/system/user@.service.d/delegate.conf << EOF
+[Service]
+Delegate=cpu cpuset io memory pids
+EOF
+systemctl daemon-reload
+```
+
+```bash
+# User steps (as the target user):
+dockerd-rootless-setuptool.sh install
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+
+# For cgroup issues, use cgroupfs driver:
+mkdir -p ~/.config/docker
+echo '{"exec-opts":["native.cgroupdriver=cgroupfs"]}' > ~/.config/docker/daemon.json
+systemctl --user restart docker.service
+
+# Then use docker-compose with LinuxServer.io containers
+docker compose up -d
+```
+
+**Recommendation**: Use the native `install-media-stack.sh` for PMSS shared hosting. Reserve Docker for environments where you control system configuration.
+
 ## Rationale (Design Notes)
 - Monolithic script to simplify distribution and self‑update while staying easy to audit.
 - Small helper functions (`fetch`, `extract_tgz`, logging) to avoid repetition but keep control flow straightforward.
