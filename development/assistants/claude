@@ -1,13 +1,9 @@
 # Context: 200k tokens
 # Strengths: Follows instructions precisely, good at complex refactors
 # Weaknesses: Slower, more expensive
-# Safety: Generally stays on rails
+# Safety: Generally stays on rails; AGENTS.md provides guard rails
 # Docs: https://code.claude.com/docs
 #
-# Claude defaults to prompting for tool permissions per session. Keep the safer
-# permission model (no bypass), but allow common dev commands to avoid repeated
-# confirmations for basics like git/gh/rg/ls/cat plus curl/wget for web fetches.
-#
-# Note: use repeated --allowed-tools=... so the option parser does not consume
-# the user prompt argument (Claude treats --allowed-tools as a variadic list).
-claude --permission-mode acceptEdits --allowed-tools='Bash(git:*)' --allowed-tools='Bash(gh:*)' --allowed-tools='Bash(rg:*)' --allowed-tools='Bash(ls:*)' --allowed-tools='Bash(cat:*)' --allowed-tools='Bash(sed:*)' --allowed-tools='Bash(awk:*)' --allowed-tools='Bash(head:*)' --allowed-tools='Bash(tail:*)' --allowed-tools='Bash(curl:*)' --allowed-tools='Bash(wget:*)' --allowed-tools='Bash(find:*)' --allowed-tools='Bash(stat:*)' --allowed-tools=Read --allowed-tools=Edit
+# Run with full permissions — AGENTS.md and repo doctrine provide the safety
+# rails; per-tool prompts just slow down agentic workflows.
+claude --dangerously-skip-permissions
