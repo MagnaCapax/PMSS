@@ -12,7 +12,7 @@ set -euo pipefail
 #   development/ci-logs.sh smoke              # stream only the 'smoke' job logs from the latest run
 #   development/ci-logs.sh job-name <name>    # stream a job by name from the latest run (e.g., build)
 #   development/ci-logs.sh last-artifacts     # download all artifacts for the latest run into ./ci-artifacts/
-#   development/ci-logs.sh codex [--job <name>] [--prompt "..."] [--exec 'codex chat --input -']
+#   development/ci-logs.sh codex [--job <name>] [--prompt "..."] [--exec 'codex --sandbox workspace-write --ask-for-approval never']
 #   development/ci-logs.sh run <run-id>       # stream logs for a specific run id
 #   development/ci-logs.sh job <job-id>       # stream logs for a specific job id
 

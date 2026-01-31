@@ -6,6 +6,6 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # Usage:
 #   development/codex.sh
 #   development/codex.sh --prompt "Do X"
-#   development/codex.sh --exec codex
+#   development/codex.sh --exec 'codex --sandbox workspace-write --ask-for-approval never'
 
 bash "$HERE/agentic.sh" --agent=codex "$@"

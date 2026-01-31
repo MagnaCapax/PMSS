@@ -88,14 +88,14 @@ Environment:
 Examples:
   development/codex-run.sh run --prompt-file development/prompts/codex.txt
   development/codex-run.sh run --prompt "Summarize changes" --dry-run
-  development/codex-run.sh run --prompt-file development/prompts/refactor.txt --exec "codex"
+  development/codex-run.sh run --prompt-file development/prompts/refactor.txt --exec "codex --sandbox workspace-write --ask-for-approval never"
 EOF
 }
 
 # Usage:
 #   development/codex-run.sh run --prompt-file development/prompts/codex.txt
 #   development/codex-run.sh run --prompt-file development/prompts/codex.txt --dry-run
-#   development/codex-run.sh run --prompt-file development/prompts/codex.txt --exec 'codex'
+#   development/codex-run.sh run --prompt-file development/prompts/codex.txt --exec 'codex --sandbox workspace-write --ask-for-approval never'
 #   development/codex-run.sh run --prompt-file development/prompts/refactor.txt --autocommit
 
 cmd=${1:-}
@@ -166,6 +166,11 @@ if [[ -z "$outdir" ]]; then
 	outdir="$(mktemp -d "${TMP%/}/pmss-codex-run-XXXXXXXX")"
 fi
 prompt_out="$outdir/prompt.txt"
+
+# Default to Codex with full tool approval (no prompts) while keeping sandboxing enabled.
+if [[ "$exec_cmd" == "codex" ]]; then
+	exec_cmd="codex --sandbox workspace-write --ask-for-approval never"
+fi
 
 if [[ -z "$custom_prompt" ]]; then
 	codex_require_nonempty_file "$prompt_file" "[codex-run] missing/empty --prompt-file"
