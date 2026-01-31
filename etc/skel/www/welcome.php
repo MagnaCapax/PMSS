@@ -237,22 +237,26 @@ if ($vendor['pulsedBox'] == true) {
                         echo quotaCreateSection($quotaInfo, $bonusQuota);
 
                         if (@file_exists('../.trafficLimit')) {
-                            $trafficLimit = (int)trim(@file_get_contents('../.trafficLimit'));
-                            if (@file_exists('../.trafficData')) {
-                                $trafficData = @unserialize(trim(@file_get_contents('../.trafficData')));
-                                $trafficIngress = null;
-                                if (@file_exists('../.trafficDataIngress')) {
+	                            $trafficLimit = (int)trim(@file_get_contents('../.trafficLimit'));
+	                            if (@file_exists('../.trafficData')) {
+	                                $trafficData = @unserialize(trim(@file_get_contents('../.trafficData')));
+	                                $trafficIngress = null;
+	                                if (@file_exists('../.trafficDataIngress')) {
                                     $trafficIngress = @unserialize(trim(@file_get_contents('../.trafficDataIngress')));
                                     if (!is_array($trafficIngress)) {
                                         $trafficIngress = null;
                                     }
-                                }
-                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress);
-                            } else {
-                                $trafficLimit = number_format($trafficLimit);
-                                echo "Traffic limit: {$trafficLimit} GiB<br />";
-                            }
-                        }
+	                                }
+	                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress);
+	                            } else {
+	                                if ($trafficLimit > 0) {
+	                                    $trafficLimitText = number_format($trafficLimit) . ' GiB';
+	                                } else {
+	                                    $trafficLimitText = 'Unlimited';
+	                                }
+	                                echo "Traffic limit: {$trafficLimitText}<br />";
+	                            }
+	                        }
 
                         echo passthru('systemctl status user-$(\'/usr/bin/id\' -u).slice|grep -m1  "Memory: "');
 
@@ -331,15 +335,32 @@ function bonusQuotaDisplay($bonusQuota) {
     return '';
 }
 
-function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null) {
-    if (count($trafficData) == 0) return;
+	function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null) {
+	    if (count($trafficData) == 0) return;
 
-    $trafficUsed = round($trafficData['raw']['month']);
-    $percent = round((($trafficUsed / 1024) / $trafficLimit) * 100);
-    $trafficUsed = round($trafficUsed / 1024) . " GiB";
+	    $trafficUsed = round($trafficData['raw']['month']);
+	    if ($trafficLimit <= 0) {
+	        $trafficUsed = round($trafficUsed / 1024) . " GiB";
+	        $inboundLine = '';
+	        if (is_array($trafficIngress) && isset($trafficIngress['raw']['month'])) {
+	            $inboundUsed = round($trafficIngress['raw']['month'] / 1024) . " GiB";
+	            $inboundLine = '<br />Inbound (30 days): '.$inboundUsed;
+	        }
 
-    if ($percent > 100) {
-        $warning = '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.';
+	        echo <<<EOF
+	    <h6>Traffic Info</h6>
+	    Traffic used (30 days): {$trafficUsed}<br />
+	    Traffic limit: Unlimited{$inboundLine}<br />
+	    This is rolling past 30 days, <a href="http://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
+	    <hr />
+	EOF;
+	        return;
+	    }
+	    $percent = round((($trafficUsed / 1024) / $trafficLimit) * 100);
+	    $trafficUsed = round($trafficUsed / 1024) . " GiB";
+
+	    if ($percent > 100) {
+	        $warning = '<br /><b style="color: red;">OVER TRAFFIC LIMIT WARNING - REDUCED BANDWIDTH</b><br />You are beyond your traffic limit. Consider upgrading your plan or adding extra traffic.<br />Datacenter external outbound (TO internet) bandwidth limited to 100 Mbps. Datacenter internal and inbound bandwidth is unrestricted.';
     } else {
         $warning = '';
     }
