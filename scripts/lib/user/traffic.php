@@ -25,7 +25,7 @@ function userApplyTrafficLimit(array $user): void
     }
 
     $cmd = sprintf(
-        '/scripts/util/userTrafficLimit.php %s %s',
+        '/scripts/util/userTrafficLimit.php --user=%s --limit=%s',
         escapeshellarg($user['name']),
         escapeshellarg($user['trafficLimit'])
     );

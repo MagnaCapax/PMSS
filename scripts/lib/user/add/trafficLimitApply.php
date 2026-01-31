@@ -15,13 +15,18 @@ function pmssAddUserTrafficLimitApply(array $user): void
         return;
     }
 
-    if (!file_exists("/etc/seedbox/runtime/trafficLimits")) {
-        mkdir("/etc/seedbox/runtime/trafficLimits");
+    $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
+    require_once __DIR__.'/../directories.php';
+    if (function_exists('pmssEnsureDir')) {
+        pmssEnsureDir($runtimeDir, 0700, 'root', 'root');
+    } elseif (!is_dir($runtimeDir)) {
+        @mkdir($runtimeDir, 0755, true);
+        @chmod($runtimeDir, 0700);
     }
-    file_put_contents("/etc/seedbox/runtime/trafficLimits/{$user['name']}", $user['trafficLimit']);
-    chmod("/etc/seedbox/runtime/trafficLimits/{$user['name']}", 0600);
-    file_put_contents("/home/{$user['name']}/.trafficLimit", $user['trafficLimit']);
-    chmod("/home/{$user['name']}/.trafficLimit", 0664);
+
+    @file_put_contents($runtimeDir."/{$user['name']}", (string) $user['trafficLimit'], LOCK_EX);
+    @chmod($runtimeDir."/{$user['name']}", 0600);
+    @file_put_contents("/home/{$user['name']}/.trafficLimit", (string) $user['trafficLimit'], LOCK_EX);
+    @chmod("/home/{$user['name']}/.trafficLimit", 0664);
     logProvisionMessage('Traffic limit set: ' . $user['trafficLimit']);
 }
-
