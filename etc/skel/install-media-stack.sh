@@ -185,20 +185,28 @@ extract_tgz(){
   echo "Installation files downloaded and extracted"
 }
 
-# Helper to append to .bashrc only if marker not present
-append_to_bashrc_if_missing() {
+# Helper to append to .bashrc.custom only if marker not present
+append_to_bashrc_custom_if_missing() {
   local content="$1"
   local marker="$2"
+  local target="$HOME/.bashrc.custom"
   
   if [[ $DRY_RUN -eq 1 ]]; then
-    log_info "[dry-run] would check and append to ~/.bashrc (marker: $marker)"
+    log_info "[dry-run] would check and append to ~/.bashrc.custom (marker: $marker)"
     return 0
   fi
   
-  if ! grep -q "$marker" "$HOME/.bashrc" 2>/dev/null; then
-    echo "$content" >> "$HOME/.bashrc"
+  if [[ ! -f "$target" ]]; then
+    : > "$target" || {
+      log_err "Failed to create $target"
+      return 1
+    }
+  fi
+
+  if ! grep -q "$marker" "$target" 2>/dev/null; then
+    echo "$content" >> "$target"
   else
-    log_warn "Entry with marker '$marker' already exists in .bashrc, skipping"
+    log_warn "Entry with marker '$marker' already exists in .bashrc.custom, skipping"
   fi
 }
 
@@ -630,10 +638,10 @@ if [[ $DRY_RUN -eq 0 ]]; then
 else
   log_info "[dry-run] would extract aspnetcore.tar.gz"
 fi
-append_to_bashrc_if_missing '# Added by PMSS media stack installer (.NET 8)
+append_to_bashrc_custom_if_missing '# Added by PMSS media stack installer (.NET 8)
 export DOTNET_ROOT=$HOME/.bin/dotnet
 export PATH=$PATH:$DOTNET_ROOT:$HOME/.bin' 'PMSS media stack installer'
-chmod 0640 "$HOME/.bashrc" 2>/dev/null || true
+chmod 0640 "$HOME/.bashrc.custom" 2>/dev/null || true
 echo ""
 
 # Install Jellyfin (URL, extract, no chmod)
@@ -743,7 +751,7 @@ echo "${app^^} configured"
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
-append_to_bashrc_if_missing '# PMSS Media stack aliases (updated Nov 2025)
+append_to_bashrc_custom_if_missing '# PMSS Media stack aliases (updated Nov 2025)
 alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\''
 alias sonarr='\''tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""'\''
 alias radarr='\''tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Radarr/Radarr.dll\" --nobrowser --data=\"$HOME/.config/radarr\""'\''

@@ -101,6 +101,11 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('export PATH=$PATH:$DOTNET_ROOT:$HOME/.bin', $this->script);
     }
 
+    public function testBashrcCustomUsedForAppends(): void
+    {
+        $this->assertStringContainsString('.bashrc.custom', $this->script);
+    }
+
     public function testLighttpdCustomConfigExists(): void
     {
         $this->assertStringContainsString('/.lighttpd/custom', $this->script);

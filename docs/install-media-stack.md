@@ -116,7 +116,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Cloudplow (venv + pip requirements)
 - SABnzbd (venv + pip requirements)
 - Radarr, Prowlarr, Sonarr (download and extract into `~/.bin/<Name>`)
-- .NET 8 ASP.NET runtime (download to `~/.bin/dotnet`, exports PATH/DOTNET_ROOT in `~/.bashrc` after system paths)
+- .NET 8 ASP.NET runtime (download to `~/.bin/dotnet`, exports PATH/DOTNET_ROOT in `~/.bashrc.custom` after system paths)
 - Jellyfin (download/extract to `~/.bin/jellyfin`)
 
 6) Configuration
@@ -125,8 +125,8 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini` and adjusts url_base/port/whitelist.
 
 7) Aliases
-- Appends tmux aliases to `~/.bashrc` that export `DOTNET_ROOT` and execute `<app>.dll` via `dotnet` (or Python venv for SABnzbd/Cloudplow).
-- Sources `~/.bashrc` with `set +u` to avoid aborts when nounset is active in a user’s shell configs.
+- Appends tmux aliases to `~/.bashrc.custom` that export `DOTNET_ROOT` and execute `<app>.dll` via `dotnet` (or Python venv for SABnzbd/Cloudplow).
+- Sources `~/.bashrc` with `set +u` so `~/.bashrc.custom` takes effect (and to avoid aborts when nounset is active in a user’s shell configs).
 
 8) Reverse proxy
 - Writes per‑user Lighttpd proxy mappings to `~/.lighttpd/custom` with URL rewriting from `/app` to `/public-<user>/<app>`.
@@ -167,10 +167,10 @@ Jellyfin depends on ffmpeg for transcoding. On older distros, the packaged ffmpe
 Steps (example with BtbN):
 1) Ensure your user bin exists: `mkdir -p ~/.bin`
 2) Download and extract a static ffmpeg build to `~/.bin/ffmpeg` and `chmod +x ~/.bin/ffmpeg`.
-3) The installer appends `~/.bin` to your PATH in `~/.bashrc` after system paths, so Jellyfin can auto‑detect `ffmpeg` from PATH. Alternatively, set it explicitly in Jellyfin (Dashboard → Playback) to `/home/<user>/.bin/ffmpeg`.
+3) The installer appends `~/.bin` to your PATH in `~/.bashrc.custom` after system paths, so Jellyfin can auto‑detect `ffmpeg` from PATH. Alternatively, set it explicitly in Jellyfin (Dashboard → Playback) to `/home/<user>/.bin/ffmpeg`.
 
 Hardware acceleration:
-- VAAPI/NVENC need matching user-accessible driver libraries. If you place libs under `~/.local/lib` or `~/.bin/lib`, export `LD_LIBRARY_PATH=$HOME/.local/lib:$HOME/.bin/lib:$LD_LIBRARY_PATH` before launching Jellyfin (the installer already sets DOTNET env; you can extend it in `~/.bashrc`).
+- VAAPI/NVENC need matching user-accessible driver libraries. If you place libs under `~/.local/lib` or `~/.bin/lib`, export `LD_LIBRARY_PATH=$HOME/.local/lib:$HOME/.bin/lib:$LD_LIBRARY_PATH` before launching Jellyfin (the installer already sets DOTNET env; you can extend it in `~/.bashrc.custom`).
 
 Compiling from source (advanced):
 - Build libraries to `~/.local`, then configure ffmpeg with:
