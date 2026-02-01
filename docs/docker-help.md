@@ -34,9 +34,10 @@ docker-install-wireguard.sh 51820
 
 On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast and space-efficient:
 
-- Debian 10/11: when no driver is configured yet and `fuse-overlayfs` is available, PMSS writes `~/.config/docker/daemon.json` with `"storage-driver": "fuse-overlayfs"`. This is the default and recommended mode for rootless Docker on these releases.
-- Debian 12+: PMSS does not force a driver; Docker’s own defaults apply unless you explicitly set `storage-driver` in `daemon.json`.
+- Debian 10+: when no driver is configured yet and `fuse-overlayfs` is available, PMSS writes `~/.config/docker/daemon.json` with `"storage-driver": "fuse-overlayfs"`. This is the default and recommended mode for rootless Docker on PMSS.
 - Custom drivers: if `daemon.json` already contains `storage-driver` (for example `overlay2` or `vfs`), PMSS leaves it untouched and logs that it is reusing the existing configuration. `vfs` is supported but slow and space-heavy, and should generally be considered a last resort.
+
+During dist-upgrades, PMSS also attempts to install `fuse-overlayfs` (best-effort) so existing rootless Docker configurations keep working after the reboot.
 
 If you ever need to change the driver, edit `~/.config/docker/daemon.json` and restart Docker. On PMSS the daemon is normally managed for you; reach out to support if you believe a driver change is required so they can coordinate it with platform tooling.
 

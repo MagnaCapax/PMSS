@@ -36,5 +36,5 @@ if (pmssPackageStatus('wireguard-tools') !== 'install ok installed'
     pmssQueuePackages($pmssWireguardNeedsDkms ? ['wireguard', 'wireguard-tools', 'wireguard-dkms'] : ['wireguard', 'wireguard-tools']);
 }
 $dockerPackages = ['docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-buildx-plugin', 'docker-compose-plugin', 'dbus-user-session', 'slirp4netns', 'uidmap'];
-if ($version < 12) { $dockerPackages[] = 'fuse-overlayfs'; }
+$dockerPackages[] = 'fuse-overlayfs';
 pmssQueuePackages($dockerPackages);

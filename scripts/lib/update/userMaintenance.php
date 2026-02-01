@@ -292,9 +292,10 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
             pmssUserLog($user, '[WARN] User missing from /etc/subgid; rootless Docker may fail.');
         }
 
-        // 2. Enforce fuse-overlayfs on Debian < 12
+        // 2. Enforce fuse-overlayfs for rootless Docker when available.
         $distroVersion = (int)(getenv('PMSS_DISTRO_VERSION') ?: 0);
-        if ($distroVersion >= 12) {
+        if ($distroVersion <= 0) {
+            pmssUserLog($user, '[WARN] PMSS_DISTRO_VERSION missing; skipping Docker storage-driver enforcement');
             return;
         }
 

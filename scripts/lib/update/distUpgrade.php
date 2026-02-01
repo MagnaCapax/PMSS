@@ -63,7 +63,53 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
     logMessage(sprintf('Initiating Debian %s → %s upgrade', $from, $next));
     pmssRewriteSources($from, $next);
     pmssExecuteUpgrade();
+    pmssEnsureFuseOverlayfsAfterDistUpgrade($next);
     return 0;
+}
+
+/**
+ * Ensure fuse-overlayfs is present after dist-upgrade so rootless Docker keeps working.
+ *
+ * Best-effort only: dist-upgrade must not fail solely because this package is missing
+ * for the current suite/architecture.
+ */
+function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
+{
+    // Rootless Docker is only supported on Debian releases that PMSS targets.
+    if ((int) $toMajor < 11) {
+        return;
+    }
+
+    $status = trim((string) @shell_exec("dpkg-query -W -f='${Status}' fuse-overlayfs 2>/dev/null"));
+    if ($status === 'install ok installed') {
+        logMessage('[SKIP] dist-upgrade: fuse-overlayfs already installed');
+        return;
+    }
+
+    $availableRc = runCommand('apt-cache show fuse-overlayfs >/dev/null 2>&1');
+    if ($availableRc !== 0) {
+        $arch = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
+        $archLabel = $arch !== '' ? (' (arch='.$arch.')') : '';
+        logMessage('[WARN] dist-upgrade: fuse-overlayfs not available in apt cache'.$archLabel);
+        return;
+    }
+
+    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
+    $hasTty = $interactiveRequested
+        && function_exists('posix_isatty')
+        && posix_isatty(STDIN)
+        && posix_isatty(STDOUT)
+        && posix_isatty(STDERR);
+    $frontend = $hasTty ? 'readline' : 'noninteractive';
+    $inheritTty = $hasTty;
+    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
+
+    logMessage('dist-upgrade: ensuring fuse-overlayfs is installed for rootless Docker');
+    $rc = runCommand("$env apt-get install -y $opts fuse-overlayfs", true, null, $inheritTty);
+    if ($rc !== 0) {
+        logMessage('[WARN] dist-upgrade: failed to install fuse-overlayfs; rootless Docker may fail or fall back to a slower storage driver');
+    }
 }
 
 /**
