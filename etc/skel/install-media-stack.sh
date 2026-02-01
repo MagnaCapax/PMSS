@@ -114,8 +114,10 @@ for arg in "$@"; do
   esac
 done
 
+# Reserved for future SABnzbd version pinning; keep the arg plumbed.
+: "${OVR_SAB_VERSION}"
+
 # Logging
-TS=$(date +%Y%m%d-%H%M%S)
 LOG_FILE="$HOME/.install-media-stack.log"
 mkdir -p "$(dirname "$LOG_FILE")" >/dev/null 2>&1 || true
 touch "$LOG_FILE" 2>/dev/null || true
@@ -282,9 +284,9 @@ esac
 # Safety check for existing .bin
 if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin" 2>/dev/null)" ]; then
     if [[ $DRY_RUN -eq 1 ]]; then
-      log_warn "~/.bin exists and would be removed (dry-run)."
+      log_warn "$HOME/.bin exists and would be removed (dry-run)."
     else
-      printf "WARNING: ~/.bin exists and will be removed. Continue? (y/N): "
+      printf "WARNING: %s exists and will be removed. Continue? (y/N): " "$HOME/.bin"
       read -r confirm
       [[ $confirm == [yY] ]] || exit 1
       rm -rf "$HOME/.bin"
@@ -638,6 +640,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 else
   log_info "[dry-run] would extract aspnetcore.tar.gz"
 fi
+# shellcheck disable=SC2016
 append_to_bashrc_custom_if_missing '# Added by PMSS media stack installer (.NET 8)
 export DOTNET_ROOT=$HOME/.bin/dotnet
 export PATH=$PATH:$DOTNET_ROOT:$HOME/.bin' 'PMSS media stack installer'
@@ -751,6 +754,7 @@ echo "${app^^} configured"
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
+# shellcheck disable=SC2016
 append_to_bashrc_custom_if_missing '# PMSS Media stack aliases (updated Nov 2025)
 alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\''
 alias sonarr='\''tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""'\''
@@ -852,6 +856,7 @@ fi
 
 # shellcheck source=/dev/null
 set +u
+# shellcheck disable=SC1091
 source "$HOME/.bashrc" || true
 set -u
 
