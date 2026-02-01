@@ -82,11 +82,14 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
     }
     if (!file_exists($lockFile)) {
         @touch($lockFile);
+        // Clear stat cache so subsequent checks see the new lock file.
+        clearstatcache(true, $lockFile);
     }
     if (!is_file($lockFile)) {
         return;
     }
     @chmod($lockFile, 0600);
+    clearstatcache(true, $lockFile);
 
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
         @chown($lighttpdDir, $user);
@@ -95,4 +98,3 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
         @chgrp($lockFile, $user);
     }
 }
-

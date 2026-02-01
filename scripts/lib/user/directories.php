@@ -118,6 +118,8 @@ if (!function_exists('pmssEnsureDir')) {
             $leafMode = $leafMode & 0777;
             if ($leafMode !== ($mode & 0777)) {
                 if (@chmod($path, $mode)) {
+                    // Refresh stat cache so callers observe updated permissions.
+                    clearstatcache(true, $path);
                     $log('[WARN] Updated directory mode: '.$path);
                 }
             }
