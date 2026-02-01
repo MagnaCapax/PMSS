@@ -1,0 +1,36 @@
+# PMSS Skel Installer — Known-Good Artifact Checksums
+# Format: sha256hash  artifact_identifier
+#
+# Lookup is by artifact_identifier (typically the upstream filename).
+# - If the identifier is NOT found: warn and proceed (new upstream version)
+# - If the identifier IS found but hash mismatches: hard-fail (corruption or compromise)
+#
+# To update: download the new release, run sha256sum, update this file, commit.
+#
+# Last updated: 2026-02-01
+
+# --- install-media-stack.sh artifacts ---
+
+# Jellyfin 10.11.6 (linux amd64)
+661f3eb586f4b7dc3aa6068c5f2fd25d6e3cb3df15cba012c05f3ad25f48ad8b  jellyfin_10.11.6-amd64.tar.gz
+
+# SABnzbd 4.5.5 (source)
+7f93d714287293f519f244b92d8eb727aa504448c5961dab8420e2093f92e3b7  SABnzbd-4.5.5-src.tar.gz
+
+# Radarr v5.10.4.9218 fallback (linux-core-x64, for glibc < 2.33)
+35184704e78e2ecffd21758c5e7d02840dbd475bbb58ef4d8ab0ffa0d4d971a3  Radarr.master.5.10.4.9218.linux-core-x64.tar.gz
+
+# ASP.NET Core 8.0 — dynamically resolved via aka.ms redirect.
+# Cannot pin: Microsoft updates the redirect target with each patch release.
+# Verification depends on the resolved filename matching an entry here.
+
+# Radarr/Sonarr/Prowlarr latest — dynamically resolved via servarr.com APIs.
+# Add entries here when pinning specific versions.
+
+# --- install-ai-tools.sh artifacts ---
+
+# Node.js 20.20.0 (linux x64)
+4f48b52acf42130844a3a75e94da0e9629009d09e4101b2304895c24f3fbe609  node-v20.20.0-linux-x64.tar.xz
+
+# OpenAI Codex CLI rust-v0.93.0 (linux x86_64 musl)
+3574eef71b062c17904b0761c397a97709ef28e99c616e2d1db261b2ea293d07  codex-x86_64-unknown-linux-musl.tar.gz

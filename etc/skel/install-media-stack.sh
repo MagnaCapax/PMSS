@@ -37,8 +37,17 @@ if [[ "${1:-}" != "--skip-update" ]] && [[ -t 0 ]]; then
       wget -q "$REMOTE_RAW_URL" -O "$tmp" || true
     fi
     if [[ -s "$tmp" ]]; then
-      chmod +x "$tmp" 2>/dev/null || true
-      exec "$tmp" --skip-update "$@"
+      # Verify downloaded script looks like a PMSS installer (not HTML error page, binary, etc.)
+      if ! head -1 "$tmp" | grep -q '^#!/usr/bin/env bash$'; then
+        echo "[WARN] Downloaded script has unexpected shebang — refusing to exec, using local copy" >&2
+        rm -f "$tmp" 2>/dev/null || true
+      elif ! grep -q '^# PMSS: .* Installer' "$tmp"; then
+        echo "[WARN] Downloaded script missing PMSS marker — refusing to exec, using local copy" >&2
+        rm -f "$tmp" 2>/dev/null || true
+      else
+        chmod +x "$tmp" 2>/dev/null || true
+        exec "$tmp" --skip-update "$@"
+      fi
     fi
     rm -f "$tmp" 2>/dev/null || true
   fi
@@ -137,6 +146,71 @@ log_ok(){ echo -e "${C_OK}[ OK ]${C_RESET} $*"; }
 log_warn(){ echo -e "${C_WARN}[WARN]${C_RESET} $*"; }
 log_err(){ echo -e "${C_ERR}[ERR ]${C_RESET} $*"; }
 
+# Checksums file for download integrity verification
+CHECKSUMS_FILE="$HOME/.install-checksums.sha256"
+CHECKSUMS_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/.install-checksums.sha256"
+
+# Fetch latest checksums file from repo (best-effort, non-blocking)
+fetch_checksums_file() {
+    local tmp_ck
+    tmp_ck=$(mktemp) || return 1
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$CHECKSUMS_RAW_URL" -o "$tmp_ck" 2>/dev/null || true
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q "$CHECKSUMS_RAW_URL" -O "$tmp_ck" 2>/dev/null || true
+    fi
+    if [[ -s "$tmp_ck" ]] && head -1 "$tmp_ck" | grep -q '^# PMSS'; then
+        mv "$tmp_ck" "$CHECKSUMS_FILE" 2>/dev/null || true
+        chmod 600 "$CHECKSUMS_FILE" 2>/dev/null || true
+    else
+        rm -f "$tmp_ck" 2>/dev/null || true
+    fi
+}
+
+# Verify SHA256 checksum of a downloaded file against the checksums file.
+# - artifact_id not found in checksums file: warn, return 0 (allow new versions)
+# - artifact_id found but hash mismatches: error, return 1 (corruption/compromise)
+verify_checksum() {
+    local file="$1" artifact_id="$2"
+    if [[ ! -f "$file" ]]; then
+        return 0  # File not present (e.g., dry-run mode) — skip
+    fi
+    if [[ ! -f "$CHECKSUMS_FILE" ]]; then
+        log_warn "No checksums file — skipping verification for $(basename "$file")"
+        return 0
+    fi
+    local expected_hash
+    expected_hash=$(grep -F "  ${artifact_id}" "$CHECKSUMS_FILE" 2>/dev/null | grep -v '^#' | awk '{print $1}' | head -1)
+    if [[ -z "$expected_hash" ]]; then
+        log_warn "No checksum on file for '${artifact_id}' — skipping verification"
+        return 0
+    fi
+    local actual_hash
+    actual_hash=$(sha256sum "$file" | cut -d' ' -f1)
+    if [[ "$actual_hash" != "$expected_hash" ]]; then
+        log_err "CHECKSUM MISMATCH for ${artifact_id}"
+        log_err "  Expected: $expected_hash"
+        log_err "  Got:      $actual_hash"
+        log_err "  This could indicate a corrupted download or supply chain compromise."
+        log_err "  Re-run the installer to retry. If this persists, report to support."
+        return 1
+    fi
+    log_ok "Checksum verified: ${artifact_id}"
+    return 0
+}
+
+# Escape XML special characters in user-supplied values before writing to config.
+# Note: in bash ${//pattern/replacement}, & in replacement = matched text; use \& for literal &.
+xml_escape() {
+    local s="$1"
+    s="${s//&/\&amp;}"
+    s="${s//</\&lt;}"
+    s="${s//>/\&gt;}"
+    s="${s//\"/\&quot;}"
+    s="${s//\'/\&apos;}"
+    printf '%s' "$s"
+}
+
 check_url(){
   local url="$1"
   if command -v curl >/dev/null 2>&1; then
@@ -221,11 +295,14 @@ SONARR_DL_BASE="https://services.sonarr.tv/v1/download"
 SONARR_MAJOR="4"
 RADARR_UPDATE_BASE="https://radarr.servarr.com/v1/update"
 PROWLARR_UPDATE_BASE="https://prowlarr.servarr.com/v1/update"
+# Cloudplow: pinned to last known-good commit (project unmaintained since 2023)
+CLOUDPLOW_COMMIT="4a4e9cf7579ce4ba91761c12ad1bc88ae2707f8c"
 DOTNET_ROOT_PATH="$HOME/.bin/dotnet"
 JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
-PUBLIC_IP=$(curl -fsS https://ifconfig.me 2>/dev/null || echo "unavailable")
+# Determine public IP from default route (no external HTTP request needed)
+PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
 
 # Apply arg overrides for branch/version
 if [[ -n "$OVR_SONARR_BRANCH" ]]; then SONARR_BRANCH="$OVR_SONARR_BRANCH"; fi
@@ -257,6 +334,11 @@ if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
 fi
 
 log_ok "All required dependencies found"
+
+# Fetch latest checksums for download verification
+if [[ $DRY_RUN -eq 0 ]]; then
+  fetch_checksums_file
+fi
 
 # CPU feature detection for compatibility warnings
 CPU_HAS_SSE42=0
@@ -502,6 +584,8 @@ if [[ $DRY_RUN -eq 0 ]]; then
   python3 -m venv "$installdir"
   cd "$installdir"
   git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
+  cd "${installdir}/cloudplow" && git checkout "$CLOUDPLOW_COMMIT" >/dev/null 2>&1
+  cd "$installdir"
   # shellcheck disable=SC1091
   source "${installdir}/bin/activate"
   python -m pip install -U pip >/dev/null 2>&1
@@ -526,6 +610,9 @@ if [[ $DRY_RUN -eq 0 ]]; then
   echo "Downloading...${app^^} (${SABNZBD_VERSION})"
   if [[ -z "${SABNZBD_URL:-}" ]]; then log_err "SABnzbd URL not resolved"; exit 1; fi
   if ! fetch "${SABNZBD_URL}" "${app}.tar.gz"; then log_err "Failed to download SABnzbd"; exit 1; fi
+  if ! verify_checksum "${app}.tar.gz" "$(basename "${SABNZBD_URL%%\?*}")"; then
+    log_err "SABnzbd download failed integrity check — aborting"; exit 1
+  fi
   mkdir -p "${app}"
   extract_tgz "${app}.tar.gz" "${app}" 1
   # shellcheck disable=SC1091
@@ -592,6 +679,9 @@ log_info "Radarr URL: $DLURL"
 echo "Downloading...${app^^}"
 cd "$installdir"
 if ! fetch "$DLURL" "Radarr.tar.gz"; then log_err "Failed to download Radarr"; exit 1; fi
+if ! verify_checksum "Radarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
+  log_err "Radarr download failed integrity check — aborting"; exit 1
+fi
 extract_tgz "Radarr.tar.gz"
 if [[ $DRY_RUN -eq 0 ]]; then
   touch "$datadir"/update_required
@@ -635,6 +725,9 @@ log_info "Prowlarr URL: $DLURL"
 echo "Downloading...${app^^}"
 cd "$installdir"
 if ! fetch "$DLURL" "Prowlarr.tar.gz"; then log_err "Failed to download Prowlarr"; exit 1; fi
+if ! verify_checksum "Prowlarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
+  log_err "Prowlarr download failed integrity check — aborting"; exit 1
+fi
 extract_tgz "Prowlarr.tar.gz"
 if [[ $DRY_RUN -eq 0 ]]; then
   touch "$datadir"/update_required
@@ -678,6 +771,9 @@ log_info "Sonarr URL: $DLURL"
 echo "Downloading...${app^^}"
 cd "$installdir"
 if ! fetch "$DLURL" "Sonarr.tar.gz"; then log_err "Failed to download Sonarr"; exit 1; fi
+if ! verify_checksum "Sonarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
+  log_err "Sonarr download failed integrity check — aborting"; exit 1
+fi
 extract_tgz "Sonarr.tar.gz"
 if [[ $DRY_RUN -eq 0 ]]; then
   touch "$datadir"/update_required
@@ -711,6 +807,9 @@ installdir="$HOME/.bin/dotnet"
 mkdir -p "$installdir"
 cd "$installdir"
 if ! fetch "$ASPDOTNET_URL" "aspnetcore.tar.gz"; then log_err "Failed to download ASP.NET runtime"; exit 1; fi
+if ! verify_checksum "aspnetcore.tar.gz" "$(basename "${ASPDOTNET_URL%%\?*}")"; then
+  log_err "ASP.NET runtime download failed integrity check — aborting"; exit 1
+fi
 if [[ $DRY_RUN -eq 0 ]]; then
   if [ ! -f "aspnetcore.tar.gz" ]; then
     log_err "Failed to find downloaded ASP.NET archive"
@@ -749,6 +848,9 @@ mkdir -p "$datadir" "$logdir" "$configdir"
 cd "$installdir"
 echo "Downloading...${app^^}"
 if ! fetch "${JELLYFIN_URL}" "${app}.tar.gz"; then log_err "Failed to download Jellyfin"; exit 1; fi
+if ! verify_checksum "${app}.tar.gz" "${JF_FILENAME:-override}"; then
+  log_err "Jellyfin download failed integrity check — aborting"; exit 1
+fi
 mkdir -p "${app}"
 extract_tgz "${app}.tar.gz" "${app}" 1
 [[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
@@ -812,7 +914,7 @@ EOF
 SYSXML
     # Add FFmpegPath if provided, otherwise close the tag
     if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
-      echo "  <FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>" >> "$syscfg"
+      echo "  <FFmpegPath>$(xml_escape "${OVR_JELLYFIN_FFMPEG}")</FFmpegPath>" >> "$syscfg"
     fi
     echo "</ServerConfiguration>" >> "$syscfg"
   else
@@ -822,12 +924,13 @@ SYSXML
     else
       sed -i -E "s|</ServerConfiguration>|  <BaseUrl>/public-${USERNAME}/${app}</BaseUrl>\n</ServerConfiguration>|" "$syscfg"
     fi
-    # Handle FFmpegPath - merge with existing config
+    # Handle FFmpegPath - merge with existing config (escape XML special chars)
     if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+      escaped_ffmpeg=$(xml_escape "${OVR_JELLYFIN_FFMPEG}")
       if grep -q "<FFmpegPath>" "$syscfg"; then
-        sed -i -E "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>|g" "$syscfg"
+        sed -i -E "s|<FFmpegPath>[^<]*</FFmpegPath>|<FFmpegPath>${escaped_ffmpeg}</FFmpegPath>|g" "$syscfg"
       else
-        sed -i -E "s|</ServerConfiguration>|  <FFmpegPath>${OVR_JELLYFIN_FFMPEG}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
+        sed -i -E "s|</ServerConfiguration>|  <FFmpegPath>${escaped_ffmpeg}</FFmpegPath>\n</ServerConfiguration>|" "$syscfg"
       fi
     fi
   fi

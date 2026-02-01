@@ -29,8 +29,17 @@ if [[ "${1:-}" != "--skip-update" ]] && [[ -t 0 ]]; then
             wget -q "$REMOTE_RAW_URL" -O "$tmp" 2>/dev/null || true
         fi
         if [[ -s "$tmp" ]]; then
-            chmod +x "$tmp" 2>/dev/null || true
-            exec "$tmp" --skip-update "$@"
+            # Verify downloaded script looks like a PMSS installer (not HTML error page, binary, etc.)
+            if ! head -1 "$tmp" | grep -q '^#!/usr/bin/env bash$'; then
+                echo "[WARN] Downloaded script has unexpected shebang — refusing to exec, using local copy" >&2
+                rm -f "$tmp" 2>/dev/null || true
+            elif ! grep -q '^# PMSS: .* Installer' "$tmp"; then
+                echo "[WARN] Downloaded script missing PMSS marker — refusing to exec, using local copy" >&2
+                rm -f "$tmp" 2>/dev/null || true
+            else
+                chmod +x "$tmp" 2>/dev/null || true
+                exec "$tmp" --skip-update "$@"
+            fi
         fi
         rm -f "$tmp" 2>/dev/null || true
     fi
@@ -51,6 +60,56 @@ info()  { printf '\033[1;34m[info]\033[0m  %s\n' "$*"; }
 ok()    { printf '\033[1;32m[ok]\033[0m    %s\n' "$*"; }
 warn()  { printf '\033[1;33m[warn]\033[0m  %s\n' "$*"; }
 fail()  { printf '\033[1;31m[fail]\033[0m  %s\n' "$*"; }
+
+# --- Download integrity verification ---
+CHECKSUMS_FILE="$HOME/.install-checksums.sha256"
+CHECKSUMS_RAW_URL="https://raw.githubusercontent.com/MagnaCapax/PMSS/refs/heads/main/etc/skel/.install-checksums.sha256"
+
+fetch_checksums_file() {
+    local tmp_ck
+    tmp_ck=$(mktemp) || return 1
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$CHECKSUMS_RAW_URL" -o "$tmp_ck" 2>/dev/null || true
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q "$CHECKSUMS_RAW_URL" -O "$tmp_ck" 2>/dev/null || true
+    fi
+    if [[ -s "$tmp_ck" ]] && head -1 "$tmp_ck" | grep -q '^# PMSS'; then
+        mv "$tmp_ck" "$CHECKSUMS_FILE" 2>/dev/null || true
+        chmod 600 "$CHECKSUMS_FILE" 2>/dev/null || true
+    else
+        rm -f "$tmp_ck" 2>/dev/null || true
+    fi
+}
+
+# Verify SHA256 checksum against the checksums file.
+# Missing entry = warn + proceed; mismatch = error + fail.
+verify_checksum() {
+    local file="$1" artifact_id="$2"
+    if [[ ! -f "$file" ]]; then
+        return 0  # File not present (e.g., dry-run mode) — skip
+    fi
+    if [[ ! -f "$CHECKSUMS_FILE" ]]; then
+        warn "No checksums file — skipping verification for $(basename "$file")"
+        return 0
+    fi
+    local expected_hash
+    expected_hash=$(grep -F "  ${artifact_id}" "$CHECKSUMS_FILE" 2>/dev/null | grep -v '^#' | awk '{print $1}' | head -1)
+    if [[ -z "$expected_hash" ]]; then
+        warn "No checksum on file for '${artifact_id}' — skipping verification"
+        return 0
+    fi
+    local actual_hash
+    actual_hash=$(sha256sum "$file" | cut -d' ' -f1)
+    if [[ "$actual_hash" != "$expected_hash" ]]; then
+        fail "CHECKSUM MISMATCH for ${artifact_id}"
+        fail "  Expected: $expected_hash"
+        fail "  Got:      $actual_hash"
+        fail "  This could indicate a corrupted download or supply chain compromise."
+        return 1
+    fi
+    ok "Checksum verified: ${artifact_id}"
+    return 0
+}
 
 # --- Disk usage warning + confirmation ---
 cat << 'BANNER'
@@ -97,6 +156,11 @@ install_node() {
     if ! curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${ARCH}.tar.xz" \
         -o "$tmp/node.tar.xz"; then
         fail "Failed to download Node.js v${NODE_VERSION}"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! verify_checksum "$tmp/node.tar.xz" "node-v${NODE_VERSION}-linux-${ARCH}.tar.xz"; then
+        fail "Node.js download failed integrity check"
         rm -rf "$tmp"
         return 1
     fi
@@ -155,6 +219,11 @@ install_codex() {
     if ! curl -fsSL -o "$tmp/codex.tar.gz" "$url"; then
         fail "Download failed: $url"
         warn "Check https://github.com/openai/codex/releases/latest for correct asset name"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! verify_checksum "$tmp/codex.tar.gz" "codex-${arch}-unknown-linux-musl.tar.gz"; then
+        fail "Codex download failed integrity check"
         rm -rf "$tmp"
         return 1
     fi
@@ -318,6 +387,9 @@ HELPSCRIPT
 # --- Main ---
 main() {
     local ok_count=0 fail_count=0
+
+    # Fetch latest checksums for download verification
+    fetch_checksums_file
 
     install_gemini  && ok_count=$((ok_count + 1)) || fail_count=$((fail_count + 1))
     echo ""
