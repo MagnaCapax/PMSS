@@ -168,8 +168,14 @@ fi
 prompt_out="$outdir/prompt.txt"
 
 # Default to Codex with full tool approval (no prompts) while keeping sandboxing enabled.
-if [[ "$exec_cmd" == "codex" ]]; then
-	exec_cmd="codex --sandbox workspace-write --ask-for-approval never"
+exec_bin="${exec_cmd%% *}"
+if [[ "$exec_bin" == "codex" ]]; then
+	if [[ "$exec_cmd" == "codex" ]]; then
+		exec_cmd="codex --sandbox workspace-write --ask-for-approval never"
+	else
+		[[ "$exec_cmd" == *"--sandbox"* ]] || exec_cmd+=" --sandbox workspace-write"
+		[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval never"
+	fi
 fi
 
 if [[ -z "$custom_prompt" ]]; then

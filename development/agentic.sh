@@ -45,6 +45,7 @@ Pass-through to codex-run:
 Assistant CLI args (appended to the exec command):
   --yolo, -y                     Convenience flag (maps to claude danger)
   --approval-mode MODE           Assistant-specific approval mode
+  --ask-for-approval POLICY      Codex approval policy (untrusted/on-failure/on-request/never)
   --allowed-tools LIST           Assistant-specific allowed tools list
   --permission-mode MODE         Assistant-specific permission mode
   --dangerously-skip-permissions Pass through as-is
@@ -95,6 +96,10 @@ while [[ $# -gt 0 ]]; do
 		shift || true
 		;;
 	--approval-mode)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--ask-for-approval | -a)
 		exec_extra_args+=("$1" "${2:-}")
 		shift 2 || true
 		;;

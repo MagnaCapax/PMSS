@@ -79,12 +79,17 @@ codex_normalize_exec_extra_args() {
 	local -a args=("$@")
 	local -a normalized=()
 	local claude_force_danger=0
+	local codex_force_approval=""
+	local codex_has_approval=0
+	local mode=""
 
 	for ((i = 0; i < ${#args[@]}; i++)); do
 		case "${args[$i]}" in
 		--yolo | -y)
 			if [[ "$agent" == "claude" ]]; then
 				claude_force_danger=1
+			elif [[ "$agent" == "codex" ]]; then
+				codex_force_approval="never"
 			else
 				normalized+=("${args[$i]}")
 			fi
@@ -93,12 +98,29 @@ codex_normalize_exec_extra_args() {
 			if [[ "$agent" == "claude" && "${args[$((i + 1))]:-}" == "yolo" ]]; then
 				claude_force_danger=1
 				i=$((i + 1))
+			elif [[ "$agent" == "codex" ]]; then
+				mode="${args[$((i + 1))]:-}"
+				[[ "$mode" == "yolo" ]] && mode="never"
+				normalized+=(--ask-for-approval)
+				codex_has_approval=1
+				if [[ -n "$mode" ]]; then
+					normalized+=("$mode")
+					i=$((i + 1))
+				fi
 			else
 				normalized+=("${args[$i]}")
 				if [[ -n "${args[$((i + 1))]:-}" ]]; then
 					normalized+=("${args[$((i + 1))]}")
 					i=$((i + 1))
 				fi
+			fi
+			;;
+		--ask-for-approval)
+			normalized+=("${args[$i]}")
+			codex_has_approval=1
+			if [[ -n "${args[$((i + 1))]:-}" ]]; then
+				normalized+=("${args[$((i + 1))]}")
+				i=$((i + 1))
 			fi
 			;;
 		*)
@@ -109,6 +131,9 @@ codex_normalize_exec_extra_args() {
 
 	if [[ "$claude_force_danger" == "1" && "$agent" == "claude" ]]; then
 		normalized+=(--dangerously-skip-permissions)
+	fi
+	if [[ "$agent" == "codex" && -n "$codex_force_approval" && "$codex_has_approval" == "0" ]]; then
+		normalized+=(--ask-for-approval "$codex_force_approval")
 	fi
 
 	printf '%s\n' "${normalized[@]}"
@@ -174,7 +199,7 @@ EOF
 	done
 	printf '\n' >>"$prompt_file"
 
-cat <<'EOF' >>"$prompt_file"
+	cat <<'EOF' >>"$prompt_file"
 
 Do not inline these; read them directly from disk.
 
@@ -203,8 +228,8 @@ codex_scan_git_diff_for_dangers() {
 	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh)'
 	local found=0
 
-	if git -C "$repo_root" diff --no-color \
-		| awk -v re="$patterns" '
+	if git -C "$repo_root" diff --no-color |
+		awk -v re="$patterns" '
 			/^[+][+][+] b[/]/ { file=substr($0,7); next }
 			/^[+][+][+]/ { next }
 			/^[+]/ {
@@ -215,13 +240,13 @@ codex_scan_git_diff_for_dangers() {
 				}
 			}
 			END { exit (found ? 0 : 1) }
-		' \
-		| sed 's/^/[codex-run] DANGER: /' >&2; then
+		' |
+		sed 's/^/[codex-run] DANGER: /' >&2; then
 		found=1
 	fi
 
-	if git -C "$repo_root" diff --cached --no-color \
-		| awk -v re="$patterns" '
+	if git -C "$repo_root" diff --cached --no-color |
+		awk -v re="$patterns" '
 			/^[+][+][+] b[/]/ { file=substr($0,7); next }
 			/^[+][+][+]/ { next }
 			/^[+]/ {
@@ -232,8 +257,8 @@ codex_scan_git_diff_for_dangers() {
 				}
 			}
 			END { exit (found ? 0 : 1) }
-		' \
-		| sed 's/^/[codex-run] DANGER: /' >&2; then
+		' |
+		sed 's/^/[codex-run] DANGER: /' >&2; then
 		found=1
 	fi
 

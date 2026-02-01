@@ -5,4 +5,5 @@
 # Safety: Generally reliable
 # Docs: https://developers.openai.com/codex
 # Default to full tool approval (no prompts) but keep sandboxing enabled.
-codex --sandbox workspace-write --ask-for-approval never
+# Keep this as the bare binary name; codex-run applies the default flags.
+codex

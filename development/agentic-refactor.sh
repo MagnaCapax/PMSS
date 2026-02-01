@@ -47,6 +47,7 @@ Options:
 Assistant CLI args (appended to the exec command):
   --yolo, -y                     Convenience flag (maps to claude danger)
   --approval-mode MODE           Assistant-specific approval mode
+  --ask-for-approval POLICY      Codex approval policy (untrusted/on-failure/on-request/never)
   --allowed-tools LIST           Assistant-specific allowed tools list
   --permission-mode MODE         Assistant-specific permission mode
   --dangerously-skip-permissions Pass through as-is
@@ -125,6 +126,10 @@ while [[ $# -gt 0 ]]; do
 		shift || true
 		;;
 	--approval-mode)
+		exec_extra_args+=("$1" "${2:-}")
+		shift 2 || true
+		;;
+	--ask-for-approval | -a)
 		exec_extra_args+=("$1" "${2:-}")
 		shift 2 || true
 		;;
@@ -207,9 +212,9 @@ echo "[agentic-refactor] output directory: $OUTDIR" >&1
 if [[ "$dry_run" != "1" ]] && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 	echo "[agentic-refactor] collecting last $commits commits…" >&1
 	git -C "$ROOT" log -n "$commits" --pretty=format:'%h %s' >"$COMMITS_SUMMARY" || true
-	git -C "$ROOT" log -n "$commits" --name-only --pretty=format:'--- %H' \
-		| awk '/^--- / { next } NF { print }' \
-		| sort -u >"$COMMITS_FILES" || true
+	git -C "$ROOT" log -n "$commits" --name-only --pretty=format:'--- %H' |
+		awk '/^--- / { next } NF { print }' |
+		sort -u >"$COMMITS_FILES" || true
 else
 	if [[ "$dry_run" == "1" ]]; then
 		echo "[agentic-refactor] dry-run: skipping commit context collection" >&1
