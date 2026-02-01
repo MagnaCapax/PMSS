@@ -34,6 +34,14 @@ class WireGuardInstallerTest extends TestCase
         });
     }
 
+    public function testExternalEndpointUrlCandidatesIncludePrimaryAndBackup(): void
+    {
+        $urls = \wgExternalEndpointUrlCandidates();
+        $this->assertTrue(is_array($urls) && count($urls) >= 2, 'Expected at least two external endpoint URL candidates');
+        $this->assertTrue(in_array('https://pulsedmedia.com/remote/myip.php', $urls, true), 'Primary PMSS endpoint missing from candidates');
+        $this->assertTrue(in_array('https://api.ipify.org', $urls, true), 'Backup endpoint missing from candidates');
+    }
+
     public function testResolveEndpointFallsBackToExternalLookup(): void
     {
         $this->withEnv([

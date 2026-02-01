@@ -115,6 +115,16 @@ function wgValidatePublicIp(string $candidate): ?string
 /**
  * Query the external helper service for the host's public address.
  */
+function wgExternalEndpointUrlCandidates(): array
+{
+    return [
+        // Primary endpoint maintained by PMSS.
+        'https://pulsedmedia.com/remote/myip.php',
+        // Best-effort fallback used when the primary endpoint is unavailable.
+        'https://api.ipify.org',
+    ];
+}
+
 function wgFetchExternalEndpoint(): ?string
 {
     // #TODO Replace with an internal endpoint discovery helper instead of calling out. (GH #123)
@@ -123,14 +133,25 @@ function wgFetchExternalEndpoint(): ?string
         return $override === '' ? null : wgValidatePublicIp($override);
     }
 
-    $url     = 'https://pulsedmedia.com/remote/myip.php';
-    $context = stream_context_create(['http' => ['timeout' => 3]]);
-    $response = @file_get_contents($url, false, $context);
-    if ($response === false) {
-        return null;
+    $context = stream_context_create([
+        'http' => [
+            'timeout'    => 3,
+            'user_agent' => 'PMSS WireGuard (+https://github.com/MagnaCapax/PMSS)',
+        ],
+    ]);
+
+    foreach (wgExternalEndpointUrlCandidates() as $url) {
+        $response = @file_get_contents($url, false, $context);
+        if ($response === false) {
+            continue;
+        }
+        $ip = wgValidatePublicIp($response);
+        if ($ip !== null) {
+            return $ip;
+        }
     }
 
-    return wgValidatePublicIp($response);
+    return null;
 }
 
 /**
@@ -174,7 +195,7 @@ function wgDetectInterfaceAddress(): ?string
 function wgResolveEndpoint(string $hostname): array
 {
     // Prefer DNS resolution before hitting external services or interface inspection.
-    $hostnameIp = '';
+    $hostnamePrivate = '';
     if ($hostname !== '') {
         $dnsOverride = getenv('PMSS_WG_DNS_IP');
         if ($dnsOverride !== false && $dnsOverride !== '') {
@@ -183,7 +204,7 @@ function wgResolveEndpoint(string $hostname): array
             $resolved = gethostbyname($hostname);
         }
         if ($resolved !== $hostname) {
-            $hostnameIp = $resolved;
+            $hostnamePrivate = $resolved;
             $public     = wgValidatePublicIp($resolved);
             if ($public !== null) {
                 return [$public, 'hostname'];
@@ -191,22 +212,27 @@ function wgResolveEndpoint(string $hostname): array
         }
     }
 
-    $external = wgFetchExternalEndpoint();
-    if ($external !== null) {
-        return [$external, 'external'];
-    }
-
+    $interfacePrivate = '';
     $interfaceIp = wgDetectInterfaceAddress();
     if ($interfaceIp !== null) {
         $public = wgValidatePublicIp($interfaceIp);
         if ($public !== null) {
             return [$public, 'interface'];
         }
-        return [$interfaceIp, 'interface_private'];
+        $interfacePrivate = $interfaceIp;
     }
 
-    if ($hostnameIp !== '') {
-        return [$hostnameIp, 'hostname_private'];
+    $external = wgFetchExternalEndpoint();
+    if ($external !== null) {
+        return [$external, 'external'];
+    }
+
+    if ($interfacePrivate !== '') {
+        return [$interfacePrivate, 'interface_private'];
+    }
+
+    if ($hostnamePrivate !== '') {
+        return [$hostnamePrivate, 'hostname_private'];
     }
 
     return ['', 'unknown'];
