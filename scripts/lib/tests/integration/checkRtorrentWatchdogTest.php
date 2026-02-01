@@ -109,7 +109,7 @@ function scgiXmlrpcCall(string $socket, string $method, string $xmlParams = '', 
 /**
  * Clean up test artifacts unconditionally.
  */
-function cleanup(string $user, string $torrentDir): void
+function watchdogTestCleanup(string $user, string $torrentDir): void
 {
     emit('INFO', 'Cleaning up...');
 
@@ -135,7 +135,7 @@ function cleanup(string $user, string $torrentDir): void
 
 // Register cleanup on exit (covers crashes, Ctrl-C via pcntl if available).
 register_shutdown_function(function () use ($testUser, $torrentDir) {
-    cleanup($testUser, $torrentDir);
+    watchdogTestCleanup($testUser, $torrentDir);
 });
 
 // --- Pre-flight ---
@@ -148,7 +148,7 @@ $existing = [];
 @exec('id '.escapeshellarg($testUser).' 2>&1', $existing, $idRc);
 if ($idRc === 0) {
     emit('WARN', "User {$testUser} already exists; cleaning up first");
-    cleanup($testUser, $torrentDir);
+    watchdogTestCleanup($testUser, $torrentDir);
     sleep(2);
 }
 
