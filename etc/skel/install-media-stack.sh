@@ -121,6 +121,7 @@ done
 LOG_FILE="$HOME/.install-media-stack.log"
 mkdir -p "$(dirname "$LOG_FILE")" >/dev/null 2>&1 || true
 touch "$LOG_FILE" 2>/dev/null || true
+chmod 600 "$LOG_FILE" 2>/dev/null || true
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 # Colors if tty
@@ -257,6 +258,19 @@ fi
 
 log_ok "All required dependencies found"
 
+# CPU feature detection for compatibility warnings
+CPU_HAS_SSE42=0
+CPU_HAS_AVX=0
+if grep -q 'sse4_2' /proc/cpuinfo 2>/dev/null; then CPU_HAS_SSE42=1; fi
+if grep -q ' avx ' /proc/cpuinfo 2>/dev/null; then CPU_HAS_AVX=1; fi
+
+if [[ $CPU_HAS_AVX -eq 0 ]]; then
+  log_warn "CPU lacks AVX instructions — some native libraries may not work"
+  log_warn "Jellyfin image processing (SkiaSharp) may crash on very old CPUs"
+  log_warn "If any app crashes with 'Illegal instruction', your CPU is too old for that component"
+  echo ""
+fi
+
 # Detect Architecture
 ARCH=$(dpkg --print-architecture)
 case "$ARCH" in
@@ -298,6 +312,7 @@ fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
   mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
+  chmod 700 "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
   mkdir -p "$HOME/.bin"
 else
   log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}"
@@ -528,12 +543,18 @@ if [[ $DRY_RUN -eq 0 ]]; then
     cat <<EOF >"$datadir/${app}.ini"
 [misc]
 port = 8080
+host = 127.0.0.1
 url_base = /sabnzbd
 host_whitelist = ${HOSTNAME}
 EOF
   fi
   sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
   sed -i -E "s#^(port = ).*#\1${SABNZBD_PORT}#" "$datadir/${app}.ini"
+  sed -i -E "s#^(host = ).*#\1127.0.0.1#" "$datadir/${app}.ini"
+  # Ensure host line exists (older installs may lack it; SABnzbd defaults to 0.0.0.0)
+  if ! grep -q '^host = ' "$datadir/${app}.ini"; then
+    sed -i '/^\[misc\]/a host = 127.0.0.1' "$datadir/${app}.ini"
+  fi
   sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
 else
   log_info "[dry-run] would configure ${app^^} (port=${SABNZBD_PORT}, url_base=/public-${USERNAME}/${app})"
@@ -732,15 +753,7 @@ mkdir -p "${app}"
 extract_tgz "${app}.tar.gz" "${app}" 1
 [[ $DRY_RUN -eq 1 ]] || echo "${app^^} Installed"
 
-if [[ $DRY_RUN -eq 0 ]]; then
-  if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
-  else
-    log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
-  fi
-  tmux kill-session -t "jellyfin" 2>/dev/null || true
-fi
-
+# Configure Jellyfin BEFORE first start (security: prevents 0.0.0.0 binding)
 echo "Configuring ${app^^}"
 if [[ $DRY_RUN -eq 0 ]]; then
   if [ ! -f "$configdir/network.xml" ]; then
@@ -825,6 +838,31 @@ else
   fi
 fi
 echo "${app^^} configured"
+
+# Jellyfin smoke test: verify DLL loads without Illegal Instruction crash
+if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
+  log_info "Running Jellyfin smoke test..."
+  JELLYFIN_SMOKE_OK=1
+  # Start Jellyfin briefly to verify native libraries load on this CPU
+  tmux new-session -d -s "jellyfin-smoke" \
+    "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-smoke.log\"" 2>/dev/null || true
+  sleep 4
+  if tmux has-session -t "jellyfin-smoke" 2>/dev/null; then
+    log_ok "Jellyfin smoke test passed (DLL loads, native libs OK)"
+    tmux kill-session -t "jellyfin-smoke" 2>/dev/null || true
+  else
+    JELLYFIN_SMOKE_OK=0
+    log_warn "Jellyfin exited during smoke test — may have crashed"
+    if [[ -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" ]]; then
+      if grep -qi "illegal instruction\|SIGILL\|signal 4" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
+        log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
+        log_err "SkiaSharp or other native libraries need SSE4.2/AVX which this CPU does not have"
+        log_warn "Jellyfin will be installed but may crash during image processing"
+      fi
+    fi
+  fi
+  rm -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null || true
+fi
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
@@ -923,6 +961,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
   ) )
 }
 EOF
+  chmod 600 "$HOME/.lighttpd/custom" 2>/dev/null || true
 else
   log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom"
 fi
@@ -990,14 +1029,28 @@ if [[ $DRY_RUN -eq 0 ]]; then
   fi
   
   # Wait a moment and verify sessions are still running
-  sleep 2
+  sleep 3
   log_step "Verifying started applications..."
   for app in jellyfin sonarr radarr prowlarr sabnzbd cloudplow; do
     if tmux has-session -t "$app" 2>/dev/null; then
       log_ok "$app session is running"
     else
-      log_warn "$app session exited immediately - check logs or run: tmux attach -t $app (if session exists)"
-      log_info "To diagnose, try: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
+      log_warn "$app session exited immediately"
+      # Check for Illegal Instruction (CPU incompatibility)
+      app_log=""
+      case "$app" in
+        jellyfin) app_log="$JELLYFIN_LOG_DIR/jellyfin.log" ;;
+        sonarr)   app_log="$HOME/.config/sonarr/sonarr.log" ;;
+        radarr)   app_log="$HOME/.config/radarr/radarr.log" ;;
+        prowlarr) app_log="$HOME/.config/prowlarr/prowlarr.log" ;;
+        sabnzbd)  app_log="$HOME/.config/sabnzbd/sabnzbd.log" ;;
+      esac
+      if [[ -n "$app_log" ]] && [[ -f "$app_log" ]]; then
+        if grep -qi "illegal instruction\|SIGILL\|signal 4" "$app_log" 2>/dev/null; then
+          log_err "$app crashed: Illegal Instruction — CPU lacks required instruction sets (SSE4.2/AVX)"
+        fi
+      fi
+      log_info "To diagnose: tmux new-session -s ${app}-debug 'cd ~/.bin/${app}* && ...'"
     fi
   done
 else
