@@ -16,9 +16,13 @@
   - `scripts/testing/test-bash.sh` when touching shell scripts
 - Capture dry-run rehearsals for updater changes.
 
+## External Communications (Agents)
+- Follow `soul.md` for all outbound communications (issues, PRs, discussions, releases, emails).
+- Always append the signature `— Sampsa Pellervoinen 🌱` to external comments/messages.
+- Commits must include `Co-Authored-By: Sampsa Pellervoinen <noreply@pulsedmedia.com>`.
+
 ## PR Checklist
 - [ ] Code + tests + docs included
 - [ ] ADR added/updated when decisions changed
 - [ ] CI passes (see `.github/workflows/ci.yml`)
 - [ ] No changes to frozen areas (e.g., `etc/skel/www`) without approval
-
