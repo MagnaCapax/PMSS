@@ -36,6 +36,7 @@ external_data_score_input() {
 	if ((removed_pct > 25)); then add_signal char_strip 2; fi
 
 	if grep -Eq '([^A-Za-z0-9 ])\\1{4,}' <<<"$input"; then add_signal repeat_special 2; fi
-	longest=$(printf '%s' "$stripped" | tr ' \t\n' '\n' | awk '{print length}' | sort -rn | head -1 || echo 0)
+	# Avoid pipefail hazards (head/sort SIGPIPE) by computing the max length in a single awk pass.
+	longest=$(printf '%s' "$stripped" | tr ' \t\n' '\n' | awk 'BEGIN{m=0} { if (length($0) > m) m = length($0) } END { print m }')
 	if [[ ${longest:-0} -gt 80 ]]; then add_signal long_token 2; fi
 }
