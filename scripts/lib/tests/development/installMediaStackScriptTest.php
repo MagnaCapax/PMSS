@@ -98,12 +98,29 @@ class installMediaStackScriptTest extends TestCase
 
     public function testBinDirAppendedToPath(): void
     {
-        $this->assertStringContainsString('export PATH=$PATH:$DOTNET_ROOT:$HOME/.bin', $this->script);
+        $this->assertStringContainsString('PATH="$PATH:$DOTNET_ROOT"', $this->script);
+        $this->assertStringContainsString('PATH="$PATH:$HOME/.bin"', $this->script);
     }
 
     public function testBashrcCustomUsedForAppends(): void
     {
         $this->assertStringContainsString('.bashrc.custom', $this->script);
+    }
+
+    public function testJellyfinRemoteAccessDisabled(): void
+    {
+        $this->assertStringContainsString('<EnableRemoteAccess>false</EnableRemoteAccess>', $this->script);
+    }
+
+    public function testJellyfinLocalNetworkAddressSet(): void
+    {
+        $this->assertStringContainsString('<string>127.0.0.1</string>', $this->script);
+    }
+
+    public function testJellyfinAspNetCoreUrlsUsed(): void
+    {
+        $this->assertStringContainsString('ASPNETCORE_URLS=', $this->script);
+        $this->assertStringContainsString('127.0.0.1:', $this->script);
     }
 
     public function testLighttpdCustomConfigExists(): void

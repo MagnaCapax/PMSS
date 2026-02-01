@@ -224,7 +224,7 @@ DOTNET_ROOT_PATH="$HOME/.bin/dotnet"
 JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
-PUBLIC_IP=$(curl -fsS ifconfig.me 2>/dev/null || echo "unavailable")
+PUBLIC_IP=$(curl -fsS https://ifconfig.me 2>/dev/null || echo "unavailable")
 
 # Apply arg overrides for branch/version
 if [[ -n "$OVR_SONARR_BRANCH" ]]; then SONARR_BRANCH="$OVR_SONARR_BRANCH"; fi
@@ -391,11 +391,73 @@ random_open_port() {
 	exit 1
 }
 
-SABNZBD_PORT=$(random_open_port)
-RADARR_PORT=$(random_open_port)
-PROWLARR_PORT=$(random_open_port)
-SONARR_PORT=$(random_open_port)
-JELLYFIN_PORT=$(random_open_port)
+# Preserve existing ports on reruns so proxy configs stay stable.
+existing_port_from_ini() {
+	local file="$1" key="$2" value=""
+	if [[ -f "$file" ]]; then
+		value=$(awk -F'=' -v k="$key" '
+			$1 ~ "^[[:space:]]*" k "[[:space:]]*$" {
+				gsub(/[[:space:]]/, "", $2);
+				print $2;
+				exit
+			}
+		' "$file")
+	fi
+	printf '%s' "$value"
+}
+
+existing_port_from_xml_tag() {
+	local file="$1" tag="$2" value=""
+	if [[ -f "$file" ]]; then
+		value=$(sed -n -E "s|.*<${tag}>([0-9]+)</${tag}>.*|\\1|p" "$file" | head -n 1)
+	fi
+	printf '%s' "$value"
+}
+
+pick_existing_or_random_port() {
+	local existing="$1"
+	if [[ -n "$existing" ]]; then
+		printf '%s' "$existing"
+	else
+		random_open_port
+	fi
+}
+
+ensure_jellyfin_local_bind() {
+	local file="$1"
+	if [[ ! -f "$file" ]]; then
+		return
+	fi
+	python3 - "$file" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as handle:
+    data = handle.read()
+
+block = "  <LocalNetworkAddresses>\\n    <string>127.0.0.1</string>\\n  </LocalNetworkAddresses>"
+
+data = re.sub(r"<LocalNetworkAddresses\\s*/>", block, data)
+data = re.sub(r"<LocalNetworkAddresses>.*?</LocalNetworkAddresses>", block, data, flags=re.S)
+
+if "<LocalNetworkAddresses>" not in data:
+    data = data.replace("<LocalNetworkSubnets />", "<LocalNetworkSubnets />\\n" + block)
+
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(data)
+PY
+}
+
+SABNZBD_PORT=$(pick_existing_or_random_port "$(existing_port_from_ini "$HOME/.config/sabnzbd/sabnzbd.ini" "port")")
+RADARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/radarr/config.xml" "Port")")
+PROWLARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/prowlarr/config.xml" "Port")")
+SONARR_PORT=$(pick_existing_or_random_port "$(existing_port_from_xml_tag "$HOME/.config/sonarr/config.xml" "Port")")
+JELLYFIN_PORT="$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "InternalHttpPort")"
+if [[ -z "$JELLYFIN_PORT" ]]; then
+	JELLYFIN_PORT="$(existing_port_from_xml_tag "$JELLYFIN_CONFIG_DIR/network.xml" "PublicHttpPort")"
+fi
+JELLYFIN_PORT="$(pick_existing_or_random_port "$JELLYFIN_PORT")"
 USERNAME=$(whoami)
 HOSTNAME=$(hostname)
 
@@ -643,7 +705,15 @@ fi
 # shellcheck disable=SC2016
 append_to_bashrc_custom_if_missing '# Added by PMSS media stack installer (.NET 8)
 export DOTNET_ROOT=$HOME/.bin/dotnet
-export PATH=$PATH:$DOTNET_ROOT:$HOME/.bin' 'PMSS media stack installer'
+case ":$PATH:" in
+  *":$DOTNET_ROOT:"*) ;;
+  *) PATH="$PATH:$DOTNET_ROOT" ;;
+esac
+case ":$PATH:" in
+  *":$HOME/.bin:"*) ;;
+  *) PATH="$PATH:$HOME/.bin" ;;
+esac
+export PATH' 'PMSS media stack installer'
 chmod 0640 "$HOME/.bashrc.custom" 2>/dev/null || true
 echo ""
 
@@ -664,7 +734,7 @@ extract_tgz "${app}.tar.gz" "${app}" 1
 
 if [[ $DRY_RUN -eq 0 ]]; then
   if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
+    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
   else
     log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
   fi
@@ -701,10 +771,12 @@ if [[ $DRY_RUN -eq 0 ]]; then
   <EnableHttps>false</EnableHttps>
   <CertificatePath />
   <CertificatePassword />
-  <EnableRemoteAccess>true</EnableRemoteAccess>
+  <EnableRemoteAccess>false</EnableRemoteAccess>
   <BaseUrl />
   <LocalNetworkSubnets />
-  <LocalNetworkAddresses />
+  <LocalNetworkAddresses>
+    <string>127.0.0.1</string>
+  </LocalNetworkAddresses>
   <RequireHttps>false</RequireHttps>
   <RemoteIPFilter />
   <IsRemoteIPFilterBlacklist>false</IsRemoteIPFilterBlacklist>
@@ -714,8 +786,10 @@ EOF
   fi
   sed -i -E "s|(<PublicHttpPort>)[^<]*(</PublicHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
   sed -i -E "s|(<InternalHttpPort>)[^<]*(</InternalHttpPort>)|\1$JELLYFIN_PORT\2|g" "$configdir/network.xml"
+  sed -i -E "s|(<EnableRemoteAccess>)[^<]*(</EnableRemoteAccess>)|\1false\2|g" "$configdir/network.xml"
   sed -i -E "s|<BaseUrl />|<BaseUrl></BaseUrl>|g" "$configdir/network.xml"
   sed -i -E "s|(<BaseUrl>)[^<]*(</BaseUrl>)|\1/public-${USERNAME}/${app}\2|g" "$configdir/network.xml"
+  ensure_jellyfin_local_bind "$configdir/network.xml"
   syscfg="$configdir/system.xml"
   if [ ! -f "$syscfg" ]; then
     cat > "$syscfg" <<SYSXML
@@ -875,7 +949,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
   
   # Start Jellyfin
   if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
+    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
   else
     log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
   fi
@@ -944,7 +1018,8 @@ echo "PROWLARR-URL = https://${HOSTNAME}/public-${USERNAME}/prowlarr/"
 echo "SABNZBD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/"
 echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
 echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
-echo "JELLYFIN-ALTERNATE-URL = ${PUBLIC_IP}:${JELLYFIN_PORT}/public-${USERNAME}/jellyfin/"
+echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
+echo "PUBLIC-IP (do not expose ports): ${PUBLIC_IP}"
 
 echo ""
 echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
@@ -959,7 +1034,13 @@ log_step "Restarting lighttpd"
 if [[ $DRY_RUN -eq 0 ]]; then
   pkill -9 -u "$USERNAME" lighttpd >/dev/null 2>&1 || true
   pkill -9 -u "$USERNAME" php-cgi >/dev/null 2>&1 || true
-  echo "It may take 1-2 minutes to restart lighttpd"
+  if command -v lighttpd >/dev/null 2>&1 && [[ -f "$HOME/.lighttpd.conf" ]]; then
+    if ! lighttpd -f "$HOME/.lighttpd.conf" >/dev/null 2>&1; then
+      log_warn "Direct lighttpd restart failed; watchdog may retry."
+    fi
+  else
+    echo "It may take 1-2 minutes to restart lighttpd"
+  fi
 else
   log_info "[dry-run] would restart lighttpd/php-cgi"
 fi
