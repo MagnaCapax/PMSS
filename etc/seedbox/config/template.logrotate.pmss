@@ -56,6 +56,19 @@
     create 0600 root root
 }
 
+/var/log/pmss/process-snapshot.log {
+    weekly
+    rotate 8
+    minsize 1M
+    maxsize 128M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0600 root root
+}
+
 /var/log/pmss/user/*.log /var/log/pmss/users/*.log {
     daily
     rotate 7
