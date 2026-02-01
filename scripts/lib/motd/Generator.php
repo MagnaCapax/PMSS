@@ -13,80 +13,194 @@ require_once __DIR__.'/../update/distro.php';
 
 class Motd
 {
-    // TODO(complexity-refactor): Shell-outs and substitution are intertwined. (GH #126)
-    // Extract IO (shell/system reads) from formatting, and isolate template
-    // replacements into a pure function to simplify testing and reduce paths.
+    /**
+     * Controller: generate + write MOTD from the template.
+     *
+     * MVC split:
+     * - Model: motdCollectModel() gathers system inputs (shell-outs, files).
+     * - View:  renderMotdTemplate() formats + substitutes placeholders (pure).
+     * - Ctrl:  motdGenerate() orchestrates IO + writes output.
+     */
     public static function motdGenerate(): void
     {
         $tplPath = getenv('PMSS_MOTD_TEMPLATE_PATH') ?: '/etc/seedbox/config/template.motd';
         $outPath = getenv('PMSS_MOTD_OUTPUT_PATH') ?: '/etc/motd';
-        if (($tpl = @file_get_contents($tplPath)) === false) return;
-
-        [$host,$ip,$cpu,$ram,$storage] = self::sysBasics();
-        [$pmssVersion,$updateDate] = self::versionInfo();
-        [$uptime,$kernel,$netSpeed] = self::runtimeInfo();
-        $distro = self::distroInfo();
-        // Light color accents for readability (opt-out via PMSS_MOTD_COLOR=0)
-        if (self::colorEnabled()) {
-            $host       = self::c($host, '1;36');   // bold cyan
-            $ip         = self::c($ip, '32');       // green
-            $cpu        = self::c($cpu, '37');      // white
-            $ram        = self::c($ram, '36');      // cyan
-            $storage    = self::c($storage, '35');  // magenta
-            $pmssVersion= self::c($pmssVersion, '1;34'); // bold blue
-            $kernel     = self::c($kernel, '34');   // blue
-            $distro     = self::c($distro, '1;35'); // bold magenta
-            $netSpeed   = trim($netSpeed);
-            $netSpeed   = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
-                ? self::c($netSpeed, '32')           // green when detected
-                : self::c('Unknown', '33');         // yellow when unknown
+        $tpl = @file_get_contents($tplPath);
+        if (!is_string($tpl)) {
+            return;
         }
-        [$wg,$ovpn] = self::serviceStatuses();
-        $storageWarn = self::storageWarnings();
 
-        $repl = [
-            '%HOSTNAME%'        => $host,
-            '%SERVER_IP%'       => $ip,
-            '%SERVER_CPU%'      => $cpu,
-            '%SERVER_RAM%'      => $ram,
-            '%SERVER_STORAGE%'  => $storage,
-            '%PMSS_VERSION%'    => $pmssVersion,
-            '%UPDATE_DATE%'     => $updateDate,
-            '%APT_LAST_UPDATE%' => self::aptLastUpdate(),
-            '%UPTIME%'          => $uptime,
-            '%KERNEL_VERSION%'  => $kernel,
-            '%NETWORK_SPEED%'   => $netSpeed,
-            '%WIREGUARD_STATUS%'=> $wg,
-            '%OPENVPN_STATUS%'  => $ovpn,
-            '%DISTRO%'          => $distro,
-        ];
-        $tpl = strtr($tpl, $repl);
-        
-        // Clean up lines that might remain if the template still has %RUN_VERSION%
-        $tpl = str_replace('Runtime Version: %RUN_VERSION%', '', $tpl);
-        $tpl = preg_replace('/^\s*Runtime Version:.*$/m', '', $tpl);
-
-        if ($storageWarn !== '') $tpl .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
-        file_put_contents($outPath, $tpl);
-        @chmod($outPath, 0644);
-        @chown($outPath, 'root');
-        @chgrp($outPath, 'root');
+        $model = self::motdCollectModel();
+        $rendered = self::renderMotdTemplate($tpl, $model, self::colorEnabled());
+        self::motdWriteOutput($outPath, $rendered);
 
         // Align PAM motd behavior so users see MOTD once (and non-root can read it).
         if ($outPath === '/etc/motd') {
-            [$usesDynamic, $usesStatic] = self::detectPamMotd();
-            $dynamicPath = '/run/motd.dynamic';
-            if ($usesDynamic && !$usesStatic) {
-                file_put_contents($dynamicPath, $tpl);
-                @chmod($dynamicPath, 0644);
-                @chown($dynamicPath, 'root');
-                @chgrp($dynamicPath, 'root');
-            } elseif ($usesDynamic && $usesStatic) {
-                file_put_contents($dynamicPath, '');
-                @chmod($dynamicPath, 0644);
-                @chown($dynamicPath, 'root');
-                @chgrp($dynamicPath, 'root');
-            }
+            self::motdSyncPamDynamic($rendered);
+        }
+    }
+
+    /**
+     * Model: gather system inputs.
+     *
+     * @return array<string, string>
+     */
+    private static function motdCollectModel(): array
+    {
+        [$host, $ip, $cpu, $ram, $storage] = self::sysBasics();
+        [$pmssVersion, $updateDate] = self::versionInfo();
+        [$uptime, $kernel, $netSpeed] = self::runtimeInfo();
+        $distro = self::distroInfo();
+        [$wg, $ovpn] = self::serviceStatuses();
+        $storageWarn = self::storageWarnings();
+
+        return [
+            'host'          => (string) $host,
+            'ip'            => (string) $ip,
+            'cpu'           => (string) $cpu,
+            'ram'           => (string) $ram,
+            'storage'       => (string) $storage,
+            'pmssVersion'   => (string) $pmssVersion,
+            'updateDate'    => (string) $updateDate,
+            'aptLastUpdate' => (string) self::aptLastUpdate(),
+            'uptime'        => (string) $uptime,
+            'kernel'        => (string) $kernel,
+            'netSpeed'      => (string) $netSpeed,
+            'wgStatus'      => (string) $wg,
+            'ovpnStatus'    => (string) $ovpn,
+            'distro'        => (string) $distro,
+            'storageWarn'   => (string) $storageWarn,
+        ];
+    }
+
+    /**
+     * View: render the MOTD template from a pre-collected model.
+     *
+     * This function is pure: it must not perform shell-outs or read files.
+     *
+     * @param array<string, string> $model
+     */
+    public static function renderMotdTemplate(string $template, array $model, bool $colorEnabled): string
+    {
+        $host = self::motdModelValue($model, 'host');
+        $ip = self::motdModelValue($model, 'ip');
+        $cpu = self::motdModelValue($model, 'cpu');
+        $ram = self::motdModelValue($model, 'ram');
+        $storage = self::motdModelValue($model, 'storage');
+        $pmssVersion = self::motdModelValue($model, 'pmssVersion');
+        $updateDate = self::motdModelValue($model, 'updateDate');
+        $aptLastUpdate = self::motdModelValue($model, 'aptLastUpdate');
+        $uptime = self::motdModelValue($model, 'uptime');
+        $kernel = self::motdModelValue($model, 'kernel');
+        $netSpeed = self::motdModelValue($model, 'netSpeed');
+        $wg = self::motdModelValue($model, 'wgStatus');
+        $ovpn = self::motdModelValue($model, 'ovpnStatus');
+        $distro = self::motdModelValue($model, 'distro');
+
+        // Light color accents for readability (opt-out via PMSS_MOTD_COLOR=0)
+        if ($colorEnabled) {
+            $host = self::c($host, '1;36'); // bold cyan
+            $ip = self::c($ip, '32'); // green
+            $cpu = self::c($cpu, '37'); // white
+            $ram = self::c($ram, '36'); // cyan
+            $storage = self::c($storage, '35'); // magenta
+            $pmssVersion = self::c($pmssVersion, '1;34'); // bold blue
+            $kernel = self::c($kernel, '34'); // blue
+            $distro = self::c($distro, '1;35'); // bold magenta
+            $netSpeed = trim($netSpeed);
+            $netSpeed = ($netSpeed !== '' && !in_array(strtolower($netSpeed), ['unknown', 'n/a'], true))
+                ? self::c($netSpeed, '32') // green when detected
+                : self::c('Unknown', '33'); // yellow when unknown
+        }
+
+        $repl = [
+            '%HOSTNAME%'         => $host,
+            '%SERVER_IP%'        => $ip,
+            '%SERVER_CPU%'       => $cpu,
+            '%SERVER_RAM%'       => $ram,
+            '%SERVER_STORAGE%'   => $storage,
+            '%PMSS_VERSION%'     => $pmssVersion,
+            '%UPDATE_DATE%'      => $updateDate,
+            '%APT_LAST_UPDATE%'  => $aptLastUpdate,
+            '%UPTIME%'           => $uptime,
+            '%KERNEL_VERSION%'   => $kernel,
+            '%NETWORK_SPEED%'    => $netSpeed,
+            '%WIREGUARD_STATUS%' => $wg,
+            '%OPENVPN_STATUS%'   => $ovpn,
+            '%DISTRO%'           => $distro,
+        ];
+
+        $rendered = self::motdSubstituteTemplate($template, $repl);
+        $rendered = self::motdStripLegacyRuntimeVersionLines($rendered);
+
+        $storageWarn = self::motdModelValue($model, 'storageWarn');
+        if ($storageWarn !== '') {
+            $rendered .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
+        }
+
+        return $rendered;
+    }
+
+    /**
+     * @param array<string, string> $model
+     */
+    private static function motdModelValue(array $model, string $key): string
+    {
+        if (!isset($model[$key])) {
+            return '';
+        }
+        $value = $model[$key];
+        return is_string($value) ? $value : (string) $value;
+    }
+
+    /**
+     * Template substitution helper (pure).
+     *
+     * @param array<string, string> $replacements
+     */
+    private static function motdSubstituteTemplate(string $template, array $replacements): string
+    {
+        return strtr($template, $replacements);
+    }
+
+    /**
+     * Remove legacy RUN_VERSION lines that may still exist in older templates.
+     */
+    private static function motdStripLegacyRuntimeVersionLines(string $rendered): string
+    {
+        $rendered = str_replace('Runtime Version: %RUN_VERSION%', '', $rendered);
+        $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
+        return is_string($patched) ? $patched : $rendered;
+    }
+
+    /**
+     * Write output and enforce root-readable file permissions.
+     */
+    private static function motdWriteOutput(string $outPath, string $content): void
+    {
+        file_put_contents($outPath, $content);
+        @chmod($outPath, 0644);
+        @chown($outPath, 'root');
+        @chgrp($outPath, 'root');
+    }
+
+    /**
+     * Mirror the rendered MOTD into /run/motd.dynamic when PAM is configured for it.
+     */
+    private static function motdSyncPamDynamic(string $rendered): void
+    {
+        [$usesDynamic, $usesStatic] = self::detectPamMotd();
+        $dynamicPath = '/run/motd.dynamic';
+        if ($usesDynamic && !$usesStatic) {
+            file_put_contents($dynamicPath, $rendered);
+            @chmod($dynamicPath, 0644);
+            @chown($dynamicPath, 'root');
+            @chgrp($dynamicPath, 'root');
+        } elseif ($usesDynamic && $usesStatic) {
+            file_put_contents($dynamicPath, '');
+            @chmod($dynamicPath, 0644);
+            @chown($dynamicPath, 'root');
+            @chgrp($dynamicPath, 'root');
         }
     }
 
