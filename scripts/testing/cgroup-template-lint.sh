@@ -46,7 +46,7 @@ check_present "$v1" "TasksMax=%%USER_CGROUP_TASKS_MAX%%" "TasksMax placeholder (
 check_present "$v1" "CPUQuota=%%USER_CGROUP_CPU_QUOTA%%" "CPUQuota placeholder (v1)"
 
 # SystemPrep path rules: default drop-ins under /etc (vendor paths must never be defaults).
-system_prep="$ROOT_DIR/scripts/lib/update/systemPrep.php"
+system_prep="$ROOT_DIR/scripts/lib/update/systemPrep/systemdSlicesEnsure.php"
 check_present "$system_prep" "pmssResolvePathFromEnv\\('PMSS_SYSTEMD_USER_SLICE_DIR', '/etc/systemd/system/user-\\.slice\\.d'\\)" \
   "PMSS_SYSTEMD_USER_SLICE_DIR default (/etc systemd user slice drop-in dir)"
 check_absent "$system_prep" "pmssResolvePathFromEnv\\('PMSS_SYSTEMD_USER_SLICE_DIR', '/(usr/lib|lib)/systemd/" \
