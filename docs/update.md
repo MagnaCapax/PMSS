@@ -40,7 +40,7 @@ Common flags:
 | --- | --- | --- |
 | *(default run)* | Stages the selected snapshot and launches phase 2 when the hand-off is not skipped. | Confirm `/var/log/pmss-update.jsonl` contains `update_step2_start` and `update_step2_end`; inspect `/etc/seedbox/config/version` for the expected spec. |
 | `--dry-run` | Parses arguments and logs planned staging actions without touching the filesystem or invoking phase 2. | Check the JSON log for `update_step2_skipped` with reason `dry_run`, then run `git status --short` to ensure no tracked files changed; review `/var/log/pmss-update.log` to confirm intended operations. |
-| `--scripts-only` | Updates `/scripts` and `/etc/skel` from the snapshot, records the version, and skips `update-step2.php`. Never runs `apt`/`apt-get` or alters package state. | Verify `/var/log/pmss-update.jsonl` shows `update_step2_skipped` with reason `scripts_only`; optionally run `/scripts/util/systemTest.php` to confirm services remain healthy. |
+| `--scripts-only` | Updates `/scripts` and `/etc/skel` from the snapshot, records the version, and skips `update-step2.php`. Never runs `apt`/`apt-get` or alters package state. Also refreshes skeleton permissions and FTP config when helpers are available. | Verify `/var/log/pmss-update.jsonl` shows `update_step2_skipped` with reason `scripts_only`; optionally run `/scripts/util/systemTest.php` to confirm services remain healthy. |
 | `--dist-upgrade=<max>` | Runs `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade, capped at the requested maximum, then exits. | Check the JSON log for `dist_upgrade_start`/`dist_upgrade_end` entries; review `apt` output in `/var/log/pmss-update.log` and rerun `/scripts/update.php` without the flag to complete orchestration. |
 | `--repo` / `--branch` | Overrides the repository or branch when resolving a `git/*` spec before staging. | Confirm the resolved spec under `/etc/seedbox/config/version.meta`; optionally run `/scripts/update.php --dry-run` with the same flags to validate fetch and staging. |
 
@@ -144,7 +144,8 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 7. Configure the web stack, disable legacy daemons, and install supporting
    packages (e.g., mediainfo, Let’s Encrypt helpers).
 8. Update every user environment via `pmssUpdateUserEnvironment` and rescan
-   skeletons, crontabs, and logrotate policies.
+   skeletons, crontabs (only when the template is missing/unchanged), and
+   logrotate policies.
 9. Reapply network templates, apply security hardening, summarise profiling, and
    log completion markers. Per-user traffic monitoring rules rely on the
    iptables owner match; when unavailable `setupNetwork.php` skips those rules

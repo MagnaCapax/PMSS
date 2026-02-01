@@ -284,6 +284,20 @@ pmssUserTerminateStep(
     'userdel '.escapeshellarg($username),
     $dryRun
 );
+$trafficFiles = array(
+    "/home/{$username}/.trafficData",
+    "/home/{$username}/.trafficDataLocal",
+    "/home/{$username}/.trafficDataIngress",
+    "/home/{$username}/.trafficDataIngressLocal",
+);
+$trafficArgs = array_map('escapeshellarg', $trafficFiles);
+$clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
+pmssUserTerminateStep(
+    $username,
+    'clear_immutable_traffic',
+    $clearImmutableCmd,
+    $dryRun
+);
 pmssUserTerminateStep(
     $username,
     'remove_home_initial',

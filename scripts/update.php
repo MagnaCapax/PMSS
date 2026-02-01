@@ -1097,6 +1097,10 @@ function bootstrapMain(array $argv): void
             logmsg('[INFO] Refreshing skeleton/config permissions for --scripts-only run');
             runSoft(escapeshellarg(PHP_BINARY).' /scripts/util/setupSkelPermissions.php');
         }
+        if (!$options['dry_run'] && file_exists('/scripts/util/ftpConfig.php')) {
+            logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');
+            runSoft(escapeshellarg(PHP_BINARY).' /scripts/util/ftpConfig.php');
+        }
         if (!$options['dry_run']) {
             restoreRootCronBestEffort('scripts-only');
         }
