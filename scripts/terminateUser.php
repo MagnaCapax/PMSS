@@ -88,8 +88,7 @@ if (!in_array($username, $knownUsers, true)) {
     die("\t**** USER NOT FOUND IN MANAGED LIST ****\n\n");
 }
 
-if (!file_exists("/home/{$username}") ||
-    !is_dir("/home/{$username}")) {
+if (!is_dir("/home/{$username}")) {
     pmssUserTerminateLog(
         pmssUserTerminateContext(
             $username,
