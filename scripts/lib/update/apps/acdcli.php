@@ -13,7 +13,9 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/pythonVenv.php';
 
-// #TODO Pin acd_cli to a specific commit/tag to avoid unbounded upgrades. (GH #129)
+// Pinned upstream version to avoid unbounded upgrades. (GH #129)
+$acdCliPinnedTag    = '0.3.2';
+$acdCliPinnedCommit = 'af929608f6279fca56e6c9ac6c48bd76d4ff1dcb';
 
 $venvDir = '/opt/acd_cli';
 $cliBin  = $venvDir.'/bin/acd_cli';
@@ -27,7 +29,15 @@ $forceUpdate = getenv('PMSS_FORCE_ACDCLI_UPDATE') === '1';
 if (pmssPythonVenvHasPackage($venv['python'], 'acdcli') && !$forceUpdate) {
     logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
 } else {
-    runStep('Installing acd_cli in virtualenv', sprintf('%s -m pip install --upgrade git+https://github.com/yadayada/acd_cli.git', escapeshellarg($venv['python'])));
+    $source = sprintf('git+https://github.com/yadayada/acd_cli.git@%s', $acdCliPinnedCommit);
+    runStep(
+        sprintf('Installing acd_cli %s in virtualenv', $acdCliPinnedTag),
+        sprintf(
+            '%s -m pip install --upgrade %s',
+            escapeshellarg($venv['python']),
+            escapeshellarg($source)
+        )
+    );
 }
 
 if (is_file($cliBin)) {
