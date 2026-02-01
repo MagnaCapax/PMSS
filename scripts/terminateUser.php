@@ -259,6 +259,26 @@ if (function_exists('posix_getpwnam')) {
 }
 
 echo "\nDeleting user, user data and HTTP password:\n";
+
+// Clear any per-user crontab before removing the account to avoid leaving stale
+// cron entries behind (Debian keeps them under /var/spool/cron/crontabs/).
+pmssUserTerminateStep(
+    $username,
+    'crontab_remove',
+    'crontab -r -u '.escapeshellarg($username).' || true',
+    $dryRun
+);
+$crontabSpoolPaths = array(
+    "/var/spool/cron/crontabs/{$username}",
+    "/var/spool/cron/{$username}",
+);
+pmssUserTerminateStep(
+    $username,
+    'crontab_spool_remove',
+    'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true',
+    $dryRun
+);
+
 pmssUserTerminateStep(
     $username,
     'userdel_initial',
@@ -347,14 +367,6 @@ pmssUserTerminateStep(
     $username,
     'groupdel_final',
     'groupdel '.escapeshellarg($username),
-    $dryRun
-);
-
-// Clear any per-user crontab to avoid leaving stale cron entries for removed users.
-pmssUserTerminateStep(
-    $username,
-    'crontab_remove',
-    'crontab -r -u '.escapeshellarg($username).' || true',
     $dryRun
 );
 
