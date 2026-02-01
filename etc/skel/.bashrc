@@ -226,11 +226,39 @@ EOF
 }
 
 
-# Ensure system admin tools (sysctl, ip, etc.) are available in user shells
-export PATH=$PATH:/usr/sbin:/sbin
+# Normalize PATH so system paths lead, then existing entries, then user bins.
+pmss_normalize_path() {
+    local sys_paths="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    local new_path=""
+    local entry
+    local path_value="${PATH:-}"
+    local -a parts=()
 
-# Ensure user-local bins are available after system paths
-export PATH=$PATH:$HOME/.bin:$HOME/bin
+    IFS=':' read -r -a parts <<< "$path_value"
+    for entry in "${parts[@]}"; do
+        case "$entry" in
+            ""|"$HOME/.bin"|"$HOME/bin") continue ;;
+        esac
+        case ":$new_path:" in
+            *":$entry:"*) ;;
+            *) new_path="${new_path:+$new_path:}$entry" ;;
+        esac
+    done
+
+    new_path="${sys_paths}${new_path:+:$new_path}"
+    for entry in "$HOME/.bin" "$HOME/bin"; do
+        if [ -d "$entry" ]; then
+            case ":$new_path:" in
+                *":$entry:"*) ;;
+                *) new_path="${new_path}:$entry" ;;
+            esac
+        fi
+    done
+
+    export PATH="$new_path"
+}
+pmss_normalize_path
+unset -f pmss_normalize_path
 
 # Prefer the per-user systemd runtime directory when available so rootless
 # daemons and other user services can attach to the correct socket.
@@ -243,6 +271,11 @@ if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
 fi
 
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+
+# Installer-managed shell extensions (optional)
+if [ -f "$HOME/.bashrc.custom" ]; then
+    . "$HOME/.bashrc.custom"
+fi
 
 # User-specific extensions (optional)
 if [ -f "$HOME/.bashrc.user" ]; then
