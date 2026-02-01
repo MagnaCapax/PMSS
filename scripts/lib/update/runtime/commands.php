@@ -120,11 +120,9 @@ if (!function_exists('pmssBuildCommand')) {
     function pmssBuildCommand(string $program, array $args = []): string
     {
         $prog = escapeshellcmd($program);
-        if (empty($args)) {
-            return $prog;
-        }
-        $escaped = array_map(static function ($a) { return escapeshellarg((string)$a); }, $args);
-        return $prog.' '.implode(' ', $escaped);
+        return empty($args)
+            ? $prog
+            : $prog.' '.implode(' ', array_map(static function ($a) { return escapeshellarg((string)$a); }, $args));
     }
 }
 

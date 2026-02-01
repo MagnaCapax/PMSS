@@ -54,10 +54,9 @@ function userApplyDiskQuota(array $user): void
     runStep('Applying disk quota', $cmd);
 
     // Immediately refresh the user-visible quota status file
-    $quotaFile = "/home/{$user['name']}/.quota";
     $refreshCmd = sprintf(
         'quota -u %2$s -s > %1$s; chmod o+r %1$s',
-        escapeshellarg($quotaFile),
+        escapeshellarg("/home/{$user['name']}/.quota"),
         escapeshellarg($user['name'])
     );
     runStep('Refreshing quota status file', $refreshCmd);

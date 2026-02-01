@@ -35,17 +35,16 @@ function userConfigureSystemdSlice(array $user): void
     }
 
     // Optional I/O throttles
-    if (!empty($user['IOReadBW'])) {
-        $args[] = '--io-read-bw=' . $user['IOReadBW'];
-    }
-    if (!empty($user['IOWriteBW'])) {
-        $args[] = '--io-write-bw=' . $user['IOWriteBW'];
-    }
-    if (!empty($user['IOReadIOPS'])) {
-        $args[] = '--io-read-iops=' . $user['IOReadIOPS'];
-    }
-    if (!empty($user['IOWriteIOPS'])) {
-        $args[] = '--io-write-iops=' . $user['IOWriteIOPS'];
+    $ioArgs = [
+        'IOReadBW'    => '--io-read-bw=',
+        'IOWriteBW'   => '--io-write-bw=',
+        'IOReadIOPS'  => '--io-read-iops=',
+        'IOWriteIOPS' => '--io-write-iops=',
+    ];
+    foreach ($ioArgs as $key => $flag) {
+        if (!empty($user[$key])) {
+            $args[] = $flag.$user[$key];
+        }
     }
     if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
         $quotaVal = $user['cpuQuotaPercent'];

@@ -30,12 +30,8 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
     {
         $error = null;
 
-        if ($raw === null || $raw === false) {
-            $error = 'missing';
-            return null;
-        }
-        if ($raw === true) {
-            $error = 'missing value';
+        if ($raw === null || $raw === false || $raw === true) {
+            $error = ($raw === true) ? 'missing value' : 'missing';
             return null;
         }
 
@@ -73,4 +69,3 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
         return $value;
     }
 }
-

@@ -18,10 +18,8 @@ class UserValidator
             return false;
         }
         $normalized = pmssNormalizeUsername($username);
-        if ($normalized !== $username) {
-            return false;
-        }
-        return preg_match('/^[a-z0-9._-]+$/', $normalized) === 1;
+        return $normalized === $username
+            && preg_match('/^[a-z0-9._-]+$/', $normalized) === 1;
     }
 
     public static function validatePayload(array $data): bool

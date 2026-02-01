@@ -24,10 +24,7 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
             if (is_string($gen)) {
                 foreach (preg_split('/\r?\n/', $gen) as $line) {
                     $trim = trim($line);
-                    if ($trim === '') {
-                        continue;
-                    }
-                    if ($trim[0] === '#') {
+                    if ($trim === '' || $trim[0] === '#') {
                         continue;
                     }
                     if (stripos($trim, $locale.' UTF-8') === 0) {
@@ -122,4 +119,3 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
         \Motd::motdGenerate();
     }
 }
-

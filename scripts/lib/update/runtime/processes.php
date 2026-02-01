@@ -73,10 +73,9 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
         logmsg("[SKIP] {$description} (unit {$unit} missing)");
         return;
     }
-    $candidate = $unit;
-    if ($action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $candidate)) {
-        $candidate .= '.service';
-    }
+    $candidate = ($action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit))
+        ? $unit.'.service'
+        : $unit;
     runStep($description, 'systemctl '.$action.' '.escapeshellarg($candidate));
 }
 

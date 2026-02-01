@@ -78,10 +78,7 @@ class UserConfigStore
         }
 
         $path = $this->userFilePath($username);
-        if (!$this->writeJsonFileAtomic($path, $payload, 0640, 'root', 'root')) {
-            return false;
-        }
-        return true;
+        return $this->writeJsonFileAtomic($path, $payload, 0640, 'root', 'root');
     }
 
     public function remove(string $username): bool

@@ -19,13 +19,15 @@ function userConfigureDeluge(array $user, array $configuration): void
     if (!file_exists($configDir)) {
         runStep('Creating Deluge config dir', sprintf('mkdir -p %s', escapeshellarg($configDir)));
     }
-    if (!file_exists($unfinishedDir)) {
-        runStep('Creating Deluge unfinished dir', sprintf('mkdir -p %s', escapeshellarg($unfinishedDir)));
-        runStep('Fixing Deluge unfinished ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($unfinishedDir)));
-    }
-    if (!file_exists($sessionDir)) {
-        runStep('Creating Deluge session dir', sprintf('mkdir -p %s', escapeshellarg($sessionDir)));
-        runStep('Fixing Deluge session ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($sessionDir)));
+    $ownedDirs = [
+        'Deluge unfinished' => $unfinishedDir,
+        'Deluge session'    => $sessionDir,
+    ];
+    foreach ($ownedDirs as $label => $dir) {
+        if (!file_exists($dir)) {
+            runStep('Creating '.$label.' dir', sprintf('mkdir -p %s', escapeshellarg($dir)));
+            runStep('Fixing '.$label.' ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg($dir)));
+        }
     }
 
     $scgiPort    = $configuration['config']['scgiPort'] ?? 5000;

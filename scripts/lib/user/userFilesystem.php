@@ -21,10 +21,7 @@ class userFilesystem
             try {
                 while (false !== ($entry = readdir($directory))) {
                     // Skip dot files and backup directories
-                    if ($entry === '.' || $entry === '..' || strpos($entry, 'backup-') === 0 || strpos($entry, 'root-backup-') === 0) {
-                        continue;
-                    }
-                    if (in_array($entry, $filterList, true)) {
+                    if ($entry === '.' || $entry === '..' || strpos($entry, 'backup-') === 0 || strpos($entry, 'root-backup-') === 0 || in_array($entry, $filterList, true)) {
                         continue;
                     }
                     $path = $homeDir.'/'.$entry;

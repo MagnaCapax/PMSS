@@ -29,12 +29,10 @@ if (!function_exists('pmssUserLogAllowed')) {
         }
 
         if ($uid === null) {
-            $cached = false;
-            return $cached;
+            return $cached = false;
         }
 
-        $cached = ($uid === 0);
-        return $cached;
+        return $cached = ($uid === 0);
     }
 }
 
@@ -50,13 +48,10 @@ if (!function_exists('pmssUserLogFile')) {
             }
             if (!is_dir($dir)) {
                 @mkdir($dir, 0755, true);
-            }
-        }
-
-        if (!is_dir($dir)) {
-            $dir = $legacyDir;
-            if (!is_dir($dir)) {
-                @mkdir($dir, 0755, true);
+                if (!is_dir($dir)) {
+                    $dir = $legacyDir;
+                    @mkdir($dir, 0755, true);
+                }
             }
         }
         $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $user);

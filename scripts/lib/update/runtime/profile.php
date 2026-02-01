@@ -18,7 +18,7 @@ require_once __DIR__.'/../logging.php';
  */
 function pmssInitProfileStore(): void
 {
-    if (!isset($GLOBALS['PMSS_PROFILE']) || !is_array($GLOBALS['PMSS_PROFILE'])) {
+    if (!is_array($GLOBALS['PMSS_PROFILE'] ?? null)) {
         $GLOBALS['PMSS_PROFILE'] = [];
     }
 }

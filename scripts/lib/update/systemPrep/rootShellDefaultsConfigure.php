@@ -22,16 +22,15 @@ if (!function_exists('pmssConfigureRootShellDefaults')) {
         }
 
         $updates = [];
-        $alias   = "alias ls='ls --color=auto'";
-        $pathAdd = 'PATH=$PATH:/scripts';
-
-        if (!in_array($alias, $lines, true)) {
-            $lines[]   = $alias;
-            $updates[] = $alias;
-        }
-        if (!in_array($pathAdd, $lines, true)) {
-            $lines[]   = $pathAdd;
-            $updates[] = $pathAdd;
+        $defaults = [
+            "alias ls='ls --color=auto'",
+            'PATH=$PATH:/scripts',
+        ];
+        foreach ($defaults as $entry) {
+            if (!in_array($entry, $lines, true)) {
+                $lines[]   = $entry;
+                $updates[] = $entry;
+            }
         }
 
         if ($updates === []) {
@@ -43,4 +42,3 @@ if (!function_exists('pmssConfigureRootShellDefaults')) {
         $log('Appended root shell defaults: '.implode(', ', $updates));
     }
 }
-

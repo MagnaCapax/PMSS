@@ -59,8 +59,7 @@ class UserRepository
     public function pruneStaleEntries(): void
     {
         $homeUsers = userFilesystem::listHomeUsers();
-        $users = $this->store->loadAll();
-        foreach (array_keys($users) as $username) {
+        foreach ($this->store->loadAll() as $username => $_payload) {
             if (!in_array($username, $homeUsers, true)) {
                 $this->store->remove($username);
             }

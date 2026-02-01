@@ -36,10 +36,8 @@ if (!function_exists('pmssTotalCpuThreads')) {
         }
         // Robust check using /proc/cpuinfo
         $cpuinfo = @file_get_contents('/proc/cpuinfo');
-        if ($cpuinfo !== false) {
-            $count = substr_count($cpuinfo, 'processor');
-            if ($count > 0) return $count;
-        }
+        $count = $cpuinfo !== false ? substr_count($cpuinfo, 'processor') : 0;
+        if ($count > 0) return $count;
         // Fallback to nproc if available
         $nproc = @shell_exec('nproc');
         if ($nproc !== null) {
@@ -49,4 +47,3 @@ if (!function_exists('pmssTotalCpuThreads')) {
         return 0;
     }
 }
-
