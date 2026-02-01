@@ -46,6 +46,16 @@
     sharedscripts
 }
 
+/var/log/pmss/quota-daily.log {
+    monthly
+    rotate 24
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0600 root root
+}
+
 /var/log/pmss/user/*.log /var/log/pmss/users/*.log {
     daily
     rotate 7

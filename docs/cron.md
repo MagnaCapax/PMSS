@@ -55,6 +55,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `cpuStat.php` – Periodically record CPU usage statistics.
 - `diskIostat.php` – Collect disk I/O metrics for later analysis.
 - `diskSmart.php` – Prototype SMART monitoring (still experimental).
+- `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`).
 - `trafficLimits.php` – Refresh per-user traffic throttling configuration.
 - `trafficLog.php` – Capture recent traffic counters for aggregation.
 - `trafficStats.php` – Fold raw logs into long-term statistics.

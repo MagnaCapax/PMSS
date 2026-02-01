@@ -1,0 +1,168 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Cron task: quota snapshot.
+ *
+ * Records a daily snapshot of per-user quota usage for /home in a stable,
+ * machine-parseable format. This data is used for capacity planning and later
+ * time-series aggregation (tracked separately).
+ *
+ * Output file (root-only): /var/log/pmss/quota-daily.log (0600)
+ *
+ * Line format:
+ *   2026-02-01T00:00:00 <uid> <blocks_used> <blocks_soft> <blocks_hard> <files_used> <files_soft> <files_hard>
+ *
+ * Notes:
+ * - Uses numeric UIDs to reduce privacy surface in logs.
+ * - Best-effort: failures are logged (date-prefixed) but do not exit non-zero
+ *   to avoid cron noise.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
+
+const PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/quota-daily.log';
+const PMSS_QUOTA_SNAPSHOT_MOUNT_DEFAULT = '/home';
+
+function pmssQuotaSnapshotNow(): string
+{
+    return date('Y-m-d\\TH:i:s');
+}
+
+/**
+ * Parse `repquota -u -n` output into stable numeric rows.
+ *
+ * @return array<int, array{0:string,1:string,2:string,3:string,4:string,5:string,6:string}>
+ */
+function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
+{
+    $rows = [];
+    foreach ($lines as $line) {
+        $line = trim((string) $line);
+        if ($line === '') {
+            continue;
+        }
+        // Data lines begin with a numeric user id (often preceded by #).
+        if (preg_match('/^#?[0-9]+\\b/', $line) !== 1) {
+            continue;
+        }
+        $tokens = preg_split('/\\s+/', $line);
+        if (!is_array($tokens) || count($tokens) < 2) {
+            continue;
+        }
+        if (preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
+            continue;
+        }
+        $uid = $m[1];
+        $numbers = [];
+        for ($i = 1, $len = count($tokens); $i < $len; $i++) {
+            $token = $tokens[$i];
+            if ($token !== '' && ctype_digit($token)) {
+                $numbers[] = $token;
+            }
+        }
+        if (count($numbers) < 6) {
+            continue;
+        }
+        $rows[] = [$uid, $numbers[0], $numbers[1], $numbers[2], $numbers[3], $numbers[4], $numbers[5]];
+    }
+    return $rows;
+}
+
+function pmssQuotaSnapshotAppendLine($fh, string $line): void
+{
+    @fwrite($fh, $line.PHP_EOL);
+}
+
+/**
+ * Capture and persist one snapshot.
+ *
+ * @return int exit code
+ */
+function pmssQuotaSnapshotRun(): int
+{
+    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+        fwrite(STDERR, "quotaSnapshot.php must be run as root.\n");
+        return 1;
+    }
+
+    $mountPath = getenv('PMSS_QUOTA_SNAPSHOT_MOUNT') ?: PMSS_QUOTA_SNAPSHOT_MOUNT_DEFAULT;
+    $logPath = getenv('PMSS_QUOTA_SNAPSHOT_LOG') ?: PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT;
+    $logDir = dirname($logPath);
+
+    $ts = pmssQuotaSnapshotNow();
+
+    $oldUmask = umask(0077);
+    if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+        umask($oldUmask);
+        return 1;
+    }
+
+    $fh = @fopen($logPath, 'ab');
+    if ($fh === false) {
+        umask($oldUmask);
+        return 1;
+    }
+    @chmod($logPath, 0600);
+    if (function_exists('flock')) {
+        @flock($fh, LOCK_EX);
+    }
+
+    // Resolve repquota binary without depending on PATH inherited by cron.
+    $repquota = trim((string) @shell_exec('command -v repquota 2>/dev/null'));
+    if ($repquota === '') {
+        pmssQuotaSnapshotAppendLine($fh, $ts.' WARN repquota_missing');
+        @fclose($fh);
+        umask($oldUmask);
+        return 0;
+    }
+
+    $cmd = $repquota.' -u -n '.escapeshellarg($mountPath).' 2>&1';
+    $output = [];
+    $rc = 0;
+    @exec($cmd, $output, $rc);
+    if ($rc !== 0) {
+        $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($output, 0, 5))));
+        pmssQuotaSnapshotAppendLine(
+            $fh,
+            $ts.' WARN repquota_failed rc='.$rc.' mount='.preg_replace('/\\s+/', '', $mountPath).($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '')
+        );
+        @fclose($fh);
+        umask($oldUmask);
+        return 0;
+    }
+
+    $rows = pmssQuotaSnapshotParseRepquotaUserRows($output);
+    if (empty($rows)) {
+        pmssQuotaSnapshotAppendLine($fh, $ts.' WARN repquota_no_rows mount='.preg_replace('/\\s+/', '', $mountPath));
+        @fclose($fh);
+        umask($oldUmask);
+        return 0;
+    }
+
+    foreach ($rows as $row) {
+        pmssQuotaSnapshotAppendLine(
+            $fh,
+            sprintf(
+                '%s %s %s %s %s %s %s %s',
+                $ts,
+                $row[0],
+                $row[1],
+                $row[2],
+                $row[3],
+                $row[4],
+                $row[5],
+                $row[6]
+            )
+        );
+    }
+
+    @fclose($fh);
+    umask($oldUmask);
+    return 0;
+}
+
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    exit(pmssQuotaSnapshotRun());
+}
+
