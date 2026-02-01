@@ -21,7 +21,7 @@ echo "[agentic-refactor] start: assembling refactor context and invoking assista
 #   development/agentic-refactor.sh --commits 25
 #   development/agentic-refactor.sh --target scripts/lib/update
 #   development/agentic-refactor.sh --prompt "Refactor X (behaviour-preserving)"
-#   development/agentic-refactor.sh --exec 'codex --sandbox workspace-write --ask-for-approval never'
+#   development/agentic-refactor.sh --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'
 #   development/agentic-refactor.sh --agent codex
 #   development/agentic-refactor.sh --dry-run
 

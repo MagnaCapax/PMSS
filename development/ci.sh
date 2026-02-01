@@ -13,7 +13,7 @@ echo "[ci] starting CI prompt assembly…" >&1
 #
 # Usage:
 #  development/ci.sh                 # build prompt; prints location
-#  development/ci.sh --exec 'codex --sandbox workspace-write --ask-for-approval never'
+#  development/ci.sh --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'
 #  development/ci.sh --job smoke     # include smoke logs instead of build
 #  development/ci.sh --prompt "..."   # custom prompt
 #  development/ci.sh --dry-run        # assemble prompt only; do not invoke assistant

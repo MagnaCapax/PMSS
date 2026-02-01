@@ -22,13 +22,13 @@ echo "[codex-ci] start: assembling CI context and invoking Codex" >&1
 #   - GitHub CLI (`gh`) installed and authenticated: gh auth login
 #   - `curl` available; for private repos set `GITHUB_TOKEN` (classic PAT with `repo` + `actions:read`)
 # Optional:
-#   - A local assistant CLI to receive the prompt. Provide via --exec (e.g., --exec 'codex --sandbox workspace-write --ask-for-approval never')
+#   - A local assistant CLI to receive the prompt. Provide via --exec (e.g., --exec 'codex --sandbox workspace-write --ask-for-approval untrusted')
 #
 # Usage:
 #   development/codex-ci.sh                          # assemble prompt + logs into codex-ci/prompt.txt
 #   development/codex-ci.sh --job smoke               # include only 'smoke' job logs in the prompt
 #   development/codex-ci.sh --prompt "text..."        # use custom high-level prompt text
-#   development/codex-ci.sh --exec 'codex --sandbox workspace-write --ask-for-approval never'  # send prompt to Codex CLI directly
+#   development/codex-ci.sh --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'  # send prompt to Codex CLI directly
 #
 # The default prompt:
 #   "Last CI Integration Logs are here. If issues or code fails, please fix them.

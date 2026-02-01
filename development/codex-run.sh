@@ -88,14 +88,14 @@ Environment:
 Examples:
   development/codex-run.sh run --prompt-file development/prompts/codex.txt
   development/codex-run.sh run --prompt "Summarize changes" --dry-run
-  development/codex-run.sh run --prompt-file development/prompts/refactor.txt --exec "codex --sandbox workspace-write --ask-for-approval never"
+  development/codex-run.sh run --prompt-file development/prompts/refactor.txt --exec "codex --sandbox workspace-write --ask-for-approval untrusted"
 EOF
 }
 
 # Usage:
 #   development/codex-run.sh run --prompt-file development/prompts/codex.txt
 #   development/codex-run.sh run --prompt-file development/prompts/codex.txt --dry-run
-#   development/codex-run.sh run --prompt-file development/prompts/codex.txt --exec 'codex --sandbox workspace-write --ask-for-approval never'
+#   development/codex-run.sh run --prompt-file development/prompts/codex.txt --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'
 #   development/codex-run.sh run --prompt-file development/prompts/refactor.txt --autocommit
 
 cmd=${1:-}
@@ -167,14 +167,14 @@ if [[ -z "$outdir" ]]; then
 fi
 prompt_out="$outdir/prompt.txt"
 
-# Default to Codex with full tool approval (no prompts) while keeping sandboxing enabled.
+# Default to Codex with approval prompts for untrusted commands while keeping sandboxing enabled.
 exec_bin="${exec_cmd%% *}"
 if [[ "$exec_bin" == "codex" ]]; then
 	if [[ "$exec_cmd" == "codex" ]]; then
-		exec_cmd="codex --sandbox workspace-write --ask-for-approval never"
+		exec_cmd="codex --sandbox workspace-write --ask-for-approval untrusted"
 	else
 		[[ "$exec_cmd" == *"--sandbox"* ]] || exec_cmd+=" --sandbox workspace-write"
-		[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval never"
+		[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval untrusted"
 	fi
 fi
 
