@@ -604,7 +604,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 <Config>
   <UrlBase></UrlBase>
   <Port>7878</Port>
-  <BindAddress>*</BindAddress>
+  <BindAddress>127.0.0.1</BindAddress>
 </Config>
 EOF
   fi
@@ -647,7 +647,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 <Config>
   <UrlBase></UrlBase>
   <Port>9696</Port>
-  <BindAddress>*</BindAddress>
+  <BindAddress>127.0.0.1</BindAddress>
 </Config>
 EOF
   fi
@@ -690,7 +690,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 <Config>
   <Port>8989</Port>
   <UrlBase></UrlBase>
-  <BindAddress>*</BindAddress>
+  <BindAddress>127.0.0.1</BindAddress>
 </Config>
 EOF
   fi
@@ -777,7 +777,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
   <HDHomerunPortRange />
   <PublishedServerUriBySubnet />
   <AutoDiscoveryTracing>false</AutoDiscoveryTracing>
-  <AutoDiscovery>true</AutoDiscovery>
+  <AutoDiscovery>false</AutoDiscovery>
   <PublicHttpsPort>8920</PublicHttpsPort>
   <InternalHttpPort>$JELLYFIN_PORT</InternalHttpPort>
   <HttpsPortNumber>8920</HttpsPortNumber>
