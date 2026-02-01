@@ -110,14 +110,16 @@ if (!function_exists('pmssCompletePendingDpkg')) {
     }
 }
 
-if (!function_exists('pmssApplyDpkgSelections')) {
+if (!function_exists('pmssSelectDpkgSelectionsBaseline')) {
     /**
-     * Apply the baseline dpkg selection snapshot so required packages stay present.
+     * Resolve the best dpkg selections baseline file for the detected distro version.
      *
-     * @return bool True when the baseline was parsed and applied successfully.
+     * This is pure selection logic (no command execution) so tests can validate
+     * baseline availability without mutating a host.
      */
-    function pmssApplyDpkgSelections(?int $distroVersion = null, bool $skipUpdate = false): bool
+    function pmssSelectDpkgSelectionsBaseline(?int $distroVersion = null, ?callable $logger = null): ?string
     {
+        $log = pmssSelectLogger($logger);
         $baseDir = __DIR__.'/dpkg';
         $baselines = [];
         foreach (glob($baseDir.'/selections-debian*.txt') ?: [] as $path) {
@@ -128,8 +130,10 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         $latestBaseline = $baselines ? max(array_keys($baselines)) : null;
 
         $candidates = [];
+        $requestedPath = null;
         if ($distroVersion !== null) {
-            $candidates[] = $baselines[$distroVersion] ?? sprintf('%s/selections-debian%d.txt', $baseDir, $distroVersion);
+            $requestedPath = $baselines[$distroVersion] ?? sprintf('%s/selections-debian%d.txt', $baseDir, $distroVersion);
+            $candidates[] = $requestedPath;
         }
         // Default to the newest baseline we have when the target release is newer than expected.
         // #TODO #Debian13: capture and ship selections-debian13.txt (platform sign-off required).
@@ -141,13 +145,39 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         }
         $candidates[] = $baseDir.'/selections.txt';
 
-        $selections = null;
+        $selected = null;
         foreach ($candidates as $candidate) {
             if (is_readable($candidate)) {
-                $selections = $candidate;
+                $selected = $candidate;
                 break;
             }
         }
+
+        if ($selected === null) {
+            return null;
+        }
+
+        if ($distroVersion !== null && $requestedPath !== null && $selected !== $requestedPath) {
+            if ($latestBaseline !== null && $latestBaseline < $distroVersion && $selected === $baselines[$latestBaseline]) {
+                $log(sprintf('[WARN] Debian %d dpkg baseline missing; using Debian %d baseline (%s).', $distroVersion, $latestBaseline, basename($selected)));
+            } else {
+                $log(sprintf('[WARN] Debian %d dpkg baseline unavailable; using %s.', $distroVersion, basename($selected)));
+            }
+        }
+
+        return $selected;
+    }
+}
+
+if (!function_exists('pmssApplyDpkgSelections')) {
+    /**
+     * Apply the baseline dpkg selection snapshot so required packages stay present.
+     *
+     * @return bool True when the baseline was parsed and applied successfully.
+     */
+    function pmssApplyDpkgSelections(?int $distroVersion = null, bool $skipUpdate = false): bool
+    {
+        $selections = pmssSelectDpkgSelectionsBaseline($distroVersion);
         if ($selections === null) {
             return true;
         }
