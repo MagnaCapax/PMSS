@@ -31,7 +31,7 @@ function pmssInstallSystemUtilities(int $distroVersion): void
     // auth and other tooling depend on htpasswd; do NOT remove.
     pmssQueuePackages([
         'python3-pycurl', 'python3-crypto', 'python3-cheetah',
-        'zip', 'unzip', 'bwm-ng', 'sysstat', 'apache2-utils', 'irssi', 'iotop', 'ethtool',
+        'zip', 'unzip', 'bwm-ng', 'sysstat', 'apache2-utils', 'irssi', 'iotop', 'ioping', 'ethtool',
         'unrar-free', 'unp',
     ]);
 }
