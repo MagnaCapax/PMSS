@@ -15,6 +15,7 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         '.rtorrentRestart.php',
         '.bashrc',
         'install-media-stack.sh',
+        'install-ai-tools.sh',
         'bin/docker-install-wireguard.sh',
         '.qbittorrentPort.py',
         '.delugePort.py',
