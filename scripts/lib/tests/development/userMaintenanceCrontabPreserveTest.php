@@ -5,17 +5,13 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UserMaintenanceCrontabPreserveTest extends TestCase
 {
-    public function testUserMaintenancePreservesCustomCrontabs(): void
+    public function testUserMaintenanceDoesNotOverwriteUserCrontab(): void
     {
         $src = (string) file_get_contents('scripts/lib/update/userMaintenance.php');
-        $posCondition = strpos($src, 'if ($shouldRestoreCrontab)');
-        $posRestore = strpos($src, 'Restoring default crontab');
-        $posPreserve = strpos($src, 'preserving existing crontab');
-
-        $this->assertTrue($posCondition !== false, 'userMaintenance.php should gate crontab restoration on $shouldRestoreCrontab');
-        $this->assertTrue($posRestore !== false, 'userMaintenance.php should still restore the default crontab when needed');
-        $this->assertTrue($posPreserve !== false, 'userMaintenance.php should log when preserving an existing crontab');
-        $this->assertTrue($posCondition < $posRestore, 'crontab restoration should be guarded by $shouldRestoreCrontab');
-        $this->assertStringContainsString('$crontabTemplateTrimmed', $src, 'userMaintenance.php should compare against the crontab template');
+        $this->assertTrue($src !== '', 'Expected to read userMaintenance.php');
+        $this->assertTrue(strpos($src, 'user.crontab.default') === false, 'userMaintenance.php must not reference user crontab templates');
+        $this->assertTrue(strpos($src, "pmssBuildCommand('crontab'") === false, 'userMaintenance.php must not invoke crontab for users');
+        $this->assertTrue(strpos($src, 'Restoring default crontab') === false, 'userMaintenance.php must not restore default user crontabs');
+        $this->assertTrue(strpos($src, '$shouldRestoreCrontab') === false, 'userMaintenance.php must not carry crontab overwrite logic');
     }
 }

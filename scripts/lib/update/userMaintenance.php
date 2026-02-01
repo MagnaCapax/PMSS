@@ -56,10 +56,6 @@ if (!function_exists('pmssUpdateAllUsers')) {
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', count($users)));
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
-        $cronTemplate = '/etc/seedbox/config/user.crontab.default';
-        $hasCrontabTemplate = is_file($cronTemplate);
-        $crontabTemplateContent = $hasCrontabTemplate ? (string) @file_get_contents($cronTemplate) : '';
-        $crontabTemplateTrimmed = trim($crontabTemplateContent);
         $htpasswdHelper = '/scripts/util/checkUserHtpasswd.php';
         $hasHtpasswdHelper = is_file($htpasswdHelper);
         $lighttpdChecker = '/scripts/cron/checkLighttpdInstances.php';
@@ -83,24 +79,6 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 continue;
             }
 
-            $crontabPaths = array(
-                "/var/spool/cron/crontabs/{$userTrim}",
-                "/var/spool/cron/{$userTrim}",
-            );
-            $crontabCurrent = '';
-            $crontabPath = '';
-            foreach ($crontabPaths as $path) {
-                if (is_file($path)) {
-                    $crontabPath = $path;
-                    $crontabCurrent = (string) @file_get_contents($path);
-                    break;
-                }
-            }
-            $hasUserCrontab = ($crontabPath !== '');
-            $crontabCurrentTrimmed = trim($crontabCurrent);
-            $shouldRestoreCrontab = $hasCrontabTemplate &&
-                (!$hasUserCrontab || $crontabCurrentTrimmed === '' || $crontabCurrentTrimmed === $crontabTemplateTrimmed);
-
             $phases = [];
             if (function_exists('pmssUpdateUserEnvironment')) {
                 $label = 'Environment (HTTP/ruTorrent/permissions';
@@ -109,9 +87,6 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 }
                 $label .= ')';
                 $phases[] = $label;
-            }
-            if ($hasCrontabTemplate) {
-                $phases[] = $shouldRestoreCrontab ? 'Crontab restoration' : 'Crontab preserved';
             }
             if ($hasHtpasswdHelper) {
                 $phases[] = 'Legacy htpasswd sync';
@@ -167,12 +142,6 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
             pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
 
-            if ($shouldRestoreCrontab) {
-                $command = pmssBuildCommand('crontab', ['-u', $userTrim, $cronTemplate]);
-                $runUserMaintenance($userTrim, 'Restoring default crontab', $command);
-            } elseif ($hasCrontabTemplate && function_exists('pmssUserLog')) {
-                pmssUserLog($userTrim, 'update-step2: preserving existing crontab');
-            }
             if ($hasHtpasswdHelper) {
                 $command = pmssBuildCommand($htpasswdHelper, [$userTrim]);
                 $runUserMaintenance($userTrim, 'Synchronizing per-user htpasswd', $command);

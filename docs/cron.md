@@ -73,6 +73,18 @@ operation; spikes or repeated errors warrant inspecting the referenced helper in
 `/scripts/cron`. Use the template as a checklist when onboarding new hosts so no
 monitoring hooks are missed.
 
+## User crontabs
+
+PMSS does not overwrite per-user crontabs. Users can manage their own schedules
+with `crontab -e` / `crontab -l`.
+
+Universal PMSS watchdogs (rTorrent, lighttpd, rootless Docker, quotas, traffic
+aggregation, etc.) are owned by root and deployed via `/etc/cron.d/pmss` from
+`etc/seedbox/config/root.cron`.
+
+Older accounts may still have legacy per-user rTorrent cron entries; they are no
+longer required because `checkRtorrent.php` runs from the root cron schedule.
+
 ## Scheduling Tips
 
 - Keep heavy jobs (quota refresh, traffic aggregation) staggered to avoid I/O

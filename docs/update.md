@@ -144,8 +144,7 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 7. Configure the web stack, disable legacy daemons, and install supporting
    packages (e.g., mediainfo, Let’s Encrypt helpers).
 8. Update every user environment via `pmssUpdateUserEnvironment` and rescan
-   skeletons, crontabs (only when the template is missing/unchanged), and
-   logrotate policies.
+   skeletons and logrotate policies (user crontabs are user-owned and not rewritten).
 9. Reapply network templates, apply security hardening, summarise profiling, and
    log completion markers. Per-user traffic monitoring rules rely on the
    iptables owner match; when unavailable `setupNetwork.php` skips those rules

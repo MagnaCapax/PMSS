@@ -448,7 +448,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
     sets expiry far future, ensures bash shell, records to per-user config store (`/etc/seedbox/config/users/<user>.json`),
     assigns lighttpd port, applies config (`userConfig.php`), configures per-user
     lighttpd, regenerates nginx, starts rTorrent and lighttpd, refreshes network,
-    installs default crontab, queues permission fix; optional traffic limit persists to runtime traffic files (user config store always writes `trafficLimit=0`).
+    queues permission fix; optional traffic limit persists to runtime traffic files (user config store always writes `trafficLimit=0`).
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
   - Guardrails: Rejects reserved system/service usernames to avoid future account collisions.
   - Fail-fast: Aborts on existing user, orphaned home directory, failed `useradd`,

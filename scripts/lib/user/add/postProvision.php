@@ -1,6 +1,6 @@
 <?php
 /**
- * addUser: post-provision steps (cron, permissions, seed runtime files).
+ * addUser: post-provision steps (permissions, seed runtime files).
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -11,13 +11,6 @@
  */
 function pmssAddUserPostProvision(array $user, string $homePath): void
 {
-    // Crontab for the user
-    logProvisionMessage('Adding crontab');
-    runProvisionStep(
-        'Install default crontab',
-        sprintf('crontab -u%s /etc/seedbox/config/user.crontab.default', escapeshellarg($user['name']))
-    );
-
     // Setting file permissions
     runProvisionStep(
         'Queue permissions fix',
@@ -95,4 +88,3 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
         @chmod("/home/{$user['name']}/.trafficLimit", 0664);
     }
 }
-
