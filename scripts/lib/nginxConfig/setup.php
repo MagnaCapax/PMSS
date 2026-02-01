@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__.'/templates.php';
+require_once __DIR__.'/../configBackups.php';
 
 /**
  * Ensure the default nginx site defines default_server on its listen directives.
@@ -61,7 +62,9 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         @mkdir('/etc/nginx/sites-enabled', 0755, true);
     }
 
+    pmssBackupCriticalConfig('nginx', '/etc/nginx/nginx.conf');
     @copy('/etc/seedbox/config/template.nginx-conf', '/etc/nginx/nginx.conf');
+    pmssBackupCriticalConfig('nginx', '/etc/nginx/proxy_params');
     @copy('/etc/seedbox/config/template.nginx-proxy_params', '/etc/nginx/proxy_params');
 
     // Configure site default
@@ -120,6 +123,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         }
 
         $nginxConfigSiteDefault = str_replace('||SSL_SETTINGS_CONFIGURED_HERE||', (string)$nginxConfigSiteDefaultSsl, $nginxConfigSiteDefault);
+        pmssBackupCriticalConfig('nginx', '/etc/nginx/sites-available/default');
         @file_put_contents('/etc/nginx/sites-available/default', $nginxConfigSiteDefault);
         $enabledDefault = '/etc/nginx/sites-enabled/default';
         if (!file_exists($enabledDefault)) {
@@ -128,6 +132,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
             }
         } elseif (!is_link($enabledDefault)) {
             // Keep the enabled copy in sync on hosts where default is not a symlink.
+            pmssBackupCriticalConfig('nginx', $enabledDefault);
             @file_put_contents($enabledDefault, $nginxConfigSiteDefault);
         }
     }

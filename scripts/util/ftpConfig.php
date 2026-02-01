@@ -10,6 +10,7 @@
 require_once __DIR__.'/../lib/update.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/update/distro.php';
+require_once __DIR__.'/../lib/configBackups.php';
 
 logMessage('Making ProFTPD configuration');
 
@@ -58,6 +59,7 @@ $daemonGroup = 'nogroup';
 ensureWritableDirectory($logDir, 0750, $daemonUser, $daemonGroup);
 ensureWritableDirectory($runDir, 0750, $daemonUser, $daemonGroup);
 
+pmssBackupCriticalConfig('proftpd', '/etc/proftpd/proftpd.conf');
 if (@file_put_contents('/etc/proftpd/proftpd.conf', $rendered) === false) {
     logMessage('Failed to write /etc/proftpd/proftpd.conf');
     exit(1);

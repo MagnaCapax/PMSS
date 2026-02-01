@@ -1,0 +1,127 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/configBackups.php';
+
+class ConfigBackupsTest extends TestCase
+{
+    public function testBackupCreatesFileWithMetadataInName(): void
+    {
+        $root = $this->makeTempDir('pmss-backups-src-');
+        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+
+        $source = $root.'/etc/ssh/sshd_config';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "Port 22\n");
+
+        $backup = \pmssBackupCriticalConfig('sshd', $source, array(
+            'backupRoot' => $backupRoot,
+            'timestamp' => '20260131123456',
+            'pmssVersion' => 'git/main@2026-01-31',
+            'correlationId' => 'abc-123',
+            'ttlSeconds' => 0,
+            'logSuccess' => false,
+        ));
+
+        $this->assertTrue(is_string($backup) && $backup !== '');
+        $this->assertTrue(is_file($backup));
+        $this->assertEquals("Port 22\n", file_get_contents($backup));
+
+        $expectedKey = \pmssConfigBackupsPathKey($source);
+        $this->assertStringContainsString('/sshd/', (string) $backup);
+        $this->assertStringContainsString('20260131123456__'.$expectedKey, (string) $backup);
+        $this->assertStringContainsString('__v=git_main_2026-01-31', (string) $backup);
+        $this->assertStringContainsString('__cid=abc-123', (string) $backup);
+        $this->assertTrue((fileperms($backup) & 0777) === 0600);
+    }
+
+    public function testBackupReturnsNullWhenSourceMissing(): void
+    {
+        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+        $missing = $backupRoot.'/nope.conf';
+
+        $backup = \pmssBackupCriticalConfig('sshd', $missing, array(
+            'backupRoot' => $backupRoot,
+        ));
+
+        $this->assertTrue($backup === null);
+    }
+
+    public function testPruneKeepsNewestNBackups(): void
+    {
+        $root = $this->makeTempDir('pmss-backups-src-');
+        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+
+        $source = $root.'/etc/ssh/sshd_config';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "Port 22\n");
+
+        $serviceDir = $backupRoot.'/sshd';
+        @mkdir($serviceDir, 0700, true);
+        $key = \pmssConfigBackupsPathKey($source);
+
+        $paths = array(
+            $serviceDir.'/20260131100000__'.$key.'.bak',
+            $serviceDir.'/20260131110000__'.$key.'.bak',
+            $serviceDir.'/20260131120000__'.$key.'.bak',
+            $serviceDir.'/20260131130000__'.$key.'.bak',
+        );
+        foreach ($paths as $p) {
+            file_put_contents($p, 'x');
+        }
+
+        \pmssPruneCriticalConfigBackups('sshd', $source, array(
+            'backupRoot' => $backupRoot,
+            'maxCount' => 2,
+            'ttlSeconds' => 0,
+        ));
+
+        $remaining = glob($serviceDir.'/*__'.$key.'*.bak') ?: array();
+        sort($remaining, SORT_STRING);
+        $this->assertEquals(array(
+            $serviceDir.'/20260131120000__'.$key.'.bak',
+            $serviceDir.'/20260131130000__'.$key.'.bak',
+        ), $remaining);
+    }
+
+    public function testPruneDropsBackupsOlderThanTtl(): void
+    {
+        $root = $this->makeTempDir('pmss-backups-src-');
+        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+
+        $source = $root.'/etc/nginx/nginx.conf';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "worker_processes auto;\n");
+
+        $serviceDir = $backupRoot.'/nginx';
+        @mkdir($serviceDir, 0700, true);
+        $key = \pmssConfigBackupsPathKey($source);
+
+        $old = $serviceDir.'/20251201000000__'.$key.'.bak';
+        $new = $serviceDir.'/20260104000000__'.$key.'.bak';
+        file_put_contents($old, 'old');
+        file_put_contents($new, 'new');
+
+        $dt = \DateTime::createFromFormat('YmdHis', '20260105000000');
+        $this->assertTrue($dt !== false);
+        $nowTs = $dt->getTimestamp();
+
+        \pmssPruneCriticalConfigBackups('nginx', $source, array(
+            'backupRoot' => $backupRoot,
+            'maxCount' => 10,
+            'ttlSeconds' => 3 * 86400,
+            'nowTs' => $nowTs,
+        ));
+
+        $this->assertTrue(!file_exists($old));
+        $this->assertTrue(file_exists($new));
+    }
+
+    private function makeTempDir(string $prefix): string
+    {
+        $path = sys_get_temp_dir().'/'.$prefix.bin2hex(random_bytes(6));
+        @mkdir($path, 0755, true);
+        return $path;
+    }
+}

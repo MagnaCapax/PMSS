@@ -9,6 +9,21 @@ PMSS manages multi-tenant hosts on bare metal. Scripts must favor safety and rev
 - Confirmation Barriers: destructive steps (partitioning, formatting, wiping) require explicit operator intent and additional checks.
 - Least Privilege: restrict scope of changes; prefer per-user operations when possible over global effects.
 
+### Config backup convention (critical services)
+
+PMSS creates best-effort, bounded-retention backups before mutating critical service configs:
+
+- Location: `/var/backups/pmss/config/<service>/`
+- Naming: `YYYYMMDDhhmmss__<source_path_key>__v=<pmss_version>__cid=<correlation_id>.bak` (version/cid may be omitted)
+- Retention: keep last 10 backups per config key, and prune older than 90 days (best-effort, never fatal).
+- `PMSS_DRY_RUN=1`: skips backup/prune (no filesystem mutations).
+
+Quick restore examples (run as root, then validate and restart the service):
+
+- `sshd`: copy a backup to `/etc/ssh/sshd_config`, run `sshd -t`, then `systemctl restart sshd`
+- `nginx`: copy backups to `/etc/nginx/nginx.conf` and/or `/etc/nginx/sites-available/default`, run `nginx -t`, then `systemctl reload nginx`
+- `proftpd`: copy a backup to `/etc/proftpd/proftpd.conf`, run `proftpd -t -c /etc/proftpd/proftpd.conf`, then restart the daemon
+
 ## Multi-Tenant Considerations
 - Preserve per-user isolation: avoid shared writable locations across tenants; enforce permissions.
 - Rate-limit/serialize operations that impact shared resources (IO, CPU) to avoid noisy neighbor effects.
