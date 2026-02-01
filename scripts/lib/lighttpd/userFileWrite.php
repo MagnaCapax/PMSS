@@ -12,13 +12,7 @@ function pmssRunningAsRoot(): bool
 
 function pmssAtomicWriteFile(string $path, string $content): bool
 {
-    if (strpos($path, "\0") !== false) {
-        return false;
-    }
-    if (is_link($path)) {
-        return false;
-    }
-    if (file_exists($path) && !is_file($path)) {
+    if (strpos($path, "\0") !== false || is_link($path) || (file_exists($path) && !is_file($path))) {
         return false;
     }
 
@@ -57,4 +51,3 @@ function pmssWriteUserFile(string $path, string $content, string $owner, int $mo
     }
     return true;
 }
-

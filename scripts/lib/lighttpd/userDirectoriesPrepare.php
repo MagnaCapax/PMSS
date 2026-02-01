@@ -7,19 +7,13 @@
 
 function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
 {
-    if (!is_dir($homeDir)) {
-        return false;
-    }
-    if (is_link($homeDir)) {
+    if (!is_dir($homeDir) || is_link($homeDir)) {
         return false;
     }
     if (is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www')) {
         return false;
     }
-    if (!file_exists($homeDir.'/.rtorrent.rc')) {
-        return false;
-    }
-    return true;
+    return file_exists($homeDir.'/.rtorrent.rc');
 }
 
 function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool
@@ -31,36 +25,28 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
         return false;
     }
 
-    if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd', 0751)) {
-        return false;
-    }
-    if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd/custom.d', 0750)) {
-        return false;
-    }
-    if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd/upload', 0751)) {
-        return false;
-    }
+    $directories = [
+        '.lighttpd'          => 0751,
+        '.lighttpd/custom.d' => 0750,
+        '.lighttpd/upload'   => 0751,
+    ];
     if ($deflateEnabled) {
-        if (!pmssEnsureUserHomeDir($user, $homeDir, '.lighttpd/compress', 0751)) {
+        $directories['.lighttpd/compress'] = 0751;
+    }
+    $directories['www/public'] = 0751;
+    foreach ($directories as $directory => $mode) {
+        if (!pmssEnsureUserHomeDir($user, $homeDir, $directory, $mode)) {
             return false;
         }
-    }
-    if (!pmssEnsureUserHomeDir($user, $homeDir, 'www/public', 0751)) {
-        return false;
     }
 
     // Ensure the optional user-controlled include exists so lighttpd start doesn't fail.
     $customFile = $homeDir.'/.lighttpd/custom';
-    if (is_link($customFile)) {
+    if (is_link($customFile) || (file_exists($customFile) && !is_file($customFile))) {
         return false;
     }
-    if (file_exists($customFile) && !is_file($customFile)) {
+    if (!file_exists($customFile) && !pmssWriteUserFile($customFile, '', $user, 0751)) {
         return false;
-    }
-    if (!file_exists($customFile)) {
-        if (!pmssWriteUserFile($customFile, '', $user, 0751)) {
-            return false;
-        }
     }
 
     return true;
