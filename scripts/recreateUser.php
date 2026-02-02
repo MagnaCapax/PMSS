@@ -12,15 +12,15 @@ declare(strict_types=1);
  * Recreate tenant helper (v5, BOM-safe, self-healing).
  *
  * - Archives a user's home, rebuilds the account with fresh quota/memory
- *   limits, and restores critical configuration while leaving room for manual
- *   intervention when needed.
+ *   limits, restores critical configuration, and resets credentials via
+ *   changePw.php (echoing the final password for operator capture).
  * - Includes defensive BOM handling and strict argument validation to avoid
  *   destructive mistakes during emergency recoveries.
  *
  * This script has been refined since the early 2010s; coordinate any changes
  * with the platform team before altering the workflow.
  *
- * Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB
+ * Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB [PASSWORD]
  *
  * @author  Aleksi Ursin <aleksi@magnacapax.fi>
  * @copyright 2010-2025 Magna Capax Finland Oy
@@ -44,11 +44,11 @@ if (is_file($userLifecycleLib)) {
 // a user when /home is unavailable would fail in confusing ways or corrupt state.
 pmssRequireHomeMounted('recreateUser.php');
 
-const USAGE = "Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB\n";
+const USAGE = "Usage: recreateUser.php USERNAME MAX_RAM_MiB DISK_QUOTA_GiB [PASSWORD]\n";
 
-[$_, $userName, $ramMiB, $quotaGiB] = array_pad($argv, 4, null);
+[$_, $userName, $ramMiB, $quotaGiB, $password] = array_pad($argv, 5, null);
 
-if ($argc !== 4) die(USAGE);
+if ($argc < 4 || $argc > 5) die(USAGE);
 $userName = function_exists('pmssNormalizeUsername')
     ? pmssNormalizeUsername((string) $userName)
     : strtolower((string) $userName);
@@ -150,7 +150,15 @@ if ($stat['uid'] !== $uid || $stat['gid'] !== $gid) {
     exit(1);
 }
 
-/* ===== 10. Done ===== */
+/* ===== 10. Password ===== */
+$pwArgs = escapeshellarg($userName);
+if ($password !== null && $password !== '') {
+    $pwArgs .= ' ' . escapeshellarg($password);
+}
+echo "[*] Setting password\n";
+run('php ' . __DIR__ . '/changePw.php ' . $pwArgs);
+
+/* ===== 11. Done ===== */
 echo "[OK] Finished. ";
 if ($homeExists) {
     echo "Review then remove backup:  rm -rf " . escapeshellarg($backupDir) . "\n";
