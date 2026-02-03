@@ -297,6 +297,8 @@ $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effective
 // System-wide services must not run on seedbox hosts. Stop/disable early so
 // package installs cannot leave attack surface exposed for the rest of the run.
 pmssStopDisableMaskSeedboxSystemServices();
+// Purge unbound DNS resolver if it is in failed state (external nameservers used)
+pmssPurgeFailedUnbound();
 // Ensure the boot-time guard is installed/enabled so masked services cannot
 // start during the next reboot even if systemd enablement drifts.
 pmssEnsureSystemdServicesGuardBootUnit();

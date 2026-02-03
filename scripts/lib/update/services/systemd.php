@@ -150,3 +150,37 @@ if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
         }
     }
 }
+
+if (!function_exists('pmssPurgeFailedUnbound')) {
+    /**
+     * Purge the unbound DNS resolver if its service is in failed state.
+     *
+     * Debian 11/12 servers may have unbound installed but failing because
+     * external nameservers (1.1.1.1, 1.0.0.1) are configured instead. When
+     * the service is in failed state, purge the package to eliminate noise
+     * in systemd status and logs.
+     *
+     * Only removes when the service is explicitly "failed" - not when it is
+     * active, inactive, or not installed.
+     */
+    function pmssPurgeFailedUnbound(): void
+    {
+        $dryRun = getenv('PMSS_DRY_RUN') === '1';
+
+        // Skip if systemd is not available (containers, very old systems)
+        if (!$dryRun && !is_dir('/run/systemd/system')) {
+            pmssLogStatus('SKIP', 'Checking unbound service status (systemd unavailable)');
+            return;
+        }
+
+        // Check if unbound service is in failed state
+        $unboundActive = trim((string) @shell_exec('systemctl is-active unbound 2>/dev/null'));
+        if ($unboundActive !== 'failed') {
+            // Service is not in failed state (could be active, inactive, or not installed)
+            return;
+        }
+
+        // Service is failed - purge the package
+        runStep('Purging failed unbound service', aptCmd('purge -y unbound'));
+    }
+}
