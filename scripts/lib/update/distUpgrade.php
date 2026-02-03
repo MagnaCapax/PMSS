@@ -80,6 +80,14 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
         return;
     }
 
+    // Only install if at least one user has rootless Docker configured.
+    // The daemon.json in user's .config/docker/ indicates rootless Docker setup.
+    $dockerConfigs = glob('/home/*/.config/docker/daemon.json');
+    if (empty($dockerConfigs)) {
+        logMessage('[SKIP] dist-upgrade: no rootless Docker configs found; skipping fuse-overlayfs');
+        return;
+    }
+
     $status = trim((string) @shell_exec("dpkg-query -W -f='${Status}' fuse-overlayfs 2>/dev/null"));
     if ($status === 'install ok installed') {
         logMessage('[SKIP] dist-upgrade: fuse-overlayfs already installed');
