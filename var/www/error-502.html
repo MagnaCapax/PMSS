@@ -1,3 +1,25 @@
+502 - Bad Gateway
+
+Your web interface could not be loaded.
+
+Common reasons:
+- Service is restarting (wait 1-2 minutes)
+- Your lighttpd instance may have crashed (autorestart within ~1 minute)
+- Disk quota may be exceeded
+- Account may be suspended - check your invoices
+
+Please wait 1-2 minutes and try again.
+If the issue persists, please open a support ticket.
+
+---
+<!-- Visual page for browsers below -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>502 - Bad Gateway</title>
+</head>
+<body>
 <div class="container">
   <span class="error-message">502 - Bad Gateway</span>
   <br />
@@ -39,3 +61,5 @@
   link.href = '/css/error-styles.css';
   document.head.appendChild(link);
 </script>
+</body>
+</html>
