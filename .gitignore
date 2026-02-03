@@ -17,7 +17,7 @@
 /etc/seedbox/config/version
 
 !/etc/seedbox/runtime/
-!/etc/seedbox/runtime/version
+/etc/seedbox/runtime/version
 
 !/etc/seedbox/skel
 !/etc/seedbox/skel/srvmgmt
