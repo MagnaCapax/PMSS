@@ -342,7 +342,10 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         $data = $current ? json_decode($current, true) : [];
         if (!is_array($data)) $data = [];
         $expectedConfig = json_encode(
-            ['storage-driver' => 'fuse-overlayfs'],
+            [
+                'storage-driver' => 'fuse-overlayfs',
+                'exec-opts' => ['native.cgroupdriver=cgroupfs']
+            ],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
         );
 
