@@ -27,6 +27,10 @@ function pmssUserTransferMain(array $argv): int
             putenv('PMSS_DRY_RUN=1');
         }
 
+        // Disable command timeout for rsync operations — TB-scale transfers take hours.
+        // See: GH #203 — userTransfer times out on large transfers
+        putenv('PMSS_COMMAND_TIMEOUT=0');
+
         if ($cfg['suffixAppended']) {
             logMessage('[INFO] No dot in hostname, appending .pulsedmedia.com');
         }
