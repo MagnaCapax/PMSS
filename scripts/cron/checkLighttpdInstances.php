@@ -76,6 +76,17 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             continue;  //Suspended
     }
 
+    // Auto-generate lighttpd config if user has a home directory but missing config.
+    // This catches migrated users whose data was transferred but config wasn't generated.
+    // See: GH #180 — Migration target server PMSS config not generated
+    if (!file_exists("/home/{$thisUser}/.lighttpd.conf") && is_dir("/home/{$thisUser}")) {
+        echo "Config missing for user: {$thisUser} — generating\n";
+        passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
+        }
+    }
+
     $instancesLighttpd = shell_exec("pgrep -u {$thisUser} lighttpd");
     $instancesPhpCgi = shell_exec("pgrep -u {$thisUser} php-cgi");
     $socketError = false;
