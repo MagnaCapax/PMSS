@@ -102,7 +102,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     // Connect to each php-cgi socket to verify it responds.
     // Increment the loop bound if php.max-procs is greater than one.
     for ($i = 0; $i < 1; $i++) {
-        $socket = fsockopen("unix:///home/{$thisUser}/.lighttpd/php.socket-$i", 0, $errno, $errstr, 1);
+        $socket = fsockopen("unix:///home/{$thisUser}/.lighttpd/php.socket-$i", 0, $errno, $errstr, 5);
         if (!$socket or $errno or $errstr) {        
             echo "Error when attempting to connect to socket /home/{$thisUser}/.lighttpd/php.socket-$i: {$errno}, {$errstr}\n";
             echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";            
