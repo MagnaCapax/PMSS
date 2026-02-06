@@ -80,12 +80,19 @@ foreach ($users as $thisUser) {
     }
 
     // Call quota once with a safely quoted username and capture its output.
+    // Note: `quota` returns exit code 1 when user is over quota, but still
+    // produces valid output. We only treat it as failure if no output or
+    // exit code > 1 (which indicates actual errors like invalid user).
     $quotaCmd = 'quota -u '.escapeshellarg($thisUser).' -s 2>&1';
     $outputLines = [];
     $ret = 0;
     exec($quotaCmd, $outputLines, $ret);
 
-    if ($ret !== 0) {
+    $content = implode(PHP_EOL, $outputLines).PHP_EOL;
+    $hasValidOutput = count($outputLines) > 0 && strpos($content, 'Disk quotas') !== false;
+
+    if ($ret > 1 || !$hasValidOutput) {
+        // Actual failure: exit > 1 or no parseable output
         $logger->msg("quota command failed for {$thisUser} (exit {$ret})");
         pmssUserWriteLogs(
             pmssUserBaseContext(
@@ -103,23 +110,25 @@ foreach ($users as $thisUser) {
             pmssUserLog($thisUser, sprintf('quota refresh failed (rc=%d)', $ret));
         }
     } else {
-        $content = implode(PHP_EOL, $outputLines).PHP_EOL;
+        // Success: exit 0 (normal) or exit 1 (over quota but valid output)
         if (@file_put_contents($quotaFile, $content) !== false) {
             @chmod($quotaFile, 0644);
         }
+        $logStatus = ($ret === 1) ? 'WARN' : 'OK';
+        $logMsg = ($ret === 1) ? 'Quota refreshed (user over quota)' : 'Quota refreshed';
         pmssUserWriteLogs(
             pmssUserBaseContext(
                 'quota',
                 'refresh',
                 $thisUser,
                 array(
-                    'status'  => 'OK',
-                    'message' => 'Quota refreshed',
+                    'status'  => $logStatus,
+                    'message' => $logMsg,
                 )
             )
         );
         if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'quota refreshed');
+            pmssUserLog($thisUser, $logMsg);
         }
     }
 }
