@@ -168,13 +168,20 @@ fi
 prompt_out="$outdir/prompt.txt"
 
 # Default to Codex with approval prompts for untrusted commands while keeping sandboxing enabled.
+# codex exec (non-interactive) doesn't support --ask-for-approval; detect and skip it.
 exec_bin="${exec_cmd%% *}"
+is_codex_exec=0
+[[ "$exec_cmd" =~ ^codex[[:space:]]+exec([[:space:]]|$) ]] && is_codex_exec=1
 if [[ "$exec_bin" == "codex" ]]; then
 	if [[ "$exec_cmd" == "codex" ]]; then
 		exec_cmd="codex --sandbox workspace-write --ask-for-approval untrusted"
+	elif [[ "$is_codex_exec" == "1" && "$exec_cmd" == "codex exec" ]]; then
+		exec_cmd="codex exec --sandbox workspace-write"
 	else
 		[[ "$exec_cmd" == *"--sandbox"* ]] || exec_cmd+=" --sandbox workspace-write"
-		[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval untrusted"
+		if [[ "$is_codex_exec" == "0" ]]; then
+			[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval untrusted"
+		fi
 	fi
 fi
 
