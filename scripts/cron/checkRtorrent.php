@@ -217,6 +217,17 @@ foreach ($usersOut as $line) {
         }
 
         // Stale - restart.
+        // Refresh executor script from skel if the deployed copy is outdated.
+        $skelScript = '/etc/skel/.rtorrentExecute.php';
+        $userScript = $home.'/.rtorrentExecute.php';
+        if (is_file($skelScript) && is_file($userScript)
+            && md5_file($skelScript) !== md5_file($userScript)
+        ) {
+            copy($skelScript, $userScript);
+            @chown($userScript, $user);
+            pmssCheckRtorrentLogBoth($user, 'refreshed stale executor from skel', $debug);
+        }
+
         pmssCheckRtorrentLogBoth(
             $user,
             "executor present but rTorrent missing for {$state['age']}s; restarting",
