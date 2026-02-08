@@ -80,8 +80,9 @@ function pmssUserTransferMain(array $argv): int
         pmssUserTransferWriteFile($finalScript, pmssUserTransferBuildRsyncFinal($cfg), 0700);
 
         // Run repeated passes to converge the remote state before the final sync.
+        $lastMainRc = 0;
         for ($i = 1; $i <= $cfg['mainPasses']; $i++) {
-            runStep(
+            $lastMainRc = runStep(
                 sprintf('Pulling home data (pass %d/%d)', $i, $cfg['mainPasses']),
                 pmssBuildCommand($expect, [$mainScript])
             );
@@ -91,8 +92,9 @@ function pmssUserTransferMain(array $argv): int
         }
 
         // Final sync for volatile paths such as session data.
+        $lastFinalRc = 0;
         for ($i = 1; $i <= $cfg['finalPasses']; $i++) {
-            runStep(
+            $lastFinalRc = runStep(
                 sprintf('Pulling volatile data (pass %d/%d)', $i, $cfg['finalPasses']),
                 pmssBuildCommand($expect, [$finalScript])
             );
@@ -109,6 +111,10 @@ function pmssUserTransferMain(array $argv): int
             logMessage('[WARN] Remote password: '.$password);
         }
 
+        if ($lastMainRc !== 0 || $lastFinalRc !== 0) {
+            logMessage(sprintf('[WARN] User transfer finished with errors (main rc=%d, final rc=%d)', $lastMainRc, $lastFinalRc));
+            return 1;
+        }
         logMessage('[OK] User transfer complete');
         return 0;
     } catch (RuntimeException $e) {

@@ -313,15 +313,13 @@ if (!function_exists('runCommand')) {
         $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
         $timeoutSec = PMSS_COMMAND_TIMEOUT_DEFAULT;
         if ($timeoutEnv !== false && $timeoutEnv !== '' && ctype_digit($timeoutEnv)) {
-            $val = (int) $timeoutEnv;
-            if ($val > 0) {
-                $timeoutSec = $val;
-            }
+            // 0 = no timeout (infinite); positive = timeout in seconds.
+            $timeoutSec = (int) $timeoutEnv;
         }
         // APT/dpkg operations legitimately take a long time (especially dist-upgrades).
         // Always apply a sane floor even when PMSS_COMMAND_TIMEOUT is set lower.
         $isAptDpkgCommand = preg_match('/\b(apt-get|apt|dpkg)\b/i', $cmd) === 1;
-        if ($isAptDpkgCommand) {
+        if ($isAptDpkgCommand && $timeoutSec > 0) {
             $timeoutSec = max($timeoutSec, PMSS_COMMAND_TIMEOUT_APT_DEFAULT);
         }
         $announceStart = $isInteractive || $verbose;
@@ -492,7 +490,7 @@ if (!function_exists('runCommand')) {
                 if (!is_array($status) || empty($status['running'])) {
                     break;
                 }
-                if ((microtime(true) - $startedAt) > $timeoutSec) {
+                if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) {
                     $timedOut = true;
                     break;
                 }
@@ -570,7 +568,7 @@ if (!function_exists('runCommand')) {
                     fflush(STDERR);
                 }
             }
-            if ((microtime(true) - $startedAt) > $timeoutSec) {
+            if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) {
                 $timedOut = true;
                 break;
             }
