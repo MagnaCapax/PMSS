@@ -224,6 +224,7 @@ $chownItems = [
     ["/home/{$thisUser}/.lighttpd/", "{$thisUser}:{$thisUser}", true],
     // NOTE: Avoid blanket chown -R on the whole home; exclude known root-owned files/dirs first.
     // The remaining tree is handled by a targeted find below.
+    ["/home/{$thisUser}/.quota", "root:{$thisUser}"],
     ["/home/{$thisUser}/.trafficData", "root:{$thisUser}"],
     ["/home/{$thisUser}/.trafficDataLocal", "root:{$thisUser}"],
     ["/home/{$thisUser}/.trafficDataIngress", "root:{$thisUser}"],
@@ -251,6 +252,7 @@ foreach ($chmodItems as $item) {
 
 // Targeted chown of the home tree excluding known root-owned paths and ~/.local
 $excludes = [
+    "/home/{$thisUser}/.quota",
     "/home/{$thisUser}/.trafficData",
     "/home/{$thisUser}/.trafficDataLocal",
     "/home/{$thisUser}/.trafficDataIngress",

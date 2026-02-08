@@ -24,6 +24,10 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
         'Normalize quota file permissions',
         sprintf('chmod 640 %s', escapeshellarg("/home/{$user['name']}/.quota"))
     );
+    runProvisionStep(
+        'Set quota file ownership',
+        sprintf('chown root:%s %s', escapeshellarg($user['name']), escapeshellarg("/home/{$user['name']}/.quota"))
+    );
 
     // Seed traffic files with zero values so first login does not show errors before cron populates them.
     // Format mirrors scripts/lib/traffic/storage.php consumers (serialized array with raw/display/daily keys).
