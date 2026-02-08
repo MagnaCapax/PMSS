@@ -88,7 +88,7 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
         return;
     }
 
-    $status = trim((string) @shell_exec("dpkg-query -W -f='\\${Status}' fuse-overlayfs 2>/dev/null"));
+    $status = trim((string) @shell_exec('dpkg-query -W -f=\'${Status}\' fuse-overlayfs 2>/dev/null'));
     if ($status === 'install ok installed') {
         logMessage('[SKIP] dist-upgrade: fuse-overlayfs already installed');
         return;
