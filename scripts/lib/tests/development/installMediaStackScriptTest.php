@@ -68,7 +68,10 @@ class installMediaStackScriptTest extends TestCase
     public function testInstallServarrAppCreatesConfigXml(): void
     {
         $this->assertStringContainsString('<Config>', $this->script);
-        $this->assertStringContainsString('<BindAddress>*</BindAddress>', $this->script);
+        $this->assertTrue(
+            strpos($this->script, '<BindAddress>*</BindAddress>') === false,
+            'Servarr defaults must not bind wildcard address'
+        );
     }
 
     public function testInstallServarrAppSetsUrlBasePublic(): void
