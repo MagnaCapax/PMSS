@@ -165,8 +165,8 @@ class installMediaStackScriptTest extends TestCase
 
     public function testTmuxKillIsScopedToNamedSessions(): void
     {
+        $this->assertStringContainsString('for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow; do', $this->script);
         $this->assertStringContainsString('tmux kill-session -t "${app}"', $this->script);
-        $this->assertStringContainsString('tmux kill-session -t "jellyfin"', $this->script);
     }
 
     public function testSourceBashrcIsFailSoft(): void
