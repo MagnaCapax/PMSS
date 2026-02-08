@@ -92,7 +92,7 @@ class DistroDetectionTest extends TestCase
         ], function (): void {
             $detected = \pmssDetectDistro();
             $this->assertEquals(12, $detected['version']);
-        });
+        }, true);
     }
 
     /**
