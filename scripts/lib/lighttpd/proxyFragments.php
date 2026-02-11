@@ -19,7 +19,13 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => {$webPort}
-  ) ) )
+  ) ) ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/user-{$user}/deluge/"  => "/",
+         "/user-{$user}/deluge" => ""
+       )
+  )
 }
 
 \$HTTP["url"] =~ "^/deluge-{$user}($|/)" {
@@ -29,8 +35,8 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
   ) ) ),
   proxy.header = (
       "map-urlpath" => (
-         "/deluge-{$user}/"  => "{$canonical}",
-         "/deluge-{$user}" => "/user-{$user}/deluge"
+         "/deluge-{$user}/"  => "/",
+         "/deluge-{$user}" => ""
        )
   )
 }
