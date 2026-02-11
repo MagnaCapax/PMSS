@@ -242,19 +242,11 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         break;
     }
 
-    if (file_exists("/home/{$thisUser}/www-disabled") or 
+    // Tracker cleaner is a data cleanup script, not a service watchdog — skip suspended
+    // users without killing any processes (see GH#210).
+    if (file_exists("/home/{$thisUser}/www-disabled") or
         !file_exists("/home/{$thisUser}/www") ) {
-            pmssTrackerCleanerLog("User {$thisUser} is suspended; killing processes and skipping.");
-	            pmssUserLifecycleStep(
-	                'trackerCleaner',
-	                $thisUser,
-	                'kill_suspended_processes',
-                'killall -9 -u '.escapeshellarg($thisUser),
-                false
-	            );  // Ensure nothing for the user is running
-                if (function_exists('pmssUserLog')) {
-                    pmssUserLog($thisUser, 'tracker cleaner: suspended user processes killed');
-                }
+            pmssTrackerCleanerLog("User {$thisUser} is suspended; skipping.");
 	            $userVerboseLog .= pmssTrackerCleanerTimestamp()." user_skip reason=suspended\n";
 	            pmssTrackerCleanerWriteUserVerboseLog($thisUser, $userVerboseLog);
 	            continue;  //Suspended

@@ -66,10 +66,11 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         continue;
     }
     #TODO Uh Oh next one should be separate script :) This is separate task altogether. Works here too as expected, just a bit confusing
-    if (file_exists("/home/{$thisUser}/www-disabled") or 
+    if (file_exists("/home/{$thisUser}/www-disabled") or
         !file_exists("/home/{$thisUser}/www")) {
             echo "User: {$thisUser} is suspended\n";
-            passthru("killall -9 -u {$thisUser}");
+            // Kill only lighttpd and php-cgi — not all user processes (see GH#210).
+            passthru("killall -9 -u ".escapeshellarg($thisUser)." lighttpd 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." php-cgi 2>/dev/null");
             if (function_exists('pmssUserLog')) {
                 pmssUserLog($thisUser, 'lighttpd stopped due to suspension');
             }

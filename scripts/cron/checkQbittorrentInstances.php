@@ -24,10 +24,11 @@ $startQbittorrent = static function (string $user): void {
 };
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    if (file_exists("/home/{$thisUser}/www-disabled") or 
+    if (file_exists("/home/{$thisUser}/www-disabled") or
         !file_exists("/home/{$thisUser}/www")) {
             echo "User: {$thisUser} is suspended\n";
-            passthru("killall -9 -u {$thisUser}");
+            // Kill only qbittorrent-nox — not all user processes (see GH#210).
+            passthru("killall -9 -u ".escapeshellarg($thisUser)." qbittorrent-nox 2>/dev/null");
             if (function_exists('pmssUserLog')) {
                 pmssUserLog($thisUser, 'qbittorrent-nox stopped due to suspension');
             }
