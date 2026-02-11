@@ -41,6 +41,17 @@ $failed = runStep(
     'rm -f '.escapeshellarg($obsoleteQuotaCron)
 ) !== 0 || $failed;
 
+// Disable Debian default mdadm monthly check — replaced by PMSS quarterly staggered
+// check in root.cron. The default runs all servers on the first Sunday at 00:57,
+// causing fleet-wide I/O storms. PMSS version staggers by hostname hash.
+$debianMdadmCron = '/etc/cron.d/mdadm';
+if (is_file($debianMdadmCron)) {
+    $failed = runStep(
+        'Removing Debian default mdadm monthly check (replaced by PMSS quarterly staggered)',
+        'rm -f '.escapeshellarg($debianMdadmCron)
+    ) !== 0 || $failed;
+}
+
 $dropinChanged = false;
 if (is_dir('/run/systemd/system')) {
     $dropinContent = "[Service]\nRestart=always\nRestartSec=10\n";
