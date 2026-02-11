@@ -11,6 +11,7 @@
  */
 function pmssAddUserPostProvision(array $user, string $homePath): void
 {
+
     // Setting file permissions
     runProvisionStep(
         'Queue permissions fix',

@@ -25,6 +25,7 @@ if ($username === '') {
 
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
+require_once __DIR__.'/lib/user/passwords.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Changing
 // a user's password when /home is unavailable would fail or write to stale paths.
@@ -82,7 +83,19 @@ passthru(sprintf(
     escapeshellarg($username)
 ));
 
+// Sync password to Deluge and qBittorrent if installed
+$delugeUpdated = pmssUpdateDelugePassword($username, $password);
+$qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);
 
+// Restart services if passwords were updated
+pmssRestartTorrentServicesAfterPasswordChange($username, $delugeUpdated, $qbittorrentUpdated);
+
+if ($delugeUpdated) {
+    echo "\t *******  Deluge password updated\n";
+}
+if ($qbittorrentUpdated) {
+    echo "\t *******  qBittorrent password updated\n";
+}
 
 
 

@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../passwords.php';
+
 /**
  * Apply the per-user PMSS configuration (quota, rtorrent, vhosts).
  *
@@ -75,5 +77,17 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         'Regenerate nginx config',
         sprintf('/scripts/util/createNginxConfig.php --user %s', escapeshellarg($user['name']))
     );
+
+    // Sync torrent client passwords after configuration is complete
+    if (!empty($user['password'])) {
+        $delugeUpdated = pmssUpdateDelugePassword($user['name'], $user['password']);
+        $qbittorrentUpdated = pmssUpdateQbittorrentPassword($user['name'], $user['password']);
+        if ($delugeUpdated) {
+            logProvisionMessage('Synced Deluge password');
+        }
+        if ($qbittorrentUpdated) {
+            logProvisionMessage('Synced qBittorrent password');
+        }
+    }
 }
 
