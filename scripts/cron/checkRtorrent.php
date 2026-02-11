@@ -187,10 +187,23 @@ foreach ($usersOut as $line) {
 
     // --- Missing: No executor and no rTorrent ---
     if (!$executorPresent && empty($rtorrentPids)) {
-        pmssCheckRtorrentLogBoth($user, 'rTorrent missing; starting', $debug);
+        // Solution 1: Stagger starts after reboot to prevent I/O storm.
+        if (rtorrentProcessRecentReboot(600)) {
+            $delay = rtorrentProcessStaggerDelay($user, 300);
+            pmssCheckRtorrentLogBoth(
+                $user,
+                "rTorrent missing; staggering start by {$delay}s (post-reboot)",
+                $debug
+            );
+            sleep($delay);
+        } else {
+            pmssCheckRtorrentLogBoth($user, 'rTorrent missing; starting', $debug);
+        }
+
         $rc = 0;
         @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
         pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
+        rtorrentProcessRecordRestart($user);
         continue;
     }
 
@@ -233,6 +246,18 @@ foreach ($usersOut as $line) {
             "executor present but rTorrent missing for {$state['age']}s; restarting",
             $debug
         );
+
+        // Solution 1: Stagger starts after reboot.
+        if (rtorrentProcessRecentReboot(600)) {
+            $delay = rtorrentProcessStaggerDelay($user, 300);
+            pmssCheckRtorrentLogBoth(
+                $user,
+                "staggering start by {$delay}s (post-reboot)",
+                $debug
+            );
+            sleep($delay);
+        }
+
         rtorrentProcessRestart($user, [], $executorAllPids, $logCallback, $debug);
         rtorrentProcessClearStaleState($missingState);
         continue;
@@ -249,8 +274,22 @@ foreach ($usersOut as $line) {
             continue;
         }
 
+        // Solution 2: Extend grace period if recently restarted (progressive backoff).
+        $restartAge = rtorrentProcessLastRestartAge($user);
+        $effectiveGrace = rtorrentProcessExtendedGrace(PMSS_RTORRENT_UNRESPONSIVE_GRACE, $restartAge);
+
+        // Log extended grace for visibility.
+        if ($effectiveGrace > PMSS_RTORRENT_UNRESPONSIVE_GRACE) {
+            $restartTime = date('Y-m-d H:i:s', time() - $restartAge);
+            pmssCheckRtorrentLog(
+                "Extending SCGI grace to {$effectiveGrace}s for {$user} (recent restart at {$restartTime})",
+                false,
+                $debug
+            );
+        }
+
         // Unresponsive - check staleness.
-        $state = rtorrentProcessCheckStaleState($unresponsiveState, PMSS_RTORRENT_UNRESPONSIVE_GRACE);
+        $state = rtorrentProcessCheckStaleState($unresponsiveState, $effectiveGrace);
 
         if ($state['action'] === 'record') {
             pmssCheckRtorrentLogBoth(
@@ -263,7 +302,7 @@ foreach ($usersOut as $line) {
 
         if ($state['action'] === 'wait') {
             pmssCheckRtorrentLog(
-                "SCGI still unresponsive for {$user}; waiting (age={$state['age']}s)",
+                "SCGI still unresponsive for {$user}; waiting (age={$state['age']}s, grace={$effectiveGrace}s)",
                 false,
                 $debug
             );

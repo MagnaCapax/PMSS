@@ -253,6 +253,124 @@ function rtorrentCustomConfigQuarantine(string $home, string $user, callable $lo
 }
 
 /**
+ * Check if system was recently rebooted.
+ *
+ * Reads /proc/uptime to determine seconds since boot. Used to detect
+ * post-reboot conditions and trigger staggered starts.
+ *
+ * @param int $threshold Seconds threshold (default: 600 = 10 minutes).
+ *
+ * @return bool True if uptime is less than threshold.
+ */
+function rtorrentProcessRecentReboot(int $threshold = 600): bool
+{
+    $uptime = @file_get_contents('/proc/uptime');
+    if ($uptime === false) {
+        return false;
+    }
+    // /proc/uptime format: "12345.67 98765.43" (uptime idle_time)
+    $parts = explode(' ', trim($uptime));
+    if (count($parts) < 1) {
+        return false;
+    }
+    $seconds = (float) $parts[0];
+    return $seconds > 0 && $seconds < $threshold;
+}
+
+/**
+ * Calculate a deterministic delay for a user.
+ *
+ * Uses crc32 hash of username to generate a consistent but distributed delay.
+ * This ensures the same user always gets the same delay, but different users
+ * are spread across the time window.
+ *
+ * @param string $user      Username.
+ * @param int    $maxDelay  Maximum delay in seconds (default: 300 = 5 minutes).
+ *
+ * @return int Delay in seconds (0 to $maxDelay).
+ */
+function rtorrentProcessStaggerDelay(string $user, int $maxDelay = 300): int
+{
+    $hash = crc32($user);
+    // crc32 returns signed int, convert to positive
+    if ($hash < 0) {
+        $hash = $hash & 0x7FFFFFFF;
+    }
+    return $hash % ($maxDelay + 1);
+}
+
+/**
+ * Check if rTorrent was recently restarted by watchdog.
+ *
+ * Uses marker file with timestamp to track restart events. Returns the age
+ * in seconds since last restart, or 0 if never restarted.
+ *
+ * @param string $user Username.
+ *
+ * @return int Seconds since last restart, or 0 if no restart recorded.
+ */
+function rtorrentProcessLastRestartAge(string $user): int
+{
+    $markerFile = '/tmp/.pmss-rtorrent-restart-'.$user;
+    if (!is_file($markerFile)) {
+        return 0;
+    }
+    $ts = (int) trim((string) @file_get_contents($markerFile));
+    if ($ts <= 0) {
+        return 0;
+    }
+    $age = time() - $ts;
+    return $age > 0 ? $age : 0;
+}
+
+/**
+ * Record a restart event for a user.
+ *
+ * Writes current timestamp to marker file for restart tracking.
+ *
+ * @param string $user Username.
+ *
+ * @return void
+ */
+function rtorrentProcessRecordRestart(string $user): void
+{
+    $markerFile = '/tmp/.pmss-rtorrent-restart-'.$user;
+    @file_put_contents($markerFile, (string) time(), LOCK_EX);
+}
+
+/**
+ * Calculate extended grace period based on recent restart history.
+ *
+ * Implements progressive backoff: if rtorrent was recently restarted,
+ * extend the grace period to allow hash-checking to complete.
+ *
+ * @param int $baseGrace   Base grace period in seconds.
+ * @param int $restartAge  Seconds since last restart.
+ *
+ * @return int Extended grace period.
+ */
+function rtorrentProcessExtendedGrace(int $baseGrace, int $restartAge): int
+{
+    // No recent restart - use base grace.
+    if ($restartAge <= 0) {
+        return $baseGrace;
+    }
+
+    // Restarted within last 2 hours (7200s) - extend to 600s (10 minutes).
+    if ($restartAge < 7200) {
+        return max($baseGrace, 600);
+    }
+
+    // Restarted within last 4 hours (14400s) - extend to 1200s (20 minutes).
+    if ($restartAge < 14400) {
+        return max($baseGrace, 1200);
+    }
+
+    // Old restart - use base grace.
+    return $baseGrace;
+}
+
+/**
  * Restart rTorrent for a user with full diagnostic logging.
  *
  * Performs graceful shutdown (SIGTERM), waits, then force kills (SIGKILL),
@@ -296,6 +414,9 @@ function rtorrentProcessRestart(
     $rc = 0;
     @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
     $logFn("startRtorrent {$user} completed (rc={$rc})", true);
+
+    // Record restart for backoff tracking.
+    rtorrentProcessRecordRestart($user);
 
     // Capture after snapshot.
     $after = rtorrentProcessSnapshot($user);
