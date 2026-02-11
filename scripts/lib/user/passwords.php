@@ -19,47 +19,10 @@ function pmssGenerateQbittorrentPasswordHash(string $password): string
     return '@ByteArray(' . base64_encode($salt) . ':' . base64_encode($hash) . ')';
 }
 
-/**
- * Update Deluge auth file with new password.
- *
- * Replaces the template 'localclient' entry with the actual username and password,
- * or updates an existing entry for the username.
- *
- * @param string $username Username to update
- * @param string $password New plaintext password
- * @return bool True on success, false if auth file doesn't exist
- */
-function pmssUpdateDelugePassword(string $username, string $password): bool
-{
-    $authFile = "/home/{$username}/.config/deluge/auth";
-    if (!file_exists($authFile)) {
-        return false;
-    }
-
-    $lines = file($authFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if ($lines === false) {
-        return false;
-    }
-
-    $updated = false;
-    foreach ($lines as $i => $line) {
-        $parts = explode(':', $line, 3);
-        if (count($parts) === 3) {
-            // Update existing username entry or replace template localclient
-            if ($parts[0] === $username || $parts[0] === 'localclient') {
-                $lines[$i] = $username . ':' . $password . ':' . $parts[2];
-                $updated = true;
-                break;
-            }
-        }
-    }
-
-    if (!$updated) {
-        return false;
-    }
-
-    return file_put_contents($authFile, implode("\n", $lines) . "\n") !== false;
-}
+// Deluge password sync intentionally omitted: Deluge daemon auth stores passwords
+// in plaintext (all versions <= 2.1.1). Syncing the account password here would
+// expose it in a readable file under the user's home directory. See GH#211 for
+// the planned fix (separate random password shown to user). -- 2026-02-11
 
 /**
  * Update qBittorrent config with new password hash.

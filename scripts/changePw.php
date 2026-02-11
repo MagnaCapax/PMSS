@@ -83,16 +83,14 @@ passthru(sprintf(
     escapeshellarg($username)
 ));
 
-// Sync password to Deluge and qBittorrent if installed
-$delugeUpdated = pmssUpdateDelugePassword($username, $password);
+// Sync password to qBittorrent if installed.
+// Deluge is intentionally excluded: its auth file stores passwords in plaintext,
+// making account password sync a security risk (see GH#211).
 $qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);
 
 // Restart services if passwords were updated
-pmssRestartTorrentServicesAfterPasswordChange($username, $delugeUpdated, $qbittorrentUpdated);
+pmssRestartTorrentServicesAfterPasswordChange($username, false, $qbittorrentUpdated);
 
-if ($delugeUpdated) {
-    echo "\t *******  Deluge password updated\n";
-}
 if ($qbittorrentUpdated) {
     echo "\t *******  qBittorrent password updated\n";
 }

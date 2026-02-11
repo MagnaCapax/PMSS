@@ -78,13 +78,11 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         sprintf('/scripts/util/createNginxConfig.php --user %s', escapeshellarg($user['name']))
     );
 
-    // Sync torrent client passwords after configuration is complete
+    // Sync qBittorrent password after configuration is complete.
+    // Deluge is intentionally excluded: its auth file stores passwords in plaintext,
+    // making account password sync a security risk (see GH#211).
     if (!empty($user['password'])) {
-        $delugeUpdated = pmssUpdateDelugePassword($user['name'], $user['password']);
         $qbittorrentUpdated = pmssUpdateQbittorrentPassword($user['name'], $user['password']);
-        if ($delugeUpdated) {
-            logProvisionMessage('Synced Deluge password');
-        }
         if ($qbittorrentUpdated) {
             logProvisionMessage('Synced qBittorrent password');
         }
