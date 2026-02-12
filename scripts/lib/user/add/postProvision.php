@@ -63,20 +63,15 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
             @mkdir($runtimeStatsDir, 0755, true);
         }
         // Home files
-        $trafficPath = "$homeBase/.trafficData";
-        $setImmutable($trafficPath, false);
-        @file_put_contents($trafficPath, serialize($zeroTraffic));
-        @chown($trafficPath, 'root');
-        @chgrp($trafficPath, $user['name']);
-        @chmod($trafficPath, 0640);
-        $setImmutable($trafficPath, true);
-        $trafficLocalPath = "$homeBase/.trafficDataLocal";
-        $setImmutable($trafficLocalPath, false);
-        @file_put_contents($trafficLocalPath, serialize($zeroTraffic));
-        @chown($trafficLocalPath, 'root');
-        @chgrp($trafficLocalPath, $user['name']);
-        @chmod($trafficLocalPath, 0640);
-        $setImmutable($trafficLocalPath, true);
+        foreach (['.trafficData', '.trafficDataLocal'] as $suffix) {
+            $trafficPath = $homeBase.'/'.$suffix;
+            $setImmutable($trafficPath, false);
+            @file_put_contents($trafficPath, serialize($zeroTraffic));
+            @chown($trafficPath, 'root');
+            @chgrp($trafficPath, $user['name']);
+            @chmod($trafficPath, 0640);
+            $setImmutable($trafficPath, true);
+        }
         // Runtime cache
         @file_put_contents("$runtimeStatsDir/{$user['name']}", serialize($zeroTraffic));
         @chown("$runtimeStatsDir/{$user['name']}", 'root');

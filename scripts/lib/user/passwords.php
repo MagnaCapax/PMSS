@@ -34,12 +34,7 @@ function pmssGenerateQbittorrentPasswordHash(string $password): string
 function pmssUpdateQbittorrentPassword(string $username, string $password): bool
 {
     $configFile = "/home/{$username}/.config/qBittorrent/qBittorrent.conf";
-    if (!file_exists($configFile)) {
-        return false;
-    }
-
-    $config = file_get_contents($configFile);
-    if ($config === false) {
+    if (!file_exists($configFile) || ($config = file_get_contents($configFile)) === false) {
         return false;
     }
 

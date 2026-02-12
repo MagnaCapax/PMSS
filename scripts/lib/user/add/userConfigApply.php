@@ -34,15 +34,14 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
     );
 
     // Configure quota, rtorrent and ruTorrent.
-    $rc = runProvisionStep(
+    if (runProvisionStep(
         'Apply user configuration',
         sprintf('/scripts/util/userConfig.php %s %s %s',
             escapeshellarg($user['name']),
             escapeshellarg($user['memory']),
             escapeshellarg($user['quota'])
         )
-    );
-    if ($rc !== 0) {
+    ) !== 0) {
         logProvisionMessage('FATAL: User configuration failed; aborting provisioning');
         finalizeProvision('FAIL', 'user_config_failed', 1);
         exit(1);
@@ -88,4 +87,3 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         }
     }
 }
-
