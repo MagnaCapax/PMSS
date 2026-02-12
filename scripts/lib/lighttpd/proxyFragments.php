@@ -35,8 +35,8 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
   ) ) ),
   proxy.header = (
       "map-urlpath" => (
-         "/deluge-{$user}/"  => "/",
-         "/deluge-{$user}" => ""
+         "/deluge-{$user}/"  => "/user-{$user}/deluge/",
+         "/deluge-{$user}" => "/user-{$user}/deluge"
        )
   )
 }
