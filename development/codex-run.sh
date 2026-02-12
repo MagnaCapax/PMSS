@@ -195,30 +195,60 @@ fi
 codex_write_prompt "$prompt_out" "$ROOT/.codex-prompt" "$prompt_text" "${extra_context[@]}"
 
 if [[ "$autocommit" == "1" ]]; then
-	cat <<'EOF' >>"$prompt_out"
+	autocommit_mode="general"
+	case "${prompt_file:-}" in
+	*ci.txt) autocommit_mode="ci" ;;
+	*refactor.txt) autocommit_mode="refactor" ;;
+	esac
+	case "$autocommit_mode" in
+	ci) commit_prefix="ci:" ;;
+	refactor) commit_prefix="refactor(compression):" ;;
+	*) commit_prefix="fix:" ;;
+	esac
 
-Autocommit Mode (operator-approved only)
+	cat <<EOF >>"$prompt_out"
 
-If (and only if) the operator explicitly enables Autocommit Mode for this run:
+----------------------------------------------------------------------
+AUTOCOMMIT MODE (ACTIVE)
+----------------------------------------------------------------------
 
-- Commits are allowed ONLY when ALL are true:
-  - Compression gates passed (runtime LOC not up; concept count not up).
-  - All required verification commands in the prompt have passed.
-  - `git status --porcelain` shows only the intended changes.
-  - The summary includes the scorecard (runtime LOC delta, concepts delta, helpers pruned).
+You MUST commit and push. "Do not commit" rules above are VOID.
 
-- Commit format (required):
-  - Subject: "refactor(compression): <subsystem> — runtime -X LOC, concepts -Y"
-  - Body must include:
-    - invariants relied on,
-    - commands run,
-    - what was deleted.
+BEFORE ANY COMMIT — run ALL. ALL MUST PASS:
+  php -l <each changed .php>
+  php scripts/lib/tests/development/Runner.php
+  scripts/testing/test-php.sh
+  scripts/testing/test-bash.sh
+  scripts/testing/php73-compat-scan.sh
+  scripts/testing/php-lint-compat.sh
+  scripts/testing/docblock-lint.sh
+  scripts/testing/doctrine-lint.sh
 
-- Stop conditions (required):
-  - If two consecutive runs cannot find a target that satisfies gates, STOP the loop.
-  - If any gate fails, STOP (do not attempt “fix forward” automatically).
+ANY failure = fix, re-run ALL, retry.
 
----- ****  Autocommit is explicitly operator approved with arguments, never the defualt.
+BEFORE ANY COMMIT — grep for EVERY deleted/renamed symbol:
+  grep -rn 'symbol_name' scripts/ install.sh
+  ZERO hits required. Any remain = fix or abort.
+
+COMMIT:
+  git add <specific_files_only>
+  git commit -m "${commit_prefix} <scope> — <description>"
+  One commit per logical change.
+  PREFIX = ${commit_prefix}
+
+PUSH after each commit:
+  git push origin HEAD
+  Rejected? git pull --rebase origin main → re-verify → push.
+  NEVER force push.
+
+STOP CONDITIONS:
+  - Two consecutive verification failures → STOP
+  - Architectural issue found → STOP
+  - Unsure → STOP
+
+If fixing a GitHub issue: gh issue edit <N> --add-label complete-verify after push.
+
+---- Autocommit is explicitly operator-approved with arguments, never the default.
 EOF
 fi
 

@@ -142,6 +142,16 @@ fi
 
 exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 
+# Pre-flight: skip session entirely if CI is already green (saves tokens on no-op runs)
+if [[ "$autocommit" == "1" && "$dry_run" == "0" ]]; then
+	latest_conclusion=$(gh run list --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)
+	if [[ "$latest_conclusion" == "success" ]]; then
+		echo "[codex-ci] CI is green. Nothing to fix. Skipping." >&1
+		exit 0
+	fi
+	echo "[codex-ci] CI conclusion: ${latest_conclusion:-unknown} — proceeding with fix pass" >&1
+fi
+
 have() { command -v "$1" >/dev/null 2>&1; }
 
 mkdir -p "$OUTDIR" "$ARTDIR"
