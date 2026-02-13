@@ -11,7 +11,7 @@
 function pmssTotalMemMiB(): int
 {
     $override = getenv('PMSS_TOTAL_MEM_MIB');
-    if (is_string($override) && $override !== '' && ctype_digit($override)) {
+    if (ctype_digit((string)$override)) {
         return (int)$override;
     }
     $meminfo = @file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [];
@@ -28,7 +28,7 @@ function pmssTotalMemMiB(): int
 function pmssTotalCpuThreads(): int
 {
     $override = getenv('PMSS_TOTAL_CPU_THREADS');
-    if (is_string($override) && $override !== '' && ctype_digit($override)) {
+    if (ctype_digit((string)$override)) {
         return (int)$override;
     }
     // Robust check using /proc/cpuinfo
