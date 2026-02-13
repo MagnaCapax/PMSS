@@ -13,10 +13,14 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
     /**
      * Recreate the legacy BFQ/sysctl configuration shipped with PMSS.
      */
-    function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targetOverride = null, bool $reload = true): void
+    function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targetOverride = null, bool $reload = true, ?string $modulesLoadOverride = null): void
     {
-        $log    = pmssSelectLogger($logger);
-        $target = $targetOverride ?? '/etc/sysctl.d/1-pmss-defaults.conf';
+        $log             = pmssSelectLogger($logger);
+        $target          = $targetOverride ?? '/etc/sysctl.d/1-pmss-defaults.conf';
+        $modulesLoadPath = $modulesLoadOverride ?? '/etc/modules-load.d/pmss-bbr.conf';
+        // Persist TCP BBR module loading across reboots.
+        $modulesContent  = "# PMSS: enable TCP BBR\n";
+        $modulesContent .= "tcp_bbr\n";
 
         $lines = ['# Pulsed Media Config'];
 
@@ -44,15 +48,35 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
 
         // Check if file needs updating
         $existing = @file_get_contents($target);
-        if ($existing !== false && trim($existing) === trim($content)) {
+        $sysctlUpToDate = $existing !== false && trim($existing) === trim($content);
+        if ($sysctlUpToDate) {
             $log('[SKIP] Legacy sysctl defaults already present and up to date');
+        } else {
+            if (!is_dir(dirname($target))) {
+                @mkdir(dirname($target), 0755, true);
+            }
+            @file_put_contents($target, $content.PHP_EOL);
+        }
+
+        $modulesExisting = @file_get_contents($modulesLoadPath);
+        $modulesUpToDate = $modulesExisting !== false && trim($modulesExisting) === trim($modulesContent);
+        if ($modulesUpToDate) {
+            $log('[SKIP] TCP BBR modules-load configuration already present and up to date');
+        } else {
+            if (!is_dir(dirname($modulesLoadPath))) {
+                @mkdir(dirname($modulesLoadPath), 0755, true);
+            }
+            if (@file_put_contents($modulesLoadPath, $modulesContent) === false) {
+                $log('[WARN] Unable to write TCP BBR modules-load configuration at '.$modulesLoadPath);
+            } else {
+                $log('Refreshed TCP BBR modules-load configuration at '.$modulesLoadPath);
+            }
+        }
+
+        if ($sysctlUpToDate) {
             return;
         }
 
-        if (!is_dir(dirname($target))) {
-            @mkdir(dirname($target), 0755, true);
-        }
-        @file_put_contents($target, $content.PHP_EOL);
         if ($reload) {
             runStep('Reloading sysctl configuration', 'sysctl --system');
         } else {

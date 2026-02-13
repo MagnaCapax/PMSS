@@ -178,6 +178,15 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ---
 
+## System Preparation
+
+- pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true, ?string $modulesLoadOverride=null): void
+  - Writes `/etc/sysctl.d/1-pmss-defaults.conf` (override path) with the legacy baseline.
+  - Ensures `/etc/modules-load.d/pmss-bbr.conf` contains `tcp_bbr` (override path).
+  - When `$reload=true`, runs `sysctl --system` to apply the baseline.
+
+---
+
 ## Distro Detection
 
 - pmssDetectDistro(): array

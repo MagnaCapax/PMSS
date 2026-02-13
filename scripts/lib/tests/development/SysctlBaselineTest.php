@@ -24,6 +24,21 @@ class SysctlBaselineTest extends TestCase
         $this->cleanup($dir);
     }
 
+    public function testWritesBbrModulesLoadFile(): void
+    {
+        $dir = $this->makeTempDir('pmss-sysctl-bbr');
+        $target = $dir.'/sysctl.conf';
+        $modulesLoad = $dir.'/modules-load.conf';
+        $messages = [];
+        $this->runBaseline($target, $messages, false, $modulesLoad);
+
+        $this->assertTrue(file_exists($modulesLoad), 'expected BBR modules-load file to be written');
+        $content = (string)file_get_contents($modulesLoad);
+        $this->assertStringContainsString('tcp_bbr', $content);
+
+        $this->cleanup($dir);
+    }
+
     public function testSkipsWhenUpToDate(): void
     {
         $dir = $this->makeTempDir('pmss-sysctl-skip');
@@ -86,12 +101,13 @@ class SysctlBaselineTest extends TestCase
         $this->cleanup($dir);
     }
 
-    private function runBaseline(string $target, array &$messages, bool $reload): void
+    private function runBaseline(string $target, array &$messages, bool $reload, ?string $modulesLoad = null): void
     {
         $logger = function (string $message) use (&$messages): void {
             $messages[] = $message;
         };
-        \pmssEnsureLegacySysctlBaseline($logger, $target, $reload);
+        $modulesLoad = $modulesLoad ?? dirname($target).'/modules-load.conf';
+        \pmssEnsureLegacySysctlBaseline($logger, $target, $reload, $modulesLoad);
     }
 
     private function messagesContain(array $messages, string $needle): bool
