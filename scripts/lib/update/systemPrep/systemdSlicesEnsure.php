@@ -13,7 +13,6 @@ require_once __DIR__.'/hostResourcesDetect.php';
 require_once __DIR__.'/systemdSlicesDropinInstall.php';
 require_once __DIR__.'/systemdSlicesRuntimeApply.php';
 
-if (!function_exists('pmssEnsureSystemdSlices')) {
     /**
      * Install tuned systemd slice overrides when missing.
      */
@@ -82,5 +81,3 @@ if (!function_exists('pmssEnsureSystemdSlices')) {
 
         pmssSystemdSlicesRuntimeApply($dropDir, $tasksMax, $skipSystemctl, $reloadSystemd, $log);
     }
-}
-

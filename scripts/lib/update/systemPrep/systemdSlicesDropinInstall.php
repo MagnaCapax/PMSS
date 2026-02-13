@@ -13,7 +13,6 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 require_once __DIR__.'/cgroupModeDetect.php';
 require_once __DIR__.'/hostResourcesDetect.php';
 
-if (!function_exists('pmssSystemdSlicesDropinInstall')) {
     /**
      * Render and install the user-.slice drop-in.
      *
@@ -146,5 +145,3 @@ if (!function_exists('pmssSystemdSlicesDropinInstall')) {
 
         return $tasksMax;
     }
-}
-

@@ -11,7 +11,6 @@ require_once dirname(__DIR__, 2).'/runtime.php';
 require_once __DIR__.'/cgroupModeDetect.php';
 require_once __DIR__.'/hostResourcesDetect.php';
 
-if (!function_exists('pmssEnsureCgroupsConfigured')) {
     /**
      * Guarantee that cgroup mounts and PID limits are configured sanely.
      */
@@ -80,5 +79,3 @@ if (!function_exists('pmssEnsureCgroupsConfigured')) {
             // Best-effort advisory only
         }
     }
-}
-

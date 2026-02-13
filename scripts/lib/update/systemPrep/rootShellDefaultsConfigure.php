@@ -8,7 +8,6 @@
 require_once dirname(__DIR__).'/logging.php';
 require_once dirname(__DIR__, 2).'/runtime.php';
 
-if (!function_exists('pmssConfigureRootShellDefaults')) {
     /**
      * Ensure root shell defaults mirror the historical installer behaviour.
      */
@@ -41,4 +40,3 @@ if (!function_exists('pmssConfigureRootShellDefaults')) {
         @file_put_contents($bashrc, implode(PHP_EOL, $lines).PHP_EOL);
         $log('Appended root shell defaults: '.implode(', ', $updates));
     }
-}

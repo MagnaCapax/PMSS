@@ -8,7 +8,6 @@
 require_once dirname(__DIR__).'/runtime/commands.php';
 require_once dirname(__DIR__, 2).'/runtime.php';
 
-if (!function_exists('pmssSystemdSlicesRuntimeApply')) {
     /**
      * Apply root slice overrides and refresh TasksMax on already-running slices.
      *
@@ -93,5 +92,3 @@ if (!function_exists('pmssSystemdSlicesRuntimeApply')) {
             }
         }
     }
-}
-

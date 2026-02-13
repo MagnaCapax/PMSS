@@ -9,7 +9,6 @@ require_once dirname(__DIR__).'/logging.php';
 require_once dirname(__DIR__).'/runtime/commands.php';
 require_once dirname(__DIR__, 2).'/runtime.php';
 
-if (!function_exists('pmssEnsureBootDefaults')) {
     /**
      * Ensure /proc hidepid=2 and legacy grub cmdline defaults stay applied.
      */
@@ -139,4 +138,3 @@ if (!function_exists('pmssEnsureBootDefaults')) {
             }
         }
     }
-}

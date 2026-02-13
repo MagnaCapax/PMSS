@@ -8,7 +8,6 @@
 require_once dirname(__DIR__).'/runtime/commands.php';
 require_once dirname(__DIR__, 2).'/runtime.php';
 
-if (!function_exists('pmssEnsureLocaleBaseline')) {
     /**
      * Make sure essential locale assets exist before other services start.
      */
@@ -118,4 +117,3 @@ if (!function_exists('pmssEnsureLocaleBaseline')) {
         require_once dirname(__DIR__).'/../motd/Generator.php';
         \Motd::motdGenerate();
     }
-}
