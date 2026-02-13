@@ -17,7 +17,6 @@ require_once dirname(__DIR__, 2).'/runtime.php';
         string $dropDir,
         int $tasksMax,
         bool $skipSystemctl,
-        callable $reloadSystemd,
         callable $log
     ): void {
         // Ensure root (uid 0) slice is not limited: create user-0 specific override setting infinity/large limits.
@@ -32,10 +31,11 @@ require_once dirname(__DIR__, 2).'/runtime.php';
         @file_put_contents($rootDrop, $rootConf);
         @chmod($rootDrop, 0644);
         @unlink($rootDir.'/99-pmss-unlimited.conf');
-        $reloadSystemd(
-            'Reloading systemd manager configuration (root slice)',
-            'Reloading systemd manager configuration (root slice, test mode)'
-        );
+        if ($skipSystemctl) {
+            pmssLogStatus('SKIP', 'Reloading systemd manager configuration (root slice, test mode)', 0);
+        } else {
+            runStep('Reloading systemd manager configuration (root slice)', 'systemctl daemon-reload');
+        }
 
         // Apply updated TasksMax limits to already-running slices without
         // persisting per-user overrides. systemctl daemon-reload does not

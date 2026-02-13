@@ -76,9 +76,8 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
     $writeTarget($scriptTarget, $scriptRaw, 0755, 'Boot tuning script');
     $writeTarget($serviceTarget, $serviceRaw, 0644, 'Boot tuning service');
 
-    $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    $testMode = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true;
-    if ($dryRun || $testMode) {
+    $skipEnable = getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
+    if ($skipEnable) {
         pmssLogStatus('SKIP', 'Enabling PMSS boot tuning service (test/dry-run)');
         return;
     }
