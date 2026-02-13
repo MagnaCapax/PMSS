@@ -270,9 +270,6 @@ function rtorrentProcessRecentReboot(int $threshold = 600): bool
     }
     // /proc/uptime format: "12345.67 98765.43" (uptime idle_time)
     $parts = explode(' ', trim($uptime));
-    if (count($parts) < 1) {
-        return false;
-    }
     $seconds = (float) $parts[0];
     return $seconds > 0 && $seconds < $threshold;
 }
@@ -319,8 +316,7 @@ function rtorrentProcessLastRestartAge(string $user): int
     if ($ts <= 0) {
         return 0;
     }
-    $age = time() - $ts;
-    return $age > 0 ? $age : 0;
+    return max(0, time() - $ts);
 }
 
 /**
@@ -334,8 +330,7 @@ function rtorrentProcessLastRestartAge(string $user): int
  */
 function rtorrentProcessRecordRestart(string $user): void
 {
-    $markerFile = '/tmp/.pmss-rtorrent-restart-'.$user;
-    @file_put_contents($markerFile, (string) time(), LOCK_EX);
+    @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
 }
 
 /**
