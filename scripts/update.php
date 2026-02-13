@@ -1036,10 +1036,7 @@ function bootstrapMain(array $argv): void
     }
 
     $distUpgradeHelper = '/scripts/util/update-dist-upgrade.php';
-    if ($options['dist_upgrade'] && file_exists($distUpgradeHelper)) {
-        maybeRunDistUpgrade($options['dist_upgrade']);
-        return;
-    } elseif ($options['dist_upgrade']) {
+    if ($options['dist_upgrade'] && !file_exists($distUpgradeHelper)) {
         logmsg('[INFO] Dist-upgrade helper missing; fetching snapshot to provision it...');
     }
 
@@ -1083,6 +1080,10 @@ function bootstrapMain(array $argv): void
     }
 
     if ($options['dist_upgrade']) {
+        if (!file_exists($distUpgradeHelper)) {
+            fatal('Dist-upgrade helper missing after snapshot staging.', EXIT_DIST);
+        }
+        logmsg('[INFO] Running dist-upgrade helper');
         maybeRunDistUpgrade($options['dist_upgrade']);
         return;
     }
