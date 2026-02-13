@@ -55,8 +55,7 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
             if ($chattrPath === '') {
                 return;
             }
-            $flag = $enable ? '+i' : '-i';
-            @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
+            @exec($chattrPath.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
         };
         @mkdir($runtimeStatsDir, 0755, true);
         // Home files

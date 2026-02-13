@@ -62,13 +62,11 @@ function pmssUpdateQbittorrentPassword(string $username, string $password): bool
  */
 function pmssRestartTorrentServicesAfterPasswordChange(string $username, bool $delugeUpdated, bool $qbittorrentUpdated): void
 {
-    if ($delugeUpdated) {
-        // Kill deluged gracefully - watchdog cron will restart it
-        shell_exec(sprintf('killall -u %s -TERM deluged 2>/dev/null', escapeshellarg($username)));
-    }
-
-    if ($qbittorrentUpdated) {
-        // Kill qbittorrent-nox gracefully - watchdog cron will restart it
-        shell_exec(sprintf('killall -u %s -TERM qbittorrent-nox 2>/dev/null', escapeshellarg($username)));
+    // Kill torrent daemons gracefully - watchdog cron will restart them.
+    foreach (['deluged' => $delugeUpdated, 'qbittorrent-nox' => $qbittorrentUpdated] as $daemon => $enabled) {
+        if (!$enabled) {
+            continue;
+        }
+        shell_exec(sprintf('killall -u %s -TERM %s 2>/dev/null', escapeshellarg($username), $daemon));
     }
 }

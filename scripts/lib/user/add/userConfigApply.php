@@ -54,18 +54,13 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         'deluge' => $homePath.'/.delugePort',
     ];
     foreach ($portFiles as $label => $path) {
-        if (!is_file($path)) {
-            continue;
-        }
-        $port = (int) trim((string) @file_get_contents($path));
+        $port = is_file($path) ? (int) trim((string) @file_get_contents($path)) : 0;
         if ($port <= 0) {
             continue;
         }
-        if ($label === 'deluge') {
-            logProvisionMessage('Assigned deluge ports: scgi='.$port.' web='.($port + 1));
-            continue;
-        }
-        logProvisionMessage('Assigned '.$label.' port: '.$port);
+        logProvisionMessage($label === 'deluge'
+            ? 'Assigned deluge ports: scgi='.$port.' web='.($port + 1)
+            : 'Assigned '.$label.' port: '.$port);
     }
 
     runProvisionStep(
