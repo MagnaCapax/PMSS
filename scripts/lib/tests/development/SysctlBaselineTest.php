@@ -15,6 +15,8 @@ class SysctlBaselineTest extends TestCase
         $this->assertTrue(file_exists($target), 'expected sysctl file to be written');
         $content = (string)file_get_contents($target);
         $this->assertStringContainsString('# Pulsed Media Config', $content);
+        $this->assertStringContainsString('net.core.default_qdisc = fq', $content);
+        $this->assertStringContainsString('net.ipv4.tcp_congestion_control = bbr', $content);
         $this->assertStringContainsString('kernel.kptr_restrict = 1', $content);
         $this->assertStringContainsString('kernel.yama.ptrace_scope = 1', $content);
         $this->assertStringContainsString('fs.protected_regular = 2', $content);

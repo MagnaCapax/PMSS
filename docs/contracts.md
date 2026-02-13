@@ -245,7 +245,7 @@ Sub-handlers:
 
 - pmssEnsureLocaleBaseline(): void → ensures `en_US.UTF-8` base locale (including `LC_TIME`), sets system timezone to `Europe/Helsinki`, and calls `Motd::motdGenerate()`.
 
-- pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true): void → writes legacy BFQ/sysctl defaults (ip_forward, fs.protected_*, ptrace_scope, kptr_restrict) to `/etc/sysctl.d/1-pmss-defaults.conf` and runs `sysctl --system` unless reload is disabled.
+- pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true): void → writes legacy BFQ/sysctl defaults (default_qdisc, tcp_congestion_control, ip_forward, fs.protected_*, ptrace_scope, kptr_restrict) to `/etc/sysctl.d/1-pmss-defaults.conf` and runs `sysctl --system` unless reload is disabled.
 
 - pmssConfigureRootShellDefaults(?callable $logger=null): void → ensures `/root/.bashrc` contains `alias ls=...` and `PATH=$PATH:/scripts`.
 

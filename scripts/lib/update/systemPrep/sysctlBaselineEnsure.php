@@ -35,6 +35,8 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
 
         // Network and Security Hardening
         $lines[] = '';
+        $lines[] = 'net.core.default_qdisc = fq';
+        $lines[] = 'net.ipv4.tcp_congestion_control = bbr';
         $lines[] = 'net.ipv4.ip_forward = 1';
         $lines[] = 'fs.protected_regular = 2';
         $lines[] = 'fs.protected_fifos = 2';
@@ -62,4 +64,3 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
         $log('Refreshed legacy sysctl defaults at '.$target);
     }
 }
-
