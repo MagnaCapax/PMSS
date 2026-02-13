@@ -349,6 +349,7 @@ pmssApplyHostnameConfig('logmsg');
 pmssConfigureQuotaMount('logmsg');
 runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
 pmssEnsureLegacySysctlBaseline('logmsg');
+pmssEnsureBootTuning('logmsg');
 pmssConfigureRootShellDefaults('logmsg');
 runStep('Restricting world access to /home', 'chmod o-rw /home');
 

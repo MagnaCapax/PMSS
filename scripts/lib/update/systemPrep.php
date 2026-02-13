@@ -21,5 +21,5 @@ require_once __DIR__.'/systemPrep/systemdSlicesRuntimeApply.php';
 require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
 require_once __DIR__.'/systemPrep/localeBaselineEnsure.php';
 require_once __DIR__.'/systemPrep/sysctlBaselineEnsure.php';
+require_once __DIR__.'/systemPrep/bootTuningEnsure.php';
 require_once __DIR__.'/systemPrep/rootShellDefaultsConfigure.php';
-

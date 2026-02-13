@@ -1,0 +1,12 @@
+[Unit]
+Description=PMSS Boot-Time System Tuning
+After=local-fs.target mdmonitor.service
+Before=pmss.service
+
+[Service]
+Type=oneshot
+ExecStart=%%PMSS_BOOT_TUNING_SCRIPT%%
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
