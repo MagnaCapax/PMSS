@@ -200,10 +200,12 @@ if [[ "$autocommit" == "1" ]]; then
 	*ci.txt) autocommit_mode="ci" ;;
 	*refactor.txt) autocommit_mode="refactor" ;;
 	*issues.txt) autocommit_mode="issues" ;;
+	*qa.txt) autocommit_mode="qa" ;;
 	esac
 	case "$autocommit_mode" in
 	ci) commit_prefix="ci:" ;;
 	refactor) commit_prefix="refactor(compression):" ;;
+	qa) commit_prefix="fix:" ;;
 	*) commit_prefix="fix:" ;;
 	esac
 
@@ -274,6 +276,16 @@ Use fix: for bugs, feat: for features, security: for security issues.
 Maximum 5 issues per session. One commit per issue.
 
 If fixing a GitHub issue: gh issue edit <N> --add-label complete-verify after push.
+
+QA VERIFICATION (when mode = qa):
+Follow the full verification protocol defined in qa.txt (the base prompt above).
+Key rules for autocommit integration:
+- Run PRE-VERIFICATION BASELINE first (test suite must be green at baseline).
+- For each issue: run all 5 layers. PASS → gh issue close N. FAIL → attempt inline fix (max 2).
+- Inline fixes: HARD LIMIT 20 lines. Prefix: fix: <scope> — QA fix for #N (Refs #N)
+- After 2 failed inline fixes: gh issue edit N --remove-label complete-verify, post FAIL report.
+- Maximum 5 issues per session (wrapper caps at 5).
+- Pseudonymize ALL GitHub comments (no real usernames, hostnames, IPs).
 
 ---- Autocommit is explicitly operator-approved with arguments, never the default.
 EOF
