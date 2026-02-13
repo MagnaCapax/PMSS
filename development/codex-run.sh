@@ -199,6 +199,7 @@ if [[ "$autocommit" == "1" ]]; then
 	case "${prompt_file:-}" in
 	*ci.txt) autocommit_mode="ci" ;;
 	*refactor.txt) autocommit_mode="refactor" ;;
+	*issues.txt) autocommit_mode="issues" ;;
 	esac
 	case "$autocommit_mode" in
 	ci) commit_prefix="ci:" ;;
@@ -213,6 +214,11 @@ AUTOCOMMIT MODE (ACTIVE)
 ----------------------------------------------------------------------
 
 You MUST commit and push. "Do not commit" rules above are VOID.
+
+YOU ARE FULLY AUTONOMOUS. No human is watching. This is a non-interactive session.
+Do NOT ask questions, propose changes, or wait for approval.
+Do NOT output "shall I proceed" or "if you want a different scope".
+Pick targets → implement → verify → commit → iterate. Repeat until done or stopped.
 
 BEFORE ANY COMMIT — run ALL. ALL MUST PASS:
   php -l <each changed .php>
@@ -259,6 +265,13 @@ Maximum 8 cycles per session. One commit per cycle.
 CI RE-VERIFY (when prefix = ci):
 After all commits: re-run full test suite. If failure count did not strictly decrease: STOP.
 If a previously-passing test now fails: revert that commit, STOP. Maximum 3 re-verify cycles.
+
+ISSUE ITERATION (when mode = issues):
+For each issue in context: assess complexity. Skip if too complex or touches frozen paths.
+Implement tractable issues one at a time. Verify. Commit with "Refs #N" in message.
+After commit: gh issue edit N --add-label complete-verify (best-effort).
+Use fix: for bugs, feat: for features, security: for security issues.
+Maximum 5 issues per session. One commit per issue.
 
 If fixing a GitHub issue: gh issue edit <N> --add-label complete-verify after push.
 
