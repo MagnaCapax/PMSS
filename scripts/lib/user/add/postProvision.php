@@ -36,7 +36,6 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
         $zeroRaw = ['month'=>0.0,'week'=>0.0,'day'=>0.0,'hour'=>0.0,'15min'=>0.0];
         $zeroDisplay = ['month'=>'0MiB','week'=>'0MiB','day'=>'0MiB','hour'=>'0MiB','15min'=>'0MiB'];
         $zeroTraffic = ['raw'=>$zeroRaw,'display'=>$zeroDisplay,'daily'=>[]];
-        $homeBase = $homePath;
         $runtimeStatsDir = '/var/run/pmss/trafficStats';
         $chattrPath = null;
         // Best-effort immutable toggle for traffic data files.
@@ -59,12 +58,10 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
             $flag = $enable ? '+i' : '-i';
             @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
         };
-        if (!is_dir($runtimeStatsDir)) {
-            @mkdir($runtimeStatsDir, 0755, true);
-        }
+        @mkdir($runtimeStatsDir, 0755, true);
         // Home files
         foreach (['.trafficData', '.trafficDataLocal'] as $suffix) {
-            $trafficPath = $homeBase.'/'.$suffix;
+            $trafficPath = $homePath.'/'.$suffix;
             $setImmutable($trafficPath, false);
             @file_put_contents($trafficPath, serialize($zeroTraffic));
             @chown($trafficPath, 'root');

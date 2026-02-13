@@ -7,13 +7,11 @@
 
 function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 {
-    $legacy = "/deluge-{$user}/";
-    $canonical = "/user-{$user}/deluge/";
     $deprecationDate = '2028-01-28';
 
     return <<<LIGHTTPD
 # PMSS-managed: Deluge reverse proxy.
-# Legacy path {$legacy} kept for compatibility until at least {$deprecationDate}.
+# Legacy path /deluge-{$user}/ kept for compatibility until at least {$deprecationDate}.
 
 \$HTTP["url"] =~ "^/user-{$user}/deluge($|/)" {
   proxy.server = ( "" => ( (
@@ -83,4 +81,3 @@ function pmssQbittorrentLighttpdProxyFragment(string $user, int $port): string
 
 LIGHTTPD;
 }
-

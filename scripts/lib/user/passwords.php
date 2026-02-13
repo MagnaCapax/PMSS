@@ -51,11 +51,9 @@ function pmssUpdateQbittorrentPassword(string $username, string $password): bool
         $newConfig = preg_replace($pattern, $replacement, $config, 1);
     }
 
-    if ($newConfig === null || $newConfig === $config) {
-        return false;
-    }
-
-    return file_put_contents($configFile, $newConfig) !== false;
+    return $newConfig !== null
+        && $newConfig !== $config
+        && file_put_contents($configFile, $newConfig) !== false;
 }
 
 /**
