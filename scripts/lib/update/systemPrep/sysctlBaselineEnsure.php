@@ -21,15 +21,12 @@ if (!function_exists('pmssEnsureLegacySysctlBaseline')) {
         $lines = ['# Pulsed Media Config'];
 
         // Dynamically detect sd* devices for scheduling/readahead tuning
-        $disks = glob('/sys/block/sd*');
-        if ($disks) {
-            foreach ($disks as $path) {
-                $dev = basename($path);
-                // Only tune if not a partition (glob matches block devices, so sda is fine, sda1 isn't in /sys/block)
-                if (preg_match('/^sd[a-z]+$/', $dev)) {
-                    $lines[] = "block/{$dev}/queue/scheduler = bfq";
-                    $lines[] = "block/{$dev}/queue/read_ahead_kb = 1024";
-                }
+        foreach (glob('/sys/block/sd*') ?: [] as $path) {
+            $dev = basename($path);
+            // Only tune if not a partition (glob matches block devices, so sda is fine, sda1 isn't in /sys/block)
+            if (preg_match('/^sd[a-z]+$/', $dev)) {
+                $lines[] = "block/{$dev}/queue/scheduler = bfq";
+                $lines[] = "block/{$dev}/queue/read_ahead_kb = 1024";
             }
         }
 

@@ -80,10 +80,7 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
     // Sync qBittorrent password after configuration is complete.
     // Deluge is intentionally excluded: its auth file stores passwords in plaintext,
     // making account password sync a security risk (see GH#211).
-    if (!empty($user['password'])) {
-        $qbittorrentUpdated = pmssUpdateQbittorrentPassword($user['name'], $user['password']);
-        if ($qbittorrentUpdated) {
-            logProvisionMessage('Synced qBittorrent password');
-        }
+    if (!empty($user['password']) && pmssUpdateQbittorrentPassword($user['name'], $user['password'])) {
+        logProvisionMessage('Synced qBittorrent password');
     }
 }

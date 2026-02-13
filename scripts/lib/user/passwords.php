@@ -39,16 +39,13 @@ function pmssUpdateQbittorrentPassword(string $username, string $password): bool
     }
 
     $passwordHash = pmssGenerateQbittorrentPasswordHash($password);
-    $pattern = '/^WebUI\\\\Password_PBKDF2=.*/m';
     $replacement = 'WebUI\\Password_PBKDF2=' . $passwordHash;
 
-    if (preg_match($pattern, $config)) {
-        $newConfig = preg_replace($pattern, $replacement, $config);
+    if (preg_match('/^WebUI\\\\Password_PBKDF2=.*/m', $config)) {
+        $newConfig = preg_replace('/^WebUI\\\\Password_PBKDF2=.*/m', $replacement, $config);
     } else {
         // If password line doesn't exist, add it under [Preferences]
-        $pattern = '/(\[Preferences\][^\[]*)/s';
-        $replacement = '$1' . $replacement . "\n";
-        $newConfig = preg_replace($pattern, $replacement, $config, 1);
+        $newConfig = preg_replace('/(\[Preferences\][^\[]*)/s', '$1' . $replacement . "\n", $config, 1);
     }
 
     return $newConfig !== null
