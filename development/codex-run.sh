@@ -236,9 +236,10 @@ COMMIT:
   One commit per logical change.
   PREFIX = ${commit_prefix}
 
-PUSH after each commit:
+PUSH after each commit (best-effort — sandbox may block network):
   git push origin HEAD
-  Rejected? git pull --rebase origin main → re-verify → push.
+  If push fails (sandbox/network): continue. Wrapper pushes after session.
+  If rejected (remote ahead): git pull --rebase origin main → re-verify → push.
   NEVER force push.
 
 STOP CONDITIONS:
