@@ -26,7 +26,7 @@ Common flags:
 ```
 
 - `--dry-run` – exercise the staging logic without copying or running phase 2.
-- `--dist-upgrade=<max>` – perform a Debian dist-upgrade (one major step per run) but never beyond the specified maximum; then exit.
+- `--dist-upgrade=<max>` – perform a Debian dist-upgrade (one major step per run) but never beyond the specified maximum; then continue with phase 2 to rebuild compiled components.
 - `--scripts-only` – deploy the new `/scripts` and `/etc/skel` content but skip
   `update-step2.php`; useful for emergency repairs. This mode MUST NOT invoke
   `apt`/`apt-get` or make any other package manager changes; it only stages
@@ -41,7 +41,7 @@ Common flags:
 | *(default run)* | Stages the selected snapshot and launches phase 2 when the hand-off is not skipped. | Confirm `/var/log/pmss-update.jsonl` contains `update_step2_start` and `update_step2_end`; inspect `/etc/seedbox/config/version` for the expected spec. |
 | `--dry-run` | Parses arguments and logs planned staging actions without touching the filesystem or invoking phase 2. | Check the JSON log for `update_step2_skipped` with reason `dry_run`, then run `git status --short` to ensure no tracked files changed; review `/var/log/pmss-update.log` to confirm intended operations. |
 | `--scripts-only` | Updates `/scripts` and `/etc/skel` from the snapshot, records the version, and skips `update-step2.php`. Never runs `apt`/`apt-get` or alters package state. Also refreshes skeleton permissions and FTP config when helpers are available. | Verify `/var/log/pmss-update.jsonl` shows `update_step2_skipped` with reason `scripts_only`; optionally run `/scripts/util/systemTest.php` to confirm services remain healthy. |
-| `--dist-upgrade=<max>` | Runs `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade, capped at the requested maximum, then exits. | Check the JSON log for `dist_upgrade_start`/`dist_upgrade_end` entries; review `apt` output in `/var/log/pmss-update.log` and rerun `/scripts/update.php` without the flag to complete orchestration. |
+| `--dist-upgrade=<max>` | Runs `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade, capped at the requested maximum, then continues with phase 2. | Check the JSON log for `dist_upgrade_start`/`dist_upgrade_end` and `update_step2_start`/`update_step2_end` entries; review `apt` output in `/var/log/pmss-update.log`. |
 | `--repo` / `--branch` | Overrides the repository or branch when resolving a `git/*` spec before staging. | Confirm the resolved spec under `/etc/seedbox/config/version.meta`; optionally run `/scripts/update.php --dry-run` with the same flags to validate fetch and staging. |
 
 Version specs normalise user input so `main`, `git main`, and `git/main` produce

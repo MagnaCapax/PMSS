@@ -78,10 +78,11 @@ Signature: refer to file for full source; highlights below.
 
 - maybeRunDistUpgrade(bool|string $distUpgrade): void
   - If enabled, runs `/scripts/util/update-dist-upgrade.php <max>` and logs start/end events.
+  - Restores root cron unless restoration is deferred to update-step2.
 
 - bootstrapMain(array $argv): void
-  - Orchestrator: ensure root → parse/normalize/parse spec → dist-upgrade (optional) →
-    workdir fetch → stage → record version → cleanup → self-update handoff →
+  - Orchestrator: ensure root → parse/normalize/parse spec → workdir fetch → stage →
+    record version → cleanup → self-update handoff → dist-upgrade (optional) →
     run phase 2 or scripts-only path → log completion with duration.
 - Update lock: uses `PMSS_UPDATE_LOCK_FILE=/var/run/pmss/update.lock` with an
   exclusive flock; sets `PMSS_UPDATE_LOCK_ENV=1` when held so child re-exec

@@ -28,7 +28,7 @@
  * | `--scripts-only`   | Deploy refreshed `/scripts` and `/etc/skel` content, skip `update-step2.php`. Useful for emergency hotfixes and MUST NOT invoke apt/apt-get or any other package manager commands. |
  * | `--repo=<url>`     | Override the git remote used for `git/*` specs. Combined with `--branch` to pin alternate forks. |
  * | `--branch=<name>`  | Branch used with `--repo`. Defaults to `main` when unspecified. |
- * | `--dist-upgrade=<max>` | Run `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade capped at the requested maximum, then exit. |
+ * | `--dist-upgrade=<max>` | Run `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade capped at the requested maximum, then continue with phase 2. |
  * | `--skip-self-update` | Internal flag injected during self-refresh to avoid recursion; operators should not pass it manually. |
  * | `--help`           | Print usage examples and exit without making changes. |
  *
@@ -565,8 +565,8 @@ function runSoft(string $command): void
  * Best-effort restore of PMSS root cron after updates that temporarily disable it.
  *
  * During phase 1 we remove `/etc/cron.d/pmss` to avoid cron activity while the
- * tree is partially refreshed. Some flows (dist-upgrade) exit before phase 2,
- * so we must restore the cron template here as well.
+ * tree is partially refreshed. Flows that end before phase 2 must restore the
+ * cron template here; otherwise defer to update-step2.
  */
 function restoreRootCronBestEffort(string $context): void
 {
@@ -944,8 +944,9 @@ function runAutoremove(): void
 
 /**
  * @param bool|string $distUpgrade
+ * @param bool $deferRootCronRestore
  */
-function maybeRunDistUpgrade($distUpgrade): void
+function maybeRunDistUpgrade($distUpgrade, bool $deferRootCronRestore = false): void
 {
     if ($distUpgrade === false) {
         return;
@@ -959,12 +960,17 @@ function maybeRunDistUpgrade($distUpgrade): void
     passthru($cmd, $rc);
     logEvent('dist_upgrade_end', ['rc' => $rc]);
 
-    // Dist-upgrade flow exits before phase 2; ensure root cron is restored even
-    // though phase 1 disabled it to avoid partial-update windows.
-    restoreRootCronBestEffort('dist-upgrade');
-
     if ($rc !== 0) {
+        restoreRootCronBestEffort('dist-upgrade');
         fatal('dist-upgrade helper exited with status '.$rc, EXIT_DIST);
+    }
+
+    // When phase 2 will run, defer root cron restoration to update-step2 so
+    // cron does not run mid-update. Otherwise restore immediately.
+    if ($deferRootCronRestore) {
+        logmsg('[INFO] Deferring root cron restore until update-step2');
+    } else {
+        restoreRootCronBestEffort('dist-upgrade');
     }
 
     // Best-effort refresh of MOTD after a successful dist-upgrade run. This
@@ -1084,8 +1090,8 @@ function bootstrapMain(array $argv): void
             fatal('Dist-upgrade helper missing after snapshot staging.', EXIT_DIST);
         }
         logmsg('[INFO] Running dist-upgrade helper');
-        maybeRunDistUpgrade($options['dist_upgrade']);
-        return;
+        maybeRunDistUpgrade($options['dist_upgrade'], true);
+        logmsg('[INFO] Dist-upgrade complete; continuing with update-step2');
     }
 
     if ($options['scripts_only']) {
