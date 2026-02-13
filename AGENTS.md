@@ -54,6 +54,14 @@ instead of restating details.
 - Context‑First Naming: name and order from larger context to smaller context in identifiers, logs, and file names where applicable (e.g., dcId → rackId → chassisId → nodeId). Apply the same discipline to env keys and options.
   - Cron/Util naming (MUST for new files): filenames should follow context‑first order with the domain first and the action second. Examples: `cgroupRootCheck.php`, `networkRulesApply.php`, `storageBenchmark.php`. Avoid verb‑first names like `checkRootCgroup.php`. Legacy scripts may retain historical names; migrate opportunistically.
 
+## Security Doctrine (Mandatory)
+- Trigger scope: ANY change that touches authentication, authorization, credential storage, encryption, or secret handling is security-adjacent and MUST follow this section.
+- Force-load gate: STOP and read `docs/security/operational-safety.md` and `docs/security/testing.md` before writing code. If the change touches credentials, do not proceed until the security doctrine is loaded and understood.
+- Credential storage rules: Primary/account credentials MUST be stored only as strong hashes (PBKDF2, scrypt, bcrypt, argon2). If a service cannot accept hashes and requires plaintext, it MUST receive a separate random service credential. Reusing the account password is ALWAYS a security violation.
+- Plaintext prohibition: Plaintext storage of primary credentials is forbidden regardless of legacy behavior or "service requires it" arguments.
+- Attack surface analysis (MANDATORY): Before implementation, research the target service's CVE history and known attack vectors. Analyze blast radius if the stored value is exposed (SSH, web UI, API, shell access). Document the findings in the commit message or issue comment.
+- Security review gate: Verification MUST explicitly check primary vs service credential separation, logging/redaction behavior, file permissions for secrets, and exposure paths (default binds/ports, web endpoints, file-read vectors).
+
 ## Compatibility Baseline (MUST)
 - PHP 7.3 Compatibility: All PHP code in this repository must run on PHP 7.3. Keep language features and libraries compatible with 7.3. The minimum version may be raised in the future via an explicit decision (ADR + CI update), but until then, treat 7.3 as the hard baseline.
 - CI checks: use `scripts/testing/php-lint-compat.sh` and the PHP 7.3 job in CI to validate compatibility.
