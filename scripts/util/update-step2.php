@@ -348,6 +348,7 @@ pmssApplyRemoteLogging('logmsg');
 pmssApplyHostnameConfig('logmsg');
 pmssConfigureQuotaMount('logmsg');
 runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
+pmssEnsureBootDefaults('logmsg');
 pmssEnsureLegacySysctlBaseline('logmsg');
 pmssEnsureBootTuning('logmsg');
 pmssConfigureRootShellDefaults('logmsg');
