@@ -15,10 +15,7 @@ require_once dirname(__DIR__, 2).'/runtime.php';
     {
         $log    = pmssSelectLogger($logger);
         $bashrc = '/root/.bashrc';
-        $lines  = file_exists($bashrc) ? file($bashrc, FILE_IGNORE_NEW_LINES) : [];
-        if ($lines === false) {
-            $lines = [];
-        }
+        $lines = file_exists($bashrc) ? (file($bashrc, FILE_IGNORE_NEW_LINES) ?: []) : [];
 
         $updates = [];
         $defaults = [

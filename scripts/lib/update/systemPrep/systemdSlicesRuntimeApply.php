@@ -31,10 +31,7 @@ require_once dirname(__DIR__, 2).'/runtime.php';
         $rootConf = "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n";
         @file_put_contents($rootDrop, $rootConf);
         @chmod($rootDrop, 0644);
-        $legacyRootDrop = $rootDir.'/99-pmss-unlimited.conf';
-        if (is_file($legacyRootDrop)) {
-            @unlink($legacyRootDrop);
-        }
+        @unlink($rootDir.'/99-pmss-unlimited.conf');
         $reloadSystemd(
             'Reloading systemd manager configuration (root slice)',
             'Reloading systemd manager configuration (root slice, test mode)'

@@ -19,6 +19,16 @@ require_once dirname(__DIR__, 2).'/runtime.php';
         $grubPath = $grubPath ?? '/etc/default/grub';
         $grubOption = $grubOption ?? 'systemd.unified_cgroup_hierarchy=0';
 
+        $writeWithBackup = static function (string $path, array $contentLines, string $label) use ($log): void {
+            $backup = $path.'.pmss-backup-'.date('YmdHis');
+            if (!@copy($path, $backup)) {
+                $log('[WARN] Unable to create '.$label.' backup at '.$backup);
+            }
+            if (@file_put_contents($path, implode(PHP_EOL, $contentLines).PHP_EOL) === false) {
+                $log('[WARN] Failed writing updated '.$path);
+            }
+        };
+
         // /proc hidepid baseline.
         $fstabChanged = false;
         if (is_readable($fstabPath) && ($lines = file($fstabPath, FILE_IGNORE_NEW_LINES)) !== false) {
@@ -68,13 +78,7 @@ require_once dirname(__DIR__, 2).'/runtime.php';
             }
             // Write fstab only when content changed, with a backup.
             if ($fstabChanged) {
-                $backup = $fstabPath.'.pmss-backup-'.date('YmdHis');
-                if (!@copy($fstabPath, $backup)) {
-                    $log('[WARN] Unable to create fstab backup at '.$backup);
-                }
-                if (@file_put_contents($fstabPath, implode(PHP_EOL, $lines).PHP_EOL) === false) {
-                    $log('[WARN] Failed writing updated '.$fstabPath);
-                }
+                $writeWithBackup($fstabPath, $lines, 'fstab');
             }
         } else {
             $log('[WARN] '.$fstabPath.' not readable; skipping /proc hidepid enforcement');
@@ -113,13 +117,7 @@ require_once dirname(__DIR__, 2).'/runtime.php';
             }
             // Persist grub updates only when modified, keeping a backup.
             if ($grubChanged) {
-                $backup = $grubPath.'.pmss-backup-'.date('YmdHis');
-                if (!@copy($grubPath, $backup)) {
-                    $log('[WARN] Unable to create grub backup at '.$backup);
-                }
-                if (@file_put_contents($grubPath, implode(PHP_EOL, $lines).PHP_EOL) === false) {
-                    $log('[WARN] Failed writing updated '.$grubPath);
-                }
+                $writeWithBackup($grubPath, $lines, 'grub');
             }
         } else {
             $log('[WARN] '.$grubPath.' not readable; skipping grub cmdline update');
