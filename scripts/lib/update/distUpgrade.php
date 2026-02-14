@@ -68,6 +68,7 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
         return 1;
     }
     pmssEnsureInitrdAfterDistUpgrade();
+    pmssRepairNginxAfterDistUpgrade();
     pmssEnsureFuseOverlayfsAfterDistUpgrade($next);
     return 0;
 }
@@ -183,6 +184,66 @@ function pmssEnsureInitrdAfterDistUpgrade(): void
     }
 
     logMessage('dist-upgrade: initrd generated for kernel '.$latest);
+}
+
+/**
+ * Repair nginx ABI mismatches after dist-upgrade.
+ */
+function pmssRepairNginxAfterDistUpgrade(): void
+{
+    $nginxPath = trim((string) @shell_exec('command -v nginx 2>/dev/null'));
+    if ($nginxPath === '') {
+        logMessage('[SKIP] dist-upgrade: nginx not installed; skipping ABI check');
+        return;
+    }
+
+    $testRc = runCommand('nginx -t', true);
+    if ($testRc === 0) {
+        logMessage('[SKIP] dist-upgrade: nginx config test passed');
+        return;
+    }
+
+    $last = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] ?? ['stderr' => '', 'stdout' => ''];
+    $combined = (string) ($last['stderr'] ?? '')."\n".(string) ($last['stdout'] ?? '');
+    if (stripos($combined, 'module is not binary compatible') === false) {
+        logMessage('[WARN] dist-upgrade: nginx -t failed, but no ABI mismatch detected; skipping reinstall');
+        return;
+    }
+
+    logMessage('dist-upgrade: nginx ABI mismatch detected; purging and reinstalling nginx packages');
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
+        return;
+    }
+
+    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
+    $hasTty = $interactiveRequested
+        && function_exists('posix_isatty')
+        && posix_isatty(STDIN)
+        && posix_isatty(STDOUT)
+        && posix_isatty(STDERR);
+    if ($interactiveRequested && !$hasTty) {
+        logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
+    }
+    $frontend = $hasTty ? 'readline' : 'noninteractive';
+    $inheritTty = $hasTty;
+    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
+
+    runCommand("$env apt-get purge -y 'nginx*'", true, null, $inheritTty);
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
+        return;
+    }
+    if (runCommand("$env apt-get install -y $opts nginx nginx-full nginx-common", true, null, $inheritTty) !== 0) {
+        logMessage('[WARN] dist-upgrade: nginx reinstall failed; leaving existing config in place');
+        return;
+    }
+
+    runCommand('/scripts/util/createNginxConfig.php --restart', true, null, $inheritTty);
+    if (runCommand('nginx -t', true, null, $inheritTty) !== 0) {
+        logMessage('[WARN] dist-upgrade: nginx -t still failing after reinstall');
+    }
 }
 
 /**
