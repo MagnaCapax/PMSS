@@ -26,6 +26,21 @@ function pmssUserConfigureHttp(array $ctx): void
 
     runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
 
+    // Keep qBittorrent WebUI host header validation disabled for reverse proxy access.
+    $qbittorrentConfig = "{$home}/.config/qBittorrent/qBittorrent.conf";
+    if (is_file($qbittorrentConfig)) {
+        $config = file_get_contents($qbittorrentConfig);
+        if ($config !== false && strpos($config, 'WebUI\\HostHeaderValidation=') !== false) {
+            $updated = preg_replace('/^WebUI\\\\HostHeaderValidation=.*$/m', 'WebUI\\HostHeaderValidation=false', $config, 1, $count);
+            if ($count > 0 && $updated !== null && $updated !== $config) {
+                file_put_contents($qbittorrentConfig, $updated);
+                if ($userLog) {
+                    $userLog('Updated qBittorrent WebUI HostHeaderValidation to false');
+                }
+            }
+        }
+    }
+
     $phpIniPath = "{$home}/.lighttpd/php.ini";
     if (file_exists($phpIniPath)) {
         $phpIni = parse_ini_file($phpIniPath);
