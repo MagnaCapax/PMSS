@@ -13,8 +13,6 @@ class ResourceStatsAccumulator
     /** @var array */
     private $compareTimes;
     /** @var array */
-    private $windowLabels;
-    /** @var array */
     private $rawTotals;
     /** @var array */
     private $memorySums;
@@ -38,17 +36,17 @@ class ResourceStatsAccumulator
     public function __construct(array $compareTimes)
     {
         $this->compareTimes = $compareTimes;
-        $this->windowLabels = array_keys($compareTimes);
+        $labels = array_keys($compareTimes);
         $this->rawTotals = [
-            'io_read'   => array_fill_keys($this->windowLabels, 0.0),
-            'io_write'  => array_fill_keys($this->windowLabels, 0.0),
-            'cpu'       => array_fill_keys($this->windowLabels, 0.0),
-            'ram_hours' => array_fill_keys($this->windowLabels, 0.0),
+            'io_read'   => array_fill_keys($labels, 0.0),
+            'io_write'  => array_fill_keys($labels, 0.0),
+            'cpu'       => array_fill_keys($labels, 0.0),
+            'ram_hours' => array_fill_keys($labels, 0.0),
         ];
-        $this->memorySums = array_fill_keys($this->windowLabels, 0.0);
-        $this->memoryCounts = array_fill_keys($this->windowLabels, 0);
-        $this->taskSums = array_fill_keys($this->windowLabels, 0.0);
-        $this->taskCounts = array_fill_keys($this->windowLabels, 0);
+        $this->memorySums = array_fill_keys($labels, 0.0);
+        $this->memoryCounts = array_fill_keys($labels, 0);
+        $this->taskSums = array_fill_keys($labels, 0.0);
+        $this->taskCounts = array_fill_keys($labels, 0);
         $this->dailyAccumulator = new ResourceStatsDailyAccumulator();
         $this->lastMemory = 0.0;
         $this->lastTasks = 0.0;

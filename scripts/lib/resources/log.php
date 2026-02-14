@@ -13,19 +13,11 @@ require_once __DIR__.'/userHelpers.php';
  */
 function pmssResourceLogEnsureDir(string $path, int $mode): bool
 {
-    if ($path === '' || $path[0] !== '/') {
+    if ($path === '' || $path[0] !== '/' || is_link($path) || (file_exists($path) && !is_dir($path))) {
         return false;
     }
-    if (is_link($path)) {
+    if (!is_dir($path) && !@mkdir($path, $mode, true)) {
         return false;
-    }
-    if (file_exists($path) && !is_dir($path)) {
-        return false;
-    }
-    if (!is_dir($path)) {
-        if (!@mkdir($path, $mode, true)) {
-            return false;
-        }
     }
     @chmod($path, $mode);
     return is_dir($path);

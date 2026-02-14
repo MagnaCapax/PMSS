@@ -36,10 +36,7 @@ class resourceStatistics
      */
     public function getData($user, $timePeriod = 10080)
     {
-        $lines = (int) $timePeriod;
-        if ($lines < 1) {
-            $lines = 1;
-        }
+        $lines = max(1, (int) $timePeriod);
         $path = escapeshellarg($this->resourceDir.'/'.$user);
         return trim(`tail -n{$lines} {$path} 2>/dev/null`);
     }
@@ -62,13 +59,9 @@ class resourceStatistics
             return false;
         }
 
-        $values = array_slice($tokens, 2);
-        if (count($values) < 5) {
-            return false;
-        }
-
+        $values = array_slice($tokens, 2, 5);
         $parsed = [];
-        foreach (array_slice($values, 0, 5) as $value) {
+        foreach ($values as $value) {
             if ($value === '' || !ctype_digit($value)) {
                 return false;
             }
