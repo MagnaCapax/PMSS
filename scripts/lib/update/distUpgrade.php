@@ -62,6 +62,7 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
 
     logMessage(sprintf('Initiating Debian %s → %s upgrade', $from, $next));
     pmssRewriteSources($from, $next);
+    pmssEnsureLibcryptBeforeUpgrade($from, $next);
     if (!pmssExecuteUpgrade()) {
         logMessage('dist-upgrade aborted: apt phase did not complete');
         return 1;
@@ -438,6 +439,45 @@ function pmssRemoveLegacyWireguardDkms(string $fromMajor, string $toMajor): void
     runCommand("$env apt-get purge -y wireguard-dkms", true);
     // Clean up DKMS registrations for the legacy module version; tolerate absence.
     runCommand('dkms remove wireguard/1.0.20210219 --all || true', true);
+}
+
+/**
+ * Ensure libcrypt1 is installed before Debian 11 → 12 upgrades.
+ */
+function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): void
+{
+    if ($fromMajor !== '11' || $toMajor !== '12') {
+        return;
+    }
+
+    logMessage('dist-upgrade: ensuring libcrypt1 is installed before Debian 11 → 12 upgrade');
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 preinstall');
+        return;
+    }
+
+    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
+    $hasTty = $interactiveRequested
+        && function_exists('posix_isatty')
+        && posix_isatty(STDIN)
+        && posix_isatty(STDOUT)
+        && posix_isatty(STDERR);
+    if ($interactiveRequested && !$hasTty) {
+        logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
+    }
+    $frontend = $hasTty ? 'readline' : 'noninteractive';
+    $inheritTty = $hasTty;
+    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
+
+    runCommand("$env apt-get update", true, null, $inheritTty);
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install');
+        return;
+    }
+    if (runCommand("$env apt-get install -y $opts libcrypt1", true, null, $inheritTty) !== 0) {
+        logMessage('[WARN] dist-upgrade: libcrypt1 preinstall failed; continuing');
+    }
 }
 
 /**
