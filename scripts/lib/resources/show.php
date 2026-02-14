@@ -90,6 +90,7 @@ function pmssResourceLoadUsers(string $statsDir): array
         exit(1);
     }
     $users = array_filter(array_map('trim', $lines), 'strlen');
+    $users = array_values(array_filter($users, 'pmssResourceLogIsValidUser'));
     if (empty($users)) {
         return [];
     }
