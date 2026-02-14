@@ -62,7 +62,10 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
 
     logMessage(sprintf('Initiating Debian %s → %s upgrade', $from, $next));
     pmssRewriteSources($from, $next);
-    pmssExecuteUpgrade();
+    if (!pmssExecuteUpgrade()) {
+        logMessage('dist-upgrade aborted: apt phase did not complete');
+        return 1;
+    }
     pmssEnsureFuseOverlayfsAfterDistUpgrade($next);
     return 0;
 }
@@ -258,13 +261,67 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
 }
 
 /**
+ * Wait for dpkg/apt locks to clear before running apt commands.
+ */
+function pmssWaitForDpkgLocks(int $timeoutSeconds = 1800, int $sleepSeconds = 5): bool
+{
+    $fuser = trim((string) @shell_exec('command -v fuser 2>/dev/null'));
+    if ($fuser === '') {
+        logMessage('[WARN] dist-upgrade: fuser not available; skipping dpkg lock checks');
+        return true;
+    }
+
+    $paths = [
+        '/var/lib/dpkg/lock-frontend',
+        '/var/lib/dpkg/lock',
+        '/var/lib/apt/lists/lock',
+        '/var/cache/apt/archives/lock',
+    ];
+
+    $start = time();
+    $announced = false;
+    while (pmssDpkgLockActive($paths)) {
+        if (!$announced) {
+            logMessage('dist-upgrade: dpkg lock detected; waiting for release');
+            $announced = true;
+        }
+        if ((time() - $start) >= $timeoutSeconds) {
+            logMessage('[ERROR] dist-upgrade: dpkg lock did not clear within '.$timeoutSeconds.' seconds');
+            return false;
+        }
+        sleep($sleepSeconds);
+    }
+
+    if ($announced) {
+        logMessage('dist-upgrade: dpkg lock cleared; continuing');
+    }
+
+    return true;
+}
+
+/**
+ * Check if any dpkg/apt lock files are currently held.
+ */
+function pmssDpkgLockActive(array $paths): bool
+{
+    foreach ($paths as $path) {
+        $rc = 1;
+        @exec('fuser '.escapeshellarg($path).' 2>/dev/null', $output, $rc);
+        if ($rc === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Execute the apt dist-upgrade sequence.
  *
  * Default behaviour is noninteractive (safe for automation). Operators may set
  * `PMSS_DIST_UPGRADE_INTERACTIVE=1` when running from a real TTY to allow debconf
  * prompts during the upgrade.
  */
-function pmssExecuteUpgrade(): void
+function pmssExecuteUpgrade(): bool
 {
     $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
     $hasTty = $interactiveRequested
@@ -279,6 +336,11 @@ function pmssExecuteUpgrade(): void
     $inheritTty = $hasTty;
     $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
+
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt phase');
+        return false;
+    }
 
     // Update package lists
     runCommand("$env apt-get update", true, null, $inheritTty);
@@ -300,7 +362,19 @@ function pmssExecuteUpgrade(): void
     );
 
     // Autoremove residuals
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove');
+        return false;
+    }
     runCommand("$env apt-get autoremove -y", true, null, $inheritTty);
+
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a');
+        return false;
+    }
+    runCommand('dpkg --configure -a', true, null, $inheritTty);
+
+    return true;
 }
 
 /**
@@ -311,14 +385,34 @@ function pmssExecuteUpgrade(): void
  */
 function pmssRunUpgradeWithRecovery(string $command, string $env, string $recoveryMessage, bool $inheritTty = false): void
 {
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt action');
+        return;
+    }
     if (runCommand($command, true, null, $inheritTty) === 0) {
         return;
     }
 
     logMessage($recoveryMessage);
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg recovery');
+        return;
+    }
     runCommand('dpkg --configure -a', true, null, $inheritTty);
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt recovery');
+        return;
+    }
     runCommand("$env apt-get -f install -y", true, null, $inheritTty);
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt update');
+        return;
+    }
     runCommand("$env apt-get update", true, null, $inheritTty);
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping apt retry');
+        return;
+    }
     runCommand($command, true, null, $inheritTty);
 }
 
