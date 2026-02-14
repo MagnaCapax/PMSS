@@ -67,6 +67,7 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
         logMessage('dist-upgrade aborted: apt phase did not complete');
         return 1;
     }
+    pmssEnsureInitrdAfterDistUpgrade();
     pmssEnsureFuseOverlayfsAfterDistUpgrade($next);
     return 0;
 }
@@ -122,6 +123,66 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
     if ($rc !== 0) {
         logMessage('[WARN] dist-upgrade: failed to install fuse-overlayfs; rootless Docker may fail or fall back to a slower storage driver');
     }
+}
+
+/**
+ * Ensure the newest kernel has a matching initrd before rebooting.
+ */
+function pmssEnsureInitrdAfterDistUpgrade(): void
+{
+    $kernelImages = glob('/boot/vmlinuz-*');
+    if (empty($kernelImages)) {
+        logMessage('[WARN] dist-upgrade: no kernel images found under /boot; skipping initrd check');
+        return;
+    }
+
+    $versions = [];
+    foreach ($kernelImages as $path) {
+        $base = basename($path);
+        if (strpos($base, 'vmlinuz-') !== 0) {
+            continue;
+        }
+        $version = substr($base, strlen('vmlinuz-'));
+        if ($version === '' || $version === 'old') {
+            continue;
+        }
+        $versions[] = $version;
+    }
+
+    if (empty($versions)) {
+        logMessage('[WARN] dist-upgrade: no usable kernel versions detected; skipping initrd check');
+        return;
+    }
+
+    usort($versions, 'version_compare');
+    $latest = end($versions);
+    if ($latest === false || $latest === '') {
+        logMessage('[WARN] dist-upgrade: unable to resolve newest kernel version; skipping initrd check');
+        return;
+    }
+
+    $initrd = '/boot/initrd.img-'.$latest;
+    if (file_exists($initrd)) {
+        logMessage('[SKIP] dist-upgrade: initrd present for kernel '.$latest);
+        return;
+    }
+
+    logMessage('dist-upgrade: initrd missing for kernel '.$latest.'; generating with update-initramfs');
+    if (!pmssWaitForDpkgLocks()) {
+        logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping initrd generation');
+        return;
+    }
+    if (runCommand('update-initramfs -c -k '.escapeshellarg($latest), true) !== 0) {
+        logMessage('[WARN] dist-upgrade: update-initramfs failed for kernel '.$latest);
+        return;
+    }
+
+    if (!file_exists($initrd)) {
+        logMessage('[WARN] dist-upgrade: initrd still missing for kernel '.$latest.' after update-initramfs');
+        return;
+    }
+
+    logMessage('dist-upgrade: initrd generated for kernel '.$latest);
 }
 
 /**
