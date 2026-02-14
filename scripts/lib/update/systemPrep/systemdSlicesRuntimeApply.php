@@ -21,14 +21,11 @@ require_once dirname(__DIR__, 2).'/runtime.php';
     ): void {
         // Ensure root (uid 0) slice is not limited: create user-0 specific override setting infinity/large limits.
         $rootDir = dirname($dropDir).'/user-0.slice.d';
-        if (!is_dir($rootDir)) {
-            @mkdir($rootDir, 0755, true);
-        }
+        is_dir($rootDir) || @mkdir($rootDir, 0755, true);
         // Use a suffix that sorts after legacy 99-pmss.conf drop-ins so root
         // remains unlimited even when a stale vendor file exists.
         $rootDrop = $rootDir.'/99-zz-pmss-unlimited.conf';
-        $rootConf = "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n";
-        @file_put_contents($rootDrop, $rootConf);
+        @file_put_contents($rootDrop, "[Slice]\nMemoryHigh=infinity\nMemoryMax=infinity\nTasksMax=infinity\n");
         @chmod($rootDrop, 0644);
         @unlink($rootDir.'/99-pmss-unlimited.conf');
         if ($skipSystemctl) {

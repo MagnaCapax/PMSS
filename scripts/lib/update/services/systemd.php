@@ -67,9 +67,7 @@ if (!function_exists('pmssEnsureSystemdServicesGuardBootUnit')) {
             return;
         }
 
-        $cfgDir = function_exists('pmssResolvePathFromEnv')
-            ? pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')
-            : '/etc/seedbox/config';
+        $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
 
         $template = $cfgDir.'/template.systemd.pmss-systemd-services-guard.service';
         if (!is_file($template)) {

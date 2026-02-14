@@ -21,6 +21,10 @@ VIOLATIONS=0
 
 scan_file() {
   local file="$1"
+  local rel="${file#"$ROOT_DIR"/}"
+  if command -v git >/dev/null 2>&1 && ! git -C "$ROOT_DIR" ls-files --error-unmatch "$rel" >/dev/null 2>&1; then
+    return
+  fi
   awk -v FILE="$file" '
     BEGIN { in_doc=0; pending_doc=""; violations=0; min_words=6; min_chars=30 }
     function has_description(doc){ return doc ~ /\*[ \t]*[^@][A-Za-z0-9]/ }

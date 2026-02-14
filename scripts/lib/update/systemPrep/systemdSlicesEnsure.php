@@ -50,9 +50,7 @@ require_once __DIR__.'/systemdSlicesRuntimeApply.php';
         $mode = pmssCgroupMode();
         $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_SLICE_DIR', '/etc/systemd/system/user-.slice.d');
         $target  = $dropDir.'/15-pmss.conf';
-        if (!is_dir($dropDir)) {
-            runStep('Creating user-.slice drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropDir));
-        }
+        is_dir($dropDir) || runStep('Creating user-.slice drop-in directory', 'install -d -m 0755 '.escapeshellarg($dropDir));
 
         // Render template based on cgroup mode
         $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');

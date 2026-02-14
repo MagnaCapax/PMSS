@@ -51,12 +51,9 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
         @unlink($tmpPath);
 
         $keyUrl = 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xC10E11090EC0E438';
-        $fetchCmd = null;
-        if (trim((string) @shell_exec('command -v wget 2>/dev/null')) !== '') {
-            $fetchCmd = sprintf('wget -qO %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl));
-        } else {
-            $fetchCmd = sprintf('curl -fsSL -o %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl));
-        }
+        $fetchCmd = trim((string) @shell_exec('command -v wget 2>/dev/null')) !== ''
+            ? sprintf('wget -qO %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl))
+            : sprintf('curl -fsSL -o %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl));
 
         if (runStep('Fetching MediaArea repository key', $fetchCmd) !== 0) {
             @unlink($tmpPath);
