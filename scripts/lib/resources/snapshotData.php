@@ -52,8 +52,7 @@ function pmssResourceSnapshotComputeFromLog(resourceStatistics $stats, string $u
 
     $threshold = time() - (24 * 60 * 60);
     $lines = array_filter(explode("\n", trim($dataLines)));
-    $compareTimes = ['day' => $threshold];
-    $accumulator = new ResourceStatsAccumulator($compareTimes);
+    $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
 
     foreach ($lines as $line) {
         $parsed = $stats->parseLine($line);

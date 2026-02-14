@@ -41,11 +41,9 @@ foreach ($users as $user) {
     $state = [];
     if (is_file($statePath)) {
         $rawState = @file_get_contents($statePath);
-        if (is_string($rawState) && trim($rawState) !== '') {
-            $decoded = json_decode($rawState, true);
-            if (is_array($decoded)) {
-                $state = $decoded;
-            }
+        $decoded = is_string($rawState) ? json_decode($rawState, true) : null;
+        if (is_array($decoded)) {
+            $state = $decoded;
         }
     }
 

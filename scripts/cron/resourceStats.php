@@ -7,16 +7,14 @@
  * @author PMSS Team
  */
 
-require_once '/scripts/lib/resources.php';
 require_once '/scripts/lib/resources/processor.php';
 
 $processor = new ResourceStatsProcessor(new resourceStatistics());
 $processor->ensureRuntime();
-$compareTimes = $processor->buildCompareTimes();
 
 if (($user = $processor->detectWorkerUser($argv)) !== null) {
     if ($processor->validateUser($user)) {
-        $processor->processUser($user, $compareTimes);
+        $processor->processUser($user, $processor->buildCompareTimes());
     } else {
         echo "Invalid user specified: {$user}\n";
     }
