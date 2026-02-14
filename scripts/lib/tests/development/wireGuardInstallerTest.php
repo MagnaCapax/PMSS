@@ -47,7 +47,7 @@ class WireGuardInstallerTest extends TestCase
         $this->withEnv([
             'PMSS_WG_DNS_IP'       => '10.0.0.1',
             'PMSS_WG_EXTERNAL_IP'  => '203.0.113.5',
-            'PMSS_WG_INTERFACE_IP' => null,
+            'PMSS_WG_INTERFACE_IP' => '10.0.0.2',
         ], function (): void {
             [$ip, $source] = \wgResolveEndpoint('seed.example.com');
             $this->assertEquals('203.0.113.5', $ip);
