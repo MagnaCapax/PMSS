@@ -1,0 +1,25 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/resources/showFormat.php';
+
+class ShowResourcesFormatTest extends TestCase
+{
+    public function testFormatBytesTiB(): void
+    {
+        $twoTiB = 2 * 1024 * 1024 * 1024 * 1024;
+        $this->assertTrue(strpos(\pmssResourceFormatBytes($twoTiB), 'TiB') !== false);
+    }
+
+    public function testFormatCpuHours(): void
+    {
+        $oneHourNsec = 3600 * 1000000000;
+        $this->assertEquals('1.0 hrs', \pmssResourceFormatCpuHours($oneHourNsec));
+    }
+
+    public function testFormatRamHoursDecimals(): void
+    {
+        $this->assertEquals('2.50 GB-hrs', \pmssResourceFormatRamHours(2.5));
+    }
+}

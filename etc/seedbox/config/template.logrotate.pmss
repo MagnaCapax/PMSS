@@ -56,6 +56,16 @@
     create 0600 root root
 }
 
+/var/log/pmss/resource-daily.log {
+    monthly
+    rotate 24
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0600 root root
+}
+
 /var/log/pmss/process-snapshot.log {
     weekly
     rotate 8
