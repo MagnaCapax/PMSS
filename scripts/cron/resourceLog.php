@@ -38,7 +38,16 @@ foreach ($users as $user) {
     }
 
     $statePath = $stateDir.'/'.$user.'.json';
-    $state = pmssResourceLogReadState($statePath);
+    $state = [];
+    if (is_file($statePath)) {
+        $rawState = @file_get_contents($statePath);
+        if (is_string($rawState) && trim($rawState) !== '') {
+            $decoded = json_decode($rawState, true);
+            if (is_array($decoded)) {
+                $state = $decoded;
+            }
+        }
+    }
 
     $currentRead = (int) $counters['io_read'];
     $currentWrite = (int) $counters['io_write'];
@@ -48,9 +57,9 @@ foreach ($users as $user) {
     $previousWrite = isset($state['io_write']) ? (int) $state['io_write'] : null;
     $previousCpu = isset($state['cpu_nsec']) ? (int) $state['cpu_nsec'] : null;
 
-    $deltaRead = pmssResourceLogDelta($currentRead, $previousRead);
-    $deltaWrite = pmssResourceLogDelta($currentWrite, $previousWrite);
-    $deltaCpu = pmssResourceLogDelta($currentCpu, $previousCpu);
+    $deltaRead = ($previousRead !== null && $currentRead >= $previousRead) ? $currentRead - $previousRead : $currentRead;
+    $deltaWrite = ($previousWrite !== null && $currentWrite >= $previousWrite) ? $currentWrite - $previousWrite : $currentWrite;
+    $deltaCpu = ($previousCpu !== null && $currentCpu >= $previousCpu) ? $currentCpu - $previousCpu : $currentCpu;
 
     $state = [
         'io_read'  => $currentRead,
@@ -60,7 +69,11 @@ foreach ($users as $user) {
         'tasks'    => (int) $counters['tasks'],
         'ts'       => time(),
     ];
-    pmssResourceLogWriteState($statePath, $state);
+    $payload = json_encode($state);
+    if (is_string($payload)) {
+        @file_put_contents($statePath, $payload);
+        @chmod($statePath, 0600);
+    }
 
     $line = sprintf(
         '%s %d %d %d %d %d',

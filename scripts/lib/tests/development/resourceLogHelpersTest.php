@@ -42,33 +42,6 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!\pmssResourceLogEnsureDir($link, 0700));
     }
 
-    public function testReadStateMissingReturnsEmpty(): void
-    {
-        $root = $this->makeRoot();
-        $state = \pmssResourceLogReadState($root.'/missing.json');
-        $this->assertTrue($state === []);
-    }
-
-    public function testWriteStateRoundTrip(): void
-    {
-        $root = $this->makeRoot();
-        $path = $root.'/state.json';
-        $payload = ['io_read' => 123, 'io_write' => 456];
-        \pmssResourceLogWriteState($path, $payload);
-        $loaded = \pmssResourceLogReadState($path);
-        $this->assertEquals($payload, $loaded);
-    }
-
-    public function testDeltaUsesPreviousWhenAvailable(): void
-    {
-        $this->assertEquals(50, \pmssResourceLogDelta(150, 100));
-    }
-
-    public function testDeltaHandlesCounterReset(): void
-    {
-        $this->assertEquals(90, \pmssResourceLogDelta(90, 100));
-    }
-
     public function testUserValidationRejectsUppercase(): void
     {
         $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));

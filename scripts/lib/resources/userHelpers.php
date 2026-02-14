@@ -61,14 +61,3 @@ function pmssResourceLogIsValidUser(string $user): bool
     }
     return true;
 }
-
-/**
- * Compute delta for cumulative counters with reset handling.
- */
-function pmssResourceLogDelta(int $current, ?int $previous): int
-{
-    if ($previous !== null && $current >= $previous) {
-        return $current - $previous;
-    }
-    return $current;
-}

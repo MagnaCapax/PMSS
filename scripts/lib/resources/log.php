@@ -64,32 +64,3 @@ function pmssResourceLogReadCounters(int $uid): ?array
     }
     return $values;
 }
-
-/**
- * Load the last-seen counters from a state file.
- */
-function pmssResourceLogReadState(string $path): array
-{
-    if (!is_file($path)) {
-        return [];
-    }
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || trim($raw) === '') {
-        return [];
-    }
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
-}
-
-/**
- * Persist the latest counters to a state file.
- */
-function pmssResourceLogWriteState(string $path, array $state): void
-{
-    $payload = json_encode($state);
-    if (!is_string($payload)) {
-        return;
-    }
-    @file_put_contents($path, $payload);
-    @chmod($path, 0600);
-}
