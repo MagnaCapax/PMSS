@@ -28,7 +28,11 @@ class resourceStatistics
     }
 
     /**
-     * Fetch raw resource log lines for a user from the PMSS log directory.
+     * Fetch resource log lines for a user from the PMSS log directory.
+     *
+     * @param string $user Username to load resource log entries for.
+     * @param int $timePeriod Number of log lines to read from tail.
+     * @return string Raw log text, possibly empty when no entries exist.
      */
     public function getData($user, $timePeriod = 10080)
     {
@@ -41,8 +45,9 @@ class resourceStatistics
     }
 
     /**
-     * Parse a single resource log line into structured data.
+     * Parse a single resource log line into structured numeric fields.
      *
+     * @param string $thisLine Raw log line to parse.
      * @return array|false
      */
     public function parseLine($thisLine)
@@ -81,7 +86,11 @@ class resourceStatistics
     }
 
     /**
-     * Persist the computed resource statistics for a user.
+     * Persist computed resource statistics for a user to storage.
+     *
+     * @param string $user Username receiving the resource statistics.
+     * @param array $data Structured resource statistics payload.
+     * @return void
      */
     public function saveUserResources($user, $data): void
     {
