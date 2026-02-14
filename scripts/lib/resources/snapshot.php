@@ -11,16 +11,6 @@ require_once __DIR__.'/snapshotData.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 
-function pmssResourceSnapshotNow(): string
-{
-    return date('Y-m-d\\TH:i:s');
-}
-
-function pmssResourceSnapshotAppendLine($fh, string $line): void
-{
-    @fwrite($fh, $line.PHP_EOL);
-}
-
 /**
  * Capture and persist one snapshot.
  *
@@ -35,7 +25,7 @@ function pmssResourceSnapshotRun(): int
 
     $logPath = getenv('PMSS_RESOURCE_SNAPSHOT_LOG') ?: PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT;
     $logDir = dirname($logPath);
-    $ts = pmssResourceSnapshotNow();
+    $ts = date('Y-m-d\\TH:i:s');
 
     $oldUmask = umask(0077);
     if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
@@ -82,11 +72,11 @@ function pmssResourceSnapshotRun(): int
         }
 
         if ($metrics === null) {
-            pmssResourceSnapshotAppendLine($fh, $ts.' WARN resource_missing user='.$user);
+            @fwrite($fh, $ts.' WARN resource_missing user='.$user.PHP_EOL);
             continue;
         }
 
-        pmssResourceSnapshotAppendLine(
+        @fwrite(
             $fh,
             sprintf(
                 '%s %d %d %d %d %d %.4f %.2f',
@@ -98,7 +88,7 @@ function pmssResourceSnapshotRun(): int
                 (int) round($metrics['memory']),
                 $metrics['ram_hours'],
                 $metrics['tasks']
-            )
+            ).PHP_EOL
         );
     }
 

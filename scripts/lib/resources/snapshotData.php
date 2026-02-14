@@ -24,25 +24,23 @@ function pmssResourceSnapshotReadUserData(string $path): ?array
 
 function pmssResourceSnapshotExtractDay(array $data): ?array
 {
-    $ioRead = $data['io_read']['raw']['day'] ?? null;
-    $ioWrite = $data['io_write']['raw']['day'] ?? null;
-    $cpu = $data['cpu']['raw']['day'] ?? null;
-    $memory = $data['memory']['raw']['day'] ?? null;
-    $ramHours = $data['ram_hours']['raw']['day'] ?? null;
-    $tasks = $data['tasks']['raw']['day'] ?? null;
+    $fields = [
+        'io_read' => $data['io_read']['raw']['day'] ?? null,
+        'io_write' => $data['io_write']['raw']['day'] ?? null,
+        'cpu' => $data['cpu']['raw']['day'] ?? null,
+        'memory' => $data['memory']['raw']['day'] ?? null,
+        'ram_hours' => $data['ram_hours']['raw']['day'] ?? null,
+        'tasks' => $data['tasks']['raw']['day'] ?? null,
+    ];
 
-    if ($ioRead === null || $ioWrite === null || $cpu === null || $memory === null || $ramHours === null || $tasks === null) {
-        return null;
+    foreach ($fields as $key => $value) {
+        if ($value === null) {
+            return null;
+        }
+        $fields[$key] = (float) $value;
     }
 
-    return [
-        'io_read' => (float) $ioRead,
-        'io_write' => (float) $ioWrite,
-        'cpu' => (float) $cpu,
-        'memory' => (float) $memory,
-        'ram_hours' => (float) $ramHours,
-        'tasks' => (float) $tasks,
-    ];
+    return $fields;
 }
 
 function pmssResourceSnapshotComputeFromLog(resourceStatistics $stats, string $user): ?array

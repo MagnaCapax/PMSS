@@ -47,40 +47,23 @@ function pmssResourceLogReadCounters(int $uid): ?array
         return null;
     }
 
-    $values = [
-        'io_read'  => null,
-        'io_write' => null,
-        'cpu_nsec' => null,
-        'memory'   => null,
-        'tasks'    => null,
+    $keys = [
+        'IOReadBytes' => 'io_read',
+        'IOWriteBytes' => 'io_write',
+        'CPUUsageNSec' => 'cpu_nsec',
+        'MemoryCurrent' => 'memory',
+        'TasksCurrent' => 'tasks',
     ];
+    $values = array_fill_keys(array_values($keys), null);
 
     foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-        if (strpos($line, 'IOReadBytes=') === 0) {
-            $value = substr($line, strlen('IOReadBytes='));
-            if (ctype_digit($value)) {
-                $values['io_read'] = (int) $value;
-            }
-        } elseif (strpos($line, 'IOWriteBytes=') === 0) {
-            $value = substr($line, strlen('IOWriteBytes='));
-            if (ctype_digit($value)) {
-                $values['io_write'] = (int) $value;
-            }
-        } elseif (strpos($line, 'CPUUsageNSec=') === 0) {
-            $value = substr($line, strlen('CPUUsageNSec='));
-            if (ctype_digit($value)) {
-                $values['cpu_nsec'] = (int) $value;
-            }
-        } elseif (strpos($line, 'MemoryCurrent=') === 0) {
-            $value = substr($line, strlen('MemoryCurrent='));
-            if (ctype_digit($value)) {
-                $values['memory'] = (int) $value;
-            }
-        } elseif (strpos($line, 'TasksCurrent=') === 0) {
-            $value = substr($line, strlen('TasksCurrent='));
-            if (ctype_digit($value)) {
-                $values['tasks'] = (int) $value;
-            }
+        $parts = explode('=', $line, 2);
+        if (count($parts) !== 2 || !isset($keys[$parts[0]])) {
+            continue;
+        }
+        $value = $parts[1];
+        if (ctype_digit($value)) {
+            $values[$keys[$parts[0]]] = (int) $value;
         }
     }
 
