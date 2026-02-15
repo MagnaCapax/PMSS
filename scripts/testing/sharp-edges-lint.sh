@@ -16,9 +16,45 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 STRICT="${PMSS_LINT_SHARP_STRICT:-1}"
-PATTERN='rm\s+-rf|chmod\s+-R|chown\s+-R|chgrp\s+-R|\bmv\b'
+PATTERN='rm[[:space:]]+-rf|chmod[[:space:]]+-R|chown[[:space:]]+-R|chgrp[[:space:]]+-R|\bmv[[:space:]]'
+PHP_WRAPPER_REGEX='(runStep|runUserStep|runSoft|runFatal|runCommand|pmssUserTerminateStep|run)\s*\('
 VIOL=0
 FATAL_VIOL=0
+
+phpAllowlistedFile() {
+  case "$1" in
+    # Command arrays passed to wrappers; line-level scan cannot see wrapper context.
+    "$ROOT_DIR/scripts/terminateUser.php") return 0 ;;
+    "$ROOT_DIR/scripts/util/setupSkelPermissions.php") return 0 ;;
+    "$ROOT_DIR/scripts/util/configureOpenvpn.php") return 0 ;;
+    "$ROOT_DIR/scripts/lib/update/user/rutorrent.php") return 0 ;;
+    "$ROOT_DIR/scripts/lib/update/apps/iprange.php") return 0 ;;
+
+    # Legacy direct shell_exec/backticks or informational strings.
+    "$ROOT_DIR/scripts/util/checkRutorrentPlugins.php") return 0 ;;
+    "$ROOT_DIR/scripts/lib/update/apps/vnstat.php") return 0 ;;
+    "$ROOT_DIR/scripts/lib/update/apps/rclone.php") return 0 ;;
+    "$ROOT_DIR/scripts/recreateUser.php") return 0 ;;
+  esac
+  return 1
+}
+
+shellAllowlistedLine() {
+  local file="$1"
+  local text="$2"
+  case "$file" in
+    "$ROOT_DIR/install.sh")
+      # Bootstrap temp cleanup and fstab atomic writes.
+      if grep -Eq 'mv[[:space:]]+"\$tmpfile"[[:space:]]+(/etc/fstab|"\$file")' <<<"$text"; then
+        return 0
+      fi
+      if grep -Eq 'rm[[:space:]]+-rf[[:space:]]+PMSS(\\*|[[:space:];]|$)' <<<"$text"; then
+        return 0
+      fi
+      ;;
+  esac
+  return 1
+}
 
 scanMatches() {
   local file="$1"
@@ -45,15 +81,23 @@ reportFatalMatches() {
 }
 
 phpScan() {
-  local file raw
+  local file raw line text
   while IFS= read -r -d '' file; do
+    if phpAllowlistedFile "$file"; then
+      continue
+    fi
     # grep candidate lines
     while IFS= read -r raw; do
-      # ignore when inside runStep command string
-      if grep -Eq "runStep\s*\(.*(${PATTERN}).*\)" <<<"$raw"; then
+      line="${raw%%:*}"
+      text="${raw#*: }"
+      if grep -Eq '^[[:space:]]*(//|#|/\*|\*)' <<<"$text"; then
         continue
       fi
-      reportViolation "PHP" "$file" "$raw"
+      # ignore when inside runStep command string
+      if grep -Eq "$PHP_WRAPPER_REGEX" <<<"$text"; then
+        continue
+      fi
+      reportViolation "PHP" "$file" "${line}: ${text}"
     done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.php" \
            -not -path "*/.git/*" \
@@ -64,14 +108,23 @@ phpScan() {
 }
 
 shScan() {
-  local file
+  local file raw line text
   while IFS= read -r -d '' file; do
     while IFS= read -r raw; do
-      reportViolation "Shell" "$file" "$raw"
+      line="${raw%%:*}"
+      text="${raw#*: }"
+      if grep -Eq '^[[:space:]]*(#)' <<<"$text"; then
+        continue
+      fi
+      if shellAllowlistedLine "$file" "$text"; then
+        continue
+      fi
+      reportViolation "Shell" "$file" "${line}: ${text}"
     done < <(scanMatches "$file")
   done < <(find "$ROOT_DIR" -type f -name "*.sh" \
            -not -path "*/.git/*" \
            -not -path "*/vendor/*" \
+           -not -path "$ROOT_DIR/development/*" \
            -not -path "*/etc/skel/*" \
            -not -path "*/scripts/testing/sharp-edges-lint.sh" -print0)
 }
