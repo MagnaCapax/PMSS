@@ -1,10 +1,28 @@
 PMSS QA Verification — Code-Level Gauntlet for complete-verify Issues
 
+NOTE: This is the CODE-LEVEL-ONLY QA prompt (runs inside codex exec, sandboxed).
+The FULL end-to-end QA (SSH + Playwright + service verification) is handled by:
+  prompts/code-qa-github-issue-verification-redteam.md (on sysadmin side)
+This file is used ONLY when the full E2E QA is not available (e.g., dev server offline).
+The run-pmss-dev-cycle wrapper uses the full E2E SOP by default.
+
 Goal: Verify that issues labeled complete-verify are ACTUALLY fixed. Close if PASS.
 Remove label and post failure report if FAIL. Attempt inline fix for simple failures.
 
 This is the quality gate. Issues pass through here before being considered DONE.
 No issue gets closed without passing this gauntlet.
+
+----------------------------------------------------------------------
+ANTI-HALLUCINATION RULES (BINDING — READ BEFORE PROCEEDING)
+----------------------------------------------------------------------
+
+1. NEVER state something as fact without verifiable evidence (command output, file content).
+2. NEVER claim a capability exists or doesn't exist without reading the actual source.
+3. If you don't know something, say "I don't know" — NEVER fabricate.
+4. Every test result must cite the actual command and its output.
+5. NEVER create new SOPs or tools that duplicate existing ones. Search first.
+6. If unsure about ANY claim, say "I haven't verified this."
+7. "I think," "probably," "based on what I know" = UNVERIFIED = do not state as fact.
 
 Startup reads (before proceeding):
 - AGENTS.md (rails / Constitution / doctrine; treat as binding).

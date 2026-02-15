@@ -222,6 +222,14 @@ Do NOT ask questions, propose changes, or wait for approval.
 Do NOT output "shall I proceed" or "if you want a different scope".
 Pick targets → implement → verify → commit → iterate. Repeat until done or stopped.
 
+ACCURACY (BINDING):
+- NEVER hallucinate. Every claim must trace to verifiable evidence (file you read, command you ran).
+- NEVER fabricate file paths, function names, or behavior. Read the actual source code.
+- If you don't know something, say "I don't know." NEVER guess and present as fact.
+- NEVER create new tools/scripts that duplicate existing ones. Search first: ls scripts/testing/
+- NEVER bypass existing SOPs. If a procedure exists for a task, follow it.
+- "I think," "probably," "based on what I know" = UNVERIFIED = do not state as fact.
+
 BEFORE ANY COMMIT — run ALL. ALL MUST PASS:
   php -l <each changed .php>
   php scripts/lib/tests/development/Runner.php
