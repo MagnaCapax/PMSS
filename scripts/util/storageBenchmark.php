@@ -17,26 +17,34 @@
 require_once __DIR__.'/../lib/runtime.php';
 
 function usage(): void {
-    echo "\nStorage benchmark (non-destructive)\n";
-    echo "Usage: storageBenchmark.php [options]\n\n";
-    echo "Core options:\n";
-    echo "  --target <dir>            Directory for file-backed tests (default /home)\n";
-    echo "  --size <bytes|MiB|GiB>    Target file size (default 500G, capped to 80% free)\n";
-    echo "  --runtime <seconds>       Per-test runtime for volume fio tests (default 60)\n";
-    echo "  --label <name>            Tag results (e.g., hostname/site/array)\n";
-    echo "  --json <path>             JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl)\n";
-    echo "  (also accepts --key=value form for all options above)\n\n";
-    echo "Device options (read-only):\n";
-    echo "  --devices                 Enable per-device tests (dd seqread + fio randread)\n";
-    echo "  --dd-size <MiB|GiB>       Size for dd seqread per device (default 1G)\n";
-    echo "  --device-runtime <sec>    Per-device fio runtime (default 30)\n\n";
-    echo "Idle checks:\n";
-    echo "  --require-idle            Abort if busy (ioping/iostat exceed thresholds)\n";
-    echo "  --idle-latency-ms <ms>    ioping avg latency threshold (default 100)\n";
-    echo "  --idle-util <percent>     iostat util threshold (default 85)\n\n";
-    echo "Other:\n";
-    echo "  --show-last               Print the last run's human summary and exit\n";
-    echo "  --help                    Show this help\n\n";
+    echo <<<'USAGE'
+
+Storage benchmark (non-destructive)
+Usage: storageBenchmark.php [options]
+
+Core options:
+  --target <dir>            Directory for file-backed tests (default /home)
+  --size <bytes|MiB|GiB>    Target file size (default 500G, capped to 80% free)
+  --runtime <seconds>       Per-test runtime for volume fio tests (default 60)
+  --label <name>            Tag results (e.g., hostname/site/array)
+  --json <path>             JSON Lines log (default /var/log/pmss/benchmark-storage.jsonl)
+  (also accepts --key=value form for all options above)
+
+Device options (read-only):
+  --devices                 Enable per-device tests (dd seqread + fio randread)
+  --dd-size <MiB|GiB>       Size for dd seqread per device (default 1G)
+  --device-runtime <sec>    Per-device fio runtime (default 30)
+
+Idle checks:
+  --require-idle            Abort if busy (ioping/iostat exceed thresholds)
+  --idle-latency-ms <ms>    ioping avg latency threshold (default 100)
+  --idle-util <percent>     iostat util threshold (default 85)
+
+Other:
+  --show-last               Print the last run's human summary and exit
+  --help                    Show this help
+
+USAGE;
 }
 
 // Parameters

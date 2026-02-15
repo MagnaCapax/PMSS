@@ -139,7 +139,6 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
         ['label' => 'dockerd-rootless', 'cmd' => 'pgrep -u %s -f dockerd-rootless 2>&1'],
         ['label' => 'dockerd', 'cmd' => 'pgrep -u %s -x dockerd 2>&1'],
     ];
-    $pgrepMissing = false;
     $checkOkLocal = true;
 
     foreach ($checks as $check) {
@@ -148,7 +147,6 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
         $cmd = sprintf($check['cmd'], escapeshellarg($user));
         exec($cmd, $out, $rc);
         if ($rc === 127) {
-            $pgrepMissing = true;
             $checkOkLocal = false;
             break;
         }
@@ -175,7 +173,7 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
         }
     }
 
-    if ($pgrepMissing) {
+    if (!$checkOkLocal) {
         $out = [];
         $rc = 0;
         $cmd = sprintf('ps -u %s -o pid=,cmd= 2>&1', escapeshellarg($user));
@@ -242,15 +240,14 @@ if ($action === 'status') {
         echo "docker socket: not found at {$dockerSock}\n";
     }
     if ($debug) {
-        $runtimeDir = "/run/user/{$uid}";
         echo "debug: home={$home}\n";
-        echo "debug: runtime_dir={$runtimeDir}\n";
+        echo "debug: runtime_dir=/run/user/{$uid}\n";
         echo "debug: unit_path={$dockerUnitPath}\n";
         echo "debug: process_check_ok=".($processCheckOk ? 'yes' : 'no')."\n";
         pmssUserLog($user, sprintf(
             'userDocker: debug status home=%s runtime_dir=%s unit_path=%s socket=%s process_check_ok=%s',
             $home,
-            $runtimeDir,
+            "/run/user/{$uid}",
             $dockerUnitPath,
             file_exists($dockerSock) ? 'present' : 'missing',
             $processCheckOk ? 'yes' : 'no'
@@ -313,8 +310,6 @@ if ($action === 'start' || $action === 'restart') {
     );
     userDockerRunAs($user, $envCmd, $userDockerStartTimeoutSec);
     echo "Docker start requested for {$user} via dockerd-rootless.sh\n";
-    exit(0);
 }
 
 // Should not be reached.
-exit(0);

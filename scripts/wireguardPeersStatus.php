@@ -144,11 +144,7 @@ echo str_pad('USER', 16)
     ."ENDPOINT\n";
 
 foreach ($peers as $peer) {
-    $key   = $peer['key'];
-    $ip    = $peer['ip'];
-    $user  = $peer['user'];
-
-    $entry     = $status[$key] ?? null;
+    $entry     = $status[$peer['key']] ?? null;
     $connected = 'no';
     $rx        = '-';
     $tx        = '-';
@@ -163,8 +159,8 @@ foreach ($peers as $peer) {
         }
     }
 
-    echo str_pad($user, 16)
-        .str_pad($ip, 18)
+    echo str_pad($peer['user'], 16)
+        .str_pad($peer['ip'], 18)
         .str_pad($connected, 12)
         .str_pad($rx, 14)
         .str_pad($tx, 14)
