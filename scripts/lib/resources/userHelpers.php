@@ -29,12 +29,11 @@ function pmssResourceLogLookupUid(string $user): ?int
  */
 function pmssResourceLogLoadUsers(): array
 {
-    $usersRaw = @shell_exec('/scripts/listUsers.php');
-    $usersRaw = is_string($usersRaw) ? trim($usersRaw) : '';
-    $users = array_filter(explode("\n", $usersRaw));
-    if (empty($users)) {
+    $usersRaw = trim((string) @shell_exec('/scripts/listUsers.php'));
+    if ($usersRaw === '') {
         return [];
     }
+    $users = array_filter(explode("\n", $usersRaw));
     $users[] = 'www-data';
     return $users;
 }

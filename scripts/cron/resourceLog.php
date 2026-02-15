@@ -40,32 +40,25 @@ foreach ($users as $user) {
     $statePath = $stateDir.'/'.$user.'.json';
     $state = [];
     if (is_file($statePath)) {
-        $rawState = @file_get_contents($statePath);
-        $decoded = is_string($rawState) ? json_decode($rawState, true) : null;
+        $decoded = json_decode((string) @file_get_contents($statePath), true);
         if (is_array($decoded)) {
             $state = $decoded;
         }
     }
 
-    $currentRead = (int) $counters['io_read'];
-    $currentWrite = (int) $counters['io_write'];
-    $currentCpu = (int) $counters['cpu_nsec'];
+    $current = [];
+    $delta = [];
+    foreach (['io_read', 'io_write', 'cpu_nsec'] as $field) {
+        $currentValue = (int) $counters[$field];
+        $previousValue = isset($state[$field]) ? (int) $state[$field] : null;
+        $current[$field] = $currentValue;
+        $delta[$field] = ($previousValue !== null && $currentValue >= $previousValue) ? $currentValue - $previousValue : $currentValue;
+    }
 
-    $previousRead = isset($state['io_read']) ? (int) $state['io_read'] : null;
-    $previousWrite = isset($state['io_write']) ? (int) $state['io_write'] : null;
-    $previousCpu = isset($state['cpu_nsec']) ? (int) $state['cpu_nsec'] : null;
-
-    $deltaRead = ($previousRead !== null && $currentRead >= $previousRead) ? $currentRead - $previousRead : $currentRead;
-    $deltaWrite = ($previousWrite !== null && $currentWrite >= $previousWrite) ? $currentWrite - $previousWrite : $currentWrite;
-    $deltaCpu = ($previousCpu !== null && $currentCpu >= $previousCpu) ? $currentCpu - $previousCpu : $currentCpu;
-
-    $state = [
-        'io_read'  => $currentRead,
-        'io_write' => $currentWrite,
-        'cpu_nsec' => $currentCpu,
-        'memory'   => (int) $counters['memory'],
-        'tasks'    => (int) $counters['tasks'],
-        'ts'       => time(),
+    $state = $current + [
+        'memory' => (int) $counters['memory'],
+        'tasks' => (int) $counters['tasks'],
+        'ts' => time(),
     ];
     $payload = json_encode($state);
     if (is_string($payload)) {
@@ -76,9 +69,9 @@ foreach ($users as $user) {
     $line = sprintf(
         '%s %d %d %d %d %d',
         date('Y-m-d H:i:s'),
-        $deltaRead,
-        $deltaWrite,
-        $deltaCpu,
+        $delta['io_read'],
+        $delta['io_write'],
+        $delta['cpu_nsec'],
         $state['memory'],
         $state['tasks']
     );

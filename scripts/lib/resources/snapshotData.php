@@ -24,16 +24,10 @@ function pmssResourceSnapshotReadUserData(string $path): ?array
 
 function pmssResourceSnapshotExtractDay(array $data): ?array
 {
-    $fields = [
-        'io_read' => $data['io_read']['raw']['day'] ?? null,
-        'io_write' => $data['io_write']['raw']['day'] ?? null,
-        'cpu' => $data['cpu']['raw']['day'] ?? null,
-        'memory' => $data['memory']['raw']['day'] ?? null,
-        'ram_hours' => $data['ram_hours']['raw']['day'] ?? null,
-        'tasks' => $data['tasks']['raw']['day'] ?? null,
-    ];
-
-    foreach ($fields as $key => $value) {
+    $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'];
+    $fields = [];
+    foreach ($keys as $key) {
+        $value = $data[$key]['raw']['day'] ?? null;
         if ($value === null) {
             return null;
         }
