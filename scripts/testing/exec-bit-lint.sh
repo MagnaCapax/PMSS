@@ -1,40 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# exec-bit-lint.sh — verify required scripts are executable
+# exec-bit-lint.sh — verify PHP executable bits match shebang usage
 #
-# Default scope focuses on commonly executed CLIs. Expand as needed.
+# Rules:
+# - PHP files with a php shebang must be executable.
+# - PHP files without a shebang must not be executable.
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 fail=0
 
-must_exec=(
-  development/codex.sh
-  development/codex-run.sh
-  development/codex-refactor.sh
-  development/ci.sh
-  development/ci-logs.sh
-  development/ci-codex.sh
-  development/adr-list.sh
-  development/fix-exec-bits.sh
-)
-
-# Recursively find .php files in util and cron that should be executable
 while IFS= read -r -d '' file; do
-  must_exec+=("$file")
-done < <(find scripts/util scripts/cron -type f -name "*.php" -print0)
-
-for f in "${must_exec[@]}"; do
-  if [[ ! -f "$f" ]]; then
-    echo "[exec-lint] missing: $f" >&2; fail=1; continue
+  first_line="$(head -n1 "$file")"
+  if [[ "$first_line" == '#!'*php* ]]; then
+    if [[ ! -x "$file" ]]; then
+      echo "[exec-lint] missing exec bit for php shebang: $file  (fix: chmod +x $file)" >&2
+      fail=1
+    fi
+  else
+    if [[ -x "$file" ]]; then
+      echo "[exec-lint] unexpected exec bit (no php shebang): $file  (fix: chmod -x $file)" >&2
+      fail=1
+    fi
   fi
-  if [[ ! -x "$f" ]]; then
-    echo "[exec-lint] not executable: $f  (fix: chmod +x $f)" >&2
-    fail=1
-  fi
-done
+done < <(find "$ROOT_DIR" -type f -name "*.php" \
+  -not -path "*/.git/*" \
+  -not -path "*/vendor/*" \
+  -not -path "*/etc/skel/*" \
+  -not -path "*/scripts/lib/devristo/*" -print0)
 
 if [[ $fail -ne 0 ]]; then
   echo "exec-bit-lint: $fail issue(s) found" >&2
