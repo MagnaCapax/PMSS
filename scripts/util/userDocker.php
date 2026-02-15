@@ -159,14 +159,6 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
                     $pids[(int) $pid] = true;
                 }
             }
-            if ($debug) {
-                $joined = implode(' | ', $out);
-                if (strlen($joined) > 300) {
-                    $joined = substr($joined, 0, 300).'...';
-                }
-                pmssUserLog($user, sprintf('userDocker: %s pgrep rc=%d out=%s', $check['label'], $rc, $joined !== '' ? $joined : '(empty)'));
-            }
-            continue;
         }
         if ($debug) {
             $joined = implode(' | ', $out);
@@ -174,6 +166,9 @@ function userDockerCollectPids(string $user, bool $debug = false, ?bool &$checkO
                 $joined = substr($joined, 0, 300).'...';
             }
             pmssUserLog($user, sprintf('userDocker: %s pgrep rc=%d out=%s', $check['label'], $rc, $joined !== '' ? $joined : '(empty)'));
+        }
+        if ($rc === 0) {
+            continue;
         }
         if ($rc !== 1) {
             pmssUserLog($user, sprintf('[WARN] Failed to check %s process state (rc=%d): %s', $check['label'], $rc, implode(' | ', $out)));

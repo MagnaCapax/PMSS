@@ -42,13 +42,11 @@ logMessage('[quotaFix] Starting quota integrity check');
 
 // 1. Report current status before any changes
 logMessage('[quotaFix] Current quota state:');
-$before = shell_exec('repquota -as 2>&1');
-echo $before;
+echo shell_exec('repquota -as 2>&1');
 
 // 2. Disable quotas to allow safe recalculation
 logMessage('[quotaFix] Disabling quotas for recalculation');
-$offResult = shell_exec('quotaoff -av 2>&1');
-echo $offResult;
+echo shell_exec('quotaoff -av 2>&1');
 
 // 3. Remove any stale/interrupted check files from previous runs
 logMessage('[quotaFix] Cleaning stale quota check files');
@@ -78,13 +76,11 @@ usleep(500000);
 
 // 6. Re-enable quotas
 logMessage('[quotaFix] Re-enabling quotas');
-$onResult = shell_exec('quotaon -av 2>&1');
-echo $onResult;
+echo shell_exec('quotaon -av 2>&1');
 
 // 7. Report final status for visual comparison
 logMessage('[quotaFix] Final quota state:');
-$after = shell_exec('repquota -as 2>&1');
-echo $after;
+echo shell_exec('repquota -as 2>&1');
 
 logMessage('[quotaFix] Quota integrity check complete');
 
