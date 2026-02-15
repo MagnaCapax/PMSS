@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../update.php';
 require_once __DIR__.'/distro.php';
+require_once __DIR__.'/userMaintenance.php';
 
 /**
  * Entry point used by scripts/update.php for --dist-upgrade runs.
@@ -70,6 +71,12 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
     pmssEnsureInitrdAfterDistUpgrade();
     pmssRepairNginxAfterDistUpgrade();
     pmssEnsureFuseOverlayfsAfterDistUpgrade($next);
+    pmssRepairDockerRootlessAfterDistUpgrade($next);
+    if (function_exists('pmssEnsureBootDefaults')) {
+        pmssEnsureBootDefaults();
+    } else {
+        logMessage('[WARN] dist-upgrade: boot defaults helper missing; skipping GRUB and hidepid checks');
+    }
     return 0;
 }
 
@@ -123,6 +130,85 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
     $rc = runCommand("$env apt-get install -y $opts fuse-overlayfs", true, null, $inheritTty);
     if ($rc !== 0) {
         logMessage('[WARN] dist-upgrade: failed to install fuse-overlayfs; rootless Docker may fail or fall back to a slower storage driver');
+    }
+}
+
+/**
+ * Repair rootless Docker state for existing users after a dist-upgrade.
+ */
+function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
+{
+    if ((int) $toMajor < 11) {
+        return;
+    }
+
+    if (!class_exists('users')) {
+        logMessage('[WARN] dist-upgrade: users helper missing; skipping rootless Docker repair');
+        return;
+    }
+    if (!function_exists('pmssEnsureRootlessDockerInstalled') || !function_exists('pmssEnsureDockerDependencies')) {
+        logMessage('[WARN] dist-upgrade: rootless Docker helpers missing; skipping rootless repair');
+        return;
+    }
+
+    if ((string) getenv('PMSS_DISTRO_VERSION') === '') {
+        putenv('PMSS_DISTRO_VERSION='.(string) ((int) $toMajor));
+    }
+
+    $users = users::listHomeUsers();
+    sort($users, SORT_NATURAL | SORT_FLAG_CASE);
+    $targets = [];
+
+    foreach ($users as $user) {
+        $userTrim = trim($user);
+        if ($userTrim === '') {
+            continue;
+        }
+        $normalized = pmssNormalizeUsername($userTrim);
+        if ($normalized !== $userTrim || !pmssValidateUsername($userTrim)) {
+            logMessage(sprintf('[WARN] dist-upgrade: skipping invalid username: %s', $userTrim));
+            continue;
+        }
+
+        $home = '/home/'.$userTrim;
+        if (!is_dir($home)) {
+            continue;
+        }
+        if (is_dir($home.'/www-disabled')) {
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');
+            }
+            continue;
+        }
+
+        $configFile = $home.'/.config/docker/daemon.json';
+        $unitFile   = $home.'/.config/systemd/user/docker.service';
+        if (!is_file($configFile) && !is_file($unitFile)) {
+            continue;
+        }
+        $targets[] = $userTrim;
+    }
+
+    if (empty($targets)) {
+        logMessage('[SKIP] dist-upgrade: no rootless Docker configs found; skipping rootless repair');
+    } else {
+        logMessage(sprintf('dist-upgrade: repairing rootless Docker for %d user(s)', count($targets)));
+    }
+
+    foreach ($targets as $user) {
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($user, 'dist-upgrade: rootless Docker repair start');
+        }
+        pmssEnsureRootlessDockerInstalled($user);
+        pmssEnsureDockerDependencies($user);
+    }
+
+    if (is_file('/usr/bin/slirp4netns') && is_file('/usr/local/bin/slirp4netns')) {
+        if (@unlink('/usr/local/bin/slirp4netns')) {
+            logMessage('dist-upgrade: removed stale /usr/local/bin/slirp4netns');
+        } else {
+            logMessage('[WARN] dist-upgrade: failed to remove /usr/local/bin/slirp4netns');
+        }
     }
 }
 

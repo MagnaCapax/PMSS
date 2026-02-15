@@ -227,6 +227,46 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
     }
 }
 
+if (!function_exists('pmssReadSystemdUnitExecStartBinary')) {
+    /**
+     * Extract the ExecStart binary path from a systemd unit file.
+     */
+    function pmssReadSystemdUnitExecStartBinary(string $unitPath): ?string
+    {
+        $lines = @file($unitPath, FILE_IGNORE_NEW_LINES);
+        if ($lines === false) {
+            return null;
+        }
+
+        foreach ($lines as $line) {
+            $trim = trim($line);
+            if ($trim === '' || $trim[0] === '#' || $trim[0] === ';') {
+                continue;
+            }
+            if (strpos($trim, 'ExecStart=') !== 0) {
+                continue;
+            }
+            $command = trim(substr($trim, strlen('ExecStart=')));
+            if ($command === '') {
+                return null;
+            }
+            if ($command[0] === '-') {
+                $command = ltrim(substr($command, 1));
+            }
+            if ($command === '') {
+                return null;
+            }
+            $parts = preg_split('/\s+/', $command);
+            if (!$parts || $parts[0] === '') {
+                return null;
+            }
+            return trim($parts[0], "\"'");
+        }
+
+        return null;
+    }
+}
+
 if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
     /**
      * Run dockerd-rootless-setuptool.sh for users that do not yet have a
@@ -248,8 +288,27 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
         // If the user already has a docker.service unit, assume the rootless
         // install has been performed (either by PMSS or manually).
         if (is_file($unit)) {
-            pmssUserLog($user, '[SKIP] Rootless Docker systemd unit already present');
-            return;
+            $execBinary = pmssReadSystemdUnitExecStartBinary($unit);
+            if ($execBinary !== null && is_file($execBinary)) {
+                pmssUserLog($user, '[SKIP] Rootless Docker systemd unit already present');
+                return;
+            }
+
+            $reason = $execBinary === null
+                ? 'missing ExecStart'
+                : ('missing ExecStart binary '.$execBinary);
+            pmssUserLog($user, '[WARN] Rootless Docker unit appears stale ('.$reason.'); removing to allow reinstall');
+
+            $realHome = realpath($home);
+            $realUnit = realpath($unit);
+            if ($realHome === false || $realUnit === false || strpos($realUnit, $realHome.'/') !== 0) {
+                pmssUserLog($user, '[WARN] Refusing to remove docker.service outside expected home path');
+                return;
+            }
+            if (!@unlink($unit)) {
+                pmssUserLog($user, '[WARN] Failed to remove stale docker.service; skipping reinstall');
+                return;
+            }
         }
 
         // Use Docker\'s official rootless install script in the same way an
@@ -338,64 +397,94 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
             return;
         }
 
-        $current = @file_get_contents($configFile);
+        $hasConfigFile = is_file($configFile);
+        $current = $hasConfigFile ? @file_get_contents($configFile) : false;
         $data = $current ? json_decode($current, true) : [];
-        if (!is_array($data)) $data = [];
-        $expectedConfig = json_encode(
-            [
-                'storage-driver' => 'fuse-overlayfs',
-                'exec-opts' => ['native.cgroupdriver=cgroupfs']
-            ],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
-        );
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        $writeConfig = static function (array $payload) use ($configFile, $uid, $gid, $user): bool {
+            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if ($json === false) {
+                pmssUserLog($user, '[WARN] Failed to encode daemon.json');
+                return false;
+            }
+            if (file_put_contents($configFile, $json) !== false) {
+                chown($configFile, $uid);
+                chgrp($configFile, $gid);
+                chmod($configFile, 0600);
+                return true;
+            }
+            pmssUserLog($user, '[WARN] Failed to write daemon.json');
+            return false;
+        };
+
+        $changed = false;
+        $ensureExecOpts = static function (array &$payload) use (&$changed): void {
+            $execOpts = [];
+            if (isset($payload['exec-opts']) && is_array($payload['exec-opts'])) {
+                $execOpts = $payload['exec-opts'];
+            }
+            if (!in_array('native.cgroupdriver=cgroupfs', $execOpts, true)) {
+                $execOpts[] = 'native.cgroupdriver=cgroupfs';
+                $payload['exec-opts'] = array_values(array_unique($execOpts));
+                $changed = true;
+            }
+        };
 
         // If storage-driver is already set, respect it unless it is our default.
         if (isset($data['storage-driver'])) {
             if ($data['storage-driver'] !== 'fuse-overlayfs') {
+                if ($hasConfigFile) {
+                    $ensureExecOpts($data);
+                    if ($changed) {
+                        $writeConfig($data);
+                    }
+                }
                 return;
             }
 
             if ($fuseOverlayfsAvailable) {
+                $ensureExecOpts($data);
+                if ($changed) {
+                    $writeConfig($data);
+                }
                 return;
             }
 
-            $isDefaultOnly = (count($data) === 1);
-            $matchesDefault = ($current !== false && trim($current) === trim($expectedConfig));
-            if ($isDefaultOnly && $matchesDefault && is_file($configFile)) {
-                $realHome = realpath($home);
-                $realConfig = realpath($configFile);
-                if ($realHome === false || $realConfig === false || strpos($realConfig, $realHome.'/') !== 0) {
-                    pmssUserLog($user, '[WARN] Refusing to remove daemon.json outside expected home path');
-                    return;
-                }
-
-                if (@unlink($configFile)) {
+            if ($hasConfigFile) {
+                unset($data['storage-driver']);
+                $changed = true;
+                $ensureExecOpts($data);
+                if ($writeConfig($data)) {
                     pmssUserLog($user, '[WARN] Removed daemon.json storage-driver because fuse-overlayfs is unavailable');
-                } else {
-                    pmssUserLog($user, '[WARN] Failed to remove daemon.json after fuse-overlayfs check');
                 }
             } else {
-                pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; leaving existing daemon.json untouched', $fuseOverlayfsStatus));
+                pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping daemon.json storage-driver cleanup', $fuseOverlayfsStatus));
             }
             return;
         }
 
         if (!$fuseOverlayfsAvailable) {
-            pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping storage-driver enforcement', $fuseOverlayfsStatus));
+            if ($hasConfigFile) {
+                $ensureExecOpts($data);
+                if ($changed) {
+                    $writeConfig($data);
+                }
+            } else {
+                pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping storage-driver enforcement', $fuseOverlayfsStatus));
+            }
             return;
         }
 
         // Otherwise, enforce fuse-overlayfs
         $data['storage-driver'] = 'fuse-overlayfs';
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $changed = true;
+        $ensureExecOpts($data);
 
-        if (file_put_contents($configFile, $json) !== false) {
-            chown($configFile, $uid);
-            chgrp($configFile, $gid);
-            chmod($configFile, 0600);
+        if ($writeConfig($data)) {
             pmssUserLog($user, '[INFO] Configured Docker storage-driver: fuse-overlayfs');
-        } else {
-            pmssUserLog($user, '[WARN] Failed to write daemon.json');
         }
     }
 }
