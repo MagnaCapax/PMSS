@@ -11,7 +11,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/wireguard.php';
 
 if (!function_exists('logmsg')) {

@@ -15,9 +15,8 @@ $db = new users();
 $removed = $db->prune();
 $after = count($db->getUsers());
 
-$timestamp = date('c');
 if ($removed > 0) {
-    echo "{$timestamp}: removed {$removed} stale user(s); {$after} remain.\n";
+    echo date('c').": removed {$removed} stale user(s); {$after} remain.\n";
 } elseif ($debug) {
-    echo "{$timestamp}: database already in sync.\n";
+    echo date('c').": database already in sync.\n";
 }

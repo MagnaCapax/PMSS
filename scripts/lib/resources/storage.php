@@ -42,25 +42,17 @@ class ResourceStorage
             $userPath = $homePath.'/.resourceData';
             $this->setImmutable($userPath, false);
             $this->writeAtomic($userPath, $serialized);
-            $this->protectUserResourceFile($userPath, $user);
+            @chown($userPath, 'root');
+            if ($user !== '') {
+                @chgrp($userPath, $user);
+            }
+            @chmod($userPath, 0640);
             $this->setImmutable($userPath, true);
         }
 
         $runtimePath = $this->statsDir.'/'.$user;
         $this->writeAtomic($runtimePath, $serialized);
         $this->protectRuntimeFile($runtimePath);
-    }
-
-    /**
-     * Enforce root ownership and read-only access for tenants.
-     */
-    private function protectUserResourceFile(string $path, string $group): void
-    {
-        @chown($path, 'root');
-        if ($group !== '') {
-            @chgrp($path, $group);
-        }
-        @chmod($path, 0640);
     }
 
     /**
