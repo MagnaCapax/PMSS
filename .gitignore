@@ -68,8 +68,7 @@
 !/CONTRIBUTING.md
 !/development/
 !/development/**
-/development/prompts/
-/development/prompts/**
+# development/prompts/ tracked in git (agent instructions for dev cycle)
 
 # Additionally, do not ignore .gitignore file itself
 !.gitignore

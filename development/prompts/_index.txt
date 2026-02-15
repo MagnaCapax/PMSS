@@ -1,0 +1,6 @@
+PMSS local prompt stash (gitignored)
+
+- issue-triage-random40.txt: GH issue sampling + scoring prompt
+
+Quick access:
+- cat development/prompts/issue-triage-random40.txt

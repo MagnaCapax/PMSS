@@ -1,0 +1,48 @@
+PMSS CI Assist — Strict Rails Mode
+
+Goal: Make required CI jobs pass with the smallest coherent change.
+
+Startup reads (before proceeding):
+- AGENTS.md (rails / Constitution / doctrine; treat as binding).
+- AGENTS.local.md (host-specific local rails, if exists).
+
+Task-relevant reads (based on what the CI failure touches):
+- Any nested AGENTS.md covering files you touch (most-specific instructions win).
+- Relevant docs under docs/ (architecture, update, etc.).
+- Relevant ADRs under docs/adr/ for the subsystem involved in the failure.
+
+Must Follow:
+- PHP 7.3 compatibility for all PHP runtime code.
+- Updater topology: install.sh → scripts/update.php (bootstrap/minimal) → scripts/util/update-step2.php (orchestration/profiling).
+- Distro detection: use scripts/lib/update/distro.php::pmssDetectDistro(); trust VERSION_CODENAME; allowed env overrides: PMSS_OS_RELEASE_PATH, PMSS_APT_SOURCES_PATH.
+- Do not modify etc/skel/www/ (and subpaths), third-party/vendor bundles, or scripts/lib/update/dpkg/selections*.txt.
+- Language/deps: Bash-first; PHP for complex flows; do not introduce Python; avoid new dependencies without explicit approval.
+- Doctrine: Deletion‑First; Minimal Edits; One Flow; Pit of Success; No Aliases; Context‑First naming (domain→action); Single‑Method Consistency; Separation of Concerns; Idempotence; Fail‑Soft where safe.
+- Observability: route shelling through runStep(); prefer structured logs; use PMSS_JSON_LOG and PMSS_PROFILE_OUTPUT when applicable.
+- Tests (dev): hermetic by default (no real network/system modification); prefer PMSS_TEST_MODE=1 to remove jitter.
+
+Absolutes:
+- NEVER CREATE GIT BRANCHES.
+- Do not commit or push unless the operator explicitly instructs you to.
+- ABSOLUTELY NO ZFS — unacceptable for our workload (poor 100% random I/O performance and elevated data-loss risk). Do not propose or introduce it here.
+- Keep diffs small, idempotent, backward‑compatible; reuse existing helpers; no aliases; context‑first naming.
+
+Autocommit: When Autocommit Mode is appended below, "do not commit or push" is VOID.
+
+Workflow (Do This Now):
+- Triage ALL failing required jobs/steps using the CI summary and job log tails below.
+- Group failures by root cause. Fix in dependency order — foundations first, dependents after.
+- Verify after each fix. Full test suite after ALL fixes.
+- One commit per distinct root cause.
+- Implement the smallest coherent fix; do not touch frozen paths; reuse existing helpers and keep changes minimal.
+- Verify locally:
+  * php -l <each changed PHP file>
+  * php scripts/lib/tests/development/Runner.php
+  * scripts/testing/test-php.sh
+  * scripts/testing/test-bash.sh
+  * scripts/testing/php73-compat-scan.sh
+- From the CI logs, locate the latest LOC snapshot emitted by development/loc.sh (look for "PMSS lines of code (excluding third-party trees)" and the advisory complexity sections) and use that to understand category growth and hotspots; do not re-run loc.sh unless explicitly requested.
+- If the operator asks you to commit (no branches, no push):
+  * `git add <specific_files>` (never `git add -A`) then `git commit -m "ci: <scope> — <short reason>"`
+
+Proceed to triage the CI summary, job logs, and artifacts. Propose a minimal patch, the verification commands you ran, and a brief summary of the latest LOC snapshot from the CI logs (key category totals and any notable hotspots based on the loc.sh output).

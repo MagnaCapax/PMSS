@@ -1,0 +1,71 @@
+PMSS Issue Implementation — Strict Rails Mode
+
+Goal: Implement open GitHub issues with the smallest coherent change per issue.
+
+Startup reads (before proceeding):
+- AGENTS.md (rails / Constitution / doctrine; treat as binding).
+- AGENTS.local.md (host-specific local rails, if exists).
+
+Task-relevant reads (based on what the issue touches):
+- Any nested AGENTS.md covering files you touch (most-specific instructions win).
+- Relevant docs under docs/ (architecture, update, etc.).
+- Relevant ADRs under docs/adr/ for the subsystem involved.
+
+Must Follow:
+- PHP 7.3 compatibility for all PHP runtime code.
+- Updater topology: install.sh -> scripts/update.php (bootstrap/minimal) -> scripts/util/update-step2.php (orchestration/profiling).
+- Do not modify etc/skel/www/ (and subpaths), third-party/vendor bundles, or scripts/lib/update/dpkg/selections*.txt.
+- Language/deps: Bash-first; PHP for complex flows; do not introduce Python; avoid new dependencies without explicit approval.
+- Doctrine: Deletion-First; Minimal Edits; One Flow; Pit of Success; No Aliases; Context-First naming.
+- Observability: route shelling through runStep(); prefer structured logs.
+- Tests (dev): hermetic by default (no real network/system modification).
+
+Absolutes:
+- NEVER CREATE GIT BRANCHES.
+- Do not commit or push unless the operator explicitly instructs you to.
+- ABSOLUTELY NO ZFS.
+- Keep diffs small, idempotent, backward-compatible; reuse existing helpers.
+
+Autocommit: When Autocommit Mode is appended below, "do not commit or push" is VOID.
+
+Workflow (Do This Now):
+- Read the issue details from context files below.
+- For EACH issue, assess: can this be fully resolved within this session?
+  SKIP if the issue:
+  - Requires external system access (SSH, package install, DC visit)
+  - Touches frozen paths (etc/skel/www, vendor trees, dpkg selections)
+  - Requires multi-server coordination or production deployment
+  - Is an investigation/research issue with no clear code fix
+  - Would take more than ~200 lines of changes
+  Note why you skipped it.
+- For tractable issues: implement the smallest coherent fix/feature.
+- Verify locally:
+  * php -l <each changed PHP file>
+  * php scripts/lib/tests/development/Runner.php
+  * scripts/testing/test-php.sh
+  * scripts/testing/test-bash.sh
+  * scripts/testing/php73-compat-scan.sh
+  * scripts/testing/php-lint-compat.sh
+  * scripts/testing/docblock-lint.sh
+  * scripts/testing/doctrine-lint.sh
+- One commit per issue. Include "Refs #N" in the commit message.
+- Commit prefix: fix: for bugs, feat: for features, security: for security issues.
+- After commit: gh issue edit N --add-label complete-verify (best-effort).
+
+Context to open (paths in this workspace):
+ - AGENTS.md
+ - AGENTS.local.md
+ - docs/architecture.md
+ - docs/update.md
+ - docs/install.md
+ - docs/refactoring.md
+ - docs/contracts.md
+ - docs/adr/
+
+Do not inline these; read them directly from disk.
+
+Output safety checklist:
+- If output size is unknown or large, redirect to a file and summarize with tail/head/rg.
+- Avoid unbounded commands (recursive find/grep, full log dumps, verbose fsck).
+- Prefer bounded queries (git status --short, rg -n pattern path | head -50).
+- When in doubt, capture output to /tmp and extract a small excerpt.
