@@ -22,14 +22,10 @@ $cacheUsers = array_keys($db->getUsers());
 $homeUsers = users::listHomeDirectories();
 $passwdUsers = users::listPasswdUsers();
 
-$dbSet = array_fill_keys($cacheUsers, true);
-$homeSet = array_fill_keys($homeUsers, true);
-$passwdSet = array_fill_keys($passwdUsers, true);
-
-$dbOnly = array_values(array_diff(array_keys($dbSet), array_keys($homeSet + $passwdSet)));
-$homeOnly = array_values(array_diff(array_keys($homeSet), array_keys($dbSet)));
-$passwdOnly = array_values(array_diff(array_keys($passwdSet), array_keys($dbSet + $homeSet)));
-$consistent = array_values(array_intersect(array_keys($dbSet), array_keys($homeSet), array_keys($passwdSet)));
+$dbOnly = array_values(array_diff($cacheUsers, $homeUsers, $passwdUsers));
+$homeOnly = array_values(array_diff($homeUsers, $cacheUsers));
+$passwdOnly = array_values(array_diff($passwdUsers, $cacheUsers, $homeUsers));
+$consistent = array_values(array_intersect($cacheUsers, $homeUsers, $passwdUsers));
 
 $result = [
     'consistent'   => $consistent,

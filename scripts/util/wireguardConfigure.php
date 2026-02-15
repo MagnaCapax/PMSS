@@ -14,8 +14,6 @@
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/wireguard.php';
 
-requireRoot();
-
 if (!function_exists('logmsg')) {
     function logmsg(string $message): void
     {

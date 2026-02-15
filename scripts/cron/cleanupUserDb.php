@@ -7,8 +7,7 @@
  * @author PMSS Team
  */
 
-$args = $argv ?? ($_SERVER['argv'] ?? []);
-$debug = in_array('--debug', $args, true);
+$debug = in_array('--debug', $argv ?? ($_SERVER['argv'] ?? []), true);
 
 require_once __DIR__.'/../lib/users.php';
 
