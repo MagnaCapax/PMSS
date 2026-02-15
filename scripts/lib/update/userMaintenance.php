@@ -63,7 +63,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
         $runUserMaintenance = static function (string $user, string $label, string $command): void {
             $rc = runUserStep($user, $label, $command);
-            if ($rc !== 0 && function_exists('pmssUserLog')) {
+            if ($rc !== 0) {
                 pmssUserLog($user, sprintf('[WARN] %s failed (rc=%d)', $label, $rc));
             }
         };
@@ -149,21 +149,17 @@ if (!function_exists('pmssUpdateAllUsers')) {
             }
 
             $userDuration = microtime(true) - $userStart;
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
-            }
-            if (function_exists('pmssRecordProfile')) {
-                pmssRecordProfile([
-                    'description'    => 'updateUser '.$userTrim,
-                    'command'        => '',
-                    'status'         => 'OK',
-                    'rc'             => 0,
-                    'duration'       => round($userDuration, 4),
-                    'dry_run'        => false,
-                    'stdout_excerpt' => '',
-                    'stderr_excerpt' => '',
-                ]);
-            }
+            pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
+            pmssRecordProfile([
+                'description'    => 'updateUser '.$userTrim,
+                'command'        => '',
+                'status'         => 'OK',
+                'rc'             => 0,
+                'duration'       => round($userDuration, 4),
+                'dry_run'        => false,
+                'stdout_excerpt' => '',
+                'stderr_excerpt' => '',
+            ]);
         }
     }
 }

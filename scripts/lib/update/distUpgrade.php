@@ -95,8 +95,7 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
 
     // Only install if at least one user has rootless Docker configured.
     // The daemon.json in user's .config/docker/ indicates rootless Docker setup.
-    $dockerConfigs = glob('/home/*/.config/docker/daemon.json');
-    if (empty($dockerConfigs)) {
+    if (empty(glob('/home/*/.config/docker/daemon.json'))) {
         logMessage('[SKIP] dist-upgrade: no rootless Docker configs found; skipping fuse-overlayfs');
         return;
     }
@@ -115,14 +114,13 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
         return;
     }
 
-    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
-    $hasTty = $interactiveRequested
+    $hasTty = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1'
         && function_exists('posix_isatty')
         && posix_isatty(STDIN)
         && posix_isatty(STDOUT)
         && posix_isatty(STDERR);
-    $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
+        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     logMessage('dist-upgrade: ensuring fuse-overlayfs is installed for rootless Docker');
@@ -310,8 +308,8 @@ function pmssRepairNginxAfterDistUpgrade(): void
     if ($interactiveRequested && !$hasTty) {
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
     }
-    $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
+        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     runCommand("$env apt-get purge -y 'nginx*'", true, null, $hasTty);
@@ -539,8 +537,8 @@ function pmssExecuteUpgrade(): bool
     if ($interactiveRequested && !$hasTty) {
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
     }
-    $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
+        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     if (!pmssWaitForDpkgLocks()) {
@@ -670,8 +668,8 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
     if ($interactiveRequested && !$hasTty) {
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
     }
-    $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
+        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     runCommand("$env apt-get update", true, null, $hasTty);
