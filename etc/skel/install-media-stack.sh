@@ -392,6 +392,20 @@ elif [ -d "$HOME/.bin" ]; then
   [[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.bin"
 fi
 
+# Safety check for existing Jellyfin config (can cause DB migration hang on rerun)
+if [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev/null)" ]; then
+    if [[ $DRY_RUN -eq 1 ]]; then
+      log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run)."
+    else
+      printf "WARNING: %s exists and will be removed. Continue? (y/N): " "$HOME/.config/jellyfin"
+      read -r confirm
+      [[ $confirm == [yY] ]] || exit 1
+      rm -rf "$HOME/.config/jellyfin"
+    fi
+elif [ -d "$HOME/.config/jellyfin" ]; then
+  [[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.config/jellyfin"
+fi
+
 if [[ $DRY_RUN -eq 0 ]]; then
   mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
   chmod 700 "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
