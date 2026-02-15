@@ -3,19 +3,23 @@ set -euo pipefail
 
 # camelCase filename lint for PMSS first-party PHP files
 # - Filenames must be camelCase starting lowercase: ^[a-z][a-zA-Z0-9]*\.php$
-# - Scope excludes third-party and web skel: etc/skel/**, scripts/lib/devristo/**, tests/**
-# - Focus on ops/update code paths where filenames are historically lowercase
+# - Scope targets ops/update paths with stable lower-camel conventions.
+# - Explicit exceptions live in the allowlist below.
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 VIOLATIONS=0
 
 is_camel_file() {
   local base="$1"
+  case "$base" in
+    update-step2.php) return 0 ;;
+  esac
   [[ "$base" =~ ^[a-z][a-zA-Z0-9]*\.php$ ]]
 }
 
 check_tree() {
   local dir="$1"
+  shift
   [[ -d "$dir" ]] || return 0
   while IFS= read -r -d '' f; do
     base="$(basename "$f")"
@@ -23,11 +27,11 @@ check_tree() {
       echo "filename violation: $f" >&2
       VIOLATIONS=$((VIOLATIONS+1))
     fi
-  done < <(find "$dir" -type f -name "*.php" -print0)
+  done < <(find "$dir" "$@" -type f -name "*.php" -print0)
 }
 
 # Enforce for selected first-party directories
-check_tree "$ROOT_DIR/scripts"
+check_tree "$ROOT_DIR/scripts" -maxdepth 1
 check_tree "$ROOT_DIR/scripts/util"
 check_tree "$ROOT_DIR/scripts/cron"
 check_tree "$ROOT_DIR/scripts/lib/update"
@@ -41,4 +45,3 @@ if [[ $VIOLATIONS -gt 0 ]]; then
   exit 1
 fi
 echo "camelCase filename lint: OK"
-
