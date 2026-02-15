@@ -41,13 +41,13 @@ class ResourceStorage
         if (is_dir($homePath)) {
             $userPath = $homePath.'/.resourceData';
             $this->setImmutable($userPath, false);
-            @file_put_contents($userPath, $serialized);
+            $this->writeAtomic($userPath, $serialized);
             $this->protectUserResourceFile($userPath, $user);
             $this->setImmutable($userPath, true);
         }
 
         $runtimePath = $this->statsDir.'/'.$user;
-        @file_put_contents($runtimePath, $serialized);
+        $this->writeAtomic($runtimePath, $serialized);
         $this->protectRuntimeFile($runtimePath);
     }
 
@@ -71,6 +71,21 @@ class ResourceStorage
         @chown($path, 'root');
         @chgrp($path, 'root');
         @chmod($path, 0600);
+    }
+
+    /**
+     * Write payloads atomically to avoid partial truncation on interruption.
+     */
+    private function writeAtomic(string $path, string $payload): void
+    {
+        $tmp = $path.'.tmp.'.getmypid().'.'.mt_rand(1000, 9999);
+        if (@file_put_contents($tmp, $payload) === false) {
+            @unlink($tmp);
+            return;
+        }
+        if (!@rename($tmp, $path)) {
+            @unlink($tmp);
+        }
     }
 
     /**
