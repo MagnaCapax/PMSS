@@ -101,11 +101,8 @@ if (!function_exists('pmssUpdateAllUsers')) {
                     echo "  \033[33m* {$phase}\033[0m".PHP_EOL;
                 }
             } else {
-                if (!empty($phases)) {
-                    logMessage(sprintf('Updating user %s phases: %s', $userTrim, implode(', ', $phases)));
-                } else {
-                    logMessage(sprintf('Updating user %s', $userTrim));
-                }
+                $phaseSummary = empty($phases) ? '' : ' phases: '.implode(', ', $phases);
+                logMessage(sprintf('Updating user %s%s', $userTrim, $phaseSummary));
             }
 
             $userStart = microtime(true);
@@ -281,9 +278,8 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
             return;
         }
 
-        $home    = $uinfo['dir'];
-        $unitDir = $home.'/.config/systemd/user';
-        $unit    = $unitDir.'/docker.service';
+        $home = $uinfo['dir'];
+        $unit = $home.'/.config/systemd/user/docker.service';
 
         // If the user already has a docker.service unit, assume the rootless
         // install has been performed (either by PMSS or manually).

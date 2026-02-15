@@ -122,12 +122,11 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
         && posix_isatty(STDOUT)
         && posix_isatty(STDERR);
     $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $inheritTty = $hasTty;
     $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     logMessage('dist-upgrade: ensuring fuse-overlayfs is installed for rootless Docker');
-    $rc = runCommand("$env apt-get install -y $opts fuse-overlayfs", true, null, $inheritTty);
+    $rc = runCommand("$env apt-get install -y $opts fuse-overlayfs", true, null, $hasTty);
     if ($rc !== 0) {
         logMessage('[WARN] dist-upgrade: failed to install fuse-overlayfs; rootless Docker may fail or fall back to a slower storage driver');
     }
@@ -312,22 +311,21 @@ function pmssRepairNginxAfterDistUpgrade(): void
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
     }
     $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $inheritTty = $hasTty;
     $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
-    runCommand("$env apt-get purge -y 'nginx*'", true, null, $inheritTty);
+    runCommand("$env apt-get purge -y 'nginx*'", true, null, $hasTty);
     if (!pmssWaitForDpkgLocks()) {
         logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
         return;
     }
-    if (runCommand("$env apt-get install -y $opts nginx nginx-full nginx-common", true, null, $inheritTty) !== 0) {
+    if (runCommand("$env apt-get install -y $opts nginx nginx-full nginx-common", true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: nginx reinstall failed; leaving existing config in place');
         return;
     }
 
-    runCommand('/scripts/util/createNginxConfig.php --restart', true, null, $inheritTty);
-    if (runCommand('nginx -t', true, null, $inheritTty) !== 0) {
+    runCommand('/scripts/util/createNginxConfig.php --restart', true, null, $hasTty);
+    if (runCommand('nginx -t', true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: nginx -t still failing after reinstall');
     }
 }
@@ -542,7 +540,6 @@ function pmssExecuteUpgrade(): bool
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
     }
     $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $inheritTty = $hasTty;
     $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
@@ -552,14 +549,14 @@ function pmssExecuteUpgrade(): bool
     }
 
     // Update package lists
-    runCommand("$env apt-get update", true, null, $inheritTty);
+    runCommand("$env apt-get update", true, null, $hasTty);
 
     // Upgrade packages (step 1)
     pmssRunUpgradeWithRecovery(
         "$env apt-get upgrade -y $opts",
         $env,
         'dist-upgrade: upgrade failed, attempting recovery (dpkg --configure -a, apt-get -f install)',
-        $inheritTty
+        $hasTty
     );
 
     // Dist-upgrade (step 2)
@@ -567,7 +564,7 @@ function pmssExecuteUpgrade(): bool
         "$env apt-get full-upgrade -y $opts",
         $env,
         'dist-upgrade: full-upgrade failed, attempting recovery',
-        $inheritTty
+        $hasTty
     );
 
     // Autoremove residuals
@@ -575,13 +572,13 @@ function pmssExecuteUpgrade(): bool
         logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; aborting apt autoremove');
         return false;
     }
-    runCommand("$env apt-get autoremove -y", true, null, $inheritTty);
+    runCommand("$env apt-get autoremove -y", true, null, $hasTty);
 
     if (!pmssWaitForDpkgLocks()) {
         logMessage('[ERROR] dist-upgrade: dpkg lock did not clear; skipping dpkg --configure -a');
         return false;
     }
-    runCommand('dpkg --configure -a', true, null, $inheritTty);
+    runCommand('dpkg --configure -a', true, null, $hasTty);
 
     return true;
 }
@@ -674,16 +671,15 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
         logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
     }
     $frontend = $hasTty ? 'readline' : 'noninteractive';
-    $inheritTty = $hasTty;
     $env = 'DEBIAN_FRONTEND='.$frontend.' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
-    runCommand("$env apt-get update", true, null, $inheritTty);
+    runCommand("$env apt-get update", true, null, $hasTty);
     if (!pmssWaitForDpkgLocks()) {
         logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install');
         return;
     }
-    if (runCommand("$env apt-get install -y $opts libcrypt1", true, null, $inheritTty) !== 0) {
+    if (runCommand("$env apt-get install -y $opts libcrypt1", true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: libcrypt1 preinstall failed; continuing');
     }
 }
