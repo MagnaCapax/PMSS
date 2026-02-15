@@ -28,7 +28,7 @@
  * | `--scripts-only`   | Deploy refreshed `/scripts` and `/etc/skel` content, skip `update-step2.php`. Useful for emergency hotfixes and MUST NOT invoke apt/apt-get or any other package manager commands. |
  * | `--repo=<url>`     | Override the git remote used for `git/*` specs. Combined with `--branch` to pin alternate forks. |
  * | `--branch=<name>`  | Branch used with `--repo`. Defaults to `main` when unspecified. |
- * | `--dist-upgrade=<max>` | Run `scripts/util/update-dist-upgrade.php` to perform a one-step Debian release upgrade capped at the requested maximum, then continue with phase 2. |
+ * | `--dist-upgrade=<max>` | Run the dist-upgrade helper (from `scripts/lib/update/distUpgrade.php`) to perform a one-step Debian release upgrade capped at the requested maximum, then continue with phase 2. |
  * | `--skip-self-update` | Internal flag injected during self-refresh to avoid recursion; operators should not pass it manually. |
  * | `--help`           | Print usage examples and exit without making changes. |
  *
@@ -955,9 +955,16 @@ function maybeRunDistUpgrade($distUpgrade, bool $deferRootCronRestore = false): 
         fatal("You must specify a maximum version for dist-upgrade (e.g. --dist-upgrade=11 or --dist-upgrade=bullseye).", EXIT_PARSE);
     }
     logEvent('dist_upgrade_start', ['target' => $distUpgrade]);
-    $cmd = '/scripts/util/update-dist-upgrade.php ' . escapeshellarg($distUpgrade);
-    logmsg('[RUN] '.$cmd);
-    passthru($cmd, $rc);
+    $helper = '/scripts/lib/update/distUpgrade.php';
+    if (!file_exists($helper)) {
+        fatal('Dist-upgrade helper missing after snapshot staging.', EXIT_DIST);
+    }
+    require_once $helper;
+    if (!function_exists('pmssRunDistUpgrade')) {
+        fatal('Dist-upgrade helper missing entrypoint after snapshot staging.', EXIT_DIST);
+    }
+    logmsg('[RUN] dist-upgrade helper');
+    $rc = pmssRunDistUpgrade((string) $distUpgrade);
     logEvent('dist_upgrade_end', ['rc' => $rc]);
 
     if ($rc !== 0) {
@@ -1041,7 +1048,7 @@ function bootstrapMain(array $argv): void
         logmsg('[INFO] Removed legacy updateQuotas cron entry to prevent quota-refresh regression');
     }
 
-    $distUpgradeHelper = '/scripts/util/update-dist-upgrade.php';
+    $distUpgradeHelper = '/scripts/lib/update/distUpgrade.php';
     if ($options['dist_upgrade'] && !file_exists($distUpgradeHelper)) {
         logmsg('[INFO] Dist-upgrade helper missing; fetching snapshot to provision it...');
     }
@@ -1086,10 +1093,6 @@ function bootstrapMain(array $argv): void
     }
 
     if ($options['dist_upgrade']) {
-        if (!file_exists($distUpgradeHelper)) {
-            fatal('Dist-upgrade helper missing after snapshot staging.', EXIT_DIST);
-        }
-        logmsg('[INFO] Running dist-upgrade helper');
         maybeRunDistUpgrade($options['dist_upgrade'], true);
         logmsg('[INFO] Dist-upgrade complete; continuing with update-step2');
     }

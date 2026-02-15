@@ -77,7 +77,7 @@ Signature: refer to file for full source; highlights below.
 - runAutoremove(): void → `apt-get autoremove -y` with non-interactive dpkg opts; `fatal(EXIT_COPY)` on failure.
 
 - maybeRunDistUpgrade(bool|string $distUpgrade): void
-  - If enabled, runs `/scripts/util/update-dist-upgrade.php <max>` and logs start/end events.
+  - If enabled, runs `pmssRunDistUpgrade(<max>)` from `scripts/lib/update/distUpgrade.php` and logs start/end events.
   - Restores root cron unless restoration is deferred to update-step2.
 
 - bootstrapMain(array $argv): void

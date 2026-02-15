@@ -10,7 +10,7 @@ require_once __DIR__.'/../update.php';
 require_once __DIR__.'/distro.php';
 
 /**
- * Entry point used by util/update-dist-upgrade.php.
+ * Entry point used by scripts/update.php for --dist-upgrade runs.
  */
 function pmssRunDistUpgrade(?string $maxTarget = null): int
 {
@@ -18,7 +18,7 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
 
     if ($maxTarget === null) {
         logMessage('Safety error: You must explicitly specify the maximum Debian major version (e.g., 11 or bullseye).');
-        logMessage('Usage: scripts/util/update-dist-upgrade.php <maxTarget>');
+        logMessage('Usage: scripts/update.php --dist-upgrade=<maxTarget>');
         return 1;
     }
 
