@@ -48,38 +48,20 @@ if ($jsonOutput) {
 
 echo "== User Dataset Comparison ==\n";
 
-echo "Users present in DB + /home + /etc/passwd:\n";
-if (empty($consistent)) {
-    echo "  (none)\n";
-} else {
-    foreach ($consistent as $name) {
-        echo "  - {$name}\n";
-    }
-}
+$sections = [
+    ['prefix' => '', 'label' => 'Users present in DB + /home + /etc/passwd:', 'list' => $consistent],
+    ['prefix' => "\n", 'label' => 'Users only in JSON database (likely stale):', 'list' => $dbOnly],
+    ['prefix' => "\n", 'label' => 'Users only in /home (missing from DB):', 'list' => $homeOnly],
+    ['prefix' => "\n", 'label' => 'Users only in /etc/passwd (no home directory/DB entry):', 'list' => $passwdOnly],
+];
 
-echo "\nUsers only in JSON database (likely stale):\n";
-if (empty($dbOnly)) {
-    echo "  (none)\n";
-} else {
-    foreach ($dbOnly as $name) {
-        echo "  - {$name}\n";
+foreach ($sections as $section) {
+    echo $section['prefix'].$section['label']."\n";
+    if (empty($section['list'])) {
+        echo "  (none)\n";
+        continue;
     }
-}
-
-echo "\nUsers only in /home (missing from DB):\n";
-if (empty($homeOnly)) {
-    echo "  (none)\n";
-} else {
-    foreach ($homeOnly as $name) {
-        echo "  - {$name}\n";
-    }
-}
-
-echo "\nUsers only in /etc/passwd (no home directory/DB entry):\n";
-if (empty($passwdOnly)) {
-    echo "  (none)\n";
-} else {
-    foreach ($passwdOnly as $name) {
+    foreach ($section['list'] as $name) {
         echo "  - {$name}\n";
     }
 }
