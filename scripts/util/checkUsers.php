@@ -9,13 +9,10 @@
 
 require_once __DIR__.'/../lib/users.php';
 
-$options = array_slice($argv, 1);
-if (in_array('--help', $options, true) || in_array('-h', $options, true)) {
+if (in_array('--help', $argv, true) || in_array('-h', $argv, true)) {
     echo "Usage: checkUsers.php [--json]\n";
     exit(0);
 }
-
-$jsonOutput = in_array('--json', $options, true);
 
 $db = new users();
 $cacheUsers = array_keys($db->getUsers());
@@ -37,7 +34,7 @@ $result = [
     'passwd_users' => array_values($passwdUsers),
 ];
 
-if ($jsonOutput) {
+if (in_array('--json', $argv, true)) {
     echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
     exit(0);
 }

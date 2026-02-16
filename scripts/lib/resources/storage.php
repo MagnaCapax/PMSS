@@ -52,17 +52,9 @@ class ResourceStorage
 
         $runtimePath = $this->statsDir.'/'.$user;
         $this->writeAtomic($runtimePath, $serialized);
-        $this->protectRuntimeFile($runtimePath);
-    }
-
-    /**
-     * Restrict runtime cache files to root-only access.
-     */
-    private function protectRuntimeFile(string $path): void
-    {
-        @chown($path, 'root');
-        @chgrp($path, 'root');
-        @chmod($path, 0600);
+        @chown($runtimePath, 'root');
+        @chgrp($runtimePath, 'root');
+        @chmod($runtimePath, 0600);
     }
 
     /**

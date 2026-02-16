@@ -76,14 +76,11 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
     $state = [];
     $handle = @fopen($statePath, 'c+');
-    $locked = false;
-    if ($handle !== false) {
-        $locked = @flock($handle, LOCK_EX);
-        if ($locked) {
-            $decoded = json_decode((string) @stream_get_contents($handle), true);
-            if (is_array($decoded)) {
-                $state = $decoded;
-            }
+    $locked = $handle !== false && @flock($handle, LOCK_EX);
+    if ($locked) {
+        $decoded = json_decode((string) @stream_get_contents($handle), true);
+        if (is_array($decoded)) {
+            $state = $decoded;
         }
     }
 
