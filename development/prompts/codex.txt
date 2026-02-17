@@ -16,7 +16,7 @@ Do NOT bulk-read all docs or ADRs upfront. Ask the task first, then read what's 
 Hard rails (must follow):
 - Stability over perfection; minimal diffs; never break old users.
 - PHP 7.3 compatibility for all PHP code.
-- Skel WWW lockdown: never touch etc/skel/www (or its contents) unless explicitly instructed.
+- Skel WWW lockdown: etc/skel/www/ is mostly frozen. ONLY etc/skel/www/{welcome,index,stats,info}.php may be edited. All other files and ALL subdirectories (rutorrent/, _lib/, data/, watch/, etc.) are locked.
 - Treat bundled vendor/third-party trees as read-only unless explicitly approved.
 - Do not edit scripts/lib/update/dpkg/selections*.txt without explicit platform sign-off.
 - No new external deps/tools/configs unless explicitly approved.

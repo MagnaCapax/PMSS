@@ -178,7 +178,7 @@ HARD RAILS (ALWAYS)
   - Do not change MediaArea repository handling now that it works.
   - Do not implement a general deb822 migration for Debian apt sources without explicit operator instruction/ADR (see `docs/adr/0008-reject-deb822-apt-sources-migration.md`; Docker deb822 is already in use; keep as-is).
 - Never modify:
-  - etc/skel/www (locked)
+  - etc/skel/www (locked — EXCEPT welcome.php, index.php, stats.php, info.php which are editable)
   - third-party/vendor trees
   - dpkg baseline files under scripts/lib/update/dpkg/selections*.txt
 - Do not change updater topology or dpkg/apt phase ordering.
