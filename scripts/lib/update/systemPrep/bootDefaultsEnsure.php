@@ -77,14 +77,13 @@ require_once dirname(__DIR__).'/runtime/commands.php';
             // Write fstab only when content changed, with a backup.
             if ($fstabChanged) {
                 $writeWithBackup($fstabPath, $lines, 'fstab');
+
+                // Remount /proc after fstab changes so the runtime view matches.
+                $command = pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']);
+                runStep('Remounting /proc with hidepid=2', $command);
             }
         } else {
             $log('[WARN] '.$fstabPath.' not readable; skipping /proc hidepid enforcement');
-        }
-        // Remount /proc after fstab changes so the runtime view matches.
-        if ($fstabChanged) {
-            $command = pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']);
-            runStep('Remounting /proc with hidepid=2', $command);
         }
 
         // Grub cmdline baseline.

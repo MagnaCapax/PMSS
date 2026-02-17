@@ -73,14 +73,13 @@ TXT;
     $users = array_keys($usersFiltered);
     sort($users, SORT_NATURAL | SORT_FLAG_CASE);
 
-    $singleUser = false;
-    if ($requestedUser !== '') {
+    $singleUser = ($requestedUser !== '');
+    if ($singleUser) {
         if (!in_array($requestedUser, $users, true)) {
             fwrite(STDERR, "Username not found: {$requestedUser}\n");
             return 1;
         }
         $users = [$requestedUser];
-        $singleUser = true;
     }
 
     $ctx = pmssCreateNginxConfigSetup($requestedUser, $singleUser);
