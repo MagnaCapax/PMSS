@@ -14,8 +14,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     $logPath = pmssStorageHealthDefaultJsonPath();
     $quiet = false;
 
-    $argc = count($argv);
-    for ($i = 1; $i < $argc; $i++) {
+    for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
         $arg = $argv[$i];
         $next = ($i + 1 < $argc) ? $argv[$i + 1] : null;
         $kv = null;

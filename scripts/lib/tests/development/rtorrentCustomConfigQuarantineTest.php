@@ -8,6 +8,15 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
     /** @var string */
     private $tempHome = '';
 
+    private function resolveTestUser(): string
+    {
+        $user = getenv('USER');
+        if ($user === false || $user === '') {
+            $user = get_current_user();
+        }
+        return $user !== '' ? $user : 'root';
+    }
+
     private function setUpTempHome(): void
     {
         $base = sys_get_temp_dir().'/pmss-rtorrent-customrc-tests';
@@ -45,7 +54,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
             $src = $this->tempHome.'/.rtorrent.rc.custom';
             @file_put_contents($src, "broken_line\n");
 
-            $user = getenv('USER') ?: 'root';
+            $user = $this->resolveTestUser();
             $logFn = function (string $message, bool $force = true): void {
                 // no-op for test
             };
@@ -63,7 +72,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
     {
         $this->setUpTempHome();
         try {
-            $user = getenv('USER') ?: 'root';
+            $user = $this->resolveTestUser();
             $logFn = function (string $message, bool $force = true): void {
             };
             $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
@@ -84,7 +93,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
                 throw new SkipTest('symlink() not available; skipping');
             }
 
-            $user = getenv('USER') ?: 'root';
+            $user = $this->resolveTestUser();
             $logFn = function (string $message, bool $force = true): void {
             };
             $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
@@ -112,4 +121,3 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         }
     }
 }
-
