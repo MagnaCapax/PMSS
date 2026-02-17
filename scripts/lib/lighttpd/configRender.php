@@ -87,8 +87,7 @@ LIGHTTPD;
 function pmssLighttpdWebdavModulePresent(): bool
 {
     // Debian packages typically install into /usr/lib/lighttpd or /usr/lib/*/lighttpd.
-    $paths = glob('/usr/lib*/lighttpd/mod_webdav.so');
-    return !empty($paths);
+    return !empty(glob('/usr/lib*/lighttpd/mod_webdav.so'));
 }
 
 function pmssStripLighttpdWebdavConfig(string $template): string

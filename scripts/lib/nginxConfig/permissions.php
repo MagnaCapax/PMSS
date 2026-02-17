@@ -11,10 +11,8 @@ function pmssCreateNginxConfigApplyPermissions(string $subdomainConfigDir): void
     if (glob('/etc/nginx/users/*')) {
         passthru('chmod 640 /etc/nginx/users/*');
     }
-    if (is_dir($subdomainConfigDir)) {
-        if (glob($subdomainConfigDir.'/pmss-user-*.conf')) {
-            passthru('chmod 640 '.$subdomainConfigDir.'/pmss-user-*.conf');
-        }
+    if (glob($subdomainConfigDir.'/pmss-user-*.conf')) {
+        passthru('chmod 640 '.$subdomainConfigDir.'/pmss-user-*.conf');
     }
     passthru('chmod 640 /etc/nginx/*.conf');
 }

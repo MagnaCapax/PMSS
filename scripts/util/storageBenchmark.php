@@ -74,12 +74,7 @@ $argvCount = count($argv);
 for ($i=1; $i<$argvCount; $i++) {
     $arg = $argv[$i];
     $next = ($i+1 < $argvCount) ? $argv[$i+1] : null;
-    $kv = null;
-    if (strpos($arg, '=') !== false) {
-        $kv = explode('=', $arg, 2);
-    }
-    $key = $kv ? $kv[0] : $arg;
-    $val = $kv ? $kv[1] : null;
+    [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
     switch ($key) {
         case '--target':
             $val = consumeCliValue($val, $next, $i);
