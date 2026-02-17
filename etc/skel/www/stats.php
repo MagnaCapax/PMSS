@@ -446,3 +446,190 @@ Past 30 days inbound traffic: <?php echo $trafficIngressData['display']['month']
     </div>
     <?php
 }
+
+if (!function_exists('pmssFormatBytesShort')) {
+    function pmssFormatBytesShort($bytes)
+    {
+        $bytes = (float)$bytes;
+        if (($bytes / 1024 / 1024 / 1024 / 1024) > 1) {
+            return round($bytes / 1024 / 1024 / 1024 / 1024, 2).'TiB';
+        }
+        if (($bytes / 1024 / 1024 / 1024) > 1) {
+            return round($bytes / 1024 / 1024 / 1024, 2).'GiB';
+        }
+        if (($bytes / 1024 / 1024) > 1) {
+            return round($bytes / 1024 / 1024, 2).'MiB';
+        }
+        return round($bytes / 1024, 2).'KiB';
+    }
+}
+
+if (!function_exists('pmssFormatDurationSeconds')) {
+    function pmssFormatDurationSeconds($seconds)
+    {
+        $seconds = (float)$seconds;
+        if ($seconds >= 3600) {
+            return round($seconds / 3600, 2).'h';
+        }
+        if ($seconds >= 60) {
+            return round($seconds / 60, 2).'m';
+        }
+        return round($seconds, 2).'s';
+    }
+}
+
+if (!function_exists('pmssFormatCpuHours')) {
+    function pmssFormatCpuHours($nanoseconds)
+    {
+        $hours = ((float)$nanoseconds / 1000000000) / 3600;
+        return round($hours, 2).' CPU-hours';
+    }
+}
+
+// === Resource Usage ===
+$resourceData = null;
+$resourceTime = null;
+$resourceDataError = null;
+
+if (file_exists('../.resourceData')) {
+    $resourceTime = @filemtime('../.resourceData');
+    $resourceData = @unserialize(@file_get_contents('../.resourceData'));
+    if (!is_array($resourceData)) {
+        $resourceDataError = 'Invalid resource data format.';
+        $resourceData = null;
+    }
+}
+
+if ($resourceData === null) {
+    $message = $resourceDataError !== null ? $resourceDataError : 'Resource data not available.';
+    echo '<div class="stats-block"><h6>Resource usage</h6><pre>'.$message.'</pre></div>';
+} else {
+    $ioReadDisplay = isset($resourceData['io_read']['display']) && is_array($resourceData['io_read']['display'])
+        ? $resourceData['io_read']['display']
+        : [];
+    $ioWriteDisplay = isset($resourceData['io_write']['display']) && is_array($resourceData['io_write']['display'])
+        ? $resourceData['io_write']['display']
+        : [];
+    $cpuDisplay = isset($resourceData['cpu']['display']) && is_array($resourceData['cpu']['display'])
+        ? $resourceData['cpu']['display']
+        : [];
+    $cpuRaw = isset($resourceData['cpu']['raw']) && is_array($resourceData['cpu']['raw'])
+        ? $resourceData['cpu']['raw']
+        : [];
+    if (isset($cpuRaw['month'])) {
+        $cpuDisplay['month'] = pmssFormatCpuHours($cpuRaw['month']);
+    }
+    if (!isset($cpuDisplay['week']) && isset($cpuRaw['week'])) {
+        $cpuDisplay['week'] = pmssFormatDurationSeconds($cpuRaw['week'] / 1000000000);
+    }
+    if (!isset($cpuDisplay['day']) && isset($cpuRaw['day'])) {
+        $cpuDisplay['day'] = pmssFormatDurationSeconds($cpuRaw['day'] / 1000000000);
+    }
+    if (!isset($cpuDisplay['hour']) && isset($cpuRaw['hour'])) {
+        $cpuDisplay['hour'] = pmssFormatDurationSeconds($cpuRaw['hour'] / 1000000000);
+    }
+    $memoryDisplay = isset($resourceData['memory']['display']) && is_array($resourceData['memory']['display'])
+        ? $resourceData['memory']['display']
+        : [];
+    $ramHoursDisplay = isset($resourceData['ram_hours']['display']) && is_array($resourceData['ram_hours']['display'])
+        ? $resourceData['ram_hours']['display']
+        : [];
+    $memoryCurrent = isset($resourceData['memory']['current'])
+        ? pmssFormatBytesShort($resourceData['memory']['current'])
+        : 'n/a';
+    $tasksCurrent = isset($resourceData['tasks']['current'])
+        ? (string)round((float)$resourceData['tasks']['current'], 2)
+        : 'n/a';
+
+    $ioDailyLabels = [];
+    $ioDailyRead = [];
+    $ioDailyWrite = [];
+    if (isset($resourceData['daily']) && is_array($resourceData['daily'])) {
+        foreach ($resourceData['daily'] as $day => $totals) {
+            $ioDailyLabels[] = $day;
+            $readBytes = isset($totals['io_read']) ? (float)$totals['io_read'] : 0.0;
+            $writeBytes = isset($totals['io_write']) ? (float)$totals['io_write'] : 0.0;
+            $ioDailyRead[] = round($readBytes / 1024 / 1024, 2);
+            $ioDailyWrite[] = round($writeBytes / 1024 / 1024, 2);
+        }
+    }
+    ?>
+    <div class="stats-block">
+        <h6>Storage I/O</h6>
+        <pre style="margin-bottom:12px;">
+Resource usage at <?php echo date('Y-m-d H:i:s', (int)$resourceTime); ?>:
+I/O Read (month/week/day/hour): <?php echo $ioReadDisplay['month'] ?? 'n/a'; ?> / <?php echo $ioReadDisplay['week'] ?? 'n/a'; ?> / <?php echo $ioReadDisplay['day'] ?? 'n/a'; ?> / <?php echo $ioReadDisplay['hour'] ?? 'n/a'; ?>
+I/O Write (month/week/day/hour): <?php echo $ioWriteDisplay['month'] ?? 'n/a'; ?> / <?php echo $ioWriteDisplay['week'] ?? 'n/a'; ?> / <?php echo $ioWriteDisplay['day'] ?? 'n/a'; ?> / <?php echo $ioWriteDisplay['hour'] ?? 'n/a'; ?>
+        </pre>
+
+        <?php if (count($ioDailyLabels) >= 2): ?>
+            <div class="traffic-chart">
+                <canvas id="ioChart" width="600" height="250"></canvas>
+            </div>
+            <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                if (typeof Chart === 'undefined') return;
+                const ctx = document.getElementById('ioChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode($ioDailyLabels); ?>,
+                        datasets: [{
+                            label: 'Daily I/O Read (MiB)',
+                            data: <?php echo json_encode($ioDailyRead); ?>,
+                            fill: true,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.4,
+                            pointRadius: 3
+                        }, {
+                            label: 'Daily I/O Write (MiB)',
+                            data: <?php echo json_encode($ioDailyWrite); ?>,
+                            fill: true,
+                            backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                            borderColor: 'rgb(244, 67, 54)',
+                            tension: 0.4,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            });
+            </script>
+        <?php else: ?>
+            <div class="docker-note">Chart requires 2+ days of data.</div>
+        <?php endif; ?>
+    </div>
+
+    <div class="stats-block">
+        <h6>CPU usage</h6>
+        <pre>
+CPU Time (month/week/day/hour): <?php echo $cpuDisplay['month'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['week'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['day'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['hour'] ?? 'n/a'; ?>
+        </pre>
+    </div>
+
+    <div class="stats-block">
+        <h6>Memory usage</h6>
+        <pre>
+Current Memory: <?php echo $memoryCurrent; ?>
+RAM-Hours (month/week/day): <?php echo $ramHoursDisplay['month'] ?? 'n/a'; ?> / <?php echo $ramHoursDisplay['week'] ?? 'n/a'; ?> / <?php echo $ramHoursDisplay['day'] ?? 'n/a'; ?>
+Average Memory (month/week/day): <?php echo $memoryDisplay['month'] ?? 'n/a'; ?> / <?php echo $memoryDisplay['week'] ?? 'n/a'; ?> / <?php echo $memoryDisplay['day'] ?? 'n/a'; ?>
+        </pre>
+    </div>
+
+    <div class="stats-block">
+        <h6>Process count</h6>
+        <pre>Current processes: <?php echo $tasksCurrent; ?></pre>
+    </div>
+    <?php
+}
