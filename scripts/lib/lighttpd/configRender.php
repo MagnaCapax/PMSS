@@ -27,9 +27,7 @@ function pmssRenderLighttpdConfig(string $template, string $user, int $serverPor
         1
     );
 
-    $config = pmssClampLighttpdBandwidthLimits($config);
-
-    return $config;
+    return pmssClampLighttpdBandwidthLimits($config);
 }
 
 function pmssClampLighttpdBandwidthLimits(string $config): string

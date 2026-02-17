@@ -13,11 +13,4 @@
 
 require_once __DIR__.'/../lib/wireguard.php';
 
-if (!function_exists('logmsg')) {
-    function logmsg(string $message): void
-    {
-        logMessage($message);
-    }
-}
-
-pmssWireguardConfigure('logmsg');
+pmssWireguardConfigure('logMessage');
