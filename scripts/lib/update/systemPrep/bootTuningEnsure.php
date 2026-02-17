@@ -19,13 +19,11 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
     $scriptTemplate = $cfgDir.'/template.pmss-boot-tuning.sh';
     $serviceTemplate = $cfgDir.'/template.systemd.pmss-boot-tuning.service';
 
-    if (!is_file($scriptTemplate)) {
-        $log('[SKIP] Boot tuning script template missing: '.$scriptTemplate);
-        return;
-    }
-    if (!is_file($serviceTemplate)) {
-        $log('[SKIP] Boot tuning service template missing: '.$serviceTemplate);
-        return;
+    foreach ([$scriptTemplate => 'Boot tuning script template', $serviceTemplate => 'Boot tuning service template'] as $template => $label) {
+        if (!is_file($template)) {
+            $log('[SKIP] '.$label.' missing: '.$template);
+            return;
+        }
     }
 
     $scriptTarget = $scriptTarget ?? '/usr/local/sbin/pmss-boot-tuning.sh';

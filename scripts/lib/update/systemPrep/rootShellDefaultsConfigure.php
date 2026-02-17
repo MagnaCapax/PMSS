@@ -17,23 +17,17 @@ require_once dirname(__DIR__, 2).'/runtime.php';
         $bashrc = '/root/.bashrc';
         $lines = file_exists($bashrc) ? (file($bashrc, FILE_IGNORE_NEW_LINES) ?: []) : [];
 
-        $updates = [];
         $defaults = [
             "alias ls='ls --color=auto'",
             'PATH=$PATH:/scripts',
         ];
-        foreach ($defaults as $entry) {
-            if (!in_array($entry, $lines, true)) {
-                $lines[]   = $entry;
-                $updates[] = $entry;
-            }
-        }
-
-        if ($updates === []) {
+        $missing = array_diff($defaults, $lines);
+        if ($missing === []) {
             $log('[SKIP] Root shell defaults already configured');
             return;
         }
 
+        $lines = array_merge($lines, $missing);
         @file_put_contents($bashrc, implode(PHP_EOL, $lines).PHP_EOL);
-        $log('Appended root shell defaults: '.implode(', ', $updates));
+        $log('Appended root shell defaults: '.implode(', ', $missing));
     }

@@ -14,8 +14,7 @@ function pmssTotalMemMiB(): int
     if (ctype_digit((string)$override)) {
         return (int)$override;
     }
-    $meminfo = @file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [];
-    foreach ($meminfo as $line) {
+    foreach (@file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
         if (strpos($line, 'MemTotal:') === 0) {
             $kb = (int)filter_var($line, FILTER_SANITIZE_NUMBER_INT);
             return (int)round($kb / 1024);
