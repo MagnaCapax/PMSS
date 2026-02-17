@@ -7,9 +7,7 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/logging.php';
 require_once dirname(__DIR__).'/runtime/commands.php';
-require_once dirname(__DIR__, 2).'/runtime.php';
 
 /**
  * Install and enable the PMSS boot tuning script + systemd unit.

@@ -5,11 +5,8 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/logging.php';
 require_once dirname(__DIR__).'/runtime/commands.php';
-require_once dirname(__DIR__, 2).'/runtime.php';
 require_once __DIR__.'/cgroupModeDetect.php';
-require_once __DIR__.'/hostResourcesDetect.php';
 
     /**
      * Guarantee that cgroup mounts and PID limits are configured sanely.
