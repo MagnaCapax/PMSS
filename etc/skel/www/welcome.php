@@ -356,7 +356,8 @@ function bonusQuotaDisplay($bonusQuota) {
 	EOF;
 	        return;
 	    }
-	    $percent = round((($trafficUsed / 1024) / $trafficLimit) * 100);
+	    $percent = ($trafficLimit > 0) ? round((($trafficUsed / 1024) / $trafficLimit) * 100) : 0;
+	    if (!is_finite($percent)) $percent = 0;
 	    $trafficUsed = round($trafficUsed / 1024) . " GiB";
 
 	    if ($percent > 100) {
@@ -384,6 +385,8 @@ EOF;
 }
 
 function createGauge($titleText, $footerText, $percent, $percentMax = 0) {
+    if (!is_finite($percent)) $percent = 0;
+    if (!is_finite($percentMax)) $percentMax = 0;
     if ($percentMax == 0) $percentMax = $percent;
     $gaugeBackgroundColor = gaugeColor($percent);
 
@@ -404,6 +407,7 @@ EOF;
 }
 
 function gaugeColor($percent) {
+    if (!is_finite($percent)) $percent = 0;
     $startColor = array(hexdec('99'), hexdec('E6'), hexdec('99'));
     $endColor   = array(hexdec('EE'), hexdec('99'), hexdec('99'));
     $differenceColor = array(
@@ -443,9 +447,9 @@ function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
         return '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
     }
 
-    $percent = round(($usedBytes / $totalSpace) * 100, 1);
-    $percentFromBurst = round(($usedBytes / $hardLimit) * 100);
-    if ($percent < 100) {
+    $percent = ($totalSpace > 0) ? round(($usedBytes / $totalSpace) * 100, 1) : 0;
+    $percentFromBurst = ($hardLimit > 0) ? round(($usedBytes / $hardLimit) * 100) : 0;
+    if ($percent < 100 && $totalSpace > 0) {
         $percentFromBurst = round(($usedBytes / $totalSpace) * 100, 1);
     }
 
