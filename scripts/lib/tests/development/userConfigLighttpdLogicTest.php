@@ -64,6 +64,23 @@ class UserConfigLighttpdLogicTest extends TestCase
         $this->assertEquals(1, \pmssParseSizeToMiB('1024K'));
     }
 
+    public function testClampLighttpdBandwidthLimits(): void
+    {
+        $template = "connection.kbytes-per-second = 204800\nserver.kbytes-per-second = 409600\n";
+        $clamped = \pmssClampLighttpdBandwidthLimits($template);
+        $this->assertTrue(strpos($clamped, 'connection.kbytes-per-second = 0') !== false);
+        $this->assertTrue(strpos($clamped, 'server.kbytes-per-second = 0') !== false);
+
+        $templateOk = "connection.kbytes-per-second = 1024\nserver.kbytes-per-second = 65535\n";
+        $clampedOk = \pmssClampLighttpdBandwidthLimits($templateOk);
+        $this->assertTrue(strpos($clampedOk, 'connection.kbytes-per-second = 1024') !== false);
+        $this->assertTrue(strpos($clampedOk, 'server.kbytes-per-second = 65535') !== false);
+
+        $templateComment = "server.kbytes-per-second = 2048 # keep\n";
+        $clampedComment = \pmssClampLighttpdBandwidthLimits($templateComment);
+        $this->assertTrue(strpos($clampedComment, 'server.kbytes-per-second = 2048 # keep') !== false);
+    }
+
     public function testShouldConfigureLighttpdSkipsNonExistingHome(): void
     {
         $this->assertTrue(!\pmssShouldConfigureLighttpdForHome('/tmp/pmss-nonexistent-home'));

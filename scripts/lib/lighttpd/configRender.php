@@ -27,7 +27,28 @@ function pmssRenderLighttpdConfig(string $template, string $user, int $serverPor
         1
     );
 
+    $config = pmssClampLighttpdBandwidthLimits($config);
+
     return $config;
+}
+
+function pmssClampLighttpdBandwidthLimits(string $config): string
+{
+    // lighttpd enforces uint16 for kbytes-per-second; overflow breaks startup on newer releases.
+    $pattern = '/^(\\s*(?:connection|server)\\.kbytes-per-second\\s*=\\s*)(\\d+)(\\s*(?:#.*)?)$/m';
+    $clamped = preg_replace_callback(
+        $pattern,
+        function (array $matches): string {
+            $value = (int)$matches[2];
+            if ($value > 65535) {
+                $value = 0;
+            }
+            return $matches[1].$value.$matches[3];
+        },
+        $config
+    );
+
+    return is_string($clamped) ? $clamped : $config;
 }
 
 function pmssWebdavWwwPolicyBlock(string $user): string
