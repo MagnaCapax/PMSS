@@ -252,6 +252,16 @@ COMMIT:
   One commit per logical change.
   PREFIX = ${commit_prefix}
 
+COMMIT MESSAGE PII RULE (PUBLIC REPO — BINDING):
+  NEVER include in commit messages:
+  - Real IP addresses (185.148.x.x, 65.108.x.x)
+  - Real hostnames (*.pulsedmedia.com)
+  - Real usernames or /home/<user> paths
+  - Customer email addresses
+  - Internal references (WHMCS, NOC-PS, doctrine/, CLAUDE.md, soul.md, sysadmin/)
+  Use generic descriptions: "user account", "target server", "the affected host".
+  The wrapper runs a PII scanner on commit messages and BLOCKS push if violations found.
+
 PUSH after each commit (best-effort — sandbox may block network):
   git push origin HEAD
   If push fails (sandbox/network): continue. Wrapper pushes after session.
@@ -319,3 +329,8 @@ if ! codex_scan_frozen_paths "$ROOT"; then
 fi
 
 codex_scan_git_diff_for_dangers "$ROOT"
+
+# Security: scan commit messages for PII before they get pushed to public repo
+if ! codex_scan_commit_messages_for_pii "$ROOT"; then
+	echo "[codex-run] WARNING: unpushed commits contain PII — wrapper should block push" >&2
+fi

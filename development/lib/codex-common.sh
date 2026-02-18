@@ -353,6 +353,87 @@ codex_scan_git_diff_for_dangers() {
 	fi
 }
 
+# Scan unpushed commit messages for PII that should not be on a public repo.
+# Usage: codex_scan_commit_messages_for_pii <repo_root> [<base_ref>]
+# base_ref defaults to origin/main.
+# Returns 0 if clean, 1 if PII detected.
+# Outputs violation details to stderr.
+codex_scan_commit_messages_for_pii() {
+	local repo_root="$1"
+	local base_ref="${2:-origin/main}"
+
+	command -v git >/dev/null 2>&1 || return 0
+	git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+
+	local ahead
+	ahead=$(git -C "$repo_root" rev-list --count "${base_ref}..HEAD" 2>/dev/null || echo 0)
+	[[ "$ahead" -gt 0 ]] || return 0
+
+	local messages
+	messages=$(git -C "$repo_root" log --format='%H %s%n%b' "${base_ref}..HEAD" 2>/dev/null) || return 0
+	[[ -n "$messages" ]] || return 0
+
+	local found=0
+	local line
+
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+
+		# IP addresses in Pulsed Media ranges (185.148.x.x, 65.108.x.x)
+		if [[ "$line" =~ 185\.148\.[0-9]+\.[0-9]+ ]] || [[ "$line" =~ 65\.108\.[0-9]+\.[0-9]+ ]]; then
+			echo "[commit-pii] BLOCK: IP address in commit message: $line" >&2
+			found=1
+		fi
+
+		# Real FQDN hostnames (.pulsedmedia.com)
+		if [[ "$line" =~ [a-z0-9-]+\.pulsedmedia\.com ]]; then
+			echo "[commit-pii] BLOCK: hostname in commit message: $line" >&2
+			found=1
+		fi
+
+		# /home/<username> paths (real customer usernames)
+		if [[ "$line" =~ /home/[a-z][a-z0-9]{2,15}[^a-z0-9] ]] || [[ "$line" =~ /home/[a-z][a-z0-9]{2,15}$ ]]; then
+			echo "[commit-pii] BLOCK: user path in commit message: $line" >&2
+			found=1
+		fi
+
+		# Customer email addresses
+		if [[ "$line" =~ [a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,} ]]; then
+			# Allow known safe emails
+			if [[ ! "$line" =~ noreply@pulsedmedia\.com ]] && [[ ! "$line" =~ noreply@anthropic\.com ]] && [[ ! "$line" =~ @magnacapax\.fi ]]; then
+				echo "[commit-pii] BLOCK: email address in commit message: $line" >&2
+				found=1
+			fi
+		fi
+
+		# Internal system references (case-insensitive check)
+		local lower
+		lower=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')
+		if [[ "$lower" =~ doctrine/ ]] || [[ "$lower" =~ claude\.md ]] || [[ "$lower" =~ mission\.md ]] || \
+		   [[ "$lower" =~ soul\.md ]] || [[ "$lower" =~ memory/lessons/ ]] || [[ "$lower" =~ tools/safety/ ]] || \
+		   [[ "$lower" =~ sysadmin/ ]] || [[ "$lower" =~ whmcs ]] || [[ "$lower" =~ noc-ps ]] || \
+		   [[ "$lower" =~ nocps ]] || [[ "$lower" =~ wiggum ]] || [[ "$lower" =~ vipunen ]]; then
+			echo "[commit-pii] BLOCK: internal reference in commit message: $line" >&2
+			found=1
+		fi
+
+		# ssh root@ commands
+		if [[ "$line" =~ ssh[[:space:]]+root@ ]]; then
+			echo "[commit-pii] BLOCK: SSH command in commit message: $line" >&2
+			found=1
+		fi
+
+	done <<< "$messages"
+
+	if [[ "$found" -eq 1 ]]; then
+		echo "[commit-pii] WARNING: $ahead unpushed commit(s) contain PII/internal references" >&2
+		echo "[commit-pii] These commits should NOT be pushed to the public repo without cleanup" >&2
+		return 1
+	fi
+
+	return 0
+}
+
 # Invoke the assistant executable with the prompt file contents.
 codex_invoke() {
 	local exec_cmd="$1" prompt_file="$2"
