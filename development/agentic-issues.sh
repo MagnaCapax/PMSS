@@ -207,7 +207,7 @@ echo "[agentic-issues] ${#issue_numbers[@]} issue(s) passed gate: ${issue_number
 
 # Build issue context file with details for each issue.
 # Use cryptographic nonce separators to prevent cross-issue contamination via
-# fake separator injection in issue bodies. (Wiggum Round 9: spoofable separators)
+# fake separator injection in issue bodies.
 ISSUE_NONCE=$(head -c 16 /dev/urandom | od -A n -t x1 | tr -d ' \n')
 
 : >"$ISSUES_FILE"

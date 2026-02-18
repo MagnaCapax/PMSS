@@ -358,6 +358,9 @@ codex_scan_git_diff_for_dangers() {
 # base_ref defaults to origin/main.
 # Returns 0 if clean, 1 if PII detected.
 # Outputs violation details to stderr.
+#
+# NOTE: This is a lightweight generic check. The external push wrapper may
+# apply additional operator-specific patterns.
 codex_scan_commit_messages_for_pii() {
 	local repo_root="$1"
 	local base_ref="${2:-origin/main}"
@@ -379,42 +382,18 @@ codex_scan_commit_messages_for_pii() {
 	while IFS= read -r line; do
 		[[ -n "$line" ]] || continue
 
-		# IP addresses in Pulsed Media ranges (185.148.x.x, 65.108.x.x)
-		if [[ "$line" =~ 185\.148\.[0-9]+\.[0-9]+ ]] || [[ "$line" =~ 65\.108\.[0-9]+\.[0-9]+ ]]; then
-			echo "[commit-pii] BLOCK: IP address in commit message: $line" >&2
-			found=1
-		fi
-
-		# Real FQDN hostnames (.pulsedmedia.com)
-		if [[ "$line" =~ [a-z0-9-]+\.pulsedmedia\.com ]]; then
-			echo "[commit-pii] BLOCK: hostname in commit message: $line" >&2
-			found=1
-		fi
-
-		# /home/<username> paths (real customer usernames)
+		# /home/<username> paths (real user accounts)
 		if [[ "$line" =~ /home/[a-z][a-z0-9]{2,15}[^a-z0-9] ]] || [[ "$line" =~ /home/[a-z][a-z0-9]{2,15}$ ]]; then
 			echo "[commit-pii] BLOCK: user path in commit message: $line" >&2
 			found=1
 		fi
 
-		# Customer email addresses
+		# Email addresses (except noreply@)
 		if [[ "$line" =~ [a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,} ]]; then
-			# Allow known safe emails
-			if [[ ! "$line" =~ noreply@pulsedmedia\.com ]] && [[ ! "$line" =~ noreply@anthropic\.com ]] && [[ ! "$line" =~ @magnacapax\.fi ]]; then
+			if [[ ! "$line" =~ noreply@ ]]; then
 				echo "[commit-pii] BLOCK: email address in commit message: $line" >&2
 				found=1
 			fi
-		fi
-
-		# Internal system references (case-insensitive check)
-		local lower
-		lower=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')
-		if [[ "$lower" =~ doctrine/ ]] || [[ "$lower" =~ claude\.md ]] || [[ "$lower" =~ mission\.md ]] || \
-		   [[ "$lower" =~ soul\.md ]] || [[ "$lower" =~ memory/lessons/ ]] || [[ "$lower" =~ tools/safety/ ]] || \
-		   [[ "$lower" =~ sysadmin/ ]] || [[ "$lower" =~ whmcs ]] || [[ "$lower" =~ noc-ps ]] || \
-		   [[ "$lower" =~ nocps ]] || [[ "$lower" =~ wiggum ]] || [[ "$lower" =~ vipunen ]]; then
-			echo "[commit-pii] BLOCK: internal reference in commit message: $line" >&2
-			found=1
 		fi
 
 		# ssh root@ commands
@@ -426,8 +405,7 @@ codex_scan_commit_messages_for_pii() {
 	done <<< "$messages"
 
 	if [[ "$found" -eq 1 ]]; then
-		echo "[commit-pii] WARNING: $ahead unpushed commit(s) contain PII/internal references" >&2
-		echo "[commit-pii] These commits should NOT be pushed to the public repo without cleanup" >&2
+		echo "[commit-pii] WARNING: $ahead unpushed commit(s) contain PII" >&2
 		return 1
 	fi
 

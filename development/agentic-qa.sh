@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # DEPRECATED (2026-02-15): Code-level-only QA replaced by full E2E QA.
-# Full E2E QA runs from sysadmin side via:
-#   run-agent prompts/code-qa-github-issue-verification-redteam.md MODE=sweep
-# This script is retained for manual/fallback use only (no server-level testing).
-# The run-pmss-dev-cycle wrapper uses run-agent for QA, not this script.
+# Full E2E QA runs externally. This script is retained for manual/fallback use only.
 set -uo pipefail
 set -o errtrace
 
@@ -17,7 +14,7 @@ source "$HERE/lib/codex-common.sh"
 codex_enable_debug PMSS_QA_CODEX_DEBUG "agentic-qa"
 codex_set_error_trap "agentic-qa"
 
-echo "[agentic-qa] DEPRECATED: Use run-agent with full E2E QA SOP instead. Running code-level fallback." >&2
+echo "[agentic-qa] DEPRECATED: Full E2E QA runs externally. Running code-level fallback." >&2
 echo "[agentic-qa] start: fetching complete-verify issues and invoking assistant" >&1
 
 # agentic-qa.sh — Fetch issues labeled complete-verify and launch an assistant

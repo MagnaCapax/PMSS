@@ -252,15 +252,14 @@ COMMIT:
   One commit per logical change.
   PREFIX = ${commit_prefix}
 
-COMMIT MESSAGE PII RULE (PUBLIC REPO — BINDING):
+COMMIT MESSAGE RULE (PUBLIC REPO — BINDING):
   NEVER include in commit messages:
-  - Real IP addresses (185.148.x.x, 65.108.x.x)
-  - Real hostnames (*.pulsedmedia.com)
+  - Real IP addresses or hostnames
   - Real usernames or /home/<user> paths
   - Customer email addresses
-  - Internal references (WHMCS, NOC-PS, doctrine/, CLAUDE.md, soul.md, sysadmin/)
+  - Internal infrastructure details
   Use generic descriptions: "user account", "target server", "the affected host".
-  The wrapper runs a PII scanner on commit messages and BLOCKS push if violations found.
+  The push wrapper scans commit messages and BLOCKS push if violations found.
 
 PUSH after each commit (best-effort — sandbox may block network):
   git push origin HEAD

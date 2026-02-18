@@ -1,10 +1,8 @@
 PMSS QA Verification — Code-Level Gauntlet for complete-verify Issues
 
 NOTE: This is the CODE-LEVEL-ONLY QA prompt (runs inside codex exec, sandboxed).
-The FULL end-to-end QA (SSH + Playwright + service verification) is handled by:
-  prompts/code-qa-github-issue-verification-redteam.md (on sysadmin side)
-This file is used ONLY when the full E2E QA is not available (e.g., dev server offline).
-The run-pmss-dev-cycle wrapper uses the full E2E SOP by default.
+Full end-to-end QA (SSH + service verification) runs externally when available.
+This file is used as fallback when full E2E QA is not available.
 
 Goal: Verify that issues labeled complete-verify are ACTUALLY fixed. Close if PASS.
 Remove label and post failure report if FAIL. Attempt inline fix for simple failures.
@@ -131,17 +129,11 @@ ANY layer fails?
 GITHUB ACTIONS (after verification)
 ----------------------------------------------------------------------
 
-VOICE & SAFETY FOR GITHUB COMMENTS (BINDING):
+GITHUB COMMENT SAFETY (PUBLIC REPO — BINDING):
   This is a PUBLIC repo. Every comment is visible to the world.
-  - Voice: Measured, formal, calm. Authority through understanding.
-  - Attribution: Always include "Väinämöinen <noreply@pulsedmedia.com>"
-  - Signature joke: Include a unique Kalevala-style parenthesized joke after attribution.
-  - NEVER include: real usernames, real hostnames, real IPs, doctrine/ references,
-    CLAUDE.md, MISSION.md, soul.md, WHMCS, NOC-PS, tools/safety/, memory/lessons/,
-    ssh root@ commands, internal tool paths, Wiggum, Vipunen, sysadmin/.
-  - Pseudonymize: /home/<username>/, <hostname>, <ip-address>, <email>
-  The wrapper runs tools/safety/github-comment-safety-gates.sh on your output.
-  BLOCK = comment is NOT posted. Fix the content.
+  NEVER include: real usernames, real hostnames, real IPs, customer emails,
+  internal infrastructure details, or ssh root@ commands.
+  Pseudonymize: /home/<username>/, <hostname>, <ip-address>, <email>.
 
 ON PASS:
   1. Output the verdict line: QA_VERDICT #N PASS
@@ -154,8 +146,6 @@ ON PASS:
     - Layer 3 (security): PASS/N-A
     - Layer 4 (regression): PASS — no stale references
     - Layer 5 (consistency): PASS/N-A
-    Väinämöinen <noreply@pulsedmedia.com>
-    (<unique Kalevala-style joke — new each time, 3-12 words>)
   NOTE: The wrapper handles `gh issue close` — do NOT attempt it yourself (sandbox blocks it).
 
 ON FAIL:
@@ -168,8 +158,6 @@ ON FAIL:
     **Actual:** <what happened>
     **Root cause:** <why the fix is incomplete>
     **Suggested fix:** <specific code change needed>
-    Väinämöinen <noreply@pulsedmedia.com>
-    (<unique Kalevala-style joke — new each time, 3-12 words>)
   NOTE: The wrapper handles `gh issue edit --remove-label` — do NOT attempt it yourself.
 
 ----------------------------------------------------------------------

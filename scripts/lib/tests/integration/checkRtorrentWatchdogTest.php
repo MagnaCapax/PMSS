@@ -16,7 +16,7 @@
  * Options:
  *   --skip-torrents  Skip torrent loading (faster, still tests watchdog)
  *
- * @author    Väinämöinen <noreply@pulsedmedia.com>
+ * @author    Sampsa Pellervoinen <noreply@pulsedmedia.com>
  * @copyright 2010-2025 Magna Capax Finland Oy
  * @license   Proprietary
  */
