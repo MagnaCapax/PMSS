@@ -142,16 +142,13 @@ function pmssUsernameIsReserved(string $username): bool
  * Validate a username for new-user provisioning (stricter than legacy checks).
  *
  * Provisioning creates fresh system users, configures services, and writes
- * state under /home. Historically PMSS allowed 1–2 character usernames, but
- * going forward we require a minimum of 3 characters for newly created users
- * while keeping legacy operations compatible with any existing short names.
+ * state under /home. PMSS allows short usernames (1–2 characters) to preserve
+ * compatibility with legacy automation while still enforcing reserved-name
+ * protections for system accounts.
  */
 function pmssUsernameIsValidForCreate(string $username): bool
 {
     if (!pmssUsernameIsValid($username)) {
-        return false;
-    }
-    if (strlen($username) < 3) {
         return false;
     }
     return !pmssUsernameIsReserved($username);
