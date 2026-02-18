@@ -121,10 +121,9 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
         && posix_isatty(STDERR);
     $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
         .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
-    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     logMessage('dist-upgrade: ensuring fuse-overlayfs is installed for rootless Docker');
-    $rc = runCommand("$env apt-get install -y $opts fuse-overlayfs", true, null, $hasTty);
+    $rc = runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold fuse-overlayfs", true, null, $hasTty);
     if ($rc !== 0) {
         logMessage('[WARN] dist-upgrade: failed to install fuse-overlayfs; rootless Docker may fail or fall back to a slower storage driver');
     }
@@ -310,14 +309,13 @@ function pmssRepairNginxAfterDistUpgrade(): void
     }
     $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
         .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
-    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     runCommand("$env apt-get purge -y 'nginx*'", true, null, $hasTty);
     if (!pmssWaitForDpkgLocks()) {
         logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping nginx reinstall');
         return;
     }
-    if (runCommand("$env apt-get install -y $opts nginx nginx-full nginx-common", true, null, $hasTty) !== 0) {
+    if (runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold nginx nginx-full nginx-common", true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: nginx reinstall failed; leaving existing config in place');
         return;
     }
@@ -670,14 +668,13 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
     }
     $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
         .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
-    $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     runCommand("$env apt-get update", true, null, $hasTty);
     if (!pmssWaitForDpkgLocks()) {
         logMessage('[WARN] dist-upgrade: dpkg lock did not clear; skipping libcrypt1 install');
         return;
     }
-    if (runCommand("$env apt-get install -y $opts libcrypt1", true, null, $hasTty) !== 0) {
+    if (runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold libcrypt1", true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: libcrypt1 preinstall failed; continuing');
     }
 }

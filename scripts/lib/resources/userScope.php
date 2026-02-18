@@ -41,12 +41,6 @@ class ResourceStatsUserScope
         }
     }
 
-    /** Sanitize user input by stripping unexpected characters. */
-    public function sanitizeUser(string $input): string
-    {
-        return preg_replace('/[^a-zA-Z0-9-_]/', '', $input);
-    }
-
     /** Validate that a user has resource data and a home directory. */
     public function validateUser(string $username): bool
     {

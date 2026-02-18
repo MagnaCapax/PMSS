@@ -64,9 +64,8 @@ function wgSupports(): bool
     exec('command -v wg', $out, $rc);
     if ($rc !== 0) {
         wgLog('wg binary not available on PATH');
-        return false;
     }
-    return true;
+    return $rc === 0;
 }
 
 /**
@@ -297,10 +296,7 @@ function wgValidatePublicKey(string $key): bool
         return false;
     }
     $decoded = base64_decode($key, true);
-    if ($decoded === false || strlen($decoded) !== 32) {
-        return false;
-    }
-    return true;
+    return $decoded !== false && strlen($decoded) === 32;
 }
 
 /**

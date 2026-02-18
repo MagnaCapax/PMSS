@@ -33,7 +33,7 @@ function pmssResourceLogLoadUsers(): array
     if ($usersRaw === '') {
         return [];
     }
-    $users = array_filter(explode("\n", $usersRaw));
+    $users = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
     $users[] = 'www-data';
     return $users;
 }

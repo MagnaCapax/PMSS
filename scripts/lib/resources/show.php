@@ -33,9 +33,20 @@ function pmssShowResourcesMain(array $argv): int
         }
         $users = [$userFilter];
     } else {
-        $users = pmssResourceLoadUsers($statsDir);
+        $lines = [];
+        $rc = 0;
+        exec(escapeshellarg(dirname(__DIR__, 2).'/listUsers.php'), $lines, $rc);
+        if ($rc !== 0) {
+            fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+            return 1;
+        }
+        $users = array_filter(array_map('trim', $lines), 'strlen');
+        $users = array_values(array_filter($users, 'pmssResourceLogIsValidUser'));
         if (count($users) === 0) {
             die("No users in this system!\n");
+        }
+        if (is_file($statsDir.'/www-data')) {
+            $users[] = 'www-data';
         }
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
     }
@@ -78,24 +89,4 @@ function pmssShowResourcesPrintHelp(): void
     echo "  --user          Show only the named user.\n";
     echo "  --help          Show this help.\n";
     echo "\n";
-}
-
-function pmssResourceLoadUsers(string $statsDir): array
-{
-    $lines = [];
-    $rc = 0;
-    exec(escapeshellarg(dirname(__DIR__, 2).'/listUsers.php'), $lines, $rc);
-    if ($rc !== 0) {
-        fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
-        exit(1);
-    }
-    $users = array_filter(array_map('trim', $lines), 'strlen');
-    $users = array_values(array_filter($users, 'pmssResourceLogIsValidUser'));
-    if (empty($users)) {
-        return [];
-    }
-    if (is_file($statsDir.'/www-data')) {
-        $users[] = 'www-data';
-    }
-    return $users;
 }

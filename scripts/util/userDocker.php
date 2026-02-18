@@ -58,9 +58,8 @@ $debug = in_array('--debug', $args, true);
 $args = array_values(array_filter($args, static function ($arg) {
     return $arg !== '--debug';
 }));
-$effectiveArgc = count($args);
 
-if ($effectiveArgc < 3) {
+if (count($args) < 3) {
     fwrite(STDERR, "Usage: /scripts/util/userDocker.php USER {start|stop|restart|status} [--debug]\n");
     exit(1);
 }

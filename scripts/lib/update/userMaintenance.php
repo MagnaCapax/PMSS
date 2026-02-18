@@ -61,16 +61,8 @@ if (!function_exists('pmssUpdateAllUsers')) {
         $lighttpdChecker = '/scripts/cron/checkLighttpdInstances.php';
         $hasLighttpdChecker = is_file($lighttpdChecker);
 
-        $runUserMaintenance = static function (string $user, string $label, string $command): void {
-            $rc = runUserStep($user, $label, $command);
-            if ($rc !== 0) {
-                pmssUserLog($user, sprintf('[WARN] %s failed (rc=%d)', $label, $rc));
-            }
-        };
-
         foreach ($users as $user) {
-            $userTrim = trim($user);
-            if ($userTrim === '') {
+            if (($userTrim = trim($user)) === '') {
                 continue;
             }
             $normalized = pmssNormalizeUsername($userTrim);
@@ -141,11 +133,13 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
             if ($hasHtpasswdHelper) {
                 $command = pmssBuildCommand($htpasswdHelper, [$userTrim]);
-                $runUserMaintenance($userTrim, 'Synchronizing per-user htpasswd', $command);
+                $rc = runUserStep($userTrim, 'Synchronizing per-user htpasswd', $command);
+                if ($rc !== 0) { pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Synchronizing per-user htpasswd', $rc)); }
             }
             if ($hasLighttpdChecker) {
                 $command = pmssBuildCommand($lighttpdChecker, [$userTrim]);
-                $runUserMaintenance($userTrim, 'Checking lighttpd instance', $command);
+                $rc = runUserStep($userTrim, 'Checking lighttpd instance', $command);
+                if ($rc !== 0) { pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Checking lighttpd instance', $rc)); }
             }
 
             $userDuration = microtime(true) - $userStart;

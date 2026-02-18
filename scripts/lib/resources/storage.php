@@ -11,14 +11,12 @@ class ResourceStorage
     private $homeDir;
     private $runtimeDir;
     private $statsDir;
-    private $chattrPath;
 
     public function __construct(array $paths = [])
     {
         $this->homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
         $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->statsDir = rtrim($paths['stats_dir'] ?? $this->runtimeDir.'/resourceStats', '/');
-        $this->chattrPath = null;
     }
 
     /** Ensure runtime directories exist before writing. */
@@ -80,26 +78,17 @@ class ResourceStorage
         if (!is_file($path)) {
             return;
         }
-        $chattr = $this->chattrPath();
+        $chattr = '';
+        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+            if (is_executable($candidate)) {
+                $chattr = $candidate;
+                break;
+            }
+        }
         if ($chattr === '') {
             return;
         }
         $flag = $enable ? '+i' : '-i';
         @exec($chattr.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
-    }
-
-    private function chattrPath(): string
-    {
-        if ($this->chattrPath !== null) {
-            return $this->chattrPath;
-        }
-        $this->chattrPath = '';
-        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-            if (is_executable($candidate)) {
-                $this->chattrPath = $candidate;
-                break;
-            }
-        }
-        return $this->chattrPath;
     }
 }

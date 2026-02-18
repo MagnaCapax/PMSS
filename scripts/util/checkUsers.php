@@ -24,18 +24,16 @@ $homeOnly = array_values(array_diff($homeUsers, $cacheUsers));
 $passwdOnly = array_values(array_diff($passwdUsers, $cacheUsers, $homeUsers));
 $consistent = array_values(array_intersect($cacheUsers, $homeUsers, $passwdUsers));
 
-$result = [
-    'consistent'   => $consistent,
-    'db_only'      => $dbOnly,
-    'home_only'    => $homeOnly,
-    'passwd_only'  => $passwdOnly,
-    'db_users'     => array_values($cacheUsers),
-    'home_users'   => array_values($homeUsers),
-    'passwd_users' => array_values($passwdUsers),
-];
-
 if (in_array('--json', $argv, true)) {
-    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+    echo json_encode([
+        'consistent'   => $consistent,
+        'db_only'      => $dbOnly,
+        'home_only'    => $homeOnly,
+        'passwd_only'  => $passwdOnly,
+        'db_users'     => $cacheUsers,
+        'home_users'   => $homeUsers,
+        'passwd_users' => $passwdUsers,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
     exit(0);
 }
 

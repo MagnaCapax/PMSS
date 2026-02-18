@@ -22,7 +22,6 @@ if (empty($users)) {
 }
 
 foreach ($users as $user) {
-    $user = trim($user);
     if (!pmssResourceLogIsValidUser($user)) {
         continue;
     }

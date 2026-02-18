@@ -7,9 +7,58 @@
  */
 
 require_once __DIR__.'/log.php';
-require_once __DIR__.'/snapshotData.php';
+require_once __DIR__.'/../resources.php';
+require_once __DIR__.'/accumulator.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
+
+function pmssResourceSnapshotReadUserData(string $path): ?array
+{
+    if (!is_file($path)) {
+        return null;
+    }
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || trim($raw) === '') {
+        return null;
+    }
+    $data = @unserialize($raw);
+    return is_array($data) ? $data : null;
+}
+
+function pmssResourceSnapshotComputeFromLog(resourceStatistics $stats, string $user): ?array
+{
+    $dataLines = $stats->getData($user, 350);
+    if (trim($dataLines) === '') {
+        return null;
+    }
+
+    $threshold = time() - (24 * 60 * 60);
+    $lines = array_filter(explode("\n", trim($dataLines)));
+    $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
+
+    foreach ($lines as $line) {
+        $parsed = $stats->parseLine($line);
+        if ($parsed === false || $parsed['timestamp'] < $threshold) {
+            continue;
+        }
+        $accumulator->addSample($parsed);
+    }
+
+    if (!$accumulator->hasSamples()) {
+        return null;
+    }
+
+    $results = $accumulator->results();
+
+    return [
+        'io_read' => $results['raw']['io_read']['day'],
+        'io_write' => $results['raw']['io_write']['day'],
+        'cpu' => $results['raw']['cpu']['day'],
+        'memory' => $results['memory']['day'],
+        'ram_hours' => $results['raw']['ram_hours']['day'],
+        'tasks' => $results['tasks']['day'],
+    ];
+}
 
 /**
  * Capture and persist one snapshot.
@@ -54,7 +103,6 @@ function pmssResourceSnapshotRun(): int
     $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
 
     foreach ($users as $user) {
-        $user = trim($user);
         if (!pmssResourceLogIsValidUser($user)) {
             continue;
         }
@@ -65,7 +113,22 @@ function pmssResourceSnapshotRun(): int
         }
 
         $data = pmssResourceSnapshotReadUserData($homeDir.'/'.$user.'/.resourceData');
-        $metrics = $data !== null ? pmssResourceSnapshotExtractDay($data) : null;
+        $metrics = null;
+        if ($data !== null) {
+            $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'];
+            $fields = [];
+            foreach ($keys as $key) {
+                $value = $data[$key]['raw']['day'] ?? null;
+                if ($value === null) {
+                    $fields = null;
+                    break;
+                }
+                $fields[$key] = (float) $value;
+            }
+            if (is_array($fields)) {
+                $metrics = $fields;
+            }
+        }
 
         if ($metrics === null) {
             $metrics = pmssResourceSnapshotComputeFromLog($stats, $user);

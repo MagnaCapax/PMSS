@@ -59,10 +59,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
         }
     }
 
-    if (in_array(null, $values, true)) {
-        return null;
-    }
-    return $values;
+    return in_array(null, $values, true) ? null : $values;
 }
 
 /**
@@ -108,10 +105,8 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         @chmod($statePath, 0600);
     }
 
-    if ($locked) {
-        @flock($handle, LOCK_UN);
-    }
     if ($handle !== false) {
+        $locked && @flock($handle, LOCK_UN);
         @fclose($handle);
     }
 

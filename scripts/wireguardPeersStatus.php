@@ -99,9 +99,6 @@ function wgLoadRuntimeStatus(): array
 
     foreach ($output as $line) {
         $parts = explode("\t", trim($line));
-        if (count($parts) < 3) {
-            continue;
-        }
         // The first field on peer lines is the public key.
         // Interface lines are ignored.
         if (strpos($parts[0], 'public-key') !== false || strpos($parts[0], 'interface') !== false) {

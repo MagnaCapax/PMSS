@@ -58,7 +58,7 @@ class ResourceStatsProcessor
 
     public function detectWorkerUser(array $argv): ?string
     {
-        return isset($argv[1]) ? $this->userScope->sanitizeUser($argv[1]) : null;
+        return isset($argv[1]) ? preg_replace('/[^a-zA-Z0-9-_]/', '', $argv[1]) : null;
     }
 
     public function discoverUsers(): array
