@@ -311,4 +311,11 @@ if [[ "$dry_run" == "1" ]]; then
 fi
 
 codex_invoke "$exec_cmd" "$prompt_out"
+
+# Security: revert any modifications to frozen pipeline paths (CRITICAL)
+# This catches sandbox escape via .github/, development/, AGENTS.md, .codex-prompt, .gitignore
+if ! codex_scan_frozen_paths "$ROOT"; then
+	echo "[codex-run] WARNING: frozen path violation detected and reverted" >&2
+fi
+
 codex_scan_git_diff_for_dangers "$ROOT"

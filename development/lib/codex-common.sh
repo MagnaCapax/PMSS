@@ -213,6 +213,87 @@ EOF
 	codex_append_local_notes "$notes_file" "$prompt_file"
 }
 
+# Post-run enforcement: revert any modifications to frozen pipeline paths.
+# The codex sandbox (workspace-write) allows writes to ALL files in the repo.
+# This function detects and reverts changes to paths that agents must NEVER modify.
+#
+# FROZEN PATHS (security-critical):
+#   .github/           — CI/CD workflows (sandbox escape vector)
+#   development/       — pipeline scripts (self-modification vector)
+#   AGENTS.md          — agent constitution (prompt injection vector)
+#   AGENTS.local.md    — local agent rails
+#   .codex-prompt      — operator notes (persistent prompt injection)
+#   .gitignore         — could hide malicious files
+#
+# Returns 0 if clean, 1 if frozen paths were touched (and reverted).
+codex_scan_frozen_paths() {
+	local repo_root="$1"
+	command -v git >/dev/null 2>&1 || return 0
+	git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+
+	local frozen_patterns=(
+		'^\.github/'
+		'^development/'
+		'^AGENTS\.md$'
+		'^AGENTS\.local\.md$'
+		'^\.codex-prompt$'
+		'^\.gitignore$'
+	)
+
+	local pattern
+	pattern=$(printf '%s\n' "${frozen_patterns[@]}" | paste -sd'|')
+
+	local touched_files=()
+	local f
+
+	# Check both staged and unstaged changes
+	while IFS= read -r f; do
+		[[ -n "$f" ]] || continue
+		if echo "$f" | grep -qE "$pattern"; then
+			touched_files+=("$f")
+		fi
+	done < <(git -C "$repo_root" diff --name-only 2>/dev/null; git -C "$repo_root" diff --cached --name-only 2>/dev/null)
+
+	# Also check untracked files in frozen dirs
+	while IFS= read -r f; do
+		[[ -n "$f" ]] || continue
+		if echo "$f" | grep -qE "$pattern"; then
+			touched_files+=("$f")
+		fi
+	done < <(git -C "$repo_root" ls-files --others --exclude-standard 2>/dev/null)
+
+	if [[ ${#touched_files[@]} -eq 0 ]]; then
+		return 0
+	fi
+
+	echo "[codex-run] FROZEN PATH VIOLATION: agent modified protected paths:" >&2
+	local file
+	for file in "${touched_files[@]}"; do
+		echo "[codex-run]   - $file" >&2
+	done
+
+	# Revert: restore frozen files from HEAD, remove untracked frozen files
+	for file in "${touched_files[@]}"; do
+		if git -C "$repo_root" ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+			# Tracked file — restore from HEAD
+			git -C "$repo_root" checkout HEAD -- "$file" 2>/dev/null || true
+			echo "[codex-run]   REVERTED: $file (restored from HEAD)" >&2
+		else
+			# Untracked file in frozen dir — remove it
+			rm -f "$repo_root/$file" 2>/dev/null || true
+			echo "[codex-run]   REMOVED: $file (untracked in frozen path)" >&2
+		fi
+	done
+
+	# Unstage any frozen files that were staged
+	for file in "${touched_files[@]}"; do
+		git -C "$repo_root" reset HEAD -- "$file" 2>/dev/null || true
+	done
+
+	echo "[codex-run] FROZEN PATH VIOLATION: all frozen paths reverted/removed" >&2
+	return 1
+}
+
 # Post-run warning scan for risky patterns newly added to the working tree.
 # This is intentionally best-effort: it should never rewrite or revert changes.
 #
@@ -225,7 +306,8 @@ codex_scan_git_diff_for_dangers() {
 	command -v awk >/dev/null 2>&1 || return 0
 	git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
 
-	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh)'
+	# Destructive commands + PHP injection patterns (public repo: issue bodies are untrusted)
+	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh|eval[[:space:]]*[(]|assert[[:space:]]*[(]|base64_decode[[:space:]]*[(]|proc_open[[:space:]]*[(]|popen[[:space:]]*[(]|\$_GET[[:space:]]*\[|\$_POST[[:space:]]*\[|\$_REQUEST[[:space:]]*\[|\$_SERVER\[.HTTP_)'
 	local found=0
 
 	if git -C "$repo_root" diff --no-color |
