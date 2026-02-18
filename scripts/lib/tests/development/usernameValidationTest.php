@@ -14,14 +14,14 @@ class UsernameValidationTest extends TestCase
         }
     }
 
-    public function testCreateUsernamesAllowShortNames(): void
+    public function testCreateUsernamesRequireMinLengthThree(): void
     {
-        $valid = ['a', 'ab', 'abc', 'user123', 'abcdefg8'];
+        $valid = ['abc', 'user123', 'abcdefg8'];
         foreach ($valid as $name) {
             $this->assertTrue(\pmssValidateUsernameForCreate($name), 'Expected create-valid username: '.$name);
         }
 
-        $invalid = ['1user', 'user-name', 'User123', 'toolong89x'];
+        $invalid = ['a', 'ab', '1user', 'user-name', 'User123', 'toolong89x'];
         foreach ($invalid as $name) {
             $this->assertTrue(!\pmssValidateUsernameForCreate($name), 'Expected create-invalid username: '.$name);
         }
