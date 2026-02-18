@@ -64,15 +64,22 @@ class ResourceStatsAccumulator
         $this->lastMemory = (float) $sample['memory'];
         $this->lastTasks = (float) $sample['tasks'];
 
-        $sampleHours = $this->sampleHours($timestamp);
+        $defaultIntervalHours = 300 / 3600;
+        if ($this->prevTimestamp === null) {
+            $intervalHours = $defaultIntervalHours;
+        } else {
+            $delta = $timestamp - $this->prevTimestamp;
+            $intervalHours = ($delta > 0 && $delta <= 3600) ? ($delta / 3600) : $defaultIntervalHours;
+        }
         $this->prevTimestamp = $timestamp;
+        $sampleRamHours = ((float) $sample['memory'] / 1024 / 1024 / 1024) * $intervalHours;
 
         foreach ($this->compareTimes as $label => $threshold) {
             if ($timestamp >= $threshold) {
                 $this->rawTotals['io_read'][$label] += $sample['io_read'];
                 $this->rawTotals['io_write'][$label] += $sample['io_write'];
                 $this->rawTotals['cpu'][$label] += $sample['cpu'];
-                $this->rawTotals['ram_hours'][$label] += $this->ramHoursSample($sample['memory'], $sampleHours);
+                $this->rawTotals['ram_hours'][$label] += $sampleRamHours;
                 $this->memorySums[$label] += $sample['memory'];
                 $this->memoryCounts[$label] += 1;
                 $this->taskSums[$label] += $sample['tasks'];
@@ -80,7 +87,7 @@ class ResourceStatsAccumulator
             }
         }
 
-        $this->dailyAccumulator->addSample($sample, $sampleHours);
+        $this->dailyAccumulator->addSample($sample, $intervalHours);
     }
 
     /**
@@ -114,25 +121,6 @@ class ResourceStatsAccumulator
             $averages[$label] = $count > 0 ? ($sum / $count) : 0.0;
         }
         return $averages;
-    }
-
-    private function sampleHours(int $timestamp): float
-    {
-        $default = 300 / 3600;
-        if ($this->prevTimestamp === null) {
-            return $default;
-        }
-        $delta = $timestamp - $this->prevTimestamp;
-        if ($delta <= 0 || $delta > 3600) {
-            return $default;
-        }
-        return $delta / 3600;
-    }
-
-    private function ramHoursSample(float $memoryBytes, float $sampleHours): float
-    {
-        $gib = $memoryBytes / 1024 / 1024 / 1024;
-        return $gib * $sampleHours;
     }
 
     // Daily totals are handled by ResourceStatsDailyAccumulator.

@@ -22,7 +22,7 @@ class ResourceStatsDailyAccumulator
     /**
      * Add a parsed sample to the daily accumulator.
      */
-    public function addSample(array $sample, float $sampleHours): void
+    public function addSample(array $sample, float $intervalHours): void
     {
         $currentDay = date('Y/m/d', (int) $sample['timestamp']);
         if ($this->firstDay === '') {
@@ -43,10 +43,11 @@ class ResourceStatsDailyAccumulator
                 'tasks_count'  => 0,
             ];
         }
+        $sampleRamHours = ((float) $sample['memory'] / 1024 / 1024 / 1024) * $intervalHours;
         $this->dailyTotals[$currentDay]['io_read'] += $sample['io_read'];
         $this->dailyTotals[$currentDay]['io_write'] += $sample['io_write'];
         $this->dailyTotals[$currentDay]['cpu'] += $sample['cpu'];
-        $this->dailyTotals[$currentDay]['ram_hours'] += $this->ramHoursSample($sample['memory'], $sampleHours);
+        $this->dailyTotals[$currentDay]['ram_hours'] += $sampleRamHours;
         $this->dailyTotals[$currentDay]['memory_sum'] += $sample['memory'];
         $this->dailyTotals[$currentDay]['memory_count'] += 1;
         $this->dailyTotals[$currentDay]['tasks_sum'] += $sample['tasks'];
@@ -72,11 +73,5 @@ class ResourceStatsDailyAccumulator
             ];
         }
         return $daily;
-    }
-
-    private function ramHoursSample(float $memoryBytes, float $sampleHours): float
-    {
-        $gib = $memoryBytes / 1024 / 1024 / 1024;
-        return $gib * $sampleHours;
     }
 }

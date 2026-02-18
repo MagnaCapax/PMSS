@@ -32,7 +32,14 @@ class ResourceStatsFormatter
     {
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
-            $formatted[$label] = $this->formatDurationSeconds($value / 1000000000);
+            $seconds = $value / 1000000000;
+            if ($seconds >= 3600) {
+                $formatted[$label] = round($seconds / 3600, 2).'h';
+            } elseif ($seconds >= 60) {
+                $formatted[$label] = round($seconds / 60, 2).'m';
+            } else {
+                $formatted[$label] = round($seconds, 2).'s';
+            }
         }
         return $formatted;
     }
@@ -55,16 +62,5 @@ class ResourceStatsFormatter
             $formatted[$label] = round($value, 2).'GB-hrs';
         }
         return $formatted;
-    }
-
-    private function formatDurationSeconds(float $seconds): string
-    {
-        if ($seconds >= 3600) {
-            return round($seconds / 3600, 2).'h';
-        }
-        if ($seconds >= 60) {
-            return round($seconds / 60, 2).'m';
-        }
-        return round($seconds, 2).'s';
     }
 }
