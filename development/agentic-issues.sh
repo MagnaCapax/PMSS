@@ -138,7 +138,72 @@ if [[ ${#issue_numbers[@]} -eq 0 ]]; then
 	exit 0
 fi
 
-echo "[agentic-issues] found ${#issue_numbers[@]} issue(s): ${issue_numbers[*]}" >&1
+echo "[agentic-issues] found ${#issue_numbers[@]} issue(s) (pre-gate): ${issue_numbers[*]}" >&1
+
+# --- Author Gate (security: public repo, only org issues auto-approved) ---
+# MagnaCapax issues: auto-approved.
+# All others: require "approved" label AND a comment from MagnaCapax.
+# Anti-bait-and-switch: reject if issue was edited after the approval comment.
+APPROVED_AUTHORS="MagnaCapax"
+
+check_issue_approved() {
+	local num="$1"
+	local author
+	author=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '.user.login' 2>/dev/null) || return 1
+
+	# Auto-approve known authors
+	local a
+	for a in $APPROVED_AUTHORS; do
+		[[ "$author" == "$a" ]] && return 0
+	done
+
+	# External: require "approved" label
+	local has_label
+	has_label=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '[.labels[].name] | any(. == "approved")' 2>/dev/null)
+	if [[ "$has_label" != "true" ]]; then
+		echo "[agentic-issues] GATE: #$num rejected — no 'approved' label (author: $author)" >&1
+		return 1
+	fi
+
+	# External: require comment from approved author
+	local approved_comments
+	approved_comments=$(gh api "repos/MagnaCapax/PMSS/issues/$num/comments" \
+		--jq '[.[] | select(.user.login == "MagnaCapax")] | length' 2>/dev/null || echo 0)
+	if [[ "$approved_comments" -eq 0 ]]; then
+		echo "[agentic-issues] GATE: #$num rejected — no MagnaCapax comment (author: $author)" >&1
+		return 1
+	fi
+
+	# Anti-bait-and-switch: issue must not be edited after latest approval comment
+	local issue_updated
+	issue_updated=$(gh api "repos/MagnaCapax/PMSS/issues/$num" --jq '.updated_at' 2>/dev/null)
+	local approval_ts
+	approval_ts=$(gh api "repos/MagnaCapax/PMSS/issues/$num/comments" \
+		--jq '[.[] | select(.user.login == "MagnaCapax")] | sort_by(.created_at) | last | .created_at' 2>/dev/null)
+	if [[ -n "$approval_ts" && "$issue_updated" > "$approval_ts" ]]; then
+		echo "[agentic-issues] GATE: #$num rejected — edited after approval (bait-and-switch protection)" >&1
+		return 1
+	fi
+
+	return 0
+}
+
+# Apply author gate
+approved_issues=()
+for num in "${issue_numbers[@]}"; do
+	if check_issue_approved "$num"; then
+		approved_issues+=("$num")
+		echo "[agentic-issues] GATE: #$num approved" >&1
+	fi
+done
+
+if [[ ${#approved_issues[@]} -eq 0 ]]; then
+	echo "[agentic-issues] No approved issues after gate. Skipping." >&1
+	exit 0
+fi
+
+issue_numbers=("${approved_issues[@]}")
+echo "[agentic-issues] ${#issue_numbers[@]} issue(s) passed gate: ${issue_numbers[*]}" >&1
 
 # Build issue context file with details for each issue.
 : >"$ISSUES_FILE"
