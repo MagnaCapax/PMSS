@@ -6,7 +6,6 @@
  */
 
 require_once dirname(__DIR__).'/logging.php';
-require_once dirname(__DIR__, 2).'/runtime.php';
 
     /**
      * Ensure root shell defaults mirror the historical installer behaviour.

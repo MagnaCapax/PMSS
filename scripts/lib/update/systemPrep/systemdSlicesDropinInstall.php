@@ -128,8 +128,7 @@ require_once __DIR__.'/hostResourcesDetect.php';
         if ($sawLegacyVendorDropin || is_file($shadowPath)) {
             $shadow = "# PMSS: override legacy TasksMax cap (shadow 99-pmss.conf)\n[Slice]\nTasksMax=".$tasksMax."\n";
             $existing = @file_get_contents($shadowPath);
-            $needsWrite = $existing === false || trim((string) $existing) !== trim($shadow);
-            if ($needsWrite) {
+            if ($existing === false || trim((string) $existing) !== trim($shadow)) {
                 if (@file_put_contents($shadowPath, $shadow) !== false) {
                     @chmod($shadowPath, 0644);
                     $log('Installed '.$shadowPath.' TasksMax override (legacy shadow)');
