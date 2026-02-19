@@ -25,6 +25,11 @@ Absolutes:
 - NEVER CREATE GIT BRANCHES.
 - Do not commit or push unless the operator explicitly instructs you to.
 - ABSOLUTELY NO ZFS — unacceptable for our workload (poor 100% random I/O performance and elevated data-loss risk). Do not propose or introduce it here.
+- NEVER fix a failing CI test by relaxing its assertion. If a CI test asserts a
+  constraint (e.g., that usernames must be ≥ N characters) and the test is failing:
+  fix the implementation to satisfy the constraint, not the test to accept the broken
+  implementation. Deleting or loosening test assertions that verify security or
+  validation constraints is never the correct CI fix.
 - Keep diffs small, idempotent, backward‑compatible; reuse existing helpers; no aliases; context‑first naming.
 
 Autocommit: When Autocommit Mode is appended below, "do not commit or push" is VOID.

@@ -131,7 +131,7 @@ while IFS= read -r num; do
 	[[ -n "$num" ]] && issue_numbers+=("$num")
 done < <(gh issue list --state open --limit "$max_issues" \
 	--json number,title,labels \
-	--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix")) | not) | .number' 2>/dev/null || true)
+	--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-operator-input")) | not) | .number' 2>/dev/null || true)
 
 if [[ ${#issue_numbers[@]} -eq 0 ]]; then
 	echo "[agentic-issues] No tractable issues (all labeled complete-verify or wontfix). Skipping." >&1

@@ -30,11 +30,30 @@ Absolutes:
 - NEVER CREATE GIT BRANCHES.
 - Do not commit or push unless the operator explicitly instructs you to.
 - ABSOLUTELY NO ZFS.
+- NEVER remove, weaken, loosen, or make unreachable any validation check, minimum,
+  maximum, constraint, or security guard to resolve a mismatch with an upstream or
+  external component. When upstream input fails PMSS validation, fix the upstream
+  component. Absence of a test for the constraint does NOT mean it is unintentional;
+  assume all constraints are intentional unless git history says otherwise.
+- NEVER make validation unreachable by removing its call, adding an early return before
+  it, deprecating the function without a replacement, or wrapping it in dead code.
+  This is equivalent to removing the validation.
+- Before removing or relaxing any constraint, run:
+    git log -n 10 --format="%h %ae %s" --follow -- <file>
+  If any author is NOT a bot (non-noreply@ email): the constraint was added by a human
+  contributor. Add `needs-operator-input` label and skip the issue. Do not implement
+  the removal.
 - Keep diffs small, idempotent, backward-compatible; reuse existing helpers.
 
 Autocommit: When Autocommit Mode is appended below, "do not commit or push" is VOID.
 
 Workflow (Do This Now):
+- Fix direction: when an issue contains a ## Suggested Fix section, that section is the
+  primary hypothesis for the implementation direction — it reflects independent
+  investigation, not just the title. Titles compress context and can imply the wrong
+  component is the problem. If title and Suggested Fix conflict: follow the Suggested
+  Fix. If Suggested Fix is absent or vague: implement the most conservative fix that
+  addresses the root cause without reducing any constraint's strictness.
 - Read the issue details from context files below.
 - For EACH issue, assess: can this be fully resolved within this session?
   SKIP if the issue:
@@ -43,6 +62,10 @@ Workflow (Do This Now):
   - Requires multi-server coordination or production deployment
   - Is an investigation/research issue with no clear code fix
   - Would take more than ~200 lines of changes
+  - Requires making a validation check, minimum, maximum, constraint, or security guard
+    less restrictive (removing it, lowering a threshold, widening allowed values, making
+    an exception into a warning, or making a guard optional) — the root fix belongs in
+    the component that produces the non-conforming input, not in the downstream validator
   Note why you skipped it.
 - For tractable issues: implement the smallest coherent fix/feature.
 - Verify locally:

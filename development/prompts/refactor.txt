@@ -174,6 +174,10 @@ HARD RAILS (ALWAYS)
 - Do not add external deps/tools/configs unless operator approves.
 - No behaviour changes: flags/env/exit/log/json/paths/order/topology.
 - No safety regressions; never weaken destructive guards.
+- Validation and constraint strictness are observable behaviors. Changing a minimum
+  threshold, widening an allowed range, removing a validation check, or altering a
+  guard condition is a BEHAVIOR CHANGE, not a refactor. These are out of scope for
+  any refactor run regardless of whether tests still pass.
 - Repository policy freeze:
   - Do not change MediaArea repository handling now that it works.
   - Do not implement a general deb822 migration for Debian apt sources without explicit operator instruction/ADR (see `docs/adr/0008-reject-deb822-apt-sources-migration.md`; Docker deb822 is already in use; keep as-is).

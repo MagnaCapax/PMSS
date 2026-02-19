@@ -351,6 +351,39 @@ codex_scan_git_diff_for_dangers() {
 			exit 3
 		fi
 	fi
+
+	# --- Validation Relaxation Scan ---
+	# Detect net removal of validation patterns (guards, constraints, checks).
+	# When more validation guards are removed than added, flag as relaxation.
+	# PMSS_CODEX_RELAXATION_FAIL=1 exits non-zero when net removals are found.
+	local removal_re='(strlen[[:space:]]*[(]|preg_match[[:space:]]*[(]|pmss[A-Za-z]*Validate[A-Za-z]*[[:space:]]*[(]|pmss[A-Za-z]*IsValid[A-Za-z]*[[:space:]]*[(]|die[[:space:]]*[(]|throw[[:space:]]+new)'
+	local relaxation_fail="${PMSS_CODEX_RELAXATION_FAIL:-0}"
+	local relax_result
+	relax_result=$( {
+		git -C "$repo_root" diff --no-color 2>/dev/null
+		git -C "$repo_root" diff --cached --no-color 2>/dev/null
+	} | awk -v re="$removal_re" '
+		/^[+][+][+] b[/]/ { file=substr($0,7); next }
+		/^[+][+][+]/ || /^[-][-][-]/ { next }
+		/^[+]/ && substr($0,2) ~ re { added++ }
+		/^[-]/ && substr($0,2) ~ re { removed++; files[file]++ }
+		END {
+			net = (removed+0) - (added+0)
+			if (net > 0) {
+				for (f in files) printf "  %s\n", f
+				printf "NET_REMOVAL=%d\n", net
+			}
+		}
+	' 2>/dev/null) || true
+
+	if [[ "$relax_result" == *"NET_REMOVAL="* ]]; then
+		echo "[codex-run] RELAXATION: net validation removal detected:" >&2
+		echo "$relax_result" | grep -v '^NET_REMOVAL=' | sed 's/^/[codex-run] RELAXATION: /' >&2
+		if [[ "$relaxation_fail" == "1" ]]; then
+			echo "[codex-run] RELAXATION: failing due to PMSS_CODEX_RELAXATION_FAIL=1" >&2
+			exit 4
+		fi
+	fi
 }
 
 # Scan unpushed commit messages for PII that should not be on a public repo.
