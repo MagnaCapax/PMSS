@@ -20,8 +20,7 @@ if (!pmssTrafficIngressEnsureDir($logDir, 0755) || !pmssTrafficIngressEnsureDir(
     exit(1);
 }
 
-$usersRaw = @shell_exec('/scripts/listUsers.php');
-$usersRaw = is_string($usersRaw) ? trim($usersRaw) : '';
+$usersRaw = trim((string) @shell_exec('/scripts/listUsers.php'));
 $users = array_filter(explode("\n", $usersRaw));
 if (empty($users)) {
     exit(0);
@@ -30,19 +29,14 @@ $users[] = 'www-data';
 
 foreach ($users as $user) {
     $user = trim($user);
-    if ($user === '') {
-        continue;
-    }
     $normalized = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($user)
         : strtolower($user);
-    if ($normalized !== $user) {
-        continue;
-    }
-    if (!preg_match('/^[a-z0-9-]+$/', $user)) {
-        continue;
-    }
-    if ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user)) {
+    if ($user === ''
+        || $normalized !== $user
+        || !preg_match('/^[a-z0-9-]+$/', $user)
+        || ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user))
+    ) {
         continue;
     }
 

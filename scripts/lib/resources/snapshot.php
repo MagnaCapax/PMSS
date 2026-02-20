@@ -116,17 +116,14 @@ function pmssResourceSnapshotRun(): int
         $metrics = null;
         if ($data !== null) {
             $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'];
-            $fields = [];
+            $metrics = [];
             foreach ($keys as $key) {
                 $value = $data[$key]['raw']['day'] ?? null;
                 if ($value === null) {
-                    $fields = null;
+                    $metrics = null;
                     break;
                 }
-                $fields[$key] = (float) $value;
-            }
-            if (is_array($fields)) {
-                $metrics = $fields;
+                $metrics[$key] = (float) $value;
             }
         }
 
