@@ -22,6 +22,7 @@ function pmssShowTrafficMain(array $argv): int
     $showMissing = isset($options['show-missing']);
 
     $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+    $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
     $statsDir = $runtimeDir.'/trafficStats';
     $users = loadTrafficUsers($statsDir);
     if (count($users) === 0) {
@@ -35,7 +36,7 @@ function pmssShowTrafficMain(array $argv): int
     $jsonRows = [];
 
     if (!$asJson) {
-        echo "Legend:\n\t USER: Traffic: Data Month / Week / Day              DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
+        echo "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
     }
 
     foreach($users AS $thisUser) {
@@ -69,6 +70,20 @@ function pmssShowTrafficMain(array $argv): int
             $dataDisplay[$thisKey] = formatTrafficAmount($thisData);
         }
 
+        $ingressData = pmssShowTrafficReadIngressData($thisUser, $homeDir);
+        $inboundMonth = null;
+        if ($ingressData !== null && isset($ingressData['raw']['month']) && is_numeric($ingressData['raw']['month'])) {
+            $inboundMonth = (float) $ingressData['raw']['month'];
+        }
+
+        $inboundRatio = null;
+        if ($inboundMonth !== null && (float) $data['raw']['month'] > 0) {
+            $inboundRatio = round($inboundMonth / (float) $data['raw']['month'], 2);
+        }
+
+        $inboundDisplay = $inboundMonth !== null ? formatTrafficAmount($inboundMonth) : '-';
+        $ratioDisplay = $inboundRatio !== null ? sprintf('%.2f', $inboundRatio) : 'n/a';
+
         $dataRates = array(
             'week' => round( ( (float) $data['raw']['week'] / (7 * 24 * 60 * 60) ), 2),
             'day' => round( ( (float) $data['raw']['day'] / (24 * 60 * 60) ), 2),
@@ -86,15 +101,19 @@ function pmssShowTrafficMain(array $argv): int
                     'day'   => $dataDisplay['day'] ?? null,
                 ],
                 'rates'   => $dataRates,
+                'inboundMonthMiB' => $inboundMonth,
+                'inboundOutboundRatio' => $inboundRatio,
                 'rawMiB'  => $data['raw'],
             ];
         } else {
             printf(
-                "%-14s %9s / %9s / %9s            Datarates: %5s / %5s / %5s / %5s\n",
+                "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n",
                 "{$displayUser}:",
                 (string) ($dataDisplay['month'] ?? ''),
                 (string) ($dataDisplay['week'] ?? ''),
                 (string) ($dataDisplay['day'] ?? ''),
+                $inboundDisplay,
+                $ratioDisplay,
                 sprintf('%.2f', $dataRates['week']),
                 sprintf('%.2f', $dataRates['day']),
                 sprintf('%.2f', $dataRates['hour']),
@@ -173,4 +192,54 @@ function formatTrafficAmount($value): string {
     if ( ($value / 1024 / 999) > 1 ) return round( ($value / 1024 / 1024), 2) . 'TiB';
     if ( ($value / 999) > 1 )        return round( ($value / 1024), 2) . 'GiB';
     return round($value, 2) . 'MiB';
+}
+
+/**
+ * Read ingress traffic data for a user label (supports -localnet suffix).
+ */
+function pmssShowTrafficReadIngressData(string $user, string $homeDir): ?array
+{
+    $suffix = '-localnet';
+    $baseUser = $user;
+    $fileSuffix = '';
+
+    if (substr($user, -strlen($suffix)) === $suffix) {
+        $baseUser = substr($user, 0, -strlen($suffix));
+        $fileSuffix = 'Local';
+    }
+
+    $path = $homeDir.'/'.$baseUser.'/.trafficDataIngress'.$fileSuffix;
+    if (!is_file($path) || is_link($path)) {
+        return null;
+    }
+
+    $stats = @stat($path);
+    if ($stats === false || (int) $stats['uid'] !== 0) {
+        return null;
+    }
+
+    $mode = $stats['mode'] & 0777;
+    if (($mode & 0022) !== 0) {
+        return null;
+    }
+
+    $group = @posix_getgrgid($stats['gid']);
+    if ($group !== false) {
+        $groupName = $group['name'];
+        if ($groupName !== $baseUser && $groupName !== 'root') {
+            return null;
+        }
+    }
+
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return null;
+    }
+
+    $data = @unserialize($raw, ['allowed_classes' => false]);
+    if (!is_array($data) || !isset($data['raw']) || !is_array($data['raw'])) {
+        return null;
+    }
+
+    return $data;
 }
