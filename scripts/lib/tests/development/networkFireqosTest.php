@@ -179,13 +179,17 @@ class NetworkFireqosTest extends TestCase
     {
         $stateDir = $this->createTempDir('pmss-fireqos-state');
         $homeDir = $this->createTempDir('pmss-fireqos-home');
+        $templatePath = sys_get_temp_dir().'/fireqos-template-'.bin2hex(random_bytes(4)).'.conf';
         @mkdir($homeDir.'/root', 0755, true);
         @file_put_contents($homeDir.'/root/.throttle', '10');
+        @file_put_contents($templatePath, "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n");
 
         $prevStateDir = getenv('PMSS_TRAFFIC_LIMIT_STATE_DIR');
         $prevHomeDir = getenv('PMSS_HOME_DIR');
+        $prevTemplate = getenv('PMSS_FIREQOS_TEMPLATE');
         putenv('PMSS_TRAFFIC_LIMIT_STATE_DIR='.$stateDir);
         putenv('PMSS_HOME_DIR='.$homeDir);
+        putenv('PMSS_FIREQOS_TEMPLATE='.$templatePath);
 
         try {
             $config = \networkBuildFireqosConfig(
@@ -197,6 +201,8 @@ class NetworkFireqosTest extends TestCase
         } finally {
             $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
             $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
+            $this->restoreEnv('PMSS_FIREQOS_TEMPLATE', $prevTemplate);
+            @unlink($templatePath);
             $this->removeTempDir($stateDir);
             $this->removeTempDir($homeDir);
         }
