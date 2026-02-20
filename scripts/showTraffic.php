@@ -12,7 +12,7 @@ if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE
 
 function pmssShowTrafficMain(array $argv): int
 {
-    $options = getopt('', ['json', 'show-missing', 'help']);
+    $options = getopt('', ['json', 'show-missing', 'help', 'extended', 'sort:', 'color', 'no-color']);
     if (isset($options['help'])) {
         pmssShowTrafficPrintHelp();
         return 0;
@@ -20,6 +20,61 @@ function pmssShowTrafficMain(array $argv): int
 
     $asJson = isset($options['json']);
     $showMissing = isset($options['show-missing']);
+    $extended = isset($options['extended']);
+
+    $sort = 'name';
+    if (array_key_exists('sort', $options)) {
+        $sort = strtolower(trim((string) $options['sort']));
+        if ($sort === '') {
+            fwrite(STDERR, "Error: --sort expects a value.\n");
+            return 2;
+        }
+    }
+    $validSorts = ['name', 'month', 'pct', 'rate'];
+    if (!in_array($sort, $validSorts, true)) {
+        fwrite(STDERR, "Error: invalid --sort value: {$sort}\n");
+        pmssShowTrafficPrintHelp();
+        return 2;
+    }
+
+    $colorRequested = array_key_exists('color', $options);
+    $noColorRequested = array_key_exists('no-color', $options);
+    if ($colorRequested && $noColorRequested) {
+        fwrite(STDERR, "Error: --color and --no-color are mutually exclusive.\n");
+        return 2;
+    }
+
+    $useColor = false;
+    if (!$asJson && $extended) {
+        if ($colorRequested) {
+            $useColor = true;
+        } elseif ($noColorRequested) {
+            $useColor = false;
+        } else {
+            if (function_exists('stream_isatty')) {
+                $useColor = @stream_isatty(STDOUT);
+            } elseif (function_exists('posix_isatty')) {
+                $useColor = @posix_isatty(STDOUT);
+            }
+            $term = getenv('TERM');
+            if ($term === false || $term === '' || $term === 'dumb') {
+                $useColor = false;
+            }
+            $noColorEnv = getenv('NO_COLOR');
+            if ($noColorEnv !== false && $noColorEnv !== '') {
+                $useColor = false;
+            }
+        }
+    }
+
+    $validationLib = __DIR__.'/lib/userLifecycle.php';
+    if (is_file($validationLib)) {
+        require_once $validationLib;
+    }
+    $trafficLimitLib = __DIR__.'/lib/user/trafficLimit.php';
+    if (is_file($trafficLimitLib)) {
+        require_once $trafficLimitLib;
+    }
 
     $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
     $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
@@ -33,14 +88,26 @@ function pmssShowTrafficMain(array $argv): int
     $dataMonthTotal = 0.0;
     $dataMonthTotalLocal = 0.0;
     $missingStats = [];
+    $rows = [];
     $jsonRows = [];
+    $limitCache = [];
+    $baseUsers = [];
+    $baseUsersWithStats = [];
+    $overLimitCount = 0;
+    $nearLimitCount = 0;
 
     if (!$asJson) {
-        echo "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
+        if ($extended) {
+            echo "Legend:\n\t USER: Traffic: Data Month / Limit  %  Stat  Bar        IN: Month  Ratio  DATARATES: Week MiB/s / Day MiB/s / Hour MiB/s / 15min MiB/s\n";
+        } else {
+            echo "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
+        }
     }
 
     foreach($users AS $thisUser) {
         //if (!file_exists("/home/{$thisUser}/.trafficData")) continue;
+        list($baseUser, $isLocalnet) = pmssShowTrafficSplitLocalnetUser($thisUser);
+        $baseUsers[$baseUser] = true;
         $statsPath = "{$statsDir}/{$thisUser}";
         if (!is_file($statsPath)) {
             $missingStats[] = $thisUser;
@@ -61,7 +128,7 @@ function pmssShowTrafficMain(array $argv): int
             $data['raw']['month'] == 0) continue;
 
         $dataMonthTotal += (float) $data['raw']['month'];
-        if (strpos($thisUser, '-localnet') !== false) {
+        if ($isLocalnet) {
             $dataMonthTotalLocal += (float) $data['raw']['month'];
         }
 
@@ -91,41 +158,125 @@ function pmssShowTrafficMain(array $argv): int
             '15min' => round( ((float) $data['raw']['15min'] / (15 * 60) ), 2)
         );
 
-        $displayUser = str_replace('-localnet', ' (L)', $thisUser);
-        if ($asJson) {
-            $jsonRows[] = [
-                'user'    => $thisUser,
-                'display' => [
-                    'month' => $dataDisplay['month'] ?? null,
-                    'week'  => $dataDisplay['week'] ?? null,
-                    'day'   => $dataDisplay['day'] ?? null,
-                ],
-                'rates'   => $dataRates,
-                'inboundMonthMiB' => $inboundMonth,
-                'inboundOutboundRatio' => $inboundRatio,
-                'rawMiB'  => $data['raw'],
-            ];
+        $displayUser = $isLocalnet ? "{$baseUser} (L)" : $baseUser;
+
+        $limitGiB = null;
+        if (array_key_exists($baseUser, $limitCache)) {
+            $limitGiB = $limitCache[$baseUser];
         } else {
-            printf(
-                "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n",
-                "{$displayUser}:",
-                (string) ($dataDisplay['month'] ?? ''),
-                (string) ($dataDisplay['week'] ?? ''),
-                (string) ($dataDisplay['day'] ?? ''),
-                $inboundDisplay,
-                $ratioDisplay,
-                sprintf('%.2f', $dataRates['week']),
-                sprintf('%.2f', $dataRates['day']),
-                sprintf('%.2f', $dataRates['hour']),
-                sprintf('%.2f', $dataRates['15min'])
-            );
+            $limitPath = "{$homeDir}/{$baseUser}/.trafficLimit";
+            if (is_file($limitPath) && !is_link($limitPath)) {
+                $limitRaw = trim((string) @file_get_contents($limitPath));
+                if ($limitRaw !== '') {
+                    if (function_exists('pmssTrafficLimitParseGiB')) {
+                        $err = null;
+                        $parsedLimit = pmssTrafficLimitParseGiB($limitRaw, $err);
+                        if ($parsedLimit !== null && $parsedLimit > 0) {
+                            $limitGiB = $parsedLimit;
+                        }
+                    } elseif (is_numeric($limitRaw)) {
+                        $parsedLimit = (int) $limitRaw;
+                        if ($parsedLimit > 0) {
+                            $limitGiB = $parsedLimit;
+                        }
+                    }
+                }
+            }
+            $limitCache[$baseUser] = $limitGiB;
         }
+
+        $limitMiB = ($limitGiB !== null) ? ($limitGiB * 1024) : null;
+        $pctUsed = null;
+        $overLimit = false;
+        $nearLimit = false;
+        if ($limitMiB !== null && $limitMiB > 0) {
+            $pctUsed = (((float) $data['raw']['month']) / $limitMiB) * 100;
+            $overLimit = ($pctUsed >= 100);
+            $nearLimit = (!$overLimit && $pctUsed >= 80);
+        }
+        if (!$isLocalnet) {
+            $baseUsersWithStats[$baseUser] = true;
+            if ($overLimit) {
+                $overLimitCount++;
+            } elseif ($nearLimit) {
+                $nearLimitCount++;
+            }
+        }
+
+        $rows[] = [
+            'user' => $thisUser,
+            'displayUser' => $displayUser,
+            'isLocalnet' => $isLocalnet,
+            'monthMiB' => (float) $data['raw']['month'],
+            'display' => [
+                'month' => $dataDisplay['month'] ?? null,
+                'week'  => $dataDisplay['week'] ?? null,
+                'day'   => $dataDisplay['day'] ?? null,
+            ],
+            'rates' => $dataRates,
+            'inboundMonthMiB' => $inboundMonth,
+            'inboundDisplay' => $inboundDisplay,
+            'inboundRatio' => $inboundRatio,
+            'ratioDisplay' => $ratioDisplay,
+            'limitGiB' => $limitGiB,
+            'limitMiB' => $limitMiB,
+            'pctUsed' => $pctUsed,
+            'overLimit' => $overLimit,
+            'nearLimit' => $nearLimit,
+            'rawMiB' => $data['raw'],
+        ];
         //echo "User: {$thisUser} \t Traffic: {$dataDisplay['week']}, day: {$dataDisplay['day']}, hour: {$dataDisplay['hour']}, 15min: {$dataDisplay['15min']}\n";
         //echo "\tData rates:\t Week: {$dataRates['week']}M/s   Day: {$dataRates['day']}M/s    Hour: {$dataRates['hour']}M/s    15min: {$dataRates['15min']}M/s\n\n";
 
     }
 
+    if (!empty($missingStats)) {
+        sort($missingStats, SORT_NATURAL | SORT_FLAG_CASE);
+    }
+
+    if ($sort !== 'name') {
+        usort($rows, static function (array $a, array $b) use ($sort): int {
+            switch ($sort) {
+                case 'month':
+                    $cmp = $b['monthMiB'] <=> $a['monthMiB'];
+                    break;
+                case 'pct':
+                    $aPct = ($a['pctUsed'] === null) ? -1 : $a['pctUsed'];
+                    $bPct = ($b['pctUsed'] === null) ? -1 : $b['pctUsed'];
+                    $cmp = $bPct <=> $aPct;
+                    break;
+                case 'rate':
+                    $cmp = $b['rates']['15min'] <=> $a['rates']['15min'];
+                    break;
+                default:
+                    $cmp = 0;
+            }
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strnatcasecmp($a['user'], $b['user']);
+        });
+    }
+
     if ($asJson) {
+        foreach ($rows as $row) {
+            $jsonRows[] = [
+                'user'    => $row['user'],
+                'display' => [
+                    'month' => $row['display']['month'],
+                    'week'  => $row['display']['week'],
+                    'day'   => $row['display']['day'],
+                ],
+                'rates'   => $row['rates'],
+                'inboundMonthMiB' => $row['inboundMonthMiB'],
+                'inboundOutboundRatio' => $row['inboundRatio'],
+                'limitMiB' => $row['limitMiB'],
+                'pctUsed' => ($row['pctUsed'] !== null) ? round($row['pctUsed'], 2) : null,
+                'overLimit' => $row['overLimit'],
+                'nearLimit' => $row['nearLimit'],
+                'rawMiB'  => $row['rawMiB'],
+            ];
+        }
         $payload = [
             'users' => $jsonRows,
             'totals' => [
@@ -134,6 +285,13 @@ function pmssShowTrafficMain(array $argv): int
                 'monthTiB'      => round(($dataMonthTotal / 1024 / 1024), 2),
                 'monthLocalTiB' => round(($dataMonthTotalLocal / 1024 / 1024), 2),
             ],
+            'summary' => [
+                'totalUsers' => count($baseUsers),
+                'usersWithStats' => count($baseUsersWithStats),
+                'overLimit' => $overLimitCount,
+                'nearLimit' => $nearLimitCount,
+                'missingStats' => count($missingStats),
+            ],
             'missingStatsUsers' => $missingStats,
         ];
         echo json_encode($payload);
@@ -141,13 +299,88 @@ function pmssShowTrafficMain(array $argv): int
         return 0;
     }
 
+    foreach ($rows as $row) {
+        if ($extended) {
+            $limitDisplay = ($row['limitMiB'] !== null) ? formatTrafficAmount($row['limitMiB']) : '-';
+            $pctDisplayRaw = 'n/a';
+            $statusLabel = '';
+            if ($row['pctUsed'] !== null) {
+                $pctValue = (int) round($row['pctUsed']);
+                if ($pctValue > 999) {
+                    $pctValue = 999;
+                }
+                $pctDisplayRaw = sprintf('%3d%%', $pctValue);
+                if ($row['pctUsed'] >= 100) {
+                    $statusLabel = '[OVER]';
+                } elseif ($row['pctUsed'] >= 80) {
+                    $statusLabel = '[WARN]';
+                }
+            }
+            $pctDisplay = sprintf('%4s', $pctDisplayRaw);
+            $statusDisplay = str_pad($statusLabel, 6, ' ', STR_PAD_RIGHT);
+            if ($useColor && $statusLabel !== '') {
+                $color = ($row['pctUsed'] !== null && $row['pctUsed'] >= 100) ? "\033[1;31m" : "\033[33m";
+                $statusDisplay = $color.$statusDisplay."\033[0m";
+            }
+            $barDisplay = ($row['limitMiB'] !== null && $row['pctUsed'] !== null)
+                ? pmssShowTrafficRenderBar((float) $row['pctUsed'])
+                : str_repeat(' ', 12);
+
+            printf(
+                "%-14s %9s / %9s %4s %s %s IN: %9s R: %5s  Datarates: %10s / %10s / %10s / %10s\n",
+                "{$row['displayUser']}:",
+                (string) $row['display']['month'],
+                $limitDisplay,
+                $pctDisplay,
+                $statusDisplay,
+                $barDisplay,
+                $row['inboundDisplay'],
+                $row['ratioDisplay'],
+                pmssShowTrafficFormatRateDisplay((float) $row['rates']['week']),
+                pmssShowTrafficFormatRateDisplay((float) $row['rates']['day']),
+                pmssShowTrafficFormatRateDisplay((float) $row['rates']['hour']),
+                pmssShowTrafficFormatRateDisplay((float) $row['rates']['15min'])
+            );
+        } else {
+            printf(
+                "%-14s %9s / %9s / %9s  IN: %9s R: %5s  Datarates: %5s / %5s / %5s / %5s\n",
+                "{$row['displayUser']}:",
+                (string) ($row['display']['month'] ?? ''),
+                (string) ($row['display']['week'] ?? ''),
+                (string) ($row['display']['day'] ?? ''),
+                $row['inboundDisplay'],
+                $row['ratioDisplay'],
+                sprintf('%.2f', $row['rates']['week']),
+                sprintf('%.2f', $row['rates']['day']),
+                sprintf('%.2f', $row['rates']['hour']),
+                sprintf('%.2f', $row['rates']['15min'])
+            );
+        }
+    }
+
     $monthTotalTiB = number_format(($dataMonthTotal / 1024 / 1024), 2);
     $monthTotalLocalTiB = number_format(($dataMonthTotalLocal / 1024 / 1024), 2);
-    echo "* Month Total: {$monthTotalTiB}TiB - Local Total: {$monthTotalLocalTiB}TiB\n";
-    if (!empty($missingStats)) {
-        echo "* Missing traffic stats for ".count($missingStats)." users (run trafficStats to rebuild).\n";
-        if ($showMissing) {
-            echo "* Missing: ".implode(' ', $missingStats)."\n";
+    if ($extended) {
+        $line = str_repeat('-', 72);
+        echo $line."\n";
+        echo " Total users: ".count($baseUsers)."  |  Over limit: {$overLimitCount}  |  Near limit (>=80%): {$nearLimitCount}\n";
+        echo " Month egress: {$monthTotalTiB}TiB  |  Local: {$monthTotalLocalTiB}TiB\n";
+        $missingLine = " Missing stats: ".count($missingStats)." users";
+        if (!empty($missingStats) && !$showMissing) {
+            $missingLine .= " (--show-missing to list)";
+        }
+        echo $missingLine."\n";
+        if ($showMissing && !empty($missingStats)) {
+            echo " Missing: ".implode(' ', $missingStats)."\n";
+        }
+        echo $line."\n";
+    } else {
+        echo "* Month Total: {$monthTotalTiB}TiB - Local Total: {$monthTotalLocalTiB}TiB\n";
+        if (!empty($missingStats)) {
+            echo "* Missing traffic stats for ".count($missingStats)." users (run trafficStats to rebuild).\n";
+            if ($showMissing) {
+                echo "* Missing: ".implode(' ', $missingStats)."\n";
+            }
         }
     }
 
@@ -157,11 +390,15 @@ function pmssShowTrafficMain(array $argv): int
 function pmssShowTrafficPrintHelp(): void
 {
     $self = basename(__FILE__);
-    echo "Usage: {$self} [--json] [--show-missing]\n";
+    echo "Usage: {$self} [--json] [--show-missing] [--extended] [--sort=<mode>]\n";
     echo "\n";
     echo "Options:\n";
     echo "  --json          Emit JSON instead of human text output.\n";
     echo "  --show-missing  Print missing stats usernames (text mode only).\n";
+    echo "  --extended      Show limit, percent, and rate units in text output.\n";
+    echo "  --sort=<mode>   Sort output by name, month, pct, or rate (default: name).\n";
+    echo "  --color         Force ANSI colors in extended text output.\n";
+    echo "  --no-color      Disable ANSI colors in extended text output.\n";
     echo "  --help          Show this help.\n";
     echo "\n";
 }
@@ -174,7 +411,32 @@ function loadTrafficUsers(string $statsDir): array {
         fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
         exit(1);
     }
-    $users = array_filter(array_map('trim', $lines), 'strlen');
+    $users = [];
+    $invalidCount = 0;
+    foreach ($lines as $line) {
+        $user = trim($line);
+        if ($user === '') {
+            continue;
+        }
+        if (preg_match('/^(PHP (Warning|Fatal error|Parse error)|Warning:|Fatal error:|Stack trace:)/', $user)) {
+            fwrite(STDERR, "Error: listUsers.php emitted errors; aborting.\n");
+            exit(1);
+        }
+        $valid = true;
+        if (function_exists('pmssValidateUsername')) {
+            $valid = pmssValidateUsername($user);
+        } else {
+            $valid = (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user);
+        }
+        if (!$valid) {
+            $invalidCount++;
+            continue;
+        }
+        $users[] = $user;
+    }
+    if ($invalidCount > 0) {
+        fwrite(STDERR, "Warning: skipped {$invalidCount} invalid username entries from listUsers.php.\n");
+    }
     if (empty($users)) {
         return [];
     }
@@ -195,18 +457,65 @@ function formatTrafficAmount($value): string {
 }
 
 /**
+ * Split a user label into base username and localnet flag.
+ *
+ * @return array{0:string,1:bool}
+ */
+function pmssShowTrafficSplitLocalnetUser(string $user): array
+{
+    $suffix = '-localnet';
+    $suffixLength = strlen($suffix);
+    if ($suffixLength > 0 && substr($user, -$suffixLength) === $suffix) {
+        return [substr($user, 0, -$suffixLength), true];
+    }
+    return [$user, false];
+}
+
+/**
+ * Format a data rate in MiB/s, auto-scaling to GiB/s.
+ */
+function pmssShowTrafficFormatRateDisplay(float $rateMiB): string
+{
+    $value = $rateMiB;
+    $unit = 'MiB/s';
+    if ($rateMiB >= 1000) {
+        $value = $rateMiB / 1024;
+        $unit = 'GiB/s';
+    }
+    return sprintf('%.2f%s', $value, $unit);
+}
+
+/**
+ * Render a fixed-width ASCII bar for a percentage.
+ */
+function pmssShowTrafficRenderBar(float $pct): string
+{
+    $width = 10;
+    $clamped = $pct;
+    if ($clamped < 0) {
+        $clamped = 0;
+    }
+    if ($clamped > 100) {
+        $clamped = 100;
+    }
+    $filled = (int) floor(($clamped / 100) * $width);
+    if ($filled < 0) {
+        $filled = 0;
+    }
+    if ($filled > $width) {
+        $filled = $width;
+    }
+    $empty = $width - $filled;
+    return '[' . str_repeat('#', $filled) . str_repeat('-', $empty) . ']';
+}
+
+/**
  * Read ingress traffic data for a user label (supports -localnet suffix).
  */
 function pmssShowTrafficReadIngressData(string $user, string $homeDir): ?array
 {
-    $suffix = '-localnet';
-    $baseUser = $user;
-    $fileSuffix = '';
-
-    if (substr($user, -strlen($suffix)) === $suffix) {
-        $baseUser = substr($user, 0, -strlen($suffix));
-        $fileSuffix = 'Local';
-    }
+    list($baseUser, $isLocalnet) = pmssShowTrafficSplitLocalnetUser($user);
+    $fileSuffix = $isLocalnet ? 'Local' : '';
 
     $path = $homeDir.'/'.$baseUser.'/.trafficDataIngress'.$fileSuffix;
     if (!is_file($path) || is_link($path)) {

@@ -34,6 +34,54 @@ class ShowTrafficFormatTest extends TestCase
         }
         $this->assertTrue(strpos($out, '--json') !== false);
         $this->assertTrue(strpos($out, '--show-missing') !== false);
+        $this->assertTrue(strpos($out, '--extended') !== false);
+        $this->assertTrue(strpos($out, '--sort') !== false);
+        $this->assertTrue(strpos($out, '--color') !== false);
+        $this->assertTrue(strpos($out, '--no-color') !== false);
+    }
+
+    public function testFormatRateDisplay(): void
+    {
+        $cases = [
+            [0.0, '0.00MiB/s'],
+            [12.345, '12.35MiB/s'],
+            [999.99, '999.99MiB/s'],
+            [1000.0, '0.98GiB/s'],
+            [1024.0, '1.00GiB/s'],
+            [2048.0, '2.00GiB/s'],
+        ];
+        foreach ($cases as $case) {
+            $this->assertEquals($case[1], \pmssShowTrafficFormatRateDisplay($case[0]));
+        }
+    }
+
+    public function testRenderBar(): void
+    {
+        $cases = [
+            [0, '[----------]'],
+            [1, '[----------]'],
+            [10, '[#---------]'],
+            [50, '[#####-----]'],
+            [80, '[########--]'],
+            [100, '[##########]'],
+            [150, '[##########]'],
+        ];
+        foreach ($cases as $case) {
+            $this->assertEquals($case[1], \pmssShowTrafficRenderBar($case[0]));
+        }
+    }
+
+    public function testSplitLocalnetUser(): void
+    {
+        $cases = [
+            ['alice', ['alice', false]],
+            ['bob-localnet', ['bob', true]],
+            ['carol-localnet-localnet', ['carol-localnet', true]],
+            ['dave-localnetx', ['dave-localnetx', false]],
+            ['eve-localnet', ['eve', true]],
+        ];
+        foreach ($cases as $case) {
+            $this->assertEquals($case[1], \pmssShowTrafficSplitLocalnetUser($case[0]));
+        }
     }
 }
-
