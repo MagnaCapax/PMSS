@@ -20,6 +20,15 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
 
     $fireqosConfigUsers = '';
     $fireqosMark = 1;
+    $limitStateDir = getenv('PMSS_TRAFFIC_LIMIT_STATE_DIR') ?: '/var/run/pmss/trafficLimits';
+    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
+    $defaultCapMbit = 100;
+    if (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throttle']['max'])) {
+        $defaultCapMbit = (int) $networkConfig['throttle']['max'];
+    }
+    if ($defaultCapMbit <= 0) {
+        $defaultCapMbit = 100;
+    }
     if (!empty($users)) {
         foreach ($users as $username) {
             $uid = trim((string)shell_exec("id -u {$username}"));
@@ -28,8 +37,19 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
             }
 
             $limit = '';
-            if (file_exists("/var/run/pmss/trafficLimits/{$username}.enabled")) {
-                $limit = ' ceil '.((int)$networkConfig['throttle']['max']).'Mbit';
+            if (is_file($limitStateDir."/{$username}.enabled")) {
+                $capMbit = $defaultCapMbit;
+                $throttlePath = $homeDir."/{$username}/.throttle";
+                if (is_file($throttlePath) && !is_link($throttlePath)) {
+                    $raw = trim((string) @file_get_contents($throttlePath));
+                    if ($raw !== '' && is_numeric($raw)) {
+                        $stored = (int) $raw;
+                        if ($stored > 0) {
+                            $capMbit = $stored;
+                        }
+                    }
+                }
+                $limit = ' ceil '.$capMbit.'Mbit';
             }
 
             $fireqosConfigUsers .= "    class {$username}{$limit} \n";

@@ -25,7 +25,7 @@ require_once __DIR__.'/../lib/user/userConfigStore.php';
  */
 
 
-$usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT]';
+$usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
 if (empty($argv[1]) || empty($argv[2]) || empty($argv[3])) {
     die('need user name. '.$usage."\n");
 }
@@ -43,6 +43,7 @@ $user = [
     'IOReadIOPS'  => isset($argv[9]) ? $argv[9] : null,
     'IOWriteIOPS' => isset($argv[10]) ? $argv[10] : null,
     'cpuQuotaPercent' => isset($argv[11]) ? $argv[11] : 0,
+    'trafficCapMbit' => isset($argv[12]) ? (int) $argv[12] : 0,
 ];
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
 
@@ -80,6 +81,7 @@ $presence = [
     'IOReadIOPS'      => array_key_exists(9, $argv),
     'IOWriteIOPS'     => array_key_exists(10, $argv),
     'cpuQuotaPercent' => array_key_exists(11, $argv),
+    'trafficCapMbit'  => array_key_exists(12, $argv),
 ];
 
 $store = new UserConfigStore();
@@ -111,6 +113,9 @@ if (!empty($presence['IOWriteIOPS'])) {
 }
 if (!empty($presence['cpuQuotaPercent'])) {
     $payload['cpuQuotaPercent'] = $user['cpuQuotaPercent'];
+}
+if ($presence['trafficCapMbit']) {
+    $payload['trafficCapMbit'] = $user['trafficCapMbit'];
 }
 if (!isset($payload['billingId'])) {
     $payload['billingId'] = 0;

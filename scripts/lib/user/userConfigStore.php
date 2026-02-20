@@ -17,6 +17,7 @@
  * - quotaBurst (int)   Burst quota in GiB (typically 125%).
  * - billingId (int)    0 when missing; fallback reads /home/<user>/.billingId if root-owned.
  * - trafficLimit (int) Always written as 0 (traffic caps live in runtime files).
+ * - trafficCapMbit (int) Post-limit ceiling in Mbit (0/absent uses server default).
  * - suspended (bool)   Best-effort mirror of suspension state (marker remains www-disabled).
  * - CPUWeight/IOWeight/IOReadBW/... pass-through for future resource controls.
  *
@@ -214,6 +215,7 @@ class UserConfigStore
 
         $intKeys = [
             'ramMiB', 'rtorrentPort', 'quota', 'quotaBurst', 'billingId', 'trafficLimit',
+            'trafficCapMbit',
             'CPUWeight', 'IOWeight', 'IOReadIOPS', 'IOWriteIOPS',
         ];
         foreach ($intKeys as $key) {

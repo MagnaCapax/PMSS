@@ -72,6 +72,27 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testTrafficCapMbitNormalisesToInt(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB' => 256,
+                'rtorrentPort' => 5100,
+                'quota' => 50,
+                'quotaBurst' => 62,
+                'trafficCapMbit' => '15',
+            ];
+            $this->assertTrue($store->set('captest', $payload));
+            $reloaded = $store->get('captest');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(15, $reloaded['trafficCapMbit']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testLegacyRtorrentRamCreatesRamMiBButPreservesKey(): void
     {
         $this->setUpTempDir();

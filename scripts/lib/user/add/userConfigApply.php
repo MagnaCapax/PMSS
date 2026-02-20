@@ -17,7 +17,7 @@ require_once __DIR__.'/../passwords.php';
 function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath): void
 {
     // Record core attributes in the user config store before provisioning services.
-    $userDb->addUser($user['name'], array(
+    $payload = array(
         'ramMiB' => $user['memory'],
         'quota' => $user['quota'],
         'quotaBurst' => round(((float) $user['quota']) * 1.25),
@@ -25,7 +25,11 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         'billingId' => 0,
         'trafficLimit' => 0,
         'suspended' => false
-    ));
+    );
+    if (isset($user['trafficCapMbit']) && is_numeric($user['trafficCapMbit'])) {
+        $payload['trafficCapMbit'] = (int) $user['trafficCapMbit'];
+    }
+    $userDb->addUser($user['name'], $payload);
 
     // Assign HTTP server port
     runProvisionStep(

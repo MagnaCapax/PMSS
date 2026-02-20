@@ -13,7 +13,7 @@
  */
 
 // Shell-facing usage string; keep the CLI contract explicit for operators.
-$usage = 'Usage: addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [trafficLimitGB]';
+$usage = 'Usage: addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [trafficLimitGB] [trafficCapMbit]';
 if (empty($argv[1]) or
     empty($argv[2]) or
     empty($argv[3]) or 
@@ -26,6 +26,7 @@ $user = array(
     'quota'     => $argv[4]    
 );
 if (isset($argv[5])) $user['trafficLimit'] = (int) $argv[5];
+if (isset($argv[6])) $user['trafficCapMbit'] = (int) $argv[6];
 if ($user['password'] == 'rand') $user['password'] = '';
 
 require_once 'lib/runtime.php';

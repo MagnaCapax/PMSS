@@ -13,6 +13,8 @@
  * @license GPL-3.0-only
  */
 require_once '/scripts/lib/rtorrentConfig.php';
+require_once '/scripts/lib/network/config.php';
+require_once '/scripts/lib/user/userConfigStore.php';
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
@@ -25,7 +27,15 @@ $users = trim( `/scripts/listUsers.php` );
 $users = array_filter(explode("\n", $users));
 if (count($users) == 0) die("No users in this system!\n");
 
-//$networkConfig = include '/etc/seedbox/config/network';
+$networkConfig = networkLoadConfig();
+$defaultTrafficCapMbit = 100;
+if (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throttle']['max'])) {
+    $defaultTrafficCapMbit = (int) $networkConfig['throttle']['max'];
+}
+if ($defaultTrafficCapMbit <= 0) {
+    $defaultTrafficCapMbit = 100;
+}
+$userConfigStore = new UserConfigStore();
 
 $trafficData = array();
 foreach($users AS $thisUser) {
@@ -45,6 +55,15 @@ foreach($users AS $thisUser) {
 //    var_dump($data);
     $trafficData[$thisUser]['traffic'] = ($data['raw']['month'] / 1024);   // Set to GiB
     $trafficData[$thisUser]['trafficLimit'] = $trafficLimit;
+    $trafficCapMbit = $defaultTrafficCapMbit;
+    $userConfig = $userConfigStore->get($thisUser);
+    if (is_array($userConfig) && isset($userConfig['trafficCapMbit']) && is_numeric($userConfig['trafficCapMbit'])) {
+        $trafficCapMbit = (int) $userConfig['trafficCapMbit'];
+    }
+    if ($trafficCapMbit <= 0) {
+        $trafficCapMbit = $defaultTrafficCapMbit;
+    }
+    $trafficData[$thisUser]['trafficCapMbit'] = $trafficCapMbit;
     
 }
 
@@ -114,7 +133,7 @@ foreach ($trafficData AS $thisUser => $thisData) {
         touch( $userTrafficLimitEnabledFile );
 
         chmod( $userTrafficLimitEnabledFile, 0600);
-        setRatelimit($thisUser, $thisData['trafficLimit']);    // Apply rate limiting
+        setRatelimit($thisUser, $thisData['trafficCapMbit']);    // Apply rate limiting
         if (function_exists('pmssUserLog')) {
             pmssUserLog(
                 $thisUser,
@@ -136,18 +155,18 @@ foreach ($trafficData AS $thisUser => $thisData) {
             if (function_exists('pmssUserLog')) {
                 pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
             }
-            setRateLimit($thisUser, $thisData['trafficLimit'], false);
+            setRateLimit($thisUser, $thisData['trafficCapMbit'], false);
 			// Do it second time as removal does not always work for some reason
 			sleep(1);
-			setRateLimit($thisUser, $thisData['trafficLimit'], false);
+			setRateLimit($thisUser, $thisData['trafficCapMbit'], false);
         }
         
     }
 
 }
 
-function setRateLimit($user, $trafficLimit, $enable=true) {
+function setRateLimit($user, $trafficCapMbit, $enable=true) {
     if ($enable == false) { @unlink("/home/{$user}/.throttle"); return; }
 
-    file_put_contents("/home/{$user}/.throttle", $trafficLimit);
+    file_put_contents("/home/{$user}/.throttle", (int) $trafficCapMbit);
 }
