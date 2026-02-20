@@ -55,10 +55,9 @@ foreach ($users as $user) {
 
     $currentIngress = (int) $counters['ingress'];
     $previousIngress = isset($state['ingress']) ? (int) $state['ingress'] : null;
-    $delta = $currentIngress;
-    if ($previousIngress !== null && $currentIngress >= $previousIngress) {
-        $delta = $currentIngress - $previousIngress;
-    }
+    $delta = ($previousIngress !== null && $currentIngress >= $previousIngress)
+        ? $currentIngress - $previousIngress
+        : $currentIngress;
 
     $state = [
         'ingress' => $currentIngress,
@@ -68,7 +67,7 @@ foreach ($users as $user) {
     pmssTrafficIngressWriteState($statePath, $state);
 
     if ($delta > 0) {
-        if ($linkSpeed !== null && $linkSpeed > 0) {
+        if ($linkSpeed > 0) {
             $maxDelta = ($linkSpeed * 1000 * 1000 * 60 * 5) * 0.9;
             if ($delta > $maxDelta) {
                 $previousDisplay = $previousIngress !== null ? $previousIngress : 'n/a';

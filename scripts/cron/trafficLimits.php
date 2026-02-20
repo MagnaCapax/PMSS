@@ -144,7 +144,6 @@ function pmssReadTrafficData(string $path, string $username): ?array
 // remove the marker and lift the rate limit. The double disable call guards
 // against occasional router desyncs.
 foreach ($trafficData AS $thisUser => $thisData) {
-    $trafficLimitEnabledTime = 0;
     $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
     $slidingThrottleFile = "/var/run/pmss/trafficLimits/{$thisUser}.throttle_mbit";
     $overLimit = ($thisData['traffic'] > $thisData['trafficLimit']);
@@ -152,32 +151,19 @@ foreach ($trafficData AS $thisUser => $thisData) {
 
     // Apply sliding throttle before the hard limit, unless cooldown is active.
     if (!$overLimit && $slidingThrottleStart < 100) {
-        $usagePct = 0.0;
-        if ($thisData['trafficLimit'] > 0) {
-            $usagePct = ($thisData['traffic'] / $thisData['trafficLimit']) * 100;
-        }
+        $usagePct = ($thisData['trafficLimit'] > 0)
+            ? ($thisData['traffic'] / $thisData['trafficLimit']) * 100
+            : 0.0;
         if ($usagePct >= $slidingThrottleStart && !file_exists($userTrafficLimitEnabledFile)) {
             $range = 100 - $slidingThrottleStart;
             if ($range > 0) {
-                $capPct = (($usagePct - $slidingThrottleStart) / $range) * 75;
-                if ($capPct > 75) {
-                    $capPct = 75;
-                }
+                $capPct = min(75, (($usagePct - $slidingThrottleStart) / $range) * 75);
                 if ($capPct > 0) {
                     $slidingApplied = true;
-                    $hardCapMbit = (int) $thisData['trafficCapMbit'];
-                    if ($hardCapMbit < 0) {
-                        $hardCapMbit = 0;
-                    }
-                    $usableBw = $networkSpeedMbit - $hardCapMbit;
-                    if ($usableBw < 0) {
-                        $usableBw = 0;
-                    }
+                    $hardCapMbit = max(0, (int) $thisData['trafficCapMbit']);
+                    $usableBw = max(0, $networkSpeedMbit - $hardCapMbit);
                     $effectiveCeil = $networkSpeedMbit - ($usableBw * ($capPct / 100));
-                    $effectiveCeilMbit = (int) round($effectiveCeil);
-                    if ($effectiveCeilMbit < 1) {
-                        $effectiveCeilMbit = 1;
-                    }
+                    $effectiveCeilMbit = max(1, (int) round($effectiveCeil));
                     $previousCeil = null;
                     if (is_file($slidingThrottleFile) && !is_link($slidingThrottleFile)) {
                         $raw = trim((string) @file_get_contents($slidingThrottleFile));
@@ -238,8 +224,7 @@ foreach ($trafficData AS $thisUser => $thisData) {
         
     } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
         
-        $trafficLimitEnabledTime = filemtime($userTrafficLimitEnabledFile);
-        $trafficLimitEnabledTime = time() - $trafficLimitEnabledTime;
+        $trafficLimitEnabledTime = time() - (int) filemtime($userTrafficLimitEnabledFile);
         
         if ($trafficLimitEnabledTime > $trafficLimitPeriod) {   // Time to remove the limit
             unlink( $userTrafficLimitEnabledFile );

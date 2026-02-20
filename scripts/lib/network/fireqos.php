@@ -29,43 +29,43 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
     if ($defaultCapMbit <= 0) {
         $defaultCapMbit = 100;
     }
-    if (!empty($users)) {
-        foreach ($users as $username) {
-            $uid = trim((string)shell_exec("id -u {$username}"));
-            if ($uid === '') {
-                continue;
-            }
-
-            $limit = '';
-            $slidingPath = $limitStateDir."/{$username}.throttle_mbit";
-            if (is_file($slidingPath) && !is_link($slidingPath)) {
-                $raw = trim((string) @file_get_contents($slidingPath));
-                if ($raw !== '' && is_numeric($raw)) {
-                    $stored = (int) $raw;
-                    if ($stored > 0) {
-                        $limit = ' ceil '.$stored.'Mbit';
-                    }
-                }
-            }
-            if ($limit === '' && is_file($limitStateDir."/{$username}.enabled")) {
-                $capMbit = $defaultCapMbit;
-                $throttlePath = $homeDir."/{$username}/.throttle";
-                if (is_file($throttlePath) && !is_link($throttlePath)) {
-                    $raw = trim((string) @file_get_contents($throttlePath));
-                    if ($raw !== '' && is_numeric($raw)) {
-                        $stored = (int) $raw;
-                        if ($stored > 0) {
-                            $capMbit = $stored;
-                        }
-                    }
-                }
-                $limit = ' ceil '.$capMbit.'Mbit';
-            }
-
-            $fireqosConfigUsers .= "    class {$username}{$limit} \n";
-            $fireqosConfigUsers .= "      match rawmark {$fireqosMark}\n";
-            ++$fireqosMark;
+    $readPositiveInt = function (string $path): ?int {
+        if (!is_file($path) || is_link($path)) {
+            return null;
         }
+        $raw = trim((string) @file_get_contents($path));
+        if ($raw === '' || !is_numeric($raw)) {
+            return null;
+        }
+        $value = (int) $raw;
+        return $value > 0 ? $value : null;
+    };
+
+    foreach ($users as $username) {
+        $uid = trim((string) shell_exec("id -u {$username}"));
+        if ($uid === '') {
+            continue;
+        }
+
+        $limit = '';
+        $slidingPath = $limitStateDir."/{$username}.throttle_mbit";
+        $stored = $readPositiveInt($slidingPath);
+        if ($stored !== null) {
+            $limit = ' ceil '.$stored.'Mbit';
+        }
+        if ($limit === '' && is_file($limitStateDir."/{$username}.enabled")) {
+            $capMbit = $defaultCapMbit;
+            $throttlePath = $homeDir."/{$username}/.throttle";
+            $stored = $readPositiveInt($throttlePath);
+            if ($stored !== null) {
+                $capMbit = $stored;
+            }
+            $limit = ' ceil '.$capMbit.'Mbit';
+        }
+
+        $fireqosConfigUsers .= "    class {$username}{$limit} \n";
+        $fireqosConfigUsers .= "      match rawmark {$fireqosMark}\n";
+        ++$fireqosMark;
     }
 
     $rendered = str_replace(
