@@ -12,19 +12,6 @@ require_once __DIR__.'/accumulator.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 
-function pmssResourceSnapshotReadUserData(string $path): ?array
-{
-    if (!is_file($path)) {
-        return null;
-    }
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || trim($raw) === '') {
-        return null;
-    }
-    $data = @unserialize($raw);
-    return is_array($data) ? $data : null;
-}
-
 function pmssResourceSnapshotComputeFromLog(resourceStatistics $stats, string $user): ?array
 {
     $dataLines = $stats->getData($user, 350);
@@ -112,7 +99,17 @@ function pmssResourceSnapshotRun(): int
             continue;
         }
 
-        $data = pmssResourceSnapshotReadUserData($homeDir.'/'.$user.'/.resourceData');
+        $data = null;
+        $dataPath = $homeDir.'/'.$user.'/.resourceData';
+        if (is_file($dataPath)) {
+            $raw = @file_get_contents($dataPath);
+            if (is_string($raw) && trim($raw) !== '') {
+                $decoded = @unserialize($raw);
+                if (is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+        }
         $metrics = null;
         if ($data !== null) {
             $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'];

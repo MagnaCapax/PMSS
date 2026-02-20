@@ -27,6 +27,17 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         'tasks_current' => 0.0,
     ];
 
+    $selectWindows = static function (array $raw) use ($windows): ?array {
+        $selected = [];
+        foreach ($windows as $label) {
+            if (!isset($raw[$label])) {
+                return null;
+            }
+            $selected[$label] = (float) $raw[$label];
+        }
+        return $selected;
+    };
+
     foreach ($users as $thisUser) {
         $statsPath = "{$statsDir}/{$thisUser}";
         if (!is_file($statsPath)) {
@@ -46,13 +57,13 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             continue;
         }
 
-        $ioRead = pmssResourceSelectWindows($data['io_read']['raw'] ?? []);
-        $ioWrite = pmssResourceSelectWindows($data['io_write']['raw'] ?? []);
-        $cpu = pmssResourceSelectWindows($data['cpu']['raw'] ?? []);
-        $ramHours = pmssResourceSelectWindows($data['ram_hours']['raw'] ?? []);
-        if ($ioRead === null || $ioWrite === null || $cpu === null || $ramHours === null) {
-            $missingStats[] = $thisUser;
-            continue;
+        $windowMetrics = [];
+        foreach (['io_read', 'io_write', 'cpu', 'ram_hours'] as $metric) {
+            $windowMetrics[$metric] = $selectWindows($data[$metric]['raw'] ?? []);
+            if ($windowMetrics[$metric] === null) {
+                $missingStats[] = $thisUser;
+                continue 2;
+            }
         }
 
         $memoryCurrent = isset($data['memory']['current']) ? (float) $data['memory']['current'] : 0.0;
@@ -60,22 +71,21 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         $tasksCurrent = isset($data['tasks']['current']) ? (float) $data['tasks']['current'] : 0.0;
 
         foreach ($windows as $label) {
-            $totals['io_read'][$label] += $ioRead[$label];
-            $totals['io_write'][$label] += $ioWrite[$label];
-            $totals['cpu'][$label] += $cpu[$label];
-            $totals['ram_hours'][$label] += $ramHours[$label];
+            foreach ($windowMetrics as $metric => $values) {
+                $totals[$metric][$label] += $values[$label];
+            }
         }
         $totals['memory_current'] += $memoryCurrent;
         $totals['memory_avg_month'] += $memoryAvgMonth;
         $totals['tasks_current'] += $tasksCurrent;
 
         $rows[$thisUser] = [
-            'io_read' => $ioRead,
-            'io_write' => $ioWrite,
-            'cpu' => $cpu,
+            'io_read' => $windowMetrics['io_read'],
+            'io_write' => $windowMetrics['io_write'],
+            'cpu' => $windowMetrics['cpu'],
             'memory_current' => $memoryCurrent,
             'memory_avg_month' => $memoryAvgMonth,
-            'ram_hours' => $ramHours,
+            'ram_hours' => $windowMetrics['ram_hours'],
             'tasks_current' => $tasksCurrent,
         ];
     }
@@ -85,19 +95,6 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         'missing' => $missingStats,
         'totals' => $totals,
     ];
-}
-
-function pmssResourceSelectWindows(array $raw): ?array
-{
-    $labels = ['month', 'week', 'day', 'hour'];
-    $selected = [];
-    foreach ($labels as $label) {
-        if (!isset($raw[$label])) {
-            return null;
-        }
-        $selected[$label] = (float) $raw[$label];
-    }
-    return $selected;
 }
 
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array

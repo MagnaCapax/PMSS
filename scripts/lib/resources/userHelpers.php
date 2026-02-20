@@ -49,13 +49,10 @@ function pmssResourceLogIsValidUser(string $user): bool
     $normalized = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($user)
         : strtolower($user);
-    if ($normalized !== $user) {
-        return false;
-    }
-    if (!preg_match('/^[a-z0-9-]+$/', $user)) {
-        return false;
-    }
-    if ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user)) {
+    if ($normalized !== $user
+        || !preg_match('/^[a-z0-9-]+$/', $user)
+        || ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user))
+    ) {
         return false;
     }
     return true;
