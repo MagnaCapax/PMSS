@@ -237,7 +237,7 @@ codex_scan_frozen_paths() {
 		'^AGENTS\.md$'
 		'^AGENTS\.local\.md$'
 		'^\.codex-prompt$'
-		'^\.gitignore$'
+		'(^|/)\.gitignore$'
 	)
 
 	local pattern
@@ -306,8 +306,9 @@ codex_scan_git_diff_for_dangers() {
 	command -v awk >/dev/null 2>&1 || return 0
 	git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
 
-	# Destructive commands + PHP injection patterns (public repo: issue bodies are untrusted)
-	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh|eval[[:space:]]*[(]|assert[[:space:]]*[(]|base64_decode[[:space:]]*[(]|proc_open[[:space:]]*[(]|popen[[:space:]]*[(]|\$_GET[[:space:]]*\[|\$_POST[[:space:]]*\[|\$_REQUEST[[:space:]]*\[|\$_SERVER\[.HTTP_)'
+	# Destructive commands + PHP injection/execution patterns (public repo: issue bodies are untrusted)
+	# Keep in sync — expand when Joukahainen finds gaps (Round 27/30)
+	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh|eval[[:space:]]*[(]|assert[[:space:]]*[(]|base64_decode[[:space:]]*[(]|proc_open[[:space:]]*[(]|popen[[:space:]]*[(]|shell_exec[[:space:]]*[(]|[^a-z_]system[[:space:]]*[(]|passthru[[:space:]]*[(]|[^a-z_]exec[[:space:]]*[(]|curl_init[[:space:]]*[(]|curl_exec[[:space:]]*[(]|file_get_contents[[:space:]]*[(][[:space:]]*["\x27]https?://|chmod[[:space:]]+[0-7]*7[0-7][0-7]|\$_GET[[:space:]]*\[|\$_POST[[:space:]]*\[|\$_REQUEST[[:space:]]*\[|\$_SERVER\[.HTTP_)'
 	local found=0
 
 	if git -C "$repo_root" diff --no-color |
@@ -341,6 +342,22 @@ codex_scan_git_diff_for_dangers() {
 			END { exit (found ? 0 : 1) }
 		' |
 		sed 's/^/[codex-run] DANGER: /' >&2; then
+		found=1
+	fi
+
+	# --- Binary File Detection ---
+	# Binary files bypass all text-based scanning (danger, relaxation, PII).
+	local binary_files=()
+	while IFS= read -r f; do
+		[[ -n "$f" ]] || continue
+		binary_files+=("$f")
+	done < <({
+		git -C "$repo_root" diff --numstat 2>/dev/null
+		git -C "$repo_root" diff --cached --numstat 2>/dev/null
+	} | awk '$1 == "-" && $2 == "-" { print $3 }' | sort -u)
+	if [[ ${#binary_files[@]} -gt 0 ]]; then
+		echo "[codex-run] DANGER: new binary file(s) detected (bypass text scanning):" >&2
+		printf '  %s\n' "${binary_files[@]}" >&2
 		found=1
 	fi
 
