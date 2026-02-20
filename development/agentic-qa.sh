@@ -59,8 +59,7 @@ QA_FILE="$OUTDIR/qa-context.txt"
 MAX_QA_ISSUES=5
 # I7: Warn if context exceeds this size (bytes).
 QA_CONTEXT_WARN=102400
-# I13: Truncate issue bodies at this many characters.
-BODY_TRUNCATE=5000
+# I13: Issue bodies excluded from QA context (security policy — Joukahainen Round 21).
 
 agent=""
 exec_cmd=""
