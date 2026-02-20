@@ -57,10 +57,9 @@ $username = trim($username);
 $username = pmssNormalizeUsername($username);
 
 if (!pmssValidateUsername($username)) {
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'validate',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'validate', $username,
             array(
                 'status'  => 'ERR',
                 'message' => 'Rejected username due to validation failure',
@@ -75,10 +74,9 @@ if (!pmssValidateUsername($username)) {
 // spawning a separate process.
 $knownUsers = users::listHomeUsers();
 if (!in_array($username, $knownUsers, true)) {
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'validate',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'validate', $username,
             array(
                 'status'  => 'ERR',
                 'message' => 'Username not present in managed user list',
@@ -89,10 +87,9 @@ if (!in_array($username, $knownUsers, true)) {
 }
 
 if (!is_dir("/home/{$username}")) {
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'validate',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'validate', $username,
             array(
                 'status'  => 'ERR',
                 'message' => 'Home directory missing',
@@ -105,10 +102,9 @@ if (!is_dir("/home/{$username}")) {
 // Ensure a passwd entry exists before continuing so we do not silently act on
 // stray directories or stale state.
 if (function_exists('posix_getpwnam') && @posix_getpwnam($username) === false) {
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'validate',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'validate', $username,
             array(
                 'status'  => 'ERR',
                 'message' => 'Username not present in /etc/passwd',
@@ -124,10 +120,9 @@ if (function_exists('posix_getpwnam') && @posix_getpwnam($username) === false) {
 $expectedHome = "/home/{$username}";
 $realHome = realpath($expectedHome);
 if ($realHome === false || strpos($realHome, $expectedHome) !== 0) {
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'invariant_home_prefix',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'invariant_home_prefix', $username,
             array(
                 'status'        => 'ERR',
                 'message'       => 'Refusing to operate on unexpected home path',
@@ -140,10 +135,9 @@ if ($realHome === false || strpos($realHome, $expectedHome) !== 0) {
 }
 
 $overallStart = microtime(true);
-pmssUserTerminateLog(
-    pmssUserTerminateContext(
-        $username,
-        'start',
+pmssUserWriteLogs(
+    pmssUserBaseContext(
+        'terminate', 'start', $username,
         array(
             'dry_run' => $dryRun,
         )
@@ -156,10 +150,9 @@ while (!in_array($continue, array('Y', 'N'))) {
     echo "Do you want to continue (Y/N)? ";
     $input = fgets(STDIN);
     if ($input === false) {
-        pmssUserTerminateLog(
-            pmssUserTerminateContext(
-                $username,
-                'confirm',
+        pmssUserWriteLogs(
+            pmssUserBaseContext(
+                'terminate', 'confirm', $username,
                 array(
                     'status'  => 'ERR',
                     'message' => 'Unable to read confirmation input (EOF). Re-run with --confirm for non-interactive use.',
@@ -172,10 +165,9 @@ while (!in_array($continue, array('Y', 'N'))) {
     $continue = strtoupper(trim($input));
 }
 if ($continue == 'N') {
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'abort',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'abort', $username,
             array(
                 'status'  => 'SKIP',
                 'message' => 'Operator declined confirmation',
@@ -186,11 +178,10 @@ if ($continue == 'N') {
 }
 
 echo "Terminating user {$username}\n";
-pmssUserTerminateStep($username, 'kill_processes_initial', 'killall -9 -u '.escapeshellarg($username), $dryRun);
+pmssUserLifecycleStep('terminate', $username, 'kill_processes_initial', 'killall -9 -u '.escapeshellarg($username), $dryRun);
 
 echo "\nRunning processes by user:\n";
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'list_processes',
     'ps aux | grep -F '.escapeshellarg($username),
     $dryRun
@@ -198,7 +189,7 @@ pmssUserTerminateStep(
 
 sleep(3);   // Allow time for rTorrent to die
 
-pmssUserTerminateStep($username, 'kill_processes_retry', 'killall -9 -u '.escapeshellarg($username), $dryRun);  // Sometimes things just don't dieee!
+pmssUserLifecycleStep('terminate', $username, 'kill_processes_retry', 'killall -9 -u '.escapeshellarg($username), $dryRun);  // Sometimes things just don't dieee!
 
 // Clean up reserved rTorrent ports before removing the home directory
 $portFile = "/home/{$username}/.rtorrent.rc";
@@ -229,10 +220,9 @@ if (file_exists($portFile)) {
     if (is_dir($portsBase) && count(glob($portsBase . '/*')) === 0) {
         rmdir($portsBase);
     }
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'cleanup_ports',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'cleanup_ports', $username,
             array(
                 'status'  => 'OK',
                 'ports'   => $ports,
@@ -248,8 +238,7 @@ if (function_exists('posix_getpwnam')) {
     if (is_array($info) && isset($info['uid'])) {
         $uid = (int)$info['uid'];
         // Use systemd revert to drop any drop-ins for user slice if present
-        pmssUserTerminateStep(
-            $username,
+        pmssUserLifecycleStep('terminate', $username,
             'revert_slice',
             'systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true',
             $dryRun
@@ -261,8 +250,7 @@ echo "\nDeleting user, user data and HTTP password:\n";
 
 // Clear any per-user crontab before removing the account to avoid leaving stale
 // cron entries behind (Debian keeps them under /var/spool/cron/crontabs/).
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'crontab_remove',
     'crontab -r -u '.escapeshellarg($username).' || true',
     $dryRun
@@ -271,15 +259,13 @@ $crontabSpoolPaths = array(
     "/var/spool/cron/crontabs/{$username}",
     "/var/spool/cron/{$username}",
 );
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'crontab_spool_remove',
     'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true',
     $dryRun
 );
 
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'userdel_initial',
     'userdel '.escapeshellarg($username),
     $dryRun
@@ -292,58 +278,49 @@ $trafficFiles = array(
 );
 $trafficArgs = array_map('escapeshellarg', $trafficFiles);
 $clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'clear_immutable_traffic',
     $clearImmutableCmd,
     $dryRun
 );
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'remove_home_initial',
     'cd /home && rm -rf -- '.escapeshellarg($username),
     $dryRun
 );
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'regen_nginx_user_configs',
     '/scripts/util/createNginxConfig.php',
     $dryRun
 );   // Reconfig nginx
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'restart_nginx',
     'systemctl restart nginx || /etc/init.d/nginx restart || true',
     $dryRun
 );
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'userdel_groupdel_retry',
     'userdel '.escapeshellarg($username),
     $dryRun
 );
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'groupdel_retry',
     'groupdel '.escapeshellarg($username),
     $dryRun
 ); // If during first attempt still some process running.
                                         // Make sure by attempting again FURTHER group needs to be deleted as well
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'remove_screen_socket',
     'rm -rf -- '.escapeshellarg("/var/run/screen/S-{$username}"),
     $dryRun
 );
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'remove_home_and_nginx_user',
     'rm -rf -- '.escapeshellarg("/home/{$username}").' -- '.escapeshellarg("/etc/nginx/users/{$username}"),
     $dryRun
 );
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'release_lighttpd_port',
     '/scripts/util/portManager.php release '.escapeshellarg($username).' lighttpd',
     $dryRun
@@ -356,10 +333,9 @@ if (function_exists('posix_getpwnam') && posix_getpwnam($username) !== false) {
     fwrite(STDERR, "Warning: {$username} still present in /etc/passwd; skipping DB removal.\n");
 } else {
     $db->removeUser($username);
-    pmssUserTerminateLog(
-        pmssUserTerminateContext(
-            $username,
-            'remove_user_db',
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'terminate', 'remove_user_db', $username,
             array(
                 'status'  => 'OK',
                 'dry_run' => $dryRun,
@@ -369,23 +345,20 @@ if (function_exists('posix_getpwnam') && posix_getpwnam($username) !== false) {
 }
 
 // If attemps 1 and 2 failed ...
-pmssUserTerminateStep($username, 'kill_processes_final', 'killall -9 -u '.escapeshellarg($username), $dryRun);
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username, 'kill_processes_final', 'killall -9 -u '.escapeshellarg($username), $dryRun);
+pmssUserLifecycleStep('terminate', $username,
     'userdel_groupdel_final',
     'userdel '.escapeshellarg($username),
     $dryRun
 );
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'groupdel_final',
     'groupdel '.escapeshellarg($username),
     $dryRun
 );
 
 // Remove stale per-user lock files left behind by lifecycle helpers.
-pmssUserTerminateStep(
-    $username,
+pmssUserLifecycleStep('terminate', $username,
     'cleanup_lock_files',
     'rm -f -- /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock',
     $dryRun
@@ -394,10 +367,9 @@ pmssUserTerminateStep(
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 
 $overallDuration = microtime(true) - $overallStart;
-pmssUserTerminateLog(
-    pmssUserTerminateContext(
-        $username,
-        'end',
+pmssUserWriteLogs(
+    pmssUserBaseContext(
+        'terminate', 'end', $username,
         array(
             'status'            => 'OK',
             'dry_run'           => $dryRun,

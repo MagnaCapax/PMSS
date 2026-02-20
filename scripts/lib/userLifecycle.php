@@ -286,24 +286,6 @@ function pmssUserLifecycleStep(string $action, string $username, string $step, s
 }
 
 /**
- * Terminate-specific wrappers used by scripts/terminateUser.php.
- */
-function pmssUserTerminateContext($username, $phase, array $extra = array())
-{
-    return pmssUserBaseContext('terminate', $phase, $username, $extra);
-}
-
-function pmssUserTerminateLog(array $payload)
-{
-    pmssUserWriteLogs($payload);
-}
-
-function pmssUserTerminateStep($username, $step, $command, $dryRun)
-{
-    return pmssUserLifecycleStep('terminate', $username, $step, $command, $dryRun);
-}
-
-/**
  * Log a user-facing fix notification.
  *
  * Writes to a user-readable log file in the user's home directory so they can

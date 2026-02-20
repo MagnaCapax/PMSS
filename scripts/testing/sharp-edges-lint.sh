@@ -17,7 +17,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 STRICT="${PMSS_LINT_SHARP_STRICT:-1}"
 PATTERN='rm[[:space:]]+-rf|chmod[[:space:]]+-R|chown[[:space:]]+-R|chgrp[[:space:]]+-R|\bmv[[:space:]]'
-PHP_WRAPPER_REGEX='(runStep|runUserStep|runSoft|runFatal|runCommand|pmssUserTerminateStep|run)\s*\('
+PHP_WRAPPER_REGEX='(runStep|runUserStep|runSoft|runFatal|runCommand|pmssUserLifecycleStep|run)\s*\('
 VIOL=0
 FATAL_VIOL=0
 
