@@ -33,10 +33,7 @@ function pmssTrafficIngressLookupUid(string $user): ?int
         }
     }
     $out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
-    if ($out === '' || !ctype_digit($out)) {
-        return null;
-    }
-    return (int) $out;
+    return ($out !== '' && ctype_digit($out)) ? (int) $out : null;
 }
 
 /**
@@ -68,10 +65,9 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
             }
         }
     }
-    if ($ingress === null || $egress === null) {
-        return null;
-    }
-    return ['ingress' => $ingress, 'egress' => $egress];
+    return ($ingress === null || $egress === null)
+        ? null
+        : ['ingress' => $ingress, 'egress' => $egress];
 }
 
 /**

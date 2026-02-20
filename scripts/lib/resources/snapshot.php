@@ -105,9 +105,7 @@ function pmssResourceSnapshotRun(): int
             $raw = @file_get_contents($dataPath);
             if (is_string($raw) && trim($raw) !== '') {
                 $decoded = @unserialize($raw);
-                if (is_array($decoded)) {
-                    $data = $decoded;
-                }
+                $data = is_array($decoded) ? $decoded : null;
             }
         }
         $metrics = null;

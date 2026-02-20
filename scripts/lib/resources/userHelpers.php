@@ -18,10 +18,7 @@ function pmssResourceLogLookupUid(string $user): ?int
         }
     }
     $out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
-    if ($out === '' || !ctype_digit($out)) {
-        return null;
-    }
-    return (int) $out;
+    return ($out !== '' && ctype_digit($out)) ? (int) $out : null;
 }
 
 /**
@@ -49,11 +46,8 @@ function pmssResourceLogIsValidUser(string $user): bool
     $normalized = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($user)
         : strtolower($user);
-    if ($normalized !== $user
+    return !($normalized !== $user
         || !preg_match('/^[a-z0-9-]+$/', $user)
         || ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user))
-    ) {
-        return false;
-    }
-    return true;
+    );
 }
