@@ -42,6 +42,7 @@ Options:
   --prompt TEXT   Override the default refactor prompt text
   --dry-run       Skip git/loc/phploc collection; show planned actions only
   --autocommit    Enable autocommit rules in the prompt (operator-approved)
+  --cooling-files PATH  Files to exclude from refactoring (cooling period)
   -h, --help      Show this help
 
 Assistant CLI args (appended to the exec command):
@@ -86,6 +87,7 @@ declare -a exec_extra_args=()
 custom_prompt=""
 dry_run=0
 autocommit=0
+cooling_files=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -120,6 +122,10 @@ while [[ $# -gt 0 ]]; do
 	--autocommit)
 		autocommit=1
 		shift || true
+		;;
+	--cooling-files)
+		cooling_files=${2:-}
+		shift 2 || true
 		;;
 	--yolo | -y)
 		exec_extra_args+=("$1")
@@ -246,6 +252,21 @@ if [[ "$dry_run" != "1" && -x "$ROOT/scripts/testing/phploc.sh" ]]; then
 	bash "$ROOT/scripts/testing/phploc.sh" >"$PHPLC_LOG" 2>&1 || true
 fi
 
+# Build cooling period context if files were specified (Joukahainen Round 8 defense)
+COOLING_CTX="$OUTDIR/cooling-period.txt"
+if [[ -n "$cooling_files" && -s "$cooling_files" ]]; then
+	{
+		echo "REFACTOR COOLING PERIOD (BINDING)"
+		echo "The following files were committed by the issues pass in this cycle."
+		echo "DO NOT refactor these files. They need stability before refactoring."
+		echo "This prevents a two-stage attack where issues pass introduces code and"
+		echo "refactor pass accidentally removes security checks embedded in complexity."
+		echo ""
+		cat "$cooling_files"
+	} >"$COOLING_CTX"
+	echo "[agentic-refactor] cooling period: excluding $(wc -l <"$cooling_files" | tr -d ' ') file(s) from refactoring" >&1
+fi
+
 codex_args=(run --prompt-file "$HERE/prompts/refactor.txt" --outdir "$OUTDIR")
 [[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
 [[ -s "$COMMITS_SUMMARY" ]] && codex_args+=(--context "$COMMITS_SUMMARY")
@@ -253,6 +274,7 @@ codex_args=(run --prompt-file "$HERE/prompts/refactor.txt" --outdir "$OUTDIR")
 [[ -s "$CANDIDATES" ]] && codex_args+=(--context "$CANDIDATES")
 [[ -s "$LOC_LOG" ]] && codex_args+=(--context "$LOC_LOG")
 [[ -s "$PHPLC_LOG" ]] && codex_args+=(--context "$PHPLC_LOG")
+[[ -s "$COOLING_CTX" ]] && codex_args+=(--context "$COOLING_CTX")
 [[ -f "$ROOT/AGENTS.${agent}.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.md")
 [[ -f "$ROOT/AGENTS.${agent}.local.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.local.md")
 [[ "$dry_run" == "1" ]] && codex_args+=(--dry-run)

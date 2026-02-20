@@ -307,8 +307,10 @@ codex_scan_git_diff_for_dangers() {
 	git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
 
 	# Destructive commands + PHP injection/execution patterns (public repo: issue bodies are untrusted)
-	# Keep in sync — expand when Joukahainen finds gaps (Round 27/30)
-	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh|eval[[:space:]]*[(]|assert[[:space:]]*[(]|base64_decode[[:space:]]*[(]|proc_open[[:space:]]*[(]|popen[[:space:]]*[(]|shell_exec[[:space:]]*[(]|[^a-z_]system[[:space:]]*[(]|passthru[[:space:]]*[(]|[^a-z_]exec[[:space:]]*[(]|curl_init[[:space:]]*[(]|curl_exec[[:space:]]*[(]|file_get_contents[[:space:]]*[(][[:space:]]*["\x27]https?://|chmod[[:space:]]+[0-7]*7[0-7][0-7]|\$_GET[[:space:]]*\[|\$_POST[[:space:]]*\[|\$_REQUEST[[:space:]]*\[|\$_SERVER\[.HTTP_)'
+	# Keep in sync — expand when Joukahainen finds gaps (Round 27/28/30)
+	# NOTE: Use [$] for literal $ and [[] for literal [ — awk -v converts \$ and \[ to plain chars,
+	# breaking regex. \$ becomes $ (anchor), \[ becomes [ (unmatched bracket → awk exit 2).
+	local patterns='(rm[[:space:]]+-[[:space:]]*rf|rm[[:space:]]+-[[:space:]]*fr|mkfs[.]|wipefs|dd[[:space:]]+if=|parted[[:space:]]|sfdisk[[:space:]]|zpool[[:space:]]|curl[[:space:]].*[|][[:space:]]*sh|wget[[:space:]].*[|][[:space:]]*sh|eval[[:space:]]*[(]|assert[[:space:]]*[(]|base64_decode[[:space:]]*[(]|proc_open[[:space:]]*[(]|popen[[:space:]]*[(]|shell_exec[[:space:]]*[(]|[^a-z_]system[[:space:]]*[(]|passthru[[:space:]]*[(]|[^a-z_]exec[[:space:]]*[(]|curl_init[[:space:]]*[(]|curl_exec[[:space:]]*[(]|file_get_contents[[:space:]]*[(][[:space:]]*["\x27]https?://|chmod[[:space:]]+[0-7]*7[0-7][0-7]|[$]_GET[[:space:]]*[[]|[$]_POST[[:space:]]*[[]|[$]_REQUEST[[:space:]]*[[]|[$]_SERVER[[:space:]]*[[]|getenv[[:space:]]*[(][[:space:]]*["\x27]CI["\x27]|[$]_ENV[[:space:]]*[[][[:space:]]*["\x27]CI["\x27])'
 	local found=0
 
 	if git -C "$repo_root" diff --no-color |
@@ -370,10 +372,11 @@ codex_scan_git_diff_for_dangers() {
 	fi
 
 	# --- Validation Relaxation Scan ---
-	# Detect net removal of validation patterns (guards, constraints, checks).
+	# Detect net removal of validation patterns (guards, constraints, checks, assertions).
 	# When more validation guards are removed than added, flag as relaxation.
+	# Includes test assertions — assertion removal is a test corruption signal (Joukahainen Round 26).
 	# PMSS_CODEX_RELAXATION_FAIL=1 exits non-zero when net removals are found.
-	local removal_re='(strlen[[:space:]]*[(]|preg_match[[:space:]]*[(]|pmss[A-Za-z]*Validate[A-Za-z]*[[:space:]]*[(]|pmss[A-Za-z]*IsValid[A-Za-z]*[[:space:]]*[(]|die[[:space:]]*[(]|throw[[:space:]]+new)'
+	local removal_re='(strlen[[:space:]]*[(]|preg_match[[:space:]]*[(]|pmss[A-Za-z]*Validate[A-Za-z]*[[:space:]]*[(]|pmss[A-Za-z]*IsValid[A-Za-z]*[[:space:]]*[(]|die[[:space:]]*[(]|throw[[:space:]]+new|[$]this->assert[A-Z])'
 	local relaxation_fail="${PMSS_CODEX_RELAXATION_FAIL:-0}"
 	local relax_result
 	relax_result=$( {
