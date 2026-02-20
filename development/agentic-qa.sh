@@ -157,9 +157,12 @@ for num in "${issue_numbers[@]}"; do
 		echo "======================================================================"
 		echo "ISSUE #$num — PENDING VERIFICATION"
 		echo "======================================================================"
-		# I13: Truncate body at $BODY_TRUNCATE chars. Agent can read full via `gh issue view`.
-		gh issue view "$num" --json title,labels,body \
-			--jq '"Title: " + .title + "\nLabels: " + ([.labels[].name] | join(", ")) + "\n\nBody:\n" + (.body | if length > '"$BODY_TRUNCATE"' then .[0:'"$BODY_TRUNCATE"'] + "\n\n[TRUNCATED — use gh issue view '"$num"' for full body]" else . end)' 2>/dev/null || echo "(failed to fetch issue #$num)"
+		# SECURITY: Do NOT include issue body in QA context.
+		# QA runs unsandboxed with SSH access. Issue bodies are untrusted external input.
+		# PI in issue body + SSH access = RCE on dev infrastructure. (Joukahainen Round 21)
+		# QA only needs: title + labels + implementing commit diffs.
+		gh issue view "$num" --json title,labels \
+			--jq '"Title: " + .title + "\nLabels: " + ([.labels[].name] | join(", ")) + "\n\n[Issue body excluded from QA context — security policy. Use implementing diffs below for verification.]"' 2>/dev/null || echo "(failed to fetch issue #$num)"
 		echo ""
 
 		# Find implementing commits (I8: search main only, not --all branches)
