@@ -368,6 +368,13 @@ if (file_exists('../.trafficDataIngress')) {
         $trafficIngressData = null;
     }
 }
+$bonusTraffic = 0;
+if (file_exists('../.bonusTraffic')) {
+    $bonusTraffic = (int) trim((string) @file_get_contents('../.bonusTraffic'));
+    if ($bonusTraffic < 0) {
+        $bonusTraffic = 0;
+    }
+}
 
 if ($trafficData === null && $trafficIngressData === null) {
     echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Traffic data not available.</pre></div>';
@@ -384,7 +391,11 @@ Past 30 days upload traffic: <?php echo $trafficData['display']['month']; ?>
 <?php
 $limit = (int)trim(file_get_contents('../.trafficLimit'));
 if ($limit > 0) {
-    echo "Traffic limit: " . number_format($limit) . " GiB\n";
+    $effectiveLimit = $limit + max(0, $bonusTraffic);
+    echo "Traffic limit: " . number_format($effectiveLimit) . " GiB\n";
+    if ($bonusTraffic > 0) {
+        echo "Bonus traffic: " . number_format($bonusTraffic) . " GiB\n";
+    }
 }
 ?>
 <?php endif; ?>

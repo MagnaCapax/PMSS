@@ -34,6 +34,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.trafficDataLocal',
         'rTorrentLog',
         '.bonusQuota',
+        '.bonusTraffic',
         '.billingId',
         '.trafficLimit',
     ];
@@ -127,4 +128,3 @@ set result [wait]
 exit [lindex $result 3]
 EXP;
 }
-

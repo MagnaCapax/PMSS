@@ -15,6 +15,10 @@
 require_once '/scripts/lib/rtorrentConfig.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/user/userConfigStore.php';
+$bonusTrafficLib = __DIR__.'/../lib/user/bonusTraffic.php';
+if (is_file($bonusTrafficLib)) {
+    require_once $bonusTrafficLib;
+}
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
@@ -74,9 +78,13 @@ foreach($users AS $thisUser) {
     if ($trafficLimit <= 0) {
         continue;
     }
+    $bonusTrafficFile = "/home/{$thisUser}/.bonusTraffic";
+    $bonusTraffic = function_exists('pmssBonusTrafficReadGiB')
+        ? pmssBonusTrafficReadGiB($bonusTrafficFile)
+        : 0;
 //    var_dump($data);
     $trafficData[$thisUser]['traffic'] = ($data['raw']['month'] / 1024);   // Set to GiB
-    $trafficData[$thisUser]['trafficLimit'] = $trafficLimit;
+    $trafficData[$thisUser]['trafficLimit'] = $trafficLimit + $bonusTraffic;
     $trafficCapMbit = $defaultTrafficCapMbit;
     $userConfig = $userConfigStore->get($thisUser);
     if (is_array($userConfig) && isset($userConfig['trafficCapMbit']) && is_numeric($userConfig['trafficCapMbit'])) {

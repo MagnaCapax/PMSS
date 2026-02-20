@@ -27,6 +27,14 @@ if (file_exists('../.bonusQuota')) {
 } else {
     $bonusQuota = 0;
 }
+if (file_exists('../.bonusTraffic')) {
+    $bonusTraffic = (int)@file_get_contents('../.bonusTraffic');
+    if ($bonusTraffic < 0) {
+        $bonusTraffic = 0;
+    }
+} else {
+    $bonusTraffic = 0;
+}
 
 $vendorDefault = array(
     'name'      => 'Pulsed Media',
@@ -247,10 +255,14 @@ if ($vendor['pulsedBox'] == true) {
                                         $trafficIngress = null;
                                     }
 	                                }
-	                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress);
+	                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic);
 	                            } else {
 	                                if ($trafficLimit > 0) {
-	                                    $trafficLimitText = number_format($trafficLimit) . ' GiB';
+	                                    $effectiveLimit = $trafficLimit + max(0, (int) $bonusTraffic);
+	                                    $trafficLimitText = number_format($effectiveLimit) . ' GiB';
+	                                    if ($bonusTraffic > 0) {
+	                                        $trafficLimitText .= ' (Bonus traffic: ' . number_format($bonusTraffic) . ' GiB)';
+	                                    }
 	                                } else {
 	                                    $trafficLimitText = 'Unlimited';
 	                                }
@@ -335,7 +347,7 @@ function bonusQuotaDisplay($bonusQuota) {
     return '';
 }
 
-	function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null) {
+	function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0) {
 	    if (count($trafficData) == 0) return;
 
 	    $trafficUsed = round($trafficData['raw']['month']);
@@ -356,7 +368,12 @@ function bonusQuotaDisplay($bonusQuota) {
 	EOF;
 	        return;
 	    }
-	    $percent = ($trafficLimit > 0) ? round((($trafficUsed / 1024) / $trafficLimit) * 100) : 0;
+	    $bonusTraffic = (int) $bonusTraffic;
+	    if ($bonusTraffic < 0) {
+	        $bonusTraffic = 0;
+	    }
+	    $limitTotal = $trafficLimit + $bonusTraffic;
+	    $percent = ($limitTotal > 0) ? round((($trafficUsed / 1024) / $limitTotal) * 100) : 0;
 	    if (!is_finite($percent)) $percent = 0;
 	    $trafficUsed = round($trafficUsed / 1024) . " GiB";
 
@@ -366,8 +383,9 @@ function bonusQuotaDisplay($bonusQuota) {
         $warning = '';
     }
 
-    $titleText = "{$trafficUsed} / {$trafficLimit} GiB";
-    $gauge = createGauge($titleText, $titleText, $percent);
+    $titleText = "{$trafficUsed} / {$limitTotal} GiB";
+    $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
+    $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
     $inboundLine = '';
     if (is_array($trafficIngress) && isset($trafficIngress['raw']['month'])) {
         $inboundUsed = round($trafficIngress['raw']['month'] / 1024) . " GiB";
