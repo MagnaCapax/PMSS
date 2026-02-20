@@ -35,6 +35,23 @@ if (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throt
 if ($defaultTrafficCapMbit <= 0) {
     $defaultTrafficCapMbit = 100;
 }
+$slidingThrottleStart = 75.0;
+if (isset($networkConfig['throttle']['slidingThrottleStart']) && is_numeric($networkConfig['throttle']['slidingThrottleStart'])) {
+    $slidingThrottleStart = (float) $networkConfig['throttle']['slidingThrottleStart'];
+}
+if ($slidingThrottleStart < 0) {
+    $slidingThrottleStart = 0.0;
+}
+if ($slidingThrottleStart > 100) {
+    $slidingThrottleStart = 100.0;
+}
+$networkSpeedMbit = 1000;
+if (isset($networkConfig['speed']) && is_numeric($networkConfig['speed'])) {
+    $networkSpeedMbit = (int) $networkConfig['speed'];
+}
+if ($networkSpeedMbit <= 0) {
+    $networkSpeedMbit = 1000;
+}
 $userConfigStore = new UserConfigStore();
 
 $trafficData = array();
@@ -49,9 +66,14 @@ foreach($users AS $thisUser) {
         echo date('Y-m-d H:i:s') . ": Skipping {$thisUser}, invalid traffic data file\n";
         continue;
     }
-    $trafficLimit = file_get_contents($userTrafficLimitFile);
-    if (empty($trafficLimit) or
-        $trafficLimit == 0) continue;
+    $trafficLimitRaw = trim((string) @file_get_contents($userTrafficLimitFile));
+    if ($trafficLimitRaw === '' || !is_numeric($trafficLimitRaw)) {
+        continue;
+    }
+    $trafficLimit = (float) $trafficLimitRaw;
+    if ($trafficLimit <= 0) {
+        continue;
+    }
 //    var_dump($data);
     $trafficData[$thisUser]['traffic'] = ($data['raw']['month'] / 1024);   // Set to GiB
     $trafficData[$thisUser]['trafficLimit'] = $trafficLimit;
@@ -124,9 +146,78 @@ function pmssReadTrafficData(string $path, string $username): ?array
 foreach ($trafficData AS $thisUser => $thisData) {
     $trafficLimitEnabledTime = 0;
     $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
+    $slidingThrottleFile = "/var/run/pmss/trafficLimits/{$thisUser}.throttle_mbit";
+    $overLimit = ($thisData['traffic'] > $thisData['trafficLimit']);
+    $slidingApplied = false;
+
+    // Apply sliding throttle before the hard limit, unless cooldown is active.
+    if (!$overLimit && $slidingThrottleStart < 100) {
+        $usagePct = 0.0;
+        if ($thisData['trafficLimit'] > 0) {
+            $usagePct = ($thisData['traffic'] / $thisData['trafficLimit']) * 100;
+        }
+        if ($usagePct >= $slidingThrottleStart && !file_exists($userTrafficLimitEnabledFile)) {
+            $range = 100 - $slidingThrottleStart;
+            if ($range > 0) {
+                $capPct = (($usagePct - $slidingThrottleStart) / $range) * 75;
+                if ($capPct > 75) {
+                    $capPct = 75;
+                }
+                if ($capPct > 0) {
+                    $slidingApplied = true;
+                    $hardCapMbit = (int) $thisData['trafficCapMbit'];
+                    if ($hardCapMbit < 0) {
+                        $hardCapMbit = 0;
+                    }
+                    $usableBw = $networkSpeedMbit - $hardCapMbit;
+                    if ($usableBw < 0) {
+                        $usableBw = 0;
+                    }
+                    $effectiveCeil = $networkSpeedMbit - ($usableBw * ($capPct / 100));
+                    $effectiveCeilMbit = (int) round($effectiveCeil);
+                    if ($effectiveCeilMbit < 1) {
+                        $effectiveCeilMbit = 1;
+                    }
+                    $previousCeil = null;
+                    if (is_file($slidingThrottleFile) && !is_link($slidingThrottleFile)) {
+                        $raw = trim((string) @file_get_contents($slidingThrottleFile));
+                        if ($raw !== '' && is_numeric($raw)) {
+                            $previousCeil = (int) $raw;
+                        }
+                    }
+                    if ($previousCeil === null || $previousCeil !== $effectiveCeilMbit) {
+                        if (@file_put_contents($slidingThrottleFile, (string) $effectiveCeilMbit) !== false) {
+                            @chmod($slidingThrottleFile, 0600);
+                            if (function_exists('pmssUserLog')) {
+                                $action = ($previousCeil === null) ? 'applied' : 'updated';
+                                pmssUserLog(
+                                    $thisUser,
+                                    sprintf(
+                                        'traffic throttle sliding %s (ceil=%d Mbit usage=%.1f%% limit=%.2f GiB)',
+                                        $action,
+                                        $effectiveCeilMbit,
+                                        $usagePct,
+                                        $thisData['trafficLimit']
+                                    )
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (!$slidingApplied && is_file($slidingThrottleFile) && !is_link($slidingThrottleFile)) {
+        if (@unlink($slidingThrottleFile)) {
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'traffic throttle sliding removed');
+            }
+        }
+    }
     
     // Needs to stay within the limit for X period of time, hence we can always touch & update the limit file
-    if ($thisData['traffic'] > $thisData['trafficLimit']) { // Should be limited
+    if ($overLimit) { // Should be limited
 
         
         

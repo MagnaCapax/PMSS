@@ -37,6 +37,7 @@ return array(
     'throttle' => array(
       'min' => 50,
       'max' => 100,
+      'slidingThrottleStart' => 75,
       'soft' => 250,
       'limitSoft' => 80,
       'limitExceedMax' => 20
@@ -50,4 +51,3 @@ PHP;
         $log('Created default network configuration');
     }
 }
-

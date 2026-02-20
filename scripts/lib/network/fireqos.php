@@ -37,7 +37,17 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
             }
 
             $limit = '';
-            if (is_file($limitStateDir."/{$username}.enabled")) {
+            $slidingPath = $limitStateDir."/{$username}.throttle_mbit";
+            if (is_file($slidingPath) && !is_link($slidingPath)) {
+                $raw = trim((string) @file_get_contents($slidingPath));
+                if ($raw !== '' && is_numeric($raw)) {
+                    $stored = (int) $raw;
+                    if ($stored > 0) {
+                        $limit = ' ceil '.$stored.'Mbit';
+                    }
+                }
+            }
+            if ($limit === '' && is_file($limitStateDir."/{$username}.enabled")) {
                 $capMbit = $defaultCapMbit;
                 $throttlePath = $homeDir."/{$username}/.throttle";
                 if (is_file($throttlePath) && !is_link($throttlePath)) {

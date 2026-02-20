@@ -90,6 +90,64 @@ class NetworkFireqosTest extends TestCase
         }
     }
 
+    public function testBuildFireqosConfigUsesSlidingThrottleWhenPresent(): void
+    {
+        $stateDir = $this->createTempDir('pmss-fireqos-state');
+        $homeDir = $this->createTempDir('pmss-fireqos-home');
+        @mkdir($homeDir.'/root', 0755, true);
+        @file_put_contents($stateDir.'/root.enabled', '1');
+        @file_put_contents($homeDir.'/root/.throttle', '25');
+        @file_put_contents($stateDir.'/root.throttle_mbit', '333');
+
+        $prevStateDir = getenv('PMSS_TRAFFIC_LIMIT_STATE_DIR');
+        $prevHomeDir = getenv('PMSS_HOME_DIR');
+        putenv('PMSS_TRAFFIC_LIMIT_STATE_DIR='.$stateDir);
+        putenv('PMSS_HOME_DIR='.$homeDir);
+
+        try {
+            $config = \networkBuildFireqosConfig(
+                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]],
+                ['root'],
+                []
+            );
+            $this->assertTrue(strpos($config, 'class root ceil 333Mbit') !== false);
+        } finally {
+            $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
+            $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
+            $this->removeTempDir($stateDir);
+            $this->removeTempDir($homeDir);
+        }
+    }
+
+    public function testBuildFireqosConfigFallsBackWhenSlidingThrottleInvalid(): void
+    {
+        $stateDir = $this->createTempDir('pmss-fireqos-state');
+        $homeDir = $this->createTempDir('pmss-fireqos-home');
+        @mkdir($homeDir.'/root', 0755, true);
+        @file_put_contents($stateDir.'/root.enabled', '1');
+        @file_put_contents($homeDir.'/root/.throttle', '25');
+        @file_put_contents($stateDir.'/root.throttle_mbit', 'nope');
+
+        $prevStateDir = getenv('PMSS_TRAFFIC_LIMIT_STATE_DIR');
+        $prevHomeDir = getenv('PMSS_HOME_DIR');
+        putenv('PMSS_TRAFFIC_LIMIT_STATE_DIR='.$stateDir);
+        putenv('PMSS_HOME_DIR='.$homeDir);
+
+        try {
+            $config = \networkBuildFireqosConfig(
+                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]],
+                ['root'],
+                []
+            );
+            $this->assertTrue(strpos($config, 'class root ceil 25Mbit') !== false);
+        } finally {
+            $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
+            $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
+            $this->removeTempDir($stateDir);
+            $this->removeTempDir($homeDir);
+        }
+    }
+
     public function testBuildFireqosConfigFallsBackToDefaultCapWhenThrottleMissing(): void
     {
         $stateDir = $this->createTempDir('pmss-fireqos-state');
