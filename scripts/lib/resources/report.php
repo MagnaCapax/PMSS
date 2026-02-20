@@ -40,19 +40,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
     foreach ($users as $thisUser) {
         $statsPath = "{$statsDir}/{$thisUser}";
-        if (!is_file($statsPath)) {
-            $missingStats[] = $thisUser;
-            continue;
-        }
-
-        $rawStats = @file_get_contents($statsPath);
-        if (!is_string($rawStats) || $rawStats === '') {
-            $missingStats[] = $thisUser;
-            continue;
-        }
-
-        $data = @unserialize($rawStats);
-        if (!is_array($data)) {
+        $rawStats = is_file($statsPath) ? @file_get_contents($statsPath) : false;
+        if (!is_string($rawStats) || $rawStats === '' || !is_array($data = @unserialize($rawStats))) {
             $missingStats[] = $thisUser;
             continue;
         }

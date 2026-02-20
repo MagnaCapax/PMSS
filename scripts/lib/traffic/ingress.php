@@ -75,10 +75,7 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
  */
 function pmssTrafficIngressReadState(string $path): array
 {
-    if (!is_file($path)) {
-        return [];
-    }
-    $raw = @file_get_contents($path);
+    $raw = is_file($path) ? @file_get_contents($path) : false;
     if (!is_string($raw) || trim($raw) === '') {
         return [];
     }

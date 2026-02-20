@@ -32,8 +32,7 @@ foreach ($users as $user) {
     $normalized = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($user)
         : strtolower($user);
-    if ($user === ''
-        || $normalized !== $user
+    if ($normalized !== $user
         || !preg_match('/^[a-z0-9-]+$/', $user)
         || ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user))
     ) {

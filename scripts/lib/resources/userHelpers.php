@@ -26,11 +26,10 @@ function pmssResourceLogLookupUid(string $user): ?int
  */
 function pmssResourceLogLoadUsers(): array
 {
-    $usersRaw = trim((string) @shell_exec('/scripts/listUsers.php'));
-    if ($usersRaw === '') {
+    $users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
+    if (empty($users)) {
         return [];
     }
-    $users = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
     $users[] = 'www-data';
     return $users;
 }
@@ -40,9 +39,6 @@ function pmssResourceLogLoadUsers(): array
  */
 function pmssResourceLogIsValidUser(string $user): bool
 {
-    if ($user === '') {
-        return false;
-    }
     $normalized = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($user)
         : strtolower($user);

@@ -101,12 +101,10 @@ function pmssResourceSnapshotRun(): int
 
         $data = null;
         $dataPath = $homeDir.'/'.$user.'/.resourceData';
-        if (is_file($dataPath)) {
-            $raw = @file_get_contents($dataPath);
-            if (is_string($raw) && trim($raw) !== '') {
-                $decoded = @unserialize($raw);
-                $data = is_array($decoded) ? $decoded : null;
-            }
+        $raw = is_file($dataPath) ? @file_get_contents($dataPath) : false;
+        if (is_string($raw) && trim($raw) !== '') {
+            $decoded = @unserialize($raw);
+            $data = is_array($decoded) ? $decoded : null;
         }
         $metrics = null;
         if ($data !== null) {
