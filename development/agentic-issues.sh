@@ -317,7 +317,7 @@ if [[ -s "$ISSUES_FILE" ]]; then
 		"$ISSUES_FILE" 2>/dev/null || true
 
 	# SUSPICIOUS PATTERN DETECTION (log warnings, don't block — the prompt warning handles it)
-	local suspicious=0
+	suspicious=0
 	# Base64 blocks (long runs of base64 chars often indicate encoded payloads)
 	if grep -qP '[A-Za-z0-9+/]{80,}={0,2}' "$ISSUES_FILE" 2>/dev/null; then
 		echo "[agentic-issues] WARNING: long base64-like string detected in issue context" >&1
