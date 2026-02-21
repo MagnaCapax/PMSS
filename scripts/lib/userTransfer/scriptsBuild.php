@@ -10,9 +10,7 @@
  */
 function pmssUserTransferBuildRsyncMain(array $cfg): string
 {
-    $remoteUser = $cfg['remoteUser'];
-    $hostname = $cfg['hostname'];
-    $localUser = $cfg['localUser'];
+    [$remoteUser, $hostname, $localUser] = [$cfg['remoteUser'], $cfg['hostname'], $cfg['localUser']];
 
     // Keep the exclude list in a stable order for readability and diffing.
     $excludes = [
@@ -62,9 +60,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
  */
 function pmssUserTransferBuildRsyncFinal(array $cfg): string
 {
-    $remoteUser = $cfg['remoteUser'];
-    $hostname = $cfg['hostname'];
-    $localUser = $cfg['localUser'];
+    [$remoteUser, $hostname, $localUser] = [$cfg['remoteUser'], $cfg['hostname'], $cfg['localUser']];
 
     // Keep this list explicit; do not rely on brace expansion inside expect.
     $sources = [

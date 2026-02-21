@@ -60,14 +60,10 @@ function pmssNormalizeUsername(string $username): string
  */
 function pmssUsernameIsValid(string $username): bool
 {
-    if ($username === '') {
-        return false;
-    }
     $normalized = pmssNormalizeUsername($username);
-    if ($normalized !== $username) {
-        return false;
-    }
-    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized);
+    return $username !== ''
+        && $normalized === $username
+        && (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized);
 }
 
 /**
@@ -146,13 +142,9 @@ function pmssUsernameIsReserved(string $username): bool
  */
 function pmssUsernameIsValidForCreate(string $username): bool
 {
-    if (!pmssUsernameIsValid($username)) {
-        return false;
-    }
-    if (strlen($username) < 3) {
-        return false;
-    }
-    return !pmssUsernameIsReserved($username);
+    return pmssUsernameIsValid($username)
+        && strlen($username) >= 3
+        && !pmssUsernameIsReserved($username);
 }
 
 /**

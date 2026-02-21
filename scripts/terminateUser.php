@@ -53,7 +53,6 @@ if ($username === '') {
     die($usage . "\n");
 }
 
-$username = trim($username);
 $username = pmssNormalizeUsername($username);
 
 if (!pmssValidateUsername($username)) {
