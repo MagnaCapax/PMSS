@@ -147,7 +147,7 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
                         </ul>
 
 <?php
-if (file_exists('/usr/local/bin/deluged') && file_exists('deluge.php')) {
+if ((file_exists('/usr/bin/deluged') || file_exists('/usr/local/bin/deluged')) && file_exists('deluge.php')) {
 ?>
                         <h6>Deluge</h6>
                         <p>Deluge default password: <b>pulsedDeluge</b> — <b>Please change this immediately when accessing</b></p>
