@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../resources/userHelpers.php';
+
 /**
  * Ensure a directory exists and is safe for use by ingress logging.
  */
@@ -19,21 +21,6 @@ function pmssTrafficIngressEnsureDir(string $path, int $mode): bool
     }
     @chmod($path, $mode);
     return is_dir($path);
-}
-
-/**
- * Resolve a username to its UID with a POSIX-first fallback.
- */
-function pmssTrafficIngressLookupUid(string $user): ?int
-{
-    if (function_exists('posix_getpwnam')) {
-        $info = @posix_getpwnam($user);
-        if (is_array($info) && isset($info['uid'])) {
-            return (int) $info['uid'];
-        }
-    }
-    $out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
-    return ($out !== '' && ctype_digit($out)) ? (int) $out : null;
 }
 
 /**

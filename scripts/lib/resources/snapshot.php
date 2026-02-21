@@ -99,24 +99,22 @@ function pmssResourceSnapshotRun(): int
             continue;
         }
 
-        $data = null;
         $dataPath = $homeDir.'/'.$user.'/.resourceData';
         $raw = is_file($dataPath) ? @file_get_contents($dataPath) : false;
-        if (is_string($raw) && trim($raw) !== '') {
-            $decoded = @unserialize($raw);
-            $data = is_array($decoded) ? $decoded : null;
-        }
         $metrics = null;
-        if ($data !== null) {
-            $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'];
-            $metrics = [];
-            foreach ($keys as $key) {
-                $value = $data[$key]['raw']['day'] ?? null;
-                if ($value === null) {
-                    $metrics = null;
-                    break;
+        if (is_string($raw) && trim($raw) !== '') {
+            $data = @unserialize($raw);
+            if (is_array($data)) {
+                $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'];
+                $metrics = [];
+                foreach ($keys as $key) {
+                    $value = $data[$key]['raw']['day'] ?? null;
+                    if ($value === null) {
+                        $metrics = null;
+                        break;
+                    }
+                    $metrics[$key] = (float) $value;
                 }
-                $metrics[$key] = (float) $value;
             }
         }
 

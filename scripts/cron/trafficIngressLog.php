@@ -39,7 +39,7 @@ foreach ($users as $user) {
         continue;
     }
 
-    $uid = pmssTrafficIngressLookupUid($user);
+    $uid = pmssResourceLogLookupUid($user);
     if ($uid === null) {
         continue;
     }
