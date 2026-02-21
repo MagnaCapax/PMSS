@@ -38,6 +38,9 @@ return array(
       'min' => 50,
       'max' => 100,
       'slidingThrottleStart' => 75,
+      'progressiveThrottleEnabled' => true,
+      'progressiveThrottleFloorPercent' => 2.5,
+      'progressiveThrottleGracePercent' => 0,
       'soft' => 250,
       'limitSoft' => 80,
       'limitExceedMax' => 20

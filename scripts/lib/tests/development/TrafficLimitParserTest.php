@@ -74,5 +74,45 @@ class TrafficLimitParserTest extends TestCase
         $this->assertEquals(null, pmssTrafficLimitParseGiB(1.1, $err));
         $this->assertEquals('must be an integer', $err);
     }
-}
 
+    public function testProgressiveCapReturnsBaseWhenNoOverage(): void
+    {
+        $result = pmssTrafficLimitComputeProgressiveCapMbit(100, 0.0, 2.5, 0.0, 1);
+        $this->assertEquals(100, $result['effective']);
+        $this->assertEquals(0.0, $result['adjustedOverage']);
+    }
+
+    public function testProgressiveCapAppliesOverage(): void
+    {
+        $result = pmssTrafficLimitComputeProgressiveCapMbit(100, 5.0, 2.5, 0.0, 1);
+        $this->assertEquals(95, $result['effective']);
+    }
+
+    public function testProgressiveCapHonorsFloorPercent(): void
+    {
+        $result = pmssTrafficLimitComputeProgressiveCapMbit(100, 100.0, 2.5, 0.0, 1);
+        $this->assertEquals(3, $result['effective']);
+        $this->assertEquals(3, $result['floorMbit']);
+    }
+
+    public function testProgressiveCapAppliesGracePercent(): void
+    {
+        $result = pmssTrafficLimitComputeProgressiveCapMbit(100, 5.0, 2.5, 5.0, 1);
+        $this->assertEquals(100, $result['effective']);
+        $this->assertEquals(0.0, $result['adjustedOverage']);
+    }
+
+    public function testProgressiveCapClampsFloorPercentToBase(): void
+    {
+        $result = pmssTrafficLimitComputeProgressiveCapMbit(80, 10.0, 150.0, 0.0, 1);
+        $this->assertEquals(80, $result['floorMbit']);
+        $this->assertEquals(80, $result['effective']);
+    }
+
+    public function testProgressiveCapReturnsZeroForZeroBase(): void
+    {
+        $result = pmssTrafficLimitComputeProgressiveCapMbit(0, 50.0, 2.5, 0.0, 1);
+        $this->assertEquals(0, $result['effective']);
+        $this->assertEquals(0.0, $result['adjustedOverage']);
+    }
+}

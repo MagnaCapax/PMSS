@@ -69,3 +69,62 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
         return $value;
     }
 }
+
+if (!function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
+    /**
+     * Compute progressive post-cap throttling in Mbit based on overage.
+     *
+     * @param int   $postCapMbit     Base post-cap speed in Mbit.
+     * @param float $overagePercent  Percent over the limit (>= 0).
+     * @param float $floorPercent    Minimum percent of post-cap speed.
+     * @param float $gracePercent    Overage percent before reduction begins.
+     * @param int   $minMbit         Absolute minimum in Mbit (FireQOS safety).
+     *
+     * @return array{effective:int, adjustedOverage:float, floorMbit:int}
+     */
+    function pmssTrafficLimitComputeProgressiveCapMbit(
+        int $postCapMbit,
+        float $overagePercent,
+        float $floorPercent,
+        float $gracePercent,
+        int $minMbit = 1
+    ): array {
+        $postCapMbit = max(0, $postCapMbit);
+        if ($postCapMbit === 0) {
+            return ['effective' => 0, 'adjustedOverage' => 0.0, 'floorMbit' => 0];
+        }
+
+        $overagePercent = max(0.0, $overagePercent);
+        $gracePercent = max(0.0, $gracePercent);
+        $floorPercent = max(0.0, min(100.0, $floorPercent));
+
+        $adjustedOverage = $overagePercent - $gracePercent;
+        if ($adjustedOverage < 0.0) {
+            $adjustedOverage = 0.0;
+        }
+
+        $rawEffective = $postCapMbit * (1 - ($adjustedOverage / 100));
+        $floorMbit = (int) ceil($postCapMbit * ($floorPercent / 100));
+        $minMbit = max(0, $minMbit);
+        if ($minMbit > 0 && $floorMbit < $minMbit) {
+            $floorMbit = $minMbit;
+        }
+        if ($floorMbit > $postCapMbit) {
+            $floorMbit = $postCapMbit;
+        }
+
+        $effective = (int) floor($rawEffective);
+        if ($effective < $floorMbit) {
+            $effective = $floorMbit;
+        }
+        if ($effective > $postCapMbit) {
+            $effective = $postCapMbit;
+        }
+
+        return [
+            'effective'       => $effective,
+            'adjustedOverage' => $adjustedOverage,
+            'floorMbit'       => $floorMbit,
+        ];
+    }
+}
