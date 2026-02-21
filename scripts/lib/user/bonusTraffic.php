@@ -9,12 +9,11 @@
  */
 
 $trafficLimitLib = __DIR__.'/trafficLimit.php';
-if (is_file($trafficLimitLib)) {
-    require_once $trafficLimitLib;
-}
 $writeHelper = dirname(__DIR__).'/lighttpd/userFileWrite.php';
-if (is_file($writeHelper)) {
-    require_once $writeHelper;
+foreach ([$trafficLimitLib, $writeHelper] as $dependency) {
+    if (is_file($dependency)) {
+        require_once $dependency;
+    }
 }
 
 if (!function_exists('pmssBonusTrafficUsage')) {
@@ -57,10 +56,7 @@ if (!function_exists('pmssBonusTrafficReadGiB')) {
         $parsed = function_exists('pmssTrafficLimitParseGiB')
             ? pmssTrafficLimitParseGiB($raw, $err)
             : (is_numeric($raw) ? (int) $raw : null);
-        if ($parsed === null || $parsed <= 0) {
-            return 0;
-        }
-        return (int) $parsed;
+        return ($parsed !== null && $parsed > 0) ? (int) $parsed : 0;
     }
 }
 
@@ -70,10 +66,9 @@ if (!function_exists('pmssBonusTrafficWriteGiB')) {
      */
     function pmssBonusTrafficWriteGiB(string $path, int $value): bool
     {
-        if ($value < 0 || !function_exists('pmssAtomicWriteFile')) {
-            return false;
-        }
-        return pmssAtomicWriteFile($path, (string) $value);
+        return $value >= 0
+            && function_exists('pmssAtomicWriteFile')
+            && pmssAtomicWriteFile($path, (string) $value);
     }
 }
 
@@ -86,10 +81,7 @@ if (!function_exists('pmssBonusTrafficRemove')) {
         if (!file_exists($path)) {
             return true;
         }
-        if (!is_file($path) || is_link($path)) {
-            return false;
-        }
-        return @unlink($path);
+        return is_file($path) && !is_link($path) ? @unlink($path) : false;
     }
 }
 
