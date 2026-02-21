@@ -3,8 +3,8 @@
  * Deluge reverse proxy hardening tests.
  *
  * Goal: Ensure Deluge follows the "nginx is lightweight; per-user lighttpd is heavy"
- * model, while keeping the legacy /deluge-<user>/ URL working via a 301 redirect
- * to the canonical /user-<user>/deluge/ base.
+ * model, while keeping the legacy /deluge-<user>/ URL working by proxying
+ * through per-user lighttpd (with a slash-normalizing 308 redirect).
  *
  * These tests are intentionally adversarial and try to catch:
  * - regressions back to nginx -> per-app port proxying
@@ -75,7 +75,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
     }
 
     // =========================================================================
-    // SECTION 1: nginx legacy Deluge URL redirect (must be 308 to canonical)
+    // SECTION 1: nginx legacy Deluge URL routing (slash redirect + proxy)
     // =========================================================================
 
     public function testNginxUserTemplateDelugeLegacyHasExactRedirectWithoutSlash(): void
@@ -83,23 +83,23 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
         $this->assertStringContainsString('location = /deluge-##username {', $template);
-        $this->assertStringContainsString('return 308 /user-##username/deluge/$is_args$args;', $template);
+        $this->assertStringContainsString('return 308 /deluge-##username/$is_args$args;', $template);
     }
 
-    public function testNginxUserTemplateDelugeLegacyHasExactRedirectWithSlash(): void
+    public function testNginxUserTemplateDelugeLegacyProxyLocationExists(): void
     {
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
-        $this->assertStringContainsString('location = /deluge-##username/ {', $template);
-        $this->assertStringContainsString('return 308 /user-##username/deluge/$is_args$args;', $template);
+        $this->assertStringContainsString('location /deluge-##username/ {', $template);
+        $this->assertStringContainsString('proxy_pass http://127.0.0.1:##serverPort/deluge-##username/;', $template);
+        $this->assertStringContainsString('include /etc/nginx/proxy_params;', $template);
     }
 
-    public function testNginxUserTemplateDelugeLegacyHasRegexRedirectForSubpaths(): void
+    public function testNginxUserTemplateDelugeLegacyDoesNotUseRegexRedirectForSubpaths(): void
     {
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
 
-        $this->assertStringContainsString('location ~ ^/deluge-##username/(.*)$ {', $template);
-        $this->assertStringContainsString('return 308 /user-##username/deluge/$1$is_args$args;', $template);
+        $this->assertStringNotContainsString('location ~ ^/deluge-##username/(.*)$ {', $template);
     }
 
     public function testNginxUserTemplateDelugeLegacyRedirectPreservesQueryString(): void
@@ -113,13 +113,13 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
         $delugeReturns = 0;
         foreach ($matches[1] as $target) {
-            if (strpos($target, '/user-##username/deluge/') === false) {
+            if (strpos($target, '/deluge-##username/') === false) {
                 continue;
             }
             $delugeReturns++;
             $this->assertTrue(strpos($target, '$is_args$args') !== false, 'Deluge redirect must preserve query string');
         }
-        $this->assertTrue($delugeReturns >= 2, 'Expected multiple Deluge redirect return targets');
+        $this->assertTrue($delugeReturns >= 1, 'Expected Deluge slash-normalizing redirect target');
     }
 
     public function testNginxUserTemplateDelugeLegacyRedirectKeepsDeprecationMarker(): void
@@ -146,7 +146,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertTrue(!empty($matches[1]), 'Expected at least one return 308 directive');
 
         foreach ($matches[1] as $target) {
-            if (strpos($target, '/user-##username/deluge/') === false) {
+            if (strpos($target, '/deluge-##username/') === false) {
                 continue;
             }
             $this->assertTrue(strpos($target, 'http') === false, 'Deluge redirect must not include scheme/host');
@@ -193,9 +193,9 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
         $this->assertStringContainsString('Keep for compatibility until at least 2028-01-28', $block);
         $this->assertStringContainsString('location = /deluge-##user## {', $block);
-        $this->assertStringContainsString('location = /deluge-##user##/ {', $block);
-        $this->assertStringContainsString('location ~ ^/deluge-##user##/(.*)$ {', $block);
-        $this->assertStringContainsString('return 308 /user-##user##/deluge/$1$is_args$args;', $block);
+        $this->assertStringContainsString('return 308 /deluge-##user##/$is_args$args;', $block);
+        $this->assertStringContainsString('location /deluge-##user##/ {', $block);
+        $this->assertStringContainsString('proxy_pass http://127.0.0.1:##port##/deluge-##user##/;', $block);
     }
 
     public function testCreateNginxConfigAddsBaseHostnameToDefaultServerName(): void
