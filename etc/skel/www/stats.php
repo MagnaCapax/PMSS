@@ -119,6 +119,13 @@ pre {
     margin-top: 4px;
     font-style: italic;
 }
+.traffic-ratio {
+    font-weight: 600;
+}
+.traffic-ratio.good { color: #81c784; }
+.traffic-ratio.warn { color: #ffb74d; }
+.traffic-ratio.bad { color: #ef5350; }
+.traffic-ratio.na { color: #b0bec5; }
 </style>
 
 <div class="stats-container">
@@ -375,6 +382,35 @@ if (file_exists('../.bonusTraffic')) {
         $bonusTraffic = 0;
     }
 }
+$trafficRatioDisplay = null;
+$trafficRatioClass = '';
+$trafficRatioGoodMin = 2.0;
+$trafficRatioWarnMin = 1.0;
+$trafficOutboundMonth = null;
+$trafficInboundMonth = null;
+
+if ($trafficData !== null && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
+    $trafficOutboundMonth = (float) $trafficData['raw']['month'];
+}
+if ($trafficIngressData !== null && isset($trafficIngressData['raw']['month']) && is_numeric($trafficIngressData['raw']['month'])) {
+    $trafficInboundMonth = (float) $trafficIngressData['raw']['month'];
+}
+if ($trafficOutboundMonth !== null && $trafficInboundMonth !== null) {
+    if ($trafficOutboundMonth > 0) {
+        $trafficRatio = $trafficInboundMonth / $trafficOutboundMonth;
+        $trafficRatioDisplay = number_format($trafficRatio, 2) . ':1';
+        if ($trafficRatio >= $trafficRatioGoodMin) {
+            $trafficRatioClass = 'traffic-ratio good';
+        } elseif ($trafficRatio >= $trafficRatioWarnMin) {
+            $trafficRatioClass = 'traffic-ratio warn';
+        } else {
+            $trafficRatioClass = 'traffic-ratio bad';
+        }
+    } else {
+        $trafficRatioDisplay = 'N/A';
+        $trafficRatioClass = 'traffic-ratio na';
+    }
+}
 
 if ($trafficData === null && $trafficIngressData === null) {
     echo '<div class="stats-block"><h6>Traffic usage</h6><pre>Traffic data not available.</pre></div>';
@@ -408,6 +444,9 @@ Inbound traffic at <?php echo date('Y-m-d H:i:s', (int)$trafficIngressTime); ?>:
 Past 30 days inbound traffic: <?php echo $trafficIngressData['display']['month']; ?>
 <?php elseif ($trafficIngressError !== null): ?>
 <?php echo $trafficIngressError . "\n"; ?>
+<?php endif; ?>
+<?php if ($trafficRatioDisplay !== null): ?>
+Inbound:Outbound ratio (month): <span class="<?php echo $trafficRatioClass; ?>"><?php echo $trafficRatioDisplay; ?></span>
 <?php endif; ?>
         </pre>
 

@@ -351,18 +351,44 @@ function bonusQuotaDisplay($bonusQuota) {
 	    if (count($trafficData) == 0) return;
 
 	    $trafficUsed = round($trafficData['raw']['month']);
+	    $ratioGoodMin = 2.0;
+	    $ratioWarnMin = 1.0;
+	    $inboundLine = '';
+	    $ratioLine = '';
+	    $outboundMonth = null;
+	    $inboundMonth = null;
+	    if (isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
+	        $outboundMonth = (float) $trafficData['raw']['month'];
+	    }
+	    if (is_array($trafficIngress) && isset($trafficIngress['raw']['month']) && is_numeric($trafficIngress['raw']['month'])) {
+	        $inboundMonth = (float) $trafficIngress['raw']['month'];
+	        $inboundUsed = round($inboundMonth / 1024) . " GiB";
+	        $inboundLine = '<br />Inbound (30 days): '.$inboundUsed;
+	    }
+	    if ($inboundMonth !== null && $outboundMonth !== null) {
+	        if ($outboundMonth > 0) {
+	            $ratio = $inboundMonth / $outboundMonth;
+	            $ratioText = number_format($ratio, 2) . ':1';
+	            if ($ratio >= $ratioGoodMin) {
+	                $ratioColor = '#81c784';
+	            } elseif ($ratio >= $ratioWarnMin) {
+	                $ratioColor = '#ffb74d';
+	            } else {
+	                $ratioColor = '#ef5350';
+	            }
+	        } else {
+	            $ratioText = 'N/A';
+	            $ratioColor = '#b0bec5';
+	        }
+	        $ratioLine = '<br />Inbound:Outbound ratio (30 days): <span style="color: '.$ratioColor.'">'.$ratioText.'</span>';
+	    }
 	    if ($trafficLimit <= 0) {
 	        $trafficUsed = round($trafficUsed / 1024) . " GiB";
-	        $inboundLine = '';
-	        if (is_array($trafficIngress) && isset($trafficIngress['raw']['month'])) {
-	            $inboundUsed = round($trafficIngress['raw']['month'] / 1024) . " GiB";
-	            $inboundLine = '<br />Inbound (30 days): '.$inboundUsed;
-	        }
 
 	        echo <<<EOF
 	    <h6>Traffic Info</h6>
 	    Traffic used (30 days): {$trafficUsed}<br />
-	    Traffic limit: Unlimited{$inboundLine}<br />
+	    Traffic limit: Unlimited{$inboundLine}{$ratioLine}<br />
 	    This is rolling past 30 days, <a href="http://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
 	    <hr />
 	EOF;
@@ -386,17 +412,12 @@ function bonusQuotaDisplay($bonusQuota) {
     $titleText = "{$trafficUsed} / {$limitTotal} GiB";
     $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
     $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
-    $inboundLine = '';
-    if (is_array($trafficIngress) && isset($trafficIngress['raw']['month'])) {
-        $inboundUsed = round($trafficIngress['raw']['month'] / 1024) . " GiB";
-        $inboundLine = '<br />Inbound (30 days): '.$inboundUsed;
-    }
 
     echo <<<EOF
     <h6>Traffic Info</h6>
     {$gauge}
     {$warning}
-    {$inboundLine}
+    {$inboundLine}{$ratioLine}
     This is rolling past 30 days, <a href="http://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
     <hr />
 EOF;
