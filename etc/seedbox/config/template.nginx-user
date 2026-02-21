@@ -2,6 +2,8 @@
 # expose it via public subdomain routing.
 location /user-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/user-##username/;
+        # Deluge map-urlpath can double cookie paths; normalize to canonical base.
+        proxy_cookie_path ~^/user-##username/deluge/user-##username/deluge/.* /user-##username/deluge/;
         proxy_set_header Upgrade $http_upgrade;
 #        proxy_set_header Connection $connection_upgrade;
         proxy_set_header Connection "upgrade";

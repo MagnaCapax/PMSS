@@ -95,6 +95,17 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('include /etc/nginx/proxy_params;', $template);
     }
 
+    public function testNginxUserTemplateDelugeCanonicalCookiePathIsNormalized(): void
+    {
+        $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
+
+        // Normalize doubled cookie paths caused by lighttpd map-urlpath rewrites.
+        $this->assertStringContainsString(
+            'proxy_cookie_path ~^/user-##username/deluge/user-##username/deluge/.* /user-##username/deluge/;',
+            $template
+        );
+    }
+
     public function testNginxUserTemplateDelugeLegacyDoesNotUseRegexRedirectForSubpaths(): void
     {
         $template = $this->readRepoFile('etc/seedbox/config/template.nginx-user');
@@ -184,6 +195,17 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $script = \pmssNginxUserSubdomainTemplates()['private'];
         $this->assertStringContainsString('location ^~ /user-##user##/', $script);
         $this->assertStringContainsString('include /etc/nginx/proxy_params;', $script);
+    }
+
+    public function testCreateNginxConfigPrivateSubdomainNormalizesDelugeCookiePath(): void
+    {
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $script = \pmssNginxUserSubdomainTemplates()['private'];
+
+        $this->assertStringContainsString(
+            'proxy_cookie_path ~^/user-##user##/deluge/user-##user##/deluge/.* /user-##user##/deluge/;',
+            $script
+        );
     }
 
     public function testCreateNginxConfigPrivateSubdomainDelugeLegacyRedirectsExist(): void

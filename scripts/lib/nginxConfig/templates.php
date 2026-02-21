@@ -101,6 +101,8 @@ server {
     # by proxying those paths as-is (without adding another /user-<user>/).
     location ^~ /user-##user##/ {
         proxy_pass http://127.0.0.1:##port##;
+        # Deluge map-urlpath can double cookie paths; normalize to canonical base.
+        proxy_cookie_path ~^/user-##user##/deluge/user-##user##/deluge/.* /user-##user##/deluge/;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         include /etc/nginx/proxy_params;
