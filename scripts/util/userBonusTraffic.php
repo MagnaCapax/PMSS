@@ -2,5 +2,4 @@
 <?php
 require_once '/scripts/lib/user/bonusTraffic.php';
 
-$argv = $argv ?? ($_SERVER['argv'] ?? []);
-exit(function_exists('pmssUserBonusTrafficCli') ? pmssUserBonusTrafficCli($argv) : 1);
+exit(function_exists('pmssUserBonusTrafficCli') ? pmssUserBonusTrafficCli($argv ?? ($_SERVER['argv'] ?? [])) : 1);

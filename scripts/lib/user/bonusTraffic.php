@@ -8,9 +8,7 @@
  * @license GPL-3.0-only
  */
 
-$trafficLimitLib = __DIR__.'/trafficLimit.php';
-$writeHelper = dirname(__DIR__).'/lighttpd/userFileWrite.php';
-foreach ([$trafficLimitLib, $writeHelper] as $dependency) {
+foreach ([__DIR__.'/trafficLimit.php', dirname(__DIR__).'/lighttpd/userFileWrite.php'] as $dependency) {
     if (is_file($dependency)) {
         require_once $dependency;
     }
@@ -103,13 +101,10 @@ if (!function_exists('pmssUserBonusTrafficCli')) {
         }
         require_once $optionParser;
 
-        $userLifecycle = '/scripts/lib/userLifecycle.php';
-        if (is_file($userLifecycle)) {
-            require_once $userLifecycle;
-        }
-        $userLogPath = '/scripts/lib/user/log.php';
-        if (is_file($userLogPath)) {
-            require_once $userLogPath;
+        foreach (['/scripts/lib/userLifecycle.php', '/scripts/lib/user/log.php'] as $dependency) {
+            if (is_file($dependency)) {
+                require_once $dependency;
+            }
         }
 
         $parsed = pmssParseCliTokens($argv);

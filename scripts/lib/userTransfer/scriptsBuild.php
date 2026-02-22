@@ -42,10 +42,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         $excludeArgs[] = '--exclude='.escapeshellarg($item);
     }
 
-    $ssh = sprintf(
-        'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l %s',
-        escapeshellarg($remoteUser)
-    );
+    $ssh = sprintf('ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l %s', escapeshellarg($remoteUser));
 
     $cmd = 'rsync -av -e '.escapeshellarg($ssh)
         .' '.implode(' ', $excludeArgs)
@@ -72,10 +69,7 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
         '/home/'.$remoteUser.'/www/public',
     ];
 
-    $ssh = sprintf(
-        'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l %s',
-        escapeshellarg($remoteUser)
-    );
+    $ssh = sprintf('ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l %s', escapeshellarg($remoteUser));
 
     $args = [];
     foreach ($sources as $source) {
