@@ -11,11 +11,8 @@
  */
 function pmssResourceLogLookupUid(string $user): ?int
 {
-    if (function_exists('posix_getpwnam')) {
-        $info = @posix_getpwnam($user);
-        if (is_array($info) && isset($info['uid'])) {
-            return (int) $info['uid'];
-        }
+    if (function_exists('posix_getpwnam') && is_array($info = @posix_getpwnam($user)) && isset($info['uid'])) {
+        return (int) $info['uid'];
     }
     $out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
     return ($out !== '' && ctype_digit($out)) ? (int) $out : null;

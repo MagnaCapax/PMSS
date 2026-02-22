@@ -47,12 +47,7 @@ $slidingThrottleStart = 75.0;
 if (isset($networkConfig['throttle']['slidingThrottleStart']) && is_numeric($networkConfig['throttle']['slidingThrottleStart'])) {
     $slidingThrottleStart = (float) $networkConfig['throttle']['slidingThrottleStart'];
 }
-if ($slidingThrottleStart < 0) {
-    $slidingThrottleStart = 0.0;
-}
-if ($slidingThrottleStart > 100) {
-    $slidingThrottleStart = 100.0;
-}
+$slidingThrottleStart = max(0.0, min(100.0, $slidingThrottleStart));
 $networkSpeedMbit = 1000;
 if (isset($networkConfig['speed']) && is_numeric($networkConfig['speed'])) {
     $networkSpeedMbit = (int) $networkConfig['speed'];
@@ -77,12 +72,7 @@ if (isset($networkConfig['throttle']['progressiveThrottleFloorPercent']) &&
     is_numeric($networkConfig['throttle']['progressiveThrottleFloorPercent'])) {
     $progressiveThrottleFloorPercent = (float) $networkConfig['throttle']['progressiveThrottleFloorPercent'];
 }
-if ($progressiveThrottleFloorPercent < 0) {
-    $progressiveThrottleFloorPercent = 0.0;
-}
-if ($progressiveThrottleFloorPercent > 100) {
-    $progressiveThrottleFloorPercent = 100.0;
-}
+$progressiveThrottleFloorPercent = max(0.0, min(100.0, $progressiveThrottleFloorPercent));
 $progressiveThrottleGracePercent = 0.0;
 if (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) &&
     is_numeric($networkConfig['throttle']['progressiveThrottleGracePercent'])) {
@@ -142,11 +132,7 @@ function pmssReadTrafficData(string $path, string $username): ?array
     }
 
     $stats = @stat($path);
-    if ($stats === false) {
-        return null;
-    }
-
-    if ($stats['uid'] !== 0) {
+    if ($stats === false || $stats['uid'] !== 0) {
         return null;
     }
 
@@ -157,8 +143,7 @@ function pmssReadTrafficData(string $path, string $username): ?array
 
     $group = @posix_getgrgid($stats['gid']);
     if ($group !== false) {
-        $groupName = $group['name'];
-        if ($groupName !== $username && $groupName !== 'root') {
+        if ($group['name'] !== $username && $group['name'] !== 'root') {
             return null;
         }
     }
