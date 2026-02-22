@@ -40,9 +40,7 @@ $defaultTrafficCapMbit = 100;
 if (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throttle']['max'])) {
     $defaultTrafficCapMbit = (int) $networkConfig['throttle']['max'];
 }
-if ($defaultTrafficCapMbit <= 0) {
-    $defaultTrafficCapMbit = 100;
-}
+$defaultTrafficCapMbit = ($defaultTrafficCapMbit > 0) ? $defaultTrafficCapMbit : 100;
 $slidingThrottleStart = 75.0;
 if (isset($networkConfig['throttle']['slidingThrottleStart']) && is_numeric($networkConfig['throttle']['slidingThrottleStart'])) {
     $slidingThrottleStart = (float) $networkConfig['throttle']['slidingThrottleStart'];
@@ -52,9 +50,7 @@ $networkSpeedMbit = 1000;
 if (isset($networkConfig['speed']) && is_numeric($networkConfig['speed'])) {
     $networkSpeedMbit = (int) $networkConfig['speed'];
 }
-if ($networkSpeedMbit <= 0) {
-    $networkSpeedMbit = 1000;
-}
+$networkSpeedMbit = ($networkSpeedMbit > 0) ? $networkSpeedMbit : 1000;
 $progressiveThrottleEnabled = true;
 if (isset($networkConfig['throttle']['progressiveThrottleEnabled'])) {
     $raw = $networkConfig['throttle']['progressiveThrottleEnabled'];

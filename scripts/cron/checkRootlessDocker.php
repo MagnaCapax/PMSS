@@ -14,16 +14,15 @@ require_once '/scripts/lib/user/log.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 
 $logger = new Logger(__FILE__);
-$legacyLog = '/var/log/pmss/rootlessDocker.log';
 // Mirror messages to the legacy logfile when stdout is interactive.
 $mirrorLegacy = !function_exists('posix_isatty') || posix_isatty(STDOUT);
 
 // Log both via the shared Logger and the historical cron redirect target.
-$logDockerMessage = static function (string $message) use ($logger, $legacyLog, $mirrorLegacy): void {
+$logDockerMessage = static function (string $message) use ($logger, $mirrorLegacy): void {
     $logger->msg($message);
     if ($mirrorLegacy) {
         $ts = date('[Y-m-d H:i:s] ');
-        @file_put_contents($legacyLog, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        @file_put_contents('/var/log/pmss/rootlessDocker.log', $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
     }
 };
 

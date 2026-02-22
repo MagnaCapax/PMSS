@@ -101,20 +101,12 @@ if (!function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
         $adjustedOverage = max(0.0, $overagePercent - $gracePercent);
 
         $rawEffective = $postCapMbit * (1 - ($adjustedOverage / 100));
-        $floorMbit = (int) ceil($postCapMbit * ($floorPercent / 100));
         $minMbit = max(0, $minMbit);
-        if ($minMbit > 0) {
-            $floorMbit = max($floorMbit, $minMbit);
-        }
-        $floorMbit = min($postCapMbit, $floorMbit);
+        $floorMbit = (int) ceil($postCapMbit * ($floorPercent / 100));
+        $floorMbit = min($postCapMbit, max($floorMbit, $minMbit));
 
         $effective = (int) floor($rawEffective);
-        if ($effective < $floorMbit) {
-            $effective = $floorMbit;
-        }
-        if ($effective > $postCapMbit) {
-            $effective = $postCapMbit;
-        }
+        $effective = min($postCapMbit, max($effective, $floorMbit));
 
         return [
             'effective'       => $effective,
