@@ -19,6 +19,7 @@
  * - trafficLimit (int) Always written as 0 (traffic caps live in runtime files).
  * - trafficCapMbit (int) Post-limit ceiling in Mbit (0/absent uses server default).
  * - suspended (bool)   Best-effort mirror of suspension state (marker remains www-disabled).
+ * - dockerEnabled (bool) Rootless Docker enablement (default true).
  * - CPUWeight/IOWeight/IOReadBW/... pass-through for future resource controls.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
@@ -234,6 +235,12 @@ class UserConfigStore
             $payload['suspended'] = (bool)$payload['suspended'];
         }
 
+        if (!array_key_exists('dockerEnabled', $payload)) {
+            $payload['dockerEnabled'] = true;
+        } else {
+            $payload['dockerEnabled'] = (bool)$payload['dockerEnabled'];
+        }
+
         // Invariant: always write trafficLimit as 0.
         $payload['trafficLimit'] = 0;
 
@@ -375,5 +382,31 @@ class UserConfigStore
         }
         $id = (int)$raw;
         return $id > 0 ? $id : 0;
+    }
+}
+
+if (!function_exists('pmssUserDockerEnabled')) {
+    /**
+     * Check whether rootless Docker should run for a user.
+     */
+    function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null): bool
+    {
+        $username = pmssNormalizeUsername($username);
+        if (!UserValidator::isValidUsername($username)) {
+            return false;
+        }
+
+        if ($store === null) {
+            $store = new UserConfigStore();
+        }
+
+        $payload = $store->get($username);
+        if (!is_array($payload)) {
+            return true;
+        }
+        if (!array_key_exists('dockerEnabled', $payload)) {
+            return true;
+        }
+        return (bool) $payload['dockerEnabled'];
     }
 }

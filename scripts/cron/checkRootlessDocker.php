@@ -11,6 +11,7 @@
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/runtime.php';
 require_once '/scripts/lib/user/log.php';
+require_once '/scripts/lib/user/userConfigStore.php';
 
 $logger = new Logger(__FILE__);
 $legacyLog = '/var/log/pmss/rootlessDocker.log';
@@ -29,10 +30,15 @@ $logDockerMessage = static function (string $message) use ($logger, $legacyLog, 
 $logDockerMessage('Checking rootless Docker services');
 
 $users = array_filter(explode("\n", trim(shell_exec('/scripts/listUsers.php'))));
+$userConfigStore = new UserConfigStore();
 
 foreach ($users as $user) {
     if (file_exists("/home/{$user}/www-disabled") || !file_exists("/home/{$user}/www")) {
         $logDockerMessage("User {$user} is suspended");
+        continue;
+    }
+    if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user, $userConfigStore)) {
+        $logDockerMessage("User {$user}: Docker disabled by config; skipping");
         continue;
     }
 

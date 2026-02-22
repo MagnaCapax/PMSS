@@ -135,6 +135,88 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testDockerEnabledDefaultsTrue(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'       => 128,
+                'rtorrentPort' => 5002,
+                'quota'        => 5,
+                'quotaBurst'   => 6,
+            ];
+            $this->assertTrue($store->set('docked', $payload));
+            $reloaded = $store->get('docked');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(true, $reloaded['dockerEnabled']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testDockerEnabledNormalisesFalse(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'        => 128,
+                'rtorrentPort'  => 5003,
+                'quota'         => 5,
+                'quotaBurst'    => 6,
+                'dockerEnabled' => 0,
+            ];
+            $this->assertTrue($store->set('dockoff', $payload));
+            $reloaded = $store->get('dockoff');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(false, $reloaded['dockerEnabled']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testPmssUserDockerEnabledDefaultsTrueWhenMissing(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertEquals(true, \pmssUserDockerEnabled('alice', $store));
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testPmssUserDockerEnabledRespectsFalse(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'        => 512,
+                'rtorrentPort'  => 5100,
+                'quota'         => 50,
+                'quotaBurst'    => 62,
+                'dockerEnabled' => false,
+            ];
+            $this->assertTrue($store->set('dockno', $payload));
+            $this->assertEquals(false, \pmssUserDockerEnabled('dockno', $store));
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testPmssUserDockerEnabledRejectsInvalidUsername(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertEquals(false, \pmssUserDockerEnabled('../evil', $store));
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testInvalidUsernameRejected(): void
     {
         $this->setUpTempDir();

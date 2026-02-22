@@ -13,6 +13,7 @@ require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/../user/directories.php';
+require_once __DIR__.'/../user/userConfigStore.php';
 
 if (!function_exists('pmssRunAndLog')) {
     /**
@@ -172,6 +173,16 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
     {
         if (is_dir("/home/{$user}/www-disabled")) {
             pmssUserLog($user, '[SKIP] User appears suspended; skipping linger/Docker wiring');
+            return;
+        }
+        static $userConfigStore = null;
+        if ($userConfigStore === null) {
+            $userConfigStore = new UserConfigStore();
+        }
+        if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user, $userConfigStore)) {
+            pmssUserLog($user, '[SKIP] Docker disabled by config; stopping rootless Docker if running');
+            $stopCmd = sprintf('php /scripts/util/userDocker.php %s stop', escapeshellarg($user));
+            pmssRunAndLog($user, 'userDocker stop (disabled)', $stopCmd, false);
             return;
         }
         if (!is_dir('/run/systemd/system')) {

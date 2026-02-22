@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/userConfigStore.php';
 
 function userEnsureShell(array $user): void
 {
@@ -63,6 +64,16 @@ function userConfigureSystemdSlice(array $user): void
 
 function userEnableLingerAndDocker(array $user): void
 {
+    static $userConfigStore = null;
+    if ($userConfigStore === null) {
+        $userConfigStore = new UserConfigStore();
+    }
+    if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user['name'], $userConfigStore)) {
+        if (function_exists('pmssLogStatus')) {
+            pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);
+        }
+        return;
+    }
     runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
     runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');
     runStep(

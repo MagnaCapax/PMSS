@@ -204,6 +204,9 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh, plugins,
     retracker cleanup, permissions, then linger/systemd/rootless Docker wiring.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
+- pmssEnsureLingerAndDocker(string $user): void
+  - Enables linger + rootless Docker wiring for the user.
+  - Skips and attempts `userDocker.php stop` when user config `dockerEnabled` is false (default true).
 
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
