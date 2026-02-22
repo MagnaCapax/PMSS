@@ -51,6 +51,17 @@ pmssRequireHomeMounted('addUser.php');
 $userDb = new users();
 
 $user['name'] = pmssNormalizeUsername($user['name']);
+pmssAddUserRuntimeInit();
+
+// Provisioning runtime stats used for summary markers.
+$provisionStart = microtime(true);
+$provisionStats = [
+    'steps'      => 0,
+    'ok'         => 0,
+    'err'        => 0,
+    'last_error' => null,
+];
+$provisionFinalized = false;
 if (!pmssValidateUsernameForCreate($user['name'])) {
     pmssUserWriteLogs(
         pmssUserBaseContext(
@@ -68,20 +79,11 @@ if (!pmssValidateUsernameForCreate($user['name'])) {
     } elseif (function_exists('logProvisionMessage')) {
         logProvisionMessage('FATAL: Invalid username; aborting provisioning');
     }
-	    die("Invalid username: {$user['name']}\n");
+    $errorMessage = "Invalid username: {$user['name']}";
+    // Ensure automation receives a non-zero exit status for invalid input.
+    fwrite(STDERR, $errorMessage . "\n");
+    exit(1);
 }
-
-pmssAddUserRuntimeInit();
-
-// Provisioning runtime stats used for summary markers.
-$provisionStart = microtime(true);
-$provisionStats = [
-    'steps'      => 0,
-    'ok'         => 0,
-    'err'        => 0,
-    'last_error' => null,
-];
-$provisionFinalized = false;
 
 // Prevent overlapping addUser runs for the same username to avoid UID/GID races.
 $lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
