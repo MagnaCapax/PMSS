@@ -76,10 +76,8 @@ if (!function_exists('pmssBonusTrafficRemove')) {
      */
     function pmssBonusTrafficRemove(string $path): bool
     {
-        if (!file_exists($path)) {
-            return true;
-        }
-        return is_file($path) && !is_link($path) ? @unlink($path) : false;
+        return !file_exists($path)
+            || (is_file($path) && !is_link($path) && @unlink($path));
     }
 }
 

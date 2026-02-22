@@ -78,9 +78,7 @@ if (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) &&
     is_numeric($networkConfig['throttle']['progressiveThrottleGracePercent'])) {
     $progressiveThrottleGracePercent = (float) $networkConfig['throttle']['progressiveThrottleGracePercent'];
 }
-if ($progressiveThrottleGracePercent < 0) {
-    $progressiveThrottleGracePercent = 0.0;
-}
+$progressiveThrottleGracePercent = max(0.0, $progressiveThrottleGracePercent);
 $userConfigStore = new UserConfigStore();
 
 $trafficData = array();
@@ -286,9 +284,7 @@ foreach ($trafficData AS $thisUser => $thisData) {
         
     } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
         
-        $trafficLimitEnabledTime = time() - (int) filemtime($userTrafficLimitEnabledFile);
-        
-        if ($trafficLimitEnabledTime > $trafficLimitPeriod) {   // Time to remove the limit
+        if ((time() - (int) filemtime($userTrafficLimitEnabledFile)) > $trafficLimitPeriod) {   // Time to remove the limit
             unlink( $userTrafficLimitEnabledFile );
             if (function_exists('pmssUserLog')) {
                 pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
