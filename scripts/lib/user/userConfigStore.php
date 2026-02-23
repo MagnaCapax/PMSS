@@ -238,6 +238,11 @@ class UserConfigStore
         if (!array_key_exists('dockerEnabled', $payload)) {
             $payload['dockerEnabled'] = true;
         } else {
+            // Normalize string booleans to avoid PHP truthiness traps.
+            if (is_string($payload['dockerEnabled'])) {
+                $value = strtolower(trim($payload['dockerEnabled']));
+                $payload['dockerEnabled'] = !in_array($value, ['false', '0', 'no', 'off', ''], true);
+            }
             $payload['dockerEnabled'] = (bool)$payload['dockerEnabled'];
         }
 

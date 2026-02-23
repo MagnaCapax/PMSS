@@ -176,6 +176,48 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testDockerEnabledNormalisesFalseString(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'        => 128,
+                'rtorrentPort'  => 5004,
+                'quota'         => 5,
+                'quotaBurst'    => 6,
+                'dockerEnabled' => 'false',
+            ];
+            $this->assertTrue($store->set('dockstr', $payload));
+            $reloaded = $store->get('dockstr');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(false, $reloaded['dockerEnabled']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testDockerEnabledNormalisesTrueString(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'        => 128,
+                'rtorrentPort'  => 5005,
+                'quota'         => 5,
+                'quotaBurst'    => 6,
+                'dockerEnabled' => 'true',
+            ];
+            $this->assertTrue($store->set('dockon', $payload));
+            $reloaded = $store->get('dockon');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(true, $reloaded['dockerEnabled']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testPmssUserDockerEnabledDefaultsTrueWhenMissing(): void
     {
         $this->setUpTempDir();
