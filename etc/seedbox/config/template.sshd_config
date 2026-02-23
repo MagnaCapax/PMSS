@@ -30,15 +30,18 @@ HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
 
 # Ciphers and key exchange algorithms
-# Prefer AES-GCM with AES-NI; keep CTR fallbacks for compatibility.
-Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes128-ctr,aes256-ctr
+# Append legacy CBC ciphers for WHMCS PHP libssh2 compatibility.
+# MUST use + prefix (append to defaults), NOT replace. Without +, WHMCS
+# cannot negotiate ciphers and provisioning breaks on all servers.
+# See: sysadmin memory/lessons/agent/20260223-ssh-hardening-fuckup-all-new-vms-broken.md
+Ciphers +aes128-cbc,aes192-cbc,aes256-cbc,chacha20-poly1305@openssh.com
 # Enable additional Kex algorithms.
 KexAlgorithms +diffie-hellman-group1-sha1,diffie-hellman-group14-sha1
 HostkeyAlgorithms +ssh-rsa
 PubkeyAcceptedKeyTypes +ssh-rsa
 
-# MACs optimized for ETM performance and security.
-MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com
+# Optionally, define MACs if needed.
+# MACs hmac-sha2-256,hmac-sha2-512
 
 # Logging
 SyslogFacility AUTH
