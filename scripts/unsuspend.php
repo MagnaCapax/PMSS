@@ -48,10 +48,92 @@ $homeDir = "/home/{$username}";
 $activeRoot = "$homeDir/www";
 $disabledRoot = "$homeDir/www-disabled";
 
+$hasSuspendedContent = static function (string $candidate): bool {
+    if (!is_dir($candidate)) {
+        return false;
+    }
+    if (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {
+        return true;
+    }
+    $entries = @scandir($candidate);
+    if ($entries === false) {
+        return false;
+    }
+    $entries = array_values(array_diff($entries, array('.', '..')));
+    if (empty($entries)) {
+        return false;
+    }
+    $allowed = array('index.html', 'public');
+    foreach ($entries as $entry) {
+        if (!in_array($entry, $allowed, true)) {
+            return true;
+        }
+    }
+    $publicPath = $candidate.'/public';
+    if (!is_dir($publicPath)) {
+        return true;
+    }
+    $publicEntries = @scandir($publicPath);
+    if ($publicEntries === false) {
+        return true;
+    }
+    $publicEntries = array_values(array_diff($publicEntries, array('.', '..')));
+    foreach ($publicEntries as $entry) {
+        if ($entry !== 'index.html') {
+            return true;
+        }
+    }
+    return false;
+};
+
+$findSuspendedBackup = static function (string $homeDir) use ($hasSuspendedContent): ?string {
+    $candidates = glob($homeDir.'/www-suspended-*', GLOB_NOSORT);
+    if (!is_array($candidates) || empty($candidates)) {
+        return null;
+    }
+    $ranked = array();
+    foreach ($candidates as $candidate) {
+        if (!$hasSuspendedContent($candidate)) {
+            continue;
+        }
+        $mtime = @filemtime($candidate);
+        $ranked[] = array(
+            'path' => $candidate,
+            'mtime' => ($mtime === false ? 0 : $mtime),
+        );
+    }
+    if (empty($ranked)) {
+        return null;
+    }
+    usort($ranked, static function (array $a, array $b): int {
+        if ($a['mtime'] === $b['mtime']) {
+            return strcmp($b['path'], $a['path']);
+        }
+        return ($b['mtime'] <=> $a['mtime']);
+    });
+    return $ranked[0]['path'];
+};
+
+$restoredFromBackup = false;
 // Canonical suspended detection: only the presence of www-disabled matters.
+// Recovery path: if both www-disabled and www are absent, restore a backup.
 if (!is_dir($disabledRoot)) {
-    (new UserConfigStore())->setSuspended($username, false);
-    die("User is not suspended\n");
+    if (!is_dir($activeRoot)) {
+        $candidate = $findSuspendedBackup($homeDir);
+        if ($candidate !== null && @rename($candidate, $activeRoot)) {
+            echo "Notice: restored {$activeRoot} from {$candidate}\n";
+            $restoredFromBackup = true;
+        } elseif ($candidate !== null) {
+            echo "Warning: failed to restore {$candidate}\n";
+        }
+    }
+    if (!$restoredFromBackup) {
+        (new UserConfigStore())->setSuspended($username, false);
+        if (!is_dir($activeRoot)) {
+            die("User is not suspended and no recoverable web root was found\n");
+        }
+        die("User is not suspended\n");
+    }
 }
 
 pmssUserWriteLogs(
@@ -79,7 +161,7 @@ pmssUserLifecycleStep(
 
 // Preserve any unexpected www/ content created during suspension (or by legacy
 // scripts) before restoring the original web root.
-if (is_dir($activeRoot)) {
+if (is_dir($activeRoot) && !$restoredFromBackup && is_dir($disabledRoot)) {
     $backup = $homeDir.'/www-suspended-'.date('YmdHis');
     if (@rename($activeRoot, $backup)) {
         echo "Notice: moved existing {$activeRoot} to {$backup} before restore\n";
@@ -88,7 +170,7 @@ if (is_dir($activeRoot)) {
     }
 }
 
-if (!@rename($disabledRoot, $activeRoot)) {
+if (is_dir($disabledRoot) && !@rename($disabledRoot, $activeRoot)) {
     echo "Warning: failed to restore {$disabledRoot}\n";
 }
 // Best-effort: mirror the state in the user config store (marker is canonical).
