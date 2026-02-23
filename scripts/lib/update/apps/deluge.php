@@ -11,6 +11,165 @@
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 
+/**
+ * Patch Deluge cache hit ratio handling for libtorrent 2.0+ stats removal.
+ */
+function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log): bool
+{
+    if (!is_file($path) || is_link($path) || !is_readable($path)) {
+        return false;
+    }
+
+    $lines = @file($path, FILE_IGNORE_NEW_LINES);
+    if (!is_array($lines)) {
+        $log('[WARN] Unable to read Deluge core.py for patching: '.$path);
+        return false;
+    }
+
+    $lineCount = count($lines);
+    $hitLine = null;
+    for ($i = 0; $i < $lineCount; $i++) {
+        if (strpos($lines[$i], 'disk.num_blocks_cache_hits') !== false) {
+            $hitLine = $i;
+            break;
+        }
+    }
+    if ($hitLine === null) {
+        return false;
+    }
+
+    $windowStart = max(0, $hitLine - 6);
+    $windowEnd = min($lineCount - 1, $hitLine + 6);
+    for ($i = $windowStart; $i <= $windowEnd; $i++) {
+        if (strpos($lines[$i], 'except KeyError') !== false) {
+            return true;
+        }
+    }
+
+    $ifLine = null;
+    for ($i = $hitLine; $i >= 0; $i--) {
+        if (preg_match('/^\\s*if blocks_read:\\s*$/', $lines[$i])) {
+            $ifLine = $i;
+            break;
+        }
+    }
+    if ($ifLine === null) {
+        $log('[WARN] Unable to locate Deluge cache ratio block in '.$path);
+        return false;
+    }
+
+    $elseLine = null;
+    $scanLimit = min($lineCount, $ifLine + 20);
+    for ($i = $hitLine; $i < $scanLimit; $i++) {
+        if (preg_match('/^\\s*else:\\s*$/', $lines[$i])) {
+            $elseLine = $i;
+            break;
+        }
+    }
+    if ($elseLine === null) {
+        $log('[WARN] Unable to locate Deluge cache ratio else block in '.$path);
+        return false;
+    }
+
+    $assignLine = null;
+    $calcLine = null;
+    for ($i = $ifLine + 1; $i < $elseLine; $i++) {
+        if ($assignLine === null && strpos($lines[$i], "self.session_status['read_hit_ratio']") !== false) {
+            $assignLine = $i;
+        }
+        if ($calcLine === null && strpos($lines[$i], 'disk.num_blocks_cache_hits') !== false) {
+            $calcLine = $i;
+        }
+    }
+    if ($assignLine === null || $calcLine === null) {
+        $log('[WARN] Unable to locate Deluge cache ratio assignment in '.$path);
+        return false;
+    }
+
+    $elseAssignLine = null;
+    $elseScanLimit = min($lineCount, $elseLine + 6);
+    for ($i = $elseLine + 1; $i < $elseScanLimit; $i++) {
+        if (strpos($lines[$i], "self.session_status['read_hit_ratio']") !== false) {
+            $elseAssignLine = $i;
+            break;
+        }
+    }
+    if ($elseAssignLine === null) {
+        $log('[WARN] Unable to locate Deluge cache ratio else assignment in '.$path);
+        return false;
+    }
+
+    $ifIndent = preg_replace('/^(\\s*).*$/', '$1', $lines[$ifLine]);
+    $assignIndent = preg_replace('/^(\\s*).*$/', '$1', $lines[$assignLine]);
+    $calcIndent = preg_replace('/^(\\s*).*$/', '$1', $lines[$calcLine]);
+    $indentUnit = '';
+    if (strpos($calcIndent, $assignIndent) === 0) {
+        $indentUnit = substr($calcIndent, strlen($assignIndent));
+    }
+    if ($indentUnit === '' && strpos($assignIndent, $ifIndent) === 0) {
+        $indentUnit = substr($assignIndent, strlen($ifIndent));
+    }
+    if ($indentUnit === '') {
+        $indentUnit = '    ';
+    }
+
+    $tryIndent = $assignIndent;
+    $innerIndent = $assignIndent.$indentUnit;
+    $exprIndent = $innerIndent.$indentUnit;
+
+    $newBlock = [
+        $ifIndent.'if blocks_read:',
+        $tryIndent.'try:',
+        $innerIndent."self.session_status['read_hit_ratio'] = (",
+        $exprIndent."self.session_status['disk.num_blocks_cache_hits'] / blocks_read",
+        $innerIndent.')',
+        $tryIndent.'except KeyError:',
+        $innerIndent."self.session_status['read_hit_ratio'] = 0.0",
+        $ifIndent.'else:',
+        $assignIndent."self.session_status['read_hit_ratio'] = 0.0",
+    ];
+
+    array_splice($lines, $ifLine, $elseAssignLine - $ifLine + 1, $newBlock);
+    $newContent = implode("\n", $lines);
+    if ($newContent !== '' && substr($newContent, -1) !== "\n") {
+        $newContent .= "\n";
+    }
+
+    if ($dryRun) {
+        $log('[DRYRUN] Would patch Deluge cache hit ratio in '.$path);
+        return true;
+    }
+
+    if (@file_put_contents($path, $newContent) === false) {
+        $log('[WARN] Failed to write Deluge cache ratio patch to '.$path);
+        return false;
+    }
+
+    return true;
+}
+
+function pmssFindDelugeCoreCandidates(): array
+{
+    $candidates = [];
+    $patterns = [
+        '/usr/lib/python3/dist-packages/deluge/core/core.py',
+        '/usr/lib/python3*/dist-packages/deluge/core/core.py',
+        '/usr/local/lib/python3*/dist-packages/deluge/core/core.py',
+    ];
+    foreach ($patterns as $pattern) {
+        $matches = glob($pattern);
+        if (!is_array($matches)) {
+            continue;
+        }
+        foreach ($matches as $match) {
+            if ($match !== '' && !in_array($match, $candidates, true)) {
+                $candidates[] = $match;
+            }
+        }
+    }
+    return $candidates;
+}
+
 $delugeTarballUrl = 'https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz';
 $delugeTarballSha256 = 'c4bd04abfd211b65218be03f3c46d26f44024884de10e01859fb856fdd6f25d8';
 $delugeTarballLabel = 'Deluge 2.0.5 source tarball';
@@ -110,4 +269,17 @@ if (file_exists('/usr/bin/deluged') && !file_exists('/usr/local/bin/deluged')) {
         'Creating Deluge convenience symlinks',
         'ln -s /usr/bin/deluge-web /usr/local/bin/deluge-web; ln -s /usr/bin/deluged /usr/local/bin/deluged'
     );
+}
+
+$patchCandidates = pmssFindDelugeCoreCandidates();
+if (!empty($patchCandidates)) {
+    $patched = false;
+    foreach ($patchCandidates as $path) {
+        if (pmssPatchDelugeCacheHitRatio($path, $dryRun, $log)) {
+            $patched = true;
+        }
+    }
+    if ($patched) {
+        echo "\t*** Deluge cache ratio guard ensured\n";
+    }
 }
