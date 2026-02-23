@@ -28,10 +28,6 @@ if (!function_exists('pmssUserLogAllowed')) {
             }
         }
 
-        if ($uid === null) {
-            return $cached = false;
-        }
-
         return $cached = ($uid === 0);
     }
 }

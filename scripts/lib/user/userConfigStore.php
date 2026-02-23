@@ -89,12 +89,8 @@ class UserConfigStore
         if (!UserValidator::isValidUsername($username)) {
             return false;
         }
-        $ok = true;
         $path = $this->userFilePath($username);
-        if (is_file($path) && !is_link($path) && !@unlink($path)) {
-            $ok = false;
-        }
-        return $ok;
+        return !is_file($path) || is_link($path) || @unlink($path);
     }
 
     public function loadAll(): array

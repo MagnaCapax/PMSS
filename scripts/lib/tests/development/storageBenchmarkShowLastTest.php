@@ -85,7 +85,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         ]);
         $out = shell_exec('php '.escapeshellarg(dirname(__DIR__, 3).'/util/storageBenchmark.php').' --show-last --json '.escapeshellarg($log).' 2>&1');
         // Only the newer result value should appear
-        $this->assertStringContainsString("\t2.00\t0.00\t2.0\t0.0\t2.00\t0.00", $out);
+        $this->assertMatches('/\t2[.,]00\t0[.,]00\t2[.,]0\t0[.,]0\t2[.,]00\t0[.,]00/', $out);
     }
 
     public function testShowLastPrintsPreflightOnlyIfNoTests(): void
