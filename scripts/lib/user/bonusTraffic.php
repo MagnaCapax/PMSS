@@ -92,12 +92,11 @@ if (!function_exists('pmssUserBonusTrafficCli')) {
             return 1;
         }
 
-        $optionParser = '/scripts/lib/cli/optionParser.php';
-        if (!is_file($optionParser)) {
+        if (!is_file('/scripts/lib/cli/optionParser.php')) {
             fwrite(STDERR, "Error: missing CLI option parser.\n");
             return 1;
         }
-        require_once $optionParser;
+        require_once '/scripts/lib/cli/optionParser.php';
 
         foreach (['/scripts/lib/userLifecycle.php', '/scripts/lib/user/log.php'] as $dependency) {
             if (is_file($dependency)) {

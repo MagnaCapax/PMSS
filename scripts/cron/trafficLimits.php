@@ -15,17 +15,14 @@
 require_once '/scripts/lib/rtorrentConfig.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/user/userConfigStore.php';
-$trafficLimitLib = '/scripts/lib/user/trafficLimit.php';
-if (is_file($trafficLimitLib)) {
-    require_once $trafficLimitLib;
+if (is_file('/scripts/lib/user/trafficLimit.php')) {
+    require_once '/scripts/lib/user/trafficLimit.php';
 }
-$bonusTrafficLib = __DIR__.'/../lib/user/bonusTraffic.php';
-if (is_file($bonusTrafficLib)) {
-    require_once $bonusTrafficLib;
+if (is_file(__DIR__.'/../lib/user/bonusTraffic.php')) {
+    require_once __DIR__.'/../lib/user/bonusTraffic.php';
 }
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
-    require_once $pmssUserLogPath;
+if (is_file(__DIR__.'/../lib/user/log.php')) {
+    require_once __DIR__.'/../lib/user/log.php';
 }
 if (!file_exists('/var/run/pmss/trafficLimits')) `mkdir -p /var/run/pmss/trafficLimits`;
 
@@ -77,7 +74,6 @@ if (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) &&
 $progressiveThrottleGracePercent = max(0.0, $progressiveThrottleGracePercent);
 $userConfigStore = new UserConfigStore();
 
-$trafficData = array();
 foreach($users AS $thisUser) {
     $userTrafficLimitFile = "/etc/seedbox/runtime/trafficLimits/{$thisUser}";
     $trafficDataFile = "/home/{$thisUser}/.trafficData";
@@ -102,8 +98,8 @@ foreach($users AS $thisUser) {
         ? pmssBonusTrafficReadGiB($bonusTrafficFile)
         : 0;
 //    var_dump($data);
-    $trafficData[$thisUser]['traffic'] = ($data['raw']['month'] / 1024);   // Set to GiB
-    $trafficData[$thisUser]['trafficLimit'] = $trafficLimit + $bonusTraffic;
+    $trafficUsageGiB = ($data['raw']['month'] / 1024);   // Set to GiB
+    $trafficLimit += $bonusTraffic;
     $trafficCapMbit = $defaultTrafficCapMbit;
     $userConfig = $userConfigStore->get($thisUser);
     if (is_array($userConfig) && isset($userConfig['trafficCapMbit']) && is_numeric($userConfig['trafficCapMbit'])) {
@@ -112,8 +108,138 @@ foreach($users AS $thisUser) {
     if ($trafficCapMbit <= 0) {
         $trafficCapMbit = $defaultTrafficCapMbit;
     }
-    $trafficData[$thisUser]['trafficCapMbit'] = $trafficCapMbit;
-    
+
+    // Enforce traffic throttling: when usage exceeds the configured limit touch the
+    // `.enabled` marker (keeping it fresh so sustained overages remain throttled).
+    // Once usage drops below the threshold for the configured cooldown window,
+    // remove the marker and lift the rate limit. The double disable call guards
+    // against occasional router desyncs.
+    $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
+    $slidingThrottleFile = "/var/run/pmss/trafficLimits/{$thisUser}.throttle_mbit";
+    $overLimit = ($trafficUsageGiB > $trafficLimit);
+    $slidingApplied = false;
+
+    // Apply sliding throttle before the hard limit, unless cooldown is active.
+    if (!$overLimit && $slidingThrottleStart < 100) {
+        $usagePct = ($trafficLimit > 0)
+            ? ($trafficUsageGiB / $trafficLimit) * 100
+            : 0.0;
+        if ($usagePct >= $slidingThrottleStart && !file_exists($userTrafficLimitEnabledFile)) {
+            $range = 100 - $slidingThrottleStart;
+            if ($range > 0) {
+                $capPct = min(75, (($usagePct - $slidingThrottleStart) / $range) * 75);
+                if ($capPct > 0) {
+                    $slidingApplied = true;
+                    $hardCapMbit = max(0, (int) $trafficCapMbit);
+                    $usableBw = max(0, $networkSpeedMbit - $hardCapMbit);
+                    $effectiveCeil = $networkSpeedMbit - ($usableBw * ($capPct / 100));
+                    $effectiveCeilMbit = max(1, (int) round($effectiveCeil));
+                    $previousCeil = null;
+                    if (is_file($slidingThrottleFile) && !is_link($slidingThrottleFile)) {
+                        $raw = trim((string) @file_get_contents($slidingThrottleFile));
+                        if ($raw !== '' && is_numeric($raw)) {
+                            $previousCeil = (int) $raw;
+                        }
+                    }
+                    if ($previousCeil === null || $previousCeil !== $effectiveCeilMbit) {
+                        if (@file_put_contents($slidingThrottleFile, (string) $effectiveCeilMbit) !== false) {
+                            @chmod($slidingThrottleFile, 0600);
+                            if (function_exists('pmssUserLog')) {
+                                $action = ($previousCeil === null) ? 'applied' : 'updated';
+                                pmssUserLog(
+                                    $thisUser,
+                                    sprintf(
+                                        'traffic throttle sliding %s (ceil=%d Mbit usage=%.1f%% limit=%.2f GiB)',
+                                        $action,
+                                        $effectiveCeilMbit,
+                                        $usagePct,
+                                        $trafficLimit
+                                    )
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (!$slidingApplied && is_file($slidingThrottleFile) && !is_link($slidingThrottleFile)) {
+        if (@unlink($slidingThrottleFile)) {
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'traffic throttle sliding removed');
+            }
+        }
+    }
+
+    // Needs to stay within the limit for X period of time, hence we can always touch & update the limit file
+    if ($overLimit) { // Should be limited
+
+        $effectiveCapMbit = (int) $trafficCapMbit;
+        $overagePercent = 0.0;
+        $adjustedOverage = 0.0;
+        $floorMbit = 0;
+        if ($progressiveThrottleEnabled && function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
+            $overagePercent = ($trafficLimit > 0)
+                ? (($trafficUsageGiB - $trafficLimit) / $trafficLimit) * 100
+                : 0.0;
+            $progressive = pmssTrafficLimitComputeProgressiveCapMbit(
+                $trafficCapMbit,
+                $overagePercent,
+                $progressiveThrottleFloorPercent,
+                $progressiveThrottleGracePercent,
+                1
+            );
+            $effectiveCapMbit = $progressive['effective'];
+            $adjustedOverage = $progressive['adjustedOverage'];
+            $floorMbit = $progressive['floorMbit'];
+        }
+
+        touch( $userTrafficLimitEnabledFile );
+
+        chmod( $userTrafficLimitEnabledFile, 0600);
+        setRatelimit($thisUser, $effectiveCapMbit);    // Apply rate limiting
+        if (function_exists('pmssUserLog')) {
+            if ($progressiveThrottleEnabled && function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
+                pmssUserLog(
+                    $thisUser,
+                    sprintf(
+                        'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB overage=%.1f%% adjusted=%.1f%% cap=%d Mbit effective=%d Mbit floor=%d Mbit)',
+                        $trafficLimit,
+                        $trafficUsageGiB,
+                        $overagePercent,
+                        $adjustedOverage,
+                        $trafficCapMbit,
+                        $effectiveCapMbit,
+                        $floorMbit
+                    )
+                );
+            } else {
+                pmssUserLog(
+                    $thisUser,
+                    sprintf(
+                        'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB)',
+                        $trafficLimit,
+                        $trafficUsageGiB
+                    )
+                );
+            }
+        }
+
+    } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
+
+        if ((time() - (int) filemtime($userTrafficLimitEnabledFile)) > $trafficLimitPeriod) {   // Time to remove the limit
+            unlink( $userTrafficLimitEnabledFile );
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
+            }
+            setRateLimit($thisUser, $trafficCapMbit, false);
+			// Do it second time as removal does not always work for some reason
+			sleep(1);
+			setRateLimit($thisUser, $trafficCapMbit, false);
+        }
+
+    }
 }
 
 /**
@@ -157,142 +283,6 @@ function pmssReadTrafficData(string $path, string $username): ?array
     }
 
     return $data;
-}
-
-
-// Enforce traffic throttling: when usage exceeds the configured limit touch the
-// `.enabled` marker (keeping it fresh so sustained overages remain throttled).
-// Once usage drops below the threshold for the configured cooldown window,
-// remove the marker and lift the rate limit. The double disable call guards
-// against occasional router desyncs.
-foreach ($trafficData AS $thisUser => $thisData) {
-    $userTrafficLimitEnabledFile = "/var/run/pmss/trafficLimits/{$thisUser}.enabled";
-    $slidingThrottleFile = "/var/run/pmss/trafficLimits/{$thisUser}.throttle_mbit";
-    $overLimit = ($thisData['traffic'] > $thisData['trafficLimit']);
-    $slidingApplied = false;
-
-    // Apply sliding throttle before the hard limit, unless cooldown is active.
-    if (!$overLimit && $slidingThrottleStart < 100) {
-        $usagePct = ($thisData['trafficLimit'] > 0)
-            ? ($thisData['traffic'] / $thisData['trafficLimit']) * 100
-            : 0.0;
-        if ($usagePct >= $slidingThrottleStart && !file_exists($userTrafficLimitEnabledFile)) {
-            $range = 100 - $slidingThrottleStart;
-            if ($range > 0) {
-                $capPct = min(75, (($usagePct - $slidingThrottleStart) / $range) * 75);
-                if ($capPct > 0) {
-                    $slidingApplied = true;
-                    $hardCapMbit = max(0, (int) $thisData['trafficCapMbit']);
-                    $usableBw = max(0, $networkSpeedMbit - $hardCapMbit);
-                    $effectiveCeil = $networkSpeedMbit - ($usableBw * ($capPct / 100));
-                    $effectiveCeilMbit = max(1, (int) round($effectiveCeil));
-                    $previousCeil = null;
-                    if (is_file($slidingThrottleFile) && !is_link($slidingThrottleFile)) {
-                        $raw = trim((string) @file_get_contents($slidingThrottleFile));
-                        if ($raw !== '' && is_numeric($raw)) {
-                            $previousCeil = (int) $raw;
-                        }
-                    }
-                    if ($previousCeil === null || $previousCeil !== $effectiveCeilMbit) {
-                        if (@file_put_contents($slidingThrottleFile, (string) $effectiveCeilMbit) !== false) {
-                            @chmod($slidingThrottleFile, 0600);
-                            if (function_exists('pmssUserLog')) {
-                                $action = ($previousCeil === null) ? 'applied' : 'updated';
-                                pmssUserLog(
-                                    $thisUser,
-                                    sprintf(
-                                        'traffic throttle sliding %s (ceil=%d Mbit usage=%.1f%% limit=%.2f GiB)',
-                                        $action,
-                                        $effectiveCeilMbit,
-                                        $usagePct,
-                                        $thisData['trafficLimit']
-                                    )
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (!$slidingApplied && is_file($slidingThrottleFile) && !is_link($slidingThrottleFile)) {
-        if (@unlink($slidingThrottleFile)) {
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'traffic throttle sliding removed');
-            }
-        }
-    }
-    
-    // Needs to stay within the limit for X period of time, hence we can always touch & update the limit file
-    if ($overLimit) { // Should be limited
-
-        $effectiveCapMbit = (int) $thisData['trafficCapMbit'];
-        $overagePercent = 0.0;
-        $adjustedOverage = 0.0;
-        $floorMbit = 0;
-        if ($progressiveThrottleEnabled && function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
-            $overagePercent = ($thisData['trafficLimit'] > 0)
-                ? (($thisData['traffic'] - $thisData['trafficLimit']) / $thisData['trafficLimit']) * 100
-                : 0.0;
-            $progressive = pmssTrafficLimitComputeProgressiveCapMbit(
-                $thisData['trafficCapMbit'],
-                $overagePercent,
-                $progressiveThrottleFloorPercent,
-                $progressiveThrottleGracePercent,
-                1
-            );
-            $effectiveCapMbit = $progressive['effective'];
-            $adjustedOverage = $progressive['adjustedOverage'];
-            $floorMbit = $progressive['floorMbit'];
-        }
-
-        touch( $userTrafficLimitEnabledFile );
-
-        chmod( $userTrafficLimitEnabledFile, 0600);
-        setRatelimit($thisUser, $effectiveCapMbit);    // Apply rate limiting
-        if (function_exists('pmssUserLog')) {
-            if ($progressiveThrottleEnabled && function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
-                pmssUserLog(
-                    $thisUser,
-                    sprintf(
-                        'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB overage=%.1f%% adjusted=%.1f%% cap=%d Mbit effective=%d Mbit floor=%d Mbit)',
-                        $thisData['trafficLimit'],
-                        $thisData['traffic'],
-                        $overagePercent,
-                        $adjustedOverage,
-                        $thisData['trafficCapMbit'],
-                        $effectiveCapMbit,
-                        $floorMbit
-                    )
-                );
-            } else {
-                pmssUserLog(
-                    $thisUser,
-                    sprintf(
-                        'traffic throttle enabled (limit=%.2f GiB usage=%.2f GiB)',
-                        $thisData['trafficLimit'],
-                        $thisData['traffic']
-                    )
-                );
-            }
-        }
-        
-    } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
-        
-        if ((time() - (int) filemtime($userTrafficLimitEnabledFile)) > $trafficLimitPeriod) {   // Time to remove the limit
-            unlink( $userTrafficLimitEnabledFile );
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
-            }
-            setRateLimit($thisUser, $thisData['trafficCapMbit'], false);
-			// Do it second time as removal does not always work for some reason
-			sleep(1);
-			setRateLimit($thisUser, $thisData['trafficCapMbit'], false);
-        }
-        
-    }
-
 }
 
 function setRateLimit($user, $trafficCapMbit, $enable=true) {
