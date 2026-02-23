@@ -16,7 +16,6 @@ require_once __DIR__.'/../lib/user/traffic.php';
 require_once __DIR__.'/../lib/user/rtorrent.php';
 require_once __DIR__.'/../lib/user/deluge.php';
 require_once __DIR__.'/../lib/user/qbittorrent.php';
-require_once __DIR__.'/../lib/user/integrations.php';
 require_once __DIR__.'/../lib/user/system.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
@@ -148,7 +147,10 @@ if ($scgiPort > 0 && (!isset($payload['rtorrentPort']) || (int) $payload['rtorre
     }
 }
 userConfigureRutorrent($user, $configuration);
-userEnsureRclonePort($user);
+$rclonePortFile = sprintf('/home/%s/.rclonePort', $user['name']);
+if (!file_exists($rclonePortFile)) {
+    file_put_contents($rclonePortFile, rand(1500, 65500));
+}
 userConfigureDeluge($user, $configuration);
 userConfigureQbittorrent($user);
 userApplyDiskQuota($user);

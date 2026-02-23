@@ -114,9 +114,6 @@ class UserConfigStore
             $users[$name] = $payload;
         }
 
-        if (empty($users)) {
-            return [];
-        }
         ksort($users, SORT_STRING);
         return $users;
     }
@@ -274,10 +271,7 @@ class UserConfigStore
             return null;
         }
         $data = json_decode($raw, true);
-        if (!is_array($data)) {
-            return null;
-        }
-        return $data;
+        return is_array($data) ? $data : null;
     }
 
     private function loadLegacyAggregateMap(): array
@@ -286,10 +280,7 @@ class UserConfigStore
         if (!is_array($data)) {
             return [];
         }
-        if (isset($data['users']) && is_array($data['users'])) {
-            return $data['users'];
-        }
-        return $data;
+        return (isset($data['users']) && is_array($data['users'])) ? $data['users'] : $data;
     }
 
     private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
