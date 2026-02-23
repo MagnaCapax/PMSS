@@ -18,10 +18,8 @@ if (!function_exists('pmssUserLogAllowed')) {
             return $cached;
         }
 
-        $uid = null;
-        if (function_exists('posix_geteuid')) {
-            $uid = @posix_geteuid();
-        } else {
+        $uid = function_exists('posix_geteuid') ? @posix_geteuid() : null;
+        if ($uid === null) {
             $status = @file_get_contents('/proc/self/status');
             if ($status !== false && preg_match('/^Uid:\\s+(\\d+)/m', $status, $matches)) {
                 $uid = (int) $matches[1];

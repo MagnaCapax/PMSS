@@ -35,7 +35,6 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
             return null;
         }
 
-        $value = null;
         if (is_int($raw)) {
             $value = $raw;
         } elseif (is_string($raw)) {

@@ -15,14 +15,14 @@
 require_once '/scripts/lib/rtorrentConfig.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/user/userConfigStore.php';
-if (is_file('/scripts/lib/user/trafficLimit.php')) {
-    require_once '/scripts/lib/user/trafficLimit.php';
-}
-if (is_file(__DIR__.'/../lib/user/bonusTraffic.php')) {
-    require_once __DIR__.'/../lib/user/bonusTraffic.php';
-}
-if (is_file(__DIR__.'/../lib/user/log.php')) {
-    require_once __DIR__.'/../lib/user/log.php';
+foreach ([
+    '/scripts/lib/user/trafficLimit.php',
+    __DIR__.'/../lib/user/bonusTraffic.php',
+    __DIR__.'/../lib/user/log.php',
+] as $dependency) {
+    if (is_file($dependency)) {
+        require_once $dependency;
+    }
 }
 if (!file_exists('/var/run/pmss/trafficLimits')) `mkdir -p /var/run/pmss/trafficLimits`;
 
@@ -86,13 +86,10 @@ foreach($users AS $thisUser) {
         continue;
     }
     $trafficLimitRaw = trim((string) @file_get_contents($userTrafficLimitFile));
-    if ($trafficLimitRaw === '' || !is_numeric($trafficLimitRaw)) {
+    if ($trafficLimitRaw === '' || !is_numeric($trafficLimitRaw) || (float) $trafficLimitRaw <= 0) {
         continue;
     }
     $trafficLimit = (float) $trafficLimitRaw;
-    if ($trafficLimit <= 0) {
-        continue;
-    }
     $bonusTrafficFile = "/home/{$thisUser}/.bonusTraffic";
     $bonusTraffic = function_exists('pmssBonusTrafficReadGiB')
         ? pmssBonusTrafficReadGiB($bonusTrafficFile)
@@ -262,10 +259,8 @@ function pmssReadTrafficData(string $path, string $username): ?array
     }
 
     $group = @posix_getgrgid($stats['gid']);
-    if ($group !== false) {
-        if ($group['name'] !== $username && $group['name'] !== 'root') {
-            return null;
-        }
+    if ($group !== false && $group['name'] !== $username && $group['name'] !== 'root') {
+        return null;
     }
 
     $blob = @file_get_contents($path);
