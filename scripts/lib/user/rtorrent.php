@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/../rtorrentConfig.php';
+require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/../update.php';
 
 /**
@@ -23,10 +24,12 @@ function userConfigureRtorrent(array $user): array
     }
 
     $rtorrentConfig = new rtorrentConfig($resources);
+    $throttle = pmssReadTorrentThrottle($user['name']);
     $configuration = $rtorrentConfig->createConfig([
         'ram' => $user['memory'],
         'dht' => file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.dht'),
         'pex' => file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.pex'),
+        'uploadThrottle' => $throttle === null ? 0 : $throttle,
     ]);
     $rtorrentConfig->writeConfig($user['name'], $configuration['configFile']);
 

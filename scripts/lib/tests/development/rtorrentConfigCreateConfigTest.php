@@ -38,6 +38,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'max=##maximumPeers',
             'usg=##uploadSlotsGlobal',
             'us=##uploadSlots',
+            '##uploadThrottleLine',
             'scgi=##scgiPort',
             'dht=##dhtPort',
             'listen=##listenPort',
@@ -55,6 +56,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'listenPort' => 5002,
             'pex'        => 'auto',
             'dht'        => 'yes',
+            'uploadThrottle' => 1234,
         ];
 
         $result = $cfg->createConfig($input);
@@ -72,6 +74,7 @@ class rtorrentConfigCreateConfigTest extends TestCase
             'max='.$maximumPeers,
             'usg='.($uploadSlots * 6),
             'us='.$uploadSlots,
+            'throttle.global_up.max_rate.set = '.$input['uploadThrottle'],
             'scgi='.$input['scgiPort'],
             'dht='.$input['dhtPort'],
             'listen='.$input['listenPort'],

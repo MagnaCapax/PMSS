@@ -62,6 +62,18 @@ class RtorrentScgiTest extends TestCase
     }
 
     /**
+     * Test xmlrpc int call formatting produces expected XML.
+     */
+    public function testXmlrpcIntCallFormattingProducesValidXml(): void
+    {
+        $xml = rtorrentScgiFormatXmlrpcIntCall('throttle.global_up.max_rate.set', 42);
+
+        $this->assertStringContainsString('<methodName>throttle.global_up.max_rate.set</methodName>', $xml);
+        $this->assertStringContainsString('<int>42</int>', $xml);
+        $this->assertStringContainsString('<params>', $xml);
+    }
+
+    /**
      * Test xmlrpc call escapes special characters in method name.
      */
     public function testXmlrpcCallEscapesSpecialChars(): void

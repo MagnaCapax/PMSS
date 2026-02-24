@@ -46,6 +46,27 @@ function rtorrentScgiFormatXmlrpcCall(string $method): string
 }
 
 /**
+ * Build an xmlrpc call with a single integer parameter.
+ *
+ * Used for lightweight settings updates (e.g. throttle adjustments).
+ *
+ * @param string $method The xmlrpc method name.
+ * @param int    $value  Integer parameter to send.
+ *
+ * @return string The xmlrpc request XML.
+ */
+function rtorrentScgiFormatXmlrpcIntCall(string $method, int $value): string
+{
+    return '<?xml version="1.0" encoding="UTF-8"?>'
+        . '<methodCall>'
+        . '<methodName>' . htmlspecialchars($method, ENT_XML1, 'UTF-8') . '</methodName>'
+        . '<params>'
+        . '<param><value><int>' . $value . '</int></value></param>'
+        . '</params>'
+        . '</methodCall>';
+}
+
+/**
  * Send an SCGI request to a Unix socket and return the response.
  *
  * Handles connection timeout and read timeout separately. Returns false on
@@ -96,6 +117,31 @@ function rtorrentScgiSend(string $socketPath, string $request, int $timeout = 5)
 
     @fclose($socket);
     return $response;
+}
+
+/**
+ * Send an xmlrpc int call and return whether rTorrent accepted it.
+ *
+ * @param string $socketPath Absolute path to the rTorrent Unix socket.
+ * @param string $method     xmlrpc method name.
+ * @param int    $value      Integer parameter.
+ * @param int    $timeout    Timeout in seconds.
+ *
+ * @return bool True when a valid response is received.
+ */
+function rtorrentScgiCallInt(string $socketPath, string $method, int $value, int $timeout = 5): bool
+{
+    $xmlrpc = rtorrentScgiFormatXmlrpcIntCall($method, $value);
+    $request = rtorrentScgiFormatRequest($xmlrpc);
+
+    $response = rtorrentScgiSend($socketPath, $request, $timeout);
+    if ($response === false) {
+        return false;
+    }
+    if (strpos($response, '<fault>') !== false) {
+        return false;
+    }
+    return strpos($response, '<value>') !== false;
 }
 
 /**

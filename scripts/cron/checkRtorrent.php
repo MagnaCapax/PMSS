@@ -32,6 +32,7 @@
 require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/rtorrent/scgi.php';
 require_once __DIR__.'/../lib/rtorrent/process.php';
+require_once __DIR__.'/../lib/user/traffic.php';
 
 $lifecycle = __DIR__.'/../lib/userLifecycle.php';
 if (is_file($lifecycle)) {
@@ -270,6 +271,17 @@ foreach ($usersOut as $line) {
 
         if ($responsive) {
             rtorrentProcessClearStaleState($unresponsiveState);
+            $throttle = pmssReadTorrentThrottle($user);
+            $throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;
+            if (!rtorrentScgiCallInt($socketPath, 'throttle.global_up.max_rate.set', $throttleValue, 5)) {
+                pmssCheckRtorrentLogBoth($user, 'failed to apply upload throttle', $debug);
+            } else {
+                pmssCheckRtorrentLog(
+                    "Applied upload throttle (up={$throttleValue} KiB/s) for {$user}",
+                    false,
+                    $debug
+                );
+            }
             pmssCheckRtorrentLog("rTorrent healthy for {$user}", false, $debug);
             continue;
         }

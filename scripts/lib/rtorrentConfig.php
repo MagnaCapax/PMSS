@@ -97,11 +97,20 @@ class rtorrentConfig {
 			$piecesMemoryMiB = 170;
 		}
 
+		$uploadThrottleLine = '';
+		if (isset($config['uploadThrottle']) && is_numeric($config['uploadThrottle'])) {
+			$uploadThrottle = (int) $config['uploadThrottle'];
+			if ($uploadThrottle > 0) {
+				$uploadThrottleLine = 'throttle.global_up.max_rate.set = '.$uploadThrottle;
+			}
+		}
+
 		$replacements = [
 			'##minimumPeers'      => $minimumPeers,
 			'##maximumPeers'      => $maximumPeers,
 			'##uploadSlotsGlobal' => $uploadSlots * 6,
 			'##uploadSlots'       => $uploadSlots,
+			'##uploadThrottleLine' => $uploadThrottleLine,
 			'##scgiPort'          => $config['scgiPort'],
 			'##dhtPort'           => $config['dhtPort'],
 			'##listenPort'        => $config['listenPort'],

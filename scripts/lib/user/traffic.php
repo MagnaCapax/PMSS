@@ -61,3 +61,107 @@ function userApplyDiskQuota(array $user): void
     );
     runStep('Refreshing quota status file', $refreshCmd);
 }
+
+/**
+ * Resolve the per-user torrent upload throttle file path.
+ */
+function pmssTorrentThrottlePath(string $username): string
+{
+    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
+    return rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
+}
+
+/**
+ * Read a root-owned torrent upload throttle (KiB/s) for the user.
+ *
+ * Returns:
+ * - null when the file is missing or invalid
+ * - 0 when the file explicitly requests unlimited
+ * - >0 for the desired KiB/s cap
+ */
+function pmssReadTorrentThrottle(string $username): ?int
+{
+    $path = pmssTorrentThrottlePath($username);
+    if (!is_file($path) || is_link($path)) {
+        return null;
+    }
+
+    $stats = @stat($path);
+    if ($stats === false) {
+        return null;
+    }
+
+    $mode = $stats['mode'] & 0777;
+    if (($mode & 0022) !== 0) { // group/other writable
+        return null;
+    }
+
+    $testMode = getenv('PMSS_TEST_MODE') === '1';
+    if (!$testMode) {
+        if ((int) $stats['uid'] !== 0) {
+            return null;
+        }
+        if (function_exists('posix_getgrgid')) {
+            $group = @posix_getgrgid((int) $stats['gid']);
+            if (is_array($group) && isset($group['name'])) {
+                $groupName = $group['name'];
+                if ($groupName !== 'root' && $groupName !== $username) {
+                    return null;
+                }
+            }
+        }
+    }
+
+    $raw = trim((string) @file_get_contents($path));
+    if ($raw === '' || !is_numeric($raw)) {
+        return null;
+    }
+
+    $value = (int) $raw;
+    return $value > 0 ? $value : 0;
+}
+
+/**
+ * Write or remove a per-user torrent upload throttle (KiB/s).
+ */
+function pmssWriteTorrentThrottle(string $username, int $value): bool
+{
+    $path = pmssTorrentThrottlePath($username);
+    $homeDir = dirname($path);
+    if (!is_dir($homeDir) || is_link($homeDir)) {
+        return false;
+    }
+
+    if ($value <= 0) {
+        if (is_link($path)) {
+            return false;
+        }
+        return !is_file($path) || @unlink($path);
+    }
+
+    if (is_link($path)) {
+        return false;
+    }
+
+    $tmp = $path.'.tmp';
+    if (@file_put_contents($tmp, (string) $value) === false) {
+        return false;
+    }
+    @chmod($tmp, 0640);
+
+    $isRoot = function_exists('posix_geteuid') ? (posix_geteuid() === 0) : false;
+    if ($isRoot) {
+        @chown($tmp, 'root');
+        @chgrp($tmp, 'root');
+    } elseif (getenv('PMSS_TEST_MODE') !== '1') {
+        @unlink($tmp);
+        return false;
+    }
+
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        return false;
+    }
+
+    return true;
+}

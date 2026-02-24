@@ -38,14 +38,16 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
     );
 
     // Configure quota, rtorrent and ruTorrent.
-    if (runProvisionStep(
-        'Apply user configuration',
-        sprintf('/scripts/util/userConfig.php %s %s %s',
-            escapeshellarg($user['name']),
-            escapeshellarg($user['memory']),
-            escapeshellarg($user['quota'])
-        )
-    ) !== 0) {
+    $userConfigCmd = sprintf(
+        '/scripts/util/userConfig.php %s %s %s',
+        escapeshellarg($user['name']),
+        escapeshellarg($user['memory']),
+        escapeshellarg($user['quota'])
+    );
+    if (isset($user['torrentThrottle']) && is_numeric($user['torrentThrottle'])) {
+        $userConfigCmd .= ' --upload-throttle-kib='.escapeshellarg((string) $user['torrentThrottle']);
+    }
+    if (runProvisionStep('Apply user configuration', $userConfigCmd) !== 0) {
         logProvisionMessage('FATAL: User configuration failed; aborting provisioning');
         finalizeProvision('FAIL', 'user_config_failed', 1);
         exit(1);

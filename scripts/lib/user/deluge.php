@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/traffic.php';
 
 function userConfigureDeluge(array $user, array $configuration): void
 {
@@ -33,11 +34,13 @@ function userConfigureDeluge(array $user, array $configuration): void
     $scgiPort    = $configuration['config']['scgiPort'] ?? 5000;
     $existingPort = file_exists("$home/.delugePort") ? (int) file_get_contents("$home/.delugePort") : 0;
     $delugePort   = ($existingPort >= 1024 && $existingPort <= 65000) ? $existingPort : $scgiPort;
+    $throttle = pmssReadTorrentThrottle($username);
+    $uploadThrottle = ($throttle !== null && $throttle > 0) ? (string) $throttle : '-1.0';
 
     $coreTemplate = file_get_contents('/etc/seedbox/config/template.deluge.core.conf');
     $coreConfig   = str_replace(
-        ['##USERNAME##', '##CACHE', '##DAEMONPORT'],
-        [$username, (int) ($user['memory'] * 1024 / 16), $delugePort],
+        ['##USERNAME##', '##CACHE', '##DAEMONPORT', '##UPLOAD_THROTTLE##'],
+        [$username, (int) ($user['memory'] * 1024 / 16), $delugePort, $uploadThrottle],
         $coreTemplate
     );
     file_put_contents("$configDir/core.conf", $coreConfig);
@@ -79,4 +82,31 @@ function userConfigureDeluge(array $user, array $configuration): void
             escapeshellarg($username)
         ));
     }
+}
+
+/**
+ * Update Deluge core.conf with the current upload throttle, returning true on change.
+ */
+function pmssDelugeApplyUploadThrottle(string $username, ?int $throttle = null): bool
+{
+    $configFile = "/home/{$username}/.config/deluge/core.conf";
+    if (!is_file($configFile) || is_link($configFile)) {
+        return false;
+    }
+
+    $config = file_get_contents($configFile);
+    if ($config === false) {
+        return false;
+    }
+
+    if ($throttle === null) {
+        $throttle = pmssReadTorrentThrottle($username);
+    }
+    $value = ($throttle !== null && $throttle > 0) ? (string) $throttle : '-1.0';
+    $updated = preg_replace('/"max_upload_speed"\\s*:\\s*-?[0-9.]+/', '"max_upload_speed": '.$value, $config, 1, $count);
+
+    return $count > 0
+        && $updated !== null
+        && $updated !== $config
+        && file_put_contents($configFile, $updated) !== false;
 }

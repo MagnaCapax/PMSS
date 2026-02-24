@@ -15,6 +15,10 @@ $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
 }
+$delugeHelper = __DIR__.'/../lib/user/deluge.php';
+if (is_file($delugeHelper)) {
+    require_once $delugeHelper;
+}
 
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
@@ -50,6 +54,17 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     if (!file_exists("/home/{$thisUser}/.delugeEnable")) continue;  // Deluge not enabled
     
     $instances = shell_exec("pgrep -u{$thisUser} deluged");
+    $configChanged = false;
+    if (function_exists('pmssDelugeApplyUploadThrottle')) {
+        $configChanged = pmssDelugeApplyUploadThrottle($thisUser);
+    }
+    if ($configChanged && !empty($instances)) {
+        passthru("killall -9 -u ".escapeshellarg($thisUser)." deluged 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." deluge-web 2>/dev/null");
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'deluge restarted to apply upload throttle');
+        }
+        $instances = '';
+    }
     if (empty($instances)) $startDeluged($thisUser);
  
     $instancesWeb = shell_exec("pgrep -u{$thisUser} deluge-web");

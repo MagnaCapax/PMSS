@@ -48,10 +48,10 @@ throttle.max_peers.normal.set = ##maximumPeers
 throttle.min_peers.seed.set = ##minimumPeers
 throttle.max_peers.seed.set = ##maximumPeers
 throttle.max_uploads.global.set = ##uploadSlots
+##uploadThrottleLine
 
 
 
 protocol.encryption.set = allow_incoming,try_outgoing,enable_retry
 encoding.add = utf8
 method.insert = system.startup_time, value|const, (system.time)
-

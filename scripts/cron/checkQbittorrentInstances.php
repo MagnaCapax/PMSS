@@ -11,6 +11,10 @@ $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
 }
+$qbittorrentHelper = __DIR__.'/../lib/user/qbittorrent.php';
+if (is_file($qbittorrentHelper)) {
+    require_once $qbittorrentHelper;
+}
 
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
@@ -39,6 +43,17 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     
     // pgrep returns running qbittorrent-nox processes owned by the user
     $instances = shell_exec('pgrep -u' . $thisUser . ' qbittorrent-nox');
+    $configChanged = false;
+    if (function_exists('pmssQbittorrentApplyUploadThrottle')) {
+        $configChanged = pmssQbittorrentApplyUploadThrottle($thisUser);
+    }
+    if ($configChanged && !empty($instances)) {
+        passthru('killall -u '.escapeshellarg($thisUser).' -TERM qbittorrent-nox 2>/dev/null');
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'qbittorrent-nox restarted to apply upload throttle');
+        }
+        $instances = '';
+    }
     if (empty($instances)) $startQbittorrent($thisUser);
  
 

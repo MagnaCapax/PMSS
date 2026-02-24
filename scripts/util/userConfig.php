@@ -25,24 +25,35 @@ require_once __DIR__.'/../lib/user/userConfigStore.php';
 
 
 $usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
-if (empty($argv[1]) || empty($argv[2]) || empty($argv[3])) {
+$rawArgs = $argv ?? ($_SERVER['argv'] ?? []);
+$args = [];
+$uploadThrottleKib = null;
+foreach ($rawArgs as $arg) {
+    if (strpos($arg, '--upload-throttle-kib=') === 0) {
+        $uploadThrottleKib = substr($arg, strlen('--upload-throttle-kib='));
+        continue;
+    }
+    $args[] = $arg;
+}
+$usage .= ' [--upload-throttle-kib=KIB]';
+if (empty($args[1]) || empty($args[2]) || empty($args[3])) {
     die('need user name. '.$usage."\n");
 }
 
-// The $user array is populated from sanitized command-line arguments ($argv)
+// The $user array is populated from sanitized command-line arguments ($args)
 // provided by an operator or trusted automation.
 $user = [
-    'name'      => $argv[1],
-    'memory'    => (int) $argv[2],
-    'quota'     => (int) $argv[3],
-    'CPUWeight' => isset($argv[5]) ? (int) $argv[5] : 0,
-    'IOWeight'  => isset($argv[6]) ? (int) $argv[6] : 0,
-    'IOReadBW'    => isset($argv[7]) ? $argv[7] : null,
-    'IOWriteBW'   => isset($argv[8]) ? $argv[8] : null,
-    'IOReadIOPS'  => isset($argv[9]) ? $argv[9] : null,
-    'IOWriteIOPS' => isset($argv[10]) ? $argv[10] : null,
-    'cpuQuotaPercent' => isset($argv[11]) ? $argv[11] : 0,
-    'trafficCapMbit' => isset($argv[12]) ? (int) $argv[12] : 0,
+    'name'      => $args[1],
+    'memory'    => (int) $args[2],
+    'quota'     => (int) $args[3],
+    'CPUWeight' => isset($args[5]) ? (int) $args[5] : 0,
+    'IOWeight'  => isset($args[6]) ? (int) $args[6] : 0,
+    'IOReadBW'    => isset($args[7]) ? $args[7] : null,
+    'IOWriteBW'   => isset($args[8]) ? $args[8] : null,
+    'IOReadIOPS'  => isset($args[9]) ? $args[9] : null,
+    'IOWriteIOPS' => isset($args[10]) ? $args[10] : null,
+    'cpuQuotaPercent' => isset($args[11]) ? $args[11] : 0,
+    'trafficCapMbit' => isset($args[12]) ? (int) $args[12] : 0,
 ];
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
 
@@ -55,8 +66,8 @@ if ($return_var !== 0) {
 }
 $user['id'] = (int) trim($output[0]);
 
-if (isset($argv[4])) {
-    $user['trafficLimit'] = (int) $argv[4];
+if (isset($args[4])) {
+    $user['trafficLimit'] = (int) $args[4];
 }
 
 if ($user['id'] < 1000) {
@@ -83,7 +94,7 @@ $presenceIndices = [
 ];
 $presence = [];
 foreach ($presenceIndices as $key => $index) {
-    $presence[$key] = array_key_exists($index, $argv);
+    $presence[$key] = array_key_exists($index, $args);
 }
 
 $store = new UserConfigStore();
@@ -120,6 +131,21 @@ if (!$store->set($user['name'], $payload)) {
     fwrite(STDERR, "Warning: failed to persist user config for {$user['name']}\n");
 } else {
     $store->writeUserCache($user['name'], $payload);
+}
+
+// Write optional torrent upload throttle before touching heavyweight services so limits
+// persist even if later steps bail out.
+if ($uploadThrottleKib !== null) {
+    if ($uploadThrottleKib === '' || !is_numeric($uploadThrottleKib)) {
+        die("Invalid --upload-throttle-kib value\n");
+    }
+    $throttleValue = (int) $uploadThrottleKib;
+    if ($throttleValue < 0) {
+        die("Upload throttle must be >= 0\n");
+    }
+    if (!pmssWriteTorrentThrottle($user['name'], $throttleValue)) {
+        fwrite(STDERR, "Warning: failed to write torrent upload throttle for {$user['name']}\n");
+    }
 }
 
 // Write optional traffic caps before touching heavyweight services so limits

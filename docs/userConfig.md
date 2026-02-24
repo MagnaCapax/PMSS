@@ -3,7 +3,7 @@
 `userConfig.php` modifies an existing account's resource limits and service configuration.
 
 ```
-Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT=1000] [IOWEIGHT=1000] [CPUQUOTAPCT]
+Usage: ./userConfig.php USERNAME MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [CPUWEIGHT=1000] [IOWEIGHT=1000] [CPUQUOTAPCT] [--upload-throttle-kib=KIB]
 ```
 
 Parameters:
@@ -14,6 +14,7 @@ Parameters:
 - **CPUWEIGHT** (optional) – systemd CPU weight (default 1000)
 - **IOWEIGHT** (optional) – systemd IO weight (default 1000)
 - **CPUQUOTAPCT** (optional) – systemd CPUQuota percentage (e.g., 85 for 85%); omit to leave unchanged/inherit slice baseline
+- **--upload-throttle-kib=KIB** (optional) – per-user torrent upload limit in KiB/s (0 removes the throttle file)
 
 The script rewrites rTorrent and ruTorrent configs, applies disk quota changes and restarts the user's rTorrent process.
 
