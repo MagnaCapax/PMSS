@@ -71,17 +71,20 @@ if (strpos($userList, $user['name']) === false) {
     die("No such user in passwd list\n");
 }
 
-$presence = [
-    'trafficLimit'    => array_key_exists(4, $argv),
-    'CPUWeight'       => array_key_exists(5, $argv),
-    'IOWeight'        => array_key_exists(6, $argv),
-    'IOReadBW'        => array_key_exists(7, $argv),
-    'IOWriteBW'       => array_key_exists(8, $argv),
-    'IOReadIOPS'      => array_key_exists(9, $argv),
-    'IOWriteIOPS'     => array_key_exists(10, $argv),
-    'cpuQuotaPercent' => array_key_exists(11, $argv),
-    'trafficCapMbit'  => array_key_exists(12, $argv),
+$presenceIndices = [
+    'CPUWeight'       => 5,
+    'IOWeight'        => 6,
+    'IOReadBW'        => 7,
+    'IOWriteBW'       => 8,
+    'IOReadIOPS'      => 9,
+    'IOWriteIOPS'     => 10,
+    'cpuQuotaPercent' => 11,
+    'trafficCapMbit'  => 12,
 ];
+$presence = [];
+foreach ($presenceIndices as $key => $index) {
+    $presence[$key] = array_key_exists($index, $argv);
+}
 
 $store = new UserConfigStore();
 $existing = $store->get($user['name']) ?? [];
@@ -92,29 +95,20 @@ $payload['rtorrentPort'] = isset($existing['rtorrentPort']) ? (int) $existing['r
 $payload['quota'] = $user['quota'];
 $payload['quotaBurst'] = (int) round(((float) $user['quota']) * 1.25);
 $payload['trafficLimit'] = 0;
-if (!empty($presence['CPUWeight'])) {
-    $payload['CPUWeight'] = $user['CPUWeight'];
-}
-if (!empty($presence['IOWeight'])) {
-    $payload['IOWeight'] = $user['IOWeight'];
-}
-if (!empty($presence['IOReadBW'])) {
-    $payload['IOReadBW'] = $user['IOReadBW'];
-}
-if (!empty($presence['IOWriteBW'])) {
-    $payload['IOWriteBW'] = $user['IOWriteBW'];
-}
-if (!empty($presence['IOReadIOPS'])) {
-    $payload['IOReadIOPS'] = $user['IOReadIOPS'];
-}
-if (!empty($presence['IOWriteIOPS'])) {
-    $payload['IOWriteIOPS'] = $user['IOWriteIOPS'];
-}
-if (!empty($presence['cpuQuotaPercent'])) {
-    $payload['cpuQuotaPercent'] = $user['cpuQuotaPercent'];
-}
-if ($presence['trafficCapMbit']) {
-    $payload['trafficCapMbit'] = $user['trafficCapMbit'];
+$payloadMap = [
+    'CPUWeight'       => 'CPUWeight',
+    'IOWeight'        => 'IOWeight',
+    'IOReadBW'        => 'IOReadBW',
+    'IOWriteBW'       => 'IOWriteBW',
+    'IOReadIOPS'      => 'IOReadIOPS',
+    'IOWriteIOPS'     => 'IOWriteIOPS',
+    'cpuQuotaPercent' => 'cpuQuotaPercent',
+    'trafficCapMbit'  => 'trafficCapMbit',
+];
+foreach ($payloadMap as $key => $userKey) {
+    if (!empty($presence[$key])) {
+        $payload[$key] = $user[$userKey];
+    }
 }
 if (!isset($payload['billingId'])) {
     $payload['billingId'] = 0;

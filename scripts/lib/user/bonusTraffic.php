@@ -14,29 +14,6 @@ foreach ([__DIR__.'/trafficLimit.php', dirname(__DIR__).'/lighttpd/userFileWrite
     }
 }
 
-if (!function_exists('pmssBonusTrafficUsage')) {
-    /**
-     * Return the CLI usage string for bonus traffic management.
-     */
-    function pmssBonusTrafficUsage(): string
-    {
-        return implode(
-            "\n",
-            [
-                'Usage:',
-                '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
-                '  ./userBonusTraffic.php --user=<username> --show',
-                '  ./userBonusTraffic.php --user=<username> --unset',
-                '  ./userBonusTraffic.php <username> <GiB>',
-                '',
-                'Notes:',
-                '  - Bonus unit is GiB (monthly quota add-on).',
-                '  - Use 0 (or --unset) to remove the bonus.',
-            ]
-        );
-    }
-}
-
 if (!function_exists('pmssBonusTrafficReadGiB')) {
     /**
      * Read bonus traffic GiB from a file, returning 0 when missing/invalid.
@@ -105,8 +82,22 @@ if (!function_exists('pmssUserBonusTrafficCli')) {
         }
 
         $parsed = pmssParseCliTokens($argv);
+        $usage = implode(
+            "\n",
+            [
+                'Usage:',
+                '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
+                '  ./userBonusTraffic.php --user=<username> --show',
+                '  ./userBonusTraffic.php --user=<username> --unset',
+                '  ./userBonusTraffic.php <username> <GiB>',
+                '',
+                'Notes:',
+                '  - Bonus unit is GiB (monthly quota add-on).',
+                '  - Use 0 (or --unset) to remove the bonus.',
+            ]
+        );
         if (pmssCliOption($parsed, 'help', 'h')) {
-            echo pmssBonusTrafficUsage()."\n";
+            echo $usage."\n";
             return 0;
         }
 
@@ -116,7 +107,7 @@ if (!function_exists('pmssUserBonusTrafficCli')) {
         $bonusRaw = pmssCliOption($parsed, 'bonus', 'b', $parsed['arguments'][1] ?? null);
 
         if ($userName === '') {
-            fwrite(STDERR, "Error: missing username.\n".pmssBonusTrafficUsage()."\n");
+            fwrite(STDERR, "Error: missing username.\n".$usage."\n");
             return 2;
         }
 

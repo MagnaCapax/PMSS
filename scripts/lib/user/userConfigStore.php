@@ -196,7 +196,6 @@ class UserConfigStore
             }
             $users[$name] = $this->normalise($payload);
         }
-        ksort($users, SORT_STRING);
         return $users;
     }
 
