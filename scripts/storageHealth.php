@@ -21,7 +21,7 @@ function pmssStorageHealthUsage(): void
 {
     echo "\nStorage health report\n";
     echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
-    echo "  --json <path>   JSON Lines input (default ".pmssStorageHealthDefaultJsonPath().")\n";
+    echo "  --json <path>   JSON Lines input (default /var/log/pmss/storage-health.jsonl)\n";
     echo "  --raw           Print the latest JSON entries (per device) and exit\n";
     echo "  --only-problems Show only warn/fail entries\n";
     echo "  --device <id>   Filter to one device (kname like sda, or path like /dev/sda)\n";
@@ -218,7 +218,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
     echo "JSONL: ".$jsonPath.PHP_EOL;
 }
 
-$jsonPath = pmssStorageHealthDefaultJsonPath();
+$jsonPath = '/var/log/pmss/storage-health.jsonl';
 $raw = false;
 $onlyProblems = false;
 $deviceFilter = null;
@@ -334,7 +334,10 @@ $perfStatus = pmssStorageHealthPerformanceStatus($raid);
 
 if ($userNoticeRequested && $userNoticePath !== '') {
     if ($perfStatus !== null) {
-        pmssStorageHealthEnsureParentDir($userNoticePath);
+        $userNoticeDir = dirname($userNoticePath);
+        if ($userNoticeDir !== '' && !is_dir($userNoticeDir)) {
+            @mkdir($userNoticeDir, 0755, true);
+        }
         $payload = [
             'timestamp' => $latestTs !== '' ? $latestTs : date('c'),
             'status' => $perfStatus['status'],

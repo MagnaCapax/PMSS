@@ -11,7 +11,7 @@ require_once __DIR__.'/../lib/storageHealth.php';
 
 function pmssStorageHealthSnapshotMain(array $argv): int
 {
-    $logPath = pmssStorageHealthDefaultJsonPath();
+    $logPath = '/var/log/pmss/storage-health.jsonl';
     $quiet = false;
 
     for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
@@ -35,25 +35,40 @@ function pmssStorageHealthSnapshotMain(array $argv): int
             case '-h':
                 echo "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\n";
                 echo "Usage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n";
-                echo "  --json <path>   JSON Lines output (default ".pmssStorageHealthDefaultJsonPath().")\n";
+                echo "  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n";
                 echo "  --quiet         Suppress the success message (cron-friendly)\n\n";
                 return 0;
         }
     }
 
-    pmssStorageHealthEnsureParentDir($logPath);
+    $logDir = dirname($logPath);
+    if ($logDir !== '' && !is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
     $timestamp = date('c');
     $last = pmssStorageHealthReadLastEntries($logPath);
 
     foreach (pmssStorageHealthListDisks() as $disk) {
-        pmssStorageHealthAppendJsonl($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
+        @file_put_contents(
+            $logPath,
+            json_encode(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp), JSON_UNESCAPED_SLASHES).PHP_EOL,
+            FILE_APPEND | LOCK_EX
+        );
         $nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp);
         if (is_array($nvme)) {
-            pmssStorageHealthAppendJsonl($logPath, $nvme);
+            @file_put_contents(
+                $logPath,
+                json_encode($nvme, JSON_UNESCAPED_SLASHES).PHP_EOL,
+                FILE_APPEND | LOCK_EX
+            );
         }
     }
     foreach (pmssStorageHealthSnapshotRaid($timestamp) as $raid) {
-        pmssStorageHealthAppendJsonl($logPath, $raid);
+        @file_put_contents(
+            $logPath,
+            json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL,
+            FILE_APPEND | LOCK_EX
+        );
     }
 
     if (!$quiet) {

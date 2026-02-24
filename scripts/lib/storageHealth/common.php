@@ -8,34 +8,6 @@
 
 require_once __DIR__.'/../runtime.php';
 
-if (!function_exists('pmssStorageHealthDefaultJsonPath')) {
-    function pmssStorageHealthDefaultJsonPath(): string
-    {
-        return '/var/log/pmss/storage-health.jsonl';
-    }
-}
-
-if (!function_exists('pmssStorageHealthEnsureParentDir')) {
-    function pmssStorageHealthEnsureParentDir(string $path): void
-    {
-        $dir = dirname($path);
-        if ($dir !== '' && !is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-    }
-}
-
-if (!function_exists('pmssStorageHealthAppendJsonl')) {
-    function pmssStorageHealthAppendJsonl(string $path, array $entry): void
-    {
-        @file_put_contents(
-            $path,
-            json_encode($entry, JSON_UNESCAPED_SLASHES).PHP_EOL,
-            FILE_APPEND | LOCK_EX
-        );
-    }
-}
-
 if (!function_exists('pmssStorageHealthReadLastEntries')) {
     /**
      * Read the latest entry per (kind, device/array) key from a JSONL file.
@@ -107,4 +79,3 @@ if (!function_exists('pmssStorageHealthPerformanceStatus')) {
         return null;
     }
 }
-
