@@ -14,6 +14,7 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 # Legacy path /deluge-{$user}/ kept for compatibility until at least {$deprecationDate}.
 
 \$HTTP["url"] =~ "^/user-{$user}/deluge($|/)" {
+  auth.require = ()
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => {$webPort}
@@ -27,6 +28,7 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 }
 
 \$HTTP["url"] =~ "^/deluge-{$user}($|/)" {
+  auth.require = ()
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => {$webPort}

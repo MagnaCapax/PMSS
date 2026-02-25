@@ -283,6 +283,13 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('"/deluge-testuser" => "/user-testuser/deluge"', $fragment);
     }
 
+    public function testDelugeLighttpdProxyFragmentDisablesBasicAuthForDelugePaths(): void
+    {
+        $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
+
+        $this->assertEquals(2, substr_count($fragment, 'auth.require = ()'));
+    }
+
     public function testDelugeLighttpdProxyFragmentHasDeprecationDate(): void
     {
         $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
