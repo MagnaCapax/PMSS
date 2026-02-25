@@ -480,6 +480,12 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringNotContainsString('"/deluge-##USER/"', $tpl);
     }
 
+    public function testDelugeWebTemplateDisablesFirstLoginWizard(): void
+    {
+        $tpl = $this->readRepoFile('etc/seedbox/config/template.deluge.web.conf');
+        $this->assertStringContainsString('"first_login": false', $tpl);
+    }
+
     public function testCreateNginxConfigUsesCentralProxyParamsInWebdavBlocks(): void
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
