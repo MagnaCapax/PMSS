@@ -5,7 +5,9 @@
 Pulsed Media Seedbox Software, server side code.
 This builds and installs all the software and scripts to operate a seedbox server.
 
-Works on Debian 10/11/12. Deb10 is stable, Deb11 is in production qualification and Deb12 is development/experimental stage.
+Works on Debian 10/11/12/13. Debian 12 (Bookworm) is the recommended
+production target. Debian 13 (Trixie) support is experimental/development.
+Debian 10 is upstream end-of-life, but existing installations continue to function.
 
 This can be used standalone fully, does not require a server from Pulsed Media. You can _freely_ use this for your own self-hosted seedbox.
 No commercial restrictions, you are free to provide seedbox services using this and there are even some minimalistic whitelabeling features.
@@ -74,13 +76,13 @@ Supported flags for `update.php`:
 - `--repo=<url>` / `--branch=<name>`: override git remote/branch for `git/*` specs
 - `--dry-run`: fetch/stage without copying files or running phase 2
 - `--scripts-only`: deploy `/scripts` + `/etc/skel` only; never runs apt
-- `--dist-upgrade=<target>`: run `scripts/util/update-dist-upgrade.php` (Debian 10→11 or 11→12); **cannot** be combined with `--scripts-only`
+- `--dist-upgrade=<target>`: run the built-in dist-upgrade helper (`scripts/lib/update/distUpgrade.php`) for one safe major-version step capped at `<target>`, then continue with phase 2; **cannot** be combined with `--scripts-only`
 - `--help`: print usage/examples
 
 To upgrade the underlying Debian release automatically, run
 `/scripts/update.php --dist-upgrade=<target>` with an explicit target
-(`11`/`bullseye` or `12`/`bookworm`). The dist-upgrade helper runs the
-recommended commands and exits without executing phase 2.
+(`11`/`bullseye`, `12`/`bookworm`, or `13`/`trixie` for experimental validation).
+The helper performs one safe major-version step per run, capped at your target.
 
 Need to refresh only the new scripts and skeleton without running the
 heavyweight configuration pass? Invoke `/scripts/update.php` with
@@ -90,22 +92,27 @@ skipping `update-step2.php`.
 See `docs/update.md` for a deep dive into the two-phase updater architecture
 and helper module layout introduced in the recent refactor.
 
-### Debian 10 to Debian 11 Upgrade
+### Upgrading Debian
 
-Dist-upgrade function manually, YOLO Mostly Unattended command for the base system update:
+Update PMSS first, then run the built-in dist-upgrade helper:
 ```
-export DEBIAN_FRONTEND=noninteractive; \
-sed -i 's/\<buster\>/bullseye/g' /etc/apt/sources.list; \
-sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list; \
-sed -i 's/\<buster\>/bullseye/g' /etc/apt/sources.list.d/*.list; \
-sed -i 's#bullseye/updates#bullseye-security#g' /etc/apt/sources.list.d/*.list; \
-apt update; \
-apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"; \
-apt full-upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"; \
-apt autoremove -y; \
-systemctl reboot
+/scripts/update.php git/main
+/scripts/update.php git/main --dist-upgrade=12
+```
 
+Supported targets: `11` (`bullseye`), `12` (`bookworm`), `13` (`trixie`, experimental).
+The helper performs one major-version step per run and resumes the normal PMSS
+update flow after the apt phase.
+
+After the dist-upgrade and reboot, run a regular update to rebuild/update
+services for the new Debian release:
 ```
+/scripts/update.php git/main
+```
+
+See also:
+- https://wiki.pulsedmedia.com/index.php/PMSS:Updating
+- https://wiki.pulsedmedia.com/index.php/Debian
 
 ### Support
 
