@@ -486,6 +486,12 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertStringContainsString('"first_login": false', $tpl);
     }
 
+    public function testDelugeWebTemplateUsesBoundedSessionTimeout(): void
+    {
+        $tpl = $this->readRepoFile('etc/seedbox/config/template.deluge.web.conf');
+        $this->assertStringContainsString('"session_timeout": 3600', $tpl);
+    }
+
     public function testCreateNginxConfigUsesCentralProxyParamsInWebdavBlocks(): void
     {
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
