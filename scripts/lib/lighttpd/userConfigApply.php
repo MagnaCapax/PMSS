@@ -72,6 +72,8 @@ function pmssUserConfigLighttpdConfigureUser(
     $delugeWebConfPath = "/home/{$thisUser}/.config/deluge/web.conf";
     $delugeParsed = null;
     if (is_readable($delugeWebConfPath)) {
+        $delugeRaw = @file_get_contents($delugeWebConfPath);
+        $needsDelugeWebConfWrite = is_string($delugeRaw) && pmssDelugeSessionsListDetected($delugeRaw);
         $delugeParsed = pmssDelugeReadWebConf($delugeWebConfPath);
         if (is_array($delugeParsed) && isset($delugeParsed['config'], $delugeParsed['meta']) && is_array($delugeParsed['config']) && is_array($delugeParsed['meta'])) {
             $port = $delugeParsed['config']['port'] ?? null;
@@ -86,8 +88,15 @@ function pmssUserConfigLighttpdConfigureUser(
             $base = $delugeParsed['config']['base'] ?? null;
             if (is_string($base) && ($base === $legacyBase || $base === $legacyBaseNoSlash || $base === $expectedBaseNoSlash) && $base !== $expectedBase) {
                 $delugeParsed['config']['base'] = $expectedBase;
+                $needsDelugeWebConfWrite = true;
+            }
+
+            if ($needsDelugeWebConfWrite) {
+                // Deluge expects sessions as a dict/object; writing an empty PHP array
+                // would serialize as [] and break login session creation.
+                pmssDelugeNormalizeEmptySessionsObject($delugeParsed['config']);
                 if (pmssDelugeWriteWebConf($delugeWebConfPath, $delugeParsed['meta'], $delugeParsed['config'], $thisUser)) {
-                    // Apply base change on the next cron tick (checkDelugeInstances.php).
+                    // Apply web.conf changes on the next cron tick (checkDelugeInstances.php).
                     passthru('killall -u '.escapeshellarg($thisUser).' -TERM deluge-web 2>/dev/null || true');
                 }
             }
@@ -165,4 +174,3 @@ function pmssUserConfigLighttpdConfigureUser(
         $resources['cpuQuotaPercent']
     );
 }
-

@@ -346,6 +346,38 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertEquals(8112, $parsed['config']['port'] ?? null);
     }
 
+    public function testDelugeSessionsListDetectedMatchesEmptyListLiteral(): void
+    {
+        $raw = '{"file":2,"format":1}{"sessions":[],"base":"/user-testuser/deluge/"}';
+        $this->assertTrue(\pmssDelugeSessionsListDetected($raw));
+    }
+
+    public function testDelugeSessionsListDetectedIgnoresObjectForm(): void
+    {
+        $raw = '{"file":2,"format":1}{"sessions":{},"base":"/user-testuser/deluge/"}';
+        $this->assertTrue(\pmssDelugeSessionsListDetected($raw) === false);
+    }
+
+    public function testDelugeNormalizeEmptySessionsObjectConvertsArrayToObject(): void
+    {
+        $config = ['sessions' => []];
+        $changed = \pmssDelugeNormalizeEmptySessionsObject($config);
+
+        $this->assertTrue($changed);
+        $this->assertTrue(is_object($config['sessions']));
+        $this->assertEquals('{}', json_encode($config['sessions']));
+    }
+
+    public function testDelugeNormalizeEmptySessionsObjectKeepsNonEmptyMap(): void
+    {
+        $config = ['sessions' => ['session1' => ['expires' => 1]]];
+        $changed = \pmssDelugeNormalizeEmptySessionsObject($config);
+
+        $this->assertTrue($changed === false);
+        $this->assertTrue(is_array($config['sessions']));
+        $this->assertTrue(isset($config['sessions']['session1']));
+    }
+
     public function testDelugeReadWebConfHandlesBracesInsideStrings(): void
     {
         $path = $this->tempDir.'/web-braces.conf';

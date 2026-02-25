@@ -68,6 +68,27 @@ function pmssSplitFirstJsonObject(string $content): ?array
     return null;
 }
 
+function pmssDelugeSessionsListDetected(string $raw): bool
+{
+    return preg_match('/"sessions"\\s*:\\s*\\[\\s*\\]/', $raw) === 1;
+}
+
+function pmssDelugeNormalizeEmptySessionsObject(array &$config): bool
+{
+    if (!array_key_exists('sessions', $config)) {
+        return false;
+    }
+    if (!is_array($config['sessions'])) {
+        return false;
+    }
+    if (count($config['sessions']) !== 0) {
+        return false;
+    }
+
+    $config['sessions'] = (object) [];
+    return true;
+}
+
 function pmssDelugeReadWebConf(string $path): ?array
 {
     $raw = @file_get_contents($path);
@@ -137,4 +158,3 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
 
     return true;
 }
-
