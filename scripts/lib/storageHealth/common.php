@@ -61,17 +61,17 @@ if (!function_exists('pmssStorageHealthPerformanceStatus')) {
         foreach ($raidEntries as $entry) {
             $flags = (array) ($entry['flags'] ?? []);
             $arrayName = (string) ($entry['array'] ?? 'md');
+            $reason = '';
             if (in_array('rebuild_in_progress', $flags, true)) {
-                return [
-                    'status' => 'performance_limited',
-                    'reason' => "RAID {$arrayName} resync in progress",
-                    'array' => $arrayName,
-                ];
+                $reason = "RAID {$arrayName} resync in progress";
+            } elseif (in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok') {
+                $reason = "RAID {$arrayName} degraded";
             }
-            if (in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok') {
+
+            if ($reason !== '') {
                 return [
                     'status' => 'performance_limited',
-                    'reason' => "RAID {$arrayName} degraded",
+                    'reason' => $reason,
                     'array' => $arrayName,
                 ];
             }

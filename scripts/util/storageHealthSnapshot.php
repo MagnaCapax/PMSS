@@ -47,28 +47,23 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     }
     $timestamp = date('c');
     $last = pmssStorageHealthReadLastEntries($logPath);
-
-    foreach (pmssStorageHealthListDisks() as $disk) {
+    $appendJson = static function (string $path, array $entry): void {
         @file_put_contents(
-            $logPath,
-            json_encode(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp), JSON_UNESCAPED_SLASHES).PHP_EOL,
+            $path,
+            json_encode($entry, JSON_UNESCAPED_SLASHES).PHP_EOL,
             FILE_APPEND | LOCK_EX
         );
+    };
+
+    foreach (pmssStorageHealthListDisks() as $disk) {
+        $appendJson($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
         $nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp);
         if (is_array($nvme)) {
-            @file_put_contents(
-                $logPath,
-                json_encode($nvme, JSON_UNESCAPED_SLASHES).PHP_EOL,
-                FILE_APPEND | LOCK_EX
-            );
+            $appendJson($logPath, $nvme);
         }
     }
     foreach (pmssStorageHealthSnapshotRaid($timestamp) as $raid) {
-        @file_put_contents(
-            $logPath,
-            json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL,
-            FILE_APPEND | LOCK_EX
-        );
+        $appendJson($logPath, $raid);
     }
 
     if (!$quiet) {

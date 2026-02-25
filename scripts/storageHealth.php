@@ -34,14 +34,7 @@ function pmssStorageHealthColor(string $severity, string $text): string
     if (!function_exists('posix_isatty') || !posix_isatty(STDOUT)) {
         return $text;
     }
-    $code = '0';
-    if ($severity === 'ok') {
-        $code = '32';
-    } elseif ($severity === 'warn') {
-        $code = '33';
-    } elseif ($severity === 'fail') {
-        $code = '31';
-    }
+    $code = ['ok' => '32', 'warn' => '33', 'fail' => '31'][$severity] ?? '0';
     return "\033[".$code."m".$text."\033[0m";
 }
 
@@ -63,14 +56,7 @@ function pmssStorageHealthFmtTemp($value): string
 
 function pmssStorageHealthMark(string $severity): string
 {
-    $mark = '?';
-    if ($severity === 'ok') {
-        $mark = 'OK';
-    } elseif ($severity === 'warn') {
-        $mark = '!!';
-    } elseif ($severity === 'fail') {
-        $mark = 'XX';
-    }
+    $mark = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'][$severity] ?? '?';
     return pmssStorageHealthColor($severity, $mark);
 }
 
@@ -225,23 +211,25 @@ $deviceFilter = null;
 $userNoticePath = '';
 $userNoticeRequested = false;
 $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
+$consumeOptionalValue = static function (?string $value, ?string $next, int &$index): ?string {
+    if ($value === null && $next !== null && strpos($next, '--') !== 0) {
+        $index++;
+        return $next;
+    }
+
+    return $value;
+};
 
 $argc = count($argv);
 for ($i = 1; $i < $argc; $i++) {
     $arg = $argv[$i];
     $next = ($i + 1 < $argc) ? $argv[$i + 1] : null;
-    $kv = null;
-    if (strpos($arg, '=') !== false) {
-        $kv = explode('=', $arg, 2);
-    }
-    $key = $kv ? $kv[0] : $arg;
-    $val = $kv ? $kv[1] : null;
+    $parts = explode('=', $arg, 2);
+    $key = $parts[0];
+    $val = count($parts) === 2 ? $parts[1] : null;
     switch ($key) {
         case '--json':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
+            $val = $consumeOptionalValue($val, $next, $i);
             if ($val !== null && $val !== '') {
                 $jsonPath = $val;
             }
@@ -253,20 +241,14 @@ for ($i = 1; $i < $argc; $i++) {
             $onlyProblems = true;
             break;
         case '--device':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
+            $val = $consumeOptionalValue($val, $next, $i);
             if ($val !== null && $val !== '') {
                 $deviceFilter = $val;
             }
             break;
         case '--user-notice':
             $userNoticeRequested = true;
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
+            $val = $consumeOptionalValue($val, $next, $i);
             $userNoticePath = $val !== null && $val !== '' ? $val : $defaultNoticePath;
             break;
         case '--help':
