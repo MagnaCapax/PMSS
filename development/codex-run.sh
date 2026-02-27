@@ -283,8 +283,8 @@ STOP CONDITIONS:
 REFACTOR ITERATION (when prefix = refactor(compression)):
 After each commit: print cumulative runtime LOC delta + concepts delta.
 If cumulative LOC delta > 0: STOP. If 2 cycles found nothing: STOP.
-If context exhausted: STOP. Otherwise: pick 3-5 new targets → implement → verify → commit.
-Maximum 8 cycles per session. One commit per cycle.
+If context exhausted: STOP. Otherwise: pick 5-10 new targets → implement → verify → commit.
+Maximum 15 cycles per session. One commit per cycle.
 
 CI RE-VERIFY (when prefix = ci):
 After all commits: re-run full test suite. If failure count did not strictly decrease: STOP.

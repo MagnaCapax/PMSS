@@ -31,7 +31,7 @@ Run types (pick one):
 
 1) Balanced Refactor & Compression Run (default):
    - Goal: Mix of structural improvement and dead code removal.
-   - Scope: Moderate (3–8 targets).
+   - Scope: Moderate (5–15 targets).
    - "Bigger stuff": Allowed to tackle slightly larger subsystems than simple peephole optimization.
    - Test-First: Strongly consider writing a targeted test case (scripts/lib/tests/development) BEFORE changing logic to ensure safety.
    - Constraint: Aim for net-negative or neutral LOC/concepts, but clarity/safety improvements are allowed to cost small LOC.
@@ -256,7 +256,7 @@ WORKFLOW (DO THIS)
    - Relevant ADRs under docs/adr/ and incidents under docs/incidents/ for the subsystem.
 
 3) Pick targets (balanced run):
-   - Pick 3–8 targets max.
+   - Pick 5–15 targets max.
    - Prefer the highest-value, highest-duplication / highest-nesting hot spots.
    - Avoid roaming.
 
@@ -302,11 +302,11 @@ Autocommit: When Autocommit Mode is appended below, "no commits" is VOID.
 No new branches unless explicitly instructed.
 
 Change budget:
-- Balanced/Safety runs: ≤ 12 files touched, ≤ 1200 total changed lines (additions + deletions)
-- Architectural Simplification runs: ≤ 20 files touched, ≤ 2000 total changed lines (additions + deletions)
+- Balanced/Safety runs: ≤ 20 files touched, ≤ 2000 total changed lines (additions + deletions)
+- Architectural Simplification runs: ≤ 30 files touched, ≤ 3000 total changed lines (additions + deletions)
 Stop if budget is reached.
 
 Autocommit budget (when Autocommit Mode is active):
-- Balanced: 15 targets, 25 files, 2500 lines (gates GATE 1-4 still apply at full strength)
-- Architectural: 30 files, 3000 lines (gates still apply)
-- Work in batches: 3-5 related changes → verify → commit → continue.
+- Balanced: 25 targets, 40 files, 5000 lines (gates GATE 1-4 still apply at full strength)
+- Architectural: 50 files, 6000 lines (gates still apply)
+- Work in batches: 5-10 related changes → verify → commit → continue.
