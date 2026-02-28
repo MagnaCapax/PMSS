@@ -45,5 +45,8 @@ class SystemdServiceDisableTest extends TestCase
         $this->assertTrue(strpos($joined, "systemctl mask 'cups'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.service'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.socket'") !== false);
+        $this->assertTrue(strpos($joined, "find '/var/spool/exim4/input' -xdev -type f -delete") !== false);
+        $this->assertTrue(strpos($joined, "find '/var/spool/exim4/msglog' -xdev -type f -delete") !== false);
+        $this->assertTrue(strpos($joined, "find '/var/spool/exim4/db' -xdev -type f -delete") !== false);
     }
 }

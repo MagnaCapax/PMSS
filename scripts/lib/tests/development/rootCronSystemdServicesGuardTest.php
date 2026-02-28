@@ -12,9 +12,9 @@ class RootCronSystemdServicesGuardTest extends TestCase
         $cron = @file_get_contents($cronPath);
         $this->assertTrue(is_string($cron) && $cron !== '', 'Expected to read '.$cronPath);
 
+        $this->assertTrue(strpos($cron, 'MAILTO=""') !== false, 'root.cron should suppress cron mail');
         $this->assertTrue(strpos($cron, '/scripts/cron/systemdServicesGuard.php') !== false);
         $this->assertEquals(2, substr_count($cron, '/scripts/cron/systemdServicesGuard.php'), 'Expected guard to run @reboot and periodically');
         $this->assertTrue(strpos($cron, '/var/log/pmss/systemdServicesGuard.log') !== false);
     }
 }
-

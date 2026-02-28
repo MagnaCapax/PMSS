@@ -132,6 +132,28 @@ if (!function_exists('pmssSeedboxSystemServiceSpecs')) {
 
 if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
     /**
+     * Purge stale exim4 spool files so masked MTAs cannot accumulate backlog.
+     *
+     * Deletion is intentionally limited to known exim4 spool directories and
+     * uses one command per directory for predictable logging and retries.
+     */
+    function pmssPurgeExim4SpoolFiles(): void
+    {
+        $spoolDirs = [
+            '/var/spool/exim4/input',
+            '/var/spool/exim4/msglog',
+            '/var/spool/exim4/db',
+        ];
+
+        foreach ($spoolDirs as $dir) {
+            runStep(
+                'Purging stale exim4 spool files in '.$dir,
+                'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true'
+            );
+        }
+    }
+
+    /**
      * Stop/disable known risky system-wide services.
      *
      * Note: per-user instances are started via PMSS cron/util scripts and are
@@ -146,6 +168,8 @@ if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
                 (bool) $spec['mask']
             );
         }
+
+        pmssPurgeExim4SpoolFiles();
     }
 }
 

@@ -1,5 +1,6 @@
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/scripts
 SHELL=/bin/bash
+MAILTO=""
 
 
 # m h  dom mon dow   command
