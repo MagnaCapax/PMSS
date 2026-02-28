@@ -33,33 +33,50 @@ function pmssResourceLogReadCounters(int $uid): ?array
     }
     $unit = sprintf('user-%d.slice', $uid);
     $cmd = 'systemctl show '.escapeshellarg($unit)
-        .' -p IOReadBytes -p IOWriteBytes -p CPUUsageNSec -p MemoryCurrent -p TasksCurrent';
+        .' -p IOReadBytes -p IOWriteBytes -p IOReadOperations -p IOWriteOperations -p CPUUsageNSec -p MemoryCurrent -p TasksCurrent';
     $out = @shell_exec($cmd);
     if (!is_string($out) || trim($out) === '') {
         return null;
     }
 
-    $keys = [
+    $requiredKeys = [
         'IOReadBytes' => 'io_read',
         'IOWriteBytes' => 'io_write',
         'CPUUsageNSec' => 'cpu_nsec',
         'MemoryCurrent' => 'memory',
         'TasksCurrent' => 'tasks',
     ];
-    $values = array_fill_keys(array_values($keys), null);
+    $optionalKeys = [
+        'IOReadOperations' => 'io_read_ops',
+        'IOWriteOperations' => 'io_write_ops',
+    ];
+    $values = array_fill_keys(array_values($requiredKeys), null);
+    $values += array_fill_keys(array_values($optionalKeys), 0);
 
     foreach (preg_split('/\r?\n/', trim($out)) as $line) {
         $parts = explode('=', $line, 2);
-        if (count($parts) !== 2 || !isset($keys[$parts[0]])) {
+        if (count($parts) !== 2) {
             continue;
         }
+        $name = $parts[0];
         $value = $parts[1];
-        if (ctype_digit($value)) {
-            $values[$keys[$parts[0]]] = (int) $value;
+        if (!ctype_digit($value)) {
+            continue;
+        }
+        if (isset($requiredKeys[$name])) {
+            $values[$requiredKeys[$name]] = (int) $value;
+        } elseif (isset($optionalKeys[$name])) {
+            $values[$optionalKeys[$name]] = (int) $value;
         }
     }
 
-    return in_array(null, $values, true) ? null : $values;
+    foreach ($requiredKeys as $field) {
+        if ($values[$field] === null) {
+            return null;
+        }
+    }
+
+    return $values;
 }
 
 /**
@@ -83,7 +100,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
 
     $current = [];
     $delta = [];
-    foreach (['io_read', 'io_write', 'cpu_nsec'] as $field) {
+    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
         $currentValue = (int) $counters[$field];
         $previousValue = isset($state[$field]) ? (int) $state[$field] : null;
         $current[$field] = $currentValue;

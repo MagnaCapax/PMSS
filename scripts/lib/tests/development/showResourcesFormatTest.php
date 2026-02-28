@@ -22,4 +22,9 @@ class ShowResourcesFormatTest extends TestCase
     {
         $this->assertEquals('2.50 GB-hrs', \pmssResourceFormatRamHours(2.5));
     }
+
+    public function testFormatOpsPerSecond(): void
+    {
+        $this->assertEquals('2.00', \pmssResourceFormatOpsPerSecond(7200, 3600));
+    }
 }

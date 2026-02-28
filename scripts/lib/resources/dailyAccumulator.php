@@ -35,6 +35,8 @@ class ResourceStatsDailyAccumulator
             $this->dailyTotals[$currentDay] = [
                 'io_read'      => 0.0,
                 'io_write'     => 0.0,
+                'io_read_ops'  => 0.0,
+                'io_write_ops' => 0.0,
                 'cpu'          => 0.0,
                 'ram_hours'    => 0.0,
                 'memory_sum'   => 0.0,
@@ -46,6 +48,8 @@ class ResourceStatsDailyAccumulator
         $sampleRamHours = ((float) $sample['memory'] / 1024 / 1024 / 1024) * $intervalHours;
         $this->dailyTotals[$currentDay]['io_read'] += $sample['io_read'];
         $this->dailyTotals[$currentDay]['io_write'] += $sample['io_write'];
+        $this->dailyTotals[$currentDay]['io_read_ops'] += isset($sample['io_read_ops']) ? (float) $sample['io_read_ops'] : 0.0;
+        $this->dailyTotals[$currentDay]['io_write_ops'] += isset($sample['io_write_ops']) ? (float) $sample['io_write_ops'] : 0.0;
         $this->dailyTotals[$currentDay]['cpu'] += $sample['cpu'];
         $this->dailyTotals[$currentDay]['ram_hours'] += $sampleRamHours;
         $this->dailyTotals[$currentDay]['memory_sum'] += $sample['memory'];
@@ -66,6 +70,8 @@ class ResourceStatsDailyAccumulator
             $daily[$day] = [
                 'io_read'   => $totals['io_read'],
                 'io_write'  => $totals['io_write'],
+                'io_read_ops' => $totals['io_read_ops'],
+                'io_write_ops' => $totals['io_write_ops'],
                 'cpu'       => $totals['cpu'],
                 'ram_hours' => $totals['ram_hours'],
                 'memory'    => $memoryAvg,

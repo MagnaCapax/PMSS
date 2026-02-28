@@ -40,6 +40,8 @@ class ResourceStatsAccumulator
         $this->rawTotals = [
             'io_read'   => array_fill_keys($labels, 0.0),
             'io_write'  => array_fill_keys($labels, 0.0),
+            'io_read_ops' => array_fill_keys($labels, 0.0),
+            'io_write_ops' => array_fill_keys($labels, 0.0),
             'cpu'       => array_fill_keys($labels, 0.0),
             'ram_hours' => array_fill_keys($labels, 0.0),
         ];
@@ -63,6 +65,8 @@ class ResourceStatsAccumulator
         $timestamp = (int) $sample['timestamp'];
         $this->lastMemory = (float) $sample['memory'];
         $this->lastTasks = (float) $sample['tasks'];
+        $sampleReadOps = isset($sample['io_read_ops']) ? (float) $sample['io_read_ops'] : 0.0;
+        $sampleWriteOps = isset($sample['io_write_ops']) ? (float) $sample['io_write_ops'] : 0.0;
 
         $defaultIntervalHours = 300 / 3600;
         if ($this->prevTimestamp === null) {
@@ -78,6 +82,8 @@ class ResourceStatsAccumulator
             if ($timestamp >= $threshold) {
                 $this->rawTotals['io_read'][$label] += $sample['io_read'];
                 $this->rawTotals['io_write'][$label] += $sample['io_write'];
+                $this->rawTotals['io_read_ops'][$label] += $sampleReadOps;
+                $this->rawTotals['io_write_ops'][$label] += $sampleWriteOps;
                 $this->rawTotals['cpu'][$label] += $sample['cpu'];
                 $this->rawTotals['ram_hours'][$label] += $sampleRamHours;
                 $this->memorySums[$label] += $sample['memory'];

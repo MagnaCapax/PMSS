@@ -14,11 +14,13 @@ class ResourceLogHelpersTest extends TestCase
         return $root;
     }
 
-    private function makeCounters(int $ioRead, int $ioWrite, int $cpuNsec, int $memory, int $tasks): array
+    private function makeCounters(int $ioRead, int $ioWrite, int $cpuNsec, int $memory, int $tasks, int $ioReadOps = 0, int $ioWriteOps = 0): array
     {
         return [
             'io_read' => $ioRead,
             'io_write' => $ioWrite,
+            'io_read_ops' => $ioReadOps,
+            'io_write_ops' => $ioWriteOps,
             'cpu_nsec' => $cpuNsec,
             'memory' => $memory,
             'tasks' => $tasks,
@@ -74,6 +76,8 @@ class ResourceLogHelpersTest extends TestCase
 
         $this->assertEquals(10, $result['delta']['io_read']);
         $this->assertEquals(20, $result['delta']['io_write']);
+        $this->assertEquals(0, $result['delta']['io_read_ops']);
+        $this->assertEquals(0, $result['delta']['io_write_ops']);
         $this->assertEquals(30, $result['delta']['cpu_nsec']);
         $this->assertEquals(4096, $result['state']['memory']);
         $this->assertEquals(7, $result['state']['tasks']);
@@ -88,20 +92,26 @@ class ResourceLogHelpersTest extends TestCase
         file_put_contents($statePath, json_encode([
             'io_read' => 5,
             'io_write' => 2,
+            'io_read_ops' => 10,
+            'io_write_ops' => 20,
             'cpu_nsec' => 100,
             'memory' => 1,
             'tasks' => 1,
             'ts' => 123,
         ]));
 
-        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(8, 12, 150, 2048, 3));
+        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(8, 12, 150, 2048, 3, 16, 29));
 
         $this->assertEquals(3, $result['delta']['io_read']);
         $this->assertEquals(10, $result['delta']['io_write']);
+        $this->assertEquals(6, $result['delta']['io_read_ops']);
+        $this->assertEquals(9, $result['delta']['io_write_ops']);
         $this->assertEquals(50, $result['delta']['cpu_nsec']);
         $state = $this->readState($statePath);
         $this->assertEquals(8, $state['io_read']);
         $this->assertEquals(12, $state['io_write']);
+        $this->assertEquals(16, $state['io_read_ops']);
+        $this->assertEquals(29, $state['io_write_ops']);
         $this->assertEquals(150, $state['cpu_nsec']);
         $this->assertEquals(2048, $state['memory']);
         $this->assertEquals(3, $state['tasks']);

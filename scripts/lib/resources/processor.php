@@ -123,6 +123,14 @@ class ResourceStatsProcessor
                 'raw'     => $rawTotals['io_write'],
                 'display' => $this->formatter->formatBytesDisplay($rawTotals['io_write']),
             ],
+            'io_read_ops' => [
+                'raw'     => $rawTotals['io_read_ops'],
+                'display' => $this->formatter->formatCountDisplay($rawTotals['io_read_ops']),
+            ],
+            'io_write_ops' => [
+                'raw'     => $rawTotals['io_write_ops'],
+                'display' => $this->formatter->formatCountDisplay($rawTotals['io_write_ops']),
+            ],
             'cpu' => [
                 'raw'     => $rawTotals['cpu'],
                 'display' => $this->formatter->formatCpuDisplay($rawTotals['cpu']),

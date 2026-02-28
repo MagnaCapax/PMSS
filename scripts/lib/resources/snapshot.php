@@ -40,6 +40,8 @@ function pmssResourceSnapshotComputeFromLog(resourceStatistics $stats, string $u
     return [
         'io_read' => $results['raw']['io_read']['day'],
         'io_write' => $results['raw']['io_write']['day'],
+        'io_read_ops' => $results['raw']['io_read_ops']['day'],
+        'io_write_ops' => $results['raw']['io_write_ops']['day'],
         'cpu' => $results['raw']['cpu']['day'],
         'memory' => $results['memory']['day'],
         'ram_hours' => $results['raw']['ram_hours']['day'],
@@ -105,11 +107,15 @@ function pmssResourceSnapshotRun(): int
         if (is_string($raw) && trim($raw) !== '') {
             $data = @unserialize($raw);
             if (is_array($data)) {
-                $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'];
+                $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks', 'io_read_ops', 'io_write_ops'];
                 $metrics = [];
                 foreach ($keys as $key) {
                     $value = $data[$key]['raw']['day'] ?? null;
                     if ($value === null) {
+                        if ($key === 'io_read_ops' || $key === 'io_write_ops') {
+                            $metrics[$key] = 0.0;
+                            continue;
+                        }
                         $metrics = null;
                         break;
                     }
@@ -130,7 +136,7 @@ function pmssResourceSnapshotRun(): int
         @fwrite(
             $fh,
             sprintf(
-                '%s %d %d %d %d %d %.4f %.2f',
+                '%s %d %d %d %d %d %.4f %.2f %d %d',
                 $ts,
                 $uid,
                 (int) round($metrics['io_read']),
@@ -138,7 +144,9 @@ function pmssResourceSnapshotRun(): int
                 (int) round($metrics['cpu']),
                 (int) round($metrics['memory']),
                 $metrics['ram_hours'],
-                $metrics['tasks']
+                $metrics['tasks'],
+                (int) round($metrics['io_read_ops']),
+                (int) round($metrics['io_write_ops'])
             ).PHP_EOL
         );
     }

@@ -16,6 +16,8 @@ class ResourceStatsAccumulatorTest extends TestCase
             'timestamp' => $now - 300,
             'io_read' => 100.0,
             'io_write' => 200.0,
+            'io_read_ops' => 10.0,
+            'io_write_ops' => 20.0,
             'cpu' => 300.0,
             'memory' => 1024 * 1024 * 1024,
             'tasks' => 2.0,
@@ -24,6 +26,8 @@ class ResourceStatsAccumulatorTest extends TestCase
             'timestamp' => $now,
             'io_read' => 50.0,
             'io_write' => 25.0,
+            'io_read_ops' => 5.0,
+            'io_write_ops' => 7.0,
             'cpu' => 100.0,
             'memory' => 1024 * 1024 * 1024,
             'tasks' => 4.0,
@@ -32,6 +36,8 @@ class ResourceStatsAccumulatorTest extends TestCase
         $results = $acc->results();
         $this->assertTrue($acc->hasSamples());
         $this->assertEquals(150.0, $results['raw']['io_read']['day']);
+        $this->assertEquals(15.0, $results['raw']['io_read_ops']['day']);
+        $this->assertEquals(27.0, $results['raw']['io_write_ops']['day']);
         $this->assertEquals(3.0, $results['tasks']['day']);
         $this->assertEquals(1024 * 1024 * 1024, $results['memory']['day']);
     }

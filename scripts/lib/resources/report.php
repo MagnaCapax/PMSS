@@ -20,6 +20,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $totals = [
         'io_read' => array_fill_keys($windows, 0.0),
         'io_write' => array_fill_keys($windows, 0.0),
+        'io_read_ops' => array_fill_keys($windows, 0.0),
+        'io_write_ops' => array_fill_keys($windows, 0.0),
         'cpu' => array_fill_keys($windows, 0.0),
         'ram_hours' => array_fill_keys($windows, 0.0),
         'memory_current' => 0.0,
@@ -27,10 +29,14 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         'tasks_current' => 0.0,
     ];
 
-    $selectWindows = static function (array $raw) use ($windows): ?array {
+    $selectWindows = static function (array $raw, bool $allowMissing = false) use ($windows): ?array {
         $selected = [];
         foreach ($windows as $label) {
             if (!isset($raw[$label])) {
+                if ($allowMissing) {
+                    $selected[$label] = 0.0;
+                    continue;
+                }
                 return null;
             }
             $selected[$label] = (float) $raw[$label];
@@ -54,6 +60,9 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
                 continue 2;
             }
         }
+        foreach (['io_read_ops', 'io_write_ops'] as $metric) {
+            $windowMetrics[$metric] = $selectWindows($data[$metric]['raw'] ?? [], true);
+        }
 
         $memoryCurrent = isset($data['memory']['current']) ? (float) $data['memory']['current'] : 0.0;
         $memoryAvgMonth = isset($data['memory']['raw']['month']) ? (float) $data['memory']['raw']['month'] : 0.0;
@@ -71,6 +80,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         $rows[$thisUser] = [
             'io_read' => $windowMetrics['io_read'],
             'io_write' => $windowMetrics['io_write'],
+            'io_read_ops' => $windowMetrics['io_read_ops'],
+            'io_write_ops' => $windowMetrics['io_write_ops'],
             'cpu' => $windowMetrics['cpu'],
             'memory_current' => $memoryCurrent,
             'memory_avg_month' => $memoryAvgMonth,
@@ -93,6 +104,8 @@ function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing
         $users[$username] = [
             'io_read' => $row['io_read'],
             'io_write' => $row['io_write'],
+            'io_read_ops' => $row['io_read_ops'],
+            'io_write_ops' => $row['io_write_ops'],
             'cpu' => $row['cpu'],
             'memory' => [
                 'current' => $row['memory_current'],
@@ -110,6 +123,8 @@ function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing
         'totals' => [
             'io_read' => $totals['io_read'],
             'io_write' => $totals['io_write'],
+            'io_read_ops' => $totals['io_read_ops'],
+            'io_write_ops' => $totals['io_write_ops'],
             'cpu' => $totals['cpu'],
             'memory' => [
                 'current' => $totals['memory_current'],

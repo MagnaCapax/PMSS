@@ -13,7 +13,19 @@ class ResourceStatisticsTest extends TestCase
         $parsed = $stats->parseLine($line);
         $this->assertTrue($parsed !== false);
         $this->assertEquals(1024.0, $parsed['io_read']);
+        $this->assertEquals(0.0, $parsed['io_read_ops']);
         $this->assertEquals(7.0, $parsed['tasks']);
+    }
+
+    public function testParseLineWithOpsFields(): void
+    {
+        $stats = new \resourceStatistics();
+        $line = date('Y-m-d H:i:s').' 1024 2048 12 34 3000 4096 7';
+        $parsed = $stats->parseLine($line);
+        $this->assertTrue($parsed !== false);
+        $this->assertEquals(12.0, $parsed['io_read_ops']);
+        $this->assertEquals(34.0, $parsed['io_write_ops']);
+        $this->assertEquals(3000.0, $parsed['cpu']);
     }
 
     public function testParseLineRejectsMalformed(): void

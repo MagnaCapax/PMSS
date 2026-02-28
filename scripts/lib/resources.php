@@ -59,7 +59,9 @@ class resourceStatistics
             return false;
         }
 
-        $values = array_slice($tokens, 2, 5);
+        $usesOpsFields = count($tokens) >= 9;
+        $valueCount = $usesOpsFields ? 7 : 5;
+        $values = array_slice($tokens, 2, $valueCount);
         $parsed = [];
         foreach ($values as $value) {
             if ($value === '' || !ctype_digit($value)) {
@@ -68,13 +70,22 @@ class resourceStatistics
             $parsed[] = (float) $value;
         }
 
+        $ioReadOps = 0.0;
+        $ioWriteOps = 0.0;
+        if ($usesOpsFields) {
+            $ioReadOps = $parsed[2];
+            $ioWriteOps = $parsed[3];
+        }
+
         return [
             'timestamp' => (int) $timestamp,
             'io_read'   => $parsed[0],
             'io_write'  => $parsed[1],
-            'cpu'       => $parsed[2],
-            'memory'    => $parsed[3],
-            'tasks'     => $parsed[4],
+            'io_read_ops' => $ioReadOps,
+            'io_write_ops' => $ioWriteOps,
+            'cpu'       => $usesOpsFields ? $parsed[4] : $parsed[2],
+            'memory'    => $usesOpsFields ? $parsed[5] : $parsed[3],
+            'tasks'     => $usesOpsFields ? $parsed[6] : $parsed[4],
         ];
     }
 

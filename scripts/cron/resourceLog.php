@@ -42,10 +42,12 @@ foreach ($users as $user) {
     $state = $result['state'];
 
     $line = sprintf(
-        '%s %d %d %d %d %d',
+        '%s %d %d %d %d %d %d %d',
         date('Y-m-d H:i:s'),
         $delta['io_read'],
         $delta['io_write'],
+        $delta['io_read_ops'],
+        $delta['io_write_ops'],
         $delta['cpu_nsec'],
         $state['memory'],
         $state['tasks']
