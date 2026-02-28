@@ -75,13 +75,7 @@ function pmssDelugeSessionsListDetected(string $raw): bool
 
 function pmssDelugeNormalizeEmptySessionsObject(array &$config): bool
 {
-    if (!array_key_exists('sessions', $config)) {
-        return false;
-    }
-    if (!is_array($config['sessions'])) {
-        return false;
-    }
-    if (count($config['sessions']) !== 0) {
+    if (!array_key_exists('sessions', $config) || !is_array($config['sessions']) || count($config['sessions']) !== 0) {
         return false;
     }
 
@@ -102,7 +96,7 @@ function pmssDelugeReadWebConf(string $path): ?array
     }
 
     $split = pmssSplitFirstJsonObject($raw);
-    if (!is_array($split) || count($split) !== 2) {
+    if (!is_array($split)) {
         return null;
     }
 

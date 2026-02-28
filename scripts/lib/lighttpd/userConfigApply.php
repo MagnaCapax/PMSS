@@ -39,37 +39,40 @@ function pmssUserConfigLighttpdConfigureUser(
         return;
     }
     pmssEnsureWebdavLockDatabase($thisUser, $homeDir);
-    $customDir = "/home/{$thisUser}/.lighttpd/custom.d";
+    $customDir = $homeDir.'/.lighttpd/custom.d';
 
-    // Rclone port
-    $rclonePort = (int) trim(@file_get_contents("/home/{$thisUser}/.rclonePort"));
-    if ($rclonePort < 1024 or $rclonePort > 65500) {
-        $rclonePort = (int) round(rand(1500, 65500));
-        file_put_contents("/home/{$thisUser}/.rclonePort", $rclonePort);
+    $proxyPortFiles = [
+        'rclone' => $homeDir.'/.rclonePort',
+        'qbittorrent' => $homeDir.'/.qbittorrentPort',
+    ];
+    $proxyPorts = [];
+    foreach ($proxyPortFiles as $proxyName => $proxyPortFile) {
+        $proxyPort = (int) trim((string) @file_get_contents($proxyPortFile));
+        if ($proxyPort < 1024 || $proxyPort > 65500) {
+            $proxyPort = (int) round(rand(1500, 65500));
+            file_put_contents($proxyPortFile, $proxyPort);
+        }
+        $proxyPorts[$proxyName] = $proxyPort;
     }
-
-    // qBittorrent port
-    $qbittorrentPort = (int) trim(@file_get_contents("/home/{$thisUser}/.qbittorrentPort"));
-    if ($qbittorrentPort < 1024 or $qbittorrentPort > 65500) {
-        $qbittorrentPort = (int) round(rand(1500, 65500));
-        file_put_contents("/home/{$thisUser}/.qbittorrentPort", $qbittorrentPort);
-    }
+    $rclonePort = $proxyPorts['rclone'];
+    $qbittorrentPort = $proxyPorts['qbittorrent'];
 
     // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
-    $rcloneConfPath = "{$customDir}/pmss-rclone.conf";
-    if (!pmssWriteUserFile($rcloneConfPath, pmssRcloneLighttpdProxyFragment($thisUser, $rclonePort), $thisUser, 0640)) {
-        fwrite(STDERR, "[user:{$thisUser}] Failed to write rclone lighttpd fragment\n");
-    }
-
-    $qbittorrentConfPath = "{$customDir}/pmss-qbittorrent.conf";
-    if (!pmssWriteUserFile($qbittorrentConfPath, pmssQbittorrentLighttpdProxyFragment($thisUser, $qbittorrentPort), $thisUser, 0640)) {
-        fwrite(STDERR, "[user:{$thisUser}] Failed to write qbittorrent lighttpd fragment\n");
+    $proxyFragments = [
+        'rclone' => pmssRcloneLighttpdProxyFragment($thisUser, $rclonePort),
+        'qbittorrent' => pmssQbittorrentLighttpdProxyFragment($thisUser, $qbittorrentPort),
+    ];
+    foreach ($proxyFragments as $proxyName => $proxyFragment) {
+        $proxyConfPath = "{$customDir}/pmss-{$proxyName}.conf";
+        if (!pmssWriteUserFile($proxyConfPath, $proxyFragment, $thisUser, 0640)) {
+            fwrite(STDERR, "[user:{$thisUser}] Failed to write {$proxyName} lighttpd fragment\n");
+        }
     }
 
     // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/
     // so nginx stays a lightweight reverse proxy.
     $delugeWebPort = null;
-    $delugeWebConfPath = "/home/{$thisUser}/.config/deluge/web.conf";
+    $delugeWebConfPath = $homeDir.'/.config/deluge/web.conf';
     $delugeParsed = null;
     if (is_readable($delugeWebConfPath)) {
         $delugeRaw = @file_get_contents($delugeWebConfPath);
@@ -104,7 +107,7 @@ function pmssUserConfigLighttpdConfigureUser(
     }
     if ($delugeWebPort === null) {
         // Fallback (legacy hosts): derive deluge-web port from .delugePort.
-        $delugePort = (int) trim(@file_get_contents("/home/{$thisUser}/.delugePort"));
+        $delugePort = (int) trim((string) @file_get_contents($homeDir.'/.delugePort'));
         if ($delugePort >= 1024 && $delugePort <= 65535) {
             $candidatePorts = [$delugePort + 1, $delugePort];
             foreach ($candidatePorts as $candidate) {
@@ -125,7 +128,7 @@ function pmssUserConfigLighttpdConfigureUser(
         }
     }
     if ($delugeWebPort !== null) {
-        $delugeConfPath = "/home/{$thisUser}/.lighttpd/custom.d/pmss-deluge.conf";
+        $delugeConfPath = $customDir.'/pmss-deluge.conf';
         if (!pmssWriteUserFile($delugeConfPath, pmssDelugeLighttpdProxyFragment($thisUser, $delugeWebPort), $thisUser, 0640)) {
             fwrite(STDERR, "[user:{$thisUser}] Failed to write deluge lighttpd fragment\n");
         }
@@ -140,12 +143,12 @@ function pmssUserConfigLighttpdConfigureUser(
         $qbittorrentPort,
         $resources
     );
-    if (!pmssWriteUserFile("/home/{$thisUser}/.lighttpd.conf", $thisUserConfig, $thisUser, 0741)) {
+    if (!pmssWriteUserFile($homeDir.'/.lighttpd.conf', $thisUserConfig, $thisUser, 0741)) {
         fwrite(STDERR, "[user:{$thisUser}] Failed to write .lighttpd.conf; skipping user\n");
         return;
     }
 
-    $phpIniPath = "/home/{$thisUser}/.lighttpd/php.ini";
+    $phpIniPath = $homeDir.'/.lighttpd/php.ini';
     if (is_link($phpIniPath) || (file_exists($phpIniPath) && !is_file($phpIniPath))) {
         fwrite(STDERR, "[user:{$thisUser}] Refusing to operate on unsafe php.ini path; skipping user\n");
         return;

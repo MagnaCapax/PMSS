@@ -7,11 +7,9 @@
 
 function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 {
-    $deprecationDate = '2028-01-28';
-
     return <<<LIGHTTPD
 # PMSS-managed: Deluge reverse proxy.
-# Legacy path /deluge-{$user}/ kept for compatibility until at least {$deprecationDate}.
+# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.
 
 \$HTTP["url"] =~ "^/user-{$user}/deluge($|/)" {
   auth.require = ()
