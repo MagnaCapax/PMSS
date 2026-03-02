@@ -145,6 +145,8 @@ class UserTransferTest extends TestCase
         $this->assertStringContainsString(':/home/deefbox/', $script);
         $this->assertStringContainsString('/home/deefbox/', $script);
         $this->assertStringContainsString("--exclude='.rtorrent.rc'", $script);
+        $this->assertStringContainsString("--exclude='.trafficDataIngress'", $script);
+        $this->assertStringContainsString("--exclude='.trafficDataIngressLocal'", $script);
         $this->assertTrue(strpos($script, '--exclude={') === false, 'expected no brace-expanded excludes');
     }
 

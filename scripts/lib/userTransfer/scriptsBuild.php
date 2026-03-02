@@ -30,6 +30,8 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.rtorrentExecuteRun',
         '.trafficData',
         '.trafficDataLocal',
+        '.trafficDataIngress',
+        '.trafficDataIngressLocal',
         'rTorrentLog',
         '.bonusQuota',
         '.bonusTraffic',
