@@ -6,16 +6,15 @@
  * @author PMSS Team
  */
 
-if (!function_exists('pmssStorageHealthParseSmartctlOutput')) {
-    /**
-     * Parse smartctl output into a stable metric set.
-     *
-     * @param array<string, mixed> $disk
-     * @param array<string, mixed>|null $prevMetrics
-     * @return array<string, mixed>
-     */
-    function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $prevMetrics, string $timestamp): array
-    {
+/**
+ * Parse smartctl output into a stable metric set.
+ *
+ * @param array<string, mixed> $disk
+ * @param array<string, mixed>|null $prevMetrics
+ * @return array<string, mixed>
+ */
+function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $prevMetrics, string $timestamp): array
+{
         $dev = (string) $disk['path'];
         $entry = [
             'timestamp' => $timestamp,
@@ -160,18 +159,16 @@ if (!function_exists('pmssStorageHealthParseSmartctlOutput')) {
         $entry['flags'] = $flags;
         $entry['severity'] = $sev;
         $entry['ok'] = ($sev === 'ok');
-        return $entry;
-    }
+    return $entry;
 }
 
-if (!function_exists('pmssStorageHealthSnapshotSmart')) {
-    /**
-     * @param array<string, mixed> $disk
-     * @param array<string, mixed> $last
-     * @return array<string, mixed>
-     */
-    function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timestamp): array
-    {
+/**
+ * @param array<string, mixed> $disk
+ * @param array<string, mixed> $last
+ * @return array<string, mixed>
+ */
+function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timestamp): array
+{
         $dev = (string) $disk['path'];
         $base = [
             'timestamp' => $timestamp,
@@ -221,7 +218,5 @@ if (!function_exists('pmssStorageHealthSnapshotSmart')) {
             $entry['ok'] = ($entry['severity'] === 'ok');
             $entry['flags'] = array_values(array_unique(array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout'])));
         }
-        return $entry;
-    }
+    return $entry;
 }
-

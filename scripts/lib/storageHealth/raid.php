@@ -6,12 +6,11 @@
  * @author PMSS Team
  */
 
-if (!function_exists('pmssStorageHealthSnapshotRaid')) {
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    function pmssStorageHealthSnapshotRaid(string $timestamp): array
-    {
+/**
+ * @return array<int, array<string, mixed>>
+ */
+function pmssStorageHealthSnapshotRaid(string $timestamp): array
+{
         $entries = [];
         $md = @file_get_contents('/proc/mdstat');
         if ($md === false) {
@@ -53,7 +52,5 @@ if (!function_exists('pmssStorageHealthSnapshotRaid')) {
                 $entries[$lastIdx]['resync'] = trim($line);
             }
         }
-        return $entries;
-    }
+    return $entries;
 }
-

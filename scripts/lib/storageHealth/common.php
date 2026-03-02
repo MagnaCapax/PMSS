@@ -6,76 +6,68 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../runtime.php';
-
-if (!function_exists('pmssStorageHealthReadLastEntries')) {
-    /**
-     * Read the latest entry per (kind, device/array) key from a JSONL file.
-     *
-     * @return array<string, array<string, mixed>>
-     */
-    function pmssStorageHealthReadLastEntries(string $path): array
-    {
-        if (!is_file($path)) {
-            return [];
-        }
-        $fh = fopen($path, 'r');
-        if (!$fh) {
-            return [];
-        }
-        $last = [];
-        while (($line = fgets($fh)) !== false) {
-            $j = json_decode($line, true);
-            if (!is_array($j)) {
-                continue;
-            }
-            $kind = (string) ($j['kind'] ?? '');
-            $id = (string) ($j['device'] ?? ($j['array'] ?? 'global'));
-            $key = $kind.'::'.$id;
-            $last[$key] = $j;
-        }
-        fclose($fh);
-        return $last;
+/**
+ * Read the latest entry per (kind, device/array) key from a JSONL file.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function pmssStorageHealthReadLastEntries(string $path): array
+{
+    if (!is_file($path)) {
+        return [];
     }
+    $fh = fopen($path, 'r');
+    if (!$fh) {
+        return [];
+    }
+    $last = [];
+    while (($line = fgets($fh)) !== false) {
+        $j = json_decode($line, true);
+        if (!is_array($j)) {
+            continue;
+        }
+        $kind = (string) ($j['kind'] ?? '');
+        $id = (string) ($j['device'] ?? ($j['array'] ?? 'global'));
+        $key = $kind.'::'.$id;
+        $last[$key] = $j;
+    }
+    fclose($fh);
+    return $last;
 }
 
-if (!function_exists('pmssStorageHealthSeverityMax')) {
-    function pmssStorageHealthSeverityMax(string $a, string $b): string
-    {
-        $rank = ['ok' => 0, 'warn' => 1, 'fail' => 2];
-        $ra = $rank[$a] ?? 1;
-        $rb = $rank[$b] ?? 1;
-        return ($rb > $ra) ? $b : $a;
-    }
+function pmssStorageHealthSeverityMax(string $a, string $b): string
+{
+    $rank = ['ok' => 0, 'warn' => 1, 'fail' => 2];
+    $ra = $rank[$a] ?? 1;
+    $rb = $rank[$b] ?? 1;
+    return ($rb > $ra) ? $b : $a;
 }
 
-if (!function_exists('pmssStorageHealthPerformanceStatus')) {
-    /**
-     * Detect performance-limiting conditions (e.g., RAID resync/rebuild).
-     *
-     * @param array<int, array<string,mixed>> $raidEntries
-     * @return array<string,string>|null ['status','reason','array']
-     */
-    function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
-    {
-        foreach ($raidEntries as $entry) {
-            $flags = (array) ($entry['flags'] ?? []);
-            $arrayName = (string) ($entry['array'] ?? 'md');
-            $reason = '';
-            if (in_array('rebuild_in_progress', $flags, true)) {
-                $reason = "RAID {$arrayName} resync in progress";
-            } elseif (in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok') {
-                $reason = "RAID {$arrayName} degraded";
-            }
-
-            if ($reason !== '') {
-                return [
-                    'status' => 'performance_limited',
-                    'reason' => $reason,
-                    'array' => $arrayName,
-                ];
-            }
+/**
+ * Detect performance-limiting conditions (e.g., RAID resync/rebuild).
+ *
+ * @param array<int, array<string,mixed>> $raidEntries
+ * @return array<string,string>|null ['status','reason','array']
+ */
+function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
+{
+    foreach ($raidEntries as $entry) {
+        $flags = (array) ($entry['flags'] ?? []);
+        $arrayName = (string) ($entry['array'] ?? 'md');
+        $reason = '';
+        if (in_array('rebuild_in_progress', $flags, true)) {
+            $reason = "RAID {$arrayName} resync in progress";
+        } elseif (in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok') {
+            $reason = "RAID {$arrayName} degraded";
         }
-        return null;
+
+        if ($reason !== '') {
+            return [
+                'status' => 'performance_limited',
+                'reason' => $reason,
+                'array' => $arrayName,
+            ];
+        }
     }
+    return null;
 }

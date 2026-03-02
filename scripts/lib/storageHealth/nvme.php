@@ -6,14 +6,13 @@
  * @author PMSS Team
  */
 
-if (!function_exists('pmssStorageHealthSnapshotNvme')) {
-    /**
-     * @param array<string, mixed> $disk
-     * @param array<string, mixed> $last
-     * @return array<string, mixed>|null
-     */
-    function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timestamp): ?array
-    {
+/**
+ * @param array<string, mixed> $disk
+ * @param array<string, mixed> $last
+ * @return array<string, mixed>|null
+ */
+function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timestamp): ?array
+{
         $dev = (string) $disk['path'];
         if (strpos($dev, 'nvme') === false) {
             return null;
@@ -98,7 +97,5 @@ if (!function_exists('pmssStorageHealthSnapshotNvme')) {
         $entry['flags'] = $flags;
         $entry['severity'] = $sev;
         $entry['ok'] = ($sev === 'ok');
-        return $entry;
-    }
+    return $entry;
 }
-
