@@ -13,14 +13,6 @@ function pmssStorageHealthSnapshotMain(array $argv): int
 {
     $logPath = '/var/log/pmss/storage-health.jsonl';
     $quiet = false;
-    $consumeOptionalValue = static function (?string $value, ?string $next, int &$index): ?string {
-        if ($value === null && $next !== null && strpos($next, '--') !== 0) {
-            $index++;
-            return $next;
-        }
-
-        return $value;
-    };
 
     for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
         $arg = $argv[$i];
@@ -28,7 +20,10 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
         switch ($key) {
             case '--json':
-                $val = $consumeOptionalValue($val, $next, $i);
+                if ($val === null && $next !== null && strpos($next, '--') !== 0) {
+                    $val = $next;
+                    $i++;
+                }
                 if ($val !== null && $val !== '') {
                     $logPath = $val;
                 }

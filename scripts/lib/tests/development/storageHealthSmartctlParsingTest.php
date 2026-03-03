@@ -87,4 +87,41 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $this->assertEquals('fail', \pmssStorageHealthSeverityMax('warn', 'fail'));
         $this->assertEquals('fail', \pmssStorageHealthSeverityMax('fail', 'ok'));
     }
+
+    public function testSsdTemperatureThresholdUsesHotSsdFlag(): void
+    {
+        $out = implode("\n", [
+            'SMART overall-health self-assessment test result: PASSED',
+            '194 Temperature_Celsius     0x0022   034   040   000    Old_age   Always       -       70',
+        ])."\n";
+        $disk = ['path' => '/dev/nvme0n1', 'kname' => 'nvme0n1', 'model' => 'SSD', 'serial' => 'S', 'rota' => 0, 'size' => '1T'];
+
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('warn', $entry['severity']);
+        $this->assertTrue(in_array('hot_ssd', $entry['flags'], true));
+    }
+
+    public function testPreviousMetricIncreasesSetExpectedFlags(): void
+    {
+        $out = implode("\n", [
+            'SMART overall-health self-assessment test result: PASSED',
+            '  5 Reallocated_Sector_Ct   0x0033   100   100   010    Pre-fail  Always       -       2',
+            '197 Current_Pending_Sector  0x0012   100   100   000    Old_age   Always       -       1',
+            '199 UDMA_CRC_Error_Count    0x003e   200   200   000    Old_age   Always       -       4',
+        ])."\n";
+        $disk = ['path' => '/dev/sdf', 'kname' => 'sdf', 'model' => 'TEST', 'serial' => 'I', 'rota' => 1, 'size' => '9T'];
+        $prev = [
+            'reallocated' => 1,
+            'pending' => 0,
+            'link_errors' => 2,
+        ];
+
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, $prev, '2025-01-01T00:00:00+00:00');
+
+        $this->assertTrue(in_array('reallocated_increase', $entry['flags'], true));
+        $this->assertTrue(in_array('pending_increase', $entry['flags'], true));
+        $this->assertTrue(in_array('link_errors_increase', $entry['flags'], true));
+        $this->assertEquals('warn', $entry['severity']);
+    }
 }
