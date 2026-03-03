@@ -18,16 +18,6 @@
 
 const PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/process-snapshot.log';
 
-function pmssProcessSnapshotNow(): string
-{
-    return date('Y-m-d\\TH:i:s');
-}
-
-function pmssProcessSnapshotAppend($fh, string $line): void
-{
-    @fwrite($fh, $line.PHP_EOL);
-}
-
 /**
  * Capture one snapshot and append it to the log.
  *
@@ -42,7 +32,7 @@ function pmssProcessSnapshotRun(): int
 
     $logPath = getenv('PMSS_PROCESS_SNAPSHOT_LOG') ?: PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT;
     $logDir = dirname($logPath);
-    $ts = pmssProcessSnapshotNow();
+    $ts = date('Y-m-d\\TH:i:s');
 
     $oldUmask = umask(0077);
     if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
@@ -62,7 +52,7 @@ function pmssProcessSnapshotRun(): int
 
     $ps = trim((string) @shell_exec('command -v ps 2>/dev/null'));
     if ($ps === '') {
-        pmssProcessSnapshotAppend($fh, $ts.' WARN ps_missing');
+        @fwrite($fh, $ts.' WARN ps_missing'.PHP_EOL);
         @fclose($fh);
         umask($oldUmask);
         return 0;
@@ -75,17 +65,17 @@ function pmssProcessSnapshotRun(): int
     @exec($cmd, $out, $rc);
     if ($rc !== 0) {
         $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($out, 0, 5))));
-        pmssProcessSnapshotAppend($fh, $ts.' WARN ps_failed rc='.$rc.($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : ''));
+        @fwrite($fh, $ts.' WARN ps_failed rc='.$rc.($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL);
         @fclose($fh);
         umask($oldUmask);
         return 0;
     }
 
-    pmssProcessSnapshotAppend($fh, $ts.' SNAPSHOT_BEGIN');
+    @fwrite($fh, $ts.' SNAPSHOT_BEGIN'.PHP_EOL);
     foreach ($out as $line) {
-        pmssProcessSnapshotAppend($fh, (string) $line);
+        @fwrite($fh, (string) $line.PHP_EOL);
     }
-    pmssProcessSnapshotAppend($fh, $ts.' SNAPSHOT_END');
+    @fwrite($fh, $ts.' SNAPSHOT_END'.PHP_EOL);
 
     @fclose($fh);
     umask($oldUmask);
@@ -95,4 +85,3 @@ function pmssProcessSnapshotRun(): int
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     exit(pmssProcessSnapshotRun());
 }
-

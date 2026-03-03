@@ -17,17 +17,22 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $rows = [];
 
     $windows = ['month', 'week', 'day', 'hour'];
+    $windowMetricConfig = [
+        'io_read' => false,
+        'io_write' => false,
+        'io_read_ops' => true,
+        'io_write_ops' => true,
+        'cpu' => false,
+        'ram_hours' => false,
+    ];
     $totals = [
-        'io_read' => array_fill_keys($windows, 0.0),
-        'io_write' => array_fill_keys($windows, 0.0),
-        'io_read_ops' => array_fill_keys($windows, 0.0),
-        'io_write_ops' => array_fill_keys($windows, 0.0),
-        'cpu' => array_fill_keys($windows, 0.0),
-        'ram_hours' => array_fill_keys($windows, 0.0),
         'memory_current' => 0.0,
         'memory_avg_month' => 0.0,
         'tasks_current' => 0.0,
     ];
+    foreach (array_keys($windowMetricConfig) as $metric) {
+        $totals[$metric] = array_fill_keys($windows, 0.0);
+    }
 
     $selectWindows = static function (array $raw, bool $allowMissing = false) use ($windows): ?array {
         $selected = [];
@@ -53,15 +58,12 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         }
 
         $windowMetrics = [];
-        foreach (['io_read', 'io_write', 'cpu', 'ram_hours'] as $metric) {
-            $windowMetrics[$metric] = $selectWindows($data[$metric]['raw'] ?? []);
+        foreach ($windowMetricConfig as $metric => $allowMissing) {
+            $windowMetrics[$metric] = $selectWindows($data[$metric]['raw'] ?? [], $allowMissing);
             if ($windowMetrics[$metric] === null) {
                 $missingStats[] = $thisUser;
                 continue 2;
             }
-        }
-        foreach (['io_read_ops', 'io_write_ops'] as $metric) {
-            $windowMetrics[$metric] = $selectWindows($data[$metric]['raw'] ?? [], true);
         }
 
         $memoryCurrent = isset($data['memory']['current']) ? (float) $data['memory']['current'] : 0.0;
@@ -100,41 +102,38 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
     $users = [];
+    $windowMetricKeys = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'];
     foreach ($rows as $username => $row) {
-        $users[$username] = [
-            'io_read' => $row['io_read'],
-            'io_write' => $row['io_write'],
-            'io_read_ops' => $row['io_read_ops'],
-            'io_write_ops' => $row['io_write_ops'],
-            'cpu' => $row['cpu'],
-            'memory' => [
-                'current' => $row['memory_current'],
-                'avg_month' => $row['memory_avg_month'],
-            ],
-            'ram_hours' => $row['ram_hours'],
-            'tasks' => [
-                'current' => $row['tasks_current'],
-            ],
+        $users[$username] = [];
+        foreach ($windowMetricKeys as $metric) {
+            $users[$username][$metric] = $row[$metric];
+        }
+        $users[$username]['memory'] = [
+            'current' => $row['memory_current'],
+            'avg_month' => $row['memory_avg_month'],
+        ];
+        $users[$username]['ram_hours'] = $row['ram_hours'];
+        $users[$username]['tasks'] = [
+            'current' => $row['tasks_current'],
         ];
     }
 
+    $totalPayload = [];
+    foreach ($windowMetricKeys as $metric) {
+        $totalPayload[$metric] = $totals[$metric];
+    }
+    $totalPayload['memory'] = [
+        'current' => $totals['memory_current'],
+        'avg_month' => $totals['memory_avg_month'],
+    ];
+    $totalPayload['ram_hours'] = $totals['ram_hours'];
+    $totalPayload['tasks'] = [
+        'current' => $totals['tasks_current'],
+    ];
+
     return [
         'users' => $users,
-        'totals' => [
-            'io_read' => $totals['io_read'],
-            'io_write' => $totals['io_write'],
-            'io_read_ops' => $totals['io_read_ops'],
-            'io_write_ops' => $totals['io_write_ops'],
-            'cpu' => $totals['cpu'],
-            'memory' => [
-                'current' => $totals['memory_current'],
-                'avg_month' => $totals['memory_avg_month'],
-            ],
-            'ram_hours' => $totals['ram_hours'],
-            'tasks' => [
-                'current' => $totals['tasks_current'],
-            ],
-        ],
+        'totals' => $totalPayload,
         'missing' => $missing,
     ];
 }
