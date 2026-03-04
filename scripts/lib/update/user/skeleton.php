@@ -6,6 +6,36 @@
  * @author PMSS Team
  */
 
+/**
+ * Ensure PHP 8.2+ does not emit notice text into filemanager download streams.
+ *
+ * We cannot edit the frozen upstream `etc/skel/www/filemanager.php` directly,
+ * so update runs patch tenant copies in-place until the upstream file is
+ * intentionally updated.
+ */
+function pmssUserFilemanagerObFlushPatchApply(string $filePath): bool
+{
+    if (!is_file($filePath) || is_link($filePath)) {
+        return false;
+    }
+
+    $content = @file_get_contents($filePath);
+    if (!is_string($content) || $content === '') {
+        return false;
+    }
+
+    if (strpos($content, '@ob_flush();') !== false) {
+        return true;
+    }
+
+    $updated = str_replace('        ob_flush();', '        @ob_flush();', $content, $replacements);
+    if ($replacements < 1 || $updated === $content) {
+        return false;
+    }
+
+    return @file_put_contents($filePath, $updated) !== false;
+}
+
 function pmssUserApplySkeletonFiles(array $ctx): void
 {
     $user = $ctx['user'];
@@ -35,6 +65,8 @@ function pmssUserApplySkeletonFiles(array $ctx): void
     if (file_exists("/home/{$user}/www/phpXplorer")) {
         unlink("/home/{$user}/www/phpXplorer");
     }
+
+    pmssUserFilemanagerObFlushPatchApply($ctx['home'].'/www/filemanager.php');
 
     $skelBase = pmssSkeletonBase();
     $quotaFiles = glob($skelBase.'/www/rutorrent/plugins/hddquota/*');
