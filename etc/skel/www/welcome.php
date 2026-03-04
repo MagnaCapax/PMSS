@@ -50,6 +50,25 @@ if (file_exists('/etc/seedbox/config/vendor')) {
 } else {
     $vendor = $vendorDefault;
 }
+
+$contextualWelcomeMessage = '';
+if (file_exists('/scripts/lib/welcomeMessage.php')) {
+    require_once '/scripts/lib/welcomeMessage.php';
+
+    if (function_exists('pmssWelcomeMessageForUser')) {
+        $userHome = @realpath(dirname(__DIR__));
+        if (!is_string($userHome) || $userHome === '') {
+            $userHome = dirname(__DIR__);
+        }
+
+        $username = basename($userHome);
+        if (!is_string($username) || $username === '' || $username === '.' || $username === '..') {
+            $username = (string) @get_current_user();
+        }
+
+        $contextualWelcomeMessage = pmssWelcomeMessageForUser($quotaInfo, $userHome, $username);
+    }
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -124,6 +143,10 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
 
                         if (file_exists('/etc/seedbox/config/vendorWelcome')) {
                             echo @file_get_contents('/etc/seedbox/config/vendorWelcome');
+                        }
+
+                        if (!empty($contextualWelcomeMessage)) {
+                            echo $contextualWelcomeMessage;
                         }
                         ?>
                         <h6>Basic Usage</h6>
