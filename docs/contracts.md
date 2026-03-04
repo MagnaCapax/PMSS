@@ -446,7 +446,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
+  - Optional flags: `--upload-throttle-kib=<KiB>` updates torrent upload throttle; `--welcome-message=<HTML>` sets/clears per-user welcome banner override (empty value clears).
   - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user. Storage Box product payloads also default `dockerEnabled=false` unless explicitly overridden.
+
+- scripts/productConfig.php <product> --welcome-message=<HTML>
+  - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.
 
 - scripts/util/portManager.php assign <user> lighttpd
   - Behavior: Assigns a unique port for the user’s lighttpd; persists reservation.

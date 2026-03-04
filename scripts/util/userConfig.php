@@ -28,14 +28,19 @@ $usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT
 $rawArgs = $argv ?? ($_SERVER['argv'] ?? []);
 $args = [];
 $uploadThrottleKib = null;
+$welcomeMessage = null;
 foreach ($rawArgs as $arg) {
     if (strpos($arg, '--upload-throttle-kib=') === 0) {
         $uploadThrottleKib = substr($arg, strlen('--upload-throttle-kib='));
         continue;
     }
+    if (strpos($arg, '--welcome-message=') === 0) {
+        $welcomeMessage = substr($arg, strlen('--welcome-message='));
+        continue;
+    }
     $args[] = $arg;
 }
-$usage .= ' [--upload-throttle-kib=KIB]';
+$usage .= ' [--upload-throttle-kib=KIB] [--welcome-message=HTML]';
 if (empty($args[1]) || empty($args[2]) || empty($args[3])) {
     die('need user name. '.$usage."\n");
 }
@@ -127,6 +132,16 @@ if (!isset($payload['billingId'])) {
 if ($payload['billingId'] === 0) {
     $payload = $store->applyFallbacks($user['name'], $payload);
 }
+
+// Optional per-user welcome banner override for welcome.php.
+if ($welcomeMessage !== null) {
+    if (trim($welcomeMessage) === '') {
+        unset($payload['welcomeMessage']);
+    } else {
+        $payload['welcomeMessage'] = $welcomeMessage;
+    }
+}
+
 if (!$store->set($user['name'], $payload)) {
     fwrite(STDERR, "Warning: failed to persist user config for {$user['name']}\n");
 } else {

@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/welcomeMessage.php';
+require_once dirname(__DIR__, 2).'/welcomeMessageProductConfig.php';
 
 class WelcomeMessageTest extends TestCase
 {
@@ -134,6 +135,41 @@ class WelcomeMessageTest extends TestCase
 
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/missing.json');
             $this->assertEquals('', $message);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testProductMessageSetWritesNestedProductsMap(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $messagesPath = $this->tempDir.'/welcomeMessages.json';
+            @file_put_contents($messagesPath, json_encode(['products' => ['m1000' => '<p>legacy</p>']], JSON_UNESCAPED_SLASHES));
+
+            $this->assertTrue(\pmssWelcomeProductMessageSet('free-tier', '<p>hello</p>', $messagesPath));
+            $decoded = json_decode((string) @file_get_contents($messagesPath), true);
+
+            $this->assertTrue(is_array($decoded), 'Message map must decode as array');
+            $this->assertEquals('<p>hello</p>', $decoded['products']['free-tier'] ?? null);
+            $this->assertEquals('<p>legacy</p>', $decoded['products']['m1000'] ?? null);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testProductMessageSetClearsMessageWhenTemplateIsEmpty(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $messagesPath = $this->tempDir.'/welcomeMessages.json';
+            @file_put_contents($messagesPath, json_encode(['free-tier' => '<p>old</p>'], JSON_UNESCAPED_SLASHES));
+
+            $this->assertTrue(\pmssWelcomeProductMessageSet('free-tier', '', $messagesPath));
+            $decoded = json_decode((string) @file_get_contents($messagesPath), true);
+
+            $this->assertTrue(is_array($decoded), 'Message map must decode as array');
+            $this->assertTrue(!isset($decoded['free-tier']), 'Entry must be removed when template is empty');
         } finally {
             $this->tearDownTempDir();
         }
