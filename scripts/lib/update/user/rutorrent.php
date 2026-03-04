@@ -8,6 +8,45 @@
 
 require_once __DIR__.'/context.php';
 
+/**
+ * Patch ruTorrent schedule interval arithmetic for PHP 8.2 strict typing.
+ *
+ * Upstream vendor files under `etc/skel/www/rutorrent` are currently frozen,
+ * so updates patch tenant copies until the bundled file can be updated.
+ */
+function pmssUserRutorrentScheduleIntervalPatchApply(string $filePath): bool
+{
+    if (!is_file($filePath) || is_link($filePath)) {
+        return false;
+    }
+
+    $content = @file_get_contents($filePath);
+    if (!is_string($content) || $content === '') {
+        return false;
+    }
+
+    $patchedExpression = '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),';
+    if (strpos($content, $patchedExpression) !== false) {
+        return true;
+    }
+
+    $legacyExpression = '((integer)($tm["minutes"]/$interval))*$interval+$interval,';
+    $updated = str_replace($legacyExpression, $patchedExpression, $content, $replacements);
+    if ($replacements < 1 || $updated === $content) {
+        return false;
+    }
+
+    return @file_put_contents($filePath, $updated) !== false;
+}
+
+/**
+ * Apply compatibility patches for legacy ruTorrent PHP files.
+ */
+function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
+{
+    pmssUserRutorrentScheduleIntervalPatchApply($ctx['home'].'/www/rutorrent/php/settings.php');
+}
+
 function pmssUserUpdateThemes(array $ctx): void
 {
     $user    = $ctx['user'];
