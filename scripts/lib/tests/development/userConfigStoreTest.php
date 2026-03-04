@@ -172,6 +172,49 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testDockerEnabledDefaultsFalseForStorageProduct(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'       => 512,
+                'rtorrentPort' => 5007,
+                'quota'        => 5,
+                'quotaBurst'   => 6,
+                'productType'  => 'storage-box',
+            ];
+            $this->assertTrue($store->set('dockst', $payload));
+            $reloaded = $store->get('dockst');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(false, $reloaded['dockerEnabled']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testDockerEnabledExplicitValueOverridesStorageDefault(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'        => 512,
+                'rtorrentPort'  => 5008,
+                'quota'         => 5,
+                'quotaBurst'    => 6,
+                'product'       => 'Storage Box 100',
+                'dockerEnabled' => true,
+            ];
+            $this->assertTrue($store->set('docksx', $payload));
+            $reloaded = $store->get('docksx');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(true, $reloaded['dockerEnabled']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testDockerEnabledNormalisesFalse(): void
     {
         $this->setUpTempDir();

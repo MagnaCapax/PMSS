@@ -19,7 +19,8 @@
  * - trafficLimit (int) Always written as 0 (traffic caps live in runtime files).
  * - trafficCapMbit (int) Post-limit ceiling in Mbit (0/absent uses server default).
  * - suspended (bool)   Best-effort mirror of suspension state (marker remains www-disabled).
- * - dockerEnabled (bool) Rootless Docker enablement (default true).
+ * - dockerEnabled (bool) Rootless Docker enablement (default true; false by
+ *   default for Storage Box products).
  * - CPUWeight/IOWeight/IOReadBW/... pass-through for future resource controls.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
@@ -251,7 +252,7 @@ class UserConfigStore
         }
 
         if (!array_key_exists('dockerEnabled', $payload)) {
-            $payload['dockerEnabled'] = true;
+            $payload['dockerEnabled'] = !$this->isStorageBoxProductPayload($payload);
         } else {
             // Normalize string booleans to avoid PHP truthiness traps.
             if (is_string($payload['dockerEnabled'])) {
@@ -273,6 +274,29 @@ class UserConfigStore
 
         ksort($payload, SORT_STRING);
         return $payload;
+    }
+
+    private function isStorageBoxProductPayload(array $payload): bool
+    {
+        foreach (['product', 'productName', 'productType'] as $key) {
+            if (!isset($payload[$key]) || !is_string($payload[$key])) {
+                continue;
+            }
+            $normalized = strtolower(trim($payload[$key]));
+            if ($normalized === '') {
+                continue;
+            }
+            $normalized = str_replace(['_', '-'], ' ', $normalized);
+            $normalized = preg_replace('/\s+/', ' ', $normalized);
+            if (!is_string($normalized)) {
+                continue;
+            }
+            if (strpos($normalized, 'storage') !== false && strpos($normalized, 'box') !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function validate(array $payload): bool

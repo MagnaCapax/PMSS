@@ -206,7 +206,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
 - pmssEnsureLingerAndDocker(string $user): void
   - Enables linger + rootless Docker wiring for the user.
-  - Skips and attempts `userDocker.php stop` when user config `dockerEnabled` is false (default true) or the effective RAM floor for Docker is below 245 MiB.
+  - Skips and attempts `userDocker.php stop` when user config `dockerEnabled` is false (default true, but defaults false for Storage Box product payloads) or the effective RAM floor for Docker is below 245 MiB.
 
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
@@ -446,7 +446,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
-  - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user.
+  - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user. Storage Box product payloads also default `dockerEnabled=false` unless explicitly overridden.
 
 - scripts/util/portManager.php assign <user> lighttpd
   - Behavior: Assigns a unique port for the user’s lighttpd; persists reservation.
