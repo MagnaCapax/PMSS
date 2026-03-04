@@ -131,7 +131,7 @@ if ($requestMethod === 'POST' && isset($_POST['docker_toggle_state'])) {
 
         if ($configResult['ok']) {
             $dockerCommand = sprintf(
-                'php /scripts/userDocker.php %s %s 2>&1; printf "\\n__PMSS_DOCKER_RC=%s" "$?"',
+                'php /scripts/userDocker.php %s %s 2>&1; printf "\\n__PMSS_DOCKER_RC=%%s" "$?"',
                 escapeshellarg($pmssStatsUsername),
                 escapeshellarg($toggleVerb)
             );
