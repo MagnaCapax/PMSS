@@ -132,6 +132,24 @@ if (!function_exists('pmssSeedboxSystemServiceSpecs')) {
 
 if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
     /**
+     * Purge exim4 packages because PMSS does not rely on a system MTA.
+     *
+     * Exim can be reinstalled indirectly by distro package relationships,
+     * so this helper keeps the host converged back to a no-exim state.
+     */
+    function pmssPurgeExim4Packages(): void
+    {
+        runStep(
+            'Purging exim4 packages',
+            aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light')
+        );
+        runStep(
+            'Autoremoving orphaned packages after exim4 purge',
+            aptCmd('autoremove -y')
+        );
+    }
+
+    /**
      * Purge stale exim4 spool files so masked MTAs cannot accumulate backlog.
      *
      * Deletion is intentionally limited to known exim4 spool directories and
@@ -169,6 +187,7 @@ if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
             );
         }
 
+        pmssPurgeExim4Packages();
         pmssPurgeExim4SpoolFiles();
     }
 }

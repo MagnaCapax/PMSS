@@ -45,6 +45,8 @@ class SystemdServiceDisableTest extends TestCase
         $this->assertTrue(strpos($joined, "systemctl mask 'cups'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.service'") !== false);
         $this->assertTrue(strpos($joined, "systemctl mask 'docker.socket'") !== false);
+        $this->assertTrue(strpos($joined, 'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold purge -y exim4 exim4-base exim4-config exim4-daemon-light') !== false);
+        $this->assertTrue(strpos($joined, 'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold autoremove -y') !== false);
         $this->assertTrue(strpos($joined, "find '/var/spool/exim4/input' -xdev -type f -delete") !== false);
         $this->assertTrue(strpos($joined, "find '/var/spool/exim4/msglog' -xdev -type f -delete") !== false);
         $this->assertTrue(strpos($joined, "find '/var/spool/exim4/db' -xdev -type f -delete") !== false);
