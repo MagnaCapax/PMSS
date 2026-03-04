@@ -52,6 +52,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/log.php';
+require_once __DIR__.'/../lib/user/userConfigStore.php';
 
 $args = $argv ?? ($_SERVER['argv'] ?? []);
 $debug = in_array('--debug', $args, true);
@@ -279,6 +280,23 @@ if ($action === 'stop' || $action === 'restart') {
 
 // START
 if ($action === 'start' || $action === 'restart') {
+    $userConfigStore = new UserConfigStore();
+    if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user, $userConfigStore)) {
+        $dockerRamFloorMiB = function_exists('pmssUserDockerMinRamMiB')
+            ? pmssUserDockerMinRamMiB()
+            : 245;
+        pmssUserLog($user, sprintf(
+            'userDocker: start blocked; Docker disabled by config or RAM floor (%d MiB)',
+            $dockerRamFloorMiB
+        ));
+        echo sprintf(
+            "Docker start blocked for %s: Docker is disabled or RAM is below %d MiB\n",
+            $user,
+            $dockerRamFloorMiB
+        );
+        exit(0);
+    }
+
     // Default to non-systemd rootless mode for robustness; check running
     // processes before attempting to start a new daemon.
     $startCheckOk = true;

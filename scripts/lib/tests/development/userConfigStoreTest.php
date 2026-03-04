@@ -3,6 +3,23 @@ namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/user/userConfigStore.php';
 
+class UserConfigStoreRuntimeStub extends \UserConfigStore
+{
+    /** @var int */
+    private $runtimeRamMiB = 0;
+
+    public function __construct(int $runtimeRamMiB, ?string $configDir = null)
+    {
+        parent::__construct($configDir);
+        $this->runtimeRamMiB = $runtimeRamMiB;
+    }
+
+    public function resolveRamMiB(string $username): int
+    {
+        return $this->runtimeRamMiB;
+    }
+}
+
 class UserConfigStoreTest extends TestCase
 {
     /** @var string */
@@ -141,7 +158,7 @@ class UserConfigStoreTest extends TestCase
         try {
             $store = new \UserConfigStore($this->configDirPath());
             $payload = [
-                'ramMiB'       => 128,
+                'ramMiB'       => 512,
                 'rtorrentPort' => 5002,
                 'quota'        => 5,
                 'quotaBurst'   => 6,
@@ -203,7 +220,7 @@ class UserConfigStoreTest extends TestCase
         try {
             $store = new \UserConfigStore($this->configDirPath());
             $payload = [
-                'ramMiB'        => 128,
+                'ramMiB'        => 512,
                 'rtorrentPort'  => 5005,
                 'quota'         => 5,
                 'quotaBurst'    => 6,
@@ -213,6 +230,27 @@ class UserConfigStoreTest extends TestCase
             $reloaded = $store->get('dockon');
             $this->assertTrue(is_array($reloaded));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testDockerEnabledForcedOffBelowRamFloor(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB'        => 244,
+                'rtorrentPort'  => 5006,
+                'quota'         => 5,
+                'quotaBurst'    => 6,
+                'dockerEnabled' => true,
+            ];
+            $this->assertTrue($store->set('docklow', $payload));
+            $reloaded = $store->get('docklow');
+            $this->assertTrue(is_array($reloaded));
+            $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();
         }
@@ -243,6 +281,44 @@ class UserConfigStoreTest extends TestCase
             ];
             $this->assertTrue($store->set('dockno', $payload));
             $this->assertEquals(false, \pmssUserDockerEnabled('dockno', $store));
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testPmssUserDockerEnabledUsesRuntimeRamFloor(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new UserConfigStoreRuntimeStub(200, $this->configDirPath());
+            $payload = [
+                'ramMiB'        => 512,
+                'rtorrentPort'  => 5101,
+                'quota'         => 50,
+                'quotaBurst'    => 62,
+                'dockerEnabled' => true,
+            ];
+            $this->assertTrue($store->set('dockruntime', $payload));
+            $this->assertEquals(false, \pmssUserDockerEnabled('dockruntime', $store));
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testPmssUserDockerEnabledAllowsRuntimeRamAtFloor(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new UserConfigStoreRuntimeStub(245, $this->configDirPath());
+            $payload = [
+                'ramMiB'        => 512,
+                'rtorrentPort'  => 5102,
+                'quota'         => 50,
+                'quotaBurst'    => 62,
+                'dockerEnabled' => true,
+            ];
+            $this->assertTrue($store->set('dockok', $payload));
+            $this->assertEquals(true, \pmssUserDockerEnabled('dockok', $store));
         } finally {
             $this->tearDownTempDir();
         }

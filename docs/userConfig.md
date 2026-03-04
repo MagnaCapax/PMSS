@@ -18,6 +18,9 @@ Parameters:
 
 The script rewrites rTorrent and ruTorrent configs, applies disk quota changes and restarts the user's rTorrent process.
 
+Docker rootless safety gate:
+- If `MAX_RAM_MB` is below `245`, PMSS automatically stores `dockerEnabled=false` for the user and blocks rootless Docker starts until RAM is raised.
+
 Example:
 ```
 /scripts/util/userConfig.php alice 1024 200 750 500 500

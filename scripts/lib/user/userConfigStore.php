@@ -30,6 +30,16 @@
 
 require_once __DIR__.'/UserValidator.php';
 
+if (!function_exists('pmssUserDockerMinRamMiB')) {
+    /**
+     * Minimum RAM required for rootless Docker.
+     */
+    function pmssUserDockerMinRamMiB(): int
+    {
+        return 245;
+    }
+}
+
 class UserConfigStore
 {
     /** @var string */
@@ -134,7 +144,7 @@ class UserConfigStore
         $username = pmssNormalizeUsername($username);
         $payload = $this->normalise($payload);
         if (empty($payload['ramMiB'])) {
-            $payload['ramMiB'] = $this->resolveRamMiBFromSystemdSlice($username);
+            $payload['ramMiB'] = $this->resolveRamMiB($username);
         }
         if (empty($payload['billingId'])) {
             $payload['billingId'] = $this->readBillingId($username);
@@ -167,6 +177,19 @@ class UserConfigStore
         $path = $configDir.'/pmss-user.json';
         // Root-owned, user-readable (group): cache for local tooling.
         $this->writeJsonFileAtomic($path, $payload, 0640, 'root', $username);
+    }
+
+    /**
+     * Resolve RAM limit in MiB from the systemd user slice.
+     */
+    public function resolveRamMiB(string $username): int
+    {
+        $username = pmssNormalizeUsername($username);
+        if (!UserValidator::isValidUsername($username)) {
+            return 0;
+        }
+
+        return $this->resolveRamMiBFromSystemdSlice($username);
     }
 
     private function userFilePath(string $username): string
@@ -236,6 +259,13 @@ class UserConfigStore
                 $payload['dockerEnabled'] = !in_array($value, ['false', '0', 'no', 'off', ''], true);
             }
             $payload['dockerEnabled'] = (bool)$payload['dockerEnabled'];
+        }
+
+        // Safety gate: keep rootless Docker disabled for low-memory accounts.
+        if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) && (int)$payload['ramMiB'] > 0) {
+            if ((int)$payload['ramMiB'] < pmssUserDockerMinRamMiB()) {
+                $payload['dockerEnabled'] = false;
+            }
         }
 
         // Invariant: always write trafficLimit as 0.
@@ -393,8 +423,28 @@ if (!function_exists('pmssUserDockerEnabled')) {
 
         $payload = $store->get($username);
         if (!is_array($payload)) {
-            return true;
+            $payload = [];
         }
+
+        $configuredRamMiB = 0;
+        if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB'])) {
+            $configuredRamMiB = (int) $payload['ramMiB'];
+        }
+
+        if (array_key_exists('dockerEnabled', $payload) && !(bool) $payload['dockerEnabled']) {
+            return false;
+        }
+
+        $runtimeRamMiB = $store->resolveRamMiB($username);
+        $effectiveRamMiB = $configuredRamMiB;
+        if ($runtimeRamMiB > 0 && ($effectiveRamMiB <= 0 || $runtimeRamMiB < $effectiveRamMiB)) {
+            $effectiveRamMiB = $runtimeRamMiB;
+        }
+
+        if ($effectiveRamMiB > 0 && $effectiveRamMiB < pmssUserDockerMinRamMiB()) {
+            return false;
+        }
+
         if (!array_key_exists('dockerEnabled', $payload)) {
             return true;
         }
