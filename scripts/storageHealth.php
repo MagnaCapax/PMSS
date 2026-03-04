@@ -38,19 +38,13 @@ function pmssStorageHealthColor(string $severity, string $text): string
     return "\033[".$code."m".$text."\033[0m";
 }
 
-function pmssStorageHealthFmtInt($value, string $suffix = ''): string
-{
-    return is_int($value) ? (string) $value.$suffix : '-';
-}
-
-function pmssStorageHealthMark(string $severity): string
-{
-    $mark = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'][$severity] ?? '?';
-    return pmssStorageHealthColor($severity, $mark);
-}
-
 function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, string $timestamp, string $jsonPath): void
 {
+    $formatInt = static function ($value, string $suffix = ''): string {
+        return is_int($value) ? (string) $value.$suffix : '-';
+    };
+    $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
+
     $header = "Storage health (latest snapshot {$timestamp})";
     echo $header.PHP_EOL;
     echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
@@ -86,10 +80,10 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
                 'size' => (string) ($entry['size'] ?? ''),
                 'model' => (string) ($entry['model'] ?? ''),
                 'health' => $health,
-                'temp' => pmssStorageHealthFmtInt($m['temp_c'] ?? null, 'C'),
-                'realloc' => pmssStorageHealthFmtInt($m['reallocated'] ?? null),
-                'pend' => pmssStorageHealthFmtInt($m['pending'] ?? null),
-                'link' => pmssStorageHealthFmtInt($m['link_errors'] ?? ($m['udma_crc'] ?? null)),
+                'temp' => $formatInt($m['temp_c'] ?? null, 'C'),
+                'realloc' => $formatInt($m['reallocated'] ?? null),
+                'pend' => $formatInt($m['pending'] ?? null),
+                'link' => $formatInt($m['link_errors'] ?? ($m['udma_crc'] ?? null)),
                 'flags' => $flags,
             ];
         }
@@ -105,10 +99,10 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
                 'size' => (string) ($entry['size'] ?? ''),
                 'model' => (string) ($entry['model'] ?? ''),
                 'health' => 'NVME',
-                'temp' => pmssStorageHealthFmtInt(is_int($temp) ? $temp : null, 'C'),
+                'temp' => $formatInt(is_int($temp) ? $temp : null, 'C'),
                 'realloc' => '-',
-                'pend' => pmssStorageHealthFmtInt($m['media_errors'] ?? null),
-                'link' => pmssStorageHealthFmtInt($m['percentage_used'] ?? null),
+                'pend' => $formatInt($m['media_errors'] ?? null),
+                'link' => $formatInt($m['percentage_used'] ?? null),
                 'flags' => $flags,
             ];
         }
@@ -149,7 +143,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
             $sevTxt = strtoupper($r['sev']);
             printf(
                 "%-4s %-4s %-5s %-5s %-".$modelWidth."s %-10s %-5s %-7s %-6s %-6s %s\n",
-                pmssStorageHealthMark($r['sev']),
+                pmssStorageHealthColor($r['sev'], $markLabelMap[$r['sev']] ?? '?'),
                 $sevTxt,
                 $r['dev'],
                 $r['size'],
@@ -174,7 +168,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
             $sev = (string) ($entry['severity'] ?? 'warn');
             printf(
                 "%-4s %-4s %-6s %-6s %-10s %s\n",
-                pmssStorageHealthMark($sev),
+                pmssStorageHealthColor($sev, $markLabelMap[$sev] ?? '?'),
                 strtoupper($sev),
                 (string) ($entry['array'] ?? ''),
                 (string) ($entry['level'] ?? ''),

@@ -35,9 +35,7 @@ function pmssStorageHealthReadLastEntries(string $path): array
 function pmssStorageHealthSeverityMax(string $a, string $b): string
 {
     $rank = ['ok' => 0, 'warn' => 1, 'fail' => 2];
-    $ra = $rank[$a] ?? 1;
-    $rb = $rank[$b] ?? 1;
-    return ($rb > $ra) ? $b : $a;
+    return (($rank[$b] ?? 1) > ($rank[$a] ?? 1)) ? $b : $a;
 }
 
 /**

@@ -66,22 +66,22 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
         $sev = pmssStorageHealthSeverityMax($sev, 'warn');
         $flags[] = 'hot_nvme';
     }
-    if (($metrics['percentage_used'] ?? 0) >= 95) {
+    $percentageUsed = (int) ($metrics['percentage_used'] ?? 0);
+    if ($percentageUsed >= 80) {
         $sev = pmssStorageHealthSeverityMax($sev, 'warn');
-        $flags[] = 'wearout_critical';
-    } elseif (($metrics['percentage_used'] ?? 0) >= 80) {
-        $sev = pmssStorageHealthSeverityMax($sev, 'warn');
-        $flags[] = 'wearout_high';
+        $flags[] = ($percentageUsed >= 95) ? 'wearout_critical' : 'wearout_high';
     }
 
     $prev = $last['nvme::'.$dev]['metrics'] ?? null;
     if (is_array($prev)) {
-        if (isset($metrics['media_errors'], $prev['media_errors']) && $metrics['media_errors'] > $prev['media_errors']) {
-            $sev = pmssStorageHealthSeverityMax($sev, 'warn');
-            $flags[] = 'media_errors_increase';
-        }
-        if (isset($metrics['num_err_log_entries'], $prev['num_err_log_entries']) && $metrics['num_err_log_entries'] > $prev['num_err_log_entries']) {
-            $flags[] = 'err_log_increase';
+        foreach (['media_errors' => 'media_errors_increase', 'num_err_log_entries' => 'err_log_increase'] as $metric => $flag) {
+            if (!isset($metrics[$metric], $prev[$metric]) || $metrics[$metric] <= $prev[$metric]) {
+                continue;
+            }
+            if ($metric === 'media_errors') {
+                $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+            }
+            $flags[] = $flag;
         }
     }
 
