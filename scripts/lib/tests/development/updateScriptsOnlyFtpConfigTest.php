@@ -7,7 +7,7 @@ class UpdateScriptsOnlyFtpConfigTest extends TestCase
 {
     public function testScriptsOnlyRefreshesFtpConfigWhenAvailable(): void
     {
-        $src = (string) file_get_contents('scripts/update.php');
+        $src = (string) file_get_contents(__DIR__.'/../../../update.php');
         $posScriptsOnly = strpos($src, "if (\$options['scripts_only'])");
         $posFtpConfig = strpos($src, '/scripts/util/ftpConfig.php');
         $posLog = strpos($src, 'Refreshing FTP configuration for --scripts-only run');

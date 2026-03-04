@@ -7,20 +7,20 @@ class AddUserProvisioningGuardTest extends TestCase
 {
     public function testAddUserUsesPerUserLock(): void
     {
-        $src = (string) file_get_contents('scripts/addUser.php');
+        $src = (string) file_get_contents(__DIR__.'/../../../addUser.php');
         $this->assertTrue(strpos($src, 'pmss-addUser-') !== false, 'addUser.php must use per-user lock file');
         $this->assertTrue(strpos($src, 'flock(') !== false, 'addUser.php must acquire a lock');
     }
 
     public function testAddUserEmitsSummaryMarker(): void
     {
-        $src = (string) file_get_contents('scripts/lib/user/add/provisioningRuntime.php');
+        $src = (string) file_get_contents(__DIR__.'/../../user/add/provisioningRuntime.php');
         $this->assertTrue(strpos($src, '###ADDUSER:') !== false, 'addUser must emit summary markers');
     }
 
     public function testAddUserWrapperStaysSmall(): void
     {
-        $lines = file('scripts/addUser.php', FILE_IGNORE_NEW_LINES);
+        $lines = file(__DIR__.'/../../../addUser.php', FILE_IGNORE_NEW_LINES);
         $this->assertTrue(is_array($lines), 'addUser.php must be readable');
         $this->assertTrue(count($lines) <= 200, 'addUser.php must stay under 200 lines');
     }

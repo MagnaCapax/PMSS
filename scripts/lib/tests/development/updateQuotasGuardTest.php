@@ -7,7 +7,7 @@ class UpdateQuotasGuardTest extends TestCase
 {
     public function testUpdateQuotasSkipsEmptyAndInvalidUsers(): void
     {
-        $src = (string) file_get_contents('scripts/cron/updateQuotas.php');
+        $src = (string) file_get_contents(__DIR__.'/../../../cron/updateQuotas.php');
         $this->assertStringContainsString('$thisUser = trim($thisUser);', $src, 'updateQuotas.php must trim usernames in the loop');
         $this->assertStringContainsString('if ($thisUser === \'\') {', $src, 'updateQuotas.php must skip empty usernames');
         $this->assertStringContainsString('!pmssValidateUsername($thisUser)', $src, 'updateQuotas.php must revalidate usernames from listUsers');

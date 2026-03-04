@@ -7,7 +7,7 @@ class TerminateUserTrafficImmutableTest extends TestCase
 {
     public function testTerminateUserClearsImmutableTrafficBeforeHomeRemoval(): void
     {
-        $src = (string) file_get_contents('scripts/terminateUser.php');
+        $src = (string) file_get_contents(__DIR__.'/../../../terminateUser.php');
         $posClear = strpos($src, "'clear_immutable_traffic'");
         $posRemove = strpos($src, "'remove_home_initial'");
 

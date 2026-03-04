@@ -7,8 +7,7 @@ class TerminateUserCgroupClearTest extends TestCase
 {
     public function testTerminateUserInvokesSystemdRevertOnSlice(): void
     {
-        $src = (string) file_get_contents('scripts/terminateUser.php');
+        $src = (string) file_get_contents(__DIR__.'/../../../terminateUser.php');
         $this->assertTrue(strpos($src, 'systemctl revert') !== false, 'terminateUser.php should revert user slice properties');
     }
 }
-

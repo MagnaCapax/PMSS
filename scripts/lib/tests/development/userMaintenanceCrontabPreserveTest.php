@@ -7,7 +7,7 @@ class UserMaintenanceCrontabPreserveTest extends TestCase
 {
     public function testUserMaintenanceDoesNotOverwriteUserCrontab(): void
     {
-        $src = (string) file_get_contents('scripts/lib/update/userMaintenance.php');
+        $src = (string) file_get_contents(__DIR__.'/../../update/userMaintenance.php');
         $this->assertTrue($src !== '', 'Expected to read userMaintenance.php');
         $this->assertTrue(strpos($src, 'user.crontab.default') === false, 'userMaintenance.php must not reference user crontab templates');
         $this->assertTrue(strpos($src, "pmssBuildCommand('crontab'") === false, 'userMaintenance.php must not invoke crontab for users');
