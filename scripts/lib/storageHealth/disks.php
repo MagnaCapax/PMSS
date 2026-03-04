@@ -45,15 +45,3 @@ function pmssStorageHealthListDisksFromLsblk(string $out): array
     }
     return $devs;
 }
-
-/**
- * @return array<int, array<string, mixed>>
- */
-function pmssStorageHealthListDisks(): array
-{
-    $out = shell_exec('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE 2>/dev/null');
-    if (!$out) {
-        return [];
-    }
-    return pmssStorageHealthListDisksFromLsblk($out);
-}

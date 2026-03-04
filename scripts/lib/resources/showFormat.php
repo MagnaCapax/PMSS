@@ -69,9 +69,3 @@ function pmssShowResourcesPrintRow(string $user, array $row): void
         pmssResourceFormatOpsPerSecond($hourOps, 3600)
     );
 }
-
-function pmssShowResourcesPrintTotals(array $totals): void
-{
-    printf("%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n", '---', '---', '---', '---', '---', '---', '---', '---');
-    pmssShowResourcesPrintRow('Total', $totals);
-}

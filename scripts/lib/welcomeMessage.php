@@ -31,8 +31,7 @@ function pmssWelcomeReadJson(string $path): array
  */
 function pmssWelcomeResolveProductKey(array $userConfig, string $userHome): string
 {
-    $candidateKeys = ['product', 'productName'];
-    foreach ($candidateKeys as $candidateKey) {
+    foreach (['product', 'productName'] as $candidateKey) {
         if (!isset($userConfig[$candidateKey]) || !is_string($userConfig[$candidateKey])) {
             continue;
         }
@@ -73,9 +72,6 @@ function pmssWelcomeSelectTemplate(array $userConfig, string $productKey, string
     $messageMap = pmssWelcomeReadJson($productMessagesPath);
     if (isset($messageMap['products']) && is_array($messageMap['products'])) {
         $messageMap = $messageMap['products'];
-    }
-    if (!is_array($messageMap)) {
-        return '';
     }
 
     if (isset($messageMap[$productKey]) && is_string($messageMap[$productKey])) {

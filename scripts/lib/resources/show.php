@@ -65,7 +65,8 @@ function pmssShowResourcesMain(array $argv): int
     foreach ($rows as $username => $row) {
         pmssShowResourcesPrintRow($username, $row);
     }
-    pmssShowResourcesPrintTotals($totals);
+    printf("%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n", '---', '---', '---', '---', '---', '---', '---', '---');
+    pmssShowResourcesPrintRow('Total', $totals);
 
     if (!empty($missingStats)) {
         echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";
