@@ -17,18 +17,6 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__.'/lib/storageHealth.php';
 
-function pmssStorageHealthUsage(): void
-{
-    echo "\nStorage health report\n";
-    echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
-    echo "  --json <path>   JSON Lines input (default /var/log/pmss/storage-health.jsonl)\n";
-    echo "  --raw           Print the latest JSON entries (per device) and exit\n";
-    echo "  --only-problems Show only warn/fail entries\n";
-    echo "  --device <id>   Filter to one device (kname like sda, or path like /dev/sda)\n";
-    echo "  --user-notice[=<path>]  Write/clear a user-facing performance notice when perf is limited\n";
-    echo "  --help          Show this help\n\n";
-}
-
 function pmssStorageHealthColor(string $severity, string $text): string
 {
     if (!function_exists('posix_isatty') || !posix_isatty(STDOUT)) {
@@ -232,7 +220,14 @@ for ($i = 1; $i < $argc; $i++) {
             break;
         case '--help':
         case '-h':
-            pmssStorageHealthUsage();
+            echo "\nStorage health report\n";
+            echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
+            echo "  --json <path>   JSON Lines input (default /var/log/pmss/storage-health.jsonl)\n";
+            echo "  --raw           Print the latest JSON entries (per device) and exit\n";
+            echo "  --only-problems Show only warn/fail entries\n";
+            echo "  --device <id>   Filter to one device (kname like sda, or path like /dev/sda)\n";
+            echo "  --user-notice[=<path>]  Write/clear a user-facing performance notice when perf is limited\n";
+            echo "  --help          Show this help\n\n";
             exit(0);
     }
 }
