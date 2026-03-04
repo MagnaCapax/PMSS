@@ -9,34 +9,33 @@ require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../resources.php';
 require_once __DIR__.'/storage.php';
 require_once __DIR__.'/accumulator.php';
-require_once __DIR__.'/formatter.php';
-require_once __DIR__.'/userScope.php';
+
 class ResourceStatsProcessor
 {
     /** @var resourceStatistics */
     private $stats;
     /** @var ResourceStorage */
     private $storage;
-    /** @var ResourceStatsFormatter */
-    private $formatter;
-    /** @var ResourceStatsUserScope */
-    private $userScope;
+    /** @var string */
+    private $resourceDir;
+    /** @var string */
+    private $homeDir;
+    /** @var string */
+    private $passwdFile;
 
     public function __construct(resourceStatistics $stats, array $paths = [])
     {
-        $resourceDir = rtrim($paths['resource_dir'] ?? getenv('PMSS_RESOURCE_DIR') ?: '/var/log/pmss/resources', '/');
-        $homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
+        $this->resourceDir = rtrim($paths['resource_dir'] ?? getenv('PMSS_RESOURCE_DIR') ?: '/var/log/pmss/resources', '/');
+        $this->homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
         $runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
-        $passwdFile = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
+        $this->passwdFile = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
 
         $this->stats = $stats;
         $this->storage = new ResourceStorage([
-            'home_dir'    => $homeDir,
+            'home_dir'    => $this->homeDir,
             'runtime_dir' => $runtimeDir,
             'stats_dir'   => $runtimeDir.'/resourceStats',
         ]);
-        $this->formatter = new ResourceStatsFormatter();
-        $this->userScope = new ResourceStatsUserScope($resourceDir, $homeDir, $passwdFile);
     }
 
     public function ensureRuntime(): void
@@ -63,23 +62,34 @@ class ResourceStatsProcessor
 
     public function discoverUsers(): array
     {
-        return $this->userScope->discoverUsers();
+        $users = array_map('basename', array_filter(glob($this->resourceDir.'/*'), 'is_file'));
+        sort($users, SORT_NATURAL | SORT_FLAG_CASE);
+        return $users;
     }
 
     public function spawnWorkers(string $scriptPath, array $users): void
     {
-        $this->userScope->spawnWorkers($scriptPath, $users);
+        $script = escapeshellarg($scriptPath);
+        foreach ($users as $user) {
+            $userArg = escapeshellarg($user);
+            $command = "nohup {$script} {$userArg} >> /var/log/pmss/resourceStats.log 2>&1 &";
+            passthru($command);
+        }
     }
 
     public function validateUser(string $user): bool
     {
-        return $this->userScope->validateUser($user);
+        $path = $this->resourceDir.'/'.$user;
+        $homePath = $this->homeDir.'/'.$user;
+        return is_readable($path)
+            && $this->userExistsInPasswd($user)
+            && is_dir($homePath);
     }
 
     /** Process and persist resource statistics for a single user. */
     public function processUser(string $user, array $compareTimes): void
     {
-        if (!$this->userScope->validateUser($user)) {
+        if (!$this->validateUser($user)) {
             logMessage(date('c').": Invalid user {$user}");
             return;
         }
@@ -117,42 +127,103 @@ class ResourceStatsProcessor
         $data = [
             'io_read' => [
                 'raw'     => $rawTotals['io_read'],
-                'display' => $this->formatter->formatBytesDisplay($rawTotals['io_read']),
+                'display' => $this->formatBytesDisplay($rawTotals['io_read']),
             ],
             'io_write' => [
                 'raw'     => $rawTotals['io_write'],
-                'display' => $this->formatter->formatBytesDisplay($rawTotals['io_write']),
+                'display' => $this->formatBytesDisplay($rawTotals['io_write']),
             ],
             'io_read_ops' => [
                 'raw'     => $rawTotals['io_read_ops'],
-                'display' => $this->formatter->formatCountDisplay($rawTotals['io_read_ops']),
+                'display' => $this->formatCountDisplay($rawTotals['io_read_ops']),
             ],
             'io_write_ops' => [
                 'raw'     => $rawTotals['io_write_ops'],
-                'display' => $this->formatter->formatCountDisplay($rawTotals['io_write_ops']),
+                'display' => $this->formatCountDisplay($rawTotals['io_write_ops']),
             ],
             'cpu' => [
                 'raw'     => $rawTotals['cpu'],
-                'display' => $this->formatter->formatCpuDisplay($rawTotals['cpu']),
+                'display' => $this->formatCpuDisplay($rawTotals['cpu']),
             ],
             'memory' => [
                 'raw'     => $results['memory'],
-                'display' => $this->formatter->formatBytesDisplay($results['memory']),
+                'display' => $this->formatBytesDisplay($results['memory']),
                 'current' => $results['current_memory'],
             ],
             'tasks' => [
                 'raw'     => $results['tasks'],
-                'display' => $this->formatter->formatCountDisplay($results['tasks']),
+                'display' => $this->formatCountDisplay($results['tasks']),
                 'current' => $results['current_tasks'],
             ],
             'ram_hours' => [
                 'raw'     => $rawTotals['ram_hours'],
-                'display' => $this->formatter->formatRamHoursDisplay($rawTotals['ram_hours']),
+                'display' => $this->formatRamHoursDisplay($rawTotals['ram_hours']),
             ],
             'daily' => $results['daily'],
         ];
 
         $this->stats->saveUserResources($user, $data);
         logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$rawTotals['io_read']['month']}");
+    }
+
+    private function userExistsInPasswd(string $username): bool
+    {
+        $passwd = @file_get_contents($this->passwdFile);
+        if ($passwd === false) {
+            return false;
+        }
+        return preg_match('/^'.preg_quote($username, '/').':/m', $passwd) === 1;
+    }
+
+    private function formatBytesDisplay(array $rawTotals): array
+    {
+        $formatted = [];
+        foreach ($rawTotals as $label => $value) {
+            $bytes = (float) $value;
+            if (($bytes / 1024 / 1024 / 1024 / 1024) > 1) {
+                $formatted[$label] = round($bytes / 1024 / 1024 / 1024 / 1024, 2).'TiB';
+            } elseif (($bytes / 1024 / 1024 / 1024) > 1) {
+                $formatted[$label] = round($bytes / 1024 / 1024 / 1024, 2).'GiB';
+            } elseif (($bytes / 1024 / 1024) > 1) {
+                $formatted[$label] = round($bytes / 1024 / 1024, 2).'MiB';
+            } else {
+                $formatted[$label] = round($bytes / 1024, 2).'KiB';
+            }
+        }
+        return $formatted;
+    }
+
+    private function formatCpuDisplay(array $rawTotals): array
+    {
+        $formatted = [];
+        foreach ($rawTotals as $label => $value) {
+            $seconds = $value / 1000000000;
+            if ($seconds >= 3600) {
+                $formatted[$label] = round($seconds / 3600, 2).'h';
+            } elseif ($seconds >= 60) {
+                $formatted[$label] = round($seconds / 60, 2).'m';
+            } else {
+                $formatted[$label] = round($seconds, 2).'s';
+            }
+        }
+        return $formatted;
+    }
+
+    private function formatCountDisplay(array $rawTotals): array
+    {
+        $formatted = [];
+        foreach ($rawTotals as $label => $value) {
+            $formatted[$label] = (string) round($value, 2);
+        }
+        return $formatted;
+    }
+
+    private function formatRamHoursDisplay(array $rawTotals): array
+    {
+        $formatted = [];
+        foreach ($rawTotals as $label => $value) {
+            $formatted[$label] = round($value, 2).'GB-hrs';
+        }
+        return $formatted;
     }
 }
