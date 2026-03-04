@@ -196,6 +196,14 @@ $userNoticePath = '';
 $userNoticeRequested = false;
 $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
 
+$consumeOptionalValue = static function (?string $value, ?string $nextArg, int &$index): ?string {
+    if ($value !== null || $nextArg === null || strpos($nextArg, '--') === 0) {
+        return $value;
+    }
+    $index++;
+    return $nextArg;
+};
+
 $argc = count($argv);
 for ($i = 1; $i < $argc; $i++) {
     $arg = $argv[$i];
@@ -205,10 +213,7 @@ for ($i = 1; $i < $argc; $i++) {
     $val = count($parts) === 2 ? $parts[1] : null;
     switch ($key) {
         case '--json':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
+            $val = $consumeOptionalValue($val, $next, $i);
             if ($val !== null && $val !== '') {
                 $jsonPath = $val;
             }
@@ -220,20 +225,14 @@ for ($i = 1; $i < $argc; $i++) {
             $onlyProblems = true;
             break;
         case '--device':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
+            $val = $consumeOptionalValue($val, $next, $i);
             if ($val !== null && $val !== '') {
                 $deviceFilter = $val;
             }
             break;
         case '--user-notice':
             $userNoticeRequested = true;
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
+            $val = $consumeOptionalValue($val, $next, $i);
             $userNoticePath = $val !== null && $val !== '' ? $val : $defaultNoticePath;
             break;
         case '--help':
@@ -275,13 +274,8 @@ if (is_string($deviceFilter) && $deviceFilter !== '') {
     $filter = static function (array $entry) use ($wantKname): bool {
         $kname = (string) ($entry['kname'] ?? '');
         $device = (string) ($entry['device'] ?? '');
-        if ($kname !== '' && $kname === $wantKname) {
-            return true;
-        }
-        if ($device !== '' && ($device === '/dev/'.$wantKname || $device === $wantKname)) {
-            return true;
-        }
-        return false;
+        return ($kname !== '' && $kname === $wantKname)
+            || ($device !== '' && ($device === '/dev/'.$wantKname || $device === $wantKname));
     };
     $smart = array_values(array_filter($smart, $filter));
     $nvme = array_values(array_filter($nvme, $filter));
@@ -289,8 +283,7 @@ if (is_string($deviceFilter) && $deviceFilter !== '') {
 
 if ($onlyProblems) {
     $filterProblems = static function (array $entry): bool {
-        $sev = (string) ($entry['severity'] ?? 'warn');
-        return $sev !== 'ok';
+        return (string) ($entry['severity'] ?? 'warn') !== 'ok';
     };
     $smart = array_values(array_filter($smart, $filterProblems));
     $nvme = array_values(array_filter($nvme, $filterProblems));

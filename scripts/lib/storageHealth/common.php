@@ -51,12 +51,14 @@ function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
     foreach ($raidEntries as $entry) {
         $flags = (array) ($entry['flags'] ?? []);
         $arrayName = (string) ($entry['array'] ?? 'md');
-        if (in_array('rebuild_in_progress', $flags, true)) {
-            return ['status' => 'performance_limited', 'reason' => "RAID {$arrayName} resync in progress", 'array' => $arrayName];
+        $isRebuild = in_array('rebuild_in_progress', $flags, true);
+        $isDegraded = in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok';
+        if (!$isRebuild && !$isDegraded) {
+            continue;
         }
-        if (in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok') {
-            return ['status' => 'performance_limited', 'reason' => "RAID {$arrayName} degraded", 'array' => $arrayName];
-        }
+
+        $reason = $isRebuild ? "RAID {$arrayName} resync in progress" : "RAID {$arrayName} degraded";
+        return ['status' => 'performance_limited', 'reason' => $reason, 'array' => $arrayName];
     }
     return null;
 }
