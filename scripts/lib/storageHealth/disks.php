@@ -19,7 +19,7 @@ function pmssStorageHealthListDisksFromLsblk(string $out): array
             continue;
         }
         $parts = preg_split('/\s+/', trim($line));
-        if (!is_array($parts) || count($parts) < 3) {
+        if (!is_array($parts) || ($partCount = count($parts)) < 3) {
             continue;
         }
         $kname = (string) $parts[0];
@@ -31,10 +31,9 @@ function pmssStorageHealthListDisksFromLsblk(string $out): array
         if (strpos($kname, 'loop') === 0 || strpos($kname, 'ram') === 0) {
             continue;
         }
-        $sizeStr = (string) ($parts[count($parts) - 1] ?? '');
-        $serial = (string) ($parts[count($parts) - 2] ?? '');
-        $modelArr = array_slice($parts, 3, max(0, count($parts) - 5));
-        $model = implode(' ', $modelArr);
+        $sizeStr = (string) ($parts[$partCount - 1] ?? '');
+        $serial = (string) ($parts[$partCount - 2] ?? '');
+        $model = implode(' ', array_slice($parts, 3, max(0, $partCount - 5)));
         $devs[] = [
             'path' => '/dev/'.$kname,
             'kname' => $kname,

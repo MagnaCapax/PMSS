@@ -72,17 +72,6 @@ function pmssShowResourcesPrintRow(string $user, array $row): void
 
 function pmssShowResourcesPrintTotals(array $totals): void
 {
-    $hourOps = (float) (($totals['io_read_ops']['hour'] ?? 0) + ($totals['io_write_ops']['hour'] ?? 0));
     printf("%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n", '---', '---', '---', '---', '---', '---', '---', '---');
-    printf(
-        "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n",
-        'Total',
-        pmssResourceFormatBytes($totals['io_read']['month']),
-        pmssResourceFormatBytes($totals['io_write']['month']),
-        pmssResourceFormatCpuHours($totals['cpu']['month']),
-        pmssResourceFormatRamHours($totals['ram_hours']['month']),
-        pmssResourceFormatBytes($totals['memory_current']),
-        (string) round($totals['tasks_current']),
-        pmssResourceFormatOpsPerSecond($hourOps, 3600)
-    );
+    pmssShowResourcesPrintRow('Total', $totals);
 }

@@ -57,8 +57,7 @@ function pmssShowResourcesMain(array $argv): int
     $totals = $report['totals'];
 
     if ($asJson) {
-        $payload = pmssResourceBuildJsonPayload($rows, $totals, $missingStats);
-        echo json_encode($payload)."\n";
+        echo json_encode(pmssResourceBuildJsonPayload($rows, $totals, $missingStats))."\n";
         return 0;
     }
 

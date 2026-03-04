@@ -51,12 +51,16 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
     $metrics = $defaultMetrics;
 
     $healthExplicit = false;
-    if (preg_match('/SMART overall-health\\s+self-assessment\\s+test\\s+result:\\s*(.+)$/im', $out, $m)) {
+    foreach ([
+        '/SMART overall-health\\s+self-assessment\\s+test\\s+result:\\s*(.+)$/im',
+        '/SMART Health Status:\\s*(.+)$/im',
+    ] as $healthPattern) {
+        if (preg_match($healthPattern, $out, $m) !== 1) {
+            continue;
+        }
         $healthExplicit = true;
         $metrics['health'] = strtoupper(trim($m[1]));
-    } elseif (preg_match('/SMART Health Status:\\s*(.+)$/im', $out, $m)) {
-        $healthExplicit = true;
-        $metrics['health'] = strtoupper(trim($m[1]));
+        break;
     }
 
     foreach (preg_split('/\r?\n/', $out) as $line) {
@@ -119,13 +123,12 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         $flags[] = 'health_unknown';
     }
 
-    if (($metrics['pending'] ?? 0) > 0) {
+    foreach (['pending' => 'pending_sectors', 'reallocated' => 'reallocated_sectors'] as $metric => $flag) {
+        if (($metrics[$metric] ?? 0) <= 0) {
+            continue;
+        }
         $sev = pmssStorageHealthSeverityMax($sev, 'warn');
-        $flags[] = 'pending_sectors';
-    }
-    if (($metrics['reallocated'] ?? 0) > 0) {
-        $sev = pmssStorageHealthSeverityMax($sev, 'warn');
-        $flags[] = 'reallocated_sectors';
+        $flags[] = $flag;
     }
 
     $temp = $metrics['temp_c'];
