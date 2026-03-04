@@ -125,19 +125,23 @@ if ($requestMethod === 'POST' && isset($_POST['docker_toggle_state'])) {
         $toggleVerb = $targetDockerEnabled ? 'start' : 'stop';
 
         $configResult = pmssInfoSetDockerEnabled($pmssStatsUsername, $targetDockerEnabled);
-
-        $dockerCommand = sprintf(
-            'php /scripts/userDocker.php %s %s 2>&1; printf "\\n__PMSS_DOCKER_RC=%s" "$?"',
-            escapeshellarg($pmssStatsUsername),
-            escapeshellarg($toggleVerb)
-        );
-        $dockerRun = pmssInfoShellExec($dockerCommand, 'Docker toggle command');
-        $dockerRunOutput = is_string($dockerRun['output']) ? trim($dockerRun['output']) : '';
+        $dockerRun = array('output' => '', 'error' => null);
+        $dockerRunOutput = '';
         $dockerRunRc = null;
 
-        if (preg_match('/__PMSS_DOCKER_RC=(\d+)$/', $dockerRunOutput, $rcMatches) === 1) {
-            $dockerRunRc = (int) $rcMatches[1];
-            $dockerRunOutput = trim((string) preg_replace('/\n__PMSS_DOCKER_RC=\d+$/', '', $dockerRunOutput));
+        if ($configResult['ok']) {
+            $dockerCommand = sprintf(
+                'php /scripts/userDocker.php %s %s 2>&1; printf "\\n__PMSS_DOCKER_RC=%s" "$?"',
+                escapeshellarg($pmssStatsUsername),
+                escapeshellarg($toggleVerb)
+            );
+            $dockerRun = pmssInfoShellExec($dockerCommand, 'Docker toggle command');
+            $dockerRunOutput = is_string($dockerRun['output']) ? trim($dockerRun['output']) : '';
+
+            if (preg_match('/__PMSS_DOCKER_RC=(\d+)$/', $dockerRunOutput, $rcMatches) === 1) {
+                $dockerRunRc = (int) $rcMatches[1];
+                $dockerRunOutput = trim((string) preg_replace('/\n__PMSS_DOCKER_RC=\d+$/', '', $dockerRunOutput));
+            }
         }
 
         if (!$configResult['ok']) {
