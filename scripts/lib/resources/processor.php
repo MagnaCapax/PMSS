@@ -162,7 +162,8 @@ class ResourceStatsProcessor
             'daily' => $results['daily'],
         ];
 
-        $this->stats->saveUserResources($user, $data);
+        $this->storage->ensureRuntime();
+        $this->storage->save($user, $data);
         logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$rawTotals['io_read']['month']}");
     }
 

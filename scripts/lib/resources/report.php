@@ -34,21 +34,6 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         $totals[$metric] = array_fill_keys($windows, 0.0);
     }
 
-    $selectWindows = static function (array $raw, bool $allowMissing = false) use ($windows): ?array {
-        $selected = [];
-        foreach ($windows as $label) {
-            if (!isset($raw[$label])) {
-                if ($allowMissing) {
-                    $selected[$label] = 0.0;
-                    continue;
-                }
-                return null;
-            }
-            $selected[$label] = (float) $raw[$label];
-        }
-        return $selected;
-    };
-
     foreach ($users as $thisUser) {
         $statsPath = "{$statsDir}/{$thisUser}";
         $rawStats = is_file($statsPath) ? @file_get_contents($statsPath) : false;
@@ -59,11 +44,20 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
         $windowMetrics = [];
         foreach ($windowMetricConfig as $metric => $allowMissing) {
-            $windowMetrics[$metric] = $selectWindows($data[$metric]['raw'] ?? [], $allowMissing);
-            if ($windowMetrics[$metric] === null) {
-                $missingStats[] = $thisUser;
-                continue 2;
+            $selected = [];
+            $rawMetric = $data[$metric]['raw'] ?? [];
+            foreach ($windows as $label) {
+                if (!isset($rawMetric[$label])) {
+                    if (!$allowMissing) {
+                        $missingStats[] = $thisUser;
+                        continue 3;
+                    }
+                    $selected[$label] = 0.0;
+                    continue;
+                }
+                $selected[$label] = (float) $rawMetric[$label];
             }
+            $windowMetrics[$metric] = $selected;
         }
 
         $memoryCurrent = (float) ($data['memory']['current'] ?? 0.0);

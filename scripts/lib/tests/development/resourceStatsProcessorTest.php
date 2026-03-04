@@ -9,17 +9,9 @@ class StubResourceStatsProcessorStatistics extends \resourceStatistics
     /** @var array<string, string> */
     public $map = [];
 
-    /** @var array<string, array> */
-    public $saved = [];
-
     public function getData($user, $timePeriod = 10080)
     {
         return $this->map[$user] ?? '';
-    }
-
-    public function saveUserResources($user, $data): void
-    {
-        $this->saved[$user] = $data;
     }
 }
 
@@ -89,8 +81,8 @@ class ResourceStatsProcessorTest extends TestCase
 
         $processor->processUser($user, $processor->buildCompareTimes());
 
-        $this->assertTrue(isset($stats->saved[$user]), 'Expected processed data to be persisted');
-        $saved = $stats->saved[$user];
+        $saved = $this->readSavedResourceStats($user);
+        $this->assertTrue(is_array($saved), 'Expected processed data to be persisted');
         $this->assertTrue(isset($saved['io_read']['raw']['month']));
         $this->assertTrue(isset($saved['ram_hours']['display']['month']));
         $this->assertStringContainsString('KiB', $saved['io_read']['display']['hour']);
@@ -109,7 +101,7 @@ class ResourceStatsProcessorTest extends TestCase
 
         $processor->processUser('ghost', $processor->buildCompareTimes());
 
-        $this->assertTrue(!isset($stats->saved['ghost']));
+        $this->assertTrue($this->readSavedResourceStats('ghost') === null);
     }
 
     public function testProcessUserSkipsTooLittleData(): void
@@ -124,7 +116,26 @@ class ResourceStatsProcessorTest extends TestCase
 
         $processor->processUser($user, $processor->buildCompareTimes());
 
-        $this->assertTrue(!isset($stats->saved[$user]));
+        $this->assertTrue($this->readSavedResourceStats($user) === null);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function readSavedResourceStats(string $user): ?array
+    {
+        $path = $this->paths['home_dir'].'/'.$user.'/.resourceData';
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $decoded = @unserialize($raw);
+        return is_array($decoded) ? $decoded : null;
     }
 
     private function makeProcessor(StubResourceStatsProcessorStatistics $stats): \ResourceStatsProcessor

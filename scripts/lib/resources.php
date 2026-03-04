@@ -6,8 +6,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/resources/storage.php';
-
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
  */
@@ -15,16 +13,10 @@ class resourceStatistics
 {
     /** @var string */
     private $resourceDir;
-    /** @var string */
-    private $homeDir;
-    /** @var string */
-    private $runtimeDir;
 
     public function __construct(array $paths = [])
     {
         $this->resourceDir = rtrim($paths['resource_dir'] ?? getenv('PMSS_RESOURCE_DIR') ?: '/var/log/pmss/resources', '/');
-        $this->homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
-        $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
     }
 
     /**
@@ -87,22 +79,5 @@ class resourceStatistics
             'memory'    => $usesOpsFields ? $parsed[5] : $parsed[3],
             'tasks'     => $usesOpsFields ? $parsed[6] : $parsed[4],
         ];
-    }
-
-    /**
-     * Persist computed resource statistics for a user to storage.
-     *
-     * @param string $user Username receiving the resource statistics.
-     * @param array $data Structured resource statistics payload.
-     * @return void
-     */
-    public function saveUserResources($user, $data): void
-    {
-        $storage = new \ResourceStorage([
-            'home_dir'    => $this->homeDir,
-            'runtime_dir' => $this->runtimeDir,
-        ]);
-        $storage->ensureRuntime();
-        $storage->save($user, $data);
     }
 }
