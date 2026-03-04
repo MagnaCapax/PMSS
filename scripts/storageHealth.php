@@ -196,14 +196,6 @@ $userNoticePath = '';
 $userNoticeRequested = false;
 $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
 
-$consumeOptionalValue = static function (?string $value, ?string $nextArg, int &$index): ?string {
-    if ($value !== null || $nextArg === null || strpos($nextArg, '--') === 0) {
-        return $value;
-    }
-    $index++;
-    return $nextArg;
-};
-
 $argc = count($argv);
 for ($i = 1; $i < $argc; $i++) {
     $arg = $argv[$i];
@@ -213,7 +205,10 @@ for ($i = 1; $i < $argc; $i++) {
     $val = count($parts) === 2 ? $parts[1] : null;
     switch ($key) {
         case '--json':
-            $val = $consumeOptionalValue($val, $next, $i);
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
+                $val = $next;
+                $i++;
+            }
             if ($val !== null && $val !== '') {
                 $jsonPath = $val;
             }
@@ -225,14 +220,20 @@ for ($i = 1; $i < $argc; $i++) {
             $onlyProblems = true;
             break;
         case '--device':
-            $val = $consumeOptionalValue($val, $next, $i);
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
+                $val = $next;
+                $i++;
+            }
             if ($val !== null && $val !== '') {
                 $deviceFilter = $val;
             }
             break;
         case '--user-notice':
             $userNoticeRequested = true;
-            $val = $consumeOptionalValue($val, $next, $i);
+            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
+                $val = $next;
+                $i++;
+            }
             $userNoticePath = $val !== null && $val !== '' ? $val : $defaultNoticePath;
             break;
         case '--help':

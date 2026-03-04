@@ -103,16 +103,11 @@ function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing
 {
     $users = [];
     $windowMetricKeys = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'];
-    $collectMetricWindows = static function (array $source) use ($windowMetricKeys): array {
-        $values = [];
-        foreach ($windowMetricKeys as $metric) {
-            $values[$metric] = $source[$metric];
-        }
-        return $values;
-    };
-
     foreach ($rows as $username => $row) {
-        $users[$username] = $collectMetricWindows($row);
+        $users[$username] = [];
+        foreach ($windowMetricKeys as $metric) {
+            $users[$username][$metric] = $row[$metric];
+        }
         $users[$username]['memory'] = [
             'current' => $row['memory_current'],
             'avg_month' => $row['memory_avg_month'],
@@ -123,7 +118,10 @@ function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing
         ];
     }
 
-    $totalPayload = $collectMetricWindows($totals);
+    $totalPayload = [];
+    foreach ($windowMetricKeys as $metric) {
+        $totalPayload[$metric] = $totals[$metric];
+    }
     $totalPayload['memory'] = [
         'current' => $totals['memory_current'],
         'avg_month' => $totals['memory_avg_month'],
