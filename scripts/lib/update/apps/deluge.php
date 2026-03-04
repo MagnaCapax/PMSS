@@ -170,6 +170,86 @@ function pmssFindDelugeCoreCandidates(): array
     return $candidates;
 }
 
+/**
+ * Patch Deluge's custom logger override for Python 3.11+ compatibility.
+ */
+function pmssPatchDelugeFindCallerSignature(string $path, bool $dryRun, callable $log): bool
+{
+    if (!is_file($path) || is_link($path) || !is_readable($path)) {
+        return false;
+    }
+
+    $lines = @file($path, FILE_IGNORE_NEW_LINES);
+    if (!is_array($lines)) {
+        $log('[WARN] Unable to read Deluge log.py for patching: '.$path);
+        return false;
+    }
+
+    $lineCount = count($lines);
+    for ($i = 0; $i < $lineCount; $i++) {
+        if (strpos($lines[$i], 'def findCaller(') === false) {
+            continue;
+        }
+
+        if (strpos($lines[$i], 'stacklevel=') !== false) {
+            return true;
+        }
+
+        if (!preg_match('/^(\s*def\s+findCaller\(\s*self\s*,\s*stack_info\s*=\s*False)\)(.*)$/', $lines[$i], $matches)) {
+            continue;
+        }
+
+        $lines[$i] = $matches[1].', stacklevel=1)'.$matches[2];
+        $newContent = implode("\n", $lines);
+        if ($newContent !== '' && substr($newContent, -1) !== "\n") {
+            $newContent .= "\n";
+        }
+
+        if ($dryRun) {
+            $log('[DRYRUN] Would patch Deluge findCaller signature in '.$path);
+            return true;
+        }
+
+        if (@file_put_contents($path, $newContent) === false) {
+            $log('[WARN] Failed to write Deluge findCaller patch to '.$path);
+            return false;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Locate candidate Deluge log.py files for compatibility patching.
+ */
+function pmssFindDelugeLogCandidates(): array
+{
+    $candidates = [];
+    $patterns = [
+        '/usr/lib/python3/dist-packages/deluge/log.py',
+        '/usr/lib/python3*/dist-packages/deluge/log.py',
+        '/usr/local/lib/python3*/dist-packages/deluge/log.py',
+    ];
+    foreach ($patterns as $pattern) {
+        $matches = glob($pattern);
+        if (!is_array($matches)) {
+            continue;
+        }
+        foreach ($matches as $match) {
+            if ($match !== '' && !in_array($match, $candidates, true)) {
+                $candidates[] = $match;
+            }
+        }
+    }
+    return $candidates;
+}
+
+if (getenv('PMSS_DELUGE_NO_ENTRYPOINT') === '1') {
+    return;
+}
+
 $delugeTarballUrl = 'https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz';
 $delugeTarballSha256 = 'c4bd04abfd211b65218be03f3c46d26f44024884de10e01859fb856fdd6f25d8';
 $delugeTarballLabel = 'Deluge 2.0.5 source tarball';
@@ -281,5 +361,18 @@ if (!empty($patchCandidates)) {
     }
     if ($patched) {
         echo "\t*** Deluge cache ratio guard ensured\n";
+    }
+}
+
+$logPatchCandidates = pmssFindDelugeLogCandidates();
+if (!empty($logPatchCandidates)) {
+    $patched = false;
+    foreach ($logPatchCandidates as $path) {
+        if (pmssPatchDelugeFindCallerSignature($path, $dryRun, $log)) {
+            $patched = true;
+        }
+    }
+    if ($patched) {
+        echo "\t*** Deluge Python 3.11 findCaller compatibility ensured\n";
     }
 }
