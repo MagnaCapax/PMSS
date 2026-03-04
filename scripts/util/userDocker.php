@@ -98,6 +98,14 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
     static $timeoutBin = null;
 
     $wrapper = sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($cmd));
+    $target = function_exists('posix_getpwnam') ? posix_getpwnam($user) : false;
+    $currentUid = function_exists('posix_geteuid') ? (int) posix_geteuid() : -1;
+    if (is_array($target) && isset($target['uid']) && $currentUid > 0 && $currentUid === (int) $target['uid']) {
+        // When already running as the target user (e.g. per-user web UI),
+        // avoid `su` so interactive password prompts do not block automation.
+        $wrapper = sprintf('/bin/bash -lc %s', escapeshellarg($cmd));
+    }
+
     if ($timeoutSeconds !== null && $timeoutSeconds > 0) {
         if (!$timeoutBinResolved) {
             $timeoutBinResolved = true;
