@@ -38,14 +38,9 @@ function pmssStorageHealthColor(string $severity, string $text): string
     return "\033[".$code."m".$text."\033[0m";
 }
 
-function pmssStorageHealthFmtInt($value): string
+function pmssStorageHealthFmtInt($value, string $suffix = ''): string
 {
-    return is_int($value) ? (string) $value : '-';
-}
-
-function pmssStorageHealthFmtTemp($value): string
-{
-    return is_int($value) ? (string) $value.'C' : '-';
+    return is_int($value) ? (string) $value.$suffix : '-';
 }
 
 function pmssStorageHealthMark(string $severity): string
@@ -54,11 +49,15 @@ function pmssStorageHealthMark(string $severity): string
     return pmssStorageHealthColor($severity, $mark);
 }
 
-function pmssStorageHealthPrintSummary(array $entries): void
+function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, string $timestamp, string $jsonPath): void
 {
+    $header = "Storage health (latest snapshot {$timestamp})";
+    echo $header.PHP_EOL;
+    echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
+
     $counts = ['ok' => 0, 'warn' => 0, 'fail' => 0];
-    foreach ($entries as $e) {
-        $sev = (string) ($e['severity'] ?? 'warn');
+    foreach (array_merge($smart, $nvme, $raid) as $entry) {
+        $sev = (string) ($entry['severity'] ?? 'warn');
         if (!isset($counts[$sev])) {
             $sev = 'warn';
         }
@@ -70,15 +69,6 @@ function pmssStorageHealthPrintSummary(array $entries): void
         (string) $counts['warn'],
         (string) $counts['fail']
     );
-}
-
-function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, string $timestamp, string $jsonPath): void
-{
-    $header = "Storage health (latest snapshot {$timestamp})";
-    echo $header.PHP_EOL;
-    echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
-
-    pmssStorageHealthPrintSummary(array_merge($smart, $nvme, $raid));
 
     if (!empty($smart) || !empty($nvme)) {
         echo "Disks\n";
@@ -96,7 +86,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
                 'size' => (string) ($entry['size'] ?? ''),
                 'model' => (string) ($entry['model'] ?? ''),
                 'health' => $health,
-                'temp' => pmssStorageHealthFmtTemp($m['temp_c'] ?? null),
+                'temp' => pmssStorageHealthFmtInt($m['temp_c'] ?? null, 'C'),
                 'realloc' => pmssStorageHealthFmtInt($m['reallocated'] ?? null),
                 'pend' => pmssStorageHealthFmtInt($m['pending'] ?? null),
                 'link' => pmssStorageHealthFmtInt($m['link_errors'] ?? ($m['udma_crc'] ?? null)),
@@ -115,7 +105,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
                 'size' => (string) ($entry['size'] ?? ''),
                 'model' => (string) ($entry['model'] ?? ''),
                 'health' => 'NVME',
-                'temp' => pmssStorageHealthFmtTemp(is_int($temp) ? $temp : null),
+                'temp' => pmssStorageHealthFmtInt(is_int($temp) ? $temp : null, 'C'),
                 'realloc' => '-',
                 'pend' => pmssStorageHealthFmtInt($m['media_errors'] ?? null),
                 'link' => pmssStorageHealthFmtInt($m['percentage_used'] ?? null),

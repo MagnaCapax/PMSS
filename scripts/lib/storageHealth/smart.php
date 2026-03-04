@@ -169,54 +169,54 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
  */
 function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timestamp): array
 {
-        $dev = (string) $disk['path'];
-        $base = [
-            'timestamp' => $timestamp,
-            'kind' => 'smart',
-            'device' => $dev,
-            'kname' => (string) ($disk['kname'] ?? ''),
-            'model' => (string) ($disk['model'] ?? ''),
-            'serial' => (string) ($disk['serial'] ?? ''),
-            'rota' => (int) ($disk['rota'] ?? 1),
-            'size' => (string) ($disk['size'] ?? ''),
-            'ok' => false,
-            'severity' => 'warn',
-        ];
+    $dev = (string) $disk['path'];
+    $base = [
+        'timestamp' => $timestamp,
+        'kind' => 'smart',
+        'device' => $dev,
+        'kname' => (string) ($disk['kname'] ?? ''),
+        'model' => (string) ($disk['model'] ?? ''),
+        'serial' => (string) ($disk['serial'] ?? ''),
+        'rota' => (int) ($disk['rota'] ?? 1),
+        'size' => (string) ($disk['size'] ?? ''),
+        'ok' => false,
+        'severity' => 'warn',
+    ];
 
-        if (!is_readable($dev)) {
-            $base['error'] = 'device unreadable';
-            $base['flags'] = ['device_unreadable'];
-            return $base;
-        }
-        if (trim((string) shell_exec('command -v smartctl 2>/dev/null')) === '') {
-            $base['error'] = 'smartctl missing';
-            $base['flags'] = ['smartctl_missing'];
-            return $base;
-        }
+    $fail = static function (string $error, string $flag) use ($base): array {
+        $base['error'] = $error;
+        $base['flags'] = [$flag];
+        return $base;
+    };
 
-        $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
-        $res = pmssStorageHealthExecCapture($cmd, 25);
-        $out = $res['stdout']."\n".$res['stderr'];
-        if (trim($out) === '') {
-            $base['error'] = 'smartctl produced no output';
-            $base['flags'] = ['smartctl_empty'];
-            return $base;
-        }
+    if (!is_readable($dev)) {
+        return $fail('device unreadable', 'device_unreadable');
+    }
+    if (trim((string) shell_exec('command -v smartctl 2>/dev/null')) === '') {
+        return $fail('smartctl missing', 'smartctl_missing');
+    }
 
-        $prevMetrics = null;
-        $prev = $last['smart::'.$dev]['metrics'] ?? null;
-        if (is_array($prev)) {
-            $prevMetrics = $prev;
-            if (isset($prev['udma_crc']) && !isset($prev['link_errors'])) {
-                $prevMetrics['link_errors'] = $prev['udma_crc'];
-            }
-        }
+    $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
+    $res = pmssStorageHealthExecCapture($cmd, 25);
+    $out = $res['stdout']."\n".$res['stderr'];
+    if (trim($out) === '') {
+        return $fail('smartctl produced no output', 'smartctl_empty');
+    }
 
-        $entry = pmssStorageHealthParseSmartctlOutput($out, $disk, $prevMetrics, $timestamp);
-        if ($res['rc'] === 124) {
-            $entry['severity'] = pmssStorageHealthSeverityMax((string) $entry['severity'], 'warn');
-            $entry['ok'] = ($entry['severity'] === 'ok');
-            $entry['flags'] = array_values(array_unique(array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout'])));
+    $prevMetrics = null;
+    $prev = $last['smart::'.$dev]['metrics'] ?? null;
+    if (is_array($prev)) {
+        $prevMetrics = $prev;
+        if (isset($prev['udma_crc']) && !isset($prev['link_errors'])) {
+            $prevMetrics['link_errors'] = $prev['udma_crc'];
         }
+    }
+
+    $entry = pmssStorageHealthParseSmartctlOutput($out, $disk, $prevMetrics, $timestamp);
+    if ($res['rc'] === 124) {
+        $entry['severity'] = pmssStorageHealthSeverityMax((string) $entry['severity'], 'warn');
+        $entry['ok'] = ($entry['severity'] === 'ok');
+        $entry['flags'] = array_values(array_unique(array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout'])));
+    }
     return $entry;
 }

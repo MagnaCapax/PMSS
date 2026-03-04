@@ -93,6 +93,13 @@ function pmssQuotaSnapshotRun(): int
         umask($oldUmask);
         return 1;
     }
+
+    $finish = static function (int $code) use ($fh, $oldUmask): int {
+        @fclose($fh);
+        umask($oldUmask);
+        return $code;
+    };
+
     @chmod($logPath, 0600);
     if (function_exists('flock')) {
         @flock($fh, LOCK_EX);
@@ -102,9 +109,7 @@ function pmssQuotaSnapshotRun(): int
     $repquota = trim((string) @shell_exec('command -v repquota 2>/dev/null'));
     if ($repquota === '') {
         @fwrite($fh, $ts.' WARN repquota_missing'.PHP_EOL);
-        @fclose($fh);
-        umask($oldUmask);
-        return 0;
+        return $finish(0);
     }
 
     $cmd = $repquota.' -u -n '.escapeshellarg($mountPath).' 2>&1';
@@ -117,17 +122,13 @@ function pmssQuotaSnapshotRun(): int
             $fh,
             $ts.' WARN repquota_failed rc='.$rc.' mount='.preg_replace('/\\s+/', '', $mountPath).($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL
         );
-        @fclose($fh);
-        umask($oldUmask);
-        return 0;
+        return $finish(0);
     }
 
     $rows = pmssQuotaSnapshotParseRepquotaUserRows($output);
     if (empty($rows)) {
         @fwrite($fh, $ts.' WARN repquota_no_rows mount='.preg_replace('/\\s+/', '', $mountPath).PHP_EOL);
-        @fclose($fh);
-        umask($oldUmask);
-        return 0;
+        return $finish(0);
     }
 
     foreach ($rows as $row) {
@@ -146,10 +147,7 @@ function pmssQuotaSnapshotRun(): int
             ).PHP_EOL
         );
     }
-
-    @fclose($fh);
-    umask($oldUmask);
-    return 0;
+    return $finish(0);
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {

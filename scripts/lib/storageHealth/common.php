@@ -13,11 +13,8 @@
  */
 function pmssStorageHealthReadLastEntries(string $path): array
 {
-    if (!is_file($path)) {
-        return [];
-    }
-    $fh = fopen($path, 'r');
-    if (!$fh) {
+    $fh = is_file($path) ? fopen($path, 'r') : false;
+    if ($fh === false) {
         return [];
     }
     $last = [];
