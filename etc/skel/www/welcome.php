@@ -69,6 +69,31 @@ if (file_exists('/scripts/lib/welcomeMessage.php')) {
         $contextualWelcomeMessage = pmssWelcomeMessageForUser($quotaInfo, $userHome, $username);
     }
 }
+
+$delugeAuthPath = '../.config/deluge/auth';
+$delugePasswordNotice = '';
+$delugePassword = '';
+$delugePasswordHelpersAvailable = false;
+
+if (file_exists('/scripts/lib/user/passwords.php')) {
+    require_once '/scripts/lib/user/passwords.php';
+}
+
+$delugePasswordHelpersAvailable = function_exists('pmssDelugeAuthReadLocalclientPassword')
+    && function_exists('pmssDelugeAuthWriteLocalclientPassword')
+    && function_exists('pmssDelugeServicePasswordGenerate');
+
+if ($delugePasswordHelpersAvailable && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
+    $newDelugePassword = pmssDelugeServicePasswordGenerate();
+    $passwordUpdated = pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword);
+    $delugePasswordNotice = $passwordUpdated
+        ? 'Deluge password rotated. Re-login in Deluge Web UI with the new password below.'
+        : 'Deluge password rotation failed. Please try again.';
+}
+
+if ($delugePasswordHelpersAvailable) {
+    $delugePassword = pmssDelugeAuthReadLocalclientPassword($delugeAuthPath);
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -173,11 +198,30 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
 if ((file_exists('/usr/bin/deluged') || file_exists('/usr/local/bin/deluged')) && file_exists('deluge.php')) {
 ?>
                         <h6>Deluge</h6>
-                        <p>Deluge default password: <b>pulsedDeluge</b> — <b>Please change this immediately when accessing</b></p>
+                        <p>Deluge password: <b><?php echo htmlspecialchars($delugePassword === '' ? 'Unavailable' : $delugePassword, ENT_QUOTES, 'UTF-8'); ?></b> (separate from your account password)</p>
 <?php
+    if ($delugePasswordHelpersAvailable) {
+?>
+                        <form method="post" action="">
+                            <input type="hidden" name="delugePasswordRotate" value="1" />
+                            <input type="submit" value="Rotate Deluge Password" />
+                        </form>
+<?php
+    } else {
+?>
+                        <p><b>Deluge password rotation is unavailable on this host.</b></p>
+<?php
+    }
+
+    if ($delugePasswordNotice !== '') {
+?>
+                        <p><b><?php echo htmlspecialchars($delugePasswordNotice, ENT_QUOTES, 'UTF-8'); ?></b></p>
+<?php
+    }
+
     if (!file_exists('../.delugeEnable')) {
 ?>
-                        <input type="button" name="delugeStart" value="Start Deluge" onClick="$.ajax({url: 'deluge.php?action=start', success: function() { alert('Deluge starting, remember to change default password of pulsedDeluge to something else. Accessible at /deluge-USERNAME/. Refresh GUI to see tab'); location.reload(true); }});" />
+                        <input type="button" name="delugeStart" value="Start Deluge" onClick="$.ajax({url: 'deluge.php?action=start', success: function() { alert('Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.'); location.reload(true); }});" />
 <?php
     } else {
 ?>

@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/traffic.php';
+require_once __DIR__.'/passwords.php';
 
 function userConfigureDeluge(array $user, array $configuration): void
 {
@@ -66,6 +67,8 @@ function userConfigureDeluge(array $user, array $configuration): void
             escapeshellarg("$configDir/auth")
         ));
     }
+    pmssEnsureDelugeServicePassword($username);
+
     if (!file_exists("$configDir/web.conf")) {
         runStep('Provisioning Deluge web template', sprintf('cp %s %s',
             escapeshellarg('/etc/seedbox/config/template.deluge.web.conf'),
