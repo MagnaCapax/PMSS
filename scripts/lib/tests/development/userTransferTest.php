@@ -161,6 +161,18 @@ class UserTransferTest extends TestCase
         $this->assertTrue(strpos($script, '{session') === false, 'expected no brace-expanded sources');
     }
 
+    public function testBuildAuthProbeUsesSinglePasswordPrompt(): void
+    {
+        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $script = \pmssUserTransferBuildAuthProbe($cfg);
+
+        $this->assertStringContainsString('ssh -o Compression=no', $script);
+        $this->assertStringContainsString('-o NumberOfPasswordPrompts=1', $script);
+        $this->assertStringContainsString("-l 'deefbox'", $script);
+        $this->assertStringContainsString("'example.com'", $script);
+        $this->assertStringContainsString("'/bin/true'", $script);
+    }
+
     public function testBuildExpectWrapperUsesEnvPassword(): void
     {
         $script = \pmssUserTransferBuildExpectWrapper();

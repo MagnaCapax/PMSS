@@ -43,8 +43,10 @@ function pmssUserTransferMain(array $argv): int
         if ($cfg['dryRun']) {
             $scratch = '/root/pmss-userTransfer-<generated>';
             $expect = $scratch.'/transfer.expect';
+            $authProbe = $scratch.'/auth-probe.sh';
             $mainScript = $scratch.'/rsync-main.sh';
             $finalScript = $scratch.'/rsync-final.sh';
+            runStep('Validating remote SSH authentication', pmssBuildCommand($expect, [$authProbe]));
             runStep('Pulling home data (pass 1/'.$cfg['mainPasses'].')', pmssBuildCommand($expect, [$mainScript]));
             runStep('Pulling volatile data (pass 1/'.$cfg['finalPasses'].')', pmssBuildCommand($expect, [$finalScript]));
             runStep('Normalising user permissions', pmssBuildCommand('php', [dirname(__DIR__).'/../util/userPermissions.php', $cfg['localUser']]));
@@ -71,13 +73,24 @@ function pmssUserTransferMain(array $argv): int
 
         // Generate scripts under /root with restrictive permissions.
         $expect = $scratch.'/transfer.expect';
+        $authProbe = $scratch.'/auth-probe.sh';
         $mainScript = $scratch.'/rsync-main.sh';
         $finalScript = $scratch.'/rsync-final.sh';
 
-        $paths = [$expect, $mainScript, $finalScript];
+        $paths = [$expect, $authProbe, $mainScript, $finalScript];
         pmssUserTransferWriteFile($expect, pmssUserTransferBuildExpectWrapper()."\n", 0700);
+        pmssUserTransferWriteFile($authProbe, pmssUserTransferBuildAuthProbe($cfg), 0700);
         pmssUserTransferWriteFile($mainScript, pmssUserTransferBuildRsyncMain($cfg), 0700);
         pmssUserTransferWriteFile($finalScript, pmssUserTransferBuildRsyncFinal($cfg), 0700);
+
+        // Validate credentials first so a bad password does not burn dozens of rsync passes.
+        $authRc = runStep('Validating remote SSH authentication', pmssBuildCommand($expect, [$authProbe]));
+        if ($authRc !== 0) {
+            logMessage(sprintf('[ERR] Aborting user transfer: remote authentication pre-flight failed (rc=%d)', $authRc));
+            $cleanup();
+            putenv('PMSS_USER_TRANSFER_PASSWORD');
+            return 1;
+        }
 
         // Run repeated passes to converge the remote state before the final sync.
         $lastMainRc = 0;
@@ -127,4 +140,3 @@ function pmssUserTransferMain(array $argv): int
         return is_int($code) && $code > 0 ? $code : 1;
     }
 }
-

@@ -86,6 +86,26 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
 }
 
 /**
+ * Build a cheap SSH auth probe used to fail fast on bad credentials.
+ */
+function pmssUserTransferBuildAuthProbe(array $cfg): string
+{
+    [$remoteUser, $hostname] = [$cfg['remoteUser'], $cfg['hostname']];
+
+    // Keep SSH flags aligned with rsync wrappers so behaviour is predictable.
+    $ssh = sprintf(
+        'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1 -l %s',
+        escapeshellarg($remoteUser)
+    );
+
+    $cmd = $ssh
+        .' '.escapeshellarg($hostname)
+        .' '.escapeshellarg('/bin/true');
+
+    return "#!/bin/bash\nset -e\n{$cmd}\n";
+}
+
+/**
  * Build a minimal Expect wrapper that injects the password via env and propagates exit codes.
  */
 function pmssUserTransferBuildExpectWrapper(): string
