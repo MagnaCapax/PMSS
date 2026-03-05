@@ -102,6 +102,22 @@ ProFTPD remains a notorious dpkg failure mode when hostnames or TLS assets are
 missing, so `pmssInstallProftpdStack()` keeps the unit unmasked and retries
 `dpkg --configure` to stop the package manager from wedging mid-run.
 
+### External Repository Trust Inventory (Phase A)
+
+This inventory documents all non-Debian repositories that PMSS currently manages.
+It captures where each source is defined, where its signing key is stored, and
+whether trust is scoped or global.
+
+| Repository | Source template/path | Key install path | `signed-by` usage | Trust scope | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Docker | `/etc/apt/sources.list.d/docker.sources` (written by `pmssEnsureDockerRepository()` in `scripts/lib/update/repositories.php`) | `/etc/apt/keyrings/docker.gpg` (override root: `PMSS_APT_KEYRING_DIR`) | Yes (`Signed-By` field in deb822 source) | Scoped to Docker source entry | Matches ADR 0008 guidance for key scoping without migrating base Debian templates. |
+| MediaArea | `etc/seedbox/config/template.sources.buster`, `etc/seedbox/config/template.sources.bullseye`, `etc/seedbox/config/template.sources.bookworm`, `etc/seedbox/config/template.sources.trixie` | `/etc/apt/trusted.gpg.d/mediaarea.asc` (override: `PMSS_APT_MEDIAAREA_KEY_PATH`) | No | Global (`trusted.gpg.d`) | Repository handling is intentionally frozen; audit only in this phase. |
+| Sonarr (legacy key support) | No active PMSS-managed source template; legacy host entries may still exist outside templates | `/etc/apt/trusted.gpg.d/sonarr.gpg` | No managed `signed-by` source in-tree | Global if a host keeps external Sonarr source entries | `pmssEnsureSonarrKey()` keeps apt update from failing on mixed/legacy hosts while app install uses GitHub release tarballs. |
+| Jessie PPA (`jcfp/ppa`) | `etc/seedbox/config/template.sources.jessie` | No dedicated PMSS keyring path in current code | No | Global when key is present in apt trusted keyrings | Legacy Jessie-only line; treat as Phase B cleanup/scoping candidate. |
+
+Base Debian repos remain in `sources.list` templates per ADR 0008, so this
+table only tracks external/non-Debian sources.
+
 ### App Installer Matrix
 
 | Module | Installs / Tasks | External Sources & Expectations |
