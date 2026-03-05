@@ -337,7 +337,7 @@ if ($vendor['pulsedBox'] == true) {
 	                            }
 	                        }
 
-                        echo passthru('systemctl status user-$(\'/usr/bin/id\' -u).slice|grep -m1  "Memory: "');
+                        echo memoryCreateSection();
 
                         if (@file_exists('../.billingId')) {
                             $billingId = (int)@file_get_contents('../.billingId');
@@ -412,6 +412,131 @@ function bonusQuotaDisplay($bonusQuota) {
         return '<b>BONUS QUOTA:</b> ' . number_format($bonusQuota) . ' GiB<br />';
     }
     return '';
+}
+
+function readUserRamLimitBytes() {
+    $configPath = '../.config/pmss-user.json';
+    if (!is_file($configPath) || is_link($configPath)) {
+        return null;
+    }
+
+    $raw = @file_get_contents($configPath);
+    if (!is_string($raw) || trim($raw) === '') {
+        return null;
+    }
+
+    $userConfig = json_decode($raw, true);
+    if (!is_array($userConfig) || !isset($userConfig['ramMiB']) || !is_numeric($userConfig['ramMiB'])) {
+        return null;
+    }
+
+    $ramMiB = (float) $userConfig['ramMiB'];
+    if ($ramMiB <= 0) {
+        return null;
+    }
+
+    return $ramMiB * 1024 * 1024;
+}
+
+function readUserMemoryCurrentBytes() {
+    $resourcePath = '../.resourceData';
+    if (!is_file($resourcePath) || is_link($resourcePath)) {
+        return null;
+    }
+
+    $raw = @file_get_contents($resourcePath);
+    if (!is_string($raw) || trim($raw) === '') {
+        return null;
+    }
+
+    $resourceData = @unserialize($raw);
+    if (!is_array($resourceData)
+        || !isset($resourceData['memory'])
+        || !is_array($resourceData['memory'])
+        || !isset($resourceData['memory']['current'])
+        || !is_numeric($resourceData['memory']['current'])) {
+        return null;
+    }
+
+    return (float) $resourceData['memory']['current'];
+}
+
+function readSystemdMemoryCurrentBytes() {
+    if (!function_exists('shell_exec')) {
+        return null;
+    }
+
+    $memoryCurrent = @shell_exec("systemctl show user-$('/usr/bin/id' -u).slice -p MemoryCurrent --value 2>/dev/null");
+    if (!is_string($memoryCurrent)) {
+        return null;
+    }
+
+    $memoryCurrent = trim($memoryCurrent);
+    if ($memoryCurrent === '' || !is_numeric($memoryCurrent)) {
+        return null;
+    }
+
+    return (float) $memoryCurrent;
+}
+
+function memoryCreateSection() {
+    $currentBytes = readUserMemoryCurrentBytes();
+    if ($currentBytes === null) {
+        $currentBytes = readSystemdMemoryCurrentBytes();
+    }
+
+    $limitBytes = readUserRamLimitBytes();
+
+    if ($currentBytes === null && $limitBytes === null) {
+        return '<h6>RAM Info</h6><b>RAM usage data is unavailable right now.</b><hr />';
+    }
+
+    $currentText = ($currentBytes === null)
+        ? 'n/a'
+        : filesize2HumanReadable($currentBytes);
+
+    if ($limitBytes === null || $limitBytes <= 0) {
+        return <<<EOF
+<h6>RAM Info</h6>
+Current RAM usage: {$currentText}<br />
+RAM limit: n/a
+<hr />
+EOF;
+    }
+
+    $limitText = filesize2HumanReadable($limitBytes);
+
+    if ($currentBytes === null) {
+        return <<<EOF
+<h6>RAM Info</h6>
+Current RAM usage: n/a<br />
+RAM limit: {$limitText}
+<hr />
+EOF;
+    }
+
+    $percent = round(($currentBytes / $limitBytes) * 100, 1);
+    if (!is_finite($percent)) {
+        $percent = 0;
+    }
+
+    $titleText = "{$currentText} / {$limitText}";
+    $gauge = createGauge($titleText, $titleText, $percent);
+
+    if ($percent > 100) {
+        $warning = '<br /><b style="color: red;">RAM LIMIT EXCEEDED</b><br />Processes may be killed (OOM) until memory usage drops.<br />';
+    } elseif ($percent >= 80) {
+        $warning = '<br /><b style="color: #d2691e;">RAM WARNING</b><br />You are close to your RAM limit. Consider reducing running services or upgrading your plan.<br />';
+    } else {
+        $warning = '';
+    }
+
+    return <<<EOF
+<h6>RAM Info</h6>
+{$gauge}
+{$warning}
+<hr />
+EOF;
 }
 
 	function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0) {
