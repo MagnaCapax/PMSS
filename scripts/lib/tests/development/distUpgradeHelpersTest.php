@@ -10,6 +10,7 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertEquals(['10','11'], \pmssDetermineUpgradePath('10'));
         $this->assertEquals(['11','12'], \pmssDetermineUpgradePath('11'));
         $this->assertEquals(['12','13'], \pmssDetermineUpgradePath('12'));
+        $this->assertEquals([null,null], \pmssDetermineUpgradePath('13'));
         $this->assertEquals([null,null], \pmssDetermineUpgradePath('14'));
     }
 
@@ -57,6 +58,16 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertStringContainsString('No dist-upgrade required', $plan['message']);
 
         $plan = \pmssResolveDistUpgradeStep('12', '11');
+        $this->assertEquals('error', $plan['action']);
+        $this->assertEquals(null, $plan['to']);
+        $this->assertStringContainsString('Safety halt', $plan['message']);
+
+        $plan = \pmssResolveDistUpgradeStep('13', '13');
+        $this->assertEquals('noop', $plan['action']);
+        $this->assertEquals(null, $plan['to']);
+        $this->assertStringContainsString('No dist-upgrade required', $plan['message']);
+
+        $plan = \pmssResolveDistUpgradeStep('13', '12');
         $this->assertEquals('error', $plan['action']);
         $this->assertEquals(null, $plan['to']);
         $this->assertStringContainsString('Safety halt', $plan['message']);

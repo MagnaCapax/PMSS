@@ -334,23 +334,13 @@ function pmssRepairNginxAfterDistUpgrade(): void
  */
 function pmssResolveDistUpgradeStep(string $currentMajor, string $maxMajor): array
 {
-    [$from, $next] = pmssDetermineUpgradePath($currentMajor);
-    if ($from === null || $next === null) {
-        return [
-            'action'  => 'noop',
-            'from'    => null,
-            'to'      => null,
-            'message' => 'No upgrade recipe for Debian '.$currentMajor,
-        ];
-    }
-
     $currentMajorInt = (int) $currentMajor;
     $maxMajorInt     = (int) $maxMajor;
 
     if ($currentMajorInt > $maxMajorInt) {
         return [
             'action'  => 'error',
-            'from'    => $from,
+            'from'    => $currentMajor,
             'to'      => null,
             'message' => sprintf('Safety halt: Current version is %s but the requested maximum is %s.', $currentMajor, $maxMajor),
         ];
@@ -358,9 +348,19 @@ function pmssResolveDistUpgradeStep(string $currentMajor, string $maxMajor): arr
     if ($currentMajorInt === $maxMajorInt) {
         return [
             'action'  => 'noop',
-            'from'    => $from,
+            'from'    => $currentMajor,
             'to'      => null,
             'message' => sprintf('No dist-upgrade required: current version is %s and requested maximum is %s.', $currentMajor, $maxMajor),
+        ];
+    }
+
+    [$from, $next] = pmssDetermineUpgradePath($currentMajor);
+    if ($from === null || $next === null) {
+        return [
+            'action'  => 'noop',
+            'from'    => null,
+            'to'      => null,
+            'message' => 'No upgrade recipe for Debian '.$currentMajor,
         ];
     }
 
@@ -418,7 +418,7 @@ function pmssDistUpgradeIsAllowedMajor(string $major): bool
  */
 function pmssDetermineUpgradePath(string $current): array
 {
-    static $map = ['10' => ['10', '11'], '11' => ['11', '12'], '12' => ['12', '13']];
+    static $map = ['10' => ['10', '11'], '11' => ['11', '12'], '12' => ['12', '13'], '13' => [null, null]];
     return $map[$current] ?? [null, null];
 }
 
