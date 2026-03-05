@@ -447,6 +447,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
   - Optional flags: `--upload-throttle-kib=<KiB>` updates torrent upload throttle; `--welcome-message=<HTML>` sets/clears per-user welcome banner override (empty value clears).
+  - Welcome-only mode: `scripts/util/userConfig.php <user> --welcome-message=<HTML>` updates only the welcome banner field and exits without running service/quota orchestration.
   - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user. Storage Box product payloads also default `dockerEnabled=false` unless explicitly overridden.
 
 - scripts/productConfig.php <product> --welcome-message=<HTML>

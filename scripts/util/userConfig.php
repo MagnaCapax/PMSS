@@ -41,8 +41,15 @@ foreach ($rawArgs as $arg) {
     $args[] = $arg;
 }
 $usage .= ' [--upload-throttle-kib=KIB] [--welcome-message=HTML]';
-if (empty($args[1]) || empty($args[2]) || empty($args[3])) {
-    die('need user name. '.$usage."\n");
+$usage .= "\n   or: ./userConfig.php USERNAME --welcome-message=HTML";
+$fullConfigMode = !empty($args[1]) && !empty($args[2]) && !empty($args[3]);
+$welcomeOnlyMode = !empty($args[1]) && $welcomeMessage !== null && empty($args[2]) && empty($args[3]);
+if (!$fullConfigMode && !$welcomeOnlyMode) {
+    die($usage."\n");
+}
+
+if ($welcomeOnlyMode && $uploadThrottleKib !== null) {
+    die("--upload-throttle-kib requires RAM and quota arguments\n");
 }
 
 // The $user array is populated from sanitized command-line arguments ($args)
@@ -104,6 +111,30 @@ foreach ($presenceIndices as $key => $index) {
 
 $store = new UserConfigStore();
 $existing = $store->get($user['name']) ?? [];
+
+if ($welcomeOnlyMode) {
+    $payload = $existing;
+    $requiredBaselineKeys = ['ramMiB', 'rtorrentPort', 'quota', 'quotaBurst'];
+    foreach ($requiredBaselineKeys as $requiredBaselineKey) {
+        if (!isset($payload[$requiredBaselineKey]) || !is_numeric($payload[$requiredBaselineKey])) {
+            fwrite(STDERR, "Error: missing existing {$requiredBaselineKey}; rerun full userConfig.php first.\n");
+            exit(1);
+        }
+    }
+
+    if (trim($welcomeMessage) === '') {
+        unset($payload['welcomeMessage']);
+    } else {
+        $payload['welcomeMessage'] = $welcomeMessage;
+    }
+
+    if (!$store->set($user['name'], $payload)) {
+        fwrite(STDERR, "Error: failed to persist user config for {$user['name']}\n");
+        exit(1);
+    }
+    $store->writeUserCache($user['name'], $payload);
+    exit(0);
+}
 
 $payload = $existing;
 $payload['ramMiB'] = $user['memory'];
