@@ -460,6 +460,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Read-only probe of system readiness (binary versions, config presence);
     intended post-provision.
 
+- scripts/util/performanceBaselineCollect.sh [--output <file>]
+  - Behavior: Collects a lightweight JSON baseline (timestamp/kernel, selected sysctl keys, TCP retransmit counter, optional vmstat/iostat samples) for before/after tuning comparisons.
+
 - scripts/util/update-step2.php
   - Behavior: Legacy consolidated phase-2 script (superseded by modular `lib/update/*`), retained for compatibility. Do not extend unless migrating behavior into modules.
   - Preflight: checks disk space on `/` and `/home` (fatal if <3 GiB), dpkg lock availability, APT cache writability, and basic network reachability; logs `preflight_ok` or `preflight_error` JSON events.
