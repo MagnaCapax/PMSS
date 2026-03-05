@@ -246,6 +246,70 @@ function pmssFindDelugeLogCandidates(): array
     return $candidates;
 }
 
+/**
+ * Keep Deluge command resolution anchored to distro package binaries.
+ *
+ * Legacy Debian 10 pip installs may leave direct binaries in /usr/local/bin.
+ * On Debian 11+, those stale binaries shadow /usr/bin on PATH and keep hosts
+ * pinned to old versions. This helper converges /usr/local/bin/$command to a
+ * symlink targeting /usr/bin/$command whenever package-managed binaries exist.
+ */
+function pmssEnsureDelugeCommandSymlink(string $command, string $systemPath, string $localPath, bool $dryRun, callable $log): bool
+{
+    if ($command === '' || $systemPath === '' || $localPath === '') {
+        return false;
+    }
+
+    if (!is_file($systemPath) || !is_executable($systemPath)) {
+        $log('[WARN] Skipping Deluge command link refresh; missing system binary: '.$systemPath);
+        return false;
+    }
+
+    if (is_link($localPath) && readlink($localPath) === $systemPath) {
+        return true;
+    }
+
+    if (file_exists($localPath) && is_dir($localPath)) {
+        $log('[WARN] Refusing to replace Deluge command directory: '.$localPath);
+        return false;
+    }
+
+    if (file_exists($localPath) || is_link($localPath)) {
+        if ($dryRun) {
+            $log('[DRYRUN] Would replace legacy Deluge command path: '.$localPath);
+            return true;
+        }
+        if (!@unlink($localPath)) {
+            $log('[WARN] Failed to remove legacy Deluge command path: '.$localPath);
+            return false;
+        }
+    }
+
+    $localDir = dirname($localPath);
+    if (!is_dir($localDir)) {
+        if ($dryRun) {
+            $log('[DRYRUN] Would create Deluge command directory: '.$localDir);
+            return true;
+        }
+        if (!@mkdir($localDir, 0755, true) && !is_dir($localDir)) {
+            $log('[WARN] Failed to create Deluge command directory: '.$localDir);
+            return false;
+        }
+    }
+
+    if ($dryRun) {
+        $log('[DRYRUN] Would create Deluge command symlink '.$localPath.' -> '.$systemPath);
+        return true;
+    }
+
+    if (!@symlink($systemPath, $localPath)) {
+        $log('[WARN] Failed to create Deluge command symlink '.$localPath.' -> '.$systemPath);
+        return false;
+    }
+
+    return true;
+}
+
 if (getenv('PMSS_DELUGE_NO_ENTRYPOINT') === '1') {
     return;
 }
@@ -343,12 +407,10 @@ if ($isDebian10) {
     }
 }
 
-// Ensure convenience symlinks exist only once.
-if (file_exists('/usr/bin/deluged') && !file_exists('/usr/local/bin/deluged')) {
-    runStep(
-        'Creating Deluge convenience symlinks',
-        'ln -s /usr/bin/deluge-web /usr/local/bin/deluge-web; ln -s /usr/bin/deluged /usr/local/bin/deluged'
-    );
+// Debian 11+ must resolve Deluge commands to package-managed /usr/bin paths.
+if (!$isDebian10) {
+    pmssEnsureDelugeCommandSymlink('deluge-web', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web', $dryRun, $log);
+    pmssEnsureDelugeCommandSymlink('deluged', '/usr/bin/deluged', '/usr/local/bin/deluged', $dryRun, $log);
 }
 
 $patchCandidates = pmssFindDelugeCoreCandidates();
