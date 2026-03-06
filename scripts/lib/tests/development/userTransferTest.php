@@ -181,6 +181,69 @@ class UserTransferTest extends TestCase
         $this->assertTrue(strpos($script, 'send "{$') === false, 'expected password not embedded in script');
     }
 
+    public function testRewriteBencodedHomePathsAdjustsStringLengths(): void
+    {
+        $oldPath = '/home/olduser/data/movie';
+        $payload = 'd9:directory'.strlen($oldPath).':'.$oldPath.'4:name4:teste';
+
+        $replacements = 0;
+        $rewritten = \pmssUserTransferRewriteBencodedHomePaths($payload, 'olduser', 'new', $replacements);
+        $newPath = '/home/new/data/movie';
+        $expected = 'd9:directory'.strlen($newPath).':'.$newPath.'4:name4:teste';
+
+        $this->assertTrue($rewritten !== null, 'expected valid bencode payload rewrite');
+        $this->assertEquals(1, $replacements);
+        $this->assertEquals($expected, $rewritten);
+    }
+
+    public function testRewriteBencodedHomePathsReturnsInputWhenNoPathMatch(): void
+    {
+        $path = '/home/another/data';
+        $payload = 'd9:directory'.strlen($path).':'.$path.'e';
+
+        $replacements = 0;
+        $rewritten = \pmssUserTransferRewriteBencodedHomePaths($payload, 'olduser', 'newuser', $replacements);
+
+        $this->assertTrue($rewritten !== null, 'expected valid payload to remain valid');
+        $this->assertEquals(0, $replacements);
+        $this->assertEquals($payload, $rewritten);
+    }
+
+    public function testRewriteBencodedHomePathsRejectsMalformedInput(): void
+    {
+        $malformed = 'd9:directory999:/home/olduser/datae';
+        $replacements = 0;
+
+        $rewritten = \pmssUserTransferRewriteBencodedHomePaths($malformed, 'olduser', 'newuser', $replacements);
+
+        $this->assertTrue($rewritten === null, 'expected malformed payload to be rejected');
+        $this->assertEquals(0, $replacements);
+    }
+
+    public function testRewriteRtorrentSessionPathsUpdatesSessionFilesForUserRename(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-userTransfer-session-rewrite-'.uniqid('', true);
+        $home = $base.'/home/newuser';
+        $sessionDir = $home.'/session';
+        @mkdir($sessionDir, 0755, true);
+
+        $sessionFile = $sessionDir.'/test.torrent.rtorrent';
+        $oldPath = '/home/olduser/data/movie';
+        $payload = 'd9:directory'.strlen($oldPath).':'.$oldPath.'e';
+        file_put_contents($sessionFile, $payload);
+
+        \pmssUserTransferRewriteRtorrentSessionPaths([
+            'localUser' => 'newuser',
+            'remoteUser' => 'olduser',
+        ], $home);
+
+        $updated = (string) file_get_contents($sessionFile);
+        $newPath = '/home/newuser/data/movie';
+        $expected = 'd9:directory'.strlen($newPath).':'.$newPath.'e';
+
+        $this->assertEquals($expected, $updated);
+    }
+
     public function testIsPathWithinHomeAcceptsRealChildPaths(): void
     {
         $base = sys_get_temp_dir().'/pmss-userTransfer-path-within-'.uniqid('', true);

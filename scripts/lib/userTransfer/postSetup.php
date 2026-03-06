@@ -7,6 +7,7 @@
 
 require_once dirname(__DIR__).'/update/runtime/commands.php';
 require_once __DIR__.'/localUserSafety.php';
+require_once __DIR__.'/sessionRewrite.php';
 
 /**
  * Apply post-transfer steps (rename ruTorrent user dir, normalise permissions, restart marker).
@@ -38,6 +39,10 @@ function pmssUserTransferPostSetup(array $cfg, string $home): void
         }
     }
 
+    // Keep migrated rTorrent sessions usable when usernames differ between
+    // source and destination accounts.
+    pmssUserTransferRewriteRtorrentSessionPaths($cfg, $home);
+
     // Normalise ownership/permissions via the shared helper, which avoids unsafe
     // recursive chown dereferencing symlinks into the host filesystem.
     runStep(
@@ -55,4 +60,3 @@ function pmssUserTransferPostSetup(array $cfg, string $home): void
         logMessage('[WARN] Skipping rTorrent restart marker (www dir missing or unsafe)');
     }
 }
-
