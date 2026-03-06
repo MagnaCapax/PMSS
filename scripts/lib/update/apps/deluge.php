@@ -393,18 +393,15 @@ if ($isDebian10) {
         echo "\t*** Deluge already at target version ({$currentVersion}); skipping pip build\n";
     }
 } else {
-    // For supported releases, prefer apt but only when not installed.
+    // For supported releases, always let apt reconcile Deluge package state.
+    // This keeps first installs and package upgrades on the same idempotent path.
     $installed = (trim((string) @shell_exec('dpkg -s deluged 2>/dev/null | grep -iE "^Status:.*installed$"')) !== '')
               && (trim((string) @shell_exec('dpkg -s deluge-web 2>/dev/null | grep -iE "^Status:.*installed$"')) !== '');
-    if (!$installed) {
-        runStep(
-            'Installing Deluge packages',
-            pmssBuildCommand('apt-get', ['install', '-y', 'deluged', 'deluge-web'])
-        );
-        runStep('Disabling deluged service', 'systemctl disable deluged || true');
-    } else {
-        echo "\t*** Deluge packages already installed; skipping apt install\n";
-    }
+    runStep(
+        $installed ? 'Upgrading Deluge packages' : 'Installing Deluge packages',
+        pmssBuildCommand('apt-get', ['install', '-y', 'deluged', 'deluge-web'])
+    );
+    runStep('Disabling deluged service', 'systemctl disable deluged || true');
 }
 
 // Debian 11+ must resolve Deluge commands to package-managed /usr/bin paths.
