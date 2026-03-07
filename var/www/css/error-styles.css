@@ -36,6 +36,14 @@ html {
   border-radius: 8px;
 }
 
+.error-description a {
+  color: #6bb1ff;
+}
+
+.error-description a:hover {
+  color: #9fd0ff;
+}
+
 .error-image {
   width: 40rem;
   border-radius: 5px;

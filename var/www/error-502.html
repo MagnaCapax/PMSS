@@ -25,35 +25,32 @@ If the issue persists, please open a support ticket.
   <br />
   <div class="content-container">
     <div id="image-container">
-      <img alt="502 - Bad Gateway" />
+      <img alt="502 - Bad Gateway" id="error-image" />
     </div>
 
     <div class="error-description">
-      <p>Potential reasons:</p>
+      <p>The sage is reconnecting the pathways. Please try again in a moment.</p>
       <p>
-        - Server is restarting, try again in 3 minutes.<br />
-        - Your lighttpd instance may have crashed or restart has been requested
-        - autorestart within ~1 minute.<br />
-        - You are beyond your burstable disk quota and/or burst time period has
-        gone full - You might need to check your data.<br />
-        - Have you paid your invoice? Check your account is not suspended.
+        The backend service might be restarting, your account may need
+        attention, or temporary load can delay the panel response.
       </p>
 
       <p>
-        Please wait 1-2 minutes and try again - if the issue persists, please
-        open a support ticket.
+        Wait 1-2 minutes and retry. If this continues, open a support ticket.
       </p>
+      <p><a href="/">Return to the main page.</a></p>
     </div>
   </div>
 </div>
 
 <script>
-  const random_index = Math.floor(Math.random() * 10) + 1;
-  const random_image = `/502_images/502-${random_index}.png`;
-
-  const imageElement = document.querySelector('img');
-  imageElement.src = random_image;
+  const variants = ['/502_images/502-1.png', '/502_images/502-2.png', '/502_images/502-3.png'];
+  const imageElement = document.getElementById('error-image');
+  imageElement.src = variants[Math.floor(Math.random() * variants.length)];
   imageElement.classList.add('error-image');
+  imageElement.addEventListener('error', function () {
+    imageElement.style.display = 'none';
+  });
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
