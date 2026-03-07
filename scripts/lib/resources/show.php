@@ -69,12 +69,35 @@ function pmssShowResourcesMain(array $argv): int
         return 0;
     }
 
-    pmssShowResourcesPrintHeader();
+    $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n";
+    printf($rowFormat, 'Username', 'IO Read/mo', 'IO Write/mo', 'CPU hrs/mo', 'RAM GB-hrs/mo', 'Mem Now', 'Procs', 'IOPS/s');
     foreach ($rows as $username => $row) {
-        pmssShowResourcesPrintRow($username, $row);
+        $hourOps = (float) (($row['io_read_ops']['hour'] ?? 0) + ($row['io_write_ops']['hour'] ?? 0));
+        printf(
+            $rowFormat,
+            $username,
+            pmssResourceFormatBytes($row['io_read']['month']),
+            pmssResourceFormatBytes($row['io_write']['month']),
+            pmssResourceFormatCpuHours($row['cpu']['month']),
+            pmssResourceFormatRamHours($row['ram_hours']['month']),
+            pmssResourceFormatBytes($row['memory_current']),
+            (string) round($row['tasks_current']),
+            pmssResourceFormatOpsPerSecond($hourOps, 3600)
+        );
     }
-    printf("%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n", '---', '---', '---', '---', '---', '---', '---', '---');
-    pmssShowResourcesPrintRow('Total', $totals);
+    printf($rowFormat, '---', '---', '---', '---', '---', '---', '---', '---');
+    $totalsHourOps = (float) (($totals['io_read_ops']['hour'] ?? 0) + ($totals['io_write_ops']['hour'] ?? 0));
+    printf(
+        $rowFormat,
+        'Total',
+        pmssResourceFormatBytes($totals['io_read']['month']),
+        pmssResourceFormatBytes($totals['io_write']['month']),
+        pmssResourceFormatCpuHours($totals['cpu']['month']),
+        pmssResourceFormatRamHours($totals['ram_hours']['month']),
+        pmssResourceFormatBytes($totals['memory_current']),
+        (string) round($totals['tasks_current']),
+        pmssResourceFormatOpsPerSecond($totalsHourOps, 3600)
+    );
 
     if (!empty($missingStats)) {
         echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";

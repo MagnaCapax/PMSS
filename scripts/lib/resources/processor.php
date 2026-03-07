@@ -135,11 +135,11 @@ class ResourceStatsProcessor
             ],
             'io_read_ops' => [
                 'raw'     => $rawTotals['io_read_ops'],
-                'display' => $this->formatCountDisplay($rawTotals['io_read_ops']),
+                'display' => $this->formatRoundedDisplay($rawTotals['io_read_ops']),
             ],
             'io_write_ops' => [
                 'raw'     => $rawTotals['io_write_ops'],
-                'display' => $this->formatCountDisplay($rawTotals['io_write_ops']),
+                'display' => $this->formatRoundedDisplay($rawTotals['io_write_ops']),
             ],
             'cpu' => [
                 'raw'     => $rawTotals['cpu'],
@@ -152,12 +152,12 @@ class ResourceStatsProcessor
             ],
             'tasks' => [
                 'raw'     => $results['tasks'],
-                'display' => $this->formatCountDisplay($results['tasks']),
+                'display' => $this->formatRoundedDisplay($results['tasks']),
                 'current' => $results['current_tasks'],
             ],
             'ram_hours' => [
                 'raw'     => $rawTotals['ram_hours'],
-                'display' => $this->formatRamHoursDisplay($rawTotals['ram_hours']),
+                'display' => $this->formatRoundedDisplay($rawTotals['ram_hours'], 2, 'GB-hrs'),
             ],
             'daily' => $results['daily'],
         ];
@@ -210,20 +210,11 @@ class ResourceStatsProcessor
         return $formatted;
     }
 
-    private function formatCountDisplay(array $rawTotals): array
+    private function formatRoundedDisplay(array $rawTotals, int $precision = 2, string $suffix = ''): array
     {
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
-            $formatted[$label] = (string) round($value, 2);
-        }
-        return $formatted;
-    }
-
-    private function formatRamHoursDisplay(array $rawTotals): array
-    {
-        $formatted = [];
-        foreach ($rawTotals as $label => $value) {
-            $formatted[$label] = round($value, 2).'GB-hrs';
+            $formatted[$label] = (string) round((float) $value, $precision).$suffix;
         }
         return $formatted;
     }
