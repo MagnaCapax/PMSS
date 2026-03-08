@@ -71,7 +71,7 @@ Signature: refer to file for full source; highlights below.
 - currentUpdaterHash(): string → SHA-256 of the current file or `''`.
 
 - runUpdateStep2(bool $dryRun): void
-  - Exports `PMSS_JSON_LOG` path; dry-run or missing file emits `update_step2_skipped`.
+  - Exports `PMSS_JSON_LOG` path and keeps `PMSS_CORRELATION_ID` available for phase 2/child processes; dry-run or missing file emits `update_step2_skipped`.
   - Else runs `/scripts/util/update-step2.php`, logs start/end + duration; `fatal` on non-zero exit.
 
 - runAutoremove(): void → `apt-get autoremove -y` with non-interactive dpkg opts; `fatal(EXIT_COPY)` on failure.
@@ -87,11 +87,11 @@ Signature: refer to file for full source; highlights below.
 - Update lock: uses `PMSS_UPDATE_LOCK_FILE=/var/run/pmss/update.lock` with an
   exclusive flock; sets `PMSS_UPDATE_LOCK_ENV=1` when held so child re-exec
   skips re-acquiring. Emits JSON events `update_lock_wait`, `update_lock_acquired`,
-  and `update_lock_released`.
+  and `update_lock_released`. Events include `pmss_correlation_id` once initialized.
 
-Environment flags consumed: none directly (phase 2 uses many).
+Environment flags consumed: `PMSS_CORRELATION_ID` (generated early when missing; inherited by phase 2 and child commands).
 
-Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-update.jsonl`.
+Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-update.jsonl` (`pmss_correlation_id` included on JSON events).
 
 ---
 
@@ -126,7 +126,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssRuntimeDir(): string → `PMSS_RUNTIME_DIR` or `/var/run/pmss`.
 - pmssStateDir(): string → `PMSS_STATE_DIR` or `/var/lib/pmss`.
 - pmssJsonLogPath(): string → cached `PMSS_JSON_LOG` or `''`.
-- pmssLogJson(array $payload): void → appends JSONL with added `ts` if path configured.
+- pmssCorrelationId(bool $createIfMissing=true): string → resolves `PMSS_CORRELATION_ID`; generates `<UTC timestamp>-<host>-<hex>` when missing.
+- pmssLogJson(array $payload): void → appends JSONL with added `ts` and `pmss_correlation_id` if path configured.
 - logMessage(string $message, array $context=[]): void → writes to `PMSS_LOG_FILE` or fallback (`pmssLogDir()/runtime.log`); also emits a JSON `log` event when JSON logging is configured.
 - pmssSelectLogger(?callable $logger=null): callable → returns the given logger or `logMessage`.
 - pmssUserLog(string $user, string $message): void → appends to `/var/log/pmss/users/<user>.log` (migrates legacy `/var/log/pmss/user`), no-ops when not running as root; mirrors to `users.log`/`users.jsonl` when lifecycle helpers are available.

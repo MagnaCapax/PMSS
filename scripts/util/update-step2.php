@@ -334,8 +334,12 @@ $effectiveRepoVersion = $repoVersion > 0 ? $repoVersion : $reportedVersion;
 
 logmsg('Update-step2 log: /var/log/pmss-update.log (fallback /tmp/pmss-update.log)');
 $jsonPath = function_exists('pmssJsonLogPath') ? pmssJsonLogPath() : (getenv('PMSS_JSON_LOG') ?: '');
+$pmssCorrelationId = function_exists('pmssCorrelationId') ? pmssCorrelationId() : trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''));
 if ($jsonPath !== '') {
     logmsg('JSON events: '.$jsonPath);
+}
+if ($pmssCorrelationId !== '') {
+    logmsg('PMSS correlation ID: '.$pmssCorrelationId);
 }
 logmsg('update-step2.php starting');
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'start']);
@@ -537,5 +541,8 @@ pmssRunProfiledCallable('Refreshing MOTD', ['Motd', 'motdGenerate']);
 pmssProfileSummary();
 
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
+if ($pmssCorrelationId !== '') {
+    logmsg('PMSS correlation ID: '.$pmssCorrelationId);
+}
 logmsg('update-step2.php completed');
 logmsg('Completed at: '.date('Y-m-d H:i:s'));

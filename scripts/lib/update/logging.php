@@ -15,6 +15,58 @@ if (!defined('PMSS_LOG_FILE')) {
 }
 
 $GLOBALS['PMSS_JSON_LOG_PATH'] = $GLOBALS['PMSS_JSON_LOG_PATH'] ?? null;
+$GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;
+
+if (!function_exists('pmssBuildCorrelationId')) {
+    /**
+     * Build a human-readable correlation ID for update/runtime logs.
+     */
+    function pmssBuildCorrelationId(): string
+    {
+        $timestamp = gmdate('Ymd-His');
+        $hostRaw = function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n');
+        $host = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $hostRaw));
+        $host = trim($host, '-');
+        if ($host === '') {
+            $host = 'host';
+        }
+
+        try {
+            $random = bin2hex(random_bytes(3));
+        } catch (\Throwable $throwable) {
+            $random = substr(hash('sha256', $timestamp.$host.microtime(true)), 0, 6);
+        }
+
+        return $timestamp.'-'.$host.'-'.$random;
+    }
+}
+
+if (!function_exists('pmssCorrelationId')) {
+    /**
+     * Resolve or initialize a shared correlation ID for this process tree.
+     */
+    function pmssCorrelationId(bool $createIfMissing = true): string
+    {
+        if (is_string($GLOBALS['PMSS_CORRELATION_ID_CACHE']) && $GLOBALS['PMSS_CORRELATION_ID_CACHE'] !== '') {
+            return $GLOBALS['PMSS_CORRELATION_ID_CACHE'];
+        }
+
+        $envValue = trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''));
+        if ($envValue !== '') {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $envValue;
+            return $envValue;
+        }
+
+        if (!$createIfMissing) {
+            return '';
+        }
+
+        $generated = pmssBuildCorrelationId();
+        $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $generated;
+        putenv('PMSS_CORRELATION_ID='.$generated);
+        return $generated;
+    }
+}
 
 if (!function_exists('pmssJsonLogPath')) {
     function pmssJsonLogPath(): string
@@ -33,6 +85,10 @@ if (!function_exists('pmssLogJson')) {
             return;
         }
         $payload['ts'] = $payload['ts'] ?? date('c');
+        $correlationId = pmssCorrelationId();
+        if ($correlationId !== '') {
+            $payload['pmss_correlation_id'] = $payload['pmss_correlation_id'] ?? $correlationId;
+        }
         @file_put_contents($path, json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
     }
 }

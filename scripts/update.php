@@ -50,8 +50,11 @@ const VERSION_RUNTIME_FILE  = '/etc/seedbox/runtime/version';
 const JSON_LOG              = '/var/log/pmss-update.jsonl';
 const SELF_UPDATE_SKIP_FLAG = '--skip-self-update';
 const SCRIPTS_ONLY_FLAG     = '--scripts-only';
+const PMSS_CORRELATION_ENV  = 'PMSS_CORRELATION_ID';
 define('PMSS_UPDATE_LOCK_FILE', '/var/run/pmss/update.lock');
 define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');
+
+$GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;
 
 const EXIT_PARSE = 11;
 const EXIT_FETCH = 12;
@@ -83,10 +86,61 @@ function logmsg(string $message): void
     fwrite(STDOUT, $message.PHP_EOL);
 }
 
+/**
+ * Build a correlation ID that remains readable in operator logs.
+ */
+function pmssBuildCorrelationId(): string
+{
+    $timestamp = gmdate('Ymd-His');
+    $hostRaw = function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n');
+    $host = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $hostRaw));
+    $host = trim($host, '-');
+    if ($host === '') {
+        $host = 'host';
+    }
+
+    try {
+        $random = bin2hex(random_bytes(3));
+    } catch (\Throwable $throwable) {
+        $random = substr(hash('sha256', $timestamp.$host.microtime(true)), 0, 6);
+    }
+
+    return $timestamp.'-'.$host.'-'.$random;
+}
+
+/**
+ * Read or initialize the cross-process correlation ID for this updater run.
+ */
+function pmssCorrelationId(bool $createIfMissing = true): string
+{
+    if (is_string($GLOBALS['PMSS_CORRELATION_ID_CACHE']) && $GLOBALS['PMSS_CORRELATION_ID_CACHE'] !== '') {
+        return $GLOBALS['PMSS_CORRELATION_ID_CACHE'];
+    }
+
+    $envValue = trim((string) (getenv(PMSS_CORRELATION_ENV) ?: ''));
+    if ($envValue !== '') {
+        $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $envValue;
+        return $envValue;
+    }
+
+    if (!$createIfMissing) {
+        return '';
+    }
+
+    $generated = pmssBuildCorrelationId();
+    $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $generated;
+    putenv(PMSS_CORRELATION_ENV.'='.$generated);
+    return $generated;
+}
+
 function logEvent(string $event, array $payload = []): void
 {
     $payload['event'] = $event;
     $payload['ts']    = $payload['ts'] ?? date('c');
+    $correlationId = pmssCorrelationId(false);
+    if ($correlationId !== '') {
+        $payload['pmss_correlation_id'] = $payload['pmss_correlation_id'] ?? $correlationId;
+    }
 
     $dir = dirname(JSON_LOG);
     if (!is_dir($dir)) {
@@ -131,6 +185,7 @@ function pmssAcquireUpdateLock(): void
 
     $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
     putenv(PMSS_UPDATE_LOCK_ENV.'=1');
+    pmssCorrelationId();
     logEvent('update_lock_acquired', ['path' => PMSS_UPDATE_LOCK_FILE]);
 
     register_shutdown_function('pmssReleaseUpdateLock');
@@ -867,7 +922,12 @@ function runUpdateStep2(bool $dryRun): void
     //   * Verify network reachability (implicit if we got this far).
     checkDiskSpace();
 
-    logmsg('Handing off to update-step2.php');
+    $correlationId = pmssCorrelationId(false);
+    $handoffLog = 'Handing off to update-step2.php';
+    if ($correlationId !== '') {
+        $handoffLog .= ' (pmss_correlation_id='.$correlationId.')';
+    }
+    logmsg($handoffLog);
     logEvent('update_step2_start');
     $start = microtime(true);
     passthru(PHP_BINARY.' /scripts/util/update-step2.php', $rc);
@@ -998,6 +1058,8 @@ function bootstrapMain(array $argv): void
 
     logmsg('Update log: /var/log/pmss/update.log (fallback /tmp/update.log)');
     logmsg('JSON events: '.JSON_LOG);
+    $correlationId = pmssCorrelationId();
+    logmsg('PMSS correlation ID: '.$correlationId);
 
     $options = parseArguments($argv);
 
