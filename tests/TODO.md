@@ -29,7 +29,8 @@ Sharp/Net Edges
 
 Static Analysis
 - Raise phpstan level in stages; document suppression policies.
- - #TODO Add per-directory phpstan configs to raise to level 2 for `scripts/lib/update/**` first (advisory), then expand. (GH #135)
+ - `phpstan.update.neon.dist` + `scripts/testing/phpstan-update-advisory.sh` run level 2 analysis for `scripts/lib/update/**` in advisory mode.
+ - #TODO Expand per-directory configs beyond `scripts/lib/update/**` once current advisory findings are triaged. (GH #135)
 
 Observability
 - Add unit coverage for JSON event helpers (required fields, timestamps, rc, durations) when accessible.
