@@ -9,13 +9,49 @@ require_once dirname(__DIR__).'/runtime/commands.php';
 
     /**
      * Ensure /proc hidepid=2 and legacy grub cmdline defaults stay applied.
+     *
+     * Extra grub cmdline options and explicit grub settings are optional so
+     * callers can enable stricter post-upgrade boot diagnostics when needed.
      */
-    function pmssEnsureBootDefaults(?callable $logger = null, ?string $fstabPath = null, ?string $grubPath = null, ?string $grubOption = null): void
+    function pmssEnsureBootDefaults(
+        ?callable $logger = null,
+        ?string $fstabPath = null,
+        ?string $grubPath = null,
+        ?string $grubOption = null,
+        ?array $extraGrubOptions = null,
+        ?array $extraGrubSettings = null
+    ): void
     {
         $log = pmssSelectLogger($logger);
         $fstabPath = $fstabPath ?? '/etc/fstab';
         $grubPath = $grubPath ?? '/etc/default/grub';
         $grubOption = $grubOption ?? 'systemd.unified_cgroup_hierarchy=0';
+
+        $requiredGrubOptions = [];
+        $grubOption = trim((string) $grubOption);
+        if ($grubOption !== '') {
+            $requiredGrubOptions[] = $grubOption;
+        }
+        if (is_array($extraGrubOptions)) {
+            foreach ($extraGrubOptions as $option) {
+                $option = trim((string) $option);
+                if ($option !== '') {
+                    $requiredGrubOptions[] = $option;
+                }
+            }
+        }
+        $requiredGrubOptions = array_values(array_unique($requiredGrubOptions));
+
+        $requiredGrubSettings = [];
+        if (is_array($extraGrubSettings)) {
+            foreach ($extraGrubSettings as $key => $value) {
+                $key = trim((string) $key);
+                if ($key === '' || preg_match('/^[A-Z0-9_]+$/', $key) !== 1) {
+                    continue;
+                }
+                $requiredGrubSettings[$key] = trim((string) $value);
+            }
+        }
 
         $writeWithBackup = static function (string $path, array $contentLines, string $label) use ($log): void {
             $backup = $path.'.pmss-backup-'.date('YmdHis');
@@ -99,19 +135,61 @@ require_once dirname(__DIR__).'/runtime/commands.php';
                 $key = $match[1];
                 $quote = $match[2];
                 $value = $match[3];
-                if (strpos($value, $grubOption) === false) {
-                    $value = trim($value.' '.$grubOption);
-                    $lines[$idx] = $key.'='.$quote.$value.$quote;
+
+                $currentOptions = preg_split('/\s+/', trim($value)) ?: [];
+                $currentOptions = array_values(array_filter($currentOptions, 'strlen'));
+                foreach ($requiredGrubOptions as $option) {
+                    if (!in_array($option, $currentOptions, true)) {
+                        $currentOptions[] = $option;
+                    }
+                }
+                $updatedValue = implode(' ', $currentOptions);
+
+                if ($updatedValue !== $value) {
+                    $lines[$idx] = $key.'='.$quote.$updatedValue.$quote;
                     $grubChanged = true;
-                    $log('Added '.$grubOption.' to '.$key.' in '.$grubPath);
+                    $log('Updated '.$key.' options in '.$grubPath);
                 }
                 break;
             }
-            if (!$found) {
-                $lines[] = 'GRUB_CMDLINE_LINUX_DEFAULT="'.$grubOption.'"';
+            if (!$found && !empty($requiredGrubOptions)) {
+                $lines[] = 'GRUB_CMDLINE_LINUX_DEFAULT="'.implode(' ', $requiredGrubOptions).'"';
                 $grubChanged = true;
                 $log('Added GRUB_CMDLINE_LINUX_DEFAULT to '.$grubPath);
             }
+
+            // Ensure additional grub key/value settings (e.g. serial console)
+            // are present with explicit values.
+            foreach ($requiredGrubSettings as $settingKey => $settingValue) {
+                $settingFound = false;
+                $settingPrefix = $settingKey.'=';
+                foreach ($lines as $lineIdx => $line) {
+                    if (strpos($line, $settingPrefix) !== 0) {
+                        continue;
+                    }
+                    $settingFound = true;
+                    $rawValue = trim(substr($line, strlen($settingPrefix)));
+                    if (strlen($rawValue) >= 2) {
+                        $first = $rawValue[0];
+                        $last = $rawValue[strlen($rawValue) - 1];
+                        if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+                            $rawValue = substr($rawValue, 1, -1);
+                        }
+                    }
+                    if ($rawValue !== $settingValue) {
+                        $lines[$lineIdx] = $settingKey.'="'.$settingValue.'"';
+                        $grubChanged = true;
+                        $log('Updated '.$settingKey.' in '.$grubPath);
+                    }
+                    break;
+                }
+                if (!$settingFound) {
+                    $lines[] = $settingKey.'="'.$settingValue.'"';
+                    $grubChanged = true;
+                    $log('Added '.$settingKey.' to '.$grubPath);
+                }
+            }
+
             // Persist grub updates only when modified, keeping a backup.
             if ($grubChanged) {
                 $writeWithBackup($grubPath, $lines, 'grub');
@@ -128,7 +206,7 @@ require_once dirname(__DIR__).'/runtime/commands.php';
                 $log('[WARN] update-grub not available; run update-grub after editing '.$grubPath);
             }
             $cmdline = @file_get_contents('/proc/cmdline');
-            if ($cmdline !== false && strpos($cmdline, $grubOption) === false) {
+            if ($grubOption !== '' && $cmdline !== false && strpos($cmdline, $grubOption) === false) {
                 $log('[WARN] '.$grubOption.' will apply after reboot');
             }
         }

@@ -72,4 +72,20 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertEquals(null, $plan['to']);
         $this->assertStringContainsString('Safety halt', $plan['message']);
     }
+
+    public function testBootReadinessParsers(): void
+    {
+        $healthyMdstat = "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\n";
+        $degradedMdstat = "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/1] [U_]\n";
+
+        $this->assertTrue(!\pmssMdstatHasDegradedArrays($healthyMdstat));
+        $this->assertTrue(\pmssMdstatHasDegradedArrays($degradedMdstat));
+
+        $this->assertTrue(\pmssMdadmConfigHasArrayDefinitions("ARRAY /dev/md0 metadata=1.2 UUID=abc\n"));
+        $this->assertTrue(!\pmssMdadmConfigHasArrayDefinitions("DEVICE partitions\nMAILADDR root\n"));
+
+        $this->assertTrue(\pmssInitramfsBootDegradedEnabled("BOOT_DEGRADED=true\n"));
+        $this->assertTrue(\pmssInitramfsBootDegradedEnabled("boot_degraded = true\n"));
+        $this->assertTrue(!\pmssInitramfsBootDegradedEnabled("BOOT_DEGRADED=false\n"));
+    }
 }

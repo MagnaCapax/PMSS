@@ -38,6 +38,38 @@ class BootDefaultsEnsureTest extends TestCase
         }
     }
 
+    public function testBootDefaultsSupportsSerialConsoleSettings(): void
+    {
+        $logger = static function (string $message): void { };
+        $dir = sys_get_temp_dir().'/pmss-boot-defaults-serial-'.bin2hex(random_bytes(4));
+        mkdir($dir, 0700, true);
+
+        $fstab = $dir.'/fstab';
+        $grub = $dir.'/grub';
+        file_put_contents($fstab, "proc /proc proc defaults,hidepid=2 0 0\n");
+        file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"\n");
+
+        \pmssEnsureBootDefaults(
+            $logger,
+            $fstab,
+            $grub,
+            'systemd.unified_cgroup_hierarchy=0',
+            ['console=tty0', 'console=ttyS0,115200n8'],
+            [
+                'GRUB_TERMINAL' => 'console serial',
+                'GRUB_SERIAL_COMMAND' => 'serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1',
+            ]
+        );
+
+        $updatedGrub = (string) file_get_contents($grub);
+        $this->assertStringContainsString('console=tty0', $updatedGrub);
+        $this->assertStringContainsString('console=ttyS0,115200n8', $updatedGrub);
+        $this->assertStringContainsString('GRUB_TERMINAL="console serial"', $updatedGrub);
+        $this->assertStringContainsString('GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"', $updatedGrub);
+
+        $this->cleanup($dir);
+    }
+
     private function cleanup(string $path): void
     {
         if (!file_exists($path)) { return; }

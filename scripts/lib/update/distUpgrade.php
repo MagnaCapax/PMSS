@@ -73,10 +73,21 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
     pmssEnsureFuseOverlayfsAfterDistUpgrade($next);
     pmssRepairDockerRootlessAfterDistUpgrade($next);
     if (function_exists('pmssEnsureBootDefaults')) {
-        pmssEnsureBootDefaults();
+        pmssEnsureBootDefaults(
+            null,
+            null,
+            null,
+            null,
+            ['console=tty0', 'console=ttyS0,115200n8'],
+            [
+                'GRUB_TERMINAL' => 'console serial',
+                'GRUB_SERIAL_COMMAND' => 'serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1',
+            ]
+        );
     } else {
         logMessage('[WARN] dist-upgrade: boot defaults helper missing; skipping GRUB and hidepid checks');
     }
+    pmssVerifyDistUpgradeBootReadiness();
     return 0;
 }
 
@@ -266,6 +277,108 @@ function pmssEnsureInitrdAfterDistUpgrade(): void
     }
 
     logMessage('dist-upgrade: initrd generated for kernel '.$latest);
+}
+
+/**
+ * Verify common post-upgrade boot prerequisites and warn loudly when drift is
+ * detected.
+ *
+ * These checks are intentionally non-fatal because the dist-upgrade flow does
+ * not reboot automatically. Warnings are surfaced so operators can resolve
+ * boot risk before scheduling the reboot window.
+ */
+function pmssVerifyDistUpgradeBootReadiness(
+    ?string $mdstatPath = null,
+    ?string $grubConfigPath = null,
+    ?string $mdadmConfigPath = null,
+    ?string $initramfsMdadmPath = null
+): void
+{
+    $mdstatPath = $mdstatPath ?? '/proc/mdstat';
+    $grubConfigPath = $grubConfigPath ?? '/boot/grub/grub.cfg';
+    $mdadmConfigPath = $mdadmConfigPath ?? '/etc/mdadm/mdadm.conf';
+    $initramfsMdadmPath = $initramfsMdadmPath ?? '/etc/initramfs-tools/conf.d/mdadm';
+
+    if (is_readable($mdstatPath)) {
+        $mdstat = (string) @file_get_contents($mdstatPath);
+        if (pmssMdstatHasDegradedArrays($mdstat)) {
+            logMessage('[WARN] dist-upgrade: degraded RAID array detected in '.$mdstatPath.'; inspect before reboot');
+        } else {
+            logMessage('[SKIP] dist-upgrade: RAID arrays appear healthy');
+        }
+    } else {
+        logMessage('[WARN] dist-upgrade: unable to read '.$mdstatPath.'; RAID health check skipped');
+    }
+
+    if (!is_file($grubConfigPath)) {
+        logMessage('[WARN] dist-upgrade: missing '.$grubConfigPath.'; run update-grub before reboot');
+    } else {
+        $grubSize = @filesize($grubConfigPath);
+        if ($grubSize === false || $grubSize < 1000) {
+            logMessage('[WARN] dist-upgrade: grub config looks too small ('.(int) $grubSize.' bytes); verify '.$grubConfigPath);
+        } else {
+            logMessage('[SKIP] dist-upgrade: grub config present at '.$grubConfigPath);
+        }
+    }
+
+    if (is_readable($mdadmConfigPath)) {
+        $mdadmConfig = (string) @file_get_contents($mdadmConfigPath);
+        if (!pmssMdadmConfigHasArrayDefinitions($mdadmConfig)) {
+            logMessage('[WARN] dist-upgrade: '.$mdadmConfigPath.' lacks ARRAY definitions; regenerate before reboot');
+        } else {
+            logMessage('[SKIP] dist-upgrade: mdadm ARRAY definitions found');
+        }
+    } else {
+        logMessage('[WARN] dist-upgrade: unable to read '.$mdadmConfigPath.'; mdadm config check skipped');
+    }
+
+    if (is_readable($initramfsMdadmPath)) {
+        $initramfsMdadm = (string) @file_get_contents($initramfsMdadmPath);
+        if (!pmssInitramfsBootDegradedEnabled($initramfsMdadm)) {
+            logMessage('[WARN] dist-upgrade: '.$initramfsMdadmPath.' missing BOOT_DEGRADED=true; degraded RAID boot may fail');
+        } else {
+            logMessage('[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured');
+        }
+    } else {
+        logMessage('[WARN] dist-upgrade: unable to read '.$initramfsMdadmPath.'; BOOT_DEGRADED verification skipped');
+    }
+}
+
+/**
+ * Detect degraded md arrays from /proc/mdstat content.
+ */
+function pmssMdstatHasDegradedArrays(string $mdstat): bool
+{
+    if ($mdstat === '') {
+        return false;
+    }
+
+    if (preg_match_all('/\[[U_]+\]/', $mdstat, $matches) !== 1) {
+        return false;
+    }
+    foreach ($matches[0] as $state) {
+        if (strpos($state, '_') !== false) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Check whether mdadm.conf includes ARRAY definitions.
+ */
+function pmssMdadmConfigHasArrayDefinitions(string $mdadmConfig): bool
+{
+    return preg_match('/^\s*ARRAY\s+\S+/m', $mdadmConfig) === 1;
+}
+
+/**
+ * Check whether initramfs mdadm config allows degraded boot.
+ */
+function pmssInitramfsBootDegradedEnabled(string $config): bool
+{
+    return preg_match('/^\s*BOOT_DEGRADED\s*=\s*true\s*$/mi', $config) === 1;
 }
 
 /**
