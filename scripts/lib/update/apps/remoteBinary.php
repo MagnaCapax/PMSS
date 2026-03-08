@@ -85,3 +85,55 @@ if (!function_exists('pmssInstallPinnedRemoteBinary')) {
     }
 }
 
+if (!function_exists('pmssInstallPinnedRemoteDebPackage')) {
+    /**
+     * Fetch and install a pinned Debian package with SHA256 verification.
+     *
+     * The package is downloaded to a temporary file and installed with `dpkg -i`
+     * only after checksum verification succeeds.
+     */
+    function pmssInstallPinnedRemoteDebPackage(
+        string $label,
+        string $url,
+        string $expectedSha256
+    ): bool {
+        $dryRun = getenv('PMSS_DRY_RUN') === '1';
+        $log = function_exists('logmsg') ? 'logmsg' : 'logMessage';
+
+        if (strpos($url, 'https://') !== 0) {
+            $log("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
+            return false;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'pmss-remote-deb-');
+        if ($tmp === false || $tmp === '') {
+            $log("[WARN] Unable to create temp file for {$label} package download");
+            return false;
+        }
+
+        $downloadCmd = pmssBuildCommand('wget', ['-q', '-O', $tmp, $url]);
+        $downloadRc = runStep("Downloading {$label} package", $downloadCmd);
+        if ($downloadRc !== 0) {
+            @unlink($tmp);
+            return false;
+        }
+
+        if ($dryRun) {
+            @unlink($tmp);
+            return true;
+        }
+
+        $actualSha = @hash_file('sha256', $tmp);
+        if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
+            $log("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
+            @unlink($tmp);
+            return false;
+        }
+
+        $installCmd = pmssBuildCommand('dpkg', ['-i', $tmp]);
+        $installRc = runStep("Installing {$label}", $installCmd);
+        @unlink($tmp);
+
+        return $installRc === 0;
+    }
+}
