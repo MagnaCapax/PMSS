@@ -1,4 +1,8 @@
-# AI CLI Tools (etc/skel/install-ai-tools.sh)
+# AI CLI Tools
+
+PMSS now installs system-wide AI CLI binaries during updates via
+`scripts/lib/update/apps/aiToolsInstall.php`. The commands are linked into
+`/usr/local/bin` so users can run `gemini`, `codex`, and `claude` immediately.
 
 This script installs three AI coding assistants in your home directory. Each tool requires your own API key or account to use. No credentials are pre-installed or shared between users.
 
@@ -7,11 +11,12 @@ Installed tools:
 - **Codex CLI** (OpenAI) - Requires API key or subscription
 - **Claude Code** (Anthropic) - Requires API key or subscription
 
-All tools install to `~/bin` and `~/.local` with configurations private to your account (mode 700).
+The optional user-local installer (`~/install-ai-tools.sh`) remains available
+for users who want personal copies under `~/bin` and `~/.local`.
 
 ## Getting Started
 
-### Install or Update
+### Optional User-Local Install or Update
 
 Run the installer from your home directory:
 
@@ -27,7 +32,7 @@ The script:
 
 To update all tools, simply re-run the same command. The script is idempotent and will upgrade existing installations.
 
-### Disk Usage
+### Disk Usage (User-Local Installer)
 
 The full installation uses approximately **1 GB** of disk space. This counts against your account quota. The breakdown:
 - Node.js runtime: ~100 MB
