@@ -13,6 +13,46 @@
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../runtime/processes.php';
 
+if (!function_exists('pmssSystemdUnitStopIfPresent')) {
+    /**
+     * Stop a systemd unit only when it exists on the host.
+     */
+    function pmssSystemdUnitStopIfPresent(string $unit, string $label): void
+    {
+        pmssSystemdUnitActionIfPresent($unit, 'Stopping '.$label.' systemd service', 'stop');
+    }
+}
+
+if (!function_exists('pmssSystemdUnitRestartIfPresent')) {
+    /**
+     * Restart a systemd unit only when it exists on the host.
+     */
+    function pmssSystemdUnitRestartIfPresent(string $unit, string $label): void
+    {
+        pmssSystemdUnitActionIfPresent($unit, 'Restarting '.$label.' systemd service', 'restart');
+    }
+}
+
+if (!function_exists('pmssSystemdUnitEnableIfPresent')) {
+    /**
+     * Enable a systemd unit only when it exists on the host.
+     */
+    function pmssSystemdUnitEnableIfPresent(string $unit, string $label): void
+    {
+        pmssSystemdUnitActionIfPresent($unit, 'Enabling '.$label.' systemd service', 'enable');
+    }
+}
+
+if (!function_exists('pmssSystemdUnitDisableIfPresent')) {
+    /**
+     * Disable a systemd unit only when it exists on the host.
+     */
+    function pmssSystemdUnitDisableIfPresent(string $unit, string $label): void
+    {
+        pmssSystemdUnitActionIfPresent($unit, 'Disabling '.$label.' systemd service', 'disable');
+    }
+}
+
 if (!function_exists('pmssStopDisableMaskSystemdUnit')) {
     /**
      * Stop + disable (and optionally mask) a unit, fail-soft.

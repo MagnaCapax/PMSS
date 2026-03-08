@@ -8,8 +8,7 @@
 
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/runtime/processes.php';
-// #TODO Create services/systemd.php with helpers stopIfPresent()/restartIfPresent()
-//       and refactor scattered stop/restart logic across modules to use it. (GH #128)
+require_once __DIR__.'/services/systemd.php';
 
 if (!function_exists('pmssConfigureWebStack')) {
     /**
@@ -24,14 +23,14 @@ if (!function_exists('pmssConfigureWebStack')) {
             runStep('Disabling lighttpd from sysvinit runlevels', 'update-rc.d lighttpd stop 2 3 4 5');
             runStep('Removing lighttpd sysvinit hooks', 'update-rc.d lighttpd remove');
         } else {
-            pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');
+            pmssSystemdUnitDisableIfPresent('lighttpd', 'lighttpd');
         }
         killProcess('lighttpd', 'Terminating lingering lighttpd processes');
         killProcess('php-cgi', 'Terminating lingering php-cgi processes');
         if ($distroVersion < 10) {
             runStep('Ensuring nginx defaults set in sysvinit', 'update-rc.d nginx defaults');
         } else {
-            pmssSystemdUnitActionIfPresent('nginx', 'Enabling nginx systemd service', 'enable');
+            pmssSystemdUnitEnableIfPresent('nginx', 'nginx');
         }
 
         // Per-user lighttpd configuration, htpasswd sync, and instance checks
