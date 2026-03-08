@@ -19,7 +19,8 @@ Naming & Lints
 - Expand camelCase filename lint coverage directory-by-directory.
 - Add opt-in class/file naming lint across first-party libs (one class per file, name matches file).
 - Enforce no-aliases policy on env keys via advisory lint.
- - Plan rollout: enable `classname-lint.sh` in CI as advisory, then required per-directory once cleaned.
+- Plan rollout: enable `classname-lint.sh` in CI as advisory, then required per-directory once cleaned.
+ - `scripts/testing/test-all.sh` now forwards `PMSS_LINT_SHARP_STRICT` and `PMSS_LINT_NET_STRICT`; CI can switch to strict mode by setting them to `1`.
  - #TODO Flip sharp-edges and net-edges lints to strict in CI once the tree is clean (set `PMSS_LINT_SHARP_STRICT=1`, `PMSS_LINT_NET_STRICT=1`). (GH #134)
 
 Sharp/Net Edges

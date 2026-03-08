@@ -29,10 +29,10 @@ scripts/testing/static-include-check.php
 runIfEnabled PMSS_LINT_DOCBLOCK "docblock lint" bash scripts/testing/docblock-lint.sh
 runIfEnabled PMSS_LINT_PHPSTAN "phpstan analysis" env PHPSTAN_DISABLE_PARALLEL=1 bash scripts/testing/phpstan.sh
 runIfEnabled PMSS_LINT_PHPSTAN_UPDATE "phpstan update advisory" bash scripts/testing/phpstan-update-advisory.sh
-echo "sharp-edges lint (advisory)"
-PMSS_LINT_SHARP_STRICT=0 bash scripts/testing/sharp-edges-lint.sh
-echo "net-edges lint (advisory)"
-PMSS_LINT_NET_STRICT=0 bash scripts/testing/net-edges-lint.sh
+echo "sharp-edges lint (advisory unless strict mode enabled)"
+PMSS_LINT_SHARP_STRICT="${PMSS_LINT_SHARP_STRICT:-0}" bash scripts/testing/sharp-edges-lint.sh
+echo "net-edges lint (advisory unless strict mode enabled)"
+PMSS_LINT_NET_STRICT="${PMSS_LINT_NET_STRICT:-0}" bash scripts/testing/net-edges-lint.sh
 
 echo "OK: all checks"
 echo
