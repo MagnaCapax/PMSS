@@ -9,7 +9,10 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__, 2).'/runtime.php';
+require_once __DIR__.'/bootstrap.php';
+if (!pmssUpdateAppRuntimeBootstrap('Sonarr')) {
+    return;
+}
 require_once __DIR__.'/arr.php';
 
 const SONARR_INSTALL_PATH   = '/opt/Sonarr';

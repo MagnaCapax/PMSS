@@ -9,10 +9,8 @@
  * @author PMSS Team
  */
 
-$runtimePath = dirname(__DIR__).'/../runtime.php';
-// #TODO consolidate update app bootstrap (runtime inclusion) into shared helper to avoid per-script duplication. (GH #130)
-if (!@include_once $runtimePath) {
-    fwrite(STDERR, "Radarr updater: missing runtime helper at {$runtimePath}, skipping install.\n");
+require_once __DIR__.'/bootstrap.php';
+if (!pmssUpdateAppRuntimeBootstrap('Radarr')) {
     return;
 }
 require_once __DIR__.'/arr.php';
