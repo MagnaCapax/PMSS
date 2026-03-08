@@ -24,20 +24,51 @@
 
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../distro.php';
+
+if (!function_exists('pmssRtorrentResolveTargetVersions')) {
+    /**
+     * Resolve rtorrent/libtorrent targets by detected Debian major version.
+     *
+     * Debian 10+ requires the 0.9.8/0.13.8 udns builds while legacy Debian
+     * 8/9 keeps the historic 0.9.6/0.13.6 fallback.
+     */
+    function pmssRtorrentResolveTargetVersions(array $distroInfo, string $legacyDebianVersion = ''): array
+    {
+        $majorVersion = isset($distroInfo['version']) ? (int) $distroInfo['version'] : 0;
+        if ($majorVersion <= 0 && preg_match('/^\s*([0-9]+)/', $legacyDebianVersion, $matches)) {
+            $majorVersion = (int) $matches[1];
+        }
+
+        if ($majorVersion >= 10) {
+            return [
+                'rtorrent'   => '0.9.8-udns',
+                'libtorrent' => '0.13.8-udns',
+            ];
+        }
+
+        return [
+            'rtorrent'   => '0.9.6',
+            'libtorrent' => '0.13.6',
+        ];
+    }
+}
+
+if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
+    return;
+}
 
 $dryRun = getenv('PMSS_DRY_RUN') === '1';
 $log = function_exists('logmsg') ? 'logmsg' : 'logMessage';
 
 $rtorrentVersion = shell_exec('rtorrent -h');
-// Choose version based on which debian version - 0.9.6 does not compile on deb10, but 0.9.8 has severe issues as well
-$debianVersion = file_get_contents('/etc/debian_version');
-if ($debianVersion[0] == 1) {
-    $rtorrentVersionTarget = '0.9.8-udns';
-    $rtorrentVersionTargetLib = '0.13.8-udns';
-} else {
-    $rtorrentVersionTarget = '0.9.6';
-    $rtorrentVersionTargetLib = '0.13.6';
-}
+// Resolve the target branch from distro detection instead of string-prefix
+// checks on /etc/debian_version so codename/major overrides stay consistent.
+$distroInfo = pmssDetectDistro();
+$debianVersion = (string) @file_get_contents('/etc/debian_version');
+$targets = pmssRtorrentResolveTargetVersions($distroInfo, $debianVersion);
+$rtorrentVersionTarget = $targets['rtorrent'];
+$rtorrentVersionTargetLib = $targets['libtorrent'];
 $rtorrentCompileOptions = '--with-xmlrpc-c --disable-debug';
 $rtorrentCompileOptionsLib = '--with-udns --with-posix-fallocate --disable-debug';
 $xmlrpcVersion = '3116';
