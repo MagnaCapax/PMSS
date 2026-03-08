@@ -7,7 +7,11 @@
  */
 
 if (!defined('PMSS_LOG_FILE')) {
-    define('PMSS_LOG_FILE', '/var/log/pmss/update.log');
+    $pmssLogDir = function_exists('pmssLogDir') ? pmssLogDir() : rtrim((string) (getenv('PMSS_LOG_DIR') ?: '/var/log/pmss'), '/');
+    if ($pmssLogDir === '') {
+        $pmssLogDir = '/var/log/pmss';
+    }
+    define('PMSS_LOG_FILE', $pmssLogDir.'/update.log');
 }
 
 $GLOBALS['PMSS_JSON_LOG_PATH'] = $GLOBALS['PMSS_JSON_LOG_PATH'] ?? null;

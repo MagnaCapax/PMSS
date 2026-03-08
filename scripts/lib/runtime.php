@@ -10,7 +10,10 @@
  * @author PMSS Team
  */
 
-const PMSS_RUNTIME_FALLBACK_LOG = '/var/log/pmss/runtime.log';
+const PMSS_LOG_DIR_DEFAULT = '/var/log/pmss';
+const PMSS_RUNTIME_DIR_DEFAULT = '/var/run/pmss';
+const PMSS_STATE_DIR_DEFAULT = '/var/lib/pmss';
+const PMSS_RUNTIME_FALLBACK_LOG = PMSS_LOG_DIR_DEFAULT.'/runtime.log';
 const PMSS_COMMAND_TIMEOUT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_APT_DEFAULT = 1200;
 
@@ -25,13 +28,45 @@ if (!function_exists('pmssResolvePathFromEnv')) {
     }
 }
 
+if (!function_exists('pmssLogDir')) {
+    // Resolve the PMSS log directory, allowing hermetic test overrides.
+    function pmssLogDir(): string
+    {
+        return pmssResolvePathFromEnv('PMSS_LOG_DIR', PMSS_LOG_DIR_DEFAULT);
+    }
+}
+
+if (!function_exists('pmssRuntimeDir')) {
+    // Resolve the PMSS runtime directory, allowing hermetic test overrides.
+    function pmssRuntimeDir(): string
+    {
+        return pmssResolvePathFromEnv('PMSS_RUNTIME_DIR', PMSS_RUNTIME_DIR_DEFAULT);
+    }
+}
+
+if (!function_exists('pmssStateDir')) {
+    // Resolve the PMSS state directory, allowing hermetic test overrides.
+    function pmssStateDir(): string
+    {
+        return pmssResolvePathFromEnv('PMSS_STATE_DIR', PMSS_STATE_DIR_DEFAULT);
+    }
+}
+
+if (!function_exists('pmssRuntimeFallbackLogPath')) {
+    // Build the default runtime log path from the resolved log directory.
+    function pmssRuntimeFallbackLogPath(): string
+    {
+        return pmssLogDir().'/runtime.log';
+    }
+}
+
 if (!function_exists('logMessage')) {
     /**
      * Write a timestamped message to the preferred log file and stdout.
      */
     function logMessage(string $message, ?string $logFile = null): void
     {
-        $target = $logFile ?? (defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : PMSS_RUNTIME_FALLBACK_LOG);
+        $target = $logFile ?? (defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : pmssRuntimeFallbackLogPath());
         $ts = date('[Y-m-d H:i:s] ');
         @file_put_contents($target, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
         echo $message.PHP_EOL;
