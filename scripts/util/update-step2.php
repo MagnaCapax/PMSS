@@ -7,12 +7,6 @@
  * (/scripts/update.php) refreshes itself. Tasks include repository setup,
  * service configuration, user environment maintenance and security tweaks.
  *
- * #TODO profiling (GH #120)
- * In a future refactor, launch this sequence from a thinner orchestrator and
- * ensure EVERY unit of work is wrapped in profiling/structured logging. That
- * means no bare function calls or shell execs without runStep/pmssRecordProfile
- * (or a wrapper), so the JSON/profile output gives a complete breakdown.
- *
  * Package phase invariant: repository templating, dpkg baseline replay, and
  * queued package installs must succeed before any other module executes. Do
  * not insert additional orchestration ahead of the package phase.
@@ -180,8 +174,50 @@ function pmssUpdateStep2Preflight(): void
     pmssLogJson(['event' => 'preflight_ok']);
 }
 
-pmssUpdateStep2AcquireLock();
-pmssUpdateStep2Preflight();
+/**
+ * Run non-shell orchestration work with profiling metadata.
+ *
+ * Wrapper keeps phase-2 profiling complete even when a step is pure PHP and
+ * does not invoke runStep() directly.
+ *
+ * @param callable $step
+ * @return mixed
+ */
+function pmssRunProfiledStep(string $description, callable $step)
+{
+    $started = microtime(true);
+    logmsg('[START] '.$description.' :: [callable]');
+
+    try {
+        $result = $step();
+    } catch (\Throwable $throwable) {
+        $duration = microtime(true) - $started;
+        pmssLogStatus('ERR', $description, 1, $duration);
+        throw $throwable;
+    }
+
+    $duration = microtime(true) - $started;
+    pmssLogStatus('OK', $description, 0, $duration);
+
+    return $result;
+}
+
+/**
+ * Profile a direct function/method invocation with optional arguments.
+ *
+ * @param callable $callable
+ * @param array<int, mixed> $arguments
+ * @return mixed
+ */
+function pmssRunProfiledCallable(string $description, callable $callable, array $arguments = [])
+{
+    return pmssRunProfiledStep($description, static function () use ($callable, $arguments) {
+        return call_user_func_array($callable, $arguments);
+    });
+}
+
+pmssRunProfiledCallable('Acquiring update-step2 lock', 'pmssUpdateStep2AcquireLock');
+pmssRunProfiledCallable('Running update-step2 preflight checks', 'pmssUpdateStep2Preflight');
 
 // Ensure the root cron template is restored even if the updater exits early.
 // Phase 1 disables `/etc/cron.d/pmss` to avoid cron activity while the tree is
@@ -209,7 +245,7 @@ register_shutdown_function(function () use (&$pmssRootCronRestored): void {
 // Safe before the package phase; avoids "Cannot fork" cascades inside user-0.slice.
 runStep('Ensuring root user slice TasksMax is unlimited (preflight)', "systemctl set-property --runtime 'user-0.slice' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity");
 
-$distribution  = pmssDetectDistro();
+$distribution  = pmssRunProfiledCallable('Detecting distribution metadata', 'pmssDetectDistro');
 $distroName    = $distribution['name'];
 $distroVersion = $distribution['version'];
 $lsbCodename   = $distribution['codename'];
@@ -272,9 +308,9 @@ if ($jsonPath !== '') {
 logmsg('update-step2.php starting');
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'start']);
 
-pmssConfigureAptNonInteractive('logmsg');
-pmssCleanupMediaareaBootstrapPackage();
-pmssPruneLegacyMediaArea();
+pmssRunProfiledCallable('Preparing noninteractive apt defaults', 'pmssConfigureAptNonInteractive', ['logmsg']);
+pmssRunProfiledCallable('Cleaning mediaarea bootstrap package state', 'pmssCleanupMediaareaBootstrapPackage');
+pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPruneLegacyMediaArea');
 
 // --- PACKAGE PHASE: DO NOT REORDER ---------------------------------------------------------
 // Everything below depends on distro packages being in a good state. Toolchains, service
@@ -290,32 +326,32 @@ pmssPruneLegacyMediaArea();
 runStep('Attempting apt fix-broken install (pre-package phase)', aptCmd('--fix-broken install -y'));
 // Ensure core packaging tools are current before bootstrapping third-party repos
 // This is now handled by the main repo refresh + dpkg baseline to avoid redundant updates.
-pmssRefreshRepositories($distroName, $effectiveRepoVersion, 'logmsg');
-pmssCompletePendingDpkg();
-$dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true);
+pmssRunProfiledCallable('Refreshing package repositories', 'pmssRefreshRepositories', [$distroName, $effectiveRepoVersion, 'logmsg']);
+pmssRunProfiledCallable('Completing pending dpkg configurations', 'pmssCompletePendingDpkg');
+$dpkgBaselineOk = pmssRunProfiledCallable('Applying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
 
 // System-wide services must not run on seedbox hosts. Stop/disable early so
 // package installs cannot leave attack surface exposed for the rest of the run.
-pmssStopDisableMaskSeedboxSystemServices();
+pmssRunProfiledCallable('Applying system service disable/mask policy (pre-app)', 'pmssStopDisableMaskSeedboxSystemServices');
 // Purge unbound DNS resolver if it is in failed state (external nameservers used)
-pmssPurgeFailedUnbound();
+pmssRunProfiledCallable('Purging failed unbound daemon if present', 'pmssPurgeFailedUnbound');
 // Ensure the boot-time guard is installed/enabled so masked services cannot
 // start during the next reboot even if systemd enablement drifts.
-pmssEnsureSystemdServicesGuardBootUnit();
+pmssRunProfiledCallable('Ensuring systemd service guard boot unit', 'pmssEnsureSystemdServicesGuardBootUnit');
 // Legacy hosts occasionally re-enable Apache during package recovery; perform
 // the stop/disable/mask sequence twice so hosts drifting between bullseye and
 // bookworm converge reliably. Success = units masked and no apache2 processes
 // left running. Failure is tolerated but logged via runStep.
-pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
+pmssRunProfiledCallable('Hardening legacy Apache systemd unit (pre-purge)', 'pmssStopDisableMaskSystemdUnit', ['apache2', 'Apache httpd (legacy)', true]);
 // Remove legacy Apache packages; keep apache2-utils. It provides htpasswd (used by
 // lighttpd basic auth) and ab; removing it breaks auth setup and other scripts.
 runStep('Removing residual Apache packages', aptCmd('purge -y apache2 apache2-bin apache2-data libapache2-mod-php7.4 || true'));
-pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
+pmssRunProfiledCallable('Hardening legacy Apache systemd unit (post-purge)', 'pmssStopDisableMaskSystemdUnit', ['apache2', 'Apache httpd (legacy)', true]);
 if ($repoLogMessage !== '') { logmsg($repoLogMessage); }
 if (!$dpkgBaselineOk) {
     logmsg('[WARN] Dpkg baseline application reported issues; attempting recovery');
     runStep('Attempting apt fix-broken install (dpkg baseline recovery)', aptCmd('--fix-broken install -y'));
-    $dpkgBaselineOk = pmssApplyDpkgSelections($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true);
+    $dpkgBaselineOk = pmssRunProfiledCallable('Reapplying distro dpkg baseline selections', 'pmssApplyDpkgSelections', [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, true]);
     if (!$dpkgBaselineOk) {
         logmsg('[ERROR] Dpkg baseline still failing after recovery attempt; continuing with caution');
         pmssLogJson(['event' => 'package_phase', 'status' => 'warn', 'reason' => 'dpkg_baseline']);
@@ -326,7 +362,7 @@ if (!$dpkgBaselineOk) {
 //       replace queued installs with a diff-summary report and remove the
 //       per-app package queue entirely.
 include_once '/scripts/lib/update/apps/packages.php';
-pmssFlushPackageQueue();
+pmssRunProfiledCallable('Flushing staged package queue', 'pmssFlushPackageQueue');
 
 $packageWarnings = (int) (getenv('PMSS_PACKAGE_INSTALL_WARNINGS') ?: 0);
 $packageErrors   = (int) (getenv('PMSS_PACKAGE_INSTALL_ERRORS') ?: 0);
@@ -341,28 +377,28 @@ $GLOBALS['PMSS_PACKAGES_READY'] = true;
 putenv('PMSS_PACKAGE_PHASE=complete');
 pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
 
-pmssMigrateLegacyLocalnet();
-pmssApplyRuntimeTemplates();
-pmssApplyJournaldLimits('logmsg');
-pmssApplyRemoteLogging('logmsg');
-pmssApplyHostnameConfig('logmsg');
-pmssConfigureQuotaMount('logmsg');
+pmssRunProfiledCallable('Migrating legacy localnet config path', 'pmssMigrateLegacyLocalnet');
+pmssRunProfiledCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates');
+pmssRunProfiledCallable('Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg']);
+pmssRunProfiledCallable('Applying remote logging configuration', 'pmssApplyRemoteLogging', ['logmsg']);
+pmssRunProfiledCallable('Applying hostname configuration', 'pmssApplyHostnameConfig', ['logmsg']);
+pmssRunProfiledCallable('Configuring quota mounts', 'pmssConfigureQuotaMount', ['logmsg']);
 runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
-pmssEnsureBootDefaults('logmsg');
-pmssEnsureLegacySysctlBaseline('logmsg');
-pmssEnsureBootTuning('logmsg');
-pmssConfigureRootShellDefaults('logmsg');
+pmssRunProfiledCallable('Applying boot defaults', 'pmssEnsureBootDefaults', ['logmsg']);
+pmssRunProfiledCallable('Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']);
+pmssRunProfiledCallable('Applying boot-time tuning', 'pmssEnsureBootTuning', ['logmsg']);
+pmssRunProfiledCallable('Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']);
 runStep('Restricting world access to /home', 'chmod o-rw /home');
 
 // --- Basic system preparation ---
-pmssEnsureCgroupsConfigured('logmsg');
-pmssEnsureSystemdSlices('logmsg');
+pmssRunProfiledCallable('Ensuring cgroup configuration', 'pmssEnsureCgroupsConfigured', ['logmsg']);
+pmssRunProfiledCallable('Ensuring systemd slices', 'pmssEnsureSystemdSlices', ['logmsg']);
 runStep('Resetting /etc/seedbox permissions', 'chmod -R 755 /etc/seedbox');
 runStep('Resetting /scripts permissions', 'chmod -R 750 /scripts');
-pmssEnsureLocaleBaseline();
+pmssRunProfiledCallable('Ensuring locale baseline', 'pmssEnsureLocaleBaseline');
 
 // Web stack hardening and per-user HTTP refresh.
-pmssConfigureWebStack($distroVersion);
+pmssRunProfiledCallable('Configuring web stack', 'pmssConfigureWebStack', [$distroVersion]);
 
 // Configure OpenVPN via dedicated utility for better logging/observability.
 runStep('Configuring OpenVPN', 'php /scripts/util/configureOpenvpn.php');
@@ -376,12 +412,14 @@ foreach ($apps as $app) {
     if (basename($app) === 'openvpn.php') {
         continue;
     }
-    include_once $app;
+    pmssRunProfiledStep('Loading app installer '.basename($app), static function () use ($app): void {
+        include_once $app;
+    });
 }
 
 // Reapply system service disablement after app installers in case any package
 // postinst scripts (re)started daemons mid-update.
-pmssStopDisableMaskSeedboxSystemServices();
+pmssRunProfiledCallable('Applying system service disable/mask policy (post-app)', 'pmssStopDisableMaskSeedboxSystemServices');
 
 runStep('Updating Let\'s Encrypt configuration', '/scripts/util/setupLetsEncrypt.php noreplies@pulsedmedia.com');
 // Drop obsolete global autodl configuration
@@ -398,16 +436,16 @@ foreach (['btsync', 'rslsync', 'pyload', 'sabnzbdplus'] as $legacySvc) {
         pmssSystemdUnitActionIfPresent($legacySvc, "Disabling {$legacySvc} systemd unit", 'disable');
     }
 }
-pmssAdjustLighttpdSecurity();
+pmssRunProfiledCallable('Adjusting lighttpd security settings', 'pmssAdjustLighttpdSecurity');
 
 // Per-user updates ensure ruTorrent stays consistent. The SHA tracks the
 // skeleton ruTorrent index version so user instances can be upgraded when the
 // template changes.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
-pmssUpdateAllUsers($rutorrentIndexSha);
+pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [$rutorrentIndexSha]);
 // Per-user maintenance now owns crontab restores, htpasswd sync, and lighttpd instance checks.
 
-pmssEnsureAuthorizedKeysDirective();
+pmssRunProfiledCallable('Ensuring sshd AuthorizedKeysFile directive', 'pmssEnsureAuthorizedKeysDirective');
 // Ensure the standard download speed test file exists
 $testfilePath = '/var/www/testfile';
 if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
@@ -415,10 +453,10 @@ if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
 }
 runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
-pmssPostUpdateWebRefresh();
+pmssRunProfiledCallable('Running post-update web refresh', 'pmssPostUpdateWebRefresh');
 
-pmssConfigureTempTmpfsMount('logmsg');
-pmssConfigureTempMountNoexec('logmsg');
+pmssRunProfiledCallable('Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']);
+pmssRunProfiledCallable('Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']);
 
 runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
 runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
@@ -429,15 +467,12 @@ if (file_exists($logrotateTemplate)) {
     runStep('Setting permissions on PMSS logrotate policy', 'chmod 644 /etc/logrotate.d/pmss-update');
 }
 
-pmssEnsureNetworkTemplate('logmsg');
+pmssRunProfiledCallable('Ensuring network template baseline', 'pmssEnsureNetworkTemplate', ['logmsg']);
 runStep('Reapplying network configuration', '/scripts/util/setupNetwork.php');
 runStep('Hardening access to session and network binaries', 'chmod o-r /var/log/wtmp /var/run/utmp /usr/bin/netstat /usr/bin/who /usr/bin/w');
 
 // Cleanup legacy runtime metadata that should never have shipped with snapshots.
 if (is_dir('/etc/seedbox/config/app-versions')) { runStep('Removing legacy app version records', 'rm -rf '.escapeshellarg('/etc/seedbox/config/app-versions')); }
-
-// Mark the end of phase 2 so log parsing knows we finished cleanly.
-pmssProfileSummary();
 
 // Restore root cron at the very end. Phase 1 disables it to avoid cron activity
 // during a partial-update window; we want it back for normal operations.
@@ -464,7 +499,10 @@ try {
 
 // Refresh MOTD at the very end so service status reflects final state.
 // Consolidated on the Motd class generator for determinism.
-Motd::motdGenerate();
+pmssRunProfiledCallable('Refreshing MOTD', ['Motd', 'motdGenerate']);
+
+// Mark the end of phase 2 and emit the final summary after all work completed.
+pmssProfileSummary();
 
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);
 logmsg('update-step2.php completed');

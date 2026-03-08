@@ -167,15 +167,11 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
    iptables owner match; when unavailable `setupNetwork.php` skips those rules
    and logs to `/var/log/pmss/iptables.log`.
 
-Every step flows through the shared `runStep()` helper which logs to
-`pmss-update.log`, records JSON events, and collects profiling metadata. When
-`PMSS_DRY_RUN=1` the orchestration still logs planned work but skips execution.
-
-### TODO: Profiling coverage
-- Move toward a thinner top-level orchestrator that launches each unit of work
-  under a profiling wrapper. No bare function calls or shell execs should be
-  outside the profiling layer so JSON/profile output reflects every step.
-  Tracked in GH issue #120.
+Every shell command flows through `runStep()`, and non-shell module calls are
+wrapped by `pmssRunProfiledStep()`/`pmssRunProfiledCallable()` in
+`scripts/util/update-step2.php` so profile JSON captures each orchestration
+step with stable labels. `PMSS_DRY_RUN=1` still logs planned work while command
+execution is skipped.
 
 ## Usage Examples
 
