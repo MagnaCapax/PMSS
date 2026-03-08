@@ -30,6 +30,7 @@
 require_once __DIR__.'/../lib/update.php';
 require_once __DIR__.'/../lib/update/runtime/profile.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';
 require_once __DIR__.'/../lib/update/runtime/processes.php';
 require_once __DIR__.'/../lib/update/environment.php';
 require_once __DIR__.'/../lib/update/distro.php';
@@ -216,6 +217,37 @@ function pmssRunProfiledCallable(string $description, callable $callable, array 
     });
 }
 
+/**
+ * Execute a profiled callable using the configured step classification policy.
+ */
+function pmssUpdateStep2RunClassifiedCallable(string $description, callable $callable, array $arguments, string $classification): bool
+{
+    try {
+        pmssRunProfiledCallable($description, $callable, $arguments);
+    } catch (\Throwable $throwable) {
+        $reason = get_class($throwable);
+        if ($throwable->getMessage() !== '') {
+            $reason .= ': '.$throwable->getMessage();
+        }
+        pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Execute a shell command step using the configured classification policy.
+ */
+function pmssUpdateStep2RunClassifiedCommand(string $description, string $command, string $classification): int
+{
+    $rc = runStep($description, $command);
+    if ($rc !== 0) {
+        pmssUpdateStep2HandleClassifiedFailure($description, $classification, $rc, 'command_rc_nonzero');
+    }
+    return $rc;
+}
+
 pmssRunProfiledCallable('Acquiring update-step2 lock', 'pmssUpdateStep2AcquireLock');
 pmssRunProfiledCallable('Running update-step2 preflight checks', 'pmssUpdateStep2Preflight');
 
@@ -378,7 +410,7 @@ putenv('PMSS_PACKAGE_PHASE=complete');
 pmssLogJson(['event' => 'package_phase', 'status' => 'ok']);
 
 pmssRunProfiledCallable('Migrating legacy localnet config path', 'pmssMigrateLegacyLocalnet');
-pmssRunProfiledCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates');
+pmssUpdateStep2RunClassifiedCallable('Applying runtime service templates', 'pmssApplyRuntimeTemplates', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 pmssRunProfiledCallable('Applying journald runtime limits', 'pmssApplyJournaldLimits', ['logmsg']);
 pmssRunProfiledCallable('Applying remote logging configuration', 'pmssApplyRemoteLogging', ['logmsg']);
 pmssRunProfiledCallable('Applying hostname configuration', 'pmssApplyHostnameConfig', ['logmsg']);
@@ -398,7 +430,7 @@ runStep('Resetting /scripts permissions', 'chmod -R 750 /scripts');
 pmssRunProfiledCallable('Ensuring locale baseline', 'pmssEnsureLocaleBaseline');
 
 // Web stack hardening and per-user HTTP refresh.
-pmssRunProfiledCallable('Configuring web stack', 'pmssConfigureWebStack', [$distroVersion]);
+pmssUpdateStep2RunClassifiedCallable('Configuring web stack', 'pmssConfigureWebStack', [$distroVersion], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 
 // Configure OpenVPN via dedicated utility for better logging/observability.
 runStep('Configuring OpenVPN', 'php /scripts/util/configureOpenvpn.php');
@@ -445,7 +477,7 @@ $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/i
 pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [$rutorrentIndexSha]);
 // Per-user maintenance now owns crontab restores, htpasswd sync, and lighttpd instance checks.
 
-pmssRunProfiledCallable('Ensuring sshd AuthorizedKeysFile directive', 'pmssEnsureAuthorizedKeysDirective');
+pmssUpdateStep2RunClassifiedCallable('Ensuring sshd AuthorizedKeysFile directive', 'pmssEnsureAuthorizedKeysDirective', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 // Ensure the standard download speed test file exists
 $testfilePath = '/var/www/testfile';
 if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {

@@ -96,6 +96,19 @@ flow. Future work aims to retire ad-hoc apt queues so the dpkg baseline becomes
 the sole source of package state. When in doubt, update the baseline snapshot
 instead of injecting additional installs elsewhere in the run.
 
+### Step Error Classification
+
+Post-package orchestration uses explicit step classes:
+
+1. `must_succeed` — after package phase completion, logs `step_failed`
+   (`severity=error`) and aborts update-step2.
+2. `soft_fail` — logs `step_failed` (`severity=warn`) and continues.
+3. `skip_if_missing` — reserved for optional dependencies that may be absent;
+   log and continue when missing.
+
+Current `must_succeed` annotations cover runtime template deployment, web stack
+configuration, and sshd AuthorizedKeysFile directive enforcement.
+
 `pmssRefreshRepositories()` ensures external repo prerequisites (currently the
 Docker deb822+keyring and Sonarr trusted key) exist before it runs `apt update`.
 ProFTPD remains a notorious dpkg failure mode when hostnames or TLS assets are
@@ -168,7 +181,8 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
    and logs to `/var/log/pmss/iptables.log`.
 
 Every shell command flows through `runStep()`, and non-shell module calls are
-wrapped by `pmssRunProfiledStep()`/`pmssRunProfiledCallable()` in
+wrapped by `pmssRunProfiledStep()`/`pmssRunProfiledCallable()` (plus classified
+wrapper helpers where strict handling is required) in
 `scripts/util/update-step2.php` so profile JSON captures each orchestration
 step with stable labels. `PMSS_DRY_RUN=1` still logs planned work while command
 execution is skipped.
