@@ -11,6 +11,42 @@
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 
+if (!function_exists('pmssDelugeLegacyPipDependencyPackages')) {
+    /**
+     * Legacy Debian 10 dependency set for the Deluge 2.0.5 source build.
+     *
+     * Keep this list stable and avoid blanket upgrades to reduce unexpected
+     * global Python state drift on long-lived hosts.
+     */
+    function pmssDelugeLegacyPipDependencyPackages(): array
+    {
+        return [
+            'twisted[tls]',
+            'chardet',
+            'mako',
+            'pyxdg',
+            'pillow',
+            'slimit',
+            'pygame',
+            'certifi',
+            'pyasn1==0.4.6',
+        ];
+    }
+}
+
+if (!function_exists('pmssDelugeLegacyPipDependencyCommand')) {
+    /**
+     * Build the pip command for Debian 10 Deluge dependencies.
+     */
+    function pmssDelugeLegacyPipDependencyCommand(): string
+    {
+        return pmssBuildCommand(
+            'pip',
+            array_merge(['install'], pmssDelugeLegacyPipDependencyPackages())
+        );
+    }
+}
+
 /**
  * Patch Deluge cache hit ratio handling for libtorrent 2.0+ stats removal.
  */
@@ -337,24 +373,8 @@ if ($isDebian10) {
     if ($currentVersion !== $targetVersion) {
         echo "\t*** Deluge pip install (target {$targetVersion})\n";
         runStep(
-            'Installing Deluge pip dependencies',
-            pmssBuildCommand('pip', [
-                'install',
-                '--upgrade',
-                'twisted[tls]',
-                'chardet',
-                'mako',
-                'pyxdg',
-                'pillow',
-                'slimit',
-                'pygame',
-                'certifi',
-                'pyasn1==0.4.6',
-            ])
-        );
-        runStep(
-            'Ensuring Deluge pillow dependency',
-            pmssBuildCommand('pip', ['install', '--upgrade', 'pillow'])
+            'Installing Deluge pip dependencies (no global upgrades)',
+            pmssDelugeLegacyPipDependencyCommand()
         );
 
         $tmp = tempnam(sys_get_temp_dir(), 'pmss-deluge-');
