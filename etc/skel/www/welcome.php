@@ -14,86 +14,17 @@
  * @version 1.0
  */
 
-if (isset($_GET['quota'])) {
-    $quotaInfo = urldecode($_GET['quota']);
-    $quotaInfo = str_replace('\\', '', $quotaInfo); // Serialized data might be malformed with \ chars!
-    $quotaInfo = unserialize($quotaInfo);
-} else {
-    $quotaInfo = array();
-}
-
-if (file_exists('../.bonusQuota')) {
-    $bonusQuota = (int)@file_get_contents('../.bonusQuota');
-} else {
-    $bonusQuota = 0;
-}
-if (file_exists('../.bonusTraffic')) {
-    $bonusTraffic = (int)@file_get_contents('../.bonusTraffic');
-    if ($bonusTraffic < 0) {
-        $bonusTraffic = 0;
-    }
-} else {
-    $bonusTraffic = 0;
-}
-
-$vendorDefault = array(
-    'name'      => 'Pulsed Media',
-    'pulsedBox' => true
-);
-
-if (file_exists('/etc/seedbox/config/vendor')) {
-    $vendor = @file_get_contents('/etc/seedbox/config/vendor');
-    $vendor = @unserialize($vendor);
-    if (count($vendor) == 0 || !isset($vendor['name']) || empty($vendor['name'])) {
-        $vendor = $vendorDefault;
-    }
-} else {
-    $vendor = $vendorDefault;
-}
-
-$contextualWelcomeMessage = '';
-if (file_exists('/scripts/lib/welcomeMessage.php')) {
-    require_once '/scripts/lib/welcomeMessage.php';
-
-    if (function_exists('pmssWelcomeMessageForUser')) {
-        $userHome = @realpath(dirname(__DIR__));
-        if (!is_string($userHome) || $userHome === '') {
-            $userHome = dirname(__DIR__);
-        }
-
-        $username = basename($userHome);
-        if (!is_string($username) || $username === '' || $username === '.' || $username === '..') {
-            $username = (string) @get_current_user();
-        }
-
-        $contextualWelcomeMessage = pmssWelcomeMessageForUser($quotaInfo, $userHome, $username);
-    }
-}
-
-$delugeAuthPath = '../.config/deluge/auth';
-$delugePasswordNotice = '';
-$delugePassword = '';
-$delugePasswordHelpersAvailable = false;
-
-if (file_exists('/scripts/lib/user/passwords.php')) {
-    require_once '/scripts/lib/user/passwords.php';
-}
-
-$delugePasswordHelpersAvailable = function_exists('pmssDelugeAuthReadLocalclientPassword')
-    && function_exists('pmssDelugeAuthWriteLocalclientPassword')
-    && function_exists('pmssDelugeServicePasswordGenerate');
-
-if ($delugePasswordHelpersAvailable && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
-    $newDelugePassword = pmssDelugeServicePasswordGenerate();
-    $passwordUpdated = pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword);
-    $delugePasswordNotice = $passwordUpdated
-        ? 'Deluge password rotated. Re-login in Deluge Web UI with the new password below.'
-        : 'Deluge password rotation failed. Please try again.';
-}
-
-if ($delugePasswordHelpersAvailable) {
-    $delugePassword = pmssDelugeAuthReadLocalclientPassword($delugeAuthPath);
-}
+$pageState = pmssWelcomePageStateBuild();
+$quotaInfo = $pageState['quotaInfo'];
+$bonusQuota = $pageState['bonusQuota'];
+$bonusTraffic = $pageState['bonusTraffic'];
+$vendor = $pageState['vendor'];
+$contextualWelcomeMessage = $pageState['contextualWelcomeMessage'];
+$delugePasswordHelpersAvailable = $pageState['delugePasswordHelpersAvailable'];
+$delugePasswordNotice = $pageState['delugePasswordNotice'];
+$delugePassword = $pageState['delugePassword'];
+$welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
+$announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -257,25 +188,7 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
                 <div class="portfoliobox">
                     <div class="portfolioimg">
                         <?php
-                        $welcomeHeadingUrl = 'https://pulsedmedia.com/remote/welcomeHeadingText.php';
-                        $welcomeContext = stream_context_create(array(
-                            'http' => array(
-                                'timeout'    => 5,
-                                'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
-                            )
-                        ));
-                        $welcomeHeading = @file_get_contents($welcomeHeadingUrl, false, $welcomeContext);
-                        if ($welcomeHeading !== false) {
-                            echo $welcomeHeading;
-                        }
-
-                        if (file_exists('/etc/seedbox/config/vendorWelcome')) {
-                            echo @file_get_contents('/etc/seedbox/config/vendorWelcome');
-                        }
-
-                        if (!empty($contextualWelcomeMessage)) {
-                            echo $contextualWelcomeMessage;
-                        }
+                        echo $welcomeHeadingHtml;
                         ?>
                         <h6>Basic Usage</h6>
                         <p><b>watch directory</b><br />
@@ -457,44 +370,7 @@ EOF;
                         <h6>Announcements</h6>
                         <ul>
 <?php
-$rssUrl = 'https://pulsedmedia.com/clients/announcementsrss.php';
-$rssContext = stream_context_create(array(
-    'http' => array(
-        'timeout'    => 5,
-        'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
-    )
-));
-$rssRaw = @file_get_contents($rssUrl, false, $rssContext);
-if ($rssRaw !== false) {
-    if (function_exists('mb_convert_encoding')) {
-        $rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8');
-        if ($rssUtf8 !== false) {
-            $rssRaw = $rssUtf8;
-        }
-    } elseif (function_exists('iconv')) {
-        $rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw);
-        if ($rssUtf8 !== false) {
-            $rssRaw = $rssUtf8;
-        }
-    }
-
-    $rssXml = @simplexml_load_string($rssRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
-    if ($rssXml !== false) {
-        $rssFeed = json_decode(json_encode($rssXml), true);
-        if (isset($rssFeed['channel']['item']) && is_array($rssFeed['channel']['item'])) {
-            $items = array_slice($rssFeed['channel']['item'], 0, 4, true);
-            foreach ($items as $thisItem) {
-                if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {
-                    continue;
-                }
-                $thisItem['pubDate'] = date('d/m', strtotime($thisItem['pubDate']));
-                $title = htmlspecialchars($thisItem['title']);
-                $link  = $thisItem['link'];
-                echo "<li>({$thisItem['pubDate']}) <a href=\"{$link}\" target=\"_blank\">{$title}</a></li>\n";
-            }
-        }
-    }
-}
+echo $announcementItemsHtml;
 ?>
                         </ul>
 
@@ -522,6 +398,199 @@ if ($rssRaw !== false) {
 </html>
 
 <?php
+/**
+ * Gather the state used by the welcome page before rendering begins.
+ *
+ * @return array<string,mixed>
+ */
+function pmssWelcomePageStateBuild() {
+    $quotaInfo = pmssWelcomeQuotaInfoRead();
+    $delugeState = pmssWelcomeDelugeStateBuild('../.config/deluge/auth');
+
+    return array(
+        'quotaInfo' => $quotaInfo,
+        'bonusQuota' => pmssWelcomeIntegerFileRead('../.bonusQuota'),
+        'bonusTraffic' => pmssWelcomeIntegerFileRead('../.bonusTraffic', true),
+        'vendor' => pmssWelcomeVendorRead(),
+        'contextualWelcomeMessage' => pmssWelcomeContextualMessageBuild($quotaInfo),
+        'delugePasswordHelpersAvailable' => $delugeState['helpersAvailable'],
+        'delugePasswordNotice' => $delugeState['passwordNotice'],
+        'delugePassword' => $delugeState['password'],
+    );
+}
+
+function pmssWelcomeQuotaInfoRead() {
+    if (!isset($_GET['quota'])) {
+        return array();
+    }
+
+    $quotaInfo = urldecode($_GET['quota']);
+    $quotaInfo = str_replace('\\', '', $quotaInfo); // Serialized data might be malformed with \ chars!
+    $quotaInfo = @unserialize($quotaInfo);
+
+    return is_array($quotaInfo) ? $quotaInfo : array();
+}
+
+function pmssWelcomeIntegerFileRead($path, $clampNegativeToZero = false) {
+    if (!file_exists($path)) {
+        return 0;
+    }
+
+    $value = (int) @file_get_contents($path);
+    if ($clampNegativeToZero && $value < 0) {
+        return 0;
+    }
+
+    return $value;
+}
+
+function pmssWelcomeVendorRead() {
+    $vendorDefault = array(
+        'name'      => 'Pulsed Media',
+        'pulsedBox' => true
+    );
+
+    if (!file_exists('/etc/seedbox/config/vendor')) {
+        return $vendorDefault;
+    }
+
+    $vendor = @file_get_contents('/etc/seedbox/config/vendor');
+    $vendor = @unserialize($vendor);
+    if (!is_array($vendor) || count($vendor) == 0 || !isset($vendor['name']) || empty($vendor['name'])) {
+        return $vendorDefault;
+    }
+
+    return $vendor;
+}
+
+function pmssWelcomeContextualMessageBuild($quotaInfo) {
+    if (!file_exists('/scripts/lib/welcomeMessage.php')) {
+        return '';
+    }
+
+    require_once '/scripts/lib/welcomeMessage.php';
+    if (!function_exists('pmssWelcomeMessageForUser')) {
+        return '';
+    }
+
+    $userHome = @realpath(dirname(__DIR__));
+    if (!is_string($userHome) || $userHome === '') {
+        $userHome = dirname(__DIR__);
+    }
+
+    $username = basename($userHome);
+    if (!is_string($username) || $username === '' || $username === '.' || $username === '..') {
+        $username = (string) @get_current_user();
+    }
+
+    return pmssWelcomeMessageForUser($quotaInfo, $userHome, $username);
+}
+
+function pmssWelcomeDelugeStateBuild($delugeAuthPath) {
+    if (file_exists('/scripts/lib/user/passwords.php')) {
+        require_once '/scripts/lib/user/passwords.php';
+    }
+
+    $helpersAvailable = function_exists('pmssDelugeAuthReadLocalclientPassword')
+        && function_exists('pmssDelugeAuthWriteLocalclientPassword')
+        && function_exists('pmssDelugeServicePasswordGenerate');
+    $passwordNotice = '';
+    $password = '';
+
+    if ($helpersAvailable && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
+        $newDelugePassword = pmssDelugeServicePasswordGenerate();
+        $passwordUpdated = pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword);
+        $passwordNotice = $passwordUpdated
+            ? 'Deluge password rotated. Re-login in Deluge Web UI with the new password below.'
+            : 'Deluge password rotation failed. Please try again.';
+    }
+
+    if ($helpersAvailable) {
+        $password = pmssDelugeAuthReadLocalclientPassword($delugeAuthPath);
+    }
+
+    return array(
+        'helpersAvailable' => $helpersAvailable,
+        'passwordNotice' => $passwordNotice,
+        'password' => $password,
+    );
+}
+
+function pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage) {
+    $html = '';
+    $welcomeHeading = pmssWelcomeRemoteFetch('https://pulsedmedia.com/remote/welcomeHeadingText.php');
+    if ($welcomeHeading !== false) {
+        $html .= $welcomeHeading;
+    }
+
+    if (file_exists('/etc/seedbox/config/vendorWelcome')) {
+        $html .= (string) @file_get_contents('/etc/seedbox/config/vendorWelcome');
+    }
+
+    if (!empty($contextualWelcomeMessage)) {
+        $html .= $contextualWelcomeMessage;
+    }
+
+    return $html;
+}
+
+function pmssWelcomeAnnouncementItemsHtmlBuild() {
+    $rssRaw = pmssWelcomeRemoteFetch('https://pulsedmedia.com/clients/announcementsrss.php');
+    if ($rssRaw === false) {
+        return '';
+    }
+
+    if (function_exists('mb_convert_encoding')) {
+        $rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8');
+        if ($rssUtf8 !== false) {
+            $rssRaw = $rssUtf8;
+        }
+    } elseif (function_exists('iconv')) {
+        $rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw);
+        if ($rssUtf8 !== false) {
+            $rssRaw = $rssUtf8;
+        }
+    }
+
+    $rssXml = @simplexml_load_string($rssRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if ($rssXml === false) {
+        return '';
+    }
+
+    $rssFeed = json_decode(json_encode($rssXml), true);
+    if (!isset($rssFeed['channel']['item']) || !is_array($rssFeed['channel']['item'])) {
+        return '';
+    }
+
+    $itemsHtml = '';
+    $items = array_slice($rssFeed['channel']['item'], 0, 4, true);
+    foreach ($items as $thisItem) {
+        if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {
+            continue;
+        }
+
+        $dateText = date('d/m', strtotime($thisItem['pubDate']));
+        $title = htmlspecialchars($thisItem['title']);
+        $link = $thisItem['link'];
+        $itemsHtml .= "<li>({$dateText}) <a href=\"{$link}\" target=\"_blank\">{$title}</a></li>\n";
+    }
+
+    return $itemsHtml;
+}
+
+function pmssWelcomeRemoteFetch($url) {
+    return @file_get_contents($url, false, pmssWelcomeHttpContextCreate());
+}
+
+function pmssWelcomeHttpContextCreate() {
+    return stream_context_create(array(
+        'http' => array(
+            'timeout'    => 5,
+            'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
+        )
+    ));
+}
+
 function bonusQuotaDisplay($bonusQuota) {
     if ($bonusQuota != 0) {
         return '<b>BONUS QUOTA:</b> ' . number_format($bonusQuota) . ' GiB<br />';
