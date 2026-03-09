@@ -32,8 +32,9 @@ function pmssResourceLogLoadUsers(): array
  */
 function pmssResourceLogIsValidUser(string $user): bool
 {
-    $normalized = function_exists('pmssNormalizeUsername') ? pmssNormalizeUsername($user) : strtolower($user);
-    if ($normalized !== $user || !preg_match('/^[a-z0-9-]+$/', $user)) {
+    if ((function_exists('pmssNormalizeUsername') ? pmssNormalizeUsername($user) : strtolower($user)) !== $user
+        || !preg_match('/^[a-z0-9-]+$/', $user)
+    ) {
         return false;
     }
     if ($user === 'www-data') {

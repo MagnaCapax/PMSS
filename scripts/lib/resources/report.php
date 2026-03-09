@@ -44,18 +44,17 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
         $windowMetrics = [];
         foreach ($windowMetricConfig as $metric => $allowMissing) {
-            $selected = [];
+            $selected = array_fill_keys($windows, 0.0);
             $rawMetric = $data[$metric]['raw'] ?? [];
             foreach ($windows as $label) {
-                if (!isset($rawMetric[$label])) {
-                    if (!$allowMissing) {
-                        $missingStats[] = $thisUser;
-                        continue 3;
-                    }
-                    $selected[$label] = 0.0;
+                if (isset($rawMetric[$label])) {
+                    $selected[$label] = (float) $rawMetric[$label];
                     continue;
                 }
-                $selected[$label] = (float) $rawMetric[$label];
+                if (!$allowMissing) {
+                    $missingStats[] = $thisUser;
+                    continue 3;
+                }
             }
             $windowMetrics[$metric] = $selected;
         }
@@ -64,8 +63,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         $memoryAvgMonth = (float) ($data['memory']['raw']['month'] ?? 0.0);
         $tasksCurrent = (float) ($data['tasks']['current'] ?? 0.0);
 
-        foreach ($windows as $label) {
-            foreach ($windowMetrics as $metric => $values) {
+        foreach ($windowMetrics as $metric => $values) {
+            foreach ($windows as $label) {
                 $totals[$metric][$label] += $values[$label];
             }
         }
@@ -89,11 +88,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
-    $payloads = [];
     $windowMetricKeys = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'];
-    $sources = $rows;
-    $sources['__totals__'] = $totals;
-    foreach ($sources as $sourceKey => $source) {
+    $buildPayload = static function (array $source) use ($windowMetricKeys): array {
         $payload = [];
         foreach ($windowMetricKeys as $metric) {
             $payload[$metric] = $source[$metric];
@@ -106,15 +102,17 @@ function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing
         $payload['tasks'] = [
             'current' => $source['tasks_current'],
         ];
-        $payloads[$sourceKey] = $payload;
-    }
+        return $payload;
+    };
 
-    $totalPayload = $payloads['__totals__'];
-    unset($payloads['__totals__']);
+    $payloads = [];
+    foreach ($rows as $sourceKey => $source) {
+        $payloads[$sourceKey] = $buildPayload($source);
+    }
 
     return [
         'users' => $payloads,
-        'totals' => $totalPayload,
+        'totals' => $buildPayload($totals),
         'missing' => $missing,
     ];
 }

@@ -149,6 +149,27 @@ class ResourceReportTest extends TestCase
         $this->assertEquals(['ghost'], $payload['missing']);
     }
 
+    public function testBuildJsonPayloadHandlesEmptyUserRows(): void
+    {
+        $totals = [
+            'io_read' => ['month' => 10.0],
+            'io_write' => ['month' => 11.0],
+            'io_read_ops' => ['month' => 12.0],
+            'io_write_ops' => ['month' => 13.0],
+            'cpu' => ['month' => 14.0],
+            'memory_current' => 15.0,
+            'memory_avg_month' => 16.0,
+            'ram_hours' => ['month' => 17.0],
+            'tasks_current' => 18.0,
+        ];
+
+        $payload = \pmssResourceBuildJsonPayload([], $totals, []);
+
+        $this->assertEquals([], $payload['users']);
+        $this->assertEquals(15.0, $payload['totals']['memory']['current']);
+        $this->assertEquals(18.0, $payload['totals']['tasks']['current']);
+    }
+
     private function writeUserData(string $user, array $data): void
     {
         @file_put_contents($this->statsDir.'/'.$user, serialize($data));
