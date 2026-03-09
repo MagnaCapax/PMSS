@@ -89,9 +89,11 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
-    $users = [];
+    $payloads = [];
     $windowMetricKeys = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'];
-    $buildPayload = static function (array $source) use ($windowMetricKeys): array {
+    $sources = $rows;
+    $sources['__totals__'] = $totals;
+    foreach ($sources as $sourceKey => $source) {
         $payload = [];
         foreach ($windowMetricKeys as $metric) {
             $payload[$metric] = $source[$metric];
@@ -104,17 +106,14 @@ function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing
         $payload['tasks'] = [
             'current' => $source['tasks_current'],
         ];
-        return $payload;
-    };
-
-    foreach ($rows as $username => $row) {
-        $users[$username] = $buildPayload($row);
+        $payloads[$sourceKey] = $payload;
     }
 
-    $totalPayload = $buildPayload($totals);
+    $totalPayload = $payloads['__totals__'];
+    unset($payloads['__totals__']);
 
     return [
-        'users' => $users,
+        'users' => $payloads,
         'totals' => $totalPayload,
         'missing' => $missing,
     ];

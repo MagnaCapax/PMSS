@@ -19,30 +19,23 @@ class TrafficStatsProcessor
     /** @var string */
     private $homeDir;
     /** @var string */
-    private $runtimeDir;
-    /** @var string */
     private $passwdFile;
-    /** @var string */
-    private $statsRuntimeDir;
     /** @var TrafficStorage */
     private $storage;
-    /** @var string */
-    private $trafficMode;
 
     public function __construct(trafficStatistics $stats, array $paths = [])
     {
         $this->stats           = $stats;
         $this->trafficDir      = rtrim($paths['traffic_dir'] ?? getenv('PMSS_TRAFFIC_DIR') ?: '/var/log/pmss/traffic', '/');
         $this->homeDir         = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
-        $this->runtimeDir      = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+        $runtimeDir            = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->passwdFile      = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
-        $this->statsRuntimeDir = $this->runtimeDir.'/trafficStats';
-        $this->trafficMode     = $paths['traffic_mode'] ?? 'egress';
+        $trafficMode           = $paths['traffic_mode'] ?? 'egress';
         $this->storage         = new TrafficStorage([
             'home_dir'   => $this->homeDir,
-            'runtime_dir'=> $this->runtimeDir,
-            'stats_dir'  => $this->statsRuntimeDir,
-            'traffic_mode' => $this->trafficMode,
+            'runtime_dir'=> $runtimeDir,
+            'stats_dir'  => $runtimeDir.'/trafficStats',
+            'traffic_mode' => $trafficMode,
         ]);
     }
 
@@ -100,20 +93,14 @@ class TrafficStatsProcessor
     public function validateUser(string $username): bool
     {
         $path = $this->trafficDir.'/'.$username;
-        $baseUser = $this->normalizeUserForValidation($username);
+        $suffix = '-localnet';
+        $baseUser = substr($username, -strlen($suffix)) === $suffix
+            ? substr($username, 0, -strlen($suffix))
+            : $username;
         $homePath = $this->homeDir.'/'.$baseUser;
         return is_readable($path)
             && $this->userExistsInPasswd($baseUser)
             && is_dir($homePath);
-    }
-
-    private function normalizeUserForValidation(string $username): string
-    {
-        $suffix = '-localnet';
-        if (substr($username, -strlen($suffix)) === $suffix) {
-            return substr($username, 0, -strlen($suffix));
-        }
-        return $username;
     }
 
     /** Process and persist traffic statistics for a single user. */

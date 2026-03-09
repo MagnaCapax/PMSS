@@ -40,6 +40,22 @@ class TrafficStatsProcessorTest extends TestCase
         $this->assertTrue(strpos($formatted['day'], 'TiB') !== false);
     }
 
+    public function testFormatDataDisplayPreservesThresholdBoundaries(): void
+    {
+        $processor = $this->makeProcessor();
+        $formatted = $processor->formatDataDisplay([
+            'exact_gib' => 1024,
+            'over_gib' => 1025,
+            'exact_tib' => 1024 * 1024,
+            'over_tib' => (1024 * 1024) + 1,
+        ]);
+
+        $this->assertEquals('1024MiB', $formatted['exact_gib']);
+        $this->assertEquals('1GiB', $formatted['over_gib']);
+        $this->assertEquals('1024GiB', $formatted['exact_tib']);
+        $this->assertEquals('1TiB', $formatted['over_tib']);
+    }
+
     public function testProcessUserPersistsData(): void
     {
         $stub = new StubTrafficStatistics();

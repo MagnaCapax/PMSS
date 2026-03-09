@@ -119,6 +119,42 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue($this->readSavedResourceStats($user) === null);
     }
 
+    public function testFormatBytesDisplayPreservesThresholdBoundaries(): void
+    {
+        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+        $method = new \ReflectionMethod($processor, 'formatBytesDisplay');
+        $method->setAccessible(true);
+
+        $formatted = $method->invoke($processor, [
+            'exact_mib' => 1024 * 1024,
+            'over_mib' => (1024 * 1024) + 1,
+            'exact_gib' => 1024 * 1024 * 1024,
+            'over_gib' => (1024 * 1024 * 1024) + 1,
+        ]);
+
+        $this->assertEquals('1024KiB', $formatted['exact_mib']);
+        $this->assertEquals('1MiB', $formatted['over_mib']);
+        $this->assertEquals('1024MiB', $formatted['exact_gib']);
+        $this->assertEquals('1GiB', $formatted['over_gib']);
+    }
+
+    public function testFormatCpuDisplayPreservesThresholdBoundaries(): void
+    {
+        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+        $method = new \ReflectionMethod($processor, 'formatCpuDisplay');
+        $method->setAccessible(true);
+
+        $formatted = $method->invoke($processor, [
+            'below_minute' => 59 * 1000000000,
+            'exact_minute' => 60 * 1000000000,
+            'exact_hour' => 3600 * 1000000000,
+        ]);
+
+        $this->assertEquals('59s', $formatted['below_minute']);
+        $this->assertEquals('1m', $formatted['exact_minute']);
+        $this->assertEquals('1h', $formatted['exact_hour']);
+    }
+
     /**
      * @return array<string, mixed>|null
      */

@@ -38,7 +38,13 @@ class TrafficStorage
     /** Persist user traffic data to home directory and runtime cache. */
     public function save(string $user, array $data): void
     {
-        [$targetUser, $filename] = $this->resolveTrafficFilename($user);
+        $targetUser = $user;
+        $filename = $this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData';
+        $localSuffix = '-localnet';
+        if (substr($user, -strlen($localSuffix)) === $localSuffix) {
+            $targetUser = substr($user, 0, -strlen($localSuffix));
+            $filename .= 'Local';
+        }
 
         $serialized = serialize($data);
         $homePath   = $this->homeDir.'/'.$targetUser;
@@ -47,61 +53,19 @@ class TrafficStorage
             $userPath = $homePath.'/'.$filename;
             $this->setImmutable($userPath, false);
             @file_put_contents($userPath, $serialized);
-            $this->protectUserTrafficFile($userPath, $targetUser);
+            @chown($userPath, 'root');
+            if ($targetUser !== '') {
+                @chgrp($userPath, $targetUser);
+            }
+            @chmod($userPath, 0640);
             $this->setImmutable($userPath, true);
         }
 
         $runtimePath = $this->statsDir.'/'.$user;
         @file_put_contents($runtimePath, $serialized);
-        $this->protectRuntimeFile($runtimePath);
-    }
-
-    /**
-     * Enforce root ownership and read-only access for tenants.
-     */
-    private function protectUserTrafficFile(string $path, string $group): void
-    {
-        @chown($path, 'root');
-        if ($group !== '') {
-            @chgrp($path, $group);
-        }
-        @chmod($path, 0640);
-    }
-
-    /**
-     * Restrict runtime cache files to root-only access.
-     */
-    private function protectRuntimeFile(string $path): void
-    {
-        @chown($path, 'root');
-        @chgrp($path, 'root');
-        @chmod($path, 0600);
-    }
-
-    /**
-     * Resolve the traffic data filename and target user for the given label.
-     *
-     * Supports the existing "-localnet" suffix and a traffic mode selector.
-     *
-     * @return array{0:string,1:string} [targetUser, filename]
-     */
-    private function resolveTrafficFilename(string $user): array
-    {
-        $targetUser = $user;
-        $suffix = '';
-        $localSuffix = '-localnet';
-
-        if (substr($user, -strlen($localSuffix)) === $localSuffix) {
-            $suffix = 'Local';
-            $targetUser = substr($user, 0, -strlen($localSuffix));
-        }
-
-        $base = $this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData';
-        if ($suffix !== '') {
-            $base .= $suffix;
-        }
-
-        return [$targetUser, $base];
+        @chown($runtimePath, 'root');
+        @chgrp($runtimePath, 'root');
+        @chmod($runtimePath, 0600);
     }
 
     /**
