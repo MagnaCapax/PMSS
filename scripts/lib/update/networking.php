@@ -41,6 +41,13 @@ return array(
       'progressiveThrottleEnabled' => true,
       'progressiveThrottleFloorPercent' => 2.5,
       'progressiveThrottleGracePercent' => 0,
+      'overageStages' => array(
+        array('overagePercent' => 200, 'capMbit' => 1),
+        array('overagePercent' => 125, 'capMbit' => 1),
+        array('overagePercent' => 100, 'capMbit' => 10),
+        array('overagePercent' => 75, 'minOverageGiB' => 5120, 'capMbit' => 25),
+        array('overagePercent' => 50, 'minOverageGiB' => 3072, 'capMbit' => 50),
+      ),
       'soft' => 250,
       'limitSoft' => 80,
       'limitExceedMax' => 20

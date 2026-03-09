@@ -114,3 +114,121 @@ if (!function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
         ];
     }
 }
+
+if (!function_exists('pmssTrafficLimitDefaultOverageStages')) {
+    /**
+     * Default tiered post-cap throttling profile.
+     *
+     * The profile mirrors the historical overage policy request from issue #60.
+     * Stage matching is evaluated from highest overage threshold to lowest.
+     *
+     * @return array<int, array<string, float|int>>
+     */
+    function pmssTrafficLimitDefaultOverageStages(): array
+    {
+        return [
+            ['overagePercent' => 200.0, 'minOverageGiB' => 0.0,    'capMbit' => 1],
+            ['overagePercent' => 125.0, 'minOverageGiB' => 0.0,    'capMbit' => 1],
+            ['overagePercent' => 100.0, 'minOverageGiB' => 0.0,    'capMbit' => 10],
+            ['overagePercent' => 75.0,  'minOverageGiB' => 5120.0, 'capMbit' => 25],
+            ['overagePercent' => 50.0,  'minOverageGiB' => 3072.0, 'capMbit' => 50],
+        ];
+    }
+}
+
+if (!function_exists('pmssTrafficLimitSelectTieredCapMbit')) {
+    /**
+     * Resolve the active tiered cap from overage stages.
+     *
+     * Invalid stage entries are ignored so malformed operator overrides do not
+     * break enforcement for valid entries.
+     *
+     * @param float                                                           $overagePercent
+     * @param float                                                           $overageGiB
+     * @param int                                                             $postCapMbit
+     * @param array<int, array<string, float|int|string|bool|array|object>>  $rawStages
+     *
+     * @return array{effective:int, matched:array<string, float|int>|null}
+     */
+    function pmssTrafficLimitSelectTieredCapMbit(
+        float $overagePercent,
+        float $overageGiB,
+        int $postCapMbit,
+        array $rawStages
+    ): array {
+        $postCapMbit = max(0, $postCapMbit);
+        if ($postCapMbit === 0) {
+            return ['effective' => 0, 'matched' => null];
+        }
+
+        $overagePercent = max(0.0, $overagePercent);
+        $overageGiB = max(0.0, $overageGiB);
+
+        $normalizedStages = [];
+        foreach ($rawStages as $index => $stage) {
+            if (!is_array($stage) ||
+                !isset($stage['overagePercent']) || !is_numeric($stage['overagePercent']) ||
+                !isset($stage['capMbit']) || !is_numeric($stage['capMbit'])) {
+                continue;
+            }
+
+            $stageCapMbit = (int) $stage['capMbit'];
+            if ($stageCapMbit <= 0) {
+                continue;
+            }
+
+            $stageMinOverageGiB = 0.0;
+            if (isset($stage['minOverageGiB']) && is_numeric($stage['minOverageGiB'])) {
+                $stageMinOverageGiB = max(0.0, (float) $stage['minOverageGiB']);
+            }
+
+            $normalizedStages[] = [
+                'overagePercent' => max(0.0, (float) $stage['overagePercent']),
+                'minOverageGiB'  => $stageMinOverageGiB,
+                'capMbit'        => $stageCapMbit,
+                'index'          => (int) $index,
+            ];
+        }
+
+        if (empty($normalizedStages)) {
+            return ['effective' => $postCapMbit, 'matched' => null];
+        }
+
+        usort(
+            $normalizedStages,
+            static function (array $left, array $right): int {
+                if ($left['overagePercent'] !== $right['overagePercent']) {
+                    return ($left['overagePercent'] < $right['overagePercent']) ? 1 : -1;
+                }
+                if ($left['minOverageGiB'] !== $right['minOverageGiB']) {
+                    return ($left['minOverageGiB'] < $right['minOverageGiB']) ? 1 : -1;
+                }
+                if ($left['index'] === $right['index']) {
+                    return 0;
+                }
+                return ($left['index'] < $right['index']) ? -1 : 1;
+            }
+        );
+
+        foreach ($normalizedStages as $stage) {
+            if ($overagePercent < $stage['overagePercent']) {
+                continue;
+            }
+            if ($overageGiB < $stage['minOverageGiB']) {
+                continue;
+            }
+
+            $effectiveCapMbit = min($postCapMbit, (int) $stage['capMbit']);
+            return [
+                'effective' => $effectiveCapMbit,
+                'matched'   => [
+                    'overagePercent' => (float) $stage['overagePercent'],
+                    'minOverageGiB'  => (float) $stage['minOverageGiB'],
+                    'capMbit'        => (int) $stage['capMbit'],
+                ],
+            ];
+        }
+
+        return ['effective' => $postCapMbit, 'matched' => null];
+    }
+}

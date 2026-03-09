@@ -57,7 +57,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `diskSmart.php` – Prototype SMART monitoring (still experimental).
 - `processSnapshot.php` – Append process tree snapshots for postmortem analysis (root-only log at `/var/log/pmss/process-snapshot.log`).
 - `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`).
-- `trafficLimits.php` – Refresh per-user traffic throttling configuration (progressive post-cap reduction is controlled via `progressiveThrottleEnabled`, `progressiveThrottleFloorPercent`, and `progressiveThrottleGracePercent` in `/etc/seedbox/config/network`).
+- `trafficLimits.php` – Refresh per-user traffic throttling configuration (supports staged overage caps via `overageStages` and progressive post-cap reduction via `progressiveThrottleEnabled`, `progressiveThrottleFloorPercent`, and `progressiveThrottleGracePercent` in `/etc/seedbox/config/network`).
 - `trafficLog.php` – Capture recent traffic counters for aggregation.
 - `trafficStats.php` – Fold raw logs into long-term statistics.
 - `systemdServicesGuard.php` – Enforce stop/disable/mask policy for system services.

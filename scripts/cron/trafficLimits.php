@@ -72,6 +72,12 @@ if (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) &&
     $progressiveThrottleGracePercent = (float) $networkConfig['throttle']['progressiveThrottleGracePercent'];
 }
 $progressiveThrottleGracePercent = max(0.0, $progressiveThrottleGracePercent);
+$overageThrottleStages = function_exists('pmssTrafficLimitDefaultOverageStages')
+    ? pmssTrafficLimitDefaultOverageStages()
+    : [];
+if (isset($networkConfig['throttle']['overageStages']) && is_array($networkConfig['throttle']['overageStages'])) {
+    $overageThrottleStages = $networkConfig['throttle']['overageStages'];
+}
 $userConfigStore = new UserConfigStore();
 
 foreach($users AS $thisUser) {
@@ -173,13 +179,28 @@ foreach($users AS $thisUser) {
     if ($overLimit) { // Should be limited
 
         $effectiveCapMbit = (int) $trafficCapMbit;
-        $overagePercent = 0.0;
+        $overageGiB = ($trafficUsageGiB > $trafficLimit)
+            ? ($trafficUsageGiB - $trafficLimit)
+            : 0.0;
+        $overagePercent = ($trafficLimit > 0)
+            ? ($overageGiB / $trafficLimit) * 100
+            : 0.0;
         $adjustedOverage = 0.0;
         $floorMbit = 0;
-        if ($progressiveThrottleEnabled && function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
-            $overagePercent = ($trafficLimit > 0)
-                ? (($trafficUsageGiB - $trafficLimit) / $trafficLimit) * 100
-                : 0.0;
+        $matchedOverageStage = null;
+        if (function_exists('pmssTrafficLimitSelectTieredCapMbit') && !empty($overageThrottleStages)) {
+            $tiered = pmssTrafficLimitSelectTieredCapMbit(
+                $overagePercent,
+                $overageGiB,
+                $trafficCapMbit,
+                $overageThrottleStages
+            );
+            $effectiveCapMbit = $tiered['effective'];
+            $matchedOverageStage = $tiered['matched'];
+        }
+        if ($matchedOverageStage === null &&
+            $progressiveThrottleEnabled &&
+            function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
             $progressive = pmssTrafficLimitComputeProgressiveCapMbit(
                 $trafficCapMbit,
                 $overagePercent,
@@ -197,7 +218,23 @@ foreach($users AS $thisUser) {
         chmod( $userTrafficLimitEnabledFile, 0600);
         setRatelimit($thisUser, $effectiveCapMbit);    // Apply rate limiting
         if (function_exists('pmssUserLog')) {
-            if ($progressiveThrottleEnabled && function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
+            if (is_array($matchedOverageStage)) {
+                pmssUserLog(
+                    $thisUser,
+                    sprintf(
+                        'traffic throttle staged (limit=%.2f GiB usage=%.2f GiB overage=%.1f%% overageGiB=%.2f cap=%d Mbit stageCap=%d Mbit stageOverage=%.1f%% stageMinOverageGiB=%.2f effective=%d Mbit)',
+                        $trafficLimit,
+                        $trafficUsageGiB,
+                        $overagePercent,
+                        $overageGiB,
+                        $trafficCapMbit,
+                        $matchedOverageStage['capMbit'],
+                        $matchedOverageStage['overagePercent'],
+                        $matchedOverageStage['minOverageGiB'],
+                        $effectiveCapMbit
+                    )
+                );
+            } elseif ($progressiveThrottleEnabled && function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
                 pmssUserLog(
                     $thisUser,
                     sprintf(
