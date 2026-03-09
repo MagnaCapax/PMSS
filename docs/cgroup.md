@@ -40,6 +40,25 @@ return [
 
 Guardrails always apply: MemoryHigh ≥ 250 MiB; MemoryMax ≤ 95% of RAM.
 
+## Extension Status Matrix (#121)
+
+Current state for the cgroup policy extension TODOs:
+
+- **Per-device IO controls**: Partially implemented.
+  - Global policy supports `mounts` entries (`ioWeight`, `readBw`, `writeBw`, `readIops`, `writeIops`) that are translated into `IODeviceWeight` and IO throttle directives.
+  - Per-user CLI supports `--device` + `--io-profile` and explicit IO bandwidth/IOPS flags.
+  - Remaining gap: richer auto-detection/scheduler-aware policy expansion remains TODO.
+
+- **NOFILE limits**: Implemented.
+  - Policy keys `limitNoFileSoft` / `limitNoFileHard` are consumed during system prep.
+  - PMSS writes `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` with `LimitNOFILE=soft:hard` when both values are valid.
+
+- **Per-user burst allowances**: Not implemented yet.
+  - No time-boxed "temporary MemoryMax raise" workflow exists in current policy.
+
+- **Network IO shaping hints in cgroup policy**: Not implemented yet.
+  - Network shaping remains managed by FireQOS configuration and user traffic limit files, not cgroup policy keys.
+
 ## Per‑User Utility
 
 Inspect and apply limits per user:
