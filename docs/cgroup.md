@@ -9,6 +9,7 @@ This document explains how PMSS configures Linux cgroups (via systemd) for per�
   - v2: `etc/seedbox/config/template.cgroup.user-slice.v2.conf`
   - v1: `etc/seedbox/config/template.cgroup.user-slice.v1.conf`
 - Admin drop‑ins are written to `/etc/systemd/system/user-.slice.d/15-pmss.conf`. Vendor paths are not used.
+- When policy defines descriptor caps, PMSS writes `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` with `LimitNOFILE=soft:hard`.
 - Root (user‑0.slice) is always unlimited. A boot + periodic check enforces this.
 
 ## Defaults & Policy
@@ -31,7 +32,9 @@ return [
   'tasksMax'      => 2048,
   'memoryHighMiB' => 500,
   'memoryMaxMiB'  => 750,
-  // #TODO: per-device IO policy, burst allowances, net shaping, NOFILE caps.
+  'limitNoFileSoft' => 8192,
+  'limitNoFileHard' => 16384,
+  // #TODO: per-device IO policy, burst allowances, net shaping.
 ];
 ```
 
@@ -99,6 +102,8 @@ Inspect and apply limits per user:
   - `MemoryMax=` (hard cap)
 - Processes/Threads
   - `TasksMax=` (max processes/threads)
+- File descriptors
+  - `LimitNOFILE=soft:hard` via policy keys `limitNoFileSoft` and `limitNoFileHard`
 - IO (weights and throttles)
   - `IOWeight=` (relative I/O weight)
   - `IOReadBandwidthMax=/dev/DEV SIZE` (strict read bandwidth)

@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__.'/hostResourcesDetect.php';
+require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
 
     /**
      * Render and install the user-.slice drop-in.
@@ -139,6 +140,10 @@ require_once __DIR__.'/hostResourcesDetect.php';
                 }
             }
         }
+
+        // Optional user@ manager descriptor caps are policy-driven and
+        // intentionally separate from the user-.slice resource controls.
+        pmssSystemdUserManagerNoFileLimitInstall($policy, $log);
 
         return $tasksMax;
     }

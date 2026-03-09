@@ -15,6 +15,10 @@ return [
     'memoryHighMiB'    => 500,    // soft throttle at 500 MiB (min enforced as 250)
     'memoryMaxMiB'     => 750,    // hard cap ~+50% over High (still capped at 95% of system RAM)
 
+    // Optional per-user file descriptor caps (via user@.service LimitNOFILE).
+    // 'limitNoFileSoft' => 8192,
+    // 'limitNoFileHard' => 16384,
+
     // Per-mount device defaults (resolved to devices at runtime)
     'mounts' => [
         '/'     => ['ioWeight'=>90,  'readBw'=>'2000M', 'writeBw'=>'2000M'],
@@ -34,5 +38,4 @@ return [
     // #TODO Implement: per-device IO scheduling hints (e.g., BFQ vs NVMe), enabling IOWeight only when effective (GH #121)
     // #TODO Implement: per-user burst allowances (temporary MemoryMax raise for a time-boxed operation) (GH #121)
     // #TODO Implement: network IO shaping hints per user (integrated with existing QoS) for fair sharing (GH #121)
-    // #TODO Implement: per-user file descriptor soft/hard caps via systemd LimitNOFILE (GH #121)
 ];
