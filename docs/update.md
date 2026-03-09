@@ -89,12 +89,12 @@ before any other orchestrator steps run. The sequence is:
 1. `pmssConfigureAptNonInteractive()` – force unattended apt behaviour.
 2. `pmssCompletePendingDpkg()` – finish any interrupted `dpkg --configure` runs.
 3. `pmssApplyDpkgSelections()` – apply the codename-specific baseline snapshot.
-4. `pmssFlushPackageQueue()` (once the queue is retired, only the dpkg baseline remains).
+4. `pmssApplyDpkgSelections()` recovery + post-phase fix-broken/autoremove checks.
 
 Do not insert other modules between these calls and never move them later in the
-flow. Future work aims to retire ad-hoc apt queues so the dpkg baseline becomes
-the sole source of package state. When in doubt, update the baseline snapshot
-instead of injecting additional installs elsewhere in the run.
+flow. The dpkg baseline is now the sole source of package state in this phase;
+when in doubt, update the baseline snapshot instead of injecting ad-hoc installs
+elsewhere in the run.
 
 ### Step Error Classification
 
@@ -135,7 +135,7 @@ table only tracks external/non-Debian sources.
 
 | Module | Installs / Tasks | External Sources & Expectations |
 | --- | --- | --- |
-| `packages.php` | Queues core package groups (system tooling, media/network stack, Python toolchain, misc apps). | Relies on Debian APT (MediaArea repo shipped via templates) and feeds `pmssFlushPackageQueue()`. |
+| `packages.php` | Legacy queue module retained for compatibility tooling; skipped by update-step2. | No longer part of runtime package orchestration. |
 | `acdcli.php` | Installs/upgrades `acd_cli` inside `/opt/acd_cli` virtualenv and links the CLI. | Pulls from GitHub (`git+https://github.com/yadayada/acd_cli.git`) via the venv’s pip; requires python3/venv tooling. |
 | `aiToolsInstall.php` | Installs system-wide Gemini CLI, Claude Code, and pinned Codex CLI for all users. | Downloads pinned Node.js/Codex artifacts over HTTPS and installs npm packages into `/opt/pmss/ai-tools`. |
 | `btsync.php` | Maintains BTSync 1.4/2.2 binaries and Resilio `rslsync` under `/usr/bin`. | Downloads binaries from `http://pulsedmedia.com/remote/pkg/`; needs write access to `/usr/bin`. |
@@ -163,9 +163,8 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 
 1. Detect distro name/version/codename and ensure `update.php` is up to date.
 2. Enforce non-interactive apt settings and finish any pending dpkg configs.
-3. Immediately refresh APT repositories and install every queued package _before_ any
-   other orchestration (this ordering is mandatory for all future regressions). Once
-   the dpkg baselines include the full package set we can drop the per-app queue entirely.
+3. Immediately refresh APT repositories and apply the codename-selected dpkg baseline
+   _before_ any other orchestration (this ordering is mandatory for all regressions).
 4. Prepare the host (cgroups, systemd slices, base permissions, MOTD, locales) and
    reapply legacy installer defaults (sysctl tuning, root shell config, `/home`
    permissions, hostname/quota overrides exported by `install.sh`).

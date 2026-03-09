@@ -304,7 +304,11 @@ iptables helpers:
 
 ---
 
-## Package Queue (transitional)
+## Legacy Package Queue Helpers (not in update-step2 main flow)
+
+`update-step2.php` now relies on dpkg baseline selections as the sole package
+authority. The helpers below remain in-tree for compatibility and targeted
+maintenance tooling, but are no longer part of the default package phase path.
 
 - pmssQueuePackages(array $packages, ?string $target=null): void → queue package names under `__default__` or suite (e.g., `buster-backports`), deduped.
 - pmssPackageQueueBaselineInstallSet(string $baselinePath): array → parse install-state package names from a selections baseline (supports `pkg install` and short-form `pkg` rows).

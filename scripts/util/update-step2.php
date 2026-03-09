@@ -394,22 +394,12 @@ if (!$dpkgBaselineOk) {
     }
 }
 
-// #TODO Finish migration: once dpkg baselines cover all apps on all hosts, (GH #122)
-//       replace queued installs with a diff-summary report and remove the
-//       per-app package queue entirely.
-include_once '/scripts/lib/update/apps/packages.php';
-pmssRunProfiledCallable(
-    'Reporting queued package drift against dpkg baseline',
-    'pmssReportPackageQueueBaselineDiff',
-    [pmssSelectDpkgSelectionsBaseline($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, 'logmsg')]
-);
-pmssRunProfiledCallable('Flushing staged package queue', 'pmssFlushPackageQueue');
-
-$packageWarnings = (int) (getenv('PMSS_PACKAGE_INSTALL_WARNINGS') ?: 0);
-$packageErrors   = (int) (getenv('PMSS_PACKAGE_INSTALL_ERRORS') ?: 0);
-
-if ($packageWarnings > 0) { logmsg(sprintf('[WARN] Package phase completed with %d warning(s); see earlier log entries for details', $packageWarnings)); }
-if ($packageErrors > 0) { logmsg(sprintf('[ERROR] Package phase could not install %d item(s); continuing with caution', $packageErrors)); pmssLogJson(['event' => 'package_phase', 'status' => 'warn', 'reason' => 'queue_failures', 'count' => $packageErrors]); }
+// Package convergence: dpkg selections are now the authoritative source of
+// package state. The legacy per-app queue module remains in-tree for
+// compatibility tooling, but update-step2 no longer executes it.
+putenv('PMSS_PACKAGE_INSTALL_WARNINGS=0');
+putenv('PMSS_PACKAGE_INSTALL_ERRORS=0');
+logmsg('[OK] Package phase relies on dpkg baseline selections only');
 
 runStep('Attempting apt fix-broken install (post-package phase)', aptCmd('--fix-broken install -y'));
 runStep('Removing packages no longer required', aptCmd('autoremove -y'));
@@ -446,11 +436,13 @@ runStep('Configuring OpenVPN', 'php /scripts/util/configureOpenvpn.php');
 runStep('Configuring WireGuard', 'php /scripts/util/wireguardConfigure.php');
 
 // Load application installers automatically (sorted for deterministic order),
-// but skip the legacy OpenVPN app script as it is superseded by the utility.
+// but skip legacy app scripts that are superseded by dedicated utilities or
+// retired package-phase orchestration.
 $apps = glob('/scripts/lib/update/apps/*.php') ?: [];
 sort($apps);
 foreach ($apps as $app) {
-    if (basename($app) === 'openvpn.php') {
+    $appBase = basename($app);
+    if ($appBase === 'openvpn.php' || $appBase === 'packages.php') {
         continue;
     }
     pmssRunProfiledStep('Loading app installer '.basename($app), static function () use ($app): void {
