@@ -18,18 +18,11 @@ if (!function_exists('pmssSystemdUserManagerNoFileLimitInstall')) {
         }
 
         $soft = isset($policy['limitNoFileSoft']) && is_numeric($policy['limitNoFileSoft'])
-            ? (int)$policy['limitNoFileSoft']
+            ? max(0, (int)$policy['limitNoFileSoft'])
             : 0;
         $hard = isset($policy['limitNoFileHard']) && is_numeric($policy['limitNoFileHard'])
-            ? (int)$policy['limitNoFileHard']
+            ? max(0, (int)$policy['limitNoFileHard'])
             : 0;
-
-        if ($soft < 0) {
-            $soft = 0;
-        }
-        if ($hard < 0) {
-            $hard = 0;
-        }
 
         if ($soft === 0 && $hard === 0) {
             $log('[SKIP] No LimitNOFILE values found in cgroup policy');
@@ -104,6 +97,6 @@ if (!function_exists('pmssSystemdUserManagerLogNamespaceInstall')) {
             return;
         }
 
-        $log(sprintf('Installed %s with LogNamespace=%s', $target, 'user-%i'));
+        $log('Installed '.$target.' with LogNamespace=user-%i');
     }
 }

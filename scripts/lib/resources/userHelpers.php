@@ -24,10 +24,7 @@ function pmssResourceLogLookupUid(string $user): ?int
 function pmssResourceLogLoadUsers(): array
 {
     $users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
-    if (!empty($users)) {
-        $users[] = 'www-data';
-    }
-    return $users;
+    return empty($users) ? $users : array_merge($users, ['www-data']);
 }
 
 /**
@@ -35,11 +32,12 @@ function pmssResourceLogLoadUsers(): array
  */
 function pmssResourceLogIsValidUser(string $user): bool
 {
-    $normalized = function_exists('pmssNormalizeUsername')
-        ? pmssNormalizeUsername($user)
-        : strtolower($user);
-    return !($normalized !== $user
-        || !preg_match('/^[a-z0-9-]+$/', $user)
-        || ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user))
-    );
+    $normalized = function_exists('pmssNormalizeUsername') ? pmssNormalizeUsername($user) : strtolower($user);
+    if ($normalized !== $user || !preg_match('/^[a-z0-9-]+$/', $user)) {
+        return false;
+    }
+    if ($user === 'www-data') {
+        return true;
+    }
+    return !function_exists('pmssValidateUsername') || pmssValidateUsername($user);
 }

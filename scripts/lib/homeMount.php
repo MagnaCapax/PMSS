@@ -48,9 +48,7 @@ if (!function_exists('pmssIsHomeMounted')) {
         }
 
         $mountsPath = getenv('PMSS_PROC_MOUNTS_PATH');
-        if (!is_string($mountsPath) || $mountsPath === '') {
-            $mountsPath = '/proc/mounts';
-        }
+        $mountsPath = (is_string($mountsPath) && $mountsPath !== '') ? $mountsPath : '/proc/mounts';
 
         $mounts = @file_get_contents($mountsPath);
         if ($mounts === false) {
@@ -86,11 +84,7 @@ if (!function_exists('pmssRequireHomeMounted')) {
     {
         // Allow operators to bypass the check for non-standard deployments.
         $skip = getenv('PMSS_SKIP_HOME_MOUNT_CHECK');
-        if ($skip === '1' || strtolower((string)$skip) === 'true') {
-            return;
-        }
-
-        if (pmssIsHomeMounted()) {
+        if ($skip === '1' || strtolower((string)$skip) === 'true' || pmssIsHomeMounted()) {
             return;
         }
 
