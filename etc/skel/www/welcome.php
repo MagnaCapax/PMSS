@@ -104,6 +104,108 @@ if ($delugePasswordHelpersAvailable) {
     <link href="https://static.pulsedmedia.com/wc/css/screen.css" rel="stylesheet" type="text/css" media="screen" />
     <!-- Javascript -->
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>
+    <style type="text/css">
+        #pmss-action-notice {
+            display: none;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            max-width: 580px;
+            padding: 8px 12px;
+            border: 1px solid #78a5d6;
+            background-color: #edf4ff;
+            color: #1a3d66;
+            font-weight: bold;
+        }
+        #pmss-action-notice.pmss-error {
+            border-color: #cc8f8f;
+            background-color: #fff1f1;
+            color: #7a1a1a;
+        }
+        .pmss-action-loading {
+            margin-left: 6px;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+    <script type="text/javascript">
+        var pmssActionNoticeTimer = null;
+
+        function pmssShowActionNotice(message, isError) {
+            var notice = $('#pmss-action-notice');
+            if (notice.length === 0) {
+                alert(message);
+                return;
+            }
+
+            notice.stop(true, true);
+            notice.removeClass('pmss-error');
+            if (isError) {
+                notice.addClass('pmss-error');
+            }
+
+            notice.text(message).fadeIn('fast');
+
+            if (pmssActionNoticeTimer !== null) {
+                window.clearTimeout(pmssActionNoticeTimer);
+            }
+
+            pmssActionNoticeTimer = window.setTimeout(function() {
+                notice.fadeOut('slow');
+            }, 3200);
+        }
+
+        function pmssSetActionLoading(button, isLoading) {
+            var actionButton = $(button);
+            var indicator = actionButton.next('.pmss-action-loading');
+
+            if (isLoading) {
+                actionButton.attr('disabled', 'disabled');
+                if (indicator.length === 0) {
+                    indicator = $('<span class="pmss-action-loading" aria-live="polite">&#8987; Working...</span>');
+                    actionButton.after(indicator);
+                }
+                indicator.show();
+                return;
+            }
+
+            actionButton.removeAttr('disabled');
+            if (indicator.length > 0) {
+                indicator.hide();
+            }
+        }
+
+        function pmssRunAction(button, url, successMessage, shouldReload, pendingMessage) {
+            pmssSetActionLoading(button, true);
+
+            if (pendingMessage) {
+                pmssShowActionNotice(pendingMessage, false);
+            }
+
+            $.ajax({
+                url: url,
+                cache: false,
+                success: function() {
+                    pmssSetActionLoading(button, false);
+
+                    if (successMessage) {
+                        pmssShowActionNotice(successMessage, false);
+                    }
+
+                    if (shouldReload) {
+                        window.setTimeout(function() {
+                            location.reload(true);
+                        }, 900);
+                    }
+                },
+                error: function() {
+                    pmssSetActionLoading(button, false);
+                    pmssShowActionNotice('Action failed. Please try again in a moment.', true);
+                }
+            });
+        }
+    </script>
 
 <?php
 // April Fool's joke (2022) - disabled after April 1st
@@ -147,6 +249,7 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
     <![endif]-->
 </head>
 <body>
+    <div id="pmss-action-notice" role="status" aria-live="polite"></div>
     <div id="wrap">
         <div id="full_page">
             <div class="full_top_nohd"><!-- top design --></div>
@@ -221,12 +324,12 @@ if ((file_exists('/usr/bin/deluged') || file_exists('/usr/local/bin/deluged')) &
 
     if (!file_exists('../.delugeEnable')) {
 ?>
-                        <input type="button" name="delugeStart" value="Start Deluge" onClick="$.ajax({url: 'deluge.php?action=start', success: function() { alert('Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.'); location.reload(true); }});" />
+                        <input type="button" name="delugeStart" value="Start Deluge" onClick="pmssRunAction(this, 'deluge.php?action=start', 'Deluge starting. Accessible at /deluge-USERNAME/. Refresh GUI to see tab.', true, 'Deluge start request sent...');" />
 <?php
     } else {
 ?>
-                        <input type="button" name="delugeDisable" value="Disable Deluge" onClick="$.ajax({url: 'deluge.php?action=disable', success: function() { location.reload(true); }});" />
-                        <input type="button" name="delugeRestart" value="Restart Deluge" onClick="$.ajax({url: 'deluge.php?action=restart', success: function() { alert('Deluge restart.'); }});" />
+                        <input type="button" name="delugeDisable" value="Disable Deluge" onClick="pmssRunAction(this, 'deluge.php?action=disable', 'Deluge disabled.', true, 'Disabling Deluge...');" />
+                        <input type="button" name="delugeRestart" value="Restart Deluge" onClick="pmssRunAction(this, 'deluge.php?action=restart', 'Deluge restart requested.', false, 'Restarting Deluge...');" />
 <?php
     }
 }
@@ -238,12 +341,12 @@ if (file_exists('/usr/bin/rclone') && file_exists('rclone.php')) {
 <?php
     if (!file_exists('../.rcloneEnable')) {
 ?>
-                        <input type="button" name="rcloneStart" value="Start Rclone" onClick="$.ajax({url: 'rclone.php?action=start', success: function() { alert('Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab'); location.reload(true); }});" />
+                        <input type="button" name="rcloneStart" value="Start Rclone" onClick="pmssRunAction(this, 'rclone.php?action=start', 'Rclone starting, access at /user-USERNAME/rclone. Refresh GUI to see tab.', true, 'Starting Rclone...');" />
 <?php
     } else {
 ?>
-                        <input type="button" name="rcloneDisable" value="Disable Rclone" onClick="$.ajax({url: 'rclone.php?action=disable', success: function() { alert('Rclone disabled.'); location.reload(true); }});" />
-                        <input type="button" name="rcloneRestart" value="Restart Rclone" onClick="$.ajax({url: 'rclone.php?action=restart', success: function() { alert('Rclone restart.'); }});" />
+                        <input type="button" name="rcloneDisable" value="Disable Rclone" onClick="pmssRunAction(this, 'rclone.php?action=disable', 'Rclone disabled.', true, 'Disabling Rclone...');" />
+                        <input type="button" name="rcloneRestart" value="Restart Rclone" onClick="pmssRunAction(this, 'rclone.php?action=restart', 'Rclone restart requested.', false, 'Restarting Rclone...');" />
 <?php
     }
 }
@@ -255,24 +358,24 @@ if ((file_exists('/usr/bin/qbittorrent-nox') || file_exists('/usr/local/bin/qbit
 <?php
     if (!file_exists('../.qbittorrentEnable')) {
 ?>
-                        <input type="button" name="qbittorrentStart" value="Start qBittorrent" onClick="$.ajax({url: 'qbittorrent.php?action=start', success: function() { alert('qBittorrent starting, access at /user-USERNAME/qbittorrent/ — Refresh GUI to see tab'); location.reload(true); }});" />
+                        <input type="button" name="qbittorrentStart" value="Start qBittorrent" onClick="pmssRunAction(this, 'qbittorrent.php?action=start', 'qBittorrent starting, access at /user-USERNAME/qbittorrent/ — Refresh GUI to see tab.', true, 'Starting qBittorrent...');" />
 <?php
     } else {
 ?>
-                        <input type="button" name="qbittorrentDisable" value="Disable qBittorrent" onClick="$.ajax({url: 'qbittorrent.php?action=disable', success: function() { alert('qBittorrent disabled.'); location.reload(true); }});" />
-                        <input type="button" name="qbittorrentRestart" value="Restart qBittorrent" onClick="$.ajax({url: 'qbittorrent.php?action=restart', success: function() { alert('qBittorrent restart.'); }});" />
+                        <input type="button" name="qbittorrentDisable" value="Disable qBittorrent" onClick="pmssRunAction(this, 'qbittorrent.php?action=disable', 'qBittorrent disabled.', true, 'Disabling qBittorrent...');" />
+                        <input type="button" name="qbittorrentRestart" value="Restart qBittorrent" onClick="pmssRunAction(this, 'qbittorrent.php?action=restart', 'qBittorrent restart requested.', false, 'Restarting qBittorrent...');" />
 <?php
     }
 }
 ?>
 
                         <h6>rTorrent</h6>
-                        <input type="button" name="rtorrentRestart" value="Restart rTorrent" onClick="$.ajax({url: 'rtorrentRestart.php', success: function() { alert('rTorrent restart request sent, please allow up to 2 minutes for restart to happen.'); }});" />
+                        <input type="button" name="rtorrentRestart" value="Restart rTorrent" onClick="pmssRunAction(this, 'rtorrentRestart.php', 'rTorrent restart request sent, please allow up to 2 minutes for restart to happen.', false, 'Sending rTorrent restart request...');" />
 <?php
 if (file_exists('lighttpdRestart.php')) {
 ?>
                         <h6>Lighttpd</h6>
-                        <input type="button" name="lighttpdRestart" value="Restart Lighttpd" onClick="alert('Lighttpd restart might take a couple of minutes'); $.ajax({url: 'lighttpdRestart.php?action=confirm-restart', success: function() {} });" />
+                        <input type="button" name="lighttpdRestart" value="Restart Lighttpd" onClick="pmssRunAction(this, 'lighttpdRestart.php?action=confirm-restart', 'Lighttpd restart request sent. It might take a couple of minutes.', false, 'Lighttpd restart may take a couple of minutes...');" />
 <?php
 }
 
