@@ -42,6 +42,140 @@ function pmssQueuePackages(array $packages, ?string $target = null): void
 //       present-but-not-in-baseline and missing-from-host to help converge
 //       systems before removing the queue entirely.
 
+/**
+ * Parse install-state package names from a dpkg selections baseline.
+ *
+ * Supports both explicit two-column rows (`pkg install`) and short-form rows
+ * (`pkg`) used by historical captures.
+ *
+ * @return array<string, true> Lower-cased package-name set.
+ */
+function pmssPackageQueueBaselineInstallSet(string $baselinePath): array
+{
+    $rows = @file($baselinePath, FILE_IGNORE_NEW_LINES);
+    if ($rows === false) {
+        return [];
+    }
+
+    $packages = [];
+    foreach ($rows as $row) {
+        $trimmed = trim((string) $row);
+        if ($trimmed === '' || strpos($trimmed, '#') === 0) {
+            continue;
+        }
+
+        $parts = preg_split('/\s+/', $trimmed);
+        if (!is_array($parts) || empty($parts)) {
+            continue;
+        }
+
+        $name = strtolower((string) $parts[0]);
+        $state = isset($parts[1]) ? strtolower((string) $parts[1]) : 'install';
+        if ($name !== '' && $state === 'install') {
+            $packages[$name] = true;
+        }
+    }
+
+    return $packages;
+}
+
+/**
+ * Emit a queue-vs-baseline diff summary to support dpkg-baseline convergence.
+ *
+ * @return array<string, mixed> Summary buckets for tests/diagnostics.
+ */
+function pmssReportPackageQueueBaselineDiff(?string $baselinePath = null): array
+{
+    global $PMSS_PACKAGE_QUEUE;
+
+    $summary = [
+        'baselinePath' => '',
+        'queuedAbsentFromBaseline' => [],
+        'queuedMissingOnHost' => [],
+        'installedAbsentFromBaseline' => [],
+    ];
+
+    if (empty($PMSS_PACKAGE_QUEUE)) {
+        return $summary;
+    }
+
+    $logNotice = function_exists('logmsg')
+        ? 'logmsg'
+        : function (string $message): void { echo $message."\n"; };
+
+    if ($baselinePath === null && function_exists('pmssSelectDpkgSelectionsBaseline')) {
+        $detectedVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+        $baselinePath = pmssSelectDpkgSelectionsBaseline($detectedVersion > 0 ? $detectedVersion : null, $logNotice);
+    }
+
+    if (!is_string($baselinePath) || $baselinePath === '' || !is_readable($baselinePath)) {
+        $logNotice('[WARN] Skipping package queue baseline diff: readable baseline selections file unavailable');
+        return $summary;
+    }
+
+    $summary['baselinePath'] = $baselinePath;
+    $baselineSet = pmssPackageQueueBaselineInstallSet($baselinePath);
+    if (empty($baselineSet)) {
+        $logNotice('[WARN] Package queue baseline diff skipped: no install entries in '.basename($baselinePath));
+        return $summary;
+    }
+
+    $queuedPackages = [];
+    foreach ($PMSS_PACKAGE_QUEUE as $packages) {
+        if (!is_array($packages)) {
+            continue;
+        }
+        foreach ($packages as $package) {
+            $package = trim((string) $package);
+            if ($package !== '') {
+                $queuedPackages[$package] = true;
+            }
+        }
+    }
+
+    if (empty($queuedPackages)) {
+        return $summary;
+    }
+
+    foreach (array_keys($queuedPackages) as $package) {
+        $name = strtolower((string) preg_replace('/:.+$/', '', $package));
+        if (isset($baselineSet[$name])) {
+            continue;
+        }
+        $summary['queuedAbsentFromBaseline'][] = $package;
+        if (pmssPackageStatus($package) === 'install ok installed') {
+            $summary['installedAbsentFromBaseline'][] = $package;
+        } else {
+            $summary['queuedMissingOnHost'][] = $package;
+        }
+    }
+
+    foreach (['queuedAbsentFromBaseline', 'queuedMissingOnHost', 'installedAbsentFromBaseline'] as $bucket) {
+        sort($summary[$bucket]);
+    }
+
+    if (!empty($summary['queuedMissingOnHost'])) {
+        $logNotice('[WARN] Queued packages absent from dpkg baseline and host: '.implode(', ', $summary['queuedMissingOnHost']));
+    }
+    if (!empty($summary['installedAbsentFromBaseline'])) {
+        $logNotice('[WARN] Installed packages absent from dpkg baseline: '.implode(', ', $summary['installedAbsentFromBaseline']));
+    }
+
+    if (empty($summary['queuedAbsentFromBaseline'])) {
+        $logNotice('[OK] Package queue diff: all queued packages are present in '.basename($baselinePath));
+    } elseif (function_exists('pmssLogJson')) {
+        pmssLogJson([
+            'event' => 'package_queue_baseline_diff',
+            'baseline' => basename($baselinePath),
+            'queuedAbsentFromBaseline' => $summary['queuedAbsentFromBaseline'],
+            'queuedMissingOnHost' => $summary['queuedMissingOnHost'],
+            'installedAbsentFromBaseline' => $summary['installedAbsentFromBaseline'],
+        ]);
+    }
+
+    return $summary;
+}
+
 function pmssFlushPackageQueue(): void
 {
     global $PMSS_PACKAGE_QUEUE, $PMSS_POST_INSTALL_COMMANDS, $PMSS_PACKAGE_WARNINGS, $PMSS_PACKAGE_ERRORS;

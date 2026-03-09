@@ -307,6 +307,8 @@ iptables helpers:
 ## Package Queue (transitional)
 
 - pmssQueuePackages(array $packages, ?string $target=null): void → queue package names under `__default__` or suite (e.g., `buster-backports`), deduped.
+- pmssPackageQueueBaselineInstallSet(string $baselinePath): array → parse install-state package names from a selections baseline (supports `pkg install` and short-form `pkg` rows).
+- pmssReportPackageQueueBaselineDiff(?string $baselinePath=null): array → compares queued packages against the selected baseline; logs queued/installed packages missing from baseline and returns summary buckets.
 - pmssFlushPackageQueue(): void → install each queue; split available vs missing with `apt-cache policy`, run `apt-get install` (with `-t <suite>`), retry with `--fix-broken`; run post-install commands; set env counters `PMSS_PACKAGE_INSTALL_WARNINGS|ERRORS`, log JSON event on errors.
 - pmssPackageStatus(string $package): string → dpkg status string or `''`.
 - pmssPackageAvailable(string $package): bool → checks cached `apt-cache pkgnames` set (fast path), falls back to `apt-cache policy` (cached).

@@ -398,6 +398,11 @@ if (!$dpkgBaselineOk) {
 //       replace queued installs with a diff-summary report and remove the
 //       per-app package queue entirely.
 include_once '/scripts/lib/update/apps/packages.php';
+pmssRunProfiledCallable(
+    'Reporting queued package drift against dpkg baseline',
+    'pmssReportPackageQueueBaselineDiff',
+    [pmssSelectDpkgSelectionsBaseline($effectiveRepoVersion > 0 ? $effectiveRepoVersion : null, 'logmsg')]
+);
 pmssRunProfiledCallable('Flushing staged package queue', 'pmssFlushPackageQueue');
 
 $packageWarnings = (int) (getenv('PMSS_PACKAGE_INSTALL_WARNINGS') ?: 0);

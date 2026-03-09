@@ -36,6 +36,16 @@ class PackageQueueTest extends TestCase
         }
     }
 
+    private function writeBaseline(array $rows): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'pmss-baseline-');
+        if (!is_string($path) || $path === '') {
+            $this->fail('Expected temporary baseline path');
+        }
+        file_put_contents($path, implode("\n", $rows)."\n");
+        return $path;
+    }
+
     public function testQueuePackagesAddsEntries(): void
     {
         pmssQueuePackages(['foo', 'bar']);
@@ -77,5 +87,43 @@ class PackageQueueTest extends TestCase
         $this->assertEquals([], $GLOBALS['PMSS_PACKAGE_ERRORS']);
         $this->assertEquals('2', getenv('PMSS_PACKAGE_INSTALL_WARNINGS') ?: '');
         $this->assertEquals('1', getenv('PMSS_PACKAGE_INSTALL_ERRORS') ?: '');
+    }
+
+    public function testReportPackageQueueBaselineDiffFindsMissingPackages(): void
+    {
+        pmssQueuePackages(['pkg-in-baseline', 'pkg-outside-baseline']);
+        $baselinePath = $this->writeBaseline([
+            'pkg-in-baseline install',
+            'another-baseline-package install',
+        ]);
+
+        try {
+            $summary = pmssReportPackageQueueBaselineDiff($baselinePath);
+        } finally {
+            @unlink($baselinePath);
+        }
+
+        $this->assertEquals(['pkg-outside-baseline'], $summary['queuedAbsentFromBaseline'] ?? []);
+        $this->assertEquals(['pkg-outside-baseline'], $summary['queuedMissingOnHost'] ?? []);
+        $this->assertEquals([], $summary['installedAbsentFromBaseline'] ?? []);
+    }
+
+    public function testReportPackageQueueBaselineDiffSupportsShortRows(): void
+    {
+        pmssQueuePackages(['pkg-short-form']);
+        $baselinePath = $this->writeBaseline([
+            'pkg-short-form',
+            '# comment row',
+        ]);
+
+        try {
+            $summary = pmssReportPackageQueueBaselineDiff($baselinePath);
+        } finally {
+            @unlink($baselinePath);
+        }
+
+        $this->assertEquals([], $summary['queuedAbsentFromBaseline'] ?? []);
+        $this->assertEquals([], $summary['queuedMissingOnHost'] ?? []);
+        $this->assertEquals([], $summary['installedAbsentFromBaseline'] ?? []);
     }
 }
