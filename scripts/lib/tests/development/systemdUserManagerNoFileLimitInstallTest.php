@@ -75,4 +75,18 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
         $target = $dir.'/20-pmss-limits.conf';
         $this->assertTrue(!is_file($target), 'Unexpected user@.service drop-in without LimitNOFILE policy');
     }
+
+    public function testInstallsLogNamespaceDropin(): void
+    {
+        $dir = $this->tempDir('log-namespace');
+        $this->withDropinDir($dir, function (): void {
+            \pmssSystemdUserManagerLogNamespaceInstall(function (): void {
+            });
+        });
+
+        $target = $dir.'/30-pmss-log-namespace.conf';
+        $this->assertTrue(is_file($target), 'Expected user@.service log namespace drop-in to be created');
+        $body = (string)file_get_contents($target);
+        $this->assertStringContainsString('LogNamespace=user-%i', $body);
+    }
 }

@@ -70,3 +70,40 @@ if (!function_exists('pmssSystemdUserManagerNoFileLimitInstall')) {
         $log(sprintf('Installed %s with LimitNOFILE=%d:%d', $target, $soft, $hard));
     }
 }
+
+if (!function_exists('pmssSystemdUserManagerLogNamespaceInstall')) {
+    /**
+     * Install user@ manager log namespace drop-in.
+     *
+     * This keeps per-user manager/service logs in dedicated journald
+     * namespaces, reducing cross-tenant log mixing in shared environments.
+     */
+    function pmssSystemdUserManagerLogNamespaceInstall(callable $log): void
+    {
+        $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
+        if (!is_dir($dropDir) && !@mkdir($dropDir, 0755, true)) {
+            $log('[WARN] Failed to create user@.service drop-in dir '.$dropDir);
+            return;
+        }
+
+        $target = $dropDir.'/30-pmss-log-namespace.conf';
+        $body = "# PMSS: isolate per-user manager logs in dedicated namespaces\n"
+            ."[Service]\n"
+            ."LogNamespace=user-%i\n";
+
+        $tmpTarget = $target.'.tmp';
+        if (@file_put_contents($tmpTarget, $body) === false) {
+            $log('[WARN] Failed to write temp user@.service log namespace drop-in '.$tmpTarget);
+            return;
+        }
+        @chmod($tmpTarget, 0644);
+
+        if (!@rename($tmpTarget, $target)) {
+            $log('[WARN] Failed to install user@.service log namespace drop-in '.$target);
+            @unlink($tmpTarget);
+            return;
+        }
+
+        $log(sprintf('Installed %s with LogNamespace=%s', $target, 'user-%i'));
+    }
+}

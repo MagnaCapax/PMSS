@@ -145,5 +145,9 @@ require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
         // intentionally separate from the user-.slice resource controls.
         pmssSystemdUserManagerNoFileLimitInstall($policy, $log);
 
+        // Keep user manager logs isolated by namespace to reduce
+        // cross-tenant journald mixing on shared hosts.
+        pmssSystemdUserManagerLogNamespaceInstall($log);
+
         return $tasksMax;
     }
