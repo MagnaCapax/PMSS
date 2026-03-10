@@ -29,13 +29,17 @@ return [
 
     // Profiles for shorthand selection (operators can use --io-profile=…)
     'profiles' => [
+        // CPU/memory/tasks profile families for CLI flags:
+        // --cpu-profile, --mem-profile, --tasks-profile.
+        // Built-in fallbacks remain available even when these are omitted.
+        // 'cpu' => ['balanced' => 180],
+        // 'mem' => ['streaming' => 1536],
+        // 'tasks' => ['service' => 12000],
         'io' => [
             'hdd'  => ['ioWeight'=>200, 'readBw'=>'5M',   'writeBw'=>'10M', 'readIops'=>100, 'writeIops'=>100],
             'nvme' => ['ioWeight'=>200],
             'bulk' => ['ioWeight'=>500, 'cpuWeight'=>300, 'tasksMax'=>8192],
         ],
-        // #TODO Pending extension: additional cpu/mem/tasks profile families
-        // (tracked in docs/cgroup.md Extension Status Matrix, GH #121).
     ],
 
     // #TODO Pending extension: scheduler-aware IO auto-policy. Mount-based IO

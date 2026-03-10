@@ -262,17 +262,7 @@ class Manager
 
     private function applyDefaults(array &$opt): array
     {
-        $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-        $policyFile = $cfgDir.'/cgroup.policy.php';
-        $policy = [];
-        // This file read is direct; ideally should be via SystemInterface if we want to mock policy
-        // But for now we rely on filesystem if it exists.
-        // To mock this, SystemInterface needs a 'includePolicy' or similar. 
-        // For now, hermetic tests can mock getenv('PMSS_CONFIG_DIR') and write a temp file.
-        if (file_exists($policyFile)) { 
-            $loaded = @include $policyFile; 
-            if (is_array($loaded)) { $policy = $loaded; } 
-        }
+        $policy = $this->loadPolicy();
         
         foreach ([['cpu-weight','cpuWeight'],['io-weight','ioWeight'],['tasks-max','tasksMax'],['cpu-quota-percent','cpuQuotaPercent']] as $map) {
             if (!isset($opt[$map[0]]) && isset($policy[$map[1]]) && is_numeric($policy[$map[1]])) {
@@ -287,6 +277,25 @@ class Manager
         }
 
         return $this->buildPolicyIoPairs($policy);
+    }
+
+    /**
+     * Load cgroup policy from PMSS config directory.
+     */
+    private function loadPolicy(): array
+    {
+        $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+        $policyFile = $cfgDir.'/cgroup.policy.php';
+        $policy = [];
+
+        if (is_file($policyFile)) {
+            $loaded = @include $policyFile;
+            if (is_array($loaded)) {
+                $policy = $loaded;
+            }
+        }
+
+        return $policy;
     }
 
     /**
@@ -359,29 +368,72 @@ class Manager
 
     private function expandProfiles(array &$opt): void
     {
+        $cpuWeights = $this->resolveNumericProfiles('cpu', [
+            'low'  => '50',
+            'high' => '300',
+        ]);
+
+        $tasksMax = $this->resolveNumericProfiles('tasks', [
+            'low'  => '1024',
+            'high' => '8192',
+        ]);
+
+        $memoryHigh = $this->resolveNumericProfiles('mem', [
+            'low'   => '250',
+            'heavy' => '1024',
+        ]);
+
         if (isset($opt['cpu-profile']) && !isset($opt['cpu-weight'])) {
-            static $cpuWeights = [
-                'low'  => '50',
-                'high' => '300',
-            ];
-            $opt['cpu-weight'] = $cpuWeights[$opt['cpu-profile']] ?? '100';
+            $profileName = strtolower($opt['cpu-profile']);
+            $opt['cpu-profile'] = $profileName;
+            $opt['cpu-weight'] = $cpuWeights[$profileName] ?? '100';
         }
+
         if (isset($opt['tasks-profile']) && !isset($opt['tasks-max'])) {
-            static $tasksMax = [
-                'low'  => '1024',
-                'high' => '8192',
-            ];
-            $opt['tasks-max'] = $tasksMax[$opt['tasks-profile']] ?? '4096';
+            $profileName = strtolower($opt['tasks-profile']);
+            $opt['tasks-profile'] = $profileName;
+            $opt['tasks-max'] = $tasksMax[$profileName] ?? '4096';
         }
+
         if (isset($opt['mem-profile'])) {
+            $profileName = strtolower($opt['mem-profile']);
+            $opt['mem-profile'] = $profileName;
             if (!isset($opt['memory-high'])) {
-                static $memoryHigh = [
-                    'low'   => '250',
-                    'heavy' => '1024',
-                ];
-                $opt['memory-high'] = $memoryHigh[$opt['mem-profile']] ?? '500';
+                $opt['memory-high'] = $memoryHigh[$profileName] ?? '500';
             }
         }
+    }
+
+    /**
+     * Resolve numeric profile maps from policy, preserving built-in defaults.
+     */
+    private function resolveNumericProfiles(string $family, array $defaults): array
+    {
+        $resolved = $defaults;
+        $policy = $this->loadPolicy();
+
+        if (!isset($policy['profiles']) || !is_array($policy['profiles'])) {
+            return $resolved;
+        }
+
+        if (!isset($policy['profiles'][$family]) || !is_array($policy['profiles'][$family])) {
+            return $resolved;
+        }
+
+        foreach ($policy['profiles'][$family] as $profileName => $profileValue) {
+            if (!is_string($profileName) || $profileName === '' || !is_numeric($profileValue)) {
+                continue;
+            }
+
+            $numericValue = (int)$profileValue;
+            if ($numericValue <= 0) {
+                continue;
+            }
+
+            $resolved[strtolower($profileName)] = (string)$numericValue;
+        }
+
+        return $resolved;
     }
 
     private function applyIoProfile(string $profile, string $dev, array &$opt, array &$pairs): void

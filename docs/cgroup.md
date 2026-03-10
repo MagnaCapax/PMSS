@@ -34,7 +34,12 @@ return [
   'memoryMaxMiB'  => 750,
   'limitNoFileSoft' => 8192,
   'limitNoFileHard' => 16384,
-  // #TODO: per-device IO policy, burst allowances, net shaping.
+  'profiles' => [
+    'cpu' => ['balanced' => 180],
+    'mem' => ['streaming' => 1536],
+    'tasks' => ['service' => 12000],
+  ],
+  // Remaining TODOs: burst allowances + policy-level net shaping hints.
 ];
 ```
 
@@ -53,6 +58,11 @@ Current state for the cgroup policy extension TODOs:
 - **NOFILE limits**: Implemented.
   - Policy keys `limitNoFileSoft` / `limitNoFileHard` are consumed during system prep.
   - PMSS writes `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` with `LimitNOFILE=soft:hard` when both values are valid.
+
+- **CPU/memory/tasks profile families**: Implemented.
+  - Built-in CLI shorthands (`low`, `high`, `heavy`) remain available.
+  - Policy can extend/override profile maps via `profiles.cpu`, `profiles.mem`, and `profiles.tasks` using positive numeric values.
+  - Invalid profile entries are ignored, preserving baseline behavior.
 
 - **Per-user burst allowances**: Not implemented yet.
   - No time-boxed "temporary MemoryMax raise" workflow exists in current policy.
@@ -106,6 +116,8 @@ Inspect and apply limits per user:
   - No throttles by default; IOWeight=200 (weights often have limited effect on NVMe)
 - `--io-profile=bulk`
   - Favor throughput: raises IOWeight (~500), CPUWeight (~300), TasksMax (~8192)
+- `--cpu-profile=<name>`, `--mem-profile=<name>`, `--tasks-profile=<name>`
+  - Uses built-in shorthands by default and policy-defined profile maps from `cgroup.policy.php` when provided.
 
 ### Behavior
 
