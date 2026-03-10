@@ -25,6 +25,7 @@ $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
 $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
+$homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -58,6 +59,24 @@ $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
             margin-left: 6px;
             color: #666;
             font-size: 0.9em;
+        }
+        .pmss-raid-notice {
+            margin: 12px 0 18px;
+            padding: 12px 14px;
+            border: 1px solid #d8a55a;
+            background: #fff6e5;
+            color: #5f3b00;
+        }
+        .pmss-raid-notice p {
+            margin: 8px 0 0;
+        }
+        .pmss-raid-icon {
+            color: #b22222;
+            margin-right: 6px;
+        }
+        .pmss-raid-meta {
+            margin-top: 8px;
+            font-weight: bold;
         }
     </style>
     <script type="text/javascript">
@@ -189,6 +208,7 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
                     <div class="portfolioimg">
                         <?php
                         echo $welcomeHeadingHtml;
+                        echo $homeRaidNoticeHtml;
                         ?>
                         <h6>Basic Usage</h6>
                         <p><b>watch directory</b><br />
@@ -484,6 +504,24 @@ function pmssWelcomeContextualMessageBuild($quotaInfo) {
     }
 
     return pmssWelcomeMessageForUser($quotaInfo, $userHome, $username);
+}
+
+function pmssWelcomeHomeRaidNoticeHtmlRead() {
+    if (!file_exists('/scripts/lib/storageHealth.php')) {
+        return '';
+    }
+
+    require_once '/scripts/lib/storageHealth.php';
+    if (!function_exists('pmssStorageHealthHomeRaidActivity')) {
+        return '';
+    }
+
+    $activity = pmssStorageHealthHomeRaidActivity();
+    if (!function_exists('pmssStorageHealthHomeRaidNoticeHtmlBuild')) {
+        return '';
+    }
+
+    return pmssStorageHealthHomeRaidNoticeHtmlBuild($activity);
 }
 
 function pmssWelcomeDelugeStateBuild($delugeAuthPath) {

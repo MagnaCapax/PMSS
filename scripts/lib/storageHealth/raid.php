@@ -41,8 +41,7 @@ function pmssStorageHealthSnapshotRaid(string $timestamp): array
             continue;
         }
 
-        if (empty($entries)
-            || (strpos($line, 'resync') === false && strpos($line, 'recovery') === false && strpos($line, 'reshape') === false)) {
+        if (empty($entries) || preg_match('/\b(check|resync|recovery|reshape)\b/', $line, $operationMatches) !== 1) {
             continue;
         }
 
@@ -50,6 +49,7 @@ function pmssStorageHealthSnapshotRaid(string $timestamp): array
         $entries[$lastIdx]['severity'] = pmssStorageHealthSeverityMax((string) $entries[$lastIdx]['severity'], 'warn');
         $entries[$lastIdx]['ok'] = ($entries[$lastIdx]['severity'] === 'ok');
         $entries[$lastIdx]['flags'][] = 'rebuild_in_progress';
+        $entries[$lastIdx]['operation'] = $operationMatches[1];
         $entries[$lastIdx]['resync'] = $trimmed;
     }
     return $entries;

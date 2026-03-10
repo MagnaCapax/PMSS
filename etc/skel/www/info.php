@@ -10,6 +10,16 @@
  *
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  */
+
+$pmssHomeRaidActivity = null;
+$pmssHomeRaidNoticeHtml = '';
+if (file_exists('/scripts/lib/storageHealth.php')) {
+    require_once '/scripts/lib/storageHealth.php';
+    if (function_exists('pmssStorageHealthHomeRaidActivity')) {
+        $pmssHomeRaidActivity = pmssStorageHealthHomeRaidActivity();
+        $pmssHomeRaidNoticeHtml = pmssStorageHealthHomeRaidNoticeHtmlBuild($pmssHomeRaidActivity);
+    }
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -29,6 +39,24 @@
         margin-left: 0;
         margin-right: 0;
       }
+      .pmss-raid-notice {
+        margin: 14px 0 18px;
+        padding: 12px 14px;
+        border: 1px solid #d8a55a;
+        background: #fff6e5;
+        color: #5f3b00;
+      }
+      .pmss-raid-notice p {
+        margin: 8px 0 0;
+      }
+      .pmss-raid-icon {
+        color: #b22222;
+        margin-right: 6px;
+      }
+      .pmss-raid-meta {
+        margin-top: 8px;
+        font-weight: 600;
+      }
     </style>
   </head>
 <body>
@@ -38,7 +66,7 @@
           <div class="full_body">
 <h1>Seedbox information</h1>
             <div class="portfoliobox">
-                
+<?php if ($pmssHomeRaidNoticeHtml !== '') echo $pmssHomeRaidNoticeHtml; ?>
 
 <div id="stats">
  <?php
