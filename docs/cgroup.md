@@ -44,10 +44,11 @@ Guardrails always apply: MemoryHigh ≥ 250 MiB; MemoryMax ≤ 95% of RAM.
 
 Current state for the cgroup policy extension TODOs:
 
-- **Per-device IO controls**: Partially implemented.
+- **Per-device IO controls**: Implemented for policy defaults and explicit CLI paths.
   - Global policy supports `mounts` entries (`ioWeight`, `readBw`, `writeBw`, `readIops`, `writeIops`) that are translated into `IODeviceWeight` and IO throttle directives.
+  - `userConfigCgroup.php --apply --defaults` expands policy `mounts` entries to per-device IO properties when mount device resolution succeeds.
   - Per-user CLI supports `--device` + `--io-profile` and explicit IO bandwidth/IOPS flags.
-  - Remaining gap: richer auto-detection/scheduler-aware policy expansion remains TODO.
+  - Remaining gap: richer scheduler-aware auto-detection policy remains TODO.
 
 - **NOFILE limits**: Implemented.
   - Policy keys `limitNoFileSoft` / `limitNoFileHard` are consumed during system prep.
@@ -107,7 +108,7 @@ Inspect and apply limits per user:
 
 - User creation applies defaults automatically:
   - `php /scripts/util/userConfigCgroup.php USER --apply --defaults`
-  - #TODO: extend to apply device‑specific IO throttles when policy defines targets.
+  - Policy `mounts` entries are applied as per-device IO limits/weights when their backing devices can be resolved.
 - User termination clears slice overrides:
   - `systemctl revert user-UID.slice` before deleting OS user data.
 

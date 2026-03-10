@@ -52,6 +52,7 @@ class Manager
         $device = '';
         $ioProfile = '';
         $hasIoFlag = false;
+        $policyIoPairs = [];
 
         // Flag parsing
         foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile','--cpu-quota-percent'] as $k) {
@@ -70,7 +71,7 @@ class Manager
 
         // Defaults policy
         if (in_array('--defaults', $flags, true)) {
-            $this->applyDefaults($opt);
+            $policyIoPairs = $this->applyDefaults($opt);
         }
 
         if ($wantConfig) $this->showConfig($slice);
@@ -110,6 +111,11 @@ class Manager
         // IO Profile
         if ($ioProfile !== '' && $devResolved !== '') {
             $this->applyIoProfile($ioProfile, $devResolved, $opt, $ioPairs);
+        }
+
+        // Policy mount defaults apply only when no explicit IO input is given.
+        if (!empty($policyIoPairs) && !$hasIoFlag && $ioProfile === '' && $device === '') {
+            $ioPairs = array_merge($ioPairs, $policyIoPairs);
         }
 
         // Default view if no actions
@@ -254,7 +260,7 @@ class Manager
         return $derived;
     }
 
-    private function applyDefaults(array &$opt): void
+    private function applyDefaults(array &$opt): array
     {
         $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
         $policyFile = $cfgDir.'/cgroup.policy.php';
@@ -279,6 +285,76 @@ class Manager
         if (!isset($opt['memory-max']) && isset($policy['memoryMaxMiB']) && is_numeric($policy['memoryMaxMiB'])) {
             $opt['memory-max'] = (string)$policy['memoryMaxMiB'];
         }
+
+        return $this->buildPolicyIoPairs($policy);
+    }
+
+    /**
+     * Expand policy mount defaults into systemd IO property pairs.
+     *
+     * Each mount entry may define ioWeight, read/write bandwidth, and
+     * read/write IOPS. Duplicate property+device pairs keep the latest value.
+     */
+    private function buildPolicyIoPairs(array $policy): array
+    {
+        if (!isset($policy['mounts']) || !is_array($policy['mounts'])) {
+            return [];
+        }
+
+        $pairsByKey = [];
+        foreach ($policy['mounts'] as $mountPath => $mountPolicy) {
+            if (!is_string($mountPath) || $mountPath === '' || !is_array($mountPolicy)) {
+                continue;
+            }
+
+            $devicePath = '';
+            if (strpos($mountPath, '/dev/') === 0) {
+                $devicePath = trim($mountPath);
+            } else {
+                $devicePath = trim($this->sys->resolveDevice($mountPath));
+            }
+
+            if ($devicePath === '') {
+                continue;
+            }
+
+            if (isset($mountPolicy['ioWeight']) && is_numeric($mountPolicy['ioWeight'])) {
+                $ioWeight = (int)$mountPolicy['ioWeight'];
+                if ($ioWeight > 0) {
+                    $pairsByKey['IODeviceWeight|'.$devicePath] = 'IODeviceWeight='.$devicePath.' '.$ioWeight;
+                }
+            }
+
+            foreach ([
+                ['readBw', 'IOReadBandwidthMax'],
+                ['writeBw', 'IOWriteBandwidthMax'],
+            ] as $mapping) {
+                $policyKey = $mapping[0];
+                $propertyName = $mapping[1];
+                if (isset($mountPolicy[$policyKey]) && is_string($mountPolicy[$policyKey])) {
+                    $limitValue = trim($mountPolicy[$policyKey]);
+                    if ($limitValue !== '') {
+                        $pairsByKey[$propertyName.'|'.$devicePath] = $propertyName.'='.$devicePath.' '.$limitValue;
+                    }
+                }
+            }
+
+            foreach ([
+                ['readIops', 'IOReadIOPSMax'],
+                ['writeIops', 'IOWriteIOPSMax'],
+            ] as $mapping) {
+                $policyKey = $mapping[0];
+                $propertyName = $mapping[1];
+                if (isset($mountPolicy[$policyKey]) && is_numeric($mountPolicy[$policyKey])) {
+                    $limitValue = (int)$mountPolicy[$policyKey];
+                    if ($limitValue > 0) {
+                        $pairsByKey[$propertyName.'|'.$devicePath] = $propertyName.'='.$devicePath.' '.$limitValue;
+                    }
+                }
+            }
+        }
+
+        return array_values($pairsByKey);
     }
 
     private function expandProfiles(array &$opt): void
