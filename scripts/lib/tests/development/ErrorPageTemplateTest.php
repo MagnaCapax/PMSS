@@ -3,11 +3,27 @@ namespace PMSS\Tests;
 
 class ErrorPageTemplateTest extends TestCase
 {
+    public function testNginxTemplateDefinesAuthenticationErrorPageInHttpAndHttpsServers(): void
+    {
+        $contents = $this->readFile('etc/seedbox/config/template.nginx-site-default');
+        $this->assertEquals(2, substr_count($contents, 'error_page 401 /error-401.html;'));
+        $this->assertEquals(2, substr_count($contents, 'location = /error-401.html {'));
+    }
+
     public function testNginxTemplateDefinesForbiddenErrorPageInHttpAndHttpsServers(): void
     {
         $contents = $this->readFile('etc/seedbox/config/template.nginx-site-default');
         $this->assertEquals(2, substr_count($contents, 'error_page 403 /error-403.html;'));
         $this->assertEquals(2, substr_count($contents, 'location = /error-403.html {'));
+    }
+
+    public function testAuthenticationErrorPageIncludesHelpfulTextAndHomeLink(): void
+    {
+        $contents = $this->readFile('var/www/error-401.html');
+        $this->assertStringContainsString('401 - Authentication Required', $contents);
+        $this->assertStringContainsString('Enter your PMSS username', $contents);
+        $this->assertStringContainsString('refresh this page to try again', $contents);
+        $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
     public function testForbiddenErrorPageIncludesFriendlyTextAndHomeLink(): void

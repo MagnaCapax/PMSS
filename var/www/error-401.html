@@ -3,17 +3,32 @@
   <br />
   <div class="content-container">
     <div class="error-description">
-      <p>You tried to reach a protected area without valid credentials.</p>
       <p>
-        - Check that you typed the correct username and password.<br />
-        - If your account was suspended or expired, please contact support.<br />
-        - Reopen the application from the Control Panel if the session timed out.
+        This area is protected by account authentication. Enter your PMSS username
+        and password when your browser prompts for credentials.
       </p>
 
       <p>
-        Need help? Visit our support portal or open a ticket so we can restore
-        access.
+        If the prompt was dismissed, refresh this page to try again.
       </p>
+
+      <p>
+        If login keeps failing, confirm your account password and check that the
+        account is active.
+      </p>
+
+      <p>
+        Need help? Open a support ticket and include the username and service name.
+      </p>
+      <p><a href="/">Return to the main page.</a></p>
     </div>
   </div>
 </div>
+
+<script>
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.type = 'text/css';
+  link.href = '/css/error-styles.css';
+  document.head.appendChild(link);
+</script>
