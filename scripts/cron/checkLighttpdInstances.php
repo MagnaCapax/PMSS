@@ -15,6 +15,7 @@ $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
 }
+require_once __DIR__.'/../lib/lighttpd/watchdog.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 // Get & parse users list (optionally for a single user).
@@ -91,6 +92,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     $instancesLighttpd = shell_exec("pgrep -u {$thisUser} lighttpd");
     $instancesPhpCgi = shell_exec("pgrep -u {$thisUser} php-cgi");
     $socketError = false;
+    $homeDir = "/home/{$thisUser}";
+    $socketPaths = pmssLighttpdWatchdogSocketPaths($homeDir, $homeDir.'/.lighttpd.conf');
 
     // If socket connection fails or no php-cgi instance is found
     if (empty($instancesPhpCgi)) {        
@@ -100,16 +103,18 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 
     }
 
-    // Connect to each php-cgi socket to verify it responds.
-    // Increment the loop bound if php.max-procs is greater than one.
-    for ($i = 0; $i < 1; $i++) {
-        $socket = fsockopen("unix:///home/{$thisUser}/.lighttpd/php.socket-$i", 0, $errno, $errstr, 5);
+    // Probe every expected php-cgi socket so partial worker crashes become
+    // visible instead of leaving the user with intermittent 502 responses.
+    foreach ($socketPaths as $socketPath) {
+        $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, 5);
         if (!$socket or $errno or $errstr) {        
-            echo "Error when attempting to connect to socket /home/{$thisUser}/.lighttpd/php.socket-$i: {$errno}, {$errstr}\n";
+            echo "Error when attempting to connect to socket {$socketPath}: {$errno}, {$errstr}\n";
             echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";            
             $socketError = true;
             break;
         }
+
+        fclose($socket);
     }
     if ($socketError == true) { $restartLighttpd($thisUser); continue; }
 
