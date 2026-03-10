@@ -22,7 +22,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Debian 11 (bullseye) and Debian 10 (buster): .NET 8 supported; Radarr GLIBC fallback:
   - If GLIBC < 2.33 on x64, Radarr is pinned to `v5.10.4.9218` linux‑core build to avoid sqlite/GLIBC loader errors. This matches observed errors like `GLIBC_2.33 not found`, `e_sqlite3.so missing` from newer Radarr builds.
 
-Note: Jellyfin benefits from recent ffmpeg for hardware transcoding. Today the script uses distro ffmpeg; upgrading ffmpeg should be an explicit, opt‑in workflow outside this installer due to maintenance and security considerations.
+Note: Jellyfin benefits from recent ffmpeg for hardware transcoding. Today the script uses distro ffmpeg; upgrading ffmpeg should be an explicit, opt‑in workflow outside this installer due to maintenance and security considerations. For an Intel/AMD setup walkthrough, see `docs/hardware-transcoding.md`.
 
 ## Prerequisites
 - `ss` (from iproute2), `curl` or `wget`, `tar`, `tmux`
@@ -153,7 +153,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Check `~/.install-media-stack.log` for a full run transcript.
 - Use `--dry-run` to verify endpoint reachability and planned actions.
 - If Servarr apps fail to start on Debian 11 due to sqlite/GLIBC errors, confirm Radarr pinning occurred or pass `--radarr-version=v5.10.4.9218`.
-- If Jellyfin’s transcoding fails, verify ffmpeg availability and drivers. Newer ffmpeg builds may be required; this script intentionally leaves that as a separate, explicit task.
+- If Jellyfin’s transcoding fails, verify ffmpeg availability and drivers. Newer ffmpeg builds may be required; this script intentionally leaves that as a separate, explicit task. Follow `docs/hardware-transcoding.md` for the full validation and troubleshooting checklist.
 
 ## FFmpeg Options (Userland)
 

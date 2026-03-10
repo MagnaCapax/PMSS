@@ -22,7 +22,8 @@ You can find information for common tasks such as adding/creating/suspending use
 
 For a quick maintenance checklist covering dry-runs, structured logging and
 tests, see `docs/maintenance.md`. WireGuard usage notes are available in
-`docs/wireguard.md`.
+`docs/wireguard.md`. Hardware acceleration setup for FFmpeg/Jellyfin is
+documented in `docs/hardware-transcoding.md`.
 
 ### Contributing & Decisions
 
