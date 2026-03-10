@@ -60,6 +60,20 @@ Current state for the cgroup policy extension TODOs:
 - **Network IO shaping hints in cgroup policy**: Not implemented yet.
   - Network shaping remains managed by FireQOS configuration and user traffic limit files, not cgroup policy keys.
 
+### Pending backlog contracts (#121)
+
+The remaining extension work is tracked as explicit backlog contracts so future
+changes stay incremental and reviewable:
+
+| Extension | Current state | Next contract before implementation | Guardrail to preserve |
+| --- | --- | --- | --- |
+| Per-user burst allowances | Pending | Define policy schema + expiry semantics for temporary `MemoryMax` raise in one ADR/issue step | Burst must be explicit opt-in and always time-bounded |
+| Network shaping hints in policy | Pending | Define policy-to-FireQOS mapping and conflict resolution with existing traffic limit files | Existing FireQOS defaults remain authoritative until mapping is proven |
+| Scheduler-aware IO auto-policy | Partially pending | Keep current mount-based IO controls; add scheduler detection only as additive hints | Never remove explicit per-device mounts policy behavior |
+
+Reference point: `etc/seedbox/config/cgroup.policy.php` contains the live
+extension TODO markers for these pending items.
+
 ## Per‑User Utility
 
 Inspect and apply limits per user:

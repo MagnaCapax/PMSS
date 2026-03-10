@@ -16,6 +16,8 @@ return [
     'memoryMaxMiB'     => 750,    // hard cap ~+50% over High (still capped at 95% of system RAM)
 
     // Optional per-user file descriptor caps (via user@.service LimitNOFILE).
+    // This path is implemented: when both values are valid integers, PMSS
+    // installs /etc/systemd/system/user@.service.d/20-pmss-limits.conf.
     // 'limitNoFileSoft' => 8192,
     // 'limitNoFileHard' => 16384,
 
@@ -32,10 +34,14 @@ return [
             'nvme' => ['ioWeight'=>200],
             'bulk' => ['ioWeight'=>500, 'cpuWeight'=>300, 'tasksMax'=>8192],
         ],
-        // #TODO: cpu/mem/tasks profiles can be extended here if needed (GH #121)
+        // #TODO Pending extension: additional cpu/mem/tasks profile families
+        // (tracked in docs/cgroup.md Extension Status Matrix, GH #121).
     ],
 
-    // #TODO Implement: per-device IO scheduling hints (e.g., BFQ vs NVMe), enabling IOWeight only when effective (GH #121)
-    // #TODO Implement: per-user burst allowances (temporary MemoryMax raise for a time-boxed operation) (GH #121)
-    // #TODO Implement: network IO shaping hints per user (integrated with existing QoS) for fair sharing (GH #121)
+    // #TODO Pending extension: scheduler-aware IO auto-policy. Mount-based IO
+    // controls already work today via the 'mounts' map above.
+    // #TODO Pending extension: per-user burst allowances (temporary MemoryMax
+    // raise for a time-boxed operation).
+    // #TODO Pending extension: network shaping hints in cgroup policy
+    // (integration point with existing QoS/FireQOS remains to be designed).
 ];
