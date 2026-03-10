@@ -434,6 +434,7 @@ pmssUpdateStep2RunClassifiedCallable('Configuring web stack', 'pmssConfigureWebS
 // Configure OpenVPN via dedicated utility for better logging/observability.
 runStep('Configuring OpenVPN', 'php /scripts/util/configureOpenvpn.php');
 runStep('Configuring WireGuard', 'php /scripts/util/wireguardConfigure.php');
+runStep('Configuring netconsole', 'php /scripts/util/netconsoleConfigure.php');
 
 // Load application installers automatically (sorted for deterministic order),
 // but skip legacy app scripts that are superseded by dedicated utilities or
