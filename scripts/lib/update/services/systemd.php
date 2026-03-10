@@ -71,15 +71,15 @@ if (!function_exists('pmssStopDisableMaskSystemdUnit')) {
             $actions[] = ['label' => "Masking {$label} system service", 'command' => 'systemctl mask %s || true'];
         }
 
+        $skipReason = '';
         if (!$dryRun && !is_dir('/run/systemd/system')) {
-            foreach ($actions as $action) {
-                pmssLogStatus('SKIP', $action['label'].' (systemd unavailable)');
-            }
-            return;
+            $skipReason = 'systemd unavailable';
+        } elseif (!$dryRun && function_exists('pmssSystemdUnitExists') && !pmssSystemdUnitExists($unit)) {
+            $skipReason = 'unit '.$unit.' missing';
         }
-        if (!$dryRun && function_exists('pmssSystemdUnitExists') && !pmssSystemdUnitExists($unit)) {
+        if ($skipReason !== '') {
             foreach ($actions as $action) {
-                pmssLogStatus('SKIP', $action['label'].' (unit '.$unit.' missing)');
+                pmssLogStatus('SKIP', $action['label'].' ('.$skipReason.')');
             }
             return;
         }

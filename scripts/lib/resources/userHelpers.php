@@ -37,8 +37,7 @@ function pmssResourceLogIsValidUser(string $user): bool
     ) {
         return false;
     }
-    if ($user === 'www-data') {
-        return true;
-    }
-    return !function_exists('pmssValidateUsername') || pmssValidateUsername($user);
+    return $user === 'www-data'
+        || !function_exists('pmssValidateUsername')
+        || pmssValidateUsername($user);
 }

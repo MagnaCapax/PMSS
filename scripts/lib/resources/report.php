@@ -105,13 +105,8 @@ function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing
         return $payload;
     };
 
-    $payloads = [];
-    foreach ($rows as $sourceKey => $source) {
-        $payloads[$sourceKey] = $buildPayload($source);
-    }
-
     return [
-        'users' => $payloads,
+        'users' => array_map($buildPayload, $rows),
         'totals' => $buildPayload($totals),
         'missing' => $missing,
     ];
