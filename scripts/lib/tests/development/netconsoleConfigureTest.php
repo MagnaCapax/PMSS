@@ -5,6 +5,38 @@ require_once dirname(__DIR__, 2).'/netconsole.php';
 
 class NetconsoleConfigureTest extends TestCase
 {
+    public function testModuleLoadedEnvOverrideHandlesZero(): void
+    {
+        $previous = getenv('PMSS_NETCONSOLE_MODULE_LOADED');
+        putenv('PMSS_NETCONSOLE_MODULE_LOADED=0');
+
+        try {
+            $this->assertTrue(!\pmssNetconsoleModuleLoaded(), 'expected env override 0 to force unloaded state');
+        } finally {
+            if ($previous === false) {
+                putenv('PMSS_NETCONSOLE_MODULE_LOADED');
+            } else {
+                putenv('PMSS_NETCONSOLE_MODULE_LOADED='.$previous);
+            }
+        }
+    }
+
+    public function testModuleLoadedEnvOverrideHandlesOne(): void
+    {
+        $previous = getenv('PMSS_NETCONSOLE_MODULE_LOADED');
+        putenv('PMSS_NETCONSOLE_MODULE_LOADED=1');
+
+        try {
+            $this->assertTrue(\pmssNetconsoleModuleLoaded(), 'expected env override 1 to force loaded state');
+        } finally {
+            if ($previous === false) {
+                putenv('PMSS_NETCONSOLE_MODULE_LOADED');
+            } else {
+                putenv('PMSS_NETCONSOLE_MODULE_LOADED='.$previous);
+            }
+        }
+    }
+
     public function testParsesValidSpec(): void
     {
         $target = \pmssNetconsoleTargetFromSpec('6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');

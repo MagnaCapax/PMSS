@@ -16,17 +16,13 @@
 require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 
-$readProperty = static function (string $property): string {
-    $output = trim((string) @shell_exec('systemctl show user-0.slice -p '.$property.' 2>/dev/null'));
-    $separatorPos = strpos($output, '=');
-    return $separatorPos !== false ? substr($output, $separatorPos + 1) : $output;
-};
-
-$fixes=[];
+$fixes = [];
 foreach (['MemoryHigh', 'MemoryMax', 'TasksMax'] as $prop) {
-    $value = $readProperty($prop);
+    $output = trim((string) @shell_exec('systemctl show user-0.slice -p '.$prop.' 2>/dev/null'));
+    $separatorPos = strpos($output, '=');
+    $value = $separatorPos !== false ? substr($output, $separatorPos + 1) : $output;
     if ($value !== '' && strtolower($value) !== 'infinity') {
-        $fixes[$prop] = 'infinity';
+        $fixes[] = $prop.'=infinity';
     }
 }
 
@@ -35,9 +31,7 @@ if ($fixes) {
     if (!defined('PMSS_TEST_MODE') && getenv('PMSS_TEST_MODE') !== '1') {
         requireRoot();
     }
-    $pairs = [];
-    foreach ($fixes as $property => $value) { $pairs[] = $property.'='.$value; }
-    runStep('Unlimiting root user slice', 'systemctl set-property user-0.slice '.implode(' ', $pairs));
+    runStep('Unlimiting root user slice', 'systemctl set-property user-0.slice '.implode(' ', $fixes));
 } else {
     logmsg('[OK] Root slice already unlimited');
 }

@@ -29,12 +29,8 @@ if (!function_exists('pmssSystemdUserManagerNoFileLimitInstall')) {
             return;
         }
 
-        if ($soft === 0) {
-            $soft = $hard;
-        }
-        if ($hard === 0 || $hard < $soft) {
-            $hard = $soft;
-        }
+        $soft = $soft ?: $hard;
+        $hard = max($soft, $hard);
 
         $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
         if (!is_dir($dropDir) && !@mkdir($dropDir, 0755, true)) {

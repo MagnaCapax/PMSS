@@ -25,11 +25,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         'cpu' => false,
         'ram_hours' => false,
     ];
-    $totals = [
-        'memory_current' => 0.0,
-        'memory_avg_month' => 0.0,
-        'tasks_current' => 0.0,
-    ];
+    $totals = array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
     foreach ($windowMetricConfig as $metric => $_allowMissing) {
         $totals[$metric] = array_fill_keys($windows, 0.0);
     }
@@ -88,12 +84,9 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
-    $windowMetricKeys = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'];
+    $windowMetricKeys = array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'], true);
     $buildPayload = static function (array $source) use ($windowMetricKeys): array {
-        $payload = [];
-        foreach ($windowMetricKeys as $metric) {
-            $payload[$metric] = $source[$metric];
-        }
+        $payload = array_intersect_key($source, $windowMetricKeys);
         $payload['memory'] = [
             'current' => $source['memory_current'],
             'avg_month' => $source['memory_avg_month'],

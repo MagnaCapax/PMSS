@@ -34,11 +34,7 @@ function pmssNetconsoleTargetFromSpec(string $spec): ?array
 function pmssNetconsoleModuleLoaded(): bool
 {
     $override = getenv('PMSS_NETCONSOLE_MODULE_LOADED');
-    if ($override !== false && $override !== '') {
-        return $override === '1';
-    }
-
-    return is_dir('/sys/module/netconsole');
+    return ($override !== false && $override !== '') ? $override === '1' : is_dir('/sys/module/netconsole');
 }
 
 /**
@@ -80,13 +76,12 @@ function pmssNetconsoleTargetIsReachable(array $target, callable $log, ?callable
         .' | grep -Fqi '.escapeshellarg($target['targetMac'])
     );
 
-    $rc = (int) call_user_func($runner, 'Verifying netconsole target reachability', $command);
-    if ($rc !== 0) {
-        $log('[WARN] Netconsole target '.$target['targetIp'].'/'.$target['targetMac'].' is not reachable via '.$target['interface']);
-        return false;
+    if ((int) call_user_func($runner, 'Verifying netconsole target reachability', $command) === 0) {
+        return true;
     }
 
-    return true;
+    $log('[WARN] Netconsole target '.$target['targetIp'].'/'.$target['targetMac'].' is not reachable via '.$target['interface']);
+    return false;
 }
 
 /**
@@ -104,8 +99,7 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    $target = pmssNetconsoleTargetFromSpec($spec);
-    if ($target === null) {
+    if (($target = pmssNetconsoleTargetFromSpec($spec)) === null) {
         $log('[WARN] Invalid netconsole syntax in '.$configPath);
         return;
     }
