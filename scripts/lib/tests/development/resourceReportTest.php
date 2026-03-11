@@ -170,6 +170,30 @@ class ResourceReportTest extends TestCase
         $this->assertEquals(18.0, $payload['totals']['tasks']['current']);
     }
 
+    public function testBuildJsonPayloadDropsUnexpectedSourceKeys(): void
+    {
+        $rows = [
+            'alice' => [
+                'io_read' => ['month' => 1.0],
+                'io_write' => ['month' => 2.0],
+                'io_read_ops' => ['month' => 3.0],
+                'io_write_ops' => ['month' => 4.0],
+                'cpu' => ['month' => 5.0],
+                'memory_current' => 6.0,
+                'memory_avg_month' => 7.0,
+                'ram_hours' => ['month' => 8.0],
+                'tasks_current' => 9.0,
+                'ignored_field' => ['month' => 999.0],
+            ],
+        ];
+        $totals = $rows['alice'] + ['ignored_total' => 10.0];
+
+        $payload = \pmssResourceBuildJsonPayload($rows, $totals, []);
+
+        $this->assertTrue(!isset($payload['users']['alice']['ignored_field']));
+        $this->assertTrue(!isset($payload['totals']['ignored_total']));
+    }
+
     private function writeUserData(string $user, array $data): void
     {
         @file_put_contents($this->statsDir.'/'.$user, serialize($data));

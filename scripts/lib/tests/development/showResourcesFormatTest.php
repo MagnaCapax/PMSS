@@ -27,4 +27,9 @@ class ShowResourcesFormatTest extends TestCase
     {
         $this->assertEquals('2.00', \pmssResourceFormatOpsPerSecond(7200, 3600));
     }
+
+    public function testFormatOpsPerSecondZeroWindow(): void
+    {
+        $this->assertEquals('0.00', \pmssResourceFormatOpsPerSecond(7200, 0));
+    }
 }

@@ -13,10 +13,10 @@ function pmssResourceFormatBytes(float $bytes): string
         [1024 * 1024 * 1024, 'GiB'],
         [1024 * 1024, 'MiB'],
     ];
-    foreach ($steps as $step) {
-        $threshold = (float) $step[0];
+    foreach ($steps as list($threshold, $unit)) {
+        $threshold = (float) $threshold;
         if ($bytes >= $threshold) {
-            return number_format($bytes / $threshold, 2).' '.$step[1];
+            return number_format($bytes / $threshold, 2).' '.$unit;
         }
     }
 
@@ -25,8 +25,7 @@ function pmssResourceFormatBytes(float $bytes): string
 
 function pmssResourceFormatCpuHours(float $cpuNsec): string
 {
-    $hours = $cpuNsec / 1000000000 / 3600;
-    return number_format($hours, 1).' hrs';
+    return number_format($cpuNsec / 1000000000 / 3600, 1).' hrs';
 }
 
 function pmssResourceFormatRamHours(float $ramHours): string
@@ -37,8 +36,5 @@ function pmssResourceFormatRamHours(float $ramHours): string
 
 function pmssResourceFormatOpsPerSecond(float $ops, int $windowSeconds): string
 {
-    if ($windowSeconds <= 0) {
-        return '0.00';
-    }
-    return number_format($ops / $windowSeconds, 2);
+    return ($windowSeconds <= 0) ? '0.00' : number_format($ops / $windowSeconds, 2);
 }

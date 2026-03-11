@@ -42,11 +42,12 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $selected = $windowZeros;
             $rawMetric = $data[$metric]['raw'] ?? [];
             foreach ($windows as $label) {
-                if (!isset($rawMetric[$label]) && !$allowMissing) {
+                $value = $rawMetric[$label] ?? null;
+                if ($value === null && !$allowMissing) {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }
-                $selected[$label] = isset($rawMetric[$label]) ? (float) $rawMetric[$label] : 0.0;
+                $selected[$label] = (float) ($value ?? 0.0);
             }
             $windowMetrics[$metric] = $selected;
         }
@@ -80,18 +81,20 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
-    $windowMetricKeys = array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'], true);
-    $buildPayload = static function (array $source) use ($windowMetricKeys): array {
-        $payload = array_intersect_key($source, $windowMetricKeys);
-        $payload['memory'] = [
-            'current' => $source['memory_current'],
-            'avg_month' => $source['memory_avg_month'],
+    $buildPayload = static function (array $source): array {
+        return [
+            'io_read' => $source['io_read'],
+            'io_write' => $source['io_write'],
+            'io_read_ops' => $source['io_read_ops'],
+            'io_write_ops' => $source['io_write_ops'],
+            'cpu' => $source['cpu'],
+            'memory' => [
+                'current' => $source['memory_current'],
+                'avg_month' => $source['memory_avg_month'],
+            ],
+            'ram_hours' => $source['ram_hours'],
+            'tasks' => ['current' => $source['tasks_current']],
         ];
-        $payload['ram_hours'] = $source['ram_hours'];
-        $payload['tasks'] = [
-            'current' => $source['tasks_current'],
-        ];
-        return $payload;
     };
 
     return [
