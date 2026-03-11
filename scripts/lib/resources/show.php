@@ -8,7 +8,7 @@
 
 require_once __DIR__.'/report.php';
 require_once __DIR__.'/showFormat.php';
-require_once __DIR__.'/log.php';
+require_once __DIR__.'/userHelpers.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 
 function pmssShowResourcesMain(array $argv): int
@@ -31,8 +31,7 @@ function pmssShowResourcesMain(array $argv): int
     $showMissing = isset($options['show-missing']);
     $userFilter = isset($options['user']) ? trim((string) $options['user']) : null;
 
-    $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
-    $statsDir = $runtimeDir.'/resourceStats';
+    $statsDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/').'/resourceStats';
 
     if ($userFilter !== null && $userFilter !== '') {
         if (!pmssResourceLogIsValidUser($userFilter)) {
@@ -59,10 +58,7 @@ function pmssShowResourcesMain(array $argv): int
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
     }
 
-    $report = pmssResourceBuildReport($statsDir, $users);
-    $rows = $report['rows'];
-    $missingStats = $report['missing'];
-    $totals = $report['totals'];
+    ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
     if ($asJson) {
         echo json_encode(pmssResourceBuildJsonPayload($rows, $totals, $missingStats))."\n";

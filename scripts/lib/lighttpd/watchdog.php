@@ -40,7 +40,5 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
         return [$baseSocketPath.($maxProcs === 1 ? '' : '-0')];
     }
 
-    return array_map(static function ($index) use ($baseSocketPath) {
-        return $baseSocketPath.'-'.$index;
-    }, range(0, $maxProcs - 1));
+    return array_map(static function ($index) use ($baseSocketPath) { return $baseSocketPath.'-'.$index; }, range(0, $maxProcs - 1));
 }

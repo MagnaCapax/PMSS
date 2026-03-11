@@ -94,8 +94,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     }
 
     $previousState = $state;
-    $state = [];
-    $delta = [];
+    $state = $delta = [];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
         $currentValue = (int) $counters[$field];
         $previousValue = isset($previousState[$field]) ? (int) $previousState[$field] : null;
