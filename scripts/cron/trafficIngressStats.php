@@ -7,7 +7,6 @@
  * @author PMSS Team
  */
 
-require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/traffic/processor.php';
 
 $paths = [

@@ -9,7 +9,6 @@
  * @license GPL-3.0-only
  */
 
-require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/traffic/processor.php';
 
 $processor = new TrafficStatsProcessor(new trafficStatistics());

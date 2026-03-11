@@ -71,9 +71,7 @@ class ResourceStatsProcessor
     {
         $script = escapeshellarg($scriptPath);
         foreach ($users as $user) {
-            $userArg = escapeshellarg($user);
-            $command = "nohup {$script} {$userArg} >> /var/log/pmss/resourceStats.log 2>&1 &";
-            passthru($command);
+            passthru("nohup {$script} ".escapeshellarg($user)." >> /var/log/pmss/resourceStats.log 2>&1 &");
         }
     }
 

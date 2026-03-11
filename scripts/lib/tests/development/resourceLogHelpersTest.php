@@ -7,6 +7,38 @@ require_once dirname(__DIR__, 2).'/userLifecycle.php';
 
 class ResourceLogHelpersTest extends TestCase
 {
+    private function withFakeSystemctl(array $outputLines, callable $callback): void
+    {
+        $root = $this->makeRoot();
+        $binDir = $root.'/bin';
+        @mkdir($binDir, 0755, true);
+
+        $scriptPath = $binDir.'/systemctl';
+        $script = "#!/bin/sh\n";
+        foreach ($outputLines as $line) {
+            $script .= "echo '".str_replace("'", "'\\''", $line)."'\n";
+        }
+        @file_put_contents($scriptPath, $script);
+        @chmod($scriptPath, 0755);
+
+        $originalPath = getenv('PATH');
+        $pathPrefix = ($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '';
+        putenv('PATH='.$binDir.$pathPrefix);
+
+        try {
+            $callback();
+        } finally {
+            if ($originalPath === false) {
+                putenv('PATH');
+            } else {
+                putenv('PATH='.$originalPath);
+            }
+            @unlink($scriptPath);
+            @rmdir($binDir);
+            @rmdir($root);
+        }
+    }
+
     private function makeRoot(): string
     {
         $root = sys_get_temp_dir().'/pmss-resource-'.bin2hex(random_bytes(4));
@@ -64,6 +96,54 @@ class ResourceLogHelpersTest extends TestCase
     public function testUserValidationRejectsUppercase(): void
     {
         $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));
+    }
+
+    public function testReadCountersParsesSystemctlOutput(): void
+    {
+        $this->withFakeSystemctl([
+            'IOReadBytes=11',
+            'IOWriteBytes=22',
+            'IOReadOperations=33',
+            'IOWriteOperations=44',
+            'CPUUsageNSec=55',
+            'MemoryCurrent=66',
+            'TasksCurrent=77',
+        ], function (): void {
+            $counters = \pmssResourceLogReadCounters(1000);
+            $this->assertTrue(is_array($counters));
+            $this->assertEquals(11, $counters['io_read']);
+            $this->assertEquals(22, $counters['io_write']);
+            $this->assertEquals(33, $counters['io_read_ops']);
+            $this->assertEquals(44, $counters['io_write_ops']);
+            $this->assertEquals(55, $counters['cpu_nsec']);
+            $this->assertEquals(66, $counters['memory']);
+            $this->assertEquals(77, $counters['tasks']);
+        });
+    }
+
+    public function testReadCountersReturnsNullWhenRequiredFieldMissing(): void
+    {
+        $this->withFakeSystemctl([
+            'IOReadBytes=11',
+            'IOWriteBytes=22',
+            'CPUUsageNSec=55',
+            'MemoryCurrent=66',
+        ], function (): void {
+            $this->assertTrue(\pmssResourceLogReadCounters(1000) === null);
+        });
+    }
+
+    public function testReadCountersReturnsNullWhenRequiredValueIsNotNumeric(): void
+    {
+        $this->withFakeSystemctl([
+            'IOReadBytes=11',
+            'IOWriteBytes=22',
+            'CPUUsageNSec=55',
+            'MemoryCurrent=oops',
+            'TasksCurrent=77',
+        ], function (): void {
+            $this->assertTrue(\pmssResourceLogReadCounters(1000) === null);
+        });
     }
 
     public function testUpdateStateCreatesStateWhenMissing(): void

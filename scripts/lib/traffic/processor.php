@@ -77,9 +77,7 @@ class TrafficStatsProcessor
     {
         $script = escapeshellarg($scriptPath);
         foreach ($users as $user) {
-            $userArg = escapeshellarg($user);
-            $command = "nohup {$script} {$userArg} >> /var/log/pmss/trafficStats.log 2>&1 &";
-            passthru($command);
+            passthru("nohup {$script} ".escapeshellarg($user)." >> /var/log/pmss/trafficStats.log 2>&1 &");
         }
     }
 

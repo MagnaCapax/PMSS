@@ -28,9 +28,6 @@ function pmssResourceLogEnsureDir(string $path, int $mode): bool
  */
 function pmssResourceLogReadCounters(int $uid): ?array
 {
-    if (trim((string) @shell_exec('command -v systemctl 2>/dev/null')) === '') {
-        return null;
-    }
     $unit = sprintf('user-%d.slice', $uid);
     $cmd = 'systemctl show '.escapeshellarg($unit)
         .' -p IOReadBytes -p IOWriteBytes -p IOReadOperations -p IOWriteOperations -p CPUUsageNSec -p MemoryCurrent -p TasksCurrent';
