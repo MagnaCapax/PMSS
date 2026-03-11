@@ -22,6 +22,7 @@ echo "[agentic-issues] start: fetching open issues and invoking assistant" >&1
 #   development/agentic-issues.sh --exec 'codex exec'
 #   development/agentic-issues.sh --autocommit
 #   development/agentic-issues.sh --dry-run
+#   development/agentic-issues.sh --select-only
 
 usage() {
 	cat <<EOF
@@ -38,11 +39,13 @@ Options:
   --exec CMD      Override assistant command line
   --autocommit    Enable autocommit rules in the prompt (operator-approved)
   --dry-run       Skip GitHub API; only assemble prompt scaffolding
+  --select-only   Print selected issue numbers and exit (no assistant launch)
   -h, --help      Show this help
 
 Environment:
   PMSS_AGENTIC_DEFAULT_AGENT  Default agent when --agent is omitted
   PMSS_ISSUES_CODEX_DEBUG=1   Enable bash -x tracing
+  PMSS_ISSUES_EXCLUDE_NUMBERS Comma/space-separated issue numbers to skip
 EOF
 }
 
@@ -57,6 +60,7 @@ agent=""
 exec_cmd=""
 dry_run=0
 autocommit=0
+select_only=0
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -84,6 +88,10 @@ while [[ $# -gt 0 ]]; do
 		dry_run=1
 		shift || true
 		;;
+	--select-only)
+		select_only=1
+		shift || true
+		;;
 	-h | --help)
 		usage
 		exit 0
@@ -97,6 +105,11 @@ done
 
 if [[ -z "$agent" ]]; then
 	agent="$default_agent"
+fi
+
+if [[ ! "$max_issues" =~ ^[0-9]+$ ]] || [[ "$max_issues" -lt 1 ]]; then
+	echo "[agentic-issues] ERROR: --max-issues must be a positive integer (got: $max_issues)" >&2
+	exit 2
 fi
 
 exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
@@ -123,22 +136,96 @@ if [[ "$issue_count" -eq 0 ]]; then
 	exit 0
 fi
 
-# Fetch open issues excluding complete-verify and wontfix labels.
-# Get basic list first, then fetch details for each.
-echo "[agentic-issues] fetching up to $max_issues open issues..." >&1
-issue_numbers=()
-while IFS= read -r num; do
-	[[ -n "$num" ]] && issue_numbers+=("$num")
-done < <(gh issue list --state open --limit "$max_issues" \
+# Fetch a larger candidate pool, then filter/prioritize down to max_issues.
+# Using --limit max_issues directly causes starvation when top N are strategic
+# meta-issues (e.g. process/architecture epics) that are repeatedly skipped.
+candidate_pool=$((max_issues * 8))
+if [[ "$candidate_pool" -lt 25 ]]; then
+	candidate_pool=25
+fi
+if [[ "$candidate_pool" -gt 100 ]]; then
+	candidate_pool=100
+fi
+echo "[agentic-issues] fetching candidate pool (limit ${candidate_pool}, target ${max_issues})..." >&1
+
+exclude_numbers_csv=$(printf '%s' "${PMSS_ISSUES_EXCLUDE_NUMBERS:-}" | tr ' ' ',' | tr -s ',')
+if [[ -n "$exclude_numbers_csv" ]]; then
+	exclude_numbers_csv=",${exclude_numbers_csv#,},"
+fi
+
+issue_numbers_bug=()
+issue_numbers_security=()
+issue_numbers_stability=()
+issue_numbers_other=()
+raw_candidate_count=0
+
+has_label() {
+	local labels_csv="${1:-}"
+	local needle="${2:-}"
+	[[ ",${labels_csv}," == *",${needle},"* ]]
+}
+
+while IFS=$'\t' read -r num title labels_csv; do
+	[[ -n "$num" ]] || continue
+	raw_candidate_count=$((raw_candidate_count + 1))
+
+	if [[ -n "$exclude_numbers_csv" && "$exclude_numbers_csv" == *",${num},"* ]]; then
+		echo "[agentic-issues] SKIP #$num (excluded via PMSS_ISSUES_EXCLUDE_NUMBERS)" >&1
+		continue
+	fi
+
+	# Skip known process/meta issues that consume cycles but don't produce
+	# tractable code changes in this runner.
+	if [[ "$title" =~ ^(Playwright:|QA\ pass:|Issues\ pass:|Refactor\ prompt:|Rewrite\ issue\ selector|Ticket\ runner\ redesign:) ]]; then
+		echo "[agentic-issues] SKIP #$num (meta/process issue): $title" >&1
+		continue
+	fi
+
+	title_lc=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')
+	if [[ "$title_lc" == *"roadmap"* || "$title_lc" == *"research"* || "$title_lc" == *"investigation"* ]]; then
+		echo "[agentic-issues] SKIP #$num (research/roadmap ticket): $title" >&1
+		continue
+	fi
+
+	# Skip pure enhancement backlog by default. Keep mixed-type issues
+	# (e.g. enhancement + stability/security/bug) in scope.
+	if has_label "$labels_csv" "enhancement" \
+		&& ! has_label "$labels_csv" "bug" \
+		&& ! has_label "$labels_csv" "security" \
+		&& ! has_label "$labels_csv" "stability" \
+		&& ! has_label "$labels_csv" "performance" \
+		&& ! has_label "$labels_csv" "refactor"; then
+		echo "[agentic-issues] SKIP #$num (pure enhancement backlog): $title" >&1
+		continue
+	fi
+
+	if has_label "$labels_csv" "bug"; then
+		issue_numbers_bug+=("$num")
+	elif has_label "$labels_csv" "security"; then
+		issue_numbers_security+=("$num")
+	elif has_label "$labels_csv" "stability"; then
+		issue_numbers_stability+=("$num")
+	else
+		issue_numbers_other+=("$num")
+	fi
+done < <(gh issue list --state open --limit "$candidate_pool" \
 	--json number,title,labels \
-	--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-operator-input")) | not) | .number' 2>/dev/null || true)
+	--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-operator-input")) | not) | [(.number|tostring), .title, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null || true)
+
+if [[ ${#issue_numbers_bug[@]} -gt 0 ]]; then
+	# Throughput rule: if there are open bug tickets, focus on those first.
+	# This avoids starving concrete break/fix work behind broad enhancement backlog.
+	issue_numbers=("${issue_numbers_bug[@]}")
+else
+	issue_numbers=("${issue_numbers_security[@]}" "${issue_numbers_stability[@]}" "${issue_numbers_other[@]}")
+fi
 
 if [[ ${#issue_numbers[@]} -eq 0 ]]; then
 	echo "[agentic-issues] No tractable issues (all labeled complete-verify or wontfix). Skipping." >&1
 	exit 0
 fi
 
-echo "[agentic-issues] found ${#issue_numbers[@]} issue(s) (pre-gate): ${issue_numbers[*]}" >&1
+echo "[agentic-issues] candidates: raw=${raw_candidate_count} filtered=${#issue_numbers[@]} (pre-gate)" >&1
 
 # --- Author Gate (security: public repo, only org issues auto-approved) ---
 # MagnaCapax issues: auto-approved.
@@ -194,6 +281,9 @@ for num in "${issue_numbers[@]}"; do
 	if check_issue_approved "$num"; then
 		approved_issues+=("$num")
 		echo "[agentic-issues] GATE: #$num approved" >&1
+		if [[ ${#approved_issues[@]} -ge "$max_issues" ]]; then
+			break
+		fi
 	fi
 done
 
@@ -203,7 +293,12 @@ if [[ ${#approved_issues[@]} -eq 0 ]]; then
 fi
 
 issue_numbers=("${approved_issues[@]}")
-echo "[agentic-issues] ${#issue_numbers[@]} issue(s) passed gate: ${issue_numbers[*]}" >&1
+echo "[agentic-issues] selected ${#issue_numbers[@]} issue(s): ${issue_numbers[*]}" >&1
+
+if [[ "$select_only" == "1" ]]; then
+	printf '%s\n' "${issue_numbers[@]}"
+	exit 0
+fi
 
 # Build issue context file with details for each issue.
 # Use cryptographic nonce separators to prevent cross-issue contamination via
