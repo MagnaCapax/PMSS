@@ -11,7 +11,7 @@ Active work items are tracked in GitHub issues to avoid duplication between this
 - #114: Config backups with TTL (sshd/nginx/proftpd)
 - #115: Test hooks and hermeticity (path overrides + patterns)
 - #116: Defensive directory creation (idempotent mkdir+perms in user maintenance)
-- #111: Debian 13 (trixie) validation roadmap (experimental → supported)
+- #111: Debian 13 (trixie) validation roadmap (experimental → supported) — see `docs/dpkg-baseline.md`
 
 ## Code Quality Audits
 

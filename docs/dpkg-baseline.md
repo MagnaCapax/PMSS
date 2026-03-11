@@ -6,6 +6,51 @@ manifest.
 
 > #TODO #Debian13: capture and land `scripts/lib/update/dpkg/selections-debian13.txt` with platform sign-off.
 
+## Debian 13 Validation Roadmap (#111)
+
+Debian 13 (`trixie`) remains experimental until PMSS has both a captured dpkg
+baseline and a second-host replay validation. Use this checklist to promote it
+from experimental to supported without widening scope during the capture work.
+
+### Current guardrails
+
+- Keep the existing `template.sources.trixie` flow; do not migrate baseline
+  Debian repositories to deb822.
+- Do not change MediaArea repository handling during Debian 13 validation.
+- Never hand-edit `scripts/lib/update/dpkg/selections-debian13.txt`; capture it
+  from a converged host and land it with platform sign-off.
+
+### Validation checklist
+
+1. Provision a clean Debian 13 host and record `/etc/os-release` plus the VM or
+   bare-metal context used for the run.
+2. Capture a full interactive install/update transcript with `script`; keep
+   `/tmp/pmss-install.typescript`, `/var/log/pmss-install.log`,
+   `/var/log/pmss/update.log`, `/var/log/pmss-update.log`, and
+   `/var/log/pmss-update.jsonl` for review.
+3. Triage any package-phase or phase-2 breakage on `main` with minimal diffs
+   before capturing the baseline.
+4. Export install-only selections from the converged host, verify replay on the
+   same host, and land the resulting file as
+   `scripts/lib/update/dpkg/selections-debian13.txt`.
+5. Provision a second clean Debian 13 host, replay the captured baseline, and
+   run `/scripts/util/systemTest.php` to confirm the baseline converges.
+6. Only after the baseline exists and replay succeeds should PMSS docs and rails
+   promote Debian 13 beyond experimental.
+
+### Promotion gate
+
+Debian 13 is ready to move beyond experimental only when all of the following
+are true:
+
+- `scripts/lib/update/dpkg/selections-debian13.txt` exists and was captured from
+  a real converged host.
+- Replay on a second clean Debian 13 host succeeds without manual package drift
+  fixes.
+- The relevant docs and support matrix entries have been updated together.
+
+## Baseline Capture Procedure
+
 1. **Provision a clean host** with the target OS and run the current PMSS
    updater (`install.sh` + `/scripts/update.php git/main`). Make sure the run
    completes without package queue warnings.
