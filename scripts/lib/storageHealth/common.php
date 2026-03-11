@@ -99,17 +99,17 @@ function pmssStorageHealthRaidActivitySummaryParse(string $activityLine): array
         'speed' => '',
     ];
 
-    if (preg_match('/\b(check|resync|recovery|reshape)\b/', $activityLine, $matches) === 1) {
-        $summary['operation'] = $matches[1];
-    }
-    if (preg_match('/=\s*([0-9.]+%)/', $activityLine, $matches) === 1) {
-        $summary['progress'] = $matches[1];
-    }
-    if (preg_match('/\bfinish=([^\s]+)/', $activityLine, $matches) === 1) {
-        $summary['eta'] = $matches[1];
-    }
-    if (preg_match('/\bspeed=([^\s]+)/', $activityLine, $matches) === 1) {
-        $summary['speed'] = $matches[1];
+    foreach (
+        [
+            'operation' => '/\b(check|resync|recovery|reshape)\b/',
+            'progress' => '/=\s*([0-9.]+%)/',
+            'eta' => '/\bfinish=([^\s]+)/',
+            'speed' => '/\bspeed=([^\s]+)/',
+        ] as $key => $pattern
+    ) {
+        if (preg_match($pattern, $activityLine, $matches) === 1) {
+            $summary[$key] = $matches[1];
+        }
     }
 
     return $summary;
@@ -133,12 +133,8 @@ function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $r
     }
 
     foreach ($raidEntries as $entry) {
-        if ((string) ($entry['array'] ?? '') !== $homeArray) {
-            continue;
-        }
-
         $activityLine = trim((string) ($entry['resync'] ?? ''));
-        if ($activityLine === '') {
+        if ((string) ($entry['array'] ?? '') !== $homeArray || $activityLine === '') {
             continue;
         }
 

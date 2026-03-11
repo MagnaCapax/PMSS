@@ -17,6 +17,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $rows = [];
 
     $windows = ['month', 'week', 'day', 'hour'];
+    $windowZeros = array_fill_keys($windows, 0.0);
     $windowMetricConfig = [
         'io_read' => false,
         'io_write' => false,
@@ -27,7 +28,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     ];
     $totals = array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
     foreach ($windowMetricConfig as $metric => $_allowMissing) {
-        $totals[$metric] = array_fill_keys($windows, 0.0);
+        $totals[$metric] = $windowZeros;
     }
 
     foreach ($users as $thisUser) {
@@ -40,14 +41,12 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
         $windowMetrics = [];
         foreach ($windowMetricConfig as $metric => $allowMissing) {
-            $selected = array_fill_keys($windows, 0.0);
+            $selected = $windowZeros;
             $rawMetric = $data[$metric]['raw'] ?? [];
             foreach ($windows as $label) {
                 if (isset($rawMetric[$label])) {
                     $selected[$label] = (float) $rawMetric[$label];
-                    continue;
-                }
-                if (!$allowMissing) {
+                } elseif (!$allowMissing) {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }

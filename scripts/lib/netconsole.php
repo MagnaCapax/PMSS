@@ -89,6 +89,7 @@ function pmssNetconsoleTargetIsReachable(array $target, callable $log, ?callable
  */
 function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
 {
+    $runner = $runner ?: 'runStep';
     $configPath = pmssResolvePathFromEnv('PMSS_NETCONSOLE_CONFIG_PATH', '/etc/seedbox/config/netconsole');
     $optionsPath = pmssResolvePathFromEnv('PMSS_NETCONSOLE_MODPROBE_PATH', '/etc/modprobe.d/netconsole.conf');
     $modulesLoadPath = pmssResolvePathFromEnv('PMSS_NETCONSOLE_MODULES_LOAD_PATH', '/etc/modules-load.d/pmss-netconsole.conf');
@@ -115,7 +116,6 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    $runner = $runner ?: 'runStep';
     $reload = 'bash -lc '.escapeshellarg('modprobe -r netconsole >/dev/null 2>&1 || true; modprobe netconsole');
     $rc = (int) call_user_func($runner, 'Loading netconsole kernel module', $reload);
     if ($rc !== 0) {
