@@ -23,10 +23,7 @@ function pmssStorageHealthReadLastEntries(string $path): array
         if (!is_array($j)) {
             continue;
         }
-        $kind = (string) ($j['kind'] ?? '');
-        $id = (string) ($j['device'] ?? ($j['array'] ?? 'global'));
-        $key = $kind.'::'.$id;
-        $last[$key] = $j;
+        $last[(string) ($j['kind'] ?? '').'::'.(string) ($j['device'] ?? ($j['array'] ?? 'global'))] = $j;
     }
     fclose($fh);
     return $last;
@@ -51,12 +48,7 @@ function pmssStorageHealthMountSourceRead(string $mountPoint, ?string $mountsPat
 
     foreach ($mounts as $line) {
         $fields = preg_split('/\s+/', trim($line));
-        if (!is_array($fields) || count($fields) < 2) {
-            continue;
-        }
-
-        $candidateMount = str_replace('\\040', ' ', (string) $fields[1]);
-        if ($candidateMount !== $mountPoint) {
+        if (!is_array($fields) || count($fields) < 2 || str_replace('\\040', ' ', (string) $fields[1]) !== $mountPoint) {
             continue;
         }
 

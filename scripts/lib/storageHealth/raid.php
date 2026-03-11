@@ -11,11 +11,11 @@
  */
 function pmssStorageHealthSnapshotRaid(string $timestamp): array
 {
-    $entries = [];
     $md = @file_get_contents('/proc/mdstat');
     if ($md === false) {
-        return $entries;
+        return [];
     }
+    $entries = [];
     foreach (preg_split('/\r?\n/', $md) as $line) {
         $trimmed = trim($line);
         if (preg_match('/^(md\\d+)\\s*:\\s*(\\w+)\\s+(raid\\d)\\s+(.*)$/', $trimmed, $m)) {

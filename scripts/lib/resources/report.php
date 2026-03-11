@@ -56,13 +56,13 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         $tasksCurrent = (float) ($data['tasks']['current'] ?? 0.0);
 
         foreach ($windowMetrics as $metric => $values) {
-            foreach ($windows as $label) {
-                $totals[$metric][$label] += $values[$label];
+            foreach ($values as $label => $value) {
+                $totals[$metric][$label] += $value;
             }
         }
-        foreach (['memory_current' => $memoryCurrent, 'memory_avg_month' => $memoryAvgMonth, 'tasks_current' => $tasksCurrent] as $field => $value) {
-            $totals[$field] += $value;
-        }
+        $totals['memory_current'] += $memoryCurrent;
+        $totals['memory_avg_month'] += $memoryAvgMonth;
+        $totals['tasks_current'] += $tasksCurrent;
 
         $rows[$thisUser] = $windowMetrics + [
             'memory_current' => $memoryCurrent,
