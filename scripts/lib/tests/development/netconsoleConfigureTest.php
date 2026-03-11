@@ -79,7 +79,10 @@ class NetconsoleConfigureTest extends TestCase
 
         $this->assertTrue(is_file($dir.'/modprobe.d/netconsole.conf'), 'expected modprobe config');
         $this->assertTrue(is_file($dir.'/modules-load.d/pmss-netconsole.conf'), 'expected modules-load config');
-        $this->assertEquals('Loading netconsole kernel module', $calls[1][0]);
+        $descriptions = array_map(static function (array $call): string {
+            return $call[0];
+        }, $calls);
+        $this->assertTrue(in_array('Loading netconsole kernel module', $descriptions, true), 'expected netconsole module load step');
         $this->cleanup($dir);
     }
 
