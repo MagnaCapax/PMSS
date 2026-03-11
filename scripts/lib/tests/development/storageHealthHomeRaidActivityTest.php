@@ -125,6 +125,18 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertStringContainsString('ETA: 15.4min', $html);
     }
 
+    public function testHomeRaidNoticeHtmlOmitsMetaWhenNoDetailsProvided(): void
+    {
+        $html = \pmssStorageHealthHomeRaidNoticeHtmlBuild([
+            'array' => 'md0',
+            'operation' => 'check',
+        ]);
+
+        $this->assertStringContainsString('Home storage maintenance in progress', $html);
+        $this->assertStringContainsString('RAID array md0 is running a check', $html);
+        $this->assertTrue(strpos($html, 'pmss-raid-meta') === false, 'Meta details should be omitted when no values exist');
+    }
+
     public function testPerformanceStatusUsesCheckOperationInReason(): void
     {
         $status = \pmssStorageHealthPerformanceStatus([

@@ -76,16 +76,13 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
         return null;
     }
 
-    $resolvedPath = @realpath($mountSource);
-    if (!is_string($resolvedPath) || $resolvedPath === '') {
-        $resolvedPath = $mountSource;
+    $resolvedPath = @realpath($mountSource) ?: $mountSource;
+
+    if (preg_match('#/(md\d+)$#', $resolvedPath, $matches) !== 1) {
+        return null;
     }
 
-    if (preg_match('#/(md\d+)$#', $resolvedPath, $matches) === 1) {
-        return $matches[1];
-    }
-
-    return null;
+    return $matches[1];
 }
 
 /**
@@ -173,10 +170,9 @@ function pmssStorageHealthHomeRaidNoticeHtmlBuild($activity): string
         }
     }
 
-    $detailHtml = '';
-    if (!empty($parts)) {
-        $detailHtml = '<div class="pmss-raid-meta">'.implode(' <span aria-hidden="true">&bull;</span> ', $parts).'</div>';
-    }
+    $detailHtml = empty($parts)
+        ? ''
+        : '<div class="pmss-raid-meta">'.implode(' <span aria-hidden="true">&bull;</span> ', $parts).'</div>';
 
     $operation = htmlspecialchars((string) $activity['operation'], ENT_QUOTES, 'UTF-8');
     $arrayName = htmlspecialchars((string) $activity['array'], ENT_QUOTES, 'UTF-8');
@@ -209,8 +205,11 @@ function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
         }
 
         $operation = (string) ($entry['operation'] ?? 'resync');
-        $reason = $isRebuild ? "RAID {$arrayName} {$operation} in progress" : "RAID {$arrayName} degraded";
-        return ['status' => 'performance_limited', 'reason' => $reason, 'array' => $arrayName];
+        return [
+            'status' => 'performance_limited',
+            'reason' => $isRebuild ? "RAID {$arrayName} {$operation} in progress" : "RAID {$arrayName} degraded",
+            'array' => $arrayName,
+        ];
     }
     return null;
 }

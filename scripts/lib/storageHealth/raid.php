@@ -47,7 +47,7 @@ function pmssStorageHealthSnapshotRaid(string $timestamp): array
 
         $lastIdx = count($entries) - 1;
         $entries[$lastIdx]['severity'] = pmssStorageHealthSeverityMax((string) $entries[$lastIdx]['severity'], 'warn');
-        $entries[$lastIdx]['ok'] = ($entries[$lastIdx]['severity'] === 'ok');
+        $entries[$lastIdx]['ok'] = false;
         $entries[$lastIdx]['flags'][] = 'rebuild_in_progress';
         $entries[$lastIdx]['operation'] = $operationMatches[1];
         $entries[$lastIdx]['resync'] = $trimmed;
