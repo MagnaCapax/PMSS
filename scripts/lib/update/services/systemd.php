@@ -13,46 +13,6 @@
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../runtime/processes.php';
 
-if (!function_exists('pmssSystemdUnitStopIfPresent')) {
-    /**
-     * Stop a systemd unit only when it exists on the host.
-     */
-    function pmssSystemdUnitStopIfPresent(string $unit, string $label): void
-    {
-        pmssSystemdUnitActionIfPresent($unit, 'Stopping '.$label.' systemd service', 'stop');
-    }
-}
-
-if (!function_exists('pmssSystemdUnitRestartIfPresent')) {
-    /**
-     * Restart a systemd unit only when it exists on the host.
-     */
-    function pmssSystemdUnitRestartIfPresent(string $unit, string $label): void
-    {
-        pmssSystemdUnitActionIfPresent($unit, 'Restarting '.$label.' systemd service', 'restart');
-    }
-}
-
-if (!function_exists('pmssSystemdUnitEnableIfPresent')) {
-    /**
-     * Enable a systemd unit only when it exists on the host.
-     */
-    function pmssSystemdUnitEnableIfPresent(string $unit, string $label): void
-    {
-        pmssSystemdUnitActionIfPresent($unit, 'Enabling '.$label.' systemd service', 'enable');
-    }
-}
-
-if (!function_exists('pmssSystemdUnitDisableIfPresent')) {
-    /**
-     * Disable a systemd unit only when it exists on the host.
-     */
-    function pmssSystemdUnitDisableIfPresent(string $unit, string $label): void
-    {
-        pmssSystemdUnitActionIfPresent($unit, 'Disabling '.$label.' systemd service', 'disable');
-    }
-}
-
 if (!function_exists('pmssStopDisableMaskSystemdUnit')) {
     /**
      * Stop + disable (and optionally mask) a unit, fail-soft.
@@ -172,46 +132,6 @@ if (!function_exists('pmssSeedboxSystemServiceSpecs')) {
 
 if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
     /**
-     * Purge exim4 packages because PMSS does not rely on a system MTA.
-     *
-     * Exim can be reinstalled indirectly by distro package relationships,
-     * so this helper keeps the host converged back to a no-exim state.
-     */
-    function pmssPurgeExim4Packages(): void
-    {
-        runStep(
-            'Purging exim4 packages',
-            aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light')
-        );
-        runStep(
-            'Autoremoving orphaned packages after exim4 purge',
-            aptCmd('autoremove -y')
-        );
-    }
-
-    /**
-     * Purge stale exim4 spool files so masked MTAs cannot accumulate backlog.
-     *
-     * Deletion is intentionally limited to known exim4 spool directories and
-     * uses one command per directory for predictable logging and retries.
-     */
-    function pmssPurgeExim4SpoolFiles(): void
-    {
-        $spoolDirs = [
-            '/var/spool/exim4/input',
-            '/var/spool/exim4/msglog',
-            '/var/spool/exim4/db',
-        ];
-
-        foreach ($spoolDirs as $dir) {
-            runStep(
-                'Purging stale exim4 spool files in '.$dir,
-                'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true'
-            );
-        }
-    }
-
-    /**
      * Stop/disable known risky system-wide services.
      *
      * Note: per-user instances are started via PMSS cron/util scripts and are
@@ -227,8 +147,25 @@ if (!function_exists('pmssStopDisableMaskSeedboxSystemServices')) {
             );
         }
 
-        pmssPurgeExim4Packages();
-        pmssPurgeExim4SpoolFiles();
+        // Exim can be reinstalled indirectly by distro package relationships,
+        // so this flow keeps the host converged back to a no-exim state.
+        runStep(
+            'Purging exim4 packages',
+            aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light')
+        );
+        runStep(
+            'Autoremoving orphaned packages after exim4 purge',
+            aptCmd('autoremove -y')
+        );
+
+        // Deletion is intentionally limited to known exim4 spool directories
+        // and uses one command per directory for predictable logging/retries.
+        foreach (['/var/spool/exim4/input', '/var/spool/exim4/msglog', '/var/spool/exim4/db'] as $dir) {
+            runStep(
+                'Purging stale exim4 spool files in '.$dir,
+                'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true'
+            );
+        }
     }
 }
 
