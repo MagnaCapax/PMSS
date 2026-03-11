@@ -3,9 +3,21 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/resources/showFormat.php';
+require_once dirname(__DIR__, 2).'/resources/show.php';
 
 class ShowResourcesFormatTest extends TestCase
 {
+    public function testHelpIncludesCoreOptions(): void
+    {
+        $script = dirname(__DIR__, 3).'/showResources.php';
+        $out = (string) shell_exec('php '.escapeshellarg($script).' --help 2>&1');
+
+        $this->assertTrue(strpos($out, '--json') !== false);
+        $this->assertTrue(strpos($out, '--show-missing') !== false);
+        $this->assertTrue(strpos($out, '--user') !== false);
+        $this->assertTrue(strpos($out, '--help') !== false);
+    }
+
     public function testFormatBytesTiB(): void
     {
         $twoTiB = 2 * 1024 * 1024 * 1024 * 1024;

@@ -52,20 +52,22 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $windowMetrics[$metric] = $metricValues;
         }
 
-        $currentMemory = (float) ($data['memory']['current'] ?? 0.0);
-        $monthAverageMemory = (float) ($data['memory']['raw']['month'] ?? 0.0);
-        $currentTasks = (float) ($data['tasks']['current'] ?? 0.0);
+        $summaryMetrics = [
+            'memory_current' => (float) ($data['memory']['current'] ?? 0.0),
+            'memory_avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
+            'tasks_current' => (float) ($data['tasks']['current'] ?? 0.0),
+        ];
 
         foreach ($windowMetrics as $metric => $values) {
             foreach ($values as $label => $value) {
                 $totals[$metric][$label] += $value;
             }
         }
-        $totals['memory_current'] += $currentMemory;
-        $totals['memory_avg_month'] += $monthAverageMemory;
-        $totals['tasks_current'] += $currentTasks;
+        foreach ($summaryMetrics as $metric => $value) {
+            $totals[$metric] += $value;
+        }
 
-        $rows[$thisUser] = $windowMetrics + ['memory_current' => $currentMemory, 'memory_avg_month' => $monthAverageMemory, 'tasks_current' => $currentTasks];
+        $rows[$thisUser] = $windowMetrics + $summaryMetrics;
     }
 
     return [
@@ -78,19 +80,18 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
     $buildPayload = static function (array $source): array {
-        return [
-            'io_read' => $source['io_read'],
-            'io_write' => $source['io_write'],
-            'io_read_ops' => $source['io_read_ops'],
-            'io_write_ops' => $source['io_write_ops'],
-            'cpu' => $source['cpu'],
-            'memory' => [
-                'current' => $source['memory_current'],
-                'avg_month' => $source['memory_avg_month'],
-            ],
-            'ram_hours' => $source['ram_hours'],
-            'tasks' => ['current' => $source['tasks_current']],
+        $payload = [];
+        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu'] as $metric) {
+            $payload[$metric] = $source[$metric];
+        }
+        $payload['memory'] = [
+            'current' => $source['memory_current'],
+            'avg_month' => $source['memory_avg_month'],
         ];
+        $payload['ram_hours'] = $source['ram_hours'];
+        $payload['tasks'] = ['current' => $source['tasks_current']];
+
+        return $payload;
     };
 
     return [

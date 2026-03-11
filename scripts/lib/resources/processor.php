@@ -125,22 +125,18 @@ class ResourceStatsProcessor
         $rawTotals = $results['raw'];
 
         $data = [];
-        foreach (['io_read', 'io_write'] as $metric) {
+        foreach ([
+            'io_read' => 'formatBytesDisplay',
+            'io_write' => 'formatBytesDisplay',
+            'io_read_ops' => 'formatRoundedDisplay',
+            'io_write_ops' => 'formatRoundedDisplay',
+            'cpu' => 'formatCpuDisplay',
+        ] as $metric => $formatter) {
             $data[$metric] = [
-                'raw'     => $rawTotals[$metric],
-                'display' => $this->formatBytesDisplay($rawTotals[$metric]),
+                'raw' => $rawTotals[$metric],
+                'display' => $this->{$formatter}($rawTotals[$metric]),
             ];
         }
-        foreach (['io_read_ops', 'io_write_ops'] as $metric) {
-            $data[$metric] = [
-                'raw'     => $rawTotals[$metric],
-                'display' => $this->formatRoundedDisplay($rawTotals[$metric]),
-            ];
-        }
-        $data['cpu'] = [
-            'raw'     => $rawTotals['cpu'],
-            'display' => $this->formatCpuDisplay($rawTotals['cpu']),
-        ];
         $data['memory'] = [
             'raw'     => $results['memory'],
             'display' => $this->formatBytesDisplay($results['memory']),
