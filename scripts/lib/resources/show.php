@@ -47,8 +47,7 @@ function pmssShowResourcesMain(array $argv): int
             fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
             return 1;
         }
-        $users = array_filter(array_map('trim', $lines), 'strlen');
-        $users = array_values(array_filter($users, 'pmssResourceLogIsValidUser'));
+        $users = array_values(array_filter(array_map('trim', $lines), 'pmssResourceLogIsValidUser'));
         if (count($users) === 0) {
             die("No users in this system!\n");
         }

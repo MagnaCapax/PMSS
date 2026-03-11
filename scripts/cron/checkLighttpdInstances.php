@@ -58,17 +58,17 @@ $restartLighttpd = static function (string $user) use ($startLighttpd): void {
 };
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    if (empty($thisUser)) continue;
-    $thisUser = trim($thisUser);
+    $thisUser = trim((string) $thisUser);
     if ($thisUser === '') continue;
+    $homeDir = "/home/{$thisUser}";
     $normalizedUser = pmssNormalizeUsername($thisUser);
     if ($normalizedUser !== $thisUser || !pmssValidateUsername($thisUser)) {
         echo "Skipping invalid username: {$thisUser}\n";
         continue;
     }
     #TODO Uh Oh next one should be separate script :) This is separate task altogether. Works here too as expected, just a bit confusing
-    if (file_exists("/home/{$thisUser}/www-disabled") or
-        !file_exists("/home/{$thisUser}/www")) {
+    if (file_exists($homeDir.'/www-disabled') or
+        !file_exists($homeDir.'/www')) {
             echo "User: {$thisUser} is suspended\n";
             // Kill only lighttpd and php-cgi — not all user processes (see GH#210).
             passthru("killall -9 -u ".escapeshellarg($thisUser)." lighttpd 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." php-cgi 2>/dev/null");
@@ -81,7 +81,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     // Auto-generate lighttpd config if user has a home directory but missing config.
     // This catches migrated users whose data was transferred but config wasn't generated.
     // See: GH #180 — Migration target server PMSS config not generated
-    if (!file_exists("/home/{$thisUser}/.lighttpd.conf") && is_dir("/home/{$thisUser}")) {
+    if (!file_exists($homeDir.'/.lighttpd.conf') && is_dir($homeDir)) {
         echo "Config missing for user: {$thisUser} — generating\n";
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
         if (function_exists('pmssUserLog')) {
@@ -92,31 +92,32 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     $instancesLighttpd = shell_exec("pgrep -u {$thisUser} lighttpd");
     $instancesPhpCgi = shell_exec("pgrep -u {$thisUser} php-cgi");
     $socketError = false;
-    $homeDir = "/home/{$thisUser}";
     $socketPaths = pmssLighttpdWatchdogSocketPaths($homeDir, $homeDir.'/.lighttpd.conf');
 
     // If socket connection fails or no php-cgi instance is found
-    if (empty($instancesPhpCgi)) {        
-            echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
-            $restartLighttpd($thisUser);
-            continue;
-
+    if (empty($instancesPhpCgi)) {
+        echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
+        $restartLighttpd($thisUser);
+        continue;
     }
 
     // Probe every expected php-cgi socket so partial worker crashes become
     // visible instead of leaving the user with intermittent 502 responses.
     foreach ($socketPaths as $socketPath) {
         $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, 5);
-        if (!$socket or $errno or $errstr) {        
+        if (!$socket or $errno or $errstr) {
             echo "Error when attempting to connect to socket {$socketPath}: {$errno}, {$errstr}\n";
-            echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";            
+            echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";
             $socketError = true;
             break;
         }
 
         fclose($socket);
     }
-    if ($socketError == true) { $restartLighttpd($thisUser); continue; }
+    if ($socketError) {
+        $restartLighttpd($thisUser);
+        continue;
+    }
 
 
 
@@ -130,7 +131,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
    if (strpos($httpResponse, 'HTTP/1.1 401 Unauthorized') === false) $instancesLighttpd = '';
     */
 
-    if(empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
+    if (empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
         $startLighttpd($thisUser);
         continue;
     }

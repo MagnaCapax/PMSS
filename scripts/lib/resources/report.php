@@ -39,16 +39,17 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
         $windowMetrics = [];
         foreach ($windowMetricConfig as $metric => $allowMissing) {
-            $windowMetrics[$metric] = $windowZeros;
             $rawMetric = $data[$metric]['raw'] ?? [];
+            $metricValues = $windowZeros;
             foreach ($windows as $label) {
                 $value = $rawMetric[$label] ?? null;
                 if ($value === null && !$allowMissing) {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }
-                $windowMetrics[$metric][$label] = (float) ($value ?? 0.0);
+                $metricValues[$label] = (float) ($value ?? 0.0);
             }
+            $windowMetrics[$metric] = $metricValues;
         }
 
         $currentMemory = (float) ($data['memory']['current'] ?? 0.0);

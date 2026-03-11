@@ -124,43 +124,38 @@ class ResourceStatsProcessor
         $results = $accumulator->results();
         $rawTotals = $results['raw'];
 
-        $data = [
-            'io_read' => [
-                'raw'     => $rawTotals['io_read'],
-                'display' => $this->formatBytesDisplay($rawTotals['io_read']),
-            ],
-            'io_write' => [
-                'raw'     => $rawTotals['io_write'],
-                'display' => $this->formatBytesDisplay($rawTotals['io_write']),
-            ],
-            'io_read_ops' => [
-                'raw'     => $rawTotals['io_read_ops'],
-                'display' => $this->formatRoundedDisplay($rawTotals['io_read_ops']),
-            ],
-            'io_write_ops' => [
-                'raw'     => $rawTotals['io_write_ops'],
-                'display' => $this->formatRoundedDisplay($rawTotals['io_write_ops']),
-            ],
-            'cpu' => [
-                'raw'     => $rawTotals['cpu'],
-                'display' => $this->formatCpuDisplay($rawTotals['cpu']),
-            ],
-            'memory' => [
-                'raw'     => $results['memory'],
-                'display' => $this->formatBytesDisplay($results['memory']),
-                'current' => $results['current_memory'],
-            ],
-            'tasks' => [
-                'raw'     => $results['tasks'],
-                'display' => $this->formatRoundedDisplay($results['tasks']),
-                'current' => $results['current_tasks'],
-            ],
-            'ram_hours' => [
-                'raw'     => $rawTotals['ram_hours'],
-                'display' => $this->formatRoundedDisplay($rawTotals['ram_hours'], 2, 'GB-hrs'),
-            ],
-            'daily' => $results['daily'],
+        $data = [];
+        foreach (['io_read', 'io_write'] as $metric) {
+            $data[$metric] = [
+                'raw'     => $rawTotals[$metric],
+                'display' => $this->formatBytesDisplay($rawTotals[$metric]),
+            ];
+        }
+        foreach (['io_read_ops', 'io_write_ops'] as $metric) {
+            $data[$metric] = [
+                'raw'     => $rawTotals[$metric],
+                'display' => $this->formatRoundedDisplay($rawTotals[$metric]),
+            ];
+        }
+        $data['cpu'] = [
+            'raw'     => $rawTotals['cpu'],
+            'display' => $this->formatCpuDisplay($rawTotals['cpu']),
         ];
+        $data['memory'] = [
+            'raw'     => $results['memory'],
+            'display' => $this->formatBytesDisplay($results['memory']),
+            'current' => $results['current_memory'],
+        ];
+        $data['tasks'] = [
+            'raw'     => $results['tasks'],
+            'display' => $this->formatRoundedDisplay($results['tasks']),
+            'current' => $results['current_tasks'],
+        ];
+        $data['ram_hours'] = [
+            'raw'     => $rawTotals['ram_hours'],
+            'display' => $this->formatRoundedDisplay($rawTotals['ram_hours'], 2, 'GB-hrs'),
+        ];
+        $data['daily'] = $results['daily'];
 
         $this->storage->ensureRuntime();
         $this->storage->save($user, $data);
@@ -181,15 +176,13 @@ class ResourceStatsProcessor
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
             $bytes = (float) $value;
-            if (($bytes / 1024 / 1024 / 1024 / 1024) > 1) {
-                $formatted[$label] = round($bytes / 1024 / 1024 / 1024 / 1024, 2).'TiB';
-            } elseif (($bytes / 1024 / 1024 / 1024) > 1) {
-                $formatted[$label] = round($bytes / 1024 / 1024 / 1024, 2).'GiB';
-            } elseif (($bytes / 1024 / 1024) > 1) {
-                $formatted[$label] = round($bytes / 1024 / 1024, 2).'MiB';
-            } else {
-                $formatted[$label] = round($bytes / 1024, 2).'KiB';
+            foreach ([1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'] as $divisor => $suffix) {
+                if (($bytes / $divisor) > 1) {
+                    $formatted[$label] = round($bytes / $divisor, 2).$suffix;
+                    continue 2;
+                }
             }
+            $formatted[$label] = round($bytes / 1024, 2).'KiB';
         }
         return $formatted;
     }
@@ -199,13 +192,9 @@ class ResourceStatsProcessor
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
             $seconds = $value / 1000000000;
-            if ($seconds >= 3600) {
-                $formatted[$label] = round($seconds / 3600, 2).'h';
-            } elseif ($seconds >= 60) {
-                $formatted[$label] = round($seconds / 60, 2).'m';
-            } else {
-                $formatted[$label] = round($seconds, 2).'s';
-            }
+            $formatted[$label] = $seconds >= 3600
+                ? round($seconds / 3600, 2).'h'
+                : ($seconds >= 60 ? round($seconds / 60, 2).'m' : round($seconds, 2).'s');
         }
         return $formatted;
     }

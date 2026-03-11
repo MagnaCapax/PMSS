@@ -83,18 +83,18 @@ function pmssResourceLogReadCounters(int $uid): ?array
  */
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
-    $state = [];
     $handle = @fopen($statePath, 'c+');
     $locked = $handle !== false && @flock($handle, LOCK_EX);
+    $previousState = [];
     if ($locked) {
         $decoded = json_decode((string) @stream_get_contents($handle), true);
         if (is_array($decoded)) {
-            $state = $decoded;
+            $previousState = $decoded;
         }
     }
 
-    $previousState = $state;
-    $state = $delta = [];
+    $state = [];
+    $delta = [];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
         $currentValue = (int) $counters[$field];
         $previousValue = isset($previousState[$field]) ? (int) $previousState[$field] : null;
