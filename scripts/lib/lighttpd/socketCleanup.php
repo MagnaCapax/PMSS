@@ -20,9 +20,7 @@ function pmssLighttpdRemoveSocketEntries(string $lighttpdDir): int
 
     $removedCount = 0;
     foreach ($socketPaths as $socketPath) {
-        if (@unlink($socketPath)) {
-            $removedCount++;
-        }
+        $removedCount += @unlink($socketPath) ? 1 : 0;
     }
 
     return $removedCount;

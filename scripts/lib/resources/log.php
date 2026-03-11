@@ -50,6 +50,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
         'IOReadOperations' => 'io_read_ops',
         'IOWriteOperations' => 'io_write_ops',
     ];
+    $fieldMap = $requiredKeys + $optionalKeys;
     $values = array_fill_keys(array_values($requiredKeys), null);
     $values += array_fill_keys(array_values($optionalKeys), 0);
 
@@ -60,14 +61,10 @@ function pmssResourceLogReadCounters(int $uid): ?array
         }
         $name = $parts[0];
         $value = $parts[1];
-        if (!ctype_digit($value)) {
+        if (!ctype_digit($value) || !isset($fieldMap[$name])) {
             continue;
         }
-        if (isset($requiredKeys[$name])) {
-            $values[$requiredKeys[$name]] = (int) $value;
-        } elseif (isset($optionalKeys[$name])) {
-            $values[$optionalKeys[$name]] = (int) $value;
-        }
+        $values[$fieldMap[$name]] = (int) $value;
     }
 
     foreach ($requiredKeys as $field) {

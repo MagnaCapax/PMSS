@@ -116,9 +116,10 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    $reload = 'bash -lc '.escapeshellarg('modprobe -r netconsole >/dev/null 2>&1 || true; modprobe netconsole');
-    $rc = (int) $runner('Loading netconsole kernel module', $reload);
-    if ($rc !== 0) {
+    if ((int) $runner(
+        'Loading netconsole kernel module',
+        'bash -lc '.escapeshellarg('modprobe -r netconsole >/dev/null 2>&1 || true; modprobe netconsole')
+    ) !== 0) {
         $log('[WARN] Failed to load netconsole kernel module');
     }
 }
