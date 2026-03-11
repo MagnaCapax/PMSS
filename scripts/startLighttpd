@@ -21,6 +21,8 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 
+require_once __DIR__.'/lib/lighttpd/socketCleanup.php';
+
 /**
  * Ensure that a given directory exists for the user, creating it via `su`.
  *
@@ -62,14 +64,7 @@ pmssEnsureUserDir($user, $uploadDir);
 if ($deflateEnabled) {
     pmssEnsureUserDir($user, $lighttpdDir.'/compress');
 }
-$sockets = glob($lighttpdDir.'/php.socket*');
-if ($sockets !== false) {
-    foreach ($sockets as $socket) {
-        if (is_file($socket) || is_link($socket)) {
-            @unlink($socket);
-        }
-    }
-}
+pmssLighttpdRemoveSocketEntries($lighttpdDir);
 
 passthru("cd /home/{$user}; su {$user} -c '/usr/sbin/lighttpd -f /home/{$user}/.lighttpd.conf'");	// This is for newer versions
 
