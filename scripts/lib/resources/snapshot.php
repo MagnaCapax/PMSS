@@ -104,23 +104,19 @@ function pmssResourceSnapshotRun(): int
         $dataPath = $homeDir.'/'.$user.'/.resourceData';
         $raw = is_file($dataPath) ? @file_get_contents($dataPath) : false;
         $metrics = null;
-        if (is_string($raw) && trim($raw) !== '') {
-            $data = @unserialize($raw);
-            if (is_array($data)) {
-                $keys = ['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks', 'io_read_ops', 'io_write_ops'];
-                $metrics = [];
-                foreach ($keys as $key) {
-                    $value = $data[$key]['raw']['day'] ?? null;
-                    if ($value === null) {
-                        if ($key === 'io_read_ops' || $key === 'io_write_ops') {
-                            $metrics[$key] = 0.0;
-                            continue;
-                        }
-                        $metrics = null;
-                        break;
-                    }
-                    $metrics[$key] = (float) $value;
+        if (is_string($raw) && trim($raw) !== '' && is_array($data = @unserialize($raw))) {
+            $metrics = [];
+            foreach (['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'] as $key) {
+                $value = $data[$key]['raw']['day'] ?? null;
+                if ($value === null) {
+                    $metrics = null;
+                    break;
                 }
+                $metrics[$key] = (float) $value;
+            }
+            if ($metrics !== null) {
+                $metrics['io_read_ops'] = (float) ($data['io_read_ops']['raw']['day'] ?? 0.0);
+                $metrics['io_write_ops'] = (float) ($data['io_write_ops']['raw']['day'] ?? 0.0);
             }
         }
 

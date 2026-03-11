@@ -37,14 +37,10 @@ class ResourceStatsAccumulator
     {
         $this->compareTimes = $compareTimes;
         $labels = array_keys($compareTimes);
-        $this->rawTotals = [
-            'io_read'   => array_fill_keys($labels, 0.0),
-            'io_write'  => array_fill_keys($labels, 0.0),
-            'io_read_ops' => array_fill_keys($labels, 0.0),
-            'io_write_ops' => array_fill_keys($labels, 0.0),
-            'cpu'       => array_fill_keys($labels, 0.0),
-            'ram_hours' => array_fill_keys($labels, 0.0),
-        ];
+        $this->rawTotals = [];
+        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metric) {
+            $this->rawTotals[$metric] = array_fill_keys($labels, 0.0);
+        }
         $this->memorySums = array_fill_keys($labels, 0.0);
         $this->memoryCounts = array_fill_keys($labels, 0);
         $this->taskSums = array_fill_keys($labels, 0.0);
@@ -120,7 +116,7 @@ class ResourceStatsAccumulator
     {
         $averages = [];
         foreach ($sums as $label => $sum) {
-            $count = isset($counts[$label]) ? (int) $counts[$label] : 0;
+            $count = (int) ($counts[$label] ?? 0);
             $averages[$label] = $count > 0 ? ($sum / $count) : 0.0;
         }
         return $averages;

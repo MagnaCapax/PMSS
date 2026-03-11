@@ -22,11 +22,10 @@ class ResourceStorage
     /** Ensure runtime directories exist before writing. */
     public function ensureRuntime(): void
     {
-        if (!is_dir($this->runtimeDir)) {
-            @mkdir($this->runtimeDir, 0755, true);
-        }
-        if (!is_dir($this->statsDir)) {
-            @mkdir($this->statsDir, 0600, true);
+        foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
+            if (!is_dir($dir)) {
+                @mkdir($dir, $mode, true);
+            }
         }
     }
 
@@ -61,11 +60,7 @@ class ResourceStorage
     private function writeAtomic(string $path, string $payload): void
     {
         $tmp = $path.'.tmp.'.getmypid().'.'.mt_rand(1000, 9999);
-        if (@file_put_contents($tmp, $payload) === false) {
-            @unlink($tmp);
-            return;
-        }
-        if (!@rename($tmp, $path)) {
+        if (@file_put_contents($tmp, $payload) === false || !@rename($tmp, $path)) {
             @unlink($tmp);
         }
     }
