@@ -39,20 +39,20 @@ function pmssResourceLogReadCounters(int $uid): ?array
         return null;
     }
 
-    $requiredKeys = [
+    $requiredFields = ['io_read', 'io_write', 'cpu_nsec', 'memory', 'tasks'];
+    $fieldMap = [
         'IOReadBytes' => 'io_read',
         'IOWriteBytes' => 'io_write',
         'CPUUsageNSec' => 'cpu_nsec',
         'MemoryCurrent' => 'memory',
         'TasksCurrent' => 'tasks',
-    ];
-    $optionalKeys = [
         'IOReadOperations' => 'io_read_ops',
         'IOWriteOperations' => 'io_write_ops',
     ];
-    $fieldMap = $requiredKeys + $optionalKeys;
-    $values = array_fill_keys(array_values($requiredKeys), null);
-    $values += array_fill_keys(array_values($optionalKeys), 0);
+    $values = array_fill_keys($requiredFields, null) + [
+        'io_read_ops' => 0,
+        'io_write_ops' => 0,
+    ];
 
     foreach (preg_split('/\r?\n/', trim($out)) as $line) {
         $parts = explode('=', $line, 2);
@@ -67,7 +67,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
         $values[$fieldMap[$name]] = (int) $value;
     }
 
-    foreach ($requiredKeys as $field) {
+    foreach ($requiredFields as $field) {
         if ($values[$field] === null) {
             return null;
         }
@@ -95,20 +95,19 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         }
     }
 
-    $current = [];
+    $previousState = $state;
+    $state = [];
     $delta = [];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
         $currentValue = (int) $counters[$field];
-        $previousValue = isset($state[$field]) ? (int) $state[$field] : null;
-        $current[$field] = $currentValue;
+        $previousValue = isset($previousState[$field]) ? (int) $previousState[$field] : null;
         $delta[$field] = ($previousValue !== null && $currentValue >= $previousValue) ? $currentValue - $previousValue : $currentValue;
+        $state[$field] = $currentValue;
     }
 
-    $state = $current + [
-        'memory' => (int) $counters['memory'],
-        'tasks' => (int) $counters['tasks'],
-        'ts' => time(),
-    ];
+    $state['memory'] = (int) $counters['memory'];
+    $state['tasks'] = (int) $counters['tasks'];
+    $state['ts'] = time();
 
     $payload = json_encode($state);
     if ($locked && is_string($payload)) {

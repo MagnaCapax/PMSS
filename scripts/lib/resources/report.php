@@ -39,7 +39,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
         $windowMetrics = [];
         foreach ($windowMetricConfig as $metric => $allowMissing) {
-            $selected = $windowZeros;
+            $windowMetrics[$metric] = $windowZeros;
             $rawMetric = $data[$metric]['raw'] ?? [];
             foreach ($windows as $label) {
                 $value = $rawMetric[$label] ?? null;
@@ -47,9 +47,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
                     $missingStats[] = $thisUser;
                     continue 3;
                 }
-                $selected[$label] = (float) ($value ?? 0.0);
+                $windowMetrics[$metric][$label] = (float) ($value ?? 0.0);
             }
-            $windowMetrics[$metric] = $selected;
         }
 
         $memoryCurrent = (float) ($data['memory']['current'] ?? 0.0);
@@ -61,9 +60,9 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
                 $totals[$metric][$label] += $values[$label];
             }
         }
-        $totals['memory_current'] += $memoryCurrent;
-        $totals['memory_avg_month'] += $memoryAvgMonth;
-        $totals['tasks_current'] += $tasksCurrent;
+        foreach (['memory_current' => $memoryCurrent, 'memory_avg_month' => $memoryAvgMonth, 'tasks_current' => $tasksCurrent] as $field => $value) {
+            $totals[$field] += $value;
+        }
 
         $rows[$thisUser] = $windowMetrics + [
             'memory_current' => $memoryCurrent,

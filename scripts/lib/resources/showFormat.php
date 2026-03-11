@@ -8,15 +8,14 @@
 
 function pmssResourceFormatBytes(float $bytes): string
 {
-    $steps = [
-        [1099511627776.0, 'TiB'],
-        [1073741824.0, 'GiB'],
-        [1048576.0, 'MiB'],
-    ];
-    foreach ($steps as list($threshold, $unit)) {
-        if ($bytes >= $threshold) {
-            return number_format($bytes / $threshold, 2).' '.$unit;
-        }
+    if ($bytes >= 1099511627776.0) {
+        return number_format($bytes / 1099511627776.0, 2).' TiB';
+    }
+    if ($bytes >= 1073741824.0) {
+        return number_format($bytes / 1073741824.0, 2).' GiB';
+    }
+    if ($bytes >= 1048576.0) {
+        return number_format($bytes / 1048576.0, 2).' MiB';
     }
 
     return number_format($bytes / 1024, 2).' KiB';
