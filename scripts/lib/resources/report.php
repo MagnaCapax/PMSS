@@ -26,10 +26,8 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         'cpu' => false,
         'ram_hours' => false,
     ];
-    $totals = array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
-    foreach ($windowMetricConfig as $metric => $_allowMissing) {
-        $totals[$metric] = $windowZeros;
-    }
+    $totals = array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0)
+        + array_fill_keys(array_keys($windowMetricConfig), $windowZeros);
 
     foreach ($users as $thisUser) {
         $statsPath = "{$statsDir}/{$thisUser}";
@@ -44,12 +42,11 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $selected = $windowZeros;
             $rawMetric = $data[$metric]['raw'] ?? [];
             foreach ($windows as $label) {
-                if (isset($rawMetric[$label])) {
-                    $selected[$label] = (float) $rawMetric[$label];
-                } elseif (!$allowMissing) {
+                if (!isset($rawMetric[$label]) && !$allowMissing) {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }
+                $selected[$label] = isset($rawMetric[$label]) ? (float) $rawMetric[$label] : 0.0;
             }
             $windowMetrics[$metric] = $selected;
         }

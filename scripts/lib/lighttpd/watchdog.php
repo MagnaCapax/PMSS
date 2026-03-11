@@ -14,7 +14,7 @@
 function pmssLighttpdWatchdogConfigMaxProcs(string $configPath): ?int
 {
     $config = @file_get_contents($configPath);
-    if (!is_string($config) || $config === '' || !preg_match('/"max-procs"\s*=>\s*([0-9]+)/', $config, $matches)) {
+    if (!is_string($config) || !preg_match('/"max-procs"\s*=>\s*([0-9]+)/', $config, $matches)) {
         return null;
     }
 
@@ -36,12 +36,8 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
     $baseSocketPath = rtrim($homeDir, '/').'/.lighttpd/php.socket';
     $maxProcs = pmssLighttpdWatchdogConfigMaxProcs($configPath);
 
-    if ($maxProcs === null) {
-        return [$baseSocketPath.'-0'];
-    }
-
-    if ($maxProcs === 1) {
-        return [$baseSocketPath];
+    if ($maxProcs === null || $maxProcs === 1) {
+        return [$baseSocketPath.($maxProcs === 1 ? '' : '-0')];
     }
 
     return array_map(static function ($index) use ($baseSocketPath) {

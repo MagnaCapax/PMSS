@@ -19,8 +19,7 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 $fixes = [];
 foreach (['MemoryHigh', 'MemoryMax', 'TasksMax'] as $prop) {
     $output = trim((string) @shell_exec('systemctl show user-0.slice -p '.$prop.' 2>/dev/null'));
-    $separatorPos = strpos($output, '=');
-    $value = $separatorPos !== false ? substr($output, $separatorPos + 1) : $output;
+    $value = (string) (explode('=', $output, 2)[1] ?? $output);
     if ($value !== '' && strtolower($value) !== 'infinity') {
         $fixes[] = $prop.'=infinity';
     }

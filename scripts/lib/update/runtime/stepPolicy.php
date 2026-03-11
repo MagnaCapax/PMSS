@@ -6,16 +6,16 @@
  * @author PMSS Team
  */
 
-if (!defined('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL')) {
-    define('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', 'soft_fail');
-}
-
-if (!defined('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED')) {
-    define('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'must_succeed');
-}
-
-if (!defined('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING')) {
-    define('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING', 'skip_if_missing');
+foreach (
+    [
+        'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL' => 'soft_fail',
+        'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED' => 'must_succeed',
+        'PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING' => 'skip_if_missing',
+    ] as $constant => $value
+) {
+    if (!defined($constant)) {
+        define($constant, $value);
+    }
 }
 
 if (!function_exists('pmssUpdateStep2HandleClassifiedFailure')) {
@@ -24,17 +24,15 @@ if (!function_exists('pmssUpdateStep2HandleClassifiedFailure')) {
      */
     function pmssUpdateStep2HandleClassifiedFailure(string $description, string $classification, int $rc, string $reason): void
     {
-        $isMustSucceed = $classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED;
-        $severity = $isMustSucceed ? 'error' : 'warn';
-        $jsonEvent = [
+        $severity = ($classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED) ? 'error' : 'warn';
+        pmssLogJson([
             'event'          => 'step_failed',
             'severity'       => $severity,
             'classification' => $classification,
             'step'           => $description,
             'rc'             => $rc,
             'reason'         => $reason,
-        ];
-        pmssLogJson($jsonEvent);
+        ]);
 
         $logLine = sprintf(
             '[%s] Step failed: %s (classification=%s rc=%d reason=%s)',
@@ -44,13 +42,10 @@ if (!function_exists('pmssUpdateStep2HandleClassifiedFailure')) {
             $rc,
             $reason
         );
-        if (function_exists('logmsg')) {
-            logmsg($logLine);
-        } else {
-            logMessage($logLine);
-        }
+        $logger = function_exists('logmsg') ? 'logmsg' : 'logMessage';
+        $logger($logLine);
 
-        if ($isMustSucceed && getenv('PMSS_PACKAGE_PHASE') === 'complete') {
+        if ($classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED && getenv('PMSS_PACKAGE_PHASE') === 'complete') {
             pmssLogJson([
                 'event'  => 'phase',
                 'name'   => 'update-step2',

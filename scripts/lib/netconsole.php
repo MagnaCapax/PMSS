@@ -76,7 +76,7 @@ function pmssNetconsoleTargetIsReachable(array $target, callable $log, ?callable
         .' | grep -Fqi '.escapeshellarg($target['targetMac'])
     );
 
-    if ((int) call_user_func($runner, 'Verifying netconsole target reachability', $command) === 0) {
+    if ((int) $runner('Verifying netconsole target reachability', $command) === 0) {
         return true;
     }
 
@@ -117,7 +117,7 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
     }
 
     $reload = 'bash -lc '.escapeshellarg('modprobe -r netconsole >/dev/null 2>&1 || true; modprobe netconsole');
-    $rc = (int) call_user_func($runner, 'Loading netconsole kernel module', $reload);
+    $rc = (int) $runner('Loading netconsole kernel module', $reload);
     if ($rc !== 0) {
         $log('[WARN] Failed to load netconsole kernel module');
     }
