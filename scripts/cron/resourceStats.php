@@ -13,11 +13,12 @@ $processor = new ResourceStatsProcessor(new resourceStatistics());
 $processor->ensureRuntime();
 
 if (($user = $processor->detectWorkerUser($argv)) !== null) {
-    if ($processor->validateUser($user)) {
-        $processor->processUser($user, $processor->buildCompareTimes());
-    } else {
+    if (!$processor->validateUser($user)) {
         echo "Invalid user specified: {$user}\n";
+        exit(0);
     }
+
+    $processor->processUser($user, $processor->buildCompareTimes());
     exit(0);
 }
 

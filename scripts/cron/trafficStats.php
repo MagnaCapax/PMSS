@@ -14,14 +14,14 @@ require_once '/scripts/lib/traffic/processor.php';
 
 $processor = new TrafficStatsProcessor(new trafficStatistics());
 $processor->ensureRuntime();
-$compareTimes = $processor->buildCompareTimes();
 
 if (($user = $processor->detectWorkerUser($argv)) !== null) {
-    if ($processor->validateUser($user)) {
-        $processor->processUser($user, $compareTimes);
-    } else {
+    if (!$processor->validateUser($user)) {
         echo "Invalid user specified: {$user}\n";
+        exit(0);
     }
+
+    $processor->processUser($user, $processor->buildCompareTimes());
     exit(0);
 }
 

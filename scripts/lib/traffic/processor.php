@@ -98,8 +98,13 @@ class TrafficStatsProcessor
             ? substr($username, 0, -strlen($suffix))
             : $username;
         $homePath = $this->homeDir.'/'.$baseUser;
-        return is_readable($path)
-            && $this->userExistsInPasswd($baseUser)
+        if (!is_readable($path)) {
+            return false;
+        }
+
+        $passwd = @file_get_contents($this->passwdFile);
+        return $passwd !== false
+            && preg_match('/^'.preg_quote($baseUser, '/').':/m', $passwd) === 1
             && is_dir($homePath);
     }
 
@@ -173,12 +178,4 @@ class TrafficStatsProcessor
         return $formatted;
     }
 
-    private function userExistsInPasswd(string $username): bool
-    {
-        $passwd = @file_get_contents($this->passwdFile);
-        if ($passwd === false) {
-            return false;
-        }
-        return preg_match("/^".preg_quote($username, '/').":/m", $passwd) === 1;
-    }
 }

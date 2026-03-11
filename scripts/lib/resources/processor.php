@@ -81,8 +81,13 @@ class ResourceStatsProcessor
     {
         $path = $this->resourceDir.'/'.$user;
         $homePath = $this->homeDir.'/'.$user;
-        return is_readable($path)
-            && $this->userExistsInPasswd($user)
+        if (!is_readable($path)) {
+            return false;
+        }
+
+        $passwd = @file_get_contents($this->passwdFile);
+        return $passwd !== false
+            && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1
             && is_dir($homePath);
     }
 
@@ -156,15 +161,6 @@ class ResourceStatsProcessor
         $this->storage->ensureRuntime();
         $this->storage->save($user, $data);
         logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$rawTotals['io_read']['month']}");
-    }
-
-    private function userExistsInPasswd(string $username): bool
-    {
-        $passwd = @file_get_contents($this->passwdFile);
-        if ($passwd === false) {
-            return false;
-        }
-        return preg_match('/^'.preg_quote($username, '/').':/m', $passwd) === 1;
     }
 
     private function formatBytesDisplay(array $rawTotals): array

@@ -37,9 +37,7 @@ foreach ($users as $user) {
     }
 
     $statePath = $stateDir.'/'.$user.'.json';
-    $result = pmssResourceLogUpdateState($statePath, $counters);
-    $delta = $result['delta'];
-    $state = $result['state'];
+    ['delta' => $delta, 'state' => $state] = pmssResourceLogUpdateState($statePath, $counters);
 
     $line = sprintf(
         '%s %d %d %d %d %d %d %d',
