@@ -24,7 +24,11 @@ function pmssResourceLogLookupUid(string $user): ?int
 function pmssResourceLogLoadUsers(): array
 {
     $users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
-    return empty($users) ? $users : array_merge($users, ['www-data']);
+    if (!empty($users)) {
+        $users[] = 'www-data';
+    }
+
+    return $users;
 }
 
 /**

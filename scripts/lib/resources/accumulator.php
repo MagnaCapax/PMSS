@@ -65,32 +65,29 @@ class ResourceStatsAccumulator
         $timestamp = (int) $sample['timestamp'];
         $this->lastMemory = (float) $sample['memory'];
         $this->lastTasks = (float) $sample['tasks'];
-        $sampleReadOps = isset($sample['io_read_ops']) ? (float) $sample['io_read_ops'] : 0.0;
-        $sampleWriteOps = isset($sample['io_write_ops']) ? (float) $sample['io_write_ops'] : 0.0;
+        $sampleReadOps = (float) ($sample['io_read_ops'] ?? 0.0);
+        $sampleWriteOps = (float) ($sample['io_write_ops'] ?? 0.0);
 
         $defaultIntervalHours = 300 / 3600;
-        if ($this->prevTimestamp === null) {
-            $intervalHours = $defaultIntervalHours;
-        } else {
-            $delta = $timestamp - $this->prevTimestamp;
-            $intervalHours = ($delta > 0 && $delta <= 3600) ? ($delta / 3600) : $defaultIntervalHours;
-        }
+        $delta = ($this->prevTimestamp === null) ? 0 : ($timestamp - $this->prevTimestamp);
+        $intervalHours = ($delta > 0 && $delta <= 3600) ? ($delta / 3600) : $defaultIntervalHours;
         $this->prevTimestamp = $timestamp;
         $sampleRamHours = ((float) $sample['memory'] / 1024 / 1024 / 1024) * $intervalHours;
 
         foreach ($this->compareTimes as $label => $threshold) {
-            if ($timestamp >= $threshold) {
-                $this->rawTotals['io_read'][$label] += $sample['io_read'];
-                $this->rawTotals['io_write'][$label] += $sample['io_write'];
-                $this->rawTotals['io_read_ops'][$label] += $sampleReadOps;
-                $this->rawTotals['io_write_ops'][$label] += $sampleWriteOps;
-                $this->rawTotals['cpu'][$label] += $sample['cpu'];
-                $this->rawTotals['ram_hours'][$label] += $sampleRamHours;
-                $this->memorySums[$label] += $sample['memory'];
-                $this->memoryCounts[$label] += 1;
-                $this->taskSums[$label] += $sample['tasks'];
-                $this->taskCounts[$label] += 1;
+            if ($timestamp < $threshold) {
+                continue;
             }
+            $this->rawTotals['io_read'][$label] += $sample['io_read'];
+            $this->rawTotals['io_write'][$label] += $sample['io_write'];
+            $this->rawTotals['io_read_ops'][$label] += $sampleReadOps;
+            $this->rawTotals['io_write_ops'][$label] += $sampleWriteOps;
+            $this->rawTotals['cpu'][$label] += $sample['cpu'];
+            $this->rawTotals['ram_hours'][$label] += $sampleRamHours;
+            $this->memorySums[$label] += $sample['memory'];
+            $this->memoryCounts[$label] += 1;
+            $this->taskSums[$label] += $sample['tasks'];
+            $this->taskCounts[$label] += 1;
         }
 
         $this->dailyAccumulator->addSample($sample, $intervalHours);
