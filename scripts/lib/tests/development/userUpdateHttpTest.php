@@ -14,6 +14,40 @@ require_once dirname(__DIR__, 2).'/update/user/http.php';
 
 class UserUpdateHttpTest extends TestCase
 {
+    public function testConfigureHttpDisablesQbittorrentReverseProxyChecks(): void
+    {
+        $home = sys_get_temp_dir().'/pmss-http-qbittorrent-'.bin2hex(random_bytes(4));
+        mkdir($home.'/.config/qBittorrent', 0755, true);
+
+        $config = "[Preferences]\n";
+        $config .= "WebUI\\CSRFProtection=true\n";
+        $config .= "WebUI\\ClickjackingProtection=true\n";
+        $config .= "WebUI\\HostHeaderValidation=true\n";
+        $config .= "WebUI\\Port=12345\n";
+        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', $config);
+
+        $ctx = [
+            'user'     => 'dummy',
+            'home'     => $home,
+            'user_esc' => escapeshellarg('dummy'),
+        ];
+
+        try {
+            \pmssUserConfigureHttp($ctx);
+
+            $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
+            $updatedConfig = ($updated === false) ? '' : $updated;
+            $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
+            $this->assertStringContainsString('WebUI\\ClickjackingProtection=false', $updatedConfig);
+            $this->assertStringContainsString('WebUI\\HostHeaderValidation=false', $updatedConfig);
+            $this->assertTrue(strpos($updatedConfig, 'WebUI\\CSRFProtection=true') === false);
+            $this->assertTrue(strpos($updatedConfig, 'WebUI\\ClickjackingProtection=true') === false);
+            $this->assertTrue(strpos($updatedConfig, 'WebUI\\HostHeaderValidation=true') === false);
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
     public function testConfigureHttpCreatesTempDirectory(): void
     {
         $tempHome = sys_get_temp_dir().'/pmss-http-'.bin2hex(random_bytes(4));
