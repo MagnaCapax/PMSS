@@ -62,6 +62,7 @@ Current state for the cgroup policy extension TODOs:
 - **CPU/memory/tasks profile families**: Implemented.
   - Built-in CLI shorthands (`low`, `high`, `heavy`) remain available.
   - Policy can extend/override profile maps via `profiles.cpu`, `profiles.mem`, and `profiles.tasks` using positive numeric values.
+  - `profiles.io` can extend/override IO profile shorthands (`--io-profile=<name>`) using `ioWeight`, `cpuWeight`, `tasksMax`, `readBw`, `writeBw`, `readIops`, and `writeIops`.
   - Invalid profile entries are ignored, preserving baseline behavior.
 
 - **Per-user burst allowances**: Not implemented yet.

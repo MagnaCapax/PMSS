@@ -105,4 +105,80 @@ class UserCgroupPolicyProfilesTest extends TestCase
 
         $this->assertStringContainsString('CPUWeight=50', $output);
     }
+
+    public function testIoProfileUsesPolicyFamilyWhenDefined(): void
+    {
+        $configDirectory = $this->createPolicyDir([
+            'profiles' => [
+                'io' => [
+                    'hdd' => [
+                        'ioWeight' => 240,
+                        'readBw' => '7M',
+                        'writeBw' => '13M',
+                        'readIops' => 77,
+                        'writeIops' => 88,
+                    ],
+                ],
+            ],
+        ]);
+
+        $output = $this->runCli(
+            ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=hdd'],
+            ['PMSS_CONFIG_DIR' => $configDirectory]
+        );
+
+        $this->assertStringContainsString('IOWeight=240', $output);
+        $this->assertStringContainsString('IOReadBandwidthMax=/dev/sda 7M', $output);
+        $this->assertStringContainsString('IOWriteBandwidthMax=/dev/sda 13M', $output);
+        $this->assertStringContainsString('IOReadIOPSMax=/dev/sda 77', $output);
+        $this->assertStringContainsString('IOWriteIOPSMax=/dev/sda 88', $output);
+    }
+
+    public function testIoProfilePolicyCanDefineCustomProfile(): void
+    {
+        $configDirectory = $this->createPolicyDir([
+            'profiles' => [
+                'io' => [
+                    'archive' => [
+                        'ioWeight' => 150,
+                        'readBw' => '3M',
+                        'writeBw' => '4M',
+                    ],
+                ],
+            ],
+        ]);
+
+        $output = $this->runCli(
+            ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=archive'],
+            ['PMSS_CONFIG_DIR' => $configDirectory]
+        );
+
+        $this->assertStringContainsString('IOWeight=150', $output);
+        $this->assertStringContainsString('IOReadBandwidthMax=/dev/sda 3M', $output);
+        $this->assertStringContainsString('IOWriteBandwidthMax=/dev/sda 4M', $output);
+    }
+
+    public function testIoProfilePolicyCanOverrideBulkCpuAndTasksDefaults(): void
+    {
+        $configDirectory = $this->createPolicyDir([
+            'profiles' => [
+                'io' => [
+                    'bulk' => [
+                        'ioWeight' => 333,
+                        'cpuWeight' => 444,
+                        'tasksMax' => 9999,
+                    ],
+                ],
+            ],
+        ]);
+
+        $output = $this->runCli(
+            ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=bulk'],
+            ['PMSS_CONFIG_DIR' => $configDirectory]
+        );
+
+        $this->assertStringContainsString('IOWeight=333', $output);
+        $this->assertStringContainsString('CPUWeight=444', $output);
+        $this->assertStringContainsString('TasksMax=9999', $output);
+    }
 }
