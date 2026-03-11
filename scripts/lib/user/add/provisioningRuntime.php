@@ -95,8 +95,9 @@ function runProvisionStep(string $description, string $command, ?string $logComm
  * @param string $status  SUCCESS|FAIL|ERROR marker.
  * @param string $message Human-readable context (kept short for grep).
  * @param int    $exitCode Intended exit code for the summary.
+ * @param array  $extraSummary Optional machine-readable reason/detail fields.
  */
-function finalizeProvision(string $status, string $message, int $exitCode): void
+function finalizeProvision(string $status, string $message, int $exitCode, array $extraSummary = array()): void
 {
     global $user, $provisionStart, $provisionStats, $provisionFinalized;
     if ($provisionFinalized) {
@@ -115,6 +116,27 @@ function finalizeProvision(string $status, string $message, int $exitCode): void
         $message
     );
     logProvisionMessage($summary);
+
+    $jsonSummary = array_merge(
+        array(
+            'event' => 'adduser_summary',
+            'status' => $status,
+            'success' => $status === 'SUCCESS' && $exitCode === 0,
+            'user' => $user['name'],
+            'message' => $message,
+            'exit_code' => $exitCode,
+            'duration' => $duration,
+            'steps_ok' => $provisionStats['ok'],
+            'steps_err' => $provisionStats['err'],
+            'last_error' => $provisionStats['last_error'],
+        ),
+        $extraSummary
+    );
+    $jsonEncoded = json_encode($jsonSummary, JSON_UNESCAPED_SLASHES);
+    if ($jsonEncoded !== false) {
+        logProvisionMessage('###ADDUSER_JSON:'.$jsonEncoded);
+    }
+
     pmssUserWriteLogs(
         pmssUserBaseContext(
             'add',
@@ -133,4 +155,3 @@ function finalizeProvision(string $status, string $message, int $exitCode): void
         )
     );
 }
-

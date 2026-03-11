@@ -18,6 +18,9 @@ leading letter followed by 2–7 lowercase letters or digits (3–8 characters
 total). This keeps Unix account names predictable for admins and avoids shell
 injection edge cases elsewhere in the tooling.
 
+Email-style usernames (`name@example.com`) are rejected explicitly; callers
+must provide a bare PMSS username.
+
 On success the script:
 - creates the Unix user and home directory
 - assigns an HTTP service port via `portManager.php`
@@ -25,6 +28,8 @@ On success the script:
 - enables quotas and traffic limits
 - starts rTorrent and lighttpd
 - emits a summary marker (`###ADDUSER:SUCCESS|FAIL|ERROR`) to stdout and `/var/log/pmss/addUser.log`
+- emits a JSON summary marker (`###ADDUSER_JSON:{...}`) with explicit `success`
+  and `exit_code` fields for automation consumers
 
 Operational notes:
 - A per-user lock file prevents concurrent addUser runs for the same username.

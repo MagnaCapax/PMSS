@@ -68,16 +68,9 @@ $provisionStats = [
     'last_error' => null,
 ];
 $provisionFinalized = false;
-if (!pmssValidateUsernameForCreate($user['name'])) {
-    $detail = 'fails validation';
-    if (!pmssUsernameIsValid($user['name'])) {
-        $detail = 'must start with a lowercase letter and contain only lowercase letters or digits (max 8 chars)';
-    } elseif (strlen($user['name']) < 3) {
-        $detail = 'must be at least 3 characters long';
-    } elseif (pmssUsernameIsReserved($user['name'])) {
-        $detail = 'is reserved for system use';
-    }
-    $errorMessage = sprintf('Invalid username "%s": %s', $user['name'], $detail);
+$usernameValidationError = pmssUsernameCreateValidationError($user['name']);
+if ($usernameValidationError !== null) {
+    $errorMessage = sprintf('Invalid username "%s": %s', $user['name'], $usernameValidationError['detail']);
     pmssUserWriteLogs(
         pmssUserBaseContext(
             'add',
@@ -85,6 +78,7 @@ if (!pmssValidateUsernameForCreate($user['name'])) {
             $user['name'],
             array(
                 'status'  => 'ERR',
+                'code'    => $usernameValidationError['code'],
                 'message' => $errorMessage,
             )
         )
@@ -93,7 +87,15 @@ if (!pmssValidateUsernameForCreate($user['name'])) {
         logProvisionMessage('FATAL: '.$errorMessage);
     }
     if (function_exists('finalizeProvision')) {
-        finalizeProvision('ERROR', 'invalid_username', 1);
+        finalizeProvision(
+            'ERROR',
+            'invalid_username',
+            1,
+            array(
+                'reason' => $usernameValidationError['code'],
+                'detail' => $usernameValidationError['detail'],
+            )
+        );
     } elseif (function_exists('logProvisionMessage')) {
         logProvisionMessage('FATAL: Invalid username; aborting provisioning');
     }

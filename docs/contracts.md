@@ -501,7 +501,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
     failed `changePw.php`, or failed `userConfig.php` to avoid partial provisioning.
   - Logs: `/var/log/pmss/addUser.log`, shared user logs (`/var/log/pmss/users.log`,
     `/var/log/pmss/users.jsonl`), and per-user logs under `/var/log/pmss/users/<user>.log`.
-    Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep.
+    Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep plus
+    `###ADDUSER_JSON:{...}` with explicit `success`/`exit_code` fields for automation.
 
 - scripts/changePw.php USERNAME [PASSWORD]
   - Behavior: Sets Unix password (generated if omitted) and per-user htpasswd; prints the password.

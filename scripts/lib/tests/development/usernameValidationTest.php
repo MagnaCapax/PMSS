@@ -38,11 +38,30 @@ class UsernameValidationTest extends TestCase
     {
         $mustInclude = [
             'root', 'www', 'nginx', 'mysql', 'postgres', 'redis', 'mongodb', 'apache', 'docker',
-            'messagebus', 'chrony', 'openvpn', 'srvadmin', 'srvapi', 'pmcseed', 'pmcdn', 'srvmgmt',
+            'messagebus', 'chrony', 'openvpn', 'seedbox', 'rtorrent', 'deluge', 'qbittorrent',
+            'lighttpd', 'rutorrent', 'srvadmin', 'srvapi', 'pmcseed', 'pmcdn', 'srvmgmt',
         ];
         foreach ($mustInclude as $name) {
             $this->assertTrue(\pmssUsernameIsReserved($name), 'Expected reserved username to be listed: '.$name);
         }
+    }
+
+    public function testCreateValidationErrorClassifiesInvalidInputs(): void
+    {
+        $cases = [
+            ['seedbox@anyemail.com', 'email_not_allowed'],
+            ['1user', 'invalid_format'],
+            ['ab', 'too_short'],
+            ['seedbox', 'reserved'],
+        ];
+
+        foreach ($cases as $case) {
+            $error = \pmssUsernameCreateValidationError($case[0]);
+            $this->assertTrue(is_array($error), 'Expected error payload for username: '.$case[0]);
+            $this->assertEquals($case[1], $error['code'], 'Unexpected error code for username: '.$case[0]);
+        }
+
+        $this->assertEquals(null, \pmssUsernameCreateValidationError('abc123'));
     }
 
     public function testInvalidUsernamesFail(): void

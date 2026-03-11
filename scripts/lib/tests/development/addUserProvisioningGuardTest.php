@@ -16,6 +16,7 @@ class AddUserProvisioningGuardTest extends TestCase
     {
         $src = (string) file_get_contents(__DIR__.'/../../user/add/provisioningRuntime.php');
         $this->assertTrue(strpos($src, '###ADDUSER:') !== false, 'addUser must emit summary markers');
+        $this->assertTrue(strpos($src, '###ADDUSER_JSON:') !== false, 'addUser must emit JSON summary markers');
     }
 
     public function testAddUserWrapperStaysSmall(): void

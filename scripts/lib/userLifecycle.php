@@ -158,6 +158,48 @@ function pmssValidateUsernameForCreate(string $username): bool
 }
 
 /**
+ * Return machine- and human-friendly create-validation failure details.
+ *
+ * @param string $username Candidate username (typically normalized input).
+ *
+ * @return array<string,string>|null Null when valid, otherwise code+detail.
+ */
+function pmssUsernameCreateValidationError(string $username): ?array
+{
+    $normalized = pmssNormalizeUsername($username);
+
+    if (strpos($normalized, '@') !== false) {
+        return array(
+            'code' => 'email_not_allowed',
+            'detail' => 'must be a bare username (email addresses are not allowed)',
+        );
+    }
+
+    if (!pmssUsernameIsValid($normalized)) {
+        return array(
+            'code' => 'invalid_format',
+            'detail' => 'must start with a lowercase letter and contain only lowercase letters or digits (max 8 chars)',
+        );
+    }
+
+    if (strlen($normalized) < 3) {
+        return array(
+            'code' => 'too_short',
+            'detail' => 'must be at least 3 characters long',
+        );
+    }
+
+    if (pmssUsernameIsReserved($normalized)) {
+        return array(
+            'code' => 'reserved',
+            'detail' => 'is reserved for system use',
+        );
+    }
+
+    return null;
+}
+
+/**
  * Build a shared context payload for user lifecycle audit logging.
  */
 function pmssUserBaseContext(string $action, string $phase, string $username, array $extra = array()): array
