@@ -102,16 +102,11 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
     $sev = 'ok';
 
     $health = $metrics['health'];
-    $healthOk = false;
-    if (is_string($health)) {
-        $h = strtoupper($health);
-        if (strpos($h, 'PASSED') !== false || $h === 'OK' || strpos($h, 'OK') === 0) {
-            $healthOk = true;
-        }
-        if (strpos($h, 'FAIL') !== false || strpos($h, 'BAD') !== false) {
-            $healthOk = false;
-        }
-    }
+    $healthUpper = is_string($health) ? strtoupper($health) : '';
+    $healthOk = $healthUpper !== ''
+        && (strpos($healthUpper, 'PASSED') !== false || $healthUpper === 'OK' || strpos($healthUpper, 'OK') === 0)
+        && strpos($healthUpper, 'FAIL') === false
+        && strpos($healthUpper, 'BAD') === false;
 
     if (!$healthExplicit) {
         $sev = pmssStorageHealthSeverityMax($sev, 'warn');
@@ -208,7 +203,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
     $entry = pmssStorageHealthParseSmartctlOutput($out, $disk, $prevMetrics, $timestamp);
     if ($res['rc'] === 124) {
         $entry['severity'] = pmssStorageHealthSeverityMax((string) $entry['severity'], 'warn');
-        $entry['ok'] = ($entry['severity'] === 'ok');
+        $entry['ok'] = false;
         $entry['flags'] = array_values(array_unique(array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout'])));
     }
     return $entry;

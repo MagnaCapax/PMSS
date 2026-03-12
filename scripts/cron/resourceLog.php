@@ -22,17 +22,9 @@ if (empty($users)) {
 }
 
 foreach ($users as $user) {
-    if (!pmssResourceLogIsValidUser($user)) {
-        continue;
-    }
-
-    $uid = pmssResourceLogLookupUid($user);
-    if ($uid === null) {
-        continue;
-    }
-
-    $counters = pmssResourceLogReadCounters($uid);
-    if ($counters === null) {
+    if (!pmssResourceLogIsValidUser($user)
+        || ($uid = pmssResourceLogLookupUid($user)) === null
+        || ($counters = pmssResourceLogReadCounters($uid)) === null) {
         continue;
     }
 

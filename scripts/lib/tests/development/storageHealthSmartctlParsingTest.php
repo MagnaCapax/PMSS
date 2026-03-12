@@ -69,6 +69,16 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $this->assertTrue(in_array('health_not_ok', $entry['flags'], true));
     }
 
+    public function testFailKeywordOverridesOkKeyword(): void
+    {
+        $out = "SMART Health Status: OK FAIL\n";
+        $disk = ['path' => '/dev/sdy', 'kname' => 'sdy', 'model' => 'TEST', 'serial' => 'Q', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('fail', $entry['severity']);
+        $this->assertTrue(in_array('health_not_ok', $entry['flags'], true));
+    }
+
     public function testStandbyIsOk(): void
     {
         $out = "Device is in STANDBY mode\n";

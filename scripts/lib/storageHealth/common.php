@@ -19,10 +19,9 @@ function pmssStorageHealthReadLastEntries(string $path): array
     }
     $last = [];
     while (($line = fgets($fh)) !== false) {
-        if (!is_array($entry = json_decode($line, true))) {
-            continue;
+        if (is_array($entry = json_decode($line, true))) {
+            $last[(string) ($entry['kind'] ?? '').'::'.(string) ($entry['device'] ?? ($entry['array'] ?? 'global'))] = $entry;
         }
-        $last[(string) ($entry['kind'] ?? '').'::'.(string) ($entry['device'] ?? ($entry['array'] ?? 'global'))] = $entry;
     }
     fclose($fh);
     return $last;
@@ -51,8 +50,7 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
             continue;
         }
 
-        $mountSource = str_replace('\\040', ' ', (string) $fields[0]);
-        $resolvedPath = @realpath($mountSource) ?: $mountSource;
+        $resolvedPath = @realpath($mountSource = str_replace('\\040', ' ', (string) $fields[0])) ?: $mountSource;
         return preg_match('#/(md\d+)$#', $resolvedPath, $matches) === 1 ? $matches[1] : null;
     }
     return null;
@@ -164,17 +162,17 @@ function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
 {
     foreach ($raidEntries as $entry) {
         $flags = (array) ($entry['flags'] ?? []);
-        $severity = (string) ($entry['severity'] ?? 'ok');
         $isRebuild = in_array('rebuild_in_progress', $flags, true);
-        if (!$isRebuild && !in_array('degraded', $flags, true) && $severity === 'ok') {
+        if (!$isRebuild && !in_array('degraded', $flags, true) && (string) ($entry['severity'] ?? 'ok') === 'ok') {
             continue;
         }
 
         $arrayName = (string) ($entry['array'] ?? 'md');
-        $operation = (string) ($entry['operation'] ?? 'resync');
         return [
             'status' => 'performance_limited',
-            'reason' => $isRebuild ? "RAID {$arrayName} {$operation} in progress" : "RAID {$arrayName} degraded",
+            'reason' => $isRebuild
+                ? 'RAID '.$arrayName.' '.((string) ($entry['operation'] ?? 'resync')).' in progress'
+                : 'RAID '.$arrayName.' degraded',
             'array' => $arrayName,
         ];
     }
