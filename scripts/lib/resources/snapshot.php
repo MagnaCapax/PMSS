@@ -12,43 +12,6 @@ require_once __DIR__.'/accumulator.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 
-function pmssResourceSnapshotComputeFromLog(resourceStatistics $stats, string $user): ?array
-{
-    $dataLines = $stats->getData($user, 350);
-    if (trim($dataLines) === '') {
-        return null;
-    }
-
-    $threshold = time() - (24 * 60 * 60);
-    $lines = array_filter(explode("\n", trim($dataLines)));
-    $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
-
-    foreach ($lines as $line) {
-        $parsed = $stats->parseLine($line);
-        if ($parsed === false || $parsed['timestamp'] < $threshold) {
-            continue;
-        }
-        $accumulator->addSample($parsed);
-    }
-
-    if (!$accumulator->hasSamples()) {
-        return null;
-    }
-
-    $results = $accumulator->results();
-
-    return [
-        'io_read' => $results['raw']['io_read']['day'],
-        'io_write' => $results['raw']['io_write']['day'],
-        'io_read_ops' => $results['raw']['io_read_ops']['day'],
-        'io_write_ops' => $results['raw']['io_write_ops']['day'],
-        'cpu' => $results['raw']['cpu']['day'],
-        'memory' => $results['memory']['day'],
-        'ram_hours' => $results['raw']['ram_hours']['day'],
-        'tasks' => $results['tasks']['day'],
-    ];
-}
-
 /**
  * Capture and persist one snapshot.
  *
@@ -113,7 +76,35 @@ function pmssResourceSnapshotRun(): int
                 }
             }
 
-            if ($metrics === null && ($metrics = pmssResourceSnapshotComputeFromLog($stats, $user)) === null) {
+            if ($metrics === null) {
+                $dataLines = $stats->getData($user, 350);
+                if (trim($dataLines) !== '') {
+                    $threshold = time() - (24 * 60 * 60);
+                    $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
+                    foreach (array_filter(explode("\n", trim($dataLines))) as $line) {
+                        $parsed = $stats->parseLine($line);
+                        if ($parsed === false || $parsed['timestamp'] < $threshold) {
+                            continue;
+                        }
+                        $accumulator->addSample($parsed);
+                    }
+                    if ($accumulator->hasSamples()) {
+                        $results = $accumulator->results();
+                        $metrics = [
+                            'io_read' => $results['raw']['io_read']['day'],
+                            'io_write' => $results['raw']['io_write']['day'],
+                            'io_read_ops' => $results['raw']['io_read_ops']['day'],
+                            'io_write_ops' => $results['raw']['io_write_ops']['day'],
+                            'cpu' => $results['raw']['cpu']['day'],
+                            'memory' => $results['memory']['day'],
+                            'ram_hours' => $results['raw']['ram_hours']['day'],
+                            'tasks' => $results['tasks']['day'],
+                        ];
+                    }
+                }
+            }
+
+            if ($metrics === null) {
                 @fwrite($fh, $ts.' WARN resource_missing user='.$user.PHP_EOL);
                 continue;
             }

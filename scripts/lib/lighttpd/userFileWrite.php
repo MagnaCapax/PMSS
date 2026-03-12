@@ -21,12 +21,7 @@ function pmssAtomicWriteFile(string $path, string $content): bool
         return false;
     }
 
-    if (@file_put_contents($tmp, $content) === false) {
-        @unlink($tmp);
-        return false;
-    }
-
-    if (!@rename($tmp, $path)) {
+    if (@file_put_contents($tmp, $content) === false || !@rename($tmp, $path)) {
         @unlink($tmp);
         return false;
     }
