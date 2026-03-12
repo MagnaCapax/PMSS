@@ -29,36 +29,36 @@ function pmssUserConfigureHttp(array $ctx): void
     // Keep qBittorrent WebUI reverse-proxy compatibility settings disabled.
     $qbittorrentConfig = "{$home}/.config/qBittorrent/qBittorrent.conf";
     if (is_file($qbittorrentConfig) && is_string($config = file_get_contents($qbittorrentConfig))) {
+        $originalConfig = $config;
         foreach (['HostHeaderValidation', 'CSRFProtection', 'ClickjackingProtection'] as $setting) {
             $updated = preg_replace('/^WebUI\\\\'.preg_quote($setting, '/').'=.*$/m', 'WebUI\\'.$setting.'=false', $config, 1, $count);
             if ($count < 1 || $updated === null || $updated === $config) {
                 continue;
             }
 
-            file_put_contents($qbittorrentConfig, $updated);
             $config = $updated;
             if ($userLog) {
                 $userLog('Updated qBittorrent WebUI '.$setting.' to false');
             }
         }
-    }
 
-    $phpIniPath = "{$home}/.lighttpd/php.ini";
-    if (file_exists($phpIniPath)) {
-        $phpIni = parse_ini_file($phpIniPath);
-        if ($phpIni !== false && !isset($phpIni['error_log'])) {
-            $phpIni['error_log'] = "{$home}/.lighttpd/error.log";
-            $newContent = '';
-            foreach ($phpIni as $key => $value) {
-                $newContent .= sprintf('%s = "%s"\n', $key, $value);
-            }
-            file_put_contents($phpIniPath, $newContent);
-            echo "Updated php.ini for user {$user}\n";
+        if ($config !== $originalConfig) {
+            file_put_contents($qbittorrentConfig, $config);
         }
     }
 
-    $tmpDir = "{$home}/.tmp";
-    if (!is_dir($tmpDir)) {
+    $phpIniPath = "{$home}/.lighttpd/php.ini";
+    if (file_exists($phpIniPath) && ($phpIni = parse_ini_file($phpIniPath)) !== false && !isset($phpIni['error_log'])) {
+        $phpIni['error_log'] = "{$home}/.lighttpd/error.log";
+        $newContent = '';
+        foreach ($phpIni as $key => $value) {
+            $newContent .= sprintf('%s = "%s"\n', $key, $value);
+        }
+        file_put_contents($phpIniPath, $newContent);
+        echo "Updated php.ini for user {$user}\n";
+    }
+
+    if (!is_dir("{$home}/.tmp")) {
         pmssEnsureUserHomeDir($user, $home, '.tmp', 0755, $userLog);
     }
 
@@ -70,8 +70,7 @@ function pmssUserConfigureHttp(array $ctx): void
         runUserStep($user, 'Adjusting irssi configuration ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($irssiDir)));
     }
 
-    $recycleDir = "{$home}/www/recycle";
-    if (!is_dir($recycleDir)) {
+    if (!is_dir("{$home}/www/recycle")) {
         // Note: parent directory mode should remain legacy defaults; only the recycle dir is 0771.
         pmssEnsureUserHomeDir($user, $home, 'www/recycle', 0771, $userLog, 0755);
     }

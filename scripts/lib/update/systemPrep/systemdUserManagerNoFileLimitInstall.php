@@ -16,12 +16,8 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         return;
     }
 
-    $soft = isset($policy['limitNoFileSoft']) && is_numeric($policy['limitNoFileSoft'])
-        ? max(0, (int)$policy['limitNoFileSoft'])
-        : 0;
-    $hard = isset($policy['limitNoFileHard']) && is_numeric($policy['limitNoFileHard'])
-        ? max(0, (int)$policy['limitNoFileHard'])
-        : 0;
+    $soft = (isset($policy['limitNoFileSoft']) && is_numeric($policy['limitNoFileSoft'])) ? max(0, (int)$policy['limitNoFileSoft']) : 0;
+    $hard = (isset($policy['limitNoFileHard']) && is_numeric($policy['limitNoFileHard'])) ? max(0, (int)$policy['limitNoFileHard']) : 0;
 
     if ($soft === 0 && $hard === 0) {
         $log('[SKIP] No LimitNOFILE values found in cgroup policy');
@@ -38,9 +34,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
     }
 
     $target = $dropDir.'/20-pmss-limits.conf';
-    $body = "# PMSS: per-user manager descriptor limits from cgroup.policy.php\n"
-        ."[Service]\n"
-        ."LimitNOFILE=".$soft.':'.$hard."\n";
+    $body = "# PMSS: per-user manager descriptor limits from cgroup.policy.php\n[Service]\nLimitNOFILE={$soft}:{$hard}\n";
 
     $tmpTarget = $target.'.tmp';
     if (@file_put_contents($tmpTarget, $body) === false) {
@@ -73,9 +67,7 @@ function pmssSystemdUserManagerLogNamespaceInstall(callable $log): void
     }
 
     $target = $dropDir.'/30-pmss-log-namespace.conf';
-    $body = "# PMSS: isolate per-user manager logs in dedicated namespaces\n"
-        ."[Service]\n"
-        ."LogNamespace=user-%i\n";
+    $body = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
 
     $tmpTarget = $target.'.tmp';
     if (@file_put_contents($tmpTarget, $body) === false) {

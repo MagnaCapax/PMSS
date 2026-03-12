@@ -46,9 +46,7 @@ function pmssEnsureAuthorizedKeysDirective(): void
         return;
     }
     $sshdConfig = '/etc/ssh/sshd_config';
-    $backupPath = '/etc/ssh/pmss.sshd_config';
-    $config = @file_get_contents($sshdConfig);
-    if ($config === false) {
+    if (!is_string($config = @file_get_contents($sshdConfig))) {
         return;
     }
     logMessage('[START] Ensuring sshd AuthorizedKeysFile directive is enabled');
@@ -59,7 +57,7 @@ function pmssEnsureAuthorizedKeysDirective(): void
 
     echo "# Allowing SSH Key based authentication.\n";
     pmssBackupCriticalConfig('sshd', $sshdConfig);
-    @copy($sshdConfig, $backupPath);
+    @copy($sshdConfig, '/etc/ssh/pmss.sshd_config');
     file_put_contents($sshdConfig, $updated);
     runStep('Restarting sshd service after config update', '/etc/init.d/ssh restart');
 }

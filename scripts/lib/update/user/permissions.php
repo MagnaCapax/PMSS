@@ -52,11 +52,7 @@ function pmssUserRefreshPermissions(array $ctx): void
     try {
         $rc = runUserStep($user, 'Refreshing user permissions', pmssUserPermissionsCommand($user));
     } finally {
-        if ($previousTimeout === false) {
-            putenv('PMSS_COMMAND_TIMEOUT');
-        } else {
-            putenv('PMSS_COMMAND_TIMEOUT='.$previousTimeout);
-        }
+        putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
     }
 
     if ($rc === 124) {
