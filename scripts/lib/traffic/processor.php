@@ -84,17 +84,14 @@ class TrafficStatsProcessor
     /** Sanitize user input by stripping unexpected characters. */
     public function sanitizeUser(string $input): string
     {
-        return preg_replace('/[^a-zA-Z0-9-_]/', '', $input);
+        return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $input);
     }
 
     /** Validate that a user has traffic data and a home directory. */
     public function validateUser(string $username): bool
     {
         $path = $this->trafficDir.'/'.$username;
-        $suffix = '-localnet';
-        $baseUser = substr($username, -strlen($suffix)) === $suffix
-            ? substr($username, 0, -strlen($suffix))
-            : $username;
+        $baseUser = (string) preg_replace('/-localnet$/', '', $username);
         $homePath = $this->homeDir.'/'.$baseUser;
         if (!is_readable($path)) {
             return false;
@@ -165,13 +162,13 @@ class TrafficStatsProcessor
     {
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
-            if (($value / 1024 / 1024) > 1) {
-                $formatted[$label] = round($value / 1024 / 1024, 2).'TiB';
-            } elseif (($value / 1024) > 1) {
-                $formatted[$label] = round($value / 1024, 2).'GiB';
-            } else {
-                $formatted[$label] = round($value, 2).'MiB';
+            foreach ([1024 * 1024 => 'TiB', 1024 => 'GiB'] as $divisor => $unit) {
+                if (($value / $divisor) > 1) {
+                    $formatted[$label] = round($value / $divisor, 2).$unit;
+                    continue 2;
+                }
             }
+            $formatted[$label] = round($value, 2).'MiB';
         }
         return $formatted;
     }

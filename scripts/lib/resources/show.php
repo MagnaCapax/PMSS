@@ -46,7 +46,7 @@ function pmssShowResourcesMain(array $argv): int
             return 1;
         }
         $users = array_values(array_filter(array_map('trim', $lines), 'pmssResourceLogIsValidUser'));
-        if (count($users) === 0) {
+        if (empty($users)) {
             die("No users in this system!\n");
         }
         if (is_file($statsDir.'/www-data')) {
