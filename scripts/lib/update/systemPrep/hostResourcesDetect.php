@@ -11,7 +11,7 @@
 function pmssTotalMemMiB(): int
 {
     $override = getenv('PMSS_TOTAL_MEM_MIB');
-    if (ctype_digit((string)$override)) {
+    if (is_string($override) && ctype_digit($override)) {
         return (int)$override;
     }
     foreach (@file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
@@ -27,18 +27,20 @@ function pmssTotalMemMiB(): int
 function pmssTotalCpuThreads(): int
 {
     $override = getenv('PMSS_TOTAL_CPU_THREADS');
-    if (ctype_digit((string)$override)) {
+    if (is_string($override) && ctype_digit($override)) {
         return (int)$override;
     }
     // Robust check using /proc/cpuinfo
     $cpuinfo = @file_get_contents('/proc/cpuinfo');
-    $count = $cpuinfo !== false ? substr_count($cpuinfo, 'processor') : 0;
-    if ($count > 0) return $count;
+    if ($cpuinfo !== false && ($count = substr_count($cpuinfo, 'processor')) > 0) {
+        return $count;
+    }
+
     // Fallback to nproc if available
     $nproc = @shell_exec('nproc');
-    if ($nproc !== null) {
-        $count = (int)trim($nproc);
-        if ($count > 0) return $count;
+    if ($nproc !== null && ($count = (int)trim($nproc)) > 0) {
+        return $count;
     }
+
     return 0;
 }

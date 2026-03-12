@@ -22,12 +22,8 @@ class RealSystem implements SystemInterface
      */
     private function isTestMode(): bool
     {
-        $flag = strtolower((string) getenv('PMSS_TEST_MODE'));
-        if ($flag === '1' || $flag === 'true' || $flag === 'yes') {
-            return true;
-        }
-
-        return defined('PMSS_TEST_MODE') && PMSS_TEST_MODE;
+        return in_array(strtolower((string) getenv('PMSS_TEST_MODE')), ['1', 'true', 'yes'], true)
+            || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE);
     }
     public function getCgroupMode(): string
     {
@@ -45,11 +41,8 @@ class RealSystem implements SystemInterface
 
     public function execute(string $command): ?string
     {
-        if ($this->isTestMode()) {
-            // In test mode we avoid shelling out to real systemctl/findmnt.
-            return '';
-        }
-        return @shell_exec($command);
+        // In test mode we avoid shelling out to real systemctl/findmnt.
+        return $this->isTestMode() ? '' : @shell_exec($command);
     }
 
     public function readFile(string $path): ?string

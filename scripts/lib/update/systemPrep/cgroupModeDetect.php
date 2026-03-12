@@ -14,7 +14,7 @@
 function pmssCgroupMode(): string
 {
     $override = getenv('PMSS_CGROUP_MODE');
-    if ($override === 'v2' || $override === 'v1') return $override;
+    if (in_array($override, ['v2', 'v1'], true)) return $override;
 
     // Strongest signal: cgroup2 mount present in /proc/self/mountinfo
     foreach (@file('/proc/self/mountinfo', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
@@ -33,8 +33,9 @@ function pmssCgroupMode(): string
     }
 
     // v1 hint: presence of controller directories under /sys/fs/cgroup/
-    foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $d) {
-        if (basename((string)$d) !== 'unified') return 'v1';
+    foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $dir) {
+        if (basename((string)$dir) === 'unified') continue;
+        return 'v1';
     }
 
     return 'unknown';
