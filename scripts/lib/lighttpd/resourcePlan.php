@@ -39,8 +39,7 @@ function pmssParseSizeToMiB($value): ?int
 
 function pmssClampMemoryLimit(int $memoryMiB): int
 {
-    $bounded = max(PMSS_PHP_MEMORY_MIN_MB, min(PMSS_PHP_MEMORY_MAX_MB, $memoryMiB));
-    return $bounded;
+    return max(PMSS_PHP_MEMORY_MIN_MB, min(PMSS_PHP_MEMORY_MAX_MB, $memoryMiB));
 }
 
 function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
@@ -87,33 +86,6 @@ function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
     return max(200, $default);
 }
 
-function pmssReadUserSliceProps(string $user): array
-{
-    if (!function_exists('posix_getpwnam')) {
-        return [];
-    }
-    $info = posix_getpwnam($user);
-    if (!is_array($info) || !isset($info['uid'])) {
-        return [];
-    }
-    $slice = sprintf('user-%d.slice', (int)$info['uid']);
-    $cmd = 'systemctl show '.escapeshellarg($slice).' -p MemoryHigh -p MemoryMax -p CPUQuotaPerSecUSec -p CPUQuotaPeriodUSec -p CPUQuota';
-    $out = @shell_exec($cmd);
-    $props = [];
-    if (!is_string($out)) {
-        return $props;
-    }
-    foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-        if ($line === '') continue;
-        $pos = strpos($line, '=');
-        if ($pos === false) continue;
-        $key = substr($line, 0, $pos);
-        $val = substr($line, $pos + 1);
-        $props[$key] = $val;
-    }
-    return $props;
-}
-
 function pmssComputePhpProcessPlan(float $cpuQuotaPercent): array
 {
     // Scale worker threads with CPU quota (approx. 4 threads per 100% quota),
@@ -141,7 +113,24 @@ function pmssComputePhpProcessPlan(float $cpuQuotaPercent): array
 
 function pmssResolveUserResources(string $user, array $policyDefaults): array
 {
-    $props = pmssReadUserSliceProps($user);
+    $props = [];
+    if (function_exists('posix_getpwnam') && is_array($info = posix_getpwnam($user)) && isset($info['uid'])) {
+        $slice = sprintf('user-%d.slice', (int)$info['uid']);
+        $cmd = 'systemctl show '.escapeshellarg($slice).' -p MemoryHigh -p MemoryMax -p CPUQuotaPerSecUSec -p CPUQuotaPeriodUSec -p CPUQuota';
+        $out = @shell_exec($cmd);
+        if (is_string($out)) {
+            foreach (preg_split('/\r?\n/', trim($out)) as $line) {
+                if ($line === '') {
+                    continue;
+                }
+                $pos = strpos($line, '=');
+                if ($pos === false) {
+                    continue;
+                }
+                $props[substr($line, 0, $pos)] = substr($line, $pos + 1);
+            }
+        }
+    }
 
     $memoryHigh = null;
     if (isset($props['MemoryHigh'])) {
@@ -169,4 +158,3 @@ function pmssResolveUserResources(string $user, array $policyDefaults): array
         'totalThreads'    => $plan['totalThreads'],
     ];
 }
-

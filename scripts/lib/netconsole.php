@@ -64,27 +64,6 @@ function pmssNetconsoleWriteIfChanged(string $path, string $body, callable $log)
 }
 
 /**
- * Verify that the configured target MAC is reachable via the configured link.
- */
-function pmssNetconsoleTargetIsReachable(array $target, callable $log, ?callable $runner = null): bool
-{
-    $runner = $runner ?: 'runStep';
-    $ping = strpos($target['targetIp'], ':') === false ? 'ping' : 'ping -6';
-    $command = 'bash -lc '.escapeshellarg(
-        $ping.' -c 1 -W 1 -I '.escapeshellarg($target['interface']).' '.escapeshellarg($target['targetIp']).' >/dev/null 2>&1 || true; '
-        .'ip neigh show to '.escapeshellarg($target['targetIp']).' dev '.escapeshellarg($target['interface'])
-        .' | grep -Fqi '.escapeshellarg($target['targetMac'])
-    );
-
-    if ((int) $runner('Verifying netconsole target reachability', $command) === 0) {
-        return true;
-    }
-
-    $log('[WARN] Netconsole target '.$target['targetIp'].'/'.$target['targetMac'].' is not reachable via '.$target['interface']);
-    return false;
-}
-
-/**
  * Apply optional netconsole configuration when `/etc/seedbox/config/netconsole` exists.
  */
 function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
@@ -105,7 +84,14 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    if (!pmssNetconsoleTargetIsReachable($target, $log, $runner)) {
+    $ping = strpos($target['targetIp'], ':') === false ? 'ping' : 'ping -6';
+    $command = 'bash -lc '.escapeshellarg(
+        $ping.' -c 1 -W 1 -I '.escapeshellarg($target['interface']).' '.escapeshellarg($target['targetIp']).' >/dev/null 2>&1 || true; '
+        .'ip neigh show to '.escapeshellarg($target['targetIp']).' dev '.escapeshellarg($target['interface'])
+        .' | grep -Fqi '.escapeshellarg($target['targetMac'])
+    );
+    if ((int) $runner('Verifying netconsole target reachability', $command) !== 0) {
+        $log('[WARN] Netconsole target '.$target['targetIp'].'/'.$target['targetMac'].' is not reachable via '.$target['interface']);
         return;
     }
 

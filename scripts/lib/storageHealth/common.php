@@ -35,9 +35,9 @@ function pmssStorageHealthSeverityMax(string $a, string $b): string
 }
 
 /**
- * Read the device mounted at the requested mount point from /proc/mounts.
+ * Resolve the md array that backs /home, if /home is mounted directly on md.
  */
-function pmssStorageHealthMountSourceRead(string $mountPoint, ?string $mountsPath = null): ?string
+function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
 {
     $mountsPath = ($mountsPath !== null && $mountsPath !== '') ? $mountsPath : '/proc/mounts';
     $mounts = @file($mountsPath, FILE_IGNORE_NEW_LINES);
@@ -45,24 +45,16 @@ function pmssStorageHealthMountSourceRead(string $mountPoint, ?string $mountsPat
         return null;
     }
 
+    $mountSource = null;
     foreach ($mounts as $line) {
         $fields = preg_split('/\s+/', trim($line));
-        if (!is_array($fields) || count($fields) < 2 || str_replace('\\040', ' ', (string) $fields[1]) !== $mountPoint) {
+        if (!is_array($fields) || count($fields) < 2 || str_replace('\\040', ' ', (string) $fields[1]) !== '/home') {
             continue;
         }
 
-        return str_replace('\\040', ' ', (string) $fields[0]);
+        $mountSource = str_replace('\\040', ' ', (string) $fields[0]);
+        break;
     }
-
-    return null;
-}
-
-/**
- * Resolve the md array that backs /home, if /home is mounted directly on md.
- */
-function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
-{
-    $mountSource = pmssStorageHealthMountSourceRead('/home', $mountsPath);
     if ($mountSource === null) {
         return null;
     }
@@ -115,9 +107,7 @@ function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $r
         return null;
     }
 
-    if ($raidEntries === null) {
-        $raidEntries = pmssStorageHealthSnapshotRaid(date('c'));
-    }
+    $raidEntries = $raidEntries ?? pmssStorageHealthSnapshotRaid(date('c'));
 
     foreach ($raidEntries as $entry) {
         $activityLine = trim((string) ($entry['resync'] ?? ''));
