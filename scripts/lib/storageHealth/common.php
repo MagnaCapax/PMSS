@@ -13,17 +13,16 @@
  */
 function pmssStorageHealthReadLastEntries(string $path): array
 {
-    $fh = is_file($path) ? fopen($path, 'r') : false;
+    $fh = @fopen($path, 'r');
     if ($fh === false) {
         return [];
     }
     $last = [];
     while (($line = fgets($fh)) !== false) {
-        $j = json_decode($line, true);
-        if (!is_array($j)) {
+        if (!is_array($entry = json_decode($line, true))) {
             continue;
         }
-        $last[(string) ($j['kind'] ?? '').'::'.(string) ($j['device'] ?? ($j['array'] ?? 'global'))] = $j;
+        $last[(string) ($entry['kind'] ?? '').'::'.(string) ($entry['device'] ?? ($entry['array'] ?? 'global'))] = $entry;
     }
     fclose($fh);
     return $last;
@@ -70,11 +69,7 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
 
     $resolvedPath = @realpath($mountSource) ?: $mountSource;
 
-    if (preg_match('#/(md\d+)$#', $resolvedPath, $matches) !== 1) {
-        return null;
-    }
-
-    return $matches[1];
+    return preg_match('#/(md\d+)$#', $resolvedPath, $matches) === 1 ? $matches[1] : null;
 }
 
 /**
@@ -185,13 +180,14 @@ function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
 {
     foreach ($raidEntries as $entry) {
         $flags = (array) ($entry['flags'] ?? []);
-        $arrayName = (string) ($entry['array'] ?? 'md');
+        $severity = (string) ($entry['severity'] ?? 'ok');
         $isRebuild = in_array('rebuild_in_progress', $flags, true);
-        $isDegraded = in_array('degraded', $flags, true) || (string) ($entry['severity'] ?? 'ok') !== 'ok';
+        $isDegraded = in_array('degraded', $flags, true) || $severity !== 'ok';
         if (!$isRebuild && !$isDegraded) {
             continue;
         }
 
+        $arrayName = (string) ($entry['array'] ?? 'md');
         $operation = (string) ($entry['operation'] ?? 'resync');
         return [
             'status' => 'performance_limited',

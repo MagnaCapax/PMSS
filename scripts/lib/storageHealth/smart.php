@@ -113,14 +113,12 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         }
     }
 
-    if ($healthExplicit) {
-        if (!$healthOk) {
-            $sev = pmssStorageHealthSeverityMax($sev, 'fail');
-            $flags[] = 'health_not_ok';
-        }
-    } else {
+    if (!$healthExplicit) {
         $sev = pmssStorageHealthSeverityMax($sev, 'warn');
         $flags[] = 'health_unknown';
+    } elseif (!$healthOk) {
+        $sev = pmssStorageHealthSeverityMax($sev, 'fail');
+        $flags[] = 'health_not_ok';
     }
 
     foreach (['pending' => 'pending_sectors', 'reallocated' => 'reallocated_sectors'] as $metric => $flag) {
@@ -143,10 +141,9 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
 
     if (is_array($prevMetrics)) {
         foreach (['reallocated' => false, 'pending' => true, 'link_errors' => false] as $metric => $raiseWarn) {
-            if (!isset($metrics[$metric], $prevMetrics[$metric])
-                || !is_int($metrics[$metric])
-                || !is_int($prevMetrics[$metric])
-                || $metrics[$metric] <= $prevMetrics[$metric]) {
+            $current = $metrics[$metric] ?? null;
+            $previous = $prevMetrics[$metric] ?? null;
+            if (!is_int($current) || !is_int($previous) || $current <= $previous) {
                 continue;
             }
             if ($raiseWarn) {
