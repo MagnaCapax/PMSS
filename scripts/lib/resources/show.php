@@ -7,9 +7,32 @@
  */
 
 require_once __DIR__.'/report.php';
-require_once __DIR__.'/showFormat.php';
 require_once __DIR__.'/userHelpers.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
+
+function pmssResourceFormatBytes(float $bytes): string
+{
+    foreach ([1099511627776.0 => 'TiB', 1073741824.0 => 'GiB', 1048576.0 => 'MiB'] as $divisor => $unit) {
+        if ($bytes >= $divisor) return number_format($bytes / $divisor, 2).' '.$unit;
+    }
+
+    return number_format($bytes / 1024, 2).' KiB';
+}
+
+function pmssResourceFormatCpuHours(float $cpuNsec): string
+{
+    return number_format($cpuNsec / 1000000000 / 3600, 1).' hrs';
+}
+
+function pmssResourceFormatRamHours(float $ramHours): string
+{
+    return number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs';
+}
+
+function pmssResourceFormatOpsPerSecond(float $ops, int $windowSeconds): string
+{
+    return ($windowSeconds <= 0) ? '0.00' : number_format($ops / $windowSeconds, 2);
+}
 
 function pmssShowResourcesMain(array $argv): int
 {

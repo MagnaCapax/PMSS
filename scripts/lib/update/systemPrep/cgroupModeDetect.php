@@ -14,15 +14,15 @@
 function pmssCgroupMode(): string
 {
     $override = getenv('PMSS_CGROUP_MODE');
-    if ($override === 'v1' || $override === 'v2') {
+    if (in_array($override, ['v1', 'v2'], true)) {
         return $override;
     }
 
     // Strongest signal: cgroup2 mount present in /proc/self/mountinfo.
     // Also treat cgroup.controllers as a definitive v2 signal.
     $mountInfo = @file_get_contents('/proc/self/mountinfo');
-    if ((is_string($mountInfo) && strpos($mountInfo, ' - cgroup2 ') !== false)
-        || is_file('/sys/fs/cgroup/cgroup.controllers')) {
+    if (is_file('/sys/fs/cgroup/cgroup.controllers')
+        || (is_string($mountInfo) && strpos($mountInfo, ' - cgroup2 ') !== false)) {
         return 'v2';
     }
 

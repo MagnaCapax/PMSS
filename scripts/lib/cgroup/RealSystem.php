@@ -28,7 +28,7 @@ class RealSystem implements SystemInterface
     {
         // In test mode we avoid shelling out to real systemctl/findmnt.
         $testMode = strtolower((string) getenv('PMSS_TEST_MODE'));
-        if ($testMode === '1' || $testMode === 'true' || $testMode === 'yes' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE)) {
+        if ((defined('PMSS_TEST_MODE') && PMSS_TEST_MODE) || in_array($testMode, ['1', 'true', 'yes'], true)) {
             return '';
         }
 
