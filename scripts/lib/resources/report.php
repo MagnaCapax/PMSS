@@ -77,10 +77,9 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
-    $payloadMetrics = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
-    $buildPayload = static function (array $source) use ($payloadMetrics): array {
+    $buildPayload = static function (array $source): array {
         $payload = [];
-        foreach ($payloadMetrics as $metric) {
+        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metric) {
             $payload[$metric] = $source[$metric];
         }
         $payload['memory'] = [

@@ -30,12 +30,11 @@ class TrafficStatsProcessor
         $this->homeDir         = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
         $runtimeDir            = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->passwdFile      = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
-        $trafficMode           = $paths['traffic_mode'] ?? 'egress';
         $this->storage         = new TrafficStorage([
             'home_dir'   => $this->homeDir,
             'runtime_dir'=> $runtimeDir,
             'stats_dir'  => $runtimeDir.'/trafficStats',
-            'traffic_mode' => $trafficMode,
+            'traffic_mode' => $paths['traffic_mode'] ?? 'egress',
         ]);
     }
 
@@ -111,13 +110,13 @@ class TrafficStatsProcessor
             return;
         }
 
-        $dataLines = $this->stats->getData($user, (int)((35 * 24 * 60) / 5));
-        if (trim($dataLines) === '') {
+        $dataLines = trim($this->stats->getData($user, (int)((35 * 24 * 60) / 5)));
+        if ($dataLines === '') {
             logMessage(date('c').": No data for user {$user}");
             return;
         }
 
-        $trafficData = array_filter(explode("\n", trim($dataLines)));
+        $trafficData = array_filter(explode("\n", $dataLines));
         if (count($trafficData) < 2) {
             logMessage(date('c').": Too little data for {$user}");
             return;

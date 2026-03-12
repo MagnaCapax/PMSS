@@ -25,8 +25,6 @@ function pmssShowResourcesMain(array $argv): int
         return 0;
     }
 
-    $asJson = isset($options['json']);
-    $showMissing = isset($options['show-missing']);
     $userFilter = isset($options['user']) ? trim((string) $options['user']) : null;
 
     $statsDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/').'/resourceStats';
@@ -57,7 +55,7 @@ function pmssShowResourcesMain(array $argv): int
 
     ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
-    if ($asJson) {
+    if (isset($options['json'])) {
         echo json_encode(pmssResourceBuildJsonPayload($rows, $totals, $missingStats))."\n";
         return 0;
     }
@@ -87,7 +85,7 @@ function pmssShowResourcesMain(array $argv): int
 
     if (!empty($missingStats)) {
         echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";
-        if ($showMissing) {
+        if (isset($options['show-missing'])) {
             echo "* Missing: ".implode(' ', $missingStats)."\n";
         }
     }

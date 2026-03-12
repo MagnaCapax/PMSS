@@ -15,12 +15,7 @@ function pmssParseSizeToMiB($value): ?int
     if (preg_match('/^([0-9.]+)\s*([KMG])?B?$/i', $raw, $m)) {
         $num = (float)$m[1];
         $unit = strtolower($m[2] ?? '');
-        if ($unit === '') {
-            // No unit → assume bytes
-            return (int)round($num / 1048576);
-        }
-
-        $factors = ['k' => 1 / 1024, 'm' => 1, 'g' => 1024];
+        $factors = ['' => 1 / 1048576, 'k' => 1 / 1024, 'm' => 1, 'g' => 1024];
         return isset($factors[$unit]) ? (int)round($num * $factors[$unit]) : null;
     }
 
@@ -127,10 +122,9 @@ function pmssResolveUserResources(string $user, array $policyDefaults): array
 
     $memoryHigh = null;
     foreach (['MemoryHigh', 'MemoryMax'] as $memoryLimitField) {
-        if ($memoryHigh !== null || !isset($props[$memoryLimitField])) {
-            continue;
+        if (isset($props[$memoryLimitField]) && ($memoryHigh = pmssParseSizeToMiB($props[$memoryLimitField])) !== null) {
+            break;
         }
-        $memoryHigh = pmssParseSizeToMiB($props[$memoryLimitField]);
     }
     if ($memoryHigh === null && isset($policyDefaults['memoryHighMiB'])) {
         $memoryHigh = (int)$policyDefaults['memoryHighMiB'];
