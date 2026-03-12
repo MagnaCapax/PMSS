@@ -141,9 +141,7 @@ class TrafficStatsProcessor
             }
 
             $currentDay = date('Y/m/d', $parsed['timestamp']);
-            if ($firstDay === '') {
-                $firstDay = $currentDay;
-            }
+            $firstDay = ($firstDay === '') ? $currentDay : $firstDay;
             if ($currentDay !== $firstDay) {
                 $dailyTotals[$currentDay] = ($dailyTotals[$currentDay] ?? 0) + $parsed['data'];
             }
@@ -162,13 +160,14 @@ class TrafficStatsProcessor
     {
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
+            $valueMiB = (float) $value;
             foreach ([1024 * 1024 => 'TiB', 1024 => 'GiB'] as $divisor => $unit) {
-                if (($value / $divisor) > 1) {
-                    $formatted[$label] = round($value / $divisor, 2).$unit;
+                if ($valueMiB > $divisor) {
+                    $formatted[$label] = round($valueMiB / $divisor, 2).$unit;
                     continue 2;
                 }
             }
-            $formatted[$label] = round($value, 2).'MiB';
+            $formatted[$label] = round($valueMiB, 2).'MiB';
         }
         return $formatted;
     }

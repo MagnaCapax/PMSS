@@ -25,9 +25,7 @@ class ResourceStatsDailyAccumulator
     public function addSample(array $sample, float $intervalHours): void
     {
         $currentDay = date('Y/m/d', (int) $sample['timestamp']);
-        if ($this->firstDay === '') {
-            $this->firstDay = $currentDay;
-        }
+        $this->firstDay = ($this->firstDay === '') ? $currentDay : $this->firstDay;
         if ($currentDay === $this->firstDay) {
             return;
         }
@@ -39,13 +37,18 @@ class ResourceStatsDailyAccumulator
         }
 
         $dayTotals = &$this->dailyTotals[$currentDay];
-        $sampleRamHours = ((float) $sample['memory'] / 1024 / 1024 / 1024) * $intervalHours;
-        $dayTotals['io_read'] += $sample['io_read'];
-        $dayTotals['io_write'] += $sample['io_write'];
-        $dayTotals['io_read_ops'] += (float) ($sample['io_read_ops'] ?? 0.0);
-        $dayTotals['io_write_ops'] += (float) ($sample['io_write_ops'] ?? 0.0);
-        $dayTotals['cpu'] += $sample['cpu'];
-        $dayTotals['ram_hours'] += $sampleRamHours;
+        foreach (
+            [
+                'io_read' => (float) $sample['io_read'],
+                'io_write' => (float) $sample['io_write'],
+                'io_read_ops' => (float) ($sample['io_read_ops'] ?? 0.0),
+                'io_write_ops' => (float) ($sample['io_write_ops'] ?? 0.0),
+                'cpu' => (float) $sample['cpu'],
+                'ram_hours' => ((float) $sample['memory'] / 1024 / 1024 / 1024) * $intervalHours,
+            ] as $metric => $value
+        ) {
+            $dayTotals[$metric] += $value;
+        }
         $dayTotals['memory_sum'] += $sample['memory'];
         $dayTotals['memory_count'] += 1;
         $dayTotals['tasks_sum'] += $sample['tasks'];

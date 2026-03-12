@@ -59,30 +59,34 @@ class ResourceStatsAccumulator
     {
         $this->sampleCount++;
         $timestamp = (int) $sample['timestamp'];
-        $this->lastMemory = (float) $sample['memory'];
-        $this->lastTasks = (float) $sample['tasks'];
-        $sampleReadOps = (float) ($sample['io_read_ops'] ?? 0.0);
-        $sampleWriteOps = (float) ($sample['io_write_ops'] ?? 0.0);
+        $sampleMemory = (float) $sample['memory'];
+        $sampleTasks = (float) $sample['tasks'];
+        $this->lastMemory = $sampleMemory;
+        $this->lastTasks = $sampleTasks;
 
         $defaultIntervalHours = 300 / 3600;
         $delta = ($this->prevTimestamp === null) ? 0 : ($timestamp - $this->prevTimestamp);
         $intervalHours = ($delta > 0 && $delta <= 3600) ? ($delta / 3600) : $defaultIntervalHours;
         $this->prevTimestamp = $timestamp;
-        $sampleRamHours = ((float) $sample['memory'] / 1024 / 1024 / 1024) * $intervalHours;
+        $sampleMetrics = [
+            'io_read' => (float) $sample['io_read'],
+            'io_write' => (float) $sample['io_write'],
+            'io_read_ops' => (float) ($sample['io_read_ops'] ?? 0.0),
+            'io_write_ops' => (float) ($sample['io_write_ops'] ?? 0.0),
+            'cpu' => (float) $sample['cpu'],
+            'ram_hours' => ($sampleMemory / 1024 / 1024 / 1024) * $intervalHours,
+        ];
 
         foreach ($this->compareTimes as $label => $threshold) {
             if ($timestamp < $threshold) {
                 continue;
             }
-            $this->rawTotals['io_read'][$label] += $sample['io_read'];
-            $this->rawTotals['io_write'][$label] += $sample['io_write'];
-            $this->rawTotals['io_read_ops'][$label] += $sampleReadOps;
-            $this->rawTotals['io_write_ops'][$label] += $sampleWriteOps;
-            $this->rawTotals['cpu'][$label] += $sample['cpu'];
-            $this->rawTotals['ram_hours'][$label] += $sampleRamHours;
-            $this->memorySums[$label] += $sample['memory'];
+            foreach ($sampleMetrics as $metric => $value) {
+                $this->rawTotals[$metric][$label] += $value;
+            }
+            $this->memorySums[$label] += $sampleMemory;
             $this->memoryCounts[$label] += 1;
-            $this->taskSums[$label] += $sample['tasks'];
+            $this->taskSums[$label] += $sampleTasks;
             $this->taskCounts[$label] += 1;
         }
 

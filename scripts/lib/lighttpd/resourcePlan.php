@@ -15,18 +15,13 @@ function pmssParseSizeToMiB($value): ?int
     if (preg_match('/^([0-9.]+)\s*([KMG])?B?$/i', $raw, $m)) {
         $num = (float)$m[1];
         $unit = strtolower($m[2] ?? '');
-        $factor = 1;
-        if ($unit === 'k') {
-            $factor = 1 / 1024;
-        } elseif ($unit === 'm') {
-            $factor = 1;
-        } elseif ($unit === 'g') {
-            $factor = 1024;
-        } else {
+        if ($unit === '') {
             // No unit → assume bytes
             return (int)round($num / 1048576);
         }
-        return (int)round($num * $factor);
+
+        $factors = ['k' => 1 / 1024, 'm' => 1, 'g' => 1024];
+        return isset($factors[$unit]) ? (int)round($num * $factors[$unit]) : null;
     }
 
     // Fallback: assume raw bytes
@@ -49,10 +44,8 @@ function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
     // Prefer explicit slice CPUQuota value when present.
     if (isset($props['CPUQuota'])) {
         $raw = trim((string)$props['CPUQuota']);
-        if ($raw !== '' && stripos($raw, 'infinity') === false) {
-            if (strpos($raw, '%') !== false) {
-                $quota = (int)round((float)$raw);
-            }
+        if ($raw !== '' && stripos($raw, 'infinity') === false && strpos($raw, '%') !== false) {
+            $quota = (int)round((float)$raw);
         }
     }
 
@@ -72,11 +65,11 @@ function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
 
     // Fallback if no usable systemd property is found:
     // Use policy default when it is a concrete value other than the legacy 85%.
-    if (isset($policyDefaults['cpuQuotaPercent']) && is_numeric($policyDefaults['cpuQuotaPercent'])) {
-        $policyQuota = (int)$policyDefaults['cpuQuotaPercent'];
-        if ($policyQuota > 0 && $policyQuota !== 85) {
-            return $policyQuota;
-        }
+    $policyQuota = (isset($policyDefaults['cpuQuotaPercent']) && is_numeric($policyDefaults['cpuQuotaPercent']))
+        ? (int)$policyDefaults['cpuQuotaPercent']
+        : 0;
+    if ($policyQuota > 0 && $policyQuota !== 85) {
+        return $policyQuota;
     }
 
     // Legacy 85% (either from slice or policy) and "no quota" fall through to a
@@ -133,18 +126,16 @@ function pmssResolveUserResources(string $user, array $policyDefaults): array
     }
 
     $memoryHigh = null;
-    if (isset($props['MemoryHigh'])) {
-        $memoryHigh = pmssParseSizeToMiB($props['MemoryHigh']);
-    }
-    if ($memoryHigh === null && isset($props['MemoryMax'])) {
-        $memoryHigh = pmssParseSizeToMiB($props['MemoryMax']);
+    foreach (['MemoryHigh', 'MemoryMax'] as $memoryLimitField) {
+        if ($memoryHigh !== null || !isset($props[$memoryLimitField])) {
+            continue;
+        }
+        $memoryHigh = pmssParseSizeToMiB($props[$memoryLimitField]);
     }
     if ($memoryHigh === null && isset($policyDefaults['memoryHighMiB'])) {
         $memoryHigh = (int)$policyDefaults['memoryHighMiB'];
     }
-    if ($memoryHigh === null) {
-        $memoryHigh = 512;
-    }
+    $memoryHigh = ($memoryHigh === null) ? 512 : $memoryHigh;
 
     $phpMemoryLimit = pmssClampMemoryLimit((int)$memoryHigh);
     $cpuQuotaPercent = pmssExtractCpuQuotaPercent($props, $policyDefaults);
