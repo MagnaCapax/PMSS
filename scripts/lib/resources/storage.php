@@ -73,17 +73,20 @@ class ResourceStorage
         if (!is_file($path)) {
             return;
         }
-        $chattr = '';
-        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-            if (is_executable($candidate)) {
-                $chattr = $candidate;
-                break;
+        static $chattrPath = null;
+        if ($chattrPath === null) {
+            $chattrPath = '';
+            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+                if (is_executable($candidate)) {
+                    $chattrPath = $candidate;
+                    break;
+                }
             }
         }
-        if ($chattr === '') {
+        if ($chattrPath === '') {
             return;
         }
         $flag = $enable ? '+i' : '-i';
-        @exec($chattr.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
+        @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
     }
 }

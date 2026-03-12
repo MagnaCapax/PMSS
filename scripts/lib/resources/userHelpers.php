@@ -15,7 +15,7 @@ function pmssResourceLogLookupUid(string $user): ?int
         return (int) $info['uid'];
     }
     $out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
-    return ($out !== '' && ctype_digit($out)) ? (int) $out : null;
+    return ctype_digit($out) ? (int) $out : null;
 }
 
 /**
@@ -24,11 +24,7 @@ function pmssResourceLogLookupUid(string $user): ?int
 function pmssResourceLogLoadUsers(): array
 {
     $users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
-    if (!empty($users)) {
-        $users[] = 'www-data';
-    }
-
-    return $users;
+    return empty($users) ? [] : array_merge($users, ['www-data']);
 }
 
 /**
