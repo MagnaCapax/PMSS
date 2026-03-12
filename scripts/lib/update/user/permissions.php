@@ -8,13 +8,63 @@
 
 require_once __DIR__.'/context.php';
 
+if (!function_exists('pmssUserPermissionsTimeoutSeconds')) {
+    /**
+     * Resolve the per-user permission refresh timeout.
+     */
+    function pmssUserPermissionsTimeoutSeconds(): int
+    {
+        $timeout = getenv('PMSS_USER_PERMISSIONS_TIMEOUT');
+        if ($timeout !== false && ctype_digit($timeout) && (int) $timeout > 0) {
+            return (int) $timeout;
+        }
+
+        return 900;
+    }
+}
+
+if (!function_exists('pmssUserPermissionsCommand')) {
+    /**
+     * Build the userPermissions command with low-impact I/O scheduling when available.
+     */
+    function pmssUserPermissionsCommand(string $user): string
+    {
+        $scriptPath = '/scripts/util/userPermissions.php';
+        foreach (['/usr/bin/ionice', '/bin/ionice'] as $ionicePath) {
+            if (is_executable($ionicePath)) {
+                return pmssBuildCommand($ionicePath, ['-c3', $scriptPath, $user]);
+            }
+        }
+
+        return pmssBuildCommand($scriptPath, [$user]);
+    }
+}
+
 function pmssUserRefreshPermissions(array $ctx): void
 {
     $user    = $ctx['user'];
-    $userEsc = $ctx['user_esc'];
     $home    = $ctx['home'];
 
-    runUserStep($user, 'Refreshing user permissions', sprintf('/scripts/util/userPermissions.php %s', $userEsc));
+    $timeoutSeconds = pmssUserPermissionsTimeoutSeconds();
+    $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
+
+    putenv('PMSS_COMMAND_TIMEOUT='.(string) $timeoutSeconds);
+    try {
+        $rc = runUserStep($user, 'Refreshing user permissions', pmssUserPermissionsCommand($user));
+    } finally {
+        if ($previousTimeout === false) {
+            putenv('PMSS_COMMAND_TIMEOUT');
+        } else {
+            putenv('PMSS_COMMAND_TIMEOUT='.$previousTimeout);
+        }
+    }
+
+    if ($rc === 124) {
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($user, sprintf('[WARN] userPermissions timed out after %ds', $timeoutSeconds));
+        }
+        throw new \RuntimeException(sprintf('userPermissions timeout after %ds', $timeoutSeconds));
+    }
 
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
     if (file_exists($rcCustomPath)

@@ -51,11 +51,14 @@ if (!function_exists('pmssUpdateAllUsers')) {
      * extra cross-cutting concerns beyond logging and the legacy CPUQuota
      * fix block.
      */
-    function pmssUpdateAllUsers(string $rutorrentIndexSha): void
+    function pmssUpdateAllUsers(string $rutorrentIndexSha): array
     {
         $users = users::listHomeUsers();
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
-        logMessage(sprintf('Per-user maintenance: %d user(s) to process', count($users)));
+        $totalUsers = count($users);
+        $processedUsers = 0;
+        $skippedUsers = 0;
+        logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
         $htpasswdHelper = '/scripts/util/checkUserHtpasswd.php';
         $hasHtpasswdHelper = is_file($htpasswdHelper);
@@ -64,10 +67,13 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
         foreach ($users as $user) {
             if (($userTrim = trim($user)) === '') {
+                $skippedUsers++;
+                logMessage('[WARN] Skipping empty username during update-step2');
                 continue;
             }
             $normalized = pmssNormalizeUsername($userTrim);
             if ($normalized !== $userTrim || !pmssValidateUsername($userTrim)) {
+                $skippedUsers++;
                 logMessage(sprintf('[WARN] Skipping invalid username during update-step2: %s', $userTrim));
                 continue;
             }
@@ -100,62 +106,115 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
             $userStart = microtime(true);
 
-            // #TODO Remove this fix block by end of 2027.
-            // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
-            // bump them to a host-based quota derived from total CPU threads so
-            // users are no longer capped to 85% of a single core.
-            $uinfo = posix_getpwnam($user);
-            if ($uinfo && isset($uinfo['uid'])) {
-                $uid = (int)$uinfo['uid'];
-                $sliceDir = '/etc/systemd/system/user-'.$uid.'.slice.d';
-                $needsFix = false;
-                if (is_dir($sliceDir)) {
-                    $files = glob($sliceDir.'/*.conf') ?: [];
-                    foreach ($files as $f) {
-                        $content = @file_get_contents($f);
-                        if ($content && preg_match('/^CPUQuota\s*=\s*85%$/m', $content)) {
-                            $needsFix = true;
-                            break;
+            try {
+                // #TODO Remove this fix block by end of 2027.
+                // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
+                // bump them to a host-based quota derived from total CPU threads so
+                // users are no longer capped to 85% of a single core.
+                $uinfo = posix_getpwnam($user);
+                if ($uinfo && isset($uinfo['uid'])) {
+                    $uid = (int)$uinfo['uid'];
+                    $sliceDir = '/etc/systemd/system/user-'.$uid.'.slice.d';
+                    $needsFix = false;
+                    if (is_dir($sliceDir)) {
+                        $files = glob($sliceDir.'/*.conf') ?: [];
+                        foreach ($files as $f) {
+                            $content = @file_get_contents($f);
+                            if ($content && preg_match('/^CPUQuota\s*=\s*85%$/m', $content)) {
+                                $needsFix = true;
+                                break;
+                            }
                         }
                     }
+                    if ($needsFix) {
+                        $threads = pmssTotalCpuThreads();
+                        $newQuota = ($threads > 0) ? ($threads * 85) : 600;
+                        $slice = 'user-'.$uid.'.slice';
+                        runStep(
+                            "Fixing legacy 85% CPUQuota for {$user}",
+                            'systemctl set-property '.escapeshellarg($slice).' CPUQuota='.$newQuota.'%'
+                        );
+                    }
                 }
-                if ($needsFix) {
-                    $threads = pmssTotalCpuThreads();
-                    $newQuota = ($threads > 0) ? ($threads * 85) : 600;
-                    $slice = 'user-'.$uid.'.slice';
-                    runStep(
-                        "Fixing legacy 85% CPUQuota for {$user}",
-                        'systemctl set-property '.escapeshellarg($slice).' CPUQuota='.$newQuota.'%'
-                    );
+
+                pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
+
+                if ($hasHtpasswdHelper) {
+                    $command = pmssBuildCommand($htpasswdHelper, [$userTrim]);
+                    $rc = runUserStep($userTrim, 'Synchronizing per-user htpasswd', $command);
+                    if ($rc !== 0) {
+                        pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Synchronizing per-user htpasswd', $rc));
+                    }
                 }
-            }
+                if ($hasLighttpdChecker) {
+                    $command = pmssBuildCommand($lighttpdChecker, [$userTrim]);
+                    $rc = runUserStep($userTrim, 'Checking lighttpd instance', $command);
+                    if ($rc !== 0) {
+                        pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Checking lighttpd instance', $rc));
+                    }
+                }
 
-            pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
+                $userDuration = microtime(true) - $userStart;
+                pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
+                pmssRecordProfile([
+                    'description'    => 'updateUser '.$userTrim,
+                    'command'        => '',
+                    'status'         => 'OK',
+                    'rc'             => 0,
+                    'duration'       => round($userDuration, 4),
+                    'dry_run'        => false,
+                    'stdout_excerpt' => '',
+                    'stderr_excerpt' => '',
+                ]);
+                $processedUsers++;
+            } catch (\Throwable $throwable) {
+                $skippedUsers++;
+                $userDuration = microtime(true) - $userStart;
+                $reason = get_class($throwable);
+                if ($throwable->getMessage() !== '') {
+                    $reason .= ': '.$throwable->getMessage();
+                }
 
-            if ($hasHtpasswdHelper) {
-                $command = pmssBuildCommand($htpasswdHelper, [$userTrim]);
-                $rc = runUserStep($userTrim, 'Synchronizing per-user htpasswd', $command);
-                if ($rc !== 0) { pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Synchronizing per-user htpasswd', $rc)); }
-            }
-            if ($hasLighttpdChecker) {
-                $command = pmssBuildCommand($lighttpdChecker, [$userTrim]);
-                $rc = runUserStep($userTrim, 'Checking lighttpd instance', $command);
-                if ($rc !== 0) { pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Checking lighttpd instance', $rc)); }
-            }
+                logMessage(sprintf('[WARN] Skipping remaining maintenance for user %s: %s', $userTrim, $reason));
+                if (function_exists('pmssUserLog')) {
+                    pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
+                }
 
-            $userDuration = microtime(true) - $userStart;
-            pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
-            pmssRecordProfile([
-                'description'    => 'updateUser '.$userTrim,
-                'command'        => '',
-                'status'         => 'OK',
-                'rc'             => 0,
-                'duration'       => round($userDuration, 4),
-                'dry_run'        => false,
-                'stdout_excerpt' => '',
-                'stderr_excerpt' => '',
+                pmssRecordProfile([
+                    'description'    => 'updateUser '.$userTrim,
+                    'command'        => '',
+                    'status'         => 'ERR',
+                    'rc'             => 1,
+                    'duration'       => round($userDuration, 4),
+                    'dry_run'        => false,
+                    'stdout_excerpt' => '',
+                    'stderr_excerpt' => substr(preg_replace('/\s+/', ' ', $reason), 0, 300),
+                ]);
+            }
+        }
+
+        $summaryStatus = $processedUsers < $totalUsers ? 'warn' : 'ok';
+        $summaryLine = sprintf('Processed %d of %d users', $processedUsers, $totalUsers);
+        if ($summaryStatus === 'warn') {
+            logMessage('[WARN] '.$summaryLine);
+        } else {
+            logMessage($summaryLine);
+        }
+        if (function_exists('pmssLogJson')) {
+            pmssLogJson([
+                'event'     => 'user_maintenance_summary',
+                'status'    => $summaryStatus,
+                'total'     => $totalUsers,
+                'processed' => $processedUsers,
+                'skipped'   => $skippedUsers,
             ]);
         }
+
+        return [
+            'total' => $totalUsers,
+            'processed' => $processedUsers,
+            'skipped' => $skippedUsers,
+        ];
     }
 }
 

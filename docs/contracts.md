@@ -203,6 +203,11 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## User Environment Orchestration – `scripts/lib/update/users.php` and submodules
 
+- pmssUpdateAllUsers(string $rutorrentIndexSha): array
+  - Enumerates users from `users::listHomeUsers()`, runs per-user maintenance, and returns summary keys: `total`, `processed`, `skipped`.
+  - Emits end-of-loop summary log line `Processed N of M users` and JSON event `user_maintenance_summary`.
+  - Catches per-user throwables (including permission-step timeouts), logs warning, skips that user, and continues remaining users.
+
 - pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): void
   - Builds context (`pmssBuildUserContext`), returns early when invalid.
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh, plugins,
@@ -220,7 +225,11 @@ Sub-handlers:
 - pmssUserUpgradeRutorrent(array $ctx): void → if user’s ruTorrent index.html SHA != skeleton (and no existing backup), backups to `oldRutorrent-3`, copies fresh from skel, restores config/share, updates config via `updateRutorrentConfig()`, fixes ownership and perms.
 - pmssUserEnsurePlugins(array $ctx): void → removes deprecated `cpuload`, ensures `unpack` plugin exists and has proper perms.
 - pmssUserMaintainRetracker(array $ctx): void → removes legacy `retrackers.dat`, creates torrents and RSS settings dirs.
-- pmssUserRefreshPermissions(array $ctx): void → runs `/scripts/util/userPermissions.php <user>`; refreshes `~/.rtorrent.rc.custom` from skel if hash matches legacy list.
+- pmssUserRefreshPermissions(array $ctx): void
+  - Runs `userPermissions.php` with optional `ionice -c3` wrapper when available.
+  - Applies per-user timeout via `PMSS_USER_PERMISSIONS_TIMEOUT` (default 900s) by temporarily setting `PMSS_COMMAND_TIMEOUT` for that command only.
+  - Throws `RuntimeException` when permission refresh times out so caller can skip that user and continue the queue.
+  - Refreshes `~/.rtorrent.rc.custom` from skel if hash matches legacy list.
 - pmssUserSkelPath(string $relative): string → returns `PMSS_SKEL_DIR` (default `/etc/skel`) joined with `$relative`.
 - pmssUserSkelCommandArg(string $relative): string → returns raw `/etc/skel/<relative>` when default, otherwise escapes the overridden path for shell commands.
 

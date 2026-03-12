@@ -476,7 +476,19 @@ pmssRunProfiledCallable('Adjusting lighttpd security settings', 'pmssAdjustLight
 // skeleton ruTorrent index version so user instances can be upgraded when the
 // template changes.
 $rutorrentIndexSha = sha1((string) @file_get_contents('/etc/skel/www/rutorrent/index.html'));
-pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [$rutorrentIndexSha]);
+$userMaintenanceSummary = pmssRunProfiledCallable('Updating all user environments', 'pmssUpdateAllUsers', [$rutorrentIndexSha]);
+if (is_array($userMaintenanceSummary)) {
+    $totalUsers = isset($userMaintenanceSummary['total']) ? (int) $userMaintenanceSummary['total'] : 0;
+    $processedUsers = isset($userMaintenanceSummary['processed']) ? (int) $userMaintenanceSummary['processed'] : 0;
+    if ($processedUsers < $totalUsers) {
+        pmssUpdateStep2HandleClassifiedFailure(
+            'Updating all user environments',
+            PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED,
+            1,
+            sprintf('processed_users_mismatch:%d_of_%d', $processedUsers, $totalUsers)
+        );
+    }
+}
 // Per-user maintenance now owns crontab restores, htpasswd sync, and lighttpd instance checks.
 
 pmssUpdateStep2RunClassifiedCallable('Ensuring sshd AuthorizedKeysFile directive', 'pmssEnsureAuthorizedKeysDirective', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
