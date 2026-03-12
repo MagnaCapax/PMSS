@@ -19,21 +19,6 @@ function pmssResourceFormatBytes(float $bytes): string
     return number_format($bytes / 1024, 2).' KiB';
 }
 
-function pmssResourceFormatCpuHours(float $cpuNsec): string
-{
-    return number_format($cpuNsec / 1000000000 / 3600, 1).' hrs';
-}
-
-function pmssResourceFormatRamHours(float $ramHours): string
-{
-    return number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs';
-}
-
-function pmssResourceFormatOpsPerSecond(float $ops, int $windowSeconds): string
-{
-    return ($windowSeconds <= 0) ? '0.00' : number_format($ops / $windowSeconds, 2);
-}
-
 function pmssShowResourcesMain(array $argv): int
 {
     $options = getopt('', ['json', 'show-missing', 'user:', 'help']);
@@ -86,16 +71,17 @@ function pmssShowResourcesMain(array $argv): int
     $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n";
     $printUsageRow = static function (string $label, array $data) use ($rowFormat): void {
         $hourOps = (float) (($data['io_read_ops']['hour'] ?? 0) + ($data['io_write_ops']['hour'] ?? 0));
+        $ramHours = (float) $data['ram_hours']['month'];
         printf(
             $rowFormat,
             $label,
             pmssResourceFormatBytes($data['io_read']['month']),
             pmssResourceFormatBytes($data['io_write']['month']),
-            pmssResourceFormatCpuHours($data['cpu']['month']),
-            pmssResourceFormatRamHours($data['ram_hours']['month']),
+            number_format((float) $data['cpu']['month'] / 1000000000 / 3600, 1).' hrs',
+            number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs',
             pmssResourceFormatBytes($data['memory_current']),
             (string) round($data['tasks_current']),
-            pmssResourceFormatOpsPerSecond($hourOps, 3600)
+            number_format($hourOps / 3600, 2)
         );
     };
 

@@ -91,15 +91,12 @@ function pmssResourceSnapshotRun(): int
                     if ($accumulator->hasSamples()) {
                         $results = $accumulator->results();
                         $metrics = [
-                            'io_read' => $results['raw']['io_read']['day'],
-                            'io_write' => $results['raw']['io_write']['day'],
-                            'io_read_ops' => $results['raw']['io_read_ops']['day'],
-                            'io_write_ops' => $results['raw']['io_write_ops']['day'],
-                            'cpu' => $results['raw']['cpu']['day'],
                             'memory' => $results['memory']['day'],
-                            'ram_hours' => $results['raw']['ram_hours']['day'],
                             'tasks' => $results['tasks']['day'],
                         ];
+                        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metricName) {
+                            $metrics[$metricName] = $results['raw'][$metricName]['day'];
+                        }
                     }
                 }
             }
