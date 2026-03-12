@@ -41,14 +41,12 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
     $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 
     $home = "{$homeRoot}/{$user}";
-    if (!is_dir($home)) {
+    if (!is_dir($home)
+        || !file_exists($home.'/.rtorrent.rc')
+        || !file_exists($home.'/data')) {
         return null;
     }
-    foreach (['.rtorrent.rc', 'data'] as $required) {
-        if (!file_exists("{$home}/{$required}")) {
-            return null;
-        }
-    }
+
     if (is_dir("{$home}/www-disabled")) {
         // Suspended users are intentionally skipped during updates to avoid
         // recreating web roots or restarting services mid-suspension.

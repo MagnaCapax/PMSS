@@ -32,6 +32,45 @@ class UserContextSuspendedTest extends TestCase
         $this->assertEquals(null, \pmssBuildUserContext($user));
     }
 
+    public function testBuildUserContextReturnsNullWhenHomeMissing(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-user-context-missing-home-'.uniqid('', true);
+        $homeRoot = $base.'/home';
+
+        putenv('PMSS_HOME_DIR='.$homeRoot);
+
+        $this->assertEquals(null, \pmssBuildUserContext('missinguser'));
+    }
+
+    public function testBuildUserContextReturnsNullWhenRtorrentConfigMissing(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-user-context-missing-rtorrent-'.uniqid('', true);
+        $homeRoot = $base.'/home';
+        $user = 'testuser';
+
+        putenv('PMSS_HOME_DIR='.$homeRoot);
+
+        $home = $homeRoot.'/'.$user;
+        @mkdir($home.'/data', 0755, true);
+
+        $this->assertEquals(null, \pmssBuildUserContext($user));
+    }
+
+    public function testBuildUserContextReturnsNullWhenDataDirMissing(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-user-context-missing-data-'.uniqid('', true);
+        $homeRoot = $base.'/home';
+        $user = 'testuser';
+
+        putenv('PMSS_HOME_DIR='.$homeRoot);
+
+        $home = $homeRoot.'/'.$user;
+        @mkdir($home, 0755, true);
+        file_put_contents($home.'/.rtorrent.rc', "dummy");
+
+        $this->assertEquals(null, \pmssBuildUserContext($user));
+    }
+
     public function testBuildUserContextReturnsWhenMarkerMissing(): void
     {
         $base = sys_get_temp_dir().'/pmss-user-context-active-'.uniqid('', true);

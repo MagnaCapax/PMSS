@@ -8,36 +8,32 @@
 
 require_once __DIR__.'/context.php';
 
-if (!function_exists('pmssUserPermissionsTimeoutSeconds')) {
-    /**
-     * Resolve the per-user permission refresh timeout.
-     */
-    function pmssUserPermissionsTimeoutSeconds(): int
-    {
-        $timeout = getenv('PMSS_USER_PERMISSIONS_TIMEOUT');
-        if ($timeout !== false && ctype_digit($timeout) && (int) $timeout > 0) {
-            return (int) $timeout;
-        }
-
-        return 900;
+/**
+ * Resolve the per-user permission refresh timeout.
+ */
+function pmssUserPermissionsTimeoutSeconds(): int
+{
+    $timeout = getenv('PMSS_USER_PERMISSIONS_TIMEOUT');
+    if ($timeout !== false && ctype_digit($timeout) && (int) $timeout > 0) {
+        return (int) $timeout;
     }
+
+    return 900;
 }
 
-if (!function_exists('pmssUserPermissionsCommand')) {
-    /**
-     * Build the userPermissions command with low-impact I/O scheduling when available.
-     */
-    function pmssUserPermissionsCommand(string $user): string
-    {
-        $scriptPath = '/scripts/util/userPermissions.php';
-        foreach (['/usr/bin/ionice', '/bin/ionice'] as $ionicePath) {
-            if (is_executable($ionicePath)) {
-                return pmssBuildCommand($ionicePath, ['-c3', $scriptPath, $user]);
-            }
+/**
+ * Build the userPermissions command with low-impact I/O scheduling when available.
+ */
+function pmssUserPermissionsCommand(string $user): string
+{
+    $scriptPath = '/scripts/util/userPermissions.php';
+    foreach (['/usr/bin/ionice', '/bin/ionice'] as $ionicePath) {
+        if (is_executable($ionicePath)) {
+            return pmssBuildCommand($ionicePath, ['-c3', $scriptPath, $user]);
         }
-
-        return pmssBuildCommand($scriptPath, [$user]);
     }
+
+    return pmssBuildCommand($scriptPath, [$user]);
 }
 
 function pmssUserRefreshPermissions(array $ctx): void

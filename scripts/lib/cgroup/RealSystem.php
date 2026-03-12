@@ -20,20 +20,19 @@ class RealSystem implements SystemInterface
 
     public function getUid(string $user): int
     {
-        if (!function_exists('posix_getpwnam')) {
-            return -1;
-        }
-        $info = posix_getpwnam($user);
-        return is_array($info) && isset($info['uid']) ? (int)$info['uid'] : -1;
+        $info = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
+        return is_array($info) && isset($info['uid']) ? (int) $info['uid'] : -1;
     }
 
     public function execute(string $command): ?string
     {
         // In test mode we avoid shelling out to real systemctl/findmnt.
-        $testMode = in_array(strtolower((string) getenv('PMSS_TEST_MODE')), ['1', 'true', 'yes'], true)
-            || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE);
+        if (in_array(strtolower((string) getenv('PMSS_TEST_MODE')), ['1', 'true', 'yes'], true)
+            || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE)) {
+            return '';
+        }
 
-        return $testMode ? '' : @shell_exec($command);
+        return @shell_exec($command);
     }
 
     public function readFile(string $path): ?string
@@ -44,13 +43,11 @@ class RealSystem implements SystemInterface
 
     public function getTotalMemoryMiB(): int
     {
-        $o = @file('/proc/meminfo', FILE_IGNORE_NEW_LINES) ?: [];
-        foreach ($o as $line) {
-            if (strpos($line, 'MemTotal:') === 0) {
-                $kb = (int)filter_var($line, FILTER_SANITIZE_NUMBER_INT);
-                return (int)round($kb / 1024);
-            }
+        $meminfo = @file_get_contents('/proc/meminfo');
+        if (is_string($meminfo) && preg_match('/^MemTotal:\s+([0-9]+)/m', $meminfo, $matches)) {
+            return (int) round(((int) $matches[1]) / 1024);
         }
+
         return 0;
     }
 

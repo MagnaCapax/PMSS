@@ -14,15 +14,17 @@
 function pmssCgroupMode(): string
 {
     $override = getenv('PMSS_CGROUP_MODE');
-    if (in_array($override, ['v2', 'v1'], true)) return $override;
+    if (in_array($override, ['v2', 'v1'], true)) {
+        return $override;
+    }
 
     // Strongest signal: cgroup2 mount present in /proc/self/mountinfo.
-    // Look for " - cgroup2 " which unambiguously indicates unified v2.
+    // Also treat cgroup.controllers as a definitive v2 signal.
     $mountInfo = @file_get_contents('/proc/self/mountinfo');
-    if (is_string($mountInfo) && strpos($mountInfo, ' - cgroup2 ') !== false) return 'v2';
-
-    // Kernel exposes controllers file only on v2
-    if (is_file('/sys/fs/cgroup/cgroup.controllers')) return 'v2';
+    if ((is_string($mountInfo) && strpos($mountInfo, ' - cgroup2 ') !== false)
+        || is_file('/sys/fs/cgroup/cgroup.controllers')) {
+        return 'v2';
+    }
 
     // Kernel cmdline override used by systemd to force v1 on newer Debian
     $cmdline = @file_get_contents('/proc/cmdline');
@@ -32,7 +34,10 @@ function pmssCgroupMode(): string
 
     // v1 hint: presence of controller directories under /sys/fs/cgroup/
     foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $dir) {
-        if (basename((string)$dir) === 'unified') continue;
+        if (basename((string) $dir) === 'unified') {
+            continue;
+        }
+
         return 'v1';
     }
 
