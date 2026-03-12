@@ -231,7 +231,6 @@ Sub-handlers:
   - Throws `RuntimeException` when permission refresh times out so caller can skip that user and continue the queue.
   - Refreshes `~/.rtorrent.rc.custom` from skel if hash matches legacy list.
 - pmssUserSkelPath(string $relative): string → returns `PMSS_SKEL_DIR` (default `/etc/skel`) joined with `$relative`.
-- pmssUserSkelCommandArg(string $relative): string → returns raw `/etc/skel/<relative>` when default, otherwise escapes the overridden path for shell commands.
 
 ---
 

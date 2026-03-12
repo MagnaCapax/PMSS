@@ -8,45 +8,25 @@
 
 require_once __DIR__.'/context.php';
 
-/**
- * Resolve the per-user permission refresh timeout.
- */
-function pmssUserPermissionsTimeoutSeconds(): int
-{
-    $timeout = getenv('PMSS_USER_PERMISSIONS_TIMEOUT');
-    if ($timeout !== false && ctype_digit($timeout) && (int) $timeout > 0) {
-        return (int) $timeout;
-    }
-
-    return 900;
-}
-
-/**
- * Build the userPermissions command with low-impact I/O scheduling when available.
- */
-function pmssUserPermissionsCommand(string $user): string
-{
-    $scriptPath = '/scripts/util/userPermissions.php';
-    foreach (['/usr/bin/ionice', '/bin/ionice'] as $ionicePath) {
-        if (is_executable($ionicePath)) {
-            return pmssBuildCommand($ionicePath, ['-c3', $scriptPath, $user]);
-        }
-    }
-
-    return pmssBuildCommand($scriptPath, [$user]);
-}
-
 function pmssUserRefreshPermissions(array $ctx): void
 {
     $user    = $ctx['user'];
     $home    = $ctx['home'];
 
-    $timeoutSeconds = pmssUserPermissionsTimeoutSeconds();
+    $timeoutRaw = getenv('PMSS_USER_PERMISSIONS_TIMEOUT');
+    $timeoutSeconds = ($timeoutRaw !== false && ctype_digit($timeoutRaw) && (int) $timeoutRaw > 0) ? (int) $timeoutRaw : 900;
     $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
+    $permissionsCommand = pmssBuildCommand('/scripts/util/userPermissions.php', [$user]);
+    foreach (['/usr/bin/ionice', '/bin/ionice'] as $ionicePath) {
+        if (is_executable($ionicePath)) {
+            $permissionsCommand = pmssBuildCommand($ionicePath, ['-c3', '/scripts/util/userPermissions.php', $user]);
+            break;
+        }
+    }
 
     putenv('PMSS_COMMAND_TIMEOUT='.(string) $timeoutSeconds);
     try {
-        $rc = runUserStep($user, 'Refreshing user permissions', pmssUserPermissionsCommand($user));
+        $rc = runUserStep($user, 'Refreshing user permissions', $permissionsCommand);
     } finally {
         putenv($previousTimeout === false ? 'PMSS_COMMAND_TIMEOUT' : 'PMSS_COMMAND_TIMEOUT='.$previousTimeout);
     }
@@ -61,7 +41,8 @@ function pmssUserRefreshPermissions(array $ctx): void
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
     if (file_exists($rcCustomPath)
         && in_array(sha1((string)file_get_contents($rcCustomPath)), ['dcf21704d49910d1670b3fdd04b37e640b755889', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
-        $skelRcCustomArg = pmssUserSkelCommandArg('.rtorrent.rc.custom');
+        $skelRcCustomPath = pmssUserSkelPath('.rtorrent.rc.custom');
+        $skelRcCustomArg = $skelRcCustomPath === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustomPath : escapeshellarg($skelRcCustomPath);
         runUserStep(
             $user,
             'Updating .rtorrent.rc.custom from skeleton',

@@ -11,19 +11,6 @@ require_once __DIR__.'/../../runtime.php';
 function pmssUserSkelPath(string $relative): string { return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/'.$relative; }
 
 /**
- * Return a shell-ready argument for a skel path.
- *
- * Keep legacy command strings stable: when PMSS_SKEL_DIR is the default
- * `/etc/skel`, older scripts historically passed the path unquoted in the
- * generated `cp` command. When overridden, we must escape the custom path.
- */
-function pmssUserSkelCommandArg(string $relative): string
-{
-    $path = pmssUserSkelPath($relative);
-    return $path === '/etc/skel/'.$relative ? $path : escapeshellarg($path);
-}
-
-/**
  * Build the shared per-user context array used by update-step2 user helpers.
  *
  * Returns null when:
