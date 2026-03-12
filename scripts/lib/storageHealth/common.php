@@ -45,7 +45,6 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
         return null;
     }
 
-    $mountSource = null;
     foreach ($mounts as $line) {
         $fields = preg_split('/\s+/', trim($line));
         if (!is_array($fields) || count($fields) < 2 || str_replace('\\040', ' ', (string) $fields[1]) !== '/home') {
@@ -53,15 +52,10 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
         }
 
         $mountSource = str_replace('\\040', ' ', (string) $fields[0]);
-        break;
+        $resolvedPath = @realpath($mountSource) ?: $mountSource;
+        return preg_match('#/(md\d+)$#', $resolvedPath, $matches) === 1 ? $matches[1] : null;
     }
-    if ($mountSource === null) {
-        return null;
-    }
-
-    $resolvedPath = @realpath($mountSource) ?: $mountSource;
-
-    return preg_match('#/(md\d+)$#', $resolvedPath, $matches) === 1 ? $matches[1] : null;
+    return null;
 }
 
 /**
@@ -172,8 +166,7 @@ function pmssStorageHealthPerformanceStatus(array $raidEntries): ?array
         $flags = (array) ($entry['flags'] ?? []);
         $severity = (string) ($entry['severity'] ?? 'ok');
         $isRebuild = in_array('rebuild_in_progress', $flags, true);
-        $isDegraded = in_array('degraded', $flags, true) || $severity !== 'ok';
-        if (!$isRebuild && !$isDegraded) {
+        if (!$isRebuild && !in_array('degraded', $flags, true) && $severity === 'ok') {
             continue;
         }
 

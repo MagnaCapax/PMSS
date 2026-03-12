@@ -97,13 +97,13 @@ class ResourceStatsProcessor
             return;
         }
 
-        $dataLines = $this->stats->getData($user, (int) ((35 * 24 * 60) / 5));
-        if (trim($dataLines) === '') {
+        $dataLines = trim($this->stats->getData($user, (int) ((35 * 24 * 60) / 5)));
+        if ($dataLines === '') {
             logMessage(date('c').": No data for user {$user}");
             return;
         }
 
-        $resourceData = array_filter(explode("\n", trim($dataLines)));
+        $resourceData = array_filter(explode("\n", $dataLines));
         if (count($resourceData) < 2) {
             logMessage(date('c').": Too little data for {$user}");
             return;
@@ -167,7 +167,7 @@ class ResourceStatsProcessor
         foreach ($rawTotals as $label => $value) {
             $bytes = (float) $value;
             foreach ([1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'] as $divisor => $suffix) {
-                if (($bytes / $divisor) > 1) {
+                if ($bytes > $divisor) {
                     $formatted[$label] = round($bytes / $divisor, 2).$suffix;
                     continue 2;
                 }

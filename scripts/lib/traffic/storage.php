@@ -35,13 +35,10 @@ class TrafficStorage
     /** Persist user traffic data to home directory and runtime cache. */
     public function save(string $user, array $data): void
     {
-        $targetUser = $user;
+        $isLocalUser = substr_compare($user, '-localnet', -9) === 0;
+        $targetUser = $isLocalUser ? substr($user, 0, -9) : $user;
         $filename = $this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData';
-        $localSuffix = '-localnet';
-        if (substr($user, -strlen($localSuffix)) === $localSuffix) {
-            $targetUser = substr($user, 0, -strlen($localSuffix));
-            $filename .= 'Local';
-        }
+        $filename .= $isLocalUser ? 'Local' : '';
 
         $serialized = serialize($data);
         $homePath   = $this->homeDir.'/'.$targetUser;
@@ -51,9 +48,7 @@ class TrafficStorage
             $this->setImmutable($userPath, false);
             @file_put_contents($userPath, $serialized);
             @chown($userPath, 'root');
-            if ($targetUser !== '') {
-                @chgrp($userPath, $targetUser);
-            }
+            $targetUser !== '' && @chgrp($userPath, $targetUser);
             @chmod($userPath, 0640);
             $this->setImmutable($userPath, true);
         }
