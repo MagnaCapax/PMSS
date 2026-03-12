@@ -74,10 +74,13 @@ foreach ($users as $thisUser) {
     }
 
     $quotaFile = "/home/{$thisUser}/.quota";
-    // Remove any existing quota file via PHP to avoid multi-command shell strings.
+    // Keep the previous snapshot until a new one is validated; this avoids
+    // leaving .quota missing/empty if the quota command fails.
+    $existingQuotaContent = '';
     if (file_exists($quotaFile) && !is_link($quotaFile)) {
-        @unlink($quotaFile);
+        $existingQuotaContent = (string) @file_get_contents($quotaFile);
     }
+    $hasExistingSnapshot = strpos($existingQuotaContent, 'Disk quotas') !== false;
 
     // Call quota once with a safely quoted username and capture its output.
     // Note: `quota` returns exit code 1 when user is over quota, but still
@@ -108,6 +111,35 @@ foreach ($users as $thisUser) {
         );
         if (function_exists('pmssUserLog')) {
             pmssUserLog($thisUser, sprintf('quota refresh failed (rc=%d)', $ret));
+        }
+
+        if (!$hasExistingSnapshot && !is_link($quotaFile)) {
+            // Emit a parseable fallback so UI consumers that read ~/.quota do
+            // not crash on missing or empty files while quota tooling is down.
+            $fallbackContent = implode(PHP_EOL, array(
+                "Disk quotas for user {$thisUser} (uid 0):",
+                '     Filesystem   space   quota   limit   grace   files   quota   limit   grace',
+                '       /dev/null      0K      0K      0K               0       0       0',
+                '',
+            ));
+            if (@file_put_contents($quotaFile, $fallbackContent) !== false) {
+                @chmod($quotaFile, 0644);
+                $logger->msg("quota fallback snapshot written for {$thisUser}");
+                pmssUserWriteLogs(
+                    pmssUserBaseContext(
+                        'quota',
+                        'fallback',
+                        $thisUser,
+                        array(
+                            'status'  => 'WARN',
+                            'message' => 'Quota fallback snapshot written after refresh failure',
+                        )
+                    )
+                );
+                if (function_exists('pmssUserLog')) {
+                    pmssUserLog($thisUser, 'Quota fallback snapshot written');
+                }
+            }
         }
     } else {
         // Success: exit 0 (normal) or exit 1 (over quota but valid output)
