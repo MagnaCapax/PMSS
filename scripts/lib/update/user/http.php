@@ -28,22 +28,17 @@ function pmssUserConfigureHttp(array $ctx): void
 
     // Keep qBittorrent WebUI reverse-proxy compatibility settings disabled.
     $qbittorrentConfig = "{$home}/.config/qBittorrent/qBittorrent.conf";
-    if (is_file($qbittorrentConfig)) {
-        $config = file_get_contents($qbittorrentConfig);
-        if ($config !== false) {
-            foreach (['HostHeaderValidation', 'CSRFProtection', 'ClickjackingProtection'] as $setting) {
-                $needle = 'WebUI\\'.$setting.'=';
-                if (strpos($config, $needle) === false) {
-                    continue;
-                }
-                $updated = preg_replace('/^WebUI\\\\'.preg_quote($setting, '/').'=.*$/m', 'WebUI\\'.$setting.'=false', $config, 1, $count);
-                if ($count > 0 && $updated !== null && $updated !== $config) {
-                    file_put_contents($qbittorrentConfig, $updated);
-                    $config = $updated;
-                    if ($userLog) {
-                        $userLog('Updated qBittorrent WebUI '.$setting.' to false');
-                    }
-                }
+    if (is_file($qbittorrentConfig) && is_string($config = file_get_contents($qbittorrentConfig))) {
+        foreach (['HostHeaderValidation', 'CSRFProtection', 'ClickjackingProtection'] as $setting) {
+            $updated = preg_replace('/^WebUI\\\\'.preg_quote($setting, '/').'=.*$/m', 'WebUI\\'.$setting.'=false', $config, 1, $count);
+            if ($count < 1 || $updated === null || $updated === $config) {
+                continue;
+            }
+
+            file_put_contents($qbittorrentConfig, $updated);
+            $config = $updated;
+            if ($userLog) {
+                $userLog('Updated qBittorrent WebUI '.$setting.' to false');
             }
         }
     }

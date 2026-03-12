@@ -16,12 +16,10 @@ require_once __DIR__.'/context.php';
  */
 function pmssUserRutorrentScheduleIntervalPatchApply(string $filePath): bool
 {
-    if (!is_file($filePath) || is_link($filePath)) {
-        return false;
-    }
-
-    $content = @file_get_contents($filePath);
-    if (!is_string($content) || $content === '') {
+    if (!is_file($filePath)
+        || is_link($filePath)
+        || !is_string($content = @file_get_contents($filePath))
+        || $content === '') {
         return false;
     }
 
@@ -47,12 +45,10 @@ function pmssUserRutorrentScheduleIntervalPatchApply(string $filePath): bool
  */
 function pmssUserRutorrentRssObFlushPatchApply(string $filePath): bool
 {
-    if (!is_file($filePath) || is_link($filePath)) {
-        return false;
-    }
-
-    $content = @file_get_contents($filePath);
-    if (!is_string($content) || $content === '') {
+    if (!is_file($filePath)
+        || is_link($filePath)
+        || !is_string($content = @file_get_contents($filePath))
+        || $content === '') {
         return false;
     }
 

@@ -70,6 +70,32 @@ class UserUpdateHttpTest extends TestCase
         }
     }
 
+    public function testConfigureHttpKeepsQbittorrentConfigWhenKeysMissing(): void
+    {
+        $home = sys_get_temp_dir().'/pmss-http-qbittorrent-missing-'.bin2hex(random_bytes(4));
+        @mkdir($home.'/.config/qBittorrent', 0755, true);
+
+        $config = "[Preferences]\n";
+        $config .= "WebUI\\Port=12345\n";
+        $config .= "WebUI\\Address=*\n";
+        file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', $config);
+
+        $ctx = [
+            'user'     => 'dummy',
+            'home'     => $home,
+            'user_esc' => escapeshellarg('dummy'),
+        ];
+
+        try {
+            \pmssUserConfigureHttp($ctx);
+
+            $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
+            $this->assertEquals($config, ($updated === false) ? '' : $updated);
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
     public function testConfigureHttpUsesDefaultSkelPathForIrssiCopy(): void
     {
         $home = sys_get_temp_dir().'/pmss-http-skel-default-'.bin2hex(random_bytes(4));
