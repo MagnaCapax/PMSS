@@ -27,8 +27,8 @@ class RealSystem implements SystemInterface
     public function execute(string $command): ?string
     {
         // In test mode we avoid shelling out to real systemctl/findmnt.
-        if (in_array(strtolower((string) getenv('PMSS_TEST_MODE')), ['1', 'true', 'yes'], true)
-            || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE)) {
+        $testMode = strtolower((string) getenv('PMSS_TEST_MODE'));
+        if ($testMode === '1' || $testMode === 'true' || $testMode === 'yes' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE)) {
             return '';
         }
 
@@ -37,8 +37,7 @@ class RealSystem implements SystemInterface
 
     public function readFile(string $path): ?string
     {
-        $content = @file_get_contents($path);
-        return $content === false ? null : $content;
+        return (($content = @file_get_contents($path)) === false) ? null : $content;
     }
 
     public function getTotalMemoryMiB(): int
@@ -53,7 +52,7 @@ class RealSystem implements SystemInterface
 
     public function resolveDevice(string $device): string
     {
-        if ($device === '/home' && is_string($homeDev = getenv('PMSS_HOME_DEVICE')) && $homeDev !== '') {
+        if ($device === '/home' && ($homeDev = getenv('PMSS_HOME_DEVICE')) !== false && $homeDev !== '') {
             return $homeDev;
         }
 

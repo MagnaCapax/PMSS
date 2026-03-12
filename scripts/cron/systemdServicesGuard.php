@@ -27,10 +27,7 @@ $specs[] = ['unit' => 'apache2', 'label' => 'Apache httpd (legacy)', 'mask' => t
 
 foreach ($specs as $spec) {
     $unit = (string) ($spec['unit'] ?? '');
-    if ($unit === '') {
-        continue;
-    }
-    if (!pmssSystemdUnitExists($unit)) {
+    if ($unit === '' || !pmssSystemdUnitExists($unit)) {
         continue;
     }
     $label = (string) ($spec['label'] ?? $unit);
@@ -39,9 +36,9 @@ foreach ($specs as $spec) {
     $active = trim((string) @shell_exec('systemctl is-active '.escapeshellarg($unit).' 2>/dev/null'));
     $enabled = trim((string) @shell_exec('systemctl is-enabled '.escapeshellarg($unit).' 2>/dev/null'));
 
-    $needsHardening = ($active === 'active' || $active === 'activating')
-        || ($shouldMask ? ($enabled !== 'masked') : ($enabled === 'enabled'));
-    if (!$needsHardening) {
+    if (($active !== 'active' && $active !== 'activating')
+        && ($shouldMask ? ($enabled === 'masked') : ($enabled !== 'enabled'))
+    ) {
         continue;
     }
 

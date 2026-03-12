@@ -162,7 +162,7 @@ function pmssUserConfigLighttpdConfigureUser(
     }
     pmssUpdatePhpIni($phpIniPath, $resources['memoryLimit']);
     @chmod($phpIniPath, 0751);
-    if (pmssRunningAsRoot()) {
+    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
         @chown($phpIniPath, $thisUser);
         @chgrp($phpIniPath, $thisUser);
     }

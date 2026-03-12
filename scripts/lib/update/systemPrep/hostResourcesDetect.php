@@ -11,7 +11,7 @@
 function pmssTotalMemMiB(): int
 {
     $override = getenv('PMSS_TOTAL_MEM_MIB');
-    if (is_string($override) && ctype_digit($override)) {
+    if ($override !== false && ctype_digit($override)) {
         return (int) $override;
     }
 
@@ -27,7 +27,7 @@ function pmssTotalMemMiB(): int
 function pmssTotalCpuThreads(): int
 {
     $override = getenv('PMSS_TOTAL_CPU_THREADS');
-    if (is_string($override) && ctype_digit($override)) {
+    if ($override !== false && ctype_digit($override)) {
         return (int) $override;
     }
 

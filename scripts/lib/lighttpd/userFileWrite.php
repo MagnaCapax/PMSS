@@ -5,11 +5,6 @@
  * @license GPL-3.0-only
  */
 
-function pmssRunningAsRoot(): bool
-{
-    return function_exists('posix_geteuid') && @posix_geteuid() === 0;
-}
-
 function pmssAtomicWriteFile(string $path, string $content): bool
 {
     if (strpos($path, "\0") !== false || is_link($path) || (file_exists($path) && !is_file($path))) {
@@ -45,7 +40,7 @@ function pmssWriteUserFile(string $path, string $content, string $owner, int $mo
         return false;
     }
     @chmod($path, $mode);
-    if (pmssRunningAsRoot()) {
+    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
         @chown($path, $owner);
         @chgrp($path, $owner);
     }
