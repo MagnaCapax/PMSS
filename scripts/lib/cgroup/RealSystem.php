@@ -42,8 +42,7 @@ class RealSystem implements SystemInterface
 
     public function getTotalMemoryMiB(): int
     {
-        $meminfo = @file_get_contents('/proc/meminfo');
-        if (is_string($meminfo) && preg_match('/^MemTotal:\s+([0-9]+)/m', $meminfo, $matches)) {
+        if (preg_match('/^MemTotal:\s+([0-9]+)/m', (string) @file_get_contents('/proc/meminfo'), $matches) === 1) {
             return (int) round(((int) $matches[1]) / 1024);
         }
 

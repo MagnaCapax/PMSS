@@ -49,6 +49,20 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $this->assertEquals(12, $entry['metrics']['link_errors']);
     }
 
+    public function testUdmaCrcAlsoSetsLinkErrorsMetric(): void
+    {
+        $out = implode("\n", [
+            'SMART overall-health self-assessment test result: PASSED',
+            '199 UDMA_CRC_Error_Count    0x003e   200   200   000    Old_age   Always       -       7',
+        ])."\n";
+
+        $disk = ['path' => '/dev/sdz', 'kname' => 'sdz', 'model' => 'TEST', 'serial' => 'U', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals(7, $entry['metrics']['udma_crc']);
+        $this->assertEquals(7, $entry['metrics']['link_errors']);
+    }
+
     public function testUnknownHealthDoesNotFailByDefault(): void
     {
         $out = "Some output without explicit health lines\n";

@@ -15,8 +15,7 @@ function pmssTotalMemMiB(): int
         return (int) $override;
     }
 
-    $meminfo = @file_get_contents('/proc/meminfo');
-    if (is_string($meminfo) && preg_match('/^MemTotal:\s+([0-9]+)/m', $meminfo, $matches)) {
+    if (preg_match('/^MemTotal:\s+([0-9]+)/m', (string) @file_get_contents('/proc/meminfo'), $matches) === 1) {
         return (int) round(((int) $matches[1]) / 1024);
     }
 
@@ -34,9 +33,7 @@ function pmssTotalCpuThreads(): int
     // Robust check using /proc/cpuinfo
     $cpuinfo = @file_get_contents('/proc/cpuinfo');
     $count = is_string($cpuinfo) ? substr_count($cpuinfo, 'processor') : 0;
-    if ($count < 1) {
-        // Fallback to nproc if available
-        $count = (int) trim((string) @shell_exec('nproc'));
-    }
-    return $count > 0 ? $count : 0;
+    // Fallback to nproc if available
+    $count = ($count > 0) ? $count : (int) trim((string) @shell_exec('nproc'));
+    return max(0, $count);
 }

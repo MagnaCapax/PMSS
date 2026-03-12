@@ -20,15 +20,13 @@ function pmssCgroupMode(): string
 
     // Strongest signal: cgroup2 mount present in /proc/self/mountinfo.
     // Also treat cgroup.controllers as a definitive v2 signal.
-    $mountInfo = @file_get_contents('/proc/self/mountinfo');
     if (is_file('/sys/fs/cgroup/cgroup.controllers')
-        || (is_string($mountInfo) && strpos($mountInfo, ' - cgroup2 ') !== false)) {
+        || strpos((string) @file_get_contents('/proc/self/mountinfo'), ' - cgroup2 ') !== false) {
         return 'v2';
     }
 
     // Kernel cmdline override used by systemd to force v1 on newer Debian
-    $cmdline = @file_get_contents('/proc/cmdline');
-    if (is_string($cmdline) && strpos($cmdline, 'systemd.unified_cgroup_hierarchy=0') !== false) {
+    if (strpos((string) @file_get_contents('/proc/cmdline'), 'systemd.unified_cgroup_hierarchy=0') !== false) {
         return 'v1';
     }
 

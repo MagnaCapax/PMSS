@@ -48,7 +48,7 @@ function pmssUserConfigureHttp(array $ctx): void
     }
 
     $phpIniPath = "{$home}/.lighttpd/php.ini";
-    if (file_exists($phpIniPath) && ($phpIni = parse_ini_file($phpIniPath)) !== false && !isset($phpIni['error_log'])) {
+    if (($phpIni = @parse_ini_file($phpIniPath)) !== false && !isset($phpIni['error_log'])) {
         $phpIni['error_log'] = "{$home}/.lighttpd/error.log";
         $newContent = '';
         foreach ($phpIni as $key => $value) {

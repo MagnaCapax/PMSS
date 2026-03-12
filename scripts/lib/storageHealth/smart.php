@@ -63,37 +63,27 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         break;
     }
 
+    $lineParsers = [
+        ['pattern' => '/\\bReallocated_Sector_Ct\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['reallocated']],
+        ['pattern' => '/\\bCurrent_Pending_Sector\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['pending']],
+        ['pattern' => '/\\bUDMA_CRC_Error_Count\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['udma_crc', 'link_errors']],
+        ['pattern' => '/\\bTemperature(_Celsius)?\\b.*?\\s(\\d+)\\s*$/', 'group' => 2, 'targets' => ['temp_c']],
+        ['pattern' => '/^194\\s+Temperature_Celsius.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['temp_c']],
+        ['pattern' => '/Current\\s+Drive\\s+Temperature:\\s*([0-9]+)\\s*C/i', 'group' => 1, 'targets' => ['temp_c']],
+        ['pattern' => '/Elements\\s+in\\s+grown\\s+defect\\s+list:\\s*([0-9]+)/i', 'group' => 1, 'targets' => ['reallocated']],
+        ['pattern' => '/Non-medium\\s+error\\s+count:\\s*([0-9]+)/i', 'group' => 1, 'targets' => ['link_errors']],
+        ['pattern' => '/\\bPower_On_Hours\\b.*?\\s(\\d+)\\s*$/', 'group' => 1, 'targets' => ['power_on_hours']],
+        ['pattern' => '/Accumulated\\s+power\\s+on\\s+time.*?([0-9]+):([0-9]+):([0-9]+)/i', 'group' => 1, 'targets' => ['power_on_hours']],
+    ];
     foreach (preg_split('/\r?\n/', $out) as $line) {
-        if (preg_match('/\\bReallocated_Sector_Ct\\b.*?\\s(\\d+)\\s*$/', $line, $m)) {
-            $metrics['reallocated'] = (int) $m[1];
-        }
-        if (preg_match('/\\bCurrent_Pending_Sector\\b.*?\\s(\\d+)\\s*$/', $line, $m)) {
-            $metrics['pending'] = (int) $m[1];
-        }
-        if (preg_match('/\\bUDMA_CRC_Error_Count\\b.*?\\s(\\d+)\\s*$/', $line, $m)) {
-            $metrics['udma_crc'] = (int) $m[1];
-            $metrics['link_errors'] = (int) $m[1];
-        }
-        if (preg_match('/\\bTemperature(_Celsius)?\\b.*?\\s(\\d+)\\s*$/', $line, $m)) {
-            $metrics['temp_c'] = (int) $m[2];
-        }
-        if (preg_match('/^194\\s+Temperature_Celsius.*?\\s(\\d+)\\s*$/', $line, $m)) {
-            $metrics['temp_c'] = (int) $m[1];
-        }
-        if (preg_match('/Current\\s+Drive\\s+Temperature:\\s*([0-9]+)\\s*C/i', $line, $m)) {
-            $metrics['temp_c'] = (int) $m[1];
-        }
-        if (preg_match('/Elements\\s+in\\s+grown\\s+defect\\s+list:\\s*([0-9]+)/i', $line, $m)) {
-            $metrics['reallocated'] = (int) $m[1];
-        }
-        if (preg_match('/Non-medium\\s+error\\s+count:\\s*([0-9]+)/i', $line, $m)) {
-            $metrics['link_errors'] = (int) $m[1];
-        }
-        if (preg_match('/\\bPower_On_Hours\\b.*?\\s(\\d+)\\s*$/', $line, $m)) {
-            $metrics['power_on_hours'] = (int) $m[1];
-        }
-        if (preg_match('/Accumulated\\s+power\\s+on\\s+time.*?([0-9]+):([0-9]+):([0-9]+)/i', $line, $m)) {
-            $metrics['power_on_hours'] = (int) $m[1];
+        foreach ($lineParsers as $parser) {
+            if (preg_match($parser['pattern'], $line, $matches) !== 1) {
+                continue;
+            }
+            $value = (int) $matches[$parser['group']];
+            foreach ($parser['targets'] as $target) {
+                $metrics[$target] = $value;
+            }
         }
     }
 
