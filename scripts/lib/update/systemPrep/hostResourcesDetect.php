@@ -37,8 +37,8 @@ function pmssTotalCpuThreads(): int
     }
 
     // Fallback to nproc if available
-    $nproc = @shell_exec('nproc');
-    if ($nproc !== null && ($count = (int)trim($nproc)) > 0) {
+    $count = (int) trim((string) @shell_exec('nproc'));
+    if ($count > 0) {
         return $count;
     }
 

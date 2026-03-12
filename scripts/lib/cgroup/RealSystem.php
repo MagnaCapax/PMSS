@@ -13,18 +13,6 @@ require_once __DIR__ . '/../runtime.php'; // for requireRoot helper if needed
 
 class RealSystem implements SystemInterface
 {
-    /**
-     * Detect whether we are running under the hermetic test harness.
-     *
-     * Development tests set PMSS_TEST_MODE=1 (and a matching constant via the
-     * test runner). In this mode we must avoid invoking real systemctl/findmnt
-     * calls so tests stay hermetic and do not depend on host capabilities.
-     */
-    private function isTestMode(): bool
-    {
-        return in_array(strtolower((string) getenv('PMSS_TEST_MODE')), ['1', 'true', 'yes'], true)
-            || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE);
-    }
     public function getCgroupMode(): string
     {
         return is_file('/sys/fs/cgroup/cgroup.controllers') ? 'v2' : 'v1';
@@ -42,7 +30,10 @@ class RealSystem implements SystemInterface
     public function execute(string $command): ?string
     {
         // In test mode we avoid shelling out to real systemctl/findmnt.
-        return $this->isTestMode() ? '' : @shell_exec($command);
+        $testMode = in_array(strtolower((string) getenv('PMSS_TEST_MODE')), ['1', 'true', 'yes'], true)
+            || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE);
+
+        return $testMode ? '' : @shell_exec($command);
     }
 
     public function readFile(string $path): ?string
