@@ -40,9 +40,7 @@ class ResourceStorage
             $this->setImmutable($userPath, false);
             $this->writeAtomic($userPath, $serialized);
             @chown($userPath, 'root');
-            if ($user !== '') {
-                @chgrp($userPath, $user);
-            }
+            $user !== '' && @chgrp($userPath, $user);
             @chmod($userPath, 0640);
             $this->setImmutable($userPath, true);
         }

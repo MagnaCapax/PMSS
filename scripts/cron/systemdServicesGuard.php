@@ -40,19 +40,13 @@ foreach ($specs as $spec) {
     $active = trim((string) @shell_exec('systemctl is-active '.escapeshellarg($unit).' 2>/dev/null'));
     $enabled = trim((string) @shell_exec('systemctl is-enabled '.escapeshellarg($unit).' 2>/dev/null'));
 
-    $needsHardening = ($active === 'active' || $active === 'activating');
-    if (!$needsHardening) {
-        $needsHardening = $shouldMask ? ($enabled !== 'masked') : ($enabled === 'enabled');
-    }
+    $needsHardening = ($active === 'active' || $active === 'activating')
+        || ($shouldMask ? ($enabled !== 'masked') : ($enabled === 'enabled'));
     if (!$needsHardening) {
         continue;
     }
 
     $touched = true;
-    if ($unit === 'apache2') {
-        pmssStopDisableMaskSystemdUnit('apache2', 'Apache httpd (legacy)', true);
-        continue;
-    }
     pmssStopDisableMaskSystemdUnit($unit, $label, $shouldMask);
 }
 

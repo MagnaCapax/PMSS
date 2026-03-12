@@ -90,12 +90,7 @@ function pmssResourceSnapshotRun(): int
         $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
 
         foreach ($users as $user) {
-            if (!pmssResourceLogIsValidUser($user)) {
-                continue;
-            }
-
-            $uid = pmssResourceLogLookupUid($user);
-            if ($uid === null) {
+            if (!pmssResourceLogIsValidUser($user) || ($uid = pmssResourceLogLookupUid($user)) === null) {
                 continue;
             }
 
@@ -118,11 +113,7 @@ function pmssResourceSnapshotRun(): int
                 }
             }
 
-            if ($metrics === null) {
-                $metrics = pmssResourceSnapshotComputeFromLog($stats, $user);
-            }
-
-            if ($metrics === null) {
+            if ($metrics === null && ($metrics = pmssResourceSnapshotComputeFromLog($stats, $user)) === null) {
                 @fwrite($fh, $ts.' WARN resource_missing user='.$user.PHP_EOL);
                 continue;
             }

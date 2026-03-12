@@ -77,20 +77,18 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
 function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
 {
-    $buildPayload = static function (array $source): array {
-        return [
-            'io_read' => $source['io_read'],
-            'io_write' => $source['io_write'],
-            'io_read_ops' => $source['io_read_ops'],
-            'io_write_ops' => $source['io_write_ops'],
-            'cpu' => $source['cpu'],
-            'ram_hours' => $source['ram_hours'],
-            'memory' => [
-                'current' => $source['memory_current'],
-                'avg_month' => $source['memory_avg_month'],
-            ],
-            'tasks' => ['current' => $source['tasks_current']],
+    $payloadMetrics = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
+    $buildPayload = static function (array $source) use ($payloadMetrics): array {
+        $payload = [];
+        foreach ($payloadMetrics as $metric) {
+            $payload[$metric] = $source[$metric];
+        }
+        $payload['memory'] = [
+            'current' => $source['memory_current'],
+            'avg_month' => $source['memory_avg_month'],
         ];
+        $payload['tasks'] = ['current' => $source['tasks_current']];
+        return $payload;
     };
 
     return [

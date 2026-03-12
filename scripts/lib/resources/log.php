@@ -57,15 +57,18 @@ function pmssResourceLogReadCounters(int $uid): ?array
             continue;
         }
         $name = $parts[0];
+        $field = $fieldMap[$name] ?? null;
         $value = $parts[1];
-        if (!ctype_digit($value) || !isset($fieldMap[$name])) {
+        if ($field === null || !ctype_digit($value)) {
             continue;
         }
-        $values[$fieldMap[$name]] = (int) $value;
+        $values[$field] = (int) $value;
     }
 
-    if (in_array(null, array_intersect_key($values, array_flip($requiredFields)), true)) {
-        return null;
+    foreach ($requiredFields as $field) {
+        if ($values[$field] === null) {
+            return null;
+        }
     }
 
     return $values;
