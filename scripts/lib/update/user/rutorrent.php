@@ -40,11 +40,41 @@ function pmssUserRutorrentScheduleIntervalPatchApply(string $filePath): bool
 }
 
 /**
+ * Suppress bare ob_flush notices in ruTorrent RSS plugin responses.
+ *
+ * The bundled ruTorrent tree is frozen for now, so we patch tenant copies
+ * until the upstream files are replaced by a version bump.
+ */
+function pmssUserRutorrentRssObFlushPatchApply(string $filePath): bool
+{
+    if (!is_file($filePath) || is_link($filePath)) {
+        return false;
+    }
+
+    $content = @file_get_contents($filePath);
+    if (!is_string($content) || $content === '') {
+        return false;
+    }
+
+    if (strpos($content, '@ob_flush();') !== false) {
+        return true;
+    }
+
+    $updated = str_replace('ob_flush();', '@ob_flush();', $content, $replacements);
+    if ($replacements < 1 || $updated === $content) {
+        return false;
+    }
+
+    return @file_put_contents($filePath, $updated) !== false;
+}
+
+/**
  * Apply compatibility patches for legacy ruTorrent PHP files.
  */
 function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
 {
     pmssUserRutorrentScheduleIntervalPatchApply($ctx['home'].'/www/rutorrent/php/settings.php');
+    pmssUserRutorrentRssObFlushPatchApply($ctx['home'].'/www/rutorrent/plugins/rss/action.php');
 }
 
 function pmssUserUpdateThemes(array $ctx): void
