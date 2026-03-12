@@ -41,8 +41,7 @@ function pmssUpdateStep2HandleClassifiedFailure(string $description, string $cla
         $rc,
         $reason
     );
-    $logger = function_exists('logmsg') ? 'logmsg' : 'logMessage';
-    $logger($logLine);
+    (function_exists('logmsg') ? 'logmsg' : 'logMessage')($logLine);
 
     if ($classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED && getenv('PMSS_PACKAGE_PHASE') === 'complete') {
         pmssLogJson([

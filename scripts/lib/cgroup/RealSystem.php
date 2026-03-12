@@ -22,13 +22,11 @@ class RealSystem implements SystemInterface
      */
     private function isTestMode(): bool
     {
-        $flag = getenv('PMSS_TEST_MODE');
-        if (is_string($flag) && $flag !== '') {
-            $flag = strtolower($flag);
-            if ($flag === '1' || $flag === 'true' || $flag === 'yes') {
-                return true;
-            }
+        $flag = strtolower((string) getenv('PMSS_TEST_MODE'));
+        if ($flag === '1' || $flag === 'true' || $flag === 'yes') {
+            return true;
         }
+
         return defined('PMSS_TEST_MODE') && PMSS_TEST_MODE;
     }
     public function getCgroupMode(): string
@@ -74,22 +72,22 @@ class RealSystem implements SystemInterface
 
     public function resolveDevice(string $device): string
     {
-        if ($device === '/home') {
-            $homeDev = getenv('PMSS_HOME_DEVICE');
-            if (is_string($homeDev) && $homeDev !== '') {
-                return $homeDev;
-            }
-            return trim((string)$this->execute('findmnt -no SOURCE /home 2>/dev/null'));
+        if ($device === '/home' && is_string($homeDev = getenv('PMSS_HOME_DEVICE')) && $homeDev !== '') {
+            return $homeDev;
         }
-        return trim((string)$this->execute('findmnt -no SOURCE ' . escapeshellarg($device) . ' 2>/dev/null'));
+
+        $target = ($device === '/home') ? '/home' : escapeshellarg($device);
+        return trim((string) $this->execute('findmnt -no SOURCE '.$target.' 2>/dev/null'));
     }
 
     public function requireRoot(): void
     {
-        // This uses the global function from runtime.php or implements check directly
         if (function_exists('requireRoot')) {
             requireRoot();
-        } elseif (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+            return;
+        }
+
+        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
             die("This script must be run as root.\n");
         }
     }

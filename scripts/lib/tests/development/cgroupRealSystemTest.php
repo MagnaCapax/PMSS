@@ -1,0 +1,86 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/cgroup/RealSystem.php';
+
+class cgroupRealSystemProbe extends \PMSS\Cgroup\RealSystem
+{
+    /** @var string */
+    public $lastCommand = '';
+    /** @var string */
+    public $returnValue = '';
+
+    public function execute(string $command): ?string
+    {
+        $this->lastCommand = $command;
+        return $this->returnValue;
+    }
+}
+
+class cgroupRealSystemTest extends TestCase
+{
+    /** @var string|false */
+    private $originalHomeDevice;
+
+    public function setUp(): void
+    {
+        $this->originalHomeDevice = getenv('PMSS_HOME_DEVICE');
+    }
+
+    public function tearDown(): void
+    {
+        if ($this->originalHomeDevice === false) {
+            putenv('PMSS_HOME_DEVICE');
+            return;
+        }
+        putenv('PMSS_HOME_DEVICE='.$this->originalHomeDevice);
+    }
+
+    public function testExecuteReturnsEmptyStringInTestMode(): void
+    {
+        putenv('PMSS_HOME_DEVICE');
+        $sys = new \PMSS\Cgroup\RealSystem();
+        $this->assertEquals('', $sys->execute('echo test'));
+    }
+
+    public function testResolveDeviceUsesHomeOverride(): void
+    {
+        putenv('PMSS_HOME_DEVICE=/dev/md-test');
+        $probe = new cgroupRealSystemProbe();
+
+        $resolved = $probe->resolveDevice('/home');
+
+        $this->assertEquals('/dev/md-test', $resolved);
+        $this->assertEquals('', $probe->lastCommand);
+    }
+
+    public function testResolveDeviceQueriesHomeWithoutOverride(): void
+    {
+        putenv('PMSS_HOME_DEVICE');
+        $probe = new cgroupRealSystemProbe();
+        $probe->returnValue = '/dev/md0';
+
+        $resolved = $probe->resolveDevice('/home');
+
+        $this->assertEquals('/dev/md0', $resolved);
+        $this->assertEquals('findmnt -no SOURCE /home 2>/dev/null', $probe->lastCommand);
+    }
+
+    public function testResolveDeviceEscapesArbitraryPath(): void
+    {
+        $probe = new cgroupRealSystemProbe();
+        $probe->returnValue = '/dev/sdb1';
+
+        $resolved = $probe->resolveDevice('/mnt/data set');
+
+        $this->assertEquals('/dev/sdb1', $resolved);
+        $this->assertEquals("findmnt -no SOURCE '/mnt/data set' 2>/dev/null", $probe->lastCommand);
+    }
+
+    public function testGetUidReturnsMinusOneForMissingUser(): void
+    {
+        $sys = new \PMSS\Cgroup\RealSystem();
+        $this->assertEquals(-1, $sys->getUid('pmss-this-user-should-not-exist-xyz'));
+    }
+}

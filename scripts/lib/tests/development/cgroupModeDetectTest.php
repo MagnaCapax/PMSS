@@ -1,0 +1,44 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update/systemPrep/cgroupModeDetect.php';
+
+class cgroupModeDetectTest extends TestCase
+{
+    /** @var string|false */
+    private $originalOverride;
+
+    public function setUp(): void
+    {
+        $this->originalOverride = getenv('PMSS_CGROUP_MODE');
+    }
+
+    public function tearDown(): void
+    {
+        if ($this->originalOverride === false) {
+            putenv('PMSS_CGROUP_MODE');
+            return;
+        }
+        putenv('PMSS_CGROUP_MODE='.$this->originalOverride);
+    }
+
+    public function testOverrideSelectsV1(): void
+    {
+        putenv('PMSS_CGROUP_MODE=v1');
+        $this->assertEquals('v1', \pmssCgroupMode());
+    }
+
+    public function testOverrideSelectsV2(): void
+    {
+        putenv('PMSS_CGROUP_MODE=v2');
+        $this->assertEquals('v2', \pmssCgroupMode());
+    }
+
+    public function testInvalidOverrideFallsBackToKnownModes(): void
+    {
+        putenv('PMSS_CGROUP_MODE=invalid');
+        $mode = \pmssCgroupMode();
+        $this->assertTrue(in_array($mode, ['v1', 'v2', 'unknown'], true));
+    }
+}

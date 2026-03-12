@@ -25,7 +25,6 @@ if (!is_dir('/run/systemd/system')) {
 $specs = pmssSeedboxSystemServiceSpecs();
 $specs[] = ['unit' => 'apache2', 'label' => 'Apache httpd (legacy)', 'mask' => true];
 
-$touched = false;
 foreach ($specs as $spec) {
     $unit = (string) ($spec['unit'] ?? '');
     if ($unit === '') {
@@ -46,10 +45,5 @@ foreach ($specs as $spec) {
         continue;
     }
 
-    $touched = true;
     pmssStopDisableMaskSystemdUnit($unit, $label, $shouldMask);
-}
-
-if (!$touched) {
-    exit(0);
 }
