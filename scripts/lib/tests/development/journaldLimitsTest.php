@@ -65,6 +65,22 @@ class JournaldLimitsTest extends TestCase
         $this->assertEquals($this->mib(256), $policy['runtime_max_use_bytes']);
     }
 
+    public function testRootFilesystemBytesUsesEnvOverride(): void
+    {
+        $previous = getenv('PMSS_ROOT_FS_BYTES');
+        putenv('PMSS_ROOT_FS_BYTES=123456');
+
+        try {
+            $this->assertEquals(123456, \pmssJournaldRootFilesystemBytes());
+        } finally {
+            if ($previous === false) {
+                putenv('PMSS_ROOT_FS_BYTES');
+            } else {
+                putenv('PMSS_ROOT_FS_BYTES='.$previous);
+            }
+        }
+    }
+
     public function testTemplateRenderAndWrite(): void
     {
         $cfgDir = $this->tempDir('cfg');

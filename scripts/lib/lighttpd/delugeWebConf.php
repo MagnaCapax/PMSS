@@ -100,13 +100,11 @@ function pmssDelugeReadWebConf(string $path): ?array
         return null;
     }
 
-    $meta = json_decode($split[0], true);
-    if (!is_array($meta) || json_last_error() !== JSON_ERROR_NONE) {
+    if (!is_array($meta = json_decode($split[0], true)) || json_last_error() !== JSON_ERROR_NONE) {
         return null;
     }
 
-    $config = json_decode(ltrim((string)$split[1]), true);
-    if (!is_array($config) || json_last_error() !== JSON_ERROR_NONE) {
+    if (!is_array($config = json_decode(ltrim((string) $split[1]), true)) || json_last_error() !== JSON_ERROR_NONE) {
         return null;
     }
 

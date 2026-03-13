@@ -20,11 +20,9 @@ function pmssParseSizeToMiB($value): ?int
     }
 
     // Fallback: assume raw bytes
-    if (is_numeric($raw)) {
-        return (int)round(((float)$raw) / 1048576);
-    }
-
-    return null;
+    return is_numeric($raw)
+        ? (int) round(((float) $raw) / 1048576)
+        : null;
 }
 
 function pmssClampMemoryLimit(int $memoryMiB): int

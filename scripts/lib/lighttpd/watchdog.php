@@ -13,12 +13,12 @@
  */
 function pmssLighttpdWatchdogConfigMaxProcs(string $configPath): ?int
 {
-    $config = @file_get_contents($configPath);
-    if (!is_string($config) || !preg_match('/"max-procs"\s*=>\s*([0-9]+)/', $config, $matches)) {
-        return null;
+    if (is_string($config = @file_get_contents($configPath))
+        && preg_match('/"max-procs"\s*=>\s*([0-9]+)/', $config, $matches) === 1) {
+        return ((int) $matches[1]) ?: null;
     }
 
-    return ((int) $matches[1]) ?: null;
+    return null;
 }
 
 /**

@@ -45,11 +45,8 @@ function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool 
     if (is_link($customFile) || (file_exists($customFile) && !is_file($customFile))) {
         return false;
     }
-    if (!file_exists($customFile) && !pmssWriteUserFile($customFile, '', $user, 0751)) {
-        return false;
-    }
 
-    return true;
+    return file_exists($customFile) || pmssWriteUserFile($customFile, '', $user, 0751);
 }
 
 /**

@@ -18,11 +18,10 @@ if (!function_exists('pmssJournaldRootFilesystemBytes')) {
         if (is_string($override) && $override !== '' && ctype_digit($override)) {
             return (int)$override;
         }
-        $bytes = @disk_total_space('/');
-        if ($bytes === false || !is_numeric($bytes) || $bytes <= 0) {
-            return 0;
-        }
-        return (int)$bytes;
+
+        return (($bytes = @disk_total_space('/')) !== false && is_numeric($bytes) && $bytes > 0)
+            ? (int) $bytes
+            : 0;
     }
 }
 
@@ -39,30 +38,13 @@ if (!function_exists('pmssJournaldLimitsForRootBytes')) {
         $rootGiB = $rootBytes / $gib;
 
         // < 50GiB gets 20% with a 2GiB floor; larger roots use 20GiB flat.
-        if ($rootGiB < 50) {
-            $systemMax = (int)floor($rootBytes * 0.20);
-        } else {
-            $systemMax = 20 * $gib;
-        }
-        if ($systemMax < (2 * $gib)) {
-            $systemMax = 2 * $gib;
-        }
+        $systemMax = max(2 * $gib, $rootGiB < 50 ? (int) floor($rootBytes * 0.20) : 20 * $gib);
 
         // Keep free 5% of root, clamped to 1-10GiB.
-        $systemKeepFree = (int)floor($rootBytes * 0.05);
-        if ($systemKeepFree < (1 * $gib)) {
-            $systemKeepFree = 1 * $gib;
-        } elseif ($systemKeepFree > (10 * $gib)) {
-            $systemKeepFree = 10 * $gib;
-        }
+        $systemKeepFree = max(1 * $gib, min(10 * $gib, (int) floor($rootBytes * 0.05)));
 
         // Runtime max defaults to 10% of SystemMaxUse, clamped to 256MiB-2GiB.
-        $runtimeMax = (int)floor($systemMax / 10);
-        if ($runtimeMax < (256 * $mib)) {
-            $runtimeMax = 256 * $mib;
-        } elseif ($runtimeMax > (2 * $gib)) {
-            $runtimeMax = 2 * $gib;
-        }
+        $runtimeMax = max(256 * $mib, min(2 * $gib, (int) floor($systemMax / 10)));
 
         return [
             'system_max_use_bytes'   => $systemMax,
