@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/update/systemPrep/systemdUserManagerNoFileLimitInstall.php';
+require_once dirname(__DIR__, 2).'/update/systemPrep/systemdSlicesDropinInstall.php';
 
 class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 {
