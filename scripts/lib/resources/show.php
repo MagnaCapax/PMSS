@@ -24,11 +24,11 @@ function pmssShowResourcesMain(array $argv): int
         return 0;
     }
 
-    $userFilter = isset($options['user']) ? trim((string) $options['user']) : null;
+    $userFilter = trim((string) ($options['user'] ?? ''));
 
     $statsDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/').'/resourceStats';
 
-    if ($userFilter !== null && $userFilter !== '') {
+    if ($userFilter !== '') {
         if (!pmssResourceLogIsValidUser($userFilter)) {
             fwrite(STDERR, "Invalid user specified: {$userFilter}\n");
             return 1;

@@ -86,7 +86,9 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue(isset($saved['io_read']['raw']['month']));
         $this->assertTrue(isset($saved['ram_hours']['display']['month']));
         $this->assertStringContainsString('KiB', $saved['io_read']['display']['hour']);
+        $this->assertStringContainsString('MiB', $saved['memory']['display']['day']);
         $this->assertStringContainsString('GB-hrs', $saved['ram_hours']['display']['day']);
+        $this->assertEquals('5', $saved['tasks']['display']['day']);
     }
 
     public function testProcessUserSkipsInvalidUserWithoutPersisting(): void
@@ -119,13 +121,13 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue($this->readSavedResourceStats($user) === null);
     }
 
-    public function testFormatBytesDisplayPreservesThresholdBoundaries(): void
+    public function testFormatMetricDisplayPreservesByteThresholdBoundaries(): void
     {
         $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
-        $method = new \ReflectionMethod($processor, 'formatBytesDisplay');
+        $method = new \ReflectionMethod($processor, 'formatMetricDisplay');
         $method->setAccessible(true);
 
-        $formatted = $method->invoke($processor, [
+        $formatted = $method->invoke($processor, 'io_read', [
             'exact_mib' => 1024 * 1024,
             'over_mib' => (1024 * 1024) + 1,
             'exact_gib' => 1024 * 1024 * 1024,
@@ -138,13 +140,13 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertEquals('1GiB', $formatted['over_gib']);
     }
 
-    public function testFormatCpuDisplayPreservesThresholdBoundaries(): void
+    public function testFormatMetricDisplayPreservesCpuThresholdBoundaries(): void
     {
         $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
-        $method = new \ReflectionMethod($processor, 'formatCpuDisplay');
+        $method = new \ReflectionMethod($processor, 'formatMetricDisplay');
         $method->setAccessible(true);
 
-        $formatted = $method->invoke($processor, [
+        $formatted = $method->invoke($processor, 'cpu', [
             'below_minute' => 59 * 1000000000,
             'exact_minute' => 60 * 1000000000,
             'exact_hour' => 3600 * 1000000000,

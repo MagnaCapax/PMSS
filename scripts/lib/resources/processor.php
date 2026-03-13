@@ -97,14 +97,12 @@ class ResourceStatsProcessor
             return;
         }
 
-        $dataLines = trim($this->stats->getData($user, (int) ((35 * 24 * 60) / 5)));
-        if ($dataLines === '') {
+        if (($dataLines = trim($this->stats->getData($user, (int) ((35 * 24 * 60) / 5)))) === '') {
             logMessage(date('c').": No data for user {$user}");
             return;
         }
 
-        $resourceData = array_filter(explode("\n", $dataLines));
-        if (count($resourceData) < 2) {
+        if (count($resourceData = array_filter(explode("\n", $dataLines))) < 2) {
             logMessage(date('c').": Too little data for {$user}");
             return;
         }
@@ -124,36 +122,29 @@ class ResourceStatsProcessor
             return;
         }
 
+        $data = [];
         $results = $accumulator->results();
         $rawTotals = $results['raw'];
-
-        $data = [];
         foreach ([
-            'io_read' => 'formatBytesDisplay',
-            'io_write' => 'formatBytesDisplay',
-            'io_read_ops' => 'formatRoundedDisplay',
-            'io_write_ops' => 'formatRoundedDisplay',
-            'cpu' => 'formatCpuDisplay',
-        ] as $metric => $formatter) {
+            'io_read' => $rawTotals['io_read'],
+            'io_write' => $rawTotals['io_write'],
+            'io_read_ops' => $rawTotals['io_read_ops'],
+            'io_write_ops' => $rawTotals['io_write_ops'],
+            'cpu' => $rawTotals['cpu'],
+        ] as $metric => $rawMetric) {
             $data[$metric] = [
-                'raw' => $rawTotals[$metric],
-                'display' => $this->{$formatter}($rawTotals[$metric]),
+                'raw' => $rawMetric,
+                'display' => $this->formatMetricDisplay($metric, $rawMetric),
             ];
         }
-        $data['memory'] = [
-            'raw'     => $results['memory'],
-            'display' => $this->formatBytesDisplay($results['memory']),
-            'current' => $results['current_memory'],
-        ];
-        $data['tasks'] = [
-            'raw'     => $results['tasks'],
-            'display' => $this->formatRoundedDisplay($results['tasks']),
-            'current' => $results['current_tasks'],
-        ];
-        $data['ram_hours'] = [
-            'raw'     => $rawTotals['ram_hours'],
-            'display' => $this->formatRoundedDisplay($rawTotals['ram_hours'], 2, 'GB-hrs'),
-        ];
+        foreach (['memory' => $results['memory'], 'tasks' => $results['tasks'], 'ram_hours' => $rawTotals['ram_hours']] as $metric => $rawMetric) {
+            $data[$metric] = [
+                'raw' => $rawMetric,
+                'display' => $this->formatMetricDisplay($metric, $rawMetric),
+            ];
+        }
+        $data['memory']['current'] = $results['current_memory'];
+        $data['tasks']['current'] = $results['current_tasks'];
         $data['daily'] = $results['daily'];
 
         $this->storage->ensureRuntime();
@@ -161,39 +152,33 @@ class ResourceStatsProcessor
         logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$rawTotals['io_read']['month']}");
     }
 
-    private function formatBytesDisplay(array $rawTotals): array
+    private function formatMetricDisplay(string $metric, array $rawTotals): array
     {
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
-            $bytes = (float) $value;
-            foreach ([1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'] as $divisor => $suffix) {
-                if ($bytes > $divisor) {
-                    $formatted[$label] = round($bytes / $divisor, 2).$suffix;
-                    continue 2;
-                }
+            $number = (float) $value;
+            if ($metric === 'cpu') {
+                $seconds = $number / 1000000000;
+                $formatted[$label] = $seconds >= 3600
+                    ? round($seconds / 3600, 2).'h'
+                    : ($seconds >= 60 ? round($seconds / 60, 2).'m' : round($seconds, 2).'s');
+                continue;
             }
-            $formatted[$label] = round($bytes / 1024, 2).'KiB';
-        }
-        return $formatted;
-    }
-
-    private function formatCpuDisplay(array $rawTotals): array
-    {
-        $formatted = [];
-        foreach ($rawTotals as $label => $value) {
-            $seconds = $value / 1000000000;
-            $formatted[$label] = $seconds >= 3600
-                ? round($seconds / 3600, 2).'h'
-                : ($seconds >= 60 ? round($seconds / 60, 2).'m' : round($seconds, 2).'s');
-        }
-        return $formatted;
-    }
-
-    private function formatRoundedDisplay(array $rawTotals, int $precision = 2, string $suffix = ''): array
-    {
-        $formatted = [];
-        foreach ($rawTotals as $label => $value) {
-            $formatted[$label] = (string) round((float) $value, $precision).$suffix;
+            if ($metric === 'ram_hours') {
+                $formatted[$label] = (string) round($number, 2).'GB-hrs';
+                continue;
+            }
+            if ($metric === 'io_read' || $metric === 'io_write' || $metric === 'memory') {
+                foreach ([1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'] as $divisor => $suffix) {
+                    if ($number > $divisor) {
+                        $formatted[$label] = round($number / $divisor, 2).$suffix;
+                        continue 2;
+                    }
+                }
+                $formatted[$label] = round($number / 1024, 2).'KiB';
+                continue;
+            }
+            $formatted[$label] = (string) round($number, 2);
         }
         return $formatted;
     }
