@@ -42,8 +42,7 @@ class ResourceStatsAccumulator
         $this->memorySums = $this->taskSums = $windowZeros;
         $this->memoryCounts = $this->taskCounts = array_fill_keys($labels, 0);
         $this->dailyAccumulator = new ResourceStatsDailyAccumulator();
-        $this->lastMemory = 0.0;
-        $this->lastTasks = 0.0;
+        $this->lastMemory = $this->lastTasks = 0.0;
         $this->prevTimestamp = null;
         $this->sampleCount = 0;
     }
@@ -55,14 +54,11 @@ class ResourceStatsAccumulator
     {
         $this->sampleCount++;
         $timestamp = (int) $sample['timestamp'];
-        $sampleMemory = (float) $sample['memory'];
-        $sampleTasks = (float) $sample['tasks'];
-        $this->lastMemory = $sampleMemory;
-        $this->lastTasks = $sampleTasks;
+        $this->lastMemory = $sampleMemory = (float) $sample['memory'];
+        $this->lastTasks = $sampleTasks = (float) $sample['tasks'];
 
-        $defaultIntervalHours = 300 / 3600;
-        $delta = ($this->prevTimestamp === null) ? 0 : ($timestamp - $this->prevTimestamp);
-        $intervalHours = ($delta > 0 && $delta <= 3600) ? ($delta / 3600) : $defaultIntervalHours;
+        $delta = ($this->prevTimestamp === null) ? 300 : ($timestamp - $this->prevTimestamp);
+        $intervalHours = (($delta > 0 && $delta <= 3600) ? $delta : 300) / 3600;
         $this->prevTimestamp = $timestamp;
         $sampleMetrics = [
             'io_read' => (float) $sample['io_read'],

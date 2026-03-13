@@ -69,4 +69,31 @@ class ResourceStatsAccumulatorTest extends TestCase
         $ramHours = $results['raw']['ram_hours']['day'];
         $this->assertTrue(abs($ramHours - 0.25) < 0.01);
     }
+
+    public function testRamHoursFallsBackToFiveMinuteWindowsForLongGaps(): void
+    {
+        $now = time();
+        $compare = ['day' => $now - (3 * 3600)];
+        $acc = new \ResourceStatsAccumulator($compare);
+
+        $acc->addSample([
+            'timestamp' => $now - (2 * 3600),
+            'io_read' => 0.0,
+            'io_write' => 0.0,
+            'cpu' => 0.0,
+            'memory' => 1024 * 1024 * 1024,
+            'tasks' => 1.0,
+        ]);
+        $acc->addSample([
+            'timestamp' => $now,
+            'io_read' => 0.0,
+            'io_write' => 0.0,
+            'cpu' => 0.0,
+            'memory' => 1024 * 1024 * 1024,
+            'tasks' => 1.0,
+        ]);
+
+        $ramHours = $acc->results()['raw']['ram_hours']['day'];
+        $this->assertTrue(abs($ramHours - (10 / 60)) < 0.01);
+    }
 }

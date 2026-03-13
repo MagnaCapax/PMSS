@@ -77,11 +77,10 @@ function pmssResourceSnapshotRun(): int
             }
 
             if ($metrics === null) {
-                $dataLines = $stats->getData($user, 350);
-                if (trim($dataLines) !== '') {
+                if (($dataLines = trim($stats->getData($user, 350))) !== '') {
                     $threshold = time() - (24 * 60 * 60);
                     $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
-                    foreach (array_filter(explode("\n", trim($dataLines))) as $line) {
+                    foreach (array_filter(explode("\n", $dataLines)) as $line) {
                         $parsed = $stats->parseLine($line);
                         if ($parsed === false || $parsed['timestamp'] < $threshold) {
                             continue;

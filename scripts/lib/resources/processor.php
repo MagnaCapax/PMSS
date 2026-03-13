@@ -117,7 +117,6 @@ class ResourceStatsProcessor
             return;
         }
 
-        $data = [];
         $results = $accumulator->results();
         $metricData = $results['raw'] + [
             'memory' => $results['memory'],

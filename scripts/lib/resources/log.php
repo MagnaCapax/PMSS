@@ -87,14 +87,12 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     $state = $delta = [];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
         $currentValue = (int) $counters[$field];
-        $previousValue = isset($previousState[$field]) ? (int) $previousState[$field] : null;
-        $delta[$field] = ($previousValue !== null && $currentValue >= $previousValue) ? $currentValue - $previousValue : $currentValue;
+        $delta[$field] = isset($previousState[$field]) && $currentValue >= (int) $previousState[$field]
+            ? $currentValue - (int) $previousState[$field]
+            : $currentValue;
         $state[$field] = $currentValue;
     }
-
-    $state['memory'] = (int) $counters['memory'];
-    $state['tasks'] = (int) $counters['tasks'];
-    $state['ts'] = time();
+    $state += ['memory' => (int) $counters['memory'], 'tasks' => (int) $counters['tasks'], 'ts' => time()];
 
     if ($locked && is_string($payload = json_encode($state))) {
         @ftruncate($handle, 0);
