@@ -7,21 +7,16 @@
 
 function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
 {
-    if (!is_dir($homeDir) || is_link($homeDir)) {
-        return false;
-    }
-    if (is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www')) {
-        return false;
-    }
-    return file_exists($homeDir.'/.rtorrent.rc');
+    return is_dir($homeDir)
+        && !is_link($homeDir)
+        && !is_dir($homeDir.'/www-disabled')
+        && is_dir($homeDir.'/www')
+        && file_exists($homeDir.'/.rtorrent.rc');
 }
 
 function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool
 {
-    if (!pmssValidateUsername($user)) {
-        return false;
-    }
-    if (!is_dir($homeDir) || is_link($homeDir)) {
+    if (!pmssValidateUsername($user) || !is_dir($homeDir) || is_link($homeDir)) {
         return false;
     }
 

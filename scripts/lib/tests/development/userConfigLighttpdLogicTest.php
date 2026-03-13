@@ -140,6 +140,46 @@ LIGHTTPD;
         $this->assertTrue(strpos($stripped, '#"mod_webdav",') !== false);
     }
 
+    public function testAtomicWriteFileRejectsSymlinkTarget(): void
+    {
+        $root = sys_get_temp_dir().'/pmss-lighttpd-write-'.uniqid('', true);
+        $realPath = $root.'/real.conf';
+        $linkPath = $root.'/link.conf';
+        @mkdir($root, 0755, true);
+        file_put_contents($realPath, 'original');
+        symlink($realPath, $linkPath);
+
+        try {
+            $this->assertTrue(!\pmssAtomicWriteFile($linkPath, 'updated'));
+            $this->assertEquals('original', file_get_contents($realPath));
+        } finally {
+            @unlink($linkPath);
+            @unlink($realPath);
+            @rmdir($root);
+        }
+    }
+
+    public function testWriteUserFileWritesContentAndMode(): void
+    {
+        $root = sys_get_temp_dir().'/pmss-lighttpd-write-'.uniqid('', true);
+        $path = $root.'/custom.conf';
+        $owner = '';
+        if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+            $ownerInfo = @posix_getpwuid(posix_geteuid());
+            $owner = is_array($ownerInfo) ? (string) ($ownerInfo['name'] ?? '') : '';
+        }
+        @mkdir($root, 0755, true);
+
+        try {
+            $this->assertTrue(\pmssWriteUserFile($path, 'server.modules = ()', $owner, 0640));
+            $this->assertEquals('server.modules = ()', file_get_contents($path));
+            $this->assertEquals(0640, fileperms($path) & 0777);
+        } finally {
+            @unlink($path);
+            @rmdir($root);
+        }
+    }
+
     public function testUserConfigEntryPointKeepsLighttpdApplyHelperWiring(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/userConfigLighttpd.php');

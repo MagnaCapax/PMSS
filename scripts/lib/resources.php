@@ -41,12 +41,7 @@ class resourceStatistics
      */
     public function parseLine($thisLine)
     {
-        $tokens = preg_split('/\s+/', trim((string) $thisLine));
-        if (!is_array($tokens)) {
-            return false;
-        }
-        $tokenCount = count($tokens);
-        if ($tokenCount < 7) {
+        if (!is_array($tokens = preg_split('/\s+/', trim((string) $thisLine))) || ($tokenCount = count($tokens)) < 7) {
             return false;
         }
 
