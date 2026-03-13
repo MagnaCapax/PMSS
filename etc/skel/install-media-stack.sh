@@ -1003,6 +1003,14 @@ if [[ $DRY_RUN -eq 0 ]]; then
     fi
   fi
   cat <<EOF >"$HOME/.lighttpd/custom"
+# Keep ARR base paths canonical so missing-slash requests
+# redirect to proxy-managed app roots.
+url.redirect += (
+  "^/radarr$" => "/public-${USERNAME}/radarr/",
+  "^/sonarr$" => "/public-${USERNAME}/sonarr/",
+  "^/prowlarr$" => "/public-${USERNAME}/prowlarr/"
+)
+
 \$HTTP["url"] =~ "^/sabnzbd(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",

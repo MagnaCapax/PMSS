@@ -131,6 +131,13 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('/.lighttpd/custom', $this->script);
     }
 
+    public function testLighttpdArrPathsRedirectToTrailingSlash(): void
+    {
+        $this->assertStringContainsString('"^/radarr$" => "/public-${USERNAME}/radarr/"', $this->script);
+        $this->assertStringContainsString('"^/sonarr$" => "/public-${USERNAME}/sonarr/"', $this->script);
+        $this->assertStringContainsString('"^/prowlarr$" => "/public-${USERNAME}/prowlarr/"', $this->script);
+    }
+
     public function testDryRunLoggingPresent(): void
     {
         $this->assertStringContainsString('[dry-run]', $this->script);
