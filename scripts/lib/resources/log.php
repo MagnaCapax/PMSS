@@ -56,8 +56,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
         if (count($parts) !== 2) {
             continue;
         }
-        $field = $fieldMap[$parts[0]] ?? null;
-        if ($field === null || !ctype_digit($parts[1])) {
+        if (($field = $fieldMap[$parts[0]] ?? null) === null || !ctype_digit($parts[1])) {
             continue;
         }
         $values[$field] = (int) $parts[1];

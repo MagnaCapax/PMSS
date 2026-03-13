@@ -48,8 +48,7 @@ function pmssNetconsoleWriteIfChanged(string $path, string $body, callable $log)
         return false;
     }
 
-    $current = is_file($path) ? (string) @file_get_contents($path) : '';
-    if ($current === $body) {
+    if (is_file($path) && (string) @file_get_contents($path) === $body) {
         return false;
     }
 

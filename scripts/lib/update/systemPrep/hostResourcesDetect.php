@@ -31,8 +31,7 @@ function pmssTotalCpuThreads(): int
     }
 
     // Robust check using /proc/cpuinfo
-    $cpuinfo = @file_get_contents('/proc/cpuinfo');
-    $count = is_string($cpuinfo) ? substr_count($cpuinfo, 'processor') : 0;
+    $count = substr_count((string) @file_get_contents('/proc/cpuinfo'), 'processor');
     // Fallback to nproc if available
     return max(0, ($count > 0) ? $count : (int) trim((string) @shell_exec('nproc')));
 }

@@ -27,7 +27,6 @@ $logger = new Logger(__FILE__);
 $logger->msg('Updating quota information');
 // Get & parse users list
 $users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
-$changedConfig = array();
 
 foreach ($users as $thisUser) {
 #TODO Check that quota is working

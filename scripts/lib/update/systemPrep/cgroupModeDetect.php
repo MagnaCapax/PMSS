@@ -14,7 +14,7 @@
 function pmssCgroupMode(): string
 {
     $override = getenv('PMSS_CGROUP_MODE');
-    if (in_array($override, ['v1', 'v2'], true)) {
+    if ($override === 'v1' || $override === 'v2') {
         return $override;
     }
 
