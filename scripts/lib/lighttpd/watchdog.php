@@ -18,8 +18,7 @@ function pmssLighttpdWatchdogConfigMaxProcs(string $configPath): ?int
         return null;
     }
 
-    $maxProcs = (int) $matches[1];
-    return $maxProcs ?: null;
+    return ((int) $matches[1]) ?: null;
 }
 
 /**

@@ -36,8 +36,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
     $target = $dropDir.'/20-pmss-limits.conf';
     $body = "# PMSS: per-user manager descriptor limits from cgroup.policy.php\n[Service]\nLimitNOFILE={$soft}:{$hard}\n";
 
-    $tmpTarget = $target.'.tmp';
-    if (@file_put_contents($tmpTarget, $body) === false) {
+    if (@file_put_contents($tmpTarget = $target.'.tmp', $body) === false) {
         $log('[WARN] Failed to write temp user@.service drop-in '.$tmpTarget);
         return;
     }
@@ -69,8 +68,7 @@ function pmssSystemdUserManagerLogNamespaceInstall(callable $log): void
     $target = $dropDir.'/30-pmss-log-namespace.conf';
     $body = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
 
-    $tmpTarget = $target.'.tmp';
-    if (@file_put_contents($tmpTarget, $body) === false) {
+    if (@file_put_contents($tmpTarget = $target.'.tmp', $body) === false) {
         $log('[WARN] Failed to write temp user@.service log namespace drop-in '.$tmpTarget);
         return;
     }

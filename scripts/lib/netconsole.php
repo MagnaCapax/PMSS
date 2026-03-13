@@ -33,8 +33,7 @@ function pmssNetconsoleTargetFromSpec(string $spec): ?array
  */
 function pmssNetconsoleModuleLoaded(): bool
 {
-    $override = getenv('PMSS_NETCONSOLE_MODULE_LOADED');
-    return ($override !== false && $override !== '') ? $override === '1' : is_dir('/sys/module/netconsole');
+    return (($override = getenv('PMSS_NETCONSOLE_MODULE_LOADED')) !== false && $override !== '') ? $override === '1' : is_dir('/sys/module/netconsole');
 }
 
 /**

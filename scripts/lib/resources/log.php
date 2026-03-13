@@ -90,8 +90,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         }
     }
 
-    $state = [];
-    $delta = [];
+    $state = $delta = [];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
         $currentValue = (int) $counters[$field];
         $previousValue = isset($previousState[$field]) ? (int) $previousState[$field] : null;
@@ -103,8 +102,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     $state['tasks'] = (int) $counters['tasks'];
     $state['ts'] = time();
 
-    $payload = json_encode($state);
-    if ($locked && is_string($payload)) {
+    if ($locked && is_string($payload = json_encode($state))) {
         @ftruncate($handle, 0);
         @rewind($handle);
         @fwrite($handle, $payload);

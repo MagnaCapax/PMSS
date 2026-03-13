@@ -49,8 +49,7 @@ require_once __DIR__.'/cgroupModeDetect.php';
         // Advisory: hidepid=2 on /proc breaks rootless Docker under cgroup v2 on many hosts.
         // Emit a warning so operators can adjust policy if needed.
         try {
-            $procMount = '';
-            $hidepid   = '';
+            $procMount = $hidepid = '';
             $mi = @file('/proc/self/mountinfo', FILE_IGNORE_NEW_LINES);
             if (is_array($mi)) {
                 foreach ($mi as $l) {
@@ -62,8 +61,7 @@ require_once __DIR__.'/cgroupModeDetect.php';
                 // Extract mount options field (4th field) and parse hidepid option
                 $parts = explode(' ', $procMount);
                 if (isset($parts[3])) {
-                    $opts = explode(',', $parts[3]);
-                    foreach ($opts as $o) {
+                    foreach (explode(',', $parts[3]) as $o) {
                         if (strpos($o, 'hidepid=') === 0) { $hidepid = substr($o, 8); break; }
                     }
                 }

@@ -14,21 +14,18 @@ require_once __DIR__.'/../../configBackups.php';
  */
 function pmssApplyRuntimeTemplates(): void
 {
-    $rcLocal = '/etc/rc.local';
-    runStep('Updating rc.local template', 'cp /etc/seedbox/config/template.rc.local '.$rcLocal);
-    runStep('Setting rc.local ownership', 'chown root:root '.$rcLocal);
-    runStep('Setting rc.local permissions', 'chmod 750 '.$rcLocal);
-    runStep('Executing rc.local to apply runtime tweaks', 'nohup '.$rcLocal.' >> /dev/null 2>&1');
+    runStep('Updating rc.local template', 'cp /etc/seedbox/config/template.rc.local /etc/rc.local');
+    runStep('Setting rc.local ownership', 'chown root:root /etc/rc.local');
+    runStep('Setting rc.local permissions', 'chmod 750 /etc/rc.local');
+    runStep('Executing rc.local to apply runtime tweaks', 'nohup /etc/rc.local >> /dev/null 2>&1');
 
-    $systemdConf = '/etc/systemd/system.conf';
-    runStep('Installing systemd system.conf template', 'cp /etc/seedbox/config/template.systemd.system.conf '.$systemdConf);
-    runStep('Setting permissions on systemd system.conf', 'chmod 644 '.$systemdConf);
+    runStep('Installing systemd system.conf template', 'cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf');
+    runStep('Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf');
     runStep('Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec');
 
-    $sshdConfig = '/etc/ssh/sshd_config';
-    pmssBackupCriticalConfig('sshd', $sshdConfig);
-    runStep('Installing sshd configuration template', 'cp /etc/seedbox/config/template.sshd_config '.$sshdConfig);
-    runStep('Setting sshd_config permissions', 'chmod 644 '.$sshdConfig);
+    pmssBackupCriticalConfig('sshd', '/etc/ssh/sshd_config');
+    runStep('Installing sshd configuration template', 'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config');
+    runStep('Setting sshd_config permissions', 'chmod 644 /etc/ssh/sshd_config');
     runStep('Restarting sshd to load updated configuration', '/usr/bin/systemctl restart sshd');
 }
 
