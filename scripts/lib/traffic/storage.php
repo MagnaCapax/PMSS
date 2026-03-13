@@ -37,8 +37,7 @@ class TrafficStorage
     {
         $isLocalUser = substr_compare($user, '-localnet', -9) === 0;
         $targetUser = $isLocalUser ? substr($user, 0, -9) : $user;
-        $filename = $this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData';
-        $filename .= $isLocalUser ? 'Local' : '';
+        $filename = ($this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData').($isLocalUser ? 'Local' : '');
 
         $serialized = serialize($data);
         $homePath   = $this->homeDir.'/'.$targetUser;
@@ -68,17 +67,19 @@ class TrafficStorage
         if (!is_file($path)) {
             return;
         }
-        $chattr = '';
-        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-            if (is_executable($candidate)) {
-                $chattr = $candidate;
-                break;
+        static $chattr = null;
+        if ($chattr === null) {
+            $chattr = '';
+            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+                if (is_executable($candidate)) {
+                    $chattr = $candidate;
+                    break;
+                }
             }
         }
         if ($chattr === '') {
             return;
         }
-        $flag = $enable ? '+i' : '-i';
-        @exec($chattr.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
+        @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
     }
 }

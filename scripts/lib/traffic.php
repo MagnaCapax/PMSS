@@ -18,20 +18,20 @@ require_once __DIR__.'/traffic/storage.php';
 class trafficStatistics {
     /** @var string */
     private $trafficDir;
-    /** @var string */
-    private $homeDir;
-    /** @var string */
-    private $runtimeDir;
-    /** @var string */
-    private $trafficMode;
+    /** @var TrafficStorage */
+    private $storage;
 
     public function __construct(array $paths = [])
     {
         $this->trafficDir = rtrim($paths['traffic_dir'] ?? getenv('PMSS_TRAFFIC_DIR') ?: '/var/log/pmss/traffic', '/');
-        $this->homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
-        $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+        $homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
+        $runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $mode = $paths['traffic_mode'] ?? 'egress';
-        $this->trafficMode = in_array($mode, ['egress', 'ingress'], true) ? $mode : 'egress';
+        $this->storage = new \TrafficStorage([
+            'home_dir' => $homeDir,
+            'runtime_dir' => $runtimeDir,
+            'traffic_mode' => in_array($mode, ['egress', 'ingress'], true) ? $mode : 'egress',
+        ]);
     }
 
 	/**
@@ -86,21 +86,16 @@ class trafficStatistics {
      * Persist a newly observed traffic sample for the given user.
      *
      * Delegates to the `TrafficStorage` helper, which is responsible for
-     * ensuring on-disk structures exist and appending the data safely.
+     * ensuring on-disk structures exist and writing the data safely.
      *
      * @param string $user Username whose traffic data should be recorded.
-     * @param float  $data Amount of traffic in megabytes for the sample.
+     * @param array  $data Structured traffic statistics payload.
      *
      * @return void
      */
     public function saveUserTraffic( $user, $data ) {
-        $storage = new \TrafficStorage([
-            'home_dir'     => $this->homeDir,
-            'runtime_dir'  => $this->runtimeDir,
-            'traffic_mode' => $this->trafficMode,
-        ]);
-        $storage->ensureRuntime();
-        $storage->save($user, $data);
+        $this->storage->ensureRuntime();
+        $this->storage->save($user, $data);
     }
 
 }

@@ -89,17 +89,14 @@ class TrafficStatsProcessor
     /** Validate that a user has traffic data and a home directory. */
     public function validateUser(string $username): bool
     {
-        $path = $this->trafficDir.'/'.$username;
         $baseUser = (string) preg_replace('/-localnet$/', '', $username);
-        $homePath = $this->homeDir.'/'.$baseUser;
-        if (!is_readable($path)) {
+        if (!is_readable($this->trafficDir.'/'.$username) || !is_dir($this->homeDir.'/'.$baseUser)) {
             return false;
         }
 
         $passwd = @file_get_contents($this->passwdFile);
-        return $passwd !== false
-            && preg_match('/^'.preg_quote($baseUser, '/').':/m', $passwd) === 1
-            && is_dir($homePath);
+        return is_string($passwd)
+            && preg_match('/^'.preg_quote($baseUser, '/').':/m', $passwd) === 1;
     }
 
     /** Process and persist traffic statistics for a single user. */
