@@ -20,13 +20,11 @@ require_once dirname(__DIR__).'/logging.php';
             "alias ls='ls --color=auto'",
             'PATH=$PATH:/scripts',
         ];
-        $missing = array_diff($defaults, $lines);
-        if ($missing === []) {
+        if (($missing = array_diff($defaults, $lines)) === []) {
             $log('[SKIP] Root shell defaults already configured');
             return;
         }
 
-        $lines = array_merge($lines, $missing);
-        @file_put_contents($bashrc, implode(PHP_EOL, $lines).PHP_EOL);
+        @file_put_contents($bashrc, implode(PHP_EOL, array_merge($lines, $missing)).PHP_EOL);
         $log('Appended root shell defaults: '.implode(', ', $missing));
     }

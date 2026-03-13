@@ -6,15 +6,9 @@
  * @author PMSS Team
  */
 
-foreach (
-    [
-        'PMSS_UPDATE_STEP_CLASS_SOFT_FAIL' => 'soft_fail',
-        'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED' => 'must_succeed',
-        'PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING' => 'skip_if_missing',
-    ] as $constant => $value
-) {
-    defined($constant) || define($constant, $value);
-}
+defined('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL') || define('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', 'soft_fail');
+defined('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED') || define('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'must_succeed');
+defined('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING') || define('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING', 'skip_if_missing');
 
 /**
  * Log classified step failures and abort on post-package MUST_SUCCEED steps.

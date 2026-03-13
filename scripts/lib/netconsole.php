@@ -12,11 +12,8 @@ require_once __DIR__.'/update/runtime/commands.php';
  */
 function pmssNetconsoleTargetFromSpec(string $spec): ?array
 {
-    if (!preg_match('~^[^,]*/([^,/@]+),[^@,]*@([^/\s,]+)/(([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})$~', trim($spec), $matches)) {
-        return null;
-    }
-
-    if (filter_var($matches[2], FILTER_VALIDATE_IP) === false) {
+    if (!preg_match('~^[^,]*/([^,/@]+),[^@,]*@([^/\s,]+)/(([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})$~', trim($spec), $matches)
+        || filter_var($matches[2], FILTER_VALIDATE_IP) === false) {
         return null;
     }
 
