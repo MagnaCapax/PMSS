@@ -8,6 +8,8 @@
 
 class ResourceStatsDailyAccumulator
 {
+    private const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
+
     /** @var array */
     private $dailyTotals;
     /** @var string */
@@ -31,7 +33,7 @@ class ResourceStatsDailyAccumulator
         }
         if (!isset($this->dailyTotals[$currentDay])) {
             $this->dailyTotals[$currentDay] = array_fill_keys(
-                ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours', 'memory_sum', 'tasks_sum'],
+                array_merge(self::RAW_METRICS, ['memory_sum', 'tasks_sum']),
                 0.0
             ) + ['memory_count' => 0, 'tasks_count' => 0];
         }
@@ -61,14 +63,9 @@ class ResourceStatsDailyAccumulator
     public function results(): array
     {
         $daily = [];
+        $metricKeys = array_flip(self::RAW_METRICS);
         foreach ($this->dailyTotals as $day => $totals) {
-            $daily[$day] = [
-                'io_read'   => $totals['io_read'],
-                'io_write'  => $totals['io_write'],
-                'io_read_ops' => $totals['io_read_ops'],
-                'io_write_ops' => $totals['io_write_ops'],
-                'cpu'       => $totals['cpu'],
-                'ram_hours' => $totals['ram_hours'],
+            $daily[$day] = array_intersect_key($totals, $metricKeys) + [
                 'memory'    => $totals['memory_count'] > 0 ? ($totals['memory_sum'] / $totals['memory_count']) : 0.0,
                 'tasks'     => $totals['tasks_count'] > 0 ? ($totals['tasks_sum'] / $totals['tasks_count']) : 0.0,
             ];

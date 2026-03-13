@@ -28,6 +28,17 @@ class ResourceStatisticsTest extends TestCase
         $this->assertEquals(3000.0, $parsed['cpu']);
     }
 
+    public function testParseLineIgnoresLegacyTrailingTokenOutsideOpsShape(): void
+    {
+        $stats = new \resourceStatistics();
+        $line = date('Y-m-d H:i:s').' 1024 2048 3000 4096 7 ignored';
+        $parsed = $stats->parseLine($line);
+        $this->assertTrue($parsed !== false);
+        $this->assertEquals(0.0, $parsed['io_read_ops']);
+        $this->assertEquals(3000.0, $parsed['cpu']);
+        $this->assertEquals(7.0, $parsed['tasks']);
+    }
+
     public function testParseLineRejectsMalformed(): void
     {
         $stats = new \resourceStatistics();

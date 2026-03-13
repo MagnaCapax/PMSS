@@ -18,10 +18,12 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
     $windows = ['month', 'week', 'day', 'hour'];
     $windowZeros = array_fill_keys($windows, 0.0);
-    $windowMetricConfig = array_fill_keys(['io_read', 'io_write', 'cpu', 'ram_hours'], false)
-        + ['io_read_ops' => true, 'io_write_ops' => true];
-    $totals = array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0)
-        + array_fill_keys(array_keys($windowMetricConfig), $windowZeros);
+    $metrics = ['io_read', 'io_write', 'cpu', 'ram_hours', 'io_read_ops', 'io_write_ops'];
+    $optionalMetrics = ['io_read_ops' => true, 'io_write_ops' => true];
+    $totals = array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
+    foreach ($metrics as $metric) {
+        $totals[$metric] = $windowZeros;
+    }
 
     foreach ($users as $thisUser) {
         $statsPath = "{$statsDir}/{$thisUser}";
@@ -32,12 +34,12 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
         }
 
         $windowMetrics = [];
-        foreach ($windowMetricConfig as $metric => $allowMissing) {
+        foreach ($metrics as $metric) {
             $rawMetric = $data[$metric]['raw'] ?? [];
             $metricValues = $windowZeros;
             foreach ($windows as $label) {
                 $value = $rawMetric[$label] ?? null;
-                if ($value === null && !$allowMissing) {
+                if ($value === null && !isset($optionalMetrics[$metric])) {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }
@@ -46,20 +48,22 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $windowMetrics[$metric] = $metricValues;
         }
 
-        $memoryCurrent = (float) ($data['memory']['current'] ?? 0.0);
-        $memoryAvgMonth = (float) ($data['memory']['raw']['month'] ?? 0.0);
-        $tasksCurrent = (float) ($data['tasks']['current'] ?? 0.0);
+        $summary = [
+            'memory_current' => (float) ($data['memory']['current'] ?? 0.0),
+            'memory_avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
+            'tasks_current' => (float) ($data['tasks']['current'] ?? 0.0),
+        ];
 
         foreach ($windowMetrics as $metric => $values) {
             foreach ($values as $label => $value) {
                 $totals[$metric][$label] += $value;
             }
         }
-        $totals['memory_current'] += $memoryCurrent;
-        $totals['memory_avg_month'] += $memoryAvgMonth;
-        $totals['tasks_current'] += $tasksCurrent;
+        foreach ($summary as $metric => $value) {
+            $totals[$metric] += $value;
+        }
 
-        $rows[$thisUser] = $windowMetrics + ['memory_current' => $memoryCurrent, 'memory_avg_month' => $memoryAvgMonth, 'tasks_current' => $tasksCurrent];
+        $rows[$thisUser] = $windowMetrics + $summary;
     }
 
     return ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals];
