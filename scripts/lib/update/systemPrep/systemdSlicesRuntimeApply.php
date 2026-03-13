@@ -60,23 +60,24 @@ require_once dirname(__DIR__).'/runtime/commands.php';
 
             $showRc = runCommand('systemctl show '.escapeshellarg($unit).' -p TasksMax', false, $log);
             $tasksLine = trim((string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
-            if ($showRc !== 0 || $tasksLine === '' || strpos($tasksLine, 'TasksMax=') !== 0) {
+            if ($showRc !== 0 || strpos($tasksLine, 'TasksMax=') !== 0) {
                 continue;
             }
             $current = trim(substr($tasksLine, strlen('TasksMax=')));
-            if ($current === '' || strtolower($current) === 'infinity' || !ctype_digit($current)) {
+            if (!ctype_digit($current)) {
                 continue;
             }
             $currentInt = (int) $current;
-            if ($currentInt > 0 && $currentInt < 2048 && $tasksMax > $currentInt) {
-                runStep(
-                    'Refreshing user slice runtime TasksMax :: '.$unit,
-                    sprintf(
-                        "systemctl set-property --runtime %s TasksMax=%d",
-                        escapeshellarg($unit),
-                        $tasksMax
-                    )
-                );
+            if ($currentInt < 1 || $currentInt >= 2048 || $tasksMax <= $currentInt) {
+                continue;
             }
+            runStep(
+                'Refreshing user slice runtime TasksMax :: '.$unit,
+                sprintf(
+                    "systemctl set-property --runtime %s TasksMax=%d",
+                    escapeshellarg($unit),
+                    $tasksMax
+                )
+            );
         }
     }

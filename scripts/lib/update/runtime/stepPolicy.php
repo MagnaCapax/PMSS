@@ -13,9 +13,7 @@ foreach (
         'PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING' => 'skip_if_missing',
     ] as $constant => $value
 ) {
-    if (!defined($constant)) {
-        define($constant, $value);
-    }
+    defined($constant) || define($constant, $value);
 }
 
 /**
@@ -23,7 +21,8 @@ foreach (
  */
 function pmssUpdateStep2HandleClassifiedFailure(string $description, string $classification, int $rc, string $reason): void
 {
-    $severity = ($classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED) ? 'error' : 'warn';
+    $mustSucceed = $classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED;
+    $severity = $mustSucceed ? 'error' : 'warn';
     pmssLogJson([
         'event'          => 'step_failed',
         'severity'       => $severity,
@@ -42,7 +41,7 @@ function pmssUpdateStep2HandleClassifiedFailure(string $description, string $cla
         $reason
     ));
 
-    if ($classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED && getenv('PMSS_PACKAGE_PHASE') === 'complete') {
+    if ($mustSucceed && getenv('PMSS_PACKAGE_PHASE') === 'complete') {
         pmssLogJson([
             'event'  => 'phase',
             'name'   => 'update-step2',

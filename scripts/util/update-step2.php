@@ -212,9 +212,7 @@ function pmssRunProfiledStep(string $description, callable $step)
  */
 function pmssRunProfiledCallable(string $description, callable $callable, array $arguments = [])
 {
-    return pmssRunProfiledStep($description, static function () use ($callable, $arguments) {
-        return call_user_func_array($callable, $arguments);
-    });
+    return pmssRunProfiledStep($description, static function () use ($callable, $arguments) { return $callable(...$arguments); });
 }
 
 /**
@@ -225,10 +223,7 @@ function pmssUpdateStep2RunClassifiedCallable(string $description, callable $cal
     try {
         pmssRunProfiledCallable($description, $callable, $arguments);
     } catch (\Throwable $throwable) {
-        $reason = get_class($throwable);
-        if ($throwable->getMessage() !== '') {
-            $reason .= ': '.$throwable->getMessage();
-        }
+        $reason = get_class($throwable).($throwable->getMessage() !== '' ? ': '.$throwable->getMessage() : '');
         pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
         return false;
     }

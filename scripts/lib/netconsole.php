@@ -16,14 +16,13 @@ function pmssNetconsoleTargetFromSpec(string $spec): ?array
         return null;
     }
 
-    $targetIp = trim($matches[2]);
-    if (filter_var($targetIp, FILTER_VALIDATE_IP) === false) {
+    if (filter_var($matches[2], FILTER_VALIDATE_IP) === false) {
         return null;
     }
 
     return [
         'interface' => $matches[1],
-        'targetIp' => $targetIp,
+        'targetIp' => $matches[2],
         'targetMac' => strtolower($matches[3]),
     ];
 }
@@ -82,9 +81,9 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    $ping = strpos($target['targetIp'], ':') === false ? 'ping' : 'ping -6';
     $command = 'bash -lc '.escapeshellarg(
-        $ping.' -c 1 -W 1 -I '.escapeshellarg($target['interface']).' '.escapeshellarg($target['targetIp']).' >/dev/null 2>&1 || true; '
+        (strpos($target['targetIp'], ':') === false ? 'ping' : 'ping -6')
+        .' -c 1 -W 1 -I '.escapeshellarg($target['interface']).' '.escapeshellarg($target['targetIp']).' >/dev/null 2>&1 || true; '
         .'ip neigh show to '.escapeshellarg($target['targetIp']).' dev '.escapeshellarg($target['interface'])
         .' | grep -Fqi '.escapeshellarg($target['targetMac'])
     );
