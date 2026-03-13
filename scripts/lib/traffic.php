@@ -26,11 +26,10 @@ class trafficStatistics {
         $this->trafficDir = rtrim($paths['traffic_dir'] ?? getenv('PMSS_TRAFFIC_DIR') ?: '/var/log/pmss/traffic', '/');
         $homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
         $runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
-        $mode = $paths['traffic_mode'] ?? 'egress';
         $this->storage = new \TrafficStorage([
             'home_dir' => $homeDir,
             'runtime_dir' => $runtimeDir,
-            'traffic_mode' => in_array($mode, ['egress', 'ingress'], true) ? $mode : 'egress',
+            'traffic_mode' => $paths['traffic_mode'] ?? 'egress',
         ]);
     }
 
@@ -47,10 +46,7 @@ class trafficStatistics {
 	 * @return string Raw log slice, possibly empty when no data is available.
 	 */
 	public function getData($user, $timePeriod = 5050) {
-        $lines = (int) $timePeriod;
-        if ($lines < 1) {
-            $lines = 1;
-        }
+        $lines = max(1, (int) $timePeriod);
         $path = escapeshellarg($this->trafficDir.'/'.$user);
 		return trim( `tail -n{$lines} {$path} 2>/dev/null` );
 	}
@@ -68,18 +64,17 @@ class trafficStatistics {
      *                     or false when the line cannot be parsed safely.
      */
     public function parseLine($thisLine) {
-        $thisLine = explode(': ', $thisLine);
-        
-	        if (count($thisLine) != 2) return false;    // Erroneous data, too many parts :
-	        $thisTime = strtotime( trim($thisLine[0]) );
-	        $thisData = (float) trim($thisLine[1]) / 1024 / 1024;   // Transform from bytes to megabytes
-	        
-	        if ($thisData > 150000 ) { return false; }    // Pruning erroneous data, 7500Mb in max 6 minutes or so? Yeap.
-        
-        return array(
-            'data' => $thisData,
-            'timestamp' => $thisTime
-        );
+        $parts = explode(': ', $thisLine);
+
+	        if (count($parts) !== 2) return false;    // Erroneous data, too many parts :
+	        $data = (float) trim($parts[1]) / 1024 / 1024;   // Transform from bytes to megabytes
+
+	        if ($data > 150000) { return false; }    // Pruning erroneous data, 7500Mb in max 6 minutes or so? Yeap.
+
+        return [
+            'data' => $data,
+            'timestamp' => strtotime(trim($parts[0])),
+        ];
     }
     
     /**

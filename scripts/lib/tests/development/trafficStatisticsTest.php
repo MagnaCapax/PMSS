@@ -31,6 +31,23 @@ class TrafficStatisticsTest extends TestCase
         $this->assertTrue($ts->parseLine('bad data') === false);
     }
 
+    public function testParseLineRejectsExtraColonParts(): void
+    {
+        $ts = new \trafficStatistics();
+        $line = date('Y-m-d H:i:s').': 1048576: 2097152';
+        $this->assertTrue($ts->parseLine($line) === false);
+    }
+
+    public function testGetDataClampsNonPositivePeriodsToOneLine(): void
+    {
+        $paths = $this->makeTrafficPaths('egress');
+        @mkdir($paths['traffic_dir'], 0755, true);
+        file_put_contents($paths['traffic_dir'].'/alice', "first\nsecond\n");
+
+        $stats = new \trafficStatistics($paths);
+        $this->assertEquals('second', $stats->getData('alice', 0));
+    }
+
     public function testSaveUserTrafficWritesHomeAndRuntimeFilesInEgressMode(): void
     {
         $paths = $this->makeTrafficPaths('egress');

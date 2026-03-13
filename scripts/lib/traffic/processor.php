@@ -107,14 +107,12 @@ class TrafficStatsProcessor
             return;
         }
 
-        $dataLines = trim($this->stats->getData($user, (int)((35 * 24 * 60) / 5)));
-        if ($dataLines === '') {
+        if (($dataLines = trim($this->stats->getData($user, (int) ((35 * 24 * 60) / 5)))) === '') {
             logMessage(date('c').": No data for user {$user}");
             return;
         }
 
-        $trafficData = array_filter(explode("\n", $dataLines));
-        if (count($trafficData) < 2) {
+        if (count($trafficData = array_filter(explode("\n", $dataLines))) < 2) {
             logMessage(date('c').": Too little data for {$user}");
             return;
         }
@@ -157,13 +155,13 @@ class TrafficStatsProcessor
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
             $valueMiB = (float) $value;
-            foreach ([1024 * 1024 => 'TiB', 1024 => 'GiB'] as $divisor => $unit) {
-                if ($valueMiB > $divisor) {
-                    $formatted[$label] = round($valueMiB / $divisor, 2).$unit;
-                    continue 2;
-                }
+            if ($valueMiB > (1024 * 1024)) {
+                $formatted[$label] = round($valueMiB / (1024 * 1024), 2).'TiB';
+                continue;
             }
-            $formatted[$label] = round($valueMiB, 2).'MiB';
+            $formatted[$label] = $valueMiB > 1024
+                ? round($valueMiB / 1024, 2).'GiB'
+                : round($valueMiB, 2).'MiB';
         }
         return $formatted;
     }
