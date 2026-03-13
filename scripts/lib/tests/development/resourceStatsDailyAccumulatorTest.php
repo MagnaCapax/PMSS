@@ -6,6 +6,11 @@ require_once dirname(__DIR__, 2).'/resources/dailyAccumulator.php';
 
 class ResourceStatsDailyAccumulatorTest extends TestCase
 {
+    public function testEmptyAccumulatorReturnsEmptyResults(): void
+    {
+        $this->assertEquals([], (new \ResourceStatsDailyAccumulator())->results());
+    }
+
     public function testSkipsFirstDaySamples(): void
     {
         $acc = new \ResourceStatsDailyAccumulator();

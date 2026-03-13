@@ -25,13 +25,11 @@ class ResourceStatsAccumulator
     /** @var ResourceStatsDailyAccumulator */
     private $dailyAccumulator;
     /** @var float */
-    private $lastMemory;
+    private $lastMemory = 0.0;
     /** @var float */
-    private $lastTasks;
+    private $lastTasks = 0.0;
     /** @var int|null */
-    private $prevTimestamp;
-    /** @var int */
-    private $sampleCount;
+    private $prevTimestamp = null;
 
     public function __construct(array $compareTimes)
     {
@@ -42,9 +40,6 @@ class ResourceStatsAccumulator
         $this->memorySums = $this->taskSums = $windowZeros;
         $this->memoryCounts = $this->taskCounts = array_fill_keys($labels, 0);
         $this->dailyAccumulator = new ResourceStatsDailyAccumulator();
-        $this->lastMemory = $this->lastTasks = 0.0;
-        $this->prevTimestamp = null;
-        $this->sampleCount = 0;
     }
 
     /**
@@ -52,7 +47,6 @@ class ResourceStatsAccumulator
      */
     public function addSample(array $sample): void
     {
-        $this->sampleCount++;
         $timestamp = (int) $sample['timestamp'];
         $this->lastMemory = $sampleMemory = (float) $sample['memory'];
         $this->lastTasks = $sampleTasks = (float) $sample['tasks'];
@@ -90,7 +84,7 @@ class ResourceStatsAccumulator
      */
     public function hasSamples(): bool
     {
-        return $this->sampleCount > 0;
+        return $this->prevTimestamp !== null;
     }
 
     /**

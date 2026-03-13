@@ -140,6 +140,8 @@ class ResourceStatsProcessor
     private function formatMetricDisplay(string $metric, array $rawTotals): array
     {
         $formatted = [];
+        $byteMetric = $metric === 'io_read' || $metric === 'io_write' || $metric === 'memory';
+        $byteDivisors = [1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'];
         foreach ($rawTotals as $label => $value) {
             $number = (float) $value;
             if ($metric === 'cpu') {
@@ -149,17 +151,17 @@ class ResourceStatsProcessor
                     : ($seconds >= 60 ? round($seconds / 60, 2).'m' : round($seconds, 2).'s');
                 continue;
             }
-            if ($metric === 'io_read' || $metric === 'io_write' || $metric === 'memory') {
-                foreach ([1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'] as $divisor => $suffix) {
-                    if ($number > $divisor) {
-                        $formatted[$label] = round($number / $divisor, 2).$suffix;
-                        continue 2;
-                    }
-                }
-                $formatted[$label] = round($number / 1024, 2).'KiB';
+            if (!$byteMetric) {
+                $formatted[$label] = $metric === 'ram_hours' ? round($number, 2).'GB-hrs' : (string) round($number, 2);
                 continue;
             }
-            $formatted[$label] = $metric === 'ram_hours' ? round($number, 2).'GB-hrs' : (string) round($number, 2);
+            foreach ($byteDivisors as $divisor => $suffix) {
+                if ($number > $divisor) {
+                    $formatted[$label] = round($number / $divisor, 2).$suffix;
+                    continue 2;
+                }
+            }
+            $formatted[$label] = round($number / 1024, 2).'KiB';
         }
         return $formatted;
     }

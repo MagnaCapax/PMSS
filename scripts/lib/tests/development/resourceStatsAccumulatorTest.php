@@ -6,6 +6,13 @@ require_once dirname(__DIR__, 2).'/resources/accumulator.php';
 
 class ResourceStatsAccumulatorTest extends TestCase
 {
+    public function testHasSamplesIsFalseBeforeAnySamples(): void
+    {
+        $acc = new \ResourceStatsAccumulator(['day' => time() - 3600]);
+
+        $this->assertTrue(!$acc->hasSamples());
+    }
+
     public function testAccumulatesTotalsAndAverages(): void
     {
         $now = time();

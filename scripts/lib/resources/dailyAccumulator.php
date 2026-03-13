@@ -11,15 +11,9 @@ class ResourceStatsDailyAccumulator
     private const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
 
     /** @var array */
-    private $dailyTotals;
+    private $dailyTotals = [];
     /** @var string */
-    private $firstDay;
-
-    public function __construct()
-    {
-        $this->dailyTotals = [];
-        $this->firstDay = '';
-    }
+    private $firstDay = '';
 
     /**
      * Add a parsed sample to the daily accumulator.
