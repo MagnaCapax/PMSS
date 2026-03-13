@@ -236,18 +236,6 @@ function pmssUpdateStep2RunClassifiedCallable(string $description, callable $cal
     return true;
 }
 
-/**
- * Execute a shell command step using the configured classification policy.
- */
-function pmssUpdateStep2RunClassifiedCommand(string $description, string $command, string $classification): int
-{
-    $rc = runStep($description, $command);
-    if ($rc !== 0) {
-        pmssUpdateStep2HandleClassifiedFailure($description, $classification, $rc, 'command_rc_nonzero');
-    }
-    return $rc;
-}
-
 pmssRunProfiledCallable('Acquiring update-step2 lock', 'pmssUpdateStep2AcquireLock');
 pmssRunProfiledCallable('Running update-step2 preflight checks', 'pmssUpdateStep2Preflight');
 

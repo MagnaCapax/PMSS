@@ -27,11 +27,10 @@ require_once __DIR__.'/systemdSlicesRuntimeApply.php';
         // reappear after dpkg updates. Remove it when found.
         $sawLegacyVendorDropin = false;
         if (!$skipSystemctl) {
-            $legacyVendorDropins = [
+            foreach ([
                 '/usr/lib/systemd/system/user-.slice.d/99-pmss.conf',
                 '/lib/systemd/system/user-.slice.d/99-pmss.conf',
-            ];
-            foreach ($legacyVendorDropins as $legacyPath) {
+            ] as $legacyPath) {
                 if (!is_file($legacyPath)) {
                     continue;
                 }

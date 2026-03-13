@@ -53,9 +53,6 @@ require_once dirname(__DIR__).'/runtime/commands.php';
                 continue;
             }
             $parts = preg_split('/\s+/', $line);
-            if (empty($parts)) {
-                continue;
-            }
             $unit = (string) $parts[0];
             if ($unit === 'user-0.slice' || preg_match('/^user-\d+\.slice$/', $unit) !== 1) {
                 continue;

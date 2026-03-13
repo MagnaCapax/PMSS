@@ -55,9 +55,7 @@ require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
 
         // Calculate default CPUQuota: 85% of total logical cores (threads).
         // Fallback to 600% (6 cores) if detection fails.
-        $defaultQuota = ($cpuThreads > 0) ? ($cpuThreads * 85) : 600;
-
-        $cpuQuotaVal = $defaultQuota;
+        $cpuQuotaVal = ($cpuThreads > 0) ? ($cpuThreads * 85) : 600;
         if (isset($policy['cpuQuotaPercent'])) {
             $pVal = $policy['cpuQuotaPercent'];
             if (is_string($pVal) && strtolower($pVal) === 'infinity') {
@@ -81,9 +79,10 @@ require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
             $append = [];
             $skippedDeviceWeights = false;
             foreach ($policy['mounts'] as $mount => $def) {
-                if (!is_array($def)) continue;
-                $src = trim((string)@shell_exec('findmnt -no SOURCE '.escapeshellarg($mount).' 2>/dev/null'));
-                if ($src === '') continue;
+                if (!is_array($def)
+                    || ($src = trim((string) @shell_exec('findmnt -no SOURCE '.escapeshellarg($mount).' 2>/dev/null'))) === '') {
+                    continue;
+                }
                 if (isset($def['ioWeight']) && is_numeric($def['ioWeight'])) {
                     if ($mode === 'v2') {
                         $append[] = 'IODeviceWeight='.$src.' '.(int)$def['ioWeight'];
