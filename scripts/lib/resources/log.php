@@ -45,15 +45,8 @@ function pmssResourceLogReadCounters(int $uid): ?array
         'IOReadOperations' => 'io_read_ops',
         'IOWriteOperations' => 'io_write_ops',
     ];
-    $values = [
-        'io_read' => null,
-        'io_write' => null,
-        'cpu_nsec' => null,
-        'memory' => null,
-        'tasks' => null,
-        'io_read_ops' => 0,
-        'io_write_ops' => 0,
-    ];
+    $requiredFields = ['io_read', 'io_write', 'cpu_nsec', 'memory', 'tasks'];
+    $values = array_fill_keys($requiredFields, null) + ['io_read_ops' => 0, 'io_write_ops' => 0];
 
     foreach (preg_split('/\r?\n/', trim($out)) as $line) {
         $parts = explode('=', $line, 2);
@@ -63,7 +56,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
         $values[$field] = (int) $parts[1];
     }
 
-    foreach (['io_read', 'io_write', 'cpu_nsec', 'memory', 'tasks'] as $field) {
+    foreach ($requiredFields as $field) {
         if (!isset($values[$field])) {
             return null;
         }

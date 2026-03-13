@@ -50,24 +50,18 @@ class resourceStatistics
             return false;
         }
 
-        $fields = $tokenCount >= 9
+        $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(
+            ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'],
+            0.0
+        );
+        foreach (($tokenCount >= 9
             ? ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks']
-            : ['io_read', 'io_write', 'cpu', 'memory', 'tasks'];
-        $parsed = [
-            'timestamp' => (int) $timestamp,
-            'io_read' => 0.0,
-            'io_write' => 0.0,
-            'io_read_ops' => 0.0,
-            'io_write_ops' => 0.0,
-            'cpu' => 0.0,
-            'memory' => 0.0,
-            'tasks' => 0.0,
-        ];
-        foreach (array_slice($tokens, 2, count($fields)) as $index => $value) {
+            : ['io_read', 'io_write', 'cpu', 'memory', 'tasks']) as $index => $field) {
+            $value = $tokens[$index + 2] ?? '';
             if ($value === '' || !ctype_digit($value)) {
                 return false;
             }
-            $parsed[$fields[$index]] = (float) $value;
+            $parsed[$field] = (float) $value;
         }
 
         return $parsed;

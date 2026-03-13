@@ -124,10 +124,9 @@ class ResourceStatsProcessor
             'tasks' => $results['tasks'],
         ];
         foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks', 'ram_hours'] as $metric) {
-            $rawMetric = $metricData[$metric];
             $data[$metric] = [
-                'raw' => $rawMetric,
-                'display' => $this->formatMetricDisplay($metric, $rawMetric),
+                'raw' => $metricData[$metric],
+                'display' => $this->formatMetricDisplay($metric, $metricData[$metric]),
             ];
         }
         $data['memory']['current'] = $results['current_memory'];
@@ -151,10 +150,6 @@ class ResourceStatsProcessor
                     : ($seconds >= 60 ? round($seconds / 60, 2).'m' : round($seconds, 2).'s');
                 continue;
             }
-            if ($metric === 'ram_hours') {
-                $formatted[$label] = (string) round($number, 2).'GB-hrs';
-                continue;
-            }
             if ($metric === 'io_read' || $metric === 'io_write' || $metric === 'memory') {
                 foreach ([1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'] as $divisor => $suffix) {
                     if ($number > $divisor) {
@@ -165,7 +160,7 @@ class ResourceStatsProcessor
                 $formatted[$label] = round($number / 1024, 2).'KiB';
                 continue;
             }
-            $formatted[$label] = (string) round($number, 2);
+            $formatted[$label] = $metric === 'ram_hours' ? round($number, 2).'GB-hrs' : (string) round($number, 2);
         }
         return $formatted;
     }

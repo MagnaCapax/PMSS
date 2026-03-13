@@ -19,11 +19,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $windows = ['month', 'week', 'day', 'hour'];
     $windowZeros = array_fill_keys($windows, 0.0);
     $metrics = ['io_read', 'io_write', 'cpu', 'ram_hours', 'io_read_ops', 'io_write_ops'];
-    $optionalMetrics = ['io_read_ops' => true, 'io_write_ops' => true];
-    $totals = array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
-    foreach ($metrics as $metric) {
-        $totals[$metric] = $windowZeros;
-    }
+    $totals = array_fill_keys($metrics, $windowZeros) + array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
 
     foreach ($users as $thisUser) {
         $statsPath = "{$statsDir}/{$thisUser}";
@@ -39,7 +35,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $metricValues = $windowZeros;
             foreach ($windows as $label) {
                 $value = $rawMetric[$label] ?? null;
-                if ($value === null && !isset($optionalMetrics[$metric])) {
+                if ($value === null && substr($metric, -4) !== '_ops') {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }

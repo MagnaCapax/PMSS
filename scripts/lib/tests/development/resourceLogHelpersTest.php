@@ -133,6 +133,22 @@ class ResourceLogHelpersTest extends TestCase
         });
     }
 
+    public function testReadCountersDefaultsMissingOpsToZero(): void
+    {
+        $this->withFakeSystemctl([
+            'IOReadBytes=11',
+            'IOWriteBytes=22',
+            'CPUUsageNSec=55',
+            'MemoryCurrent=66',
+            'TasksCurrent=77',
+        ], function (): void {
+            $counters = \pmssResourceLogReadCounters(1000);
+            $this->assertTrue(is_array($counters));
+            $this->assertEquals(0, $counters['io_read_ops']);
+            $this->assertEquals(0, $counters['io_write_ops']);
+        });
+    }
+
     public function testReadCountersReturnsNullWhenRequiredValueIsNotNumeric(): void
     {
         $this->withFakeSystemctl([
