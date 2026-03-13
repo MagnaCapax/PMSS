@@ -33,15 +33,14 @@ function pmssUpdateStep2HandleClassifiedFailure(string $description, string $cla
         'reason'         => $reason,
     ]);
 
-    $logLine = sprintf(
+    (function_exists('logmsg') ? 'logmsg' : 'logMessage')(sprintf(
         '[%s] Step failed: %s (classification=%s rc=%d reason=%s)',
         strtoupper($severity),
         $description,
         $classification,
         $rc,
         $reason
-    );
-    (function_exists('logmsg') ? 'logmsg' : 'logMessage')($logLine);
+    ));
 
     if ($classification === PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED && getenv('PMSS_PACKAGE_PHASE') === 'complete') {
         pmssLogJson([

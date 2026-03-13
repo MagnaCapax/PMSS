@@ -36,11 +36,9 @@ require_once __DIR__.'/systemdSlicesRuntimeApply.php';
                     continue;
                 }
                 $sawLegacyVendorDropin = true;
-                if (@unlink($legacyPath)) {
-                    $log('[WARN] Removed legacy vendor systemd drop-in '.$legacyPath);
-                } else {
-                    $log('[WARN] Unable to remove legacy vendor systemd drop-in '.$legacyPath);
-                }
+                $log((@unlink($legacyPath)
+                    ? '[WARN] Removed legacy vendor systemd drop-in '
+                    : '[WARN] Unable to remove legacy vendor systemd drop-in ').$legacyPath);
             }
         }
 

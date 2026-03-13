@@ -43,8 +43,7 @@ require_once dirname(__DIR__).'/runtime/commands.php';
         );
 
         $rc = runCommand("systemctl list-units --type=slice 'user-*.slice' --state=active --no-legend --no-pager", false, $log);
-        $stdout = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
-        $stdout = is_string($stdout) ? trim($stdout) : '';
+        $stdout = trim((string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
         if ($rc !== 0 || $stdout === '') {
             return;
         }
@@ -63,8 +62,7 @@ require_once dirname(__DIR__).'/runtime/commands.php';
             }
 
             $showRc = runCommand('systemctl show '.escapeshellarg($unit).' -p TasksMax', false, $log);
-            $tasksLine = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? '';
-            $tasksLine = trim(is_string($tasksLine) ? $tasksLine : '');
+            $tasksLine = trim((string) ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT']['stdout'] ?? ''));
             if ($showRc !== 0 || $tasksLine === '' || strpos($tasksLine, 'TasksMax=') !== 0) {
                 continue;
             }

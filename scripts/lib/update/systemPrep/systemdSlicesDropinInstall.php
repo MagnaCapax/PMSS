@@ -50,8 +50,7 @@ require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
         $cpuThreads = pmssTotalCpuThreads();
         $memGiB = $totalMiB > 0 ? (int)ceil($totalMiB / 1024) : 0;
         $scaleBase = max($cpuThreads, $memGiB);
-        $defaultTasksMax = 512 * $scaleBase;
-        $defaultTasksMax = max(2048, min(16384, $defaultTasksMax));
+        $defaultTasksMax = max(2048, min(16384, 512 * $scaleBase));
         $tasksMax = (isset($policy['tasksMax']) && is_numeric($policy['tasksMax'])) ? (int) $policy['tasksMax'] : $defaultTasksMax;
 
         // Calculate default CPUQuota: 85% of total logical cores (threads).

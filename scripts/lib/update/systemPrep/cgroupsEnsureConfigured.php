@@ -36,9 +36,8 @@ require_once __DIR__.'/cgroupModeDetect.php';
 
         // On v2, prefer TasksMax limits via slice; on v1, pids.max may be available.
         if ($mode === 'v1') {
-            $rootPidSlice = '/sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max';
-            if (file_exists($rootPidSlice)) {
-                runStep('Raising PID limit for root user slice (v1)', "sh -c 'echo 100000 > {$rootPidSlice}'");
+            if (file_exists('/sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max')) {
+                runStep('Raising PID limit for root user slice (v1)', "sh -c 'echo 100000 > /sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max'");
             } else {
                 $log('[SKIP] pids.max controller path missing (v1), relying on system defaults');
             }
