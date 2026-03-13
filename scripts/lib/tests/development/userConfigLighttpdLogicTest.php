@@ -139,4 +139,31 @@ LIGHTTPD;
         $this->assertTrue(strpos($stripped, 'mod_webdav') !== false);
         $this->assertTrue(strpos($stripped, '#"mod_webdav",') !== false);
     }
+
+    public function testUserConfigEntryPointKeepsLighttpdApplyHelperWiring(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/userConfigLighttpd.php');
+
+        $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';", $src);
+        $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';", $src);
+    }
+
+    public function testUserConfigApplyOwnsPhpIniMemoryLimitUpdate(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/lighttpd/userConfigApply.php');
+
+        $this->assertStringContainsString("preg_match('/^memory_limit\\s*=.*$/m', \$phpIniContent)", $src);
+        $this->assertStringContainsString('pmssAtomicWriteFile($phpIniPath, $phpIniContent);', $src);
+    }
+
+    public function testResourcePlanEndsAtProcessPlanner(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/lighttpd/resourcePlan.php');
+        $start = strpos($src, 'function pmssComputePhpProcessPlan(');
+
+        $this->assertTrue($start !== false);
+        $tail = substr($src, $start);
+        $functionCount = preg_match_all('/^function /m', $tail, $matches);
+        $this->assertEquals(1, $functionCount);
+    }
 }

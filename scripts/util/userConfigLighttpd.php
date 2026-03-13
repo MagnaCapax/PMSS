@@ -26,7 +26,6 @@ const PMSS_PHP_THREADS_MAX = 48;
 require_once dirname(__DIR__).'/lib/lighttpd/userFileWrite.php';
 require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';
 require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';
-require_once dirname(__DIR__).'/lib/lighttpd/phpIniUpdate.php';
 require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';
 require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';
 require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';
@@ -134,4 +133,3 @@ function pmssUserConfigLighttpdMain(array $argv): int
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
     exit(pmssUserConfigLighttpdMain($argv));
 }
-

@@ -134,7 +134,39 @@ function pmssUserConfigLighttpdConfigureUser(
         }
     }
 
-    $resources = pmssResolveUserResources($thisUser, $policyDefaults);
+    $props = [];
+    if (function_exists('posix_getpwnam') && is_array($info = posix_getpwnam($thisUser)) && isset($info['uid'])) {
+        $slice = sprintf('user-%d.slice', (int) $info['uid']);
+        $cmd = 'systemctl show '.escapeshellarg($slice).' -p MemoryHigh -p MemoryMax -p CPUQuotaPerSecUSec -p CPUQuotaPeriodUSec -p CPUQuota';
+        $out = @shell_exec($cmd);
+        if (is_string($out)) {
+            foreach (preg_split('/\r?\n/', trim($out)) as $line) {
+                if ($line === '') {
+                    continue;
+                }
+                $pos = strpos($line, '=');
+                if ($pos === false) {
+                    continue;
+                }
+                $props[substr($line, 0, $pos)] = substr($line, $pos + 1);
+            }
+        }
+    }
+    $memoryHigh = null;
+    foreach (['MemoryHigh', 'MemoryMax'] as $memoryLimitField) {
+        if (isset($props[$memoryLimitField]) && ($memoryHigh = pmssParseSizeToMiB($props[$memoryLimitField])) !== null) {
+            break;
+        }
+    }
+    $cpuQuotaPercent = pmssExtractCpuQuotaPercent($props, $policyDefaults);
+    $plan = pmssComputePhpProcessPlan($cpuQuotaPercent);
+    $resources = [
+        'memoryLimit'     => pmssClampMemoryLimit((int) ($memoryHigh ?? (isset($policyDefaults['memoryHighMiB']) ? (int) $policyDefaults['memoryHighMiB'] : 512))),
+        'cpuQuotaPercent' => $cpuQuotaPercent,
+        'maxProcs'        => $plan['max_procs'],
+        'children'        => $plan['children'],
+        'totalThreads'    => $plan['totalThreads'],
+    ];
     $thisUserConfig = pmssRenderLighttpdConfig(
         $template,
         $thisUser,
@@ -160,7 +192,15 @@ function pmssUserConfigLighttpdConfigureUser(
             return;
         }
     }
-    pmssUpdatePhpIni($phpIniPath, $resources['memoryLimit']);
+    if (!is_link($phpIniPath) && is_file($phpIniPath) && is_string($phpIniContent = @file_get_contents($phpIniPath))) {
+        $memoryLine = 'memory_limit = '.$resources['memoryLimit'].'M';
+        if (preg_match('/^memory_limit\s*=.*$/m', $phpIniContent)) {
+            $phpIniContent = preg_replace('/^memory_limit\s*=.*$/m', $memoryLine, $phpIniContent, 1);
+        } else {
+            $phpIniContent = rtrim($phpIniContent, "\n")."\n".$memoryLine."\n";
+        }
+        pmssAtomicWriteFile($phpIniPath, $phpIniContent);
+    }
     @chmod($phpIniPath, 0751);
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
         @chown($phpIniPath, $thisUser);
