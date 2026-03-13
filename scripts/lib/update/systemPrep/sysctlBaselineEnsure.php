@@ -59,10 +59,6 @@ SYSCTL;
         return;
     }
 
-    if ($reload) {
-        runStep('Reloading sysctl configuration', 'sysctl --system');
-    } else {
-        $log('[SKIP] sysctl reload disabled');
-    }
+    $reload ? runStep('Reloading sysctl configuration', 'sysctl --system') : $log('[SKIP] sysctl reload disabled');
     $log('Refreshed legacy sysctl defaults at '.$target);
 }

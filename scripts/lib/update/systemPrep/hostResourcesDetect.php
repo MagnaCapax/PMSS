@@ -31,5 +31,5 @@ function pmssTotalCpuThreads(): int
     // Robust check using /proc/cpuinfo
     $count = substr_count((string) @file_get_contents('/proc/cpuinfo'), 'processor');
     // Fallback to nproc if available
-    return max(0, $count > 0 ? $count : (int) trim((string) @shell_exec('nproc')));
+    return $count > 0 ? $count : max(0, (int) trim((string) @shell_exec('nproc')));
 }

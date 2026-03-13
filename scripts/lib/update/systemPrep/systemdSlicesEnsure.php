@@ -26,19 +26,17 @@ require_once __DIR__.'/systemdSlicesRuntimeApply.php';
         // which can override PMSS settings (including TasksMax) and can even
         // reappear after dpkg updates. Remove it when found.
         $sawLegacyVendorDropin = false;
-        if (!$skipSystemctl) {
-            foreach ([
-                '/usr/lib/systemd/system/user-.slice.d/99-pmss.conf',
-                '/lib/systemd/system/user-.slice.d/99-pmss.conf',
-            ] as $legacyPath) {
-                if (!is_file($legacyPath)) {
-                    continue;
-                }
-                $sawLegacyVendorDropin = true;
-                $log((@unlink($legacyPath)
-                    ? '[WARN] Removed legacy vendor systemd drop-in '
-                    : '[WARN] Unable to remove legacy vendor systemd drop-in ').$legacyPath);
+        foreach ([
+            '/usr/lib/systemd/system/user-.slice.d/99-pmss.conf',
+            '/lib/systemd/system/user-.slice.d/99-pmss.conf',
+        ] as $legacyPath) {
+            if ($skipSystemctl || !is_file($legacyPath)) {
+                continue;
             }
+            $sawLegacyVendorDropin = true;
+            $log((@unlink($legacyPath)
+                ? '[WARN] Removed legacy vendor systemd drop-in '
+                : '[WARN] Unable to remove legacy vendor systemd drop-in ').$legacyPath);
         }
 
         $mode = pmssCgroupMode();
@@ -48,9 +46,7 @@ require_once __DIR__.'/systemdSlicesRuntimeApply.php';
 
         // Render template based on cgroup mode
         $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-        $tpl = $mode === 'v2'
-            ? $cfgDir.'/template.cgroup.user-slice.v2.conf'
-            : $cfgDir.'/template.cgroup.user-slice.v1.conf';
+        $tpl = $cfgDir.'/template.cgroup.user-slice.'.($mode === 'v2' ? 'v2' : 'v1').'.conf';
 
         $tasksMax = pmssSystemdSlicesDropinInstall($tpl, $cfgDir, $mode, $dropDir, $target, $sawLegacyVendorDropin, $log);
         if ($tasksMax === null) {

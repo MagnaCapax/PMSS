@@ -90,10 +90,9 @@ require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
                         $skippedDeviceWeights = true;
                     }
                 }
-                if (isset($def['readBw']))  { $append[] = 'IOReadBandwidthMax='.$src.' '.$def['readBw']; }
-                if (isset($def['writeBw'])) { $append[] = 'IOWriteBandwidthMax='.$src.' '.$def['writeBw']; }
-                if (isset($def['readIops'])) { $append[] = 'IOReadIOPSMax='.$src.' '.$def['readIops']; }
-                if (isset($def['writeIops'])) { $append[] = 'IOWriteIOPSMax='.$src.' '.$def['writeIops']; }
+                foreach (['readBw' => 'IOReadBandwidthMax', 'writeBw' => 'IOWriteBandwidthMax', 'readIops' => 'IOReadIOPSMax', 'writeIops' => 'IOWriteIOPSMax'] as $policyKey => $directive) {
+                    if (isset($def[$policyKey])) { $append[] = $directive.'='.$src.' '.$def[$policyKey]; }
+                }
             }
             if (!empty($append)) { $raw .= "\n".implode("\n", $append)."\n"; }
             if ($skippedDeviceWeights) {
