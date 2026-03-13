@@ -67,7 +67,6 @@ class ResourceStatsProcessorTest extends TestCase
     {
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = $this->makeProcessor($stats);
-        $processor->ensureRuntime();
 
         $user = 'alice';
         file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
@@ -83,6 +82,7 @@ class ResourceStatsProcessorTest extends TestCase
 
         $saved = $this->readSavedResourceStats($user);
         $this->assertTrue(is_array($saved), 'Expected processed data to be persisted');
+        $this->assertTrue(is_dir($this->paths['runtime_dir'].'/resourceStats'));
         $this->assertTrue(isset($saved['io_read']['raw']['month']));
         $this->assertTrue(isset($saved['ram_hours']['display']['month']));
         $this->assertStringContainsString('KiB', $saved['io_read']['display']['hour']);

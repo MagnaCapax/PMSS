@@ -37,14 +37,10 @@ class ResourceStatsAccumulator
     {
         $this->compareTimes = $compareTimes;
         $labels = array_keys($compareTimes);
-        $this->rawTotals = [];
-        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metric) {
-            $this->rawTotals[$metric] = array_fill_keys($labels, 0.0);
-        }
-        $this->memorySums = array_fill_keys($labels, 0.0);
-        $this->memoryCounts = array_fill_keys($labels, 0);
-        $this->taskSums = array_fill_keys($labels, 0.0);
-        $this->taskCounts = array_fill_keys($labels, 0);
+        $windowZeros = array_fill_keys($labels, 0.0);
+        $this->rawTotals = array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'], $windowZeros);
+        $this->memorySums = $this->taskSums = $windowZeros;
+        $this->memoryCounts = $this->taskCounts = array_fill_keys($labels, 0);
         $this->dailyAccumulator = new ResourceStatsDailyAccumulator();
         $this->lastMemory = 0.0;
         $this->lastTasks = 0.0;

@@ -42,7 +42,11 @@ class resourceStatistics
     public function parseLine($thisLine)
     {
         $tokens = preg_split('/\s+/', trim((string) $thisLine));
-        if (!is_array($tokens) || count($tokens) < 7) {
+        if (!is_array($tokens)) {
+            return false;
+        }
+        $tokenCount = count($tokens);
+        if ($tokenCount < 7) {
             return false;
         }
 
@@ -51,7 +55,7 @@ class resourceStatistics
             return false;
         }
 
-        $usesOpsFields = count($tokens) >= 9;
+        $usesOpsFields = $tokenCount >= 9;
         $valueCount = $usesOpsFields ? 7 : 5;
         $values = array_slice($tokens, 2, $valueCount);
         $parsed = [];
@@ -62,22 +66,17 @@ class resourceStatistics
             $parsed[] = (float) $value;
         }
 
-        $ioReadOps = 0.0;
-        $ioWriteOps = 0.0;
-        if ($usesOpsFields) {
-            $ioReadOps = $parsed[2];
-            $ioWriteOps = $parsed[3];
-        }
+        $offset = $usesOpsFields ? 2 : 0;
 
         return [
             'timestamp' => (int) $timestamp,
             'io_read'   => $parsed[0],
             'io_write'  => $parsed[1],
-            'io_read_ops' => $ioReadOps,
-            'io_write_ops' => $ioWriteOps,
-            'cpu'       => $usesOpsFields ? $parsed[4] : $parsed[2],
-            'memory'    => $usesOpsFields ? $parsed[5] : $parsed[3],
-            'tasks'     => $usesOpsFields ? $parsed[6] : $parsed[4],
+            'io_read_ops' => $usesOpsFields ? $parsed[2] : 0.0,
+            'io_write_ops' => $usesOpsFields ? $parsed[3] : 0.0,
+            'cpu'       => $parsed[2 + $offset],
+            'memory'    => $parsed[3 + $offset],
+            'tasks'     => $parsed[4 + $offset],
         ];
     }
 }

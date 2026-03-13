@@ -38,11 +38,6 @@ class ResourceStatsProcessor
         ]);
     }
 
-    public function ensureRuntime(): void
-    {
-        $this->storage->ensureRuntime();
-    }
-
     public function buildCompareTimes(): array
     {
         $now = time();
@@ -124,20 +119,12 @@ class ResourceStatsProcessor
 
         $data = [];
         $results = $accumulator->results();
-        $rawTotals = $results['raw'];
-        foreach ([
-            'io_read' => $rawTotals['io_read'],
-            'io_write' => $rawTotals['io_write'],
-            'io_read_ops' => $rawTotals['io_read_ops'],
-            'io_write_ops' => $rawTotals['io_write_ops'],
-            'cpu' => $rawTotals['cpu'],
-        ] as $metric => $rawMetric) {
-            $data[$metric] = [
-                'raw' => $rawMetric,
-                'display' => $this->formatMetricDisplay($metric, $rawMetric),
-            ];
-        }
-        foreach (['memory' => $results['memory'], 'tasks' => $results['tasks'], 'ram_hours' => $rawTotals['ram_hours']] as $metric => $rawMetric) {
+        $metricData = $results['raw'] + [
+            'memory' => $results['memory'],
+            'tasks' => $results['tasks'],
+        ];
+        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks', 'ram_hours'] as $metric) {
+            $rawMetric = $metricData[$metric];
             $data[$metric] = [
                 'raw' => $rawMetric,
                 'display' => $this->formatMetricDisplay($metric, $rawMetric),
@@ -149,7 +136,7 @@ class ResourceStatsProcessor
 
         $this->storage->ensureRuntime();
         $this->storage->save($user, $data);
-        logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$rawTotals['io_read']['month']}");
+        logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$results['raw']['io_read']['month']}");
     }
 
     private function formatMetricDisplay(string $metric, array $rawTotals): array
