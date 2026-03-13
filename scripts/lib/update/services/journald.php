@@ -64,11 +64,10 @@ if (!function_exists('pmssJournaldFormatSize')) {
     {
         $gib = 1024 * 1024 * 1024;
         if ($bytes > 0 && ($bytes % $gib) === 0) {
-            return (string)($bytes / $gib).'G';
+            return (string) ($bytes / $gib).'G';
         }
-        $mib = 1024 * 1024;
-        $mibVal = max(1, (int)floor($bytes / $mib));
-        return (string)$mibVal.'M';
+
+        return (string) max(1, (int) floor($bytes / (1024 * 1024))).'M';
     }
 }
 
@@ -86,14 +85,12 @@ if (!function_exists('pmssApplyJournaldLimits')) {
             return;
         }
 
-        $rootBytes = pmssJournaldRootFilesystemBytes();
-        if ($rootBytes <= 0) {
+        if (($rootBytes = pmssJournaldRootFilesystemBytes()) <= 0) {
             $log('[WARN] Unable to determine root filesystem size; skipping journald limits');
             return;
         }
 
-        $raw = @file_get_contents($template);
-        if ($raw === false) {
+        if (($raw = @file_get_contents($template)) === false) {
             $log('[WARN] Unable to read journald limits template: '.$template);
             return;
         }
@@ -135,9 +132,7 @@ if (!function_exists('pmssApplyJournaldLimits')) {
             $policy['rate_limit_burst']
         ));
 
-        $dryRun = getenv('PMSS_DRY_RUN') === '1';
-        $testMode = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true;
-        if ($dryRun || $testMode) {
+        if (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) {
             pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps (test/dry-run)');
             return;
         }
