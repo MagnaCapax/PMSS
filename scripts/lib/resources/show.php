@@ -10,15 +10,6 @@ require_once __DIR__.'/report.php';
 require_once __DIR__.'/userHelpers.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 
-function pmssResourceFormatBytes(float $bytes): string
-{
-    foreach ([1099511627776.0 => 'TiB', 1073741824.0 => 'GiB', 1048576.0 => 'MiB'] as $divisor => $unit) {
-        if ($bytes >= $divisor) return number_format($bytes / $divisor, 2).' '.$unit;
-    }
-
-    return number_format($bytes / 1024, 2).' KiB';
-}
-
 function pmssShowResourcesMain(array $argv): int
 {
     $options = getopt('', ['json', 'show-missing', 'user:', 'help']);
@@ -64,22 +55,47 @@ function pmssShowResourcesMain(array $argv): int
     ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
     if (isset($options['json'])) {
-        echo json_encode(pmssResourceBuildJsonPayload($rows, $totals, $missingStats))."\n";
+        $buildPayload = static function (array $source): array {
+            return [
+                'io_read' => $source['io_read'],
+                'io_write' => $source['io_write'],
+                'io_read_ops' => $source['io_read_ops'],
+                'io_write_ops' => $source['io_write_ops'],
+                'cpu' => $source['cpu'],
+                'ram_hours' => $source['ram_hours'],
+                'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
+                'tasks' => ['current' => $source['tasks_current']],
+            ];
+        };
+        echo json_encode([
+            'users' => array_map($buildPayload, $rows),
+            'totals' => $buildPayload($totals),
+            'missing' => $missingStats,
+        ])."\n";
         return 0;
     }
 
+    $formatBytes = static function (float $bytes): string {
+        foreach ([1099511627776.0 => 'TiB', 1073741824.0 => 'GiB', 1048576.0 => 'MiB'] as $divisor => $unit) {
+            if ($bytes >= $divisor) {
+                return number_format($bytes / $divisor, 2).' '.$unit;
+            }
+        }
+
+        return number_format($bytes / 1024, 2).' KiB';
+    };
     $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n";
-    $printUsageRow = static function (string $label, array $data) use ($rowFormat): void {
+    $printUsageRow = static function (string $label, array $data) use ($formatBytes, $rowFormat): void {
         $hourOps = (float) (($data['io_read_ops']['hour'] ?? 0) + ($data['io_write_ops']['hour'] ?? 0));
         $ramHours = (float) $data['ram_hours']['month'];
         printf(
             $rowFormat,
             $label,
-            pmssResourceFormatBytes($data['io_read']['month']),
-            pmssResourceFormatBytes($data['io_write']['month']),
+            $formatBytes((float) $data['io_read']['month']),
+            $formatBytes((float) $data['io_write']['month']),
             number_format((float) $data['cpu']['month'] / 1000000000 / 3600, 1).' hrs',
             number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs',
-            pmssResourceFormatBytes($data['memory_current']),
+            $formatBytes((float) $data['memory_current']),
             (string) round($data['tasks_current']),
             number_format($hourOps / 3600, 2)
         );

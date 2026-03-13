@@ -64,22 +64,3 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
     return ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals];
 }
-
-function pmssResourceBuildJsonPayload(array $rows, array $totals, array $missing): array
-{
-    $buildPayload = static function (array $source): array {
-        $payload = [];
-        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metric) {
-            $payload[$metric] = $source[$metric];
-        }
-        $payload['memory'] = ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']];
-        $payload['tasks'] = ['current' => $source['tasks_current']];
-        return $payload;
-    };
-
-    return [
-        'users' => array_map($buildPayload, $rows),
-        'totals' => $buildPayload($totals),
-        'missing' => $missing,
-    ];
-}
