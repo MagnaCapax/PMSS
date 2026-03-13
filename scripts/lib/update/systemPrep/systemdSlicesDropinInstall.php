@@ -34,11 +34,7 @@ require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
         $minHighMiB   = 250; // minimum MemoryHigh
         // Allow policy override via PHP array file: cgroup.policy.php returning ['memoryHighMiB'=>..,'memoryMaxMiB'=>..,'cpuWeight'=>..,'ioWeight'=>..,'tasksMax'=>..]
         $policyFile = $cfgDir.'/cgroup.policy.php';
-        $policy = [];
-        if (file_exists($policyFile)) {
-            $loaded = @include $policyFile;
-            if (is_array($loaded)) { $policy = $loaded; }
-        }
+        $policy = (is_array($loaded = file_exists($policyFile) ? @include $policyFile : null)) ? $loaded : [];
 
         $defaultHigh  = max($minHighMiB, (int)floor($totalMiB * 0.10)); // default ~10% of RAM
         $maxCapMiB    = (int)floor($totalMiB * 0.95); // MemoryMax never above 95% of total
@@ -56,10 +52,7 @@ require_once __DIR__.'/systemdUserManagerNoFileLimitInstall.php';
         $scaleBase = max($cpuThreads, $memGiB);
         $defaultTasksMax = 512 * $scaleBase;
         $defaultTasksMax = max(2048, min(16384, $defaultTasksMax));
-        $tasksMax = $defaultTasksMax;
-        if (isset($policy['tasksMax']) && is_numeric($policy['tasksMax'])) {
-            $tasksMax = (int)$policy['tasksMax'];
-        }
+        $tasksMax = (isset($policy['tasksMax']) && is_numeric($policy['tasksMax'])) ? (int) $policy['tasksMax'] : $defaultTasksMax;
 
         // Calculate default CPUQuota: 85% of total logical cores (threads).
         // Fallback to 600% (6 cores) if detection fails.

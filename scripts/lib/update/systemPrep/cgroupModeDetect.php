@@ -13,8 +13,7 @@
  */
 function pmssCgroupMode(): string
 {
-    $override = getenv('PMSS_CGROUP_MODE');
-    if ($override === 'v1' || $override === 'v2') {
+    if (($override = getenv('PMSS_CGROUP_MODE')) === 'v1' || $override === 'v2') {
         return $override;
     }
 
@@ -32,7 +31,7 @@ function pmssCgroupMode(): string
 
     // v1 hint: presence of controller directories under /sys/fs/cgroup/
     foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $dir) {
-        if (basename((string) $dir) !== 'unified') {
+        if (basename($dir) !== 'unified') {
             return 'v1';
         }
     }

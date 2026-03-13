@@ -10,8 +10,7 @@
 /** Return total system memory in MiB (rounded). */
 function pmssTotalMemMiB(): int
 {
-    $override = getenv('PMSS_TOTAL_MEM_MIB');
-    if (is_string($override) && ctype_digit($override)) {
+    if (is_string($override = getenv('PMSS_TOTAL_MEM_MIB')) && ctype_digit($override)) {
         return (int) $override;
     }
 
@@ -25,13 +24,12 @@ function pmssTotalMemMiB(): int
 /** Return total logical CPU threads. */
 function pmssTotalCpuThreads(): int
 {
-    $override = getenv('PMSS_TOTAL_CPU_THREADS');
-    if (is_string($override) && ctype_digit($override)) {
+    if (is_string($override = getenv('PMSS_TOTAL_CPU_THREADS')) && ctype_digit($override)) {
         return (int) $override;
     }
 
     // Robust check using /proc/cpuinfo
     $count = substr_count((string) @file_get_contents('/proc/cpuinfo'), 'processor');
     // Fallback to nproc if available
-    return max(0, ($count > 0) ? $count : (int) trim((string) @shell_exec('nproc')));
+    return max(0, $count > 0 ? $count : (int) trim((string) @shell_exec('nproc')));
 }

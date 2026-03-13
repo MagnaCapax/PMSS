@@ -13,11 +13,11 @@ require_once __DIR__.'/cgroupModeDetect.php';
      */
     function pmssEnsureCgroupsConfigured(?callable $logger = null): void
     {
-        $log   = pmssSelectLogger($logger);
+        $log = pmssSelectLogger($logger);
         $mode = pmssCgroupMode();
         if ($mode === 'v1') {
             $fstab = @file_get_contents('/etc/fstab');
-            if ($fstab === false || strpos((string)$fstab, ' /sys/fs/cgroup ') === false) {
+            if ($fstab === false || strpos($fstab, ' /sys/fs/cgroup ') === false) {
                 $mountLine = "\ncgroup  /sys/fs/cgroup  cgroup  defaults  0   0\n";
                 if (@file_put_contents('/etc/fstab', $mountLine, FILE_APPEND) === false) {
                     $log('[WARN] Unable to append cgroup mount to /etc/fstab');
@@ -68,8 +68,7 @@ require_once __DIR__.'/cgroupModeDetect.php';
                     }
                 }
             }
-            $rootlessTool = is_file('/usr/bin/dockerd-rootless-setuptool.sh');
-            if ($mode === 'v2' && $hidepid !== '' && (int)$hidepid > 0 && $rootlessTool) {
+            if ($mode === 'v2' && $hidepid !== '' && (int)$hidepid > 0 && is_file('/usr/bin/dockerd-rootless-setuptool.sh')) {
                 $log('[WARN] cgroup v2 with /proc hidepid>0 detected; rootless Docker may fail. Consider remounting /proc without hidepid or adjusting policy.');
             }
         } catch (\Throwable $e) {
