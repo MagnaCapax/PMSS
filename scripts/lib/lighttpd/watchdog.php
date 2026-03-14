@@ -1,6 +1,6 @@
 <?php
 /**
- * Helpers shared by the per-user lighttpd watchdog.
+ * Helpers shared by per-user lighttpd watchdog and startup flows.
  *
  * @license GPL-3.0-only
  */
@@ -26,4 +26,20 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
     return $maxProcs > 1
         ? array_map(static function ($index) use ($baseSocketPath) { return $baseSocketPath.'-'.$index; }, range(0, $maxProcs - 1))
         : [$baseSocketPath.($maxProcs === 1 ? '' : '-0')];
+}
+
+/**
+ * Remove stale FastCGI socket entries before launching lighttpd.
+ *
+ * FastCGI endpoints are UNIX sockets, not regular files. Use unlink directly
+ * for every matched path so stale socket nodes do not block restarts.
+ */
+function pmssLighttpdRemoveSocketEntries(string $lighttpdDir): int
+{
+    $removedCount = 0;
+    foreach (glob(rtrim($lighttpdDir, '/').'/php.socket*') ?: [] as $socketPath) {
+        $removedCount += (int) @unlink($socketPath);
+    }
+
+    return $removedCount;
 }

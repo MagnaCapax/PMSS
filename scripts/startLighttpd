@@ -21,7 +21,7 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 
-require_once __DIR__.'/lib/lighttpd/socketCleanup.php';
+require_once __DIR__.'/lib/lighttpd/watchdog.php';
 
 /**
  * Ensure that a given directory exists for the user, creating it via `su`.
