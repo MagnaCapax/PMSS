@@ -5,8 +5,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/runtime/commands.php';
-
     /**
      * Apply root slice overrides and refresh TasksMax on already-running slices.
      *
