@@ -67,8 +67,7 @@ function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
 
     // Legacy 85% (either from slice or policy) and "no quota" fall through to a
     // host-based default: ~85% per logical CPU thread, but never below 200%.
-    $threads = pmssTotalCpuThreads();
-    return max(200, $threads * 85);
+    return max(200, pmssTotalCpuThreads() * 85);
 }
 
 function pmssComputePhpProcessPlan(float $cpuQuotaPercent): array

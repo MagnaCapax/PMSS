@@ -26,12 +26,9 @@ function pmssUserConfigLighttpdConfigureUser(
     }
 
     $portFile = "{$portsDirectory}/lighttpd-{$thisUser}";
-    if (file_exists($portFile)) {
-        $serverPort = (int) file_get_contents($portFile);
-    } else {
-        // Allocate a unique port using portManager utility
-        $serverPort = (int) trim((string)shell_exec('/scripts/util/portManager.php assign '.escapeshellarg($thisUser).' lighttpd'));
-    }
+    $serverPort = file_exists($portFile)
+        ? (int) file_get_contents($portFile)
+        : (int) trim((string) shell_exec('/scripts/util/portManager.php assign '.escapeshellarg($thisUser).' lighttpd'));
 
     // Prepare directories and defaults.
     if (!pmssPrepareLighttpdUserDirectories($thisUser, $homeDir, $deflateEnabled)) {
@@ -49,8 +46,7 @@ function pmssUserConfigLighttpdConfigureUser(
     foreach ($proxyPortFiles as $proxyName => $proxyPortFile) {
         $proxyPort = (int) trim((string) @file_get_contents($proxyPortFile));
         if ($proxyPort < 1024 || $proxyPort > 65500) {
-            $proxyPort = (int) round(rand(1500, 65500));
-            file_put_contents($proxyPortFile, $proxyPort);
+            file_put_contents($proxyPortFile, $proxyPort = (int) round(rand(1500, 65500)));
         }
         $proxyPorts[$proxyName] = $proxyPort;
     }
@@ -58,11 +54,10 @@ function pmssUserConfigLighttpdConfigureUser(
     $qbittorrentPort = $proxyPorts['qbittorrent'];
 
     // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
-    $proxyFragments = [
+    foreach ([
         'rclone' => pmssRcloneLighttpdProxyFragment($thisUser, $rclonePort),
         'qbittorrent' => pmssQbittorrentLighttpdProxyFragment($thisUser, $qbittorrentPort),
-    ];
-    foreach ($proxyFragments as $proxyName => $proxyFragment) {
+    ] as $proxyName => $proxyFragment) {
         $proxyConfPath = "{$customDir}/pmss-{$proxyName}.conf";
         if (!pmssWriteUserFile($proxyConfPath, $proxyFragment, $thisUser, 0640)) {
             fwrite(STDERR, "[user:{$thisUser}] Failed to write {$proxyName} lighttpd fragment\n");
@@ -73,7 +68,6 @@ function pmssUserConfigLighttpdConfigureUser(
     // so nginx stays a lightweight reverse proxy.
     $delugeWebPort = null;
     $delugeWebConfPath = $homeDir.'/.config/deluge/web.conf';
-    $delugeParsed = null;
     if (is_readable($delugeWebConfPath)) {
         $delugeRaw = @file_get_contents($delugeWebConfPath);
         $needsDelugeWebConfWrite = is_string($delugeRaw) && pmssDelugeSessionsListDetected($delugeRaw);
@@ -109,8 +103,7 @@ function pmssUserConfigLighttpdConfigureUser(
         // Fallback (legacy hosts): derive deluge-web port from .delugePort.
         $delugePort = (int) trim((string) @file_get_contents($homeDir.'/.delugePort'));
         if ($delugePort >= 1024 && $delugePort <= 65535) {
-            $candidatePorts = [$delugePort + 1, $delugePort];
-            foreach ($candidatePorts as $candidate) {
+            foreach ([$delugePort + 1, $delugePort] as $candidate) {
                 if ($candidate < 1024 || $candidate > 65535) {
                     continue;
                 }
@@ -141,9 +134,6 @@ function pmssUserConfigLighttpdConfigureUser(
         $out = @shell_exec($cmd);
         if (is_string($out)) {
             foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-                if ($line === '') {
-                    continue;
-                }
                 $pos = strpos($line, '=');
                 if ($pos === false) {
                     continue;
