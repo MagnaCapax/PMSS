@@ -33,31 +33,6 @@ function pmssNetconsoleModuleLoaded(): bool
 }
 
 /**
- * Write a file only when content changes.
- */
-function pmssNetconsoleWriteIfChanged(string $path, string $body, callable $log): bool
-{
-    $dir = dirname($path);
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
-        $log('[WARN] Failed to create netconsole directory '.$dir);
-        return false;
-    }
-
-    if (is_file($path) && (string) @file_get_contents($path) === $body) {
-        return false;
-    }
-
-    if (@file_put_contents($path, $body) === false) {
-        $log('[WARN] Failed to write netconsole file '.$path);
-        return false;
-    }
-
-    @chmod($path, 0644);
-    $log('Updated '.$path);
-    return true;
-}
-
-/**
  * Apply optional netconsole configuration when `/etc/seedbox/config/netconsole` exists.
  */
 function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
@@ -89,8 +64,24 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    $changed = pmssNetconsoleWriteIfChanged($optionsPath, "options netconsole netconsole={$spec}\n", $log);
-    $changed = pmssNetconsoleWriteIfChanged($modulesLoadPath, "netconsole\n", $log) || $changed;
+    $changed = false;
+    foreach ([$optionsPath => "options netconsole netconsole={$spec}\n", $modulesLoadPath => "netconsole\n"] as $path => $body) {
+        $dir = dirname($path);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+            $log('[WARN] Failed to create netconsole directory '.$dir);
+            continue;
+        }
+        if (is_file($path) && (string) @file_get_contents($path) === $body) {
+            continue;
+        }
+        if (@file_put_contents($path, $body) === false) {
+            $log('[WARN] Failed to write netconsole file '.$path);
+            continue;
+        }
+        @chmod($path, 0644);
+        $log('Updated '.$path);
+        $changed = true;
+    }
     if (!$changed && pmssNetconsoleModuleLoaded()) {
         $log('[SKIP] netconsole already configured and loaded');
         return;
