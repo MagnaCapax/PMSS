@@ -184,8 +184,10 @@ LIGHTTPD;
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/userConfigLighttpd.php');
 
-        $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';", $src);
         $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';", $src);
+        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';") === false);
+        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';") === false);
+        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';") === false);
     }
 
     public function testUserConfigApplyOwnsPhpIniMemoryLimitUpdate(): void
@@ -196,14 +198,19 @@ LIGHTTPD;
         $this->assertStringContainsString('pmssAtomicWriteFile($phpIniPath, $phpIniContent);', $src);
     }
 
-    public function testResourcePlanEndsAtProcessPlanner(): void
+    public function testUserConfigApplyOwnsMovedHelperFunctions(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/lighttpd/resourcePlan.php');
-        $start = strpos($src, 'function pmssComputePhpProcessPlan(');
+        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/lighttpd/userConfigApply.php');
 
-        $this->assertTrue($start !== false);
-        $tail = substr($src, $start);
-        $functionCount = preg_match_all('/^function /m', $tail, $matches);
-        $this->assertEquals(1, $functionCount);
+        foreach ([
+            'pmssClampLighttpdBandwidthLimits',
+            'pmssStripLighttpdWebdavConfig',
+            'pmssParseSizeToMiB',
+            'pmssComputePhpProcessPlan',
+            'pmssShouldConfigureLighttpdForHome',
+            'pmssEnsureWebdavLockDatabase',
+        ] as $functionName) {
+            $this->assertStringContainsString('function '.$functionName.'(', $src);
+        }
     }
 }

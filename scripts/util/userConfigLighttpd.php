@@ -24,11 +24,8 @@ const PMSS_PHP_THREADS_MIN = 3;
 const PMSS_PHP_THREADS_MAX = 48;
 
 require_once dirname(__DIR__).'/lib/lighttpd/userFileWrite.php';
-require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';
-require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';
 require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';
 require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';
-require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';
 require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';
 
 function pmssUserConfigLighttpdMain(array $argv): int

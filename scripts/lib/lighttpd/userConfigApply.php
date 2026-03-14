@@ -1,12 +1,250 @@
 <?php
 /**
- * Per-user lighttpd configuration application helper.
+ * Per-user lighttpd configuration helpers and application helper.
  *
  * Extracted from scripts/util/userConfigLighttpd.php to keep the entrypoint
  * small while preserving output, ordering, and on-disk effects.
  *
  * @license GPL-3.0-only
  */
+
+function pmssClampLighttpdBandwidthLimits(string $config): string
+{
+    // lighttpd enforces uint16 for kbytes-per-second; overflow breaks startup on newer releases.
+    $pattern = '/^(\\s*(?:connection|server)\\.kbytes-per-second\\s*=\\s*)(\\d+)(\\s*(?:#.*)?)$/m';
+    $clamped = preg_replace_callback(
+        $pattern,
+        function (array $matches): string {
+            $value = (int)$matches[2];
+            if ($value > 65535) {
+                $value = 0;
+            }
+            return $matches[1].$value.$matches[3];
+        },
+        $config
+    );
+
+    return is_string($clamped) ? $clamped : $config;
+}
+
+function pmssWebdavWwwPolicyBlock(string $user): string
+{
+    // Defense-in-depth: validate username even though upstream should have validated.
+    // Reject invalid usernames to prevent regex injection or path traversal in lighttpd config.
+    // Valid PMSS usernames: ^[a-z][a-z0-9]{0,7}$ (1-8 chars, starts with letter, alphanumeric).
+    if (!pmssUsernameIsValid($user)) {
+        // Return safe empty block rather than generating config with untrusted input.
+        // Log a warning so operators can investigate how invalid input reached here.
+        error_log("pmssWebdavWwwPolicyBlock: rejected invalid username: " . substr($user, 0, 20));
+        return '# WebDAV www policy skipped: invalid username';
+    }
+
+    // Default: keep ~/www read-only over WebDAV to prevent users from breaking the web stack.
+    // Allow writing to ~/www/public by default, and allow full ~/www write if the user opts in.
+    $marker = "/home/{$user}/.lighttpd/webdav.www-writable";
+    if (file_exists($marker)) {
+        return <<<LIGHTTPD
+\$HTTP["url"] =~ "^/webdav-{$user}/www(\$|/)" {
+    webdav.is-readonly = "disable"
+}
+LIGHTTPD;
+    }
+
+    return <<<LIGHTTPD
+\$HTTP["url"] =~ "^/webdav-{$user}/www(\$|/)" {
+    webdav.is-readonly = "enable"
+}
+\$HTTP["url"] =~ "^/webdav-{$user}/www/public(\$|/)" {
+    webdav.is-readonly = "disable"
+}
+LIGHTTPD;
+}
+
+function pmssStripLighttpdWebdavConfig(string $template): string
+{
+    // Strip the managed WebDAV block (if present) to keep lighttpd start-safe on hosts
+    // where the module is missing or was manually removed.
+    $template = preg_replace(
+        '/^\\s*#\\s*PMSS_WEBDAV_BEGIN\\s*$.*^\\s*#\\s*PMSS_WEBDAV_END\\s*$\\s*/ms',
+        '',
+        $template
+    );
+
+    // Comment out the module line if present.
+    $template = preg_replace(
+        '/^(\\s*)\"mod_webdav\",\\s*$/m',
+        '${1}#"mod_webdav",',
+        $template,
+        1
+    );
+
+    // Remove placeholder that would otherwise leak into lighttpd.conf.
+    $template = str_replace('##PMSS_WEBDAV_WWW_POLICY##', '', $template);
+
+    return (string)$template;
+}
+
+function pmssParseSizeToMiB($value): ?int
+{
+    $raw = trim((string)$value);
+    if ($raw === '' || $raw === 'infinity' || $raw === '0') {
+        return null;
+    }
+
+    if (preg_match('/^([0-9.]+)\s*([KMG])?B?$/i', $raw, $m)) {
+        $num = (float)$m[1];
+        $unit = strtolower($m[2] ?? '');
+        $factors = ['' => 1 / 1048576, 'k' => 1 / 1024, 'm' => 1, 'g' => 1024];
+        return isset($factors[$unit]) ? (int)round($num * $factors[$unit]) : null;
+    }
+
+    // Fallback: assume raw bytes
+    return is_numeric($raw)
+        ? (int) round(((float) $raw) / 1048576)
+        : null;
+}
+
+function pmssClampMemoryLimit(int $memoryMiB): int
+{
+    return max(PMSS_PHP_MEMORY_MIN_MB, min(PMSS_PHP_MEMORY_MAX_MB, $memoryMiB));
+}
+
+function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
+{
+    $quota = null;
+
+    // Prefer explicit slice CPUQuota value when present.
+    if (isset($props['CPUQuota'])) {
+        $raw = trim((string)$props['CPUQuota']);
+        if ($raw !== '' && stripos($raw, 'infinity') === false && strpos($raw, '%') !== false) {
+            $quota = (int)round((float)$raw);
+        }
+    }
+
+    // Derive quota from period values when CPUQuota is not set directly.
+    if ($quota === null) {
+        $perSec = $props['CPUQuotaPerSecUSec'] ?? null;
+        $period = $props['CPUQuotaPeriodUSec'] ?? null;
+        if (is_numeric($perSec) && is_numeric($period) && (float)$period > 0.0) {
+            $quota = (int)round(((float)$perSec / (float)$period) * 100);
+        }
+    }
+
+    // When quota is explicitly set and not a legacy 85% sentinel, use it as-is.
+    if ($quota !== null && $quota > 0 && $quota !== 85) {
+        return $quota;
+    }
+
+    // Fallback if no usable systemd property is found:
+    // Use policy default when it is a concrete value other than the legacy 85%.
+    $policyQuota = (isset($policyDefaults['cpuQuotaPercent']) && is_numeric($policyDefaults['cpuQuotaPercent']))
+        ? (int)$policyDefaults['cpuQuotaPercent']
+        : 0;
+    if ($policyQuota > 0 && $policyQuota !== 85) {
+        return $policyQuota;
+    }
+
+    // Legacy 85% (either from slice or policy) and "no quota" fall through to a
+    // host-based default: ~85% per logical CPU thread, but never below 200%.
+    return max(200, pmssTotalCpuThreads() * 85);
+}
+
+function pmssComputePhpProcessPlan(float $cpuQuotaPercent): array
+{
+    // Scale worker threads with CPU quota (approx. 4 threads per 100% quota),
+    // then clamp to safe bounds (3..48 total threads).
+    $effectiveQuota = $cpuQuotaPercent > 0 ? $cpuQuotaPercent : 100;
+    $targetThreads = (int)ceil(($effectiveQuota / 100) * 4);
+    $targetThreads = max(PMSS_PHP_THREADS_MIN, min(PMSS_PHP_THREADS_MAX, $targetThreads));
+
+    $childrenPerProc = PMSS_LIGHTTPD_CHILDREN_PER_PROC;
+    $maxProcs = (int)ceil($targetThreads / $childrenPerProc);
+    $totalThreads = $maxProcs * $childrenPerProc;
+
+    // Ensure we do not exceed global cap after rounding.
+    if ($totalThreads > PMSS_PHP_THREADS_MAX) {
+        $maxProcs = (int)ceil(PMSS_PHP_THREADS_MAX / $childrenPerProc);
+        $totalThreads = $maxProcs * $childrenPerProc;
+    }
+
+    return [
+        'max_procs'    => $maxProcs,
+        'children'     => $childrenPerProc,
+        'totalThreads' => $totalThreads,
+    ];
+}
+
+function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
+{
+    return is_dir($homeDir)
+        && !is_link($homeDir)
+        && !is_dir($homeDir.'/www-disabled')
+        && is_dir($homeDir.'/www')
+        && file_exists($homeDir.'/.rtorrent.rc');
+}
+
+function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool
+{
+    if (!pmssValidateUsername($user) || !is_dir($homeDir) || is_link($homeDir)) {
+        return false;
+    }
+
+    $directories = [
+        '.lighttpd'          => 0751,
+        '.lighttpd/custom.d' => 0750,
+        '.lighttpd/upload'   => 0751,
+    ];
+    if ($deflateEnabled) {
+        $directories['.lighttpd/compress'] = 0751;
+    }
+    $directories['www/public'] = 0751;
+    foreach ($directories as $directory => $mode) {
+        if (!pmssEnsureUserHomeDir($user, $homeDir, $directory, $mode)) {
+            return false;
+        }
+    }
+
+    // Ensure the optional user-controlled include exists so lighttpd start doesn't fail.
+    $customFile = $homeDir.'/.lighttpd/custom';
+    if (is_link($customFile) || (file_exists($customFile) && !is_file($customFile))) {
+        return false;
+    }
+
+    return file_exists($customFile) || pmssWriteUserFile($customFile, '', $user, 0751);
+}
+
+/**
+ * Ensure the WebDAV lock database is present and owned by the target user.
+ */
+function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
+{
+    $lighttpdDir = $homeDir.'/.lighttpd';
+    if (!is_dir($lighttpdDir) || is_link($lighttpdDir)) {
+        return;
+    }
+
+    $lockFile = $lighttpdDir.'/webdav.lock.db';
+    if (is_link($lockFile)) {
+        return;
+    }
+    if (!file_exists($lockFile)) {
+        @touch($lockFile);
+        // Clear stat cache so subsequent checks see the new lock file.
+        clearstatcache(true, $lockFile);
+    }
+    if (!is_file($lockFile)) {
+        return;
+    }
+    @chmod($lockFile, 0600);
+    clearstatcache(true, $lockFile);
+
+    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+        @chown($lighttpdDir, $user);
+        @chgrp($lighttpdDir, $user);
+        @chown($lockFile, $user);
+        @chgrp($lockFile, $user);
+    }
+}
 
 function pmssUserConfigLighttpdConfigureUser(
     string $thisUser,
