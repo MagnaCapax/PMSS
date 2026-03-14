@@ -14,8 +14,6 @@ require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../runtime.php';
 
-require_once __DIR__.'/systemPrep/cgroupsEnsureConfigured.php';
-
 /**
  * Return total system memory in MiB (rounded).
  */
@@ -45,9 +43,108 @@ function pmssTotalCpuThreads(): int
     return $count > 0 ? $count : max(0, (int) trim((string) @shell_exec('nproc')));
 }
 
+/**
+ * Detect cgroup mode: 'v2', 'v1', or 'unknown'.
+ */
+function pmssCgroupMode(): string
+{
+    if (($override = getenv('PMSS_CGROUP_MODE')) === 'v1' || $override === 'v2') {
+        return $override;
+    }
+
+    // Strongest signal: cgroup2 mount present in /proc/self/mountinfo.
+    // Also treat cgroup.controllers as a definitive v2 signal.
+    if (is_file('/sys/fs/cgroup/cgroup.controllers')
+        || strpos((string) @file_get_contents('/proc/self/mountinfo'), ' - cgroup2 ') !== false) {
+        return 'v2';
+    }
+
+    // Kernel cmdline override used by systemd to force v1 on newer Debian
+    if (strpos((string) @file_get_contents('/proc/cmdline'), 'systemd.unified_cgroup_hierarchy=0') !== false) {
+        return 'v1';
+    }
+
+    // v1 hint: presence of controller directories under /sys/fs/cgroup/
+    foreach (glob('/sys/fs/cgroup/*', GLOB_ONLYDIR) ?: [] as $dir) {
+        if (basename($dir) !== 'unified') {
+            return 'v1';
+        }
+    }
+
+    return 'unknown';
+}
+
+/**
+ * Guarantee that cgroup mounts and PID limits are configured sanely.
+ */
+function pmssEnsureCgroupsConfigured(?callable $logger = null): void
+{
+    $log = pmssSelectLogger($logger);
+    $mode = pmssCgroupMode();
+    if ($mode === 'v1') {
+        $fstab = @file_get_contents('/etc/fstab');
+        if ($fstab === false || strpos($fstab, ' /sys/fs/cgroup ') === false) {
+            $mountLine = "\ncgroup  /sys/fs/cgroup  cgroup  defaults  0   0\n";
+            if (@file_put_contents('/etc/fstab', $mountLine, FILE_APPEND) === false) {
+                $log('[WARN] Unable to append cgroup mount to /etc/fstab');
+            } else {
+                $log('Appended cgroup mount configuration to /etc/fstab (v1)');
+            }
+            runStep('Mounting /sys/fs/cgroup (v1)', 'mount /sys/fs/cgroup');
+        } else {
+            $log('[SKIP] cgroup v1 mount already present in /etc/fstab');
+        }
+    } elseif ($mode === 'v2') {
+        $log('[SKIP] cgroup v2 detected; no fstab mount or cgroup-bin needed');
+    } else {
+        $log('[WARN] cgroup mode unknown; leaving mounts untouched');
+    }
+
+    // On v2, prefer TasksMax limits via slice; on v1, pids.max may be available.
+    if ($mode === 'v1') {
+        if (file_exists('/sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max')) {
+            runStep('Raising PID limit for root user slice (v1)', "sh -c 'echo 100000 > /sys/fs/cgroup/pids/user.slice/user-0.slice/pids.max'");
+        } else {
+            $log('[SKIP] pids.max controller path missing (v1), relying on system defaults');
+        }
+    } else {
+        $log('[SKIP] Using systemd TasksMax for PID limits (cgroup v2)');
+    }
+
+    // Advisory: hidepid=2 on /proc breaks rootless Docker under cgroup v2 on many hosts.
+    // Emit a warning so operators can adjust policy if needed.
+    try {
+        $procMount = $hidepid = '';
+        $mi = @file('/proc/self/mountinfo', FILE_IGNORE_NEW_LINES);
+        if (is_array($mi)) {
+            foreach ($mi as $l) {
+                // Identify the /proc mountpoint line
+                if (preg_match('#\s(/proc)\s#', $l)) {
+                    $procMount = $l;
+                }
+            }
+        }
+        if ($procMount !== '') {
+            // Extract mount options field (4th field) and parse hidepid option
+            $parts = explode(' ', $procMount);
+            if (isset($parts[3])) {
+                foreach (explode(',', $parts[3]) as $o) {
+                    if (strpos($o, 'hidepid=') === 0) {
+                        $hidepid = substr($o, 8);
+                        break;
+                    }
+                }
+            }
+        }
+        if ($mode === 'v2' && $hidepid !== '' && (int) $hidepid > 0 && is_file('/usr/bin/dockerd-rootless-setuptool.sh')) {
+            $log('[WARN] cgroup v2 with /proc hidepid>0 detected; rootless Docker may fail. Consider remounting /proc without hidepid or adjusting policy.');
+        }
+    } catch (\Throwable $e) {
+        // Best-effort advisory only
+    }
+}
+
 require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
-require_once __DIR__.'/systemPrep/localeBaselineEnsure.php';
-require_once __DIR__.'/systemPrep/bootDefaultsEnsure.php';
 
 /**
  * Recreate the legacy BFQ/sysctl configuration shipped with PMSS.
@@ -180,6 +277,321 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
     runStep('Reloading systemd unit files (PMSS boot tuning)', 'systemctl daemon-reload || true');
     runStep('Enabling PMSS boot tuning service', 'systemctl enable pmss-boot-tuning.service || true');
     runStep('Starting PMSS boot tuning service', 'systemctl start pmss-boot-tuning.service || true');
+}
+
+/**
+ * Ensure /proc hidepid=2 and legacy grub cmdline defaults stay applied.
+ *
+ * Extra grub cmdline options and explicit grub settings are optional so
+ * callers can enable stricter post-upgrade boot diagnostics when needed.
+ */
+function pmssEnsureBootDefaults(
+    ?callable $logger = null,
+    ?string $fstabPath = null,
+    ?string $grubPath = null,
+    ?string $grubOption = null,
+    ?array $extraGrubOptions = null,
+    ?array $extraGrubSettings = null
+): void
+{
+    $log = pmssSelectLogger($logger);
+    $fstabPath = $fstabPath ?? '/etc/fstab';
+    $grubPath = $grubPath ?? '/etc/default/grub';
+    $grubOption = $grubOption ?? 'systemd.unified_cgroup_hierarchy=0';
+
+    $requiredGrubOptions = [];
+    $grubOption = trim((string) $grubOption);
+    if ($grubOption !== '') {
+        $requiredGrubOptions[] = $grubOption;
+    }
+    if (is_array($extraGrubOptions)) {
+        foreach ($extraGrubOptions as $option) {
+            $option = trim((string) $option);
+            if ($option !== '') {
+                $requiredGrubOptions[] = $option;
+            }
+        }
+    }
+    $requiredGrubOptions = array_values(array_unique($requiredGrubOptions));
+
+    $requiredGrubSettings = [];
+    if (is_array($extraGrubSettings)) {
+        foreach ($extraGrubSettings as $key => $value) {
+            $key = trim((string) $key);
+            if ($key === '' || preg_match('/^[A-Z0-9_]+$/', $key) !== 1) {
+                continue;
+            }
+            $requiredGrubSettings[$key] = trim((string) $value);
+        }
+    }
+
+    $writeWithBackup = static function (string $path, array $contentLines, string $label) use ($log): void {
+        $backup = $path.'.pmss-backup-'.date('YmdHis');
+        if (!@copy($path, $backup)) {
+            $log('[WARN] Unable to create '.$label.' backup at '.$backup);
+        }
+        if (@file_put_contents($path, implode(PHP_EOL, $contentLines).PHP_EOL) === false) {
+            $log('[WARN] Failed writing updated '.$path);
+        }
+    };
+
+    // /proc hidepid baseline.
+    $fstabChanged = false;
+    if (is_readable($fstabPath) && ($lines = file($fstabPath, FILE_IGNORE_NEW_LINES)) !== false) {
+        // Locate existing /proc entry when present.
+        $found = false;
+        foreach ($lines as $idx => $line) {
+            $trim = trim($line);
+            if ($trim === '' || $trim[0] === '#') {
+                continue;
+            }
+            $columns = preg_split('/\s+/', $trim);
+            if (count($columns) < 4 || $columns[1] !== '/proc' || $columns[2] !== 'proc') {
+                continue;
+            }
+            $found = true;
+            // Normalize hidepid option to enforce the legacy value.
+            $options = $columns[3] === '' || $columns[3] === '-' ? 'defaults' : $columns[3];
+            $parts = array_values(array_filter(explode(',', $options), 'strlen'));
+            $new = [];
+            $hidepid = false;
+            foreach ($parts as $opt) {
+                if (strpos($opt, 'hidepid=') === 0) {
+                    if (!$hidepid) {
+                        $new[] = 'hidepid=2';
+                        $hidepid = true;
+                    }
+                    continue;
+                }
+                $new[] = $opt;
+            }
+            if (!$hidepid) {
+                $new[] = 'hidepid=2';
+            }
+            $updated = implode(',', $new);
+            if ($updated !== $columns[3]) {
+                $columns[3] = $updated;
+                $lines[$idx] = implode("\t", $columns);
+                $fstabChanged = true;
+                $log('Updated /proc mount options in '.$fstabPath);
+            }
+            break;
+        }
+        if (!$found) {
+            $lines[] = "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0";
+            $fstabChanged = true;
+            $log('Added /proc mount with hidepid=2 to '.$fstabPath);
+        }
+        // Write fstab only when content changed, with a backup.
+        if ($fstabChanged) {
+            $writeWithBackup($fstabPath, $lines, 'fstab');
+
+            // Remount /proc after fstab changes so the runtime view matches.
+            $command = pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']);
+            runStep('Remounting /proc with hidepid=2', $command);
+        }
+    } else {
+        $log('[WARN] '.$fstabPath.' not readable; skipping /proc hidepid enforcement');
+    }
+
+    // Grub cmdline baseline.
+    $grubChanged = false;
+    if (is_readable($grubPath) && ($lines = file($grubPath, FILE_IGNORE_NEW_LINES)) !== false) {
+        // Update the first GRUB_CMDLINE entry or add a new one.
+        $found = false;
+        foreach ($lines as $idx => $line) {
+            if (!preg_match('/^(GRUB_CMDLINE_LINUX_DEFAULT|GRUB_CMDLINE_LINUX)=("|\')([^"\']*)("|\')/', $line, $match)) {
+                continue;
+            }
+            $found = true;
+            $key = $match[1];
+            $quote = $match[2];
+            $value = $match[3];
+
+            $currentOptions = preg_split('/\s+/', trim($value)) ?: [];
+            $currentOptions = array_values(array_filter($currentOptions, 'strlen'));
+            foreach ($requiredGrubOptions as $option) {
+                if (!in_array($option, $currentOptions, true)) {
+                    $currentOptions[] = $option;
+                }
+            }
+            $updatedValue = implode(' ', $currentOptions);
+
+            if ($updatedValue !== $value) {
+                $lines[$idx] = $key.'='.$quote.$updatedValue.$quote;
+                $grubChanged = true;
+                $log('Updated '.$key.' options in '.$grubPath);
+            }
+            break;
+        }
+        if (!$found && !empty($requiredGrubOptions)) {
+            $lines[] = 'GRUB_CMDLINE_LINUX_DEFAULT="'.implode(' ', $requiredGrubOptions).'"';
+            $grubChanged = true;
+            $log('Added GRUB_CMDLINE_LINUX_DEFAULT to '.$grubPath);
+        }
+
+        // Ensure additional grub key/value settings (e.g. serial console)
+        // are present with explicit values.
+        foreach ($requiredGrubSettings as $settingKey => $settingValue) {
+            $settingFound = false;
+            $settingPrefix = $settingKey.'=';
+            foreach ($lines as $lineIdx => $line) {
+                if (strpos($line, $settingPrefix) !== 0) {
+                    continue;
+                }
+                $settingFound = true;
+                $rawValue = trim(substr($line, strlen($settingPrefix)));
+                if (strlen($rawValue) >= 2) {
+                    $first = $rawValue[0];
+                    $last = $rawValue[strlen($rawValue) - 1];
+                    if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+                        $rawValue = substr($rawValue, 1, -1);
+                    }
+                }
+                if ($rawValue !== $settingValue) {
+                    $lines[$lineIdx] = $settingKey.'="'.$settingValue.'"';
+                    $grubChanged = true;
+                    $log('Updated '.$settingKey.' in '.$grubPath);
+                }
+                break;
+            }
+            if (!$settingFound) {
+                $lines[] = $settingKey.'="'.$settingValue.'"';
+                $grubChanged = true;
+                $log('Added '.$settingKey.' to '.$grubPath);
+            }
+        }
+
+        // Persist grub updates only when modified, keeping a backup.
+        if ($grubChanged) {
+            $writeWithBackup($grubPath, $lines, 'grub');
+        }
+    } else {
+        $log('[WARN] '.$grubPath.' not readable; skipping grub cmdline update');
+    }
+    // Apply grub changes when possible and warn about reboot.
+    if ($grubChanged) {
+        $hasUpdateGrub = trim((string) @shell_exec('command -v update-grub 2>/dev/null')) !== '';
+        if ($hasUpdateGrub) {
+            runStep('Updating GRUB configuration', 'update-grub');
+        } else {
+            $log('[WARN] update-grub not available; run update-grub after editing '.$grubPath);
+        }
+        $cmdline = @file_get_contents('/proc/cmdline');
+        if ($grubOption !== '' && $cmdline !== false && strpos($cmdline, $grubOption) === false) {
+            $log('[WARN] '.$grubOption.' will apply after reboot');
+        }
+    }
+}
+
+/**
+ * Make sure essential locale assets exist before other services start.
+ */
+function pmssEnsureLocaleBaseline(): void
+{
+    $langLocale = 'en_US.UTF-8';
+    $timeLocale = 'en_US.UTF-8';
+
+    // Deduplicate locales to avoid redundant file reads and locale-gen calls.
+    foreach (array_unique([$langLocale, $timeLocale]) as $locale) {
+        $enabled = false;
+        $gen = @file_get_contents('/etc/locale.gen');
+        if (is_string($gen)) {
+            foreach (preg_split('/\r?\n/', $gen) as $line) {
+                $trim = trim($line);
+                if ($trim === '' || $trim[0] === '#') {
+                    continue;
+                }
+                if (stripos($trim, $locale.' UTF-8') === 0) {
+                    $enabled = true;
+                    break;
+                }
+            }
+        }
+        if (!$enabled) {
+            $line = $locale.' UTF-8';
+            if ($gen === false) {
+                // Best effort: create file with the required locale line
+                @file_put_contents('/etc/locale.gen', $line."\n");
+                logMessage('[WARN] /etc/locale.gen missing; created with '.$line);
+            } else {
+                if (strpos($gen, $line) === false) {
+                    // Append the desired locale line if not present at all
+                    if (@file_put_contents('/etc/locale.gen', rtrim($gen, "\r\n")."\n".$line."\n") === false) {
+                        logMessage('[WARN] Unable to append '.$line.' to /etc/locale.gen');
+                    } else {
+                        logMessage('Appended '.$line.' to /etc/locale.gen');
+                    }
+                } else {
+                    // Un-comment the existing line if commented out
+                    runStep('Enabling '.$locale.' in /etc/locale.gen',
+                        "sed -i 's/^# *".$locale." UTF-8/".$locale." UTF-8/' /etc/locale.gen");
+                }
+            }
+        }
+
+        $out = [];
+        @exec('locale -a 2>/dev/null', $out);
+        $has = false;
+        if (!empty($out)) {
+            $needle1 = strtolower($locale);
+            $needle2 = strtolower(str_replace('UTF-8', 'utf8', $locale));
+            foreach ($out as $line) {
+                $val = strtolower(trim((string) $line));
+                if ($val === $needle1 || $val === $needle2) {
+                    $has = true;
+                    break;
+                }
+            }
+        }
+        if (!$has || !$enabled) {
+            runStep('Generating '.$locale.' locale', 'locale-gen '.$locale);
+        } else {
+            logMessage('[SKIP] '.$locale.' already generated');
+        }
+    }
+
+    $defaultMatches = false;
+    $data = @file_get_contents('/etc/default/locale');
+    if (is_string($data)) {
+        $lang = null;
+        $lcTime = null;
+        foreach (preg_split('/\r?\n/', $data) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') {
+                continue;
+            }
+            if (stripos($line, 'LANG=') === 0) {
+                $lang = trim(substr($line, 5));
+            }
+            if (stripos($line, 'LC_TIME=') === 0) {
+                $lcTime = trim(substr($line, 8));
+            }
+        }
+        $defaultMatches = ($lang === $langLocale && $lcTime === $timeLocale);
+    }
+    if (!$defaultMatches) {
+        runStep(
+            'Setting default system locale',
+            'update-locale LANG='.$langLocale.' LC_TIME='.$timeLocale
+        );
+    } else {
+        logMessage('[SKIP] Default system locale already set to '.$langLocale.' (LC_TIME='.$timeLocale.')');
+    }
+
+    // Ensure system timezone matches the Finland/Helsinki baseline.
+    $tz = trim((string) @file_get_contents('/etc/timezone'));
+    if ($tz !== 'Europe/Helsinki') {
+        runStep(
+            'Setting system timezone to Europe/Helsinki',
+            "timedatectl set-timezone Europe/Helsinki 2>/dev/null || (ln -sf /usr/share/zoneinfo/Europe/Helsinki /etc/localtime && echo 'Europe/Helsinki' > /etc/timezone)"
+        );
+    } else {
+        logMessage('[SKIP] System timezone already set to Europe/Helsinki');
+    }
+
+    require_once dirname(__DIR__).'/../motd/Generator.php';
+    \Motd::motdGenerate();
 }
 
 /**

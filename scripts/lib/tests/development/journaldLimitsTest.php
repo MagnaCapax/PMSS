@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/update/services/journald.php';
+require_once dirname(__DIR__, 2).'/update/services/logging.php';
 
 class JournaldLimitsTest extends TestCase
 {
