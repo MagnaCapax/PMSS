@@ -22,25 +22,41 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
         $this->removeTree($this->tempDir);
     }
 
-    public function testReadsConfiguredMaxProcs(): void
+    public function testBuildsEverySocketPathWhenConfigHasMultipleWorkers(): void
     {
         $configPath = $this->writeConfig('"max-procs" => 6');
 
-        $this->assertEquals(6, \pmssLighttpdWatchdogConfigMaxProcs($configPath));
+        $this->assertEquals(
+            [
+                $this->tempDir.'/.lighttpd/php.socket-0',
+                $this->tempDir.'/.lighttpd/php.socket-1',
+                $this->tempDir.'/.lighttpd/php.socket-2',
+                $this->tempDir.'/.lighttpd/php.socket-3',
+                $this->tempDir.'/.lighttpd/php.socket-4',
+                $this->tempDir.'/.lighttpd/php.socket-5',
+            ],
+            \pmssLighttpdWatchdogSocketPaths($this->tempDir, $configPath)
+        );
     }
 
-    public function testReturnsNullWhenMaxProcsMissing(): void
+    public function testFallsBackToLegacySocketProbeWhenMaxProcsMissing(): void
     {
         $configPath = $this->writeConfig('server.port = 12345');
 
-        $this->assertEquals(null, \pmssLighttpdWatchdogConfigMaxProcs($configPath));
+        $this->assertEquals(
+            [$this->tempDir.'/.lighttpd/php.socket-0'],
+            \pmssLighttpdWatchdogSocketPaths($this->tempDir, $configPath)
+        );
     }
 
-    public function testReturnsNullWhenMaxProcsInvalid(): void
+    public function testFallsBackToLegacySocketProbeWhenMaxProcsInvalid(): void
     {
         $configPath = $this->writeConfig('"max-procs" => 0');
 
-        $this->assertEquals(null, \pmssLighttpdWatchdogConfigMaxProcs($configPath));
+        $this->assertEquals(
+            [$this->tempDir.'/.lighttpd/php.socket-0'],
+            \pmssLighttpdWatchdogSocketPaths($this->tempDir, $configPath)
+        );
     }
 
     public function testBuildsSingleSocketPathWhenOnlyOneWorkerExpected(): void

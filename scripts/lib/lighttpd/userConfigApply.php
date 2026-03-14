@@ -167,14 +167,18 @@ function pmssUserConfigLighttpdConfigureUser(
         'children'        => $plan['children'],
         'totalThreads'    => $plan['totalThreads'],
     ];
-    $thisUserConfig = pmssRenderLighttpdConfig(
-        $template,
-        $thisUser,
-        $serverPort,
-        $rclonePort,
-        $qbittorrentPort,
-        $resources
+    $thisUserConfig = str_replace(
+        array("##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##"),
+        array($thisUser, $serverPort, $rclonePort, $qbittorrentPort, pmssWebdavWwwPolicyBlock($thisUser)),
+        $template
     );
+    $thisUserConfig = preg_replace(
+        ['/("max-procs"\\s*=>\\s*)[0-9]+/', '/("PHP_FCGI_CHILDREN"\\s*=>\\s*")[0-9]+(")/'],
+        ['${1}'.$resources['maxProcs'], '${1}'.$resources['children'].'${2}'],
+        $thisUserConfig,
+        1
+    );
+    $thisUserConfig = pmssClampLighttpdBandwidthLimits($thisUserConfig);
     if (!pmssWriteUserFile($homeDir.'/.lighttpd.conf', $thisUserConfig, $thisUser, 0741)) {
         fwrite(STDERR, "[user:{$thisUser}] Failed to write .lighttpd.conf; skipping user\n");
         return;

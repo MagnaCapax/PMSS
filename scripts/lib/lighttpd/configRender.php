@@ -5,25 +5,6 @@
  * @license GPL-3.0-only
  */
 
-function pmssRenderLighttpdConfig(string $template, string $user, int $serverPort, int $rclonePort, int $qbittorrentPort, array $resources): string
-{
-    $webdavWwwPolicy = pmssWebdavWwwPolicyBlock($user);
-    $config = str_replace(
-        array("##username", "##serverPort", "##rclonePort", "##qbittorrentPort", "##PMSS_WEBDAV_WWW_POLICY##"),
-        array($user, $serverPort, $rclonePort, $qbittorrentPort, $webdavWwwPolicy),
-        $template
-    );
-
-    $config = preg_replace(
-        ['/("max-procs"\\s*=>\\s*)[0-9]+/', '/("PHP_FCGI_CHILDREN"\\s*=>\\s*")[0-9]+(")/'],
-        ['${1}'.$resources['maxProcs'], '${1}'.$resources['children'].'${2}'],
-        $config,
-        1
-    );
-
-    return pmssClampLighttpdBandwidthLimits($config);
-}
-
 function pmssClampLighttpdBandwidthLimits(string $config): string
 {
     // lighttpd enforces uint16 for kbytes-per-second; overflow breaks startup on newer releases.
