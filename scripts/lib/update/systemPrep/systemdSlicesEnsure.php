@@ -5,7 +5,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/runtime/commands.php';
 require_once __DIR__.'/cgroupsEnsureConfigured.php';
 require_once __DIR__.'/systemdSlicesDropinInstall.php';
 require_once __DIR__.'/systemdSlicesRuntimeApply.php';

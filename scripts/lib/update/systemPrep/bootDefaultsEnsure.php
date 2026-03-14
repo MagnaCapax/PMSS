@@ -5,8 +5,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/runtime/commands.php';
-
     /**
      * Ensure /proc hidepid=2 and legacy grub cmdline defaults stay applied.
      *

@@ -16,8 +16,6 @@ require_once __DIR__.'/../runtime.php';
 
 require_once __DIR__.'/systemPrep/hostResourcesDetect.php';
 require_once __DIR__.'/systemPrep/cgroupsEnsureConfigured.php';
-require_once __DIR__.'/systemPrep/systemdSlicesDropinInstall.php';
-require_once __DIR__.'/systemPrep/systemdSlicesRuntimeApply.php';
 require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
 require_once __DIR__.'/systemPrep/localeBaselineEnsure.php';
 require_once __DIR__.'/systemPrep/bootTuningEnsure.php';

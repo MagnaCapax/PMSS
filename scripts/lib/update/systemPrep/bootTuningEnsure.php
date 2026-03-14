@@ -7,8 +7,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/runtime/commands.php';
-
 /**
  * Install and enable the PMSS boot tuning script + systemd unit.
  */
