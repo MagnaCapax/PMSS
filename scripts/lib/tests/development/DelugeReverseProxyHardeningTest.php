@@ -409,6 +409,15 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertTrue($parsed === null, 'Expected null when second JSON object is missing');
     }
 
+    public function testDelugeReadWebConfRejectsUnterminatedFirstObject(): void
+    {
+        $path = $this->tempDir.'/web-unterminated-first.conf';
+        file_put_contents($path, "{\"file\":2,\"format\":1,\"x\":\"unterminated}{}");
+
+        $parsed = \pmssDelugeReadWebConf($path);
+        $this->assertTrue($parsed === null, 'Expected null for unterminated first JSON object');
+    }
+
     public function testDelugeReadWebConfRejectsSecondObjectWhenNotAnObject(): void
     {
         $path = $this->tempDir.'/web-second-not-object.conf';
@@ -446,32 +455,33 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertTrue($parsed === null, 'Expected null for invalid JSON containing NUL byte');
     }
 
-    public function testSplitFirstJsonObjectRejectsUnterminatedString(): void
+    public function testDelugeReadWebConfRejectsUnterminatedString(): void
     {
-        $bad = "{\"file\":2,\"format\":1,\"x\":\"unterminated}{}";
-        $split = \pmssSplitFirstJsonObject($bad);
-        $this->assertTrue($split === null, 'Expected null for unterminated JSON string');
+        $path = $this->tempDir.'/web-unterminated-string.conf';
+        file_put_contents($path, "{\"file\":2,\"format\":1,\"x\":\"unterminated}{}");
+
+        $parsed = \pmssDelugeReadWebConf($path);
+        $this->assertTrue($parsed === null, 'Expected null for unterminated JSON string');
     }
 
-    public function testSplitFirstJsonObjectRejectsMissingClosingBrace(): void
+    public function testDelugeReadWebConfRejectsMissingClosingBrace(): void
     {
-        $bad = "{\"file\":2,\"format\":1{\"base\":\"/user-testuser/deluge/\"}";
-        $split = \pmssSplitFirstJsonObject($bad);
-        $this->assertTrue($split === null, 'Expected null for missing closing brace');
+        $path = $this->tempDir.'/web-missing-brace.conf';
+        file_put_contents($path, "{\"file\":2,\"format\":1{\"base\":\"/user-testuser/deluge/\"}");
+
+        $parsed = \pmssDelugeReadWebConf($path);
+        $this->assertTrue($parsed === null, 'Expected null for missing closing brace');
     }
 
-    public function testSplitFirstJsonObjectHandlesEscapedQuotes(): void
+    public function testDelugeReadWebConfHandlesEscapedQuotes(): void
     {
         $good = "{\"file\":2,\"format\":1,\"note\":\"a\\\"b\\\"c\"}{\"base\":\"/user-testuser/deluge/\",\"port\":8112}";
-        $split = \pmssSplitFirstJsonObject($good);
-        $this->assertTrue(is_array($split), 'Expected split array');
-
         $parsed = \pmssDelugeReadWebConf($this->writeTemp('web-escaped.conf', $good));
         $this->assertTrue(is_array($parsed));
         $this->assertEquals('a"b"c', $parsed['meta']['note'] ?? null);
     }
 
-    public function testSplitFirstJsonObjectFailsSoftOnUtf8Bom(): void
+    public function testDelugeReadWebConfFailsSoftOnUtf8Bom(): void
     {
         $bom = "\xEF\xBB\xBF";
         $path = $this->tempDir.'/web-bom.conf';
@@ -499,6 +509,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $parsed2 = \pmssDelugeReadWebConf($path);
         $this->assertTrue(is_array($parsed2));
         $this->assertEquals('/user-testuser/deluge/', $parsed2['config']['base'] ?? null);
+        $this->assertEquals(0640, @fileperms($path) & 0777);
     }
 
     private function writeTemp(string $name, string $content): string

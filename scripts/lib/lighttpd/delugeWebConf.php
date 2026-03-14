@@ -5,69 +5,6 @@
  * @license GPL-3.0-only
  */
 
-function pmssSplitFirstJsonObject(string $content): ?array
-{
-    $len = strlen($content);
-    $i = 0;
-
-    while ($i < $len) {
-        $ch = $content[$i];
-        if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") {
-            $i++;
-            continue;
-        }
-        break;
-    }
-
-    if ($i >= $len || $content[$i] !== '{') {
-        return null;
-    }
-
-    $start = $i;
-    $depth = 0;
-    $inString = false;
-    $escape = false;
-
-    for (; $i < $len; $i++) {
-        $ch = $content[$i];
-        if ($inString) {
-            if ($escape) {
-                $escape = false;
-                continue;
-            }
-            if ($ch === '\\') {
-                $escape = true;
-                continue;
-            }
-            if ($ch === '"') {
-                $inString = false;
-            }
-            continue;
-        }
-
-        if ($ch === '"') {
-            $inString = true;
-            continue;
-        }
-        if ($ch === '{') {
-            $depth++;
-            continue;
-        }
-        if ($ch === '}') {
-            $depth--;
-            if ($depth === 0) {
-                $end = $i + 1;
-                return [
-                    substr($content, $start, $end - $start),
-                    substr($content, $end),
-                ];
-            }
-        }
-    }
-
-    return null;
-}
-
 function pmssDelugeSessionsListDetected(string $raw): bool
 {
     return preg_match('/"sessions"\\s*:\\s*\\[\\s*\\]/', $raw) === 1;
@@ -95,16 +32,51 @@ function pmssDelugeReadWebConf(string $path): ?array
         return null;
     }
 
-    $split = pmssSplitFirstJsonObject($raw);
-    if (!is_array($split)) {
+    $length = strlen($raw);
+    $start = strspn($raw, " \t\n\r");
+    if ($start >= $length || $raw[$start] !== '{') {
         return null;
     }
 
-    if (!is_array($meta = json_decode($split[0], true)) || json_last_error() !== JSON_ERROR_NONE) {
-        return null;
+    $depth = 0;
+    $inString = false;
+    $escape = false;
+    $firstObjectEnd = null;
+    for ($index = $start; $index < $length; $index++) {
+        $ch = $raw[$index];
+        if ($inString) {
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+            if ($ch === '\\') {
+                $escape = true;
+                continue;
+            }
+            if ($ch === '"') {
+                $inString = false;
+            }
+            continue;
+        }
+        if ($ch === '"') {
+            $inString = true;
+            continue;
+        }
+        if ($ch === '{') {
+            $depth++;
+            continue;
+        }
+        if ($ch === '}') {
+            $depth--;
+            if ($depth === 0) {
+                $firstObjectEnd = $index + 1;
+                break;
+            }
+        }
     }
-
-    if (!is_array($config = json_decode(ltrim((string) $split[1]), true)) || json_last_error() !== JSON_ERROR_NONE) {
+    if ($firstObjectEnd === null
+        || !is_array($meta = json_decode(substr($raw, $start, $firstObjectEnd - $start), true))
+        || !is_array($config = json_decode(ltrim(substr($raw, $firstObjectEnd)), true))) {
         return null;
     }
 
@@ -143,10 +115,6 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
         @unlink($tmp);
         return false;
     }
-
-    @chmod($path, $mode);
-    @chown($path, $owner);
-    @chgrp($path, $owner);
 
     return true;
 }
