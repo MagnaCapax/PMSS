@@ -8,22 +8,21 @@
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../../runtime.php';
-if (!function_exists('pmssConfigureTempMountNoexec')) {
-    /** Ensure /tmp and /dev/shm are mounted with noexec/nosuid/nodev when enabled. */
-    function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
-    {
-        $log = pmssSelectLogger($logger);
-        // Opt-in only: default off to preserve legacy workloads that execute from /tmp.
-        $flag = getenv('PMSS_HARDEN_TMP_NOEXEC');
-        if ($flag === false) {
-            $log('[SKIP] /tmp and /dev/shm noexec hardening disabled (PMSS_HARDEN_TMP_NOEXEC not set)');
-            return;
-        }
-        $normalized = strtolower(trim($flag));
-        if (in_array($normalized, ['', '0', 'false', 'no'], true)) {
-            $log('[SKIP] /tmp and /dev/shm noexec hardening disabled via PMSS_HARDEN_TMP_NOEXEC');
-            return;
-        }
+/** Ensure /tmp and /dev/shm are mounted with noexec/nosuid/nodev when enabled. */
+function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
+{
+    $log = pmssSelectLogger($logger);
+    // Opt-in only: default off to preserve legacy workloads that execute from /tmp.
+    $flag = getenv('PMSS_HARDEN_TMP_NOEXEC');
+    if ($flag === false) {
+        $log('[SKIP] /tmp and /dev/shm noexec hardening disabled (PMSS_HARDEN_TMP_NOEXEC not set)');
+        return;
+    }
+    $normalized = strtolower(trim($flag));
+    if (in_array($normalized, ['', '0', 'false', 'no'], true)) {
+        $log('[SKIP] /tmp and /dev/shm noexec hardening disabled via PMSS_HARDEN_TMP_NOEXEC');
+        return;
+    }
         // Resolve paths up front so tests can inject temp files.
         $fstabPath = $fstabPath ?? '/etc/fstab';
         $mountsPath = $mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
@@ -147,27 +146,25 @@ if (!function_exists('pmssConfigureTempMountNoexec')) {
             $command = pmssBuildCommand('mount', ['-o', 'remount,noexec,nosuid,nodev', $mountPoint]);
             runStep('Remounting '.$mountPoint.' with noexec hardening', $command);
         }
-    }
 }
 
-if (!function_exists('pmssConfigureTempTmpfsMount')) {
-    /**
-     * Ensure /tmp is mounted as tmpfs with hardened options when enabled.
-     */
-    function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
-    {
-        $log = pmssSelectLogger($logger);
-        // Opt-in only: tmpfs overlay can evict existing /tmp contents.
-        $flag = getenv('PMSS_HARDEN_TMP_TMPFS');
-        if ($flag === false) {
-            $log('[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)');
-            return;
-        }
-        $normalized = strtolower(trim($flag));
-        if (in_array($normalized, ['', '0', 'false', 'no'], true)) {
-            $log('[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS');
-            return;
-        }
+/**
+ * Ensure /tmp is mounted as tmpfs with hardened options when enabled.
+ */
+function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
+{
+    $log = pmssSelectLogger($logger);
+    // Opt-in only: tmpfs overlay can evict existing /tmp contents.
+    $flag = getenv('PMSS_HARDEN_TMP_TMPFS');
+    if ($flag === false) {
+        $log('[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)');
+        return;
+    }
+    $normalized = strtolower(trim($flag));
+    if (in_array($normalized, ['', '0', 'false', 'no'], true)) {
+        $log('[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS');
+        return;
+    }
 
         $size = getenv('PMSS_TMPFS_TMP_SIZE');
         $size = $size === false ? '' : trim($size);
@@ -327,5 +324,4 @@ if (!function_exists('pmssConfigureTempTmpfsMount')) {
 
         $command = pmssBuildCommand('mount', ['/tmp']);
         runStep('Mounting /tmp tmpfs from fstab', $command);
-    }
 }
