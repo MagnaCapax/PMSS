@@ -21,30 +21,6 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 
-require_once __DIR__.'/lib/lighttpd/watchdog.php';
-
-/**
- * Ensure that a given directory exists for the user, creating it via `su`.
- *
- * The directory is created as the target user so subsequent file writes by
- * lighttpd or PHP processes do not hit permission errors.
- *
- * @param string $user Username used with `su` when creating the directory.
- * @param string $dir  Absolute directory path that should exist.
- */
-function pmssEnsureUserDir(string $user, string $dir): void
-{
-    if (is_dir($dir)) {
-        return;
-    }
-    $cmd = sprintf(
-        "su %s -c %s",
-        escapeshellarg($user),
-        escapeshellarg('mkdir -p '.escapeshellarg($dir))
-    );
-    passthru($cmd);
-}
-
 if ($argc != 2) die("Usage: startLighttpd USERNAME\n");
 $user = $argv[1];
 $homeDir = '/home/'.$user;
@@ -60,12 +36,23 @@ $uploadDir   = $lighttpdDir.'/upload';
 $config      = @file_get_contents($configPath);
 $deflateEnabled = is_string($config) && preg_match('/^[ \t]*deflate\.cache-dir/m', $config);
 
-pmssEnsureUserDir($user, $lighttpdDir);
-pmssEnsureUserDir($user, $uploadDir);
+$requiredDirs = [$lighttpdDir, $uploadDir];
 if ($deflateEnabled) {
-    pmssEnsureUserDir($user, $lighttpdDir.'/compress');
+    $requiredDirs[] = $lighttpdDir.'/compress';
 }
-pmssLighttpdRemoveSocketEntries($lighttpdDir);
+foreach ($requiredDirs as $dir) {
+    if (is_dir($dir)) {
+        continue;
+    }
+    passthru(sprintf(
+        "su %s -c %s",
+        escapeshellarg($user),
+        escapeshellarg('mkdir -p '.escapeshellarg($dir))
+    ));
+}
+foreach (glob(rtrim($lighttpdDir, '/').'/php.socket*') ?: [] as $socketPath) {
+    @unlink($socketPath);
+}
 
 passthru("cd {$homeDir}; su {$user} -c '/usr/sbin/lighttpd -f {$configPath}'");	// This is for newer versions
 
