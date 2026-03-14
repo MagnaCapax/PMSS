@@ -14,8 +14,37 @@ require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../runtime.php';
 
-require_once __DIR__.'/systemPrep/hostResourcesDetect.php';
 require_once __DIR__.'/systemPrep/cgroupsEnsureConfigured.php';
+
+/**
+ * Return total system memory in MiB (rounded).
+ */
+function pmssTotalMemMiB(): int
+{
+    if (is_string($override = getenv('PMSS_TOTAL_MEM_MIB')) && ctype_digit($override)) {
+        return (int) $override;
+    }
+
+    return preg_match('/^MemTotal:\s+([0-9]+)/m', (string) @file_get_contents('/proc/meminfo'), $matches) === 1
+        ? (int) round(((int) $matches[1]) / 1024)
+        : 0;
+}
+
+/**
+ * Return total logical CPU threads.
+ */
+function pmssTotalCpuThreads(): int
+{
+    if (is_string($override = getenv('PMSS_TOTAL_CPU_THREADS')) && ctype_digit($override)) {
+        return (int) $override;
+    }
+
+    // Robust check using /proc/cpuinfo
+    $count = substr_count((string) @file_get_contents('/proc/cpuinfo'), 'processor');
+    // Fallback to nproc if available
+    return $count > 0 ? $count : max(0, (int) trim((string) @shell_exec('nproc')));
+}
+
 require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
 require_once __DIR__.'/systemPrep/localeBaselineEnsure.php';
 require_once __DIR__.'/systemPrep/bootDefaultsEnsure.php';

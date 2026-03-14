@@ -6,7 +6,6 @@
  */
 
 require_once __DIR__.'/cgroupsEnsureConfigured.php';
-require_once __DIR__.'/hostResourcesDetect.php';
 require_once dirname(__DIR__).'/../runtime.php';
 
 /**
