@@ -144,24 +144,25 @@ function updateUserFile($file, $user) {
     if (!file_exists($targetFile)) {
         copyToUserSpace($sourceFile, $targetFile, $user);
         logMessage("[user:{$user}] Added skeleton file: {$file}");
-    } else {
-        if (!is_file($targetFile)) {
-            logMessage("[user:{$user}] Target path is not a regular file, skipping: {$file}");
-            return;
-        }
-        $sourceContent = file_get_contents($sourceFile);
-        $targetContent = file_get_contents($targetFile);
-        if ($sourceContent === false || $targetContent === false) {
-            logMessage("[user:{$user}] Error reading file contents for comparison: {$file}");
-            return;
-        }
-        $sourceChecksum = sha1($sourceContent);
-        $targetChecksum = sha1($targetContent);
-        if ($sourceChecksum !== $targetChecksum) {
-            copyToUserSpace($sourceFile, $targetFile, $user);
-            logMessage("[user:{$user}] Updated skeleton file: {$file}");
-        }
+        return;
     }
+
+    if (!is_file($targetFile)) {
+        logMessage("[user:{$user}] Target path is not a regular file, skipping: {$file}");
+        return;
+    }
+    $sourceContent = file_get_contents($sourceFile);
+    $targetContent = file_get_contents($targetFile);
+    if ($sourceContent === false || $targetContent === false) {
+        logMessage("[user:{$user}] Error reading file contents for comparison: {$file}");
+        return;
+    }
+    if (sha1($sourceContent) === sha1($targetContent)) {
+        return;
+    }
+
+    copyToUserSpace($sourceFile, $targetFile, $user);
+    logMessage("[user:{$user}] Updated skeleton file: {$file}");
 }
 
 /**
@@ -370,25 +371,19 @@ function getPmssVersion($versionFile = '/etc/seedbox/config/version') {
 }
 
 // Backwards-compatible wrappers for legacy helper names.
-if (!function_exists('loadRepoTemplate')) {
-    function loadRepoTemplate(string $codename, ?callable $logger = null): string
-    {
-        return pmssLoadRepoTemplate($codename, $logger);
-    }
+function loadRepoTemplate(string $codename, ?callable $logger = null): string
+{
+    return pmssLoadRepoTemplate($codename, $logger);
 }
 
-if (!function_exists('safeWriteSources')) {
-    function safeWriteSources(string $content, string $label, ?callable $logger = null): bool
-    {
-        return pmssSafeWriteSources($content, $label, $logger);
-    }
+function safeWriteSources(string $content, string $label, ?callable $logger = null): bool
+{
+    return pmssSafeWriteSources($content, $label, $logger);
 }
 
-if (!function_exists('updateAptSources')) {
-    function updateAptSources(string $distroName, int $distroVersion, string $currentHash, array $repos, ?callable $logger = null): void
-    {
-        pmssUpdateAptSources($distroName, $distroVersion, $currentHash, $repos, $logger);
-    }
+function updateAptSources(string $distroName, int $distroVersion, string $currentHash, array $repos, ?callable $logger = null): void
+{
+    pmssUpdateAptSources($distroName, $distroVersion, $currentHash, $repos, $logger);
 }
 
 /** Generate /etc/motd using the template and system details */

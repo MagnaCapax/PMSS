@@ -8,70 +8,57 @@
  * @author PMSS Team
  */
 
-if (!function_exists('pmssOpenvpnFqdnFromHostname')) {
-    function pmssOpenvpnFqdnFromHostname(string $hostname): string
-    {
-        $hostname = trim($hostname);
-        if ($hostname === '') {
-            return '';
-        }
-        if (strpos($hostname, '.pulsedmedia.com') === false) {
-            return $hostname.'.pulsedmedia.com';
-        }
-        return $hostname;
+function pmssOpenvpnFqdnFromHostname(string $hostname): string
+{
+    $hostname = trim($hostname);
+    if ($hostname === '') {
+        return '';
     }
+    if (strpos($hostname, '.pulsedmedia.com') === false) {
+        return $hostname.'.pulsedmedia.com';
+    }
+    return $hostname;
 }
 
-if (!function_exists('pmssOpenvpnSlugFromHostname')) {
-    function pmssOpenvpnSlugFromHostname(string $hostname): string
-    {
-        $fqdn = pmssOpenvpnFqdnFromHostname($hostname);
-        return $fqdn === '' ? '' : str_replace('.', '-', $fqdn);
-    }
+function pmssOpenvpnSlugFromHostname(string $hostname): string
+{
+    $fqdn = pmssOpenvpnFqdnFromHostname($hostname);
+    return $fqdn === '' ? '' : str_replace('.', '-', $fqdn);
 }
 
-if (!function_exists('pmssOpenvpnSlug')) {
-    function pmssOpenvpnSlug(): string
-    {
-        $hostname = @file_get_contents('/etc/hostname');
-        $hostname = $hostname === false ? '' : trim($hostname);
-        return pmssOpenvpnSlugFromHostname($hostname);
-    }
+function pmssOpenvpnSlug(): string
+{
+    $hostname = @file_get_contents('/etc/hostname');
+    $hostname = $hostname === false ? '' : trim($hostname);
+    return pmssOpenvpnSlugFromHostname($hostname);
 }
 
-if (!function_exists('pmssOpenvpnArtifactPathsFromSlug')) {
-    function pmssOpenvpnArtifactPathsFromSlug(string $slug): array
-    {
-        $ovpn = $slug !== '' ? ('/home/openvpn-'.$slug.'.ovpn') : '';
-        $crt  = $slug !== '' ? ('/home/openvpn-'.$slug.'.crt') : '';
-        return [$ovpn, $crt];
-    }
+function pmssOpenvpnArtifactPathsFromSlug(string $slug): array
+{
+    $ovpn = $slug !== '' ? ('/home/openvpn-'.$slug.'.ovpn') : '';
+    $crt  = $slug !== '' ? ('/home/openvpn-'.$slug.'.crt') : '';
+    return [$ovpn, $crt];
 }
 
-if (!function_exists('pmssOpenvpnArtifactPaths')) {
-    function pmssOpenvpnArtifactPaths(): array
-    {
-        return pmssOpenvpnArtifactPathsFromSlug(pmssOpenvpnSlug());
-    }
+function pmssOpenvpnArtifactPaths(): array
+{
+    return pmssOpenvpnArtifactPathsFromSlug(pmssOpenvpnSlug());
 }
 
-if (!function_exists('pmssOpenvpnIsConfigured')) {
-    /**
-     * Return true if OpenVPN is configured (binary + server conf + CA + client artifacts).
-     */
-    function pmssOpenvpnIsConfigured(): bool
-    {
-        $bin = trim((string) @shell_exec('command -v openvpn 2>/dev/null'));
-        if ($bin === '') {
-            return false;
-        }
-        $serverConf = '/etc/openvpn/openvpn.conf';
-        $easyRsaDir = '/etc/openvpn/easy-rsa';
-        $hasServer  = is_file($serverConf);
-        $hasCa      = is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt');
-        list($ovpn, $crt) = pmssOpenvpnArtifactPaths();
-        $hasClient = ($ovpn !== '' && is_file($ovpn)) && ($crt !== '' && is_file($crt));
-        return $hasServer && $hasCa && $hasClient;
+/**
+ * Return true if OpenVPN is configured (binary + server conf + CA + client artifacts).
+ */
+function pmssOpenvpnIsConfigured(): bool
+{
+    $bin = trim((string) @shell_exec('command -v openvpn 2>/dev/null'));
+    if ($bin === '') {
+        return false;
     }
+    $serverConf = '/etc/openvpn/openvpn.conf';
+    $easyRsaDir = '/etc/openvpn/easy-rsa';
+    $hasServer  = is_file($serverConf);
+    $hasCa      = is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt');
+    list($ovpn, $crt) = pmssOpenvpnArtifactPaths();
+    $hasClient = ($ovpn !== '' && is_file($ovpn)) && ($crt !== '' && is_file($crt));
+    return $hasServer && $hasCa && $hasClient;
 }
-
