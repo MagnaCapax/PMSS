@@ -246,6 +246,201 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
     }
 }
 
+// Deluge web.conf parsing and writing helpers stay here because only the
+// lighttpd apply flow consumes them at runtime.
+function pmssDelugeSessionsListDetected(string $raw): bool
+{
+    return preg_match('/"sessions"\\s*:\\s*\\[\\s*\\]/', $raw) === 1;
+}
+
+function pmssDelugeNormalizeEmptySessionsObject(array &$config): bool
+{
+    if (!array_key_exists('sessions', $config) || !is_array($config['sessions']) || count($config['sessions']) !== 0) {
+        return false;
+    }
+
+    $config['sessions'] = (object) [];
+    return true;
+}
+
+function pmssDelugeReadWebConf(string $path): ?array
+{
+    $raw = @file_get_contents($path);
+    if (!is_string($raw)) {
+        return null;
+    }
+    if (strpos($raw, "\0") !== false) {
+        // Deluge web.conf is expected to be plain text JSON (two objects).
+        // Treat NUL bytes as corruption/malicious input and refuse to parse.
+        return null;
+    }
+
+    $length = strlen($raw);
+    $start = strspn($raw, " \t\n\r");
+    if ($start >= $length || $raw[$start] !== '{') {
+        return null;
+    }
+
+    $depth = 0;
+    $inString = false;
+    $escape = false;
+    $firstObjectEnd = null;
+    for ($index = $start; $index < $length; $index++) {
+        $ch = $raw[$index];
+        if ($inString) {
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+            if ($ch === '\\') {
+                $escape = true;
+                continue;
+            }
+            if ($ch === '"') {
+                $inString = false;
+            }
+            continue;
+        }
+        if ($ch === '"') {
+            $inString = true;
+            continue;
+        }
+        if ($ch === '{') {
+            $depth++;
+            continue;
+        }
+        if ($ch === '}') {
+            $depth--;
+            if ($depth === 0) {
+                $firstObjectEnd = $index + 1;
+                break;
+            }
+        }
+    }
+    if ($firstObjectEnd === null
+        || !is_array($meta = json_decode(substr($raw, $start, $firstObjectEnd - $start), true))
+        || !is_array($config = json_decode(ltrim(substr($raw, $firstObjectEnd)), true))) {
+        return null;
+    }
+
+    return ['meta' => $meta, 'config' => $config];
+}
+
+function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string $owner): bool
+{
+    $existingMode = @fileperms($path);
+    $mode = is_int($existingMode) ? ($existingMode & 0777) : 0600;
+
+    $metaJson = json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($metaJson === false || $configJson === false) {
+        return false;
+    }
+
+    $dir = dirname($path);
+    if (!is_dir($dir) || is_link($dir)) {
+        return false;
+    }
+    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
+    if ($tmp === false) {
+        return false;
+    }
+    if (file_put_contents($tmp, $metaJson.$configJson) === false) {
+        @unlink($tmp);
+        return false;
+    }
+
+    @chmod($tmp, $mode);
+    @chown($tmp, $owner);
+    @chgrp($tmp, $owner);
+
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        return false;
+    }
+
+    return true;
+}
+
+// Reverse proxy fragments stay with the lighttpd apply flow because the
+// runtime caller is the per-user config writer.
+function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
+{
+    return <<<LIGHTTPD
+# PMSS-managed: Deluge reverse proxy.
+# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.
+
+\$HTTP["url"] =~ "^/user-{$user}/deluge($|/)" {
+  auth.require = ()
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$webPort}
+  ) ) ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/user-{$user}/deluge/"  => "/",
+         "/user-{$user}/deluge" => ""
+       )
+  )
+}
+
+\$HTTP["url"] =~ "^/deluge-{$user}($|/)" {
+  auth.require = ()
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$webPort}
+  ) ) ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/deluge-{$user}/"  => "/user-{$user}/deluge/",
+         "/deluge-{$user}" => "/user-{$user}/deluge"
+       )
+  )
+}
+
+LIGHTTPD;
+}
+
+function pmssRcloneLighttpdProxyFragment(string $user, int $port): string
+{
+    return <<<LIGHTTPD
+# PMSS-managed: rclone reverse proxy.
+
+\$HTTP["url"] =~ "^/user-{$user}/rclone/" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$port}
+  ) ) )
+}
+
+LIGHTTPD;
+}
+
+function pmssQbittorrentLighttpdProxyFragment(string $user, int $port): string
+{
+    return <<<LIGHTTPD
+# PMSS-managed: qBittorrent reverse proxy.
+
+\$HTTP["url"] =~ "^/user-{$user}/qbittorrent/" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$port}
+  ) ) ),
+  proxy.forwarded = ( "for" => 1,
+                      "host" => 1,
+                      "by" => 1
+  ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/user-{$user}/qbittorrent/"  => "/",
+         "/user-{$user}/qbittorrent" => ""
+       )
+  )
+}
+
+LIGHTTPD;
+}
+
 function pmssUserConfigLighttpdConfigureUser(
     string $thisUser,
     string $portsDirectory,

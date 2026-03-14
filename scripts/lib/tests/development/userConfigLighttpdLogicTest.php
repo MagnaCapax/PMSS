@@ -185,6 +185,8 @@ LIGHTTPD;
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/userConfigLighttpd.php');
 
         $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';", $src);
+        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';") === false);
+        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';") === false);
         $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';") === false);
         $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';") === false);
         $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';") === false);
@@ -209,6 +211,13 @@ LIGHTTPD;
             'pmssComputePhpProcessPlan',
             'pmssShouldConfigureLighttpdForHome',
             'pmssEnsureWebdavLockDatabase',
+            'pmssDelugeSessionsListDetected',
+            'pmssDelugeNormalizeEmptySessionsObject',
+            'pmssDelugeReadWebConf',
+            'pmssDelugeWriteWebConf',
+            'pmssDelugeLighttpdProxyFragment',
+            'pmssRcloneLighttpdProxyFragment',
+            'pmssQbittorrentLighttpdProxyFragment',
         ] as $functionName) {
             $this->assertStringContainsString('function '.$functionName.'(', $src);
         }
