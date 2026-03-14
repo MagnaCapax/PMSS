@@ -9,7 +9,7 @@
  */
 
 require_once __DIR__.'/hostResourcesDetect.php';
-require_once dirname(__DIR__).'/runtime/commands.php';
+require_once dirname(__DIR__).'/../runtime.php';
 
 /**
  * Render and install LimitNOFILE drop-in for user@.service when configured.
