@@ -18,7 +18,6 @@ function pmssApplyRuntimeTemplates(): void
     runStep('Setting rc.local ownership', 'chown root:root /etc/rc.local');
     runStep('Setting rc.local permissions', 'chmod 750 /etc/rc.local');
     runStep('Executing rc.local to apply runtime tweaks', 'nohup /etc/rc.local >> /dev/null 2>&1');
-
     runStep('Installing systemd system.conf template', 'cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf');
     runStep('Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf');
     runStep('Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec');
@@ -47,8 +46,7 @@ function pmssEnsureAuthorizedKeysDirective(): void
         return;
     }
     logMessage('[START] Ensuring sshd AuthorizedKeysFile directive is enabled');
-    $updated = str_replace('#AuthorizedKeysFile', 'AuthorizedKeysFile', $config);
-    if ($config === $updated) {
+    if ($config === ($updated = str_replace('#AuthorizedKeysFile', 'AuthorizedKeysFile', $config))) {
         return;
     }
 

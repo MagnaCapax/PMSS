@@ -72,10 +72,7 @@ function pmssEnsureSystemdServicesGuardBootUnit(): void
     }
 
     $target = '/etc/systemd/system/pmss-systemd-services-guard.service';
-    runStep(
-        'Installing PMSS boot-time systemd services guard unit',
-        sprintf('install -m 0644 %s %s', escapeshellarg($template), escapeshellarg($target))
-    );
+    runStep('Installing PMSS boot-time systemd services guard unit', sprintf('install -m 0644 %s %s', escapeshellarg($template), escapeshellarg($target)));
     runStep('Reloading systemd unit files (PMSS services guard)', 'systemctl daemon-reload || true');
     runStep('Enabling PMSS boot-time services guard unit', 'systemctl enable pmss-systemd-services-guard.service || true');
 }
@@ -141,22 +138,13 @@ function pmssStopDisableMaskSeedboxSystemServices(): void
 
     // Exim can be reinstalled indirectly by distro package relationships,
     // so this flow keeps the host converged back to a no-exim state.
-    runStep(
-        'Purging exim4 packages',
-        aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light')
-    );
-    runStep(
-        'Autoremoving orphaned packages after exim4 purge',
-        aptCmd('autoremove -y')
-    );
+    runStep('Purging exim4 packages', aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light'));
+    runStep('Autoremoving orphaned packages after exim4 purge', aptCmd('autoremove -y'));
 
     // Deletion is intentionally limited to known exim4 spool directories
     // and uses one command per directory for predictable logging/retries.
     foreach (['/var/spool/exim4/input', '/var/spool/exim4/msglog', '/var/spool/exim4/db'] as $dir) {
-        runStep(
-            'Purging stale exim4 spool files in '.$dir,
-            'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true'
-        );
+        runStep('Purging stale exim4 spool files in '.$dir, 'find '.escapeshellarg($dir).' -xdev -type f -delete 2>/dev/null || true');
     }
 }
 

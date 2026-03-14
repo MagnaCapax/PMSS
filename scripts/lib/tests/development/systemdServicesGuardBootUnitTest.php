@@ -34,10 +34,10 @@ class SystemdServicesGuardBootUnitTest extends TestCase
             return (string) ($entry['command'] ?? '');
         }, $GLOBALS['PMSS_PROFILE'] ?? []);
 
-        $joined = implode("\n", $commands);
-        $this->assertTrue(strpos($joined, "install -m 0644 '".$template."' '/etc/systemd/system/pmss-systemd-services-guard.service'") !== false);
-        $this->assertTrue(strpos($joined, 'systemctl daemon-reload') !== false);
-        $this->assertTrue(strpos($joined, 'systemctl enable pmss-systemd-services-guard.service') !== false);
+        $this->assertEquals([
+            "install -m 0644 '".$template."' '/etc/systemd/system/pmss-systemd-services-guard.service'",
+            'systemctl daemon-reload || true',
+            'systemctl enable pmss-systemd-services-guard.service || true',
+        ], $commands);
     }
 }
-

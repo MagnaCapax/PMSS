@@ -50,5 +50,32 @@ class SystemdServiceDisableTest extends TestCase
         $this->assertTrue(strpos($joined, "find '/var/spool/exim4/input' -xdev -type f -delete") !== false);
         $this->assertTrue(strpos($joined, "find '/var/spool/exim4/msglog' -xdev -type f -delete") !== false);
         $this->assertTrue(strpos($joined, "find '/var/spool/exim4/db' -xdev -type f -delete") !== false);
+
+        $purgeIndex = array_search(
+            'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold purge -y exim4 exim4-base exim4-config exim4-daemon-light',
+            $commands,
+            true
+        );
+        $autoremoveIndex = array_search(
+            'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold autoremove -y',
+            $commands,
+            true
+        );
+        $inputIndex = array_search("find '/var/spool/exim4/input' -xdev -type f -delete 2>/dev/null || true", $commands, true);
+        $msglogIndex = array_search("find '/var/spool/exim4/msglog' -xdev -type f -delete 2>/dev/null || true", $commands, true);
+        $dbIndex = array_search("find '/var/spool/exim4/db' -xdev -type f -delete 2>/dev/null || true", $commands, true);
+
+        $this->assertTrue(
+            $purgeIndex !== false
+            && $autoremoveIndex !== false
+            && $inputIndex !== false
+            && $msglogIndex !== false
+            && $dbIndex !== false
+            && $purgeIndex < $autoremoveIndex
+            && $autoremoveIndex < $inputIndex
+            && $inputIndex < $msglogIndex
+            && $msglogIndex < $dbIndex,
+            'Expected exim purge, autoremove, and spool cleanup commands to remain ordered'
+        );
     }
 }

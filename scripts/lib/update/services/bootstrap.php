@@ -24,27 +24,26 @@ require_once __DIR__.'/../../runtime.php';
             return;
         }
 
-        $target = getenv('PMSS_HOSTNAME');
-        if ($target === false || trim($target) === '') {
-            $log('[SKIP] No hostname override provided');
-            return;
-        }
+    if (($hostname = trim((string) getenv('PMSS_HOSTNAME'))) === '') {
+        $log('[SKIP] No hostname override provided');
+        return;
+    }
 
-        $hostname = trim($target);
-        $hasHostnamectl = trim((string) @shell_exec('command -v hostnamectl')) !== '';
-        $command        = $hasHostnamectl
-            ? sprintf('hostnamectl set-hostname %s', escapeshellarg($hostname))
+    $hasHostnamectl = trim((string) @shell_exec('command -v hostnamectl')) !== '';
+    $command        = $hasHostnamectl
+        ? sprintf('hostnamectl set-hostname %s', escapeshellarg($hostname))
             : sprintf('hostname %s', escapeshellarg($hostname));
-        $description    = $hasHostnamectl ? 'Setting hostname via hostnamectl' : 'Setting hostname';
-        runStep($description, $command);
+    $description    = $hasHostnamectl ? 'Setting hostname via hostnamectl' : 'Setting hostname';
+    runStep($description, $command);
 
-        $existing = @file_get_contents('/etc/hostname');
-        if ($existing === false || trim($existing) !== $hostname) {
-            @file_put_contents('/etc/hostname', $hostname.PHP_EOL);
-            $log('Updated /etc/hostname to '.$hostname);
-        } else {
-            $log('[SKIP] /etc/hostname already set to '.$hostname);
-        }
+    $existing = @file_get_contents('/etc/hostname');
+    if ($existing !== false && trim($existing) === $hostname) {
+        $log('[SKIP] /etc/hostname already set to '.$hostname);
+        return;
+    }
+
+    @file_put_contents('/etc/hostname', $hostname.PHP_EOL);
+    $log('Updated /etc/hostname to '.$hostname);
     }
 
     /**
@@ -58,14 +57,15 @@ require_once __DIR__.'/../../runtime.php';
         ) {
             $log('[SKIP] Quota configuration skipped via PMSS_SKIP_QUOTA');
             return;
-        }
-
-        $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
-        pmssEnsureQuotaOptions($mount, null, $log);
-        if (is_dir($mount)) {
-            runStep('Remounting '.$mount.' to refresh quota options', sprintf('mount -o remount %s', escapeshellarg($mount)));
-            pmssWarnUnexpectedQuotaFiles($mount, $log);
-            return;
-        }
-        $log('[WARN] Skipping remount for '.$mount.' (mount path not found)');
     }
+
+    $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
+    pmssEnsureQuotaOptions($mount, null, $log);
+    if (!is_dir($mount)) {
+        $log('[WARN] Skipping remount for '.$mount.' (mount path not found)');
+        return;
+    }
+
+    runStep('Remounting '.$mount.' to refresh quota options', sprintf('mount -o remount %s', escapeshellarg($mount)));
+    pmssWarnUnexpectedQuotaFiles($mount, $log);
+}
