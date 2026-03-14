@@ -44,7 +44,9 @@ function pmssResourceSnapshotRun(): int
             @flock($fh, LOCK_EX);
         }
 
-        $users = pmssResourceLogLoadUsers();
+        $users = ($users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen'))
+            ? array_merge($users, ['www-data'])
+            : [];
         if (empty($users)) {
             return 0;
         }

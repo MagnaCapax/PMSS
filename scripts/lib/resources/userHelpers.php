@@ -19,14 +19,6 @@ function pmssResourceLogLookupUid(string $user): ?int
 }
 
 /**
- * Load users from listUsers.php and include service accounts when needed.
- */
-function pmssResourceLogLoadUsers(): array
-{
-    return ($users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen')) ? array_merge($users, ['www-data']) : [];
-}
-
-/**
  * Validate user entries from listUsers.php output.
  */
 function pmssResourceLogIsValidUser(string $user): bool
