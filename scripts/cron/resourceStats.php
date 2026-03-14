@@ -10,7 +10,7 @@
 require_once '/scripts/lib/resources/processor.php';
 
 $processor = new ResourceStatsProcessor(new resourceStatistics());
-(new ResourceStorage())->ensureRuntime();
+$processor->ensureRuntime();
 
 if (($user = $processor->detectWorkerUser($argv)) !== null) {
     if (!$processor->validateUser($user)) {

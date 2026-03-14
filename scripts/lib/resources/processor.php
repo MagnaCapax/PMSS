@@ -7,19 +7,20 @@
  */
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../resources.php';
-require_once __DIR__.'/storage.php';
 require_once __DIR__.'/accumulator.php';
 
 class ResourceStatsProcessor
 {
     /** @var resourceStatistics */
     private $stats;
-    /** @var ResourceStorage */
-    private $storage;
     /** @var string */
     private $resourceDir;
     /** @var string */
     private $homeDir;
+    /** @var string */
+    private $runtimeDir;
+    /** @var string */
+    private $statsDir;
     /** @var string */
     private $passwdFile;
 
@@ -27,15 +28,19 @@ class ResourceStatsProcessor
     {
         $this->resourceDir = rtrim($paths['resource_dir'] ?? getenv('PMSS_RESOURCE_DIR') ?: '/var/log/pmss/resources', '/');
         $this->homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
-        $runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+        $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+        $this->statsDir = rtrim($paths['stats_dir'] ?? $this->runtimeDir.'/resourceStats', '/');
         $this->passwdFile = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
 
         $this->stats = $stats;
-        $this->storage = new ResourceStorage([
-            'home_dir'    => $this->homeDir,
-            'runtime_dir' => $runtimeDir,
-            'stats_dir'   => $runtimeDir.'/resourceStats',
-        ]);
+    }
+
+    /** Ensure runtime directories exist before writing. */
+    public function ensureRuntime(): void
+    {
+        foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
+            is_dir($dir) || @mkdir($dir, $mode, true);
+        }
     }
 
     public function buildCompareTimes(): array
@@ -130,9 +135,68 @@ class ResourceStatsProcessor
         $data['tasks']['current'] = $results['current_tasks'];
         $data['daily'] = $results['daily'];
 
-        $this->storage->ensureRuntime();
-        $this->storage->save($user, $data);
+        $this->ensureRuntime();
+        $this->save($user, $data);
         logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$results['raw']['io_read']['month']}");
+    }
+
+    /** Persist user resource data to home directory and runtime cache. */
+    private function save(string $user, array $data): void
+    {
+        $serialized = serialize($data);
+        $homePath = $this->homeDir.'/'.$user;
+
+        if (is_dir($homePath)) {
+            $userPath = $homePath.'/.resourceData';
+            $this->setImmutable($userPath, false);
+            $this->writeAtomic($userPath, $serialized);
+            @chown($userPath, 'root');
+            $user !== '' && @chgrp($userPath, $user);
+            @chmod($userPath, 0640);
+            $this->setImmutable($userPath, true);
+        }
+
+        $runtimePath = $this->statsDir.'/'.$user;
+        $this->writeAtomic($runtimePath, $serialized);
+        @chown($runtimePath, 'root');
+        @chgrp($runtimePath, 'root');
+        @chmod($runtimePath, 0600);
+    }
+
+    /**
+     * Write payloads atomically to avoid partial truncation on interruption.
+     */
+    private function writeAtomic(string $path, string $payload): void
+    {
+        $tmp = $path.'.tmp.'.getmypid().'.'.mt_rand(1000, 9999);
+        if (@file_put_contents($tmp, $payload) === false || !@rename($tmp, $path)) {
+            @unlink($tmp);
+        }
+    }
+
+    /**
+     * Toggle immutable bit when supported (best-effort).
+     */
+    private function setImmutable(string $path, bool $enable): void
+    {
+        if (!is_file($path)) {
+            return;
+        }
+        static $chattrPath = null;
+        if ($chattrPath === null) {
+            $chattrPath = '';
+            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+                if (is_executable($candidate)) {
+                    $chattrPath = $candidate;
+                    break;
+                }
+            }
+        }
+        if ($chattrPath === '') {
+            return;
+        }
+        $flag = $enable ? '+i' : '-i';
+        @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
     }
 
     private function formatMetricDisplay(string $metric, array $rawTotals): array

@@ -63,6 +63,18 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertEquals('alice-1', $user);
     }
 
+    public function testEnsureRuntimeCreatesRuntimeDirectories(): void
+    {
+        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+
+        $this->assertTrue(!is_dir($this->paths['runtime_dir'].'/resourceStats'));
+
+        $processor->ensureRuntime();
+
+        $this->assertTrue(is_dir($this->paths['runtime_dir']));
+        $this->assertTrue(is_dir($this->paths['runtime_dir'].'/resourceStats'));
+    }
+
     public function testProcessUserPersistsMetricsAndDisplays(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
