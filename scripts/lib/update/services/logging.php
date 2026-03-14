@@ -136,157 +136,151 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
  * aborts the update process. Remote logging is optional infrastructure.
  */
 function pmssApplyRemoteLogging(?callable $logger = null): void
-    {
-        $log = pmssSelectLogger($logger);
-        $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-        $loggingConf = $cfgDir.'/logging.conf';
-        $template = $cfgDir.'/template.rsyslog-remote.conf';
-        $targetDir = pmssResolvePathFromEnv('PMSS_RSYSLOG_CONF_DIR', '/etc/rsyslog.d');
-        $target = $targetDir.'/50-pmss-remote.conf';
-        $skipRestart = getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
+{
+    $log = pmssSelectLogger($logger);
+    $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+    $loggingConf = $cfgDir.'/logging.conf';
+    $template = $cfgDir.'/template.rsyslog-remote.conf';
+    $targetDir = pmssResolvePathFromEnv('PMSS_RSYSLOG_CONF_DIR', '/etc/rsyslog.d');
+    $target = $targetDir.'/50-pmss-remote.conf';
+    $skipRestart = getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
 
-        // Check for logging.conf - if not present, silently skip (disabled by default)
-        if (!is_file($loggingConf)) {
-            // Silent skip - remote logging disabled by default
-            return;
-        }
-
-        $config = [
-            'enabled'  => false,
-            'host'     => '',
-            'port'     => 514,
-            'protocol' => 'tcp',
-        ];
-        if (is_readable($loggingConf) && ($rawConfig = @file_get_contents($loggingConf)) !== false && trim($rawConfig) !== '') {
-            $lines = preg_split('/\r?\n/', $rawConfig);
-            if (is_array($lines)) {
-                foreach ($lines as $line) {
-                    $line = trim($line);
-                    if ($line === '' || $line[0] === '#' || $line[0] === ';') {
-                        continue;
-                    }
-
-                    $parts = explode('=', $line, 2);
-                    if (count($parts) !== 2) {
-                        continue;
-                    }
-
-                    $key = strtolower(trim($parts[0]));
-                    $value = trim($parts[1]);
-
-                    switch ($key) {
-                        case 'remote_logging_enabled':
-                            $config['enabled'] = in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
-                            break;
-                        case 'remote_host':
-                            $config['host'] = $value;
-                            break;
-                        case 'remote_port':
-                            if (ctype_digit($value) && (int)$value > 0 && (int)$value <= 65535) {
-                                $config['port'] = (int)$value;
-                            }
-                            break;
-                        case 'remote_protocol':
-                            $lower = strtolower($value);
-                            if ($lower === 'tcp' || $lower === 'udp') {
-                                $config['protocol'] = $lower;
-                            }
-                            break;
-                    }
-                }
-            }
-        }
-
-        $invalidReason = '';
-        if (!$config['enabled']) {
-            $invalidReason = 'Remote logging not enabled';
-        } elseif ($config['host'] === '') {
-            $invalidReason = 'Remote host not configured';
-        } elseif (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host'])) {
-            $invalidReason = 'Invalid remote host format';
-        }
-
-        if ($invalidReason !== '') {
-            if ($config['enabled']) {
-                // Only warn if explicitly enabled but misconfigured
-                $log('[WARN] Remote logging enabled but invalid: '.$invalidReason);
-            }
-            // Ensure no stale config exists when disabled
-            if (is_file($target)) {
-                if (@unlink($target)) {
-                    $log('Removed remote logging config (disabled)');
-
-                    if (!$skipRestart) {
-                        runStep('Restarting rsyslog after removing remote forwarding', 'systemctl restart rsyslog');
-                    }
-                } else {
-                    $log('[WARN] Unable to remove remote logging config: '.$target);
-                }
-            }
-            return;
-        }
-
-        // Check template exists
-        if (!is_file($template)) {
-            $log('[WARN] Remote logging template missing: '.$template);
-            return;
-        }
-
-        $raw = @file_get_contents($template);
-        if ($raw === false) {
-            $log('[WARN] Unable to read remote logging template: '.$template);
-            return;
-        }
-
-        // Apply substitutions
-        $repl = [
-            '%%PMSS_RSYSLOG_REMOTE_HOST%%' => $config['host'],
-            '%%PMSS_RSYSLOG_REMOTE_PORT%%' => (string)$config['port'],
-            '%%PMSS_RSYSLOG_PROTOCOL%%'    => $config['protocol'],
-        ];
-        $rendered = strtr($raw, $repl);
-
-        // Deploy to rsyslog.d
-        if (!is_dir($targetDir)) {
-            // rsyslog not installed or unusual setup; skip silently
-            $log('[SKIP] rsyslog conf.d directory not found: '.$targetDir);
-            return;
-        }
-
-        $tmpTarget = $target.'.tmp';
-
-        if (@file_put_contents($tmpTarget, $rendered) === false) {
-            $log('[WARN] Unable to write remote logging config: '.$tmpTarget);
-            return;
-        }
-        @chmod($tmpTarget, 0644);
-
-        if (!@rename($tmpTarget, $target)) {
-            $log('[WARN] Unable to install remote logging config: '.$target);
-            @unlink($tmpTarget);
-            return;
-        }
-
-        $log(sprintf(
-            'Applied remote logging: %s:%d (%s)',
-            $config['host'],
-            $config['port'],
-            $config['protocol']
-        ));
-
-        // Restart rsyslog to apply changes (best-effort)
-        if ($skipRestart) {
-            pmssLogStatus('SKIP', 'Restarting rsyslog to apply remote forwarding (test/dry-run)');
-            return;
-        }
-
-        // Check if rsyslog service exists before attempting restart
-        $rsyslogActive = @file_exists('/lib/systemd/system/rsyslog.service')
-                      || @file_exists('/etc/init.d/rsyslog');
-        if (!$rsyslogActive) {
-            $log('[SKIP] rsyslog service not found; config deployed but service not restarted');
-            return;
-        }
-
-        runStep('Restarting rsyslog to apply remote forwarding', 'systemctl restart rsyslog');
+    // Check for logging.conf - if not present, silently skip (disabled by default)
+    if (!is_file($loggingConf)) {
+        // Silent skip - remote logging disabled by default
+        return;
     }
+
+    $config = [
+        'enabled'  => false,
+        'host'     => '',
+        'port'     => 514,
+        'protocol' => 'tcp',
+    ];
+    if (is_readable($loggingConf) && ($rawConfig = @file_get_contents($loggingConf)) !== false && trim($rawConfig) !== '') {
+        $lines = preg_split('/\r?\n/', $rawConfig);
+        if (is_array($lines)) {
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#' || $line[0] === ';') {
+                    continue;
+                }
+                if (count($parts = explode('=', $line, 2)) !== 2) {
+                    continue;
+                }
+
+                $key = strtolower(trim($parts[0]));
+                $value = trim($parts[1]);
+
+                switch ($key) {
+                    case 'remote_logging_enabled':
+                        $config['enabled'] = in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
+                        break;
+                    case 'remote_host':
+                        $config['host'] = $value;
+                        break;
+                    case 'remote_port':
+                        if (ctype_digit($value) && ($port = (int) $value) > 0 && $port <= 65535) {
+                            $config['port'] = $port;
+                        }
+                        break;
+                    case 'remote_protocol':
+                        if (in_array($lower = strtolower($value), ['tcp', 'udp'], true)) {
+                            $config['protocol'] = $lower;
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+    $invalidReason = '';
+    if (!$config['enabled']) {
+        $invalidReason = 'Remote logging not enabled';
+    } elseif ($config['host'] === '') {
+        $invalidReason = 'Remote host not configured';
+    } elseif (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host'])) {
+        $invalidReason = 'Invalid remote host format';
+    }
+
+    if ($invalidReason !== '') {
+        if ($config['enabled']) {
+            // Only warn if explicitly enabled but misconfigured
+            $log('[WARN] Remote logging enabled but invalid: '.$invalidReason);
+        }
+        // Ensure no stale config exists when disabled
+        if (is_file($target)) {
+            if (@unlink($target)) {
+                $log('Removed remote logging config (disabled)');
+
+                if (!$skipRestart) {
+                    runStep('Restarting rsyslog after removing remote forwarding', 'systemctl restart rsyslog');
+                }
+            } else {
+                $log('[WARN] Unable to remove remote logging config: '.$target);
+            }
+        }
+        return;
+    }
+
+    // Check template exists
+    if (!is_file($template)) {
+        $log('[WARN] Remote logging template missing: '.$template);
+        return;
+    }
+
+    $raw = @file_get_contents($template);
+    if ($raw === false) {
+        $log('[WARN] Unable to read remote logging template: '.$template);
+        return;
+    }
+
+    // Apply substitutions
+    $repl = [
+        '%%PMSS_RSYSLOG_REMOTE_HOST%%' => $config['host'],
+        '%%PMSS_RSYSLOG_REMOTE_PORT%%' => (string) $config['port'],
+        '%%PMSS_RSYSLOG_PROTOCOL%%'    => $config['protocol'],
+    ];
+    $rendered = strtr($raw, $repl);
+
+    // Deploy to rsyslog.d
+    if (!is_dir($targetDir)) {
+        // rsyslog not installed or unusual setup; skip silently
+        $log('[SKIP] rsyslog conf.d directory not found: '.$targetDir);
+        return;
+    }
+
+    $tmpTarget = $target.'.tmp';
+    if (@file_put_contents($tmpTarget, $rendered) === false) {
+        $log('[WARN] Unable to write remote logging config: '.$tmpTarget);
+        return;
+    }
+    @chmod($tmpTarget, 0644);
+
+    if (!@rename($tmpTarget, $target)) {
+        $log('[WARN] Unable to install remote logging config: '.$target);
+        @unlink($tmpTarget);
+        return;
+    }
+
+    $log(sprintf(
+        'Applied remote logging: %s:%d (%s)',
+        $config['host'],
+        $config['port'],
+        $config['protocol']
+    ));
+
+    // Restart rsyslog to apply changes (best-effort)
+    if ($skipRestart) {
+        pmssLogStatus('SKIP', 'Restarting rsyslog to apply remote forwarding (test/dry-run)');
+        return;
+    }
+
+    // Check if rsyslog service exists before attempting restart
+    if (!@file_exists('/lib/systemd/system/rsyslog.service') && !@file_exists('/etc/init.d/rsyslog')) {
+        $log('[SKIP] rsyslog service not found; config deployed but service not restarted');
+        return;
+    }
+
+    runStep('Restarting rsyslog to apply remote forwarding', 'systemctl restart rsyslog');
+}

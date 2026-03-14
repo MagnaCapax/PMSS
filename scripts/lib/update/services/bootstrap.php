@@ -11,18 +11,18 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/quota.php';
 require_once __DIR__.'/../../runtime.php';
 
-    /**
-     * Apply hostname overrides provided by the installer.
-     */
-    function pmssApplyHostnameConfig(?callable $logger = null): void
-    {
-        $log   = pmssSelectLogger($logger);
-        if (($skipEnv = getenv('PMSS_SKIP_HOSTNAME')) !== false
-            && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
-        ) {
-            $log('[SKIP] Hostname configuration skipped via PMSS_SKIP_HOSTNAME');
-            return;
-        }
+/**
+ * Apply hostname overrides provided by the installer.
+ */
+function pmssApplyHostnameConfig(?callable $logger = null): void
+{
+    $log = pmssSelectLogger($logger);
+    if (($skipEnv = getenv('PMSS_SKIP_HOSTNAME')) !== false
+        && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
+    ) {
+        $log('[SKIP] Hostname configuration skipped via PMSS_SKIP_HOSTNAME');
+        return;
+    }
 
     if (($hostname = trim((string) getenv('PMSS_HOSTNAME'))) === '') {
         $log('[SKIP] No hostname override provided');
@@ -30,33 +30,31 @@ require_once __DIR__.'/../../runtime.php';
     }
 
     $hasHostnamectl = trim((string) @shell_exec('command -v hostnamectl')) !== '';
-    $command        = $hasHostnamectl
-        ? sprintf('hostnamectl set-hostname %s', escapeshellarg($hostname))
-            : sprintf('hostname %s', escapeshellarg($hostname));
-    $description    = $hasHostnamectl ? 'Setting hostname via hostnamectl' : 'Setting hostname';
-    runStep($description, $command);
+    runStep(
+        $hasHostnamectl ? 'Setting hostname via hostnamectl' : 'Setting hostname',
+        sprintf($hasHostnamectl ? 'hostnamectl set-hostname %s' : 'hostname %s', escapeshellarg($hostname))
+    );
 
-    $existing = @file_get_contents('/etc/hostname');
-    if ($existing !== false && trim($existing) === $hostname) {
+    if (is_string($existing = @file_get_contents('/etc/hostname')) && trim($existing) === $hostname) {
         $log('[SKIP] /etc/hostname already set to '.$hostname);
         return;
     }
 
     @file_put_contents('/etc/hostname', $hostname.PHP_EOL);
     $log('Updated /etc/hostname to '.$hostname);
-    }
+}
 
-    /**
-     * Ensure quota options exist for the requested mount and remount it.
-     */
-    function pmssConfigureQuotaMount(?callable $logger = null): void
-    {
-        $log = pmssSelectLogger($logger);
-        if (($skipEnv = getenv('PMSS_SKIP_QUOTA')) !== false
-            && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
-        ) {
-            $log('[SKIP] Quota configuration skipped via PMSS_SKIP_QUOTA');
-            return;
+/**
+ * Ensure quota options exist for the requested mount and remount it.
+ */
+function pmssConfigureQuotaMount(?callable $logger = null): void
+{
+    $log = pmssSelectLogger($logger);
+    if (($skipEnv = getenv('PMSS_SKIP_QUOTA')) !== false
+        && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
+    ) {
+        $log('[SKIP] Quota configuration skipped via PMSS_SKIP_QUOTA');
+        return;
     }
 
     $mount = trim(pmssResolvePathFromEnv('PMSS_QUOTA_MOUNT', '/home'));
