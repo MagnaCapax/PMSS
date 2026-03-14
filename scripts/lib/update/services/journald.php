@@ -53,19 +53,6 @@ require_once __DIR__.'/../runtime/commands.php';
     }
 
     /**
-     * Format a byte count into journald-friendly units (GiB/MiB).
-     */
-    function pmssJournaldFormatSize(int $bytes): string
-    {
-        $gib = 1024 * 1024 * 1024;
-        if ($bytes > 0 && ($bytes % $gib) === 0) {
-            return (string) ($bytes / $gib).'G';
-        }
-
-        return (string) max(1, (int) floor($bytes / (1024 * 1024))).'M';
-    }
-
-    /**
      * Render and install journald limits template, then restart journald.
      */
     function pmssApplyJournaldLimits(?callable $logger = null): void
@@ -89,10 +76,21 @@ require_once __DIR__.'/../runtime/commands.php';
         }
 
         $policy = pmssJournaldLimitsForRootBytes($rootBytes);
+        $formattedPolicy = [];
+        $gib = 1024 * 1024 * 1024;
+        foreach ([
+            '%%PMSS_JOURNALD_SYSTEM_MAX_USE%%' => $policy['system_max_use_bytes'],
+            '%%PMSS_JOURNALD_SYSTEM_KEEP_FREE%%' => $policy['system_keep_free_bytes'],
+            '%%PMSS_JOURNALD_RUNTIME_MAX_USE%%' => $policy['runtime_max_use_bytes'],
+        ] as $placeholder => $bytes) {
+            $formattedPolicy[$placeholder] = ($bytes > 0 && ($bytes % $gib) === 0)
+                ? (string) ($bytes / $gib).'G'
+                : (string) max(1, (int) floor($bytes / (1024 * 1024))).'M';
+        }
         $repl = [
-            '%%PMSS_JOURNALD_SYSTEM_MAX_USE%%'    => pmssJournaldFormatSize($policy['system_max_use_bytes']),
-            '%%PMSS_JOURNALD_SYSTEM_KEEP_FREE%%'  => pmssJournaldFormatSize($policy['system_keep_free_bytes']),
-            '%%PMSS_JOURNALD_RUNTIME_MAX_USE%%'   => pmssJournaldFormatSize($policy['runtime_max_use_bytes']),
+            '%%PMSS_JOURNALD_SYSTEM_MAX_USE%%'    => $formattedPolicy['%%PMSS_JOURNALD_SYSTEM_MAX_USE%%'],
+            '%%PMSS_JOURNALD_SYSTEM_KEEP_FREE%%'  => $formattedPolicy['%%PMSS_JOURNALD_SYSTEM_KEEP_FREE%%'],
+            '%%PMSS_JOURNALD_RUNTIME_MAX_USE%%'   => $formattedPolicy['%%PMSS_JOURNALD_RUNTIME_MAX_USE%%'],
             '%%PMSS_JOURNALD_RATE_LIMIT_INTERVAL%%' => $policy['rate_limit_interval_sec'].'s',
             '%%PMSS_JOURNALD_RATE_LIMIT_BURST%%'    => (string)$policy['rate_limit_burst'],
         ];
