@@ -9,7 +9,6 @@
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../../runtime.php';
 
-if (!function_exists('pmssEnsureQuotaOptions')) {
     /**
      * Ensure the given mount point in /etc/fstab contains the quota options.
      */
@@ -91,9 +90,7 @@ if (!function_exists('pmssEnsureQuotaOptions')) {
             }
         }
     }
-}
 
-if (!function_exists('pmssWarnUnexpectedQuotaFiles')) {
     /**
      * Warn if quota state files under the mount point have unexpected names.
      *
@@ -130,4 +127,3 @@ if (!function_exists('pmssWarnUnexpectedQuotaFiles')) {
         sort($unexpected, SORT_STRING);
         $log('[WARN] Unexpected quota files under '.$mountPoint.': '.implode(', ', $unexpected));
     }
-}

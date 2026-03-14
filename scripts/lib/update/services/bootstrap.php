@@ -11,7 +11,6 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/quota.php';
 require_once __DIR__.'/../../runtime.php';
 
-if (!function_exists('pmssApplyHostnameConfig')) {
     /**
      * Apply hostname overrides provided by the installer.
      */
@@ -51,9 +50,7 @@ if (!function_exists('pmssApplyHostnameConfig')) {
             $log('[SKIP] /etc/hostname already set to '.$hostname);
         }
     }
-}
 
-if (!function_exists('pmssConfigureQuotaMount')) {
     /**
      * Ensure quota options exist for the requested mount and remount it.
      */
@@ -80,4 +77,3 @@ if (!function_exists('pmssConfigureQuotaMount')) {
         }
         $log('[WARN] Skipping remount for '.$mount.' (mount path not found)');
     }
-}

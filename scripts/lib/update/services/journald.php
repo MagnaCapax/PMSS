@@ -8,7 +8,6 @@
 
 require_once __DIR__.'/../runtime/commands.php';
 
-if (!function_exists('pmssJournaldRootFilesystemBytes')) {
     /**
      * Return the root filesystem size in bytes, or 0 on failure.
      */
@@ -23,9 +22,7 @@ if (!function_exists('pmssJournaldRootFilesystemBytes')) {
             ? (int) $bytes
             : 0;
     }
-}
 
-if (!function_exists('pmssJournaldLimitsForRootBytes')) {
     /**
      * Compute journald caps based on root filesystem size.
      *
@@ -54,9 +51,7 @@ if (!function_exists('pmssJournaldLimitsForRootBytes')) {
             'rate_limit_burst'       => 2000,
         ];
     }
-}
 
-if (!function_exists('pmssJournaldFormatSize')) {
     /**
      * Format a byte count into journald-friendly units (GiB/MiB).
      */
@@ -69,9 +64,7 @@ if (!function_exists('pmssJournaldFormatSize')) {
 
         return (string) max(1, (int) floor($bytes / (1024 * 1024))).'M';
     }
-}
 
-if (!function_exists('pmssApplyJournaldLimits')) {
     /**
      * Render and install journald limits template, then restart journald.
      */
@@ -142,4 +135,3 @@ if (!function_exists('pmssApplyJournaldLimits')) {
         }
         runStep('Restarting systemd-journald to apply log caps', 'systemctl restart systemd-journald');
     }
-}

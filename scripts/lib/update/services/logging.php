@@ -17,7 +17,6 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../../runtime.php';
 
-if (!function_exists('pmssParseLoggingConfig')) {
     /**
      * Parse the logging.conf file and return configuration array.
      *
@@ -91,9 +90,7 @@ if (!function_exists('pmssParseLoggingConfig')) {
 
         return $config;
     }
-}
 
-if (!function_exists('pmssValidateLoggingConfig')) {
     /**
      * Validate that a logging configuration is deployable.
      *
@@ -117,9 +114,7 @@ if (!function_exists('pmssValidateLoggingConfig')) {
 
         return ['valid' => true, 'error' => ''];
     }
-}
 
-if (!function_exists('pmssApplyRemoteLogging')) {
     /**
      * Deploy rsyslog remote forwarding configuration if enabled.
      *
@@ -220,9 +215,7 @@ if (!function_exists('pmssApplyRemoteLogging')) {
 
         runStep('Restarting rsyslog to apply remote forwarding', 'systemctl restart rsyslog');
     }
-}
 
-if (!function_exists('pmssRemoveRemoteLoggingConfig')) {
     /**
      * Remove the remote logging rsyslog config when disabled.
      *
@@ -251,4 +244,3 @@ if (!function_exists('pmssRemoveRemoteLoggingConfig')) {
             $log('[WARN] Unable to remove remote logging config: '.$target);
         }
     }
-}
