@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/userHelpers.php';
+require_once __DIR__.'/log.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 
 /**

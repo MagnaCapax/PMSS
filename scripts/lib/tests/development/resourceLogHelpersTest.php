@@ -98,6 +98,14 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));
     }
 
+    public function testLegacyUserHelpersPathStillExportsFunctions(): void
+    {
+        $script = 'require_once '.var_export(dirname(__DIR__, 2).'/resources/userHelpers.php', true).';'
+            .'echo (function_exists("pmssResourceLogLookupUid") && function_exists("pmssResourceLogIsValidUser")) ? "ok" : "fail";';
+        $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script);
+        $this->assertEquals('ok', trim((string) @shell_exec($command)));
+    }
+
     public function testReadCountersParsesSystemctlOutput(): void
     {
         $this->withFakeSystemctl([

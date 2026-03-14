@@ -6,7 +6,29 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/userHelpers.php';
+/**
+ * Resolve a username to its UID with a POSIX-first fallback.
+ */
+function pmssResourceLogLookupUid(string $user): ?int
+{
+    if (function_exists('posix_getpwnam') && is_array($info = @posix_getpwnam($user)) && isset($info['uid'])) {
+        return (int) $info['uid'];
+    }
+    $out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
+    return ctype_digit($out) ? (int) $out : null;
+}
+
+/**
+ * Validate user entries from listUsers.php output.
+ */
+function pmssResourceLogIsValidUser(string $user): bool
+{
+    return (function_exists('pmssNormalizeUsername') ? pmssNormalizeUsername($user) : strtolower($user)) === $user
+        && preg_match('/^[a-z0-9-]+$/', $user)
+        && ($user === 'www-data'
+        || !function_exists('pmssValidateUsername')
+        || pmssValidateUsername($user));
+}
 
 /**
  * Ensure a directory exists and is safe for resource logging.
@@ -45,8 +67,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
         'IOReadOperations' => 'io_read_ops',
         'IOWriteOperations' => 'io_write_ops',
     ];
-    $requiredFields = ['io_read', 'io_write', 'cpu_nsec', 'memory', 'tasks'];
-    $values = array_fill_keys($requiredFields, null) + ['io_read_ops' => 0, 'io_write_ops' => 0];
+    $values = ['io_read_ops' => 0, 'io_write_ops' => 0];
 
     foreach (preg_split('/\r?\n/', trim($out)) as $line) {
         $parts = explode('=', $line, 2);
@@ -56,7 +77,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
         $values[$field] = (int) $parts[1];
     }
 
-    foreach ($requiredFields as $field) {
+    foreach (['io_read', 'io_write', 'cpu_nsec', 'memory', 'tasks'] as $field) {
         if (!isset($values[$field])) {
             return null;
         }
