@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/update/systemPrep/systemdSlicesEnsure.php';
+require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 {
@@ -78,10 +78,57 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
     public function testInstallsLogNamespaceDropin(): void
     {
+        $cfgDir = $this->tempDir('cfg');
+        $sliceDir = $this->tempDir('slice');
         $dir = $this->tempDir('log-namespace');
-        $this->withDropinDir($dir, function (): void {
-            \pmssSystemdUserManagerLogNamespaceInstall(function (): void {
-            });
+        file_put_contents(
+            $cfgDir.'/template.cgroup.user-slice.v2.conf',
+            "[Slice]\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n"
+        );
+
+        $previousConfigDir = getenv('PMSS_CONFIG_DIR');
+        $previousSliceDir = getenv('PMSS_SYSTEMD_USER_SLICE_DIR');
+        $previousMode = getenv('PMSS_CGROUP_MODE');
+        $previousMem = getenv('PMSS_TOTAL_MEM_MIB');
+        $previousCpu = getenv('PMSS_TOTAL_CPU_THREADS');
+
+        $this->withDropinDir($dir, function () use ($cfgDir, $sliceDir, $previousConfigDir, $previousSliceDir, $previousMode, $previousMem, $previousCpu): void {
+            putenv('PMSS_CONFIG_DIR='.$cfgDir);
+            putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$sliceDir);
+            putenv('PMSS_CGROUP_MODE=v2');
+            putenv('PMSS_TOTAL_MEM_MIB=4096');
+            putenv('PMSS_TOTAL_CPU_THREADS=4');
+
+            try {
+                \pmssEnsureSystemdSlices(function (): void {
+                });
+            } finally {
+                if ($previousConfigDir === false) {
+                    putenv('PMSS_CONFIG_DIR');
+                } else {
+                    putenv('PMSS_CONFIG_DIR='.$previousConfigDir);
+                }
+                if ($previousSliceDir === false) {
+                    putenv('PMSS_SYSTEMD_USER_SLICE_DIR');
+                } else {
+                    putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$previousSliceDir);
+                }
+                if ($previousMode === false) {
+                    putenv('PMSS_CGROUP_MODE');
+                } else {
+                    putenv('PMSS_CGROUP_MODE='.$previousMode);
+                }
+                if ($previousMem === false) {
+                    putenv('PMSS_TOTAL_MEM_MIB');
+                } else {
+                    putenv('PMSS_TOTAL_MEM_MIB='.$previousMem);
+                }
+                if ($previousCpu === false) {
+                    putenv('PMSS_TOTAL_CPU_THREADS');
+                } else {
+                    putenv('PMSS_TOTAL_CPU_THREADS='.$previousCpu);
+                }
+            }
         });
 
         $target = $dir.'/30-pmss-log-namespace.conf';

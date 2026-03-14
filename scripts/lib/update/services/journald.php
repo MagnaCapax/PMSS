@@ -9,21 +9,6 @@
 require_once __DIR__.'/../runtime/commands.php';
 
     /**
-     * Return the root filesystem size in bytes, or 0 on failure.
-     */
-    function pmssJournaldRootFilesystemBytes(): int
-    {
-        $override = getenv('PMSS_ROOT_FS_BYTES');
-        if (is_string($override) && $override !== '' && ctype_digit($override)) {
-            return (int)$override;
-        }
-
-        return (($bytes = @disk_total_space('/')) !== false && is_numeric($bytes) && $bytes > 0)
-            ? (int) $bytes
-            : 0;
-    }
-
-    /**
      * Compute journald caps based on root filesystem size.
      *
      * @return array{system_max_use_bytes:int,system_keep_free_bytes:int,runtime_max_use_bytes:int,rate_limit_interval_sec:int,rate_limit_burst:int}
@@ -65,7 +50,11 @@ require_once __DIR__.'/../runtime/commands.php';
             return;
         }
 
-        if (($rootBytes = pmssJournaldRootFilesystemBytes()) <= 0) {
+        $override = getenv('PMSS_ROOT_FS_BYTES');
+        $rootBytes = (is_string($override) && $override !== '' && ctype_digit($override))
+            ? (int) $override
+            : (((($bytes = @disk_total_space('/')) !== false) && is_numeric($bytes) && $bytes > 0) ? (int) $bytes : 0);
+        if ($rootBytes <= 0) {
             $log('[WARN] Unable to determine root filesystem size; skipping journald limits');
             return;
         }

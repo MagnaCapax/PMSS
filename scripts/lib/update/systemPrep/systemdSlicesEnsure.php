@@ -50,37 +50,6 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
 }
 
 /**
- * Install user@ manager log namespace drop-in.
- *
- * This keeps per-user manager/service logs in dedicated journald
- * namespaces, reducing cross-tenant log mixing in shared environments.
- */
-function pmssSystemdUserManagerLogNamespaceInstall(callable $log): void
-{
-    $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
-    if (!is_dir($dropDir) && !@mkdir($dropDir, 0755, true)) {
-        $log('[WARN] Failed to create user@.service drop-in dir '.$dropDir);
-        return;
-    }
-
-    $target = $dropDir.'/30-pmss-log-namespace.conf';
-    $body = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
-    if (@file_put_contents($tmpTarget = $target.'.tmp', $body) === false) {
-        $log('[WARN] Failed to write temp user@.service log namespace drop-in '.$tmpTarget);
-        return;
-    }
-    @chmod($tmpTarget, 0644);
-
-    if (!@rename($tmpTarget, $target)) {
-        $log('[WARN] Failed to install user@.service log namespace drop-in '.$target);
-        @unlink($tmpTarget);
-        return;
-    }
-
-    $log('Installed '.$target.' with LogNamespace=user-%i');
-}
-
-/**
  * Render and install the user-.slice drop-in.
  *
  * @return int|null The computed TasksMax, or null on failure.
@@ -211,7 +180,24 @@ function pmssSystemdSlicesDropinInstall(
 
     // Keep user manager logs isolated by namespace to reduce
     // cross-tenant journald mixing on shared hosts.
-    pmssSystemdUserManagerLogNamespaceInstall($log);
+    $userAtDropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
+    if (!is_dir($userAtDropDir) && !@mkdir($userAtDropDir, 0755, true)) {
+        $log('[WARN] Failed to create user@.service drop-in dir '.$userAtDropDir);
+        return $tasksMax;
+    }
+    $userAtTarget = $userAtDropDir.'/30-pmss-log-namespace.conf';
+    $userAtBody = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
+    if (@file_put_contents($userAtTmpTarget = $userAtTarget.'.tmp', $userAtBody) === false) {
+        $log('[WARN] Failed to write temp user@.service log namespace drop-in '.$userAtTmpTarget);
+        return $tasksMax;
+    }
+    @chmod($userAtTmpTarget, 0644);
+    if (!@rename($userAtTmpTarget, $userAtTarget)) {
+        $log('[WARN] Failed to install user@.service log namespace drop-in '.$userAtTarget);
+        @unlink($userAtTmpTarget);
+        return $tasksMax;
+    }
+    $log('Installed '.$userAtTarget.' with LogNamespace=user-%i');
 
     return $tasksMax;
 }
