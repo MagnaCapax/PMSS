@@ -58,8 +58,7 @@ function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask)
  */
 function pmssEnsureSystemdServicesGuardBootUnit(): void
 {
-    $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    if (!$dryRun && !is_dir('/run/systemd/system')) {
+    if (getenv('PMSS_DRY_RUN') !== '1' && !is_dir('/run/systemd/system')) {
         pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (systemd unavailable)');
         return;
     }
@@ -174,10 +173,8 @@ function pmssStopDisableMaskSeedboxSystemServices(): void
  */
 function pmssPurgeFailedUnbound(): void
 {
-    $dryRun = getenv('PMSS_DRY_RUN') === '1';
-
     // Skip if systemd is not available (containers, very old systems)
-    if (!$dryRun && !is_dir('/run/systemd/system')) {
+    if (getenv('PMSS_DRY_RUN') !== '1' && !is_dir('/run/systemd/system')) {
         pmssLogStatus('SKIP', 'Checking unbound service status (systemd unavailable)');
         return;
     }

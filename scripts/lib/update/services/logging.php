@@ -31,6 +31,7 @@ require_once __DIR__.'/../../runtime.php';
         $template = $cfgDir.'/template.rsyslog-remote.conf';
         $targetDir = pmssResolvePathFromEnv('PMSS_RSYSLOG_CONF_DIR', '/etc/rsyslog.d');
         $target = $targetDir.'/50-pmss-remote.conf';
+        $skipRestart = getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
 
         // Check for logging.conf - if not present, silently skip (disabled by default)
         if (!is_file($loggingConf)) {
@@ -103,9 +104,7 @@ require_once __DIR__.'/../../runtime.php';
                 if (@unlink($target)) {
                     $log('Removed remote logging config (disabled)');
 
-                    $dryRun = getenv('PMSS_DRY_RUN') === '1';
-                    $testMode = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true;
-                    if (!$dryRun && !$testMode) {
+                    if (!$skipRestart) {
                         runStep('Restarting rsyslog after removing remote forwarding', 'systemctl restart rsyslog');
                     }
                 } else {
@@ -164,9 +163,7 @@ require_once __DIR__.'/../../runtime.php';
         ));
 
         // Restart rsyslog to apply changes (best-effort)
-        $dryRun = getenv('PMSS_DRY_RUN') === '1';
-        $testMode = defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true;
-        if ($dryRun || $testMode) {
+        if ($skipRestart) {
             pmssLogStatus('SKIP', 'Restarting rsyslog to apply remote forwarding (test/dry-run)');
             return;
         }

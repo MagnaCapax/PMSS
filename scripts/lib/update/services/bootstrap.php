@@ -17,18 +17,14 @@ require_once __DIR__.'/../../runtime.php';
     function pmssApplyHostnameConfig(?callable $logger = null): void
     {
         $log   = pmssSelectLogger($logger);
-        $skipEnv = getenv('PMSS_SKIP_HOSTNAME');
-        $skip = false;
-        if ($skipEnv !== false) {
-            $normalised = strtolower(trim($skipEnv));
-            $skip = !in_array($normalised, ['', '0', 'false', 'no'], true);
-        }
-        $target = getenv('PMSS_HOSTNAME');
-
-        if ($skip) {
+        if (($skipEnv = getenv('PMSS_SKIP_HOSTNAME')) !== false
+            && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
+        ) {
             $log('[SKIP] Hostname configuration skipped via PMSS_SKIP_HOSTNAME');
             return;
         }
+
+        $target = getenv('PMSS_HOSTNAME');
         if ($target === false || trim($target) === '') {
             $log('[SKIP] No hostname override provided');
             return;
@@ -57,13 +53,9 @@ require_once __DIR__.'/../../runtime.php';
     function pmssConfigureQuotaMount(?callable $logger = null): void
     {
         $log = pmssSelectLogger($logger);
-        $skipEnv = getenv('PMSS_SKIP_QUOTA');
-        $skip = false;
-        if ($skipEnv !== false) {
-            $normalised = strtolower(trim($skipEnv));
-            $skip = !in_array($normalised, ['', '0', 'false', 'no'], true);
-        }
-        if ($skip) {
+        if (($skipEnv = getenv('PMSS_SKIP_QUOTA')) !== false
+            && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
+        ) {
             $log('[SKIP] Quota configuration skipped via PMSS_SKIP_QUOTA');
             return;
         }
