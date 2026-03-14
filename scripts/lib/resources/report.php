@@ -13,12 +13,10 @@
  */
 function pmssResourceBuildReport(string $statsDir, array $users): array
 {
-    $missingStats = [];
-    $rows = [];
-
+    $missingStats = $rows = [];
     $windows = ['month', 'week', 'day', 'hour'];
-    $windowZeros = array_fill_keys($windows, 0.0);
     $metrics = ['io_read', 'io_write', 'cpu', 'ram_hours', 'io_read_ops', 'io_write_ops'];
+    $windowZeros = array_fill_keys($windows, 0.0);
     $totals = array_fill_keys($metrics, $windowZeros) + array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
 
     foreach ($users as $thisUser) {

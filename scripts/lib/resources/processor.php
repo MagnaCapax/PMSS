@@ -72,16 +72,14 @@ class ResourceStatsProcessor
 
     public function validateUser(string $user): bool
     {
-        $path = $this->resourceDir.'/'.$user;
-        $homePath = $this->homeDir.'/'.$user;
-        if (!is_readable($path)) {
+        if (!is_readable($this->resourceDir.'/'.$user)) {
             return false;
         }
 
         $passwd = @file_get_contents($this->passwdFile);
         return $passwd !== false
             && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1
-            && is_dir($homePath);
+            && is_dir($this->homeDir.'/'.$user);
     }
 
     /** Process and persist resource statistics for a single user. */

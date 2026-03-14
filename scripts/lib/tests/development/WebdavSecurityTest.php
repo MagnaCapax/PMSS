@@ -545,18 +545,6 @@ LIGHTTPD;
     // =========================================================================
 
     /**
-     * TEST 23: Module detection returns correct type
-     *
-     * HARDENS: pmssLighttpdWebdavModulePresent() must return boolean.
-     */
-    public function testModuleDetectionReturnsBool(): void
-    {
-        $result = pmssLighttpdWebdavModulePresent();
-
-        $this->assertIsBool($result);
-    }
-
-    /**
      * TEST 24: Lock file path is user-specific and secure
      *
      * HARDENS: Lock database must be in user private directory.

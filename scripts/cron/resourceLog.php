@@ -16,12 +16,11 @@ if (!pmssResourceLogEnsureDir($logDir, 0755) || !pmssResourceLogEnsureDir($state
     exit(1);
 }
 
-$users = ($users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen'))
-    ? array_merge($users, ['www-data'])
-    : [];
-if (empty($users)) {
+$users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
+if ($users === []) {
     exit(0);
 }
+$users[] = 'www-data';
 
 foreach ($users as $user) {
     if (!pmssResourceLogIsValidUser($user)

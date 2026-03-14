@@ -44,12 +44,11 @@ function pmssResourceSnapshotRun(): int
             @flock($fh, LOCK_EX);
         }
 
-        $users = ($users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen'))
-            ? array_merge($users, ['www-data'])
-            : [];
-        if (empty($users)) {
+        $users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
+        if ($users === []) {
             return 0;
         }
+        $users[] = 'www-data';
 
         $stats = new resourceStatistics();
         $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
@@ -78,26 +77,24 @@ function pmssResourceSnapshotRun(): int
                 }
             }
 
-            if ($metrics === null) {
-                if (($dataLines = trim($stats->getData($user, 350))) !== '') {
-                    $threshold = time() - (24 * 60 * 60);
-                    $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
-                    foreach (array_filter(explode("\n", $dataLines)) as $line) {
-                        $parsed = $stats->parseLine($line);
-                        if ($parsed === false || $parsed['timestamp'] < $threshold) {
-                            continue;
-                        }
-                        $accumulator->addSample($parsed);
+            if ($metrics === null && ($dataLines = trim($stats->getData($user, 350))) !== '') {
+                $threshold = time() - (24 * 60 * 60);
+                $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
+                foreach (array_filter(explode("\n", $dataLines)) as $line) {
+                    $parsed = $stats->parseLine($line);
+                    if ($parsed === false || $parsed['timestamp'] < $threshold) {
+                        continue;
                     }
-                    if ($accumulator->hasSamples()) {
-                        $results = $accumulator->results();
-                        $metrics = [
-                            'memory' => $results['memory']['day'],
-                            'tasks' => $results['tasks']['day'],
-                        ];
-                        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metricName) {
-                            $metrics[$metricName] = $results['raw'][$metricName]['day'];
-                        }
+                    $accumulator->addSample($parsed);
+                }
+                if ($accumulator->hasSamples()) {
+                    $results = $accumulator->results();
+                    $metrics = [
+                        'memory' => $results['memory']['day'],
+                        'tasks' => $results['tasks']['day'],
+                    ];
+                    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metricName) {
+                        $metrics[$metricName] = $results['raw'][$metricName]['day'];
                     }
                 }
             }

@@ -25,14 +25,6 @@ function pmssNetconsoleTargetFromSpec(string $spec): ?array
 }
 
 /**
- * Detect whether the kernel module is already loaded.
- */
-function pmssNetconsoleModuleLoaded(): bool
-{
-    return (($override = getenv('PMSS_NETCONSOLE_MODULE_LOADED')) !== false && $override !== '') ? $override === '1' : is_dir('/sys/module/netconsole');
-}
-
-/**
  * Apply optional netconsole configuration when `/etc/seedbox/config/netconsole` exists.
  */
 function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
@@ -82,7 +74,7 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         $log('Updated '.$path);
         $changed = true;
     }
-    if (!$changed && pmssNetconsoleModuleLoaded()) {
+    if (!$changed && ((($override = getenv('PMSS_NETCONSOLE_MODULE_LOADED')) !== false && $override !== '') ? $override === '1' : is_dir('/sys/module/netconsole'))) {
         $log('[SKIP] netconsole already configured and loaded');
         return;
     }

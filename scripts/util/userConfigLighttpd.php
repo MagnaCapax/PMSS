@@ -106,7 +106,7 @@ function pmssUserConfigLighttpdMain(array $argv): int
     }
     $deflateEnabled = (bool) preg_match('/^[ \t]*deflate\./m', $template);
 
-    if (!pmssLighttpdWebdavModulePresent()) {
+    if (empty(glob('/usr/lib*/lighttpd/mod_webdav.so'))) {
         $template = pmssStripLighttpdWebdavConfig($template);
     }
 
