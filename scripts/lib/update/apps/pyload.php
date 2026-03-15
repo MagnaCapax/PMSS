@@ -32,7 +32,7 @@ if ($python === '') {
 $venvDir   = '/opt/pyload';
 $cliBin    = $venvDir.'/bin/pyload';
 
-// Required Python toolchain packages are queued centrally via packages/python.php
+// Required Python toolchain packages are queued centrally via packages.php
 
 $venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', $logger);
 if (empty($venv)) {

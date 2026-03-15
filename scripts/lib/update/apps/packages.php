@@ -6,18 +6,66 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/packages/system.php';
-require_once __DIR__.'/packages/python.php';
+require_once __DIR__.'/packages/helpers.php';
 
-$version = isset($distroVersion) ? (int)$distroVersion : 0;
+$version = isset($distroVersion) ? (int) $distroVersion : 0;
 
 pmssQueuePackages(['lighttpd', 'lighttpd-mod-webdav']);
 pmssInstallProftpdStack($version);
-pmssInstallSystemUtilities($version);
-pmssInstallMediaAndNetworkTools($version);
+
+if ($version < 10) {
+    logmsg('[WARN] Skipping system utility install: unsupported Debian release');
+} else {
+    pmssQueuePackages(['screen', 'mc', 'wget', 'gawk', 'subversion', 'libtool', 'sqlite', 'locate', 'ntpdate', 'build-essential', 'pkg-config', 'autoconf', 'automake', 'python3', 'python3-pip', 'python3-venv', 'python3-dev']);
+    pmssInstallBestEffort(['libncurses6'], 'ncurses runtime');
+    pmssInstallBestEffort(['libncurses-dev'], 'ncurses development headers');
+    // apache2-utils is required system-wide (htpasswd, ab). Lighttpd user
+    // auth and other tooling depend on htpasswd; do NOT remove.
+    pmssQueuePackages([
+        'python3-pycurl', 'python3-crypto', 'python3-cheetah',
+        'zip', 'unzip', 'bwm-ng', 'sysstat', 'apache2-utils', 'irssi', 'iotop', 'ioping', 'ethtool',
+        'unrar-free', 'unp',
+    ]);
+}
+
+if ($version < 10) {
+    logmsg('[WARN] Skipping media/network tool install: unsupported Debian release');
+} else {
+    pmssQueuePackages([
+        'libzen0v5', 'sox', 'tmux', 'tree', 'ncdu', 'weechat', 'php-xml', 'php-zip', 'php-sqlite3', 'php-mbstring', 'qbittorrent-nox',
+        'zsh', 'atop', 'php-cgi', 'php-cli',
+        'aria2', 'htop', 'mtr', 'mktorrent',
+        'genisoimage', 'xorriso',
+        'uidmap',
+        'net-tools', 'nicstat',
+        'restic', 'borgbackup', 'borgmatic', 'borgbackup-doc', 'backupninja',
+        'links', 'elinks', 'lynx', 'ethtool', 'zip', 'p7zip-full', 'smartmontools', 'flac', 'lame', 'lame-doc', 'mp3diags', 'gcc', 'g++', 'gettext', 'fuse3', 'glib-networking', 'libglib2.0-dev', 'libfuse-dev', 'apt-transport-https', 'pigz',
+        'python3-cheetah',
+        // #TODO revisit curl/libcurl upgrades once a consistent backports policy is defined.
+        'unionfs-fuse', 'sshfs', 's3fs',
+        'ranger', 'nethack-console',
+        'libmozjs-52-0', 'libmozjs-60-0',
+        'libarchive-zip-perl', 'libnet-ssleay-perl', 'libhtml-parser-perl', 'libxml-libxml-perl', 'libjson-perl', 'libjson-xs-perl', 'libxml-libxslt-perl',
+        'lftp', 'megatools',
+        'nginx', 'ntp',
+    ]);
+
+    if ($version == 10) {
+        pmssQueuePackages(['linux-image-amd64', 'firmware-bnx2', 'firmware-bnx2x'], 'buster-backports');
+    }
+}
+
 pmssQueuePackages(['libffi-dev', 'libssl-dev', 'libjpeg-dev', 'zlib1g-dev', 'python3', 'python3-dev', 'python3-venv', 'python3-virtualenv', 'python3-pip', 'python3-setuptools', 'python3-wheel']);
 if (!file_exists('/usr/bin/sabnzbdplus')) { echo "## Installing Sabnzbdplus\n"; pmssQueuePackages(['sabnzbdplus']); }
-pmssInstallZncStack($version);
+
+if ($version < 10) {
+    logmsg('[WARN] Skipping ZNC stack: unsupported Debian release');
+} else {
+    pmssQueuePackages(['znc', 'znc-perl', 'znc-tcl', 'znc-python3', 'git', 'intltool', 'librsvg2-common', 'xdg-utils', 'geoip-database', 'python3-notify2', 'python3-pygame', 'python3-gi', 'python3-mako', 'python3-setproctitle', 'python3-openssl', 'python3-twisted', 'python3-chardet', 'python3-xdg', 'python3-libtorrent']);
+
+    // ffmpeg ships via the dpkg baselines; no additional queueing required here.
+}
+
 if (!file_exists('/usr/bin/mkvextract')) { pmssQueuePackages(['mkvtoolnix']); }
 
 if (!file_exists('/usr/sbin/openvpn')) { pmssQueuePackages(['openvpn', 'easy-rsa']); }

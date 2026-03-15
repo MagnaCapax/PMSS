@@ -9,7 +9,12 @@
 # Rclone installer + update
 
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
-[$rcloneVersion, $fetchedLatest] = pmssResolveRcloneVersion();
+$rcloneVersion = '1.69.1';
+$fetchedLatest = false;
+if (getenv('PMSS_RCLONE_FETCH_LATEST') === '1' && ($latest = pmssFetchLatestRcloneVersion()) !== null) {
+    $rcloneVersion = $latest;
+    $fetchedLatest = true;
+}
 
 # Optional info when a newer version is requested
 if ($fetchedLatest) {
@@ -33,25 +38,6 @@ if (!file_exists('/usr/bin/rclone')) {
 if (file_exists('/usr/sbin/rclone') &&
     !file_exists('/usr/bin/rclone') )   passthru('mv /usr/sbin/rclone /usr/bin/rclone');
 
-
-/**
- * Resolve which rclone version should be installed.
- */
-function pmssResolveRcloneVersion(): array
-{
-    $version = '1.69.1';
-    $fetched = false;
-
-    if (getenv('PMSS_RCLONE_FETCH_LATEST') === '1') {
-        $latest = pmssFetchLatestRcloneVersion();
-        if ($latest !== null) {
-            $version = $latest;
-            $fetched = true;
-        }
-    }
-
-    return [$version, $fetched];
-}
 
 /**
  * Try to discover the newest rclone release without breaking when offline.

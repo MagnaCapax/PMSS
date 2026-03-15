@@ -329,9 +329,7 @@ maintenance tooling, but are no longer part of the default package phase path.
 - pmssInstallProftpdStack(int $distroVersion): void → queues proftpd stack (+nftables for >=10), unmask unit pre-install, and enqueues a `dpkg --configure` recovery command.
 
 System/app groups:
-- pmssInstallSystemUtilities(int $distroVersion): void → queues standard utility packages (ncurses/python3 family/zip/unzip/irssi/etc.); logs warn when v<10 and returns.
-- pmssInstallMediaAndNetworkTools(int $distroVersion): void → queues media/network/backup tooling; kernels/firmware from backports on v=10.
-- pmssInstallZncStack(int $distroVersion): void → queues `znc` and related packages; logs warn and returns on v<10.
+- `scripts/lib/update/apps/packages.php` → queues the standard utility set (ncurses/python3 family/zip/unzip/irssi/etc.), media/network/backup tooling, and the ZNC package group inline; each group logs the historical v<10 warning and skips only that group, and Debian 10 still queues kernels/firmware from `buster-backports`.
 
 ---
 
@@ -421,8 +419,8 @@ These scripts are primarily imperative; treat them as idempotent installers guar
   - Seeds EasyRSA into `/etc/openvpn/easy-rsa`, writes vars, builds server certs/DH, renders server config from template, restarts service; writes client `.ovpn` and `ca.crt` to `/home`, packs `openvpn-config.tgz` into skeleton and updates user homes.
 
 - rclone.php
-  - Functions: `pmssResolveRcloneVersion()`, `pmssFetchLatestRcloneVersion()`, `pmssPersistRcloneVersion()`.
-  - Logic: Picks pinned or latest version, replaces `/usr/bin/rclone` when version mismatch, installs from official zip.
+  - Functions: `pmssFetchLatestRcloneVersion()`, `pmssDetectRcloneVersion()`.
+  - Logic: Picks the pinned version by default, optionally fetches the latest release when requested, replaces `/usr/bin/rclone` when version mismatch, installs from the official zip.
   - Env: `PMSS_RCLONE_FETCH_LATEST=1` to request latest.
 
 - wireguard.php

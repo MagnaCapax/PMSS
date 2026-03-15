@@ -21,7 +21,7 @@ function pmssArrUpdate(array $config): void
 {
     $app = $config['app'];
     $log = static function (string $message) use ($app): void {
-        pmssArrLog($app, $message);
+        logMessage($app.': '.$message);
     };
 
     $asset = pmssArrResolveAsset($config, $log);
@@ -57,15 +57,17 @@ function pmssArrUpdate(array $config): void
 
     $archivePath = $workDir.'/'.$assetName;
     $extractPath = $workDir.'/'.$config['extract_dir'];
-    $downloadCmd = sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl));
-    if (runCommand($downloadCmd) !== 0 || !is_file($archivePath)) {
+    if (runCommand(sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl))) !== 0
+        || !is_file($archivePath)
+    ) {
         $log('Download failed; keeping existing installation');
         runCommand('rm -rf '.escapeshellarg($workDir));
         return;
     }
 
-    $extractCmd = sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir));
-    if (runCommand($extractCmd) !== 0 || !is_dir($extractPath)) {
+    if (runCommand(sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir))) !== 0
+        || !is_dir($extractPath)
+    ) {
         $log('Extraction failed; keeping existing installation');
         runCommand('rm -rf '.escapeshellarg($workDir));
         return;
@@ -181,12 +183,4 @@ function pmssArrDetectInstalledVersion(string $installPath, string $app): ?strin
     }
 
     return null;
-}
-
-/**
- * Emit a structured log line for Starr installers.
- */
-function pmssArrLog(string $app, string $message): void
-{
-    logMessage($app.': '.$message);
 }

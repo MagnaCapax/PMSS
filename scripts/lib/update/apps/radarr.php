@@ -18,13 +18,10 @@ if (!@include_once $runtimePath) {
 }
 require_once __DIR__.'/arr.php';
 
-const RADARR_INSTALL_PATH   = '/opt/Radarr';
-const RADARR_RELEASES_URL   = 'https://api.github.com/repos/Radarr/Radarr/releases';
-
 pmssArrUpdate([
     'app'            => 'Radarr',
-    'install_path'   => RADARR_INSTALL_PATH,
-    'releases_url'   => RADARR_RELEASES_URL,
+    'install_path'   => '/opt/Radarr',
+    'releases_url'   => 'https://api.github.com/repos/Radarr/Radarr/releases',
     'asset_pattern'  => '/Radarr\.(?:develop|master)\.([0-9.]+).*linux.*tar\.gz/i',
     'extract_dir'    => 'Radarr',
     'user_agent'     => 'PMSS-Radarr',
