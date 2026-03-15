@@ -26,16 +26,6 @@ foreach (['cliParse', 'localUserSafety'] as $module) {
 }
 
 /**
- * Ensure the caller is root (best effort; depends on posix extension).
- */
-function pmssUserTransferAssertRoot(): void
-{
-    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-        throw new RuntimeException('This script must be run as root', 1);
-    }
-}
-
-/**
  * Read a password from env or from an interactive TTY prompt.
  */
 function pmssUserTransferReadPassword(): string
@@ -75,24 +65,6 @@ function pmssUserTransferReadPassword(): string
         throw new RuntimeException('Password mismatch', 1);
     }
     return $pass1;
-}
-
-/**
- * Create a private scratch directory under /root for temporary scripts.
- */
-function pmssUserTransferScratchDir(): string
-{
-    try {
-        $token = bin2hex(random_bytes(12));
-    } catch (Throwable $e) {
-        $token = sha1(microtime(true).'-'.mt_rand());
-    }
-    $dir = '/root/pmss-userTransfer-'.$token;
-    if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
-        throw new RuntimeException('Failed to create scratch directory: '.$dir, 1);
-    }
-    @chmod($dir, 0700);
-    return $dir;
 }
 
 /**

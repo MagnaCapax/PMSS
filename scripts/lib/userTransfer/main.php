@@ -146,7 +146,9 @@ EXP;
 function pmssUserTransferMain(array $argv): int
 {
     try {
-        pmssUserTransferAssertRoot();
+        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+            throw new RuntimeException('This script must be run as root', 1);
+        }
         $cfg = pmssUserTransferParseCli($argv);
         $home = pmssUserTransferAssertSafeLocalHome($cfg['localUser']);
 
@@ -184,7 +186,17 @@ function pmssUserTransferMain(array $argv): int
         $password = pmssUserTransferReadPassword();
         putenv('PMSS_USER_TRANSFER_PASSWORD='.$password);
 
-        $scratch = pmssUserTransferScratchDir();
+        try {
+            $token = bin2hex(random_bytes(12));
+        } catch (Throwable $e) {
+            $token = sha1(microtime(true).'-'.mt_rand());
+        }
+        $scratch = '/root/pmss-userTransfer-'.$token;
+        if (!@mkdir($scratch, 0700, true) && !is_dir($scratch)) {
+            throw new RuntimeException('Failed to create scratch directory: '.$scratch, 1);
+        }
+        @chmod($scratch, 0700);
+
         $paths = [];
         $cleanup = function () use (&$paths, $scratch): void {
             foreach ($paths as $p) {

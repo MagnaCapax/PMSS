@@ -238,9 +238,7 @@ Sub-handlers:
 
 - pmssConfigureWebStack(int $distroVersion): void
   - Stops nginx; disables/stops lighttpd based on init system; kills lingering `lighttpd` and `php-cgi`.
-  - Enables nginx; refreshes configs (`configureLighttpd.php`, `createNginxConfig.php`), ensures htpasswd, restarts nginx, checks per-user lighttpd instances; hardens `/home` perms.
-
-- pmssPostUpdateWebRefresh(): void → re-runs the same trio (configureLighttpd, createNginxConfig, checkUserHtpasswd) and restarts nginx; checks instances.
+  - Enables nginx and hardens `/home` perms; final nginx config refresh runs later in `scripts/util/update-step2.php` after app installers finish.
 
 - pmssApplyRuntimeTemplates(): void
   - Installs `rc.local`, systemd `system.conf`, and `sshd_config` from templates;

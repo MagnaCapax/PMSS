@@ -37,8 +37,14 @@ $tplServer    = '/etc/seedbox/config/template.openvpn.server.config';
 $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
 list($clientOvpn, $clientCrt) = pmssOpenvpnArtifactPathsFromSlug($slug);
 
-// Fast-path using shared helper semantics (matches systemTest expectations)
-$alreadyConfigured = pmssOpenvpnIsConfigured();
+// Fast-path using the same binary/config/artifact checks expected by systemTest.
+$alreadyConfigured = trim((string) @shell_exec('command -v openvpn 2>/dev/null')) !== ''
+    && is_file($serverConf)
+    && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
+    && $clientOvpn !== ''
+    && $clientCrt !== ''
+    && is_file($clientOvpn)
+    && is_file($clientCrt);
 if ($alreadyConfigured) {
     if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0); }
     else { logmsg('[SKIP] OpenVPN already configured; skipping provisioning'); }

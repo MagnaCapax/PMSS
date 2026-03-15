@@ -77,6 +77,21 @@ function pmssSystemStatsCollect(): array
     $hasIoping = trim((string)@shell_exec('command -v ioping 2>/dev/null')) !== '';
     $iopingRoot = $hasIoping ? pmssSystemStatsIopingMs('/') : 'na';
     $iopingHome = $hasIoping ? pmssSystemStatsIopingMs('/home') : 'na';
+    $topMem = 'na';
+    $out = trim((string)@shell_exec('ps -eo comm=,rss= --sort=-rss | head -n 3'));
+    if ($out !== '') {
+        $items = [];
+        foreach (preg_split('/\n+/', $out) as $line) {
+            $parts = preg_split('/\s+/', trim($line));
+            if (count($parts) < 2) {
+                continue;
+            }
+            $items[] = $parts[0].':'.pmssSystemStatsKbToHuman((int) $parts[1]);
+        }
+        if (!empty($items)) {
+            $topMem = implode(',', $items);
+        }
+    }
 
     return [
         'load'       => implode(',', $load),
@@ -90,7 +105,7 @@ function pmssSystemStatsCollect(): array
         'diskBusy'    => $diskBusy,
         'iopingRoot'  => $iopingRoot,
         'iopingHome'  => $iopingHome,
-        'topMem'      => pmssSystemStatsTopMem(),
+        'topMem'      => $topMem,
         'psiIo'       => $psiIo,
         'psiMem'      => $psiMem,
     ];
@@ -190,25 +205,4 @@ function pmssSystemStatsIopingMs(string $path): string
         $val = $val / 1000;
     }
     return number_format($val, 1, '.', '').'ms';
-}
-
-/**
- * Format the top three RSS consumers as name:SIZE entries.
- * @return string Comma list of process:memory entries.
- */
-function pmssSystemStatsTopMem(): string
-{
-    $out = trim((string)@shell_exec('ps -eo comm=,rss= --sort=-rss | head -n 3'));
-    if ($out === '') {
-        return 'na';
-    }
-    $items = [];
-    foreach (preg_split('/\n+/', $out) as $line) {
-        $parts = preg_split('/\s+/', trim($line));
-        if (count($parts) < 2) {
-            continue;
-        }
-        $items[] = $parts[0].':'.pmssSystemStatsKbToHuman((int) $parts[1]);
-    }
-    return $items ? implode(',', $items) : 'na';
 }

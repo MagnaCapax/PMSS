@@ -33,8 +33,8 @@ function pmssConfigureWebStack(int $distroVersion): void
 
     // Per-user lighttpd configuration, htpasswd sync, and instance checks
     // are handled inside the consolidated per-user maintenance loop.
-    // nginx config regeneration moved to pmssPostUpdateWebRefresh() - no need to
-    // run twice. nginx stays stopped until final config refresh at end of update.
+    // nginx config regeneration runs once after app installers finish, so do
+    // not duplicate it here. nginx stays stopped until that final refresh.
     runStep('Setting /home directory permissions', 'chmod 751 /home');
     // Quota state files reject chmod; prune them so the find commands stay noise-free.
     $prune = '\( -name "aquota.*" -o -name "lost+found" \)';
@@ -77,17 +77,4 @@ function pmssAdjustLighttpdSecurity(): void
     } else {
         logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');
     }
-}
-
-/**
- * Re-run global web service configuration after application installers finish.
- *
- * Per-user lighttpd refresh and auth sync now run inside the per-user
- * maintenance loop; keep this focused on the global nginx config regeneration.
- * createNginxConfig.php validates config with nginx -t before restart, refusing
- * to restart if config is broken (added 2026-01, issue #137).
- */
-function pmssPostUpdateWebRefresh(): void
-{
-    runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
 }

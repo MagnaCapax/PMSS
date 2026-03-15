@@ -28,20 +28,3 @@ function pmssOpenvpnArtifactPathsFromSlug(string $slug): array
         ? ['', '']
         : ['/home/openvpn-'.$slug.'.ovpn', '/home/openvpn-'.$slug.'.crt'];
 }
-
-/**
- * Return true if OpenVPN is configured (binary + server conf + CA + client artifacts).
- */
-function pmssOpenvpnIsConfigured(): bool
-{
-    $bin = trim((string) @shell_exec('command -v openvpn 2>/dev/null'));
-    if ($bin === '') {
-        return false;
-    }
-    $easyRsaDir = '/etc/openvpn/easy-rsa';
-    $slug = pmssOpenvpnSlugFromHostname(trim((string) @file_get_contents('/etc/hostname')));
-    list($ovpn, $crt) = pmssOpenvpnArtifactPathsFromSlug($slug);
-    return is_file('/etc/openvpn/openvpn.conf')
-        && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
-        && $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);
-}

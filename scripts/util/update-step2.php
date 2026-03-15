@@ -480,7 +480,9 @@ if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
 }
 runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
-pmssRunProfiledCallable('Running post-update web refresh', 'pmssPostUpdateWebRefresh');
+pmssRunProfiledStep('Running post-update web refresh', static function (): void {
+    runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
+});
 
 pmssRunProfiledCallable('Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']);
 pmssRunProfiledCallable('Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']);
