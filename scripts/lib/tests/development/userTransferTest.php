@@ -280,6 +280,42 @@ class UserTransferTest extends TestCase
         $this->assertEquals('/home', \pmssUserTransferHomeRoot());
     }
 
+    public function testWriteFilePersistsPayloadAndMode(): void
+    {
+        $path = sys_get_temp_dir().'/pmss-userTransfer-write-'.uniqid('', true);
+        \pmssUserTransferWriteFile($path, 'payload', 0600);
+
+        $this->assertEquals('payload', (string) file_get_contents($path));
+        $this->assertEquals(0600, fileperms($path) & 0777);
+    }
+
+    public function testWriteFileThrowsWhenParentDirectoryIsMissing(): void
+    {
+        $path = sys_get_temp_dir().'/pmss-userTransfer-missing-'.uniqid('', true).'/payload';
+
+        $this->assertThrowsRuntime(static function () use ($path): void {
+            \pmssUserTransferWriteFile($path, 'payload', 0600);
+        }, 'Failed writing: ');
+    }
+
+    public function testSleepReturnsImmediatelyDuringDryRun(): void
+    {
+        putenv('PMSS_DRY_RUN=1');
+
+        $started = microtime(true);
+        \pmssUserTransferSleep(1, 1, 'Unit test');
+
+        $this->assertTrue((microtime(true) - $started) < 0.2, 'expected dry-run sleep to return immediately');
+    }
+
+    public function testSleepReturnsImmediatelyWhenMaximumIsNonPositive(): void
+    {
+        $started = microtime(true);
+        \pmssUserTransferSleep(0, 0, 'Unit test');
+
+        $this->assertTrue((microtime(true) - $started) < 0.2, 'expected non-positive max sleep to return immediately');
+    }
+
     private function assertThrowsRuntime(callable $fn, string $messageFragment): void
     {
         try {

@@ -45,8 +45,6 @@ require_once 'lib/user/add/provisioningRuntime.php';
 require_once 'lib/user/add/runtimeInit.php';
 require_once 'lib/user/add/systemUserCreate.php';
 require_once 'lib/user/add/userConfigApply.php';
-require_once 'lib/user/add/servicesStart.php';
-require_once 'lib/user/add/trafficLimitApply.php';
 require_once 'lib/user/add/postProvision.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Creating
