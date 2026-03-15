@@ -24,15 +24,86 @@ function pmssArrUpdate(array $config): void
         logMessage($app.': '.$message);
     };
 
-    $asset = pmssArrResolveAsset($config, $log);
+    $headers = [
+        'Accept: application/vnd.github+json',
+        'User-Agent: '.($config['user_agent'] ?? 'PMSS-ARR'),
+    ];
+    $context = stream_context_create([
+        'http' => [
+            'header'  => $headers,
+            'timeout' => 15,
+        ],
+    ]);
+
+    $payload = @file_get_contents($config['releases_url'], false, $context);
+    if ($payload === false) {
+        $log('Unable to fetch release metadata (network issue?)');
+        return;
+    }
+
+    $releases = json_decode($payload, true);
+    if (!is_array($releases)) {
+        $log('Invalid release metadata payload');
+        return;
+    }
+
+    $asset = null;
+    foreach ($releases as $release) {
+        if (empty($release['assets']) || !is_array($release['assets'])) {
+            continue;
+        }
+        foreach ($release['assets'] as $candidateAsset) {
+            $name = (string) ($candidateAsset['name'] ?? '');
+            if (!preg_match($config['asset_pattern'], $name, $match)) {
+                continue;
+            }
+            $url = (string) ($candidateAsset['browser_download_url'] ?? '');
+            if ($url === '') {
+                continue;
+            }
+            $asset = [$match[1], $url, $name];
+            break 2;
+        }
+    }
     if ($asset === null) {
+        $log('No suitable linux release asset found');
         return;
     }
     [$latestVersion, $downloadUrl, $assetName] = $asset;
 
     $installPath = $config['install_path'];
 
-    $currentVersion = pmssArrDetectInstalledVersion($installPath, $app);
+    $currentVersion = null;
+    foreach ([$installPath.'/version.txt', $installPath.'/VERSION'] as $file) {
+        if (!is_file($file)) {
+            continue;
+        }
+        $versionPayload = @file_get_contents($file);
+        if (is_string($versionPayload)
+            && $versionPayload !== ''
+            && preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $versionPayload, $match)
+        ) {
+            $currentVersion = $match[1];
+            break;
+        }
+    }
+    if ($currentVersion === null) {
+        foreach ([$installPath.'/'.$app, $installPath.'/'.strtolower($app), $installPath.'/'.$app.'.exe'] as $binary) {
+            if (!is_executable($binary)) {
+                continue;
+            }
+            foreach ([escapeshellarg($binary).' --version 2>/dev/null', escapeshellarg($binary).' -v 2>/dev/null'] as $command) {
+                $output = @shell_exec($command);
+                if (is_string($output)
+                    && $output !== ''
+                    && preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $output, $match)
+                ) {
+                    $currentVersion = $match[1];
+                    break 2;
+                }
+            }
+        }
+    }
     if ($currentVersion === $latestVersion && is_dir($installPath)) {
         $log("Already at {$latestVersion}, skipping update");
         return;
@@ -78,109 +149,4 @@ function pmssArrUpdate(array $config): void
     runCommand('rm -rf '.escapeshellarg($workDir));
 
     $log("Installed version {$latestVersion}");
-}
-
-/**
- * Resolve the latest linux asset that matches the configured pattern.
- */
-function pmssArrResolveAsset(array $config, callable $log): ?array
-{
-    $headers = [
-        'Accept: application/vnd.github+json',
-        'User-Agent: '.($config['user_agent'] ?? 'PMSS-ARR'),
-    ];
-    $context = stream_context_create([
-        'http' => [
-            'header'  => $headers,
-            'timeout' => 15,
-        ],
-    ]);
-
-    $payload = @file_get_contents($config['releases_url'], false, $context);
-    if ($payload === false) {
-        $log('Unable to fetch release metadata (network issue?)');
-        return null;
-    }
-
-    $releases = json_decode($payload, true);
-    if (!is_array($releases)) {
-        $log('Invalid release metadata payload');
-        return null;
-    }
-
-    foreach ($releases as $release) {
-        if (empty($release['assets']) || !is_array($release['assets'])) {
-            continue;
-        }
-        foreach ($release['assets'] as $asset) {
-            $name = (string)($asset['name'] ?? '');
-            if (!preg_match($config['asset_pattern'], $name, $match)) {
-                continue;
-            }
-            $version = $match[1];
-            $url = (string)($asset['browser_download_url'] ?? '');
-            if ($url === '') {
-                continue;
-            }
-            return [$version, $url, $name];
-        }
-    }
-
-    $log('No suitable linux release asset found');
-    return null;
-}
-
-/**
- * Extract a semantic version string from the provided text.
- */
-function pmssArrExtractVersionFromString(?string $payload): ?string
-{
-    if (is_string($payload) && $payload !== '' && preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $payload, $match)) {
-        return $match[1];
-    }
-    return null;
-}
-
-/**
- * Detect an installed version without relying on out-of-band state files.
- */
-function pmssArrDetectInstalledVersion(string $installPath, string $app): ?string
-{
-    $versionFiles = [
-        $installPath.'/version.txt',
-        $installPath.'/VERSION',
-    ];
-    foreach ($versionFiles as $file) {
-        if (!is_file($file)) {
-            continue;
-        }
-        $version = pmssArrExtractVersionFromString(@file_get_contents($file));
-        if ($version !== null) {
-            return $version;
-        }
-    }
-
-    $binaries = [
-        $installPath.'/'.$app,
-        $installPath.'/'.strtolower($app),
-        $installPath.'/'.$app.'.exe',
-    ];
-    foreach ($binaries as $binary) {
-        if (!is_executable($binary)) {
-            continue;
-        }
-        $commands = [
-            escapeshellarg($binary).' --version 2>/dev/null',
-            escapeshellarg($binary).' -v 2>/dev/null',
-        ];
-        foreach ($commands as $command) {
-            $output = @shell_exec($command);
-            $version = pmssArrExtractVersionFromString($output);
-            if ($version !== null) {
-                return $version;
-            }
-        }
-    }
-
-    return null;
 }

@@ -11,17 +11,37 @@
 // Version pinning keeps deployments reproducible; opt-in fetch updates on demand.
 $rcloneVersion = '1.69.1';
 $fetchedLatest = false;
-if (getenv('PMSS_RCLONE_FETCH_LATEST') === '1' && ($latest = pmssFetchLatestRcloneVersion()) !== null) {
-    $rcloneVersion = $latest;
-    $fetchedLatest = true;
+if (getenv('PMSS_RCLONE_FETCH_LATEST') === '1') {
+    foreach (['https://downloads.rclone.org/version.txt', 'https://rclone.org/downloads/'] as $url) {
+        $payload = @file_get_contents($url);
+        if ($payload !== false && preg_match('/v?(\d+\.\d+\.\d+)/', $payload, $match)) {
+            $rcloneVersion = $match[1];
+            $fetchedLatest = true;
+            break;
+        }
+    }
+    if (!$fetchedLatest) {
+        echo "Warning: Unable to determine latest rclone version, falling back to pinned release.\n";
+    }
 }
 
 # Optional info when a newer version is requested
 if ($fetchedLatest) {
     echo "Requested latest rclone release: {$rcloneVersion}\n";
 }
-
-$currentRclone = pmssDetectRcloneVersion();
+$currentRclone = null;
+if (file_exists('/usr/bin/rclone')) {
+    foreach (['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'] as $command) {
+        $output = @shell_exec($command);
+        if (!is_string($output)) {
+            continue;
+        }
+        if (preg_match('/rclone v?(\d+\.\d+\.\d+)/i', $output, $match)) {
+            $currentRclone = $match[1];
+            break;
+        }
+    }
+}
 if ($currentRclone !== null && $currentRclone !== $rcloneVersion) {
     unlink('/usr/bin/rclone');    // This forces following code to install rclone .. thus updating it :)
 }
@@ -37,47 +57,3 @@ if (!file_exists('/usr/bin/rclone')) {
 #Fix for rclone install path / paths lacking. Not included in above because in many places needs to fixed
 if (file_exists('/usr/sbin/rclone') &&
     !file_exists('/usr/bin/rclone') )   passthru('mv /usr/sbin/rclone /usr/bin/rclone');
-
-
-/**
- * Try to discover the newest rclone release without breaking when offline.
- */
-function pmssFetchLatestRcloneVersion(): ?string
-{
-    $sources = [
-        'https://downloads.rclone.org/version.txt',
-        'https://rclone.org/downloads/',
-    ];
-    foreach ($sources as $url) {
-        $payload = @file_get_contents($url);
-        if ($payload !== false && preg_match('/v?(\d+\.\d+\.\d+)/', $payload, $match)) {
-            return $match[1];
-        }
-    }
-    echo "Warning: Unable to determine latest rclone version, falling back to pinned release.\n";
-    return null;
-}
-
-/**
- * Detect the currently installed rclone version if present.
- */
-function pmssDetectRcloneVersion(): ?string
-{
-    if (!file_exists('/usr/bin/rclone')) {
-        return null;
-    }
-    $commands = [
-        '/usr/bin/rclone version 2>/dev/null',
-        '/usr/bin/rclone -V 2>/dev/null',
-    ];
-    foreach ($commands as $command) {
-        $output = @shell_exec($command);
-        if (!is_string($output)) {
-            continue;
-        }
-        if (preg_match('/rclone v?(\\d+\\.\\d+\\.\\d+)/i', $output, $match)) {
-            return $match[1];
-        }
-    }
-    return null;
-}

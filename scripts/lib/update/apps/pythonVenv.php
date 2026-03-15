@@ -40,12 +40,14 @@ function pmssPythonVenvEnsure(string $venvDir, string $label, ?callable $logger 
     }
 
     // Determine if pip is actually importable, not just if a script exists.
-    $hasPip = pmssPythonVenvHasPip($pythonBin);
+    exec(escapeshellarg($pythonBin).' -m pip --version 1>/dev/null 2>&1', $out, $rc);
+    $hasPip = $rc === 0;
     if (!$hasPip) {
         runStep('Bootstrapping pip in '.$label.' virtualenv', sprintf('%s -m ensurepip --upgrade --default-pip', escapeshellarg($pythonBin)));
         // Emit minimal debug context to help diagnose odd hosts.
         runStep('Debug '.$label.' ensurepip context', sprintf("%s -c 'import sys,ensurepip; print(sys.version); print(getattr(ensurepip,\"__file__\",\"n/a\"))'", escapeshellarg($pythonBin)));
-        $hasPip = pmssPythonVenvHasPip($pythonBin);
+        exec(escapeshellarg($pythonBin).' -m pip --version 1>/dev/null 2>&1', $out, $rc);
+        $hasPip = $rc === 0;
     }
 
     if (!$hasPip) {
@@ -59,17 +61,6 @@ function pmssPythonVenvEnsure(string $venvDir, string $label, ?callable $logger 
 
     return ['python' => $pythonBin, 'pip' => $pipBin];
 }
-
-/**
- * True if `python -m pip --version` runs successfully.
- */
-function pmssPythonVenvHasPip(string $pythonBin): bool
-{
-    $cmd = escapeshellarg($pythonBin).' -m pip --version 1>/dev/null 2>&1';
-    exec($cmd, $out, $rc);
-    return $rc === 0;
-}
-
 /**
  * True if `python -m pip show <package>` returns successfully in the venv.
  */

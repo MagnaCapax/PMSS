@@ -419,7 +419,6 @@ These scripts are primarily imperative; treat them as idempotent installers guar
   - Seeds EasyRSA into `/etc/openvpn/easy-rsa`, writes vars, builds server certs/DH, renders server config from template, restarts service; writes client `.ovpn` and `ca.crt` to `/home`, packs `openvpn-config.tgz` into skeleton and updates user homes.
 
 - rclone.php
-  - Functions: `pmssFetchLatestRcloneVersion()`, `pmssDetectRcloneVersion()`.
   - Logic: Picks the pinned version by default, optionally fetches the latest release when requested, replaces `/usr/bin/rclone` when version mismatch, installs from the official zip.
   - Env: `PMSS_RCLONE_FETCH_LATEST=1` to request latest.
 
