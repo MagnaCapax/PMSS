@@ -7,48 +7,6 @@
  */
 
 /**
- * Start per-user services and refresh shared runtime state.
- */
-function pmssAddUserServicesStart(array $user): void
-{
-    runProvisionStep(
-        'Start rTorrent',
-        sprintf('/scripts/startRtorrent %s', escapeshellarg($user['name']))
-    );
-    runProvisionStep(
-        'Start lighttpd',
-        sprintf('/scripts/startLighttpd %s', escapeshellarg($user['name']))
-    );
-    runProvisionStep('Restart nginx', 'systemctl restart nginx || /etc/init.d/nginx restart || true');
-    runProvisionStep('Refresh network rules', '/scripts/util/setupNetwork.php');
-}
-
-/**
- * Persist optional traffic limits to runtime and the user's home directory.
- */
-function pmssAddUserTrafficLimitApply(array $user): void
-{
-    if (empty($user['trafficLimit']) || $user['trafficLimit'] <= 0) {
-        return;
-    }
-
-    $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
-    require_once __DIR__.'/../directories.php';
-    if (function_exists('pmssEnsureDir')) {
-        pmssEnsureDir($runtimeDir, 0700, 'root', 'root');
-    } elseif (!is_dir($runtimeDir)) {
-        @mkdir($runtimeDir, 0755, true);
-        @chmod($runtimeDir, 0700);
-    }
-
-    @file_put_contents($runtimeDir."/{$user['name']}", (string) $user['trafficLimit'], LOCK_EX);
-    @chmod($runtimeDir."/{$user['name']}", 0600);
-    @file_put_contents("/home/{$user['name']}/.trafficLimit", (string) $user['trafficLimit'], LOCK_EX);
-    @chmod("/home/{$user['name']}/.trafficLimit", 0664);
-    logProvisionMessage('Traffic limit set: '.$user['trafficLimit']);
-}
-
-/**
  * Run post-provision steps that should not block account creation.
  */
 function pmssAddUserPostProvision(array $user, string $homePath): void

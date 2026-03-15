@@ -162,9 +162,28 @@ if (file_exists('/etc/seedbox/modules/basic/addUser.php')) {
     include '/etc/seedbox/modules/basic/addUser.php';
 }
 
-// Finally start rTorrent for the user
-pmssAddUserServicesStart($user);
-pmssAddUserTrafficLimitApply($user);
+// Finally start per-user services, refresh shared network state, and persist the optional traffic cap.
+foreach ([
+    ['Start rTorrent', sprintf('/scripts/startRtorrent %s', escapeshellarg($user['name']))],
+    ['Start lighttpd', sprintf('/scripts/startLighttpd %s', escapeshellarg($user['name']))],
+    ['Restart nginx', 'systemctl restart nginx || /etc/init.d/nginx restart || true'],
+    ['Refresh network rules', '/scripts/util/setupNetwork.php'],
+] as $step) runProvisionStep($step[0], $step[1]);
+if (!empty($user['trafficLimit']) && $user['trafficLimit'] > 0) {
+    $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
+    require_once 'lib/user/directories.php';
+    if (function_exists('pmssEnsureDir')) {
+        pmssEnsureDir($runtimeDir, 0700, 'root', 'root');
+    } elseif (!is_dir($runtimeDir)) {
+        @mkdir($runtimeDir, 0755, true);
+        @chmod($runtimeDir, 0700);
+    }
+    @file_put_contents($runtimeDir."/{$user['name']}", (string) $user['trafficLimit'], LOCK_EX);
+    @chmod($runtimeDir."/{$user['name']}", 0600);
+    @file_put_contents("/home/{$user['name']}/.trafficLimit", (string) $user['trafficLimit'], LOCK_EX);
+    @chmod("/home/{$user['name']}/.trafficLimit", 0664);
+    logProvisionMessage('Traffic limit set: '.$user['trafficLimit']);
+}
 
 // Retracker config
 /*$retrackerConfigPath = $userHomedirPath . "/www/rutorrent/share/users/{$user['name']}/settings";
@@ -176,8 +195,6 @@ if (mkdir($retrackerConfigPath, 0777, true)) {
     passthru("chown {$user['name']}:{$user['name']} /home/{$user['name']}/www/rutorrent/share/users/{$user['name']}");
     passthru("chown {$user['name']}:{$user['name']} /home/{$user['name']}/www/rutorrent/share/users/{$user['name']}/torrents");
 }*/
-
-
 pmssAddUserPostProvision($user, $homePath);
 
 finalizeProvision('SUCCESS', 'completed', 0);

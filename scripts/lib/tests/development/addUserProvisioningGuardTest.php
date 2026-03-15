@@ -33,4 +33,18 @@ class AddUserProvisioningGuardTest extends TestCase
         $this->assertTrue(is_array($lines), 'addUser.php must be readable');
         $this->assertTrue(count($lines) <= 200, 'addUser.php must stay under 200 lines');
     }
+
+    public function testAddUserStillStartsServicesAndRefreshesNetwork(): void
+    {
+        $src = (string) file_get_contents(__DIR__.'/../../../addUser.php');
+        $rtorrentPos = strpos($src, '/scripts/startRtorrent');
+        $lighttpdPos = strpos($src, '/scripts/startLighttpd');
+        $networkPos = strpos($src, '/scripts/util/setupNetwork.php');
+
+        $this->assertTrue($rtorrentPos !== false, 'addUser.php must start rTorrent');
+        $this->assertTrue($lighttpdPos !== false, 'addUser.php must start lighttpd');
+        $this->assertTrue($networkPos !== false, 'addUser.php must refresh network rules');
+        $this->assertTrue($rtorrentPos < $lighttpdPos, 'addUser.php must start rTorrent before lighttpd');
+        $this->assertTrue($lighttpdPos < $networkPos, 'addUser.php must refresh network after starting services');
+    }
 }
