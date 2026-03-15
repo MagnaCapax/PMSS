@@ -17,6 +17,22 @@ class ShowResourcesFormatTest extends TestCase
         $this->assertTrue(strpos($out, '--help') !== false);
     }
 
+    public function testHelpOutputMatchesSnapshot(): void
+    {
+        $script = dirname(__DIR__, 3).'/showResources.php';
+        $out = (string) shell_exec('php '.escapeshellarg($script).' --help 2>&1');
+
+        $this->assertEquals(
+            "Usage: showResources.php [--json] [--show-missing] [--user=<username>]\n\n"
+            ."Options:\n"
+            ."  --json          Emit JSON instead of human text output.\n"
+            ."  --show-missing  Print missing stats usernames (text mode only).\n"
+            ."  --user          Show only the named user.\n"
+            ."  --help          Show this help.\n\n",
+            $out
+        );
+    }
+
     public function testFormatBytesTiB(): void
     {
         $runtimeDir = sys_get_temp_dir().'/pmss-show-runtime-'.bin2hex(random_bytes(4));

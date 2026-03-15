@@ -71,12 +71,17 @@ function pmssShowResourcesMain(array $argv): int
     $options = getopt('', ['json', 'show-missing', 'user:', 'help']);
     if (isset($options['help'])) {
         $self = basename($_SERVER['SCRIPT_NAME'] ?? 'showResources.php');
-        echo "Usage: {$self} [--json] [--show-missing] [--user=<username>]\n\n"
-            ."Options:\n"
-            ."  --json          Emit JSON instead of human text output.\n"
-            ."  --show-missing  Print missing stats usernames (text mode only).\n"
-            ."  --user          Show only the named user.\n"
-            ."  --help          Show this help.\n\n";
+        echo <<<TEXT
+Usage: {$self} [--json] [--show-missing] [--user=<username>]
+
+Options:
+  --json          Emit JSON instead of human text output.
+  --show-missing  Print missing stats usernames (text mode only).
+  --user          Show only the named user.
+  --help          Show this help.
+
+TEXT;
+        echo PHP_EOL;
         return 0;
     }
 

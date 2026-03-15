@@ -24,42 +24,29 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once '/scripts/lib/cli/optionParser.php';
-$trafficLimitLib = '/scripts/lib/user/trafficLimit.php';
-if (is_file($trafficLimitLib)) {
-    require_once $trafficLimitLib;
-}
-$dirHelper = '/scripts/lib/user/directories.php';
-if (is_file($dirHelper)) {
-    require_once $dirHelper;
-}
-$pmssUserLogPath = '/scripts/lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
-    require_once $pmssUserLogPath;
-}
-$userLifecycle = '/scripts/lib/userLifecycle.php';
-if (is_file($userLifecycle)) {
-    require_once $userLifecycle;
+foreach ([
+    '/scripts/lib/user/trafficLimit.php',
+    '/scripts/lib/user/directories.php',
+    '/scripts/lib/user/log.php',
+    '/scripts/lib/userLifecycle.php',
+] as $dependency) {
+    if (is_file($dependency)) {
+        require_once $dependency;
+    }
 }
 
-function pmssTrafficLimitCliUsage(): string
-{
-    return implode(
-        "\n",
-        array(
-            'Usage:',
-            '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
-            '  ./userTrafficLimit.php --user=<username> --show',
-            '  ./userTrafficLimit.php --user=<username> --unset',
-            '  ./userTrafficLimit.php <username> <GiB>',
-            '',
-            'Notes:',
-            '  - Limit unit is GiB (monthly quota).',
-            '  - Use 0 (or --unset) to remove a limit.',
-        )
-    );
-}
+$usage = rtrim(<<<'TEXT'
+Usage:
+  ./userTrafficLimit.php --user=<username> --limit=<GiB>
+  ./userTrafficLimit.php --user=<username> --show
+  ./userTrafficLimit.php --user=<username> --unset
+  ./userTrafficLimit.php <username> <GiB>
 
-$usage = pmssTrafficLimitCliUsage();
+Notes:
+  - Limit unit is GiB (monthly quota).
+  - Use 0 (or --unset) to remove a limit.
+TEXT
+);
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
 
 if (pmssCliOption($parsed, 'help', 'h')) {
@@ -191,10 +178,6 @@ if ($trafficLimit === 0) {
     }
     echo "Traffic limit for {$userName} set at 0 GiB\n";
     exit(0);
-}
-
-if (file_exists($userTrafficFile)) {
-    // noop: retained for back-compat; file written below
 }
 
 if (!$writeFileAtomic($userTrafficFile, (string) $trafficLimit)) {

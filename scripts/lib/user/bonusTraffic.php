@@ -75,19 +75,17 @@ function pmssUserBonusTrafficCli(array $argv): int
     }
 
     $parsed = pmssParseCliTokens($argv);
-    $usage = implode(
-        "\n",
-        [
-            'Usage:',
-            '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
-            '  ./userBonusTraffic.php --user=<username> --show',
-            '  ./userBonusTraffic.php --user=<username> --unset',
-            '  ./userBonusTraffic.php <username> <GiB>',
-            '',
-            'Notes:',
-            '  - Bonus unit is GiB (monthly quota add-on).',
-            '  - Use 0 (or --unset) to remove the bonus.',
-        ]
+    $usage = rtrim(<<<'TEXT'
+Usage:
+  ./userBonusTraffic.php --user=<username> --bonus=<GiB>
+  ./userBonusTraffic.php --user=<username> --show
+  ./userBonusTraffic.php --user=<username> --unset
+  ./userBonusTraffic.php <username> <GiB>
+
+Notes:
+  - Bonus unit is GiB (monthly quota add-on).
+  - Use 0 (or --unset) to remove the bonus.
+TEXT
     );
     if (pmssCliOption($parsed, 'help', 'h')) {
         echo $usage."\n";
