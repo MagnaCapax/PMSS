@@ -32,6 +32,15 @@ if ($briefMode && $fullMode) {
     exit(1);
 }
 $displayMode = $fullMode ? 'full' : 'brief';
+$columnFormats = [
+    'brief' => "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s\n",
+    'full' => "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s\n",
+];
+$columnHeaders = [
+    'brief' => ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS"],
+    'full' => ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS", "DskQ", "DskB", "InoQ", "InoB", "NetLim", "NetUsed", "ProcMax", "Suspended"],
+];
+$columnSeparatorWidths = ['brief' => 120, 'full' => 180];
 
 $notSet = '[not set]';
 $sliceKeys = [
@@ -187,19 +196,8 @@ if ($usersRaw === '') {
 $users = explode("\n", $usersRaw);
 
 if (!$outputJson && !$outputJsonl) {
-    if ($displayMode === 'full') {
-        printf(
-            "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s\n",
-            "User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS", "DskQ", "DskB", "InoQ", "InoB", "NetLim", "NetUsed", "ProcMax", "Suspended"
-        );
-        echo str_repeat("-", 180) . "\n";
-    } else {
-        printf(
-            "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s\n",
-            "User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS"
-        );
-        echo str_repeat("-", 120) . "\n";
-    }
+    printf($columnFormats[$displayMode], ...$columnHeaders[$displayMode]);
+    echo str_repeat('-', $columnSeparatorWidths[$displayMode])."\n";
 }
 
 $allData = [];
@@ -234,8 +232,10 @@ foreach ($users as $user) {
     $writeIops = $parseTrailingInt($props['IOWriteIOPSMax']);
     $memoryHigh = $parseTrailingInt($props['MemoryHigh']);
     $memoryMax = $parseTrailingInt($props['MemoryMax']);
+    $cpuWeight = ($props['CPUWeight'] !== $notSet) ? (int) $props['CPUWeight'] : null;
     $ioReadBandwidth = $parseTrailingInt($props['IOReadBandwidthMax']);
     $ioWriteBandwidth = $parseTrailingInt($props['IOWriteBandwidthMax']);
+    $ioWeight = ($props['IOWeight'] !== $notSet) ? (int) $props['IOWeight'] : null;
     $tasksMax = $parseTrailingInt($props['TasksMax']);
 
     $userConfig = $store->get($user);
@@ -272,9 +272,9 @@ foreach ($users as $user) {
         'uid' => $info['uid'],
         'memory_high' => $memoryHigh,
         'memory_max' => $memoryMax,
-        'cpu_weight' => ($props['CPUWeight'] !== '[not set]') ? (int)$props['CPUWeight'] : null,
+        'cpu_weight' => $cpuWeight,
         'cpu_quota_percent' => $cpuQuotaPercent,
-        'io_weight' => ($props['IOWeight'] !== '[not set]') ? (int)$props['IOWeight'] : null,
+        'io_weight' => $ioWeight,
         'io_read_bandwidth' => $ioReadBandwidth,
         'io_write_bandwidth' => $ioWriteBandwidth,
         'io_read_iops' => $readIops,
@@ -294,20 +294,21 @@ foreach ($users as $user) {
     } elseif ($outputJson) {
         $allData[] = $resourceData;
     } else {
+        $row = [
+            substr($user, 0, 10),
+            (string) $info['uid'],
+            $formatBinary($memoryHigh),
+            $formatBinary($memoryMax),
+            $cpuWeight === null ? '-' : (string) $cpuWeight,
+            $cpuQuotaPercent === null ? '-' : $cpuQuotaPercent.'%',
+            $ioWeight === null ? '-' : (string) $ioWeight,
+            $formatBinary($ioReadBandwidth),
+            $formatBinary($ioWriteBandwidth),
+            $readIops === null ? '-' : (string) $readIops,
+            $writeIops === null ? '-' : (string) $writeIops,
+        ];
         if ($displayMode === 'full') {
-            printf(
-                "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s\n",
-                substr($user, 0, 10),
-                (string) $info['uid'],
-                $formatBinary($memoryHigh),
-                $formatBinary($memoryMax),
-                $resourceData['cpu_weight'] === null ? '-' : (string) $resourceData['cpu_weight'],
-                $cpuQuotaPercent === null ? '-' : $cpuQuotaPercent.'%',
-                $resourceData['io_weight'] === null ? '-' : (string) $resourceData['io_weight'],
-                $formatBinary($ioReadBandwidth),
-                $formatBinary($ioWriteBandwidth),
-                $readIops === null ? '-' : (string) $readIops,
-                $writeIops === null ? '-' : (string) $writeIops,
+            $row = array_merge($row, [
                 $diskQuotaGiB === null ? '-' : $formatGiB($diskQuotaGiB),
                 $diskBurstGiB === null ? '-' : $formatGiB($diskBurstGiB),
                 $inodeQuota === null ? '-' : (string) $inodeQuota,
@@ -315,25 +316,10 @@ foreach ($users as $user) {
                 $trafficLimitGiB === null ? 'inf' : $formatGiB($trafficLimitGiB),
                 $formatGiB($trafficUsedGiB),
                 $tasksMax === null ? 'inf' : (string) $tasksMax,
-                $suspended ? 'yes' : 'no'
-            );
-            continue;
+                $suspended ? 'yes' : 'no',
+            ]);
         }
-
-        printf(
-            "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s\n",
-            substr($user, 0, 10),
-            (string) $info['uid'],
-            $formatBinary($memoryHigh),
-            $formatBinary($memoryMax),
-            $resourceData['cpu_weight'] === null ? '-' : (string) $resourceData['cpu_weight'],
-            $cpuQuotaPercent === null ? '-' : $cpuQuotaPercent.'%',
-            $resourceData['io_weight'] === null ? '-' : (string) $resourceData['io_weight'],
-            $formatBinary($ioReadBandwidth),
-            $formatBinary($ioWriteBandwidth),
-            $readIops === null ? '-' : (string) $readIops,
-            $writeIops === null ? '-' : (string) $writeIops
-        );
+        printf($columnFormats[$displayMode], ...$row);
     }
 }
 

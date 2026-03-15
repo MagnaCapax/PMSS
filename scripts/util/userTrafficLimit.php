@@ -90,6 +90,7 @@ if (!is_dir($homeDir) || is_link($homeDir)) {
 $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
 $userTrafficFile = "{$runtimeDir}/{$userName}";
 $userHomeFile = "{$homeDir}/.trafficLimit";
+$targetModes = [$userTrafficFile => 0600, $userHomeFile => 0664];
 
 if ($show && $unset) {
     fwrite(STDERR, "Error: --show and --unset are mutually exclusive.\n");
@@ -164,7 +165,7 @@ $writeFileAtomic = static function (string $path, string $content): bool {
 };
 
 if ($trafficLimit === 0) {
-    foreach ([$userTrafficFile, $userHomeFile] as $target) {
+    foreach (array_keys($targetModes) as $target) {
         if (file_exists($target)) {
             if (!is_file($target) || is_link($target)) {
                 fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$target}\n");
@@ -180,17 +181,13 @@ if ($trafficLimit === 0) {
     exit(0);
 }
 
-if (!$writeFileAtomic($userTrafficFile, (string) $trafficLimit)) {
-    fwrite(STDERR, "Error: failed to write {$userTrafficFile}\n");
-    exit(4);
+foreach ($targetModes as $target => $mode) {
+    if (!$writeFileAtomic($target, (string) $trafficLimit)) {
+        fwrite(STDERR, "Error: failed to write {$target}\n");
+        exit(4);
+    }
+    @chmod($target, $mode);
 }
-@chmod($userTrafficFile, 0600);
-
-if (!$writeFileAtomic($userHomeFile, (string) $trafficLimit)) {
-    fwrite(STDERR, "Error: failed to write {$userHomeFile}\n");
-    exit(4);
-}
-@chmod($userHomeFile, 0664);
 
 if (function_exists('pmssUserLog')) {
     pmssUserLog($userName, sprintf('traffic limit set to %d GiB (monthly quota)', $trafficLimit));
