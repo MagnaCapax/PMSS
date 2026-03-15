@@ -7,25 +7,14 @@
  */
 
 /**
- * Return the sampling interval for stats deltas (CPU/disk) in microseconds.
- *
- * Keep this low in test mode so hermetic tests don't waste time sleeping.
- *
- * @return int
- */
-function pmssSystemStatsSampleIntervalUsec(): int
-{
-    return getenv('PMSS_TEST_MODE') === '1' ? 50000 : 1000000;
-}
-
-/**
  * Collect a single snapshot of system metrics for logging.
  *
  * @return array<string, string> Metric values formatted for log output.
  */
 function pmssSystemStatsCollect(): array
 {
-    $sampleUsec = pmssSystemStatsSampleIntervalUsec();
+    // Keep this low in test mode so hermetic tests don't waste time sleeping.
+    $sampleUsec = getenv('PMSS_TEST_MODE') === '1' ? 50000 : 1000000;
     $sampleSeconds = $sampleUsec / 1000000;
 
     $cpu1 = pmssSystemStatsReadCpuStat();

@@ -44,23 +44,36 @@ function pmssArrUpdate(array $config): void
         $log('Unknown installed version; reinstalling to avoid stale binaries');
     }
 
-    $workDir = pmssArrCreateWorkspace($app, $log);
-    if ($workDir === null) {
+    try {
+        $suffix = bin2hex(random_bytes(4));
+    } catch (Exception $e) {
+        $suffix = uniqid();
+    }
+    $workDir = sys_get_temp_dir().'/'.strtolower($app).'-'.$suffix;
+    if (!@mkdir($workDir, 0755, true) && !is_dir($workDir)) {
+        $log('Failed to create temporary workspace');
         return;
     }
 
     $archivePath = $workDir.'/'.$assetName;
     $extractPath = $workDir.'/'.$config['extract_dir'];
-    $prepared = pmssArrDownload($downloadUrl, $archivePath, $log)
-        && pmssArrExtract($archivePath, $workDir, $config['extract_dir'], $log);
-    if (!$prepared) {
-        pmssArrCleanup($workDir);
+    $downloadCmd = sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl));
+    if (runCommand($downloadCmd) !== 0 || !is_file($archivePath)) {
+        $log('Download failed; keeping existing installation');
+        runCommand('rm -rf '.escapeshellarg($workDir));
+        return;
+    }
+
+    $extractCmd = sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir));
+    if (runCommand($extractCmd) !== 0 || !is_dir($extractPath)) {
+        $log('Extraction failed; keeping existing installation');
+        runCommand('rm -rf '.escapeshellarg($workDir));
         return;
     }
 
     runCommand('rm -rf '.escapeshellarg($installPath));
     runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)));
-    pmssArrCleanup($workDir);
+    runCommand('rm -rf '.escapeshellarg($workDir));
 
     $log("Installed version {$latestVersion}");
 }
@@ -116,53 +129,6 @@ function pmssArrResolveAsset(array $config, callable $log): ?array
 }
 
 /**
- * Create a temporary working directory for archive extraction.
- */
-function pmssArrCreateWorkspace(string $app, callable $log): ?string
-{
-    try {
-        $suffix = bin2hex(random_bytes(4));
-    } catch (Exception $e) {
-        $suffix = uniqid();
-    }
-    $workDir = sys_get_temp_dir().'/'.strtolower($app).'-'.$suffix;
-    if (@mkdir($workDir, 0755, true)) {
-        return $workDir;
-    }
-    if (is_dir($workDir)) {
-        return $workDir;
-    }
-    $log('Failed to create temporary workspace');
-    return null;
-}
-
-/**
- * Download the release asset to the given path.
- */
-function pmssArrDownload(string $url, string $targetPath, callable $log): bool
-{
-    $cmd = sprintf('curl -sSL --fail -o %s %s', escapeshellarg($targetPath), escapeshellarg($url));
-    if (runCommand($cmd) !== 0 || !is_file($targetPath)) {
-        $log('Download failed; keeping existing installation');
-        return false;
-    }
-    return true;
-}
-
-/**
- * Extract the archive and confirm the expected directory exists.
- */
-function pmssArrExtract(string $archivePath, string $workDir, string $expectedDir, callable $log): bool
-{
-    $extractCmd = sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir));
-    if (runCommand($extractCmd) !== 0 || !is_dir($workDir.'/'.$expectedDir)) {
-        $log('Extraction failed; keeping existing installation');
-        return false;
-    }
-    return true;
-}
-
-/**
  * Extract a semantic version string from the provided text.
  */
 function pmssArrExtractVersionFromString(?string $payload): ?string
@@ -171,14 +137,6 @@ function pmssArrExtractVersionFromString(?string $payload): ?string
         return $match[1];
     }
     return null;
-}
-
-/**
- * Delete the temporary workspace.
- */
-function pmssArrCleanup(string $workDir): void
-{
-    runCommand('rm -rf '.escapeshellarg($workDir));
 }
 
 /**
