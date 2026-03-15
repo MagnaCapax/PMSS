@@ -77,11 +77,8 @@ function pmssUserTransferAssertSafeLocalHome(string $user): string
 function pmssUserTransferIsPathWithinHome(string $path, string $home): bool
 {
     $realHome = realpath($home);
-    if ($realHome === false) {
-        return false;
-    }
     $realPath = realpath($path);
-    if ($realPath === false) {
+    if ($realHome === false || $realPath === false) {
         return false;
     }
     $prefix = rtrim($realHome, '/').'/';

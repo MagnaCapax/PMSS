@@ -82,7 +82,6 @@ function pmssUserTransferReadPassword(): string
  */
 function pmssUserTransferScratchDir(): string
 {
-    $token = '';
     try {
         $token = bin2hex(random_bytes(12));
     } catch (Throwable $e) {
@@ -113,10 +112,7 @@ function pmssUserTransferWriteFile(string $path, string $contents, int $mode): v
 function pmssUserTransferSleep(int $min, int $max, string $reason): void
 {
     // Dry runs should never stall for long-running sleeps.
-    if (getenv('PMSS_DRY_RUN') === '1') {
-        return;
-    }
-    if ($max <= 0) {
+    if (getenv('PMSS_DRY_RUN') === '1' || $max <= 0) {
         return;
     }
 
