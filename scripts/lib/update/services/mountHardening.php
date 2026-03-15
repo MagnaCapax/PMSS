@@ -77,27 +77,21 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
                 }
                 $found = true;
                 $options = array_values(array_filter(explode(',', $columns[3]), 'strlen'));
-                if ($options !== []) {
-                    foreach ($conflicts as $conflict) {
-                        $pos = array_search($conflict, $options, true);
-                        if ($pos !== false) {
-                            unset($options[$pos]);
-                            $removed[] = $conflict;
-                        }
+                foreach ($conflicts as $conflict) {
+                    $pos = array_search($conflict, $options, true);
+                    if ($pos === false) {
+                        continue;
                     }
-                    $options = array_values($options);
+                    unset($options[$pos]);
+                    $removed[] = $conflict;
                 }
-                foreach ($required as $opt) {
-                    if (!in_array($opt, $options, true)) {
-                        $options[] = $opt;
-                        $missing[] = $opt;
-                    }
-                }
+                $options = array_values($options);
+                $missing = array_values(array_diff($required, $options));
                 if ($missing === [] && $removed === []) {
                     $log('[SKIP] '.$mountPoint.' already hardened in '.$fstabPath);
                     break;
                 }
-                $columns[3] = implode(',', $options);
+                $columns[3] = implode(',', array_merge($options, $missing));
                 $lines[$idx] = implode("\t", $columns);
                 $changed = true;
                 $msg = '[WARN] Updated '.$mountPoint.' mount options in '.$fstabPath;
@@ -262,11 +256,7 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
                 $options[$sizeIndex] = $sizeOption;
             }
 
-            foreach ($required as $opt) {
-                if (!in_array($opt, $options, true)) {
-                    $options[] = $opt;
-                }
-            }
+            $options = array_merge($options, array_values(array_diff($required, $options)));
 
             if ($options === $original) {
                 $log('[SKIP] /tmp tmpfs entry already up to date in '.$fstabPath);

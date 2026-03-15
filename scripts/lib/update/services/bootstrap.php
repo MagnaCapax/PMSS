@@ -72,18 +72,26 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
  */
 function pmssApplyRuntimeTemplates(): void
 {
-    runStep('Updating rc.local template', 'cp /etc/seedbox/config/template.rc.local /etc/rc.local');
-    runStep('Setting rc.local ownership', 'chown root:root /etc/rc.local');
-    runStep('Setting rc.local permissions', 'chmod 750 /etc/rc.local');
-    runStep('Executing rc.local to apply runtime tweaks', 'nohup /etc/rc.local >> /dev/null 2>&1');
-    runStep('Installing systemd system.conf template', 'cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf');
-    runStep('Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf');
-    runStep('Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec');
+    foreach ([
+        ['Updating rc.local template', 'cp /etc/seedbox/config/template.rc.local /etc/rc.local'],
+        ['Setting rc.local ownership', 'chown root:root /etc/rc.local'],
+        ['Setting rc.local permissions', 'chmod 750 /etc/rc.local'],
+        ['Executing rc.local to apply runtime tweaks', 'nohup /etc/rc.local >> /dev/null 2>&1'],
+        ['Installing systemd system.conf template', 'cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf'],
+        ['Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf'],
+        ['Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec'],
+    ] as $action) {
+        runStep($action[0], $action[1]);
+    }
 
     pmssBackupCriticalConfig('sshd', '/etc/ssh/sshd_config');
-    runStep('Installing sshd configuration template', 'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config');
-    runStep('Setting sshd_config permissions', 'chmod 644 /etc/ssh/sshd_config');
-    runStep('Restarting sshd to load updated configuration', '/usr/bin/systemctl restart sshd');
+    foreach ([
+        ['Installing sshd configuration template', 'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config'],
+        ['Setting sshd_config permissions', 'chmod 644 /etc/ssh/sshd_config'],
+        ['Restarting sshd to load updated configuration', '/usr/bin/systemctl restart sshd'],
+    ] as $action) {
+        runStep($action[0], $action[1]);
+    }
 }
 
 /**

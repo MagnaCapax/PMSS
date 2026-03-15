@@ -72,9 +72,13 @@ function pmssEnsureSystemdServicesGuardBootUnit(): void
     }
 
     $target = '/etc/systemd/system/pmss-systemd-services-guard.service';
-    runStep('Installing PMSS boot-time systemd services guard unit', sprintf('install -m 0644 %s %s', escapeshellarg($template), escapeshellarg($target)));
-    runStep('Reloading systemd unit files (PMSS services guard)', 'systemctl daemon-reload || true');
-    runStep('Enabling PMSS boot-time services guard unit', 'systemctl enable pmss-systemd-services-guard.service || true');
+    foreach ([
+        ['Installing PMSS boot-time systemd services guard unit', sprintf('install -m 0644 %s %s', escapeshellarg($template), escapeshellarg($target))],
+        ['Reloading systemd unit files (PMSS services guard)', 'systemctl daemon-reload || true'],
+        ['Enabling PMSS boot-time services guard unit', 'systemctl enable pmss-systemd-services-guard.service || true'],
+    ] as $action) {
+        runStep($action[0], $action[1]);
+    }
 }
 
 /**
@@ -129,17 +133,17 @@ function pmssSeedboxSystemServiceSpecs(): array
 function pmssStopDisableMaskSeedboxSystemServices(): void
 {
     foreach (pmssSeedboxSystemServiceSpecs() as $spec) {
-        pmssStopDisableMaskSystemdUnit(
-            (string) $spec['unit'],
-            (string) $spec['label'],
-            (bool) $spec['mask']
-        );
+        pmssStopDisableMaskSystemdUnit($spec['unit'], $spec['label'], $spec['mask']);
     }
 
     // Exim can be reinstalled indirectly by distro package relationships,
     // so this flow keeps the host converged back to a no-exim state.
-    runStep('Purging exim4 packages', aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light'));
-    runStep('Autoremoving orphaned packages after exim4 purge', aptCmd('autoremove -y'));
+    foreach ([
+        ['Purging exim4 packages', aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light')],
+        ['Autoremoving orphaned packages after exim4 purge', aptCmd('autoremove -y')],
+    ] as $action) {
+        runStep($action[0], $action[1]);
+    }
 
     // Deletion is intentionally limited to known exim4 spool directories
     // and uses one command per directory for predictable logging/retries.

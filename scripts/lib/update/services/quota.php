@@ -47,22 +47,16 @@ function pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions = nul
         }
 
         $found = true;
-        $current = array_filter($columns[3] === 'defaults' ? ['defaults'] : explode(',', $columns[3]), 'strlen');
-        $missingOptions = [];
-        foreach ($requiredOptions as $opt) {
-            if (!in_array($opt, $current, true)) {
-                $missingOptions[] = $opt;
-                if ($current === ['defaults']) {
-                    $current = [];
-                }
-                $current[] = $opt;
-            }
-        }
+        $current = array_values(array_filter($columns[3] === 'defaults' ? ['defaults'] : explode(',', $columns[3]), 'strlen'));
+        $missingOptions = array_values(array_diff($requiredOptions, $current));
         if ($missingOptions === []) {
             $log('[SKIP] Quota options already present for '.$mountPoint);
             break;
         }
-        $columns[3] = implode(',', array_unique($current));
+        if ($current === ['defaults']) {
+            $current = [];
+        }
+        $columns[3] = implode(',', array_unique(array_merge($current, $missingOptions)));
         $lines[$idx] = implode("\t", $columns);
         $changed = true;
         $log('[WARN] Updated quota options for '.$mountPoint.' (added '.implode(', ', $missingOptions).')');
