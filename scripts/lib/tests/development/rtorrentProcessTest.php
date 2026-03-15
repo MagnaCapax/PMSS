@@ -145,6 +145,89 @@ class RtorrentProcessTest extends TestCase
     }
 
     /**
+     * Test failed-start state: first failure records attempt 1.
+     */
+    public function testFailureCountStateRecordsFirstAttempt(): void
+    {
+        $stateFile = $this->tempDir.'/test-failure.count';
+
+        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+
+        $this->assertEquals('record', $result['action']);
+        $this->assertEquals(1, $result['count']);
+        $this->assertEquals('1', trim((string) file_get_contents($stateFile)));
+    }
+
+    /**
+     * Test failed-start state: intermediate failures keep waiting.
+     */
+    public function testFailureCountStateWaitsBeforeThreshold(): void
+    {
+        $stateFile = $this->tempDir.'/test-failure.count';
+        file_put_contents($stateFile, '2');
+
+        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+
+        $this->assertEquals('wait', $result['action']);
+        $this->assertEquals(3, $result['count']);
+    }
+
+    /**
+     * Test failed-start state: reaching threshold becomes stale.
+     */
+    public function testFailureCountStateBecomesStaleAtThreshold(): void
+    {
+        $stateFile = $this->tempDir.'/test-failure.count';
+        file_put_contents($stateFile, '3');
+
+        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+
+        $this->assertEquals('stale', $result['action']);
+        $this->assertEquals(4, $result['count']);
+    }
+
+    /**
+     * Test failed-start state: invalid file contents reset to attempt 1.
+     */
+    public function testFailureCountStateInvalidContentsResetCount(): void
+    {
+        $stateFile = $this->tempDir.'/test-failure.count';
+        file_put_contents($stateFile, 'invalid');
+
+        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+
+        $this->assertEquals('record', $result['action']);
+        $this->assertEquals(1, $result['count']);
+    }
+
+    /**
+     * Test failed-start state: negative counts reset to attempt 1.
+     */
+    public function testFailureCountStateNegativeContentsResetCount(): void
+    {
+        $stateFile = $this->tempDir.'/test-failure.count';
+        file_put_contents($stateFile, '-3');
+
+        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+
+        $this->assertEquals('record', $result['action']);
+        $this->assertEquals(1, $result['count']);
+    }
+
+    /**
+     * Test failed-start state: thresholds below 1 escalate immediately.
+     */
+    public function testFailureCountStateNormalizesZeroThreshold(): void
+    {
+        $stateFile = $this->tempDir.'/test-failure.count';
+
+        $result = rtorrentProcessCheckFailureCountState($stateFile, 0);
+
+        $this->assertEquals('stale', $result['action']);
+        $this->assertEquals(1, $result['count']);
+    }
+
+    /**
      * Test pgrep exact returns empty for nonexistent user.
      */
     public function testPgrepExactNonexistentUser(): void

@@ -190,6 +190,45 @@ function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): ar
 }
 
 /**
+ * Check and track consecutive failed start attempts using a counter file.
+ *
+ * Stores a single integer count in the state file. First failure records 1 and
+ * returns `record`, intermediate counts return `wait`, and reaching the
+ * threshold returns `stale` so callers can escalate.
+ *
+ * @param string $stateFile         Path to the state file.
+ * @param int    $failureThreshold  Number of failed attempts before escalation.
+ *
+ * @return array{action:string,count:int} 'action' is 'record'|'wait'|'stale', 'count' is the current failed-attempt count.
+ */
+function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureThreshold): array
+{
+    $failureThreshold = max(1, $failureThreshold);
+    $count = 0;
+
+    if (is_file($stateFile)) {
+        $count = (int) trim((string) @file_get_contents($stateFile));
+    }
+
+    if ($count < 0) {
+        $count = 0;
+    }
+
+    $count++;
+    @file_put_contents($stateFile, (string) $count, LOCK_EX);
+
+    if ($count === 1 && $failureThreshold > 1) {
+        return ['action' => 'record', 'count' => $count];
+    }
+
+    if ($count < $failureThreshold) {
+        return ['action' => 'wait', 'count' => $count];
+    }
+
+    return ['action' => 'stale', 'count' => $count];
+}
+
+/**
  * Clear a stale state file.
  *
  * @param string $stateFile Path to the state file.
