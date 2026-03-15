@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/user/add/provisioningRuntime.php';
 
 class AddUserProvisioningGuardTest extends TestCase
 {
@@ -17,6 +18,13 @@ class AddUserProvisioningGuardTest extends TestCase
         $src = (string) file_get_contents(__DIR__.'/../../user/add/provisioningRuntime.php');
         $this->assertTrue(strpos($src, '###ADDUSER:') !== false, 'addUser must emit summary markers');
         $this->assertTrue(strpos($src, '###ADDUSER_JSON:') !== false, 'addUser must emit JSON summary markers');
+    }
+
+    public function testAddUserRuntimeInitStaysWithProvisioningRuntimeHelpers(): void
+    {
+        $this->assertTrue(function_exists('\pmssAddUserRuntimeInit'));
+        $src = (string) file_get_contents(__DIR__.'/../../user/add/provisioningRuntime.php');
+        $this->assertTrue(strpos($src, 'function pmssAddUserRuntimeInit(') !== false);
     }
 
     public function testAddUserWrapperStaysSmall(): void

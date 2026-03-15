@@ -42,7 +42,6 @@ require_once 'lib/userLifecycle.php';
 require_once 'lib/user/log.php';
 require_once 'lib/homeMount.php';
 require_once 'lib/user/add/provisioningRuntime.php';
-require_once 'lib/user/add/runtimeInit.php';
 require_once 'lib/user/add/systemUserCreate.php';
 require_once 'lib/user/add/userConfigApply.php';
 require_once 'lib/user/add/postProvision.php';

@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/lighttpd/watchdog.php';
+require_once dirname(__DIR__, 2).'/lighttpd/userConfigApply.php';
 
 class LighttpdWatchdogSocketPathsTest extends TestCase
 {

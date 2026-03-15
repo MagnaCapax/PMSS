@@ -210,6 +210,7 @@ LIGHTTPD;
             'pmssParseSizeToMiB',
             'pmssComputePhpProcessPlan',
             'pmssShouldConfigureLighttpdForHome',
+            'pmssLighttpdWatchdogSocketPaths',
             'pmssEnsureWebdavLockDatabase',
             'pmssDelugeSessionsListDetected',
             'pmssDelugeNormalizeEmptySessionsObject',

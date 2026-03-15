@@ -15,7 +15,7 @@ $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
 }
-require_once __DIR__.'/../lib/lighttpd/watchdog.php';
+require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 // Get & parse users list (optionally for a single user).

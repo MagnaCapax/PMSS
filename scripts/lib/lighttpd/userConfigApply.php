@@ -183,6 +183,28 @@ function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
         && file_exists($homeDir.'/.rtorrent.rc');
 }
 
+/**
+ * Build the FastCGI socket list the watchdog must probe for a user.
+ *
+ * PMSS historically probed only `php.socket-0`. Keep that as the fallback when
+ * the rendered config is unavailable, while using the configured `max-procs`
+ * value when it can be read safely.
+ *
+ * @return array<int, string>
+ */
+function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): array
+{
+    $baseSocketPath = rtrim($homeDir, '/').'/.lighttpd/php.socket';
+    $maxProcs = null;
+    if (preg_match('/"max-procs"\s*=>\s*([0-9]+)/', (string) @file_get_contents($configPath), $matches) === 1) {
+        $maxProcs = ((int) $matches[1]) ?: null;
+    }
+
+    return $maxProcs > 1
+        ? array_map(static function ($index) use ($baseSocketPath) { return $baseSocketPath.'-'.$index; }, range(0, $maxProcs - 1))
+        : [$baseSocketPath.($maxProcs === 1 ? '' : '-0')];
+}
+
 function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool
 {
     if (!pmssValidateUsername($user) || !is_dir($homeDir) || is_link($homeDir)) {
