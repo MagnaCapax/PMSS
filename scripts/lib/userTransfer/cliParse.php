@@ -40,15 +40,28 @@ function pmssUserTransferParseCli(array $argv): array
     // followed by a positional token, which makes boolean flags fragile.
     $tokens = array_slice($argv, 1);
     $positionals = [];
-
-    $mainPasses = 31;
-    $finalPasses = 3;
-    $sleepMin = 60;
-    $sleepMax = 360;
-    $noSleep = false;
-    $dryRun = false;
-    $printPassword = false;
-    $help = false;
+    $options = [
+        'mainPasses' => 31,
+        'finalPasses' => 3,
+        'sleepMin' => 60,
+        'sleepMax' => 360,
+        'noSleep' => false,
+        'dryRun' => false,
+        'printPassword' => false,
+        'help' => false,
+    ];
+    $flagOptions = [
+        'help' => 'help',
+        'no-sleep' => 'noSleep',
+        'dry-run' => 'dryRun',
+        'print-password' => 'printPassword',
+    ];
+    $integerOptions = [
+        'main-passes' => 'mainPasses',
+        'final-passes' => 'finalPasses',
+        'sleep-min' => 'sleepMin',
+        'sleep-max' => 'sleepMax',
+    ];
 
     $parseInt = static function (string $name, ?string $value): int {
         if ($value === null || $value === '') {
@@ -60,7 +73,7 @@ function pmssUserTransferParseCli(array $argv): array
         return (int) $value;
     };
 
-    for ($i = 0; $i < count($tokens); $i++) {
+    for ($i = 0, $tokenCount = count($tokens); $i < $tokenCount; $i++) {
         $token = $tokens[$i];
         if ($token === '--') {
             $positionals = array_merge($positionals, array_slice($tokens, $i + 1));
@@ -69,29 +82,14 @@ function pmssUserTransferParseCli(array $argv): array
 
         if (substr($token, 0, 2) === '--') {
             $body = substr($token, 2);
-            if ($body === '') {
-                continue;
-            }
             $key = $body;
             $value = null;
             if (strpos($body, '=') !== false) {
                 [$key, $value] = explode('=', $body, 2);
             }
 
-            if ($key === 'help') {
-                $help = true;
-                continue;
-            }
-            if ($key === 'no-sleep') {
-                $noSleep = true;
-                continue;
-            }
-            if ($key === 'dry-run') {
-                $dryRun = true;
-                continue;
-            }
-            if ($key === 'print-password') {
-                $printPassword = true;
+            if (isset($flagOptions[$key])) {
+                $options[$flagOptions[$key]] = true;
                 continue;
             }
 
@@ -100,20 +98,8 @@ function pmssUserTransferParseCli(array $argv): array
                 $value = $tokens[$i] ?? null;
             }
 
-            if ($key === 'main-passes') {
-                $mainPasses = $parseInt('main-passes', $value);
-                continue;
-            }
-            if ($key === 'final-passes') {
-                $finalPasses = $parseInt('final-passes', $value);
-                continue;
-            }
-            if ($key === 'sleep-min') {
-                $sleepMin = $parseInt('sleep-min', $value);
-                continue;
-            }
-            if ($key === 'sleep-max') {
-                $sleepMax = $parseInt('sleep-max', $value);
+            if (isset($integerOptions[$key])) {
+                $options[$integerOptions[$key]] = $parseInt($key, $value);
                 continue;
             }
 
@@ -121,9 +107,8 @@ function pmssUserTransferParseCli(array $argv): array
         }
 
         if (substr($token, 0, 1) === '-' && strlen($token) > 1) {
-            $flags = substr($token, 1);
-            if ($flags === 'h') {
-                $help = true;
+            if (substr($token, 1) === 'h') {
+                $options['help'] = true;
                 continue;
             }
             throw new RuntimeException('Unknown option: '.$token, 1);
@@ -132,23 +117,20 @@ function pmssUserTransferParseCli(array $argv): array
         $positionals[] = $token;
     }
 
-    if ($help) {
+    if ($options['help']) {
         throw new RuntimeException(pmssUserTransferUsageText(), 0);
     }
 
-    if (count($positionals) !== 2 && count($positionals) !== 3) {
+    $positionalCount = count($positionals);
+    if ($positionalCount !== 2 && $positionalCount !== 3) {
         throw new RuntimeException('Need arguments.'.PHP_EOL.pmssUserTransferUsageText(), 1);
     }
 
     $localUser = pmssNormalizeUsername((string) $positionals[0]);
-    $remoteUser = $localUser;
-    $hostname = '';
-    if (count($positionals) === 2) {
-        $hostname = trim((string) $positionals[1]);
-    } else {
-        $remoteUser = pmssNormalizeUsername((string) $positionals[1]);
-        $hostname = trim((string) $positionals[2]);
-    }
+    $remoteUser = $positionalCount === 3
+        ? pmssNormalizeUsername((string) $positionals[1])
+        : $localUser;
+    $hostname = trim((string) $positionals[$positionalCount - 1]);
 
     // Usernames are used in file paths and ssh user arguments; keep strict.
     if (!pmssValidateUsername($localUser) || !pmssValidateUsername($remoteUser)) {
@@ -164,21 +146,21 @@ function pmssUserTransferParseCli(array $argv): array
         throw new RuntimeException('Invalid hostname', 1);
     }
 
-    if ($mainPasses < 1 || $mainPasses > 500) {
+    if ($options['mainPasses'] < 1 || $options['mainPasses'] > 500) {
         throw new RuntimeException('Invalid --main-passes (expected 1..500)', 1);
     }
-    if ($finalPasses < 1 || $finalPasses > 100) {
+    if ($options['finalPasses'] < 1 || $options['finalPasses'] > 100) {
         throw new RuntimeException('Invalid --final-passes (expected 1..100)', 1);
     }
-    if ($sleepMin < 0 || $sleepMax < 0) {
+    if ($options['sleepMin'] < 0 || $options['sleepMax'] < 0) {
         throw new RuntimeException('Invalid sleep values (expected non-negative integers)', 1);
     }
-    if ($sleepMax < $sleepMin) {
+    if ($options['sleepMax'] < $options['sleepMin']) {
         throw new RuntimeException('Invalid sleep range (sleep-max must be >= sleep-min)', 1);
     }
-    if ($noSleep) {
-        $sleepMin = 0;
-        $sleepMax = 0;
+    if ($options['noSleep']) {
+        $options['sleepMin'] = 0;
+        $options['sleepMax'] = 0;
     }
 
     return [
@@ -186,12 +168,12 @@ function pmssUserTransferParseCli(array $argv): array
         'remoteUser' => $remoteUser,
         'hostname' => $hostname,
         'suffixAppended' => $suffixAppended,
-        'mainPasses' => $mainPasses,
-        'finalPasses' => $finalPasses,
-        'sleepMin' => $sleepMin,
-        'sleepMax' => $sleepMax,
-        'dryRun' => $dryRun,
-        'printPassword' => $printPassword,
+        'mainPasses' => $options['mainPasses'],
+        'finalPasses' => $options['finalPasses'],
+        'sleepMin' => $options['sleepMin'],
+        'sleepMax' => $options['sleepMax'],
+        'dryRun' => $options['dryRun'],
+        'printPassword' => $options['printPassword'],
     ];
 }
 
@@ -200,13 +182,7 @@ function pmssUserTransferParseCli(array $argv): array
  */
 function pmssUserTransferHostnameIsValid(string $hostname): bool
 {
-    if ($hostname === '') {
-        return false;
-    }
-    if (preg_match('/\\s/', $hostname)) {
-        return false;
-    }
-    if (strlen($hostname) > 253) {
+    if ($hostname === '' || preg_match('/\\s/', $hostname) || strlen($hostname) > 253) {
         return false;
     }
 
@@ -219,19 +195,13 @@ function pmssUserTransferHostnameIsValid(string $hostname): bool
     if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/', $hostname)) {
         return false;
     }
-    if (strpos($hostname, '..') !== false) {
-        return false;
-    }
-    if ($hostname[0] === '.' || substr($hostname, -1) === '.') {
+    if (strpos($hostname, '..') !== false || $hostname[0] === '.' || substr($hostname, -1) === '.') {
         return false;
     }
 
     $labels = explode('.', $hostname);
     foreach ($labels as $label) {
-        if ($label === '' || strlen($label) > 63) {
-            return false;
-        }
-        if ($label[0] === '-' || substr($label, -1) === '-') {
+        if ($label === '' || strlen($label) > 63 || $label[0] === '-' || substr($label, -1) === '-') {
             return false;
         }
     }

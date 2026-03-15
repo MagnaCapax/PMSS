@@ -127,6 +127,35 @@ class UserTransferTest extends TestCase
         }, 'expected integer');
     }
 
+    public function testParseCliAcceptsSplitLongOptionValuesAndFlags(): void
+    {
+        $cfg = \pmssUserTransferParseCli([
+            'userTransfer.php',
+            '--main-passes',
+            '7',
+            '--final-passes',
+            '2',
+            '--dry-run',
+            '--print-password',
+            'deefbox',
+            'example.com',
+        ]);
+
+        $this->assertEquals(7, $cfg['mainPasses']);
+        $this->assertEquals(2, $cfg['finalPasses']);
+        $this->assertTrue($cfg['dryRun']);
+        $this->assertTrue($cfg['printPassword']);
+    }
+
+    public function testParseCliStopsOptionParsingAfterDoubleDash(): void
+    {
+        $cfg = \pmssUserTransferParseCli(['userTransfer.php', '--', 'deefbox', 'example.com']);
+
+        $this->assertEquals('deefbox', $cfg['localUser']);
+        $this->assertEquals('deefbox', $cfg['remoteUser']);
+        $this->assertEquals('example.com', $cfg['hostname']);
+    }
+
     public function testParseCliNoSleepOverridesSleepRange(): void
     {
         $cfg = \pmssUserTransferParseCli(['userTransfer.php', '--no-sleep', 'deefbox', 'example.com']);
