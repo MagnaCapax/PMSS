@@ -21,7 +21,7 @@
 require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/runtime/commands.php';
 
-foreach (['hostnameValidate', 'cliParse', 'localUserSafety', 'scriptsBuild', 'postSetup'] as $module) {
+foreach (['cliParse', 'localUserSafety', 'scriptsBuild'] as $module) {
     require_once __DIR__.'/userTransfer/'.$module.'.php';
 }
 

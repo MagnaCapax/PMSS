@@ -29,4 +29,12 @@ class UserTransferGuardTest extends TestCase
         $this->assertStringContainsString('posix_geteuid', $src, 'userTransfer must check effective UID');
         $this->assertStringContainsString('must be run as root', $src, 'userTransfer must refuse non-root execution');
     }
+
+    public function testUserTransferLibraryLoadsSharedHelpersThroughTopLevelInclude(): void
+    {
+        require_once __DIR__.'/../../userTransfer.php';
+
+        $this->assertTrue(\function_exists('pmssUserTransferHostnameIsValid'), 'userTransfer should load hostname validation helper');
+        $this->assertTrue(\function_exists('pmssUserTransferPostSetup'), 'userTransfer should load post-setup helper');
+    }
 }
