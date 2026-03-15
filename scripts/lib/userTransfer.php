@@ -21,14 +21,9 @@
 require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/runtime/commands.php';
 
-require_once __DIR__.'/userTransfer/cliUsage.php';
-require_once __DIR__.'/userTransfer/hostnameValidate.php';
-require_once __DIR__.'/userTransfer/cliParse.php';
-require_once __DIR__.'/userTransfer/localUserSafety.php';
-require_once __DIR__.'/userTransfer/scratchIo.php';
-require_once __DIR__.'/userTransfer/scriptsBuild.php';
-require_once __DIR__.'/userTransfer/sleep.php';
-require_once __DIR__.'/userTransfer/postSetup.php';
+foreach (['cliUsage', 'hostnameValidate', 'cliParse', 'localUserSafety', 'scratchIo', 'scriptsBuild', 'sleep', 'postSetup'] as $module) {
+    require_once __DIR__.'/userTransfer/'.$module.'.php';
+}
 
 /**
  * Ensure the caller is root (best effort; depends on posix extension).
@@ -83,4 +78,3 @@ function pmssUserTransferReadPassword(): string
 }
 
 require_once __DIR__.'/userTransfer/main.php';
-

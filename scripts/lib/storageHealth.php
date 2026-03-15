@@ -9,10 +9,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/storageHealth/common.php';
-require_once __DIR__.'/storageHealth/exec.php';
-require_once __DIR__.'/storageHealth/disks.php';
-require_once __DIR__.'/storageHealth/smart.php';
-require_once __DIR__.'/storageHealth/nvme.php';
-require_once __DIR__.'/storageHealth/raid.php';
-
+foreach (['common', 'exec', 'disks', 'smart', 'nvme', 'raid'] as $module) {
+    require_once __DIR__.'/storageHealth/'.$module.'.php';
+}

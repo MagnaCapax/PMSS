@@ -22,21 +22,11 @@ function pmssOpenvpnSlugFromHostname(string $hostname): string
     return $fqdn === '' ? '' : str_replace('.', '-', $fqdn);
 }
 
-function pmssOpenvpnSlug(): string
-{
-    return pmssOpenvpnSlugFromHostname(trim((string) @file_get_contents('/etc/hostname')));
-}
-
 function pmssOpenvpnArtifactPathsFromSlug(string $slug): array
 {
     return $slug === ''
         ? ['', '']
         : ['/home/openvpn-'.$slug.'.ovpn', '/home/openvpn-'.$slug.'.crt'];
-}
-
-function pmssOpenvpnArtifactPaths(): array
-{
-    return pmssOpenvpnArtifactPathsFromSlug(pmssOpenvpnSlug());
 }
 
 /**
@@ -49,7 +39,8 @@ function pmssOpenvpnIsConfigured(): bool
         return false;
     }
     $easyRsaDir = '/etc/openvpn/easy-rsa';
-    list($ovpn, $crt) = pmssOpenvpnArtifactPaths();
+    $slug = pmssOpenvpnSlugFromHostname(trim((string) @file_get_contents('/etc/hostname')));
+    list($ovpn, $crt) = pmssOpenvpnArtifactPathsFromSlug($slug);
     return is_file('/etc/openvpn/openvpn.conf')
         && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
         && $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);

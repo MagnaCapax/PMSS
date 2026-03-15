@@ -6,11 +6,9 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../logging.php';
-require_once __DIR__.'/../runtime/commands.php';
-require_once __DIR__.'/quota.php';
-require_once __DIR__.'/../../configBackups.php';
-require_once __DIR__.'/../../runtime.php';
+foreach (['../logging.php', '../runtime/commands.php', 'quota.php', '../../configBackups.php', '../../runtime.php'] as $relativePath) {
+    require_once __DIR__.'/'.$relativePath;
+}
 
 /**
  * Apply hostname overrides provided by the installer.

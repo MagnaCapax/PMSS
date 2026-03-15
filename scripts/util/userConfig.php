@@ -12,12 +12,9 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../lib/user/traffic.php';
-require_once __DIR__.'/../lib/user/rtorrent.php';
-require_once __DIR__.'/../lib/user/deluge.php';
-require_once __DIR__.'/../lib/user/qbittorrent.php';
-require_once __DIR__.'/../lib/user/system.php';
-require_once __DIR__.'/../lib/user/userConfigStore.php';
+foreach (['traffic', 'rtorrent', 'deluge', 'qbittorrent', 'system', 'userConfigStore'] as $module) {
+    require_once __DIR__.'/../lib/user/'.$module.'.php';
+}
 
 /**
  * Main entry point for user configuration changes.

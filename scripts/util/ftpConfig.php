@@ -7,10 +7,9 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../lib/update.php';
-require_once __DIR__.'/../lib/update/runtime/commands.php';
-require_once __DIR__.'/../lib/update/distro.php';
-require_once __DIR__.'/../lib/configBackups.php';
+foreach (['../lib/update.php', '../lib/update/runtime/commands.php', '../lib/update/distro.php', '../lib/configBackups.php'] as $relativePath) {
+    require_once __DIR__.'/'.$relativePath;
+}
 
 logMessage('Making ProFTPD configuration');
 
