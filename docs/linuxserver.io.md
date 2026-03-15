@@ -147,6 +147,12 @@ This section walks through a simple Jellyfin media server deployment.
 
 Once this is working you can reuse the same pattern for other images.
 
+If you want the most common PMSS-ready presets without retyping the full
+`docker run` lines, the default skeleton now includes `~/bin/linuxserverInstall.sh`.
+It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, and `prowlarr`,
+creates the expected home-directory mounts, attaches the containers to a shared
+`pmss-media` Docker network, and keeps `--restart unless-stopped` enabled.
+
 ## 4. Common seedbox recipes
 
 This section shows typical LinuxServer.io containers seedbox users care about.

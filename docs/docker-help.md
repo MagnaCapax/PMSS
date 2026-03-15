@@ -30,6 +30,18 @@ linuxserver.io Wireguard container. Invoke it with an optional port:
 docker-install-wireguard.sh 51820
 ```
 
+For the common LinuxServer.io media stack, PMSS also ships `linuxserverInstall.sh`
+in `~/bin`. It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, and
+`prowlarr`, keeps their mounts under `~/`, joins them to a shared `pmss-media`
+network, and starts them with `--restart unless-stopped` so the existing
+rootless Docker watchdog can bring them back with the daemon:
+
+```
+linuxserverInstall.sh qbittorrent
+linuxserverInstall.sh radarr
+linuxserverInstall.sh sonarr 18989
+```
+
 ## Storage drivers on PMSS
 
 On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast and space-efficient:

@@ -47,6 +47,7 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         'install-media-stack.sh',
         'install-ai-tools.sh',
         'bin/docker-install-wireguard.sh',
+        'bin/linuxserverInstall.sh',
         '.qbittorrentPort.py',
         '.delugePort.py',
         '.scriptsInc.php',
