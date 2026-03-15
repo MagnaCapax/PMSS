@@ -4,7 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/update/runtime/commands.php';
 require_once dirname(__DIR__, 2).'/update/runtime/profile.php';
-require_once dirname(__DIR__, 2).'/update/services/runtime.php';
+require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesRuntimeTest extends TestCase
 {
