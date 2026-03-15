@@ -5,7 +5,7 @@ schedule2 = dht_node2, 15, 3600, "dht.add_node=dht.transmissionbt.com"
 schedule2 = dht_node3, 45, 3600, "dht.add_node=router.utorrent.com"
 schedule2 = watch_directory,15,1,"load.start_verbose=~/watch/*.torrent"
 #schedule2 = untied_directory,10,10,stop_untied=
-schedule2 = rss,0,1800,"execute={sh,-c,php ~/www/rutorrent/plugins/rss/update.php& exit 0}"
+schedule2 = rss,0,1800,"execute.nothrow=sh,-c,php ~/www/rutorrent/plugins/rss/update.php& exit 0"
 #schedule2 = last_scrape_s, 0, 1800, "d.multicall2=main,d.tracker.send_scrape=0"
 schedule2 = scgi_permission,0,0,"execute.nothrow=chmod,770,~/.rtorrent.socket"
 
