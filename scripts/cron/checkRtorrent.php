@@ -272,15 +272,17 @@ foreach ($usersOut as $line) {
         if ($responsive) {
             rtorrentProcessClearStaleState($unresponsiveState);
             $throttle = pmssReadTorrentThrottle($user);
-            $throttleValue = ($throttle !== null && $throttle > 0) ? $throttle : 0;
-            if (!rtorrentScgiCallInt($socketPath, 'throttle.global_up.max_rate.set', $throttleValue, 5)) {
-                pmssCheckRtorrentLogBoth($user, 'failed to apply upload throttle', $debug);
-            } else {
-                pmssCheckRtorrentLog(
-                    "Applied upload throttle (up={$throttleValue} KiB/s) for {$user}",
-                    false,
-                    $debug
-                );
+            if ($throttle !== null) {
+                $throttleValue = $throttle > 0 ? $throttle : 0;
+                if (!rtorrentScgiCallInt($socketPath, 'throttle.global_up.max_rate.set', $throttleValue, 5)) {
+                    pmssCheckRtorrentLogBoth($user, 'failed to apply upload throttle', $debug);
+                } else {
+                    pmssCheckRtorrentLog(
+                        "Applied upload throttle (up={$throttleValue} KiB/s) for {$user}",
+                        false,
+                        $debug
+                    );
+                }
             }
             pmssCheckRtorrentLog("rTorrent healthy for {$user}", false, $debug);
             continue;
