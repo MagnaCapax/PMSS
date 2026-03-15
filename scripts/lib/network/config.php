@@ -26,5 +26,5 @@ function networkLoadLocalnets(): array
     }
 
     $cfg = trim((string) file_get_contents($path));
-    return $cfg === '' ? $default : array_filter(preg_split('/\r?\n/', $cfg) ?: [], 'strlen');
+    return $cfg === '' ? $default : preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY);
 }

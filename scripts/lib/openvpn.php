@@ -11,13 +11,9 @@
 function pmssOpenvpnFqdnFromHostname(string $hostname): string
 {
     $hostname = trim($hostname);
-    if ($hostname === '') {
-        return '';
-    }
-    if (strpos($hostname, '.pulsedmedia.com') === false) {
-        return $hostname.'.pulsedmedia.com';
-    }
-    return $hostname;
+    return ($hostname === '' || strpos($hostname, '.pulsedmedia.com') !== false)
+        ? $hostname
+        : $hostname.'.pulsedmedia.com';
 }
 
 function pmssOpenvpnSlugFromHostname(string $hostname): string
@@ -28,16 +24,14 @@ function pmssOpenvpnSlugFromHostname(string $hostname): string
 
 function pmssOpenvpnSlug(): string
 {
-    $hostname = @file_get_contents('/etc/hostname');
-    $hostname = $hostname === false ? '' : trim($hostname);
-    return pmssOpenvpnSlugFromHostname($hostname);
+    return pmssOpenvpnSlugFromHostname(trim((string) @file_get_contents('/etc/hostname')));
 }
 
 function pmssOpenvpnArtifactPathsFromSlug(string $slug): array
 {
-    $ovpn = $slug !== '' ? ('/home/openvpn-'.$slug.'.ovpn') : '';
-    $crt  = $slug !== '' ? ('/home/openvpn-'.$slug.'.crt') : '';
-    return [$ovpn, $crt];
+    return $slug === ''
+        ? ['', '']
+        : ['/home/openvpn-'.$slug.'.ovpn', '/home/openvpn-'.$slug.'.crt'];
 }
 
 function pmssOpenvpnArtifactPaths(): array
@@ -54,11 +48,9 @@ function pmssOpenvpnIsConfigured(): bool
     if ($bin === '') {
         return false;
     }
-    $serverConf = '/etc/openvpn/openvpn.conf';
     $easyRsaDir = '/etc/openvpn/easy-rsa';
-    $hasServer  = is_file($serverConf);
-    $hasCa      = is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt');
     list($ovpn, $crt) = pmssOpenvpnArtifactPaths();
-    $hasClient = ($ovpn !== '' && is_file($ovpn)) && ($crt !== '' && is_file($crt));
-    return $hasServer && $hasCa && $hasClient;
+    return is_file('/etc/openvpn/openvpn.conf')
+        && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
+        && $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);
 }

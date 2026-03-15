@@ -45,13 +45,15 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
         return;
     }
 
-    $command = 'bash -lc '.escapeshellarg(
-        (strpos($target['targetIp'], ':') === false ? 'ping' : 'ping -6')
-        .' -c 1 -W 1 -I '.escapeshellarg($target['interface']).' '.escapeshellarg($target['targetIp']).' >/dev/null 2>&1 || true; '
-        .'ip neigh show to '.escapeshellarg($target['targetIp']).' dev '.escapeshellarg($target['interface'])
-        .' | grep -Fqi '.escapeshellarg($target['targetMac'])
-    );
-    if ((int) $runner('Verifying netconsole target reachability', $command) !== 0) {
+    if ((int) $runner(
+        'Verifying netconsole target reachability',
+        'bash -lc '.escapeshellarg(
+            (strpos($target['targetIp'], ':') === false ? 'ping' : 'ping -6')
+            .' -c 1 -W 1 -I '.escapeshellarg($target['interface']).' '.escapeshellarg($target['targetIp']).' >/dev/null 2>&1 || true; '
+            .'ip neigh show to '.escapeshellarg($target['targetIp']).' dev '.escapeshellarg($target['interface'])
+            .' | grep -Fqi '.escapeshellarg($target['targetMac'])
+        )
+    ) !== 0) {
         $log('[WARN] Netconsole target '.$target['targetIp'].'/'.$target['targetMac'].' is not reachable via '.$target['interface']);
         return;
     }

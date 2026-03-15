@@ -77,13 +77,9 @@ function pmssResourceLogReadCounters(int $uid): ?array
         $values[$field] = (int) $parts[1];
     }
 
-    foreach (['io_read', 'io_write', 'cpu_nsec', 'memory', 'tasks'] as $field) {
-        if (!isset($values[$field])) {
-            return null;
-        }
-    }
-
-    return $values;
+    return isset($values['io_read'], $values['io_write'], $values['cpu_nsec'], $values['memory'], $values['tasks'])
+        ? $values
+        : null;
 }
 
 /**
