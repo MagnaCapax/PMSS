@@ -418,13 +418,13 @@ runStep('Configuring WireGuard', 'php /scripts/util/wireguardConfigure.php');
 runStep('Configuring netconsole', 'php /scripts/util/netconsoleConfigure.php');
 
 // Load application installers automatically (sorted for deterministic order),
-// but skip legacy app scripts that are superseded by dedicated utilities or
-// retired package-phase orchestration.
+// but skip helper-only modules and legacy app scripts that are superseded by
+// dedicated utilities or retired package-phase orchestration.
 $apps = glob('/scripts/lib/update/apps/*.php') ?: [];
 sort($apps);
 foreach ($apps as $app) {
     $appBase = basename($app);
-    if ($appBase === 'openvpn.php' || $appBase === 'packages.php') {
+    if (in_array($appBase, ['arr.php', 'openvpn.php', 'packages.php', 'pythonVenv.php', 'remoteBinary.php'], true)) {
         continue;
     }
     pmssRunProfiledStep('Loading app installer '.basename($app), static function () use ($app): void {
