@@ -5,8 +5,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/update/runtime/commands.php';
-require_once __DIR__.'/localUserSafety.php';
 require_once __DIR__.'/sessionRewrite.php';
 
 /**

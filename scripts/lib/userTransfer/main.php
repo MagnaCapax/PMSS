@@ -5,12 +5,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/update/runtime/commands.php';
-require_once __DIR__.'/cliParse.php';
-require_once __DIR__.'/localUserSafety.php';
-require_once __DIR__.'/scriptsBuild.php';
-require_once __DIR__.'/postSetup.php';
-
 /**
  * Entry point used by scripts/util/userTransfer.php.
  */

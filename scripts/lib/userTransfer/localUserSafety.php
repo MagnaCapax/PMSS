@@ -5,47 +5,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/update/runtime/commands.php';
-
-/**
- * Fetch passwd metadata for a local user.
- */
-function pmssUserTransferPasswdRecord(string $user): ?array
-{
-    if (function_exists('posix_getpwnam')) {
-        $pw = @posix_getpwnam($user);
-        if (!is_array($pw)) {
-            return null;
-        }
-        return [
-            'uid' => (int) ($pw['uid'] ?? -1),
-            'gid' => (int) ($pw['gid'] ?? -1),
-            'dir' => (string) ($pw['dir'] ?? ''),
-        ];
-    }
-
-    $lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
-        return null;
-    }
-    $prefix = $user.':';
-    foreach ($lines as $line) {
-        if (strpos($line, $prefix) !== 0) {
-            continue;
-        }
-        $parts = explode(':', $line);
-        if (count($parts) < 7) {
-            return null;
-        }
-        return [
-            'uid' => (int) $parts[2],
-            'gid' => (int) $parts[3],
-            'dir' => (string) $parts[5],
-        ];
-    }
-    return null;
-}
-
 /**
  * Return the configured home root for user transfers.
  */
@@ -67,7 +26,37 @@ function pmssUserTransferAssertSafeLocalHome(string $user): string
         throw new RuntimeException('Local user home does not look safe: '.$expected, 1);
     }
 
-    $pw = pmssUserTransferPasswdRecord($user);
+    if (function_exists('posix_getpwnam')) {
+        $pw = @posix_getpwnam($user);
+        $pw = is_array($pw)
+            ? [
+                'uid' => (int) ($pw['uid'] ?? -1),
+                'gid' => (int) ($pw['gid'] ?? -1),
+                'dir' => (string) ($pw['dir'] ?? ''),
+            ]
+            : null;
+    } else {
+        $pw = null;
+        $lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($lines)) {
+            $prefix = $user.':';
+            foreach ($lines as $line) {
+                if (strpos($line, $prefix) !== 0) {
+                    continue;
+                }
+                $parts = explode(':', $line);
+                $pw = count($parts) < 7
+                    ? null
+                    : [
+                        'uid' => (int) $parts[2],
+                        'gid' => (int) $parts[3],
+                        'dir' => (string) $parts[5],
+                    ];
+                break;
+            }
+        }
+    }
+
     if ($pw === null) {
         throw new RuntimeException('Local user not present in /etc/passwd: '.$user, 1);
     }
@@ -98,4 +87,3 @@ function pmssUserTransferIsPathWithinHome(string $path, string $home): bool
     $prefix = rtrim($realHome, '/').'/';
     return strpos(rtrim($realPath, '/').'/', $prefix) === 0;
 }
-

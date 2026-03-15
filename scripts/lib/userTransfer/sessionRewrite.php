@@ -4,7 +4,6 @@
  *
  * @license GPL-3.0-only
  */
-require_once __DIR__.'/localUserSafety.php';
 /**
  * Rewrite /home/<remote>/ path strings in local rTorrent session files.
  *

@@ -101,6 +101,18 @@ class UserTransferTest extends TestCase
         }, 'Invalid hostname');
     }
 
+    public function testParseCliHelpReturnsStableUsageText(): void
+    {
+        try {
+            \pmssUserTransferParseCli(['userTransfer.php', '--help']);
+            $this->fail('expected help path to throw RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertEquals(0, $e->getCode());
+            $this->assertEquals(\pmssUserTransferUsageText(), $e->getMessage());
+            $this->assertStringContainsString('--print-password    Print the supplied password at the end (unsafe)', $e->getMessage());
+        }
+    }
+
     public function testParseCliRejectsMissingOptionValue(): void
     {
         $this->assertThrowsRuntime(static function (): void {
