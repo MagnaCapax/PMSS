@@ -45,6 +45,20 @@ require_once __DIR__.'/../lib/update/networking.php';
 require_once __DIR__.'/../lib/update/services/bootstrap.php';
 require_once __DIR__.'/../lib/motd/Generator.php';
 
+// When update-step2 runs standalone it does not inherit update.php's logger,
+// so define the fallback before any profiled step can emit a log line.
+if (!function_exists('logmsg')) {
+    /**
+     * Minimal logger used when update-step2 runs outside update.php.
+     */
+    function logmsg(string $message): void
+    {
+        $timestamp = date('[Y-m-d H:i:s] ');
+        @file_put_contents('/var/log/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX) || @file_put_contents('/tmp/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        fwrite(STDERR, $message.PHP_EOL);
+    }
+}
+
 requireRoot();
 
 if (!defined('PMSS_UPDATE_LOCK_FILE')) {
@@ -291,20 +305,6 @@ putenv('UCF_FORCE_CONFOLD=1');
 putenv('UCF_FORCE_CONFNEW=0');
 putenv('UCF_FORCE_CONFDEF=1');
 putenv('NEEDRESTART_MODE=a');
-
-// logmsg is defined in /scripts/update.php when this file is loaded from there.
-// Provide a very small fallback so running this script standalone won't fatal.
-if (!function_exists('logmsg')) {
-    /**
-     * Minimal logger used when update-step2 runs outside update.php.
-     */
-    function logmsg(string $message): void
-    {
-        $timestamp = date('[Y-m-d H:i:s] ');
-        @file_put_contents('/var/log/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX) || @file_put_contents('/tmp/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
-        fwrite(STDERR, $message.PHP_EOL);
-    }
-}
 
 $GLOBALS['PMSS_PACKAGES_READY'] = false;
 // PMSS_PACKAGE_PHASE advertises coarse progress (`initializing`/`complete`); unknown values mean "in progress".
