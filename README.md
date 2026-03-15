@@ -31,6 +31,10 @@ See `CONTRIBUTING.md` for workflow and validation steps. Significant technical
 choices are recorded as ADRs; new decisions should include an ADR alongside
 code, tests, and documentation.
 
+For a Debian-based development container that can run the local validation
+suite without touching a real host, see the `Development Container` section in
+`CONTRIBUTING.md`.
+
 ### Installation
 
 Install minimal Debian system, and run following as root

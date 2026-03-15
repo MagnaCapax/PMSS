@@ -1,0 +1,5 @@
+# The image does not copy the repository tree.
+# Keep the build context tiny and mount the checkout at runtime instead.
+**
+!Dockerfile
+!.dockerignore
