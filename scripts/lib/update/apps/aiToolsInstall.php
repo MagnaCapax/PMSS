@@ -87,58 +87,6 @@ function pmssAiToolsInstallNpmCli(string $toolLabel, string $packageName, string
     runStep('Linking '.$toolLabel.' command', sprintf('ln -sf %s %s', escapeshellarg($binaryPath), escapeshellarg('/usr/local/bin/'.$binaryName)));
 }
 
-/**
- * Install pinned Codex CLI binary and old-kernel fallback config.
- */
-function pmssAiToolsInstallCodex(bool $forceRefresh): void
-{
-    $destination = '/usr/local/bin/codex';
-    if (is_file($destination) && !$forceRefresh) {
-        return;
-    }
-    if (!in_array(php_uname('m'), ['x86_64', 'amd64'], true)) {
-        if (function_exists('logmsg')) {
-            logmsg('[WARN] Skipping Codex install: no pinned binary for this CPU architecture');
-        }
-        return;
-    }
-
-    $tag         = 'rust-v0.93.0';
-    $archive     = 'codex-x86_64-unknown-linux-musl.tar.gz';
-    $sha256      = '3574eef71b062c17904b0761c397a97709ef28e99c616e2d1db261b2ea293d07';
-    $url         = 'https://github.com/openai/codex/releases/download/'.$tag.'/'.$archive;
-    $downloadDir = sys_get_temp_dir().'/pmss-ai-tools-codex';
-    $archivePath = $downloadDir.'/'.$archive;
-
-    runStep('Preparing Codex download directory', 'mkdir -p '.escapeshellarg($downloadDir));
-    runStep('Downloading pinned Codex CLI archive', sprintf('wget -q -O %s %s', escapeshellarg($archivePath), escapeshellarg($url)));
-
-    if (getenv('PMSS_DRY_RUN') !== '1') {
-        $actualSha = @hash_file('sha256', $archivePath);
-        if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($sha256)) {
-            if (function_exists('logmsg')) {
-                logmsg('[WARN] Codex archive checksum mismatch; refusing installation');
-            }
-            return;
-        }
-    }
-
-    runStep('Extracting Codex CLI archive', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($downloadDir)));
-    runStep('Installing Codex CLI binary', sprintf('install -m 0755 %s %s', escapeshellarg($downloadDir.'/codex-x86_64-unknown-linux-musl'), escapeshellarg($destination)));
-
-    // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
-    if (preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {
-        runStep('Ensuring /etc/codex exists', 'mkdir -p /etc/codex');
-        if (getenv('PMSS_DRY_RUN') === '1') {
-            return;
-        }
-        if (!is_file('/etc/codex/config.toml')) {
-            @file_put_contents('/etc/codex/config.toml', "# PMSS compatibility fallback for kernels without Landlock support.\n"."sandbox = \"danger-full-access\"\n");
-            @chmod('/etc/codex/config.toml', 0644);
-        }
-    }
-}
-
 $logger = function_exists('logmsg') ? 'logmsg' : 'logMessage';
 $force  = getenv('PMSS_FORCE_AI_TOOLS_REFRESH') === '1';
 
@@ -148,4 +96,40 @@ if ($nodeBinary !== '') {
     pmssAiToolsInstallNpmCli('Claude Code', '@anthropic-ai/claude-code', 'claude', $nodeBinary, $force);
 }
 
-pmssAiToolsInstallCodex($force);
+$destination = '/usr/local/bin/codex';
+if (!is_file($destination) || $force) {
+    if (!in_array(php_uname('m'), ['x86_64', 'amd64'], true)) {
+        $logger('[WARN] Skipping Codex install: no pinned binary for this CPU architecture');
+    } else {
+        $tag         = 'rust-v0.93.0';
+        $archive     = 'codex-x86_64-unknown-linux-musl.tar.gz';
+        $sha256      = '3574eef71b062c17904b0761c397a97709ef28e99c616e2d1db261b2ea293d07';
+        $url         = 'https://github.com/openai/codex/releases/download/'.$tag.'/'.$archive;
+        $downloadDir = sys_get_temp_dir().'/pmss-ai-tools-codex';
+        $archivePath = $downloadDir.'/'.$archive;
+
+        runStep('Preparing Codex download directory', 'mkdir -p '.escapeshellarg($downloadDir));
+        runStep('Downloading pinned Codex CLI archive', sprintf('wget -q -O %s %s', escapeshellarg($archivePath), escapeshellarg($url)));
+
+        if (getenv('PMSS_DRY_RUN') !== '1') {
+            $actualSha = @hash_file('sha256', $archivePath);
+            if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($sha256)) {
+                $logger('[WARN] Codex archive checksum mismatch; refusing installation');
+            }
+        }
+
+        if (getenv('PMSS_DRY_RUN') === '1' || (isset($actualSha) && is_string($actualSha) && strtolower($actualSha) === strtolower($sha256))) {
+            runStep('Extracting Codex CLI archive', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($downloadDir)));
+            runStep('Installing Codex CLI binary', sprintf('install -m 0755 %s %s', escapeshellarg($downloadDir.'/codex-x86_64-unknown-linux-musl'), escapeshellarg($destination)));
+
+            // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
+            if (preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {
+                runStep('Ensuring /etc/codex exists', 'mkdir -p /etc/codex');
+                if (getenv('PMSS_DRY_RUN') !== '1' && !is_file('/etc/codex/config.toml')) {
+                    @file_put_contents('/etc/codex/config.toml', "# PMSS compatibility fallback for kernels without Landlock support.\n"."sandbox = \"danger-full-access\"\n");
+                    @chmod('/etc/codex/config.toml', 0644);
+                }
+            }
+        }
+    }
+}

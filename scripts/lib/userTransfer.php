@@ -26,48 +26,6 @@ foreach (['cliParse', 'localUserSafety'] as $module) {
 }
 
 /**
- * Read a password from env or from an interactive TTY prompt.
- */
-function pmssUserTransferReadPassword(): string
-{
-    $fromEnv = getenv('PMSS_USER_TRANSFER_PASSWORD');
-    if ($fromEnv !== false && $fromEnv !== '') {
-        return $fromEnv;
-    }
-
-    $isTty = function_exists('posix_isatty') && posix_isatty(STDIN);
-    if (!$isTty) {
-        throw new RuntimeException('Password missing (set PMSS_USER_TRANSFER_PASSWORD for non-interactive runs)', 1);
-    }
-
-    // Avoid echoing the password on the console.
-    $mode = trim((string) @shell_exec('stty -g 2>/dev/null'));
-    $pass1 = '';
-    $pass2 = '';
-    try {
-        @shell_exec('stty -echo 2>/dev/null');
-        echo 'Remote user password: ';
-        $pass1 = (string) fgets(STDIN);
-        echo PHP_EOL.'Re-type password: ';
-        $pass2 = (string) fgets(STDIN);
-        echo PHP_EOL;
-    } finally {
-        if ($mode !== '') {
-            @shell_exec('stty '.escapeshellarg($mode).' 2>/dev/null');
-        } else {
-            @shell_exec('stty echo 2>/dev/null');
-        }
-    }
-
-    $pass1 = trim($pass1);
-    $pass2 = trim($pass2);
-    if ($pass1 === '' || $pass1 !== $pass2) {
-        throw new RuntimeException('Password mismatch', 1);
-    }
-    return $pass1;
-}
-
-/**
  * Write a file with the given contents and permissions.
  */
 function pmssUserTransferWriteFile(string $path, string $contents, int $mode): void

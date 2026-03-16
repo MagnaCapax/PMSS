@@ -16,9 +16,10 @@ class UserTransferGuardTest extends TestCase
 
     public function testUserTransferLibraryAvoidsEmbeddingPasswordInScripts(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../userTransfer.php');
+        $src = (string) file_get_contents(__DIR__.'/../../userTransfer/main.php');
 
-        $this->assertStringContainsString('PMSS_USER_TRANSFER_PASSWORD', $src, 'expected password to be sourced from env');
+        $this->assertStringContainsString('PMSS_USER_TRANSFER_PASSWORD', $src, 'expected password to be sourced from env in the main flow');
+        $this->assertStringContainsString('Remote user password:', $src, 'interactive password prompt should remain in the main flow');
         $this->assertTrue(strpos($src, 'send "{$args') === false, 'userTransfer must not embed password literals');
     }
 
