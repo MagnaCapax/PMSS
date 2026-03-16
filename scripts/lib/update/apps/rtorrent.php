@@ -26,32 +26,30 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../distro.php';
 
-if (!function_exists('pmssRtorrentResolveTargetVersions')) {
-    /**
-     * Resolve rtorrent/libtorrent targets by detected Debian major version.
-     *
-     * Debian 10+ requires the 0.9.8/0.13.8 udns builds while legacy Debian
-     * 8/9 keeps the historic 0.9.6/0.13.6 fallback.
-     */
-    function pmssRtorrentResolveTargetVersions(array $distroInfo, string $legacyDebianVersion = ''): array
-    {
-        $majorVersion = isset($distroInfo['version']) ? (int) $distroInfo['version'] : 0;
-        if ($majorVersion <= 0 && preg_match('/^\s*([0-9]+)/', $legacyDebianVersion, $matches)) {
-            $majorVersion = (int) $matches[1];
-        }
+/**
+ * Resolve rtorrent/libtorrent targets by detected Debian major version.
+ *
+ * Debian 10+ requires the 0.9.8/0.13.8 udns builds while legacy Debian
+ * 8/9 keeps the historic 0.9.6/0.13.6 fallback.
+ */
+function pmssRtorrentResolveTargetVersions(array $distroInfo, string $legacyDebianVersion = ''): array
+{
+    $majorVersion = isset($distroInfo['version']) ? (int) $distroInfo['version'] : 0;
+    if ($majorVersion <= 0 && preg_match('/^\s*([0-9]+)/', $legacyDebianVersion, $matches)) {
+        $majorVersion = (int) $matches[1];
+    }
 
-        if ($majorVersion >= 10) {
-            return [
-                'rtorrent'   => '0.9.8-udns',
-                'libtorrent' => '0.13.8-udns',
-            ];
-        }
-
+    if ($majorVersion >= 10) {
         return [
-            'rtorrent'   => '0.9.6',
-            'libtorrent' => '0.13.6',
+            'rtorrent'   => '0.9.8-udns',
+            'libtorrent' => '0.13.8-udns',
         ];
     }
+
+    return [
+        'rtorrent'   => '0.9.6',
+        'libtorrent' => '0.13.6',
+    ];
 }
 
 if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
