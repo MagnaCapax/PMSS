@@ -19,16 +19,12 @@ require_once '/scripts/lib/network/fireqos.php';
 require_once '/scripts/lib/userLifecycle.php';
 // Collect tenant usernames for FireQOS shaping.
 $usersRaw = trim((string) shell_exec('/scripts/listUsers.php'));
-$users    = $usersRaw === '' ? [] : array_filter(explode("\n", $usersRaw), 'strlen');
+$users    = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
 
 // Defensive validation: ensure usernames from listUsers conform to the core
 // regex so any anomalies are surfaced via users.log and excluded from shaping.
 $validatedUsers = [];
 foreach ($users as $u) {
-    $u = trim($u);
-    if ($u === '') {
-        continue;
-    }
     if (!pmssValidateUsername($u)) {
         pmssUserWriteLogs(
             pmssUserBaseContext(

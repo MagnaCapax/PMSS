@@ -39,10 +39,6 @@ function pmssUserTorrentsMain(array $argv): int
     $users = array_filter(array_map('trim', $lines), 'strlen');
 
     foreach($users AS $thisUser) {    // Loop users checking their instances
-        $thisUser = trim($thisUser);
-        if ($thisUser === '') {
-            continue;
-        }
         if (!pmssValidateUsername($thisUser)) {
             pmssUserWriteLogs(
                 pmssUserBaseContext(

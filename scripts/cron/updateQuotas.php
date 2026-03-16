@@ -26,14 +26,10 @@ $logger = new Logger(__FILE__);
 
 $logger->msg('Updating quota information');
 // Get & parse users list
-$users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
+$users = array_filter(array_map('trim', explode("\n", trim((string) shell_exec('/scripts/listUsers.php')))), 'strlen');
 
 foreach ($users as $thisUser) {
 #TODO Check that quota is working
-    $thisUser = trim($thisUser);
-    if ($thisUser === '') {
-        continue;
-    }
     if (!pmssValidateUsername($thisUser)) {
         $logger->msg("Skipping invalid username {$thisUser} during quota refresh");
         pmssUserWriteLogs(

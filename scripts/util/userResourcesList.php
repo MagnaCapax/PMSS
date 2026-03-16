@@ -135,7 +135,7 @@ if ($usersRaw === '') {
     }
     exit(0);
 }
-$users = explode("\n", $usersRaw);
+$users = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
 
 if (!$outputJson && !$outputJsonl) {
     printf($columnFormats[$displayMode], ...$columnHeaders[$displayMode]);
@@ -145,10 +145,6 @@ if (!$outputJson && !$outputJsonl) {
 $allData = [];
 
 foreach ($users as $user) {
-    $user = trim($user);
-    if ($user === '') {
-        continue;
-    }
     if (!pmssValidateUsername($user)) {
         pmssUserWriteLogs(
             pmssUserBaseContext(

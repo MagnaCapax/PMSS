@@ -44,7 +44,10 @@ class ListUsersGarbageOutputTest extends TestCase
         foreach ($targets as $file) {
             $src = (string) file_get_contents(__DIR__.'/../../../../'.$file);
             $this->assertStringContainsString('listUsers.php', $src, $file.' must call listUsers.php');
-            $this->assertStringContainsString('trim($', $src, $file.' should trim usernames from listUsers');
+            $this->assertTrue(
+                strpos($src, 'trim($') !== false || strpos($src, "array_map('trim'") !== false,
+                $file.' should trim usernames from listUsers'
+            );
             $this->assertStringContainsString('pmssValidateUsername', $src, $file.' must revalidate usernames from listUsers');
         }
 

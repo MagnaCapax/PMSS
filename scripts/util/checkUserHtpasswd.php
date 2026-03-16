@@ -47,7 +47,7 @@ if ($singleUserMode) {
     if ($usersRaw === '') {
         die("No users setup - nothing to do\n");
     }
-    $users = array_filter(explode("\n", $usersRaw), 'strlen');
+    $users = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
 }
 
 $globalHtpasswd = '/etc/lighttpd/.htpasswd';
@@ -62,10 +62,6 @@ if ($globalContents === false || trim($globalContents) === '') {
 $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
 foreach ($users as $thisUser) {
-    $thisUser = trim($thisUser);
-    if ($thisUser === '') {
-        continue;
-    }
     if (!pmssValidateUsername($thisUser)) {
         pmssUserWriteLogs(
             pmssUserBaseContext(

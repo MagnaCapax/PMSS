@@ -184,13 +184,7 @@ if ($usersRc !== 0) {
     pmssTrackerCleanerLog("ERR: /scripts/listUsers.php failed (rc={$usersRc}); skipping run.");
     exit(0);
 }
-$users = array();
-foreach ($usersLines as $line) {
-    $line = trim($line);
-    if ($line !== '') {
-        $users[] = $line;
-    }
-}
+$users = array_filter(array_map('trim', $usersLines), 'strlen');
 if (count($users) === 0) {
     pmssTrackerCleanerLog('SKIP: no users returned by /scripts/listUsers.php.');
     exit(0);
@@ -210,10 +204,6 @@ $anyWork = false;
 $anyChanges = false;
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    $thisUser = trim($thisUser);
-    if ($thisUser === '') {
-        continue;
-    }
     if (!pmssValidateUsername($thisUser)) {
         pmssUserWriteLogs(
             pmssUserBaseContext(

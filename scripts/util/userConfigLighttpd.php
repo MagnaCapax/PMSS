@@ -35,11 +35,7 @@ function pmssUserConfigLighttpdMain(array $argv): int
 
     $rawUsers = shell_exec('/scripts/listUsers.php');
     $users = [];
-    foreach (explode("\n", trim((string)$rawUsers)) as $rawUser) {
-        $rawUser = trim($rawUser);
-        if ($rawUser === '') {
-            continue;
-        }
+    foreach (array_filter(array_map('trim', explode("\n", trim((string) $rawUsers))), 'strlen') as $rawUser) {
         $normalized = pmssNormalizeUsername($rawUser);
         if (!pmssValidateUsername($normalized)) {
             fwrite(STDERR, "Skipping invalid username from listUsers: ".substr($normalized, 0, 20)."\n");

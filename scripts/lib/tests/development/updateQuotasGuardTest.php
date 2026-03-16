@@ -8,8 +8,9 @@ class UpdateQuotasGuardTest extends TestCase
     public function testUpdateQuotasSkipsEmptyAndInvalidUsers(): void
     {
         $src = (string) file_get_contents(__DIR__.'/../../../cron/updateQuotas.php');
-        $this->assertStringContainsString('$thisUser = trim($thisUser);', $src, 'updateQuotas.php must trim usernames in the loop');
-        $this->assertStringContainsString('if ($thisUser === \'\') {', $src, 'updateQuotas.php must skip empty usernames');
+        $this->assertStringContainsString("array_map('trim', explode(\"\\n\", trim((string) shell_exec('/scripts/listUsers.php'))))", $src, 'updateQuotas.php must trim usernames before the loop');
+        $this->assertTrue(strpos($src, '$thisUser = trim($thisUser);') === false, 'updateQuotas.php should avoid redundant in-loop trimming after prefiltering');
+        $this->assertTrue(strpos($src, "if (\$thisUser === '') {") === false, 'updateQuotas.php should avoid redundant empty-user guards after prefiltering');
         $this->assertStringContainsString('!pmssValidateUsername($thisUser)', $src, 'updateQuotas.php must revalidate usernames from listUsers');
 
         // Quota handling must be split into safe PHP filesystem operations and a
