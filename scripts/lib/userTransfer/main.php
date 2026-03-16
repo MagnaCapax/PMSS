@@ -146,9 +146,7 @@ EXP;
 function pmssUserTransferMain(array $argv): int
 {
     try {
-        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-            throw new RuntimeException('This script must be run as root', 1);
-        }
+        pmssUserTransferAssertRoot();
         $cfg = pmssUserTransferParseCli($argv);
         $home = pmssUserTransferAssertSafeLocalHome($cfg['localUser']);
 

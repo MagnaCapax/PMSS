@@ -26,6 +26,17 @@ foreach (['cliParse', 'localUserSafety'] as $module) {
 }
 
 /**
+ * Refuse non-root execution for transfer operations that change ownership and
+ * write scratch files under `/root`.
+ */
+function pmssUserTransferAssertRoot(): void
+{
+    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+        throw new RuntimeException('This script must be run as root', 1);
+    }
+}
+
+/**
  * Read a password from env or from an interactive TTY prompt.
  */
 function pmssUserTransferReadPassword(): string
