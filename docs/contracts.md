@@ -335,8 +335,7 @@ System/app groups:
 
 - pmssOsReleasePath(): string → `PMSS_OS_RELEASE_PATH` or `/etc/os-release`.
 - pmssSkeletonBase()/pmssSkeletonPath(string $relative): string → `PMSS_SKEL_DIR` or `/etc/skel` and joined path.
-- pmssUserHomeRoot(): string → `PMSS_HOME_DIR` or `/home`, used by user file helpers for test overrides.
-- updateUserFile(string $file, string $user): void → copies a skeleton file into `/home/<user>/<file>` when missing or checksum differs; ensures parent directories exist, writes via temp-file + rename, sets mode 755 and `chown user:user`.
+- updateUserFile(string $file, string $user): void → copies a skeleton file into `PMSS_HOME_DIR` (default `/home`) under `/<user>/<file>` when missing or checksum differs; ensures parent directories exist, writes via temp-file + rename, sets mode 755 and `chown user:user`.
 - copyToUserSpace(string $sourceFile, string $targetFile, string $user): void → atomic copy via temp + rename, chmod 755, chown/chgrp user.
 - updateRutorrentConfig(string $username, int $scgiPort): void → renders ruTorrent templates with user paths and writes `conf/{config.php,access.ini}`.
 - getOsReleaseData(): array → cached `parse_ini_file` of `pmssOsReleasePath()`.

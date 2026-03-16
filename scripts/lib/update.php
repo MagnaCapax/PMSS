@@ -43,14 +43,6 @@ function pmssSkeletonPath(string $relative): string
 }
 
 /**
- * Resolve the base home directory for user files.
- */
-function pmssUserHomeRoot(): string
-{
-    return pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
-}
-
-/**
  * Ensure the parent directory for a user file exists with sane permissions.
  */
 function pmssEnsureUserParentDir(string $targetFile, string $user, string $home): bool
@@ -113,7 +105,7 @@ function updateUserFile($file, $user) {
         return;
     }
 
-    $homeRoot = pmssUserHomeRoot();
+    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
     $homeDir  = $homeRoot.'/'.$user;
     if (!file_exists($homeDir)) {
         logMessage("[user:{$user}] updateUserFile skipped (home missing): {$file}");

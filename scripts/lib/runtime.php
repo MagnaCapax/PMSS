@@ -648,7 +648,8 @@ if (!function_exists('requireRoot')) {
     function requireRoot(): void
     {
         if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-            pmssFatal("This script must be run as root.");
+            pmssError("This script must be run as root.");
+            exit(1);
         }
     }
 }
@@ -665,16 +666,5 @@ if (!function_exists('pmssError')) {
         
         fwrite(STDERR, $prefix . $message . PHP_EOL);
         logMessage('[ERROR] ' . $message); // Persist to logfile
-    }
-}
-
-if (!function_exists('pmssFatal')) {
-    /**
-     * Report an error and exit with a non-zero status code.
-     */
-    function pmssFatal(string $message, int $code = 1): void
-    {
-        pmssError($message);
-        exit($code);
     }
 }
