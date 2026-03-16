@@ -45,8 +45,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         return null;
     }
 
-    $backupRoot = isset($options['backupRoot']) ? (string) $options['backupRoot'] : '/var/backups/pmss/config';
-    $backupRoot = rtrim($backupRoot, '/');
+    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/');
     if ($backupRoot === '') {
         $backupRoot = '/var/backups/pmss/config';
     }
@@ -93,13 +92,9 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
 
     $name = $timestamp.'__'.$key;
     $versionLabel = pmssConfigBackupsSanitizeLabel($pmssVersion);
-    if ($versionLabel !== '' && $versionLabel !== 'unknown') {
-        $name .= '__v='.$versionLabel;
-    }
+    if ($versionLabel !== '' && $versionLabel !== 'unknown') { $name .= '__v='.$versionLabel; }
     $cidLabel = pmssConfigBackupsSanitizeLabel($correlationId);
-    if ($cidLabel !== '') {
-        $name .= '__cid='.$cidLabel;
-    }
+    if ($cidLabel !== '') { $name .= '__cid='.$cidLabel; }
     $backupPath = $serviceDir.'/'.$name.'.bak';
 
     if (!@copy($sourcePath, $backupPath)) {
@@ -134,8 +129,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
         return;
     }
 
-    $backupRoot = isset($options['backupRoot']) ? (string) $options['backupRoot'] : '/var/backups/pmss/config';
-    $backupRoot = rtrim($backupRoot, '/');
+    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/');
     if ($backupRoot === '') {
         $backupRoot = '/var/backups/pmss/config';
     }
@@ -159,12 +153,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     // Sort by filename (timestamp prefix) descending so we keep the newest ones.
     rsort($files, SORT_STRING);
 
-    $kept = array();
-    if ($maxCount > 0) {
-        $kept = array_slice($files, 0, $maxCount);
-    } else {
-        $kept = $files;
-    }
+    $kept = $maxCount > 0 ? array_slice($files, 0, $maxCount) : $files;
     $keptMap = array_fill_keys($kept, true);
 
     $cutoff = $ttlSeconds > 0 ? ($nowTs - $ttlSeconds) : null;
@@ -228,10 +217,7 @@ function pmssConfigBackupsPathKey(string $path): string
     $path = preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path);
     $path = str_replace('/', '_', $path);
     $path = ltrim($path, '_');
-    if ($path === '') {
-        $path = 'unknown_path';
-    }
-    return $path;
+    return $path === '' ? 'unknown_path' : $path;
 }
 
 /**
@@ -249,8 +235,5 @@ function pmssConfigBackupsSanitizeLabel(string $label, int $maxLen = 80): string
     if ($label === '') {
         return '';
     }
-    if (strlen($label) > $maxLen) {
-        $label = substr($label, 0, $maxLen);
-    }
-    return $label;
+    return strlen($label) > $maxLen ? substr($label, 0, $maxLen) : $label;
 }

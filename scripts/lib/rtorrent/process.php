@@ -166,11 +166,7 @@ function rtorrentProcessKillPids(array $pids, int $signal): void
 function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): array
 {
     $now = time();
-    $firstSeen = 0;
-
-    if (is_file($stateFile)) {
-        $firstSeen = (int) trim((string) @file_get_contents($stateFile));
-    }
+    $firstSeen = is_file($stateFile) ? (int) trim((string) @file_get_contents($stateFile)) : 0;
 
     // First time seeing this condition.
     if ($firstSeen <= 0) {
@@ -198,24 +194,15 @@ function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): ar
 function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureThreshold): array
 {
     $failureThreshold = max(1, $failureThreshold);
-    $count = 0;
-
-    if (is_file($stateFile)) {
-        $count = (int) trim((string) @file_get_contents($stateFile));
-    }
-
-    if ($count < 0) {
-        $count = 0;
-    }
-
+    $count = is_file($stateFile) ? max(0, (int) trim((string) @file_get_contents($stateFile))) : 0;
     $count++;
     @file_put_contents($stateFile, (string) $count, LOCK_EX);
 
-    if ($count < $failureThreshold) {
-        return ['action' => $count === 1 ? 'record' : 'wait', 'count' => $count];
+    if ($count >= $failureThreshold) {
+        return ['action' => 'stale', 'count' => $count];
     }
 
-    return ['action' => 'stale', 'count' => $count];
+    return ['action' => $count === 1 ? 'record' : 'wait', 'count' => $count];
 }
 
 /**
@@ -227,9 +214,7 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
  */
 function rtorrentProcessClearStaleState(string $stateFile): void
 {
-    if (is_file($stateFile)) {
-        @unlink($stateFile);
-    }
+    if (is_file($stateFile)) { @unlink($stateFile); }
 }
 
 /**

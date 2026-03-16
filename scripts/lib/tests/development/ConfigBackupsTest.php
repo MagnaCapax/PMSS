@@ -118,6 +118,17 @@ class ConfigBackupsTest extends TestCase
         $this->assertTrue(file_exists($new));
     }
 
+    public function testPathKeyFallsBackForBlankInput(): void
+    {
+        $this->assertEquals('unknown_path', \pmssConfigBackupsPathKey(" \n\t "));
+    }
+
+    public function testSanitizeLabelCondensesUnsafeCharacters(): void
+    {
+        $this->assertEquals('git_main_2026-01-31', \pmssConfigBackupsSanitizeLabel('  git/main @2026-01-31  '));
+        $this->assertEquals('abcd', \pmssConfigBackupsSanitizeLabel('abcd-efgh', 4));
+    }
+
     private function makeTempDir(string $prefix): string
     {
         $path = sys_get_temp_dir().'/'.$prefix.bin2hex(random_bytes(6));

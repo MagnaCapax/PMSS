@@ -132,15 +132,6 @@ function pmssSystemStatsCollect(): array
         }
     }
 
-    $memTotal = $kbToHuman($meminfo['MemTotal'] ?? 0);
-    $memFree = $kbToHuman($meminfo['MemFree'] ?? 0);
-    $memCache = $kbToHuman($meminfo['Cached'] ?? 0);
-    $memBuffers = $kbToHuman($meminfo['Buffers'] ?? 0);
-    $swapTotal = $kbToHuman($meminfo['SwapTotal'] ?? 0);
-    $swapFree = $kbToHuman($meminfo['SwapFree'] ?? 0);
-    $psiIo = $readPsiAvg10('/proc/pressure/io');
-    $psiMem = $readPsiAvg10('/proc/pressure/memory');
-
     $hasIoping = trim((string)@shell_exec('command -v ioping 2>/dev/null')) !== '';
     $iopingRoot = $hasIoping ? $iopingMs('/') : 'na';
     $iopingHome = $hasIoping ? $iopingMs('/home') : 'na';
@@ -155,25 +146,23 @@ function pmssSystemStatsCollect(): array
             }
             $items[] = $parts[0].':'.$kbToHuman((int) $parts[1]);
         }
-        if (!empty($items)) {
-            $topMem = implode(',', $items);
-        }
+        $topMem = empty($items) ? 'na' : implode(',', $items);
     }
 
     return [
         'load'       => implode(',', $load),
         'cpuIowait'   => $cpuIowait,
-        'memTotal'    => $memTotal,
-        'memFree'     => $memFree,
-        'memCache'    => $memCache,
-        'memBuffers'  => $memBuffers,
-        'swapTotal'   => $swapTotal,
-        'swapFree'    => $swapFree,
+        'memTotal'    => $kbToHuman($meminfo['MemTotal'] ?? 0),
+        'memFree'     => $kbToHuman($meminfo['MemFree'] ?? 0),
+        'memCache'    => $kbToHuman($meminfo['Cached'] ?? 0),
+        'memBuffers'  => $kbToHuman($meminfo['Buffers'] ?? 0),
+        'swapTotal'   => $kbToHuman($meminfo['SwapTotal'] ?? 0),
+        'swapFree'    => $kbToHuman($meminfo['SwapFree'] ?? 0),
         'diskBusy'    => $diskBusy,
         'iopingRoot'  => $iopingRoot,
         'iopingHome'  => $iopingHome,
         'topMem'      => $topMem,
-        'psiIo'       => $psiIo,
-        'psiMem'      => $psiMem,
+        'psiIo'       => $readPsiAvg10('/proc/pressure/io'),
+        'psiMem'      => $readPsiAvg10('/proc/pressure/memory'),
     ];
 }
