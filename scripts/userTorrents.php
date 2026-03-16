@@ -71,12 +71,15 @@ function pmssUserTorrentsMain(array $argv): int
 function pmssUserTorrentsPrintHelp(): void
 {
     $self = basename(__FILE__);
-    echo "Usage: {$self} [--by-client]\n";
-    echo "\n";
-    echo "Options:\n";
-    echo "  --by-client  Show per-client breakdown (rtorrent/deluge/qbittorrent).\n";
-    echo "  --help       Show this help.\n";
-    echo "\n";
+    echo <<<TXT
+Usage: {$self} [--by-client]
+
+Options:
+  --by-client  Show per-client breakdown (rtorrent/deluge/qbittorrent).
+  --help       Show this help.
+
+TXT;
+    echo PHP_EOL;
 }
 
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
@@ -87,31 +90,27 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 
     $home = $homeDir.'/'.$username;
 
-    $rtorrent = pmssUserTorrentsCountUnique([
-        $home.'/session/*.torrent',
-    ], true);
-
-    $deluge = pmssUserTorrentsCountUnique([
-        $home.'/.config/deluge/state/*.torrent',
-        $home.'/.delugeSession/*.torrent',
-        $home.'/.sessionDeluge/*.torrent',
-    ], true);
-
-    $qbittorrent = pmssUserTorrentsCountUnique([
-        $home.'/.local/share/data/qBittorrent/BT_backup/*.torrent',
-        $home.'/.local/share/data/qBittorrent/BT_backup/*.fastresume',
-        $home.'/.local/share/qBittorrent/BT_backup/*.torrent',
-        $home.'/.local/share/qBittorrent/BT_backup/*.fastresume',
-        $home.'/.config/qBittorrent/BT_backup/*.torrent',
-        $home.'/.config/qBittorrent/BT_backup/*.fastresume',
-    ], true);
-
-    return [
-        'rtorrent'    => $rtorrent,
-        'deluge'      => $deluge,
-        'qbittorrent' => $qbittorrent,
-        'total'       => ($rtorrent + $deluge + $qbittorrent),
+    $counts = [
+        'rtorrent' => pmssUserTorrentsCountUnique([
+            $home.'/session/*.torrent',
+        ], true),
+        'deluge' => pmssUserTorrentsCountUnique([
+            $home.'/.config/deluge/state/*.torrent',
+            $home.'/.delugeSession/*.torrent',
+            $home.'/.sessionDeluge/*.torrent',
+        ], true),
+        'qbittorrent' => pmssUserTorrentsCountUnique([
+            $home.'/.local/share/data/qBittorrent/BT_backup/*.torrent',
+            $home.'/.local/share/data/qBittorrent/BT_backup/*.fastresume',
+            $home.'/.local/share/qBittorrent/BT_backup/*.torrent',
+            $home.'/.local/share/qBittorrent/BT_backup/*.fastresume',
+            $home.'/.config/qBittorrent/BT_backup/*.torrent',
+            $home.'/.config/qBittorrent/BT_backup/*.fastresume',
+        ], true),
     ];
+    $counts['total'] = array_sum($counts);
+
+    return $counts;
 }
 
 function pmssUserTorrentsCountUnique(array $patterns, bool $stripExtension): int

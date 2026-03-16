@@ -27,7 +27,7 @@ function pmssUserTransferRewriteRtorrentSessionPaths(array $cfg, string $home): 
         return;
     }
     $sessionFiles = glob($sessionDir.'/*.rtorrent');
-    if (!is_array($sessionFiles) || $sessionFiles === []) {
+    if (!$sessionFiles) {
         logMessage('[INFO] No rTorrent session files found for path rewrite');
         return;
     }
@@ -59,11 +59,9 @@ function pmssUserTransferRewriteRtorrentSessionPaths(array $cfg, string $home): 
         $rewrittenFiles++;
         $rewrittenPaths += $fileReplacements;
     }
-    if ($rewrittenPaths > 0) {
-        logMessage(sprintf('[OK] Rewrote %d path reference(s) across %d rTorrent session file(s)', $rewrittenPaths, $rewrittenFiles));
-        return;
-    }
-    logMessage('[INFO] rTorrent session rewrite found no /home path references to update');
+    logMessage($rewrittenPaths > 0
+        ? sprintf('[OK] Rewrote %d path reference(s) across %d rTorrent session file(s)', $rewrittenPaths, $rewrittenFiles)
+        : '[INFO] rTorrent session rewrite found no /home path references to update');
 }
 /**
  * Rewrite bencoded string values containing /home/<oldUser>/ paths.
@@ -100,9 +98,6 @@ function pmssUserTransferRewriteBencodedHomePaths(string $payload, string $oldUs
                 return null;
             }
             $stringLength = (int) $lengthToken;
-            if ($stringLength < 0) {
-                return null;
-            }
             $offset++;
             if ($offset + $stringLength > $payloadLength) {
                 return null;

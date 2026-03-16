@@ -138,5 +138,19 @@ class UserTorrentsCountTest extends TestCase
             $this->tearDownTempDir();
         }
     }
-}
 
+    public function testHelpOutputRemainsStable(): void
+    {
+        ob_start();
+        \pmssUserTorrentsPrintHelp();
+        $output = (string) ob_get_clean();
+
+        $this->assertEquals(
+            "Usage: userTorrents.php [--by-client]\n\n"
+            ."Options:\n"
+            ."  --by-client  Show per-client breakdown (rtorrent/deluge/qbittorrent).\n"
+            ."  --help       Show this help.\n\n",
+            $output
+        );
+    }
+}

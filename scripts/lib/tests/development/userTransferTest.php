@@ -12,6 +12,7 @@ class UserTransferTest extends TestCase
     {
         putenv('PMSS_HOME_DIR');
         putenv('PMSS_DRY_RUN');
+        putenv('PMSS_LOG_DIR');
     }
 
     public function testHostnameValidationAcceptsExpectedNames(): void
@@ -283,6 +284,29 @@ class UserTransferTest extends TestCase
         $expected = 'd9:directory'.strlen($newPath).':'.$newPath.'e';
 
         $this->assertEquals($expected, $updated);
+    }
+
+    public function testRewriteRtorrentSessionPathsReportsWhenNothingNeedsRewrite(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-userTransfer-session-nochange-'.uniqid('', true);
+        $home = $base.'/home/newuser';
+        $sessionDir = $home.'/session';
+        $logDir = $base.'/logs';
+        @mkdir($sessionDir, 0755, true);
+        @mkdir($logDir, 0755, true);
+
+        $path = '/home/another/data/movie';
+        file_put_contents($sessionDir.'/test.torrent.rtorrent', 'd9:directory'.strlen($path).':'.$path.'e');
+        putenv('PMSS_LOG_DIR='.$logDir);
+
+        ob_start();
+        \pmssUserTransferRewriteRtorrentSessionPaths([
+            'localUser' => 'newuser',
+            'remoteUser' => 'olduser',
+        ], $home);
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('[INFO] rTorrent session rewrite found no /home path references to update', $output);
     }
 
     public function testIsPathWithinHomeAcceptsRealChildPaths(): void

@@ -122,14 +122,12 @@ function pmssUserTransferParseCli(array $argv): array
     }
 
     $positionalCount = count($positionals);
-    if ($positionalCount !== 2 && $positionalCount !== 3) {
+    if ($positionalCount < 2 || $positionalCount > 3) {
         throw new RuntimeException('Need arguments.'.PHP_EOL.pmssUserTransferUsageText(), 1);
     }
 
     $localUser = pmssNormalizeUsername((string) $positionals[0]);
-    $remoteUser = $positionalCount === 3
-        ? pmssNormalizeUsername((string) $positionals[1])
-        : $localUser;
+    $remoteUser = pmssNormalizeUsername((string) $positionals[$positionalCount === 3 ? 1 : 0]);
     $hostname = trim((string) $positionals[$positionalCount - 1]);
 
     // Usernames are used in file paths and ssh user arguments; keep strict.
@@ -159,8 +157,7 @@ function pmssUserTransferParseCli(array $argv): array
         throw new RuntimeException('Invalid sleep range (sleep-max must be >= sleep-min)', 1);
     }
     if ($options['noSleep']) {
-        $options['sleepMin'] = 0;
-        $options['sleepMax'] = 0;
+        $options['sleepMin'] = $options['sleepMax'] = 0;
     }
 
     return [

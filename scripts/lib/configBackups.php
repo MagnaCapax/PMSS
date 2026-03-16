@@ -154,11 +154,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
 
     $cutoff = $ttlSeconds > 0 ? ($nowTs - $ttlSeconds) : null;
     foreach ($files as $file) {
-        $remove = false;
-
-        if (!isset($keptMap[$file])) {
-            $remove = true;
-        }
+        $remove = !isset($keptMap[$file]);
 
         if ($cutoff !== null) {
             $ts = null;
@@ -188,11 +184,8 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
  */
 function pmssConfigBackupsSelectLogger(?callable $logger = null): callable
 {
-    if ($logger !== null) {
-        return $logger;
-    }
-    if (function_exists('logMessage')) {
-        return 'logMessage';
+    if ($logger !== null || function_exists('logMessage')) {
+        return $logger ?? 'logMessage';
     }
     return static function (string $message): void {
         if (defined('STDERR')) {

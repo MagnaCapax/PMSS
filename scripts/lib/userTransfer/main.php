@@ -327,9 +327,7 @@ function pmssUserTransferPostSetup(array $cfg, string $home): void
         $src = $home.'/www/rutorrent/share/users/'.$remoteUser;
         $dst = $home.'/www/rutorrent/share/users/'.$localUser;
         if (file_exists($src) && !file_exists($dst)) {
-            $srcSafe = pmssUserTransferIsPathWithinHome($src, $home);
-            $dstParentSafe = pmssUserTransferIsPathWithinHome(dirname($dst), $home);
-            if ($srcSafe && $dstParentSafe) {
+            if (pmssUserTransferIsPathWithinHome($src, $home) && pmssUserTransferIsPathWithinHome(dirname($dst), $home)) {
                 if (!@rename($src, $dst)) {
                     runStep(
                         'Renaming ruTorrent user directory',
