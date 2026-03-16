@@ -16,12 +16,8 @@ require_once __DIR__.'/welcomeMessage.php';
  */
 function pmssWelcomeWriteJsonAtomic(string $path, array $payload): bool
 {
-    if (strpos($path, "\0") !== false) {
-        return false;
-    }
-
     $directoryPath = dirname($path);
-    if (!is_dir($directoryPath) || is_link($directoryPath)) {
+    if (strpos($path, "\0") !== false || !is_dir($directoryPath) || is_link($directoryPath)) {
         return false;
     }
 
@@ -68,7 +64,7 @@ function pmssWelcomeProductMessageSet(
     }
 
     $rootMap = pmssWelcomeReadJson($productMessagesPath);
-    $useNestedProductsMap = isset($rootMap['products']) && is_array($rootMap['products']);
+    $useNestedProductsMap = is_array($rootMap['products'] ?? null);
     $productMap = $useNestedProductsMap ? $rootMap['products'] : $rootMap;
 
     if (trim($template) === '') {
@@ -86,4 +82,3 @@ function pmssWelcomeProductMessageSet(
 
     return pmssWelcomeWriteJsonAtomic($productMessagesPath, $rootMap);
 }
-

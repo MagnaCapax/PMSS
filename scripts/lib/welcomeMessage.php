@@ -13,12 +13,7 @@
  */
 function pmssWelcomeReadJson(string $path): array
 {
-    if (!is_file($path) || is_link($path)) {
-        return [];
-    }
-
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || trim($raw) === '') {
+    if (!is_file($path) || is_link($path) || !is_string($raw = @file_get_contents($path)) || trim($raw) === '') {
         return [];
     }
 
@@ -32,21 +27,14 @@ function pmssWelcomeReadJson(string $path): array
 function pmssWelcomeResolveProductKey(array $userConfig, string $userHome): string
 {
     foreach (['product', 'productName'] as $candidateKey) {
-        if (!isset($userConfig[$candidateKey]) || !is_string($userConfig[$candidateKey])) {
-            continue;
-        }
-        $value = trim($userConfig[$candidateKey]);
-        if ($value !== '') {
+        if (is_string($userConfig[$candidateKey] ?? null) && ($value = trim($userConfig[$candidateKey])) !== '') {
             return $value;
         }
     }
 
     $productFile = rtrim($userHome, '/').'/.product';
-    if (is_file($productFile) && !is_link($productFile)) {
-        $value = trim((string) @file_get_contents($productFile));
-        if ($value !== '') {
-            return $value;
-        }
+    if (is_file($productFile) && !is_link($productFile) && ($value = trim((string) @file_get_contents($productFile))) !== '') {
+        return $value;
     }
 
     return '';
@@ -58,11 +46,8 @@ function pmssWelcomeResolveProductKey(array $userConfig, string $userHome): stri
  */
 function pmssWelcomeSelectTemplate(array $userConfig, string $productKey, string $productMessagesPath): string
 {
-    if (isset($userConfig['welcomeMessage']) && is_string($userConfig['welcomeMessage'])) {
-        $value = trim($userConfig['welcomeMessage']);
-        if ($value !== '') {
-            return $userConfig['welcomeMessage'];
-        }
+    if (is_string($userConfig['welcomeMessage'] ?? null) && trim($userConfig['welcomeMessage']) !== '') {
+        return $userConfig['welcomeMessage'];
     }
 
     if ($productKey === '') {
@@ -70,20 +55,15 @@ function pmssWelcomeSelectTemplate(array $userConfig, string $productKey, string
     }
 
     $messageMap = pmssWelcomeReadJson($productMessagesPath);
-    if (isset($messageMap['products']) && is_array($messageMap['products'])) {
-        $messageMap = $messageMap['products'];
-    }
+    $messageMap = is_array($messageMap['products'] ?? null) ? $messageMap['products'] : $messageMap;
 
-    if (isset($messageMap[$productKey]) && is_string($messageMap[$productKey])) {
+    if (is_string($messageMap[$productKey] ?? null)) {
         return $messageMap[$productKey];
     }
 
     $lowerProductKey = strtolower($productKey);
     foreach ($messageMap as $mapKey => $mapValue) {
-        if (!is_string($mapKey) || !is_string($mapValue)) {
-            continue;
-        }
-        if (strtolower($mapKey) === $lowerProductKey) {
+        if (is_string($mapKey) && is_string($mapValue) && strtolower($mapKey) === $lowerProductKey) {
             return $mapValue;
         }
     }
@@ -97,26 +77,16 @@ function pmssWelcomeSelectTemplate(array $userConfig, string $productKey, string
 function pmssWelcomeRenderTemplate(string $template, array $quotaInfo, array $userConfig, string $username, string $productKey): string
 {
     $quota = '';
-    if (isset($quotaInfo['totalSpace']) && is_numeric($quotaInfo['totalSpace'])) {
-        $quotaGiB = ((float) $quotaInfo['totalSpace']) / 1073741824;
-        if ($quotaGiB > 0) {
-            $quota = round($quotaGiB, 1).' GiB';
-        }
+    if (is_numeric($quotaInfo['totalSpace'] ?? null) && ($quotaGiB = ((float) $quotaInfo['totalSpace']) / 1073741824) > 0) {
+        $quota = round($quotaGiB, 1).' GiB';
     }
 
-    $ramMiB = '';
-    if (isset($userConfig['ramMiB']) && is_numeric($userConfig['ramMiB'])) {
-        $ramMiB = (string) ((int) $userConfig['ramMiB']);
-    }
-
-    $substitutions = [
+    return strtr($template, [
         '{{username}}' => htmlspecialchars($username, ENT_QUOTES, 'UTF-8'),
         '{{quota}}'    => htmlspecialchars($quota, ENT_QUOTES, 'UTF-8'),
-        '{{ramMiB}}'   => htmlspecialchars($ramMiB, ENT_QUOTES, 'UTF-8'),
+        '{{ramMiB}}'   => htmlspecialchars(is_numeric($userConfig['ramMiB'] ?? null) ? (string) ((int) $userConfig['ramMiB']) : '', ENT_QUOTES, 'UTF-8'),
         '{{product}}'  => htmlspecialchars($productKey, ENT_QUOTES, 'UTF-8'),
-    ];
-
-    return strtr($template, $substitutions);
+    ]);
 }
 
 /**
@@ -130,8 +100,7 @@ function pmssWelcomeMessageForUser(
 ): string {
     $userConfig = pmssWelcomeReadJson(rtrim($userHome, '/').'/.config/pmss-user.json');
     $productKey = pmssWelcomeResolveProductKey($userConfig, $userHome);
-    $template = pmssWelcomeSelectTemplate($userConfig, $productKey, $productMessagesPath);
-    if ($template === '') {
+    if (($template = pmssWelcomeSelectTemplate($userConfig, $productKey, $productMessagesPath)) === '') {
         return '';
     }
 
