@@ -64,21 +64,6 @@ function pmssCheckRtorrentLog(string $message, bool $force = false, bool $debug 
 }
 
 /**
- * Validate a username using the shared validator when available.
- *
- * @param string $user Username to validate.
- *
- * @return bool True if valid.
- */
-function pmssCheckRtorrentUsernameIsValid(string $user): bool
-{
-    if (function_exists('pmssValidateUsername')) {
-        return pmssValidateUsername($user);
-    }
-    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $user);
-}
-
-/**
  * Log to both cron output and per-user log file.
  *
  * @param string $user    Username for per-user log.
@@ -131,7 +116,10 @@ foreach ($usersOut as $line) {
     if ($user === '') {
         continue;
     }
-    if (!pmssCheckRtorrentUsernameIsValid($user)) {
+    $userIsValid = function_exists('pmssValidateUsername')
+        ? pmssValidateUsername($user)
+        : (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $user);
+    if (!$userIsValid) {
         pmssCheckRtorrentLog("Skipping invalid username: {$user}", false, $debug);
         continue;
     }

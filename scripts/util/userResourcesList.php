@@ -124,64 +124,6 @@ $formatGiB = static function ($value): string {
     return $rounded.'G';
 };
 
-$parseCpuQuota = static function (array $props) use ($notSet): ?int {
-    if ($props['CPUQuota'] !== $notSet) {
-        $val = $props['CPUQuota'];
-        if (strpos($val, '%') !== false) {
-            return (int) round((float) $val);
-        }
-    }
-    if ($props['CPUQuotaPerSecUSec'] !== $notSet && $props['CPUQuotaPeriodUSec'] !== $notSet) {
-        $period = (int) $props['CPUQuotaPeriodUSec'];
-        if ($period > 0) {
-            return (int) round(((int) $props['CPUQuotaPerSecUSec'] / $period) * 100);
-        }
-    }
-    return null;
-};
-
-$readTrafficMonthGiB = static function (string $user): float {
-    $path = "/home/{$user}/.trafficData";
-    if (!is_file($path) || is_link($path)) {
-        return 0.0;
-    }
-
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || $raw === '') {
-        return 0.0;
-    }
-
-    $data = @unserialize($raw, ['allowed_classes' => false]);
-    if (!is_array($data) || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
-        return 0.0;
-    }
-
-    return round(((float) $data['raw']['month']) / 1024, 1);
-};
-
-$readTrafficLimitGiB = static function (string $user): ?int {
-    $path = "/home/{$user}/.trafficLimit";
-    if (!is_file($path) || is_link($path)) {
-        return null;
-    }
-
-    $raw = trim((string) @file_get_contents($path));
-    if ($raw === '' || !is_numeric($raw)) {
-        return null;
-    }
-
-    $limit = (int) $raw;
-    return $limit > 0 ? $limit : null;
-};
-
-$deriveInodeQuota = static function (?int $diskQuotaGiB): ?int {
-    if ($diskQuotaGiB === null || $diskQuotaGiB <= 0) {
-        return null;
-    }
-
-    return max($diskQuotaGiB * 500, 15000);
-};
-
 $store = new UserConfigStore();
 
 $usersRaw = trim((string) shell_exec('/scripts/listUsers.php'));
@@ -227,7 +169,15 @@ foreach ($users as $user) {
 
     $slice = "user-{$info['uid']}.slice";
     $props = $getSliceProperties($slice);
-    $cpuQuotaPercent = $parseCpuQuota($props);
+    $cpuQuotaPercent = null;
+    if ($props['CPUQuota'] !== $notSet && strpos($props['CPUQuota'], '%') !== false) {
+        $cpuQuotaPercent = (int) round((float) $props['CPUQuota']);
+    } elseif ($props['CPUQuotaPerSecUSec'] !== $notSet && $props['CPUQuotaPeriodUSec'] !== $notSet) {
+        $cpuQuotaPeriod = (int) $props['CPUQuotaPeriodUSec'];
+        if ($cpuQuotaPeriod > 0) {
+            $cpuQuotaPercent = (int) round(((int) $props['CPUQuotaPerSecUSec'] / $cpuQuotaPeriod) * 100);
+        }
+    }
     $readIops = $parseTrailingInt($props['IOReadIOPSMax']);
     $writeIops = $parseTrailingInt($props['IOWriteIOPSMax']);
     $memoryHigh = $parseTrailingInt($props['MemoryHigh']);
@@ -255,7 +205,9 @@ foreach ($users as $user) {
         if ($diskBurstGiB === null && $diskQuotaGiB !== null) {
             $diskBurstGiB = (int) round($diskQuotaGiB * 1.25);
         }
-        $inodeQuota = $deriveInodeQuota($diskQuotaGiB);
+        if ($diskQuotaGiB !== null && $diskQuotaGiB > 0) {
+            $inodeQuota = max($diskQuotaGiB * 500, 15000);
+        }
         if ($inodeQuota !== null) {
             $inodeBurst = (int) floor($inodeQuota * 1.25);
         }
@@ -264,8 +216,29 @@ foreach ($users as $user) {
         }
     }
 
-    $trafficLimitGiB = $readTrafficLimitGiB($user);
-    $trafficUsedGiB = $readTrafficMonthGiB($user);
+    $trafficLimitGiB = null;
+    $trafficLimitPath = "/home/{$user}/.trafficLimit";
+    if (is_file($trafficLimitPath) && !is_link($trafficLimitPath)) {
+        $rawTrafficLimit = trim((string) @file_get_contents($trafficLimitPath));
+        if ($rawTrafficLimit !== '' && is_numeric($rawTrafficLimit)) {
+            $parsedTrafficLimit = (int) $rawTrafficLimit;
+            if ($parsedTrafficLimit > 0) {
+                $trafficLimitGiB = $parsedTrafficLimit;
+            }
+        }
+    }
+
+    $trafficUsedGiB = 0.0;
+    $trafficDataPath = "/home/{$user}/.trafficData";
+    if (is_file($trafficDataPath) && !is_link($trafficDataPath)) {
+        $rawTrafficData = @file_get_contents($trafficDataPath);
+        if (is_string($rawTrafficData) && $rawTrafficData !== '') {
+            $trafficData = @unserialize($rawTrafficData, ['allowed_classes' => false]);
+            if (is_array($trafficData) && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
+                $trafficUsedGiB = round(((float) $trafficData['raw']['month']) / 1024, 1);
+            }
+        }
+    }
 
     $resourceData = [
         'user' => $user,

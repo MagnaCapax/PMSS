@@ -180,13 +180,7 @@ function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): ar
 
     $age = $now - $firstSeen;
 
-    // Still within grace period.
-    if ($age < $gracePeriod) {
-        return ['action' => 'wait', 'age' => $age];
-    }
-
-    // Grace period exceeded.
-    return ['action' => 'stale', 'age' => $age];
+    return ['action' => $age < $gracePeriod ? 'wait' : 'stale', 'age' => $age];
 }
 
 /**
@@ -217,12 +211,8 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
     $count++;
     @file_put_contents($stateFile, (string) $count, LOCK_EX);
 
-    if ($count === 1 && $failureThreshold > 1) {
-        return ['action' => 'record', 'count' => $count];
-    }
-
     if ($count < $failureThreshold) {
-        return ['action' => 'wait', 'count' => $count];
+        return ['action' => $count === 1 ? 'record' : 'wait', 'count' => $count];
     }
 
     return ['action' => 'stale', 'count' => $count];
