@@ -276,36 +276,6 @@ class Manager
             $opt['memory-max'] = (string)$policy['memoryMaxMiB'];
         }
 
-        return $this->buildPolicyIoPairs($policy);
-    }
-
-    /**
-     * Load cgroup policy from PMSS config directory.
-     */
-    private function loadPolicy(): array
-    {
-        $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-        $policyFile = $cfgDir.'/cgroup.policy.php';
-        $policy = [];
-
-        if (is_file($policyFile)) {
-            $loaded = @include $policyFile;
-            if (is_array($loaded)) {
-                $policy = $loaded;
-            }
-        }
-
-        return $policy;
-    }
-
-    /**
-     * Expand policy mount defaults into systemd IO property pairs.
-     *
-     * Each mount entry may define ioWeight, read/write bandwidth, and
-     * read/write IOPS. Duplicate property+device pairs keep the latest value.
-     */
-    private function buildPolicyIoPairs(array $policy): array
-    {
         if (!isset($policy['mounts']) || !is_array($policy['mounts'])) {
             return [];
         }
@@ -316,13 +286,9 @@ class Manager
                 continue;
             }
 
-            $devicePath = '';
-            if (strpos($mountPath, '/dev/') === 0) {
-                $devicePath = trim($mountPath);
-            } else {
-                $devicePath = trim($this->sys->resolveDevice($mountPath));
-            }
-
+            $devicePath = strpos($mountPath, '/dev/') === 0
+                ? trim($mountPath)
+                : trim($this->sys->resolveDevice($mountPath));
             if ($devicePath === '') {
                 continue;
             }
@@ -364,6 +330,25 @@ class Manager
         }
 
         return array_values($pairsByKey);
+    }
+
+    /**
+     * Load cgroup policy from PMSS config directory.
+     */
+    private function loadPolicy(): array
+    {
+        $cfgDir = \pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
+        $policyFile = $cfgDir.'/cgroup.policy.php';
+        $policy = [];
+
+        if (is_file($policyFile)) {
+            $loaded = @include $policyFile;
+            if (is_array($loaded)) {
+                $policy = $loaded;
+            }
+        }
+
+        return $policy;
     }
 
     private function expandProfiles(array &$opt): void
@@ -436,14 +421,7 @@ class Manager
         return $resolved;
     }
 
-    /**
-     * Resolve IO profile maps from policy while preserving built-in defaults.
-     *
-     * Policy entries may override any built-in profile (or define new ones)
-     * using ioWeight/cpuWeight/tasksMax and optional read/write bandwidth/IOPS
-     * keys.
-     */
-    private function resolveIoProfiles(): array
+    private function applyIoProfile(string $profile, string $dev, array &$opt, array &$pairs): void
     {
         $profiles = [
             'hdd' => [
@@ -461,73 +439,62 @@ class Manager
         ];
 
         $policy = $this->loadPolicy();
-        if (!isset($policy['profiles']) || !is_array($policy['profiles'])) {
-            return $profiles;
-        }
-        if (!isset($policy['profiles']['io']) || !is_array($policy['profiles']['io'])) {
-            return $profiles;
-        }
-
-        foreach ($policy['profiles']['io'] as $profileName => $profileConfig) {
-            if (!is_string($profileName) || $profileName === '' || !is_array($profileConfig)) {
-                continue;
-            }
-
-            $resolvedName = strtolower($profileName);
-            $resolvedProfile = isset($profiles[$resolvedName]) && is_array($profiles[$resolvedName])
-                ? $profiles[$resolvedName]
-                : ['defaults' => [], 'limits' => []];
-            $hasValidOverride = false;
-
-            foreach ([['ioWeight', 'io-weight'], ['cpuWeight', 'cpu-weight'], ['tasksMax', 'tasks-max']] as $mapping) {
-                $policyKey = $mapping[0];
-                $targetKey = $mapping[1];
-                if (!isset($profileConfig[$policyKey]) || !is_numeric($profileConfig[$policyKey])) {
+        if (isset($policy['profiles']['io']) && is_array($policy['profiles']['io'])) {
+            foreach ($policy['profiles']['io'] as $profileName => $profileConfig) {
+                if (!is_string($profileName) || $profileName === '' || !is_array($profileConfig)) {
                     continue;
                 }
-                $numeric = (int)$profileConfig[$policyKey];
-                if ($numeric <= 0) {
-                    continue;
-                }
-                $resolvedProfile['defaults'][$targetKey] = (string)$numeric;
-                $hasValidOverride = true;
-            }
 
-            foreach (['readBw', 'writeBw'] as $bandwidthKey) {
-                if (!isset($profileConfig[$bandwidthKey]) || !is_string($profileConfig[$bandwidthKey])) {
-                    continue;
-                }
-                $limitValue = trim($profileConfig[$bandwidthKey]);
-                if ($limitValue === '') {
-                    continue;
-                }
-                $resolvedProfile['limits'][$bandwidthKey] = $limitValue;
-                $hasValidOverride = true;
-            }
+                $resolvedName = strtolower($profileName);
+                $resolvedProfile = isset($profiles[$resolvedName]) && is_array($profiles[$resolvedName])
+                    ? $profiles[$resolvedName]
+                    : ['defaults' => [], 'limits' => []];
+                $hasValidOverride = false;
 
-            foreach (['readIops', 'writeIops'] as $iopsKey) {
-                if (!isset($profileConfig[$iopsKey]) || !is_numeric($profileConfig[$iopsKey])) {
-                    continue;
+                foreach ([['ioWeight', 'io-weight'], ['cpuWeight', 'cpu-weight'], ['tasksMax', 'tasks-max']] as $mapping) {
+                    $policyKey = $mapping[0];
+                    $targetKey = $mapping[1];
+                    if (!isset($profileConfig[$policyKey]) || !is_numeric($profileConfig[$policyKey])) {
+                        continue;
+                    }
+                    $numeric = (int)$profileConfig[$policyKey];
+                    if ($numeric <= 0) {
+                        continue;
+                    }
+                    $resolvedProfile['defaults'][$targetKey] = (string)$numeric;
+                    $hasValidOverride = true;
                 }
-                $limitValue = (int)$profileConfig[$iopsKey];
-                if ($limitValue <= 0) {
-                    continue;
-                }
-                $resolvedProfile['limits'][$iopsKey] = $limitValue;
-                $hasValidOverride = true;
-            }
 
-            if ($hasValidOverride) {
-                $profiles[$resolvedName] = $resolvedProfile;
+                foreach (['readBw', 'writeBw'] as $bandwidthKey) {
+                    if (!isset($profileConfig[$bandwidthKey]) || !is_string($profileConfig[$bandwidthKey])) {
+                        continue;
+                    }
+                    $limitValue = trim($profileConfig[$bandwidthKey]);
+                    if ($limitValue === '') {
+                        continue;
+                    }
+                    $resolvedProfile['limits'][$bandwidthKey] = $limitValue;
+                    $hasValidOverride = true;
+                }
+
+                foreach (['readIops', 'writeIops'] as $iopsKey) {
+                    if (!isset($profileConfig[$iopsKey]) || !is_numeric($profileConfig[$iopsKey])) {
+                        continue;
+                    }
+                    $limitValue = (int)$profileConfig[$iopsKey];
+                    if ($limitValue <= 0) {
+                        continue;
+                    }
+                    $resolvedProfile['limits'][$iopsKey] = $limitValue;
+                    $hasValidOverride = true;
+                }
+
+                if ($hasValidOverride) {
+                    $profiles[$resolvedName] = $resolvedProfile;
+                }
             }
         }
 
-        return $profiles;
-    }
-
-    private function applyIoProfile(string $profile, string $dev, array &$opt, array &$pairs): void
-    {
-        $profiles = $this->resolveIoProfiles();
         $entry = isset($profiles[$profile]) ? $profiles[$profile] : null;
         if (!is_array($entry)) {
             return;

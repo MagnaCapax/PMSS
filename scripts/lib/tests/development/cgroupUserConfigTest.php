@@ -236,6 +236,53 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString('TasksMax=8192', $res['out']);
     }
 
+    public function testDefaultsApplyPolicyMountIoPairsWithoutExplicitIoInput()
+    {
+        $policy = <<<'PHP'
+<?php return [
+    'mounts' => [
+        '/home' => [
+            'ioWeight' => 333,
+            'readBw' => '6M',
+            'readIops' => 123,
+        ],
+    ],
+];
+PHP;
+        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->sys->findmnt['/home'] = '/dev/md0';
+
+        $res = $this->runMgr(['testuser', '--defaults']);
+
+        $this->assertStringContainsString('IODeviceWeight=/dev/md0 333', $res['out']);
+        $this->assertStringContainsString('IOReadBandwidthMax=/dev/md0 6M', $res['out']);
+        $this->assertStringContainsString('IOReadIOPSMax=/dev/md0 123', $res['out']);
+    }
+
+    public function testIoProfilePolicyOverridesPreserveBuiltInFallbacks()
+    {
+        $policy = <<<'PHP'
+<?php return [
+    'profiles' => [
+        'io' => [
+            'hdd' => [
+                'ioWeight' => 777,
+                'writeBw' => '12M',
+            ],
+        ],
+    ],
+];
+PHP;
+        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->sys->findmnt['/dev/sdb'] = '/dev/sdb';
+
+        $res = $this->runMgr(['testuser', '--device=/dev/sdb', '--io-profile=hdd']);
+
+        $this->assertStringContainsString('IOWeight=777', $res['out']);
+        $this->assertStringContainsString('IOReadBandwidthMax=/dev/sdb 5M', $res['out']);
+        $this->assertStringContainsString('IOWriteBandwidthMax=/dev/sdb 12M', $res['out']);
+    }
+
     // -- Defaults & Policy Tests --
 
     public function testDefaultsApplication()
