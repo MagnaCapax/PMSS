@@ -6,19 +6,11 @@
  */
 
 /**
- * Return the configured home root for user transfers.
- */
-function pmssUserTransferHomeRoot(): string
-{
-    return pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
-}
-
-/**
  * Ensure the local home exists, is not a symlink, and matches passwd metadata.
  */
 function pmssUserTransferAssertSafeLocalHome(string $user): string
 {
-    $homeRoot = pmssUserTransferHomeRoot();
+    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
     $expected = $homeRoot.'/'.$user;
 
     $real = realpath($expected);

@@ -39,14 +39,6 @@ function wgConfigPath(string $file): string
 }
 
 /**
- * Resolve the home directory base used when distributing user files.
- */
-function wgHomeBase(): string
-{
-    return pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
-}
-
-/**
  * Enumerate tenants targeted for configuration distribution.
  */
 function wgListHomeUsers(): array
@@ -306,7 +298,7 @@ function wgValidatePublicKey(string $key): bool
  */
 function wgCollectUserPublicKeys(): array
 {
-    $homeBase = wgHomeBase();
+    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
     $result   = [];
 
     foreach (wgListHomeUsers() as $user) {
@@ -496,7 +488,7 @@ function wgDistributeToUsers(string $content): void
     if ($content === '') {
         return;
     }
-    $homeBase = wgHomeBase();
+    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
     foreach (wgListHomeUsers() as $user) {
         $target = $homeBase.'/'.$user.'/wireguard.txt';
         @file_put_contents($target, $content);

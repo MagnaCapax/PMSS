@@ -81,7 +81,7 @@ function pmssUserTorrentsPrintHelp(): void
 
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 {
-    if (!pmssUserTorrentsUsernameIsValid($username)) {
+    if (!pmssUsernameIsValid($username)) {
         return ['rtorrent' => 0, 'deluge' => 0, 'qbittorrent' => 0, 'total' => 0];
     }
 
@@ -137,9 +137,4 @@ function pmssUserTorrentsCountUnique(array $patterns, bool $stripExtension): int
         }
     }
     return count($seen);
-}
-
-function pmssUserTorrentsUsernameIsValid(string $username): bool
-{
-    return (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $username);
 }

@@ -37,7 +37,7 @@ require_once __DIR__.'/../lib/userTransfer.php';
 try {
     $cfg = pmssUserTransferParseCli($argv);
     pmssValidateUsername($cfg['localUser']);
-    $expectedHome = pmssUserTransferHomeRoot().'/'.$cfg['localUser'];
+    $expectedHome = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home').'/'.$cfg['localUser'];
     realpath($expectedHome);
 
     // Post-setup delegates ownership/permission normalisation to userPermissions.php

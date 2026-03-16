@@ -52,21 +52,13 @@ if (!function_exists('pmssStateDir')) {
     }
 }
 
-if (!function_exists('pmssRuntimeFallbackLogPath')) {
-    // Build the default runtime log path from the resolved log directory.
-    function pmssRuntimeFallbackLogPath(): string
-    {
-        return pmssLogDir().'/runtime.log';
-    }
-}
-
 if (!function_exists('logMessage')) {
     /**
      * Write a timestamped message to the preferred log file and stdout.
      */
     function logMessage(string $message, ?string $logFile = null): void
     {
-        $target = $logFile ?? (defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : pmssRuntimeFallbackLogPath());
+        $target = $logFile ?? (defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : pmssLogDir().'/runtime.log');
         $ts = date('[Y-m-d H:i:s] ');
         @file_put_contents($target, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
         echo $message.PHP_EOL;
