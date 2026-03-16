@@ -46,9 +46,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     }
 
     $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/');
-    if ($backupRoot === '') {
-        $backupRoot = '/var/backups/pmss/config';
-    }
+    $backupRoot = $backupRoot === '' ? '/var/backups/pmss/config' : $backupRoot;
 
     $timestamp = isset($options['timestamp']) ? (string) $options['timestamp'] : date('YmdHis');
     if (!preg_match('/^[0-9]{14}$/', $timestamp)) {
@@ -130,9 +128,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     }
 
     $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/');
-    if ($backupRoot === '') {
-        $backupRoot = '/var/backups/pmss/config';
-    }
+    $backupRoot = $backupRoot === '' ? '/var/backups/pmss/config' : $backupRoot;
 
     $serviceDir = $backupRoot.'/'.$service;
     if (!is_dir($serviceDir)) {

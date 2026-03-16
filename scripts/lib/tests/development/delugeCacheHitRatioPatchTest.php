@@ -1,0 +1,155 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+
+putenv('PMSS_DELUGE_NO_ENTRYPOINT=1');
+require_once dirname(__DIR__, 2).'/update/apps/deluge.php';
+
+class DelugeCacheHitRatioPatchTest extends TestCase
+{
+    /** @var string */
+    private $tempDir;
+
+    /** @var array<int,string> */
+    private $logs = [];
+
+    protected function setUp(): void
+    {
+        $this->tempDir = sys_get_temp_dir().'/pmss-deluge-cache-hit-ratio-'.bin2hex(random_bytes(6));
+        @mkdir($this->tempDir, 0700, true);
+        $this->logs = [];
+    }
+
+    protected function tearDown(): void
+    {
+        $this->removePath($this->tempDir);
+    }
+
+    public function testPatchAddsKeyErrorGuardToLegacyBlock(): void
+    {
+        $path = $this->tempDir.'/core.py';
+        file_put_contents($path, $this->legacyCacheRatioSource());
+
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+        $content = (string) file_get_contents($path);
+
+        $this->assertTrue($result, 'Expected legacy cache ratio block to be patched');
+        $this->assertStringContainsString('try:', $content);
+        $this->assertStringContainsString('except KeyError:', $content);
+        $this->assertStringContainsString("self.session_status['disk.num_blocks_cache_hits'] / blocks_read", $content);
+    }
+
+    public function testPatchReturnsTrueWhenGuardAlreadyPresent(): void
+    {
+        $path = $this->tempDir.'/core.py';
+        $original = "class Core:\n    def update_stats(self):\n        if blocks_read:\n            try:\n                self.session_status['read_hit_ratio'] = (\n                    self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n                )\n            except KeyError:\n                self.session_status['read_hit_ratio'] = 0.0\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
+        file_put_contents($path, $original);
+
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+        $content = (string) file_get_contents($path);
+
+        $this->assertTrue($result, 'Expected already-guarded block to be accepted');
+        $this->assertEquals($original, $content, 'Already guarded file should remain unchanged');
+    }
+
+    public function testPatchDryRunDoesNotModifyFile(): void
+    {
+        $path = $this->tempDir.'/core.py';
+        $original = $this->legacyCacheRatioSource();
+        file_put_contents($path, $original);
+
+        $result = \pmssPatchDelugeCacheHitRatio($path, true, [$this, 'collectLog']);
+        $content = (string) file_get_contents($path);
+
+        $this->assertTrue($result, 'Expected dry-run patch to report success');
+        $this->assertEquals($original, $content, 'Dry-run must not modify file content');
+        $this->assertTrue($this->logContains('Would patch Deluge cache hit ratio'), 'Expected dry-run log message');
+    }
+
+    public function testPatchReturnsFalseWhenCacheRatioLineMissing(): void
+    {
+        $path = $this->tempDir.'/core.py';
+        file_put_contents($path, "class Core:\n    def update_stats(self):\n        self.session_status['other_metric'] = 1\n");
+
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+
+        $this->assertTrue($result === false, 'Expected no-op when cache ratio line is absent');
+    }
+
+    public function testPatchLogsWarningWhenElseBlockMissing(): void
+    {
+        $path = $this->tempDir.'/core.py';
+        $original = "class Core:\n    def update_stats(self):\n        if blocks_read:\n            self.session_status['read_hit_ratio'] = (\n                self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n            )\n";
+        file_put_contents($path, $original);
+
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+        $content = (string) file_get_contents($path);
+
+        $this->assertTrue($result === false, 'Expected patch to fail without an else block');
+        $this->assertEquals($original, $content, 'Failed patch must not modify file content');
+        $this->assertTrue($this->logContains('Unable to locate Deluge cache ratio else block'), 'Expected missing else warning');
+    }
+
+    public function testPatchRejectsSymlinkPath(): void
+    {
+        $realPath = $this->tempDir.'/core-real.py';
+        $linkPath = $this->tempDir.'/core.py';
+        $original = $this->legacyCacheRatioSource();
+        file_put_contents($realPath, $original);
+        @symlink($realPath, $linkPath);
+
+        $result = \pmssPatchDelugeCacheHitRatio($linkPath, false, [$this, 'collectLog']);
+        $content = (string) file_get_contents($realPath);
+
+        $this->assertTrue($result === false, 'Expected symlink path to be refused');
+        $this->assertEquals($original, $content, 'Symlink target must remain unchanged');
+    }
+
+    public function collectLog(string $message): void
+    {
+        $this->logs[] = $message;
+    }
+
+    private function legacyCacheRatioSource(): string
+    {
+        return "class Core:\n    def update_stats(self):\n        if blocks_read:\n            self.session_status['read_hit_ratio'] = (\n                self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n            )\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
+    }
+
+    private function logContains(string $needle): bool
+    {
+        foreach ($this->logs as $message) {
+            if (strpos($message, $needle) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function removePath(string $path): void
+    {
+        if ($path === '' || !file_exists($path)) {
+            return;
+        }
+
+        if (is_link($path) || is_file($path)) {
+            @unlink($path);
+            return;
+        }
+
+        $items = scandir($path);
+        if (!is_array($items)) {
+            @rmdir($path);
+            return;
+        }
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            $this->removePath($path.'/'.$item);
+        }
+
+        @rmdir($path);
+    }
+}

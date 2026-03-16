@@ -364,8 +364,12 @@ if ($isDebian10) {
 
 // Debian 11+ must resolve Deluge commands to package-managed /usr/bin paths.
 if (!$isDebian10) {
-    pmssEnsureDelugeCommandSymlink('deluge-web', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web', $dryRun, $log);
-    pmssEnsureDelugeCommandSymlink('deluged', '/usr/bin/deluged', '/usr/local/bin/deluged', $dryRun, $log);
+    foreach ([
+        ['deluge-web', '/usr/bin/deluge-web', '/usr/local/bin/deluge-web'],
+        ['deluged', '/usr/bin/deluged', '/usr/local/bin/deluged'],
+    ] as $commandPaths) {
+        pmssEnsureDelugeCommandSymlink($commandPaths[0], $commandPaths[1], $commandPaths[2], $dryRun, $log);
+    }
 }
 
 $delugeCandidates = static function (array $patterns): array {
@@ -380,36 +384,25 @@ $delugeCandidates = static function (array $patterns): array {
     return $candidates;
 };
 
-$patchCandidates = $delugeCandidates([
+$ensurePatch = static function (array $patterns, callable $patch, string $message) use ($delugeCandidates, $dryRun, $log): void {
+    $patched = false;
+    foreach ($delugeCandidates($patterns) as $path) {
+        if ($patch($path, $dryRun, $log)) {
+            $patched = true;
+        }
+    }
+    if ($patched) {
+        echo $message;
+    }
+};
+
+$ensurePatch([
     '/usr/lib/python3/dist-packages/deluge/core/core.py',
     '/usr/lib/python3*/dist-packages/deluge/core/core.py',
     '/usr/local/lib/python3*/dist-packages/deluge/core/core.py',
-]);
-if (!empty($patchCandidates)) {
-    $patched = false;
-    foreach ($patchCandidates as $path) {
-        if (pmssPatchDelugeCacheHitRatio($path, $dryRun, $log)) {
-            $patched = true;
-        }
-    }
-    if ($patched) {
-        echo "\t*** Deluge cache ratio guard ensured\n";
-    }
-}
-
-$logPatchCandidates = $delugeCandidates([
+], 'pmssPatchDelugeCacheHitRatio', "\t*** Deluge cache ratio guard ensured\n");
+$ensurePatch([
     '/usr/lib/python3/dist-packages/deluge/log.py',
     '/usr/lib/python3*/dist-packages/deluge/log.py',
     '/usr/local/lib/python3*/dist-packages/deluge/log.py',
-]);
-if (!empty($logPatchCandidates)) {
-    $patched = false;
-    foreach ($logPatchCandidates as $path) {
-        if (pmssPatchDelugeFindCallerSignature($path, $dryRun, $log)) {
-            $patched = true;
-        }
-    }
-    if ($patched) {
-        echo "\t*** Deluge Python 3.11 findCaller compatibility ensured\n";
-    }
-}
+], 'pmssPatchDelugeFindCallerSignature', "\t*** Deluge Python 3.11 findCaller compatibility ensured\n");
