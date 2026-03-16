@@ -21,13 +21,17 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/remoteBinary.php';
 
 $arch   = php_uname('m');
+$hasLegacyLogger = function_exists('logmsg');
+$log = $hasLegacyLogger
+    ? 'logmsg'
+    : function (string $message): void {
+        echo $message.PHP_EOL;
+    };
 
 if ($arch !== 'x86_64' && $arch !== 'amd64') {
-    if (function_exists('logmsg')) {
-        logmsg("[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
-    } else {
-        echo "*** btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}\n";
-    }
+    $log($hasLegacyLogger
+        ? "[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}"
+        : "*** btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
     return;
 }
 
@@ -49,11 +53,7 @@ $legacyBinaries = [
 ];
 foreach ($legacyBinaries as $legacy) {
     if (!file_exists($legacy['path'])) {
-        if (function_exists('logmsg')) {
-            logmsg("*** {$legacy['label']} not present, downloading and adding!");
-        } else {
-            echo "*** {$legacy['label']} not present, downloading and adding!\n";
-        }
+        $log("*** {$legacy['label']} not present, downloading and adding!");
         pmssInstallPinnedRemoteBinary($legacy['label'], $legacy['url'], $legacy['sha256'], $legacy['path'], false);
     }
 }
@@ -86,19 +86,11 @@ $rslsyncSha256   = 'f8c71f6d447a2a9aec93bde7c316bbb7ac6be98d0bcb9dc645f4ca4e347b
 if (is_file($rslsyncBinary)) {
     $installedSha = @hash_file('sha256', $rslsyncBinary);
     if (is_string($installedSha) && strtolower($installedSha) === strtolower($rslsyncSha256)) {
-        if (function_exists('logmsg')) {
-            logmsg('*** Resilio Sync already matches pinned checksum; skipping download');
-        } else {
-            echo "*** Resilio Sync already matches pinned checksum; skipping download\n";
-        }
+        $log('*** Resilio Sync already matches pinned checksum; skipping download');
         return;
     }
 }
 
-if (function_exists('logmsg')) {
-    logmsg('*** Resilio Sync missing/out of date; refreshing rslsync binary');
-} else {
-    echo "*** Resilio Sync missing/out of date; refreshing rslsync binary\n";
-}
+$log('*** Resilio Sync missing/out of date; refreshing rslsync binary');
 
 pmssInstallPinnedRemoteBinary('Resilio Sync', $rslsyncUrl, $rslsyncSha256, $rslsyncBinary, true);

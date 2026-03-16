@@ -184,28 +184,6 @@ function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log)
     return true;
 }
 
-function pmssFindDelugeCoreCandidates(): array
-{
-    $candidates = [];
-    $patterns = [
-        '/usr/lib/python3/dist-packages/deluge/core/core.py',
-        '/usr/lib/python3*/dist-packages/deluge/core/core.py',
-        '/usr/local/lib/python3*/dist-packages/deluge/core/core.py',
-    ];
-    foreach ($patterns as $pattern) {
-        $matches = glob($pattern);
-        if (!is_array($matches)) {
-            continue;
-        }
-        foreach ($matches as $match) {
-            if ($match !== '' && !in_array($match, $candidates, true)) {
-                $candidates[] = $match;
-            }
-        }
-    }
-    return $candidates;
-}
-
 /**
  * Patch Deluge's custom logger override for Python 3.11+ compatibility.
  */
@@ -255,31 +233,6 @@ function pmssPatchDelugeFindCallerSignature(string $path, bool $dryRun, callable
     }
 
     return false;
-}
-
-/**
- * Locate candidate Deluge log.py files for compatibility patching.
- */
-function pmssFindDelugeLogCandidates(): array
-{
-    $candidates = [];
-    $patterns = [
-        '/usr/lib/python3/dist-packages/deluge/log.py',
-        '/usr/lib/python3*/dist-packages/deluge/log.py',
-        '/usr/local/lib/python3*/dist-packages/deluge/log.py',
-    ];
-    foreach ($patterns as $pattern) {
-        $matches = glob($pattern);
-        if (!is_array($matches)) {
-            continue;
-        }
-        foreach ($matches as $match) {
-            if ($match !== '' && !in_array($match, $candidates, true)) {
-                $candidates[] = $match;
-            }
-        }
-    }
-    return $candidates;
 }
 
 /**
@@ -430,7 +383,23 @@ if (!$isDebian10) {
     pmssEnsureDelugeCommandSymlink('deluged', '/usr/bin/deluged', '/usr/local/bin/deluged', $dryRun, $log);
 }
 
-$patchCandidates = pmssFindDelugeCoreCandidates();
+$delugeCandidates = static function (array $patterns): array {
+    $candidates = [];
+    foreach ($patterns as $pattern) {
+        foreach (glob($pattern) ?: [] as $match) {
+            if ($match !== '' && !in_array($match, $candidates, true)) {
+                $candidates[] = $match;
+            }
+        }
+    }
+    return $candidates;
+};
+
+$patchCandidates = $delugeCandidates([
+    '/usr/lib/python3/dist-packages/deluge/core/core.py',
+    '/usr/lib/python3*/dist-packages/deluge/core/core.py',
+    '/usr/local/lib/python3*/dist-packages/deluge/core/core.py',
+]);
 if (!empty($patchCandidates)) {
     $patched = false;
     foreach ($patchCandidates as $path) {
@@ -443,7 +412,11 @@ if (!empty($patchCandidates)) {
     }
 }
 
-$logPatchCandidates = pmssFindDelugeLogCandidates();
+$logPatchCandidates = $delugeCandidates([
+    '/usr/lib/python3/dist-packages/deluge/log.py',
+    '/usr/lib/python3*/dist-packages/deluge/log.py',
+    '/usr/local/lib/python3*/dist-packages/deluge/log.py',
+]);
 if (!empty($logPatchCandidates)) {
     $patched = false;
     foreach ($logPatchCandidates as $path) {

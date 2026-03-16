@@ -9,13 +9,11 @@
 require_once __DIR__.'/packages/helpers.php';
 require_once __DIR__.'/pythonVenv.php';
 
-$logger = function (string $message): void {
-    if (function_exists('logmsg')) {
-        logmsg($message);
-    } else {
+$logger = function_exists('logmsg')
+    ? 'logmsg'
+    : function (string $message): void {
         echo $message."\n";
-    }
-};
+    };
 
 $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
 if ($python === '') {
