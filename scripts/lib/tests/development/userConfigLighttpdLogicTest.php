@@ -46,6 +46,19 @@ class UserConfigLighttpdLogicTest extends TestCase
         $this->assertEquals(250, $quota);
     }
 
+    public function testCpuQuotaDerivesFromPeriodValuesWhenDirectQuotaMissing(): void
+    {
+        putenv('PMSS_TOTAL_CPU_THREADS=8');
+        $props = [
+            'CPUQuotaPerSecUSec' => '50000',
+            'CPUQuotaPeriodUSec' => '100000',
+        ];
+        $policy = ['cpuQuotaPercent' => 85];
+
+        $quota = \pmssExtractCpuQuotaPercent($props, $policy);
+        $this->assertEquals(50, $quota);
+    }
+
     public function testCpuQuotaFallsBackToThreadsWhenMissing(): void
     {
         putenv('PMSS_TOTAL_CPU_THREADS=4');

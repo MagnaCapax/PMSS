@@ -42,18 +42,17 @@ function pmssWebdavWwwPolicyBlock(string $user): string
     // Default: keep ~/www read-only over WebDAV to prevent users from breaking the web stack.
     // Allow writing to ~/www/public by default, and allow full ~/www write if the user opts in.
     $marker = "/home/{$user}/.lighttpd/webdav.www-writable";
-    if (file_exists($marker)) {
-        return <<<LIGHTTPD
+    $policy = <<<LIGHTTPD
 \$HTTP["url"] =~ "^/webdav-{$user}/www(\$|/)" {
-    webdav.is-readonly = "disable"
+    webdav.is-readonly = "%s"
 }
 LIGHTTPD;
+    if (file_exists($marker)) {
+        return sprintf($policy, 'disable');
     }
 
-    return <<<LIGHTTPD
-\$HTTP["url"] =~ "^/webdav-{$user}/www(\$|/)" {
-    webdav.is-readonly = "enable"
-}
+    return sprintf($policy, 'enable').<<<LIGHTTPD
+
 \$HTTP["url"] =~ "^/webdav-{$user}/www/public(\$|/)" {
     webdav.is-readonly = "disable"
 }
@@ -91,17 +90,15 @@ function pmssParseSizeToMiB($value): ?int
         return null;
     }
 
-    if (preg_match('/^([0-9.]+)\s*([KMG])?B?$/i', $raw, $m)) {
-        $num = (float)$m[1];
-        $unit = strtolower($m[2] ?? '');
-        $factors = ['' => 1 / 1048576, 'k' => 1 / 1024, 'm' => 1, 'g' => 1024];
-        return isset($factors[$unit]) ? (int)round($num * $factors[$unit]) : null;
+    if (preg_match('/^([0-9.]+)\s*([KMG])?B?$/i', $raw, $m) !== 1) {
+        return is_numeric($raw)
+            ? (int) round(((float) $raw) / 1048576)
+            : null;
     }
 
-    // Fallback: assume raw bytes
-    return is_numeric($raw)
-        ? (int) round(((float) $raw) / 1048576)
-        : null;
+    $factors = ['' => 1 / 1048576, 'k' => 1 / 1024, 'm' => 1, 'g' => 1024];
+    $unit = strtolower($m[2] ?? '');
+    return isset($factors[$unit]) ? (int)round(((float) $m[1]) * $factors[$unit]) : null;
 }
 
 function pmssClampMemoryLimit(int $memoryMiB): int
@@ -111,27 +108,20 @@ function pmssClampMemoryLimit(int $memoryMiB): int
 
 function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
 {
-    $quota = null;
-
-    // Prefer explicit slice CPUQuota value when present.
-    if (isset($props['CPUQuota'])) {
-        $raw = trim((string)$props['CPUQuota']);
-        if ($raw !== '' && stripos($raw, 'infinity') === false && strpos($raw, '%') !== false) {
-            $quota = (int)round((float)$raw);
-        }
-    }
-
-    // Derive quota from period values when CPUQuota is not set directly.
-    if ($quota === null) {
-        $perSec = $props['CPUQuotaPerSecUSec'] ?? null;
-        $period = $props['CPUQuotaPeriodUSec'] ?? null;
-        if (is_numeric($perSec) && is_numeric($period) && (float)$period > 0.0) {
-            $quota = (int)round(((float)$perSec / (float)$period) * 100);
-        }
+    $quota = 0;
+    $raw = trim((string) ($props['CPUQuota'] ?? ''));
+    if ($raw !== '' && stripos($raw, 'infinity') === false && strpos($raw, '%') !== false) {
+        $quota = (int)round((float)$raw);
+    } elseif (
+        is_numeric($props['CPUQuotaPerSecUSec'] ?? null)
+        && is_numeric($props['CPUQuotaPeriodUSec'] ?? null)
+        && (float)$props['CPUQuotaPeriodUSec'] > 0.0
+    ) {
+        $quota = (int)round(((float)$props['CPUQuotaPerSecUSec'] / (float)$props['CPUQuotaPeriodUSec']) * 100);
     }
 
     // When quota is explicitly set and not a legacy 85% sentinel, use it as-is.
-    if ($quota !== null && $quota > 0 && $quota !== 85) {
+    if ($quota > 0 && $quota !== 85) {
         return $quota;
     }
 
@@ -195,10 +185,9 @@ function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
 function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): array
 {
     $baseSocketPath = rtrim($homeDir, '/').'/.lighttpd/php.socket';
-    $maxProcs = null;
-    if (preg_match('/"max-procs"\s*=>\s*([0-9]+)/', (string) @file_get_contents($configPath), $matches) === 1) {
-        $maxProcs = ((int) $matches[1]) ?: null;
-    }
+    $maxProcs = preg_match('/"max-procs"\s*=>\s*([0-9]+)/', (string) @file_get_contents($configPath), $matches) === 1
+        ? (int) $matches[1]
+        : 0;
 
     return $maxProcs > 1
         ? array_map(static function ($index) use ($baseSocketPath) { return $baseSocketPath.'-'.$index; }, range(0, $maxProcs - 1))
