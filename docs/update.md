@@ -17,6 +17,9 @@ Responsibilities:
   `version.meta`.
 - Re-run itself once if the fetched snapshot updated `update.php`.
 - Invoke phase 2 unless explicitly skipped.
+- If phase 2 exits non-zero after staging, make a best-effort
+  `setupSkelPermissions.php` pass before surfacing the failure so
+  `/etc/seedbox` remains traversable.
 
 Common flags:
 

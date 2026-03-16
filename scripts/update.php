@@ -646,6 +646,26 @@ function restoreRootCronBestEffort(string $context): void
     runSoft($helper);
 }
 
+/**
+ * Best-effort refresh of skeleton/config permissions after snapshot staging.
+ *
+ * Phase 1 hardens `/etc/skel` and `/etc/seedbox`, so flows that do not finish
+ * phase 2 must rerun the dedicated helper to restore expected traversal and
+ * file visibility for tenant-facing services.
+ */
+function restoreSkelPermissionsBestEffort(string $context): void
+{
+    $helper = '/scripts/util/setupSkelPermissions.php';
+
+    if (!file_exists($helper)) {
+        logmsg('[WARN] setupSkelPermissions.php missing; cannot refresh skeleton/config permissions after '.$context);
+        return;
+    }
+
+    logmsg('[INFO] Refreshing skeleton/config permissions after '.$context);
+    runSoft(escapeshellarg(PHP_BINARY).' '.escapeshellarg($helper));
+}
+
 function ensureSnapshot(string $tmp): void
 {
     $required = [
@@ -961,6 +981,7 @@ function runUpdateStep2(bool $dryRun): void
     }
     logEvent('update_step2_end', $details);
     if ($rc !== 0) {
+        restoreSkelPermissionsBestEffort('update-step2 failure');
         fatal('update-step2.php exited with status '.$rc, $rc);
     }
 }
@@ -1165,9 +1186,8 @@ function bootstrapMain(array $argv): void
         // skeleton and configuration permissions so services like rTorrent
         // continue to see readable config under /etc/seedbox after the
         // initial hardening in stageSnapshot().
-        if (!$options['dry_run'] && file_exists('/scripts/util/setupSkelPermissions.php')) {
-            logmsg('[INFO] Refreshing skeleton/config permissions for --scripts-only run');
-            runSoft(escapeshellarg(PHP_BINARY).' /scripts/util/setupSkelPermissions.php');
+        if (!$options['dry_run']) {
+            restoreSkelPermissionsBestEffort('--scripts-only run');
         }
         if (!$options['dry_run'] && file_exists('/scripts/util/ftpConfig.php')) {
             logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');

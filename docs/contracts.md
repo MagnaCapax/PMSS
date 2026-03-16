@@ -72,7 +72,7 @@ Signature: refer to file for full source; highlights below.
 
 - runUpdateStep2(bool $dryRun): void
   - Exports `PMSS_JSON_LOG` path and keeps `PMSS_CORRELATION_ID` available for phase 2/child processes; dry-run or missing file emits `update_step2_skipped`.
-  - Else runs `/scripts/util/update-step2.php`, logs start/end + duration; `fatal` on non-zero exit.
+  - Else runs `/scripts/util/update-step2.php`, logs start/end + duration, and on non-zero exit makes a best-effort `scripts/util/setupSkelPermissions.php` pass before `fatal`.
 
 - runAutoremove(): void → `apt-get autoremove -y` with non-interactive dpkg opts; `fatal(EXIT_COPY)` on failure.
 
