@@ -39,7 +39,7 @@ function pmssSystemStatsCollect(): array
                 continue;
             }
             $name = $parts[2] ?? '';
-            if ($name === '' || !preg_match('/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/', $name)) {
+            if (!preg_match('/^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/', $name)) {
                 continue;
             }
             $stats[$name] = (int) ($parts[12] ?? 0);
@@ -99,19 +99,16 @@ function pmssSystemStatsCollect(): array
         ? number_format((($cpuDiff[4] ?? 0) / $cpuTotal) * 100, 1, '.', '')
         : '0.0';
 
-    $diskBusy = '0.0';
-    if ($disk2) {
-        $maxPct = 0.0;
-        foreach ($disk2 as $name => $ioTime) {
-            $delta = max(0, $ioTime - ($disk1[$name] ?? $ioTime));
-            // /proc/diskstats io_time is in milliseconds spent doing IO.
-            $pct = $sampleSeconds > 0 ? ($delta / ($sampleSeconds * 1000)) * 100 : 0.0;
-            if ($pct > $maxPct) {
-                $maxPct = $pct;
-            }
+    $maxPct = 0.0;
+    foreach ($disk2 as $name => $ioTime) {
+        $delta = max(0, $ioTime - ($disk1[$name] ?? $ioTime));
+        // /proc/diskstats io_time is in milliseconds spent doing IO.
+        $pct = $sampleSeconds > 0 ? ($delta / ($sampleSeconds * 1000)) * 100 : 0.0;
+        if ($pct > $maxPct) {
+            $maxPct = $pct;
         }
-        $diskBusy = number_format(min(100, $maxPct), 1, '.', '');
     }
+    $diskBusy = number_format(min(100, $maxPct), 1, '.', '');
 
     $load = ['na', 'na', 'na'];
     $loadRaw = @file_get_contents('/proc/loadavg');

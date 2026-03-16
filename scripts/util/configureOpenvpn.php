@@ -39,8 +39,6 @@ $clientCrt    = '/home/openvpn-'.$slug.'.crt';
 $alreadyConfigured = trim((string) @shell_exec('command -v openvpn 2>/dev/null')) !== ''
     && is_file($serverConf)
     && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
-    && $clientOvpn !== ''
-    && $clientCrt !== ''
     && is_file($clientOvpn)
     && is_file($clientCrt);
 if ($alreadyConfigured) {
@@ -99,10 +97,8 @@ if (file_exists($easyRsaDir.'/easyrsa') && !file_exists($easyRsaDir.'/pki/ca.crt
 }
 
 // 6) Server configuration from template
-if (file_exists($tplServer)) {
-    if (!file_exists($serverConf) || md5_file($serverConf) !== md5_file($tplServer)) {
-        runStep('Installing OpenVPN server configuration', sprintf('cp -p %s %s', escapeshellarg($tplServer), escapeshellarg($serverConf)));
-    }
+if (file_exists($tplServer) && (!file_exists($serverConf) || md5_file($serverConf) !== md5_file($tplServer))) {
+    runStep('Installing OpenVPN server configuration', sprintf('cp -p %s %s', escapeshellarg($tplServer), escapeshellarg($serverConf)));
 }
 
 // 7) Restart OpenVPN service
