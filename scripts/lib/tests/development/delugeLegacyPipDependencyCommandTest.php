@@ -12,7 +12,7 @@ class DelugeLegacyPipDependencyCommandTest extends TestCase
      */
     public function testCommandIncludesPinnedPyasn1Requirement(): void
     {
-        $command = \pmssDelugeLegacyPipDependencyCommand();
+        $command = \pmssBuildCommand('pip', array_merge(['install'], \pmssDelugeLegacyPipDependencyPackages()));
 
         $this->assertTrue(strpos($command, "'pyasn1==0.4.6'") !== false);
     }
@@ -22,7 +22,7 @@ class DelugeLegacyPipDependencyCommandTest extends TestCase
      */
     public function testCommandDoesNotUseUpgradeFlag(): void
     {
-        $command = \pmssDelugeLegacyPipDependencyCommand();
+        $command = \pmssBuildCommand('pip', array_merge(['install'], \pmssDelugeLegacyPipDependencyPackages()));
 
         $this->assertTrue(strpos($command, "'--upgrade'") === false);
     }
@@ -40,4 +40,3 @@ class DelugeLegacyPipDependencyCommandTest extends TestCase
         $this->assertEquals('pyasn1==0.4.6', $packages[8]);
     }
 }
-

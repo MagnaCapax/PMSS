@@ -20,14 +20,6 @@ require_once __DIR__.'/../lib/openvpn.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
 
 /**
- * Execute a command and return trimmed output.
- */
-function pmssExec(string $command): string
-{
-    return trim((string) @shell_exec($command));
-}
-
-/**
  * Build a normalized check result structure.
  *
  * Centralizing this helper keeps the returned array shape consistent and
@@ -81,12 +73,12 @@ $binaryChecks = [
 ];
 
 foreach ($binaryChecks as $binary => $infoCmd) {
-    $exists = pmssExec('command -v '.escapeshellarg($binary));
+    $exists = trim((string) @shell_exec('command -v '.escapeshellarg($binary)));
     if ($exists === '') {
         $checks[] = pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
         continue;
     }
-    $detail = pmssExec($infoCmd);
+    $detail = trim((string) @shell_exec($infoCmd));
     $checks[] = pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
 }
 
@@ -227,7 +219,7 @@ foreach ($symlinkTargets as $label => [$link, $expected]) {
 // Fold in the componentStatus view so operators get a single, richer picture.
 // The helper already focuses on binaries/configs; here we simply import its
 // JSON output when available and prefix entries so name clashes remain obvious.
-$componentJson = pmssExec('php /scripts/util/componentStatus.php --json 2>/dev/null');
+$componentJson = trim((string) @shell_exec('php /scripts/util/componentStatus.php --json 2>/dev/null'));
 if ($componentJson !== '') {
     $decoded = json_decode($componentJson, true);
     foreach (is_array($decoded['results'] ?? null) ? $decoded['results'] : [] as $entry) {

@@ -57,7 +57,27 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     }
 
     $key = pmssConfigBackupsPathKey($sourcePath);
-    $pmssVersion = array_key_exists('pmssVersion', $options) ? (string) $options['pmssVersion'] : pmssConfigBackupsGetPmssVersion();
+    if (array_key_exists('pmssVersion', $options)) {
+        $pmssVersion = (string) $options['pmssVersion'];
+    } elseif (function_exists('getPmssVersion')) {
+        $pmssVersion = (string) getPmssVersion();
+    } else {
+        $pmssVersion = 'unknown';
+        foreach (array('/etc/seedbox/config/version', '/etc/seedbox/runtime/version') as $path) {
+            if ($path === '' || !is_file($path) || !is_readable($path)) {
+                continue;
+            }
+            $data = @file_get_contents($path);
+            if (!is_string($data)) {
+                continue;
+            }
+            $trimmed = trim($data);
+            if ($trimmed !== '') {
+                $pmssVersion = $trimmed;
+                break;
+            }
+        }
+    }
     $correlationId = array_key_exists('correlationId', $options) ? (string) $options['correlationId'] : (string) (getenv('PMSS_CORRELATION_ID') ?: '');
 
     $serviceDir = $backupRoot.'/'.$service;
@@ -156,7 +176,11 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
         }
 
         if ($cutoff !== null) {
-            $ts = pmssConfigBackupsExtractTimestamp($file);
+            $ts = null;
+            if (preg_match('/^([0-9]{14})__/', basename($file), $m)) {
+                $dt = \DateTime::createFromFormat('YmdHis', $m[1]);
+                $ts = $dt === false ? null : $dt->getTimestamp();
+            }
             if ($ts !== null && $ts < $cutoff) {
                 $remove = true;
             }
@@ -229,45 +253,4 @@ function pmssConfigBackupsSanitizeLabel(string $label, int $maxLen = 80): string
         $label = substr($label, 0, $maxLen);
     }
     return $label;
-}
-
-/**
- * Best-effort lookup for the current PMSS version label.
- */
-function pmssConfigBackupsGetPmssVersion(): string
-{
-    if (function_exists('getPmssVersion')) {
-        return (string) getPmssVersion();
-    }
-    $paths = array('/etc/seedbox/config/version', '/etc/seedbox/runtime/version');
-    foreach ($paths as $path) {
-        if ($path === '' || !is_file($path) || !is_readable($path)) {
-            continue;
-        }
-        $data = @file_get_contents($path);
-        if (!is_string($data)) {
-            continue;
-        }
-        $trimmed = trim($data);
-        if ($trimmed !== '') {
-            return $trimmed;
-        }
-    }
-    return 'unknown';
-}
-
-/**
- * Extract the embedded timestamp from a backup filename and return its epoch seconds.
- */
-function pmssConfigBackupsExtractTimestamp(string $backupPath): ?int
-{
-    $base = basename($backupPath);
-    if (!preg_match('/^([0-9]{14})__/', $base, $m)) {
-        return null;
-    }
-    $dt = \DateTime::createFromFormat('YmdHis', $m[1]);
-    if ($dt === false) {
-        return null;
-    }
-    return $dt->getTimestamp();
 }

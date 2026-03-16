@@ -33,17 +33,6 @@ function pmssDelugeLegacyPipDependencyPackages(): array
 }
 
 /**
- * Build the pip command for Debian 10 Deluge dependencies.
- */
-function pmssDelugeLegacyPipDependencyCommand(): string
-{
-    return pmssBuildCommand(
-        'pip',
-        array_merge(['install'], pmssDelugeLegacyPipDependencyPackages())
-    );
-}
-
-/**
  * Patch Deluge cache hit ratio handling for libtorrent 2.0+ stats removal.
  */
 function pmssPatchDelugeCacheHitRatio(string $path, bool $dryRun, callable $log): bool
@@ -323,7 +312,7 @@ if ($isDebian10) {
         echo "\t*** Deluge pip install (target {$targetVersion})\n";
         runStep(
             'Installing Deluge pip dependencies (no global upgrades)',
-            pmssDelugeLegacyPipDependencyCommand()
+            pmssBuildCommand('pip', array_merge(['install'], pmssDelugeLegacyPipDependencyPackages()))
         );
 
         $tmp = tempnam(sys_get_temp_dir(), 'pmss-deluge-');
