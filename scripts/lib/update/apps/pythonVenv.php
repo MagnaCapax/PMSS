@@ -61,12 +61,3 @@ function pmssPythonVenvEnsure(string $venvDir, string $label, ?callable $logger 
 
     return ['python' => $pythonBin, 'pip' => $pipBin];
 }
-/**
- * True if `python -m pip show <package>` returns successfully in the venv.
- */
-function pmssPythonVenvHasPackage(string $pythonBin, string $package): bool
-{
-    $cmd = escapeshellarg($pythonBin).' -m pip show '.escapeshellarg($package).' 1>/dev/null 2>&1';
-    exec($cmd, $out, $rc);
-    return $rc === 0;
-}

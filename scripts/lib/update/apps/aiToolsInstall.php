@@ -13,54 +13,6 @@
 require_once __DIR__.'/../runtime/commands.php';
 
 /**
- * Resolve a Node.js 20+ binary, installing a pinned portable runtime if needed.
- */
-function pmssAiToolsNodeBinary(callable $log): string
-{
-    $systemNode = trim((string) @shell_exec('command -v node 2>/dev/null'));
-    if ($systemNode !== '') {
-        $systemVersion = trim((string) @shell_exec(escapeshellarg($systemNode).' --version 2>/dev/null'));
-        if (preg_match('/^v?([0-9]+)/', $systemVersion, $match) && (int) $match[1] >= 20) {
-            return $systemNode;
-        }
-    }
-
-    if (!in_array(php_uname('m'), ['x86_64', 'amd64'], true)) {
-        $log('[WARN] Skipping Gemini/Claude install: no pinned Node.js artifact for this CPU architecture');
-        return '';
-    }
-
-    $nodeVersion  = '20.20.0';
-    $nodeArchive  = 'node-v20.20.0-linux-x64.tar.xz';
-    $nodeSha256   = '4f48b52acf42130844a3a75e94da0e9629009d09e4101b2304895c24f3fbe609';
-    $installRoot  = '/opt/pmss/ai-tools';
-    $nodeDir      = $installRoot.'/node-v20.20.0-linux-x64';
-    $nodeBinary   = $nodeDir.'/bin/node';
-    $downloadPath = sys_get_temp_dir().'/'.$nodeArchive;
-    $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
-
-    if (is_executable($nodeBinary)) {
-        return $nodeBinary;
-    }
-
-    runStep('Ensuring AI tools install root exists', 'mkdir -p '.escapeshellarg($installRoot));
-    runStep('Downloading pinned Node.js runtime for AI CLI tools', sprintf('wget -q -O %s %s', escapeshellarg($downloadPath), escapeshellarg($downloadUrl)));
-
-    if (getenv('PMSS_DRY_RUN') === '1') {
-        return $nodeBinary;
-    }
-
-    $actualSha = @hash_file('sha256', $downloadPath);
-    if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($nodeSha256)) {
-        $log('[WARN] Node.js checksum mismatch; skipping Gemini/Claude installation');
-        return '';
-    }
-
-    runStep('Extracting pinned Node.js runtime for AI CLI tools', sprintf('tar -xJf %s -C %s', escapeshellarg($downloadPath), escapeshellarg($installRoot)));
-    return is_executable($nodeBinary) ? $nodeBinary : '';
-}
-
-/**
  * Install a global npm CLI into a dedicated prefix and link into PATH.
  */
 function pmssAiToolsInstallNpmCli(string $toolLabel, string $packageName, string $binaryName, string $nodeBinary, bool $forceRefresh): void
@@ -89,8 +41,50 @@ function pmssAiToolsInstallNpmCli(string $toolLabel, string $packageName, string
 
 $logger = function_exists('logmsg') ? 'logmsg' : 'logMessage';
 $force  = getenv('PMSS_FORCE_AI_TOOLS_REFRESH') === '1';
+$architecture = php_uname('m');
 
-$nodeBinary = pmssAiToolsNodeBinary($logger);
+$nodeBinary = '';
+$systemNode = trim((string) @shell_exec('command -v node 2>/dev/null'));
+if ($systemNode !== '') {
+    $systemVersion = trim((string) @shell_exec(escapeshellarg($systemNode).' --version 2>/dev/null'));
+    if (preg_match('/^v?([0-9]+)/', $systemVersion, $match) && (int) $match[1] >= 20) {
+        $nodeBinary = $systemNode;
+    }
+}
+
+if ($nodeBinary === '') {
+    if (!in_array($architecture, ['x86_64', 'amd64'], true)) {
+        $logger('[WARN] Skipping Gemini/Claude install: no pinned Node.js artifact for this CPU architecture');
+    } else {
+        $nodeVersion  = '20.20.0';
+        $nodeArchive  = 'node-v20.20.0-linux-x64.tar.xz';
+        $nodeSha256   = '4f48b52acf42130844a3a75e94da0e9629009d09e4101b2304895c24f3fbe609';
+        $installRoot  = '/opt/pmss/ai-tools';
+        $nodeDir      = $installRoot.'/node-v20.20.0-linux-x64';
+        $nodeBinary   = $nodeDir.'/bin/node';
+        $downloadPath = sys_get_temp_dir().'/'.$nodeArchive;
+        $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
+
+        if (!is_executable($nodeBinary)) {
+            runStep('Ensuring AI tools install root exists', 'mkdir -p '.escapeshellarg($installRoot));
+            runStep('Downloading pinned Node.js runtime for AI CLI tools', sprintf('wget -q -O %s %s', escapeshellarg($downloadPath), escapeshellarg($downloadUrl)));
+
+            if (getenv('PMSS_DRY_RUN') !== '1') {
+                $actualSha = @hash_file('sha256', $downloadPath);
+                if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($nodeSha256)) {
+                    $logger('[WARN] Node.js checksum mismatch; skipping Gemini/Claude installation');
+                    $nodeBinary = '';
+                } else {
+                    runStep('Extracting pinned Node.js runtime for AI CLI tools', sprintf('tar -xJf %s -C %s', escapeshellarg($downloadPath), escapeshellarg($installRoot)));
+                    if (!is_executable($nodeBinary)) {
+                        $nodeBinary = '';
+                    }
+                }
+            }
+        }
+    }
+}
+
 if ($nodeBinary !== '') {
     pmssAiToolsInstallNpmCli('Gemini CLI', '@google/gemini-cli', 'gemini', $nodeBinary, $force);
     pmssAiToolsInstallNpmCli('Claude Code', '@anthropic-ai/claude-code', 'claude', $nodeBinary, $force);
@@ -98,7 +92,7 @@ if ($nodeBinary !== '') {
 
 $destination = '/usr/local/bin/codex';
 if (!is_file($destination) || $force) {
-    if (!in_array(php_uname('m'), ['x86_64', 'amd64'], true)) {
+    if (!in_array($architecture, ['x86_64', 'amd64'], true)) {
         $logger('[WARN] Skipping Codex install: no pinned binary for this CPU architecture');
     } else {
         $tag         = 'rust-v0.93.0';

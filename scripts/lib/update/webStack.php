@@ -38,14 +38,15 @@ function pmssConfigureWebStack(int $distroVersion): void
     runStep('Setting /home directory permissions', 'chmod 751 /home');
     // Quota state files reject chmod; prune them so the find commands stay noise-free.
     $prune = '\( -name "aquota.*" -o -name "lost+found" \)';
-    runStep(
-        'Hardening /home tenant directories',
-        'find /home -mindepth 1 -maxdepth 1 '.$prune.' -prune -o -type d -exec chmod 700 {} +'
-    );
-    runStep(
-        'Hardening /home tenant files',
-        'find /home -mindepth 1 -maxdepth 1 '.$prune.' -prune -o -type f -exec chmod 600 {} +'
-    );
+    foreach ([
+        ['Hardening /home tenant directories', 'd', '700'],
+        ['Hardening /home tenant files', 'f', '600'],
+    ] as $hardeningStep) {
+        runStep(
+            $hardeningStep[0],
+            sprintf('find /home -mindepth 1 -maxdepth 1 %s -prune -o -type %s -exec chmod %s {} +', $prune, $hardeningStep[1], $hardeningStep[2])
+        );
+    }
 }
 
 /**

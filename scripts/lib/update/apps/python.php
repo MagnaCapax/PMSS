@@ -28,10 +28,15 @@ if (empty($venv)) {
     return;
 }
 
-runStep('Installing gdrivefs in FlexGet venv', sprintf('%s -m pip install --upgrade gdrivefs', escapeshellarg($venv['python'])));
-runStep('Installing FlexGet dependencies', sprintf("%s -m pip install --upgrade pyopenssl ndg-httpsclient cryptography funcsigs 'chardet==3.0.3' 'certifi==2017.4.17'", escapeshellarg($venv['python'])));
-runStep('Installing FlexGet', sprintf('%s -m pip install --upgrade flexget', escapeshellarg($venv['python'])));
-runStep('Installing youtube-dl for FlexGet', sprintf('%s -m pip install --upgrade youtube_dl', escapeshellarg($venv['python'])));
+$venvPython = escapeshellarg($venv['python']);
+foreach ([
+    ['Installing gdrivefs in FlexGet venv', 'gdrivefs'],
+    ['Installing FlexGet dependencies', "pyopenssl ndg-httpsclient cryptography funcsigs 'chardet==3.0.3' 'certifi==2017.4.17'"],
+    ['Installing FlexGet', 'flexget'],
+    ['Installing youtube-dl for FlexGet', 'youtube_dl'],
+] as $installStep) {
+    runStep($installStep[0], sprintf('%s -m pip install --upgrade %s', $venvPython, $installStep[1]));
+}
 
 if (is_file($cliBin)) {
     if (!is_link('/usr/local/bin/flexget') || readlink('/usr/local/bin/flexget') !== $cliBin) {

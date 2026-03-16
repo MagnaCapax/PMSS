@@ -26,7 +26,8 @@ if (empty($venv)) {
 }
 
 $forceUpdate = getenv('PMSS_FORCE_ACDCLI_UPDATE') === '1';
-if (pmssPythonVenvHasPackage($venv['python'], 'acdcli') && !$forceUpdate) {
+exec(escapeshellarg($venv['python']).' -m pip show '.escapeshellarg('acdcli').' 1>/dev/null 2>&1', $packageProbeOutput, $packageProbeStatus);
+if ($packageProbeStatus === 0 && !$forceUpdate) {
     logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
 } else {
     $source = sprintf('git+https://github.com/yadayada/acd_cli.git@%s', $acdCliPinnedCommit);

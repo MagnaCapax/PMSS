@@ -37,7 +37,8 @@ class AcdCliInstallerPinTest extends TestCase
     {
         $contents = $this->loadInstaller();
         $this->assertStringContainsString("getenv('PMSS_FORCE_ACDCLI_UPDATE')", $contents);
-        $this->assertStringContainsString('pmssPythonVenvHasPackage', $contents);
+        $this->assertStringContainsString('-m pip show', $contents);
+        $this->assertStringContainsString("escapeshellarg('acdcli')", $contents);
         $this->assertStringContainsString('already installed; set PMSS_FORCE_ACDCLI_UPDATE=1', $contents);
     }
 
