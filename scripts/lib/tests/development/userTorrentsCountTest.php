@@ -112,6 +112,23 @@ class UserTorrentsCountTest extends TestCase
         }
     }
 
+    public function testIgnoresEntriesWithEmptyTorrentBaseName(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $home = $this->homeDir();
+            $this->makeFile($home.'/alice/session/.torrent');
+            $this->makeFile($home.'/alice/session/good.torrent');
+
+            $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+
+            $this->assertEquals(1, $counts['rtorrent']);
+            $this->assertEquals(1, $counts['total']);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testMissingDirsReturnZeros(): void
     {
         $this->setUpTempDir();

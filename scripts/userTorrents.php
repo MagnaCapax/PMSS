@@ -54,10 +54,9 @@ function pmssUserTorrentsMain(array $argv): int
             continue;
         }
         $counts = pmssUserTorrentsCountForUser($homeDir, $thisUser);
-        $line = $byClient
+        echo ($byClient
             ? "{$thisUser}: total=".number_format($counts['total'])." rtorrent=".number_format($counts['rtorrent'])." deluge=".number_format($counts['deluge'])." qbittorrent=".number_format($counts['qbittorrent'])
-            : "{$thisUser}: ".number_format($counts['total']);
-        echo $line."\n";
+            : "{$thisUser}: ".number_format($counts['total']))."\n";
     }
 
     return 0;
@@ -104,32 +103,19 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
             $home.'/.config/qBittorrent/BT_backup/*.fastresume',
         ],
     ] as $client => $patterns) {
-        $counts[$client] = pmssUserTorrentsCountUnique($patterns);
+        $seen = [];
+        foreach ($patterns as $pattern) {
+            foreach (glob($pattern) ?: [] as $path) {
+                $name = pathinfo(basename($path), PATHINFO_FILENAME);
+                if ($name === '' || $name === '.' || $name === '..') {
+                    continue;
+                }
+                $seen[$name] = true;
+            }
+        }
+        $counts[$client] = count($seen);
     }
     $counts['total'] = array_sum($counts);
 
     return $counts;
-}
-
-function pmssUserTorrentsCountUnique(array $patterns): int
-{
-    $seen = [];
-    foreach ($patterns as $pattern) {
-        $matches = glob($pattern);
-        if (!is_array($matches)) {
-            continue;
-        }
-        foreach ($matches as $path) {
-            $name = basename($path);
-            if ($name === '' || $name === '.' || $name === '..') {
-                continue;
-            }
-            $name = pathinfo($name, PATHINFO_FILENAME);
-            if ($name === '') {
-                continue;
-            }
-            $seen[$name] = true;
-        }
-    }
-    return count($seen);
 }
