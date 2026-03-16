@@ -45,13 +45,10 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         return null;
     }
 
-    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/');
-    $backupRoot = $backupRoot === '' ? '/var/backups/pmss/config' : $backupRoot;
+    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
 
-    $timestamp = isset($options['timestamp']) ? (string) $options['timestamp'] : date('YmdHis');
-    if (!preg_match('/^[0-9]{14}$/', $timestamp)) {
-        $timestamp = date('YmdHis');
-    }
+    $timestamp = isset($options['timestamp']) ? (string) $options['timestamp'] : '';
+    $timestamp = preg_match('/^[0-9]{14}$/', $timestamp) ? $timestamp : date('YmdHis');
 
     $key = pmssConfigBackupsPathKey($sourcePath);
     if (array_key_exists('pmssVersion', $options)) {
@@ -93,8 +90,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         return null;
     }
     @chmod($backupPath, 0600);
-    $logSuccess = isset($options['logSuccess']) ? (bool) $options['logSuccess'] : function_exists('logMessage');
-    if ($logSuccess) {
+    if (isset($options['logSuccess']) ? (bool) $options['logSuccess'] : function_exists('logMessage')) {
         $log('Backup written: '.$backupPath);
     }
 
@@ -117,8 +113,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
         return;
     }
 
-    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/');
-    $backupRoot = $backupRoot === '' ? '/var/backups/pmss/config' : $backupRoot;
+    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
 
     $serviceDir = $backupRoot.'/'.$service;
     if (!is_dir($serviceDir)) {
@@ -146,15 +141,13 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     foreach ($files as $file) {
         $remove = !isset($keptMap[$file]);
 
-        if ($cutoff !== null) {
-            $ts = null;
-            if (preg_match('/^([0-9]{14})__/', basename($file), $m)) {
-                $dt = \DateTime::createFromFormat('YmdHis', $m[1]);
-                $ts = $dt === false ? null : $dt->getTimestamp();
-            }
-            if ($ts !== null && $ts < $cutoff) {
-                $remove = true;
-            }
+        if (
+            $cutoff !== null
+            && preg_match('/^([0-9]{14})__/', basename($file), $matches)
+            && ($dateTime = \DateTime::createFromFormat('YmdHis', $matches[1])) !== false
+            && $dateTime->getTimestamp() < $cutoff
+        ) {
+            $remove = true;
         }
 
         if ($remove) {

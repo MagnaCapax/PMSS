@@ -93,17 +93,17 @@ function pmssUserTransferParseCli(array $argv): array
                 continue;
             }
 
+            if (!isset($integerOptions[$key])) {
+                throw new RuntimeException('Unknown option: --'.$key, 1);
+            }
+
             if ($value === null) {
                 $i++;
                 $value = $tokens[$i] ?? null;
             }
 
-            if (isset($integerOptions[$key])) {
-                $options[$integerOptions[$key]] = $parseInt($key, $value);
-                continue;
-            }
-
-            throw new RuntimeException('Unknown option: --'.$key, 1);
+            $options[$integerOptions[$key]] = $parseInt($key, $value);
+            continue;
         }
 
         if (substr($token, 0, 1) === '-' && strlen($token) > 1) {
@@ -121,8 +121,7 @@ function pmssUserTransferParseCli(array $argv): array
         throw new RuntimeException(pmssUserTransferUsageText(), 0);
     }
 
-    $positionalCount = count($positionals);
-    if ($positionalCount < 2 || $positionalCount > 3) {
+    if (($positionalCount = count($positionals)) < 2 || $positionalCount > 3) {
         throw new RuntimeException('Need arguments.'.PHP_EOL.pmssUserTransferUsageText(), 1);
     }
 

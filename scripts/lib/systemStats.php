@@ -111,17 +111,16 @@ function pmssSystemStatsCollect(): array
     $diskBusy = number_format(min(100, $maxPct), 1, '.', '');
 
     $load = ['na', 'na', 'na'];
-    $loadRaw = @file_get_contents('/proc/loadavg');
-    if (is_string($loadRaw)) {
-        $parts = preg_split('/\s+/', trim($loadRaw));
-        if (is_array($parts) && count($parts) >= 3) {
-            $load = array_slice($parts, 0, 3);
-        }
+    if (
+        is_string($loadRaw = @file_get_contents('/proc/loadavg'))
+        && is_array($parts = preg_split('/\s+/', trim($loadRaw)))
+        && count($parts) >= 3
+    ) {
+        $load = array_slice($parts, 0, 3);
     }
 
     $meminfo = [];
-    $memLines = @file('/proc/meminfo');
-    if (is_array($memLines)) {
+    if (is_array($memLines = @file('/proc/meminfo'))) {
         foreach ($memLines as $line) {
             if (preg_match('/^(\w+):\s+(\d+)/', $line, $m)) {
                 $meminfo[$m[1]] = (int)$m[2];
@@ -133,8 +132,7 @@ function pmssSystemStatsCollect(): array
     $iopingRoot = $hasIoping ? $iopingMs('/') : 'na';
     $iopingHome = $hasIoping ? $iopingMs('/home') : 'na';
     $topMem = 'na';
-    $out = trim((string)@shell_exec('ps -eo comm=,rss= --sort=-rss | head -n 3'));
-    if ($out !== '') {
+    if (($out = trim((string)@shell_exec('ps -eo comm=,rss= --sort=-rss | head -n 3'))) !== '') {
         $items = [];
         foreach (preg_split('/\n+/', $out) as $line) {
             $parts = preg_split('/\s+/', trim($line));

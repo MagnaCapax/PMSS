@@ -18,6 +18,7 @@ function pmssUserTransferAssertSafeLocalHome(string $user): string
         throw new RuntimeException('Local user home does not look safe: '.$expected, 1);
     }
 
+    $pw = null;
     if (function_exists('posix_getpwnam')) {
         $pw = @posix_getpwnam($user);
         $pw = is_array($pw)
@@ -27,25 +28,21 @@ function pmssUserTransferAssertSafeLocalHome(string $user): string
                 'dir' => (string) ($pw['dir'] ?? ''),
             ]
             : null;
-    } else {
-        $pw = null;
-        $lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if (is_array($lines)) {
-            $prefix = $user.':';
-            foreach ($lines as $line) {
-                if (strpos($line, $prefix) !== 0) {
-                    continue;
-                }
-                $parts = explode(':', $line);
-                $pw = count($parts) < 7
-                    ? null
-                    : [
-                        'uid' => (int) $parts[2],
-                        'gid' => (int) $parts[3],
-                        'dir' => (string) $parts[5],
-                    ];
-                break;
+    } elseif (is_array($lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES))) {
+        $prefix = $user.':';
+        foreach ($lines as $line) {
+            if (strpos($line, $prefix) !== 0) {
+                continue;
             }
+            $parts = explode(':', $line);
+            $pw = count($parts) < 7
+                ? null
+                : [
+                    'uid' => (int) $parts[2],
+                    'gid' => (int) $parts[3],
+                    'dir' => (string) $parts[5],
+                ];
+            break;
         }
     }
 
