@@ -16,7 +16,6 @@ declare(strict_types=1);
  * packages.
  */
 
-require_once __DIR__.'/../lib/openvpn.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
 
 /**
@@ -163,8 +162,10 @@ $hostname = trim((string) @file_get_contents('/etc/hostname'));
 if ($hostname === '') {
     $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown');
 } else {
-    $slug = pmssOpenvpnSlugFromHostname($hostname);
-    list($ovpn, $crt) = pmssOpenvpnArtifactPathsFromSlug($slug);
+    $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
+    $slug = str_replace('.', '-', $fqdn);
+    $ovpn = '/home/openvpn-'.$slug.'.ovpn';
+    $crt = '/home/openvpn-'.$slug.'.crt';
     $ok = $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);
     if ($ok) {
         $checks[] = pmssStatus('OpenVPN client artifacts', 'OK', basename($ovpn).', '.basename($crt));

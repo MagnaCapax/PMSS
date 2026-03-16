@@ -277,8 +277,15 @@ foreach ($usersOut as $line) {
         }
 
         // Solution 2: Extend grace period if recently restarted (progressive backoff).
-        $restartAge = rtorrentProcessLastRestartAge($user);
-        $effectiveGrace = rtorrentProcessExtendedGrace(PMSS_RTORRENT_UNRESPONSIVE_GRACE, $restartAge);
+        $restartMarker = '/tmp/.pmss-rtorrent-restart-'.$user;
+        $restartTs = is_file($restartMarker) ? (int) trim((string) @file_get_contents($restartMarker)) : 0;
+        $restartAge = $restartTs > 0 ? max(0, time() - $restartTs) : 0;
+        $effectiveGrace = PMSS_RTORRENT_UNRESPONSIVE_GRACE;
+        if ($restartAge > 0 && $restartAge < 7200) {
+            $effectiveGrace = max(PMSS_RTORRENT_UNRESPONSIVE_GRACE, 600);
+        } elseif ($restartAge > 0 && $restartAge < 14400) {
+            $effectiveGrace = max(PMSS_RTORRENT_UNRESPONSIVE_GRACE, 1200);
+        }
 
         // Log extended grace for visibility.
         if ($effectiveGrace > PMSS_RTORRENT_UNRESPONSIVE_GRACE) {

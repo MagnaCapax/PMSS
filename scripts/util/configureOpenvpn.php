@@ -18,24 +18,22 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 // Bring in shared runtime helpers; avoid duplicating apt/repo logic here.
 // Package installation for OpenVPN/EasyRSA is handled centrally in the package phase.
 require_once __DIR__.'/../lib/update.php';
-require_once __DIR__.'/../lib/openvpn.php';
 
 requireRoot();
 
 $hostname = trim((string) @file_get_contents('/etc/hostname'));
-	if ($hostname === '') {
-	    $hostname = 'localhost';
-	}
-	$slug = pmssOpenvpnSlugFromHostname($hostname);
-	$fqdn = pmssOpenvpnFqdnFromHostname($hostname);
-	
-	$openvpnDir   = '/etc/openvpn';
-	$easyRsaDir   = $openvpnDir.'/easy-rsa';
+$hostname = $hostname === '' ? 'localhost' : $hostname;
+$fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
+$slug = str_replace('.', '-', $fqdn);
+
+$openvpnDir   = '/etc/openvpn';
+$easyRsaDir   = $openvpnDir.'/easy-rsa';
 $easyRsaShare = '/usr/share/easy-rsa';
 $serverConf   = $openvpnDir.'/openvpn.conf';
 $tplServer    = '/etc/seedbox/config/template.openvpn.server.config';
 $tplClient    = '/etc/seedbox/config/template.openvpn.client.config';
-list($clientOvpn, $clientCrt) = pmssOpenvpnArtifactPathsFromSlug($slug);
+$clientOvpn   = '/home/openvpn-'.$slug.'.ovpn';
+$clientCrt    = '/home/openvpn-'.$slug.'.crt';
 
 // Fast-path using the same binary/config/artifact checks expected by systemTest.
 $alreadyConfigured = trim((string) @shell_exec('command -v openvpn 2>/dev/null')) !== ''

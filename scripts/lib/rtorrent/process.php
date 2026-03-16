@@ -311,29 +311,6 @@ function rtorrentProcessStaggerDelay(string $user, int $maxDelay = 300): int
 }
 
 /**
- * Check if rTorrent was recently restarted by watchdog.
- *
- * Uses marker file with timestamp to track restart events. Returns the age
- * in seconds since last restart, or 0 if never restarted.
- *
- * @param string $user Username.
- *
- * @return int Seconds since last restart, or 0 if no restart recorded.
- */
-function rtorrentProcessLastRestartAge(string $user): int
-{
-    $markerFile = '/tmp/.pmss-rtorrent-restart-'.$user;
-    if (!is_file($markerFile)) {
-        return 0;
-    }
-    $ts = (int) trim((string) @file_get_contents($markerFile));
-    if ($ts <= 0) {
-        return 0;
-    }
-    return max(0, time() - $ts);
-}
-
-/**
  * Record a restart event for a user.
  *
  * Writes current timestamp to marker file for restart tracking.
@@ -345,38 +322,6 @@ function rtorrentProcessLastRestartAge(string $user): int
 function rtorrentProcessRecordRestart(string $user): void
 {
     @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
-}
-
-/**
- * Calculate extended grace period based on recent restart history.
- *
- * Implements progressive backoff: if rtorrent was recently restarted,
- * extend the grace period to allow hash-checking to complete.
- *
- * @param int $baseGrace   Base grace period in seconds.
- * @param int $restartAge  Seconds since last restart.
- *
- * @return int Extended grace period.
- */
-function rtorrentProcessExtendedGrace(int $baseGrace, int $restartAge): int
-{
-    // No recent restart - use base grace.
-    if ($restartAge <= 0) {
-        return $baseGrace;
-    }
-
-    // Restarted within last 2 hours (7200s) - extend to 600s (10 minutes).
-    if ($restartAge < 7200) {
-        return max($baseGrace, 600);
-    }
-
-    // Restarted within last 4 hours (14400s) - extend to 1200s (20 minutes).
-    if ($restartAge < 14400) {
-        return max($baseGrace, 1200);
-    }
-
-    // Old restart - use base grace.
-    return $baseGrace;
 }
 
 /**

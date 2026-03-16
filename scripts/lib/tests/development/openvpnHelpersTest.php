@@ -2,40 +2,47 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/openvpn.php';
 
 class OpenvpnHelpersTest extends TestCase
 {
-    public function testFqdnAddsPmSuffixWhenMissing(): void
+    private function loadSource(string $relativePath): string
     {
-        $this->assertEquals('seedbox1.pulsedmedia.com', \pmssOpenvpnFqdnFromHostname('seedbox1'));
+        $path = dirname(__DIR__, 4).'/'.$relativePath;
+        $contents = @file_get_contents($path);
+        $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
+        return $contents;
     }
 
-    public function testFqdnPreservesExistingPmSuffix(): void
+    public function testConfigureOpenvpnStillBuildsPmFqdnAndSlugInline(): void
     {
-        $this->assertEquals('seedbox1.pulsedmedia.com', \pmssOpenvpnFqdnFromHostname('seedbox1.pulsedmedia.com'));
+        $contents = $this->loadSource('scripts/util/configureOpenvpn.php');
+
+        $this->assertStringContainsString("strpos(\$hostname, '.pulsedmedia.com') !== false", $contents);
+        $this->assertStringContainsString("str_replace('.', '-', \$fqdn)", $contents);
     }
 
-    public function testFqdnReturnsEmptyForBlankHostname(): void
+    public function testConfigureOpenvpnClientArtifactsStayUnderHome(): void
     {
-        $this->assertEquals('', \pmssOpenvpnFqdnFromHostname(" \n\t"));
+        $contents = $this->loadSource('scripts/util/configureOpenvpn.php');
+
+        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.ovpn'", $contents);
+        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.crt'", $contents);
     }
 
-    public function testSlugReplacesDotsInNormalizedFqdn(): void
+    public function testSystemTestUsesMatchingClientArtifactPaths(): void
     {
-        $this->assertEquals('seedbox1-pulsedmedia-com', \pmssOpenvpnSlugFromHostname('seedbox1'));
+        $contents = $this->loadSource('scripts/util/systemTest.php');
+
+        $this->assertStringContainsString("strpos(\$hostname, '.pulsedmedia.com') !== false", $contents);
+        $this->assertStringContainsString("str_replace('.', '-', \$fqdn)", $contents);
+        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.ovpn'", $contents);
+        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.crt'", $contents);
     }
 
-    public function testArtifactPathsFollowSlugContract(): void
+    public function testSystemTestStillWarnsWhenHostnameIsUnknown(): void
     {
-        $this->assertEquals(
-            ['/home/openvpn-seedbox1-pulsedmedia-com.ovpn', '/home/openvpn-seedbox1-pulsedmedia-com.crt'],
-            \pmssOpenvpnArtifactPathsFromSlug('seedbox1-pulsedmedia-com')
-        );
-    }
+        $contents = $this->loadSource('scripts/util/systemTest.php');
 
-    public function testArtifactPathsStayBlankWithoutSlug(): void
-    {
-        $this->assertEquals(['', ''], \pmssOpenvpnArtifactPathsFromSlug(''));
+        $this->assertStringContainsString("pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown')", $contents);
     }
 }
