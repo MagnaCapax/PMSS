@@ -182,6 +182,22 @@ class WireGuardInstallerTest extends TestCase
         });
     }
 
+    public function testEnsureKeysUsesEnvOverridesWhenGenerating(): void
+    {
+        $dir = $this->createTempDir();
+
+        $this->withEnv([
+            'PMSS_WG_PRIVATE_KEY' => 'env-priv',
+            'PMSS_WG_PUBLIC_KEY'  => 'env-pub',
+        ], function () use ($dir): void {
+            [$priv, $pub] = \wgEnsureKeys($dir);
+            $this->assertEquals('env-priv', $priv);
+            $this->assertEquals('env-pub', $pub);
+            $this->assertEquals("env-priv\n", (string) file_get_contents($dir.'/server_private.key'));
+            $this->assertEquals("env-pub\n", (string) file_get_contents($dir.'/server_public.key'));
+        });
+    }
+
     public function testEnsureKeysHandlesGenerationFailure(): void
     {
         $dir = $this->createTempDir();

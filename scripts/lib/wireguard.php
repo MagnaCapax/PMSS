@@ -31,14 +31,6 @@ function wgConfigDir(): string
 }
 
 /**
- * Compose an absolute path inside the WireGuard configuration directory.
- */
-function wgConfigPath(string $file): string
-{
-    return wgConfigDir().'/'.$file;
-}
-
-/**
  * Enumerate tenants targeted for configuration distribution.
  */
 function wgListHomeUsers(): array
@@ -58,34 +50,6 @@ function wgSupports(): bool
         wgLog('wg binary not available on PATH');
     }
     return $rc === 0;
-}
-
-/**
- * Produce a WireGuard private key, optionally via test overrides.
- */
-function wgGeneratePrivateKey(): string
-{
-    $override = getenv('PMSS_WG_PRIVATE_KEY');
-    if ($override !== false) {
-        return trim($override);
-    }
-
-    exec('wg genkey', $privOut, $rc);
-    return $rc === 0 ? trim($privOut[0] ?? '') : '';
-}
-
-/**
- * Derive the WireGuard public key from the supplied private key.
- */
-function wgDerivePublicKey(string $private): string
-{
-    $override = getenv('PMSS_WG_PUBLIC_KEY');
-    if ($override !== false) {
-        return trim($override);
-    }
-
-    exec('echo '.escapeshellarg($private).' | wg pubkey', $pubOut, $rc);
-    return $rc === 0 ? trim($pubOut[0] ?? '') : '';
 }
 
 /**
@@ -241,13 +205,25 @@ function wgEnsureKeys(string $dir): array
         return [trim((string)file_get_contents($privFile)), trim((string)file_get_contents($pubFile))];
     }
 
-    $priv = wgGeneratePrivateKey();
+    $override = getenv('PMSS_WG_PRIVATE_KEY');
+    if ($override !== false) {
+        $priv = trim($override);
+    } else {
+        exec('wg genkey', $privOut, $rc);
+        $priv = $rc === 0 ? trim($privOut[0] ?? '') : '';
+    }
     if ($priv === '') {
         wgLog('Failed to generate server private key');
         return ['', ''];
     }
 
-    $pub = wgDerivePublicKey($priv);
+    $override = getenv('PMSS_WG_PUBLIC_KEY');
+    if ($override !== false) {
+        $pub = trim($override);
+    } else {
+        exec('echo '.escapeshellarg($priv).' | wg pubkey', $pubOut, $rc);
+        $pub = $rc === 0 ? trim($pubOut[0] ?? '') : '';
+    }
     if ($pub === '') {
         wgLog('Failed to derive server public key');
         return ['', ''];
@@ -451,7 +427,7 @@ function wireguardBuildConfig(string $privKey, int $port): string
  */
 function wireguardWriteConfig(string $privKey, int $port): void
 {
-    $configPath = wgConfigPath('wg0.conf');
+    $configPath = wgConfigDir().'/wg0.conf';
     $contents   = wireguardBuildConfig($privKey, $port);
 
     file_put_contents($configPath, $contents);
@@ -476,7 +452,7 @@ function wgWriteReadme(string $hostname, string $endpoint, string $pubKey, int $
     if ($rendered === null) {
         return '';
     }
-    file_put_contents(wgConfigPath('README'), $rendered);
+    file_put_contents(wgConfigDir().'/README', $rendered);
     return $rendered;
 }
 

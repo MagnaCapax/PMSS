@@ -21,7 +21,7 @@ require_once __DIR__.'/lib/wireguard.php';
  */
 function wgLoadConfiguredPeers(): array
 {
-    $configPath = wgConfigPath('wg0.conf');
+    $configPath = wgConfigDir().'/wg0.conf';
     if (!is_file($configPath)) {
         fwrite(STDERR, "WireGuard config not found at {$configPath}\n");
         return [];
