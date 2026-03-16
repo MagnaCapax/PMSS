@@ -20,10 +20,8 @@
 
 require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/runtime/commands.php';
-
-foreach (['cliParse', 'localUserSafety'] as $module) {
-    require_once __DIR__.'/userTransfer/'.$module.'.php';
-}
+require_once __DIR__.'/userTransfer/cliParse.php';
+require_once __DIR__.'/userTransfer/localUserSafety.php';
 
 /**
  * Write a file with the given contents and permissions.

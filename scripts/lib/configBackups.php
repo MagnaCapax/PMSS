@@ -35,13 +35,13 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
 {
     $log = pmssConfigBackupsSelectLogger($options['logger'] ?? null);
     $sourcePath = trim($sourcePath);
-    if ($service === '' || $sourcePath === '') {
-        return null;
-    }
-    if (getenv('PMSS_DRY_RUN') === '1') {
-        return null;
-    }
-    if (!is_file($sourcePath) || !is_readable($sourcePath)) {
+    if (
+        $service === ''
+        || $sourcePath === ''
+        || getenv('PMSS_DRY_RUN') === '1'
+        || !is_file($sourcePath)
+        || !is_readable($sourcePath)
+    ) {
         return null;
     }
 
@@ -120,10 +120,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
 {
     $log = pmssConfigBackupsSelectLogger($options['logger'] ?? null);
     $sourcePath = trim($sourcePath);
-    if ($service === '' || $sourcePath === '') {
-        return;
-    }
-    if (getenv('PMSS_DRY_RUN') === '1') {
+    if ($service === '' || $sourcePath === '' || getenv('PMSS_DRY_RUN') === '1') {
         return;
     }
 

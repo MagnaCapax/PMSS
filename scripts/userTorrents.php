@@ -89,12 +89,12 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
     $counts = [
         'rtorrent' => pmssUserTorrentsCountUnique([
             $home.'/session/*.torrent',
-        ], true),
+        ]),
         'deluge' => pmssUserTorrentsCountUnique([
             $home.'/.config/deluge/state/*.torrent',
             $home.'/.delugeSession/*.torrent',
             $home.'/.sessionDeluge/*.torrent',
-        ], true),
+        ]),
         'qbittorrent' => pmssUserTorrentsCountUnique([
             $home.'/.local/share/data/qBittorrent/BT_backup/*.torrent',
             $home.'/.local/share/data/qBittorrent/BT_backup/*.fastresume',
@@ -102,14 +102,14 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
             $home.'/.local/share/qBittorrent/BT_backup/*.fastresume',
             $home.'/.config/qBittorrent/BT_backup/*.torrent',
             $home.'/.config/qBittorrent/BT_backup/*.fastresume',
-        ], true),
+        ]),
     ];
     $counts['total'] = array_sum($counts);
 
     return $counts;
 }
 
-function pmssUserTorrentsCountUnique(array $patterns, bool $stripExtension): int
+function pmssUserTorrentsCountUnique(array $patterns): int
 {
     $seen = [];
     foreach ($patterns as $pattern) {
@@ -122,9 +122,7 @@ function pmssUserTorrentsCountUnique(array $patterns, bool $stripExtension): int
             if ($name === '' || $name === '.' || $name === '..') {
                 continue;
             }
-            if ($stripExtension) {
-                $name = pathinfo($name, PATHINFO_FILENAME);
-            }
+            $name = pathinfo($name, PATHINFO_FILENAME);
             if ($name === '') {
                 continue;
             }
