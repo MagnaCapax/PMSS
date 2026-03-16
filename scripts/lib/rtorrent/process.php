@@ -311,20 +311,6 @@ function rtorrentProcessStaggerDelay(string $user, int $maxDelay = 300): int
 }
 
 /**
- * Record a restart event for a user.
- *
- * Writes current timestamp to marker file for restart tracking.
- *
- * @param string $user Username.
- *
- * @return void
- */
-function rtorrentProcessRecordRestart(string $user): void
-{
-    @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
-}
-
-/**
  * Restart rTorrent for a user with full diagnostic logging.
  *
  * Performs graceful shutdown (SIGTERM), waits, then force kills (SIGKILL),
@@ -370,7 +356,7 @@ function rtorrentProcessRestart(
     $logFn("startRtorrent {$user} completed (rc={$rc})", true);
 
     // Record restart for backoff tracking.
-    rtorrentProcessRecordRestart($user);
+    @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
 
     // Capture after snapshot.
     $after = rtorrentProcessSnapshot($user);

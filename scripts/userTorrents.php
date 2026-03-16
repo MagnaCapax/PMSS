@@ -54,11 +54,10 @@ function pmssUserTorrentsMain(array $argv): int
             continue;
         }
         $counts = pmssUserTorrentsCountForUser($homeDir, $thisUser);
-        if ($byClient) {
-            echo "{$thisUser}: total=".number_format($counts['total'])." rtorrent=".number_format($counts['rtorrent'])." deluge=".number_format($counts['deluge'])." qbittorrent=".number_format($counts['qbittorrent'])."\n";
-        } else {
-            echo "{$thisUser}: " . number_format($counts['total']) . "\n";
-        }
+        $line = $byClient
+            ? "{$thisUser}: total=".number_format($counts['total'])." rtorrent=".number_format($counts['rtorrent'])." deluge=".number_format($counts['deluge'])." qbittorrent=".number_format($counts['qbittorrent'])
+            : "{$thisUser}: ".number_format($counts['total']);
+        echo $line."\n";
     }
 
     return 0;
@@ -86,24 +85,27 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 
     $home = $homeDir.'/'.$username;
 
-    $counts = [
-        'rtorrent' => pmssUserTorrentsCountUnique([
+    $counts = [];
+    foreach ([
+        'rtorrent' => [
             $home.'/session/*.torrent',
-        ]),
-        'deluge' => pmssUserTorrentsCountUnique([
+        ],
+        'deluge' => [
             $home.'/.config/deluge/state/*.torrent',
             $home.'/.delugeSession/*.torrent',
             $home.'/.sessionDeluge/*.torrent',
-        ]),
-        'qbittorrent' => pmssUserTorrentsCountUnique([
+        ],
+        'qbittorrent' => [
             $home.'/.local/share/data/qBittorrent/BT_backup/*.torrent',
             $home.'/.local/share/data/qBittorrent/BT_backup/*.fastresume',
             $home.'/.local/share/qBittorrent/BT_backup/*.torrent',
             $home.'/.local/share/qBittorrent/BT_backup/*.fastresume',
             $home.'/.config/qBittorrent/BT_backup/*.torrent',
             $home.'/.config/qBittorrent/BT_backup/*.fastresume',
-        ]),
-    ];
+        ],
+    ] as $client => $patterns) {
+        $counts[$client] = pmssUserTorrentsCountUnique($patterns);
+    }
     $counts['total'] = array_sum($counts);
 
     return $counts;

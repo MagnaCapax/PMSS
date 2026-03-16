@@ -168,11 +168,8 @@ foreach ($users as $user) {
     $cpuQuotaPercent = null;
     if ($props['CPUQuota'] !== $notSet && strpos($props['CPUQuota'], '%') !== false) {
         $cpuQuotaPercent = (int) round((float) $props['CPUQuota']);
-    } elseif ($props['CPUQuotaPerSecUSec'] !== $notSet && $props['CPUQuotaPeriodUSec'] !== $notSet) {
-        $cpuQuotaPeriod = (int) $props['CPUQuotaPeriodUSec'];
-        if ($cpuQuotaPeriod > 0) {
-            $cpuQuotaPercent = (int) round(((int) $props['CPUQuotaPerSecUSec'] / $cpuQuotaPeriod) * 100);
-        }
+    } elseif ($props['CPUQuotaPerSecUSec'] !== $notSet && $props['CPUQuotaPeriodUSec'] !== $notSet && (int) $props['CPUQuotaPeriodUSec'] > 0) {
+        $cpuQuotaPercent = (int) round(((int) $props['CPUQuotaPerSecUSec'] / (int) $props['CPUQuotaPeriodUSec']) * 100);
     }
     $readIops = $parseTrailingInt($props['IOReadIOPSMax']);
     $writeIops = $parseTrailingInt($props['IOWriteIOPSMax']);

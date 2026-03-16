@@ -62,11 +62,13 @@ if (!is_dir($easyRsaDir) || !file_exists($easyRsaDir.'/easyrsa')) {
         runStep('Seeding EasyRSA from system share', sprintf('cp -r %s %s', escapeshellarg($easyRsaShare), escapeshellarg($openvpnDir)));
     } else {
         runStep('Creating EasyRSA directory', 'install -d -m 0755 '.escapeshellarg($easyRsaDir));
-        $download = 'cd '.escapeshellarg($openvpnDir).' && '
+        runStep(
+            'Downloading EasyRSA v3.1.1 (fallback)',
+            'cd '.escapeshellarg($openvpnDir).' && '
             .'wget -q https://github.com/OpenVPN/easy-rsa/releases/download/v3.1.1/EasyRSA-3.1.1.tgz -O EasyRSA.tgz && '
             .'tar -xzf EasyRSA.tgz && '
-            .'mv EasyRSA-3.1.1 easy-rsa || true';
-        runStep('Downloading EasyRSA v3.1.1 (fallback)', $download);
+            .'mv EasyRSA-3.1.1 easy-rsa || true'
+        );
     }
 }
 
@@ -109,20 +111,17 @@ if (is_dir('/run/systemd/system')) {
 }
 
 // 8) Client artifacts (.ovpn + CA)
-if (file_exists($tplClient) && !file_exists($clientOvpn)) {
-    $content = file_get_contents($tplClient);
-    if ($content !== false) {
-        $rendered = str_replace([
-            '##SERVER_HOSTNAME##',
-            '##CONFIG_FILENAME##',
-        ], [
-            $fqdn,
-            'openvpn-'.$slug,
-        ], $content);
-        @file_put_contents($clientOvpn, $rendered);
-        @chmod($clientOvpn, 0644);
-        logmsg('OpenVPN client profile written to '.$clientOvpn);
-    }
+if (file_exists($tplClient) && !file_exists($clientOvpn) && ($content = file_get_contents($tplClient)) !== false) {
+    $rendered = str_replace([
+        '##SERVER_HOSTNAME##',
+        '##CONFIG_FILENAME##',
+    ], [
+        $fqdn,
+        'openvpn-'.$slug,
+    ], $content);
+    @file_put_contents($clientOvpn, $rendered);
+    @chmod($clientOvpn, 0644);
+    logmsg('OpenVPN client profile written to '.$clientOvpn);
 }
 
 if (!file_exists($clientCrt) && file_exists($easyRsaDir.'/pki/ca.crt')) {

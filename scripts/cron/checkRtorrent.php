@@ -192,7 +192,7 @@ foreach ($usersOut as $line) {
         $rc = 0;
         @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
         pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-        rtorrentProcessRecordRestart($user);
+        @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
         continue;
     }
 

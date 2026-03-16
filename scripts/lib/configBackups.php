@@ -61,14 +61,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     } else {
         $pmssVersion = 'unknown';
         foreach (array('/etc/seedbox/config/version', '/etc/seedbox/runtime/version') as $path) {
-            if (!is_file($path) || !is_readable($path)) {
-                continue;
-            }
-            $data = @file_get_contents($path);
-            if (!is_string($data)) {
-                continue;
-            }
-            $trimmed = trim($data);
+            $trimmed = trim((string) @file_get_contents($path));
             if ($trimmed !== '') {
                 $pmssVersion = $trimmed;
                 break;
