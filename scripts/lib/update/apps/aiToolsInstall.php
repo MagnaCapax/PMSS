@@ -13,17 +13,6 @@
 require_once __DIR__.'/../runtime/commands.php';
 
 /**
- * Extract Node.js major version from `node --version` output.
- */
-function pmssAiToolsNodeMajor(string $rawVersion): int
-{
-    if (!preg_match('/^v?([0-9]+)/', trim($rawVersion), $match)) {
-        return 0;
-    }
-    return (int) $match[1];
-}
-
-/**
  * Resolve a Node.js 20+ binary, installing a pinned portable runtime if needed.
  */
 function pmssAiToolsNodeBinary(callable $log): string
@@ -31,7 +20,7 @@ function pmssAiToolsNodeBinary(callable $log): string
     $systemNode = trim((string) @shell_exec('command -v node 2>/dev/null'));
     if ($systemNode !== '') {
         $systemVersion = trim((string) @shell_exec(escapeshellarg($systemNode).' --version 2>/dev/null'));
-        if (pmssAiToolsNodeMajor($systemVersion) >= 20) {
+        if (preg_match('/^v?([0-9]+)/', $systemVersion, $match) && (int) $match[1] >= 20) {
             return $systemNode;
         }
     }

@@ -24,10 +24,14 @@ class UserTransferGuardTest extends TestCase
 
     public function testUserTransferRequiresRoot(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../userTransfer.php');
+        $src = (string) file_get_contents(__DIR__.'/../../userTransfer/main.php');
 
-        $this->assertStringContainsString('posix_geteuid', $src, 'userTransfer must check effective UID');
-        $this->assertStringContainsString('must be run as root', $src, 'userTransfer must refuse non-root execution');
+        $this->assertStringContainsString('posix_geteuid', $src, 'userTransfer main flow must check effective UID');
+        $this->assertStringContainsString('must be run as root', $src, 'userTransfer main flow must refuse non-root execution');
+        $this->assertTrue(
+            strpos($src, 'posix_geteuid') < strpos($src, 'pmssUserTransferParseCli'),
+            'userTransfer should refuse non-root execution before parsing CLI arguments'
+        );
     }
 
     public function testUserTransferLibraryLoadsSharedHelpersThroughTopLevelInclude(): void

@@ -35,6 +35,14 @@ class AiToolsInstallTest extends TestCase
         $this->assertStringContainsString('PMSS_FORCE_AI_TOOLS_REFRESH', $contents);
     }
 
+    public function testKeepsInlineNodeVersionGate(): void
+    {
+        $contents = $this->loadInstaller();
+        $this->assertStringContainsString('preg_match(\'/^v?([0-9]+)/\', $systemVersion, $match)', $contents);
+        $this->assertStringContainsString('>= 20', $contents);
+        $this->assertTrue(strpos($contents, 'function pmssAiTools'.'NodeMajor(') === false, 'Node major parsing should stay inline in the only call site');
+    }
+
     public function testPreservesCodexOldKernelFallback(): void
     {
         $contents = $this->loadInstaller();
@@ -42,4 +50,3 @@ class AiToolsInstallTest extends TestCase
         $this->assertStringContainsString('danger-full-access', $contents);
     }
 }
-

@@ -6,7 +6,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/packages/helpers.php';
 require_once __DIR__.'/pythonVenv.php';
 
 $logger = function_exists('logmsg')

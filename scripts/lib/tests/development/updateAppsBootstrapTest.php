@@ -104,6 +104,20 @@ class UpdateAppsBootstrapTest extends TestCase
         $this->assertStringContainsString("'remoteBinary.php'", $contents);
     }
 
+    public function testPythonVenvInstallersAvoidPackageQueueHelpers(): void
+    {
+        foreach (['python.php', 'pyload.php'] as $installer) {
+            $path = dirname(__DIR__, 2).'/update/apps/'.$installer;
+            $contents = $this->readFile($path);
+
+            $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
+            $this->assertTrue(
+                strpos($contents, "packages/helpers.php") === false,
+                $installer.' should not pull package queue helpers when it only needs the shared venv runtime'
+            );
+        }
+    }
+
     public function testRadarrKeepsInlineRuntimeBootstrapPath(): void
     {
         $path = dirname(__DIR__, 2).'/update/apps/radarr.php';
