@@ -13,55 +13,6 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 
-if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    exit(pmssUserTorrentsMain($argv));
-}
-
-function pmssUserTorrentsMain(array $argv): int
-{
-    // Options.
-    $options = getopt('', ['by-client', 'help']);
-    if (isset($options['help'])) {
-        pmssUserTorrentsPrintHelp();
-        return 0;
-    }
-    $byClient = isset($options['by-client']);
-    $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
-
-    // Get & parse users list.
-    $lines = [];
-    $rc = 0;
-    exec(escapeshellarg(__DIR__.'/listUsers.php'), $lines, $rc);
-    if ($rc !== 0) {
-        fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
-        return 1;
-    }
-    $users = array_filter(array_map('trim', $lines), 'strlen');
-
-    foreach($users AS $thisUser) {    // Loop users checking their instances
-        if (!pmssValidateUsername($thisUser)) {
-            pmssUserWriteLogs(
-                pmssUserBaseContext(
-                    'torrents',
-                    'validate',
-                    $thisUser,
-                    [
-                        'status'  => 'ERR',
-                        'message' => 'Skipping invalid username in userTorrents',
-                    ]
-                )
-            );
-            continue;
-        }
-        $counts = pmssUserTorrentsCountForUser($homeDir, $thisUser);
-        echo ($byClient
-            ? "{$thisUser}: total=".number_format($counts['total'])." rtorrent=".number_format($counts['rtorrent'])." deluge=".number_format($counts['deluge'])." qbittorrent=".number_format($counts['qbittorrent'])
-            : "{$thisUser}: ".number_format($counts['total']))."\n";
-    }
-
-    return 0;
-}
-
 function pmssUserTorrentsPrintHelp(): void
 {
     $self = basename(__FILE__);
@@ -118,4 +69,48 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
     $counts['total'] = array_sum($counts);
 
     return $counts;
+}
+
+if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    // Options.
+    $options = getopt('', ['by-client', 'help']);
+    if (isset($options['help'])) {
+        pmssUserTorrentsPrintHelp();
+        exit(0);
+    }
+    $byClient = isset($options['by-client']);
+    $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
+
+    // Get & parse users list.
+    $lines = [];
+    $rc = 0;
+    exec(escapeshellarg(__DIR__.'/listUsers.php'), $lines, $rc);
+    if ($rc !== 0) {
+        fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+        exit(1);
+    }
+    $users = array_filter(array_map('trim', $lines), 'strlen');
+
+    foreach($users AS $thisUser) {    // Loop users checking their instances
+        if (!pmssValidateUsername($thisUser)) {
+            pmssUserWriteLogs(
+                pmssUserBaseContext(
+                    'torrents',
+                    'validate',
+                    $thisUser,
+                    [
+                        'status'  => 'ERR',
+                        'message' => 'Skipping invalid username in userTorrents',
+                    ]
+                )
+            );
+            continue;
+        }
+        $counts = pmssUserTorrentsCountForUser($homeDir, $thisUser);
+        echo ($byClient
+            ? "{$thisUser}: total=".number_format($counts['total'])." rtorrent=".number_format($counts['rtorrent'])." deluge=".number_format($counts['deluge'])." qbittorrent=".number_format($counts['qbittorrent'])
+            : "{$thisUser}: ".number_format($counts['total']))."\n";
+    }
+
+    exit(0);
 }
