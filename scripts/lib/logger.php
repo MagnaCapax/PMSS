@@ -48,6 +48,10 @@ class Logger {
  */
 if (!function_exists('logmsg')) {
     function logmsg(string $m): void {
+        if (!empty($GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE']) && function_exists('logMessage')) {
+            logMessage($m);
+            return;
+        }
         global $logmsg_default_logger;
         if (!isset($logmsg_default_logger)) {
             $logmsg_default_logger = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);

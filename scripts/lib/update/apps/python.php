@@ -8,11 +8,7 @@
 
 require_once __DIR__.'/pythonVenv.php';
 
-$logger = function_exists('logmsg')
-    ? 'logmsg'
-    : function (string $message): void {
-        echo $message."\n";
-    };
+$logger = 'logmsg';
 
 $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
 if ($python === '') {

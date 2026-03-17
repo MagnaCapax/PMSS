@@ -12,7 +12,7 @@
 
 require_once __DIR__.'/../runtime/commands.php';
 
-$logger = function_exists('logmsg') ? 'logmsg' : 'logMessage';
+$logger = 'logmsg';
 $force = getenv('PMSS_FORCE_AI_TOOLS_REFRESH') === '1';
 $dryRun = getenv('PMSS_DRY_RUN') === '1';
 $architecture = php_uname('m');
@@ -71,9 +71,7 @@ if ($nodeBinary !== '') {
         ['Claude Code', '@anthropic-ai/claude-code', 'claude'],
     ] as $toolSpec) {
         if ($npmBinary === '') {
-            if (function_exists('logmsg')) {
-                logmsg('[WARN] Skipping '.$toolSpec[0].' install: npm not available');
-            }
+            $logger('[WARN] Skipping '.$toolSpec[0].' install: npm not available');
             continue;
         }
 

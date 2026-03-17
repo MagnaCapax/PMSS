@@ -21,17 +21,10 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/remoteBinary.php';
 
 $arch   = php_uname('m');
-$hasLegacyLogger = function_exists('logmsg');
-$log = $hasLegacyLogger
-    ? 'logmsg'
-    : function (string $message): void {
-        echo $message.PHP_EOL;
-    };
+$log = 'logmsg';
 
 if ($arch !== 'x86_64' && $arch !== 'amd64') {
-    $log($hasLegacyLogger
-        ? "[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}"
-        : "*** btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
+    $log("[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
     return;
 }
 

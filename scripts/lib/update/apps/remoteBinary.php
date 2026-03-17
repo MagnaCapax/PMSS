@@ -34,7 +34,7 @@ function pmssInstallPinnedRemoteBinary(
     bool $refreshWhenPresent
 ): void {
     $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    $log = function_exists('logmsg') ? 'logmsg' : 'logMessage';
+    $log = 'logmsg';
 
     if (strpos($url, 'https://') !== 0) {
         $log("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
@@ -95,7 +95,7 @@ function pmssInstallPinnedRemoteDebPackage(
     string $expectedSha256
 ): bool {
     $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    $log = function_exists('logmsg') ? 'logmsg' : 'logMessage';
+    $log = 'logmsg';
 
     if (strpos($url, 'https://') !== 0) {
         $log("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");

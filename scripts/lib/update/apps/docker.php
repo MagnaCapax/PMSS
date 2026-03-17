@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-function_exists('logmsg') && logmsg('[docker] Starting Docker rootless configuration');
+logmsg('[docker] Starting Docker rootless configuration');
 
 // Disable Docker system service and remove stray socket
 runStep('[docker] Docker: disabling system service', 'systemctl disable --now docker.service docker.socket');
@@ -20,7 +20,7 @@ runStep('[docker] Docker: applying sysctl configuration', 'sysctl --system');
 $version = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
 if ($version > 0 && $version < 12) {
     $archOutput = shell_exec('uname -m 2>/dev/null');
-    function_exists('logmsg') && logmsg("[docker] Command 'uname -m 2>/dev/null' output: ".trim((string) $archOutput));
+    logmsg("[docker] Command 'uname -m 2>/dev/null' output: ".trim((string) $archOutput));
     $arch = trim((string) $archOutput) ?: 'x86_64';
 
     // #TODO: Generalize this to a version-managed dependency system
@@ -32,4 +32,4 @@ if ($version > 0 && $version < 12) {
     runStep('[docker] Docker: creating iptables symlink', 'ln -sf /usr/sbin/iptables /usr/local/bin/iptables');
 }
 
-function_exists('logmsg') && logmsg('[docker] Docker rootless configuration complete');
+logmsg('[docker] Docker rootless configuration complete');

@@ -9,9 +9,7 @@
 require_once __DIR__.'/packages/helpers.php';
 
 if (empty($GLOBALS['PMSS_PACKAGES_READY'])) {
-    if (function_exists('logmsg')) {
-        logmsg('[WARN] Skipping iprange build: package phase not complete');
-    }
+    logmsg('[WARN] Skipping iprange build: package phase not complete');
     return;
 }
 
@@ -26,11 +24,7 @@ $missing = array_values(array_filter($dependencies, static function (string $pkg
 
 if (!empty($missing)) {
     $message = 'Skipping iprange build: missing toolchain packages '.implode(', ', $missing);
-    if (function_exists('logmsg')) {
-        logmsg('[WARN] '.$message);
-    } else {
-        echo $message."\n";
-    }
+    logmsg('[WARN] '.$message);
     return;
 }
 

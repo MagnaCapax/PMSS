@@ -300,7 +300,7 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         if ($rc !== 0) {
             runStep('Attempting apt fix-broken install (dpkg baseline)', aptCmd('--fix-broken install -y'));
             $retryRc = runStep('Retrying package selection install', $installCmd);
-            if ($retryRc !== 0 && function_exists('logmsg')) {
+            if ($retryRc !== 0) {
                 logmsg('[ERROR] Package baseline installation still failing after retry');
             }
             $success = $success && ($retryRc === 0);

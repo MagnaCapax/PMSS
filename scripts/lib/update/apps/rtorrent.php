@@ -57,7 +57,7 @@ if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
 }
 
 $dryRun = getenv('PMSS_DRY_RUN') === '1';
-$log = function_exists('logmsg') ? 'logmsg' : 'logMessage';
+$log = 'logmsg';
 
 $rtorrentVersion = shell_exec('rtorrent -h');
 // Resolve the target branch from distro detection instead of string-prefix

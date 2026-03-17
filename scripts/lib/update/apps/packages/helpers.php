@@ -99,9 +99,7 @@ function pmssReportPackageQueueBaselineDiff(?string $baselinePath = null): array
         return $summary;
     }
 
-    $logNotice = function_exists('logmsg')
-        ? 'logmsg'
-        : function (string $message): void { echo $message."\n"; };
+    $logNotice = 'logmsg';
 
     if ($baselinePath === null && function_exists('pmssSelectDpkgSelectionsBaseline')) {
         $detectedVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
@@ -183,9 +181,7 @@ function pmssFlushPackageQueue(): void
         return;
     }
 
-    $logNotice = function_exists('logmsg')
-        ? 'logmsg'
-        : function (string $message): void { echo $message."\n"; };
+    $logNotice = 'logmsg';
 
     foreach ($PMSS_PACKAGE_QUEUE as $target => $packages) {
         $isDefaultTarget = $target === PMSS_PACKAGE_QUEUE_DEFAULT;
@@ -371,5 +367,5 @@ function pmssInstallProftpdStack(int $distroVersion): void
             return;
         }
     }
-    if (function_exists('logmsg')) { logmsg('[SKIP] ProFTPD packages already configured'); }
+    logmsg('[SKIP] ProFTPD packages already configured');
 }

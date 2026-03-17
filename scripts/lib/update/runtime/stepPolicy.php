@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../logging.php';
+
 defined('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL') || define('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', 'soft_fail');
 defined('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED') || define('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', 'must_succeed');
 defined('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING') || define('PMSS_UPDATE_STEP_CLASS_SKIP_IF_MISSING', 'skip_if_missing');
@@ -26,7 +28,7 @@ function pmssUpdateStep2HandleClassifiedFailure(string $description, string $cla
         'reason'         => $reason,
     ]);
 
-    (function_exists('logmsg') ? 'logmsg' : 'logMessage')(sprintf(
+    logmsg(sprintf(
         '[%s] Step failed: %s (classification=%s rc=%d reason=%s)',
         strtoupper($severity),
         $description,

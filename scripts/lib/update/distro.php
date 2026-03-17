@@ -70,9 +70,7 @@ if (!function_exists('pmssDetectDistro')) {
 
         $mappedVersion = pmssVersionFromCodename($codename);
         if ($mappedVersion !== 0 && $mappedVersion !== $version) {
-            if (function_exists('logmsg')) {
-                logmsg(sprintf('Distro codename/version mismatch (%s vs %d); trusting codename', $codename, $version));
-            }
+            logmsg(sprintf('Distro codename/version mismatch (%s vs %d); trusting codename', $codename, $version));
             $version = $mappedVersion;
         } elseif ($version === 0) {
             $version = $mappedVersion;

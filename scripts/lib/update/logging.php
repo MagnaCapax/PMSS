@@ -109,6 +109,16 @@ if (!function_exists('logMessage')) {
     }
 }
 
+if (!function_exists('logmsg')) {
+    /**
+     * Legacy compatibility wrapper for update modules using the historic name.
+     */
+    function logmsg(string $message): void
+    {
+        logMessage($message);
+    }
+}
+
 if (!function_exists('pmssSelectLogger')) {
     function pmssSelectLogger(?callable $logger = null): callable
     {

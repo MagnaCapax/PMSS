@@ -10,8 +10,11 @@
  */
 
 require_once __DIR__.'/rtorrentConfig.php';
-require_once __DIR__.'/runtime.php';
+// Bootstrap the structured update logger before the generic runtime fallback
+// so update helpers always keep the context-aware logging contract.
 require_once __DIR__.'/update/logging.php';
+$GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = true;
+require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/update/apt.php';
 
 // Cache container for os-release parsing so tests can reset it safely.
