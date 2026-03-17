@@ -104,12 +104,28 @@ class UserTransferTest extends TestCase
 
     public function testParseCliHelpReturnsStableUsageText(): void
     {
+        $expected = "Usage:\n"
+            ."  /scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_HOSTNAME\n"
+            ."  /scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_USERNAME REMOTE_HOSTNAME\n\n"
+            ."Options:\n"
+            ."  --main-passes N     Number of passes for the main rsync (default 31)\n"
+            ."  --final-passes N    Number of passes for the final rsync (default 3)\n"
+            ."  --sleep-min N       Minimum sleep seconds between passes (default 60)\n"
+            ."  --sleep-max N       Maximum sleep seconds between passes (default 360)\n"
+            ."  --no-sleep          Disable sleeping between passes\n"
+            ."  --dry-run           Log planned steps without executing commands\n"
+            ."  --print-password    Print the supplied password at the end (unsafe)\n"
+            ."  --help, -h          Show this help\n\n"
+            ."Notes:\n"
+            ."  - If REMOTE_HOSTNAME does not contain a dot, \".pulsedmedia.com\" is appended.\n"
+            ."  - Password can be provided via env: PMSS_USER_TRANSFER_PASSWORD\n";
+
         try {
             \pmssUserTransferParseCli(['userTransfer.php', '--help']);
             $this->fail('expected help path to throw RuntimeException');
         } catch (\RuntimeException $e) {
             $this->assertEquals(0, $e->getCode());
-            $this->assertEquals(\pmssUserTransferUsageText(), $e->getMessage());
+            $this->assertEquals($expected, $e->getMessage());
             $this->assertStringContainsString('--print-password    Print the supplied password at the end (unsafe)', $e->getMessage());
         }
     }

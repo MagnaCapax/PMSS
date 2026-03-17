@@ -10,29 +10,6 @@
  */
 
 /**
- * Normalize remote RSS bytes to UTF-8 when a local conversion helper exists.
- *
- * @param string $rssRaw Raw XML fetched from the announcement feed.
- * @return string
- */
-function pmssWelcomeAnnouncementsUtf8Normalize(string $rssRaw): string
-{
-    if (function_exists('mb_convert_encoding')) {
-        $rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8');
-        if ($rssUtf8 !== false) {
-            return $rssUtf8;
-        }
-    } elseif (function_exists('iconv')) {
-        $rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw);
-        if ($rssUtf8 !== false) {
-            return $rssUtf8;
-        }
-    }
-
-    return $rssRaw;
-}
-
-/**
  * Parse announcement RSS content into the welcome-page list-item HTML.
  *
  * Malformed XML, invalid UTF-8, and parser exceptions all fail soft to an
@@ -47,7 +24,18 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         return '';
     }
 
-    $rssRaw = pmssWelcomeAnnouncementsUtf8Normalize($rssRaw);
+    if (function_exists('mb_convert_encoding')) {
+        $rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8');
+        if ($rssUtf8 !== false) {
+            $rssRaw = $rssUtf8;
+        }
+    } elseif (function_exists('iconv')) {
+        $rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw);
+        if ($rssUtf8 !== false) {
+            $rssRaw = $rssUtf8;
+        }
+    }
+
     $restoreInternalErrors = function_exists('libxml_use_internal_errors');
     $previousInternalErrors = false;
 

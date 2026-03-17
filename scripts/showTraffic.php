@@ -79,7 +79,44 @@ function pmssShowTrafficMain(array $argv): int
     $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
     $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
     $statsDir = $runtimeDir.'/trafficStats';
-    $users = loadTrafficUsers($statsDir);
+    $listUsersLines = [];
+    $listUsersRc = 0;
+    exec(escapeshellarg(__DIR__.'/listUsers.php'), $listUsersLines, $listUsersRc);
+    if ($listUsersRc !== 0) {
+        fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+        exit(1);
+    }
+    $users = [];
+    $invalidCount = 0;
+    foreach ($listUsersLines as $line) {
+        $user = trim($line);
+        if ($user === '') {
+            continue;
+        }
+        if (preg_match('/^(PHP (Warning|Fatal error|Parse error)|Warning:|Fatal error:|Stack trace:)/', $user)) {
+            fwrite(STDERR, "Error: listUsers.php emitted errors; aborting.\n");
+            exit(1);
+        }
+        $valid = function_exists('pmssValidateUsername')
+            ? pmssValidateUsername($user)
+            : (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user);
+        if (!$valid) {
+            $invalidCount++;
+            continue;
+        }
+        $users[] = $user;
+    }
+    if ($invalidCount > 0) {
+        fwrite(STDERR, "Warning: skipped {$invalidCount} invalid username entries from listUsers.php.\n");
+    }
+    $usersWithLocalnet = [];
+    foreach ($users as $user) {
+        $usersWithLocalnet[] = $user;
+        if (is_file($statsDir.'/'.$user.'-localnet')) {
+            $usersWithLocalnet[] = $user.'-localnet';
+        }
+    }
+    $users = $usersWithLocalnet;
     if (count($users) === 0) {
         die("No users in this system!\n");
     }
@@ -416,50 +453,6 @@ Options:
   --help          Show this help.
 
 TXT;
-}
-
-function loadTrafficUsers(string $statsDir): array {
-    $lines = [];
-    $rc = 0;
-    exec(escapeshellarg(__DIR__.'/listUsers.php'), $lines, $rc);
-    if ($rc !== 0) {
-        fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
-        exit(1);
-    }
-    $users = [];
-    $invalidCount = 0;
-    foreach ($lines as $line) {
-        $user = trim($line);
-        if ($user === '') {
-            continue;
-        }
-        if (preg_match('/^(PHP (Warning|Fatal error|Parse error)|Warning:|Fatal error:|Stack trace:)/', $user)) {
-            fwrite(STDERR, "Error: listUsers.php emitted errors; aborting.\n");
-            exit(1);
-        }
-        $valid = true;
-        if (function_exists('pmssValidateUsername')) {
-            $valid = pmssValidateUsername($user);
-        } else {
-            $valid = (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user);
-        }
-        if (!$valid) {
-            $invalidCount++;
-            continue;
-        }
-        $users[] = $user;
-    }
-    if ($invalidCount > 0) {
-        fwrite(STDERR, "Warning: skipped {$invalidCount} invalid username entries from listUsers.php.\n");
-    }
-    $withLocalnet = [];
-    foreach ($users as $user) {
-        $withLocalnet[] = $user;
-        if (is_file($statsDir.'/'.$user.'-localnet')) {
-            $withLocalnet[] = $user.'-localnet';
-        }
-    }
-    return $withLocalnet;
 }
 
 function formatTrafficAmount($value): string {

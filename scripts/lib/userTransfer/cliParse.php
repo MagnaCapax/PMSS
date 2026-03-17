@@ -5,9 +5,14 @@
  * @license GPL-3.0-only
  */
 
-function pmssUserTransferUsageText(): string
+/**
+ * Parse argv and return a normalised configuration array.
+ *
+ * @throws RuntimeException on invalid input.
+ */
+function pmssUserTransferParseCli(array $argv): array
 {
-    return <<<TXT
+    $usageText = <<<TXT
 Usage:
   /scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_HOSTNAME
   /scripts/util/userTransfer.php LOCAL_USERNAME REMOTE_USERNAME REMOTE_HOSTNAME
@@ -27,15 +32,7 @@ Notes:
   - Password can be provided via env: PMSS_USER_TRANSFER_PASSWORD
 
 TXT;
-}
 
-/**
- * Parse argv and return a normalised configuration array.
- *
- * @throws RuntimeException on invalid input.
- */
-function pmssUserTransferParseCli(array $argv): array
-{
     // Parse options manually: optionParser treats long flags as value-taking when
     // followed by a positional token, which makes boolean flags fragile.
     $tokens = array_slice($argv, 1);
@@ -118,11 +115,11 @@ function pmssUserTransferParseCli(array $argv): array
     }
 
     if ($options['help']) {
-        throw new RuntimeException(pmssUserTransferUsageText(), 0);
+        throw new RuntimeException($usageText, 0);
     }
 
     if (($positionalCount = count($positionals)) < 2 || $positionalCount > 3) {
-        throw new RuntimeException('Need arguments.'.PHP_EOL.pmssUserTransferUsageText(), 1);
+        throw new RuntimeException('Need arguments.'.PHP_EOL.$usageText, 1);
     }
 
     $localUser = pmssNormalizeUsername((string) $positionals[0]);
