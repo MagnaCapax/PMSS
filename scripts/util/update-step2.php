@@ -319,7 +319,20 @@ logmsg('update-step2.php starting');
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'start']);
 
 pmssRunProfiledCallable('Preparing noninteractive apt defaults', 'pmssConfigureAptNonInteractive', ['logmsg']);
-pmssRunProfiledCallable('Cleaning mediaarea bootstrap package state', 'pmssCleanupMediaareaBootstrapPackage');
+pmssRunProfiledStep('Cleaning mediaarea bootstrap package state', static function (): void {
+    $status = trim((string) @shell_exec('dpkg-query -W -f=${Status} repo-mediaarea 2>/dev/null'));
+    if ($status === '' || stripos($status, 'not-installed') !== false) {
+        return;
+    }
+
+    runStep(
+        'Removing legacy MediaArea bootstrap package (repo-mediaarea)',
+        'dpkg --remove --force-remove-reinstreq repo-mediaarea || true'
+    );
+
+    $setSelection = "printf '%s\\t%s\\n' 'repo-mediaarea' 'deinstall' | dpkg --set-selections";
+    runStep('Marking repo-mediaarea for deinstallation', $setSelection);
+});
 pmssRunProfiledCallable('Pruning legacy MediaArea repository entries', 'pmssPruneLegacyMediaArea');
 
 // --- PACKAGE PHASE: DO NOT REORDER ---------------------------------------------------------

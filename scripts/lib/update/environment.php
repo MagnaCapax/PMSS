@@ -318,38 +318,6 @@ if (!function_exists('pmssApplyDpkgSelections')) {
     }
 }
 
-if (!function_exists('pmssCleanupMediaareaBootstrapPackage')) {
-    /**
-     * Remove the legacy MediaArea bootstrap package when present.
-     *
-     * Older repo-mediaarea builds now ship control.tar.zst which dpkg on
-     * Debian 10 cannot unpack. If the package is installed, apt operations
-     * like dselect-upgrade or --fix-broken will repeatedly attempt to
-     * upgrade it and fail with a dpkg-deb compression error. Proactively
-     * removing the package and marking its selection state as "deinstall"
-     * prevents these failures while keeping the MediaArea repository itself
-     * configured via standard templates.
-     */
-    function pmssCleanupMediaareaBootstrapPackage(): void
-    {
-        $status = trim((string) @shell_exec('dpkg-query -W -f=${Status} repo-mediaarea 2>/dev/null'));
-        if ($status === '' || stripos($status, 'not-installed') !== false) {
-            return;
-        }
-
-        // Best-effort removal: handles installed and reinst-required states
-        // without depending on newer zstd-based .debs being present.
-        runStep(
-            'Removing legacy MediaArea bootstrap package (repo-mediaarea)',
-            'dpkg --remove --force-remove-reinstreq repo-mediaarea || true'
-        );
-
-        // Ensure future dselect-based runs keep the package absent.
-        $setSelection = "printf '%s\\t%s\\n' 'repo-mediaarea' 'deinstall' | dpkg --set-selections";
-        runStep('Marking repo-mediaarea for deinstallation', $setSelection);
-    }
-}
-
 if (!function_exists('pmssMigrateLegacyLocalnet')) {
     /**
      * Move the legacy localnet file into the configuration directory.

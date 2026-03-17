@@ -284,46 +284,6 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
     }
 }
 
-if (!function_exists('pmssReadSystemdUnitExecStartBinary')) {
-    /**
-     * Extract the ExecStart binary path from a systemd unit file.
-     */
-    function pmssReadSystemdUnitExecStartBinary(string $unitPath): ?string
-    {
-        $lines = @file($unitPath, FILE_IGNORE_NEW_LINES);
-        if ($lines === false) {
-            return null;
-        }
-
-        foreach ($lines as $line) {
-            $trim = trim($line);
-            if ($trim === '' || $trim[0] === '#' || $trim[0] === ';') {
-                continue;
-            }
-            if (strpos($trim, 'ExecStart=') !== 0) {
-                continue;
-            }
-            $command = trim(substr($trim, strlen('ExecStart=')));
-            if ($command === '') {
-                return null;
-            }
-            if ($command[0] === '-') {
-                $command = ltrim(substr($command, 1));
-            }
-            if ($command === '') {
-                return null;
-            }
-            $parts = preg_split('/\s+/', $command);
-            if (!$parts || $parts[0] === '') {
-                return null;
-            }
-            return trim($parts[0], "\"'");
-        }
-
-        return null;
-    }
-}
-
 if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
     /**
      * Run dockerd-rootless-setuptool.sh for users that do not yet have a
@@ -344,7 +304,35 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
         // If the user already has a docker.service unit, assume the rootless
         // install has been performed (either by PMSS or manually).
         if (is_file($unit)) {
-            $execBinary = pmssReadSystemdUnitExecStartBinary($unit);
+            $execBinary = null;
+            $lines = @file($unit, FILE_IGNORE_NEW_LINES);
+            if ($lines !== false) {
+                foreach ($lines as $line) {
+                    $trim = trim($line);
+                    if ($trim === '' || $trim[0] === '#' || $trim[0] === ';') {
+                        continue;
+                    }
+                    if (strpos($trim, 'ExecStart=') !== 0) {
+                        continue;
+                    }
+                    $command = trim(substr($trim, strlen('ExecStart=')));
+                    if ($command === '') {
+                        break;
+                    }
+                    if ($command[0] === '-') {
+                        $command = ltrim(substr($command, 1));
+                    }
+                    if ($command === '') {
+                        break;
+                    }
+                    $parts = preg_split('/\s+/', $command);
+                    if (!$parts || $parts[0] === '') {
+                        break;
+                    }
+                    $execBinary = trim($parts[0], "\"'");
+                    break;
+                }
+            }
             if ($execBinary !== null && is_file($execBinary)) {
                 pmssUserLog($user, '[SKIP] Rootless Docker systemd unit already present');
                 return;

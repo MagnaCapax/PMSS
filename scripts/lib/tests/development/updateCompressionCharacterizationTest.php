@@ -49,4 +49,35 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('graceful stop', $src);
         $this->assertStringContainsString('processes linger after SIGKILL', $src);
     }
+
+    public function testUpdateStep2KeepsMediaareaBootstrapCleanupInline(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssCleanup'.'MediaareaBootstrapPackage';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertStringContainsString("pmssRunProfiledStep('Cleaning mediaarea bootstrap package state'", $src);
+        $this->assertStringContainsString("dpkg-query -W -f=\${Status} repo-mediaarea 2>/dev/null", $src);
+        $this->assertStringContainsString("runStep('Marking repo-mediaarea for deinstallation', \$setSelection);", $src);
+        $this->assertTrue(
+            strpos($src, $symbol) === false,
+            'update-step2.php should own the mediaarea bootstrap cleanup directly'
+        );
+    }
+
+    public function testRootlessDockerUnitParsingStaysInsideUserMaintenance(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssReadSystemd'.'UnitExecStartBinary';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol) === false,
+            'userMaintenance.php should keep the docker ExecStart parse local to the stale-unit check'
+        );
+        $this->assertStringContainsString("if (strpos(\$trim, 'ExecStart=') !== 0)", $src);
+        $this->assertStringContainsString("\$execBinary = trim(\$parts[0], \"\\\"'\");", $src);
+    }
 }
