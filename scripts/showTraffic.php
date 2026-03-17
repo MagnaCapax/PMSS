@@ -137,10 +137,23 @@ function pmssShowTrafficMain(array $argv): int
             $dataDisplay[$thisKey] = formatTrafficAmount($thisData);
         }
 
-        $ingressData = pmssShowTrafficReadIngressData($thisUser, $homeDir);
         $inboundMonth = null;
-        if ($ingressData !== null && isset($ingressData['raw']['month']) && is_numeric($ingressData['raw']['month'])) {
-            $inboundMonth = (float) $ingressData['raw']['month'];
+        $ingressPath = $homeDir.'/'.$baseUser.'/.trafficDataIngress'.($isLocalnet ? 'Local' : '');
+        if (is_file($ingressPath) && !is_link($ingressPath)) {
+            $ingressStats = @stat($ingressPath);
+            if ($ingressStats !== false && (int) $ingressStats['uid'] === 0 && (($ingressStats['mode'] & 0777) & 0022) === 0) {
+                $ingressGroup = @posix_getgrgid($ingressStats['gid']);
+                $ingressGroupName = is_array($ingressGroup) ? ($ingressGroup['name'] ?? '') : '';
+                if ($ingressGroupName === '' || $ingressGroupName === $baseUser || $ingressGroupName === 'root') {
+                    $ingressRaw = @file_get_contents($ingressPath);
+                    $ingressData = is_string($ingressRaw) && $ingressRaw !== ''
+                        ? @unserialize($ingressRaw, ['allowed_classes' => false])
+                        : null;
+                    if (is_array($ingressData) && isset($ingressData['raw']['month']) && is_numeric($ingressData['raw']['month'])) {
+                        $inboundMonth = (float) $ingressData['raw']['month'];
+                    }
+                }
+            }
         }
 
         $inboundRatio = null;
@@ -491,48 +504,4 @@ function pmssShowTrafficRenderBar(float $pct): string
     $filled = (int) floor((max(0.0, min(100.0, $pct)) / 100) * $width);
     $empty = $width - $filled;
     return '[' . str_repeat('#', $filled) . str_repeat('-', $empty) . ']';
-}
-
-/**
- * Read ingress traffic data for a user label (supports -localnet suffix).
- */
-function pmssShowTrafficReadIngressData(string $user, string $homeDir): ?array
-{
-    list($baseUser, $isLocalnet) = pmssShowTrafficSplitLocalnetUser($user);
-    $fileSuffix = $isLocalnet ? 'Local' : '';
-
-    $path = $homeDir.'/'.$baseUser.'/.trafficDataIngress'.$fileSuffix;
-    if (!is_file($path) || is_link($path)) {
-        return null;
-    }
-
-    $stats = @stat($path);
-    if ($stats === false || (int) $stats['uid'] !== 0) {
-        return null;
-    }
-
-    $mode = $stats['mode'] & 0777;
-    if (($mode & 0022) !== 0) {
-        return null;
-    }
-
-    $group = @posix_getgrgid($stats['gid']);
-    if ($group !== false) {
-        $groupName = $group['name'];
-        if ($groupName !== $baseUser && $groupName !== 'root') {
-            return null;
-        }
-    }
-
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || $raw === '') {
-        return null;
-    }
-
-    $data = @unserialize($raw, ['allowed_classes' => false]);
-    if (!is_array($data) || !isset($data['raw']) || !is_array($data['raw'])) {
-        return null;
-    }
-
-    return $data;
 }

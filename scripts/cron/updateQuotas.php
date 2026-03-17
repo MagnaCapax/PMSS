@@ -71,10 +71,9 @@ foreach ($users as $thisUser) {
     $quotaFile = "/home/{$thisUser}/.quota";
     // Keep the previous snapshot until a new one is validated; this avoids
     // leaving .quota missing/empty if the quota command fails.
-    $existingQuotaContent = '';
-    if (file_exists($quotaFile) && !is_link($quotaFile)) {
-        $existingQuotaContent = (string) @file_get_contents($quotaFile);
-    }
+    $existingQuotaContent = (file_exists($quotaFile) && !is_link($quotaFile))
+        ? (string) @file_get_contents($quotaFile)
+        : '';
     $hasExistingSnapshot = strpos($existingQuotaContent, 'Disk quotas') !== false;
 
     // Call quota once with a safely quoted username and capture its output.

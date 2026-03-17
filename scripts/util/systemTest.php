@@ -166,13 +166,13 @@ if ($hostname === '') {
     $slug = str_replace('.', '-', $fqdn);
     $ovpn = '/home/openvpn-'.$slug.'.ovpn';
     $crt = '/home/openvpn-'.$slug.'.crt';
-    $ok = $ovpn !== '' && $crt !== '' && is_file($ovpn) && is_file($crt);
+    $ok = is_file($ovpn) && is_file($crt);
     if ($ok) {
         $checks[] = pmssStatus('OpenVPN client artifacts', 'OK', basename($ovpn).', '.basename($crt));
     } else {
         $missing = [];
-        if ($ovpn === '' || !is_file($ovpn)) { $missing[] = ($ovpn !== '' ? basename($ovpn) : 'openvpn-<slug>.ovpn'); }
-        if ($crt === ''  || !is_file($crt))  { $missing[] = ($crt  !== '' ? basename($crt)  : 'openvpn-<slug>.crt'); }
+        if (!is_file($ovpn)) { $missing[] = basename($ovpn); }
+        if (!is_file($crt))  { $missing[] = basename($crt); }
         $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'missing: '.implode(', ', $missing));
     }
 }

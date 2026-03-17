@@ -29,11 +29,10 @@ if ($singleUserMode) {
     $argUser = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($argUserRaw)
         : $argUserRaw;
-    if ($argUser !== $argUserRaw) {
-        fwrite(STDERR, "Invalid username\n");
-        exit(1);
-    }
-    if (function_exists('pmssValidateUsername') && !pmssValidateUsername($argUser)) {
+    if (
+        $argUser !== $argUserRaw
+        || (function_exists('pmssValidateUsername') && !pmssValidateUsername($argUser))
+    ) {
         fwrite(STDERR, "Invalid username\n");
         exit(1);
     }
@@ -78,19 +77,23 @@ foreach ($users as $thisUser) {
     }
 
     $thisUserDir = "/home/{$thisUser}";
-    if (file_exists($thisUserDir . '/.lighttpd/.htpasswd')) {
-        $userHtpasswdContents = @file_get_contents($thisUserDir . '/.lighttpd/.htpasswd');
-        if ($userHtpasswdContents !== false && strpos($userHtpasswdContents, $thisUser) !== false) continue;   // Already exists! :)
+    $userHtpasswd = $thisUserDir.'/.lighttpd/.htpasswd';
+    if (
+        is_file($userHtpasswd)
+        && ($userHtpasswdContents = @file_get_contents($userHtpasswd)) !== false
+        && strpos($userHtpasswdContents, $thisUser) !== false
+    ) {
+        continue;
     }
 
     foreach ($passwords as $thisPassword) {
         if (strpos($thisPassword, $thisUser.':') === 0) {
-            file_put_contents($thisUserDir . '/.lighttpd/.htpasswd', $thisPassword."\n", FILE_APPEND);
+            file_put_contents($userHtpasswd, $thisPassword."\n", FILE_APPEND);
             pmssUserLifecycleStep(
                 'htpasswd',
                 $thisUser,
                 'chown_htpasswd',
-                'chown '.escapeshellarg($thisUser.':'.$thisUser).' '.escapeshellarg($thisUserDir.'/.lighttpd/.htpasswd'),
+                'chown '.escapeshellarg($thisUser.':'.$thisUser).' '.escapeshellarg($userHtpasswd),
                 false
             );
             if (function_exists('pmssUserLog')) {
