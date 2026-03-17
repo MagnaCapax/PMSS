@@ -30,6 +30,9 @@ if (function_exists('pmssValidateUsername') && !pmssValidateUsername($thisUser))
 }
 if (!is_dir("/home/{$thisUser}")) die("User does not exist\n");
 
+$userIds = pmssPasswdUserIds($thisUser);
+if (!is_array($userIds)) die("No such user\n");
+
 function pmssMaybeUserLog(string $user, string $message): void
 {
     if (function_exists('pmssUserLog')) {
@@ -56,8 +59,6 @@ function pmssPasswdUserIds(string $username): ?array
     }
     return null;
 }
-
-if (pmssPasswdUserIds($thisUser) === null) die("No such user\n");
 
 function run(string $cmd): int
 {
@@ -137,35 +138,32 @@ function pmssSetImmutable(string $path, bool $enable): void
 
 // Safer traversal without relying on xargs delimiters; applies to each directory in place.
 // Skip ~/.local entirely to avoid interfering with per-user application data (e.g. Docker overlays).
-$userIds = pmssPasswdUserIds($thisUser);
-if (is_array($userIds)) {
-    $homeOwner = @fileowner("/home/{$thisUser}");
-    $homeGroup = @filegroup("/home/{$thisUser}");
-    if ($homeOwner !== false && $homeGroup !== false &&
-        ($homeOwner !== $userIds['uid'] || $homeGroup !== $userIds['gid'])) {
-        fwrite(
-            STDERR,
-            sprintf(
-                "[WARN] Fixing home directory ownership for %s (uid=%s gid=%s expected uid=%s gid=%s)\n",
-                "/home/{$thisUser}",
-                $homeOwner,
-                $homeGroup,
-                $userIds['uid'],
-                $userIds['gid']
-            )
-        );
-        chownPath("/home/{$thisUser}", $userIds['uid'].':'.$userIds['gid']);
-        pmssMaybeUserLog(
-            $thisUser,
-            sprintf(
-                'userPermissions: fixed home ownership (uid=%s gid=%s, was uid=%s gid=%s)',
-                $userIds['uid'],
-                $userIds['gid'],
-                $homeOwner,
-                $homeGroup
-            )
-        );
-    }
+$homeOwner = @fileowner("/home/{$thisUser}");
+$homeGroup = @filegroup("/home/{$thisUser}");
+if ($homeOwner !== false && $homeGroup !== false &&
+    ($homeOwner !== $userIds['uid'] || $homeGroup !== $userIds['gid'])) {
+    fwrite(
+        STDERR,
+        sprintf(
+            "[WARN] Fixing home directory ownership for %s (uid=%s gid=%s expected uid=%s gid=%s)\n",
+            "/home/{$thisUser}",
+            $homeOwner,
+            $homeGroup,
+            $userIds['uid'],
+            $userIds['gid']
+        )
+    );
+    chownPath("/home/{$thisUser}", $userIds['uid'].':'.$userIds['gid']);
+    pmssMaybeUserLog(
+        $thisUser,
+        sprintf(
+            'userPermissions: fixed home ownership (uid=%s gid=%s, was uid=%s gid=%s)',
+            $userIds['uid'],
+            $userIds['gid'],
+            $homeOwner,
+            $homeGroup
+        )
+    );
 }
 run(sprintf(
     'find %s -path %s -prune -o -type d -exec chmod 750 {} +',
@@ -207,7 +205,9 @@ $chmodItems = [
     ["/home/{$thisUser}/.rtorrent.rc", 0644],
     ["/home/{$thisUser}/watch", 0750, true],
     ["/home/{$thisUser}/session", 0750, true],
-    ["/home/{$thisUser}/data", 0750, true],
+    // The directory walk above already normalises nested data directories.
+    // Avoid `chmod -R` on payload files so large homes do not time out here.
+    ["/home/{$thisUser}/data", 0750],
     ["/home/{$thisUser}/www", 0750, true],
     ["/home/{$thisUser}/.*.php", 0750],
     ["/home/{$thisUser}/.lighttpd", 0775],
@@ -229,6 +229,7 @@ $chownItems = [
     ["/home/{$thisUser}/.trafficDataLocal", "root:{$thisUser}"],
     ["/home/{$thisUser}/.trafficDataIngress", "root:{$thisUser}"],
     ["/home/{$thisUser}/.trafficDataIngressLocal", "root:{$thisUser}"],
+    ["/home/{$thisUser}/data", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings/retrackers.dat", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}", "{$thisUser}:{$thisUser}"],
@@ -250,7 +251,9 @@ foreach ($chmodItems as $item) {
     chmodPath($path, $perm, $recursive);
 }
 
-// Targeted chown of the home tree excluding known root-owned paths and ~/.local
+// Targeted chown of the home tree excluding known root-owned paths, app-managed
+// trees, and bulk payload data. Healthy homes should not pay a blanket chown
+// cost when uid/gid ownership is already correct.
 $excludes = [
     "/home/{$thisUser}/.quota",
     "/home/{$thisUser}/.trafficData",
@@ -263,14 +266,22 @@ $excludes = [
 $findParts = [sprintf('find %s -mindepth 1', escapeshellarg("/home/{$thisUser}"))];
 // Prune ~/.local subtree to avoid noisy chown failures on application-managed trees (e.g. Docker).
 $findParts[] = '-path '.escapeshellarg("/home/{$thisUser}/.local").' -prune -o';
+// Bulk data files are user payload and typically already owned correctly; avoid
+// walking that whole subtree during routine permission refreshes.
+$findParts[] = '-path '.escapeshellarg("/home/{$thisUser}/data").' -prune -o';
 foreach ($excludes as $ex) {
     $findParts[] = '-not -path '.escapeshellarg($ex);
 }
 // Skip symbolic links so broken symlinks (e.g. ~/www/watch) do not cause chown
 // dereference errors or non-zero rc noise in logs.
 $findParts[] = '-not -type l';
+$findParts[] = '\\(';
+$findParts[] = '-not -uid '.(string) $userIds['uid'];
+$findParts[] = '-o';
+$findParts[] = '-not -gid '.(string) $userIds['gid'];
+$findParts[] = '\\)';
 $findParts[] = '-exec chown';
-$findParts[] = escapeshellarg("{$thisUser}:{$thisUser}");
+$findParts[] = escapeshellarg($userIds['uid'].':'.$userIds['gid']);
 $findParts[] = '{}';
 $findParts[] = '+';
 run(implode(' ', $findParts));
