@@ -41,21 +41,8 @@ class Logger {
 }
 
 /**
- * Legacy wrapper for older scripts.
- * Usage: require_once '/scripts/lib/logger.php';
- *   $log = new Logger(__FILE__);
- *   $log->msg('text');
+ * Load the shared `logmsg()` compatibility wrapper after the Logger class so
+ * standalone scripts can either instantiate Logger directly or keep using the
+ * historic helper name.
  */
-if (!function_exists('logmsg')) {
-    function logmsg(string $m): void {
-        if (!empty($GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE']) && function_exists('logMessage')) {
-            logMessage($m);
-            return;
-        }
-        global $logmsg_default_logger;
-        if (!isset($logmsg_default_logger)) {
-            $logmsg_default_logger = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);
-        }
-        $logmsg_default_logger->msg($m);
-    }
-}
+require_once __DIR__.'/log.php';

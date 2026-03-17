@@ -14,8 +14,11 @@ if (!defined('PMSS_LOG_FILE')) {
     define('PMSS_LOG_FILE', $pmssLogDir.'/update.log');
 }
 
+$GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = true;
 $GLOBALS['PMSS_JSON_LOG_PATH'] = $GLOBALS['PMSS_JSON_LOG_PATH'] ?? null;
 $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;
+
+require_once __DIR__.'/../log.php';
 
 if (!function_exists('pmssBuildCorrelationId')) {
     /**
@@ -106,16 +109,6 @@ if (!function_exists('logMessage')) {
             'message' => $cleanMessage,
             'context' => $context,
         ]);
-    }
-}
-
-if (!function_exists('logmsg')) {
-    /**
-     * Legacy compatibility wrapper for update modules using the historic name.
-     */
-    function logmsg(string $message): void
-    {
-        logMessage($message);
     }
 }
 

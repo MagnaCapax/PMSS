@@ -29,7 +29,7 @@ class UpdateLoggingBootstrapTest extends TestCase
             '$function = new ReflectionFunction("logmsg"); echo str_replace("\\\\", "/", $function->getFileName());'
         );
 
-        $this->assertStringContainsString('/scripts/lib/update/logging.php', $source);
+        $this->assertStringContainsString('/scripts/lib/log.php', $source);
     }
 
     public function testStructuredLogMessageWritesJsonContext(): void
