@@ -33,53 +33,39 @@ function wgLoadConfiguredPeers(): array
         return [];
     }
 
-    $peers       = [];
-    $currentUser = '';
-    $currentKey  = '';
-    $currentIp   = '';
+    $peers = [];
+    $current = ['user' => '-', 'key' => '', 'ip' => ''];
 
-    $flushPeer = function () use (&$peers, &$currentUser, &$currentKey, &$currentIp): void {
-        if ($currentKey !== '' && $currentIp !== '') {
-            $peers[] = [
-                'user' => $currentUser !== '' ? $currentUser : '-',
-                'key'  => $currentKey,
-                'ip'   => $currentIp,
-            ];
-        }
-        $currentUser = '';
-        $currentKey  = '';
-        $currentIp   = '';
-    };
-
-    foreach ($lines as $line) {
+    foreach (array_merge($lines, ['[Peer]']) as $line) {
         $trimmed = trim($line);
         if ($trimmed === '') {
             continue;
         }
         if (strpos($trimmed, '[Peer]') === 0) {
-            $flushPeer();
+            if ($current['key'] !== '' && $current['ip'] !== '') {
+                $peers[] = $current;
+            }
+            $current = ['user' => '-', 'key' => '', 'ip' => ''];
             continue;
         }
         if (strpos($trimmed, '# user=') === 0) {
-            $currentUser = trim(substr($trimmed, strlen('# user=')));
+            $current['user'] = trim(substr($trimmed, strlen('# user=')));
+            if ($current['user'] === '') {
+                $current['user'] = '-';
+            }
             continue;
         }
         if (stripos($trimmed, 'PublicKey =') === 0) {
-            $currentKey = trim(substr($trimmed, strlen('PublicKey =')));
+            $current['key'] = trim(substr($trimmed, strlen('PublicKey =')));
             continue;
         }
         if (stripos($trimmed, 'AllowedIPs =') === 0) {
             $value = trim(substr($trimmed, strlen('AllowedIPs =')));
             // Take the first CIDR entry before any comma.
-            $parts = explode(',', $value, 2);
-            $cidr  = trim($parts[0]);
-            $ipParts = explode('/', $cidr, 2);
-            $currentIp = trim($ipParts[0]);
-            continue;
+            $cidr = trim(explode(',', $value, 2)[0]);
+            $current['ip'] = trim(explode('/', $cidr, 2)[0]);
         }
     }
-
-    $flushPeer();
 
     return $peers;
 }
@@ -99,26 +85,16 @@ function wgLoadRuntimeStatus(): array
 
     foreach ($output as $line) {
         $parts = explode("\t", trim($line));
-        // The first field on peer lines is the public key.
-        // Interface lines are ignored.
-        if (strpos($parts[0], 'public-key') !== false || strpos($parts[0], 'interface') !== false) {
-            continue;
-        }
-        // Heuristic: peer lines have at least 8 columns; public key is column 1.
+        // Interface lines are ignored because peer lines have at least 8 columns.
         if (count($parts) < 8) {
             continue;
         }
-        $pubkey   = $parts[0];
-        $endpoint = $parts[1];
-        $latest   = (int) $parts[4];
-        $rx       = $parts[5];
-        $tx       = $parts[6];
 
-        $status[$pubkey] = [
-            'endpoint' => $endpoint,
-            'latest'   => $latest,
-            'rx'       => $rx,
-            'tx'       => $tx,
+        $status[$parts[0]] = [
+            'endpoint' => $parts[1],
+            'latest'   => (int) $parts[4],
+            'rx'       => $parts[5],
+            'tx'       => $parts[6],
         ];
     }
 
@@ -141,25 +117,13 @@ echo str_pad('USER', 16)
     ."ENDPOINT\n";
 
 foreach ($peers as $peer) {
-    $entry     = $status[$peer['key']] ?? null;
-    $connected = 'no';
-    $rx        = '-';
-    $tx        = '-';
-    $endpoint  = '-';
-
-    if (is_array($entry)) {
-        $endpoint = $entry['endpoint'] !== '' ? $entry['endpoint'] : '-';
-        $rx       = $entry['rx'];
-        $tx       = $entry['tx'];
-        if ($entry['latest'] > 0) {
-            $connected = 'yes';
-        }
-    }
+    $entry = $status[$peer['key']] ?? ['endpoint' => '-', 'latest' => 0, 'rx' => '-', 'tx' => '-'];
+    $endpoint = $entry['endpoint'] !== '' ? $entry['endpoint'] : '-';
 
     echo str_pad($peer['user'], 16)
         .str_pad($peer['ip'], 18)
-        .str_pad($connected, 12)
-        .str_pad($rx, 14)
-        .str_pad($tx, 14)
+        .str_pad($entry['latest'] > 0 ? 'yes' : 'no', 12)
+        .str_pad($entry['rx'], 14)
+        .str_pad($entry['tx'], 14)
         .$endpoint."\n";
 }

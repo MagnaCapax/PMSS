@@ -36,7 +36,7 @@ if ($privKey === '' || $pubKey === '') {
 }
 
 $listenPort = 51820;
-$configPath = wgConfigDir().'/wg0.conf';
+$configPath = $configDir.'/wg0.conf';
 $current    = is_file($configPath) ? (string) file_get_contents($configPath) : '';
 
 $newConfig = wireguardBuildConfig($privKey, $listenPort);
