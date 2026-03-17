@@ -390,17 +390,19 @@ function pmssShowTrafficMain(array $argv): int
 function pmssShowTrafficPrintHelp(): void
 {
     $self = basename(__FILE__);
-    echo "Usage: {$self} [--json] [--show-missing] [--extended] [--sort=<mode>]\n";
-    echo "\n";
-    echo "Options:\n";
-    echo "  --json          Emit JSON instead of human text output.\n";
-    echo "  --show-missing  Print missing stats usernames (text mode only).\n";
-    echo "  --extended      Show limit, percent, and rate units in text output.\n";
-    echo "  --sort=<mode>   Sort output by name, month, pct, or rate (default: name).\n";
-    echo "  --color         Force ANSI colors in extended text output.\n";
-    echo "  --no-color      Disable ANSI colors in extended text output.\n";
-    echo "  --help          Show this help.\n";
-    echo "\n";
+    echo <<<TXT
+Usage: {$self} [--json] [--show-missing] [--extended] [--sort=<mode>]
+
+Options:
+  --json          Emit JSON instead of human text output.
+  --show-missing  Print missing stats usernames (text mode only).
+  --extended      Show limit, percent, and rate units in text output.
+  --sort=<mode>   Sort output by name, month, pct, or rate (default: name).
+  --color         Force ANSI colors in extended text output.
+  --no-color      Disable ANSI colors in extended text output.
+  --help          Show this help.
+
+TXT;
 }
 
 function loadTrafficUsers(string $statsDir): array {
@@ -436,9 +438,6 @@ function loadTrafficUsers(string $statsDir): array {
     }
     if ($invalidCount > 0) {
         fwrite(STDERR, "Warning: skipped {$invalidCount} invalid username entries from listUsers.php.\n");
-    }
-    if (empty($users)) {
-        return [];
     }
     $withLocalnet = [];
     foreach ($users as $user) {
@@ -476,13 +475,11 @@ function pmssShowTrafficSplitLocalnetUser(string $user): array
  */
 function pmssShowTrafficFormatRateDisplay(float $rateMiB): string
 {
-    $value = $rateMiB;
-    $unit = 'MiB/s';
-    if ($rateMiB >= 1000) {
-        $value = $rateMiB / 1024;
-        $unit = 'GiB/s';
-    }
-    return sprintf('%.2f%s', $value, $unit);
+    return sprintf(
+        '%.2f%s',
+        $rateMiB >= 1000 ? $rateMiB / 1024 : $rateMiB,
+        $rateMiB >= 1000 ? 'GiB/s' : 'MiB/s'
+    );
 }
 
 /**
@@ -491,20 +488,7 @@ function pmssShowTrafficFormatRateDisplay(float $rateMiB): string
 function pmssShowTrafficRenderBar(float $pct): string
 {
     $width = 10;
-    $clamped = $pct;
-    if ($clamped < 0) {
-        $clamped = 0;
-    }
-    if ($clamped > 100) {
-        $clamped = 100;
-    }
-    $filled = (int) floor(($clamped / 100) * $width);
-    if ($filled < 0) {
-        $filled = 0;
-    }
-    if ($filled > $width) {
-        $filled = $width;
-    }
+    $filled = (int) floor((max(0.0, min(100.0, $pct)) / 100) * $width);
     $empty = $width - $filled;
     return '[' . str_repeat('#', $filled) . str_repeat('-', $empty) . ']';
 }

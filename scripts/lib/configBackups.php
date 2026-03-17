@@ -185,11 +185,8 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
  */
 function pmssConfigBackupsPathKey(string $path): string
 {
-    $path = trim($path);
-    $path = preg_replace('/\\s+/', ' ', $path);
-    $path = preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path);
-    $path = str_replace('/', '_', $path);
-    $path = ltrim($path, '_');
+    $path = preg_replace('/\\s+/', ' ', trim($path));
+    $path = ltrim(str_replace('/', '_', preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path)), '_');
     return $path === '' ? 'unknown_path' : $path;
 }
 
@@ -198,13 +195,11 @@ function pmssConfigBackupsPathKey(string $path): string
  */
 function pmssConfigBackupsSanitizeLabel(string $label, int $maxLen = 80): string
 {
-    $label = trim($label);
+    $label = preg_replace('/\\s+/', ' ', trim($label));
     if ($label === '') {
         return '';
     }
-    $label = preg_replace('/\\s+/', ' ', $label);
-    $label = preg_replace('/[^A-Za-z0-9._\\-]+/', '_', $label);
-    $label = trim($label, '_');
+    $label = trim(preg_replace('/[^A-Za-z0-9._\\-]+/', '_', $label), '_');
     if ($label === '') {
         return '';
     }
