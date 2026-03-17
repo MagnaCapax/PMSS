@@ -235,6 +235,25 @@ class WireGuardInstallerTest extends TestCase
         }
     }
 
+    public function testConfigureKeepsReadmeFlowInline(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/wireguard.php');
+
+        $this->assertStringContainsString('template.wireguard.readme', $source);
+        $this->assertStringContainsString("file_put_contents(\$configDir.'/README', \$guide);", $source);
+        $this->assertTrue(strpos($source, 'function wgWrite'.'Readme') === false, 'README helper should stay inlined in pmssWireguardConfigure');
+    }
+
+    public function testConfigureKeepsServiceEnableFlowInline(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/wireguard.php');
+
+        $this->assertStringContainsString('PMSS_WG_SKIP_SERVICE', $source);
+        $this->assertStringContainsString('systemctl enable --now wg-quick@wg0', $source);
+        $this->assertStringContainsString('systemd unavailable; skipping wg-quick@wg0 enable', $source);
+        $this->assertTrue(strpos($source, 'function wgEnable'.'Service') === false, 'Service enable helper should stay inlined in pmssWireguardConfigure');
+    }
+
     /**
      * Apply temporary environment variable overrides for the duration of a callback.
      *

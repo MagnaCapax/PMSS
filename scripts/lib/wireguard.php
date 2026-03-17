@@ -406,27 +406,6 @@ function wireguardWriteConfig(string $privKey, int $port): void
 }
 
 /**
- * Refresh the operator README with the currently advertised endpoint.
- */
-function wgWriteReadme(string $hostname, string $endpoint, string $pubKey, int $port): string
-{
-    $rendered = wgRenderTemplate(
-        '/etc/seedbox/config/template.wireguard.readme',
-        [
-            '%HOSTNAME%'   => $hostname,
-            '%ENDPOINT%'   => $endpoint,
-            '%PUBLIC_KEY%' => $pubKey,
-            '%LISTEN_PORT%' => (string)$port,
-        ]
-    );
-    if ($rendered === null) {
-        return '';
-    }
-    file_put_contents(wgConfigDir().'/README', $rendered);
-    return $rendered;
-}
-
-/**
  * Copy connection instructions to every tenant home directory.
  */
 function wgDistributeToUsers(string $content): void
@@ -445,25 +424,6 @@ function wgDistributeToUsers(string $content): void
 }
 
 /**
- * Enable and start the wg-quick unit unless explicitly disabled.
- */
-function wgEnableService(): void
-{
-    if (getenv('PMSS_WG_SKIP_SERVICE') === '1') {
-        wgLog('Service enable skipped via PMSS_WG_SKIP_SERVICE');
-        return;
-    }
-    if (!is_dir('/run/systemd/system')) {
-        wgLog('systemd unavailable; skipping wg-quick@wg0 enable');
-        return;
-    }
-    $rc = runStep('[wireguard] Enabling wg-quick@wg0', 'systemctl enable --now wg-quick@wg0');
-    if ($rc !== 0) {
-        wgLog('wg-quick@wg0 failed to start (rc='.$rc.')');
-    }
-}
-
-/**
  * Provision WireGuard configuration and service.
  */
 function pmssWireguardConfigure(?callable $logger = null): void
@@ -473,8 +433,9 @@ function pmssWireguardConfigure(?callable $logger = null): void
         requireRoot();
     }
 
-    if (!is_dir(wgConfigDir())) {
-        @mkdir(wgConfigDir(), 0750, true);
+    $configDir = wgConfigDir();
+    if (!is_dir($configDir)) {
+        @mkdir($configDir, 0750, true);
     }
 
     if (!wgSupports()) {
@@ -482,7 +443,7 @@ function pmssWireguardConfigure(?callable $logger = null): void
         return;
     }
 
-    [$privKey, $pubKey] = wgEnsureKeys(wgConfigDir());
+    [$privKey, $pubKey] = wgEnsureKeys($configDir);
     if ($privKey === '' || $pubKey === '') {
         $log('[wireguard] Failed to ensure keys; aborting configure');
         return;
@@ -500,7 +461,33 @@ function pmssWireguardConfigure(?callable $logger = null): void
         $log(sprintf('[wireguard] Using %s endpoint %s', $endpointSource, $endpoint));
     }
 
-    $guide = wgWriteReadme($hostname, $endpoint, $pubKey, $listenPort);
+    $guide = wgRenderTemplate(
+        '/etc/seedbox/config/template.wireguard.readme',
+        [
+            '%HOSTNAME%'    => $hostname,
+            '%ENDPOINT%'    => $endpoint,
+            '%PUBLIC_KEY%'  => $pubKey,
+            '%LISTEN_PORT%' => (string) $listenPort,
+        ]
+    );
+    if ($guide === null) {
+        $guide = '';
+    } else {
+        file_put_contents($configDir.'/README', $guide);
+    }
+
     wgDistributeToUsers($guide);
-    wgEnableService();
+
+    if (getenv('PMSS_WG_SKIP_SERVICE') === '1') {
+        wgLog('Service enable skipped via PMSS_WG_SKIP_SERVICE');
+        return;
+    }
+    if (!is_dir('/run/systemd/system')) {
+        wgLog('systemd unavailable; skipping wg-quick@wg0 enable');
+        return;
+    }
+    $rc = runStep('[wireguard] Enabling wg-quick@wg0', 'systemctl enable --now wg-quick@wg0');
+    if ($rc !== 0) {
+        wgLog('wg-quick@wg0 failed to start (rc='.$rc.')');
+    }
 }
