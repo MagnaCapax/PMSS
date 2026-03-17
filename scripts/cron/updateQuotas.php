@@ -24,6 +24,62 @@ if (is_file($pmssUserLogPath)) {
 }
 $logger = new Logger(__FILE__);
 
+/**
+ * Atomically replace a quota snapshot without exposing a missing-file window.
+ *
+ * Existing owner/group metadata is preserved when the refresher runs as root so
+ * routine writes do not drift away from the current on-disk policy.
+ */
+function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0644): bool
+{
+    if (strpos($path, "\0") !== false || is_link($path) || (file_exists($path) && !is_file($path))) {
+        return false;
+    }
+
+    $dir = dirname($path);
+    if (!is_dir($dir) || is_link($dir)) {
+        return false;
+    }
+
+    $owner = null;
+    $group = null;
+    $canAdjustOwnership = function_exists('posix_geteuid') && @posix_geteuid() === 0;
+    if ($canAdjustOwnership && is_file($path)) {
+        $existingOwner = @fileowner($path);
+        $existingGroup = @filegroup($path);
+        if ($existingOwner !== false) {
+            $owner = $existingOwner;
+        }
+        if ($existingGroup !== false) {
+            $group = $existingGroup;
+        }
+    }
+
+    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
+    if ($tmp === false) {
+        return false;
+    }
+
+    if (@file_put_contents($tmp, $content, LOCK_EX) === false || !@chmod($tmp, $mode)) {
+        @unlink($tmp);
+        return false;
+    }
+    if ($owner !== null && !@chown($tmp, $owner)) {
+        @unlink($tmp);
+        return false;
+    }
+    if ($group !== null && !@chgrp($tmp, $group)) {
+        @unlink($tmp);
+        return false;
+    }
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        return false;
+    }
+
+    return true;
+}
+
 $logger->msg('Updating quota information');
 // Get & parse users list
 $users = array_filter(array_map('trim', explode("\n", trim((string) shell_exec('/scripts/listUsers.php')))), 'strlen');
@@ -116,8 +172,7 @@ foreach ($users as $thisUser) {
                 '       /dev/null      0K      0K      0K               0       0       0',
                 '',
             ));
-            if (@file_put_contents($quotaFile, $fallbackContent) !== false) {
-                @chmod($quotaFile, 0644);
+            if (pmssQuotaSnapshotWrite($quotaFile, $fallbackContent)) {
                 $logger->msg("quota fallback snapshot written for {$thisUser}");
                 pmssUserWriteLogs(
                     pmssUserBaseContext(
@@ -133,12 +188,43 @@ foreach ($users as $thisUser) {
                 if (function_exists('pmssUserLog')) {
                     pmssUserLog($thisUser, 'Quota fallback snapshot written');
                 }
+            } else {
+                $logger->msg("quota fallback snapshot write failed for {$thisUser}");
+                pmssUserWriteLogs(
+                    pmssUserBaseContext(
+                        'quota',
+                        'fallback',
+                        $thisUser,
+                        array(
+                            'status'  => 'ERR',
+                            'message' => 'Quota fallback snapshot write failed',
+                        )
+                    )
+                );
+                if (function_exists('pmssUserLog')) {
+                    pmssUserLog($thisUser, 'Quota fallback snapshot write failed');
+                }
             }
         }
     } else {
         // Success: exit 0 (normal) or exit 1 (over quota but valid output)
-        if (@file_put_contents($quotaFile, $content) !== false) {
-            @chmod($quotaFile, 0644);
+        if (!pmssQuotaSnapshotWrite($quotaFile, $content)) {
+            $logger->msg("quota snapshot write failed for {$thisUser}");
+            pmssUserWriteLogs(
+                pmssUserBaseContext(
+                    'quota',
+                    'write',
+                    $thisUser,
+                    array(
+                        'status'  => 'ERR',
+                        'message' => 'Quota snapshot write failed',
+                    )
+                )
+            );
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($thisUser, 'Quota snapshot write failed');
+            }
+            continue;
         }
         $logStatus = ($ret === 1) ? 'WARN' : 'OK';
         $logMsg = ($ret === 1) ? 'Quota refreshed (user over quota)' : 'Quota refreshed';
