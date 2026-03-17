@@ -33,18 +33,16 @@
  */
 function pmssBackupCriticalConfig(string $service, string $sourcePath, array $options = array()): ?string
 {
-    $log = $options['logger'] ?? null;
-    if ($log === null) {
-        $log = function_exists('logMessage')
-            ? 'logMessage'
-            : function (string $message): void {
-                if (defined('STDERR')) {
-                    @fwrite(STDERR, $message.PHP_EOL);
-                } else {
-                    error_log($message);
-                }
-            };
-    }
+    $log = $options['logger'] ?? (function_exists('logMessage')
+        ? 'logMessage'
+        : function (string $message): void {
+            if (defined('STDERR')) {
+                @fwrite(STDERR, $message.PHP_EOL);
+                return;
+            }
+
+            error_log($message);
+        });
     $sourcePath = trim($sourcePath);
     if (
         $service === ''
@@ -118,20 +116,17 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
  */
 function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, array $options = array()): void
 {
-    $log = $options['logger'] ?? null;
-    if ($log === null) {
-        $log = function_exists('logMessage')
-            ? 'logMessage'
-            : function (string $message): void {
-                if (defined('STDERR')) {
-                    @fwrite(STDERR, $message.PHP_EOL);
-                } else {
-                    error_log($message);
-                }
-            };
-    }
-    $sourcePath = trim($sourcePath);
-    if ($service === '' || $sourcePath === '' || getenv('PMSS_DRY_RUN') === '1') {
+    $log = $options['logger'] ?? (function_exists('logMessage')
+        ? 'logMessage'
+        : function (string $message): void {
+            if (defined('STDERR')) {
+                @fwrite(STDERR, $message.PHP_EOL);
+                return;
+            }
+
+            error_log($message);
+        });
+    if ($service === '' || ($sourcePath = trim($sourcePath)) === '' || getenv('PMSS_DRY_RUN') === '1') {
         return;
     }
 
@@ -143,9 +138,8 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     }
 
     $key = pmssConfigBackupsPathKey($sourcePath);
-    $pattern = $serviceDir.'/*__'.$key.'*.bak';
-    $files = glob($pattern);
-    if (!$files) {
+    $files = glob($serviceDir.'/*__'.$key.'*.bak');
+    if ($files === false || $files === array()) {
         return;
     }
 
@@ -187,7 +181,7 @@ function pmssConfigBackupsPathKey(string $path): string
 {
     $path = preg_replace('/\\s+/', ' ', trim($path));
     $path = ltrim(str_replace('/', '_', preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path)), '_');
-    return $path === '' ? 'unknown_path' : $path;
+    return $path !== '' ? $path : 'unknown_path';
 }
 
 /**
@@ -195,11 +189,10 @@ function pmssConfigBackupsPathKey(string $path): string
  */
 function pmssConfigBackupsSanitizeLabel(string $label, int $maxLen = 80): string
 {
-    $label = preg_replace('/\\s+/', ' ', trim($label));
-    if ($label === '') {
-        return '';
-    }
-    $label = trim(preg_replace('/[^A-Za-z0-9._\\-]+/', '_', $label), '_');
+    $label = trim(
+        preg_replace('/[^A-Za-z0-9._\\-]+/', '_', preg_replace('/\\s+/', ' ', trim($label))),
+        '_'
+    );
     if ($label === '') {
         return '';
     }

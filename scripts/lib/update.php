@@ -267,11 +267,12 @@ function updateRutorrentConfig($username, $scgiPort) {
  */
 function getOsReleaseData() {
     $path = pmssOsReleasePath();
-    if (!isset($GLOBALS['PMSS_OS_RELEASE_CACHE'][$path])) {
-        $parsed = @parse_ini_file($path);
-        $GLOBALS['PMSS_OS_RELEASE_CACHE'][$path] = is_array($parsed) ? $parsed : [];
+    if (isset($GLOBALS['PMSS_OS_RELEASE_CACHE'][$path])) {
+        return $GLOBALS['PMSS_OS_RELEASE_CACHE'][$path];
     }
-    return $GLOBALS['PMSS_OS_RELEASE_CACHE'][$path];
+
+    $parsed = @parse_ini_file($path);
+    return $GLOBALS['PMSS_OS_RELEASE_CACHE'][$path] = is_array($parsed) ? $parsed : [];
 }
 
 /**
@@ -280,8 +281,7 @@ function getOsReleaseData() {
  * @return string The distribution ID (e.g., "ubuntu", "debian"), or an empty string if not found.
  */
 function getDistroName() {
-    $data = getOsReleaseData();
-    return isset($data['ID']) ? $data['ID'] : '';
+    return (string) (getOsReleaseData()['ID'] ?? '');
 }
 
 /**
@@ -292,14 +292,12 @@ function getDistroName() {
  * @return string The distribution version number, or an empty string if not found.
  */
 function getDistroVersion() {
-    $data = getOsReleaseData();
-    if (isset($data['VERSION_ID'])) {
-        if (preg_match('/^([0-9]+)/', $data['VERSION_ID'], $matches)) {
-            return $matches[1];
-        }
-        return $data['VERSION_ID'];
+    $versionId = (string) (getOsReleaseData()['VERSION_ID'] ?? '');
+    if ($versionId === '') {
+        return '';
     }
-    return '';
+
+    return preg_match('/^([0-9]+)/', $versionId, $matches) ? $matches[1] : $versionId;
 }
 
 /**
@@ -307,8 +305,7 @@ function getDistroVersion() {
  */
 function pmssResetOsReleaseCache(): void
 {
-    $path = pmssOsReleasePath();
-    unset($GLOBALS['PMSS_OS_RELEASE_CACHE'][$path]);
+    unset($GLOBALS['PMSS_OS_RELEASE_CACHE'][pmssOsReleasePath()]);
 }
 
 /**
@@ -318,11 +315,8 @@ function pmssResetOsReleaseCache(): void
  */
 function getDistroCodename(): string
 {
-    $data = getOsReleaseData();
-    if (!empty($data['VERSION_CODENAME'])) {
-        return strtolower(trim($data['VERSION_CODENAME']));
-    }
-    return '';
+    $codename = (string) (getOsReleaseData()['VERSION_CODENAME'] ?? '');
+    return $codename !== '' ? strtolower(trim($codename)) : '';
 }
 
 /**
@@ -333,21 +327,17 @@ function getDistroCodename(): string
  * @return string The version string or "unknown" if not found.
  */
 function getPmssVersion($versionFile = '/etc/seedbox/config/version') {
-    $paths = array($versionFile, '/etc/seedbox/runtime/version');
-    foreach ($paths as $path) {
+    foreach (array($versionFile, '/etc/seedbox/runtime/version') as $path) {
         if ($path === '' || !is_file($path)) {
             continue;
         }
-        $size = @filesize($path);
-        if (!is_int($size) || $size <= 0) {
-            continue;
+
+        $data = trim((string) @file_get_contents($path));
+        if ($data !== '') {
+            return $data;
         }
-        $data = @file_get_contents($path);
-        if (!is_string($data)) {
-            continue;
-        }
-        return trim($data);
     }
+
     return 'unknown';
 }
 
