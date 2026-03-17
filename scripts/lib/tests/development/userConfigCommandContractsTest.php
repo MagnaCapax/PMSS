@@ -17,8 +17,6 @@ class userConfigCommandContractsTest extends TestCase
     {
         return $this->loadSource('util/userConfig.php')
             ."\n"
-            .$this->loadSource('lib/user/rtorrent.php')
-            ."\n"
             .$this->loadSource('lib/user/system.php');
     }
 

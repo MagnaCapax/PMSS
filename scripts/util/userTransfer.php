@@ -31,19 +31,6 @@ if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
 
 require_once __DIR__.'/../lib/userTransfer.php';
 
-// Guardrails (best effort): parse CLI safely and ensure we can validate the
-// resolved home path before running transfer steps. The library enforces these
-// invariants at runtime, but we keep the entrypoint explicit and grepable.
-try {
-    $cfg = pmssUserTransferParseCli($argv);
-    pmssValidateUsername($cfg['localUser']);
-    $expectedHome = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home').'/'.$cfg['localUser'];
-    realpath($expectedHome);
-
-    // Post-setup delegates ownership/permission normalisation to userPermissions.php
-    // to avoid unsafe recursive chown behaviour on symlinked trees.
-} catch (Throwable $e) {
-    // Ignore; pmssUserTransferMain() owns the user-facing error handling and exit codes.
-}
+pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 
 exit(pmssUserTransferMain($argv));

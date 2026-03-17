@@ -12,9 +12,10 @@
  * @author PMSS Team
  */
 
-foreach (['traffic', 'rtorrent', 'deluge', 'qbittorrent', 'system', 'userConfigStore'] as $module) {
+foreach (['traffic', 'deluge', 'qbittorrent', 'system', 'userConfigStore'] as $module) {
     require_once __DIR__.'/../lib/user/'.$module.'.php';
 }
+require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/update.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 
@@ -198,7 +199,21 @@ if ($uploadThrottleKib !== null) {
 userApplyTrafficLimit($user);
 
 // Compose a canonical rtorrent configuration and mirror it to companion apps.
-$configuration = userConfigureRtorrent($user);
+echo "Creating rTorrent config\n";
+$resources = [];
+$resourceFile = '/etc/seedbox/config/system.rtorrent.resources';
+if (file_exists($resourceFile)) {
+    $resources = unserialize((string) file_get_contents($resourceFile));
+}
+$rtorrentConfig = new rtorrentConfig($resources);
+$throttle = pmssReadTorrentThrottle($user['name']);
+$configuration = $rtorrentConfig->createConfig([
+    'ram' => $user['memory'],
+    'dht' => file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.dht'),
+    'pex' => file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.pex'),
+    'uploadThrottle' => $throttle === null ? 0 : $throttle,
+]);
+$rtorrentConfig->writeConfig($user['name'], $configuration['configFile']);
 
 // Persist derived ports once rTorrent config is generated so they survive
 // re-runs and other tooling can read a single source of truth.
