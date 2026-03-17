@@ -177,21 +177,35 @@ function pmssShouldConfigureLighttpdForHome(string $homeDir): bool
  * Build the FastCGI socket list the watchdog must probe for a user.
  *
  * PMSS historically probed only `php.socket-0`. Keep that as the fallback when
- * the rendered config is unavailable, while using the configured `max-procs`
- * value when it can be read safely.
+ * the rendered config is unavailable, while using `min-procs` to decide how
+ * many numbered sockets must exist immediately after startup.
  *
  * @return array<int, string>
  */
 function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): array
 {
     $baseSocketPath = rtrim($homeDir, '/').'/.lighttpd/php.socket';
-    $maxProcs = preg_match('/"max-procs"\s*=>\s*([0-9]+)/', (string) @file_get_contents($configPath), $matches) === 1
+    $config = (string) @file_get_contents($configPath);
+    $maxProcs = preg_match('/"max-procs"\s*=>\s*([0-9]+)/', $config, $matches) === 1
+        ? (int) $matches[1]
+        : 0;
+    $minProcs = preg_match('/"min-procs"\s*=>\s*([0-9]+)/', $config, $matches) === 1
         ? (int) $matches[1]
         : 0;
 
-    return $maxProcs > 1
-        ? array_map(static function ($index) use ($baseSocketPath) { return $baseSocketPath.'-'.$index; }, range(0, $maxProcs - 1))
-        : [$baseSocketPath.($maxProcs === 1 ? '' : '-0')];
+    if ($maxProcs === 1) {
+        return [$baseSocketPath];
+    }
+
+    if ($maxProcs <= 0) {
+        return [$baseSocketPath.'-0'];
+    }
+
+    $expectedSockets = min($maxProcs, $minProcs > 0 ? $minProcs : $maxProcs);
+
+    return array_map(static function ($index) use ($baseSocketPath) {
+        return $baseSocketPath.'-'.$index;
+    }, range(0, $expectedSockets - 1));
 }
 
 function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool

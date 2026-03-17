@@ -49,7 +49,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `checkDirectories.php` – Repair expected directory hierarchy if it drifts.
 - `checkGui.php` – Restore missing `www/` + `data/` paths and GUI entrypoint.
 - `checkRtorrent.php` – Monitor rTorrent instances and restart as needed.
-- `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair and probe every expected php-cgi socket before restarting the stack.
+- `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair and probe the php-cgi sockets that should exist immediately after startup before restarting the stack.
 - `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
 - `checkRcloneInstances.php` – Maintain rclone mount processes.
 - `cpuStat.php` – Periodically record CPU usage statistics.
