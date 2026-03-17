@@ -10,27 +10,6 @@
  * @author PMSS Team
  */
 
-if (!function_exists('pmssLogmsgDefaultLogger')) {
-    /**
-     * Resolve the fallback logger used by standalone scripts.
-     *
-     * @return Logger
-     */
-    function pmssLogmsgDefaultLogger()
-    {
-        global $logmsg_default_logger;
-
-        if (!isset($logmsg_default_logger)) {
-            if (!class_exists('Logger')) {
-                require_once __DIR__.'/logger.php';
-            }
-            $logmsg_default_logger = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);
-        }
-
-        return $logmsg_default_logger;
-    }
-}
-
 if (!function_exists('logmsg')) {
     /**
      * Historical logging function retained for backwards compatibility.
@@ -42,6 +21,15 @@ if (!function_exists('logmsg')) {
             return;
         }
 
-        pmssLogmsgDefaultLogger()->msg($message);
+        global $logmsg_default_logger;
+
+        if (!isset($logmsg_default_logger)) {
+            if (!class_exists('Logger')) {
+                require_once __DIR__.'/logger.php';
+            }
+            $logmsg_default_logger = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);
+        }
+
+        $logmsg_default_logger->msg($message);
     }
 }

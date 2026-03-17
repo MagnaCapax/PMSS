@@ -31,7 +31,10 @@ class Motd
 
         $model = self::motdCollectModel();
         $rendered = self::renderMotdTemplate($tpl, $model, self::colorEnabled());
-        self::motdWriteOutput($outPath, $rendered);
+        file_put_contents($outPath, $rendered);
+        @chmod($outPath, 0644);
+        @chown($outPath, 'root');
+        @chgrp($outPath, 'root');
 
         // Align PAM motd behavior so users see MOTD once (and non-root can read it).
         if ($outPath === '/etc/motd') {
@@ -129,7 +132,7 @@ class Motd
             '%DISTRO%'           => $distro,
         ];
 
-        $rendered = self::motdSubstituteTemplate($template, $repl);
+        $rendered = strtr($template, $repl);
         $rendered = self::motdStripLegacyRuntimeVersionLines($rendered);
 
         $storageWarn = self::motdModelValue($model, 'storageWarn');
@@ -153,16 +156,6 @@ class Motd
     }
 
     /**
-     * Template substitution helper (pure).
-     *
-     * @param array<string, string> $replacements
-     */
-    private static function motdSubstituteTemplate(string $template, array $replacements): string
-    {
-        return strtr($template, $replacements);
-    }
-
-    /**
      * Remove legacy RUN_VERSION lines that may still exist in older templates.
      */
     private static function motdStripLegacyRuntimeVersionLines(string $rendered): string
@@ -170,17 +163,6 @@ class Motd
         $rendered = str_replace('Runtime Version: %RUN_VERSION%', '', $rendered);
         $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
         return is_string($patched) ? $patched : $rendered;
-    }
-
-    /**
-     * Write output and enforce root-readable file permissions.
-     */
-    private static function motdWriteOutput(string $outPath, string $content): void
-    {
-        file_put_contents($outPath, $content);
-        @chmod($outPath, 0644);
-        @chown($outPath, 'root');
-        @chgrp($outPath, 'root');
     }
 
     /**

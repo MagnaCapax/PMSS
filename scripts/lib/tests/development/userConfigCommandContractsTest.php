@@ -15,9 +15,7 @@ class userConfigCommandContractsTest extends TestCase
 
     private function loadUserConfigSubsystemSource(): string
     {
-        return $this->loadSource('util/userConfig.php')
-            ."\n"
-            .$this->loadSource('lib/user/system.php');
+        return $this->loadSource('util/userConfig.php');
     }
 
     public function testRutorrentConfigUpdateContractRemainsStable(): void
@@ -42,5 +40,25 @@ class userConfigCommandContractsTest extends TestCase
 
         $this->assertStringContainsString("file_exists('/bin/bash')", $source);
         $this->assertStringContainsString("runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg(\$user['name'])));", $source);
+    }
+
+    public function testCgroupConfigurationContractRemainsStable(): void
+    {
+        $source = $this->loadUserConfigSubsystemSource();
+
+        $this->assertStringContainsString("'/scripts/util/userConfigCgroup.php'", $source);
+        $this->assertStringContainsString("runStep(\n    'Configuring cgroups',", $source);
+        $this->assertStringContainsString("'--memory-high=' . \$user['memory']", $source);
+    }
+
+    public function testRootlessDockerProvisioningContractRemainsStable(): void
+    {
+        $source = $this->loadUserConfigSubsystemSource();
+
+        $this->assertStringContainsString("'Rootless Docker disabled by config for '.\$user['name']", $source);
+        $this->assertStringContainsString("runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg(\$user['name'])));", $source);
+        $this->assertStringContainsString("runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');", $source);
+        $this->assertStringContainsString("'Configuring rootless Docker'", $source);
+        $this->assertStringContainsString("'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'", $source);
     }
 }
