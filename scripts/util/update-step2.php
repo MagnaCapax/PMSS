@@ -21,6 +21,13 @@
 // Cap PHP memory use so we fail fast with a PHP fatal instead of a host-wide OOM kill.
 @ini_set('memory_limit', '4096M');
 
+// Bootstrap the shared logger before loading update helpers so include-time
+// logs and standalone update-step2 runs share the same sink.
+require_once __DIR__.'/../lib/logger.php';
+if (!isset($GLOBALS['logmsg_default_logger'])) {
+    $GLOBALS['logmsg_default_logger'] = new Logger(__FILE__, '/var/log', '/tmp', 'pmss-update', true);
+}
+
 // Module load order mirrors the runtime sequence. Keep shared runtime helpers
 // first, followed by environment detection, repository setup, system prep, web
 // stack, service bundles, user refresh, networking, and finally bootstrap
@@ -44,20 +51,6 @@ require_once __DIR__.'/../lib/update/userMaintenance.php';
 require_once __DIR__.'/../lib/update/networking.php';
 require_once __DIR__.'/../lib/update/services/bootstrap.php';
 require_once __DIR__.'/../lib/motd/Generator.php';
-
-// When update-step2 runs standalone it does not inherit update.php's logger,
-// so define the fallback before any profiled step can emit a log line.
-if (!function_exists('logmsg')) {
-    /**
-     * Minimal logger used when update-step2 runs outside update.php.
-     */
-    function logmsg(string $message): void
-    {
-        $timestamp = date('[Y-m-d H:i:s] ');
-        @file_put_contents('/var/log/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX) || @file_put_contents('/tmp/pmss-update.log', $timestamp.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
-        fwrite(STDERR, $message.PHP_EOL);
-    }
-}
 
 requireRoot();
 

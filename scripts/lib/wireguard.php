@@ -9,13 +9,8 @@
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/networkInfo.php';
 require_once __DIR__.'/runtime.php';
-
-if (!function_exists('logmsg')) {
-    require_once __DIR__.'/update.php';
-}
-if (!function_exists('runStep')) {
-    require_once __DIR__.'/update/runtime/commands.php';
-}
+require_once __DIR__.'/logger.php';
+require_once __DIR__.'/update/runtime/commands.php';
 
 function wgLog(string $message): void
 {

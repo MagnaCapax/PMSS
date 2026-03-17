@@ -42,4 +42,16 @@ class LoggerTest extends TestCase
         $this->assertTrue(strpos((string) file_get_contents($fallbackPath), 'wrapper line') !== false);
         @unlink($fallbackPath);
     }
+
+    public function testLoggerSupportsCustomBaseName(): void
+    {
+        $dir = sys_get_temp_dir().'/pmss-logs-custom-'.bin2hex(random_bytes(4));
+        mkdir($dir, 0700, true);
+        $logger = new \Logger(__FILE__, $dir, $dir, 'pmss-update');
+        $logger->msg('custom base');
+
+        $path = $dir.'/pmss-update.log';
+        $this->assertTrue(file_exists($path));
+        $this->assertTrue(strpos((string) file_get_contents($path), 'custom base') !== false);
+    }
 }

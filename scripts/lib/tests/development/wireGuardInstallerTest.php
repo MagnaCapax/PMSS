@@ -254,6 +254,17 @@ class WireGuardInstallerTest extends TestCase
         $this->assertTrue(strpos($source, 'function wgEnable'.'Service') === false, 'Service enable helper should stay inlined in pmssWireguardConfigure');
     }
 
+    public function testWireguardUsesDirectLoggerAndRuntimeRequires(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/wireguard.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/logger.php';", $source);
+        $this->assertStringContainsString("require_once __DIR__.'/update/runtime/commands.php';", $source);
+        $this->assertTrue(strpos($source, "require_once __DIR__.'/update.php';") === false, 'wireguard.php should not pull update.php just to get logmsg()');
+        $this->assertTrue(strpos($source, "if (!function_exists('logmsg')) {") === false, 'wireguard.php should rely on require_once instead of logmsg guards');
+        $this->assertTrue(strpos($source, "if (!function_exists('runStep')) {") === false, 'wireguard.php should rely on require_once instead of runStep guards');
+    }
+
     /**
      * Apply temporary environment variable overrides for the duration of a callback.
      *
