@@ -8,7 +8,6 @@
 
 /** MOTD generator (class-based). */
 
-require_once __DIR__.'/../update.php';
 require_once __DIR__.'/../update/distro.php';
 
 class Motd

@@ -15,9 +15,8 @@
 
 require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
-// Bring in shared runtime helpers; avoid duplicating apt/repo logic here.
-// Package installation for OpenVPN/EasyRSA is handled centrally in the package phase.
-require_once __DIR__.'/../lib/update.php';
+// Shared runtime helpers are loaded directly above; package installation for
+// OpenVPN/EasyRSA remains owned by the central package phase.
 
 requireRoot();
 
