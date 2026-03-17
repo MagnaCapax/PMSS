@@ -352,16 +352,6 @@ function getPmssVersion($versionFile = '/etc/seedbox/config/version') {
 }
 
 // Backwards-compatible wrappers for legacy helper names.
-function loadRepoTemplate(string $codename, ?callable $logger = null): string
-{
-    return pmssLoadRepoTemplate($codename, $logger);
-}
-
-function safeWriteSources(string $content, string $label, ?callable $logger = null): bool
-{
-    return pmssSafeWriteSources($content, $label, $logger);
-}
-
 function updateAptSources(string $distroName, int $distroVersion, string $currentHash, array $repos, ?callable $logger = null): void
 {
     pmssUpdateAptSources($distroName, $distroVersion, $currentHash, $repos, $logger);

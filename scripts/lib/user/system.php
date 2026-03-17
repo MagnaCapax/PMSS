@@ -9,14 +9,6 @@
 require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/userConfigStore.php';
 
-function userEnsureShell(array $user): void
-{
-    if (!file_exists('/bin/bash')) {
-        return;
-    }
-    runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg($user['name'])));
-}
-
 function userConfigureSystemdSlice(array $user): void
 {
     // Delegate cgroup configuration to the dedicated utility.

@@ -15,6 +15,8 @@
 foreach (['traffic', 'rtorrent', 'deluge', 'qbittorrent', 'system', 'userConfigStore'] as $module) {
     require_once __DIR__.'/../lib/user/'.$module.'.php';
 }
+require_once __DIR__.'/../lib/update.php';
+require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 /**
  * Main entry point for user configuration changes.
@@ -209,7 +211,8 @@ if ($scgiPort > 0 && (!isset($payload['rtorrentPort']) || (int) $payload['rtorre
         fwrite(STDERR, "Warning: failed to persist rtorrentPort for {$user['name']}\n");
     }
 }
-userConfigureRutorrent($user, $configuration);
+echo "Changing ruTorrent config\n";
+updateRutorrentConfig($user['name'], $scgiPort);
 $rclonePortFile = sprintf('/home/%s/.rclonePort', $user['name']);
 if (!file_exists($rclonePortFile)) {
     file_put_contents($rclonePortFile, rand(1500, 65500));
@@ -217,7 +220,16 @@ if (!file_exists($rclonePortFile)) {
 userConfigureDeluge($user, $configuration);
 userConfigureQbittorrent($user);
 userApplyDiskQuota($user);
-userRestartRtorrentIfRunning($user);
-userEnsureShell($user);
+$lockFile = sprintf('/home/%s/session/rtorrent.lock', $user['name']);
+if (file_exists($lockFile)) {
+    $pidChunk = explode(':+', (string)file_get_contents($lockFile));
+    $pid = (int) $pidChunk;
+    if ($pid > 0) {
+        runStep('Restarting rTorrent', sprintf('kill -9 %d', $pid));
+    }
+}
+if (file_exists('/bin/bash')) {
+    runStep('Ensuring bash shell', sprintf('chsh -s /bin/bash %s', escapeshellarg($user['name'])));
+}
 userConfigureSystemdSlice($user);
 userEnableLingerAndDocker($user);

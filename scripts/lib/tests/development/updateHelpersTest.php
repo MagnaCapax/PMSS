@@ -26,7 +26,7 @@ class UpdateHelpersTest extends TestCase
     {
         $logs = [];
         $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
-        $data = \loadRepoTemplate('this-code-name-does-not-exist', $logger);
+        $data = \pmssLoadRepoTemplate('this-code-name-does-not-exist', $logger);
         $this->assertEquals('', $data);
         $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Repository template missing:') !== false; }));
     }
@@ -35,7 +35,7 @@ class UpdateHelpersTest extends TestCase
     {
         $logs = [];
         $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
-        $ok = \safeWriteSources('', 'UnitTest', $logger);
+        $ok = \pmssSafeWriteSources('', 'UnitTest', $logger);
         $this->assertTrue($ok === false);
         $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Empty repository content') !== false; }));
     }
