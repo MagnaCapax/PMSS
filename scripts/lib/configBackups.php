@@ -33,7 +33,18 @@
  */
 function pmssBackupCriticalConfig(string $service, string $sourcePath, array $options = array()): ?string
 {
-    $log = pmssConfigBackupsSelectLogger($options['logger'] ?? null);
+    $log = $options['logger'] ?? null;
+    if ($log === null) {
+        $log = function_exists('logMessage')
+            ? 'logMessage'
+            : function (string $message): void {
+                if (defined('STDERR')) {
+                    @fwrite(STDERR, $message.PHP_EOL);
+                } else {
+                    error_log($message);
+                }
+            };
+    }
     $sourcePath = trim($sourcePath);
     if (
         $service === ''
@@ -107,7 +118,18 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
  */
 function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, array $options = array()): void
 {
-    $log = pmssConfigBackupsSelectLogger($options['logger'] ?? null);
+    $log = $options['logger'] ?? null;
+    if ($log === null) {
+        $log = function_exists('logMessage')
+            ? 'logMessage'
+            : function (string $message): void {
+                if (defined('STDERR')) {
+                    @fwrite(STDERR, $message.PHP_EOL);
+                } else {
+                    error_log($message);
+                }
+            };
+    }
     $sourcePath = trim($sourcePath);
     if ($service === '' || $sourcePath === '' || getenv('PMSS_DRY_RUN') === '1') {
         return;
@@ -156,27 +178,6 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
             }
         }
     }
-}
-
-/**
- * Select a logger callable, preferring logMessage() when available.
- *
- * @param callable(string):void|null $logger Logger override.
- *
- * @return callable(string):void
- */
-function pmssConfigBackupsSelectLogger(?callable $logger = null): callable
-{
-    if ($logger !== null || function_exists('logMessage')) {
-        return $logger ?? 'logMessage';
-    }
-    return static function (string $message): void {
-        if (defined('STDERR')) {
-            @fwrite(STDERR, $message.PHP_EOL);
-        } else {
-            error_log($message);
-        }
-    };
 }
 
 /**

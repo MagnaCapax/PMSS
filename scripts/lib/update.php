@@ -43,57 +43,6 @@ function pmssSkeletonPath(string $relative): string
 }
 
 /**
- * Ensure the parent directory for a user file exists with sane permissions.
- */
-function pmssEnsureUserParentDir(string $targetFile, string $user, string $home): bool
-{
-    $parent = dirname($targetFile);
-    if ($parent === '' || $parent === '.' || $parent === '/') {
-        logMessage("[user:{$user}] Invalid parent directory for {$targetFile}");
-        return false;
-    }
-    if (is_dir($parent)) {
-        return true;
-    }
-    if (file_exists($parent)) {
-        logMessage("[user:{$user}] Parent path exists but is not a directory: {$parent}");
-        return false;
-    }
-
-    $prefix = rtrim($home, '/');
-    $relative = substr($parent, strlen($prefix));
-    $relative = ltrim($relative, '/');
-    if ($relative === '') {
-        return true;
-    }
-
-    $path = $prefix;
-    foreach (explode('/', $relative) as $segment) {
-        if ($segment === '') {
-            continue;
-        }
-        $path .= '/'.$segment;
-        if (is_dir($path)) {
-            continue;
-        }
-        if (file_exists($path)) {
-            logMessage("[user:{$user}] Cannot create directory, path exists: {$path}");
-            return false;
-        }
-        if (!@mkdir($path, 0755)) {
-            logMessage("[user:{$user}] Failed to create directory: {$path}");
-            return false;
-        }
-        @chmod($path, 0755);
-        @chown($path, (string) $user);
-        @chgrp($path, (string) $user);
-        logMessage("[user:{$user}] Created directory: {$path}");
-    }
-
-    return is_dir($parent);
-}
-
-/**
  * Update a user's file from the skeleton directory.
  *
  * @param string $file The filename relative to the skeleton base and the user's home.
@@ -129,7 +78,47 @@ function updateUserFile($file, $user) {
         return;
     }
     
-    if (!pmssEnsureUserParentDir($targetFile, $user, $homeDir)) {
+    $parent = dirname($targetFile);
+    if ($parent === '' || $parent === '.' || $parent === '/') {
+        logMessage("[user:{$user}] Invalid parent directory for {$targetFile}");
+        return;
+    }
+    if (!is_dir($parent)) {
+        if (file_exists($parent)) {
+            logMessage("[user:{$user}] Parent path exists but is not a directory: {$parent}");
+            return;
+        }
+
+        $prefix = rtrim($homeDir, '/');
+        $relative = substr($parent, strlen($prefix));
+        $relative = ltrim($relative, '/');
+        if ($relative !== '') {
+            $path = $prefix;
+            foreach (explode('/', $relative) as $segment) {
+                if ($segment === '') {
+                    continue;
+                }
+                $path .= '/'.$segment;
+                if (is_dir($path)) {
+                    continue;
+                }
+                if (file_exists($path)) {
+                    logMessage("[user:{$user}] Cannot create directory, path exists: {$path}");
+                    return;
+                }
+                if (!@mkdir($path, 0755)) {
+                    logMessage("[user:{$user}] Failed to create directory: {$path}");
+                    return;
+                }
+                @chmod($path, 0755);
+                @chown($path, (string) $user);
+                @chgrp($path, (string) $user);
+                logMessage("[user:{$user}] Created directory: {$path}");
+            }
+        }
+    }
+
+    if (!is_dir($parent)) {
         return;
     }
 

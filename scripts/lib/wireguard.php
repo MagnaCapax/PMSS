@@ -80,70 +80,6 @@ function wgExternalEndpointUrlCandidates(): array
     ];
 }
 
-function wgFetchExternalEndpoint(): ?string
-{
-    // #TODO Replace with an internal endpoint discovery helper instead of calling out. (GH #123)
-    $override = getenv('PMSS_WG_EXTERNAL_IP');
-    if ($override !== false) {
-        return $override === '' ? null : wgValidatePublicIp($override);
-    }
-
-    $context = stream_context_create([
-        'http' => [
-            'timeout'    => 3,
-            'user_agent' => 'PMSS WireGuard (+https://github.com/MagnaCapax/PMSS)',
-        ],
-    ]);
-
-    foreach (wgExternalEndpointUrlCandidates() as $url) {
-        $response = @file_get_contents($url, false, $context);
-        if ($response === false) {
-            continue;
-        }
-        $ip = wgValidatePublicIp($response);
-        if ($ip !== null) {
-            return $ip;
-        }
-    }
-
-    return null;
-}
-
-/**
- * Discover the IPv4 address currently bound to the uplink interface.
- */
-function wgDetectInterfaceAddress(): ?string
-{
-    $override = getenv('PMSS_WG_INTERFACE_IP');
-    if ($override !== false) {
-        $trimmed = trim($override);
-        if ($trimmed === '') {
-            return null;
-        }
-        return $trimmed;
-    }
-
-    $interface = detectPrimaryInterface();
-    if ($interface === '') {
-        return null;
-    }
-
-    // Look for the primary IPv4 address associated with the uplink interface.
-    $cmd = '/sbin/ip -4 -o addr show dev '.escapeshellarg($interface).' 2>/dev/null';
-    exec($cmd, $output, $rc);
-    if ($rc !== 0) {
-        return null;
-    }
-
-    foreach ($output as $line) {
-        if (preg_match('/inet\\s+([0-9.]+)/', $line, $matches)) {
-            return $matches[1];
-        }
-    }
-
-    return null;
-}
-
 /**
  * Determine the best endpoint to advertise to tenants.
  */
@@ -168,7 +104,31 @@ function wgResolveEndpoint(string $hostname): array
     }
 
     $interfacePrivate = '';
-    $interfaceIp = wgDetectInterfaceAddress();
+    $interfaceOverride = getenv('PMSS_WG_INTERFACE_IP');
+    if ($interfaceOverride !== false) {
+        $interfaceIp = trim($interfaceOverride);
+        if ($interfaceIp === '') {
+            $interfaceIp = null;
+        }
+    } else {
+        $interface = detectPrimaryInterface();
+        if ($interface === '') {
+            $interfaceIp = null;
+        } else {
+            // Look for the primary IPv4 address associated with the uplink interface.
+            $cmd = '/sbin/ip -4 -o addr show dev '.escapeshellarg($interface).' 2>/dev/null';
+            exec($cmd, $output, $rc);
+            $interfaceIp = null;
+            if ($rc === 0) {
+                foreach ($output as $line) {
+                    if (preg_match('/inet\\s+([0-9.]+)/', $line, $matches)) {
+                        $interfaceIp = $matches[1];
+                        break;
+                    }
+                }
+            }
+        }
+    }
     if ($interfaceIp !== null) {
         $public = wgValidatePublicIp($interfaceIp);
         if ($public !== null) {
@@ -177,7 +137,31 @@ function wgResolveEndpoint(string $hostname): array
         $interfacePrivate = $interfaceIp;
     }
 
-    $external = wgFetchExternalEndpoint();
+    // #TODO Replace with an internal endpoint discovery helper instead of calling out. (GH #123)
+    $externalOverride = getenv('PMSS_WG_EXTERNAL_IP');
+    if ($externalOverride !== false) {
+        $external = $externalOverride === '' ? null : wgValidatePublicIp($externalOverride);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'timeout'    => 3,
+                'user_agent' => 'PMSS WireGuard (+https://github.com/MagnaCapax/PMSS)',
+            ],
+        ]);
+
+        $external = null;
+        foreach (wgExternalEndpointUrlCandidates() as $url) {
+            $response = @file_get_contents($url, false, $context);
+            if ($response === false) {
+                continue;
+            }
+            $ip = wgValidatePublicIp($response);
+            if ($ip !== null) {
+                $external = $ip;
+                break;
+            }
+        }
+    }
     if ($external !== null) {
         return [$external, 'external'];
     }
@@ -340,16 +324,17 @@ function wgDeriveClientIp(string $key, array $usedIps): string
 }
 
 /**
- * Assign unique /32 addresses to each collected key.
- *
- * @param array<int,array{user:string,key:string}> $entries
- * @return array<int,array{user:string,key:string,ip:string}>
+ * Render auto-managed peer sections from collected public keys.
  */
-function wgAssignClientIps(array $entries): array
+function wgBuildPeersConfig(): string
 {
-    $used      = [];
-    $assigned  = [];
+    $entries = wgCollectUserPublicKeys();
+    if (empty($entries)) {
+        return "# No WireGuard peers configured; place public key(s) in ~/.wireguard-public-key on each user account.\n";
+    }
 
+    $used = [];
+    $assigned = [];
     foreach ($entries as $entry) {
         $ip = wgDeriveClientIp($entry['key'], $used);
         if ($ip === '') {
@@ -363,21 +348,6 @@ function wgAssignClientIps(array $entries): array
             'ip'   => $ip,
         ];
     }
-
-    return $assigned;
-}
-
-/**
- * Render auto-managed peer sections from collected public keys.
- */
-function wgBuildPeersConfig(): string
-{
-    $entries = wgCollectUserPublicKeys();
-    if (empty($entries)) {
-        return "# No WireGuard peers configured; place public key(s) in ~/.wireguard-public-key on each user account.\n";
-    }
-
-    $assigned = wgAssignClientIps($entries);
     if (empty($assigned)) {
         return "# No valid WireGuard peers configured; all provided keys were invalid.\n";
     }
