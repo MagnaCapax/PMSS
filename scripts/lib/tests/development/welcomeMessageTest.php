@@ -81,6 +81,24 @@ class WelcomeMessageTest extends TestCase
         }
     }
 
+    public function testProductNameAliasReadsNestedProductsMap(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $home = $this->makeUserHome();
+            @file_put_contents($home.'/.config/pmss-user.json', json_encode(['productName' => 'M900'], JSON_UNESCAPED_SLASHES));
+            @file_put_contents(
+                $this->tempDir.'/welcomeMessages.json',
+                json_encode(['products' => ['m900' => '<b>{{product}}/{{username}}</b>']], JSON_UNESCAPED_SLASHES)
+            );
+
+            $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
+            $this->assertEquals('<b>M900/alice</b>', $message);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testProductLookupIsCaseInsensitive(): void
     {
         $this->setUpTempDir();
