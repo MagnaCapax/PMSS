@@ -35,6 +35,7 @@ if (substr(__FILE__, 0, 3) === "\xEF\xBB\xBF") {
 
 /* ===== 1. CLI parsing ===== */
 require_once __DIR__.'/lib/homeMount.php';
+require_once __DIR__.'/lib/shell.php';
 $userLifecycleLib = __DIR__.'/lib/userLifecycle.php';
 if (is_file($userLifecycleLib)) {
     require_once $userLifecycleLib;
@@ -76,37 +77,28 @@ if (is_dir($backupDir))
 
 $homeExists = is_dir($homeDir);
 
-/* ===== 4. Helpers ===== */
-function run(string $cmd): void
-{
-    passthru($cmd, $code);
-    if ($code !== 0) {
-        fwrite(STDERR, "Command failed ({$code}): {$cmd}\n");
-        exit($code);
-    }
-}
 function ensureDir(string $dir, string $owner): void
 {
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
-        run('chown -R ' . escapeshellarg($owner) . ':' . escapeshellarg($owner) . ' ' . escapeshellarg($dir));
+        pmssRunOrExit('chown -R ' . escapeshellarg($owner) . ':' . escapeshellarg($owner) . ' ' . escapeshellarg($dir));
     }
 }
 
 /* ===== 5. Begin ===== */
 echo "[*] Killing processes for {$userName}\n";
-run('pkill -9 -u ' . escapeshellarg($userName) . ' || true');
+pmssRunOrExit('pkill -9 -u ' . escapeshellarg($userName) . ' || true');
 
 if ($homeExists) {
     echo "[*] Moving {$homeDir} to {$backupDir}\n";
-    run('mv ' . escapeshellarg($homeDir) . ' ' . escapeshellarg($backupDir));
+    pmssRunOrExit('mv ' . escapeshellarg($homeDir) . ' ' . escapeshellarg($backupDir));
 } else {
     echo "[i] Home directory missing - building fresh\n";
 }
 
 /* ===== 6. Rebuild skeleton ===== */
-run('cp -Rp /etc/skel ' . escapeshellarg($homeDir));
-run('chown -R ' . escapeshellarg($userName) . ':' . escapeshellarg($userName) . ' ' . escapeshellarg($homeDir));
+pmssRunOrExit('cp -Rp /etc/skel ' . escapeshellarg($homeDir));
+pmssRunOrExit('chown -R ' . escapeshellarg($userName) . ':' . escapeshellarg($userName) . ' ' . escapeshellarg($homeDir));
 
 /* 6a. Guarantee required sub-dirs */
 ensureDir("{$homeDir}/data",    $userName);
@@ -114,16 +106,16 @@ ensureDir("{$homeDir}/session", $userName);
 ensureDir("{$homeDir}/.lighttpd", $userName);
 
 /* ===== 7. Service config ===== */
-run(sprintf(
+pmssRunOrExit(sprintf(
     '/scripts/util/userConfig.php %s %d %d',
     escapeshellarg($userName),
     $ramMiB,
     $quotaGiB
 ));
-run('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($userName));
-run('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
-run('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
-run('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
+pmssRunOrExit('/scripts/util/setupUserHomePermissions.php ' . escapeshellarg($userName));
+pmssRunOrExit('/scripts/util/userConfigLighttpd.php ' . escapeshellarg($userName));
+pmssRunOrExit('/scripts/util/createNginxConfig.php --user ' . escapeshellarg($userName));
+pmssRunOrExit('/scripts/util/userPermissions.php ' . escapeshellarg($userName));
 
 /* ===== 8. Restore data (if we had any) ===== */
 if ($homeExists) {
@@ -132,11 +124,11 @@ if ($homeExists) {
         $src = "{$backupDir}/{$dir}";
         $dst = "{$homeDir}/{$dir}";
         if (is_dir($src)) {
-            run('rsync -a ' . escapeshellarg($src . '/') . ' ' . escapeshellarg($dst . '/'));
+            pmssRunOrExit('rsync -a ' . escapeshellarg($src . '/') . ' ' . escapeshellarg($dst . '/'));
         }
     }
     if (is_file("{$backupDir}/.lighttpd/.htpasswd")) {
-        run('cp ' . escapeshellarg("{$backupDir}/.lighttpd/.htpasswd") . ' ' .
+        pmssRunOrExit('cp ' . escapeshellarg("{$backupDir}/.lighttpd/.htpasswd") . ' ' .
             escapeshellarg("{$homeDir}/.lighttpd/"));
     }
 }
@@ -156,7 +148,7 @@ if ($password !== null && $password !== '') {
     $pwArgs .= ' ' . escapeshellarg($password);
 }
 echo "[*] Setting password\n";
-run('php ' . __DIR__ . '/changePw.php ' . $pwArgs);
+pmssRunOrExit('php ' . __DIR__ . '/changePw.php ' . $pwArgs);
 
 /* ===== 11. Done ===== */
 echo "[OK] Finished. ";

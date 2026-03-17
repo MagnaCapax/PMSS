@@ -18,6 +18,11 @@ if (is_file($pmssUserLifecyclePath)) {
     require_once $pmssUserLifecyclePath;
 }
 
+$pmssShellPath = __DIR__.'/../lib/shell.php';
+if (is_file($pmssShellPath)) {
+    require_once $pmssShellPath;
+}
+
 $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
 
@@ -60,16 +65,6 @@ function pmssPasswdUserIds(string $username): ?array
     return null;
 }
 
-function run(string $cmd): int
-{
-    $rc = 0;
-    passthru($cmd, $rc);
-    if ($rc !== 0) {
-        fwrite(STDERR, "Command failed (rc={$rc}): {$cmd}\n");
-    }
-    return $rc;
-}
-
 function chmodPath(string $path, int $perm, bool $recursive = false): void
 {
     $flag = $recursive ? '-R ' : '';
@@ -88,7 +83,7 @@ function chmodPath(string $path, int $perm, bool $recursive = false): void
         $target = escapeshellarg($path);
     }
 
-    run(sprintf('chmod %s%o %s', $flag, $perm, $target));
+    pmssRun(sprintf('chmod %s%o %s', $flag, $perm, $target));
 }
 
 function chownPath(string $path, string $owner, bool $recursive = false): void
@@ -110,7 +105,7 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
     }
 
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
-    run(sprintf('chown %s%s %s', $flag, escapeshellarg($owner), $target));
+    pmssRun(sprintf('chown %s%s %s', $flag, escapeshellarg($owner), $target));
 }
 
 // Best-effort immutable toggle for traffic data files.
@@ -165,7 +160,7 @@ if ($homeOwner !== false && $homeGroup !== false &&
         )
     );
 }
-run(sprintf(
+pmssRun(sprintf(
     'find %s -path %s -prune -o -type d -exec chmod 750 {} +',
     escapeshellarg('/home/'.$thisUser),
     escapeshellarg("/home/{$thisUser}/.local")
@@ -174,7 +169,7 @@ run(sprintf(
 // Ensure ~/.bin and ~/bin exist with safe permissions and ownership
 $binDirHidden = "/home/{$thisUser}/.bin";
 if (!is_dir($binDirHidden)) {
-    run(sprintf('mkdir -p %s', escapeshellarg($binDirHidden)));
+    pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDirHidden)));
     chownPath($binDirHidden, "{$thisUser}:{$thisUser}");
     chmodPath($binDirHidden, 0750, true);
     pmssMaybeUserLog($thisUser, 'userPermissions: created ~/.bin with safe ownership');
@@ -182,7 +177,7 @@ if (!is_dir($binDirHidden)) {
 
 $binDir = "/home/{$thisUser}/bin";
 if (!is_dir($binDir)) {
-    run(sprintf('mkdir -p %s', escapeshellarg($binDir)));
+    pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDir)));
     chownPath($binDir, "{$thisUser}:{$thisUser}");
     chmodPath($binDir, 0750, true);
     pmssMaybeUserLog($thisUser, 'userPermissions: created ~/bin with safe ownership');
@@ -284,7 +279,7 @@ $findParts[] = '-exec chown';
 $findParts[] = escapeshellarg($userIds['uid'].':'.$userIds['gid']);
 $findParts[] = '{}';
 $findParts[] = '+';
-run(implode(' ', $findParts));
+pmssRun(implode(' ', $findParts));
 
 foreach ($chownItems as $item) {
     $path = $item[0];
