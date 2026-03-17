@@ -14,6 +14,10 @@
  * @version 1.0
  */
 
+if (file_exists('/scripts/lib/welcomeAnnouncements.php')) {
+    require_once '/scripts/lib/welcomeAnnouncements.php';
+}
+
 $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
 $bonusQuota = $pageState['bonusQuota'];
@@ -574,46 +578,11 @@ function pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage) {
 
 function pmssWelcomeAnnouncementItemsHtmlBuild() {
     $rssRaw = pmssWelcomeRemoteFetch('https://pulsedmedia.com/clients/announcementsrss.php');
-    if ($rssRaw === false) {
+    if ($rssRaw === false || !function_exists('pmssWelcomeAnnouncementItemsHtmlBuildFromRaw')) {
         return '';
     }
 
-    if (function_exists('mb_convert_encoding')) {
-        $rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8');
-        if ($rssUtf8 !== false) {
-            $rssRaw = $rssUtf8;
-        }
-    } elseif (function_exists('iconv')) {
-        $rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw);
-        if ($rssUtf8 !== false) {
-            $rssRaw = $rssUtf8;
-        }
-    }
-
-    $rssXml = @simplexml_load_string($rssRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
-    if ($rssXml === false) {
-        return '';
-    }
-
-    $rssFeed = json_decode(json_encode($rssXml), true);
-    if (!isset($rssFeed['channel']['item']) || !is_array($rssFeed['channel']['item'])) {
-        return '';
-    }
-
-    $itemsHtml = '';
-    $items = array_slice($rssFeed['channel']['item'], 0, 4, true);
-    foreach ($items as $thisItem) {
-        if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {
-            continue;
-        }
-
-        $dateText = date('d/m', strtotime($thisItem['pubDate']));
-        $title = htmlspecialchars($thisItem['title']);
-        $link = $thisItem['link'];
-        $itemsHtml .= "<li>({$dateText}) <a href=\"{$link}\" target=\"_blank\">{$title}</a></li>\n";
-    }
-
-    return $itemsHtml;
+    return pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rssRaw);
 }
 
 function pmssWelcomeRemoteFetch($url) {
