@@ -33,21 +33,25 @@ function pmssWelcomeMessageForUser(
     $userConfig = pmssWelcomeReadJson(rtrim($userHome, '/').'/.config/pmss-user.json');
     $productKey = '';
     foreach (['product', 'productName'] as $candidateKey) {
-        if (is_string($userConfig[$candidateKey] ?? null) && ($value = trim($userConfig[$candidateKey])) !== '') {
+        if (!is_string($userConfig[$candidateKey] ?? null)) {
+            continue;
+        }
+
+        $value = trim($userConfig[$candidateKey]);
+        if ($value !== '') {
             $productKey = $value;
             break;
         }
     }
-    if ($productKey === '') {
-        $productFile = rtrim($userHome, '/').'/.product';
-        if (is_file($productFile) && !is_link($productFile) && ($value = trim((string) @file_get_contents($productFile))) !== '') {
-            $productKey = $value;
-        }
+    $productFile = rtrim($userHome, '/').'/.product';
+    if ($productKey === '' && is_file($productFile) && !is_link($productFile)) {
+        $productKey = trim((string) @file_get_contents($productFile));
     }
 
-    if (is_string($userConfig['welcomeMessage'] ?? null) && trim($userConfig['welcomeMessage']) !== '') {
-        $template = $userConfig['welcomeMessage'];
-    } elseif ($productKey !== '') {
+    $template = is_string($userConfig['welcomeMessage'] ?? null) && trim($userConfig['welcomeMessage']) !== ''
+        ? $userConfig['welcomeMessage']
+        : '';
+    if ($template === '' && $productKey !== '') {
         $messageMap = pmssWelcomeReadJson($productMessagesPath);
         $messageMap = is_array($messageMap['products'] ?? null) ? $messageMap['products'] : $messageMap;
         if (is_string($messageMap[$productKey] ?? null)) {
@@ -62,8 +66,6 @@ function pmssWelcomeMessageForUser(
                 }
             }
         }
-    } else {
-        $template = '';
     }
     if ($template === '') {
         return '';

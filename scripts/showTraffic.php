@@ -13,17 +13,14 @@ if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE
 function pmssShowTrafficMain(array $argv): int
 {
     $options = getopt('', ['json', 'show-missing', 'help', 'extended', 'sort:', 'color', 'no-color']);
-    if (isset($options['help'])) {
-        pmssShowTrafficPrintHelp();
-        return 0;
-    }
+    $helpExitCode = isset($options['help']) ? 0 : null;
 
     $asJson = isset($options['json']);
     $showMissing = isset($options['show-missing']);
     $extended = isset($options['extended']);
 
     $sort = 'name';
-    if (array_key_exists('sort', $options)) {
+    if ($helpExitCode === null && array_key_exists('sort', $options)) {
         $sort = strtolower(trim((string) $options['sort']));
         if ($sort === '') {
             fwrite(STDERR, "Error: --sort expects a value.\n");
@@ -31,10 +28,26 @@ function pmssShowTrafficMain(array $argv): int
         }
     }
     $validSorts = ['name', 'month', 'pct', 'rate'];
-    if (!in_array($sort, $validSorts, true)) {
+    if ($helpExitCode === null && !in_array($sort, $validSorts, true)) {
         fwrite(STDERR, "Error: invalid --sort value: {$sort}\n");
-        pmssShowTrafficPrintHelp();
-        return 2;
+        $helpExitCode = 2;
+    }
+    if ($helpExitCode !== null) {
+        $self = basename(__FILE__);
+        echo <<<TXT
+Usage: {$self} [--json] [--show-missing] [--extended] [--sort=<mode>]
+
+Options:
+  --json          Emit JSON instead of human text output.
+  --show-missing  Print missing stats usernames (text mode only).
+  --extended      Show limit, percent, and rate units in text output.
+  --sort=<mode>   Sort output by name, month, pct, or rate (default: name).
+  --color         Force ANSI colors in extended text output.
+  --no-color      Disable ANSI colors in extended text output.
+  --help          Show this help.
+
+TXT;
+        return $helpExitCode;
     }
 
     $colorRequested = array_key_exists('color', $options);
@@ -436,25 +449,6 @@ function pmssShowTrafficMain(array $argv): int
 
     return 0;
 }
-
-function pmssShowTrafficPrintHelp(): void
-{
-    $self = basename(__FILE__);
-    echo <<<TXT
-Usage: {$self} [--json] [--show-missing] [--extended] [--sort=<mode>]
-
-Options:
-  --json          Emit JSON instead of human text output.
-  --show-missing  Print missing stats usernames (text mode only).
-  --extended      Show limit, percent, and rate units in text output.
-  --sort=<mode>   Sort output by name, month, pct, or rate (default: name).
-  --color         Force ANSI colors in extended text output.
-  --no-color      Disable ANSI colors in extended text output.
-  --help          Show this help.
-
-TXT;
-}
-
 function formatTrafficAmount($value): string {
     if ( ($value / 1024 / 999) > 1 ) return round( ($value / 1024 / 1024), 2) . 'TiB';
     if ( ($value / 999) > 1 )        return round( ($value / 1024), 2) . 'GiB';
@@ -469,11 +463,9 @@ function formatTrafficAmount($value): string {
 function pmssShowTrafficSplitLocalnetUser(string $user): array
 {
     $suffix = '-localnet';
-    $suffixLength = strlen($suffix);
-    if ($suffixLength > 0 && substr($user, -$suffixLength) === $suffix) {
-        return [substr($user, 0, -$suffixLength), true];
-    }
-    return [$user, false];
+    return substr($user, -strlen($suffix)) === $suffix
+        ? [substr($user, 0, -strlen($suffix)), true]
+        : [$user, false];
 }
 
 /**

@@ -114,6 +114,33 @@ class WelcomeMessageTest extends TestCase
         }
     }
 
+    public function testProductMessageSetPreservesNestedProductsMapShape(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $messagesPath = $this->tempDir.'/welcomeMessages.json';
+            @file_put_contents(
+                $messagesPath,
+                json_encode(
+                    [
+                        'meta' => ['updatedBy' => 'test'],
+                        'products' => ['free-tier' => '<p>old</p>'],
+                    ],
+                    JSON_UNESCAPED_SLASHES
+                )
+            );
+
+            $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>new</p>', $messagesPath));
+
+            $stored = json_decode((string) file_get_contents($messagesPath), true);
+            $this->assertEquals('test', $stored['meta']['updatedBy'] ?? '');
+            $this->assertEquals('<p>old</p>', $stored['products']['free-tier'] ?? '');
+            $this->assertEquals('<p>new</p>', $stored['products']['m1000'] ?? '');
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testProductFallsBackToDotProductFile(): void
     {
         $this->setUpTempDir();

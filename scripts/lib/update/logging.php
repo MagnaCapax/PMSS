@@ -54,18 +54,15 @@ if (!function_exists('pmssCorrelationId')) {
             return $GLOBALS['PMSS_CORRELATION_ID_CACHE'];
         }
 
-        $envValue = trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''));
-        if ($envValue !== '') {
-            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $envValue;
-            return $envValue;
+        if (($envValue = trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''))) !== '') {
+            return $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $envValue;
         }
 
         if (!$createIfMissing) {
             return '';
         }
 
-        $generated = pmssBuildCorrelationId();
-        $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $generated;
+        $generated = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = pmssBuildCorrelationId();
         putenv('PMSS_CORRELATION_ID='.$generated);
         return $generated;
     }
@@ -74,10 +71,11 @@ if (!function_exists('pmssCorrelationId')) {
 if (!function_exists('pmssJsonLogPath')) {
     function pmssJsonLogPath(): string
     {
-        if ($GLOBALS['PMSS_JSON_LOG_PATH'] === null) {
-            $GLOBALS['PMSS_JSON_LOG_PATH'] = getenv('PMSS_JSON_LOG') ?: '';
+        if ($GLOBALS['PMSS_JSON_LOG_PATH'] !== null) {
+            return $GLOBALS['PMSS_JSON_LOG_PATH'];
         }
-        return $GLOBALS['PMSS_JSON_LOG_PATH'];
+
+        return $GLOBALS['PMSS_JSON_LOG_PATH'] = getenv('PMSS_JSON_LOG') ?: '';
     }
 }
 

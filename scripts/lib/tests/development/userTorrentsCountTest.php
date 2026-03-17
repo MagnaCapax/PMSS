@@ -158,9 +158,11 @@ class UserTorrentsCountTest extends TestCase
 
     public function testHelpOutputRemainsStable(): void
     {
-        ob_start();
-        \pmssUserTorrentsPrintHelp();
-        $output = (string) ob_get_clean();
+        $output = shell_exec(
+            escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 3).'/userTorrents.php').' --help'
+        );
+
+        $this->assertTrue(is_string($output));
 
         $this->assertEquals(
             "Usage: userTorrents.php [--by-client]\n\n"

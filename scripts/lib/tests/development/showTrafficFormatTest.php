@@ -23,15 +23,11 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testHelpIncludesJsonOption(): void
     {
-        ob_start();
-        try {
-            \pmssShowTrafficPrintHelp();
-            $out = (string) ob_get_clean();
-        } finally {
-            if (ob_get_level() > 0) {
-                ob_end_clean();
-            }
-        }
+        $out = shell_exec(
+            escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 3).'/showTraffic.php').' --help'
+        );
+
+        $this->assertTrue(is_string($out));
         $this->assertTrue(strpos($out, '--json') !== false);
         $this->assertTrue(strpos($out, '--show-missing') !== false);
         $this->assertTrue(strpos($out, '--extended') !== false);

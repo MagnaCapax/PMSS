@@ -25,8 +25,7 @@ function pmssWelcomeProductMessageSet(
     }
 
     $rootMap = pmssWelcomeReadJson($productMessagesPath);
-    $useNestedProductsMap = is_array($rootMap['products'] ?? null);
-    $productMap = $useNestedProductsMap ? $rootMap['products'] : $rootMap;
+    $productMap = is_array($rootMap['products'] ?? null) ? $rootMap['products'] : $rootMap;
 
     if (trim($template) === '') {
         unset($productMap[$normalizedProductKey]);
@@ -35,7 +34,7 @@ function pmssWelcomeProductMessageSet(
     }
     ksort($productMap, SORT_STRING);
 
-    if ($useNestedProductsMap) {
+    if (is_array($rootMap['products'] ?? null)) {
         $rootMap['products'] = $productMap;
     } else {
         $rootMap = $productMap;

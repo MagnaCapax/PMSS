@@ -13,20 +13,6 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 
-function pmssUserTorrentsPrintHelp(): void
-{
-    $self = basename(__FILE__);
-    echo <<<TXT
-Usage: {$self} [--by-client]
-
-Options:
-  --by-client  Show per-client breakdown (rtorrent/deluge/qbittorrent).
-  --help       Show this help.
-
-TXT;
-    echo PHP_EOL;
-}
-
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 {
     if (!pmssUsernameIsValid($username)) {
@@ -75,7 +61,16 @@ if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE
     // Options.
     $options = getopt('', ['by-client', 'help']);
     if (isset($options['help'])) {
-        pmssUserTorrentsPrintHelp();
+        $self = basename(__FILE__);
+        echo <<<TXT
+Usage: {$self} [--by-client]
+
+Options:
+  --by-client  Show per-client breakdown (rtorrent/deluge/qbittorrent).
+  --help       Show this help.
+
+TXT;
+        echo PHP_EOL;
         exit(0);
     }
     $byClient = isset($options['by-client']);
