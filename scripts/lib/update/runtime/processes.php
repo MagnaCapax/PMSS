@@ -18,21 +18,6 @@ function pmssProcessRunning(string $name): bool
 }
 
 /**
- * Wait up to $timeoutSeconds for a process to exit.
- */
-function pmssWaitForProcessExit(string $name, int $timeoutSeconds): bool
-{
-    $deadline = microtime(true) + max(0, $timeoutSeconds);
-    while (microtime(true) < $deadline) {
-        if (!pmssProcessRunning($name)) {
-            return true;
-        }
-        usleep(250000); // back off to avoid busy-looping
-    }
-    return !pmssProcessRunning($name);
-}
-
-/**
  * True when systemd knows about the requested unit.
  */
 function pmssSystemdUnitExists(string $unit): bool
@@ -89,6 +74,17 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
  */
 function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
 {
+    $waitForProcessExit = static function (int $waitSeconds) use ($name): bool {
+        $deadline = microtime(true) + max(0, $waitSeconds);
+        while (microtime(true) < $deadline) {
+            if (!pmssProcessRunning($name)) {
+                return true;
+            }
+            usleep(250000); // back off to avoid busy-looping
+        }
+        return !pmssProcessRunning($name);
+    };
+
     if (!pmssProcessRunning($name)) {
         logmsg("[SKIP] {$description} (no {$name} processes)");
         return;
@@ -102,13 +98,13 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
 
     runStep($description.' (SIGTERM)', 'pkill -TERM -x '.escapeshellarg($name));
 
-    if (pmssWaitForProcessExit($name, $timeoutSeconds)) {
+    if ($waitForProcessExit($timeoutSeconds)) {
         logmsg("[OK] {$description} (graceful stop)");
         return;
     }
 
     runStep($description.' (SIGKILL)', 'pkill -KILL -x '.escapeshellarg($name));
-    if (!pmssWaitForProcessExit($name, 5)) {
+    if (!$waitForProcessExit(5)) {
         logmsg("[WARN] {$description} processes linger after SIGKILL");
     }
 }

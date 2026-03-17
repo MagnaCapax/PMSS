@@ -444,7 +444,32 @@ foreach (['btsync', 'rslsync', 'pyload', 'sabnzbdplus'] as $legacySvc) {
         pmssSystemdUnitActionIfPresent($legacySvc, "Disabling {$legacySvc} systemd unit", 'disable');
     }
 }
-pmssRunProfiledCallable('Adjusting lighttpd security settings', 'pmssAdjustLighttpdSecurity');
+pmssRunProfiledStep('Adjusting lighttpd security settings', static function (): void {
+    $configDir  = '/etc/lighttpd';
+    $configFile = $configDir.'/lighttpd.conf';
+    $htpasswd   = $configDir.'/.htpasswd';
+
+    if (!is_dir($configDir)) {
+        logmsg('[SKIP] /etc/lighttpd missing; skipping lighttpd hardening');
+        return;
+    }
+
+    runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');
+
+    if (is_file($configFile)) {
+        runStep('Adjusting /etc/lighttpd/lighttpd.conf permissions', 'chmod 750 '.$configFile);
+        runStep('Setting ownership on /etc/lighttpd/lighttpd.conf', 'chown root:root '.$configFile);
+    } else {
+        logmsg('[SKIP] lighttpd.conf missing; skipping lighttpd permission adjustments');
+    }
+
+    if (is_file($htpasswd)) {
+        runStep('Setting ownership on /etc/lighttpd/.htpasswd', 'chown root:root '.$htpasswd);
+        runStep('Adjusting /etc/lighttpd/.htpasswd permissions', 'chmod 640 '.$htpasswd);
+    } else {
+        logmsg('[SKIP] lighttpd .htpasswd missing; per-user instances manage authentication');
+    }
+});
 
 // Per-user updates ensure ruTorrent stays consistent. The SHA tracks the
 // skeleton ruTorrent index version so user instances can be upgraded when the

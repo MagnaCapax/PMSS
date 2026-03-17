@@ -122,70 +122,6 @@ if (!function_exists('pmssEnsureSonarrKey')) {
     }
 
     /**
-     * Apply signed-by scoping to any legacy Sonarr list files we can detect.
-     *
-     * Returns false when a write was required but failed.
-     */
-    function pmssScopeLegacySonarrSources(string $keyPath, string $sourcesListDir, bool $dryRun): bool
-    {
-        $targets = [];
-        $mainSources = pmssAptSourcesPath();
-        if (is_file($mainSources)) {
-            $targets[] = $mainSources;
-        }
-        foreach (glob(rtrim($sourcesListDir, '/').'/*.list') ?: [] as $listFile) {
-            if (is_file($listFile)) {
-                $targets[] = $listFile;
-            }
-        }
-
-        $ok = true;
-        foreach (array_values(array_unique($targets)) as $target) {
-            $content = @file_get_contents($target);
-            if (!is_string($content) || $content === '') {
-                continue;
-            }
-            if (preg_match('/^[ \t]*[^#\r\n].*(sonarr|nzbdrone)/im', $content) !== 1) {
-                continue;
-            }
-
-            $lines = preg_split('/\r?\n/', $content);
-            $changed = false;
-            foreach ($lines as $index => $line) {
-                $updated = pmssSonarrSourceLineWithSignedBy($line, $keyPath);
-                if ($updated !== $line) {
-                    $lines[$index] = $updated;
-                    $changed = true;
-                }
-            }
-            if (!$changed) {
-                continue;
-            }
-
-            $updatedContent = implode(PHP_EOL, $lines);
-            if (substr($content, -1) === "\n" && substr($updatedContent, -1) !== "\n") {
-                $updatedContent .= "\n";
-            }
-
-            if ($dryRun) {
-                logmsg('[SKIP] Would scope Sonarr apt source with signed-by in '.$target);
-                continue;
-            }
-
-            if (@file_put_contents($target, $updatedContent, LOCK_EX) === false) {
-                $ok = false;
-                logmsg('[WARN] Failed to scope Sonarr apt source with signed-by in '.$target);
-                continue;
-            }
-
-            @chmod($target, 0644);
-            logmsg('Scoped Sonarr apt source with signed-by in '.$target);
-        }
-
-        return $ok;
-    }
-
-    /**
      * Ensure Sonarr legacy apt sources use scoped keyrings instead of global trust.
      */
     function pmssEnsureSonarrKey(): void
@@ -239,7 +175,60 @@ if (!function_exists('pmssEnsureSonarrKey')) {
             logmsg('Sonarr key installed at '.$keyPath.' (fingerprint EBFF6B99D9B78493)');
         }
 
-        $sourcesScoped = pmssScopeLegacySonarrSources($keyPath, $sourcesListDir, $dryRun);
+        $targets = [];
+        $mainSources = pmssAptSourcesPath();
+        if (is_file($mainSources)) {
+            $targets[] = $mainSources;
+        }
+        foreach (glob(rtrim($sourcesListDir, '/').'/*.list') ?: [] as $listFile) {
+            if (is_file($listFile)) {
+                $targets[] = $listFile;
+            }
+        }
+
+        $sourcesScoped = true;
+        foreach (array_values(array_unique($targets)) as $target) {
+            $content = @file_get_contents($target);
+            if (!is_string($content) || $content === '') {
+                continue;
+            }
+            if (preg_match('/^[ \t]*[^#\r\n].*(sonarr|nzbdrone)/im', $content) !== 1) {
+                continue;
+            }
+
+            $lines = preg_split('/\r?\n/', $content);
+            $changed = false;
+            foreach ($lines as $index => $line) {
+                $updated = pmssSonarrSourceLineWithSignedBy($line, $keyPath);
+                if ($updated !== $line) {
+                    $lines[$index] = $updated;
+                    $changed = true;
+                }
+            }
+            if (!$changed) {
+                continue;
+            }
+
+            $updatedContent = implode(PHP_EOL, $lines);
+            if (substr($content, -1) === "\n" && substr($updatedContent, -1) !== "\n") {
+                $updatedContent .= "\n";
+            }
+
+            if ($dryRun) {
+                logmsg('[SKIP] Would scope Sonarr apt source with signed-by in '.$target);
+                continue;
+            }
+
+            if (@file_put_contents($target, $updatedContent, LOCK_EX) === false) {
+                $sourcesScoped = false;
+                logmsg('[WARN] Failed to scope Sonarr apt source with signed-by in '.$target);
+                continue;
+            }
+
+            @chmod($target, 0644);
+            logmsg('Scoped Sonarr apt source with signed-by in '.$target);
+        }
+
         if (!$sourcesScoped) {
             return;
         }
