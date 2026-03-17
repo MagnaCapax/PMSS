@@ -12,36 +12,11 @@
 
 require_once __DIR__.'/../runtime/commands.php';
 
-/**
- * Install a global npm CLI into a dedicated prefix and link into PATH.
- */
-function pmssAiToolsInstallNpmCli(string $toolLabel, string $packageName, string $binaryName, string $nodeBinary, bool $forceRefresh): void
-{
-    $npmBinary = dirname($nodeBinary).'/npm';
-    if (!is_executable($npmBinary)) {
-        $npmBinary = trim((string) @shell_exec('command -v npm 2>/dev/null'));
-    }
-    if ($npmBinary === '') {
-        if (function_exists('logmsg')) {
-            logmsg('[WARN] Skipping '.$toolLabel.' install: npm not available');
-        }
-        return;
-    }
-
-    $prefixDir  = '/opt/pmss/ai-tools/npm/'.$binaryName;
-    $binaryPath = $prefixDir.'/bin/'.$binaryName;
-    if (is_file($binaryPath) && !$forceRefresh) {
-        return;
-    }
-
-    runStep('Ensuring '.$toolLabel.' install prefix exists', 'mkdir -p '.escapeshellarg($prefixDir));
-    runStep('Installing '.$toolLabel, sprintf('%s install --prefix %s -g --no-audit --no-fund %s', escapeshellarg($npmBinary), escapeshellarg($prefixDir), escapeshellarg($packageName)));
-    runStep('Linking '.$toolLabel.' command', sprintf('ln -sf %s %s', escapeshellarg($binaryPath), escapeshellarg('/usr/local/bin/'.$binaryName)));
-}
-
 $logger = function_exists('logmsg') ? 'logmsg' : 'logMessage';
-$force  = getenv('PMSS_FORCE_AI_TOOLS_REFRESH') === '1';
+$force = getenv('PMSS_FORCE_AI_TOOLS_REFRESH') === '1';
+$dryRun = getenv('PMSS_DRY_RUN') === '1';
 $architecture = php_uname('m');
+$supportsPinnedArtifacts = in_array($architecture, ['x86_64', 'amd64'], true);
 
 $nodeBinary = '';
 $systemNode = trim((string) @shell_exec('command -v node 2>/dev/null'));
@@ -53,7 +28,7 @@ if ($systemNode !== '') {
 }
 
 if ($nodeBinary === '') {
-    if (!in_array($architecture, ['x86_64', 'amd64'], true)) {
+    if (!$supportsPinnedArtifacts) {
         $logger('[WARN] Skipping Gemini/Claude install: no pinned Node.js artifact for this CPU architecture');
     } else {
         $nodeVersion  = '20.20.0';
@@ -69,7 +44,7 @@ if ($nodeBinary === '') {
             runStep('Ensuring AI tools install root exists', 'mkdir -p '.escapeshellarg($installRoot));
             runStep('Downloading pinned Node.js runtime for AI CLI tools', sprintf('wget -q -O %s %s', escapeshellarg($downloadPath), escapeshellarg($downloadUrl)));
 
-            if (getenv('PMSS_DRY_RUN') !== '1') {
+            if (!$dryRun) {
                 $actualSha = @hash_file('sha256', $downloadPath);
                 if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($nodeSha256)) {
                     $logger('[WARN] Node.js checksum mismatch; skipping Gemini/Claude installation');
@@ -86,13 +61,37 @@ if ($nodeBinary === '') {
 }
 
 if ($nodeBinary !== '') {
-    pmssAiToolsInstallNpmCli('Gemini CLI', '@google/gemini-cli', 'gemini', $nodeBinary, $force);
-    pmssAiToolsInstallNpmCli('Claude Code', '@anthropic-ai/claude-code', 'claude', $nodeBinary, $force);
+    $npmBinary = dirname($nodeBinary).'/npm';
+    if (!is_executable($npmBinary)) {
+        $npmBinary = trim((string) @shell_exec('command -v npm 2>/dev/null'));
+    }
+
+    foreach ([
+        ['Gemini CLI', '@google/gemini-cli', 'gemini'],
+        ['Claude Code', '@anthropic-ai/claude-code', 'claude'],
+    ] as $toolSpec) {
+        if ($npmBinary === '') {
+            if (function_exists('logmsg')) {
+                logmsg('[WARN] Skipping '.$toolSpec[0].' install: npm not available');
+            }
+            continue;
+        }
+
+        $prefixDir = '/opt/pmss/ai-tools/npm/'.$toolSpec[2];
+        $binaryPath = $prefixDir.'/bin/'.$toolSpec[2];
+        if (is_file($binaryPath) && !$force) {
+            continue;
+        }
+
+        runStep('Ensuring '.$toolSpec[0].' install prefix exists', 'mkdir -p '.escapeshellarg($prefixDir));
+        runStep('Installing '.$toolSpec[0], sprintf('%s install --prefix %s -g --no-audit --no-fund %s', escapeshellarg($npmBinary), escapeshellarg($prefixDir), escapeshellarg($toolSpec[1])));
+        runStep('Linking '.$toolSpec[0].' command', sprintf('ln -sf %s %s', escapeshellarg($binaryPath), escapeshellarg('/usr/local/bin/'.$toolSpec[2])));
+    }
 }
 
 $destination = '/usr/local/bin/codex';
 if (!is_file($destination) || $force) {
-    if (!in_array($architecture, ['x86_64', 'amd64'], true)) {
+    if (!$supportsPinnedArtifacts) {
         $logger('[WARN] Skipping Codex install: no pinned binary for this CPU architecture');
     } else {
         $tag         = 'rust-v0.93.0';
@@ -105,21 +104,21 @@ if (!is_file($destination) || $force) {
         runStep('Preparing Codex download directory', 'mkdir -p '.escapeshellarg($downloadDir));
         runStep('Downloading pinned Codex CLI archive', sprintf('wget -q -O %s %s', escapeshellarg($archivePath), escapeshellarg($url)));
 
-        if (getenv('PMSS_DRY_RUN') !== '1') {
+        if (!$dryRun) {
             $actualSha = @hash_file('sha256', $archivePath);
             if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($sha256)) {
                 $logger('[WARN] Codex archive checksum mismatch; refusing installation');
             }
         }
 
-        if (getenv('PMSS_DRY_RUN') === '1' || (isset($actualSha) && is_string($actualSha) && strtolower($actualSha) === strtolower($sha256))) {
+        if ($dryRun || (isset($actualSha) && is_string($actualSha) && strtolower($actualSha) === strtolower($sha256))) {
             runStep('Extracting Codex CLI archive', sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($downloadDir)));
             runStep('Installing Codex CLI binary', sprintf('install -m 0755 %s %s', escapeshellarg($downloadDir.'/codex-x86_64-unknown-linux-musl'), escapeshellarg($destination)));
 
             // Landlock sandbox requires kernel 5.13+; keep old kernels usable.
             if (preg_match('/^([0-9]+)\.([0-9]+)/', php_uname('r'), $kernel) && (((int) $kernel[1] < 5) || ((int) $kernel[1] === 5 && (int) $kernel[2] < 13))) {
                 runStep('Ensuring /etc/codex exists', 'mkdir -p /etc/codex');
-                if (getenv('PMSS_DRY_RUN') !== '1' && !is_file('/etc/codex/config.toml')) {
+                if (!$dryRun && !is_file('/etc/codex/config.toml')) {
                     @file_put_contents('/etc/codex/config.toml', "# PMSS compatibility fallback for kernels without Landlock support.\n"."sandbox = \"danger-full-access\"\n");
                     @chmod('/etc/codex/config.toml', 0644);
                 }

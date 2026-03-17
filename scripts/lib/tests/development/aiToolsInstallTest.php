@@ -43,6 +43,17 @@ class AiToolsInstallTest extends TestCase
         $this->assertTrue(strpos($contents, 'function pmssAiTools'.'NodeMajor(') === false, 'Node major parsing should stay inline in the only call site');
     }
 
+    public function testKeepsNpmCliInstallFlowInline(): void
+    {
+        $contents = $this->loadInstaller();
+        $this->assertStringContainsString("dirname(\$nodeBinary).'/npm'", $contents);
+        $this->assertStringContainsString('npm not available', $contents);
+        $this->assertTrue(
+            strpos($contents, 'function pmssAiTools'.'InstallNpmCli(') === false,
+            'NPM CLI installation should stay inline in the only installer'
+        );
+    }
+
     public function testPreservesCodexOldKernelFallback(): void
     {
         $contents = $this->loadInstaller();
