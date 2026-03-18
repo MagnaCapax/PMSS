@@ -82,9 +82,8 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         }
 
         $dateText = date('d/m', strtotime($thisItem['pubDate']));
-        $title = htmlspecialchars($thisItem['title']);
-        $link = $thisItem['link'];
-        $itemsHtml .= "<li>({$dateText}) <a href=\"{$link}\" target=\"_blank\">{$title}</a></li>\n";
+        $itemsHtml .= "<li>({$dateText}) <a href=\"{$thisItem['link']}\" target=\"_blank\">"
+            .htmlspecialchars($thisItem['title'])."</a></li>\n";
     }
 
     return $itemsHtml;

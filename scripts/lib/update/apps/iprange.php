@@ -23,8 +23,7 @@ $missing = array_values(array_filter($dependencies, static function (string $pkg
 }));
 
 if (!empty($missing)) {
-    $message = 'Skipping iprange build: missing toolchain packages '.implode(', ', $missing);
-    logmsg('[WARN] '.$message);
+    logmsg('[WARN] Skipping iprange build: missing toolchain packages '.implode(', ', $missing));
     return;
 }
 

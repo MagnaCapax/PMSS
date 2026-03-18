@@ -30,13 +30,12 @@ exec(escapeshellarg($venv['python']).' -m pip show '.escapeshellarg('acdcli').' 
 if ($packageProbeStatus === 0 && !$forceUpdate) {
     logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
 } else {
-    $source = sprintf('git+https://github.com/yadayada/acd_cli.git@%s', $acdCliPinnedCommit);
     runStep(
         sprintf('Installing acd_cli %s in virtualenv', $acdCliPinnedTag),
         sprintf(
             '%s -m pip install --upgrade %s',
             escapeshellarg($venv['python']),
-            escapeshellarg($source)
+            escapeshellarg(sprintf('git+https://github.com/yadayada/acd_cli.git@%s', $acdCliPinnedCommit))
         )
     );
 }

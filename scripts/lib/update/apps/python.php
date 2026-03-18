@@ -34,10 +34,8 @@ foreach ([
     runStep($installStep[0], sprintf('%s -m pip install --upgrade %s', $venvPython, $installStep[1]));
 }
 
-if (is_file($cliBin)) {
-    if (!is_link('/usr/local/bin/flexget') || readlink('/usr/local/bin/flexget') !== $cliBin) {
-        runStep('Linking FlexGet CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/flexget')));
-    }
-} elseif (getenv('PMSS_DRY_RUN') !== '1') {
+if (is_file($cliBin) && (!is_link('/usr/local/bin/flexget') || readlink('/usr/local/bin/flexget') !== $cliBin)) {
+    runStep('Linking FlexGet CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/flexget')));
+} elseif (!is_file($cliBin) && getenv('PMSS_DRY_RUN') !== '1') {
     $logger('[WARN] FlexGet binary missing after install');
 }

@@ -45,10 +45,9 @@ $legacyBinaries = [
     ],
 ];
 foreach ($legacyBinaries as $legacy) {
-    if (!file_exists($legacy['path'])) {
-        $log("*** {$legacy['label']} not present, downloading and adding!");
-        pmssInstallPinnedRemoteBinary($legacy['label'], $legacy['url'], $legacy['sha256'], $legacy['path'], false);
-    }
+    if (file_exists($legacy['path'])) { continue; }
+    $log("*** {$legacy['label']} not present, downloading and adding!");
+    pmssInstallPinnedRemoteBinary($legacy['label'], $legacy['url'], $legacy['sha256'], $legacy['path'], false);
 }
 
 $btsyncPath = '/usr/bin/btsync';
@@ -76,12 +75,10 @@ $rslsyncBinary   = '/usr/bin/rslsync';
 $rslsyncUrl      = 'https://pulsedmedia.com/remote/pkg/rslsync';
 $rslsyncSha256   = 'f8c71f6d447a2a9aec93bde7c316bbb7ac6be98d0bcb9dc645f4ca4e347bc333';
 
-if (is_file($rslsyncBinary)) {
-    $installedSha = @hash_file('sha256', $rslsyncBinary);
-    if (is_string($installedSha) && strtolower($installedSha) === strtolower($rslsyncSha256)) {
-        $log('*** Resilio Sync already matches pinned checksum; skipping download');
-        return;
-    }
+if (is_string($installedSha = is_file($rslsyncBinary) ? @hash_file('sha256', $rslsyncBinary) : false)
+    && strtolower($installedSha) === strtolower($rslsyncSha256)) {
+    $log('*** Resilio Sync already matches pinned checksum; skipping download');
+    return;
 }
 
 $log('*** Resilio Sync missing/out of date; refreshing rslsync binary');

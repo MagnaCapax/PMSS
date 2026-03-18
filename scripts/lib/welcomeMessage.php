@@ -54,10 +54,8 @@ function pmssWelcomeMessageForUser(
     if ($template === '' && $productKey !== '') {
         $messageMap = pmssWelcomeReadJson($productMessagesPath);
         $messageMap = is_array($messageMap['products'] ?? null) ? $messageMap['products'] : $messageMap;
-        if (is_string($messageMap[$productKey] ?? null)) {
-            $template = $messageMap[$productKey];
-        } else {
-            $template = '';
+        $template = is_string($messageMap[$productKey] ?? null) ? $messageMap[$productKey] : '';
+        if ($template === '') {
             $lowerProductKey = strtolower($productKey);
             foreach ($messageMap as $mapKey => $mapValue) {
                 if (is_string($mapKey) && is_string($mapValue) && strtolower($mapKey) === $lowerProductKey) {
