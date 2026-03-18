@@ -9,15 +9,6 @@
 require_once __DIR__.'/commands.php';
 
 /**
- * True when any process with the exact binary name is running.
- */
-function pmssProcessRunning(string $name): bool
-{
-    exec('pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1', $_, $status);
-    return $status === 0;
-}
-
-/**
  * True when systemd knows about the requested unit.
  */
 function pmssSystemdUnitExists(string $unit): bool
@@ -74,18 +65,23 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
  */
 function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
 {
-    $waitForProcessExit = static function (int $waitSeconds) use ($name): bool {
+    $processRunning = static function () use ($name): bool {
+        exec('pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1', $_, $status);
+        return $status === 0;
+    };
+
+    $waitForProcessExit = static function (int $waitSeconds) use ($processRunning): bool {
         $deadline = microtime(true) + max(0, $waitSeconds);
         while (microtime(true) < $deadline) {
-            if (!pmssProcessRunning($name)) {
+            if (!$processRunning()) {
                 return true;
             }
             usleep(250000); // back off to avoid busy-looping
         }
-        return !pmssProcessRunning($name);
+        return !$processRunning();
     };
 
-    if (!pmssProcessRunning($name)) {
+    if (!$processRunning()) {
         logmsg("[SKIP] {$description} (no {$name} processes)");
         return;
     }

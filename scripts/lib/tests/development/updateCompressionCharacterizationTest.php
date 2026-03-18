@@ -50,6 +50,21 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('processes linger after SIGKILL', $src);
     }
 
+    public function testKillProcessKeepsProcessProbeLocal(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/processes.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssProcess'.'Running';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'process presence checks should stay localized inside killProcess()'
+        );
+        $this->assertStringContainsString("exec('pgrep -x '.escapeshellarg(\$name).' >/dev/null 2>&1'", $src);
+        $this->assertStringContainsString('[SKIP] {$description} (no {$name} processes)', $src);
+    }
+
     public function testUpdateStep2KeepsMediaareaBootstrapCleanupInline(): void
     {
         $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
