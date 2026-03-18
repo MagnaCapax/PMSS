@@ -79,6 +79,18 @@ class DistroDetectionTest extends TestCase
         });
     }
 
+    public function testOsReleaseHelpersNormalizeCodenameAndMajorVersion(): void
+    {
+        $this->withOsRelease([
+            'ID'                => 'debian',
+            'VERSION_ID'        => '12 (testing snapshot)',
+            'VERSION_CODENAME'  => ' Bookworm ',
+        ], function (): void {
+            $this->assertEquals('12', \getDistroVersion());
+            $this->assertEquals('bookworm', \getDistroCodename());
+        });
+    }
+
     /**
      * If both codename and version are missing we should surface zero.
      */

@@ -53,11 +53,7 @@ if (!function_exists('getDistroVersion')) {
     function getDistroVersion()
     {
         $versionId = (string) (getOsReleaseData()['VERSION_ID'] ?? '');
-        if ($versionId === '') {
-            return '';
-        }
-
-        return preg_match('/^([0-9]+)/', $versionId, $matches) ? $matches[1] : $versionId;
+        return $versionId !== '' && preg_match('/^([0-9]+)/', $versionId, $matches) ? $matches[1] : $versionId;
     }
 }
 
@@ -77,7 +73,6 @@ if (!function_exists('getDistroCodename')) {
      */
     function getDistroCodename(): string
     {
-        $codename = (string) (getOsReleaseData()['VERSION_CODENAME'] ?? '');
-        return $codename !== '' ? strtolower(trim($codename)) : '';
+        return strtolower(trim((string) (getOsReleaseData()['VERSION_CODENAME'] ?? '')));
     }
 }

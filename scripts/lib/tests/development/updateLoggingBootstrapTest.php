@@ -62,6 +62,30 @@ class UpdateLoggingBootstrapTest extends TestCase
         $this->assertEquals([], $payload['context'] ?? null);
     }
 
+    public function testCorrelationIdPrefersEnvironmentValueWhenCacheEmpty(): void
+    {
+        $value = $this->runLibraryScript(
+            'putenv("PMSS_CORRELATION_ID=fixed-correlation-id"); '
+            .'$GLOBALS["PMSS_CORRELATION_ID_CACHE"] = null; '
+            .'echo pmssCorrelationId(false);'
+        );
+
+        $this->assertEquals('fixed-correlation-id', $value);
+    }
+
+    public function testJsonLogPathRemainsCachedAfterFirstRead(): void
+    {
+        $path = $this->runLibraryScript(
+            'putenv("PMSS_JSON_LOG=/tmp/pmss-first.jsonl"); '
+            .'$GLOBALS["PMSS_JSON_LOG_PATH"] = null; '
+            .'$first = pmssJsonLogPath(); '
+            .'putenv("PMSS_JSON_LOG=/tmp/pmss-second.jsonl"); '
+            .'echo $first."|".pmssJsonLogPath();'
+        );
+
+        $this->assertEquals('/tmp/pmss-first.jsonl|/tmp/pmss-first.jsonl', $path);
+    }
+
     private function emitJsonLog(string $statement, string $bootstrap = ''): array
     {
         $path = sys_get_temp_dir().'/pmss-update-log-'.bin2hex(random_bytes(4)).'.jsonl';

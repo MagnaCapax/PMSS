@@ -24,9 +24,7 @@ if (!function_exists('pmssBuildCorrelationId')) {
     function pmssBuildCorrelationId(): string
     {
         $timestamp = gmdate('Ymd-His');
-        $hostRaw = function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n');
-        $host = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $hostRaw));
-        $host = trim($host, '-');
+        $host = trim(strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n'))), '-');
         if ($host === '') {
             $host = 'host';
         }
@@ -47,8 +45,8 @@ if (!function_exists('pmssCorrelationId')) {
      */
     function pmssCorrelationId(bool $createIfMissing = true): string
     {
-        if (is_string($GLOBALS['PMSS_CORRELATION_ID_CACHE']) && $GLOBALS['PMSS_CORRELATION_ID_CACHE'] !== '') {
-            return $GLOBALS['PMSS_CORRELATION_ID_CACHE'];
+        if (is_string($cached = $GLOBALS['PMSS_CORRELATION_ID_CACHE']) && $cached !== '') {
+            return $cached;
         }
 
         if (($envValue = trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''))) !== '') {
@@ -68,11 +66,9 @@ if (!function_exists('pmssCorrelationId')) {
 if (!function_exists('pmssJsonLogPath')) {
     function pmssJsonLogPath(): string
     {
-        if ($GLOBALS['PMSS_JSON_LOG_PATH'] !== null) {
-            return $GLOBALS['PMSS_JSON_LOG_PATH'];
-        }
-
-        return $GLOBALS['PMSS_JSON_LOG_PATH'] = (string) (getenv('PMSS_JSON_LOG') ?: '');
+        return $GLOBALS['PMSS_JSON_LOG_PATH'] !== null
+            ? $GLOBALS['PMSS_JSON_LOG_PATH']
+            : $GLOBALS['PMSS_JSON_LOG_PATH'] = (string) (getenv('PMSS_JSON_LOG') ?: '');
     }
 }
 
