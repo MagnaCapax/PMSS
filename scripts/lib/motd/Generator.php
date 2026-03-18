@@ -30,7 +30,14 @@ class Motd
         }
 
         $model = self::motdCollectModel();
-        $rendered = self::renderMotdTemplate($tpl, $model, self::colorEnabled());
+        $colorEnabled = getenv('PMSS_MOTD_COLOR');
+        $rendered = self::renderMotdTemplate(
+            $tpl,
+            $model,
+            ($colorEnabled === false || $colorEnabled === '')
+                ? true
+                : in_array(strtolower((string) $colorEnabled), ['1', 'true', 'yes', 'on'], true)
+        );
         file_put_contents($outPath, $rendered);
         @chmod($outPath, 0644);
         @chown($outPath, 'root');
@@ -55,6 +62,7 @@ class Motd
         $distro = self::distroInfo();
         [$wg, $ovpn] = self::serviceStatuses();
         $storageWarn = self::storageWarnings();
+        $aptUpdateStamp = @filemtime('/var/lib/apt/periodic/update-success-stamp');
 
         return [
             'host'          => (string) $host,
@@ -64,7 +72,9 @@ class Motd
             'storage'       => (string) $storage,
             'pmssVersion'   => (string) $pmssVersion,
             'updateDate'    => (string) $updateDate,
-            'aptLastUpdate' => (string) self::aptLastUpdate(),
+            'aptLastUpdate' => ($aptUpdateStamp === false || $aptUpdateStamp <= 0)
+                ? 'Not available'
+                : date('Y-m-d', $aptUpdateStamp),
             'uptime'        => (string) $uptime,
             'kernel'        => (string) $kernel,
             'netSpeed'      => (string) $netSpeed,
@@ -133,7 +143,9 @@ class Motd
         ];
 
         $rendered = strtr($template, $repl);
-        $rendered = self::motdStripLegacyRuntimeVersionLines($rendered);
+        $rendered = str_replace('Runtime Version: %RUN_VERSION%', '', $rendered);
+        $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
+        $rendered = is_string($patched) ? $patched : $rendered;
 
         $storageWarn = self::motdModelValue($model, 'storageWarn');
         if ($storageWarn !== '') {
@@ -156,21 +168,29 @@ class Motd
     }
 
     /**
-     * Remove legacy RUN_VERSION lines that may still exist in older templates.
-     */
-    private static function motdStripLegacyRuntimeVersionLines(string $rendered): string
-    {
-        $rendered = str_replace('Runtime Version: %RUN_VERSION%', '', $rendered);
-        $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
-        return is_string($patched) ? $patched : $rendered;
-    }
-
-    /**
      * Mirror the rendered MOTD into /run/motd.dynamic when PAM is configured for it.
      */
     private static function motdSyncPamDynamic(string $rendered): void
     {
-        [$usesDynamic, $usesStatic] = self::detectPamMotd();
+        $data = @file_get_contents('/etc/pam.d/sshd');
+        $usesDynamic = false;
+        $usesStatic = false;
+        if (is_string($data)) {
+            foreach (preg_split('/\r?\n/', $data) as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') {
+                    continue;
+                }
+                if (strpos($line, 'pam_motd.so') === false) {
+                    continue;
+                }
+                if (strpos($line, 'motd=/run/motd.dynamic') !== false) {
+                    $usesDynamic = true;
+                    continue;
+                }
+                $usesStatic = true;
+            }
+        }
         $dynamicPath = '/run/motd.dynamic';
         if ($usesDynamic && !$usesStatic) {
             file_put_contents($dynamicPath, $rendered);
@@ -212,23 +232,18 @@ class Motd
         return [$pmssVersion,$updateDate];
     }
 
-    private static function aptLastUpdate(): string
-    {
-        $f = '/var/lib/apt/periodic/update-success-stamp';
-        $ts = @filemtime($f);
-        if ($ts === false || $ts <= 0) return 'Not available';
-        // Show date only to avoid noisy fractional seconds/timezones
-        return date('Y-m-d', $ts);
-    }
-
     private static function runtimeInfo(): array
     {
         $uptime  = trim((string) shell_exec('uptime -p'));
         $kernel  = trim((string) shell_exec('uname -r'));
         // Discover the primary interface via routing table
-        $iface = self::parseIfaceFromRoute(trim((string) shell_exec('ip -o route get 1 2>/dev/null')));
+        $route = preg_split('/\s+/', trim((string) shell_exec('ip -o route get 1 2>/dev/null')));
+        $ifaceIndex = is_array($route) ? array_search('dev', $route, true) : false;
+        $iface = ($ifaceIndex !== false && isset($route[$ifaceIndex + 1])) ? $route[$ifaceIndex + 1] : '';
         if ($iface === '') {
-            $iface = self::parseIfaceFromRoute(trim((string) shell_exec('ip route show default 2>/dev/null')));
+            $route = preg_split('/\s+/', trim((string) shell_exec('ip route show default 2>/dev/null')));
+            $ifaceIndex = is_array($route) ? array_search('dev', $route, true) : false;
+            $iface = ($ifaceIndex !== false && isset($route[$ifaceIndex + 1])) ? $route[$ifaceIndex + 1] : '';
         }
         $net = 'Unknown';
         if ($iface !== '') {
@@ -254,25 +269,9 @@ class Motd
         return [$uptime,$kernel,$net];
     }
 
-    private static function colorEnabled(): bool
-    {
-        $v = getenv('PMSS_MOTD_COLOR');
-        // Default to enabled; allow explicit opt-out
-        return ($v === false || $v === '') ? true : in_array(strtolower((string) $v), ['1', 'true', 'yes', 'on'], true);
-    }
-
     private static function c(string $text, string $code): string
     {
         return "\e[{$code}m{$text}\e[0m";
-    }
-
-    private static function parseIfaceFromRoute(string $line): string
-    {
-        if ($line === '') return '';
-        $parts = preg_split('/\s+/', $line);
-        if (!$parts) return '';
-        $idx = array_search('dev', $parts, true);
-        return ($idx !== false && isset($parts[$idx + 1])) ? $parts[$idx + 1] : '';
     }
 
     private static function distroInfo(): string
@@ -340,36 +339,4 @@ class Motd
         return implode(' | ', $lines);
     }
 
-    /**
-     * Detect whether PAM motd is configured to use dynamic/static outputs.
-     */
-    private static function detectPamMotd(): array
-    {
-        $path = '/etc/pam.d/sshd';
-        $data = @file_get_contents($path);
-        if (!is_string($data)) {
-            return [false, false];
-        }
-        $usesDynamic = false;
-        $usesStatic = false;
-        foreach (preg_split('/\r?\n/', $data) as $line) {
-            $line = trim($line);
-            if ($line === '' || $line[0] === '#') {
-                continue;
-            }
-            if (strpos($line, 'pam_motd.so') === false) {
-                continue;
-            }
-            if (strpos($line, 'motd=/run/motd.dynamic') !== false) {
-                $usesDynamic = true;
-                continue;
-            }
-            if (strpos($line, 'motd=') !== false) {
-                $usesStatic = true;
-                continue;
-            }
-            $usesStatic = true;
-        }
-        return [$usesDynamic, $usesStatic];
-    }
 }

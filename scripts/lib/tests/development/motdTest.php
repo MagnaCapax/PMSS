@@ -29,6 +29,29 @@ class MotdTest extends TestCase
         $this->assertTrue(strpos($content, '%PMSS_VERSION%') === false, 'PMSS_VERSION placeholder should be replaced');
     }
 
+    public function testGenerateMotdHonorsColorOptOutEnv(): void
+    {
+        $dir = sys_get_temp_dir().'/pmss-motd-'.bin2hex(random_bytes(4));
+        @mkdir($dir, 0700, true);
+        $template = $dir.'/template.motd';
+        $output   = $dir.'/motd.txt';
+        $runtime  = $dir.'/run';
+        @mkdir($runtime, 0700, true);
+
+        file_put_contents($template, "Host: %HOSTNAME%\nKernel: %KERNEL_VERSION%\nNet: %NETWORK_SPEED%\n");
+
+        putenv('PMSS_MOTD_TEMPLATE_PATH='.$template);
+        putenv('PMSS_MOTD_OUTPUT_PATH='.$output);
+        putenv('PMSS_RUNTIME_DIR='.$runtime);
+        putenv('PMSS_MOTD_COLOR=0');
+
+        \Motd::motdGenerate();
+
+        $this->assertTrue(file_exists($output), 'MOTD output file missing');
+        $content = (string) file_get_contents($output);
+        $this->assertTrue(strpos($content, "\e[") === false, 'MOTD color opt-out should suppress ANSI escapes');
+    }
+
     public function testUpdateStep2CallsGenerateMotdNearEnd(): void
     {
         $path = dirname(__DIR__, 3).'/util/update-step2.php';
