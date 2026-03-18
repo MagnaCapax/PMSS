@@ -45,14 +45,6 @@ function pmssTorrentPortExpectedRead(string $path): ?int
 }
 
 /**
- * Best-effort kill of a per-user torrent process before rewriting its port.
- */
-function pmssTorrentPortProcessKill(string $user, string $process): void
-{
-    @shell_exec(sprintf('killall -u %s -9 %s 2>/dev/null', escapeshellarg($user), escapeshellarg($process)));
-}
-
-/**
  * Ensure the current user's Deluge web port matches ~/.delugePort.
  */
 function pmssDelugePortEnsureCurrentUser(): bool
@@ -76,7 +68,7 @@ function pmssDelugePortEnsure(string $user, string $home): bool
         return true;
     }
 
-    pmssTorrentPortProcessKill($user, 'deluge-web');
+    @shell_exec(sprintf('killall -u %s -9 %s 2>/dev/null', escapeshellarg($user), escapeshellarg('deluge-web')));
     $parsed['config']['port'] = $expectedPort;
     pmssDelugeNormalizeEmptySessionsObject($parsed['config']);
     return pmssDelugeWriteWebConf($home.'/.config/deluge/web.conf', $parsed['meta'], $parsed['config'], $user);
@@ -114,7 +106,7 @@ function pmssQbittorrentPortEnsure(string $user, string $home): bool
         return false;
     }
 
-    pmssTorrentPortProcessKill($user, 'qbittorrent-nox');
+    @shell_exec(sprintf('killall -u %s -9 %s 2>/dev/null', escapeshellarg($user), escapeshellarg('qbittorrent-nox')));
     $dir = dirname($configPath);
     if (!is_dir($dir) || is_link($dir)) {
         return false;

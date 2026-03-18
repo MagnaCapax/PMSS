@@ -57,21 +57,24 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         return '';
     }
 
-    $rssFeed = json_decode((string) json_encode($rssXml), true);
-    if (!is_array($rssFeed) || !is_array($items = $rssFeed['channel']['item'] ?? null)) {
+    if (!isset($rssXml->channel->item)) {
         return '';
     }
 
     $itemsHtml = '';
-    $items = isset($items['pubDate'], $items['link'], $items['title']) ? [$items] : $items;
-    foreach (array_slice($items, 0, 4, true) as $thisItem) {
-        if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {
+    $renderedItems = 0;
+    foreach ($rssXml->channel->item as $thisItem) {
+        if (!isset($thisItem->pubDate, $thisItem->link, $thisItem->title)) {
             continue;
         }
 
-        $dateText = date('d/m', strtotime($thisItem['pubDate']));
-        $itemsHtml .= "<li>({$dateText}) <a href=\"{$thisItem['link']}\" target=\"_blank\">"
-            .htmlspecialchars($thisItem['title'])."</a></li>\n";
+        $dateText = date('d/m', strtotime((string) $thisItem->pubDate));
+        $itemsHtml .= "<li>({$dateText}) <a href=\"".(string) $thisItem->link."\" target=\"_blank\">"
+            .htmlspecialchars((string) $thisItem->title)."</a></li>\n";
+        $renderedItems++;
+        if ($renderedItems === 4) {
+            break;
+        }
     }
 
     return $itemsHtml;
