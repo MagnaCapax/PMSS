@@ -45,30 +45,3 @@ function pmssQbittorrentApplyUploadThrottle(string $username, ?int $throttle = n
         && $newConfig !== $config
         && file_put_contents($configFile, $newConfig) !== false;
 }
-
-function userConfigureQbittorrent(array $user): void
-{
-    $configDir  = sprintf('/home/%s/.config/qBittorrent', $user['name']);
-    $configFile = $configDir.'/qBittorrent.conf';
-    $throttle = pmssReadTorrentThrottle($user['name']);
-    $throttleLine = ($throttle !== null && $throttle > 0)
-        ? 'Connection\\GlobalUPLimit='.(int) $throttle
-        : '';
-
-    if (!file_exists($configFile)) {
-        $template = file_get_contents('/etc/seedbox/config/template.qbittorrent.conf');
-        $port = (int) round(rand(1500, 65500));
-        if (!file_exists($configDir)) {
-            mkdir($configDir, 0770, true);
-        }
-        $config = str_replace(
-            ['##username', '##port', '##uploadThrottleLine'],
-            [$user['name'], $port, $throttleLine],
-            $template
-        );
-        file_put_contents($configFile, $config);
-        file_put_contents(sprintf('/home/%s/.qbittorrentPort', $user['name']), $port);
-    }
-
-    pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
-}

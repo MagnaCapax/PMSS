@@ -232,7 +232,29 @@ if (!file_exists($rclonePortFile)) {
     file_put_contents($rclonePortFile, rand(1500, 65500));
 }
 userConfigureDeluge($user, $configuration);
-userConfigureQbittorrent($user);
+$qbittorrentConfigDir = sprintf('/home/%s/.config/qBittorrent', $user['name']);
+$qbittorrentConfigFile = $qbittorrentConfigDir.'/qBittorrent.conf';
+if (!file_exists($qbittorrentConfigFile)) {
+    $qbittorrentPort = (int) round(rand(1500, 65500));
+    if (!file_exists($qbittorrentConfigDir)) {
+        mkdir($qbittorrentConfigDir, 0770, true);
+    }
+
+    file_put_contents(
+        $qbittorrentConfigFile,
+        str_replace(
+            ['##username', '##port', '##uploadThrottleLine'],
+            [
+                $user['name'],
+                $qbittorrentPort,
+                ($throttle !== null && $throttle > 0) ? 'Connection\\GlobalUPLimit='.(int) $throttle : '',
+            ],
+            file_get_contents('/etc/seedbox/config/template.qbittorrent.conf')
+        )
+    );
+    file_put_contents(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort);
+}
+pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
 userApplyDiskQuota($user);
 $lockFile = sprintf('/home/%s/session/rtorrent.lock', $user['name']);
 if (file_exists($lockFile)) {

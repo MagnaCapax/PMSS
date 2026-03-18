@@ -42,7 +42,11 @@ function pmssQuotaSnapshotNormalizeHumanReadableLine(string $line): string
 
     $changed = false;
     for ($index = 1; $index <= 3; $index++) {
-        $normalizedToken = pmssQuotaSnapshotNormalizeSizeToken($tokens[$index]);
+        if (preg_match('/^([0-9]+)(\*)?$/', $tokens[$index], $matches) === 1) {
+            $normalizedToken = $matches[1].'K'.($matches[2] ?? '');
+        } else {
+            $normalizedToken = $tokens[$index];
+        }
         if ($normalizedToken !== $tokens[$index]) {
             $changed = true;
             $tokens[$index] = $normalizedToken;
@@ -55,16 +59,4 @@ function pmssQuotaSnapshotNormalizeHumanReadableLine(string $line): string
 
     $indent = substr($line, 0, strlen($line) - strlen(ltrim($line)));
     return $indent.implode(' ', $tokens);
-}
-
-/**
- * Convert bare numeric `quota -s` values into explicitly suffixed size tokens.
- */
-function pmssQuotaSnapshotNormalizeSizeToken(string $token): string
-{
-    if (preg_match('/^([0-9]+)(\*)?$/', $token, $matches) !== 1) {
-        return $token;
-    }
-
-    return $matches[1].'K'.($matches[2] ?? '');
 }

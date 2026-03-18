@@ -95,4 +95,52 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("if (strpos(\$trim, 'ExecStart=') !== 0)", $src);
         $this->assertStringContainsString("\$execBinary = trim(\$parts[0], \"\\\"'\");", $src);
     }
+
+    public function testQuotaSnapshotKeepsSizeTokenNormalizationLocal(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/quotaSnapshot.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssQuotaSnapshotNormalize'.'SizeToken';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer'
+        );
+        $this->assertStringContainsString("preg_match('/^([0-9]+)(\\*)?$/', \$tokens[\$index], \$matches)", $src);
+        $this->assertStringContainsString("\$normalizedToken = \$matches[1].'K'.(\$matches[2] ?? '');", $src);
+    }
+
+    public function testQbittorrentPortEnsureKeepsAtomicRewriteInline(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/user/torrentPort.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssTorrentPort'.'FileWrite';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'torrentPort.php should keep the qBittorrent atomic rewrite local to pmssQbittorrentPortEnsure()'
+        );
+        $this->assertStringContainsString("@tempnam(\$dir, basename(\$configPath).'.pmss-tmp-')", $src);
+        $this->assertStringContainsString("@rename(\$tmp, \$configPath)", $src);
+    }
+
+    public function testUserConfigKeepsQbittorrentBootstrapInline(): void
+    {
+        $userConfigPath = dirname(__DIR__, 4).'/scripts/util/userConfig.php';
+        $userConfigSrc = @file_get_contents($userConfigPath);
+        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/user/qbittorrent.php';
+        $librarySrc = @file_get_contents($libraryPath);
+        $symbol = 'userConfigure'.'Qbittorrent';
+
+        $this->assertTrue(is_string($userConfigSrc) && $userConfigSrc !== '', 'Expected to read '.$userConfigPath);
+        $this->assertTrue(is_string($librarySrc) && $librarySrc !== '', 'Expected to read '.$libraryPath);
+        $this->assertTrue(
+            strpos($librarySrc, 'function '.$symbol.'(') === false,
+            'qbittorrent.php should no longer export a one-call user bootstrap wrapper'
+        );
+        $this->assertStringContainsString('template.qbittorrent.conf', $userConfigSrc);
+        $this->assertStringContainsString("pmssQbittorrentApplyUploadThrottle(\$user['name'], \$throttle);", $userConfigSrc);
+    }
 }

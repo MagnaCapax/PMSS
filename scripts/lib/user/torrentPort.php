@@ -53,38 +53,6 @@ function pmssTorrentPortProcessKill(string $user, string $process): void
 }
 
 /**
- * Atomically rewrite a user-owned config file while preserving the mode.
- */
-function pmssTorrentPortFileWrite(string $path, string $content, string $owner): bool
-{
-    $dir = dirname($path);
-    if (!is_dir($dir) || is_link($dir)) {
-        return false;
-    }
-
-    $mode = @fileperms($path);
-    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
-    if ($tmp === false) {
-        return false;
-    }
-    if (@file_put_contents($tmp, $content) === false) {
-        @unlink($tmp);
-        return false;
-    }
-
-    @chmod($tmp, is_int($mode) ? ($mode & 0777) : 0600);
-    @chown($tmp, $owner);
-    @chgrp($tmp, $owner);
-
-    if (!@rename($tmp, $path)) {
-        @unlink($tmp);
-        return false;
-    }
-
-    return true;
-}
-
-/**
  * Ensure the current user's Deluge web port matches ~/.delugePort.
  */
 function pmssDelugePortEnsureCurrentUser(): bool
@@ -147,5 +115,28 @@ function pmssQbittorrentPortEnsure(string $user, string $home): bool
     }
 
     pmssTorrentPortProcessKill($user, 'qbittorrent-nox');
-    return pmssTorrentPortFileWrite($configPath, $updated, $user);
+    $dir = dirname($configPath);
+    if (!is_dir($dir) || is_link($dir)) {
+        return false;
+    }
+
+    $mode = @fileperms($configPath);
+    $tmp = @tempnam($dir, basename($configPath).'.pmss-tmp-');
+    if ($tmp === false) {
+        return false;
+    }
+    if (@file_put_contents($tmp, $updated) === false) {
+        @unlink($tmp);
+        return false;
+    }
+
+    @chmod($tmp, is_int($mode) ? ($mode & 0777) : 0600);
+    @chown($tmp, $user);
+    @chgrp($tmp, $user);
+    if (!@rename($tmp, $configPath)) {
+        @unlink($tmp);
+        return false;
+    }
+
+    return true;
 }
