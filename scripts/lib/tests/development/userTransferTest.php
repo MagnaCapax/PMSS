@@ -357,11 +357,9 @@ class UserTransferTest extends TestCase
 
     public function testUserTransferHomePathsStillResolveFromPmssHomeDirEnv(): void
     {
-        $entrypoint = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/userTransfer.php');
         $helper = (string) file_get_contents(dirname(__DIR__, 2).'/userTransfer/localUserSafety.php');
 
         $needle = "pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')";
-        $this->assertTrue(strpos($entrypoint, $needle) !== false, 'userTransfer entrypoint must honour PMSS_HOME_DIR');
         $this->assertTrue(strpos($helper, $needle) !== false, 'userTransfer safety checks must honour PMSS_HOME_DIR');
     }
 

@@ -31,6 +31,4 @@ if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
 
 require_once __DIR__.'/../lib/userTransfer.php';
 
-pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
-
 exit(pmssUserTransferMain($argv));
