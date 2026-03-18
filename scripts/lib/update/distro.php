@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/runtime/commands.php';
+require_once __DIR__.'/../log.php';
 require_once __DIR__.'/osRelease.php';
 
 if (!function_exists('pmssDebianCodenameToMajorMap')) {

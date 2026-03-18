@@ -21,6 +21,15 @@ class FilebotInstallerHardeningTest extends TestCase
         $this->assertStringContainsString('pmssInstallPinnedRemoteDebPackage', $contents);
     }
 
+    public function testFilebotInstallerLetsRemoteBinaryBootstrapRuntimeHelpers(): void
+    {
+        $path = dirname(__DIR__, 2).'/update/apps/filebot.php';
+        $contents = $this->readFile($path);
+
+        $this->assertTrue(strpos($contents, "require_once __DIR__.'/../runtime/commands.php';") === false, 'FileBot installer should rely on remoteBinary.php for runtime helper bootstrap');
+        $this->assertTrue(strpos($contents, "require_once __DIR__.'/../logging.php';") === false, 'FileBot installer should not duplicate remoteBinary.php logging bootstrap');
+    }
+
     public function testFilebotInstallerKeepsHttpsPinnedUrl(): void
     {
         $path = dirname(__DIR__, 2).'/update/apps/filebot.php';

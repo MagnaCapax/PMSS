@@ -46,4 +46,28 @@ class UpdateLibraryDependencyTest extends TestCase
         $this->assertStringContainsString("require_once __DIR__.'/../update/distro.php';", $source);
         $this->assertTrue(strpos($source, "require_once __DIR__.'/../update.php';") === false, 'Motd generator should not pull scripts/lib/update.php just for distro detection');
     }
+
+    public function testDistroLibraryUsesDirectLegacyLogLibrary(): void
+    {
+        $source = $this->loadSource('lib/update/distro.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/../log.php';", $source);
+        $this->assertTrue(strpos($source, "require_once __DIR__.'/runtime/commands.php';") === false, 'distro.php should not pull runtime/commands.php just to expose logmsg()');
+    }
+
+    public function testNetworkingLibraryAvoidsRuntimeCommandsBootstrap(): void
+    {
+        $source = $this->loadSource('lib/update/networking.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/logging.php';", $source);
+        $this->assertTrue(strpos($source, "require_once __DIR__.'/runtime/commands.php';") === false, 'networking.php should not pull runtime/commands.php when it only selects a logger');
+    }
+
+    public function testQbittorrentLibraryAvoidsUpdateRuntimeBootstrap(): void
+    {
+        $source = $this->loadSource('lib/user/qbittorrent.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/traffic.php';", $source);
+        $this->assertTrue(strpos($source, "require_once __DIR__.'/../update/runtime/commands.php';") === false, 'qbittorrent.php should not bootstrap update runtime helpers it does not use');
+    }
 }

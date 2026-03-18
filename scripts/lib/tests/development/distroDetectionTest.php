@@ -21,6 +21,17 @@ class DistroDetectionTest extends TestCase
         $this->assertEquals(11, \pmssVersionFromCodename('Bullseye'));
     }
 
+    public function testStandaloneDistroLibraryStillBootstrapsLegacyLogmsg(): void
+    {
+        $path = dirname(__DIR__, 2).'/update/distro.php';
+        $script = 'require '.var_export($path, true).'; $function = new ReflectionFunction("logmsg"); echo str_replace("\\\\", "/", $function->getFileName());';
+        $command = 'PMSS_TEST_MODE=1 '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>/dev/null';
+
+        $source = trim((string) @shell_exec($command));
+
+        $this->assertStringContainsString('/scripts/lib/log.php', $source);
+    }
+
     /**
      * Ensure codename mapping overrides a mismatched VERSION_ID.
      */

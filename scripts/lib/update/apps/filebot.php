@@ -7,8 +7,6 @@
  */
 // Install FileBot from a pinned package when the expected version is missing.
 
-require_once __DIR__.'/../runtime/commands.php';
-require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/remoteBinary.php';
 
 $filebotVersion = '4.9.4 (r8736)';

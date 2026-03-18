@@ -14,7 +14,6 @@
  */
 
 require_once __DIR__.'/logging.php';
-require_once __DIR__.'/runtime/commands.php';
 
 if (!function_exists('pmssEnsureNetworkTemplate')) {
     /**

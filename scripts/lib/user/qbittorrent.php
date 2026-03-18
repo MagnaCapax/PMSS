@@ -6,7 +6,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/traffic.php';
 
 /**
