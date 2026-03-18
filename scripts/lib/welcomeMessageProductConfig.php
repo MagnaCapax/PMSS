@@ -41,16 +41,16 @@ function pmssWelcomeProductMessageSet(
     }
 
     $directoryPath = dirname($productMessagesPath);
-    if (strpos($productMessagesPath, "\0") !== false || !is_dir($directoryPath) || is_link($directoryPath)) {
+    if (
+        strpos($productMessagesPath, "\0") !== false
+        || !is_dir($directoryPath)
+        || is_link($directoryPath)
+        || (file_exists($productMessagesPath) && (!is_file($productMessagesPath) || is_link($productMessagesPath)))
+    ) {
         return false;
     }
 
-    if (file_exists($productMessagesPath) && (!is_file($productMessagesPath) || is_link($productMessagesPath))) {
-        return false;
-    }
-
-    $encoded = json_encode($rootMap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    if (!is_string($encoded)) {
+    if (!is_string($encoded = json_encode($rootMap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
         return false;
     }
 

@@ -24,16 +24,14 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         return '';
     }
 
+    $rssUtf8 = false;
     if (function_exists('mb_convert_encoding')) {
         $rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8');
-        if ($rssUtf8 !== false) {
-            $rssRaw = $rssUtf8;
-        }
     } elseif (function_exists('iconv')) {
         $rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw);
-        if ($rssUtf8 !== false) {
-            $rssRaw = $rssUtf8;
-        }
+    }
+    if (is_string($rssUtf8)) {
+        $rssRaw = $rssUtf8;
     }
 
     $restoreInternalErrors = function_exists('libxml_use_internal_errors');
@@ -51,14 +49,14 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         $rssXml = simplexml_load_string($rssRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
     } catch (\Throwable $throwable) {
         $rssXml = false;
-    }
+    } finally {
+        if (function_exists('libxml_clear_errors')) {
+            libxml_clear_errors();
+        }
 
-    if (function_exists('libxml_clear_errors')) {
-        libxml_clear_errors();
-    }
-
-    if ($restoreInternalErrors) {
-        libxml_use_internal_errors($previousInternalErrors);
+        if ($restoreInternalErrors) {
+            libxml_use_internal_errors($previousInternalErrors);
+        }
     }
 
     if ($rssXml === false) {
@@ -71,18 +69,14 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
     }
 
     $rssFeed = json_decode($rssFeedJson, true);
-    if (!isset($rssFeed['channel']['item']) || !is_array($rssFeed['channel']['item'])) {
+    if (!is_array($rssFeed['channel']['item'] ?? null)) {
         return '';
     }
 
     $itemsHtml = '';
     $items = $rssFeed['channel']['item'];
-    if (isset($items['pubDate'], $items['link'], $items['title'])) {
-        $items = array($items);
-    }
-
-    $items = array_slice($items, 0, 4, true);
-    foreach ($items as $thisItem) {
+    $items = isset($items['pubDate'], $items['link'], $items['title']) ? array($items) : $items;
+    foreach (array_slice($items, 0, 4, true) as $thisItem) {
         if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {
             continue;
         }

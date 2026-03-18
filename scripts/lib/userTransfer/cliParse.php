@@ -78,12 +78,7 @@ TXT;
         }
 
         if (substr($token, 0, 2) === '--') {
-            $body = substr($token, 2);
-            $key = $body;
-            $value = null;
-            if (strpos($body, '=') !== false) {
-                [$key, $value] = explode('=', $body, 2);
-            }
+            [$key, $value] = array_pad(explode('=', substr($token, 2), 2), 2, null);
 
             if (isset($flagOptions[$key])) {
                 $options[$flagOptions[$key]] = true;
@@ -95,8 +90,7 @@ TXT;
             }
 
             if ($value === null) {
-                $i++;
-                $value = $tokens[$i] ?? null;
+                $value = $tokens[++$i] ?? null;
             }
 
             $options[$integerOptions[$key]] = $parseInt($key, $value);
@@ -185,15 +179,16 @@ function pmssUserTransferHostnameIsValid(string $hostname): bool
     }
 
     // Allow hostname labels separated by dots.
-    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/', $hostname)) {
-        return false;
-    }
-    if (strpos($hostname, '..') !== false || $hostname[0] === '.' || substr($hostname, -1) === '.') {
+    if (
+        !preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/', $hostname)
+        || strpos($hostname, '..') !== false
+        || $hostname[0] === '.'
+        || substr($hostname, -1) === '.'
+    ) {
         return false;
     }
 
-    $labels = explode('.', $hostname);
-    foreach ($labels as $label) {
+    foreach (explode('.', $hostname) as $label) {
         if ($label === '' || strlen($label) > 63 || $label[0] === '-' || substr($label, -1) === '-') {
             return false;
         }

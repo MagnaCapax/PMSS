@@ -44,8 +44,7 @@ function pmssRun(string $cmd, bool $logFailure = true): int
  */
 function pmssRunOrExit(string $cmd, bool $logFailure = true): void
 {
-    $exitCode = pmssRun($cmd, $logFailure);
-    if ($exitCode !== 0) {
+    if (($exitCode = pmssRun($cmd, $logFailure)) !== 0) {
         exit($exitCode);
     }
 }

@@ -8,10 +8,7 @@
 
 if (!defined('PMSS_LOG_FILE')) {
     $pmssLogDir = function_exists('pmssLogDir') ? pmssLogDir() : rtrim((string) (getenv('PMSS_LOG_DIR') ?: '/var/log/pmss'), '/');
-    if ($pmssLogDir === '') {
-        $pmssLogDir = '/var/log/pmss';
-    }
-    define('PMSS_LOG_FILE', $pmssLogDir.'/update.log');
+    define('PMSS_LOG_FILE', ($pmssLogDir !== '' ? $pmssLogDir : '/var/log/pmss').'/update.log');
 }
 
 $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = true;
@@ -75,7 +72,7 @@ if (!function_exists('pmssJsonLogPath')) {
             return $GLOBALS['PMSS_JSON_LOG_PATH'];
         }
 
-        return $GLOBALS['PMSS_JSON_LOG_PATH'] = getenv('PMSS_JSON_LOG') ?: '';
+        return $GLOBALS['PMSS_JSON_LOG_PATH'] = (string) (getenv('PMSS_JSON_LOG') ?: '');
     }
 }
 
@@ -113,6 +110,6 @@ if (!function_exists('logMessage')) {
 if (!function_exists('pmssSelectLogger')) {
     function pmssSelectLogger(?callable $logger = null): callable
     {
-        return $logger ?? 'logMessage';
+        return $logger ?: 'logMessage';
     }
 }
