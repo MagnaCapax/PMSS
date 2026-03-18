@@ -73,12 +73,10 @@ function pmssUserApplySkeletonFiles(array $ctx): void
  */
 function pmssUserPatchTorrentFrontends(string $path, string $requireLine, string $legacyCommand, string $patchedCommand): void
 {
-    if (!is_file($path) || is_link($path)) {
-        return;
-    }
-
-    $content = @file_get_contents($path);
-    if (!is_string($content) || $content === '') {
+    if (!is_file($path)
+        || is_link($path)
+        || !is_string($content = @file_get_contents($path))
+        || $content === '') {
         return;
     }
 

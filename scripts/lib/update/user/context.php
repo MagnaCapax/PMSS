@@ -26,15 +26,13 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
     $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
 
     $home = "{$homeRoot}/{$user}";
+    // The shared context only exists for active PMSS tenants; suspended users
+    // are intentionally skipped to avoid recreating web roots or restarting
+    // services mid-suspension.
     if (!is_dir($home)
         || !file_exists($home.'/.rtorrent.rc')
-        || !file_exists($home.'/data')) {
-        return null;
-    }
-
-    if (is_dir("{$home}/www-disabled")) {
-        // Suspended users are intentionally skipped during updates to avoid
-        // recreating web roots or restarting services mid-suspension.
+        || !file_exists($home.'/data')
+        || is_dir("{$home}/www-disabled")) {
         return null;
     }
 

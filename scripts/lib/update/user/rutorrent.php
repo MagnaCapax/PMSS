@@ -31,11 +31,8 @@ function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
         if (!is_file($filePath)
             || is_link($filePath)
             || !is_string($content = @file_get_contents($filePath))
-            || $content === '') {
-            continue;
-        }
-
-        if (strpos($content, $patch['patched']) !== false) {
+            || $content === ''
+            || strpos($content, $patch['patched']) !== false) {
             continue;
         }
 
@@ -55,13 +52,14 @@ function pmssUserUpdateThemes(array $ctx): void
     $userEsc = $ctx['user_esc'];
 
     $themesPath = "{$home}/www/rutorrent/plugins/theme/themes/";
+    $skelThemesPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent/plugins/theme/themes/';
     $themes     = ['Agent34','Agent46','OblivionBlue','FlatUI_Dark','FlatUI_Light','FlatUI_Material','MaterialDesign','club-QuickBox'];
     foreach ($themes as $theme) {
         if (file_exists($themesPath.$theme)) {
             continue;
         }
 
-        $source = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel')."/www/rutorrent/plugins/theme/themes/{$theme}";
+        $source = $skelThemesPath.$theme;
         runUserStep(
             $user,
             "Installing ruTorrent theme {$theme}",
