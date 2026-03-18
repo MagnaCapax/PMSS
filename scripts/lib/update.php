@@ -15,18 +15,7 @@ require_once __DIR__.'/rtorrentConfig.php';
 require_once __DIR__.'/update/logging.php';
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/update/apt.php';
-
-// Cache container for os-release parsing so tests can reset it safely.
-$GLOBALS['PMSS_OS_RELEASE_CACHE'] = $GLOBALS['PMSS_OS_RELEASE_CACHE'] ?? [];
-
-/**
- * Determine which os-release file to consult (allows tests to override).
- */
-function pmssOsReleasePath(): string
-{
-    // Allow tests to override os-release location while keeping default stable.
-    return pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release');
-}
+require_once __DIR__.'/update/osRelease.php';
 
 /**
  * Locate the base directory for skeleton files.
@@ -260,65 +249,6 @@ function updateRutorrentConfig($username, $scgiPort) {
         echo "Failed to write ruTorrent access config to {$accessPath}\n";
         return;
     }
-}
-
-/**
- * Retrieve and cache OS release data from /etc/os-release.
- *
- * @return array Parsed key-value pairs from /etc/os-release.
- */
-function getOsReleaseData() {
-    $path = pmssOsReleasePath();
-    if (isset($GLOBALS['PMSS_OS_RELEASE_CACHE'][$path])) {
-        return $GLOBALS['PMSS_OS_RELEASE_CACHE'][$path];
-    }
-
-    $parsed = @parse_ini_file($path);
-    return $GLOBALS['PMSS_OS_RELEASE_CACHE'][$path] = is_array($parsed) ? $parsed : [];
-}
-
-/**
- * Get the distribution name from /etc/os-release.
- *
- * @return string The distribution ID (e.g., "ubuntu", "debian"), or an empty string if not found.
- */
-function getDistroName() {
-    return (string) (getOsReleaseData()['ID'] ?? '');
-}
-
-/**
- * Get the distribution version from /etc/os-release.
- *
- * Extracts and returns the numeric part of VERSION_ID.
- *
- * @return string The distribution version number, or an empty string if not found.
- */
-function getDistroVersion() {
-    $versionId = (string) (getOsReleaseData()['VERSION_ID'] ?? '');
-    if ($versionId === '') {
-        return '';
-    }
-
-    return preg_match('/^([0-9]+)/', $versionId, $matches) ? $matches[1] : $versionId;
-}
-
-/**
- * Reset cached os-release data so tests can inject fresh fixtures.
- */
-function pmssResetOsReleaseCache(): void
-{
-    unset($GLOBALS['PMSS_OS_RELEASE_CACHE'][pmssOsReleasePath()]);
-}
-
-/**
- * Get the distribution codename from /etc/os-release when available.
- *
- * @return string Lowercase codename (e.g., "bullseye") or an empty string.
- */
-function getDistroCodename(): string
-{
-    $codename = (string) (getOsReleaseData()['VERSION_CODENAME'] ?? '');
-    return $codename !== '' ? strtolower(trim($codename)) : '';
 }
 
 /**
