@@ -18,48 +18,45 @@ $configPath = wgConfigDir().'/wg0.conf';
 $peers = [];
 if (!is_file($configPath)) {
     fwrite(STDERR, "WireGuard config not found at {$configPath}\n");
+} elseif (($lines = @file($configPath, FILE_IGNORE_NEW_LINES)) === false) {
+    fwrite(STDERR, "Unable to read {$configPath}\n");
 } else {
-    $lines = @file($configPath, FILE_IGNORE_NEW_LINES);
-    if ($lines === false) {
-        fwrite(STDERR, "Unable to read {$configPath}\n");
-    } else {
-        $current = ['user' => '-', 'key' => '', 'ip' => ''];
-        foreach (array_merge($lines, ['[Peer]']) as $line) {
-            $trimmed = trim($line);
-            if ($trimmed === '') {
-                continue;
+    $current = ['user' => '-', 'key' => '', 'ip' => ''];
+    foreach (array_merge($lines, ['[Peer]']) as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '') {
+            continue;
+        }
+        if (strpos($trimmed, '[Peer]') === 0) {
+            if ($current['key'] !== '' && $current['ip'] !== '') {
+                $peers[] = $current;
             }
-            if (strpos($trimmed, '[Peer]') === 0) {
-                if ($current['key'] !== '' && $current['ip'] !== '') {
-                    $peers[] = $current;
-                }
-                $current = ['user' => '-', 'key' => '', 'ip' => ''];
-                continue;
+            $current = ['user' => '-', 'key' => '', 'ip' => ''];
+            continue;
+        }
+        if (strpos($trimmed, '# user=') === 0) {
+            $current['user'] = trim(substr($trimmed, strlen('# user=')));
+            if ($current['user'] === '') {
+                $current['user'] = '-';
             }
-            if (strpos($trimmed, '# user=') === 0) {
-                $current['user'] = trim(substr($trimmed, strlen('# user=')));
-                if ($current['user'] === '') {
-                    $current['user'] = '-';
-                }
-                continue;
-            }
-            if (stripos($trimmed, 'PublicKey =') === 0) {
-                $current['key'] = trim(substr($trimmed, strlen('PublicKey =')));
-                continue;
-            }
-            if (stripos($trimmed, 'AllowedIPs =') === 0) {
-                $value = trim(substr($trimmed, strlen('AllowedIPs =')));
-                // Take the first CIDR entry before any comma.
-                $cidr = trim(explode(',', $value, 2)[0]);
-                $current['ip'] = trim(explode('/', $cidr, 2)[0]);
-            }
+            continue;
+        }
+        if (stripos($trimmed, 'PublicKey =') === 0) {
+            $current['key'] = trim(substr($trimmed, strlen('PublicKey =')));
+            continue;
+        }
+        if (stripos($trimmed, 'AllowedIPs =') === 0) {
+            $value = trim(substr($trimmed, strlen('AllowedIPs =')));
+            // Take the first CIDR entry before any comma.
+            $cidr = trim(explode(',', $value, 2)[0]);
+            $current['ip'] = trim(explode('/', $cidr, 2)[0]);
         }
     }
 }
 
 $status = [];
 exec('wg show wg0 dump 2>/dev/null', $output, $rc);
-if ($rc === 0 && !empty($output)) {
+if ($rc === 0) {
     foreach ($output as $line) {
         $parts = explode("\t", trim($line));
         // Interface lines are ignored because peer lines have at least 8 columns.

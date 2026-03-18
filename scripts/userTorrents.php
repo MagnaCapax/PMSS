@@ -44,10 +44,9 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
         foreach ($patterns as $pattern) {
             foreach (glob($pattern) ?: [] as $path) {
                 $name = pathinfo(basename($path), PATHINFO_FILENAME);
-                if ($name === '' || $name === '.' || $name === '..') {
-                    continue;
+                if ($name !== '' && $name !== '.' && $name !== '..') {
+                    $seen[$name] = true;
                 }
-                $seen[$name] = true;
             }
         }
         $counts[$client] = count($seen);

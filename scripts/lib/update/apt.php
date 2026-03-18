@@ -16,8 +16,7 @@ function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): strin
 {
     $log = pmssSelectLogger($logger);
     // Allow tests and recovery scripts to point at alternate config roots.
-    $configRoot = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-    $path = $configRoot."/template.sources.$codename";
+    $path = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')."/template.sources.$codename";
 
     if (!file_exists($path)) { $log("Repository template missing: $path"); return ''; }
     if (($data = trim((string) @file_get_contents($path))) === '') { $log("Repository template empty: $path"); return ''; }

@@ -147,11 +147,9 @@ TXT;
     $nearLimitCount = 0;
 
     if (!$asJson) {
-        if ($extended) {
-            echo "Legend:\n\t USER: Traffic: Data Month / Limit  %  Stat  Bar        IN: Month  Ratio  DATARATES: Week MiB/s / Day MiB/s / Hour MiB/s / 15min MiB/s\n";
-        } else {
-            echo "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
-        }
+        echo $extended
+            ? "Legend:\n\t USER: Traffic: Data Month / Limit  %  Stat  Bar        IN: Month  Ratio  DATARATES: Week MiB/s / Day MiB/s / Hour MiB/s / 15min MiB/s\n"
+            : "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
     }
 
     foreach($users AS $thisUser) {
@@ -182,10 +180,7 @@ TXT;
             $dataMonthTotalLocal += (float) $data['raw']['month'];
         }
 
-        $dataDisplay = $data['raw'];
-        foreach($dataDisplay AS $thisKey => $thisData) {
-            $dataDisplay[$thisKey] = formatTrafficAmount($thisData);
-        }
+        $dataDisplay = array_map('formatTrafficAmount', $data['raw']);
 
         $inboundMonth = null;
         $ingressPath = $homeDir.'/'.$baseUser.'/.trafficDataIngress'.($isLocalnet ? 'Local' : '');
@@ -293,9 +288,7 @@ TXT;
 
     }
 
-    if (!empty($missingStats)) {
-        sort($missingStats, SORT_NATURAL | SORT_FLAG_CASE);
-    }
+    sort($missingStats, SORT_NATURAL | SORT_FLAG_CASE);
 
     if ($sort !== 'name') {
         usort($rows, static function (array $a, array $b) use ($sort): int {
@@ -314,10 +307,7 @@ TXT;
                 default:
                     $cmp = 0;
             }
-            if ($cmp !== 0) {
-                return $cmp;
-            }
-            return strnatcasecmp($a['user'], $b['user']);
+            return $cmp !== 0 ? $cmp : strnatcasecmp($a['user'], $b['user']);
         });
     }
 

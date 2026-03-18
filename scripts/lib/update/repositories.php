@@ -88,11 +88,8 @@ if (!function_exists('pmssEnsureSonarrKey')) {
      */
     function pmssSonarrSourceLine(string $line): bool
     {
-        if (preg_match('/^[ \t]*#/', $line) === 1) {
-            return false;
-        }
-
-        return preg_match('/^[ \t]*deb([ \t]+\[[^\]]*\])?[ \t]+[^#\r\n]*(sonarr|nzbdrone)/i', $line) === 1;
+        return preg_match('/^[ \t]*#/', $line) !== 1
+            && preg_match('/^[ \t]*deb([ \t]+\[[^\]]*\])?[ \t]+[^#\r\n]*(sonarr|nzbdrone)/i', $line) === 1;
     }
 
     /**
@@ -358,8 +355,7 @@ if (!function_exists('pmssRefreshRepositories')) {
         $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $logger);
         $needsUpdate = $plan['mode'] !== 'reuse';
         if ($needsUpdate) {
-            $log = pmssSelectLogger($logger);
-            pmssUpdateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], $log);
+            pmssUpdateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], pmssSelectLogger($logger));
         }
 
         $aptRc = runStep($needsUpdate ? 'Refreshing apt package index' : 'Refreshing apt package index (existing sources)', aptCmd('update'));
