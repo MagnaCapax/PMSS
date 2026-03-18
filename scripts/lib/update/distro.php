@@ -45,22 +45,18 @@ if (!function_exists('pmssDetectDistro')) {
     function pmssDetectDistro(): array
     {
         $name = strtolower((string) getDistroName());
-        if ($name === '') {
-            $fallback = strtolower(trim((string) @shell_exec('lsb_release -is 2>/dev/null')));
-            $name = $fallback !== '' ? $fallback : 'debian';
-            if ($fallback === '') {
-                logmsg('Could not detect distro name; defaulting to debian');
-            }
+        if ($name === '' && ($fallback = strtolower(trim((string) @shell_exec('lsb_release -is 2>/dev/null')))) !== '') {
+            $name = $fallback;
+        } elseif ($name === '') {
+            $name = 'debian';
+            logmsg('Could not detect distro name; defaulting to debian');
         }
 
         $rawVersion = (string) getDistroVersion();
-        if ($rawVersion === '') {
-            $fallback = trim((string) @shell_exec('lsb_release -rs 2>/dev/null'));
-            if ($fallback !== '') {
-                $rawVersion = $fallback;
-            } else {
-                logmsg('Could not detect distro version; defaulting to 0');
-            }
+        if ($rawVersion === '' && ($fallback = trim((string) @shell_exec('lsb_release -rs 2>/dev/null'))) !== '') {
+            $rawVersion = $fallback;
+        } elseif ($rawVersion === '') {
+            logmsg('Could not detect distro version; defaulting to 0');
         }
 
         $version  = (int) filter_var($rawVersion, FILTER_SANITIZE_NUMBER_INT) ?: 0;

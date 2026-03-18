@@ -70,8 +70,7 @@ function pmssPackageQueueBaselineInstallSet(string $baselinePath): array
         }
 
         $name = strtolower((string) $parts[0]);
-        $state = isset($parts[1]) ? strtolower((string) $parts[1]) : 'install';
-        if ($name !== '' && $state === 'install') {
+        if ($name !== '' && strtolower((string) ($parts[1] ?? 'install')) === 'install') {
             $packages[$name] = true;
         }
     }
@@ -313,15 +312,12 @@ function pmssInstallBestEffort(array $items, string $label = ''): void
 {
     $selection = [];
     foreach ($items as $item) {
-        if (is_array($item)) {
-            foreach ($item as $candidate) {
-                if (pmssPackageAvailable($candidate)) {
-                    $selection[] = $candidate;
-                    break;
-                }
+        foreach (is_array($item) ? $item : [$item] as $candidate) {
+            if (!pmssPackageAvailable($candidate)) {
+                continue;
             }
-        } elseif (pmssPackageAvailable($item)) {
-            $selection[] = $item;
+            $selection[] = $candidate;
+            break;
         }
     }
     $selection = array_unique($selection);

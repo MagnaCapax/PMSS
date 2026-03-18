@@ -126,4 +126,40 @@ class PackageQueueTest extends TestCase
         $this->assertEquals([], $summary['queuedMissingOnHost'] ?? []);
         $this->assertEquals([], $summary['installedAbsentFromBaseline'] ?? []);
     }
+
+    public function testPackageQueueBaselineInstallSetSkipsNonInstallStates(): void
+    {
+        $baselinePath = $this->writeBaseline([
+            'pkg-install install',
+            'pkg-hold hold',
+            'pkg-remove deinstall',
+            'pkg-short-form',
+        ]);
+
+        try {
+            $packages = pmssPackageQueueBaselineInstallSet($baselinePath);
+        } finally {
+            @unlink($baselinePath);
+        }
+
+        $this->assertEquals([
+            'pkg-install' => true,
+            'pkg-short-form' => true,
+        ], $packages);
+    }
+
+    public function testInstallBestEffortSelectsFirstAvailableFallbackOnlyOnce(): void
+    {
+        if (!pmssPackageAvailable('bash')) {
+            throw new SkipTest('bash package unavailable in local apt cache');
+        }
+
+        pmssInstallBestEffort([
+            ['pmss-definitely-missing-package', 'bash', 'coreutils'],
+            'bash',
+            ['pmss-another-missing-package'],
+        ], 'shell runtime');
+
+        $this->assertEquals(['bash'], $GLOBALS['PMSS_PACKAGE_QUEUE'][PMSS_PACKAGE_QUEUE_DEFAULT] ?? []);
+    }
 }

@@ -111,15 +111,6 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
 
     $label = $target['label'];
     $template = $repos[$target['repo']] ?? '';
-    $post = $target['eol'] ? function () use ($log, $label): void {
-        // EOL suites lack valid Release timestamps; relax the check.
-        if (defined('PMSS_TEST_MODE')) {
-            $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
-            return;
-        }
-        passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-        passthru('apt-get clean;');
-    } : null;
 
     if ($template === '') {
         $log("{$label} template missing, leaving sources.list untouched");
@@ -128,7 +119,15 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
 
     $hash = sha1($template);
     if ($currentHash !== $hash && pmssSafeWriteSources($template, $label, $log)) {
-        $post && $post();
+        if ($target['eol']) {
+            // EOL suites lack valid Release timestamps; relax the check.
+            if (defined('PMSS_TEST_MODE')) {
+                $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
+            } else {
+                passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+                passthru('apt-get clean;');
+            }
+        }
         $log("Applied Debian {$label} repository config");
         return;
     }
