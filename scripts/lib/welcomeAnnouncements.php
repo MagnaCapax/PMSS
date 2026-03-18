@@ -32,13 +32,10 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
     }
 
     $restoreInternalErrors = function_exists('libxml_use_internal_errors');
-    $previousInternalErrors = false;
+    $clearErrors = function_exists('libxml_clear_errors');
+    $previousInternalErrors = $restoreInternalErrors ? libxml_use_internal_errors(true) : false;
 
-    if ($restoreInternalErrors) {
-        $previousInternalErrors = libxml_use_internal_errors(true);
-    }
-
-    if (function_exists('libxml_clear_errors')) {
+    if ($clearErrors) {
         libxml_clear_errors();
     }
 
@@ -47,7 +44,7 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
     } catch (\Throwable $throwable) {
         $rssXml = false;
     } finally {
-        if (function_exists('libxml_clear_errors')) {
+        if ($clearErrors) {
             libxml_clear_errors();
         }
 

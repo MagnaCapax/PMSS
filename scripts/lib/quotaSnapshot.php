@@ -17,11 +17,7 @@ function pmssQuotaSnapshotNormalizeHumanReadableOutput(string $content): string
         return $content;
     }
 
-    foreach ($lines as $index => $line) {
-        $lines[$index] = pmssQuotaSnapshotNormalizeHumanReadableLine((string) $line);
-    }
-
-    $normalized = implode(PHP_EOL, $lines);
+    $normalized = implode(PHP_EOL, array_map('pmssQuotaSnapshotNormalizeHumanReadableLine', $lines));
     if ($content !== '' && substr($content, -1) === "\n" && substr($normalized, -1) !== "\n") {
         $normalized .= PHP_EOL;
     }
@@ -70,5 +66,5 @@ function pmssQuotaSnapshotNormalizeSizeToken(string $token): string
         return $token;
     }
 
-    return $matches[1].'K'.(isset($matches[2]) ? $matches[2] : '');
+    return $matches[1].'K'.($matches[2] ?? '');
 }

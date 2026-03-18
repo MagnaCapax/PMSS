@@ -21,11 +21,10 @@ function pmssTorrentPortCurrentUserContext(): ?array
     }
 
     $user = basename($home);
-    if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
-        $info = @posix_getpwuid(@posix_geteuid());
-        if (is_array($info) && isset($info['name']) && is_string($info['name']) && $info['name'] !== '') {
-            $user = $info['name'];
-        }
+    if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')
+        && is_array($info = @posix_getpwuid(@posix_geteuid()))
+        && is_string($info['name'] ?? null) && $info['name'] !== '') {
+        $user = $info['name'];
     }
 
     return $user === '' ? null : ['user' => $user, 'home' => $home];
@@ -37,7 +36,7 @@ function pmssTorrentPortCurrentUserContext(): ?array
 function pmssTorrentPortExpectedRead(string $path): ?int
 {
     $raw = trim((string) @file_get_contents($path));
-    if ($raw === '' || preg_match('/^[0-9]+$/', $raw) !== 1) {
+    if (preg_match('/^[0-9]+$/', $raw) !== 1) {
         return null;
     }
 

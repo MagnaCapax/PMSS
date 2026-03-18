@@ -17,8 +17,7 @@ function pmssWelcomeReadJson(string $path): array
         return [];
     }
 
-    $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
+    return is_array($decoded = json_decode($raw, true)) ? $decoded : [];
 }
 
 /**
@@ -38,8 +37,7 @@ function pmssWelcomeMessageForUser(
             break;
         }
     }
-    $productFile = rtrim($userHome, '/').'/.product';
-    if ($productKey === '' && is_file($productFile) && !is_link($productFile)) {
+    if ($productKey === '' && is_file($productFile = rtrim($userHome, '/').'/.product') && !is_link($productFile)) {
         $productKey = trim((string) @file_get_contents($productFile));
     }
 
@@ -51,9 +49,8 @@ function pmssWelcomeMessageForUser(
         $messageMap = is_array($messageMap['products'] ?? null) ? $messageMap['products'] : $messageMap;
         if (!is_string($template = $messageMap[$productKey] ?? null)) {
             $template = '';
-            $lowerProductKey = strtolower($productKey);
             foreach ($messageMap as $mapKey => $mapValue) {
-                if (!is_string($mapKey) || !is_string($mapValue) || strtolower($mapKey) !== $lowerProductKey) {
+                if (!is_string($mapKey) || !is_string($mapValue) || strcasecmp($mapKey, $productKey) !== 0) {
                     continue;
                 }
 

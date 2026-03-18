@@ -24,9 +24,7 @@ if (!function_exists('logmsg')) {
         global $logmsg_default_logger;
 
         if (!isset($logmsg_default_logger)) {
-            if (!class_exists('Logger')) {
-                require_once __DIR__.'/logger.php';
-            }
+            require_once __DIR__.'/logger.php';
             $logmsg_default_logger = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);
         }
 
