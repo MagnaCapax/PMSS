@@ -153,6 +153,18 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
         return;
     }
 
+    $applyPermissions = static function (string $path) use ($targetFile, $user): void {
+        if (!@chmod($path, 0755)) {
+            logMessage("[WARN] Failed to chmod 0755: {$targetFile}");
+        }
+        if (!@chown($path, (string) $user)) {
+            logMessage("[WARN] Failed to chown {$user}: {$targetFile}");
+        }
+        if (!@chgrp($path, (string) $user)) {
+            logMessage("[WARN] Failed to chgrp {$user}: {$targetFile}");
+        }
+    };
+
     $tempFile = @tempnam($parent, 'pmss-userfile-');
     if ($tempFile === false) {
         logMessage("[user:{$user}] Failed to create temp file in {$parent}");
@@ -164,15 +176,7 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
         return;
     }
 
-    if (!@chmod($tempFile, 0755)) {
-        logMessage("[WARN] Failed to chmod 0755: {$targetFile}");
-    }
-    if (!@chown($tempFile, (string) $user)) {
-        logMessage("[WARN] Failed to chown {$user}: {$targetFile}");
-    }
-    if (!@chgrp($tempFile, (string) $user)) {
-        logMessage("[WARN] Failed to chgrp {$user}: {$targetFile}");
-    }
+    $applyPermissions($tempFile);
 
     if (!@rename($tempFile, $targetFile)) {
         @unlink($tempFile);
@@ -181,15 +185,7 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
     }
 
     // Avoid shelling out for simple chmod/chown: fork failures are common during updates.
-    if (!@chmod($targetFile, 0755)) {
-        logMessage("[WARN] Failed to chmod 0755: {$targetFile}");
-    }
-    if (!@chown($targetFile, (string) $user)) {
-        logMessage("[WARN] Failed to chown {$user}: {$targetFile}");
-    }
-    if (!@chgrp($targetFile, (string) $user)) {
-        logMessage("[WARN] Failed to chgrp {$user}: {$targetFile}");
-    }
+    $applyPermissions($targetFile);
 }
 
 /**
@@ -259,13 +255,8 @@ function updateRutorrentConfig($username, $scgiPort) {
  * @return string The version string or "unknown" if not found.
  */
 function getPmssVersion($versionFile = '/etc/seedbox/config/version') {
-    foreach (array($versionFile, '/etc/seedbox/runtime/version') as $path) {
-        if ($path === '' || !is_file($path)) {
-            continue;
-        }
-
-        $data = trim((string) @file_get_contents($path));
-        if ($data !== '') {
+    foreach ([$versionFile, '/etc/seedbox/runtime/version'] as $path) {
+        if ($path !== '' && is_file($path) && ($data = trim((string) @file_get_contents($path))) !== '') {
             return $data;
         }
     }

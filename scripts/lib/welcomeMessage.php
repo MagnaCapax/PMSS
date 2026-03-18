@@ -29,7 +29,8 @@ function pmssWelcomeMessageForUser(
     string $username,
     string $productMessagesPath = '/etc/seedbox/config/welcomeMessages.json'
 ): string {
-    $userConfig = pmssWelcomeReadJson(rtrim($userHome, '/').'/.config/pmss-user.json');
+    $userHome = rtrim($userHome, '/');
+    $userConfig = pmssWelcomeReadJson($userHome.'/.config/pmss-user.json');
     $productKey = '';
     foreach (['product', 'productName'] as $candidateKey) {
         $candidateValue = $userConfig[$candidateKey] ?? null;
@@ -37,7 +38,7 @@ function pmssWelcomeMessageForUser(
             break;
         }
     }
-    if ($productKey === '' && is_file($productFile = rtrim($userHome, '/').'/.product') && !is_link($productFile)) {
+    if ($productKey === '' && is_file($productFile = $userHome.'/.product') && !is_link($productFile)) {
         $productKey = trim((string) @file_get_contents($productFile));
     }
 

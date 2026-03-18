@@ -63,7 +63,7 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
     }
 
     $itemsHtml = '';
-    $items = isset($items['pubDate'], $items['link'], $items['title']) ? array($items) : $items;
+    $items = isset($items['pubDate'], $items['link'], $items['title']) ? [$items] : $items;
     foreach (array_slice($items, 0, 4, true) as $thisItem) {
         if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {
             continue;

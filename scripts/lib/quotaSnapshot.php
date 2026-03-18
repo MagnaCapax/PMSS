@@ -12,17 +12,15 @@
  */
 function pmssQuotaSnapshotNormalizeHumanReadableOutput(string $content): string
 {
-    $lines = preg_split('/\r?\n/', $content);
-    if (!is_array($lines)) {
+    if (!is_array($lines = preg_split('/\r?\n/', $content))) {
         return $content;
     }
 
     $normalized = implode(PHP_EOL, array_map('pmssQuotaSnapshotNormalizeHumanReadableLine', $lines));
-    if ($content !== '' && substr($content, -1) === "\n" && substr($normalized, -1) !== "\n") {
-        $normalized .= PHP_EOL;
-    }
 
-    return $normalized;
+    return ($content !== '' && substr($content, -1) === "\n" && substr($normalized, -1) !== "\n")
+        ? $normalized.PHP_EOL
+        : $normalized;
 }
 
 /**
@@ -47,10 +45,12 @@ function pmssQuotaSnapshotNormalizeHumanReadableLine(string $line): string
         } else {
             $normalizedToken = $tokens[$index];
         }
-        if ($normalizedToken !== $tokens[$index]) {
-            $changed = true;
-            $tokens[$index] = $normalizedToken;
+        if ($normalizedToken === $tokens[$index]) {
+            continue;
         }
+
+        $changed = true;
+        $tokens[$index] = $normalizedToken;
     }
 
     if (!$changed) {
