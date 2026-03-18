@@ -143,4 +143,59 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('template.qbittorrent.conf', $userConfigSrc);
         $this->assertStringContainsString("pmssQbittorrentApplyUploadThrottle(\$user['name'], \$throttle);", $userConfigSrc);
     }
+
+    public function testSuspendLandingKeepsTemplateLoadInline(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/suspend.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssRender'.'SuspendedHtml';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()'
+        );
+        $this->assertStringContainsString("/etc/seedbox/config/template.suspended.notice.html", $src);
+        $this->assertStringContainsString("pmssSuspendedFallbackHtml(\$username)", $src);
+        $this->assertStringContainsString("@file_put_contents(\$suspendRoot.'/index.html', \$html)", $src);
+    }
+
+    public function testStorageHealthSnapshotKeepsLsblkParsingLocal(): void
+    {
+        $snapshotPath = dirname(__DIR__, 4).'/scripts/util/storageHealthSnapshot.php';
+        $snapshotSrc = @file_get_contents($snapshotPath);
+        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/disks.php';
+        $facadePath = dirname(__DIR__, 4).'/scripts/lib/storageHealth.php';
+        $facadeSrc = @file_get_contents($facadePath);
+        $symbol = 'pmssStorageHealthList'.'DisksFromLsblk';
+
+        $this->assertTrue(is_string($snapshotSrc) && $snapshotSrc !== '', 'Expected to read '.$snapshotPath);
+        $this->assertTrue(is_string($facadeSrc) && $facadeSrc !== '', 'Expected to read '.$facadePath);
+        $this->assertTrue(!is_file($libraryPath), 'Expected one-call storageHealth/disks.php helper file to be removed');
+        $this->assertTrue(
+            strpos($snapshotSrc, $symbol.'(') === false,
+            'storageHealthSnapshot.php should keep lsblk parsing local to pmssStorageHealthSnapshotMain()'
+        );
+        $this->assertStringContainsString("preg_split('/\\r?\\n/', trim((string) \$lsblkOut))", $snapshotSrc);
+        $this->assertStringContainsString("strpos(\$kname, 'loop') === 0", $snapshotSrc);
+        $this->assertTrue(
+            strpos($facadeSrc, "'disks'") === false,
+            'storageHealth.php should stop requiring the removed disks.php module'
+        );
+    }
+
+    public function testResourceSnapshotCronOwnsSnapshotLoop(): void
+    {
+        $cronPath = dirname(__DIR__, 4).'/scripts/cron/resourceSnapshot.php';
+        $cronSrc = @file_get_contents($cronPath);
+        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/resources/snapshot.php';
+        $symbol = 'pmssResource'.'SnapshotRun';
+        $this->assertTrue(is_string($cronSrc) && $cronSrc !== '', 'Expected to read '.$cronPath);
+        $this->assertTrue(!is_file($libraryPath), 'Expected one-call resources snapshot library file to be removed');
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/resources/log.php';", $cronSrc);
+        $this->assertStringContainsString('const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT', $cronSrc);
+        $this->assertStringContainsString('new ResourceStatsAccumulator([\'day\' => $threshold])', $cronSrc);
+        $this->assertStringContainsString('exit(pmssResourceSnapshotRun());', $cronSrc);
+        $this->assertStringContainsString('function '.$symbol.'(): int', $cronSrc);
+    }
 }

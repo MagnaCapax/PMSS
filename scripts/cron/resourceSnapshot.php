@@ -7,7 +7,130 @@
  * @author PMSS Team
  */
 
-require_once '/scripts/lib/resources/snapshot.php';
+require_once __DIR__.'/../lib/resources/log.php';
+require_once __DIR__.'/../lib/resources.php';
+require_once __DIR__.'/../lib/resources/accumulator.php';
+
+const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
+
+/**
+ * Capture and persist one snapshot.
+ *
+ * @return int exit code
+ */
+function pmssResourceSnapshotRun(): int
+{
+    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+        fwrite(STDERR, "resourceSnapshot.php must be run as root.\n");
+        return 1;
+    }
+
+    $logPath = getenv('PMSS_RESOURCE_SNAPSHOT_LOG') ?: PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT;
+    $logDir = dirname($logPath);
+    $ts = date('Y-m-d\\TH:i:s');
+
+    $oldUmask = umask(0077);
+    $fh = false;
+    try {
+        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+            return 1;
+        }
+
+        $fh = @fopen($logPath, 'ab');
+        if ($fh === false) {
+            return 1;
+        }
+        @chmod($logPath, 0600);
+        if (function_exists('flock')) {
+            @flock($fh, LOCK_EX);
+        }
+
+        $users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
+        if ($users === []) {
+            return 0;
+        }
+        $users[] = 'www-data';
+
+        $stats = new resourceStatistics();
+        $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
+
+        foreach ($users as $user) {
+            if (!pmssResourceLogIsValidUser($user) || ($uid = pmssResourceLogLookupUid($user)) === null) {
+                continue;
+            }
+
+            $dataPath = $homeDir.'/'.$user.'/.resourceData';
+            $raw = is_file($dataPath) ? @file_get_contents($dataPath) : false;
+            $metrics = null;
+            if (is_string($raw) && trim($raw) !== '' && is_array($data = @unserialize($raw))) {
+                $metrics = [];
+                foreach (['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'] as $key) {
+                    $value = $data[$key]['raw']['day'] ?? null;
+                    if ($value === null) {
+                        $metrics = null;
+                        break;
+                    }
+                    $metrics[$key] = (float) $value;
+                }
+                if ($metrics !== null) {
+                    $metrics['io_read_ops'] = (float) ($data['io_read_ops']['raw']['day'] ?? 0.0);
+                    $metrics['io_write_ops'] = (float) ($data['io_write_ops']['raw']['day'] ?? 0.0);
+                }
+            }
+
+            if ($metrics === null && ($dataLines = trim($stats->getData($user, 350))) !== '') {
+                $threshold = time() - (24 * 60 * 60);
+                $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
+                foreach (array_filter(explode("\n", $dataLines)) as $line) {
+                    $parsed = $stats->parseLine($line);
+                    if ($parsed === false || $parsed['timestamp'] < $threshold) {
+                        continue;
+                    }
+                    $accumulator->addSample($parsed);
+                }
+                if ($accumulator->hasSamples()) {
+                    $results = $accumulator->results();
+                    $metrics = [
+                        'memory' => $results['memory']['day'],
+                        'tasks' => $results['tasks']['day'],
+                    ];
+                    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metricName) {
+                        $metrics[$metricName] = $results['raw'][$metricName]['day'];
+                    }
+                }
+            }
+
+            if ($metrics === null) {
+                @fwrite($fh, $ts.' WARN resource_missing user='.$user.PHP_EOL);
+                continue;
+            }
+
+            @fwrite(
+                $fh,
+                sprintf(
+                    '%s %d %d %d %d %d %.4f %.2f %d %d',
+                    $ts,
+                    $uid,
+                    (int) round($metrics['io_read']),
+                    (int) round($metrics['io_write']),
+                    (int) round($metrics['cpu']),
+                    (int) round($metrics['memory']),
+                    $metrics['ram_hours'],
+                    $metrics['tasks'],
+                    (int) round($metrics['io_read_ops']),
+                    (int) round($metrics['io_write_ops'])
+                ).PHP_EOL
+            );
+        }
+
+        return 0;
+    } finally {
+        if ($fh !== false) {
+            @fclose($fh);
+        }
+        umask($oldUmask);
+    }
+}
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     exit(pmssResourceSnapshotRun());

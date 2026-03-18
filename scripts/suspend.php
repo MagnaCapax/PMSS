@@ -166,7 +166,17 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
         }
     }
 
-    $html = pmssRenderSuspendedHtml($username);
+    $templatePath = '/etc/seedbox/config/template.suspended.notice.html';
+    $template = @file_get_contents($templatePath);
+    if ($template === false || trim($template) === '') {
+        $html = pmssSuspendedFallbackHtml($username);
+    } else {
+        $html = str_replace(
+            ['##USERNAME##', '##SUPPORT_URL##'],
+            [htmlspecialchars($username, ENT_QUOTES, 'UTF-8'), 'https://pulsedmedia.com/contact/'],
+            $template
+        );
+    }
     $rootResult = @file_put_contents($suspendRoot.'/index.html', $html);
     $publicResult = @file_put_contents($publicDir.'/index.html', $html);
 
@@ -180,24 +190,6 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
     @chgrp($publicDir.'/index.html', $username);
 
     return $rootResult !== false && $publicResult !== false;
-}
-
-/**
- * Build landing HTML using template or fallback markup.
- */
-function pmssRenderSuspendedHtml(string $username): string
-{
-    $templatePath = '/etc/seedbox/config/template.suspended.notice.html';
-    $template = @file_get_contents($templatePath);
-    if ($template === false || trim($template) === '') {
-        return pmssSuspendedFallbackHtml($username);
-    }
-
-    $replacements = [
-        '##USERNAME##' => htmlspecialchars($username, ENT_QUOTES, 'UTF-8'),
-        '##SUPPORT_URL##' => 'https://pulsedmedia.com/contact/',
-    ];
-    return str_replace(array_keys($replacements), array_values($replacements), $template);
 }
 
 /**

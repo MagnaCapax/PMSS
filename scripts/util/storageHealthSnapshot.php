@@ -56,7 +56,31 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     };
 
     $lsblkOut = shell_exec('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE 2>/dev/null');
-    $disks = $lsblkOut ? pmssStorageHealthListDisksFromLsblk($lsblkOut) : [];
+    $disks = [];
+    foreach (preg_split('/\r?\n/', trim((string) $lsblkOut)) as $line) {
+        if ($line === '') {
+            continue;
+        }
+
+        $parts = preg_split('/\s+/', trim($line));
+        if (!is_array($parts) || ($partCount = count($parts)) < 3) {
+            continue;
+        }
+
+        $kname = (string) $parts[0];
+        if ($parts[1] !== 'disk' || strpos($kname, 'loop') === 0 || strpos($kname, 'ram') === 0) {
+            continue;
+        }
+
+        $disks[] = [
+            'path' => '/dev/'.$kname,
+            'kname' => $kname,
+            'rota' => (int) $parts[2],
+            'model' => implode(' ', array_slice($parts, 3, max(0, $partCount - 5))),
+            'serial' => (string) ($parts[$partCount - 2] ?? ''),
+            'size' => (string) ($parts[$partCount - 1] ?? ''),
+        ];
+    }
     foreach ($disks as $disk) {
         $appendJson(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
         $nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp);
