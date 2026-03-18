@@ -19,10 +19,12 @@ class UpdateQuotasGuardTest extends TestCase
         $this->assertStringContainsString('$quotaFile = "/home/{$thisUser}/.quota";', $src, 'updateQuotas.php must derive quota file path from /home/<user>');
         $this->assertStringContainsString('file_exists($quotaFile)', $src, 'updateQuotas.php must check for existing quota file via PHP');
         $this->assertStringContainsString('function pmssQuotaSnapshotWrite', $src, 'updateQuotas.php should own the atomic snapshot writer locally');
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/quotaSnapshot.php';", $src, 'updateQuotas.php should load the quota snapshot normalizer');
         $this->assertStringContainsString("tempnam(\$dir, basename(\$path).'.pmss-tmp-')", $src, 'updateQuotas.php must stage quota snapshots in the destination directory');
         $this->assertStringContainsString('@rename($tmp, $path)', $src, 'updateQuotas.php must atomically replace quota snapshots via rename');
         $this->assertStringContainsString('pmssQuotaSnapshotWrite($quotaFile, $fallbackContent)', $src, 'updateQuotas.php must atomically write fallback quota snapshots');
         $this->assertStringContainsString('pmssQuotaSnapshotWrite($quotaFile, $content)', $src, 'updateQuotas.php must atomically write refreshed quota snapshots');
+        $this->assertStringContainsString('pmssQuotaSnapshotNormalizeHumanReadableOutput($content)', $src, 'updateQuotas.php should normalize human-readable quota snapshots before writing them');
         $this->assertTrue(strpos($src, 'unlink($quotaFile)') === false, 'updateQuotas.php must not delete existing quota snapshot before validating a refresh');
         $this->assertTrue(strpos($src, 'file_put_contents($quotaFile') === false, 'updateQuotas.php should not stream quota snapshots directly into the live path');
         $this->assertStringContainsString("strpos(\$existingQuotaContent, 'Disk quotas') !== false", $src, 'updateQuotas.php should detect an existing parseable quota snapshot');

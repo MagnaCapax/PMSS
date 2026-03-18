@@ -18,6 +18,7 @@
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';
+require_once __DIR__.'/../lib/quotaSnapshot.php';
 $pmssUserLogPath = __DIR__.'/../lib/user/log.php';
 if (is_file($pmssUserLogPath)) {
     require_once $pmssUserLogPath;
@@ -142,6 +143,7 @@ foreach ($users as $thisUser) {
     exec($quotaCmd, $outputLines, $ret);
 
     $content = implode(PHP_EOL, $outputLines).PHP_EOL;
+    $content = pmssQuotaSnapshotNormalizeHumanReadableOutput($content);
     $hasValidOutput = count($outputLines) > 0 && strpos($content, 'Disk quotas') !== false;
 
     if ($ret > 1 || !$hasValidOutput) {
