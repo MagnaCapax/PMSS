@@ -23,6 +23,18 @@ class WelcomeAnnouncementsTest extends TestCase
         $this->assertEquals('', \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss));
     }
 
+    public function testSingleItemFeedRendersOneListItem(): void
+    {
+        $rss = '<?xml version="1.0" encoding="UTF-8"?><rss><channel>'
+            . '<item><title>Only</title><link>https://example.test/only</link><pubDate>Tue, 17 Mar 2026 10:00:00 +0000</pubDate></item>'
+            . '</channel></rss>';
+
+        $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
+
+        $this->assertEquals(1, substr_count($html, '<li>'));
+        $this->assertStringContainsString('Only', $html);
+    }
+
     public function testValidFeedRendersOnlyFirstFourItems(): void
     {
         $rss = '<?xml version="1.0" encoding="UTF-8"?><rss><channel>'

@@ -33,13 +33,8 @@ function pmssWelcomeMessageForUser(
     $userConfig = pmssWelcomeReadJson(rtrim($userHome, '/').'/.config/pmss-user.json');
     $productKey = '';
     foreach (['product', 'productName'] as $candidateKey) {
-        if (!is_string($userConfig[$candidateKey] ?? null)) {
-            continue;
-        }
-
-        $value = trim($userConfig[$candidateKey]);
-        if ($value !== '') {
-            $productKey = $value;
+        $candidateValue = $userConfig[$candidateKey] ?? null;
+        if (is_string($candidateValue) && ($productKey = trim($candidateValue)) !== '') {
             break;
         }
     }
@@ -54,14 +49,16 @@ function pmssWelcomeMessageForUser(
     if ($template === '' && $productKey !== '') {
         $messageMap = pmssWelcomeReadJson($productMessagesPath);
         $messageMap = is_array($messageMap['products'] ?? null) ? $messageMap['products'] : $messageMap;
-        $template = is_string($messageMap[$productKey] ?? null) ? $messageMap[$productKey] : '';
-        if ($template === '') {
+        if (!is_string($template = $messageMap[$productKey] ?? null)) {
+            $template = '';
             $lowerProductKey = strtolower($productKey);
             foreach ($messageMap as $mapKey => $mapValue) {
-                if (is_string($mapKey) && is_string($mapValue) && strtolower($mapKey) === $lowerProductKey) {
-                    $template = $mapValue;
-                    break;
+                if (!is_string($mapKey) || !is_string($mapValue) || strtolower($mapKey) !== $lowerProductKey) {
+                    continue;
                 }
+
+                $template = $mapValue;
+                break;
             }
         }
     }

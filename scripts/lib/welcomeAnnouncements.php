@@ -24,13 +24,10 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         return '';
     }
 
-    $rssUtf8 = false;
-    if (function_exists('mb_convert_encoding')) {
-        $rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8');
-    } elseif (function_exists('iconv')) {
-        $rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw);
-    }
-    if (is_string($rssUtf8)) {
+    if (
+        (function_exists('mb_convert_encoding') && is_string($rssUtf8 = @mb_convert_encoding($rssRaw, 'UTF-8', 'UTF-8')))
+        || (function_exists('iconv') && is_string($rssUtf8 = @iconv('UTF-8', 'UTF-8//IGNORE', $rssRaw)))
+    ) {
         $rssRaw = $rssUtf8;
     }
 
@@ -63,18 +60,12 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         return '';
     }
 
-    $rssFeedJson = json_encode($rssXml);
-    if (!is_string($rssFeedJson) || $rssFeedJson === '') {
-        return '';
-    }
-
-    $rssFeed = json_decode($rssFeedJson, true);
-    if (!is_array($rssFeed['channel']['item'] ?? null)) {
+    $rssFeed = json_decode((string) json_encode($rssXml), true);
+    if (!is_array($rssFeed) || !is_array($items = $rssFeed['channel']['item'] ?? null)) {
         return '';
     }
 
     $itemsHtml = '';
-    $items = $rssFeed['channel']['item'];
     $items = isset($items['pubDate'], $items['link'], $items['title']) ? array($items) : $items;
     foreach (array_slice($items, 0, 4, true) as $thisItem) {
         if (!isset($thisItem['pubDate'], $thisItem['link'], $thisItem['title'])) {

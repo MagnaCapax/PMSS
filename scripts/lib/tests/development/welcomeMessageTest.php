@@ -114,6 +114,27 @@ class WelcomeMessageTest extends TestCase
         }
     }
 
+    public function testProductFieldWinsOverProductNameWhenBothExist(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $home = $this->makeUserHome();
+            @file_put_contents(
+                $home.'/.config/pmss-user.json',
+                json_encode(['product' => 'm500', 'productName' => 'm900'], JSON_UNESCAPED_SLASHES)
+            );
+            @file_put_contents(
+                $this->tempDir.'/welcomeMessages.json',
+                json_encode(['m500' => 'primary {{product}}', 'm900' => 'alias {{product}}'], JSON_UNESCAPED_SLASHES)
+            );
+
+            $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
+            $this->assertEquals('primary m500', $message);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testProductMessageSetPreservesNestedProductsMapShape(): void
     {
         $this->setUpTempDir();
