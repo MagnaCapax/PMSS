@@ -20,25 +20,22 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/remoteBinary.php';
 
-$arch   = php_uname('m');
-$log = 'logmsg';
+$arch = php_uname('m');
 
 if ($arch !== 'x86_64' && $arch !== 'amd64') {
-    $log("[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
+    logmsg("[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
     return;
 }
 
 $legacyBinaries = [
     [
         'label'   => 'BTSync 1.4',
-        'version' => '1.4',
         'url'     => 'https://pulsedmedia.com/remote/pkg/btsync',
         'sha256'  => '7f7cdd367b90c857427cf2ec849061cafc4933af5c4cf8b5a38412c755043332',
         'path'    => '/usr/bin/btsync1.4',
     ],
     [
         'label'   => 'BTSync 2.2',
-        'version' => '2.2',
         'url'     => 'https://pulsedmedia.com/remote/pkg/btsync2.2',
         'sha256'  => '30b4b9d3d2b27a4c9800dcebc14df7db13b4979fcd64fc66c49aff0c8c1cb26d',
         'path'    => '/usr/bin/btsync2.2',
@@ -46,7 +43,7 @@ $legacyBinaries = [
 ];
 foreach ($legacyBinaries as $legacy) {
     if (file_exists($legacy['path'])) { continue; }
-    $log("*** {$legacy['label']} not present, downloading and adding!");
+    logmsg("*** {$legacy['label']} not present, downloading and adding!");
     pmssInstallPinnedRemoteBinary($legacy['label'], $legacy['url'], $legacy['sha256'], $legacy['path'], false);
 }
 
@@ -71,16 +68,15 @@ if (!file_exists($btsyncPath)) {
 
 
 // Install Resilio Sync if required.
-$rslsyncBinary   = '/usr/bin/rslsync';
-$rslsyncUrl      = 'https://pulsedmedia.com/remote/pkg/rslsync';
-$rslsyncSha256   = 'f8c71f6d447a2a9aec93bde7c316bbb7ac6be98d0bcb9dc645f4ca4e347bc333';
+$rslsyncBinary = '/usr/bin/rslsync';
+$rslsyncSha256 = 'f8c71f6d447a2a9aec93bde7c316bbb7ac6be98d0bcb9dc645f4ca4e347bc333';
 
 if (is_string($installedSha = is_file($rslsyncBinary) ? @hash_file('sha256', $rslsyncBinary) : false)
     && strtolower($installedSha) === strtolower($rslsyncSha256)) {
-    $log('*** Resilio Sync already matches pinned checksum; skipping download');
+    logmsg('*** Resilio Sync already matches pinned checksum; skipping download');
     return;
 }
 
-$log('*** Resilio Sync missing/out of date; refreshing rslsync binary');
+logmsg('*** Resilio Sync missing/out of date; refreshing rslsync binary');
 
-pmssInstallPinnedRemoteBinary('Resilio Sync', $rslsyncUrl, $rslsyncSha256, $rslsyncBinary, true);
+pmssInstallPinnedRemoteBinary('Resilio Sync', 'https://pulsedmedia.com/remote/pkg/rslsync', $rslsyncSha256, $rslsyncBinary, true);

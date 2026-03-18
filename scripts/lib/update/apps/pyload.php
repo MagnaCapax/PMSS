@@ -8,17 +8,13 @@
 
 require_once __DIR__.'/pythonVenv.php';
 
-$logger = 'logmsg';
-
-$distroVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
-if ($distroVersion > 0 && $distroVersion < 10) {
-    $logger('[WARN] Skipping pyLoad setup: unsupported Debian release');
+if (($distroVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0)) > 0 && $distroVersion < 10) {
+    logmsg('[WARN] Skipping pyLoad setup: unsupported Debian release');
     return;
 }
 
-$python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
-if ($python === '') {
-    $logger('[WARN] Skipping pyLoad setup: python3 missing from PATH');
+if (trim((string) @shell_exec('command -v python3 2>/dev/null')) === '') {
+    logmsg('[WARN] Skipping pyLoad setup: python3 missing from PATH');
     return;
 }
 
@@ -27,15 +23,20 @@ $cliBin    = $venvDir.'/bin/pyload';
 
 // Required Python toolchain packages are queued centrally via packages.php
 
-$venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', $logger);
+$venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', 'logmsg');
 if (empty($venv)) {
     return;
 }
 
 runStep('Installing pyLoad (pyload-ng)', sprintf('%s -m pip install --upgrade pyload-ng', escapeshellarg($venv['python'])));
 
-if (is_file($cliBin) && (!is_link('/usr/local/bin/pyload') || readlink('/usr/local/bin/pyload') !== $cliBin)) {
+if (!is_file($cliBin)) {
+    if (getenv('PMSS_DRY_RUN') !== '1') {
+        logmsg('[WARN] pyLoad binary missing after install');
+    }
+    return;
+}
+
+if (!is_link('/usr/local/bin/pyload') || readlink('/usr/local/bin/pyload') !== $cliBin) {
     runStep('Linking pyLoad CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/pyload')));
-} elseif (!is_file($cliBin) && getenv('PMSS_DRY_RUN') !== '1') {
-    $logger('[WARN] pyLoad binary missing after install');
 }

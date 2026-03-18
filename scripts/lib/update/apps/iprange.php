@@ -17,8 +17,7 @@ if (file_exists('/usr/local/bin/iprange')) {
     return;
 }
 
-$dependencies = ['build-essential', 'gcc', 'make', 'gawk'];
-$missing = array_values(array_filter($dependencies, static function (string $pkg): bool {
+$missing = array_values(array_filter(['build-essential', 'gcc', 'make', 'gawk'], static function (string $pkg): bool {
     return pmssPackageStatus($pkg) !== 'install ok installed';
 }));
 
@@ -27,7 +26,7 @@ if (!empty($missing)) {
     return;
 }
 
-$compileCmd = implode(' && ', [
+runStep('Building iprange from source', implode(' && ', [
     'set -e',
     'mkdir -p /root/compile',
     'cd /root/compile',
@@ -38,6 +37,4 @@ $compileCmd = implode(' && ', [
     './configure',
     'make -j6',
     'make install'
-]);
-
-runStep('Building iprange from source', $compileCmd);
+]));
