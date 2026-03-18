@@ -38,7 +38,6 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '')
         'ruTorrent refresh'   => 'pmssUserUpgradeRutorrent',
         'ruTorrent PHP compatibility' => 'pmssUserMaintainRutorrentPhpCompatibility',
         'Plugin maintenance'  => 'pmssUserEnsurePlugins',
-        'Retracker cleanup'   => 'pmssUserMaintainRetracker',
         'Permission refresh'  => 'pmssUserRefreshPermissions',
     ];
 

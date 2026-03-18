@@ -3,7 +3,10 @@ namespace {
     if (!function_exists('runUserStep')) {
         function runUserStep(string $user, string $description, string $command): int
         {
-            // simulate success without executing commands
+            $GLOBALS['PMSS_PROFILE'][] = [
+                'description' => $description,
+                'command' => $command,
+            ];
             return 0;
         }
     }
@@ -67,6 +70,56 @@ class UserUpdatePluginsTest extends TestCase
             }
             $this->cleanup($home);
         }
+    }
+
+    public function testEnsurePluginsOwnsRetrackerCleanupAndDirectoryBootstrap(): void
+    {
+        $home = sys_get_temp_dir().'/pmss-plugins-retracker-'.bin2hex(random_bytes(4));
+        $settingsDir = $home.'/www/rutorrent/share/users/dummy/settings';
+        @mkdir($home.'/www/rutorrent/plugins/unpack', 0755, true);
+        @mkdir($settingsDir, 0755, true);
+        file_put_contents(
+            $settingsDir.'/retrackers.dat',
+            'O:11:"rRetrackers":4:{s:4:"hash";s:14:"retrackers.dat";s:4:"list";a:1:{i:0;a:1:{i:0;s:33:"http://149.5.241.17:6969/announce";}}s:14:"dontAddPrivate";s:1:"1";s:10:"addToBegin";s:1:"1";}'
+        );
+
+        $GLOBALS['PMSS_PROFILE'] = [];
+
+        try {
+            \pmssUserEnsurePlugins([
+                'user'     => 'dummy',
+                'home'     => $home,
+                'user_esc' => escapeshellarg('dummy'),
+            ]);
+
+            $this->assertTrue(!file_exists($settingsDir.'/retrackers.dat'));
+            $this->assertEquals(
+                sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/users/dummy/torrents')),
+                $this->findCommand('Creating ruTorrent torrents directory')
+            );
+            $this->assertEquals(
+                sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/settings/rss')),
+                $this->findCommand('Creating ruTorrent RSS settings directory')
+            );
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
+    private function findCommand(string $needle): ?string
+    {
+        foreach (($GLOBALS['PMSS_PROFILE'] ?? []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $description = (string) ($entry['description'] ?? '');
+            if (strpos($description, $needle) === false) {
+                continue;
+            }
+            return isset($entry['command']) ? (string) $entry['command'] : null;
+        }
+
+        return null;
     }
 
     private function cleanup(string $path): void

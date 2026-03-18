@@ -12,7 +12,7 @@ class SkeletonPathTest extends TestCase
         putenv('PMSS_SKEL_DIR='.$temp);
         try {
             $this->assertEquals($temp, \pmssSkeletonBase());
-            $this->assertEquals($temp.'/foo/bar', \pmssSkeletonPath('foo/bar'));
+            $this->assertEquals($temp.'/foo/bar', \pmssSkeletonBase().'/foo/bar');
         } finally {
             if ($original === false) {
                 putenv('PMSS_SKEL_DIR');
@@ -22,10 +22,10 @@ class SkeletonPathTest extends TestCase
         }
     }
 
-    public function testSkeletonPathHandlesTrailingSlash(): void
+    public function testSkeletonBaseNormalizesTrailingSlash(): void
     {
         putenv('PMSS_SKEL_DIR=/etc/skel/');
-        $this->assertEquals('/etc/skel/foo', \pmssSkeletonPath('foo'));
+        $this->assertEquals('/etc/skel', \pmssSkeletonBase());
         putenv('PMSS_SKEL_DIR');
     }
 }

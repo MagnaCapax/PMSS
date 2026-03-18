@@ -40,11 +40,16 @@ class RepositoryPrerequisitesTest extends TestCase
         $this->assertEquals($before, $after, 'MediaArea bootstrap should skip when key already present');
     }
 
-    public function testSonarrSourceLineDetectionRequiresActiveDebLine(): void
+    public function testSonarrSourceLineWithSignedByLeavesCommentedLineUntouched(): void
     {
-        $this->assertTrue(\pmssSonarrSourceLine('deb https://apt.sonarr.tv/debian bullseye main'));
-        $this->assertTrue(!\pmssSonarrSourceLine('# deb https://apt.sonarr.tv/debian bullseye main'));
-        $this->assertTrue(!\pmssSonarrSourceLine('deb http://deb.debian.org/debian bullseye main'));
+        $line = '# deb https://apt.sonarr.tv/debian bullseye main';
+        $this->assertEquals($line, \pmssSonarrSourceLineWithSignedBy($line, '/tmp/sonarr.gpg'));
+    }
+
+    public function testSonarrSourceLineWithSignedByLeavesUnrelatedLineUntouched(): void
+    {
+        $line = 'deb http://deb.debian.org/debian bullseye main';
+        $this->assertEquals($line, \pmssSonarrSourceLineWithSignedBy($line, '/tmp/sonarr.gpg'));
     }
 
     public function testSonarrSourceLineWithSignedByAddsOptionToPlainLine(): void

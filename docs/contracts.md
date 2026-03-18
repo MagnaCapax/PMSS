@@ -207,8 +207,8 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 - pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): void
   - Builds context (`pmssBuildUserContext`), returns early when invalid.
-  - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh, plugins,
-    retracker cleanup, permissions, then linger/systemd/rootless Docker wiring.
+  - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh,
+    plugin maintenance, permissions, then linger/systemd/rootless Docker wiring.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
 - pmssEnsureLingerAndDocker(string $user): void
   - Enables linger + rootless Docker wiring for the user.
@@ -220,8 +220,7 @@ Sub-handlers:
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; deletes `~/www/phpXplorer`.
 - pmssUserUpdateThemes(array $ctx): void → ensures named themes exist under `rutorrent/plugins/theme/themes/` (copied from skel), fixes ownership.
 - pmssUserUpgradeRutorrent(array $ctx): void → if user’s ruTorrent index.html SHA != skeleton (and no existing backup), backups to `oldRutorrent-3`, copies fresh from skel, restores config/share, updates config via `updateRutorrentConfig()`, fixes ownership and perms.
-- pmssUserEnsurePlugins(array $ctx): void → removes deprecated `cpuload`, ensures `unpack` plugin exists and has proper perms.
-- pmssUserMaintainRetracker(array $ctx): void → removes legacy `retrackers.dat`, creates torrents and RSS settings dirs.
+- pmssUserEnsurePlugins(array $ctx): void → removes deprecated `cpuload`, ensures `unpack` plugin exists and has proper perms, removes legacy `retrackers.dat`, and creates torrents/RSS settings dirs.
 - pmssUserRefreshPermissions(array $ctx): void
   - Runs `userPermissions.php` with optional `ionice -c3` wrapper when available.
   - Applies per-user timeout via `PMSS_USER_PERMISSIONS_TIMEOUT` (default 900s) by temporarily setting `PMSS_COMMAND_TIMEOUT` for that command only.
@@ -330,7 +329,7 @@ System/app groups:
 ## OS-Release & Skeleton Utilities – `scripts/lib/update.php`
 
 - pmssOsReleasePath(): string → `PMSS_OS_RELEASE_PATH` or `/etc/os-release`.
-- pmssSkeletonBase()/pmssSkeletonPath(string $relative): string → `PMSS_SKEL_DIR` or `/etc/skel` and joined path.
+- pmssSkeletonBase(): string → `PMSS_SKEL_DIR` or `/etc/skel`.
 - updateUserFile(string $file, string $user): void → copies a skeleton file into `PMSS_HOME_DIR` (default `/home`) under `/<user>/<file>` when missing or checksum differs; ensures parent directories exist, writes via temp-file + rename, sets mode 755 and `chown user:user`.
 - copyToUserSpace(string $sourceFile, string $targetFile, string $user): void → atomic copy via temp + rename, chmod 755, chown/chgrp user.
 - updateRutorrentConfig(string $username, int $scgiPort): void → renders ruTorrent templates with user paths and writes `conf/{config.php,access.ini}`.

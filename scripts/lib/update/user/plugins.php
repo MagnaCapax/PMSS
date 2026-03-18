@@ -26,13 +26,6 @@ function pmssUserEnsurePlugins(array $ctx): void
         runUserStep($user, 'Adjusting unpack plugin ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, $unpackArg));
         runUserStep($user, 'Setting unpack plugin permissions', sprintf('chmod -R 755 %s', $unpackArg));
     }
-}
-
-function pmssUserMaintainRetracker(array $ctx): void
-{
-    $user    = $ctx['user'];
-    $home    = $ctx['home'];
-    $userEsc = $ctx['user_esc'];
 
     $userShareDir = "{$home}/www/rutorrent/share/users/{$user}";
     $retrackerConfigPath = "{$userShareDir}/settings";

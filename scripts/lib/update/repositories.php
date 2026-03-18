@@ -84,20 +84,12 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
 
 if (!function_exists('pmssEnsureSonarrKey')) {
     /**
-     * Return true when a source line points to the legacy Sonarr repository.
-     */
-    function pmssSonarrSourceLine(string $line): bool
-    {
-        return preg_match('/^[ \t]*#/', $line) !== 1
-            && preg_match('/^[ \t]*deb([ \t]+\[[^\]]*\])?[ \t]+[^#\r\n]*(sonarr|nzbdrone)/i', $line) === 1;
-    }
-
-    /**
      * Ensure a Sonarr deb line includes the provided signed-by option.
      */
     function pmssSonarrSourceLineWithSignedBy(string $line, string $keyPath): string
     {
-        if (!pmssSonarrSourceLine($line)) {
+        if (preg_match('/^[ \t]*#/', $line) === 1
+            || preg_match('/^[ \t]*deb([ \t]+\[[^\]]*\])?[ \t]+[^#\r\n]*(sonarr|nzbdrone)/i', $line) !== 1) {
             return $line;
         }
 

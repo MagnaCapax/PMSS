@@ -26,14 +26,6 @@ function pmssSkeletonBase(): string
 }
 
 /**
- * Resolve a path inside the skeleton directory.
- */
-function pmssSkeletonPath(string $relative): string
-{
-    return pmssSkeletonBase().'/'.$relative;
-}
-
-/**
  * Update a user's file from the skeleton directory.
  *
  * @param string $file The filename relative to the skeleton base and the user's home.
@@ -56,7 +48,7 @@ function updateUserFile($file, $user) {
         return;
     }
 
-    $sourceFile = pmssSkeletonPath($file);
+    $sourceFile = pmssSkeletonBase().'/'.$file;
     $targetFile = $homeDir.'/'.$file;
 
     if (!file_exists($sourceFile)) {

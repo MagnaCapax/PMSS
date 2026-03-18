@@ -21,13 +21,11 @@ if (!function_exists('logmsg')) {
             return;
         }
 
-        global $logmsg_default_logger;
-
-        if (!isset($logmsg_default_logger)) {
+        if (!isset($GLOBALS['logmsg_default_logger'])) {
             require_once __DIR__.'/logger.php';
-            $logmsg_default_logger = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);
+            $GLOBALS['logmsg_default_logger'] = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);
         }
 
-        $logmsg_default_logger->msg($message);
+        $GLOBALS['logmsg_default_logger']->msg($message);
     }
 }

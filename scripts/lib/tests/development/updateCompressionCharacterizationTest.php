@@ -198,4 +198,55 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('exit(pmssResourceSnapshotRun());', $cronSrc);
         $this->assertStringContainsString('function '.$symbol.'(): int', $cronSrc);
     }
+
+    public function testUpdateLibraryDropsStandaloneSkeletonPathHelper(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssSkeleton'.'Path';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'update.php should keep skeleton path joins inline inside updateUserFile()'
+        );
+        $this->assertStringContainsString("pmssSkeletonBase().'/'.\$file", $src);
+    }
+
+    public function testRepositoryPrerequisitesKeepSonarrDetectionInline(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/repositories.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssSonarr'.'SourceLine';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'repositories.php should keep Sonarr source detection inside signed-by rewriting'
+        );
+        $this->assertStringContainsString("preg_match('/^[ \\t]*#/', \$line) === 1", $src);
+        $this->assertStringContainsString('signed-by=', $src);
+    }
+
+    public function testPluginMaintenanceOwnsRetrackerCleanup(): void
+    {
+        $pluginsPath = dirname(__DIR__, 4).'/scripts/lib/update/user/plugins.php';
+        $pluginsSrc = @file_get_contents($pluginsPath);
+        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
+        $usersSrc = @file_get_contents($usersPath);
+        $symbol = 'pmssUserMaintain'.'Retracker';
+        $this->assertTrue(is_string($pluginsSrc) && $pluginsSrc !== '', 'Expected to read '.$pluginsPath);
+        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
+
+        $this->assertTrue(
+            strpos($pluginsSrc, 'function '.$symbol.'(') === false,
+            'plugins.php should keep retracker cleanup inside pmssUserEnsurePlugins()'
+        );
+        $this->assertTrue(
+            strpos($usersSrc, 'Retracker cleanup') === false,
+            'users.php should stop wiring a separate retracker maintenance step'
+        );
+        $this->assertStringContainsString('retrackers.dat', $pluginsSrc);
+        $this->assertStringContainsString('Creating ruTorrent RSS settings directory', $pluginsSrc);
+    }
 }
