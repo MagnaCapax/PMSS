@@ -59,10 +59,8 @@ TXT;
 
     $useColor = false;
     if (!$asJson && $extended) {
-        if ($colorRequested) {
-            $useColor = true;
-        } elseif ($noColorRequested) {
-            $useColor = false;
+        if ($colorRequested || $noColorRequested) {
+            $useColor = $colorRequested;
         } else {
             if (function_exists('stream_isatty')) {
                 $useColor = @stream_isatty(STDOUT);

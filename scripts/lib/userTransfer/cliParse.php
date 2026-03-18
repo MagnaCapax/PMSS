@@ -60,16 +60,6 @@ TXT;
         'sleep-max' => 'sleepMax',
     ];
 
-    $parseInt = static function (string $name, ?string $value): int {
-        if ($value === null || $value === '') {
-            throw new RuntimeException('Option --'.$name.' requires a value', 1);
-        }
-        if (!ctype_digit($value)) {
-            throw new RuntimeException('Invalid value for --'.$name.' (expected integer)', 1);
-        }
-        return (int) $value;
-    };
-
     for ($i = 0, $tokenCount = count($tokens); $i < $tokenCount; $i++) {
         $token = $tokens[$i];
         if ($token === '--') {
@@ -92,8 +82,14 @@ TXT;
             if ($value === null) {
                 $value = $tokens[++$i] ?? null;
             }
+            if ($value === null || $value === '') {
+                throw new RuntimeException('Option --'.$key.' requires a value', 1);
+            }
+            if (!ctype_digit($value)) {
+                throw new RuntimeException('Invalid value for --'.$key.' (expected integer)', 1);
+            }
 
-            $options[$integerOptions[$key]] = $parseInt($key, $value);
+            $options[$integerOptions[$key]] = (int) $value;
             continue;
         }
 

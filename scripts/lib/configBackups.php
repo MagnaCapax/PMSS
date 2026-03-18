@@ -193,8 +193,5 @@ function pmssConfigBackupsSanitizeLabel(string $label, int $maxLen = 80): string
         preg_replace('/[^A-Za-z0-9._\\-]+/', '_', preg_replace('/\\s+/', ' ', trim($label))),
         '_'
     );
-    if ($label === '') {
-        return '';
-    }
-    return strlen($label) > $maxLen ? substr($label, 0, $maxLen) : $label;
+    return $label === '' ? '' : substr($label, 0, $maxLen);
 }

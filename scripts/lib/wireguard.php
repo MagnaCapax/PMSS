@@ -30,10 +30,8 @@ function wgConfigDir(): string
  */
 function wgListHomeUsers(): array
 {
-    $override = getenv('PMSS_WG_USER_LIST');
-    if ($override !== false && $override !== '') {
-        $users = array_filter(array_map('trim', explode(',', $override)), 'strlen');
-        return array_values($users);
+    if (($override = getenv('PMSS_WG_USER_LIST')) !== false && $override !== '') {
+        return array_values(array_filter(array_map('trim', explode(',', $override)), 'strlen'));
     }
     return users::listHomeUsers();
 }
@@ -52,13 +50,11 @@ function wgSupports(): bool
  */
 function wgValidatePublicIp(string $candidate): ?string
 {
-    $candidate = trim($candidate);
-    if ($candidate === '') {
+    if (($candidate = trim($candidate)) === '') {
         return null;
     }
 
-    $flags = FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE;
-    $ip    = filter_var($candidate, FILTER_VALIDATE_IP, $flags);
+    $ip = filter_var($candidate, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
     return $ip === false ? null : $ip;
 }
 

@@ -52,6 +52,17 @@ class MotdTest extends TestCase
         $this->assertTrue(strpos($content, "\e[") === false, 'MOTD color opt-out should suppress ANSI escapes');
     }
 
+    public function testRenderMotdTemplateDefaultsMissingModelValues(): void
+    {
+        $rendered = \Motd::renderMotdTemplate(
+            'Host:%HOSTNAME% Kernel:%KERNEL_VERSION% WG:%WIREGUARD_STATUS% OVPN:%OPENVPN_STATUS%',
+            ['host' => 123, 'kernel' => 456],
+            false
+        );
+
+        $this->assertEquals('Host:123 Kernel:456 WG: OVPN:', $rendered);
+    }
+
     public function testUpdateStep2CallsGenerateMotdNearEnd(): void
     {
         $path = dirname(__DIR__, 3).'/util/update-step2.php';

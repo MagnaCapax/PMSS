@@ -94,20 +94,14 @@ class Motd
      */
     public static function renderMotdTemplate(string $template, array $model, bool $colorEnabled): string
     {
-        $host = self::motdModelValue($model, 'host');
-        $ip = self::motdModelValue($model, 'ip');
-        $cpu = self::motdModelValue($model, 'cpu');
-        $ram = self::motdModelValue($model, 'ram');
-        $storage = self::motdModelValue($model, 'storage');
-        $pmssVersion = self::motdModelValue($model, 'pmssVersion');
-        $updateDate = self::motdModelValue($model, 'updateDate');
-        $aptLastUpdate = self::motdModelValue($model, 'aptLastUpdate');
-        $uptime = self::motdModelValue($model, 'uptime');
-        $kernel = self::motdModelValue($model, 'kernel');
-        $netSpeed = self::motdModelValue($model, 'netSpeed');
-        $wg = self::motdModelValue($model, 'wgStatus');
-        $ovpn = self::motdModelValue($model, 'ovpnStatus');
-        $distro = self::motdModelValue($model, 'distro');
+        [$host, $ip, $cpu, $ram, $storage,
+            $pmssVersion, $updateDate, $aptLastUpdate, $uptime, $kernel,
+            $netSpeed, $wg, $ovpn, $distro, $storageWarn] = array_map(
+            static function (string $key) use ($model): string {
+                return isset($model[$key]) ? (string) $model[$key] : '';
+            },
+            ['host', 'ip', 'cpu', 'ram', 'storage', 'pmssVersion', 'updateDate', 'aptLastUpdate', 'uptime', 'kernel', 'netSpeed', 'wgStatus', 'ovpnStatus', 'distro', 'storageWarn']
+        );
 
         // Light color accents for readability (opt-out via PMSS_MOTD_COLOR=0)
         if ($colorEnabled) {
@@ -147,24 +141,11 @@ class Motd
         $patched = preg_replace('/^\s*Runtime Version:.*$/m', '', $rendered);
         $rendered = is_string($patched) ? $patched : $rendered;
 
-        $storageWarn = self::motdModelValue($model, 'storageWarn');
         if ($storageWarn !== '') {
             $rendered .= "\n\e[33mStorage WARN:\e[0m ".$storageWarn."\n";
         }
 
         return $rendered;
-    }
-
-    /**
-     * @param array<string, string> $model
-     */
-    private static function motdModelValue(array $model, string $key): string
-    {
-        if (!isset($model[$key])) {
-            return '';
-        }
-        $value = $model[$key];
-        return is_string($value) ? $value : (string) $value;
     }
 
     /**
