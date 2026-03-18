@@ -10,11 +10,6 @@ require_once __DIR__.'/logging.php';
 require_once __DIR__.'/../runtime.php';
 
 /**
- * Return the target path for the primary apt sources file (testable override).
- */
-function pmssAptSourcesPath(): string { return pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list'); }
-
-/**
  * Load an APT sources template from the config directory.
  */
 function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): string
@@ -36,7 +31,7 @@ function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): strin
 function pmssSafeWriteSources(string $content, string $label, ?callable $logger = null): bool
 {
     $log = pmssSelectLogger($logger);
-    $target = pmssAptSourcesPath();
+    $target = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
     $backup = $target.'.pmss-backup';
 
     if ($content === '') { $log("[WARN] Empty repository content for $label, skipping"); return false; }
@@ -127,23 +122,17 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
         passthru('apt-get clean;');
     } : null;
 
-    pmssApplyAptTemplate($label, $template, $currentHash, $log, $post);
-}
-
-/**
- * Shared routine that compares hash, writes the template, and executes optional callbacks.
- */
-function pmssApplyAptTemplate(string $label, string $template, string $currentHash, callable $log, ?callable $post = null): void
-{
     if ($template === '') {
         $log("{$label} template missing, leaving sources.list untouched");
         return;
     }
+
     $hash = sha1($template);
     if ($currentHash !== $hash && pmssSafeWriteSources($template, $label, $log)) {
         $post && $post();
         $log("Applied Debian {$label} repository config");
-    } else {
-        $log("Debian {$label} repositories already correct");
+        return;
     }
+
+    $log("Debian {$label} repositories already correct");
 }

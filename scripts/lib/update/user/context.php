@@ -8,8 +8,6 @@
 
 require_once __DIR__.'/../../runtime.php';
 
-function pmssUserSkelPath(string $relative): string { return pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/'.$relative; }
-
 /**
  * Build the shared per-user context array used by update-step2 user helpers.
  *

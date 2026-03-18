@@ -106,10 +106,11 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         $this->assertTrue(count($logs) >= 1);
     }
 
-    public function testPmssAptSourcesPathOverride(): void
+    public function testSafeWriteSourcesUsesAptSourcesOverride(): void
     {
         $this->withTempSources('example', function (string $file): void {
-            $this->assertEquals($file, \pmssAptSourcesPath());
+            $this->assertTrue(\pmssSafeWriteSources('updated', 'UnitTest', null));
+            $this->assertEquals('updated', (string) file_get_contents($file));
         });
     }
 

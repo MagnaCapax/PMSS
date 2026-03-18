@@ -137,22 +137,18 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## APT Repository Management
 
-- pmssAptSourcesPath(): string → `PMSS_APT_SOURCES_PATH` or `/etc/apt/sources.list`.
 - pmssLoadRepoTemplate(string $codename, ?callable $logger=null): string
   - Loads `/etc/seedbox/config/template.sources.<codename>` (or `PMSS_CONFIG_DIR`).
   - Returns trimmed content with trailing `\n`, or `''` and logs when missing/empty.
 
 - pmssSafeWriteSources(string $content, string $label, ?callable $logger=null): bool
-  - Backs up current sources to `.pmss-backup` (best-effort), writes new content or restores on failure.
+  - Uses `PMSS_APT_SOURCES_PATH` (default `/etc/apt/sources.list`), backs up current sources to `.pmss-backup` (best-effort), writes new content or restores on failure.
 
 - pmssUpdateAptSources(string $distroName, int $distroVersion, string $currentHash, array $repos, ?callable $logger=null): void
   - Dispatches by distro: Debian uses `pmssUpdateAptSourcesDebian`; Ubuntu logs unsupported.
 
 - pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $repos, callable $log): void
-  - Applies templates for Jessie/Buster/Bullseye/Bookworm/Trixie; compares hash and logs “Applied ...” or “already correct”. Jessie also writes an apt conf to ignore release dates and cleans cache.
-
-- pmssApplyAptTemplate(string $label, string $template, string $currentHash, callable $log, ?callable $post=null): void
-  - Writes template via `pmssSafeWriteSources` when hash differs; runs post-hook if provided.
+  - Applies templates for Jessie/Buster/Bullseye/Bookworm/Trixie; compares hash, writes via `pmssSafeWriteSources`, and logs “Applied ...” or “already correct”. Jessie also writes an apt conf to ignore release dates and cleans cache.
 
 - pmssEnsureMediaareaRepository(): void → removes legacy MediaArea `.list/.sources` files and ensures the MediaArea signing key exists at `/etc/apt/trusted.gpg.d/mediaarea.asc` (override: `PMSS_APT_MEDIAAREA_KEY_PATH`); best-effort fetch unless `PMSS_DRY_RUN=1`.
 - pmssEnsureSonarrKey(): void → ensures Sonarr keyring material exists at `/etc/apt/keyrings/sonarr.gpg` (overrides: `PMSS_APT_KEYRING_DIR`, `PMSS_APT_SONARR_KEY_PATH`), rewrites legacy Sonarr/NzbDrone `deb` lines with `signed-by=...`, and removes `/etc/apt/trusted.gpg.d/sonarr.gpg` when scoping succeeds (overrides: `PMSS_APT_SONARR_LEGACY_KEY_PATH`, `PMSS_APT_SOURCES_LIST_D_PATH`).
@@ -231,7 +227,6 @@ Sub-handlers:
   - Applies per-user timeout via `PMSS_USER_PERMISSIONS_TIMEOUT` (default 900s) by temporarily setting `PMSS_COMMAND_TIMEOUT` for that command only.
   - Throws `RuntimeException` when permission refresh times out so caller can skip that user and continue the queue.
   - Refreshes `~/.rtorrent.rc.custom` from skel if hash matches legacy list.
-- pmssUserSkelPath(string $relative): string → returns `PMSS_SKEL_DIR` (default `/etc/skel`) joined with `$relative`.
 
 ---
 

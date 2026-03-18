@@ -20,7 +20,7 @@ function pmssUserEnsurePlugins(array $ctx): void
 
     $unpackPath = "{$home}/www/rutorrent/plugins/unpack";
     if (!file_exists($unpackPath)) {
-        $source = pmssUserSkelPath('www/rutorrent/plugins/unpack');
+        $source = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent/plugins/unpack';
         $unpackArg = escapeshellarg($unpackPath);
         runUserStep($user, 'Installing unpack plugin', sprintf('cp -Rp %s %s', escapeshellarg($source), $unpackArg));
         runUserStep($user, 'Adjusting unpack plugin ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, $unpackArg));

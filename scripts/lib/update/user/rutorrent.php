@@ -86,7 +86,7 @@ function pmssUserUpdateThemes(array $ctx): void
             continue;
         }
 
-        $source = pmssUserSkelPath("www/rutorrent/plugins/theme/themes/{$theme}");
+        $source = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel')."/www/rutorrent/plugins/theme/themes/{$theme}";
         runUserStep(
             $user,
             "Installing ruTorrent theme {$theme}",
@@ -132,7 +132,7 @@ function pmssUserUpgradeRutorrent(array $ctx): void
         $user,
         'Copying new ruTorrent from skel',
         sprintf('cp -Rp %s %s',
-            escapeshellarg(pmssUserSkelPath('www/rutorrent')),
+            escapeshellarg(pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent'),
             escapeshellarg("{$home}/www/")
         )
     );

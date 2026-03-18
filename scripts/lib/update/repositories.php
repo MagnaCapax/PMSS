@@ -176,7 +176,7 @@ if (!function_exists('pmssEnsureSonarrKey')) {
         }
 
         $targets = [];
-        $mainSources = pmssAptSourcesPath();
+        $mainSources = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
         if (is_file($mainSources)) {
             $targets[] = $mainSources;
         }
@@ -327,7 +327,7 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
     function pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger = null): array
     {
         $log = pmssSelectLogger($logger);
-        $currentData = @file_get_contents(pmssAptSourcesPath());
+        $currentData = @file_get_contents(pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list'));
         $currentHash = $currentData !== false ? sha1($currentData) : '';
 
         if ($distroVersion <= 0) {
