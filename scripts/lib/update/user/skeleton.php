@@ -23,8 +23,10 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         '.scriptsInc.php',
         '.lighttpd/php.ini',
         'radarr-sonarr.txt',
+        'www/deluge.php',
         'www/filemanager.php',
         'www/openvpn-config.tgz',
+        'www/qbittorrent.php',
         'www/rutorrent/js/content.js',
         'www/rutorrent/php/settings.php',
         'www/rutorrent/plugins/theme/conf.php',
@@ -51,6 +53,11 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         }
     }
 
+    // Keep tenant torrent frontend copies off the legacy Python port helpers
+    // until the frozen /etc/skel/www sources can be updated directly.
+    pmssUserPatchTorrentFrontends($ctx['home'].'/www/deluge.php', "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';\n", "shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');", "if (function_exists('pmssDelugePortEnsureCurrentUser')) {\n        pmssDelugePortEnsureCurrentUser();\n    }\n    shell_exec('nohup deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');");
+    pmssUserPatchTorrentFrontends($ctx['home'].'/www/qbittorrent.php', "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';\n", "passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');", "if (function_exists('pmssQbittorrentPortEnsureCurrentUser')) {\n        pmssQbittorrentPortEnsureCurrentUser();\n    }\n    passthru('zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');");
+
     $skelBase = pmssSkeletonBase();
     $quotaFiles = glob($skelBase.'/www/rutorrent/plugins/hddquota/*');
     if ($quotaFiles !== false) {
@@ -58,5 +65,33 @@ function pmssUserApplySkeletonFiles(array $ctx): void
             $relative = strpos($file, $skelBase.'/') === 0 ? substr($file, strlen($skelBase) + 1) : str_replace('/etc/skel/', '', $file);
             updateUserFile($relative, $user);
         }
+    }
+}
+
+/**
+ * Patch a tenant frontend copy without touching the frozen skeleton source.
+ */
+function pmssUserPatchTorrentFrontends(string $path, string $requireLine, string $legacyCommand, string $patchedCommand): void
+{
+    if (!is_file($path) || is_link($path)) {
+        return;
+    }
+
+    $content = @file_get_contents($path);
+    if (!is_string($content) || $content === '') {
+        return;
+    }
+
+    $updated = $content;
+    if (strpos($updated, $requireLine) === false) {
+        $updated = preg_replace('/^<\?php\s*/', $requireLine, $updated, 1, $count);
+        if (!is_string($updated) || $count !== 1) {
+            return;
+        }
+    }
+    $updated = str_replace($legacyCommand, $patchedCommand, $updated);
+
+    if ($updated !== $content) {
+        @file_put_contents($path, $updated);
     }
 }
