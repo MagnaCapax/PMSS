@@ -5,85 +5,87 @@ require_once dirname(__DIR__, 2).'/update/user/rutorrent.php';
 
 class UserRutorrentRssCompatPatchTest extends TestCase
 {
-    public function testPatchAddsSuppressionToRssObFlushCall(): void
+    public function testCompatibilityPatchesLegacyRssObFlushCall(): void
     {
-        $path = $this->tempPath('patch-adds');
+        $home = $this->createHome();
+        $path = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($path, "before\nob_flush();\nafter\n");
-
-        $patched = \pmssUserRutorrentRssObFlushPatchApply($path);
-        $content = (string) file_get_contents($path);
-
-        $this->assertTrue($patched);
-        $this->assertTrue(strpos($content, '@ob_flush();') !== false);
-        $this->assertTrue(strpos($content, "\nob_flush();\n") === false);
-
-        @unlink($path);
-    }
-
-    public function testPatchReturnsTrueWhenRssFileAlreadyPatched(): void
-    {
-        $path = $this->tempPath('patch-already');
-        file_put_contents($path, "before\n@ob_flush();\nafter\n");
-
-        $patched = \pmssUserRutorrentRssObFlushPatchApply($path);
-        $content = (string) file_get_contents($path);
-
-        $this->assertTrue($patched);
-        $this->assertTrue(strpos($content, '@ob_flush();') !== false);
-
-        @unlink($path);
-    }
-
-    public function testPatchReturnsFalseWhenRssTargetMissing(): void
-    {
-        $this->assertTrue(!\pmssUserRutorrentRssObFlushPatchApply($this->tempPath('patch-missing')));
-    }
-
-    public function testPatchReturnsFalseForRssSymlinkPath(): void
-    {
-        $target = $this->tempPath('patch-symlink-target');
-        $link = $this->tempPath('patch-symlink-link');
-        file_put_contents($target, "before\nob_flush();\nafter\n");
-        @symlink($target, $link);
-
-        $this->assertTrue(!\pmssUserRutorrentRssObFlushPatchApply($link));
-
-        @unlink($link);
-        @unlink($target);
-    }
-
-    public function testPatchReturnsFalseWhenRssPatternMissing(): void
-    {
-        $path = $this->tempPath('patch-no-pattern');
-        file_put_contents($path, "before\nflush();\nafter\n");
-
-        $this->assertTrue(!\pmssUserRutorrentRssObFlushPatchApply($path));
-
-        @unlink($path);
-    }
-
-    public function testMaintainCompatibilityTargetsRssActionPath(): void
-    {
-        $home = sys_get_temp_dir().'/pmss-rutorrent-rss-home-'.bin2hex(random_bytes(4));
-        @mkdir($home.'/www/rutorrent/php', 0755, true);
-        @mkdir($home.'/www/rutorrent/plugins/rss', 0755, true);
-
-        $settingsPath = $home.'/www/rutorrent/php/settings.php';
-        $rssPath = $home.'/www/rutorrent/plugins/rss/action.php';
-        file_put_contents($settingsPath, "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
-        file_put_contents($rssPath, "before\nob_flush();\nafter\n");
 
         try {
             \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $content = (string) file_get_contents($path);
 
-            $settingsContent = (string) file_get_contents($settingsPath);
-            $rssContent = (string) file_get_contents($rssPath);
-
-            $this->assertTrue(strpos($settingsContent, '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),') !== false);
-            $this->assertTrue(strpos($rssContent, '@ob_flush();') !== false);
+            $this->assertTrue(strpos($content, '@ob_flush();') !== false);
+            $this->assertTrue(strpos($content, "\nob_flush();\n") === false);
         } finally {
             $this->cleanup($home);
         }
+    }
+
+    public function testCompatibilityLeavesPatchedRssObFlushCallUntouched(): void
+    {
+        $home = $this->createHome();
+        $path = $home.'/www/rutorrent/plugins/rss/action.php';
+        file_put_contents($path, "before\n@ob_flush();\nafter\n");
+
+        try {
+            $before = (string) file_get_contents($path);
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertEquals($before, (string) file_get_contents($path));
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
+    public function testCompatibilitySkipsMissingRssTarget(): void
+    {
+        $home = $this->createHome();
+
+        try {
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertTrue(!file_exists($home.'/www/rutorrent/plugins/rss/action.php'));
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
+    public function testCompatibilitySkipsSymlinkedRssTarget(): void
+    {
+        $home = $this->createHome();
+        $target = $this->tempPath('patch-symlink-target');
+        $link = $home.'/www/rutorrent/plugins/rss/action.php';
+        file_put_contents($target, "before\nob_flush();\nafter\n");
+        @symlink($target, $link);
+
+        try {
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertEquals("before\nob_flush();\nafter\n", (string) file_get_contents($target));
+        } finally {
+            @unlink($target);
+            $this->cleanup($home);
+        }
+    }
+
+    public function testCompatibilityLeavesNonMatchingRssContentUntouched(): void
+    {
+        $home = $this->createHome();
+        $path = $home.'/www/rutorrent/plugins/rss/action.php';
+        file_put_contents($path, "before\nflush();\nafter\n");
+
+        try {
+            $before = (string) file_get_contents($path);
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertEquals($before, (string) file_get_contents($path));
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
+    private function createHome(): string
+    {
+        $home = sys_get_temp_dir().'/pmss-rutorrent-rss-home-'.bin2hex(random_bytes(4));
+        @mkdir($home.'/www/rutorrent/plugins/rss', 0755, true);
+        return $home;
     }
 
     private function tempPath(string $suffix): string

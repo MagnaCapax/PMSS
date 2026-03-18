@@ -9,68 +9,43 @@
 require_once __DIR__.'/context.php';
 
 /**
- * Patch ruTorrent schedule interval arithmetic for PHP 8.2 strict typing.
- *
- * Upstream vendor files under `etc/skel/www/rutorrent` are currently frozen,
- * so updates patch tenant copies until the bundled file can be updated.
- */
-function pmssUserRutorrentScheduleIntervalPatchApply(string $filePath): bool
-{
-    if (!is_file($filePath)
-        || is_link($filePath)
-        || !is_string($content = @file_get_contents($filePath))
-        || $content === '') {
-        return false;
-    }
-
-    $patchedExpression = '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),';
-    if (strpos($content, $patchedExpression) !== false) {
-        return true;
-    }
-
-    $legacyExpression = '((integer)($tm["minutes"]/$interval))*$interval+$interval,';
-    $updated = str_replace($legacyExpression, $patchedExpression, $content, $replacements);
-    if ($replacements < 1 || $updated === $content) {
-        return false;
-    }
-
-    return @file_put_contents($filePath, $updated) !== false;
-}
-
-/**
- * Suppress bare ob_flush notices in ruTorrent RSS plugin responses.
- *
- * The bundled ruTorrent tree is frozen for now, so we patch tenant copies
- * until the upstream files are replaced by a version bump.
- */
-function pmssUserRutorrentRssObFlushPatchApply(string $filePath): bool
-{
-    if (!is_file($filePath)
-        || is_link($filePath)
-        || !is_string($content = @file_get_contents($filePath))
-        || $content === '') {
-        return false;
-    }
-
-    if (strpos($content, '@ob_flush();') !== false) {
-        return true;
-    }
-
-    $updated = str_replace('ob_flush();', '@ob_flush();', $content, $replacements);
-    if ($replacements < 1 || $updated === $content) {
-        return false;
-    }
-
-    return @file_put_contents($filePath, $updated) !== false;
-}
-
-/**
  * Apply compatibility patches for legacy ruTorrent PHP files.
  */
 function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
 {
-    pmssUserRutorrentScheduleIntervalPatchApply($ctx['home'].'/www/rutorrent/php/settings.php');
-    pmssUserRutorrentRssObFlushPatchApply($ctx['home'].'/www/rutorrent/plugins/rss/action.php');
+    // Keep these compatibility shims local to the maintenance boundary so the
+    // frozen ruTorrent tenant patches do not leak extra exported helpers.
+    foreach ([
+        [
+            'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
+            'legacy' => '((integer)($tm["minutes"]/$interval))*$interval+$interval,',
+            'patched' => '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),',
+        ],
+        [
+            'path' => $ctx['home'].'/www/rutorrent/plugins/rss/action.php',
+            'legacy' => 'ob_flush();',
+            'patched' => '@ob_flush();',
+        ],
+    ] as $patch) {
+        $filePath = $patch['path'];
+        if (!is_file($filePath)
+            || is_link($filePath)
+            || !is_string($content = @file_get_contents($filePath))
+            || $content === '') {
+            continue;
+        }
+
+        if (strpos($content, $patch['patched']) !== false) {
+            continue;
+        }
+
+        $updated = str_replace($patch['legacy'], $patch['patched'], $content, $replacements);
+        if ($replacements < 1 || $updated === $content) {
+            continue;
+        }
+
+        @file_put_contents($filePath, $updated);
+    }
 }
 
 function pmssUserUpdateThemes(array $ctx): void

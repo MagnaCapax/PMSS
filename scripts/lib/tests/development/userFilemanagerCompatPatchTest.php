@@ -1,73 +1,149 @@
 <?php
-namespace PMSS\Tests {
+namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update.php';
 require_once dirname(__DIR__, 2).'/update/user/skeleton.php';
 
 class UserFilemanagerCompatPatchTest extends TestCase
 {
-    public function testPatchAddsSuppressionToObFlushCall(): void
+    private $homeRoot;
+    private $skelDir;
+    private $user;
+    private $envBackup = [];
+
+    protected function setUp(): void
     {
-        $path = $this->tempPath('patch-adds');
-        file_put_contents($path, "before\n        ob_flush();\nafter\n");
+        $this->homeRoot = sys_get_temp_dir().'/pmss-user-filemanager-home-'.bin2hex(random_bytes(4));
+        $this->skelDir = sys_get_temp_dir().'/pmss-user-filemanager-skel-'.bin2hex(random_bytes(4));
+        $this->user = 'user'.bin2hex(random_bytes(2));
+        $this->envBackup = $this->stashEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
-        $patched = \pmssUserFilemanagerObFlushPatchApply($path);
-        $content = (string) file_get_contents($path);
+        @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
+        @mkdir($this->skelDir.'/www', 0755, true);
 
-        $this->assertTrue($patched);
+        putenv('PMSS_HOME_DIR='.$this->homeRoot);
+        putenv('PMSS_SKEL_DIR='.$this->skelDir);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->restoreEnv($this->envBackup);
+        $this->cleanup($this->homeRoot);
+        $this->cleanup($this->skelDir);
+    }
+
+    public function testApplySkeletonFilesPatchesCopiedFilemanager(): void
+    {
+        $this->writeSkelFile('www/filemanager.php', "before\n        ob_flush();\nafter\n");
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $content = (string) file_get_contents($this->targetPath());
         $this->assertTrue(strpos($content, '        @ob_flush();') !== false);
         $this->assertTrue(strpos($content, "\n        ob_flush();\n") === false);
-
-        @unlink($path);
     }
 
-    public function testPatchReturnsTrueWhenAlreadyPatched(): void
+    public function testApplySkeletonFilesLeavesPatchedFilemanagerUntouched(): void
     {
-        $path = $this->tempPath('patch-already');
-        file_put_contents($path, "before\n        @ob_flush();\nafter\n");
+        $this->writeSkelFile('www/filemanager.php', "before\n        @ob_flush();\nafter\n");
 
-        $patched = \pmssUserFilemanagerObFlushPatchApply($path);
-        $content = (string) file_get_contents($path);
+        \pmssUserApplySkeletonFiles($this->context());
 
-        $this->assertTrue($patched);
-        $this->assertTrue(strpos($content, '        @ob_flush();') !== false);
-
-        @unlink($path);
+        $this->assertEquals("before\n        @ob_flush();\nafter\n", (string) file_get_contents($this->targetPath()));
     }
 
-    public function testPatchReturnsFalseWhenTargetMissing(): void
+    public function testApplySkeletonFilesSkipsMissingFilemanagerSource(): void
     {
-        $path = $this->tempPath('patch-missing');
-
-        $this->assertTrue(!\pmssUserFilemanagerObFlushPatchApply($path));
+        \pmssUserApplySkeletonFiles($this->context());
+        $this->assertTrue(!file_exists($this->targetPath()));
     }
 
-    public function testPatchReturnsFalseForSymlinkPath(): void
+    public function testApplySkeletonFilesSkipsSymlinkedFilemanagerTarget(): void
     {
+        $this->writeSkelFile('www/filemanager.php', "before\n        ob_flush();\nafter\n");
+        @mkdir(dirname($this->targetPath()), 0755, true);
+
         $target = $this->tempPath('patch-symlink-target');
-        $link = $this->tempPath('patch-symlink-link');
+        $link = $this->targetPath();
         file_put_contents($target, "before\n        ob_flush();\nafter\n");
         @symlink($target, $link);
 
-        $this->assertTrue(!\pmssUserFilemanagerObFlushPatchApply($link));
+        \pmssUserApplySkeletonFiles($this->context());
 
-        @unlink($link);
+        $this->assertEquals("before\n        ob_flush();\nafter\n", (string) file_get_contents($target));
+
         @unlink($target);
     }
 
-    public function testPatchReturnsFalseWhenPatternIsMissing(): void
+    private function context(): array
     {
-        $path = $this->tempPath('patch-no-pattern');
-        file_put_contents($path, "before\n        flush();\nafter\n");
-
-        $this->assertTrue(!\pmssUserFilemanagerObFlushPatchApply($path));
-
-        @unlink($path);
+        return [
+            'user' => $this->user,
+            'home' => $this->homeRoot.'/'.$this->user,
+        ];
     }
 
     private function tempPath(string $suffix): string
     {
         return sys_get_temp_dir().'/pmss-user-filemanager-'.$suffix.'-'.bin2hex(random_bytes(4)).'.php';
     }
-}
 
+    private function targetPath(): string
+    {
+        return $this->homeRoot.'/'.$this->user.'/www/filemanager.php';
+    }
+
+    private function writeSkelFile(string $relative, string $content): void
+    {
+        $path = $this->skelDir.'/'.$relative;
+        @mkdir(dirname($path), 0755, true);
+        file_put_contents($path, $content);
+    }
+
+    private function stashEnv(array $names): array
+    {
+        $previous = [];
+        foreach ($names as $name) {
+            $previous[$name] = getenv($name);
+        }
+        return $previous;
+    }
+
+    private function restoreEnv(array $previous): void
+    {
+        foreach ($previous as $name => $value) {
+            if ($value === false) {
+                putenv($name);
+            } else {
+                putenv($name.'='.$value);
+            }
+        }
+    }
+
+    private function cleanup(string $path): void
+    {
+        if (!file_exists($path)) {
+            return;
+        }
+
+        if (is_file($path) || is_link($path)) {
+            @unlink($path);
+            return;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($iterator as $item) {
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                @unlink($item->getPathname());
+            }
+        }
+
+        @rmdir($path);
+    }
 }

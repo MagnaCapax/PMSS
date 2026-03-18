@@ -5,75 +5,87 @@ require_once dirname(__DIR__, 2).'/update/user/rutorrent.php';
 
 class UserRutorrentCompatPatchTest extends TestCase
 {
-    public function testPatchRewritesLegacyScheduleExpression(): void
+    public function testCompatibilityPatchesLegacyScheduleExpression(): void
     {
-        $path = $this->tempPath('rewrite-legacy');
+        $home = $this->createHome();
+        $path = $home.'/www/rutorrent/php/settings.php';
         file_put_contents($path, "prefix\n((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\nsuffix\n");
-
-        $patched = \pmssUserRutorrentScheduleIntervalPatchApply($path);
-        $content = (string) file_get_contents($path);
-
-        $this->assertTrue($patched);
-        $this->assertTrue(strpos($content, '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),') !== false);
-        $this->assertTrue(strpos($content, '((integer)($tm["minutes"]/$interval))*$interval+$interval,') === false);
-
-        @unlink($path);
-    }
-
-    public function testPatchReturnsTrueWhenAlreadyPatched(): void
-    {
-        $path = $this->tempPath('already-patched');
-        file_put_contents($path, "prefix\n((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n");
-
-        $patched = \pmssUserRutorrentScheduleIntervalPatchApply($path);
-
-        $this->assertTrue($patched);
-
-        @unlink($path);
-    }
-
-    public function testPatchReturnsFalseWhenTargetMissing(): void
-    {
-        $this->assertTrue(!\pmssUserRutorrentScheduleIntervalPatchApply($this->tempPath('missing')));
-    }
-
-    public function testPatchReturnsFalseForSymlinkTarget(): void
-    {
-        $target = $this->tempPath('symlink-target');
-        $link = $this->tempPath('symlink-link');
-        file_put_contents($target, "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
-        @symlink($target, $link);
-
-        $this->assertTrue(!\pmssUserRutorrentScheduleIntervalPatchApply($link));
-
-        @unlink($link);
-        @unlink($target);
-    }
-
-    public function testPatchReturnsFalseWhenLegacyExpressionIsMissing(): void
-    {
-        $path = $this->tempPath('no-legacy-pattern');
-        file_put_contents($path, "prefix\n\$interval = \$interval * 60;\nsuffix\n");
-
-        $this->assertTrue(!\pmssUserRutorrentScheduleIntervalPatchApply($path));
-
-        @unlink($path);
-    }
-
-    public function testMaintainCompatibilityTargetsUserSettingsPath(): void
-    {
-        $home = sys_get_temp_dir().'/pmss-rutorrent-home-'.bin2hex(random_bytes(4));
-        @mkdir($home.'/www/rutorrent/php', 0755, true);
-        $settingsPath = $home.'/www/rutorrent/php/settings.php';
-        file_put_contents($settingsPath, "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
 
         try {
             \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-            $content = (string) file_get_contents($settingsPath);
+            $content = (string) file_get_contents($path);
+
             $this->assertTrue(strpos($content, '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),') !== false);
+            $this->assertTrue(strpos($content, '((integer)($tm["minutes"]/$interval))*$interval+$interval,') === false);
         } finally {
             $this->cleanup($home);
         }
+    }
+
+    public function testCompatibilityLeavesPatchedScheduleExpressionUntouched(): void
+    {
+        $home = $this->createHome();
+        $path = $home.'/www/rutorrent/php/settings.php';
+        file_put_contents($path, "prefix\n((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n");
+
+        try {
+            $before = (string) file_get_contents($path);
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertEquals($before, (string) file_get_contents($path));
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
+    public function testCompatibilitySkipsMissingSettingsTarget(): void
+    {
+        $home = $this->createHome();
+
+        try {
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertTrue(!file_exists($home.'/www/rutorrent/php/settings.php'));
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
+    public function testCompatibilitySkipsSymlinkedSettingsTarget(): void
+    {
+        $home = $this->createHome();
+        $target = $this->tempPath('symlink-target');
+        $link = $home.'/www/rutorrent/php/settings.php';
+        file_put_contents($target, "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
+        @symlink($target, $link);
+
+        try {
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertEquals("((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n", (string) file_get_contents($target));
+        } finally {
+            @unlink($target);
+            $this->cleanup($home);
+        }
+    }
+
+    public function testCompatibilityLeavesNonMatchingSettingsContentUntouched(): void
+    {
+        $home = $this->createHome();
+        $path = $home.'/www/rutorrent/php/settings.php';
+        file_put_contents($path, "prefix\n\$interval = \$interval * 60;\nsuffix\n");
+
+        try {
+            $before = (string) file_get_contents($path);
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertEquals($before, (string) file_get_contents($path));
+        } finally {
+            $this->cleanup($home);
+        }
+    }
+
+    private function createHome(): string
+    {
+        $home = sys_get_temp_dir().'/pmss-rutorrent-home-'.bin2hex(random_bytes(4));
+        @mkdir($home.'/www/rutorrent/php', 0755, true);
+        return $home;
     }
 
     private function tempPath(string $suffix): string
