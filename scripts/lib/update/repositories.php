@@ -10,8 +10,7 @@ require_once __DIR__.'/apt.php';
 require_once __DIR__.'/distro.php';
 require_once __DIR__.'/runtime/commands.php';
 
-if (!function_exists('pmssEnsureMediaareaRepository')) {
-    /**
+/**
      * Ensure MediaArea repository prerequisites are present.
      *
      * - Removes legacy MediaArea list files that conflict with the consolidated sources.list template.
@@ -79,11 +78,9 @@ if (!function_exists('pmssEnsureMediaareaRepository')) {
         }
         @chmod($keyPath, 0644);
         logmsg('MediaArea apt key installed at '.$keyPath.' (fingerprint C10E11090EC0E438)');
-    }
 }
 
-if (!function_exists('pmssEnsureSonarrKey')) {
-    /**
+/**
      * Ensure a Sonarr deb line includes the provided signed-by option.
      */
     function pmssSonarrSourceLineWithSignedBy(string $line, string $keyPath): string
@@ -237,11 +234,9 @@ if (!function_exists('pmssEnsureSonarrKey')) {
         } else {
             logmsg('Sonarr key available at '.$keyPath.' for scoped apt sources');
         }
-    }
 }
 
-if (!function_exists('pmssEnsureDockerRepository')) {
-    /**
+/**
      * Ensure Docker's official repository is configured via deb822 with a keyring.
      */
     function pmssEnsureDockerRepository(): void
@@ -303,11 +298,9 @@ if (!function_exists('pmssEnsureDockerRepository')) {
             @file_put_contents($legacyList, implode(PHP_EOL, $lines).PHP_EOL);
             logmsg('Disabled legacy Docker entry in docker.list');
         }
-    }
 }
 
-if (!function_exists('pmssRepositoryUpdatePlan')) {
-    /**
+/**
      * Build a dry-run friendly plan describing how repository configuration should evolve.
      *
      * Callers may inspect the returned structure to assert behaviour without mutating the
@@ -331,11 +324,9 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
         }
 
         return ['mode' => 'update', 'current_hash' => $currentHash, 'templates' => $templates];
-    }
 }
 
-if (!function_exists('pmssRefreshRepositories')) {
-    /**
+/**
      * Apply the appropriate sources.list template and refresh indices.
      * Returns true if apt-get update was executed.
      */
@@ -363,5 +354,4 @@ if (!function_exists('pmssRefreshRepositories')) {
             logMessage('[WARN] apt-get update failed; not updating /var/lib/apt/periodic/update-success-stamp');
         }
         return true;
-    }
 }

@@ -15,8 +15,7 @@ require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/apps/packages/helpers.php';
 
-if (!function_exists('pmssPruneLegacyMediaArea')) {
-    /**
+/**
      * Remove lingering MediaArea apt sources and cached bootstrap packages.
      *
      * Older repo-mediaarea packages now use control.tar.zst and are not needed
@@ -50,11 +49,9 @@ if (!function_exists('pmssPruneLegacyMediaArea')) {
             .'/var/lib/apt/lists/*mediaarea* /var/lib/apt/lists/partial/*mediaarea* '
             .'/etc/apt/sources.list.d/*.list.pmss-backup-*'
         );
-    }
 }
 
-if (!function_exists('pmssConfigureAptNonInteractive')) {
-    /**
+/**
      * Ensure apt operates in fully non-interactive mode.
      */
     function pmssConfigureAptNonInteractive(?callable $logger = null): void
@@ -83,11 +80,9 @@ CONF;
         }
 
         $log('[SKIP] apt non-interactive configuration already up to date');
-    }
 }
 
-if (!function_exists('pmssCompletePendingDpkg')) {
-    /**
+/**
      * Finish any interrupted dpkg configuration runs.
      */
     function pmssCompletePendingDpkg(): void
@@ -108,11 +103,9 @@ if (!function_exists('pmssCompletePendingDpkg')) {
         if ($rc !== 0) {
             runStep('Retrying proftpd configure', 'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true');
         }
-    }
 }
 
-if (!function_exists('pmssSelectDpkgSelectionsBaseline')) {
-    /**
+/**
      * Resolve the best dpkg selections baseline file for the detected distro version.
      *
      * This is pure selection logic (no command execution) so tests can validate
@@ -167,11 +160,9 @@ if (!function_exists('pmssSelectDpkgSelectionsBaseline')) {
         }
 
         return $selected;
-    }
 }
 
-if (!function_exists('pmssApplyDpkgSelections')) {
-    /**
+/**
      * Apply the baseline dpkg selection snapshot so required packages stay present.
      *
      * @return bool True when the baseline was parsed and applied successfully.
@@ -316,11 +307,9 @@ if (!function_exists('pmssApplyDpkgSelections')) {
         }
 
         return $success;
-    }
 }
 
-if (!function_exists('pmssMigrateLegacyLocalnet')) {
-    /**
+/**
      * Move the legacy localnet file into the configuration directory.
      */
     function pmssMigrateLegacyLocalnet(): void
@@ -328,5 +317,4 @@ if (!function_exists('pmssMigrateLegacyLocalnet')) {
         if (file_exists('/etc/seedbox/localnet') && !file_exists('/etc/seedbox/config/localnet')) {
             runStep('Migrating legacy localnet configuration', 'mv /etc/seedbox/localnet /etc/seedbox/config/localnet');
         }
-    }
 }

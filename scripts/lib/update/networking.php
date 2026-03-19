@@ -15,19 +15,18 @@
 
 require_once __DIR__.'/logging.php';
 
-if (!function_exists('pmssEnsureNetworkTemplate')) {
-    /**
-     * Seed the default network configuration file when missing.
-     */
-    function pmssEnsureNetworkTemplate(?callable $logger = null): void
-    {
-        $log  = $logger ?: 'logMessage';
-        $path = '/etc/seedbox/config/network';
-        if (file_exists($path)) {
-            return;
-        }
+/**
+ * Seed the default network configuration file when missing.
+ */
+function pmssEnsureNetworkTemplate(?callable $logger = null): void
+{
+    $log  = $logger ?: 'logMessage';
+    $path = '/etc/seedbox/config/network';
+    if (file_exists($path)) {
+        return;
+    }
 
-        $template = <<<PHP
+    $template = <<<PHP
 <?php
 #Default settings, change these to suit your system. Speeds are in mbits
 return array(
@@ -56,7 +55,6 @@ return array(
 );
 PHP;
 
-        file_put_contents($path, $template);
-        $log('Created default network configuration');
-    }
+    file_put_contents($path, $template);
+    $log('Created default network configuration');
 }
