@@ -13,8 +13,7 @@
  */
 function pmssStorageHealthReadLastEntries(string $path): array
 {
-    $fh = @fopen($path, 'r');
-    if ($fh === false) {
+    if (($fh = @fopen($path, 'r')) === false) {
         return [];
     }
     $last = [];
@@ -113,8 +112,7 @@ function pmssStorageHealthSeverityMax(string $a, string $b): string
 function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
 {
     $mountsPath = ($mountsPath !== null && $mountsPath !== '') ? $mountsPath : '/proc/mounts';
-    $mounts = @file($mountsPath, FILE_IGNORE_NEW_LINES);
-    if (!is_array($mounts)) {
+    if (!is_array($mounts = @file($mountsPath, FILE_IGNORE_NEW_LINES))) {
         return null;
     }
 

@@ -56,8 +56,9 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
 
     $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
 
-    $timestamp = isset($options['timestamp']) ? (string) $options['timestamp'] : '';
-    $timestamp = preg_match('/^[0-9]{14}$/', $timestamp) ? $timestamp : date('YmdHis');
+    $timestamp = isset($options['timestamp']) && preg_match('/^[0-9]{14}$/', (string) $options['timestamp'])
+        ? (string) $options['timestamp']
+        : date('YmdHis');
 
     $key = pmssConfigBackupsPathKey($sourcePath);
     if (array_key_exists('pmssVersion', $options)) {
@@ -77,21 +78,15 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     $correlationId = array_key_exists('correlationId', $options) ? (string) $options['correlationId'] : (string) (getenv('PMSS_CORRELATION_ID') ?: '');
 
     $serviceDir = $backupRoot.'/'.$service;
-    if (!is_dir($serviceDir)) {
-        @mkdir($serviceDir, 0700, true);
-    }
-    @chmod($serviceDir, 0700);
-
-    if (!is_dir($serviceDir)) {
+    if (!is_dir($serviceDir) && !@mkdir($serviceDir, 0700, true) && !is_dir($serviceDir)) {
         $log('[WARN] Unable to create config backup directory: '.$serviceDir);
         return null;
     }
+    @chmod($serviceDir, 0700);
 
     $name = $timestamp.'__'.$key;
-    $versionLabel = pmssConfigBackupsSanitizeLabel($pmssVersion);
-    if ($versionLabel !== '' && $versionLabel !== 'unknown') { $name .= '__v='.$versionLabel; }
-    $cidLabel = pmssConfigBackupsSanitizeLabel($correlationId);
-    if ($cidLabel !== '') { $name .= '__cid='.$cidLabel; }
+    if (($versionLabel = pmssConfigBackupsSanitizeLabel($pmssVersion)) !== '' && $versionLabel !== 'unknown') { $name .= '__v='.$versionLabel; }
+    if (($cidLabel = pmssConfigBackupsSanitizeLabel($correlationId)) !== '') { $name .= '__cid='.$cidLabel; }
     $backupPath = $serviceDir.'/'.$name.'.bak';
 
     if (!@copy($sourcePath, $backupPath)) {

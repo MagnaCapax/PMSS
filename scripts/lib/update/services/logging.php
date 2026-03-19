@@ -98,8 +98,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
     }
 
     $target = $targetDir.'/pmss-limits.conf';
-    $tmpTarget = $target.'.tmp';
-    if (@file_put_contents($tmpTarget, $raw) === false) {
+    if (@file_put_contents($tmpTarget = $target.'.tmp', $raw) === false) {
         $log('[WARN] Unable to write journald limits: '.$tmpTarget);
         return;
     }
@@ -158,50 +157,41 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         'protocol' => 'tcp',
     ];
     if (is_readable($loggingConf) && ($rawConfig = @file_get_contents($loggingConf)) !== false && trim($rawConfig) !== '') {
-        $lines = preg_split('/\r?\n/', $rawConfig);
-        if (is_array($lines)) {
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if ($line === '' || $line[0] === '#' || $line[0] === ';') {
-                    continue;
-                }
-                if (count($parts = explode('=', $line, 2)) !== 2) {
-                    continue;
-                }
+        foreach (preg_split('/\r?\n/', $rawConfig) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#' || $line[0] === ';' || count($parts = explode('=', $line, 2)) !== 2) {
+                continue;
+            }
 
-                $key = strtolower(trim($parts[0]));
-                $value = trim($parts[1]);
+            $key = strtolower(trim($parts[0]));
+            $value = trim($parts[1]);
 
-                switch ($key) {
-                    case 'remote_logging_enabled':
-                        $config['enabled'] = in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
-                        break;
-                    case 'remote_host':
-                        $config['host'] = $value;
-                        break;
-                    case 'remote_port':
-                        if (ctype_digit($value) && ($port = (int) $value) > 0 && $port <= 65535) {
-                            $config['port'] = $port;
-                        }
-                        break;
-                    case 'remote_protocol':
-                        if (in_array($lower = strtolower($value), ['tcp', 'udp'], true)) {
-                            $config['protocol'] = $lower;
-                        }
-                        break;
-                }
+            switch ($key) {
+                case 'remote_logging_enabled':
+                    $config['enabled'] = in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
+                    break;
+                case 'remote_host':
+                    $config['host'] = $value;
+                    break;
+                case 'remote_port':
+                    if (ctype_digit($value) && ($port = (int) $value) > 0 && $port <= 65535) {
+                        $config['port'] = $port;
+                    }
+                    break;
+                case 'remote_protocol':
+                    if (in_array($lower = strtolower($value), ['tcp', 'udp'], true)) {
+                        $config['protocol'] = $lower;
+                    }
+                    break;
             }
         }
     }
 
-    $invalidReason = '';
-    if (!$config['enabled']) {
-        $invalidReason = 'Remote logging not enabled';
-    } elseif ($config['host'] === '') {
-        $invalidReason = 'Remote host not configured';
-    } elseif (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host'])) {
-        $invalidReason = 'Invalid remote host format';
-    }
+    $invalidReason = !$config['enabled']
+        ? 'Remote logging not enabled'
+        : ($config['host'] === ''
+            ? 'Remote host not configured'
+            : (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host']) ? '' : 'Invalid remote host format'));
 
     if ($invalidReason !== '') {
         if ($config['enabled']) {
@@ -250,8 +240,7 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         return;
     }
 
-    $tmpTarget = $target.'.tmp';
-    if (@file_put_contents($tmpTarget, $rendered) === false) {
+    if (@file_put_contents($tmpTarget = $target.'.tmp', $rendered) === false) {
         $log('[WARN] Unable to write remote logging config: '.$tmpTarget);
         return;
     }

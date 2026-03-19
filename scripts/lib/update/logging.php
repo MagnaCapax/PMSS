@@ -68,8 +68,7 @@ if (!function_exists('pmssLogJson')) {
             return;
         }
         $payload['ts'] = $payload['ts'] ?? date('c');
-        $correlationId = pmssCorrelationId();
-        if ($correlationId !== '') {
+        if (($correlationId = pmssCorrelationId()) !== '') {
             $payload['pmss_correlation_id'] = $payload['pmss_correlation_id'] ?? $correlationId;
         }
         @file_put_contents($path, json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);

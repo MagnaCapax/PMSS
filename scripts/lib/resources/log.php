@@ -70,11 +70,10 @@ function pmssResourceLogReadCounters(int $uid): ?array
     $values = ['io_read_ops' => 0, 'io_write_ops' => 0];
 
     foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-        $parts = explode('=', $line, 2);
-        if (count($parts) !== 2 || ($field = $fieldMap[$parts[0]] ?? null) === null || !ctype_digit($parts[1])) {
+        if (count($parts = explode('=', $line, 2)) !== 2 || !ctype_digit($parts[1]) || !isset($fieldMap[$parts[0]])) {
             continue;
         }
-        $values[$field] = (int) $parts[1];
+        $values[$fieldMap[$parts[0]]] = (int) $parts[1];
     }
 
     return isset($values['io_read'], $values['io_write'], $values['cpu_nsec'], $values['memory'], $values['tasks'])
@@ -94,11 +93,8 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     $handle = @fopen($statePath, 'c+');
     $locked = $handle !== false && @flock($handle, LOCK_EX);
     $previousState = [];
-    if ($locked) {
-        $decoded = json_decode((string) @stream_get_contents($handle), true);
-        if (is_array($decoded)) {
-            $previousState = $decoded;
-        }
+    if ($locked && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))) {
+        $previousState = $decoded;
     }
 
     $state = $delta = [];
