@@ -19,14 +19,6 @@ if (is_file($qbittorrentHelper)) {
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
 
-$startQbittorrent = static function (string $user): void {
-    echo "Start qBittorrent for user: {$user}\n";
-    passthru("su {$user} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'");
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'qbittorrent-nox start requested');
-    }
-};
-
 foreach($users AS $thisUser) {    // Loop users checking their instances
     if (file_exists("/home/{$thisUser}/www-disabled") or
         !file_exists("/home/{$thisUser}/www")) {
@@ -54,7 +46,13 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         }
         $instances = '';
     }
-    if (empty($instances)) $startQbittorrent($thisUser);
+    if (empty($instances)) {
+        echo "Start qBittorrent for user: {$thisUser}\n";
+        passthru("su {$thisUser} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'");
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'qbittorrent-nox start requested');
+        }
+    }
  
 
 }

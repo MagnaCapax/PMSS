@@ -23,22 +23,6 @@ if (is_file($delugeHelper)) {
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
 
-$startDeluged = static function (string $user): void {
-    echo "Start deluged for user: {$user}\n";
-    passthru("su {$user} -c 'cd ~; deluged -l /home/{$user}/.delugeLog -L info'");
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'deluged start requested');
-    }
-};
-
-$startDelugeWeb = static function (string $user): void {
-    echo "Start deluge-web for user: {$user}\n";
-    passthru("su {$user} -c 'cd ~; deluge-web -l /home/{$user}/.delugeWebLog -L info'");
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'deluge-web start requested');
-    }
-};
-
 foreach($users AS $thisUser) {    // Loop users checking their instances
     if (file_exists("/home/{$thisUser}/www-disabled") or
         !file_exists("/home/{$thisUser}/www")) {
@@ -65,9 +49,21 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         }
         $instances = '';
     }
-    if (empty($instances)) $startDeluged($thisUser);
+    if (empty($instances)) {
+        echo "Start deluged for user: {$thisUser}\n";
+        passthru("su {$thisUser} -c 'cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info'");
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'deluged start requested');
+        }
+    }
  
     $instancesWeb = shell_exec("pgrep -u{$thisUser} deluge-web");
-    if (empty($instancesWeb)) $startDelugeWeb($thisUser);
+    if (empty($instancesWeb)) {
+        echo "Start deluge-web for user: {$thisUser}\n";
+        passthru("su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'");
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'deluge-web start requested');
+        }
+    }
 
 }

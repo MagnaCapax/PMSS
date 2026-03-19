@@ -236,34 +236,38 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
     $serviceRaw = str_replace('%%PMSS_BOOT_TUNING_SCRIPT%%', $scriptTarget, $serviceRaw);
 
     // Write files only when content changes to keep the run idempotent.
-    $writeTarget = static function (string $path, string $content, int $mode, string $label) use ($log): bool {
+    foreach ([
+        [$scriptTarget, $scriptRaw, 0755, 'Boot tuning script'],
+        [$serviceTarget, $serviceRaw, 0644, 'Boot tuning service'],
+    ] as $targetSpec) {
+        [$path, $content, $mode, $label] = $targetSpec;
         $existing = @file_get_contents($path);
         if ($existing !== false && $existing === $content) {
             $log('[SKIP] '.$label.' already present and up to date');
-            return false;
+            continue;
         }
+
         $dir = dirname($path);
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
             $log('[WARN] Unable to create '.$label.' directory: '.$dir);
-            return false;
+            continue;
         }
+
         $tmp = $path.'.tmp';
         if (@file_put_contents($tmp, $content) === false) {
             $log('[WARN] Unable to write '.$label.' at '.$tmp);
-            return false;
+            continue;
         }
+
         @chmod($tmp, $mode);
         if (!@rename($tmp, $path)) {
             $log('[WARN] Unable to install '.$label.' at '.$path);
             @unlink($tmp);
-            return false;
+            continue;
         }
-        $log('Installed '.$label.' at '.$path);
-        return true;
-    };
 
-    $writeTarget($scriptTarget, $scriptRaw, 0755, 'Boot tuning script');
-    $writeTarget($serviceTarget, $serviceRaw, 0644, 'Boot tuning service');
+        $log('Installed '.$label.' at '.$path);
+    }
 
     if (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) {
         pmssLogStatus('SKIP', 'Enabling PMSS boot tuning service (test/dry-run)');
