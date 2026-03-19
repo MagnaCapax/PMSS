@@ -25,8 +25,6 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         'serial' => (string) ($disk['serial'] ?? ''),
         'rota' => (int) ($disk['rota'] ?? 1),
         'size' => (string) ($disk['size'] ?? ''),
-        'ok' => false,
-        'severity' => 'warn',
     ];
 
     $defaultMetrics = [
@@ -165,24 +163,18 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
         'severity' => 'warn',
     ];
 
-    $fail = static function (string $error, string $flag) use ($base): array {
-        $base['error'] = $error;
-        $base['flags'] = [$flag];
-        return $base;
-    };
-
     if (!is_readable($dev)) {
-        return $fail('device unreadable', 'device_unreadable');
+        return $base + ['error' => 'device unreadable', 'flags' => ['device_unreadable']];
     }
     if (trim((string) shell_exec('command -v smartctl 2>/dev/null')) === '') {
-        return $fail('smartctl missing', 'smartctl_missing');
+        return $base + ['error' => 'smartctl missing', 'flags' => ['smartctl_missing']];
     }
 
     $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
     $res = pmssStorageHealthExecCapture($cmd, 25);
     $out = $res['stdout']."\n".$res['stderr'];
     if (trim($out) === '') {
-        return $fail('smartctl produced no output', 'smartctl_empty');
+        return $base + ['error' => 'smartctl produced no output', 'flags' => ['smartctl_empty']];
     }
 
     $prevMetrics = $last['smart::'.$dev]['metrics'] ?? null;

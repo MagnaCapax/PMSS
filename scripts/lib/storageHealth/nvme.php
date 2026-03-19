@@ -51,9 +51,6 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
         'rota' => (int) ($disk['rota'] ?? 0),
         'size' => (string) ($disk['size'] ?? ''),
         'metrics' => $metrics,
-        'ok' => true,
-        'severity' => 'ok',
-        'flags' => [],
     ];
 
     $flags = [];
