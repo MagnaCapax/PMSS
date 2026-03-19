@@ -59,12 +59,9 @@ function pmssUserApplySkeletonFiles(array $ctx): void
     pmssUserPatchTorrentFrontends($ctx['home'].'/www/qbittorrent.php', "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';\n", "passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');", "if (function_exists('pmssQbittorrentPortEnsureCurrentUser')) {\n        pmssQbittorrentPortEnsureCurrentUser();\n    }\n    passthru('zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');");
 
     $skelBase = pmssSkeletonBase();
-    $quotaFiles = glob($skelBase.'/www/rutorrent/plugins/hddquota/*');
-    if ($quotaFiles !== false) {
-        foreach ($quotaFiles as $file) {
-            $relative = strpos($file, $skelBase.'/') === 0 ? substr($file, strlen($skelBase) + 1) : str_replace('/etc/skel/', '', $file);
-            updateUserFile($relative, $user);
-        }
+    foreach (glob($skelBase.'/www/rutorrent/plugins/hddquota/*') ?: [] as $file) {
+        $relative = strpos($file, $skelBase.'/') === 0 ? substr($file, strlen($skelBase) + 1) : str_replace('/etc/skel/', '', $file);
+        updateUserFile($relative, $user);
     }
 }
 

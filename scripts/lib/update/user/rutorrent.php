@@ -27,10 +27,9 @@ function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
             'patched' => '@ob_flush();',
         ],
     ] as $patch) {
-        $filePath = $patch['path'];
-        if (!is_file($filePath)
-            || is_link($filePath)
-            || !is_string($content = @file_get_contents($filePath))
+        if (!is_file($patch['path'])
+            || is_link($patch['path'])
+            || !is_string($content = @file_get_contents($patch['path']))
             || $content === ''
             || strpos($content, $patch['patched']) !== false) {
             continue;
@@ -41,7 +40,7 @@ function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
             continue;
         }
 
-        @file_put_contents($filePath, $updated);
+        @file_put_contents($patch['path'], $updated);
     }
 }
 
@@ -59,12 +58,11 @@ function pmssUserUpdateThemes(array $ctx): void
             continue;
         }
 
-        $source = $skelThemesPath.$theme;
         runUserStep(
             $user,
             "Installing ruTorrent theme {$theme}",
             sprintf('cp -r %s %s',
-                escapeshellarg($source),
+                escapeshellarg($skelThemesPath.$theme),
                 escapeshellarg($themesPath)
             )
         );
@@ -84,12 +82,11 @@ function pmssUserUpgradeRutorrent(array $ctx): void
     $expectedSha = $ctx['rutorrent_index_sha'];
     $rutorrentPath = "{$home}/www/rutorrent";
     $legacyPath = "{$home}/www/oldRutorrent-3";
-    $currentIndex = $rutorrentPath.'/index.html';
 
     if ($expectedSha === ''
-        || !file_exists($currentIndex)
+        || !file_exists($rutorrentPath.'/index.html')
         || file_exists($legacyPath)
-        || $expectedSha === sha1(file_get_contents($currentIndex))) {
+        || $expectedSha === sha1(file_get_contents($rutorrentPath.'/index.html'))) {
         return;
     }
 

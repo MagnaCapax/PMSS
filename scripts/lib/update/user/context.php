@@ -23,9 +23,7 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
 {
     // Allow tests and development tooling to override the home root while
     // keeping the default `/home` behaviour for production.
-    $homeRoot = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
-
-    $home = "{$homeRoot}/{$user}";
+    $home = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')."/{$user}";
     // The shared context only exists for active PMSS tenants; suspended users
     // are intentionally skipped to avoid recreating web roots or restarting
     // services mid-suspension.

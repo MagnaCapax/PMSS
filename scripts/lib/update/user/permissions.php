@@ -13,8 +13,8 @@ function pmssUserRefreshPermissions(array $ctx): void
     $user    = $ctx['user'];
     $home    = $ctx['home'];
 
-    $timeoutRaw = getenv('PMSS_USER_PERMISSIONS_TIMEOUT');
-    $timeoutSeconds = ($timeoutRaw !== false && ctype_digit($timeoutRaw) && (int) $timeoutRaw > 0) ? (int) $timeoutRaw : 900;
+    $timeoutRaw = (string) getenv('PMSS_USER_PERMISSIONS_TIMEOUT');
+    $timeoutSeconds = (ctype_digit($timeoutRaw) && (int) $timeoutRaw > 0) ? (int) $timeoutRaw : 900;
     $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
     $permissionsCommand = pmssBuildCommand('/scripts/util/userPermissions.php', [$user]);
     foreach (['/usr/bin/ionice', '/bin/ionice'] as $ionicePath) {
@@ -42,11 +42,14 @@ function pmssUserRefreshPermissions(array $ctx): void
     if (file_exists($rcCustomPath)
         && in_array(sha1((string)file_get_contents($rcCustomPath)), ['dcf21704d49910d1670b3fdd04b37e640b755889', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
         $skelRcCustomPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.rtorrent.rc.custom';
-        $skelRcCustomArg = $skelRcCustomPath === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustomPath : escapeshellarg($skelRcCustomPath);
         runUserStep(
             $user,
             'Updating .rtorrent.rc.custom from skeleton',
-            sprintf('cp %s %s/', $skelRcCustomArg, escapeshellarg($home))
+            sprintf(
+                'cp %s %s/',
+                $skelRcCustomPath === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustomPath : escapeshellarg($skelRcCustomPath),
+                escapeshellarg($home)
+            )
         );
     }
 }

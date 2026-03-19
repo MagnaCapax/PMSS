@@ -80,12 +80,9 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
             $phases = [];
             if (function_exists('pmssUpdateUserEnvironment')) {
-                $label = 'Environment (HTTP/ruTorrent/permissions';
-                if (function_exists('pmssEnsureLingerAndDocker')) {
-                    $label .= ' + linger/systemd/rootless Docker';
-                }
-                $label .= ')';
-                $phases[] = $label;
+                $phases[] = 'Environment (HTTP/ruTorrent/permissions'
+                    .(function_exists('pmssEnsureLingerAndDocker') ? ' + linger/systemd/rootless Docker' : '')
+                    .')';
             }
             if ($hasHtpasswdHelper) {
                 $phases[] = 'Legacy htpasswd sync';
