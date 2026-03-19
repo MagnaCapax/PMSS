@@ -152,7 +152,8 @@ TXT;
 
     foreach($users AS $thisUser) {
         //if (!file_exists("/home/{$thisUser}/.trafficData")) continue;
-        list($baseUser, $isLocalnet) = pmssShowTrafficSplitLocalnetUser($thisUser);
+        $isLocalnet = substr($thisUser, -strlen('-localnet')) === '-localnet';
+        $baseUser = $isLocalnet ? substr($thisUser, 0, -strlen('-localnet')) : $thisUser;
         $baseUsers[$baseUser] = true;
         $statsPath = "{$statsDir}/{$thisUser}";
         if (!is_file($statsPath)) {
@@ -373,9 +374,12 @@ TXT;
                 $color = ($row['pctUsed'] !== null && $row['pctUsed'] >= 100) ? "\033[1;31m" : "\033[33m";
                 $statusDisplay = $color.$statusDisplay."\033[0m";
             }
-            $barDisplay = ($row['limitMiB'] !== null && $row['pctUsed'] !== null)
-                ? pmssShowTrafficRenderBar((float) $row['pctUsed'])
-                : str_repeat(' ', 12);
+            if ($row['limitMiB'] !== null && $row['pctUsed'] !== null) {
+                $filled = (int) floor((max(0.0, min(100.0, (float) $row['pctUsed'])) / 100) * 10);
+                $barDisplay = '['.str_repeat('#', $filled).str_repeat('-', 10 - $filled).']';
+            } else {
+                $barDisplay = str_repeat(' ', 12);
+            }
 
             printf(
                 "%-14s %9s / %9s %4s %s %s IN: %9s R: %5s  Datarates: %10s / %10s / %10s / %10s\n",
@@ -444,19 +448,6 @@ function formatTrafficAmount($value): string {
 }
 
 /**
- * Split a user label into base username and localnet flag.
- *
- * @return array{0:string,1:bool}
- */
-function pmssShowTrafficSplitLocalnetUser(string $user): array
-{
-    $suffix = '-localnet';
-    return substr($user, -strlen($suffix)) === $suffix
-        ? [substr($user, 0, -strlen($suffix)), true]
-        : [$user, false];
-}
-
-/**
  * Format a data rate in MiB/s, auto-scaling to GiB/s.
  */
 function pmssShowTrafficFormatRateDisplay(float $rateMiB): string
@@ -466,14 +457,4 @@ function pmssShowTrafficFormatRateDisplay(float $rateMiB): string
         $rateMiB >= 1000 ? $rateMiB / 1024 : $rateMiB,
         $rateMiB >= 1000 ? 'GiB/s' : 'MiB/s'
     );
-}
-
-/**
- * Render a fixed-width ASCII bar for a percentage.
- */
-function pmssShowTrafficRenderBar(float $pct): string
-{
-    $width = 10;
-    $filled = (int) floor((max(0.0, min(100.0, $pct)) / 100) * $width);
-    return '[' . str_repeat('#', $filled) . str_repeat('-', $width - $filled) . ']';
 }

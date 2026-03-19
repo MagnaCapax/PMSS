@@ -195,6 +195,27 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("@file_put_contents(\$suspendRoot.'/index.html', \$html)", $src);
     }
 
+    public function testShowTrafficKeepsLocalnetSplitAndBarRenderingInline(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/showTraffic.php';
+        $src = @file_get_contents($path);
+        $splitSymbol = 'pmssShowTrafficSplit'.'LocalnetUser';
+        $barSymbol = 'pmssShowTrafficRender'.'Bar';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$splitSymbol.'(') === false,
+            'showTraffic.php should keep localnet suffix detection inside pmssShowTrafficMain()'
+        );
+        $this->assertTrue(
+            strpos($src, 'function '.$barSymbol.'(') === false,
+            'showTraffic.php should keep the extended output bar rendering inside pmssShowTrafficMain()'
+        );
+        $this->assertStringContainsString("substr(\$thisUser, -strlen('-localnet')) === '-localnet'", $src);
+        $this->assertStringContainsString("str_repeat('#', \$filled)", $src);
+        $this->assertStringContainsString("str_repeat('-', 10 - \$filled)", $src);
+    }
+
     public function testStorageHealthSnapshotKeepsLsblkParsingLocal(): void
     {
         $snapshotPath = dirname(__DIR__, 4).'/scripts/util/storageHealthSnapshot.php';

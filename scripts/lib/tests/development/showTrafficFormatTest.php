@@ -50,34 +50,4 @@ class ShowTrafficFormatTest extends TestCase
             $this->assertEquals($case[1], \pmssShowTrafficFormatRateDisplay($case[0]));
         }
     }
-
-    public function testRenderBar(): void
-    {
-        $cases = [
-            [0, '[----------]'],
-            [1, '[----------]'],
-            [10, '[#---------]'],
-            [50, '[#####-----]'],
-            [80, '[########--]'],
-            [100, '[##########]'],
-            [150, '[##########]'],
-        ];
-        foreach ($cases as $case) {
-            $this->assertEquals($case[1], \pmssShowTrafficRenderBar($case[0]));
-        }
-    }
-
-    public function testSplitLocalnetUser(): void
-    {
-        $cases = [
-            ['alice', ['alice', false]],
-            ['bob-localnet', ['bob', true]],
-            ['carol-localnet-localnet', ['carol-localnet', true]],
-            ['dave-localnetx', ['dave-localnetx', false]],
-            ['eve-localnet', ['eve', true]],
-        ];
-        foreach ($cases as $case) {
-            $this->assertEquals($case[1], \pmssShowTrafficSplitLocalnetUser($case[0]));
-        }
-    }
 }
