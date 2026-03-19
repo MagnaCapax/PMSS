@@ -47,6 +47,16 @@ class FilebotInstallerHardeningTest extends TestCase
         $this->assertMatches('/\\x27[0-9a-f]{64}\\x27/', $contents);
     }
 
+    public function testFilebotInstallerKeepsVersionProbeAndPathGuard(): void
+    {
+        $path = dirname(__DIR__, 2).'/update/apps/filebot.php';
+        $contents = $this->readFile($path);
+
+        $this->assertStringContainsString('/usr/bin/filebot', $contents);
+        $this->assertStringContainsString('filebot -version 2>/dev/null', $contents);
+        $this->assertStringContainsString('@unlink($filebotPath)', $contents);
+    }
+
     public function testFilebotInstallerNoLongerBuildsDpkgCommandInline(): void
     {
         $path = dirname(__DIR__, 2).'/update/apps/filebot.php';
@@ -66,4 +76,3 @@ class FilebotInstallerHardeningTest extends TestCase
         $this->assertStringContainsString('package checksum mismatch', $contents);
     }
 }
-

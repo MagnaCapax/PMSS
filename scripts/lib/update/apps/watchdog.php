@@ -39,13 +39,10 @@ if (!is_file($device)) {
     return;
 }
 
-if ($device !== '/dev/watchdog') {
-    $config = @file_get_contents('/etc/watchdog.conf');
-    if ($config !== false) {
-        $updated = preg_replace('/^watchdog-device\\s*=\\s*\\/dev\\/watchdog\\b/m', 'watchdog-device = '.$device, $config);
-        if ($updated !== null && $updated !== $config) {
-            file_put_contents('/etc/watchdog.conf', $updated);
-        }
+if ($device !== '/dev/watchdog' && is_string($config = @file_get_contents('/etc/watchdog.conf'))) {
+    $updated = preg_replace('/^watchdog-device\\s*=\\s*\\/dev\\/watchdog\\b/m', 'watchdog-device = '.$device, $config);
+    if ($updated !== null && $updated !== $config) {
+        file_put_contents('/etc/watchdog.conf', $updated);
     }
 }
 

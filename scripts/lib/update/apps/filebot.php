@@ -11,8 +11,7 @@ require_once __DIR__.'/remoteBinary.php';
 
 $filebotPath = '/usr/bin/filebot';
 if (file_exists($filebotPath)
-    && (($out = @shell_exec('filebot -version 2>/dev/null')) === null
-        || strpos((string) $out, '4.9.4 (r8736)') === false)) {
+    && strpos((string) @shell_exec('filebot -version 2>/dev/null'), '4.9.4 (r8736)') === false) {
     @unlink($filebotPath);
 }
 

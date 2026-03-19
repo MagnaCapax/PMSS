@@ -10,14 +10,12 @@ require_once '/scripts/lib/networkInfo.php';
 
 $link = isset($link) ? (string) $link : '';
 $linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (int) $linkSpeed : 0;
-$debianVersion = isset($debianVersion) ? $debianVersion : array('0');
-if (is_string($debianVersion)) {
-    $debianVersion = explode('.', $debianVersion);
+if (is_array($debianVersion ?? null)) {
+    $debianVersion = (string) ($debianVersion[0] ?? '0');
 }
-if (!is_array($debianVersion)) {
-    $debianVersion = array('0');
-}
-$debianMajor = is_numeric($debianVersion[0] ?? '') ? (int) $debianVersion[0] : 0;
+$debianVersion = is_string($debianVersion ?? null) ? $debianVersion : '0';
+$debianMajorParts = explode('.', $debianVersion);
+$debianMajor = is_numeric($debianMajorParts[0] ?? '') ? (int) $debianMajorParts[0] : 0;
 
 #TODO This should be in the install script
 #TODO Use an actual config template

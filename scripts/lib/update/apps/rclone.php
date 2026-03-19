@@ -32,11 +32,7 @@ if ($fetchedLatest) {
 $currentRclone = null;
 if (file_exists('/usr/bin/rclone')) {
     foreach (['/usr/bin/rclone version 2>/dev/null', '/usr/bin/rclone -V 2>/dev/null'] as $command) {
-        $output = @shell_exec($command);
-        if (!is_string($output)) {
-            continue;
-        }
-        if (preg_match('/rclone v?(\d+\.\d+\.\d+)/i', $output, $match)) {
+        if (preg_match('/rclone v?(\d+\.\d+\.\d+)/i', (string) @shell_exec($command), $match)) {
             $currentRclone = $match[1];
             break;
         }

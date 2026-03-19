@@ -77,4 +77,50 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->assertStringContainsString('make -j6', $contents);
         $this->assertStringContainsString('make install', $contents);
     }
+
+    public function testSyncthingInstallerKeepsVersionProbeAndPinnedDownload(): void
+    {
+        $contents = $this->readInstaller('syncthing.php');
+
+        $this->assertStringContainsString('syncthing -version 2>/dev/null', $contents);
+        $this->assertStringContainsString('v1.18.2 "Fermium Flea"', $contents);
+        $this->assertStringContainsString('http://pulsedmedia.com/remote/pkg/syncthing', $contents);
+        $this->assertStringContainsString('chmod 755 /usr/bin/syncthing', $contents);
+    }
+
+    public function testRcloneInstallerKeepsLatestFetchAndRelocationGuards(): void
+    {
+        $contents = $this->readInstaller('rclone.php');
+
+        $this->assertStringContainsString("getenv('PMSS_RCLONE_FETCH_LATEST') === '1'", $contents);
+        $this->assertStringContainsString('Warning: Unable to determine latest rclone version, falling back to pinned release.', $contents);
+        $this->assertStringContainsString('/usr/bin/rclone version 2>/dev/null', $contents);
+        $this->assertStringContainsString('/usr/bin/rclone -V 2>/dev/null', $contents);
+        $this->assertStringContainsString('mandb;', $contents);
+        $this->assertStringContainsString("passthru('mv /usr/sbin/rclone /usr/bin/rclone')", $contents);
+    }
+
+    public function testVnstatInstallerKeepsLegacyConfigAndDebian8Repair(): void
+    {
+        $contents = $this->readInstaller('vnstat.php');
+
+        $this->assertStringContainsString("require_once '/scripts/lib/networkInfo.php';", $contents);
+        $this->assertStringContainsString("passthru('apt-get install vnstat -y')", $contents);
+        $this->assertStringContainsString("str_replace('RateUnit 1', 'RateUnit 0'", $contents);
+        $this->assertStringContainsString('MaxBandwidth 100', $contents);
+        $this->assertStringContainsString('/etc/init.d/vnstat restart', $contents);
+        $this->assertStringContainsString('chown -R vnstat:vnstat /var/lib/vnstat', $contents);
+    }
+
+    public function testWatchdogInstallerKeepsTemplateAndDeviceFallbackFlow(): void
+    {
+        $contents = $this->readInstaller('watchdog.php');
+
+        $this->assertStringContainsString('template.watchdog.conf', $contents);
+        $this->assertStringContainsString('template.watchdog.network-check.sh', $contents);
+        $this->assertStringContainsString('/etc/watchdog.d', $contents);
+        $this->assertStringContainsString('/dev/watchdog0', $contents);
+        $this->assertStringContainsString('systemctl unmask watchdog || true', $contents);
+        $this->assertStringContainsString('systemctl enable --now watchdog', $contents);
+    }
 }
