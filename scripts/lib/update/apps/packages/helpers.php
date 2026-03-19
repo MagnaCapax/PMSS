@@ -28,7 +28,7 @@ function pmssQueuePackages(array $packages, ?string $target = null): void
 {
     global $PMSS_PACKAGE_QUEUE;
     $key = $target ?? PMSS_PACKAGE_QUEUE_DEFAULT;
-    if (!isset($PMSS_PACKAGE_QUEUE[$key])) { $PMSS_PACKAGE_QUEUE[$key] = []; }
+    $PMSS_PACKAGE_QUEUE[$key] = $PMSS_PACKAGE_QUEUE[$key] ?? [];
     foreach ($packages as $pkg) {
         $pkg = trim($pkg);
         if ($pkg !== '' && !in_array($pkg, $PMSS_PACKAGE_QUEUE[$key], true)) {
@@ -321,13 +321,13 @@ function pmssInstallBestEffort(array $items, string $label = ''): void
         }
     }
     $selection = array_unique($selection);
-    if (empty($selection)) {
-        if ($label !== '') {
-            echo "Notice: No packages available for {$label}\n";
-        }
+    if (!empty($selection)) {
+        pmssQueuePackages($selection);
         return;
     }
-    pmssQueuePackages($selection);
+    if ($label !== '') {
+        echo "Notice: No packages available for {$label}\n";
+    }
 }
 
 /**

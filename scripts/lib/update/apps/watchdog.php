@@ -28,13 +28,8 @@ runStep('Ensuring watchdog script directory exists', 'mkdir -p '.$scriptDir);
 runStep('Installing watchdog configuration', 'install -m 0644 '.$configTemplate.' /etc/watchdog.conf');
 runStep('Installing watchdog network check', 'install -m 0755 '.$scriptTemplate.' '.$scriptTarget);
 
-// Prefer /dev/watchdog, but allow watchdog0 if that is what the kernel exposes.
-$device = '/dev/watchdog';
-if (!is_file($device) && is_file('/dev/watchdog0')) {
-    $device = '/dev/watchdog0';
-}
-
-if (!is_file($device)) {
+$device = is_file('/dev/watchdog') ? '/dev/watchdog' : (is_file('/dev/watchdog0') ? '/dev/watchdog0' : '');
+if ($device === '') {
     logMessage('[WARN] Watchdog device missing; leaving service disabled.');
     return;
 }

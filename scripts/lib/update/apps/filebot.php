@@ -11,14 +11,13 @@ require_once __DIR__.'/remoteBinary.php';
 
 $filebotPath = '/usr/bin/filebot';
 if (file_exists($filebotPath)
-    && strpos((string) @shell_exec('filebot -version 2>/dev/null'), '4.9.4 (r8736)') === false) {
-    @unlink($filebotPath);
+    && strpos((string) @shell_exec('filebot -version 2>/dev/null'), '4.9.4 (r8736)') !== false) {
+    return;
 }
 
-if (!file_exists($filebotPath)) {
-    pmssInstallPinnedRemoteDebPackage(
-        'FileBot 4.9.4',
-        'https://pulsedmedia.com/remote/pkg/FileBot_4.9.4_amd64.deb',
-        '30d1483a6ec3e24df6f518b6f82e4115140be010026e554c15be9a75b47783cc'
-    );
-}
+@unlink($filebotPath);
+pmssInstallPinnedRemoteDebPackage(
+    'FileBot 4.9.4',
+    'https://pulsedmedia.com/remote/pkg/FileBot_4.9.4_amd64.deb',
+    '30d1483a6ec3e24df6f518b6f82e4115140be010026e554c15be9a75b47783cc'
+);
