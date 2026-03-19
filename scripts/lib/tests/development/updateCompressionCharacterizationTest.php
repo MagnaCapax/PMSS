@@ -184,6 +184,26 @@ class UpdateCompressionCharacterizationTest extends TestCase
         );
     }
 
+    public function testStorageHealthFacadeDropsStandaloneExecModule(): void
+    {
+        $facadePath = dirname(__DIR__, 4).'/scripts/lib/storageHealth.php';
+        $facadeSrc = @file_get_contents($facadePath);
+        $commonPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/common.php';
+        $commonSrc = @file_get_contents($commonPath);
+        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/exec.php';
+        $symbol = 'pmssStorageHealthExec'.'Capture';
+
+        $this->assertTrue(is_string($facadeSrc) && $facadeSrc !== '', 'Expected to read '.$facadePath);
+        $this->assertTrue(is_string($commonSrc) && $commonSrc !== '', 'Expected to read '.$commonPath);
+        $this->assertTrue(!is_file($libraryPath), 'Expected one-call storageHealth/exec.php helper file to be removed');
+        $this->assertTrue(
+            strpos($facadeSrc, "'exec'") === false,
+            'storageHealth.php should stop requiring the removed exec.php module'
+        );
+        $this->assertStringContainsString('function '.$symbol.'(', $commonSrc);
+        $this->assertStringContainsString("return ['rc' => 124, 'stdout' => \$stdout, 'stderr' => \$stderr];", $commonSrc);
+    }
+
     public function testResourceSnapshotCronOwnsSnapshotLoop(): void
     {
         $cronPath = dirname(__DIR__, 4).'/scripts/cron/resourceSnapshot.php';
@@ -211,6 +231,22 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'update.php should keep skeleton path joins inline inside updateUserFile()'
         );
         $this->assertStringContainsString("pmssSkeletonBase().'/'.\$file", $src);
+    }
+
+    public function testSkeletonMaintenanceKeepsTorrentFrontendPatchLocal(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/user/skeleton.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssUserPatch'.'TorrentFrontends';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'skeleton.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()'
+        );
+        $this->assertStringContainsString("preg_replace('/^<\\?php\\s*/', \$requireLine, \$updated, 1, \$count)", $src);
+        $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $src);
+        $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $src);
     }
 
     public function testOsReleaseHelpersKeepPathLookupInline(): void
@@ -260,22 +296,21 @@ class UpdateCompressionCharacterizationTest extends TestCase
     public function testPluginMaintenanceOwnsRetrackerCleanup(): void
     {
         $pluginsPath = dirname(__DIR__, 4).'/scripts/lib/update/user/plugins.php';
-        $pluginsSrc = @file_get_contents($pluginsPath);
         $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
         $usersSrc = @file_get_contents($usersPath);
         $symbol = 'pmssUserMaintain'.'Retracker';
-        $this->assertTrue(is_string($pluginsSrc) && $pluginsSrc !== '', 'Expected to read '.$pluginsPath);
         $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
+        $this->assertTrue(!is_file($pluginsPath), 'Expected one-call update/user/plugins.php helper file to be removed');
 
         $this->assertTrue(
-            strpos($pluginsSrc, 'function '.$symbol.'(') === false,
-            'plugins.php should keep retracker cleanup inside pmssUserEnsurePlugins()'
+            strpos($usersSrc, 'function '.$symbol.'(') === false,
+            'users.php should keep retracker cleanup inside pmssUserEnsurePlugins()'
         );
         $this->assertTrue(
-            strpos($usersSrc, 'Retracker cleanup') === false,
-            'users.php should stop wiring a separate retracker maintenance step'
+            strpos($usersSrc, "require_once __DIR__.'/user/plugins.php';") === false,
+            'users.php should stop requiring the removed plugins.php submodule'
         );
-        $this->assertStringContainsString('retrackers.dat', $pluginsSrc);
-        $this->assertStringContainsString('Creating ruTorrent RSS settings directory', $pluginsSrc);
+        $this->assertStringContainsString('retrackers.dat', $usersSrc);
+        $this->assertStringContainsString('Creating ruTorrent RSS settings directory', $usersSrc);
     }
 }

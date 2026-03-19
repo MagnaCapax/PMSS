@@ -14,7 +14,7 @@ namespace {
 
 namespace PMSS\Tests {
 
-require_once dirname(__DIR__, 2).'/update/user/plugins.php';
+require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdatePluginsTest extends TestCase
 {
