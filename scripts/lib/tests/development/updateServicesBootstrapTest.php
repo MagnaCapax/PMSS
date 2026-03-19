@@ -48,6 +48,29 @@ class UpdateServicesBootstrapTest extends TestCase
         );
     }
 
+    public function testHostnameSkipUppercaseFalseyValueFallsThroughToMissingHostname(): void
+    {
+        $messages = [];
+
+        $this->withEnv([
+            'PMSS_SKIP_HOSTNAME' => 'FALSE',
+            'PMSS_HOSTNAME' => null,
+        ], function () use (&$messages): void {
+            \pmssApplyHostnameConfig(function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            });
+        });
+
+        $this->assertTrue(
+            !$this->messagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
+            'uppercase falsey PMSS_SKIP_HOSTNAME must not trigger skip'
+        );
+        $this->assertTrue(
+            $this->messagesContain($messages, 'No hostname override provided'),
+            'uppercase falsey PMSS_SKIP_HOSTNAME should fall through to missing-hostname handling'
+        );
+    }
+
     public function testQuotaSkipTruthyValueSkips(): void
     {
         $messages = [];
@@ -88,6 +111,30 @@ class UpdateServicesBootstrapTest extends TestCase
         $this->assertTrue(
             $this->messagesContain($messages, 'Skipping remount for '.$mount.' (mount path not found)'),
             'falsey PMSS_SKIP_QUOTA should fall through to normal quota handling'
+        );
+    }
+
+    public function testQuotaSkipUppercaseFalseyValueFallsThroughPastSkipGuard(): void
+    {
+        $messages = [];
+        $mount = sys_get_temp_dir().'/pmss-bootstrap-quota-'.bin2hex(random_bytes(4));
+
+        $this->withEnv([
+            'PMSS_SKIP_QUOTA' => 'FALSE',
+            'PMSS_QUOTA_MOUNT' => $mount,
+        ], function () use (&$messages): void {
+            \pmssConfigureQuotaMount(function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            });
+        });
+
+        $this->assertTrue(
+            !$this->messagesContain($messages, 'Quota configuration skipped via PMSS_SKIP_QUOTA'),
+            'uppercase falsey PMSS_SKIP_QUOTA must not trigger skip'
+        );
+        $this->assertTrue(
+            $this->messagesContain($messages, 'Skipping remount for '.$mount.' (mount path not found)'),
+            'uppercase falsey PMSS_SKIP_QUOTA should fall through to normal quota handling'
         );
     }
 

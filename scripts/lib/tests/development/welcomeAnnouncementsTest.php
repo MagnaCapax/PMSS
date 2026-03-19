@@ -17,6 +17,26 @@ class WelcomeAnnouncementsTest extends TestCase
         $this->assertEquals('', \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss));
     }
 
+    public function testMalformedFeedRestoresLibxmlInternalErrorsSetting(): void
+    {
+        if (!function_exists('libxml_use_internal_errors')) {
+            $this->assertTrue(true);
+            return;
+        }
+
+        $previous = libxml_use_internal_errors(false);
+        try {
+            \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw('<rss><channel><item>');
+            $this->assertTrue(libxml_use_internal_errors() === false, 'libxml internal error mode should be restored');
+        } finally {
+            if (function_exists('libxml_clear_errors')) {
+                libxml_clear_errors();
+            }
+
+            libxml_use_internal_errors($previous);
+        }
+    }
+
     public function testFeedWithoutItemsReturnsEmptyHtml(): void
     {
         $rss = '<?xml version="1.0" encoding="UTF-8"?><rss><channel><title>News</title></channel></rss>';

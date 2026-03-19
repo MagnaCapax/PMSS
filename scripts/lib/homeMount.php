@@ -39,12 +39,9 @@ if (!function_exists('pmssIsHomeMounted')) {
     function pmssIsHomeMounted(): bool
     {
         // Allow test harnesses to override mount detection.
-        $override = strtolower((string) getenv('PMSS_HOME_MOUNTED_OVERRIDE'));
-        if ($override === '1' || $override === 'true') {
-            return true;
-        }
-        if ($override === '0' || $override === 'false') {
-            return false;
+        $override = ['1' => true, 'true' => true, '0' => false, 'false' => false][strtolower((string) getenv('PMSS_HOME_MOUNTED_OVERRIDE'))] ?? null;
+        if ($override !== null) {
+            return $override;
         }
 
         $mountsPath = (string) getenv('PMSS_PROC_MOUNTS_PATH');
@@ -81,8 +78,7 @@ if (!function_exists('pmssRequireHomeMounted')) {
     function pmssRequireHomeMounted(string $context = ''): void
     {
         // Allow operators to bypass the check for non-standard deployments.
-        $skip = strtolower((string) getenv('PMSS_SKIP_HOME_MOUNT_CHECK'));
-        if ($skip === '1' || $skip === 'true' || pmssIsHomeMounted()) {
+        if ((['1' => true, 'true' => true][strtolower((string) getenv('PMSS_SKIP_HOME_MOUNT_CHECK'))] ?? false) || pmssIsHomeMounted()) {
             return;
         }
 

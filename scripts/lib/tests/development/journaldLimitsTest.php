@@ -44,6 +44,13 @@ class JournaldLimitsTest extends TestCase
         $this->assertEquals($this->gib(20), $policy['system_max_use_bytes']);
     }
 
+    public function testFiftyGiBBoundaryUsesFlatTwentyGiBCap(): void
+    {
+        $rootBytes = $this->gib(50);
+        $policy = \pmssJournaldLimitsForRootBytes($rootBytes);
+        $this->assertEquals($this->gib(20), $policy['system_max_use_bytes']);
+    }
+
     public function testKeepFreeClampLow(): void
     {
         $rootBytes = $this->gib(8);

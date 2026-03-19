@@ -62,6 +62,15 @@ class HomeMountTest extends TestCase
         $this->assertTrue(!pmssIsHomeMounted());
     }
 
+    public function testIsHomeMountedNormalizesOverrideCase(): void
+    {
+        putenv('PMSS_HOME_MOUNTED_OVERRIDE=TRUE');
+        $this->assertTrue(pmssIsHomeMounted());
+
+        putenv('PMSS_HOME_MOUNTED_OVERRIDE=FALSE');
+        $this->assertTrue(!pmssIsHomeMounted());
+    }
+
     public function testIsHomeMountedParsesRealMountsFile(): void
     {
         // Create a temporary mounts file with /home mounted.

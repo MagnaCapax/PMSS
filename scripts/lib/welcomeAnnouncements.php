@@ -31,11 +31,9 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         $rssRaw = $rssUtf8;
     }
 
-    $restoreInternalErrors = function_exists('libxml_use_internal_errors');
-    $clearErrors = function_exists('libxml_clear_errors');
-    $previousInternalErrors = $restoreInternalErrors ? libxml_use_internal_errors(true) : false;
+    $previousInternalErrors = function_exists('libxml_use_internal_errors') ? libxml_use_internal_errors(true) : null;
 
-    if ($clearErrors) {
+    if (function_exists('libxml_clear_errors')) {
         libxml_clear_errors();
     }
 
@@ -44,11 +42,11 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
     } catch (\Throwable $throwable) {
         $rssXml = false;
     } finally {
-        if ($clearErrors) {
+        if (function_exists('libxml_clear_errors')) {
             libxml_clear_errors();
         }
 
-        if ($restoreInternalErrors) {
+        if ($previousInternalErrors !== null) {
             libxml_use_internal_errors($previousInternalErrors);
         }
     }

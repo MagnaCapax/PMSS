@@ -25,17 +25,15 @@ require_once __DIR__.'/../../runtime.php';
 function pmssJournaldLimitsForRootBytes(int $rootBytes): array
 {
     $gib = 1024 * 1024 * 1024;
-    $mib = 1024 * 1024;
-    $rootGiB = $rootBytes / $gib;
 
     // < 50GiB gets 20% with a 2GiB floor; larger roots use 20GiB flat.
-    $systemMax = max(2 * $gib, $rootGiB < 50 ? (int) floor($rootBytes * 0.20) : 20 * $gib);
+    $systemMax = max(2 * $gib, $rootBytes < 50 * $gib ? (int) floor($rootBytes * 0.20) : 20 * $gib);
 
     // Keep free 5% of root, clamped to 1-10GiB.
     $systemKeepFree = max(1 * $gib, min(10 * $gib, (int) floor($rootBytes * 0.05)));
 
     // Runtime max defaults to 10% of SystemMaxUse, clamped to 256MiB-2GiB.
-    $runtimeMax = max(256 * $mib, min(2 * $gib, (int) floor($systemMax / 10)));
+    $runtimeMax = max(256 * 1024 * 1024, min(2 * $gib, (int) floor($systemMax / 10)));
 
     return [
         'system_max_use_bytes'   => $systemMax,
