@@ -49,17 +49,11 @@ function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
             continue;
         }
         $uid = $m[1];
-        $numbers = [];
-        for ($i = 1, $len = count($tokens); $i < $len; $i++) {
-            $token = $tokens[$i];
-            if ($token !== '' && ctype_digit($token)) {
-                $numbers[] = $token;
-            }
-        }
+        $numbers = array_values(array_filter(array_slice($tokens, 1), 'ctype_digit'));
         if (count($numbers) < 6) {
             continue;
         }
-        $rows[] = [$uid, $numbers[0], $numbers[1], $numbers[2], $numbers[3], $numbers[4], $numbers[5]];
+        $rows[] = array_merge([$uid], array_slice($numbers, 0, 6));
     }
     return $rows;
 }
@@ -83,71 +77,72 @@ function pmssQuotaSnapshotRun(): int
     $ts = date('Y-m-d\\TH:i:s');
 
     $oldUmask = umask(0077);
-    if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+    $fh = false;
+    try {
+        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+            return 1;
+        }
+
+        $fh = @fopen($logPath, 'ab');
+        if ($fh === false) {
+            return 1;
+        }
+
+        @chmod($logPath, 0600);
+        if (function_exists('flock')) {
+            @flock($fh, LOCK_EX);
+        }
+
+        // Resolve repquota binary without depending on PATH inherited by cron.
+        $repquota = trim((string) @shell_exec('command -v repquota 2>/dev/null'));
+        if ($repquota === '') {
+            @fwrite($fh, $ts.' WARN repquota_missing'.PHP_EOL);
+            return 0;
+        }
+
+        $cmd = $repquota.' -u -n '.escapeshellarg($mountPath).' 2>&1';
+        $output = [];
+        $rc = 0;
+        @exec($cmd, $output, $rc);
+        if ($rc !== 0) {
+            $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($output, 0, 5))));
+            @fwrite(
+                $fh,
+                $ts.' WARN repquota_failed rc='.$rc.' mount='.preg_replace('/\\s+/', '', $mountPath).($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL
+            );
+            return 0;
+        }
+
+        $rows = pmssQuotaSnapshotParseRepquotaUserRows($output);
+        if (empty($rows)) {
+            @fwrite($fh, $ts.' WARN repquota_no_rows mount='.preg_replace('/\\s+/', '', $mountPath).PHP_EOL);
+            return 0;
+        }
+
+        foreach ($rows as $row) {
+            @fwrite(
+                $fh,
+                sprintf(
+                    '%s %s %s %s %s %s %s %s',
+                    $ts,
+                    $row[0],
+                    $row[1],
+                    $row[2],
+                    $row[3],
+                    $row[4],
+                    $row[5],
+                    $row[6]
+                ).PHP_EOL
+            );
+        }
+
+        return 0;
+    } finally {
+        if ($fh !== false) {
+            @fclose($fh);
+        }
         umask($oldUmask);
-        return 1;
     }
-
-    $fh = @fopen($logPath, 'ab');
-    if ($fh === false) {
-        umask($oldUmask);
-        return 1;
-    }
-
-    $finish = static function (int $code) use ($fh, $oldUmask): int {
-        @fclose($fh);
-        umask($oldUmask);
-        return $code;
-    };
-
-    @chmod($logPath, 0600);
-    if (function_exists('flock')) {
-        @flock($fh, LOCK_EX);
-    }
-
-    // Resolve repquota binary without depending on PATH inherited by cron.
-    $repquota = trim((string) @shell_exec('command -v repquota 2>/dev/null'));
-    if ($repquota === '') {
-        @fwrite($fh, $ts.' WARN repquota_missing'.PHP_EOL);
-        return $finish(0);
-    }
-
-    $cmd = $repquota.' -u -n '.escapeshellarg($mountPath).' 2>&1';
-    $output = [];
-    $rc = 0;
-    @exec($cmd, $output, $rc);
-    if ($rc !== 0) {
-        $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($output, 0, 5))));
-        @fwrite(
-            $fh,
-            $ts.' WARN repquota_failed rc='.$rc.' mount='.preg_replace('/\\s+/', '', $mountPath).($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL
-        );
-        return $finish(0);
-    }
-
-    $rows = pmssQuotaSnapshotParseRepquotaUserRows($output);
-    if (empty($rows)) {
-        @fwrite($fh, $ts.' WARN repquota_no_rows mount='.preg_replace('/\\s+/', '', $mountPath).PHP_EOL);
-        return $finish(0);
-    }
-
-    foreach ($rows as $row) {
-        @fwrite(
-            $fh,
-            sprintf(
-                '%s %s %s %s %s %s %s %s',
-                $ts,
-                $row[0],
-                $row[1],
-                $row[2],
-                $row[3],
-                $row[4],
-                $row[5],
-                $row[6]
-            ).PHP_EOL
-        );
-    }
-    return $finish(0);
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {

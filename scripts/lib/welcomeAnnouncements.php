@@ -64,11 +64,9 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
             continue;
         }
 
-        $dateText = date('d/m', strtotime((string) $thisItem->pubDate));
-        $itemsHtml .= "<li>({$dateText}) <a href=\"".(string) $thisItem->link."\" target=\"_blank\">"
+        $itemsHtml .= '<li>('.date('d/m', strtotime((string) $thisItem->pubDate)).') <a href="'.(string) $thisItem->link.'" target="_blank">'
             .htmlspecialchars((string) $thisItem->title)."</a></li>\n";
-        $renderedItems++;
-        if ($renderedItems === 4) {
+        if (++$renderedItems === 4) {
             break;
         }
     }

@@ -186,8 +186,7 @@ function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $r
             continue;
         }
 
-        $summary['array'] = $homeArray;
-        return $summary;
+        return $summary + ['array' => $homeArray];
     }
 
     return null;

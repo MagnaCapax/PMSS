@@ -180,14 +180,10 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
     $rootResult = @file_put_contents($suspendRoot.'/index.html', $html);
     $publicResult = @file_put_contents($publicDir.'/index.html', $html);
 
-    @chown($suspendRoot, $username);
-    @chgrp($suspendRoot, $username);
-    @chown($publicDir, $username);
-    @chgrp($publicDir, $username);
-    @chown($suspendRoot.'/index.html', $username);
-    @chgrp($suspendRoot.'/index.html', $username);
-    @chown($publicDir.'/index.html', $username);
-    @chgrp($publicDir.'/index.html', $username);
+    foreach ([$suspendRoot, $publicDir, $suspendRoot.'/index.html', $publicDir.'/index.html'] as $path) {
+        @chown($path, $username);
+        @chgrp($path, $username);
+    }
 
     return $rootResult !== false && $publicResult !== false;
 }
