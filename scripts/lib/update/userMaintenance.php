@@ -78,6 +78,18 @@ if (!function_exists('pmssUpdateAllUsers')) {
             $postChecks['Checking lighttpd instance'] = $lighttpdChecker;
         }
         $phaseSummary = empty($phases) ? '' : ' phases: '.implode(', ', $phases);
+        $recordUserProfile = static function (string $user, string $status, int $rc, float $duration, string $stderrExcerpt = ''): void {
+            pmssRecordProfile([
+                'description'    => 'updateUser '.$user,
+                'command'        => '',
+                'status'         => $status,
+                'rc'             => $rc,
+                'duration'       => round($duration, 4),
+                'dry_run'        => false,
+                'stdout_excerpt' => '',
+                'stderr_excerpt' => $stderrExcerpt,
+            ]);
+        };
 
         foreach ($users as $user) {
             if (($userTrim = trim($user)) === '') {
@@ -145,16 +157,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
                 $userDuration = microtime(true) - $userStart;
                 pmssUserLog($userTrim, sprintf('update-step2: user maintenance finished (%.2fs)', $userDuration));
-                pmssRecordProfile([
-                    'description'    => 'updateUser '.$userTrim,
-                    'command'        => '',
-                    'status'         => 'OK',
-                    'rc'             => 0,
-                    'duration'       => round($userDuration, 4),
-                    'dry_run'        => false,
-                    'stdout_excerpt' => '',
-                    'stderr_excerpt' => '',
-                ]);
+                $recordUserProfile($userTrim, 'OK', 0, $userDuration);
                 $processedUsers++;
             } catch (\Throwable $throwable) {
                 $skippedUsers++;
@@ -166,16 +169,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
                     pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
                 }
 
-                pmssRecordProfile([
-                    'description'    => 'updateUser '.$userTrim,
-                    'command'        => '',
-                    'status'         => 'ERR',
-                    'rc'             => 1,
-                    'duration'       => round($userDuration, 4),
-                    'dry_run'        => false,
-                    'stdout_excerpt' => '',
-                    'stderr_excerpt' => substr(preg_replace('/\s+/', ' ', $reason), 0, 300),
-                ]);
+                $recordUserProfile($userTrim, 'ERR', 1, $userDuration, substr(preg_replace('/\s+/', ' ', $reason), 0, 300));
             }
         }
 
@@ -433,9 +427,7 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         $hasConfigFile = is_file($configFile);
         $current = $hasConfigFile ? @file_get_contents($configFile) : false;
         $data = $current ? json_decode($current, true) : [];
-        if (!is_array($data)) {
-            $data = [];
-        }
+        $data = is_array($data) ? $data : [];
 
         $writeConfig = static function (array $payload) use ($configFile, $uid, $gid, $user): bool {
             $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -465,24 +457,23 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
                 $changed = true;
             }
         };
+        $writeIfChanged = static function (array $payload) use (&$changed, $writeConfig): bool {
+            return $changed ? $writeConfig($payload) : false;
+        };
 
         // If storage-driver is already set, respect it unless it is our default.
         if (isset($data['storage-driver'])) {
             if ($data['storage-driver'] !== 'fuse-overlayfs') {
                 if ($hasConfigFile) {
                     $ensureExecOpts($data);
-                    if ($changed) {
-                        $writeConfig($data);
-                    }
+                    $writeIfChanged($data);
                 }
                 return;
             }
 
             if ($fuseOverlayfsAvailable) {
                 $ensureExecOpts($data);
-                if ($changed) {
-                    $writeConfig($data);
-                }
+                $writeIfChanged($data);
                 return;
             }
 
@@ -490,7 +481,7 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
                 unset($data['storage-driver']);
                 $changed = true;
                 $ensureExecOpts($data);
-                if ($writeConfig($data)) {
+                if ($writeIfChanged($data)) {
                     pmssUserLog($user, '[WARN] Removed daemon.json storage-driver because fuse-overlayfs is unavailable');
                 }
             } else {
@@ -502,9 +493,7 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         if (!$fuseOverlayfsAvailable) {
             if ($hasConfigFile) {
                 $ensureExecOpts($data);
-                if ($changed) {
-                    $writeConfig($data);
-                }
+                $writeIfChanged($data);
             } else {
                 pmssUserLog($user, sprintf('[WARN] fuse-overlayfs %s; skipping storage-driver enforcement', $fuseOverlayfsStatus));
             }
@@ -516,7 +505,7 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
         $changed = true;
         $ensureExecOpts($data);
 
-        if ($writeConfig($data)) {
+        if ($writeIfChanged($data)) {
             pmssUserLog($user, '[INFO] Configured Docker storage-driver: fuse-overlayfs');
         }
     }

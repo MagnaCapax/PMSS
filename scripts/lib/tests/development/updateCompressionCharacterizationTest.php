@@ -358,6 +358,37 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('Checking lighttpd instance', $src);
     }
 
+    public function testUserMaintenanceKeepsProfilePayloadLocal(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssBuild'.'UserMaintenanceProfile';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'userMaintenance.php should keep per-user profile payload assembly inside pmssUpdateAllUsers()'
+        );
+        $this->assertStringContainsString("'description'    => 'updateUser '.\$user", $src);
+        $this->assertStringContainsString("'stdout_excerpt' => ''", $src);
+        $this->assertStringContainsString("'stderr_excerpt' => \$stderrExcerpt", $src);
+    }
+
+    public function testDockerDependenciesKeepDaemonJsonWritesLocal(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssWrite'.'DockerDaemonConfig';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'userMaintenance.php should keep daemon.json write handling inside pmssEnsureDockerDependencies()'
+        );
+        $this->assertStringContainsString('JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES', $src);
+        $this->assertStringContainsString("'native.cgroupdriver=cgroupfs'", $src);
+    }
+
     public function testRepositoryPrerequisitesKeepSonarrDetectionInline(): void
     {
         $path = dirname(__DIR__, 4).'/scripts/lib/update/repositories.php';
