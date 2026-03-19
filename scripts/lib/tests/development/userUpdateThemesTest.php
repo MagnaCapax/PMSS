@@ -1,7 +1,7 @@
 <?php
 namespace PMSS\Tests;
 
-require_once dirname(__DIR__, 2).'/update/user/rutorrent.php';
+require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdateThemesTest extends TestCase
 {

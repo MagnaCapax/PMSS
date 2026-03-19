@@ -27,7 +27,6 @@ phpAllowlistedFile() {
     "$ROOT_DIR/scripts/terminateUser.php") return 0 ;;
     "$ROOT_DIR/scripts/util/setupSkelPermissions.php") return 0 ;;
     "$ROOT_DIR/scripts/util/configureOpenvpn.php") return 0 ;;
-    "$ROOT_DIR/scripts/lib/update/user/rutorrent.php") return 0 ;;
     "$ROOT_DIR/scripts/lib/update/apps/iprange.php") return 0 ;;
 
     # Legacy direct shell_exec/backticks or informational strings.

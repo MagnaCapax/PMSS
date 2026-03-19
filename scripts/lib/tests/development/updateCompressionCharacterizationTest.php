@@ -239,18 +239,45 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testSkeletonMaintenanceKeepsTorrentFrontendPatchLocal(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/user/skeleton.php';
-        $src = @file_get_contents($path);
+        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
+        $skeletonPath = dirname(__DIR__, 4).'/scripts/lib/update/user/skeleton.php';
+        $src = @file_get_contents($usersPath);
         $symbol = 'pmssUserPatch'.'TorrentFrontends';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$usersPath);
+        $this->assertTrue(!is_file($skeletonPath), 'Expected one-call update/user/skeleton.php helper file to be removed');
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
-            'skeleton.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()'
+            'users.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()'
+        );
+        $this->assertTrue(
+            strpos($src, "require_once __DIR__.'/user/skeleton.php';") === false,
+            'users.php should stop requiring the removed skeleton.php submodule'
         );
         $this->assertStringContainsString("preg_replace('/^<\\?php\\s*/', \$requireLine, \$updated, 1, \$count)", $src);
         $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $src);
         $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $src);
+    }
+
+    public function testUserUpdateModuleOwnsRutorrentHelpers(): void
+    {
+        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
+        $usersSrc = @file_get_contents($usersPath);
+        $rutorrentPath = dirname(__DIR__, 4).'/scripts/lib/update/user/rutorrent.php';
+        $symbol = 'pmssUserUpgrade'.'Rutorrent';
+        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
+        $this->assertTrue(!is_file($rutorrentPath), 'Expected one-call update/user/rutorrent.php helper file to be removed');
+
+        $this->assertTrue(
+            strpos($usersSrc, "require_once __DIR__.'/user/rutorrent.php';") === false,
+            'users.php should stop requiring the removed rutorrent.php submodule'
+        );
+        $this->assertTrue(
+            strpos($usersSrc, 'function '.$symbol.'(') !== false,
+            'users.php should own the ruTorrent refresh helper directly'
+        );
+        $this->assertStringContainsString('function pmssUserMaintainRutorrentPhpCompatibility(', $usersSrc);
+        $this->assertStringContainsString('function pmssUserUpdateThemes(', $usersSrc);
     }
 
     public function testOsReleaseHelpersKeepPathLookupInline(): void

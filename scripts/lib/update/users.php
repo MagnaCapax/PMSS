@@ -9,8 +9,6 @@
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../user/directories.php';
-require_once __DIR__.'/user/skeleton.php';
-require_once __DIR__.'/user/rutorrent.php';
 
 /**
  * Build the shared per-user context array used by update-step2 user helpers.
@@ -46,6 +44,90 @@ function pmssBuildUserContext(string $user, string $rutorrentIndexSha = ''): ?ar
         'user_esc'           => escapeshellarg($user),
         'rutorrent_index_sha'=> $rutorrentIndexSha,
     ];
+}
+
+/**
+ * Apply skeleton file refreshes and tenant-side compatibility patches.
+ *
+ * @param array $ctx Per-user context from pmssBuildUserContext().
+ */
+function pmssUserApplySkeletonFiles(array $ctx): void
+{
+    $user = $ctx['user'];
+    $patchTorrentFrontends = static function (string $path, string $requireLine, string $legacyCommand, string $patchedCommand): void {
+        if (!is_file($path)
+            || is_link($path)
+            || !is_string($content = @file_get_contents($path))
+            || $content === '') {
+            return;
+        }
+
+        $updated = $content;
+        if (strpos($updated, $requireLine) === false) {
+            $updated = preg_replace('/^<\?php\s*/', $requireLine, $updated, 1, $count);
+            if (!is_string($updated) || $count !== 1) {
+                return;
+            }
+        }
+        $updated = str_replace($legacyCommand, $patchedCommand, $updated);
+
+        if ($updated !== $content) {
+            @file_put_contents($path, $updated);
+        }
+    };
+
+    $files = [
+        '.rtorrentExecute.php',
+        '.rtorrentRestart.php',
+        '.bashrc',
+        'install-media-stack.sh',
+        'install-ai-tools.sh',
+        'bin/docker-install-wireguard.sh',
+        'bin/linuxserverInstall.sh',
+        '.qbittorrentPort.py',
+        '.delugePort.py',
+        '.scriptsInc.php',
+        '.lighttpd/php.ini',
+        'radarr-sonarr.txt',
+        'www/deluge.php',
+        'www/filemanager.php',
+        'www/openvpn-config.tgz',
+        'www/qbittorrent.php',
+        'www/rutorrent/js/content.js',
+        'www/rutorrent/php/settings.php',
+        'www/rutorrent/plugins/theme/conf.php',
+    ];
+    foreach ($files as $file) {
+        updateUserFile($file, $user);
+    }
+
+    if (file_exists("/home/{$user}/www/phpXplorer")) {
+        unlink("/home/{$user}/www/phpXplorer");
+    }
+
+    // Patch tenant copies until the frozen skeleton filemanager source can be
+    // updated upstream without touching the locked tree.
+    $filemanagerPath = $ctx['home'].'/www/filemanager.php';
+    if (is_file($filemanagerPath)
+        && !is_link($filemanagerPath)
+        && is_string($content = @file_get_contents($filemanagerPath))
+        && $content !== ''
+        && strpos($content, '        @ob_flush();') === false) {
+        if (($updated = str_replace('        ob_flush();', '        @ob_flush();', $content, $replacements)) !== $content && $replacements > 0) {
+            @file_put_contents($filemanagerPath, $updated);
+        }
+    }
+
+    // Keep tenant torrent frontend copies off the legacy Python port helpers
+    // until the frozen /etc/skel/www sources can be updated directly.
+    $patchTorrentFrontends($ctx['home'].'/www/deluge.php', "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';\n", "shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');", "if (function_exists('pmssDelugePortEnsureCurrentUser')) {\n        pmssDelugePortEnsureCurrentUser();\n    }\n    shell_exec('nohup deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');");
+    $patchTorrentFrontends($ctx['home'].'/www/qbittorrent.php', "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';\n", "passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');", "if (function_exists('pmssQbittorrentPortEnsureCurrentUser')) {\n        pmssQbittorrentPortEnsureCurrentUser();\n    }\n    passthru('zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');");
+
+    $skelBase = pmssSkeletonBase();
+    foreach (glob($skelBase.'/www/rutorrent/plugins/hddquota/*') ?: [] as $file) {
+        $relative = strpos($file, $skelBase.'/') === 0 ? substr($file, strlen($skelBase) + 1) : str_replace('/etc/skel/', '', $file);
+        updateUserFile($relative, $user);
+    }
 }
 
 /**
@@ -156,6 +238,124 @@ function pmssUserEnsurePlugins(array $ctx): void
         runUserStep($user, 'Adjusting RSS settings ownership', sprintf('chown %1$s:%1$s %2$s', $userEsc, escapeshellarg($rssDir)));
         echo "\t*** Created RSS Settings folder\n";
     }
+}
+
+/**
+ * Apply compatibility patches for legacy ruTorrent PHP files.
+ *
+ * @param array $ctx Per-user context from pmssBuildUserContext().
+ */
+function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
+{
+    // Keep these compatibility shims local to the maintenance boundary so the
+    // frozen ruTorrent tenant patches do not leak extra exported helpers.
+    foreach ([
+        [
+            'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
+            'legacy' => '((integer)($tm["minutes"]/$interval))*$interval+$interval,',
+            'patched' => '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),',
+        ],
+        [
+            'path' => $ctx['home'].'/www/rutorrent/plugins/rss/action.php',
+            'legacy' => 'ob_flush();',
+            'patched' => '@ob_flush();',
+        ],
+    ] as $patch) {
+        if (!is_file($patch['path'])
+            || is_link($patch['path'])
+            || !is_string($content = @file_get_contents($patch['path']))
+            || $content === ''
+            || strpos($content, $patch['patched']) !== false) {
+            continue;
+        }
+
+        if (($updated = str_replace($patch['legacy'], $patch['patched'], $content, $replacements)) === $content || $replacements < 1) {
+            continue;
+        }
+
+        @file_put_contents($patch['path'], $updated);
+    }
+}
+
+/**
+ * Refresh bundled ruTorrent theme assets from the skeleton tree.
+ *
+ * @param array $ctx Per-user context from pmssBuildUserContext().
+ */
+function pmssUserUpdateThemes(array $ctx): void
+{
+    $user    = $ctx['user'];
+    $home    = $ctx['home'];
+    $userEsc = $ctx['user_esc'];
+
+    $themesPath = "{$home}/www/rutorrent/plugins/theme/themes/";
+    $skelThemesPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent/plugins/theme/themes/';
+    foreach (['Agent34','Agent46','OblivionBlue','FlatUI_Dark','FlatUI_Light','FlatUI_Material','MaterialDesign','club-QuickBox'] as $theme) {
+        if (file_exists($themesPath.$theme)) {
+            continue;
+        }
+
+        runUserStep(
+            $user,
+            "Installing ruTorrent theme {$theme}",
+            sprintf('cp -r %s %s',
+                escapeshellarg($skelThemesPath.$theme),
+                escapeshellarg($themesPath)
+            )
+        );
+        runUserStep($user, "Adjusting theme {$theme} ownership", sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($themesPath.$theme)));
+    }
+}
+
+/**
+ * Replace stale per-user ruTorrent trees with the current skeleton copy.
+ *
+ * @param array $ctx Per-user context from pmssBuildUserContext().
+ */
+function pmssUserUpgradeRutorrent(array $ctx): void
+{
+    $user          = $ctx['user'];
+    $home          = $ctx['home'];
+    $userEsc       = $ctx['user_esc'];
+    $expectedSha   = $ctx['rutorrent_index_sha'];
+    $rutorrentPath = "{$home}/www/rutorrent";
+    $legacyPath    = "{$home}/www/oldRutorrent-3";
+
+    if ($expectedSha === ''
+        || !file_exists($rutorrentPath.'/index.html')
+        || file_exists($legacyPath)
+        || $expectedSha === sha1(file_get_contents($rutorrentPath.'/index.html'))) {
+        return;
+    }
+
+    echo "****** Updating ruTorrent\n";
+    echo "******* Backing up old as 'oldRutorrent-3'\n";
+    runUserStep($user, 'Backing up existing ruTorrent', sprintf('mv %s %s', escapeshellarg($rutorrentPath), escapeshellarg($legacyPath)));
+    echo "******* Copying new ruTorrent from skel\n";
+    runUserStep(
+        $user,
+        'Copying new ruTorrent from skel',
+        sprintf('cp -Rp %s %s',
+            escapeshellarg(pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent'),
+            escapeshellarg("{$home}/www/")
+        )
+    );
+    echo "******* Configuring\n";
+    runUserStep(
+        $user,
+        'Restoring ruTorrent config.php',
+        sprintf('cp -p %s %s', escapeshellarg($legacyPath.'/conf/config.php'), escapeshellarg($rutorrentPath.'/conf/'))
+    );
+    runUserStep(
+        $user,
+        'Restoring ruTorrent share directory',
+        sprintf('bash -lc %s',
+            escapeshellarg("cp -rp {$legacyPath}/share/* {$rutorrentPath}/share/")
+        )
+    );
+    updateRutorrentConfig($user, 1);
+    runUserStep($user, 'Setting ruTorrent ownership', sprintf('chown -R %1$s:%1$s %2$s', $userEsc, escapeshellarg($rutorrentPath)));
+    runUserStep($user, 'Setting ruTorrent permissions', sprintf('chmod -R 751 %s', escapeshellarg($rutorrentPath)));
 }
 
 /**
