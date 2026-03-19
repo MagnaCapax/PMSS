@@ -61,7 +61,7 @@ class UpdateAppsBootstrapTest extends TestCase
         $sandboxDir = $this->tempDir.'/apps';
         $this->assertTrue(@mkdir($sandboxDir, 0700, true), 'Unable to create sandbox app dir');
 
-        foreach ([$installerFile, 'bootstrap.php'] as $file) {
+        foreach ([$installerFile, 'bootstrap.php', 'arr.php'] as $file) {
             $sourcePath = $sourceDir.'/'.$file;
             if (!is_file($sourcePath)) {
                 continue;
@@ -118,23 +118,35 @@ class UpdateAppsBootstrapTest extends TestCase
         }
     }
 
-    public function testRadarrKeepsInlineRuntimeBootstrapPath(): void
+    public function testArrHelperKeepsSharedRuntimeBootstrapPath(): void
     {
-        $path = dirname(__DIR__, 2).'/update/apps/radarr.php';
+        $path = dirname(__DIR__, 2).'/update/apps/arr.php';
         $contents = $this->readFile($path);
 
-        $this->assertStringContainsString("dirname(__DIR__).'/runtime.php'", $contents);
-        $this->assertStringContainsString('Radarr updater: missing runtime helper', $contents);
-        $this->assertTrue(strpos($contents, "require_once __DIR__.'/bootstrap.php';") === false, 'Radarr should not require a separate bootstrap helper');
+        $this->assertStringContainsString("dirname(__DIR__, 2).'/runtime.php'", $contents);
+        $this->assertStringContainsString('%s updater: missing runtime helper', $contents);
+        $this->assertTrue(strpos($contents, "require_once __DIR__.'/bootstrap.php';") === false, 'ARR helper should not require a separate bootstrap helper');
     }
 
-    public function testSonarrKeepsInlineRuntimeBootstrapPath(): void
+    public function testStarrInstallersDelegateRuntimeBootstrapToArrHelper(): void
     {
-        $path = dirname(__DIR__, 2).'/update/apps/sonarr.php';
-        $contents = $this->readFile($path);
+        foreach (['radarr.php', 'sonarr.php'] as $installer) {
+            $path = dirname(__DIR__, 2).'/update/apps/'.$installer;
+            $contents = $this->readFile($path);
 
-        $this->assertStringContainsString("dirname(__DIR__).'/runtime.php'", $contents);
-        $this->assertStringContainsString('Sonarr updater: missing runtime helper', $contents);
-        $this->assertTrue(strpos($contents, "require_once __DIR__.'/bootstrap.php';") === false, 'Sonarr should not require a separate bootstrap helper');
+            $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);
+            $this->assertTrue(
+                strpos($contents, "dirname(__DIR__).'/runtime.php'") === false,
+                $installer.' should delegate runtime bootstrap to arr.php'
+            );
+            $this->assertTrue(
+                strpos($contents, 'missing runtime helper') === false,
+                $installer.' should keep the runtime warning in arr.php'
+            );
+            $this->assertTrue(
+                strpos($contents, "require_once __DIR__.'/bootstrap.php';") === false,
+                $installer.' should not require a separate bootstrap helper'
+            );
+        }
     }
 }

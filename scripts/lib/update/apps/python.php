@@ -8,15 +8,10 @@
 
 require_once __DIR__.'/pythonVenv.php';
 
-if (trim((string) @shell_exec('command -v python3 2>/dev/null')) === '') {
-    logmsg('[WARN] Skipping FlexGet install: python3 missing from PATH');
-    return;
-}
-
 $venvDir   = '/opt/flexget';
 $cliBin    = $venvDir.'/bin/flexget';
 
-$venv = pmssPythonVenvEnsure($venvDir, 'FlexGet', 'logmsg');
+$venv = pmssPythonVenvEnsure($venvDir, 'FlexGet', 'logmsg', '[WARN] Skipping FlexGet install: python3 missing from PATH');
 if (empty($venv)) {
     return;
 }

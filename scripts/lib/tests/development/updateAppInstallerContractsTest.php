@@ -21,7 +21,7 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->assertStringContainsString("getenv('PMSS_DISTRO_VERSION')", $contents);
         $this->assertStringContainsString('Skipping pyLoad setup: unsupported Debian release', $contents);
         $this->assertStringContainsString('Skipping pyLoad setup: python3 missing from PATH', $contents);
-        $this->assertStringContainsString("pmssPythonVenvEnsure(\$venvDir, 'pyLoad', 'logmsg')", $contents);
+        $this->assertStringContainsString("pmssPythonVenvEnsure(\$venvDir, 'pyLoad', 'logmsg', '[WARN] Skipping pyLoad setup: python3 missing from PATH')", $contents);
     }
 
     public function testPyloadKeepsInstallAndLinkSteps(): void
@@ -40,7 +40,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
         $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
         $this->assertStringContainsString('Skipping FlexGet install: python3 missing from PATH', $contents);
-        $this->assertStringContainsString("pmssPythonVenvEnsure(\$venvDir, 'FlexGet', 'logmsg')", $contents);
+        $this->assertStringContainsString("pmssPythonVenvEnsure(\$venvDir, 'FlexGet', 'logmsg', '[WARN] Skipping FlexGet install: python3 missing from PATH')", $contents);
         $this->assertStringContainsString('FlexGet binary missing after install', $contents);
     }
 

@@ -15,6 +15,7 @@ pmssInstallProftpdStack($version);
 
 if ($version < 10) {
     logmsg('[WARN] Skipping system utility install: unsupported Debian release');
+    logmsg('[WARN] Skipping media/network tool install: unsupported Debian release');
 } else {
     pmssQueuePackages(['screen', 'mc', 'wget', 'gawk', 'subversion', 'libtool', 'sqlite', 'locate', 'ntpdate', 'build-essential', 'pkg-config', 'autoconf', 'automake', 'python3', 'python3-pip', 'python3-venv', 'python3-dev']);
     pmssInstallBestEffort(['libncurses6'], 'ncurses runtime');
@@ -26,11 +27,6 @@ if ($version < 10) {
         'zip', 'unzip', 'bwm-ng', 'sysstat', 'apache2-utils', 'irssi', 'iotop', 'ioping', 'ethtool',
         'unrar-free', 'unp',
     ]);
-}
-
-if ($version < 10) {
-    logmsg('[WARN] Skipping media/network tool install: unsupported Debian release');
-} else {
     pmssQueuePackages([
         'libzen0v5', 'sox', 'tmux', 'tree', 'ncdu', 'weechat', 'php-xml', 'php-zip', 'php-sqlite3', 'php-mbstring', 'qbittorrent-nox',
         'zsh', 'atop', 'php-cgi', 'php-cli',
@@ -83,6 +79,4 @@ if (pmssPackageStatus('wireguard-tools') !== 'install ok installed'
     || ($pmssWireguardNeedsDkms && pmssPackageStatus('wireguard-dkms') !== 'install ok installed')) {
     pmssQueuePackages($pmssWireguardNeedsDkms ? ['wireguard', 'wireguard-tools', 'wireguard-dkms'] : ['wireguard', 'wireguard-tools']);
 }
-$dockerPackages = ['docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-buildx-plugin', 'docker-compose-plugin', 'dbus-user-session', 'slirp4netns', 'uidmap'];
-$dockerPackages[] = 'fuse-overlayfs';
-pmssQueuePackages($dockerPackages);
+pmssQueuePackages(['docker-ce', 'docker-ce-cli', 'containerd.io', 'docker-buildx-plugin', 'docker-compose-plugin', 'dbus-user-session', 'slirp4netns', 'uidmap', 'fuse-overlayfs']);

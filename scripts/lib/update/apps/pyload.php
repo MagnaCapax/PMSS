@@ -13,17 +13,12 @@ if (($distroVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0)) > 0 && $distro
     return;
 }
 
-if (trim((string) @shell_exec('command -v python3 2>/dev/null')) === '') {
-    logmsg('[WARN] Skipping pyLoad setup: python3 missing from PATH');
-    return;
-}
-
 $venvDir   = '/opt/pyload';
 $cliBin    = $venvDir.'/bin/pyload';
 
 // Required Python toolchain packages are queued centrally via packages.php
 
-$venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', 'logmsg');
+$venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', 'logmsg', '[WARN] Skipping pyLoad setup: python3 missing from PATH');
 if (empty($venv)) {
     return;
 }

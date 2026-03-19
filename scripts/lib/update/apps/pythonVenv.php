@@ -17,13 +17,18 @@ require_once __DIR__.'/../logging.php';
  * Returns ['python' => <path>, 'pip' => <path>] on success or an empty array on failure.
  * Uses runStep() so PMSS_DRY_RUN is honoured; failures are logged and soft.
  */
-function pmssPythonVenvEnsure(string $venvDir, string $label, ?callable $logger = null): array
+function pmssPythonVenvEnsure(
+    string $venvDir,
+    string $label,
+    ?callable $logger = null,
+    ?string $missingPythonMessage = null
+): array
 {
     $log = $logger ?: 'logMessage';
 
     $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
     if ($python === '') {
-        $log('[WARN] Skipping '.$label.' setup: python3 missing');
+        $log($missingPythonMessage !== null ? $missingPythonMessage : '[WARN] Skipping '.$label.' setup: python3 missing');
         return [];
     }
 

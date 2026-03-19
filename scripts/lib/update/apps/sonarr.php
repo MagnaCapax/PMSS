@@ -9,13 +9,6 @@
  * @author PMSS Team
  */
 
-$runtimePath = dirname(__DIR__).'/runtime.php';
-if (!@include_once $runtimePath) {
-    if (defined('STDERR')) {
-        fwrite(STDERR, sprintf('Sonarr updater: missing runtime helper at %s, skipping install.', $runtimePath)."\n");
-    }
-    return;
-}
 require_once __DIR__.'/arr.php';
 
 // Remove legacy repo fragments to avoid apt warnings during upgrades.

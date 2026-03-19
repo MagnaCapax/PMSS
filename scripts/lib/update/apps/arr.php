@@ -20,6 +20,14 @@
 function pmssArrUpdate(array $config): void
 {
     $app = $config['app'];
+    $runtimePath = dirname(__DIR__, 2).'/runtime.php';
+    if (!@include_once $runtimePath) {
+        if (defined('STDERR')) {
+            fwrite(STDERR, sprintf('%s updater: missing runtime helper at %s, skipping install.', $app, $runtimePath).PHP_EOL);
+        }
+        return;
+    }
+
     $log = static function (string $message) use ($app): void {
         logMessage($app.': '.$message);
     };
