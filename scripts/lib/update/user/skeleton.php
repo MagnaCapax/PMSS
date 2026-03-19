@@ -47,8 +47,7 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         && is_string($content = @file_get_contents($filemanagerPath))
         && $content !== ''
         && strpos($content, '        @ob_flush();') === false) {
-        $updated = str_replace('        ob_flush();', '        @ob_flush();', $content, $replacements);
-        if ($replacements > 0 && $updated !== $content) {
+        if (($updated = str_replace('        ob_flush();', '        @ob_flush();', $content, $replacements)) !== $content && $replacements > 0) {
             @file_put_contents($filemanagerPath, $updated);
         }
     }

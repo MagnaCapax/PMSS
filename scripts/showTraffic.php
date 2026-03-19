@@ -475,6 +475,5 @@ function pmssShowTrafficRenderBar(float $pct): string
 {
     $width = 10;
     $filled = (int) floor((max(0.0, min(100.0, $pct)) / 100) * $width);
-    $empty = $width - $filled;
-    return '[' . str_repeat('#', $filled) . str_repeat('-', $empty) . ']';
+    return '[' . str_repeat('#', $filled) . str_repeat('-', $width - $filled) . ']';
 }

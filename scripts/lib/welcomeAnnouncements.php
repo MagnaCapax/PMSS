@@ -53,11 +53,7 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
         }
     }
 
-    if ($rssXml === false) {
-        return '';
-    }
-
-    if (!isset($rssXml->channel->item)) {
+    if ($rssXml === false || !isset($rssXml->channel->item)) {
         return '';
     }
 

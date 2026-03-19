@@ -42,11 +42,12 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '')
     ];
 
     foreach ($steps as $label => $handler) {
-        if (function_exists($handler)) {
-            $handler($ctx);
-        } else {
+        if (!function_exists($handler)) {
             logmsg("[WARN] Missing handler {$handler} for {$label}");
+            continue;
         }
+
+        $handler($ctx);
     }
 
     // Keep linger/systemd/rootless Docker wiring inside the main user flow.

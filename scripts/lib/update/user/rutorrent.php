@@ -35,8 +35,7 @@ function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
             continue;
         }
 
-        $updated = str_replace($patch['legacy'], $patch['patched'], $content, $replacements);
-        if ($replacements < 1 || $updated === $content) {
+        if (($updated = str_replace($patch['legacy'], $patch['patched'], $content, $replacements)) === $content || $replacements < 1) {
             continue;
         }
 
@@ -52,8 +51,7 @@ function pmssUserUpdateThemes(array $ctx): void
 
     $themesPath = "{$home}/www/rutorrent/plugins/theme/themes/";
     $skelThemesPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/www/rutorrent/plugins/theme/themes/';
-    $themes     = ['Agent34','Agent46','OblivionBlue','FlatUI_Dark','FlatUI_Light','FlatUI_Material','MaterialDesign','club-QuickBox'];
-    foreach ($themes as $theme) {
+    foreach (['Agent34','Agent46','OblivionBlue','FlatUI_Dark','FlatUI_Light','FlatUI_Material','MaterialDesign','club-QuickBox'] as $theme) {
         if (file_exists($themesPath.$theme)) {
             continue;
         }
