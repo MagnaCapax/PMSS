@@ -213,6 +213,35 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("pmssSkeletonBase().'/'.\$file", $src);
     }
 
+    public function testOsReleaseHelpersKeepPathLookupInline(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/osRelease.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssOsRelease'.'Path';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'osRelease.php should keep the os-release path lookup inline inside cache helpers'
+        );
+        $this->assertStringContainsString("pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release')", $src);
+    }
+
+    public function testUserMaintenanceKeepsOptionalPostChecksInline(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssRunUser'.'PostCheck';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'userMaintenance.php should keep optional htpasswd/lighttpd checks inside pmssUpdateAllUsers()'
+        );
+        $this->assertStringContainsString('Synchronizing per-user htpasswd', $src);
+        $this->assertStringContainsString('Checking lighttpd instance', $src);
+    }
+
     public function testRepositoryPrerequisitesKeepSonarrDetectionInline(): void
     {
         $path = dirname(__DIR__, 4).'/scripts/lib/update/repositories.php';

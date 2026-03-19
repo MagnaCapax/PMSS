@@ -8,16 +8,6 @@
 
 $GLOBALS['PMSS_OS_RELEASE_CACHE'] = $GLOBALS['PMSS_OS_RELEASE_CACHE'] ?? [];
 
-if (!function_exists('pmssOsReleasePath')) {
-    /**
-     * Determine which os-release file to consult (allows tests to override).
-     */
-    function pmssOsReleasePath(): string
-    {
-        return pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release');
-    }
-}
-
 if (!function_exists('getOsReleaseData')) {
     /**
      * Retrieve and cache os-release data from the configured path.
@@ -26,7 +16,7 @@ if (!function_exists('getOsReleaseData')) {
      */
     function getOsReleaseData()
     {
-        $path = pmssOsReleasePath();
+        $path = pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release');
         if (isset($GLOBALS['PMSS_OS_RELEASE_CACHE'][$path])) {
             return $GLOBALS['PMSS_OS_RELEASE_CACHE'][$path];
         }
@@ -63,7 +53,7 @@ if (!function_exists('pmssResetOsReleaseCache')) {
      */
     function pmssResetOsReleaseCache(): void
     {
-        unset($GLOBALS['PMSS_OS_RELEASE_CACHE'][pmssOsReleasePath()]);
+        unset($GLOBALS['PMSS_OS_RELEASE_CACHE'][pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release')]);
     }
 }
 

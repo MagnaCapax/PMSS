@@ -60,10 +60,8 @@ if (!function_exists('pmssUpdateAllUsers')) {
         $skippedUsers = 0;
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
-        $htpasswdHelper = '/scripts/util/checkUserHtpasswd.php';
-        $hasHtpasswdHelper = is_file($htpasswdHelper);
-        $lighttpdChecker = '/scripts/cron/checkLighttpdInstances.php';
-        $hasLighttpdChecker = is_file($lighttpdChecker);
+        $htpasswdHelper = is_file('/scripts/util/checkUserHtpasswd.php') ? '/scripts/util/checkUserHtpasswd.php' : '';
+        $lighttpdChecker = is_file('/scripts/cron/checkLighttpdInstances.php') ? '/scripts/cron/checkLighttpdInstances.php' : '';
 
         foreach ($users as $user) {
             if (($userTrim = trim($user)) === '') {
@@ -84,10 +82,10 @@ if (!function_exists('pmssUpdateAllUsers')) {
                     .(function_exists('pmssEnsureLingerAndDocker') ? ' + linger/systemd/rootless Docker' : '')
                     .')';
             }
-            if ($hasHtpasswdHelper) {
+            if ($htpasswdHelper !== '') {
                 $phases[] = 'Legacy htpasswd sync';
             }
-            if ($hasLighttpdChecker) {
+            if ($lighttpdChecker !== '') {
                 $phases[] = 'Lighttpd instance check';
             }
 
@@ -136,18 +134,17 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
                 pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
 
-                if ($hasHtpasswdHelper) {
-                    $command = pmssBuildCommand($htpasswdHelper, [$userTrim]);
-                    $rc = runUserStep($userTrim, 'Synchronizing per-user htpasswd', $command);
-                    if ($rc !== 0) {
-                        pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Synchronizing per-user htpasswd', $rc));
+                foreach ([
+                    'Synchronizing per-user htpasswd' => $htpasswdHelper,
+                    'Checking lighttpd instance' => $lighttpdChecker,
+                ] as $label => $helperPath) {
+                    if ($helperPath === '') {
+                        continue;
                     }
-                }
-                if ($hasLighttpdChecker) {
-                    $command = pmssBuildCommand($lighttpdChecker, [$userTrim]);
-                    $rc = runUserStep($userTrim, 'Checking lighttpd instance', $command);
+
+                    $rc = runUserStep($userTrim, $label, pmssBuildCommand($helperPath, [$userTrim]));
                     if ($rc !== 0) {
-                        pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', 'Checking lighttpd instance', $rc));
+                        pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', $label, $rc));
                     }
                 }
 
@@ -167,10 +164,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
             } catch (\Throwable $throwable) {
                 $skippedUsers++;
                 $userDuration = microtime(true) - $userStart;
-                $reason = get_class($throwable);
-                if ($throwable->getMessage() !== '') {
-                    $reason .= ': '.$throwable->getMessage();
-                }
+                $reason = get_class($throwable).($throwable->getMessage() === '' ? '' : ': '.$throwable->getMessage());
 
                 logMessage(sprintf('[WARN] Skipping remaining maintenance for user %s: %s', $userTrim, $reason));
                 if (function_exists('pmssUserLog')) {
@@ -192,11 +186,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
         $summaryStatus = $processedUsers < $totalUsers ? 'warn' : 'ok';
         $summaryLine = sprintf('Processed %d of %d users', $processedUsers, $totalUsers);
-        if ($summaryStatus === 'warn') {
-            logMessage('[WARN] '.$summaryLine);
-        } else {
-            logMessage($summaryLine);
-        }
+        logMessage(($summaryStatus === 'warn' ? '[WARN] ' : '').$summaryLine);
         if (function_exists('pmssLogJson')) {
             pmssLogJson([
                 'event'     => 'user_maintenance_summary',

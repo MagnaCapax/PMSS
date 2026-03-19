@@ -328,12 +328,11 @@ System/app groups:
 
 ## OS-Release & Skeleton Utilities – `scripts/lib/update.php`
 
-- pmssOsReleasePath(): string → `PMSS_OS_RELEASE_PATH` or `/etc/os-release`.
 - pmssSkeletonBase(): string → `PMSS_SKEL_DIR` or `/etc/skel`.
 - updateUserFile(string $file, string $user): void → copies a skeleton file into `PMSS_HOME_DIR` (default `/home`) under `/<user>/<file>` when missing or checksum differs; ensures parent directories exist, writes via temp-file + rename, sets mode 755 and `chown user:user`.
 - copyToUserSpace(string $sourceFile, string $targetFile, string $user): void → atomic copy via temp + rename, chmod 755, chown/chgrp user.
 - updateRutorrentConfig(string $username, int $scgiPort): void → renders ruTorrent templates with user paths and writes `conf/{config.php,access.ini}`.
-- getOsReleaseData(): array → cached `parse_ini_file` of `pmssOsReleasePath()`.
+- getOsReleaseData(): array → cached `parse_ini_file` of `PMSS_OS_RELEASE_PATH` or `/etc/os-release`.
 - getDistroName(): string, getDistroVersion(): string, getDistroCodename(): string → wrappers around `getOsReleaseData()`.
 - pmssResetOsReleaseCache(): void → clears cached os-release data for current path.
 - getPmssVersion(string $versionFile='/etc/seedbox/config/version'): string → trimmed file contents or `'unknown'`.

@@ -45,11 +45,7 @@ function pmssUserRefreshPermissions(array $ctx): void
         runUserStep(
             $user,
             'Updating .rtorrent.rc.custom from skeleton',
-            sprintf(
-                'cp %s %s/',
-                $skelRcCustomPath === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustomPath : escapeshellarg($skelRcCustomPath),
-                escapeshellarg($home)
-            )
+            sprintf('cp %s %s/', $skelRcCustomPath === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustomPath : escapeshellarg($skelRcCustomPath), escapeshellarg($home))
         );
     }
 }

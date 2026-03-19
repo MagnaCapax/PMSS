@@ -7,16 +7,12 @@ require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class UpdateHelpersEnvCacheTest extends TestCase
 {
-    public function testOsReleasePathDefaultsToEtc(): void
-    {
-        $this->assertEquals('/etc/os-release', \pmssOsReleasePath());
-    }
-
-    public function testOsReleasePathOverrideTakesPrecedence(): void
+    public function testGetOsReleaseDataUsesOverridePath(): void
     {
         $file = $this->tempFile('override', 'ID=custom');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
-        $this->assertEquals($file, \pmssOsReleasePath());
+        \pmssResetOsReleaseCache();
+        $this->assertEquals('custom', \getOsReleaseData()['ID']);
         $this->clearEnv('PMSS_OS_RELEASE_PATH');
     }
 
@@ -73,16 +69,6 @@ class UpdateHelpersEnvCacheTest extends TestCase
         $this->clearEnv('PMSS_OS_RELEASE_PATH');
     }
 
-    public function testOsReleasePathOverrideClearsAfterUnset(): void
-    {
-        $file = $this->tempFile('override', 'ID=temp');
-        putenv('PMSS_OS_RELEASE_PATH='.$file);
-        \pmssResetOsReleaseCache();
-        $this->assertEquals($file, \pmssOsReleasePath());
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
-        $this->assertEquals('/etc/os-release', \pmssOsReleasePath());
-    }
-
     private function tempFile(string $prefix, string $content): string
     {
         $path = tempnam(sys_get_temp_dir(), 'pmss-env-'.$prefix.'-');
@@ -98,4 +84,3 @@ class UpdateHelpersEnvCacheTest extends TestCase
         putenv($name);
     }
 }
-
