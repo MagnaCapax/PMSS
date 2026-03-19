@@ -9,20 +9,6 @@
 require_once __DIR__.'/../log.php';
 require_once __DIR__.'/osRelease.php';
 
-if (!function_exists('pmssDebianCodenameToMajorMap')) {
-    /**
-     * Debian codename → major mapping.
-     *
-     * Keep this as the single source of truth; other modules should reuse it
-     * rather than duplicating release tables.
-     */
-    function pmssDebianCodenameToMajorMap(): array
-    {
-        static $map = ['jessie' => 8, 'stretch' => 9, 'buster' => 10, 'bullseye' => 11, 'bookworm' => 12, 'trixie' => 13];
-        return $map;
-    }
-}
-
 if (!function_exists('pmssDebianCodenameFromMajor')) {
     /**
      * Debian major → codename mapping.
@@ -32,8 +18,7 @@ if (!function_exists('pmssDebianCodenameFromMajor')) {
      */
     function pmssDebianCodenameFromMajor(int $major): string
     {
-        static $reverse;
-        $reverse = is_array($reverse) ? $reverse : array_flip(pmssDebianCodenameToMajorMap());
+        static $reverse = [8 => 'jessie', 9 => 'stretch', 10 => 'buster', 11 => 'bullseye', 12 => 'bookworm', 13 => 'trixie'];
         return $reverse[$major] ?? '';
     }
 }
@@ -81,5 +66,9 @@ if (!function_exists('pmssVersionFromCodename')) {
     /**
      * Map Debian release codenames to their major version numbers.
      */
-    function pmssVersionFromCodename(string $codename): int { return (int) (pmssDebianCodenameToMajorMap()[strtolower($codename)] ?? 0); }
+    function pmssVersionFromCodename(string $codename): int
+    {
+        static $map = ['jessie' => 8, 'stretch' => 9, 'buster' => 10, 'bullseye' => 11, 'bookworm' => 12, 'trixie' => 13];
+        return (int) ($map[strtolower($codename)] ?? 0);
+    }
 }

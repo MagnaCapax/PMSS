@@ -93,7 +93,8 @@ if (!function_exists('pmssCompletePendingDpkg')) {
     function pmssCompletePendingDpkg(): void
     {
         // #TODO replace special-casing with a generic unit-unmask helper when more services require it.
-        if (is_dir('/run/systemd/system')) {
+        $hasSystemd = is_dir('/run/systemd/system');
+        if ($hasSystemd) {
             $state = trim((string) @shell_exec('systemctl is-enabled proftpd.service 2>/dev/null'));
             if ($state === 'masked') {
                 runCommand('systemctl unmask proftpd.service');
@@ -101,10 +102,10 @@ if (!function_exists('pmssCompletePendingDpkg')) {
         }
 
         $rc = runStep('Completing pending dpkg configuration', 'dpkg --configure -a');
+        if ($rc !== 0 && $hasSystemd) {
+            runStep('Unmasking proftpd for dpkg retry', 'systemctl unmask proftpd.service || true');
+        }
         if ($rc !== 0) {
-            if (is_dir('/run/systemd/system')) {
-                runStep('Unmasking proftpd for dpkg retry', 'systemctl unmask proftpd.service || true');
-            }
             runStep('Retrying proftpd configure', 'dpkg --configure proftpd-core proftpd-mod-crypto proftpd-mod-wrap proftpd-basic || true');
         }
     }

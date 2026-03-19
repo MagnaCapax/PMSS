@@ -262,17 +262,14 @@ function pmssRunProfiledCallable(string $description, callable $callable, array 
 /**
  * Execute a profiled callable using the configured step classification policy.
  */
-function pmssUpdateStep2RunClassifiedCallable(string $description, callable $callable, array $arguments, string $classification): bool
+function pmssUpdateStep2RunClassifiedCallable(string $description, callable $callable, array $arguments, string $classification): void
 {
     try {
         pmssRunProfiledCallable($description, $callable, $arguments);
     } catch (\Throwable $throwable) {
         $reason = get_class($throwable).($throwable->getMessage() !== '' ? ': '.$throwable->getMessage() : '');
         pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
-        return false;
     }
-
-    return true;
 }
 
 pmssRunProfiledCallable('Acquiring update-step2 lock', 'pmssUpdateStep2AcquireLock');

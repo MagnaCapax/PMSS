@@ -62,6 +62,22 @@ if (!function_exists('pmssUpdateAllUsers')) {
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
         $htpasswdHelper = is_file('/scripts/util/checkUserHtpasswd.php') ? '/scripts/util/checkUserHtpasswd.php' : '';
         $lighttpdChecker = is_file('/scripts/cron/checkLighttpdInstances.php') ? '/scripts/cron/checkLighttpdInstances.php' : '';
+        $phases = [];
+        if (function_exists('pmssUpdateUserEnvironment')) {
+            $phases[] = 'Environment (HTTP/ruTorrent/permissions'
+                .(function_exists('pmssEnsureLingerAndDocker') ? ' + linger/systemd/rootless Docker' : '')
+                .')';
+        }
+        $postChecks = [];
+        if ($htpasswdHelper !== '') {
+            $phases[] = 'Legacy htpasswd sync';
+            $postChecks['Synchronizing per-user htpasswd'] = $htpasswdHelper;
+        }
+        if ($lighttpdChecker !== '') {
+            $phases[] = 'Lighttpd instance check';
+            $postChecks['Checking lighttpd instance'] = $lighttpdChecker;
+        }
+        $phaseSummary = empty($phases) ? '' : ' phases: '.implode(', ', $phases);
 
         foreach ($users as $user) {
             if (($userTrim = trim($user)) === '') {
@@ -76,26 +92,12 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 continue;
             }
 
-            $phases = [];
-            if (function_exists('pmssUpdateUserEnvironment')) {
-                $phases[] = 'Environment (HTTP/ruTorrent/permissions'
-                    .(function_exists('pmssEnsureLingerAndDocker') ? ' + linger/systemd/rootless Docker' : '')
-                    .')';
-            }
-            if ($htpasswdHelper !== '') {
-                $phases[] = 'Legacy htpasswd sync';
-            }
-            if ($lighttpdChecker !== '') {
-                $phases[] = 'Lighttpd instance check';
-            }
-
             if ($isTty) {
                 echo PHP_EOL."\033[35mUpdating user {$userTrim}\033[0m".PHP_EOL;
                 foreach ($phases as $phase) {
                     echo "  \033[33m* {$phase}\033[0m".PHP_EOL;
                 }
             } else {
-                $phaseSummary = empty($phases) ? '' : ' phases: '.implode(', ', $phases);
                 logMessage(sprintf('Updating user %s%s', $userTrim, $phaseSummary));
             }
 
@@ -134,14 +136,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
 
                 pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
 
-                foreach ([
-                    'Synchronizing per-user htpasswd' => $htpasswdHelper,
-                    'Checking lighttpd instance' => $lighttpdChecker,
-                ] as $label => $helperPath) {
-                    if ($helperPath === '') {
-                        continue;
-                    }
-
+                foreach ($postChecks as $label => $helperPath) {
                     $rc = runUserStep($userTrim, $label, pmssBuildCommand($helperPath, [$userTrim]));
                     if ($rc !== 0) {
                         pmssUserLog($userTrim, sprintf('[WARN] %s failed (rc=%d)', $label, $rc));
@@ -228,7 +223,7 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user, $userConfigStore)) {
             pmssUserLog($user, '[SKIP] Docker disabled by config; stopping rootless Docker if running');
             $stopCmd = sprintf('php /scripts/util/userDocker.php %s stop', escapeshellarg($user));
-            pmssRunAndLog($user, 'userDocker stop (disabled)', $stopCmd, false);
+            pmssRunAndLog($user, 'userDocker stop (disabled)', $stopCmd);
             return;
         }
         if (!is_dir('/run/systemd/system')) {
@@ -249,7 +244,7 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         }
 
         // Enable linger to allow user@UID to run without active login.
-        pmssRunAndLog($user, 'loginctl enable-linger', 'loginctl enable-linger '.escapeshellarg($user), false);
+        pmssRunAndLog($user, 'loginctl enable-linger', 'loginctl enable-linger '.escapeshellarg($user));
 
         // Ensure rootless Docker is installed for users that predate the
         // rollout. This is a guarded migration: if the unit already exists
@@ -257,17 +252,24 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         pmssEnsureRootlessDockerInstalled($user);
 
         // Check and (re)start the per-user systemd instance.
-        pmssRunAndLog($user, 'systemctl status user@.service (pre)', 'systemctl --no-pager -l status user@'.$uid.'.service || true', false);
-        pmssRunAndLog($user, 'systemctl start user@.service', 'systemctl start user@'.$uid.'.service', false);
-        pmssRunAndLog($user, 'systemctl status user@.service (post)', 'systemctl --no-pager -l status user@'.$uid.'.service || true', false);
+        foreach ([
+            ['systemctl status user@.service (pre)', 'systemctl --no-pager -l status user@'.$uid.'.service || true'],
+            ['systemctl start user@.service', 'systemctl start user@'.$uid.'.service'],
+            ['systemctl status user@.service (post)', 'systemctl --no-pager -l status user@'.$uid.'.service || true'],
+        ] as $systemdCommand) {
+            pmssRunAndLog($user, $systemdCommand[0], $systemdCommand[1]);
+        }
 
         // Start rootless Docker for the user via the shared helper so both
         // systemd and non-systemd rootless modes are handled consistently.
         pmssEnsureDockerDependencies($user);
-        $startCmd = sprintf('php /scripts/util/userDocker.php %s start', escapeshellarg($user));
-        pmssRunAndLog($user, 'userDocker start', $startCmd, false);
-        $statusCmd = sprintf('php /scripts/util/userDocker.php %s status', escapeshellarg($user));
-        pmssRunAndLog($user, 'userDocker status', $statusCmd, false);
+        foreach (['start', 'status'] as $dockerAction) {
+            pmssRunAndLog(
+                $user,
+                'userDocker '.$dockerAction,
+                sprintf('php /scripts/util/userDocker.php %s %s', escapeshellarg($user), $dockerAction)
+            );
+        }
     }
 }
 
@@ -354,7 +356,7 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
             escapeshellarg($user),
             escapeshellarg($installCmd)
         );
-        pmssRunAndLog($user, 'docker.com rootless install script', $wrapped, false);
+        pmssRunAndLog($user, 'docker.com rootless install script', $wrapped);
 
         // After running the installer, verify that the user unit was created.
         clearstatcache();
