@@ -31,12 +31,11 @@ if (empty($venv)) {
 runStep('Installing pyLoad (pyload-ng)', sprintf('%s -m pip install --upgrade pyload-ng', escapeshellarg($venv['python'])));
 
 if (!is_file($cliBin)) {
-    if (getenv('PMSS_DRY_RUN') !== '1') {
-        logmsg('[WARN] pyLoad binary missing after install');
-    }
+    if (getenv('PMSS_DRY_RUN') !== '1') logmsg('[WARN] pyLoad binary missing after install');
     return;
 }
 
-if (!is_link('/usr/local/bin/pyload') || readlink('/usr/local/bin/pyload') !== $cliBin) {
-    runStep('Linking pyLoad CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/pyload')));
+if (is_link('/usr/local/bin/pyload') && readlink('/usr/local/bin/pyload') === $cliBin) {
+    return;
 }
+runStep('Linking pyLoad CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/pyload')));

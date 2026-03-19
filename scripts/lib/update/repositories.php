@@ -344,19 +344,22 @@ if (!function_exists('pmssRefreshRepositories')) {
         pmssEnsureMediaareaRepository();
         pmssEnsureDockerRepository();
         pmssEnsureSonarrKey();
-        $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $logger);
-        $needsUpdate = $plan['mode'] !== 'reuse';
+        $log = pmssSelectLogger($logger);
+        $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $log);
+        $needsUpdate = $plan['mode'] === 'update';
         if ($needsUpdate) {
-            pmssUpdateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], pmssSelectLogger($logger));
+            pmssUpdateAptSources($distroName, (int) $distroVersion, $plan['current_hash'], $plan['templates'], $log);
         }
 
         $aptRc = runStep($needsUpdate ? 'Refreshing apt package index' : 'Refreshing apt package index (existing sources)', aptCmd('update'));
-
-        if ($needsUpdate && $aptRc === 0) {
+        if (!$needsUpdate) {
+            return true;
+        }
+        if ($aptRc === 0) {
             // Touch the periodic stamp so tools like MOTD know the index is fresh
             @mkdir('/var/lib/apt/periodic', 0755, true);
             @touch('/var/lib/apt/periodic/update-success-stamp');
-        } elseif ($needsUpdate && $aptRc !== 0) {
+        } else {
             logMessage('[WARN] apt-get update failed; not updating /var/lib/apt/periodic/update-success-stamp');
         }
         return true;

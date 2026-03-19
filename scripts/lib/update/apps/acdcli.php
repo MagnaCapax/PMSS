@@ -26,7 +26,9 @@ if (empty($venv)) {
 }
 
 exec(escapeshellarg($venv['python']).' -m pip show '.escapeshellarg('acdcli').' 1>/dev/null 2>&1', $packageProbeOutput, $packageProbeStatus);
-if ($packageProbeStatus !== 0 || getenv('PMSS_FORCE_ACDCLI_UPDATE') === '1') {
+if ($packageProbeStatus === 0 && getenv('PMSS_FORCE_ACDCLI_UPDATE') !== '1') {
+    logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
+} else {
     runStep(
         sprintf('Installing acd_cli %s in virtualenv', $acdCliPinnedTag),
         sprintf(
@@ -35,14 +37,10 @@ if ($packageProbeStatus !== 0 || getenv('PMSS_FORCE_ACDCLI_UPDATE') === '1') {
             escapeshellarg(sprintf('git+https://github.com/yadayada/acd_cli.git@%s', $acdCliPinnedCommit))
         )
     );
-} else {
-    logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
 }
 
 if (!is_file($cliBin)) {
-    if (getenv('PMSS_DRY_RUN') !== '1') {
-        logmsg('[WARN] acd_cli binary not found in virtualenv after install');
-    }
+    if (getenv('PMSS_DRY_RUN') !== '1') logmsg('[WARN] acd_cli binary not found in virtualenv after install');
     return;
 }
 

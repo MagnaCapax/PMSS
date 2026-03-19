@@ -25,9 +25,7 @@ if (!function_exists('pmssBuildCorrelationId')) {
     {
         $timestamp = gmdate('Ymd-His');
         $host = trim(strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n'))), '-');
-        if ($host === '') {
-            $host = 'host';
-        }
+        $host = $host !== '' ? $host : 'host';
 
         try {
             $random = bin2hex(random_bytes(3));
@@ -45,11 +43,13 @@ if (!function_exists('pmssCorrelationId')) {
      */
     function pmssCorrelationId(bool $createIfMissing = true): string
     {
-        if (is_string($cached = $GLOBALS['PMSS_CORRELATION_ID_CACHE']) && $cached !== '') {
+        $cached = $GLOBALS['PMSS_CORRELATION_ID_CACHE'];
+        if (is_string($cached) && $cached !== '') {
             return $cached;
         }
 
-        if (($envValue = trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''))) !== '') {
+        $envValue = trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''));
+        if ($envValue !== '') {
             return $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $envValue;
         }
 
@@ -57,9 +57,9 @@ if (!function_exists('pmssCorrelationId')) {
             return '';
         }
 
-        $generated = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = pmssBuildCorrelationId();
+        $generated = pmssBuildCorrelationId();
         putenv('PMSS_CORRELATION_ID='.$generated);
-        return $generated;
+        return $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $generated;
     }
 }
 

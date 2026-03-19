@@ -32,12 +32,11 @@ foreach ([
 }
 
 if (!is_file($cliBin)) {
-    if (getenv('PMSS_DRY_RUN') !== '1') {
-        logmsg('[WARN] FlexGet binary missing after install');
-    }
+    if (getenv('PMSS_DRY_RUN') !== '1') logmsg('[WARN] FlexGet binary missing after install');
     return;
 }
 
-if (!is_link('/usr/local/bin/flexget') || readlink('/usr/local/bin/flexget') !== $cliBin) {
-    runStep('Linking FlexGet CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/flexget')));
+if (is_link('/usr/local/bin/flexget') && readlink('/usr/local/bin/flexget') === $cliBin) {
+    return;
 }
+runStep('Linking FlexGet CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/flexget')));
