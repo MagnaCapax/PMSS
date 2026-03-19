@@ -10,8 +10,7 @@
 
 require_once '/scripts/lib/logger.php';
 $logger = new Logger(__FILE__);
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 /**

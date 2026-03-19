@@ -19,8 +19,7 @@
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';
 require_once __DIR__.'/../lib/quotaSnapshot.php';
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 $logger = new Logger(__FILE__);

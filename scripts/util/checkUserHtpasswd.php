@@ -17,8 +17,7 @@
 // Some kind of htpasswd synchronization from times when lighttpd global instance transition to per-user instances
 
 require_once __DIR__.'/../lib/userLifecycle.php';
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 

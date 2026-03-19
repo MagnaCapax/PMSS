@@ -6,13 +6,10 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
-    require_once $pmssUserLogPath;
-}
-$pmssUserLifecyclePath = __DIR__.'/../lib/userLifecycle.php';
-if (is_file($pmssUserLifecyclePath)) {
-    require_once $pmssUserLifecyclePath;
+foreach ([__DIR__.'/../lib/user/log.php', __DIR__.'/../lib/userLifecycle.php'] as $optionalRequire) {
+    if (is_file($optionalRequire)) {
+        require_once $optionalRequire;
+    }
 }
 
 $args = $argv ?? ($_SERVER['argv'] ?? []);

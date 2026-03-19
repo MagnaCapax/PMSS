@@ -29,12 +29,10 @@ require_once __DIR__.'/../lib/homeMount.php';
 // missing), causing downtime until manual intervention. Abort early to preserve
 // working configs. Credit to Chris M. (Canada) for reporting this failure mode.
 pmssRequireHomeMounted('createNginxConfig.php');
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 
 require_once __DIR__.'/../lib/nginxConfig/main.php';
 
 exit(pmssCreateNginxConfigMain($argv));
-

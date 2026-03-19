@@ -8,19 +8,10 @@
  */
 # Set user folder permissions
 
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
-    require_once $pmssUserLogPath;
-}
-
-$pmssUserLifecyclePath = __DIR__.'/../lib/userLifecycle.php';
-if (is_file($pmssUserLifecyclePath)) {
-    require_once $pmssUserLifecyclePath;
-}
-
-$pmssShellPath = __DIR__.'/../lib/shell.php';
-if (is_file($pmssShellPath)) {
-    require_once $pmssShellPath;
+foreach ([__DIR__.'/../lib/user/log.php', __DIR__.'/../lib/userLifecycle.php', __DIR__.'/../lib/shell.php'] as $optionalRequire) {
+    if (is_file($optionalRequire)) {
+        require_once $optionalRequire;
+    }
 }
 
 $usage = 'Usage: ./userPermissions.php USERNAME';

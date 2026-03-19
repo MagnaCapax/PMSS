@@ -11,8 +11,7 @@ Pulsed Media Seedbox Management Software "PMSS"
 This script manages and monitors user-specific lighttpd and php-cgi processes.
 */
 
-$pmssUserLogPath = __DIR__.'/../lib/user/log.php';
-if (is_file($pmssUserLogPath)) {
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
