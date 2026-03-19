@@ -24,8 +24,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 
     foreach ($users as $thisUser) {
         $statsPath = "{$statsDir}/{$thisUser}";
-        $rawStats = is_file($statsPath) ? @file_get_contents($statsPath) : false;
-        if (!is_string($rawStats) || $rawStats === '' || !is_array($data = @unserialize($rawStats))) {
+        if (!is_string($rawStats = @file_get_contents($statsPath)) || $rawStats === '' || !is_array($data = @unserialize($rawStats))) {
             $missingStats[] = $thisUser;
             continue;
         }
@@ -117,16 +116,16 @@ TEXT;
 
     if (isset($options['json'])) {
         $buildPayload = static function (array $source): array {
-            return [
-                'io_read' => $source['io_read'],
-                'io_write' => $source['io_write'],
-                'io_read_ops' => $source['io_read_ops'],
-                'io_write_ops' => $source['io_write_ops'],
-                'cpu' => $source['cpu'],
-                'ram_hours' => $source['ram_hours'],
+            $payload = [
                 'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
                 'tasks' => ['current' => $source['tasks_current']],
             ];
+
+            foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metric) {
+                $payload[$metric] = $source[$metric];
+            }
+
+            return $payload;
         };
         echo json_encode([
             'users' => array_map($buildPayload, $rows),

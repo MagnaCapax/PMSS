@@ -39,7 +39,7 @@ if (!function_exists('pmssIsHomeMounted')) {
     function pmssIsHomeMounted(): bool
     {
         // Allow test harnesses to override mount detection.
-        $override = getenv('PMSS_HOME_MOUNTED_OVERRIDE');
+        $override = strtolower((string) getenv('PMSS_HOME_MOUNTED_OVERRIDE'));
         if ($override === '1' || $override === 'true') {
             return true;
         }
@@ -47,11 +47,9 @@ if (!function_exists('pmssIsHomeMounted')) {
             return false;
         }
 
-        $mountsPath = getenv('PMSS_PROC_MOUNTS_PATH');
-        $mountsPath = (is_string($mountsPath) && $mountsPath !== '') ? $mountsPath : '/proc/mounts';
-
-        $mounts = @file_get_contents($mountsPath);
-        if ($mounts === false) {
+        $mountsPath = (string) getenv('PMSS_PROC_MOUNTS_PATH');
+        $mountsPath = $mountsPath !== '' ? $mountsPath : '/proc/mounts';
+        if (!is_string($mounts = @file_get_contents($mountsPath))) {
             // If we cannot read /proc/mounts, assume not mounted to be safe.
             return false;
         }
@@ -83,16 +81,15 @@ if (!function_exists('pmssRequireHomeMounted')) {
     function pmssRequireHomeMounted(string $context = ''): void
     {
         // Allow operators to bypass the check for non-standard deployments.
-        $skip = getenv('PMSS_SKIP_HOME_MOUNT_CHECK');
-        if ($skip === '1' || strtolower((string)$skip) === 'true' || pmssIsHomeMounted()) {
+        $skip = strtolower((string) getenv('PMSS_SKIP_HOME_MOUNT_CHECK'));
+        if ($skip === '1' || $skip === 'true' || pmssIsHomeMounted()) {
             return;
         }
 
         // Build a helpful error message.
-        $prefix = $context !== '' ? "[{$context}] " : '';
-        $message = "{$prefix}Error: /home is not mounted as a separate filesystem.\n";
-        $message .= "PMSS requires /home to be mounted. Aborting to prevent data loss.\n";
-        $message .= "If this is intentional (non-standard deployment), set PMSS_SKIP_HOME_MOUNT_CHECK=1.\n";
+        $message = ($context !== '' ? "[{$context}] " : '')."Error: /home is not mounted as a separate filesystem.\n"
+            ."PMSS requires /home to be mounted. Aborting to prevent data loss.\n"
+            ."If this is intentional (non-standard deployment), set PMSS_SKIP_HOME_MOUNT_CHECK=1.\n";
 
         fwrite(STDERR, $message);
         exit(1);

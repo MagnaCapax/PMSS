@@ -33,28 +33,19 @@ function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
 {
     $rows = [];
     foreach ($lines as $line) {
-        $line = trim((string) $line);
-        if ($line === '') {
+        $tokens = preg_split('/\\s+/', trim((string) $line));
+        if (!is_array($tokens) || count($tokens) < 2 || preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
             continue;
         }
-        // Data lines begin with a numeric user id (often preceded by #).
-        if (preg_match('/^#?[0-9]+\\b/', $line) !== 1) {
-            continue;
-        }
-        $tokens = preg_split('/\\s+/', $line);
-        if (!is_array($tokens) || count($tokens) < 2) {
-            continue;
-        }
-        if (preg_match('/^#?([0-9]+)$/', $tokens[0], $m) !== 1) {
-            continue;
-        }
-        $uid = $m[1];
+
         $numbers = array_values(array_filter(array_slice($tokens, 1), 'ctype_digit'));
         if (count($numbers) < 6) {
             continue;
         }
-        $rows[] = array_merge([$uid], array_slice($numbers, 0, 6));
+
+        $rows[] = array_merge([$m[1]], array_slice($numbers, 0, 6));
     }
+
     return $rows;
 }
 
@@ -73,6 +64,7 @@ function pmssQuotaSnapshotRun(): int
     $mountPath = getenv('PMSS_QUOTA_SNAPSHOT_MOUNT') ?: PMSS_QUOTA_SNAPSHOT_MOUNT_DEFAULT;
     $logPath = getenv('PMSS_QUOTA_SNAPSHOT_LOG') ?: PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT;
     $logDir = dirname($logPath);
+    $mountLabel = preg_replace('/\\s+/', '', $mountPath);
 
     $ts = date('Y-m-d\\TH:i:s');
 
@@ -108,32 +100,19 @@ function pmssQuotaSnapshotRun(): int
             $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($output, 0, 5))));
             @fwrite(
                 $fh,
-                $ts.' WARN repquota_failed rc='.$rc.' mount='.preg_replace('/\\s+/', '', $mountPath).($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL
+                $ts.' WARN repquota_failed rc='.$rc.' mount='.$mountLabel.($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL
             );
             return 0;
         }
 
         $rows = pmssQuotaSnapshotParseRepquotaUserRows($output);
         if (empty($rows)) {
-            @fwrite($fh, $ts.' WARN repquota_no_rows mount='.preg_replace('/\\s+/', '', $mountPath).PHP_EOL);
+            @fwrite($fh, $ts.' WARN repquota_no_rows mount='.$mountLabel.PHP_EOL);
             return 0;
         }
 
         foreach ($rows as $row) {
-            @fwrite(
-                $fh,
-                sprintf(
-                    '%s %s %s %s %s %s %s %s',
-                    $ts,
-                    $row[0],
-                    $row[1],
-                    $row[2],
-                    $row[3],
-                    $row[4],
-                    $row[5],
-                    $row[6]
-                ).PHP_EOL
-            );
+            @fwrite($fh, $ts.' '.implode(' ', $row).PHP_EOL);
         }
 
         return 0;
