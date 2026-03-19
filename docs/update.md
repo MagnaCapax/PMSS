@@ -59,20 +59,23 @@ invoked.
 
 Phase 2 executes with the full repository mounted locally, so it may load shared
 helpers from `scripts/lib/update/…`. The orchestrator is intentionally thin and
-mostly wires together specialised modules:
+mostly wires together specialised modules, while keeping a few one-caller steps
+inline:
 
 ```
 scripts/lib/update/distro.php          # OS detection and legacy self-heal
 scripts/lib/update/environment.php     # dpkg/apt environment guards
 scripts/lib/update/repositories.php    # sources.list templates and apt refresh
 scripts/lib/update/systemPrep.php      # cgroups, slices, base locale and perms
-scripts/lib/update/webStack.php        # lighttpd/nginx lifecycle
 scripts/lib/update/services/*          # runtime templates, legacy daemons,
                                        # mediainfo installer, security tweaks
 scripts/lib/update/userMaintenance.php # per-user refresh and skeleton/cron sync
 scripts/lib/update/networking.php      # network template seeding & rollout
 scripts/lib/update/runtime/*           # shared runStep/logging/profile helpers
 ```
+
+The lighttpd/nginx lifecycle step stays inline in `scripts/util/update-step2.php`
+because phase 2 is its only caller.
 
 Environment hints captured by `install.sh` are passed via `PMSS_HOSTNAME`,
 `PMSS_SKIP_HOSTNAME`, `PMSS_QUOTA_MOUNT`, and `PMSS_SKIP_QUOTA`; phase 2 honors

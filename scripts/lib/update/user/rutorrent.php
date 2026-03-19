@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/context.php';
+require_once __DIR__.'/../../runtime.php';
 
 /**
  * Apply compatibility patches for legacy ruTorrent PHP files.

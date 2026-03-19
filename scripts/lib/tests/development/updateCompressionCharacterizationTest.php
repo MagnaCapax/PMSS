@@ -21,16 +21,20 @@ class UpdateCompressionCharacterizationTest extends TestCase
         );
     }
 
-    public function testWebStackDropsStandaloneLighttpdHardeningHelper(): void
+    public function testUpdateStep2OwnsWebStackConfiguration(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/webStack.php';
-        $src = @file_get_contents($path);
-        $symbol = 'pmssAdjust'.'LighttpdSecurity';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $step2Path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
+        $step2Src = @file_get_contents($step2Path);
+        $modulePath = dirname(__DIR__, 4).'/scripts/lib/update/webStack.php';
+        $this->assertTrue(is_string($step2Src) && $step2Src !== '', 'Expected to read '.$step2Path);
+        $this->assertTrue(!is_file($modulePath), 'Expected one-call update/webStack.php helper file to be removed');
         $this->assertTrue(
-            strpos($src, 'function '.$symbol) === false,
-            'webStack.php should no longer export a one-use lighttpd hardening helper'
+            strpos($step2Src, "require_once __DIR__.'/../lib/update/webStack.php';") === false,
+            'update-step2.php should stop requiring the removed webStack.php module'
         );
+        $this->assertStringContainsString('function pmssConfigureWebStack(int $distroVersion): void', $step2Src);
+        $this->assertStringContainsString("runStep('Stopping nginx prior to configuration refresh'", $step2Src);
+        $this->assertStringContainsString("pmssSystemdUnitActionIfPresent('lighttpd', 'Disabling lighttpd systemd service', 'disable');", $step2Src);
     }
 
     public function testKillProcessKeepsGracefulAndForcedWaitPhasesLocally(): void
@@ -312,5 +316,46 @@ class UpdateCompressionCharacterizationTest extends TestCase
         );
         $this->assertStringContainsString('retrackers.dat', $usersSrc);
         $this->assertStringContainsString('Creating ruTorrent RSS settings directory', $usersSrc);
+    }
+
+    public function testUserUpdateModuleOwnsContextAndHttpHelpers(): void
+    {
+        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
+        $usersSrc = @file_get_contents($usersPath);
+        $contextPath = dirname(__DIR__, 4).'/scripts/lib/update/user/context.php';
+        $httpPath = dirname(__DIR__, 4).'/scripts/lib/update/user/http.php';
+        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
+        $this->assertTrue(!is_file($contextPath), 'Expected one-call update/user/context.php helper file to be removed');
+        $this->assertTrue(!is_file($httpPath), 'Expected one-call update/user/http.php helper file to be removed');
+
+        $this->assertTrue(
+            strpos($usersSrc, "require_once __DIR__.'/user/context.php';") === false,
+            'users.php should stop requiring the removed context.php submodule'
+        );
+        $this->assertTrue(
+            strpos($usersSrc, "require_once __DIR__.'/user/http.php';") === false,
+            'users.php should stop requiring the removed http.php submodule'
+        );
+        $this->assertStringContainsString('function pmssBuildUserContext(', $usersSrc);
+        $this->assertStringContainsString('www-disabled', $usersSrc);
+        $this->assertStringContainsString('function pmssUserConfigureHttp(', $usersSrc);
+        $this->assertStringContainsString('HostHeaderValidation', $usersSrc);
+    }
+
+    public function testUserUpdateModuleOwnsPermissionRefreshHelper(): void
+    {
+        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
+        $usersSrc = @file_get_contents($usersPath);
+        $permissionsPath = dirname(__DIR__, 4).'/scripts/lib/update/user/permissions.php';
+        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
+        $this->assertTrue(!is_file($permissionsPath), 'Expected one-call update/user/permissions.php helper file to be removed');
+
+        $this->assertTrue(
+            strpos($usersSrc, "require_once __DIR__.'/user/permissions.php';") === false,
+            'users.php should stop requiring the removed permissions.php submodule'
+        );
+        $this->assertStringContainsString('function pmssUserRefreshPermissions(', $usersSrc);
+        $this->assertStringContainsString('PMSS_USER_PERMISSIONS_TIMEOUT', $usersSrc);
+        $this->assertStringContainsString("'-c3'", $usersSrc);
     }
 }

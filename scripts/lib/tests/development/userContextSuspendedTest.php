@@ -1,7 +1,7 @@
 <?php
 namespace PMSS\Tests;
 
-require_once dirname(__DIR__, 3).'/lib/update/user/context.php';
+require_once dirname(__DIR__, 2).'/update/users.php';
 
 /**
  * Verify pmssBuildUserContext() skips suspended users (www-disabled marker).

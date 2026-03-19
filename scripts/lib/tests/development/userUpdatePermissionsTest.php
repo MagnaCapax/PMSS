@@ -10,7 +10,7 @@ namespace {
 
 namespace PMSS\Tests {
 
-require_once dirname(__DIR__, 2).'/update/user/permissions.php';
+require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdatePermissionsTest extends TestCase
 {
