@@ -206,7 +206,7 @@ function pmssSystemdSlicesDropinInstall(
      */
     function pmssEnsureSystemdSlices(?callable $logger = null): void
     {
-        $log = pmssSelectLogger($logger);
+        $log = $logger ?: 'logMessage';
         // Avoid touching the host systemd manager in test mode so dev tests stay hermetic.
         $skipSystemctl = (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
 

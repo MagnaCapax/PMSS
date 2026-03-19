@@ -315,7 +315,7 @@ if (!function_exists('pmssRepositoryUpdatePlan')) {
      */
     function pmssRepositoryUpdatePlan(string $distroName, int $distroVersion, ?callable $logger = null): array
     {
-        $log = pmssSelectLogger($logger);
+        $log = $logger ?: 'logMessage';
         $currentData = @file_get_contents(pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list'));
         $currentHash = $currentData !== false ? sha1($currentData) : '';
 
@@ -344,7 +344,7 @@ if (!function_exists('pmssRefreshRepositories')) {
         pmssEnsureMediaareaRepository();
         pmssEnsureDockerRepository();
         pmssEnsureSonarrKey();
-        $log = pmssSelectLogger($logger);
+        $log = $logger ?: 'logMessage';
         $plan = pmssRepositoryUpdatePlan($distroName, $distroVersion, $log);
         $needsUpdate = $plan['mode'] === 'update';
         if ($needsUpdate) {

@@ -79,7 +79,7 @@ function pmssCgroupMode(): string
  */
 function pmssEnsureCgroupsConfigured(?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     $mode = pmssCgroupMode();
     if ($mode === 'v1') {
         $fstab = @file_get_contents('/etc/fstab');
@@ -151,7 +151,7 @@ require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
  */
 function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targetOverride = null, bool $reload = true, ?string $modulesLoadOverride = null): void
 {
-    $log             = pmssSelectLogger($logger);
+    $log             = $logger ?: 'logMessage';
     $target          = $targetOverride ?? '/etc/sysctl.d/1-pmss-defaults.conf';
     $modulesLoadPath = $modulesLoadOverride ?? '/etc/modules-load.d/pmss-bbr.conf';
     // Persist TCP BBR module loading across reboots.
@@ -207,7 +207,7 @@ SYSCTL;
  */
 function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = null, ?string $serviceTarget = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     $scriptTemplate = $cfgDir.'/template.pmss-boot-tuning.sh';
     $serviceTemplate = $cfgDir.'/template.systemd.pmss-boot-tuning.service';
@@ -294,7 +294,7 @@ function pmssEnsureBootDefaults(
     ?array $extraGrubSettings = null
 ): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     $fstabPath = $fstabPath ?? '/etc/fstab';
     $grubPath = $grubPath ?? '/etc/default/grub';
     $grubOption = $grubOption ?? 'systemd.unified_cgroup_hierarchy=0';
@@ -599,7 +599,7 @@ function pmssEnsureLocaleBaseline(): void
  */
 function pmssConfigureRootShellDefaults(?callable $logger = null): void
 {
-    $log    = pmssSelectLogger($logger);
+    $log    = $logger ?: 'logMessage';
     $bashrc = '/root/.bashrc';
     $lines = file_exists($bashrc) ? (file($bashrc, FILE_IGNORE_NEW_LINES) ?: []) : [];
 

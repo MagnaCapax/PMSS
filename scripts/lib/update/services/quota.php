@@ -16,7 +16,7 @@ function pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions = nul
 {
     // #TODO Add hermetic tests that verify fstab line parsing and option
     //       insertion behavior for common edge cases.
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     if ($mountPoint === '') {
         return;
     }
@@ -90,7 +90,7 @@ function pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions = nul
  */
 function pmssWarnUnexpectedQuotaFiles(string $mountPoint, ?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     if ($mountPoint === '' || !is_dir($mountPoint) || ($entries = @scandir($mountPoint)) === false) {
         return;
     }

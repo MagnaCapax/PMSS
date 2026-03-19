@@ -51,7 +51,7 @@ function pmssJournaldLimitsForRootBytes(int $rootBytes): array
  */
 function pmssApplyJournaldLimits(?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     $template = $cfgDir.'/template.journald.conf.d-pmss-limits.conf';
     if (!is_file($template)) {
@@ -137,7 +137,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
  */
 function pmssApplyRemoteLogging(?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     $loggingConf = $cfgDir.'/logging.conf';
     $template = $cfgDir.'/template.rsyslog-remote.conf';

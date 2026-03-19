@@ -19,7 +19,7 @@ require_once __DIR__.'/../logging.php';
  */
 function pmssPythonVenvEnsure(string $venvDir, string $label, ?callable $logger = null): array
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
 
     $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
     if ($python === '') {

@@ -21,7 +21,7 @@ if (!function_exists('pmssEnsureNetworkTemplate')) {
      */
     function pmssEnsureNetworkTemplate(?callable $logger = null): void
     {
-        $log  = pmssSelectLogger($logger);
+        $log  = $logger ?: 'logMessage';
         $path = '/etc/seedbox/config/network';
         if (file_exists($path)) {
             return;

@@ -11,7 +11,7 @@ require_once __DIR__.'/../../runtime.php';
 /** Ensure /tmp and /dev/shm are mounted with noexec/nosuid/nodev when enabled. */
 function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     // Opt-in only: default off to preserve legacy workloads that execute from /tmp.
     $flag = getenv('PMSS_HARDEN_TMP_NOEXEC');
     if ($flag === false) {
@@ -147,7 +147,7 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
  */
 function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     // Opt-in only: tmpfs overlay can evict existing /tmp contents.
     $flag = getenv('PMSS_HARDEN_TMP_TMPFS');
     if ($flag === false) {

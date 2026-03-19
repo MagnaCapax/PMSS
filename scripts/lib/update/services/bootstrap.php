@@ -15,7 +15,7 @@ foreach (['../logging.php', '../runtime/commands.php', 'quota.php', '../../confi
  */
 function pmssApplyHostnameConfig(?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     if (($skipEnv = getenv('PMSS_SKIP_HOSTNAME')) !== false
         && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
     ) {
@@ -48,7 +48,7 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
  */
 function pmssConfigureQuotaMount(?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     if (($skipEnv = getenv('PMSS_SKIP_QUOTA')) !== false
         && !in_array(strtolower(trim($skipEnv)), ['', '0', 'false', 'no'], true)
     ) {

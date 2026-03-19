@@ -9,17 +9,23 @@ class UpdateHelpersTest extends TestCase
 {
     // Note: pmssJsonLogPath() caches the first observed value process-wide; avoid asserting dynamic changes here.
 
-    public function testSelectLoggerPrefersCustom(): void
+    public function testLoadRepoTemplateWithoutCustomLoggerStillUsesLogMessageFallback(): void
     {
-        $custom = function (string $m): void {};
-        $cb = \pmssSelectLogger($custom);
-        $this->assertTrue(is_callable($cb));
-    }
+        $configDir = sys_get_temp_dir().'/pmss-update-logger-'.bin2hex(random_bytes(4));
+        @mkdir($configDir, 0700, true);
 
-    public function testSelectLoggerFallbackToDefault(): void
-    {
-        $cb = \pmssSelectLogger(null);
-        $this->assertEquals('logMessage', $cb);
+        $script = 'function logMessage(string $message, array $context = array()): void { echo $message; } '
+            .'putenv('.var_export('PMSS_CONFIG_DIR='.$configDir, true).'); '
+            .'require '.var_export(dirname(__DIR__, 2).'/update/apt.php', true).'; '
+            .'pmssLoadRepoTemplate("this-code-name-does-not-exist");';
+
+        $output = trim((string) @shell_exec(
+            'PMSS_TEST_MODE=1 '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>/dev/null'
+        ));
+
+        @rmdir($configDir);
+
+        $this->assertStringContainsString('Repository template missing:', $output);
     }
 
     public function testLoadRepoTemplateMissingLogsAndReturnsEmpty(): void

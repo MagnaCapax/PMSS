@@ -14,7 +14,7 @@ require_once __DIR__.'/../runtime.php';
  */
 function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): string
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     // Allow tests and recovery scripts to point at alternate config roots.
     $path = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')."/template.sources.$codename";
 
@@ -29,7 +29,7 @@ function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): strin
  */
 function pmssSafeWriteSources(string $content, string $label, ?callable $logger = null): bool
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     $target = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
     $backup = $target.'.pmss-backup';
 
@@ -72,7 +72,7 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
 function pmssUpdateAptSources(string $distroName, int $distroVersion, string $currentHash,
     array $repos, ?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     // NOTE: Base Debian repos use sources.list templates, NOT deb822. See @docs/adr/0008-reject-deb822-apt-sources-migration.md
     // Do not implement `/etc/apt/sources.list.d/*.sources` for the main Debian templates
     // without explicit operator instruction/ADR. (Docker deb822 is already in use.)

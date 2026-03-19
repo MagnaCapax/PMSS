@@ -419,7 +419,7 @@ function wgDistributeToUsers(string $content): void
  */
 function pmssWireguardConfigure(?callable $logger = null): void
 {
-    $log = pmssSelectLogger($logger);
+    $log = $logger ?: 'logMessage';
     if (function_exists('requireRoot')) {
         requireRoot();
     }

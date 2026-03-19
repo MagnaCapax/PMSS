@@ -59,7 +59,7 @@ if (!function_exists('pmssConfigureAptNonInteractive')) {
      */
     function pmssConfigureAptNonInteractive(?callable $logger = null): void
     {
-        $log = pmssSelectLogger($logger);
+        $log = $logger ?: 'logMessage';
         $path = '/etc/apt/apt.conf.d/90pmss-noninteractive';
         $contents = <<<CONF
 Dpkg::Options {
@@ -120,7 +120,7 @@ if (!function_exists('pmssSelectDpkgSelectionsBaseline')) {
      */
     function pmssSelectDpkgSelectionsBaseline(?int $distroVersion = null, ?callable $logger = null): ?string
     {
-        $log = pmssSelectLogger($logger);
+        $log = $logger ?: 'logMessage';
         $baseDir = __DIR__.'/dpkg';
         $baselines = [];
         foreach (glob($baseDir.'/selections-debian*.txt') ?: [] as $path) {
