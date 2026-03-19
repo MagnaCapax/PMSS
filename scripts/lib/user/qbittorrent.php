@@ -23,22 +23,21 @@ function pmssQbittorrentApplyUploadThrottle(string $username, ?int $throttle = n
         return false;
     }
 
-    if ($throttle === null) {
-        $throttle = pmssReadTorrentThrottle($username);
-    }
+    $throttle = $throttle ?? pmssReadTorrentThrottle($username);
     $hasThrottle = ($throttle !== null && $throttle > 0);
     $replacement = 'Connection\\GlobalUPLimit='.(int) $throttle;
 
     if (preg_match('/^Connection\\\\GlobalUPLimit=.*/m', $config)) {
-        if ($hasThrottle) {
-            $newConfig = preg_replace('/^Connection\\\\GlobalUPLimit=.*/m', $replacement, $config, 1);
-        } else {
-            $newConfig = preg_replace('/^Connection\\\\GlobalUPLimit=.*\\n?/m', '', $config, 1);
-        }
-    } elseif ($hasThrottle) {
-        $newConfig = preg_replace('/(\\[Preferences\\][^\\[]*)/s', '$1'.$replacement."\n", $config, 1);
-    } else {
+        $newConfig = preg_replace(
+            $hasThrottle ? '/^Connection\\\\GlobalUPLimit=.*/m' : '/^Connection\\\\GlobalUPLimit=.*\\n?/m',
+            $hasThrottle ? $replacement : '',
+            $config,
+            1
+        );
+    } elseif (!$hasThrottle) {
         return false;
+    } else {
+        $newConfig = preg_replace('/(\\[Preferences\\][^\\[]*)/s', '$1'.$replacement."\n", $config, 1);
     }
 
     return $newConfig !== null

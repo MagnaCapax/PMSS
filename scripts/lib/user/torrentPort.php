@@ -49,8 +49,7 @@ function pmssTorrentPortExpectedRead(string $path): ?int
  */
 function pmssDelugePortEnsureCurrentUser(): bool
 {
-    $ctx = pmssTorrentPortCurrentUserContext();
-    return is_array($ctx) ? pmssDelugePortEnsure($ctx['user'], $ctx['home']) : false;
+    return is_array($ctx = pmssTorrentPortCurrentUserContext()) && pmssDelugePortEnsure($ctx['user'], $ctx['home']);
 }
 
 /**
@@ -79,8 +78,7 @@ function pmssDelugePortEnsure(string $user, string $home): bool
  */
 function pmssQbittorrentPortEnsureCurrentUser(): bool
 {
-    $ctx = pmssTorrentPortCurrentUserContext();
-    return is_array($ctx) ? pmssQbittorrentPortEnsure($ctx['user'], $ctx['home']) : false;
+    return is_array($ctx = pmssTorrentPortCurrentUserContext()) && pmssQbittorrentPortEnsure($ctx['user'], $ctx['home']);
 }
 
 /**

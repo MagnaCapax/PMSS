@@ -85,20 +85,42 @@ $logger->msg('Updating quota information');
 // Get & parse users list
 $users = array_filter(array_map('trim', explode("\n", trim((string) shell_exec('/scripts/listUsers.php')))), 'strlen');
 
+// Keep the structured quota event payload and the optional per-user log line in
+// one place so status/message pairs stay aligned across outcomes.
+$writeQuotaUserLogs = static function (
+    string $user,
+    string $action,
+    string $status,
+    string $contextMessage,
+    array $context = [],
+    ?string $userLogMessage = null,
+    bool $mirrorUserLog = true
+): void {
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            'quota',
+            $action,
+            $user,
+            array('status' => $status, 'message' => $contextMessage) + $context
+        )
+    );
+    if ($mirrorUserLog && function_exists('pmssUserLog')) {
+        pmssUserLog($user, $userLogMessage === null ? $contextMessage : $userLogMessage);
+    }
+};
+
 foreach ($users as $thisUser) {
 #TODO Check that quota is working
     if (!pmssValidateUsername($thisUser)) {
         $logger->msg("Skipping invalid username {$thisUser} during quota refresh");
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'quota',
-                'validate',
-                $thisUser,
-                array(
-                    'status'  => 'ERR',
-                    'message' => 'Invalid username encountered during quota refresh',
-                )
-            )
+        $writeQuotaUserLogs(
+            $thisUser,
+            'validate',
+            'ERR',
+            'Invalid username encountered during quota refresh',
+            [],
+            null,
+            false
         );
         continue;
     }
@@ -109,18 +131,17 @@ foreach ($users as $thisUser) {
     $realHome = realpath($expectedHome);
     if ($realHome === false || strpos($realHome, $expectedHome) !== 0) {
         $logger->msg("Refusing quota refresh for {$thisUser}: unexpected home path '{$realHome}'");
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'quota',
-                'invariant_home_prefix',
-                $thisUser,
-                array(
-                    'status'        => 'ERR',
-                    'message'       => 'Refusing quota refresh due to unexpected home path',
-                    'expected_home' => $expectedHome,
-                    'real_home'     => $realHome,
-                )
-            )
+        $writeQuotaUserLogs(
+            $thisUser,
+            'invariant_home_prefix',
+            'ERR',
+            'Refusing quota refresh due to unexpected home path',
+            array(
+                'expected_home' => $expectedHome,
+                'real_home' => $realHome,
+            ),
+            null,
+            false
         );
         continue;
     }
@@ -149,21 +170,14 @@ foreach ($users as $thisUser) {
     if ($ret > 1 || !$hasValidOutput) {
         // Actual failure: exit > 1 or no parseable output
         $logger->msg("quota command failed for {$thisUser} (exit {$ret})");
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'quota',
-                'refresh',
-                $thisUser,
-                array(
-                    'status'  => 'ERR',
-                    'message' => 'Quota command failed',
-                    'rc'      => $ret,
-                )
-            )
+        $writeQuotaUserLogs(
+            $thisUser,
+            'refresh',
+            'ERR',
+            'Quota command failed',
+            array('rc' => $ret),
+            sprintf('quota refresh failed (rc=%d)', $ret)
         );
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, sprintf('quota refresh failed (rc=%d)', $ret));
-        }
 
         if (!$hasExistingSnapshot && !is_link($quotaFile)) {
             // Emit a parseable fallback so UI consumers that read ~/.quota do
@@ -176,73 +190,43 @@ foreach ($users as $thisUser) {
             ));
             if (pmssQuotaSnapshotWrite($quotaFile, $fallbackContent)) {
                 $logger->msg("quota fallback snapshot written for {$thisUser}");
-                pmssUserWriteLogs(
-                    pmssUserBaseContext(
-                        'quota',
-                        'fallback',
-                        $thisUser,
-                        array(
-                            'status'  => 'WARN',
-                            'message' => 'Quota fallback snapshot written after refresh failure',
-                        )
-                    )
+                $writeQuotaUserLogs(
+                    $thisUser,
+                    'fallback',
+                    'WARN',
+                    'Quota fallback snapshot written after refresh failure',
+                    [],
+                    'Quota fallback snapshot written'
                 );
-                if (function_exists('pmssUserLog')) {
-                    pmssUserLog($thisUser, 'Quota fallback snapshot written');
-                }
             } else {
                 $logger->msg("quota fallback snapshot write failed for {$thisUser}");
-                pmssUserWriteLogs(
-                    pmssUserBaseContext(
-                        'quota',
-                        'fallback',
-                        $thisUser,
-                        array(
-                            'status'  => 'ERR',
-                            'message' => 'Quota fallback snapshot write failed',
-                        )
-                    )
+                $writeQuotaUserLogs(
+                    $thisUser,
+                    'fallback',
+                    'ERR',
+                    'Quota fallback snapshot write failed'
                 );
-                if (function_exists('pmssUserLog')) {
-                    pmssUserLog($thisUser, 'Quota fallback snapshot write failed');
-                }
             }
         }
     } else {
         // Success: exit 0 (normal) or exit 1 (over quota but valid output)
         if (!pmssQuotaSnapshotWrite($quotaFile, $content)) {
             $logger->msg("quota snapshot write failed for {$thisUser}");
-            pmssUserWriteLogs(
-                pmssUserBaseContext(
-                    'quota',
-                    'write',
-                    $thisUser,
-                    array(
-                        'status'  => 'ERR',
-                        'message' => 'Quota snapshot write failed',
-                    )
-                )
+            $writeQuotaUserLogs(
+                $thisUser,
+                'write',
+                'ERR',
+                'Quota snapshot write failed'
             );
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'Quota snapshot write failed');
-            }
             continue;
         }
         $logStatus = ($ret === 1) ? 'WARN' : 'OK';
         $logMsg = ($ret === 1) ? 'Quota refreshed (user over quota)' : 'Quota refreshed';
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'quota',
-                'refresh',
-                $thisUser,
-                array(
-                    'status'  => $logStatus,
-                    'message' => $logMsg,
-                )
-            )
+        $writeQuotaUserLogs(
+            $thisUser,
+            'refresh',
+            $logStatus,
+            $logMsg
         );
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, $logMsg);
-        }
     }
 }

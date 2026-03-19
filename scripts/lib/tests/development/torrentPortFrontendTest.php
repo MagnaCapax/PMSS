@@ -95,6 +95,28 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $home) === false);
     }
 
+    public function testTorrentPortExpectedReadAcceptsValidRange(): void
+    {
+        $path = $this->homePath('.expected-port');
+        file_put_contents($path, "45678\n");
+
+        $this->assertEquals(45678, \pmssTorrentPortExpectedRead($path));
+    }
+
+    public function testTorrentPortExpectedReadRejectsInvalidValues(): void
+    {
+        $cases = [
+            ['path' => $this->homePath('.expected-port-text'), 'content' => "abc\n"],
+            ['path' => $this->homePath('.expected-port-low'), 'content' => "80\n"],
+            ['path' => $this->homePath('.expected-port-high'), 'content' => "70000\n"],
+        ];
+
+        foreach ($cases as $case) {
+            file_put_contents($case['path'], $case['content']);
+            $this->assertTrue(\pmssTorrentPortExpectedRead($case['path']) === null);
+        }
+    }
+
     private function context(): array
     {
         return ['user' => $this->user, 'home' => $this->homePath()];
