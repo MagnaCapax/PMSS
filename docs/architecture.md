@@ -30,7 +30,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - **scripts/lib/update/repositories.php** – Applies `/etc/seedbox/config/template.sources.<suite>` when version is known; otherwise logs and leaves sources untouched. Finishes with `apt update` via `runStep()`.
 - **scripts/lib/update/systemPrep.php** – Cgroups, systemd slices, base permissions, locale setup.
 - **scripts/lib/update/services/** – Runtime templates (rc.local, systemd, sshd), legacy service disablement, mediainfo installer, security tweaks.
-- **scripts/lib/update/user/** – User maintenance (quota skeleton, permissions, ruTorrent refresh).
+- **scripts/lib/update/users/** – User maintenance (context, HTTP, home maintenance, ruTorrent refresh).
 - **scripts/lib/update/apps/** – Application installers (rtorrent, deluge, docker, etc.) called during phase 2. These modules perform one-time bootstrap tasks only; ongoing configuration and scheduling belong under `scripts/util` and `scripts/cron`.
 
 ## Package Strategy

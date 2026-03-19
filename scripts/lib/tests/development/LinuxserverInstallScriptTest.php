@@ -186,7 +186,7 @@ BASH;
 
     public function testSkeletonCopiesInstallerScript(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 2).'/update/users.php');
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/update/users/filesystem.php');
 
         $this->assertStringContainsString("'bin/linuxserverInstall.sh'", $source);
     }

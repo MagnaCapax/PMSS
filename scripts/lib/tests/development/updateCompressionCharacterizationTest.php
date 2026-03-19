@@ -292,44 +292,41 @@ class UpdateCompressionCharacterizationTest extends TestCase
     public function testSkeletonMaintenanceKeepsTorrentFrontendPatchLocal(): void
     {
         $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
-        $skeletonPath = dirname(__DIR__, 4).'/scripts/lib/update/user/skeleton.php';
+        $filesystemPath = dirname(__DIR__, 4).'/scripts/lib/update/users/filesystem.php';
         $src = @file_get_contents($usersPath);
+        $filesystemSrc = @file_get_contents($filesystemPath);
         $symbol = 'pmssUserPatch'.'TorrentFrontends';
         $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(!is_file($skeletonPath), 'Expected one-call update/user/skeleton.php helper file to be removed');
+        $this->assertTrue(is_string($filesystemSrc) && $filesystemSrc !== '', 'Expected to read '.$filesystemPath);
 
         $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'users.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()'
+            strpos($filesystemSrc, 'function '.$symbol.'(') === false,
+            'filesystem.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()'
         );
-        $this->assertTrue(
-            strpos($src, "require_once __DIR__.'/user/skeleton.php';") === false,
-            'users.php should stop requiring the removed skeleton.php submodule'
-        );
-        $this->assertStringContainsString("preg_replace('/^<\\?php\\s*/', \$requireLine, \$updated, 1, \$count)", $src);
-        $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $src);
-        $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $src);
+        $this->assertStringContainsString("require_once __DIR__.'/users/filesystem.php';", $src);
+        $this->assertStringContainsString("preg_replace('/^<\\?php\\s*/', \$requireLine, \$updated, 1, \$count)", $filesystemSrc);
+        $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $filesystemSrc);
+        $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $filesystemSrc);
     }
 
     public function testUserUpdateModuleOwnsRutorrentHelpers(): void
     {
         $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
         $usersSrc = @file_get_contents($usersPath);
-        $rutorrentPath = dirname(__DIR__, 4).'/scripts/lib/update/user/rutorrent.php';
+        $rutorrentPath = dirname(__DIR__, 4).'/scripts/lib/update/users/rutorrent.php';
+        $rutorrentSrc = @file_get_contents($rutorrentPath);
         $symbol = 'pmssUserUpgrade'.'Rutorrent';
         $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(!is_file($rutorrentPath), 'Expected one-call update/user/rutorrent.php helper file to be removed');
+        $this->assertTrue(is_string($rutorrentSrc) && $rutorrentSrc !== '', 'Expected to read '.$rutorrentPath);
 
         $this->assertTrue(
-            strpos($usersSrc, "require_once __DIR__.'/user/rutorrent.php';") === false,
-            'users.php should stop requiring the removed rutorrent.php submodule'
+            strpos($usersSrc, 'function '.$symbol.'(') === false,
+            'users.php should stay thin and delegate ruTorrent maintenance'
         );
-        $this->assertTrue(
-            strpos($usersSrc, 'function '.$symbol.'(') !== false,
-            'users.php should own the ruTorrent refresh helper directly'
-        );
-        $this->assertStringContainsString('function pmssUserMaintainRutorrentPhpCompatibility(', $usersSrc);
-        $this->assertStringContainsString('function pmssUserUpdateThemes(', $usersSrc);
+        $this->assertStringContainsString("require_once __DIR__.'/users/rutorrent.php';", $usersSrc);
+        $this->assertStringContainsString('function pmssUserUpgradeRutorrent(', $rutorrentSrc);
+        $this->assertStringContainsString('function pmssUserMaintainRutorrentPhpCompatibility(', $rutorrentSrc);
+        $this->assertStringContainsString('function pmssUserUpdateThemes(', $rutorrentSrc);
     }
 
     public function testOsReleaseHelpersKeepPathLookupInline(): void
@@ -378,63 +375,81 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testPluginMaintenanceOwnsRetrackerCleanup(): void
     {
-        $pluginsPath = dirname(__DIR__, 4).'/scripts/lib/update/user/plugins.php';
+        $pluginsPath = dirname(__DIR__, 4).'/scripts/lib/update/users/rutorrent.php';
         $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
         $usersSrc = @file_get_contents($usersPath);
+        $pluginsSrc = @file_get_contents($pluginsPath);
         $symbol = 'pmssUserMaintain'.'Retracker';
         $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(!is_file($pluginsPath), 'Expected one-call update/user/plugins.php helper file to be removed');
+        $this->assertTrue(is_string($pluginsSrc) && $pluginsSrc !== '', 'Expected to read '.$pluginsPath);
 
         $this->assertTrue(
-            strpos($usersSrc, 'function '.$symbol.'(') === false,
-            'users.php should keep retracker cleanup inside pmssUserEnsurePlugins()'
+            strpos($pluginsSrc, 'function '.$symbol.'(') === false,
+            'rutorrent.php should keep retracker cleanup inside pmssUserEnsurePlugins()'
         );
-        $this->assertTrue(
-            strpos($usersSrc, "require_once __DIR__.'/user/plugins.php';") === false,
-            'users.php should stop requiring the removed plugins.php submodule'
-        );
-        $this->assertStringContainsString('retrackers.dat', $usersSrc);
-        $this->assertStringContainsString('Creating ruTorrent RSS settings directory', $usersSrc);
+        $this->assertStringContainsString("require_once __DIR__.'/users/rutorrent.php';", $usersSrc);
+        $this->assertStringContainsString('retrackers.dat', $pluginsSrc);
+        $this->assertStringContainsString('Creating ruTorrent RSS settings directory', $pluginsSrc);
     }
 
     public function testUserUpdateModuleOwnsContextAndHttpHelpers(): void
     {
         $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
         $usersSrc = @file_get_contents($usersPath);
-        $contextPath = dirname(__DIR__, 4).'/scripts/lib/update/user/context.php';
-        $httpPath = dirname(__DIR__, 4).'/scripts/lib/update/user/http.php';
+        $contextPath = dirname(__DIR__, 4).'/scripts/lib/update/users/context.php';
+        $httpPath = dirname(__DIR__, 4).'/scripts/lib/update/users/http.php';
+        $contextSrc = @file_get_contents($contextPath);
+        $httpSrc = @file_get_contents($httpPath);
         $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(!is_file($contextPath), 'Expected one-call update/user/context.php helper file to be removed');
-        $this->assertTrue(!is_file($httpPath), 'Expected one-call update/user/http.php helper file to be removed');
+        $this->assertTrue(is_string($contextSrc) && $contextSrc !== '', 'Expected to read '.$contextPath);
+        $this->assertTrue(is_string($httpSrc) && $httpSrc !== '', 'Expected to read '.$httpPath);
 
         $this->assertTrue(
-            strpos($usersSrc, "require_once __DIR__.'/user/context.php';") === false,
-            'users.php should stop requiring the removed context.php submodule'
+            strpos($usersSrc, 'function pmssBuildUserContext(') === false,
+            'users.php should delegate context building to a domain module'
         );
         $this->assertTrue(
-            strpos($usersSrc, "require_once __DIR__.'/user/http.php';") === false,
-            'users.php should stop requiring the removed http.php submodule'
+            strpos($usersSrc, 'function pmssUserConfigureHttp(') === false,
+            'users.php should delegate HTTP maintenance to a domain module'
         );
-        $this->assertStringContainsString('function pmssBuildUserContext(', $usersSrc);
-        $this->assertStringContainsString('www-disabled', $usersSrc);
-        $this->assertStringContainsString('function pmssUserConfigureHttp(', $usersSrc);
-        $this->assertStringContainsString('HostHeaderValidation', $usersSrc);
+        $this->assertStringContainsString("require_once __DIR__.'/users/context.php';", $usersSrc);
+        $this->assertStringContainsString("require_once __DIR__.'/users/http.php';", $usersSrc);
+        $this->assertStringContainsString('function pmssBuildUserContext(', $contextSrc);
+        $this->assertStringContainsString('www-disabled', $contextSrc);
+        $this->assertStringContainsString('function pmssUserConfigureHttp(', $httpSrc);
+        $this->assertStringContainsString('HostHeaderValidation', $httpSrc);
     }
 
     public function testUserUpdateModuleOwnsPermissionRefreshHelper(): void
     {
         $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
         $usersSrc = @file_get_contents($usersPath);
-        $permissionsPath = dirname(__DIR__, 4).'/scripts/lib/update/user/permissions.php';
+        $permissionsPath = dirname(__DIR__, 4).'/scripts/lib/update/users/filesystem.php';
+        $permissionsSrc = @file_get_contents($permissionsPath);
         $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(!is_file($permissionsPath), 'Expected one-call update/user/permissions.php helper file to be removed');
+        $this->assertTrue(is_string($permissionsSrc) && $permissionsSrc !== '', 'Expected to read '.$permissionsPath);
 
         $this->assertTrue(
-            strpos($usersSrc, "require_once __DIR__.'/user/permissions.php';") === false,
-            'users.php should stop requiring the removed permissions.php submodule'
+            strpos($usersSrc, 'function pmssUserRefreshPermissions(') === false,
+            'users.php should delegate permission refresh to filesystem.php'
         );
-        $this->assertStringContainsString('function pmssUserRefreshPermissions(', $usersSrc);
-        $this->assertStringContainsString('PMSS_USER_PERMISSIONS_TIMEOUT', $usersSrc);
-        $this->assertStringContainsString("'-c3'", $usersSrc);
+        $this->assertStringContainsString("require_once __DIR__.'/users/filesystem.php';", $usersSrc);
+        $this->assertStringContainsString('function pmssUserRefreshPermissions(', $permissionsSrc);
+        $this->assertStringContainsString('PMSS_USER_PERMISSIONS_TIMEOUT', $permissionsSrc);
+        $this->assertStringContainsString("'-c3'", $permissionsSrc);
+    }
+
+    public function testUserDomainModulesDoNotCrossRequireEachOther(): void
+    {
+        $base = dirname(__DIR__, 4).'/scripts/lib/update/users';
+        foreach (['context.php', 'http.php', 'filesystem.php', 'rutorrent.php'] as $file) {
+            $path = $base.'/'.$file;
+            $src = @file_get_contents($path);
+            $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+            $this->assertTrue(
+                strpos($src, "require_once __DIR__.'/") === false,
+                $file.' should not require sibling domain modules'
+            );
+        }
     }
 }

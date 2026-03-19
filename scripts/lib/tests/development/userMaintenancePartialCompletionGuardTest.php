@@ -30,7 +30,7 @@ class UserMaintenancePartialCompletionGuardTest extends TestCase
 
     public function testUserPermissionsRefreshUsesScopedTimeoutAndIonice(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/users/filesystem.php';
         $src = @file_get_contents($path);
         $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
