@@ -33,8 +33,7 @@ function pmssWelcomeMessageForUser(
     $userConfig = pmssWelcomeReadJson($userHome.'/.config/pmss-user.json');
     $productKey = '';
     foreach (['product', 'productName'] as $candidateKey) {
-        $candidateValue = $userConfig[$candidateKey] ?? null;
-        if (is_string($candidateValue) && ($productKey = trim($candidateValue)) !== '') {
+        if (is_string($candidateValue = $userConfig[$candidateKey] ?? null) && ($productKey = trim($candidateValue)) !== '') {
             break;
         }
     }
@@ -64,10 +63,9 @@ function pmssWelcomeMessageForUser(
         return '';
     }
 
-    $quota = '';
-    if (is_numeric($quotaInfo['totalSpace'] ?? null) && ($quotaGiB = ((float) $quotaInfo['totalSpace']) / 1073741824) > 0) {
-        $quota = round($quotaGiB, 1).' GiB';
-    }
+    $quota = is_numeric($quotaInfo['totalSpace'] ?? null) && ($quotaGiB = ((float) $quotaInfo['totalSpace']) / 1073741824) > 0
+        ? round($quotaGiB, 1).' GiB'
+        : '';
 
     return strtr($template, [
         '{{username}}' => htmlspecialchars($username, ENT_QUOTES, 'UTF-8'),

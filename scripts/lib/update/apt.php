@@ -117,20 +117,19 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
         return;
     }
 
-    $hash = sha1($template);
-    if ($currentHash !== $hash && pmssSafeWriteSources($template, $label, $log)) {
-        if ($target['eol']) {
-            // EOL suites lack valid Release timestamps; relax the check.
-            if (defined('PMSS_TEST_MODE')) {
-                $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
-            } else {
-                passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-                passthru('apt-get clean;');
-            }
-        }
-        $log("Applied Debian {$label} repository config");
+    if ($currentHash === sha1($template) || !pmssSafeWriteSources($template, $label, $log)) {
+        $log("Debian {$label} repositories already correct");
         return;
     }
 
-    $log("Debian {$label} repositories already correct");
+    if ($target['eol']) {
+        // EOL suites lack valid Release timestamps; relax the check.
+        if (defined('PMSS_TEST_MODE')) {
+            $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
+        } else {
+            passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
+            passthru('apt-get clean;');
+        }
+    }
+    $log("Applied Debian {$label} repository config");
 }

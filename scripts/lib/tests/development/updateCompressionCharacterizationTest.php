@@ -108,7 +108,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer'
         );
         $this->assertStringContainsString("preg_match('/^([0-9]+)(\\*)?$/', \$tokens[\$index], \$matches)", $src);
-        $this->assertStringContainsString("\$normalizedToken = \$matches[1].'K'.(\$matches[2] ?? '');", $src);
+        $this->assertStringContainsString("\$tokens[\$index] = \$matches[1].'K'.(\$matches[2] ?? '');", $src);
     }
 
     public function testQbittorrentPortEnsureKeepsAtomicRewriteInline(): void

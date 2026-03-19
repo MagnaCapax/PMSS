@@ -189,9 +189,6 @@ function pmssConfigBackupsPathKey(string $path): string
  */
 function pmssConfigBackupsSanitizeLabel(string $label, int $maxLen = 80): string
 {
-    $label = trim(
-        preg_replace('/[^A-Za-z0-9._\\-]+/', '_', preg_replace('/\\s+/', ' ', trim($label))),
-        '_'
-    );
+    $label = trim(preg_replace('/[^A-Za-z0-9._\\-]+/', '_', preg_replace('/\\s+/', ' ', trim($label))), '_');
     return $label === '' ? '' : substr($label, 0, $maxLen);
 }
