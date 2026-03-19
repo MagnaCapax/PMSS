@@ -36,7 +36,6 @@ if (!is_file($cliBin)) {
     return;
 }
 
-if (is_link('/usr/local/bin/flexget') && readlink('/usr/local/bin/flexget') === $cliBin) {
-    return;
+if (!is_link('/usr/local/bin/flexget') || readlink('/usr/local/bin/flexget') !== $cliBin) {
+    runStep('Linking FlexGet CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/flexget')));
 }
-runStep('Linking FlexGet CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/flexget')));

@@ -100,6 +100,22 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("\$execBinary = trim(\$parts[0], \"\\\"'\");", $src);
     }
 
+    public function testUpdateLoggingKeepsCorrelationIdBuildLocal(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/logging.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssBuild'.'CorrelationId';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'logging.php should keep correlation ID generation inside pmssCorrelationId()'
+        );
+        $this->assertStringContainsString("gmdate('Ymd-His')", $src);
+        $this->assertStringContainsString("bin2hex(random_bytes(3))", $src);
+        $this->assertStringContainsString("substr(hash('sha256', \$timestamp.\$host.microtime(true)), 0, 6)", $src);
+    }
+
     public function testQuotaSnapshotKeepsSizeTokenNormalizationLocal(): void
     {
         $path = dirname(__DIR__, 4).'/scripts/lib/quotaSnapshot.php';

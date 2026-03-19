@@ -22,7 +22,7 @@ require_once __DIR__.'/remoteBinary.php';
 
 $arch = php_uname('m');
 
-if ($arch !== 'x86_64' && $arch !== 'amd64') {
+if (!in_array($arch, ['x86_64', 'amd64'], true)) {
     logmsg("[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
     return;
 }

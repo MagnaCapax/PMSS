@@ -203,31 +203,20 @@ function updateRutorrentConfig($username, $scgiPort) {
         echo "Failed to read ruTorrent template files.\n";
         return;
     }
-    
-    // Update ruTorrent configuration with user-specific values.
-    $rutorrentConfig = str_replace(
-        '$scgi_host = "";',
-        '$scgi_host = "unix:///home/' . $username . '/.rtorrent.socket";',
-        $rutorrentConfig
-    );
-    $rutorrentConfig = str_replace(
-        '$tempDirectory = null;',
-        "\$tempDirectory = '/home/{$username}/.tmp/';",
-        $rutorrentConfig
-    );
-    $rutorrentConfig = str_replace(
-        '$topDirectory = \'/\';',
-        "\$topDirectory = '/home/{$username}/';",
-        $rutorrentConfig
-    );
-    $rutorrentConfig = str_replace(
-        '$log_file = \'/tmp/errors.log\';',
-        "\$log_file = '/home/{$username}/www/rutorrent/errors.log';",
-        $rutorrentConfig
-    );
-    
-    $configPath = "/home/{$username}/www/rutorrent/conf/config.php";
-    $accessPath = "/home/{$username}/www/rutorrent/conf/access.ini";
+
+    $homeDir = "/home/{$username}";
+    $rutorrentDir = $homeDir.'/www/rutorrent';
+    foreach ([
+        '$scgi_host = "";' => '$scgi_host = "unix://'.$homeDir.'/.rtorrent.socket";',
+        '$tempDirectory = null;' => "\$tempDirectory = '{$homeDir}/.tmp/';",
+        '$topDirectory = \'/\';' => "\$topDirectory = '{$homeDir}/';",
+        '$log_file = \'/tmp/errors.log\';' => "\$log_file = '{$rutorrentDir}/errors.log';",
+    ] as $search => $replace) {
+        $rutorrentConfig = str_replace($search, $replace, $rutorrentConfig);
+    }
+
+    $configPath = $rutorrentDir.'/conf/config.php';
+    $accessPath = $rutorrentDir.'/conf/access.ini';
     
     if (file_put_contents($configPath, $rutorrentConfig) === false) {
         echo "Failed to write ruTorrent config to {$configPath}\n";

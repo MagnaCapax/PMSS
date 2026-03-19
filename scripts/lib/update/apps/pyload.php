@@ -35,7 +35,6 @@ if (!is_file($cliBin)) {
     return;
 }
 
-if (is_link('/usr/local/bin/pyload') && readlink('/usr/local/bin/pyload') === $cliBin) {
-    return;
+if (!is_link('/usr/local/bin/pyload') || readlink('/usr/local/bin/pyload') !== $cliBin) {
+    runStep('Linking pyLoad CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/pyload')));
 }
-runStep('Linking pyLoad CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/pyload')));

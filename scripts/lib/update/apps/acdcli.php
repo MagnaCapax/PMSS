@@ -25,7 +25,8 @@ if (empty($venv)) {
     return;
 }
 
-exec(escapeshellarg($venv['python']).' -m pip show '.escapeshellarg('acdcli').' 1>/dev/null 2>&1', $packageProbeOutput, $packageProbeStatus);
+$packageProbeStatus = 1;
+@system(escapeshellarg($venv['python']).' -m pip show '.escapeshellarg('acdcli').' 1>/dev/null 2>&1', $packageProbeStatus);
 if ($packageProbeStatus === 0 && getenv('PMSS_FORCE_ACDCLI_UPDATE') !== '1') {
     logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
 } else {
@@ -39,9 +40,8 @@ if ($packageProbeStatus === 0 && getenv('PMSS_FORCE_ACDCLI_UPDATE') !== '1') {
     );
 }
 
-if (!is_file($cliBin)) {
-    if (getenv('PMSS_DRY_RUN') !== '1') logmsg('[WARN] acd_cli binary not found in virtualenv after install');
-    return;
+if (is_file($cliBin)) {
+    runStep('Linking acd_cli CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/acd_cli')));
+} elseif (getenv('PMSS_DRY_RUN') !== '1') {
+    logmsg('[WARN] acd_cli binary not found in virtualenv after install');
 }
-
-runStep('Linking acd_cli CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/acd_cli')));

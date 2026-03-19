@@ -370,11 +370,9 @@ function pmssUserRefreshPermissions(array $ctx): void
     $timeoutSeconds = (ctype_digit($timeoutRaw) && (int) $timeoutRaw > 0) ? (int) $timeoutRaw : 900;
     $previousTimeout = getenv('PMSS_COMMAND_TIMEOUT');
     $permissionsCommand = pmssBuildCommand('/scripts/util/userPermissions.php', [$user]);
-    foreach (['/usr/bin/ionice', '/bin/ionice'] as $ionicePath) {
-        if (is_executable($ionicePath)) {
-            $permissionsCommand = pmssBuildCommand($ionicePath, ['-c3', '/scripts/util/userPermissions.php', $user]);
-            break;
-        }
+    $ionicePath = is_executable('/usr/bin/ionice') ? '/usr/bin/ionice' : (is_executable('/bin/ionice') ? '/bin/ionice' : '');
+    if ($ionicePath !== '') {
+        $permissionsCommand = pmssBuildCommand($ionicePath, ['-c3', '/scripts/util/userPermissions.php', $user]);
     }
 
     putenv('PMSS_COMMAND_TIMEOUT='.(string) $timeoutSeconds);

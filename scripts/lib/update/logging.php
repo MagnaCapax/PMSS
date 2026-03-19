@@ -17,26 +17,6 @@ $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ??
 
 require_once __DIR__.'/../log.php';
 
-if (!function_exists('pmssBuildCorrelationId')) {
-    /**
-     * Build a human-readable correlation ID for update/runtime logs.
-     */
-    function pmssBuildCorrelationId(): string
-    {
-        $timestamp = gmdate('Ymd-His');
-        $host = trim(strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n'))), '-');
-        $host = $host !== '' ? $host : 'host';
-
-        try {
-            $random = bin2hex(random_bytes(3));
-        } catch (\Throwable $throwable) {
-            $random = substr(hash('sha256', $timestamp.$host.microtime(true)), 0, 6);
-        }
-
-        return $timestamp.'-'.$host.'-'.$random;
-    }
-}
-
 if (!function_exists('pmssCorrelationId')) {
     /**
      * Resolve or initialize a shared correlation ID for this process tree.
@@ -57,7 +37,16 @@ if (!function_exists('pmssCorrelationId')) {
             return '';
         }
 
-        $generated = pmssBuildCorrelationId();
+        $timestamp = gmdate('Ymd-His');
+        $host = trim(strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n'))), '-');
+        $host = $host !== '' ? $host : 'host';
+
+        try {
+            $generated = $timestamp.'-'.$host.'-'.bin2hex(random_bytes(3));
+        } catch (\Throwable $throwable) {
+            $generated = $timestamp.'-'.$host.'-'.substr(hash('sha256', $timestamp.$host.microtime(true)), 0, 6);
+        }
+
         putenv('PMSS_CORRELATION_ID='.$generated);
         return $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $generated;
     }
