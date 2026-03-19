@@ -220,6 +220,11 @@ else
 	issue_numbers=("${issue_numbers_security[@]}" "${issue_numbers_stability[@]}" "${issue_numbers_other[@]}")
 fi
 
+# Randomize selection to avoid getting locked on the same issue every run
+if [[ ${#issue_numbers[@]} -gt 1 ]] && command -v shuf >/dev/null 2>&1; then
+	mapfile -t issue_numbers < <(printf '%s\n' "${issue_numbers[@]}" | shuf)
+fi
+
 if [[ ${#issue_numbers[@]} -eq 0 ]]; then
 	echo "[agentic-issues] No tractable issues (all labeled complete-verify or wontfix). Skipping." >&1
 	exit 0

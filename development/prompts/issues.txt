@@ -81,6 +81,17 @@ Workflow (Do This Now):
     an exception into a warning, or making a guard optional) — the root fix belongs in
     the component that produces the non-conforming input, not in the downstream validator
   Note why you skipped it.
+- BLOCKED ISSUE FEEDBACK (important — enables autonomous cycle health):
+  When you skip an issue, FIRST check its existing comments — if a previous
+  cycle already posted a blocking explanation and nothing has changed (no new
+  comments, no new information since the last skip comment), do NOT post again.
+  Instead investigate whether the situation has changed that might unblock it.
+  If it IS the first skip, or you have NEW information about what's blocking:
+    gh issue comment $ISSUE_NUMBER --body "BLOCKED: <one-sentence reason>.
+    Missing: <what specific info/access/change is needed to unblock>.
+    Attempted: <what you tried before skipping>."
+  Keep it factual and short. Do not repeat yourself across cycles.
+  Then move to the next issue.
 - For tractable issues: implement the smallest coherent fix/feature.
 - Verify locally:
   * php -l <each changed PHP file>
