@@ -311,9 +311,7 @@ runStep(
 );
 
 if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user['name'], $store)) {
-    if (function_exists('pmssLogStatus')) {
-        pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);
-    }
+    pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);
 } else {
     runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));
     runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');

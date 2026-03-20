@@ -70,4 +70,52 @@ class UpdateLibraryDependencyTest extends TestCase
         $this->assertStringContainsString("require_once __DIR__.'/traffic.php';", $source);
         $this->assertTrue(strpos($source, "require_once __DIR__.'/../update/runtime/commands.php';") === false, 'qbittorrent.php should not bootstrap update runtime helpers it does not use');
     }
+
+    public function testUpdateRuntimeCommandsKeepsOnlyRunUserStepOverrideGuard(): void
+    {
+        $source = $this->loadSource('lib/update/runtime/commands.php');
+
+        $this->assertStringContainsString("if (!function_exists('runUserStep')) {", $source);
+        foreach (['runStep', 'aptCmd', 'pmssBuildCommand', 'pmssLogStatus'] as $functionName) {
+            $this->assertTrue(
+                strpos($source, "if (!function_exists('".$functionName."')) {") === false,
+                'runtime/commands.php should rely on require_once for '.$functionName
+            );
+        }
+    }
+
+    public function testUpdateLoggingUsesDirectJsonHelpers(): void
+    {
+        $source = $this->loadSource('lib/update/logging.php');
+
+        $this->assertStringContainsString("if (!function_exists('pmssCorrelationId')) {", $source);
+        foreach (['pmssJsonLogPath', 'pmssLogJson'] as $functionName) {
+            $this->assertTrue(
+                strpos($source, "if (!function_exists('".$functionName."')) {") === false,
+                'logging.php should rely on require_once for '.$functionName
+            );
+        }
+    }
+
+    public function testConfigureOpenvpnUsesDirectPmssLogStatus(): void
+    {
+        $source = $this->loadSource('util/configureOpenvpn.php');
+
+        $this->assertStringContainsString("pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0);", $source);
+        $this->assertTrue(
+            strpos($source, "function_exists('pmssLogStatus')") === false,
+            'configureOpenvpn.php should rely on runtime/commands.php for pmssLogStatus()'
+        );
+    }
+
+    public function testUserConfigUsesDirectPmssLogStatus(): void
+    {
+        $source = $this->loadSource('util/userConfig.php');
+
+        $this->assertStringContainsString("pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.\$user['name']);", $source);
+        $this->assertTrue(
+            strpos($source, "function_exists('pmssLogStatus')") === false,
+            'userConfig.php should rely on runtime/commands.php for pmssLogStatus()'
+        );
+    }
 }

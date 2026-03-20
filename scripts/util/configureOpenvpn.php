@@ -41,8 +41,7 @@ $alreadyConfigured = trim((string) @shell_exec('command -v openvpn 2>/dev/null')
     && is_file($clientOvpn)
     && is_file($clientCrt);
 if ($alreadyConfigured) {
-    if (function_exists('pmssLogStatus')) { pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0); }
-    else { logmsg('[SKIP] OpenVPN already configured; skipping provisioning'); }
+    pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0);
     return;
 }
 

@@ -52,27 +52,23 @@ if (!function_exists('pmssCorrelationId')) {
     }
 }
 
-if (!function_exists('pmssJsonLogPath')) {
-    function pmssJsonLogPath(): string
-    {
-        return $GLOBALS['PMSS_JSON_LOG_PATH'] !== null
-            ? $GLOBALS['PMSS_JSON_LOG_PATH']
-            : $GLOBALS['PMSS_JSON_LOG_PATH'] = (string) (getenv('PMSS_JSON_LOG') ?: '');
-    }
+function pmssJsonLogPath(): string
+{
+    return $GLOBALS['PMSS_JSON_LOG_PATH'] !== null
+        ? $GLOBALS['PMSS_JSON_LOG_PATH']
+        : $GLOBALS['PMSS_JSON_LOG_PATH'] = (string) (getenv('PMSS_JSON_LOG') ?: '');
 }
 
-if (!function_exists('pmssLogJson')) {
-    function pmssLogJson(array $payload): void
-    {
-        if (($path = pmssJsonLogPath()) === '') {
-            return;
-        }
-        $payload['ts'] = $payload['ts'] ?? date('c');
-        if (($correlationId = pmssCorrelationId()) !== '') {
-            $payload['pmss_correlation_id'] = $payload['pmss_correlation_id'] ?? $correlationId;
-        }
-        @file_put_contents($path, json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+function pmssLogJson(array $payload): void
+{
+    if (($path = pmssJsonLogPath()) === '') {
+        return;
     }
+    $payload['ts'] = $payload['ts'] ?? date('c');
+    if (($correlationId = pmssCorrelationId()) !== '') {
+        $payload['pmss_correlation_id'] = $payload['pmss_correlation_id'] ?? $correlationId;
+    }
+    @file_put_contents($path, json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
 if (!function_exists('logMessage')) {
