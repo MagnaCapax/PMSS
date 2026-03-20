@@ -69,7 +69,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
             $phases[] = 'Lighttpd instance check';
             $postChecks['Checking lighttpd instance'] = $lighttpdChecker;
         }
-        $phaseSummary = empty($phases) ? '' : ' phases: '.implode(', ', $phases);
+        $phaseSummary = ' phases: '.implode(', ', $phases);
         $recordUserProfile = static function (string $user, string $status, int $rc, float $duration, string $stderrExcerpt = ''): void {
             pmssRecordProfile([
                 'description'    => 'updateUser '.$user,

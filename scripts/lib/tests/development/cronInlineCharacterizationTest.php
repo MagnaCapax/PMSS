@@ -68,6 +68,22 @@ class CronInlineCharacterizationTest extends TestCase
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluge-web start requested');", $src);
     }
 
+    public function testLighttpdWatchdogKeepsRestartSequenceInline(): void
+    {
+        $src = $this->readRuntimeFile('scripts/cron/checkLighttpdInstances.php');
+        $wrapperNeedle = '$restart'.'Lighttpd = static function';
+
+        $this->assertTrue(
+            strpos($src, $wrapperNeedle) === false,
+            'checkLighttpdInstances.php should keep the lighttpd restart sequence inline'
+        );
+        $this->assertStringContainsString('Killing (if any) lighttpd for user: {$thisUser}', $src);
+        $this->assertStringContainsString('killall -15 -u {$thisUser} lighttpd; killall -15 -u {$thisUser} php-cgi; sleep 5; killall -9 -u {$thisUser} lighttpd; killall -9 -u {$thisUser} php-cgi;', $src);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd restart requested');", $src);
+        $this->assertStringContainsString('if ($socketError || empty($instancesLighttpd)) {', $src);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd start requested');", $src);
+    }
+
     private function readRuntimeFile(string $relativePath): string
     {
         $path = dirname(__DIR__, 4).'/'.$relativePath;

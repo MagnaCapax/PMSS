@@ -38,20 +38,6 @@ if ($singleUserMode) {
     $users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
 }
 
-$restartLighttpd = static function (string $user): void {
-    echo "Killing (if any) lighttpd for user: {$user}\n";
-    shell_exec("killall -15 -u {$user} lighttpd; killall -15 -u {$user} php-cgi; sleep 5; killall -9 -u {$user} lighttpd; killall -9 -u {$user} php-cgi;");
-    usleep(50000);   // brief pause before relaunch
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'lighttpd restart requested');
-    }
-    echo "Start lighttpd for user: {$user}\n";
-    passthru('/scripts/startLighttpd ' . $user);
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'lighttpd start requested');
-    }
-};
-
 foreach($users AS $thisUser) {    // Loop users checking their instances
     $thisUser = trim((string) $thisUser);
     if ($thisUser === '') continue;
@@ -92,26 +78,29 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     // If socket connection fails or no php-cgi instance is found
     if (empty($instancesPhpCgi)) {
         echo "php-cgi not running, for user: {$thisUser}. Killing lighttpd instances.\n";
-        $restartLighttpd($thisUser);
-        continue;
-    }
+        $socketError = true;
+    } else {
+        // Probe every expected php-cgi socket so partial worker crashes become
+        // visible instead of leaving the user with intermittent 502 responses.
+        foreach ($socketPaths as $socketPath) {
+            $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, 5);
+            if (!$socket or $errno or $errstr) {
+                echo "Error when attempting to connect to socket {$socketPath}: {$errno}, {$errstr}\n";
+                echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";
+                $socketError = true;
+                break;
+            }
 
-    // Probe every expected php-cgi socket so partial worker crashes become
-    // visible instead of leaving the user with intermittent 502 responses.
-    foreach ($socketPaths as $socketPath) {
-        $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, 5);
-        if (!$socket or $errno or $errstr) {
-            echo "Error when attempting to connect to socket {$socketPath}: {$errno}, {$errstr}\n";
-            echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";
-            $socketError = true;
-            break;
+            fclose($socket);
         }
-
-        fclose($socket);
     }
     if ($socketError) {
-        $restartLighttpd($thisUser);
-        continue;
+        echo "Killing (if any) lighttpd for user: {$thisUser}\n";
+        shell_exec("killall -15 -u {$thisUser} lighttpd; killall -15 -u {$thisUser} php-cgi; sleep 5; killall -9 -u {$thisUser} lighttpd; killall -9 -u {$thisUser} php-cgi;");
+        usleep(50000);   // brief pause before relaunch
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'lighttpd restart requested');
+        }
     }
 
 
@@ -126,7 +115,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
    if (strpos($httpResponse, 'HTTP/1.1 401 Unauthorized') === false) $instancesLighttpd = '';
     */
 
-    if (empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
+    if ($socketError || empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
         echo "Start lighttpd for user: {$thisUser}\n";
         passthru('/scripts/startLighttpd ' . $thisUser);
         if (function_exists('pmssUserLog')) {
