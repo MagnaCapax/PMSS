@@ -82,15 +82,16 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
         return;
     }
 
-    if ($distroName === 'debian') {
-        pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
-        return;
+    switch ($distroName) {
+        case 'debian':
+            pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
+            return;
+        case 'ubuntu':
+            $log('Ubuntu is not supported yet.');
+            return;
+        default:
+            $log("Unsupported distro: $distroName");
     }
-    if ($distroName === 'ubuntu') {
-        $log('Ubuntu is not supported yet.');
-        return;
-    }
-    $log("Unsupported distro: $distroName");
 }
 
 /**

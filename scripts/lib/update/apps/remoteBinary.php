@@ -41,11 +41,10 @@ function pmssInstallPinnedRemoteBinary(
         return;
     }
 
-    if (is_file($destination) && !$refreshWhenPresent) {
-        return;
-    }
-
-    if (is_file($destination) && $refreshWhenPresent) {
+    if (is_file($destination)) {
+        if (!$refreshWhenPresent) {
+            return;
+        }
         $installedSha = @hash_file('sha256', $destination);
         if (is_string($installedSha) && strtolower($installedSha) === strtolower($expectedSha256)) {
             $log("[SKIP] {$label} already matches pinned checksum; skipping refresh");
@@ -59,9 +58,7 @@ function pmssInstallPinnedRemoteBinary(
         return;
     }
 
-    $downloadCmd = pmssBuildCommand('wget', ['-q', '-O', $tmp, $url]);
-    $rc = runStep("Downloading {$label}", $downloadCmd);
-    if ($rc !== 0) {
+    if (runStep("Downloading {$label}", pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
         @unlink($tmp);
         return;
     }
@@ -78,8 +75,7 @@ function pmssInstallPinnedRemoteBinary(
         return;
     }
 
-    $installCmd = pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]);
-    runStep("Installing {$label}", $installCmd);
+    runStep("Installing {$label}", pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]));
     @unlink($tmp);
 }
 
@@ -108,9 +104,7 @@ function pmssInstallPinnedRemoteDebPackage(
         return false;
     }
 
-    $downloadCmd = pmssBuildCommand('wget', ['-q', '-O', $tmp, $url]);
-    $downloadRc = runStep("Downloading {$label} package", $downloadCmd);
-    if ($downloadRc !== 0) {
+    if (runStep("Downloading {$label} package", pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
         @unlink($tmp);
         return false;
     }
@@ -127,9 +121,8 @@ function pmssInstallPinnedRemoteDebPackage(
         return false;
     }
 
-    $installCmd = pmssBuildCommand('dpkg', ['-i', $tmp]);
-    $installRc = runStep("Installing {$label}", $installCmd);
+    $installed = runStep("Installing {$label}", pmssBuildCommand('dpkg', ['-i', $tmp])) === 0;
     @unlink($tmp);
 
-    return $installRc === 0;
+    return $installed;
 }

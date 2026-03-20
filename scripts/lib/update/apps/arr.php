@@ -136,25 +136,23 @@ function pmssArrUpdate(array $config): void
 
     $archivePath = $workDir.'/'.$assetName;
     $extractPath = $workDir.'/'.$config['extract_dir'];
+    $installed = false;
     if (runCommand(sprintf('curl -sSL --fail -o %s %s', escapeshellarg($archivePath), escapeshellarg($downloadUrl))) !== 0
         || !is_file($archivePath)
     ) {
         $log('Download failed; keeping existing installation');
-        runCommand('rm -rf '.escapeshellarg($workDir));
-        return;
-    }
-
-    if (runCommand(sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir))) !== 0
+    } elseif (runCommand(sprintf('tar -xzf %s -C %s', escapeshellarg($archivePath), escapeshellarg($workDir))) !== 0
         || !is_dir($extractPath)
     ) {
         $log('Extraction failed; keeping existing installation');
-        runCommand('rm -rf '.escapeshellarg($workDir));
-        return;
+    } else {
+        runCommand('rm -rf '.escapeshellarg($installPath));
+        runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)));
+        $installed = true;
     }
 
-    runCommand('rm -rf '.escapeshellarg($installPath));
-    runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)));
     runCommand('rm -rf '.escapeshellarg($workDir));
-
-    $log("Installed version {$latestVersion}");
+    if ($installed) {
+        $log("Installed version {$latestVersion}");
+    }
 }
