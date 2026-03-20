@@ -14,12 +14,7 @@ require_once __DIR__.'/traffic.php';
 function pmssQbittorrentApplyUploadThrottle(string $username, ?int $throttle = null): bool
 {
     $configFile = sprintf('/home/%s/.config/qBittorrent/qBittorrent.conf', $username);
-    if (!is_file($configFile) || is_link($configFile)) {
-        return false;
-    }
-
-    $config = file_get_contents($configFile);
-    if ($config === false) {
+    if (!is_file($configFile) || is_link($configFile) || ($config = file_get_contents($configFile)) === false) {
         return false;
     }
 

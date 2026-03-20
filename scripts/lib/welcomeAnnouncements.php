@@ -33,18 +33,14 @@ function pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
 
     $previousInternalErrors = function_exists('libxml_use_internal_errors') ? libxml_use_internal_errors(true) : null;
 
-    if (function_exists('libxml_clear_errors')) {
-        libxml_clear_errors();
-    }
+    if (function_exists('libxml_clear_errors')) { libxml_clear_errors(); }
 
     try {
         $rssXml = simplexml_load_string($rssRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
     } catch (\Throwable $throwable) {
         $rssXml = false;
     } finally {
-        if (function_exists('libxml_clear_errors')) {
-            libxml_clear_errors();
-        }
+        if (function_exists('libxml_clear_errors')) { libxml_clear_errors(); }
 
         if ($previousInternalErrors !== null) {
             libxml_use_internal_errors($previousInternalErrors);

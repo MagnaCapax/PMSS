@@ -32,10 +32,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     
     // pgrep returns running qbittorrent-nox processes owned by the user
     $instances = shell_exec('pgrep -u' . $thisUser . ' qbittorrent-nox');
-    $configChanged = false;
-    if (function_exists('pmssQbittorrentApplyUploadThrottle')) {
-        $configChanged = pmssQbittorrentApplyUploadThrottle($thisUser);
-    }
+    $configChanged = function_exists('pmssQbittorrentApplyUploadThrottle')
+        && pmssQbittorrentApplyUploadThrottle($thisUser);
     if ($configChanged && !empty($instances)) {
         passthru('killall -u '.escapeshellarg($thisUser).' -TERM qbittorrent-nox 2>/dev/null');
         if (function_exists('pmssUserLog')) {

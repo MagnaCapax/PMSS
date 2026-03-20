@@ -35,10 +35,8 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     if (!file_exists("/home/{$thisUser}/.delugeEnable")) continue;  // Deluge not enabled
     
     $instances = shell_exec("pgrep -u{$thisUser} deluged");
-    $configChanged = false;
-    if (function_exists('pmssDelugeApplyUploadThrottle')) {
-        $configChanged = pmssDelugeApplyUploadThrottle($thisUser);
-    }
+    $configChanged = function_exists('pmssDelugeApplyUploadThrottle')
+        && pmssDelugeApplyUploadThrottle($thisUser);
     if ($configChanged && !empty($instances)) {
         passthru("killall -9 -u ".escapeshellarg($thisUser)." deluged 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." deluge-web 2>/dev/null");
         if (function_exists('pmssUserLog')) {
