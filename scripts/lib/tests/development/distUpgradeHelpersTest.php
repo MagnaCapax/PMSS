@@ -5,22 +5,25 @@ require_once dirname(__DIR__, 2).'/update/distUpgrade.php';
 
 class DistUpgradeHelpersTest extends TestCase
 {
-    public function testDetermineUpgradePath(): void
+    /** @var string */
+    private $tmpDir;
+
+    public function setUp(): void
     {
-        $this->assertEquals(['10','11'], \pmssDetermineUpgradePath('10'));
-        $this->assertEquals(['11','12'], \pmssDetermineUpgradePath('11'));
-        $this->assertEquals(['12','13'], \pmssDetermineUpgradePath('12'));
-        $this->assertEquals([null,null], \pmssDetermineUpgradePath('13'));
-        $this->assertEquals([null,null], \pmssDetermineUpgradePath('14'));
+        $this->tmpDir = sys_get_temp_dir().'/pmss-dist-upgrade-helpers-'.mt_rand(1000, 999999);
+        @mkdir($this->tmpDir, 0755, true);
     }
 
-    public function testCodenameForMajor(): void
+    public function tearDown(): void
     {
-        $this->assertEquals('buster', \pmssCodenameForMajor('10'));
-        $this->assertEquals('bullseye', \pmssCodenameForMajor('11'));
-        $this->assertEquals('bookworm', \pmssCodenameForMajor('12'));
-        $this->assertEquals('trixie', \pmssCodenameForMajor('13'));
-        $this->assertEquals('', \pmssCodenameForMajor('99'));
+        if (!is_dir($this->tmpDir)) {
+            return;
+        }
+
+        foreach ((array) glob($this->tmpDir.'/*') as $file) {
+            @unlink($file);
+        }
+        @rmdir($this->tmpDir);
     }
 
     public function testResolveTargetVersionAcceptsNumbersAndCodenames(): void
@@ -71,6 +74,12 @@ class DistUpgradeHelpersTest extends TestCase
         $this->assertEquals('error', $plan['action']);
         $this->assertEquals(null, $plan['to']);
         $this->assertStringContainsString('Safety halt', $plan['message']);
+
+        $plan = \pmssResolveDistUpgradeStep('14', '13');
+        $this->assertEquals('error', $plan['action']);
+        $this->assertEquals('14', $plan['from']);
+        $this->assertEquals(null, $plan['to']);
+        $this->assertStringContainsString('Safety halt', $plan['message']);
     }
 
     public function testBootReadinessParsers(): void
@@ -80,12 +89,60 @@ class DistUpgradeHelpersTest extends TestCase
 
         $this->assertTrue(!\pmssMdstatHasDegradedArrays($healthyMdstat));
         $this->assertTrue(\pmssMdstatHasDegradedArrays($degradedMdstat));
+    }
 
-        $this->assertTrue(\pmssMdadmConfigHasArrayDefinitions("ARRAY /dev/md0 metadata=1.2 UUID=abc\n"));
-        $this->assertTrue(!\pmssMdadmConfigHasArrayDefinitions("DEVICE partitions\nMAILADDR root\n"));
+    public function testVerifyDistUpgradeBootReadinessLogsHealthyConfigs(): void
+    {
+        $output = $this->captureBootReadinessOutput(
+            "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\n",
+            str_repeat('menuentry test\n', 100),
+            "ARRAY /dev/md0 metadata=1.2 UUID=abc\n",
+            "BOOT_DEGRADED=true\n"
+        );
 
-        $this->assertTrue(\pmssInitramfsBootDegradedEnabled("BOOT_DEGRADED=true\n"));
-        $this->assertTrue(\pmssInitramfsBootDegradedEnabled("boot_degraded = true\n"));
-        $this->assertTrue(!\pmssInitramfsBootDegradedEnabled("BOOT_DEGRADED=false\n"));
+        $this->assertStringContainsString('[SKIP] dist-upgrade: RAID arrays appear healthy', $output);
+        $this->assertStringContainsString('[SKIP] dist-upgrade: grub config present', $output);
+        $this->assertStringContainsString('[SKIP] dist-upgrade: mdadm ARRAY definitions found', $output);
+        $this->assertStringContainsString('[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured', $output);
+    }
+
+    public function testVerifyDistUpgradeBootReadinessWarnsForUnsafeRaidBootConfig(): void
+    {
+        $output = $this->captureBootReadinessOutput(
+            "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/1] [U_]\n",
+            str_repeat('menuentry test\n', 100),
+            "DEVICE partitions\nMAILADDR root\n",
+            "BOOT_DEGRADED=false\n"
+        );
+
+        $this->assertStringContainsString('degraded RAID array detected', $output);
+        $this->assertStringContainsString('lacks ARRAY definitions', $output);
+        $this->assertStringContainsString('missing BOOT_DEGRADED=true', $output);
+    }
+
+    private function captureBootReadinessOutput(
+        string $mdstat,
+        string $grub,
+        string $mdadmConfig,
+        string $initramfsMdadm
+    ): string {
+        $mdstatPath = $this->tmpDir.'/mdstat';
+        $grubPath = $this->tmpDir.'/grub.cfg';
+        $mdadmConfigPath = $this->tmpDir.'/mdadm.conf';
+        $initramfsMdadmPath = $this->tmpDir.'/initramfs-mdadm';
+
+        file_put_contents($mdstatPath, $mdstat);
+        file_put_contents($grubPath, $grub);
+        file_put_contents($mdadmConfigPath, $mdadmConfig);
+        file_put_contents($initramfsMdadmPath, $initramfsMdadm);
+
+        ob_start();
+        try {
+            \pmssVerifyDistUpgradeBootReadiness($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath);
+            return (string) ob_get_clean();
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            throw $e;
+        }
     }
 }

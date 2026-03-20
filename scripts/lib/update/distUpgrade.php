@@ -306,7 +306,7 @@ function pmssVerifyDistUpgradeBootReadiness(
 
     if (is_readable($mdadmConfigPath)) {
         $mdadmConfig = (string) @file_get_contents($mdadmConfigPath);
-        if (!pmssMdadmConfigHasArrayDefinitions($mdadmConfig)) {
+        if (preg_match('/^\s*ARRAY\s+\S+/m', $mdadmConfig) !== 1) {
             logMessage('[WARN] dist-upgrade: '.$mdadmConfigPath.' lacks ARRAY definitions; regenerate before reboot');
         } else {
             logMessage('[SKIP] dist-upgrade: mdadm ARRAY definitions found');
@@ -317,7 +317,7 @@ function pmssVerifyDistUpgradeBootReadiness(
 
     if (is_readable($initramfsMdadmPath)) {
         $initramfsMdadm = (string) @file_get_contents($initramfsMdadmPath);
-        if (!pmssInitramfsBootDegradedEnabled($initramfsMdadm)) {
+        if (preg_match('/^\s*BOOT_DEGRADED\s*=\s*true\s*$/mi', $initramfsMdadm) !== 1) {
             logMessage('[WARN] dist-upgrade: '.$initramfsMdadmPath.' missing BOOT_DEGRADED=true; degraded RAID boot may fail');
         } else {
             logMessage('[SKIP] dist-upgrade: BOOT_DEGRADED=true is configured');
@@ -346,22 +346,6 @@ function pmssMdstatHasDegradedArrays(string $mdstat): bool
     }
 
     return false;
-}
-
-/**
- * Check whether mdadm.conf includes ARRAY definitions.
- */
-function pmssMdadmConfigHasArrayDefinitions(string $mdadmConfig): bool
-{
-    return preg_match('/^\s*ARRAY\s+\S+/m', $mdadmConfig) === 1;
-}
-
-/**
- * Check whether initramfs mdadm config allows degraded boot.
- */
-function pmssInitramfsBootDegradedEnabled(string $config): bool
-{
-    return preg_match('/^\s*BOOT_DEGRADED\s*=\s*true\s*$/mi', $config) === 1;
 }
 
 /**
