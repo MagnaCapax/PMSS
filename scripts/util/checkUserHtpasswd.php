@@ -22,9 +22,7 @@ if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
 }
 
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
-$singleUserMode = ($argUserRaw !== '');
-$users = [];
-if ($singleUserMode) {
+if ($argUserRaw !== '') {
     $argUser = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($argUserRaw)
         : $argUserRaw;
@@ -51,7 +49,7 @@ if ($singleUserMode) {
 $globalHtpasswd = '/etc/lighttpd/.htpasswd';
 $globalContents = @file_get_contents($globalHtpasswd);
 if ($globalContents === false || trim($globalContents) === '') {
-    if (!$singleUserMode) {
+    if ($argUserRaw === '') {
         echo "Global htpasswd file missing or empty, skipping synchronization\n";
     }
     exit(0);

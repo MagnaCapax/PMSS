@@ -7,11 +7,8 @@
  * @author PMSS Team
  */
 echo date('Y-m-d H:i:s') . ': Checking qBittorrent instances' . "\n";
-foreach ([__DIR__.'/../lib/user/log.php', __DIR__.'/../lib/user/qbittorrent.php'] as $optionalRequire) {
-    if (is_file($optionalRequire)) {
-        require_once $optionalRequire;
-    }
-}
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
+if (is_file($pmssQbittorrentPath = __DIR__.'/../lib/user/qbittorrent.php')) { require_once $pmssQbittorrentPath; }
 
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));

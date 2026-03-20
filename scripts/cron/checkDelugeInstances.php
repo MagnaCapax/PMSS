@@ -11,11 +11,8 @@
  * @author PMSS Team
  */
 echo date('Y-m-d H:i:s') . ': Checking Deluge instances' . "\n";
-foreach ([__DIR__.'/../lib/user/log.php', __DIR__.'/../lib/user/deluge.php'] as $optionalRequire) {
-    if (is_file($optionalRequire)) {
-        require_once $optionalRequire;
-    }
-}
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
+if (is_file($pmssDelugePath = __DIR__.'/../lib/user/deluge.php')) { require_once $pmssDelugePath; }
 
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
