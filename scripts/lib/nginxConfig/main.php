@@ -65,7 +65,7 @@ TXT;
     $usersFiltered = [];
     foreach ($userLines as $name) {
         $name = pmssNormalizeUsername((string) $name);
-        if ($name === '' || !pmssValidateUsername($name)) {
+        if (!pmssValidateUsername($name)) {
             continue;
         }
         $usersFiltered[$name] = true;

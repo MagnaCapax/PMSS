@@ -141,24 +141,12 @@ $payload['rtorrentPort'] = isset($existing['rtorrentPort']) ? (int) $existing['r
 $payload['quota'] = $user['quota'];
 $payload['quotaBurst'] = (int) round(((float) $user['quota']) * 1.25);
 $payload['trafficLimit'] = 0;
-$payloadMap = [
-    'CPUWeight'       => 'CPUWeight',
-    'IOWeight'        => 'IOWeight',
-    'IOReadBW'        => 'IOReadBW',
-    'IOWriteBW'       => 'IOWriteBW',
-    'IOReadIOPS'      => 'IOReadIOPS',
-    'IOWriteIOPS'     => 'IOWriteIOPS',
-    'cpuQuotaPercent' => 'cpuQuotaPercent',
-    'trafficCapMbit'  => 'trafficCapMbit',
-];
-foreach ($payloadMap as $key => $userKey) {
+foreach (['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit'] as $key) {
     if (!empty($presence[$key])) {
-        $payload[$key] = $user[$userKey];
+        $payload[$key] = $user[$key];
     }
 }
-if (!isset($payload['billingId'])) {
-    $payload['billingId'] = 0;
-}
+$payload['billingId'] = $payload['billingId'] ?? 0;
 if ($payload['billingId'] === 0) {
     $payload = $store->applyFallbacks($user['name'], $payload);
 }

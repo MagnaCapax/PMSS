@@ -24,11 +24,11 @@ if (!$singleUserMode) {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
 }
 if ($singleUserMode) {
-    $argUser = pmssNormalizeUsername($argUserRaw);
-    if ($argUser !== $argUserRaw || !pmssValidateUsername($argUser)) {
+    if (!pmssValidateUsername($argUserRaw)) {
         fwrite(STDERR, "Invalid username\n");
         exit(1);
     }
+    $argUser = pmssNormalizeUsername($argUserRaw);
     if (function_exists('posix_getpwnam') && posix_getpwnam($argUser) === false) {
         fwrite(STDERR, "User not found\n");
         exit(1);
@@ -42,8 +42,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     $thisUser = trim((string) $thisUser);
     if ($thisUser === '') continue;
     $homeDir = "/home/{$thisUser}";
-    $normalizedUser = pmssNormalizeUsername($thisUser);
-    if ($normalizedUser !== $thisUser || !pmssValidateUsername($thisUser)) {
+    if (!pmssValidateUsername($thisUser)) {
         echo "Skipping invalid username: {$thisUser}\n";
         continue;
     }

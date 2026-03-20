@@ -32,11 +32,8 @@ $hostname = preg_replace('/[^a-z0-9.-]/', '', $hostname);
 if ($hostname === '') {
     $hostname = 'localhost';
 }
-$distroVersion = 0;
 $detected = \pmssDetectDistro();
-if (is_array($detected) && isset($detected['version'])) {
-    $distroVersion = (int) $detected['version'];
-}
+$distroVersion = is_array($detected) && isset($detected['version']) ? (int) $detected['version'] : 0;
 
 $tlsBlock = '';
 $candidates = [];
@@ -55,10 +52,9 @@ foreach ($candidates as $base) {
     }
 
     // Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
-    $tlsProtocol = '    TLSProtocol                   TLSv1.2 TLSv1.3';
-    if ($distroVersion > 0 && $distroVersion <= 10) {
-        $tlsProtocol = '    TLSProtocol                   TLSv1.2';
-    }
+    $tlsProtocol = $distroVersion > 0 && $distroVersion <= 10
+        ? '    TLSProtocol                   TLSv1.2'
+        : '    TLSProtocol                   TLSv1.2 TLSv1.3';
 
     $tlsBlock = implode("\n", [
         '    TLSEngine                     on',
@@ -88,9 +84,6 @@ if ($tlsBlock === '') {
 
 $logDir = '/var/log/proftpd';
 $runDir = '/var/run/proftpd';
-$daemonUser = 'proftpd';
-$daemonGroup = 'nogroup';
-
 foreach ([$logDir, $runDir] as $path) {
     if (!is_dir($path) && !@mkdir($path, 0750, true)) {
         logMessage("Warning: Unable to create {$path}");
@@ -98,8 +91,8 @@ foreach ([$logDir, $runDir] as $path) {
     }
 
     @chmod($path, 0750);
-    @chown($path, $daemonUser);
-    @chgrp($path, $daemonGroup);
+    @chown($path, 'proftpd');
+    @chgrp($path, 'nogroup');
 }
 
 pmssBackupCriticalConfig('proftpd', '/etc/proftpd/proftpd.conf');

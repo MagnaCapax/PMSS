@@ -158,8 +158,7 @@ function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
         if ($userTrim === '') {
             continue;
         }
-        $normalized = pmssNormalizeUsername($userTrim);
-        if ($normalized !== $userTrim || !pmssValidateUsername($userTrim)) {
+        if (!pmssValidateUsername($userTrim)) {
             logMessage(sprintf('[WARN] dist-upgrade: skipping invalid username: %s', $userTrim));
             continue;
         }

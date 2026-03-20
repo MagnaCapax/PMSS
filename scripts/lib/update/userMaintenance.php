@@ -89,8 +89,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
                 logMessage('[WARN] Skipping empty username during update-step2');
                 continue;
             }
-            $normalized = pmssNormalizeUsername($userTrim);
-            if ($normalized !== $userTrim || !pmssValidateUsername($userTrim)) {
+            if (!pmssValidateUsername($userTrim)) {
                 $skippedUsers++;
                 logMessage(sprintf('[WARN] Skipping invalid username during update-step2: %s', $userTrim));
                 continue;
