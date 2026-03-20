@@ -56,16 +56,16 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
     $flags = [];
     $sev = 'ok';
     if (($metrics['critical_warnings'] ?? 0) > 0) {
-        $sev = pmssStorageHealthSeverityMax($sev, 'fail');
+        $sev = 'fail';
         $flags[] = 'nvme_critical_warning';
     }
     if (($metrics['temperature'] ?? 0) >= 70) {
-        $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+        if ($sev === 'ok') { $sev = 'warn'; }
         $flags[] = 'hot_nvme';
     }
     $percentageUsed = (int) ($metrics['percentage_used'] ?? 0);
     if ($percentageUsed >= 80) {
-        $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+        if ($sev === 'ok') { $sev = 'warn'; }
         $flags[] = ($percentageUsed >= 95) ? 'wearout_critical' : 'wearout_high';
     }
 
@@ -76,7 +76,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
                 continue;
             }
             if ($metric === 'media_errors') {
-                $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+                if ($sev === 'ok') { $sev = 'warn'; }
             }
             $flags[] = $flag;
         }

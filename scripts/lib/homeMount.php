@@ -26,68 +26,64 @@
  * @license GPL-3.0-only
  */
 
-if (!function_exists('pmssIsHomeMounted')) {
-    /**
-     * Check whether /home is mounted as a separate filesystem.
-     *
-     * Reads /proc/mounts and looks for a line where the second field (mountpoint)
-     * is exactly "/home". This reliably detects whether /home is its own mount
-     * rather than part of the root filesystem.
-     *
-     * @return bool True if /home is a mounted filesystem, false otherwise.
-     */
-    function pmssIsHomeMounted(): bool
-    {
-        // Allow test harnesses to override mount detection.
-        $override = ['1' => true, 'true' => true, '0' => false, 'false' => false][strtolower((string) getenv('PMSS_HOME_MOUNTED_OVERRIDE'))] ?? null;
-        if ($override !== null) {
-            return $override;
-        }
-
-        $mountsPath = (string) getenv('PMSS_PROC_MOUNTS_PATH');
-        $mountsPath = $mountsPath !== '' ? $mountsPath : '/proc/mounts';
-        if (!is_string($mounts = @file_get_contents($mountsPath))) {
-            // If we cannot read /proc/mounts, assume not mounted to be safe.
-            return false;
-        }
-
-        // /proc/mounts format: device mountpoint fstype options dump pass
-        // We look for a line where mountpoint (field 2) is exactly "/home".
-        return preg_match('/^\\s*\\S+\\s+\\/home\\s+/m', $mounts) === 1;
+/**
+ * Check whether /home is mounted as a separate filesystem.
+ *
+ * Reads /proc/mounts and looks for a line where the second field (mountpoint)
+ * is exactly "/home". This reliably detects whether /home is its own mount
+ * rather than part of the root filesystem.
+ *
+ * @return bool True if /home is a mounted filesystem, false otherwise.
+ */
+function pmssIsHomeMounted(): bool
+{
+    // Allow test harnesses to override mount detection.
+    $override = ['1' => true, 'true' => true, '0' => false, 'false' => false][strtolower((string) getenv('PMSS_HOME_MOUNTED_OVERRIDE'))] ?? null;
+    if ($override !== null) {
+        return $override;
     }
+
+    $mountsPath = (string) getenv('PMSS_PROC_MOUNTS_PATH');
+    $mountsPath = $mountsPath !== '' ? $mountsPath : '/proc/mounts';
+    if (!is_string($mounts = @file_get_contents($mountsPath))) {
+        // If we cannot read /proc/mounts, assume not mounted to be safe.
+        return false;
+    }
+
+    // /proc/mounts format: device mountpoint fstype options dump pass
+    // We look for a line where mountpoint (field 2) is exactly "/home".
+    return preg_match('/^\\s*\\S+\\s+\\/home\\s+/m', $mounts) === 1;
 }
 
-if (!function_exists('pmssRequireHomeMounted')) {
-    /**
-     * Abort execution with a clear error if /home is not mounted.
-     *
-     * This guard should be called early in scripts that operate on /home to
-     * prevent destructive actions (wiping configs, modifying user homes) when
-     * the filesystem is unavailable. The check runs before any side effects,
-     * preserving idempotency.
-     *
-     * The check can be bypassed by setting PMSS_SKIP_HOME_MOUNT_CHECK=1 in the
-     * environment. This is intended for non-standard deployments where /home is
-     * part of the root filesystem (loopback mounts, containers, etc.).
-     *
-     * @param string $context Optional context string for the error message,
-     *                        typically the calling script name.
-     *
-     * @return void Exits with code 1 if /home is not mounted.
-     */
-    function pmssRequireHomeMounted(string $context = ''): void
-    {
-        // Allow operators to bypass the check for non-standard deployments.
-        if ((['1' => true, 'true' => true][strtolower((string) getenv('PMSS_SKIP_HOME_MOUNT_CHECK'))] ?? false) || pmssIsHomeMounted()) {
-            return;
-        }
-
-        // Build a helpful error message.
-        $message = ($context !== '' ? "[{$context}] " : '')."Error: /home is not mounted as a separate filesystem.\n"
-            ."PMSS requires /home to be mounted. Aborting to prevent data loss.\n"
-            ."If this is intentional (non-standard deployment), set PMSS_SKIP_HOME_MOUNT_CHECK=1.\n";
-
-        fwrite(STDERR, $message);
-        exit(1);
+/**
+ * Abort execution with a clear error if /home is not mounted.
+ *
+ * This guard should be called early in scripts that operate on /home to
+ * prevent destructive actions (wiping configs, modifying user homes) when
+ * the filesystem is unavailable. The check runs before any side effects,
+ * preserving idempotency.
+ *
+ * The check can be bypassed by setting PMSS_SKIP_HOME_MOUNT_CHECK=1 in the
+ * environment. This is intended for non-standard deployments where /home is
+ * part of the root filesystem (loopback mounts, containers, etc.).
+ *
+ * @param string $context Optional context string for the error message,
+ *                        typically the calling script name.
+ *
+ * @return void Exits with code 1 if /home is not mounted.
+ */
+function pmssRequireHomeMounted(string $context = ''): void
+{
+    // Allow operators to bypass the check for non-standard deployments.
+    if ((['1' => true, 'true' => true][strtolower((string) getenv('PMSS_SKIP_HOME_MOUNT_CHECK'))] ?? false) || pmssIsHomeMounted()) {
+        return;
     }
+
+    // Build a helpful error message.
+    $message = ($context !== '' ? "[{$context}] " : '')."Error: /home is not mounted as a separate filesystem.\n"
+        ."PMSS requires /home to be mounted. Aborting to prevent data loss.\n"
+        ."If this is intentional (non-standard deployment), set PMSS_SKIP_HOME_MOUNT_CHECK=1.\n";
+
+    fwrite(STDERR, $message);
+    exit(1);
 }

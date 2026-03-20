@@ -97,10 +97,10 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         && strpos($healthUpper, 'BAD') === false;
 
     if (!$healthExplicit) {
-        $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+        if ($sev === 'ok') { $sev = 'warn'; }
         $flags[] = 'health_unknown';
     } elseif (!$healthOk) {
-        $sev = pmssStorageHealthSeverityMax($sev, 'fail');
+        $sev = 'fail';
         $flags[] = 'health_not_ok';
     }
 
@@ -108,7 +108,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         if (($metrics[$metric] ?? 0) <= 0) {
             continue;
         }
-        $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+        if ($sev === 'ok') { $sev = 'warn'; }
         $flags[] = $flag;
     }
 
@@ -117,7 +117,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         $rota = (int) ($disk['rota'] ?? 1);
         $threshold = ($rota === 1) ? 50 : 70;
         if ($temp >= $threshold) {
-            $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+            if ($sev === 'ok') { $sev = 'warn'; }
             $flags[] = ($rota === 1) ? 'hot_hdd' : 'hot_ssd';
         }
     }
@@ -130,7 +130,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
                 continue;
             }
             if ($raiseWarn) {
-                $sev = pmssStorageHealthSeverityMax($sev, 'warn');
+                if ($sev === 'ok') { $sev = 'warn'; }
             }
             $flags[] = $metric.'_increase';
         }
@@ -184,7 +184,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
 
     $entry = pmssStorageHealthParseSmartctlOutput($out, $disk, $prevMetrics, $timestamp);
     if ($res['rc'] === 124) {
-        $entry['severity'] = pmssStorageHealthSeverityMax((string) $entry['severity'], 'warn');
+        if (($entry['severity'] ?? 'ok') === 'ok') { $entry['severity'] = 'warn'; }
         $entry['ok'] = false;
         $entry['flags'] = array_values(array_unique(array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout'])));
     }

@@ -105,11 +105,19 @@ class StorageHealthSmartctlParsingTest extends TestCase
         $this->assertEquals('STANDBY', $entry['metrics']['health']);
     }
 
-    public function testSeverityMaxUsesRankOrder(): void
+    public function testFailedHealthStaysFailWhenWarnFlagsAlsoApply(): void
     {
-        $this->assertEquals('warn', \pmssStorageHealthSeverityMax('ok', 'warn'));
-        $this->assertEquals('fail', \pmssStorageHealthSeverityMax('warn', 'fail'));
-        $this->assertEquals('fail', \pmssStorageHealthSeverityMax('fail', 'ok'));
+        $out = implode("\n", [
+            'SMART Health Status: FAILED',
+            '197 Current_Pending_Sector  0x0012   100   100   000    Old_age   Always       -       1',
+            '194 Temperature_Celsius     0x0022   034   040   000    Old_age   Always       -       70',
+        ])."\n";
+        $disk = ['path' => '/dev/sdx', 'kname' => 'sdx', 'model' => 'TEST', 'serial' => 'R', 'rota' => 1, 'size' => '9T'];
+        $entry = \pmssStorageHealthParseSmartctlOutput($out, $disk, null, '2025-01-01T00:00:00+00:00');
+
+        $this->assertEquals('fail', $entry['severity']);
+        $this->assertTrue(in_array('health_not_ok', $entry['flags'], true));
+        $this->assertTrue(in_array('pending_sectors', $entry['flags'], true));
     }
 
     public function testSsdTemperatureThresholdUsesHotSsdFlag(): void

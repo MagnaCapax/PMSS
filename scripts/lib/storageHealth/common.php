@@ -100,12 +100,6 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
     return ['rc' => (int) $rc, 'stdout' => $stdout, 'stderr' => $stderr];
 }
 
-function pmssStorageHealthSeverityMax(string $a, string $b): string
-{
-    static $rank = ['ok' => 0, 'warn' => 1, 'fail' => 2];
-    return (($rank[$b] ?? 1) > ($rank[$a] ?? 1)) ? $b : $a;
-}
-
 /**
  * Resolve the md array that backs /home, if /home is mounted directly on md.
  */
