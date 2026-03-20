@@ -160,7 +160,7 @@ function pmssReportPackageQueueBaselineDiff(?string $baselinePath = null): array
 
     if (empty($summary['queuedAbsentFromBaseline'])) {
         $logNotice('[OK] Package queue diff: all queued packages are present in '.basename($baselinePath));
-    } elseif (function_exists('pmssLogJson')) {
+    } else {
         pmssLogJson([
             'event' => 'package_queue_baseline_diff',
             'baseline' => basename($baselinePath),
@@ -238,7 +238,7 @@ function pmssFlushPackageQueue(): void
         if (!empty($summary)) {
             $isError = $bucket === 'PMSS_PACKAGE_ERRORS';
             $logNotice(($isError ? '[ERROR] Package queue errors: ' : '[WARN] Package queue warnings: ').implode(' | ', $summary));
-            if ($isError && function_exists('pmssLogJson')) {
+            if ($isError) {
                 pmssLogJson([
                     'event'   => 'package_queue_failure',
                     'issues'  => $summary,

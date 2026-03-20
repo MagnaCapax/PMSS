@@ -118,4 +118,30 @@ class UpdateLibraryDependencyTest extends TestCase
             'userConfig.php should rely on runtime/commands.php for pmssLogStatus()'
         );
     }
+
+    public function testPackageHelpersUseDirectPmssLogJson(): void
+    {
+        $source = $this->loadSource('lib/update/apps/packages/helpers.php');
+
+        $this->assertStringContainsString('pmssLogJson([', $source);
+        $this->assertTrue(
+            strpos($source, "function_exists('pmssLogJson')") === false,
+            'packages/helpers.php should rely on runtime/commands.php for pmssLogJson()'
+        );
+    }
+
+    public function testUpdateStep2UsesBootstrappedRuntimeHelpersDirectly(): void
+    {
+        $source = $this->loadSource('util/update-step2.php');
+
+        $this->assertStringContainsString("runStep('Restoring root cron configuration (shutdown)', \$helper);", $source);
+        $this->assertStringContainsString("\$jsonPath = pmssJsonLogPath();", $source);
+        $this->assertStringContainsString("\$pmssCorrelationId = pmssCorrelationId();", $source);
+        foreach (["function_exists('runStep')", "function_exists('pmssJsonLogPath')", "function_exists('pmssCorrelationId')"] as $needle) {
+            $this->assertTrue(
+                strpos($source, $needle) === false,
+                'update-step2.php should rely on the shared bootstrap for '.$needle
+            );
+        }
+    }
 }

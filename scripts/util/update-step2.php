@@ -290,11 +290,7 @@ register_shutdown_function(function () use (&$pmssRootCronRestored): void {
     if (!is_file($helper)) {
         return;
     }
-    if (function_exists('runStep')) {
-        runStep('Restoring root cron configuration (shutdown)', $helper);
-        return;
-    }
-    @passthru($helper);
+    runStep('Restoring root cron configuration (shutdown)', $helper);
 });
 
 // Preflight: ensure root can keep forking during long updates even if legacy TasksMax caps are present.
@@ -343,8 +339,8 @@ putenv('PMSS_PACKAGE_PHASE=initializing');
 $effectiveRepoVersion = $repoVersion > 0 ? $repoVersion : $reportedVersion;
 
 logmsg('Update-step2 log: /var/log/pmss-update.log (fallback /tmp/pmss-update.log)');
-$jsonPath = function_exists('pmssJsonLogPath') ? pmssJsonLogPath() : (getenv('PMSS_JSON_LOG') ?: '');
-$pmssCorrelationId = function_exists('pmssCorrelationId') ? pmssCorrelationId() : trim((string) (getenv('PMSS_CORRELATION_ID') ?: ''));
+$jsonPath = pmssJsonLogPath();
+$pmssCorrelationId = pmssCorrelationId();
 if ($jsonPath !== '') {
     logmsg('JSON events: '.$jsonPath);
 }
