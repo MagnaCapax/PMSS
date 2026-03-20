@@ -82,16 +82,12 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
         return;
     }
 
-    switch ($distroName) {
-        case 'debian':
-            pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
-            return;
-        case 'ubuntu':
-            $log('Ubuntu is not supported yet.');
-            return;
-        default:
-            $log("Unsupported distro: $distroName");
+    if ($distroName === 'debian') {
+        pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
+        return;
     }
+
+    $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName");
 }
 
 /**
@@ -109,11 +105,9 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
 
     if (!isset($targets[$version])) { $log("Unsupported Debian version: $version"); return; }
     $target = $targets[$version];
-
     $label = $target['label'];
-    $template = $repos[$target['repo']] ?? '';
 
-    if ($template === '') {
+    if (($template = $repos[$target['repo']] ?? '') === '') {
         $log("{$label} template missing, leaving sources.list untouched");
         return;
     }

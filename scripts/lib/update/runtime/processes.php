@@ -62,8 +62,7 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
  */
 function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
 {
-    $probeOutput = [];
-    exec('pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1', $probeOutput, $probeStatus);
+    exec('pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1', $_, $probeStatus);
     if ($probeStatus !== 0) {
         logmsg("[SKIP] {$description} (no {$name} processes)");
         return;
@@ -80,7 +79,7 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
 
     $deadline = microtime(true) + max(0, $timeoutSeconds);
     while (true) {
-        exec($probeCommand, $probeOutput, $probeStatus);
+        exec($probeCommand, $_, $probeStatus);
         if ($probeStatus !== 0) {
             logmsg("[OK] {$description} (graceful stop)");
             return;
@@ -95,7 +94,7 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
 
     $deadline = microtime(true) + 5;
     while (true) {
-        exec($probeCommand, $probeOutput, $probeStatus);
+        exec($probeCommand, $_, $probeStatus);
         if ($probeStatus !== 0) {
             return;
         }

@@ -197,16 +197,17 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
             $log('[WARN] Remote logging enabled but invalid: '.$invalidReason);
         }
         // Ensure no stale config exists when disabled
-        if (is_file($target)) {
-            if (@unlink($target)) {
-                $log('Removed remote logging config (disabled)');
+        if (!is_file($target)) {
+            return;
+        }
+        if (!@unlink($target)) {
+            $log('[WARN] Unable to remove remote logging config: '.$target);
+            return;
+        }
 
-                if (!$skipRestart) {
-                    runStep('Restarting rsyslog after removing remote forwarding', 'systemctl restart rsyslog');
-                }
-            } else {
-                $log('[WARN] Unable to remove remote logging config: '.$target);
-            }
+        $log('Removed remote logging config (disabled)');
+        if (!$skipRestart) {
+            runStep('Restarting rsyslog after removing remote forwarding', 'systemctl restart rsyslog');
         }
         return;
     }

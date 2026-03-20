@@ -53,12 +53,7 @@ function runStep(string $description, string $command): int
     $cGreen  = "\033[32m";
     $cYellow = "\033[33m";
 
-    $statusColors = [
-        'OK'   => $cGreen,
-        'ERR'  => $cRed,
-        'SKIP' => $cYellow,
-    ];
-    $color = $statusColors[$status] ?? $cGreen;
+    $color = $status === 'ERR' ? $cRed : ($status === 'SKIP' ? $cYellow : $cGreen);
 
     // Colorize the status block: [STATUS ... rc=N]
     $statusBlock = sprintf('[%s%s%s %.3fs rc=%s%d%s]',
