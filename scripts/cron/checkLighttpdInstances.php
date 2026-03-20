@@ -16,6 +16,7 @@ if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
 }
 require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
+$canUserLog = function_exists('pmssUserLog');
 
 // Get & parse users list (optionally for a single user).
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
@@ -52,9 +53,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             echo "User: {$thisUser} is suspended\n";
             // Kill only lighttpd and php-cgi — not all user processes (see GH#210).
             passthru("killall -9 -u ".escapeshellarg($thisUser)." lighttpd 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." php-cgi 2>/dev/null");
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'lighttpd stopped due to suspension');
-            }
+            if ($canUserLog) { pmssUserLog($thisUser, 'lighttpd stopped due to suspension'); }
             continue;  //Suspended
     }
 
@@ -64,9 +63,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     if (!file_exists($homeDir.'/.lighttpd.conf') && is_dir($homeDir)) {
         echo "Config missing for user: {$thisUser} — generating\n";
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
-        }
+        if ($canUserLog) { pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)'); }
     }
 
     $instancesLighttpd = shell_exec("pgrep -u {$thisUser} lighttpd");
@@ -97,9 +94,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         echo "Killing (if any) lighttpd for user: {$thisUser}\n";
         shell_exec("killall -15 -u {$thisUser} lighttpd; killall -15 -u {$thisUser} php-cgi; sleep 5; killall -9 -u {$thisUser} lighttpd; killall -9 -u {$thisUser} php-cgi;");
         usleep(50000);   // brief pause before relaunch
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'lighttpd restart requested');
-        }
+        if ($canUserLog) { pmssUserLog($thisUser, 'lighttpd restart requested'); }
     }
 
 
@@ -117,9 +112,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     if ($socketError || empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
         echo "Start lighttpd for user: {$thisUser}\n";
         passthru('/scripts/startLighttpd ' . $thisUser);
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'lighttpd start requested');
-        }
+        if ($canUserLog) { pmssUserLog($thisUser, 'lighttpd start requested'); }
         continue;
     }
 

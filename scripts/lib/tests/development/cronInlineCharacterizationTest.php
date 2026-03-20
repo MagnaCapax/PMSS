@@ -68,6 +68,23 @@ class CronInlineCharacterizationTest extends TestCase
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluge-web start requested');", $src);
     }
 
+    public function testWatchdogsKeepSuspensionAndStartUserLogMessages(): void
+    {
+        $lighttpdSrc = $this->readRuntimeFile('scripts/cron/checkLighttpdInstances.php');
+        $qbittorrentSrc = $this->readRuntimeFile('scripts/cron/checkQbittorrentInstances.php');
+        $rcloneSrc = $this->readRuntimeFile('scripts/cron/checkRcloneInstances.php');
+        $delugeSrc = $this->readRuntimeFile('scripts/cron/checkDelugeInstances.php');
+
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd stopped due to suspension');", $lighttpdSrc);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd start requested');", $lighttpdSrc);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'qbittorrent-nox stopped due to suspension');", $qbittorrentSrc);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'qbittorrent-nox start requested');", $qbittorrentSrc);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'rclone stopped due to suspension');", $rcloneSrc);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'rclone start requested');", $rcloneSrc);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluge stopped due to suspension');", $delugeSrc);
+        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluged start requested');", $delugeSrc);
+    }
+
     public function testLighttpdWatchdogKeepsRestartSequenceInline(): void
     {
         $src = $this->readRuntimeFile('scripts/cron/checkLighttpdInstances.php');

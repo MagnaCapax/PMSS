@@ -13,6 +13,7 @@
 echo date('Y-m-d H:i:s') . ': Checking Deluge instances' . "\n";
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
 if (is_file($pmssDelugePath = __DIR__.'/../lib/user/deluge.php')) { require_once $pmssDelugePath; }
+$canUserLog = function_exists('pmssUserLog');
 
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
@@ -23,9 +24,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             echo "User: {$thisUser} is suspended\n";
             // Kill only deluged and deluge-web — not all user processes (see GH#210).
             passthru("killall -9 -u ".escapeshellarg($thisUser)." deluged 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." deluge-web 2>/dev/null");
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'deluge stopped due to suspension');
-            }
+            if ($canUserLog) { pmssUserLog($thisUser, 'deluge stopped due to suspension'); }
             continue;  //Suspended
     }
 
@@ -36,26 +35,20 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         && pmssDelugeApplyUploadThrottle($thisUser);
     if ($configChanged && !empty($instances)) {
         passthru("killall -9 -u ".escapeshellarg($thisUser)." deluged 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." deluge-web 2>/dev/null");
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'deluge restarted to apply upload throttle');
-        }
+        if ($canUserLog) { pmssUserLog($thisUser, 'deluge restarted to apply upload throttle'); }
         $instances = '';
     }
     if (empty($instances)) {
         echo "Start deluged for user: {$thisUser}\n";
         passthru("su {$thisUser} -c 'cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info'");
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'deluged start requested');
-        }
+        if ($canUserLog) { pmssUserLog($thisUser, 'deluged start requested'); }
     }
  
     $instancesWeb = shell_exec("pgrep -u{$thisUser} deluge-web");
     if (empty($instancesWeb)) {
         echo "Start deluge-web for user: {$thisUser}\n";
         passthru("su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'");
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'deluge-web start requested');
-        }
+        if ($canUserLog) { pmssUserLog($thisUser, 'deluge-web start requested'); }
     }
 
 }

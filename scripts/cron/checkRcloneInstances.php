@@ -10,6 +10,7 @@ echo date('Y-m-d H:i:s') . ': Checking Rclone instances' . "\n";
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
+$canUserLog = function_exists('pmssUserLog');
 
 // Get & parse users list
 $users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
@@ -20,9 +21,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
             echo "User: {$thisUser} is suspended\n";
             // Kill only rclone — not all user processes (see GH#210).
             passthru("killall -9 -u ".escapeshellarg($thisUser)." rclone 2>/dev/null");
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'rclone stopped due to suspension');
-            }
+            if ($canUserLog) { pmssUserLog($thisUser, 'rclone stopped due to suspension'); }
             continue;  //Suspended
     }
 
@@ -34,9 +33,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         echo "Start rclone for user: {$thisUser}\n";
         $port = (int) file_get_contents("/home/{$thisUser}/.rclonePort");
         passthru("su {$thisUser} -c 'cd ~; nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &'");
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($thisUser, 'rclone start requested');
-        }
+        if ($canUserLog) { pmssUserLog($thisUser, 'rclone start requested'); }
     }
 
 }
