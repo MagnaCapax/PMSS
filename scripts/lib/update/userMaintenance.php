@@ -62,12 +62,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
         $htpasswdHelper = is_file('/scripts/util/checkUserHtpasswd.php') ? '/scripts/util/checkUserHtpasswd.php' : '';
         $lighttpdChecker = is_file('/scripts/cron/checkLighttpdInstances.php') ? '/scripts/cron/checkLighttpdInstances.php' : '';
-        $phases = [];
-        if (function_exists('pmssUpdateUserEnvironment')) {
-            $phases[] = 'Environment (HTTP/ruTorrent/permissions'
-                .(function_exists('pmssEnsureLingerAndDocker') ? ' + linger/systemd/rootless Docker' : '')
-                .')';
-        }
+        $phases = ['Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)'];
         $postChecks = [];
         if ($htpasswdHelper !== '') {
             $phases[] = 'Legacy htpasswd sync';
@@ -165,9 +160,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
                 $reason = get_class($throwable).($throwable->getMessage() === '' ? '' : ': '.$throwable->getMessage());
 
                 logMessage(sprintf('[WARN] Skipping remaining maintenance for user %s: %s', $userTrim, $reason));
-                if (function_exists('pmssUserLog')) {
-                    pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
-                }
+                pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
 
                 $recordUserProfile($userTrim, 'ERR', 1, $userDuration, substr(preg_replace('/\s+/', ' ', $reason), 0, 300));
             }
@@ -176,15 +169,13 @@ if (!function_exists('pmssUpdateAllUsers')) {
         $summaryStatus = $processedUsers < $totalUsers ? 'warn' : 'ok';
         $summaryLine = sprintf('Processed %d of %d users', $processedUsers, $totalUsers);
         logMessage(($summaryStatus === 'warn' ? '[WARN] ' : '').$summaryLine);
-        if (function_exists('pmssLogJson')) {
-            pmssLogJson([
-                'event'     => 'user_maintenance_summary',
-                'status'    => $summaryStatus,
-                'total'     => $totalUsers,
-                'processed' => $processedUsers,
-                'skipped'   => $skippedUsers,
-            ]);
-        }
+        pmssLogJson([
+            'event'     => 'user_maintenance_summary',
+            'status'    => $summaryStatus,
+            'total'     => $totalUsers,
+            'processed' => $processedUsers,
+            'skipped'   => $skippedUsers,
+        ]);
 
         return [
             'total' => $totalUsers,
@@ -214,7 +205,7 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
         if ($userConfigStore === null) {
             $userConfigStore = new UserConfigStore();
         }
-        if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user, $userConfigStore)) {
+        if (!pmssUserDockerEnabled($user, $userConfigStore)) {
             pmssUserLog($user, '[SKIP] Docker disabled by config; stopping rootless Docker if running');
             $stopCmd = sprintf('php /scripts/util/userDocker.php %s stop', escapeshellarg($user));
             pmssRunAndLog($user, 'userDocker stop (disabled)', $stopCmd);

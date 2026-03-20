@@ -32,22 +32,15 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '')
     echo "***** Updating user {$user}\n";
     logmsg("Updating user {$user}");
 
-    $steps = [
-        'HTTP services'       => 'pmssUserConfigureHttp',
-        'Skeleton files'      => 'pmssUserApplySkeletonFiles',
-        'ruTorrent themes'    => 'pmssUserUpdateThemes',
-        'ruTorrent refresh'   => 'pmssUserUpgradeRutorrent',
-        'ruTorrent PHP compatibility' => 'pmssUserMaintainRutorrentPhpCompatibility',
-        'Plugin maintenance'  => 'pmssUserEnsurePlugins',
-        'Permission refresh'  => 'pmssUserRefreshPermissions',
-    ];
-
-    foreach ($steps as $label => $handler) {
-        if (!function_exists($handler)) {
-            logmsg("[WARN] Missing handler {$handler} for {$label}");
-            continue;
-        }
-
+    foreach ([
+        'pmssUserConfigureHttp',
+        'pmssUserApplySkeletonFiles',
+        'pmssUserUpdateThemes',
+        'pmssUserUpgradeRutorrent',
+        'pmssUserMaintainRutorrentPhpCompatibility',
+        'pmssUserEnsurePlugins',
+        'pmssUserRefreshPermissions',
+    ] as $handler) {
         $handler($ctx);
     }
 

@@ -483,4 +483,72 @@ class UpdateCompressionCharacterizationTest extends TestCase
             );
         }
     }
+
+    public function testUserUpdateEntrypointKeepsDirectHandlerSequence(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
+        $src = @file_get_contents($path);
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertStringContainsString("'pmssUserConfigureHttp'", $src);
+        $this->assertStringContainsString("'pmssUserApplySkeletonFiles'", $src);
+        $this->assertStringContainsString("'pmssUserUpgradeRutorrent'", $src);
+        $this->assertStringContainsString("'pmssUserRefreshPermissions'", $src);
+        $this->assertTrue(
+            strpos($src, 'Missing handler') === false,
+            'users.php should not keep a dead missing-handler warning branch once domain modules are required directly'
+        );
+    }
+
+    public function testUserMaintenanceKeepsDirectPhaseSummaryAndSummaryLogging(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
+        $src = @file_get_contents($path);
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertStringContainsString('Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)', $src);
+        $this->assertStringContainsString("pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);", $src);
+        $this->assertStringContainsString('pmssLogJson([', $src);
+        $this->assertTrue(
+            strpos($src, "function_exists('pmssUpdateUserEnvironment')") === false,
+            'userMaintenance.php should not guard helpers that are required at file load time'
+        );
+        $this->assertTrue(
+            strpos($src, "function_exists('pmssLogJson')") === false,
+            'userMaintenance.php should log its JSON summary directly through the required logging runtime'
+        );
+        $this->assertTrue(
+            strpos($src, "function_exists('pmssUserDockerEnabled')") === false,
+            'userMaintenance.php should call the required Docker config helper directly'
+        );
+    }
+
+    public function testDistUpgradeUsesRequiredRepairHelpersDirectly(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/distUpgrade.php';
+        $src = @file_get_contents($path);
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertStringContainsString('pmssEnsureBootDefaults(', $src);
+        $this->assertStringContainsString('pmssEnsureRootlessDockerInstalled($user);', $src);
+        $this->assertStringContainsString('pmssEnsureDockerDependencies($user);', $src);
+        $this->assertStringContainsString("pmssUserLog(\$userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');", $src);
+        $this->assertStringContainsString("pmssUserLog(\$user, 'dist-upgrade: rootless Docker repair start');", $src);
+        $this->assertTrue(
+            strpos($src, "function_exists('pmssEnsureBootDefaults')") === false,
+            'distUpgrade.php should call the required boot defaults helper directly'
+        );
+        $this->assertTrue(
+            strpos($src, "class_exists('users')") === false,
+            'distUpgrade.php should not keep a dead users class guard once userMaintenance.php is required'
+        );
+        $this->assertTrue(
+            strpos($src, "function_exists('pmssEnsureRootlessDockerInstalled')") === false,
+            'distUpgrade.php should not keep dead rootless helper guards once userMaintenance.php is required'
+        );
+        $this->assertTrue(
+            strpos($src, "function_exists('pmssUserLog')") === false,
+            'distUpgrade.php should log through the required user logger directly'
+        );
+    }
 }

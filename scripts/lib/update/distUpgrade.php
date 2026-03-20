@@ -72,21 +72,17 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
     pmssRepairNginxAfterDistUpgrade();
     pmssEnsureFuseOverlayfsAfterDistUpgrade($next);
     pmssRepairDockerRootlessAfterDistUpgrade($next);
-    if (function_exists('pmssEnsureBootDefaults')) {
-        pmssEnsureBootDefaults(
-            null,
-            null,
-            null,
-            null,
-            ['console=tty0', 'console=ttyS0,115200n8'],
-            [
-                'GRUB_TERMINAL' => 'console serial',
-                'GRUB_SERIAL_COMMAND' => 'serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1',
-            ]
-        );
-    } else {
-        logMessage('[WARN] dist-upgrade: boot defaults helper missing; skipping GRUB and hidepid checks');
-    }
+    pmssEnsureBootDefaults(
+        null,
+        null,
+        null,
+        null,
+        ['console=tty0', 'console=ttyS0,115200n8'],
+        [
+            'GRUB_TERMINAL' => 'console serial',
+            'GRUB_SERIAL_COMMAND' => 'serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1',
+        ]
+    );
     pmssVerifyDistUpgradeBootReadiness();
     return 0;
 }
@@ -149,15 +145,6 @@ function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
         return;
     }
 
-    if (!class_exists('users')) {
-        logMessage('[WARN] dist-upgrade: users helper missing; skipping rootless Docker repair');
-        return;
-    }
-    if (!function_exists('pmssEnsureRootlessDockerInstalled') || !function_exists('pmssEnsureDockerDependencies')) {
-        logMessage('[WARN] dist-upgrade: rootless Docker helpers missing; skipping rootless repair');
-        return;
-    }
-
     if ((string) getenv('PMSS_DISTRO_VERSION') === '') {
         putenv('PMSS_DISTRO_VERSION='.(string) ((int) $toMajor));
     }
@@ -182,9 +169,7 @@ function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
             continue;
         }
         if (is_dir($home.'/www-disabled')) {
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');
-            }
+            pmssUserLog($userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');
             continue;
         }
 
@@ -203,9 +188,7 @@ function pmssRepairDockerRootlessAfterDistUpgrade(string $toMajor): void
     }
 
     foreach ($targets as $user) {
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($user, 'dist-upgrade: rootless Docker repair start');
-        }
+        pmssUserLog($user, 'dist-upgrade: rootless Docker repair start');
         pmssEnsureRootlessDockerInstalled($user);
         pmssEnsureDockerDependencies($user);
     }
