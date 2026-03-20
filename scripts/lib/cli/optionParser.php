@@ -17,6 +17,14 @@ function pmssParseCliTokens(array $argv): array
     $options = [];
     $positionals = [];
     $tokens = array_slice($argv, 1);
+    $readOptionValue = static function (array $tokens, int &$index) {
+        $next = $tokens[$index + 1] ?? null;
+        if ($next === null || $next === '' || $next[0] === '-') {
+            return true;
+        }
+        $index++;
+        return $next;
+    };
 
     for ($i = 0; $i < count($tokens); $i++) {
         $token = $tokens[$i];
@@ -30,13 +38,7 @@ function pmssParseCliTokens(array $argv): array
                 [$key, $value] = explode('=', $body, 2);
                 $options[$key] = $value;
             } else {
-                $next = $tokens[$i + 1] ?? null;
-                if ($next !== null && $next !== '' && $next[0] !== '-') {
-                    $options[$body] = $next;
-                    $i++;
-                } else {
-                    $options[$body] = true;
-                }
+                $options[$body] = $readOptionValue($tokens, $i);
             }
             continue;
         }
@@ -44,13 +46,7 @@ function pmssParseCliTokens(array $argv): array
         if (substr($token, 0, 1) === '-' && strlen($token) > 1) {
             $body = substr($token, 1);
             if (strlen($body) === 1) {
-                $next = $tokens[$i + 1] ?? null;
-                if ($next !== null && $next !== '' && $next[0] !== '-') {
-                    $options[$body] = $next;
-                    $i++;
-                } else {
-                    $options[$body] = true;
-                }
+                $options[$body] = $readOptionValue($tokens, $i);
                 continue;
             }
 
