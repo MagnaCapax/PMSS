@@ -17,20 +17,11 @@ function pmssParseCliTokens(array $argv): array
     $options = [];
     $positionals = [];
     $tokens = array_slice($argv, 1);
-    $readOptionValue = static function (array $tokens, int &$index) {
-        $next = $tokens[$index + 1] ?? null;
-        if ($next === null || $next === '' || ($next[0] ?? '') === '-') {
-            return true;
-        }
-        $index++;
-        return $next;
-    };
+    $tokenCount = count($tokens);
 
-    for ($i = 0; $i < count($tokens); $i++) {
+    for ($i = 0; $i < $tokenCount; $i++) {
         $token = $tokens[$i];
-        $prefix = $token[0] ?? '';
-
-        if ($prefix !== '-' || $token === '-') {
+        if (($token[0] ?? '') !== '-' || $token === '-') {
             $positionals[] = $token;
             continue;
         }
@@ -40,29 +31,33 @@ function pmssParseCliTokens(array $argv): array
             if ($body === '') {
                 continue;
             }
-            if (strpos($body, '=') !== false) {
-                [$key, $value] = explode('=', $body, 2);
-                $options[$key] = $value;
-            } else {
-                $options[$body] = $readOptionValue($tokens, $i);
+            if (($equalsOffset = strpos($body, '=')) !== false) {
+                $options[substr($body, 0, $equalsOffset)] = substr($body, $equalsOffset + 1);
+                continue;
             }
-            continue;
-        }
+        } else {
+            $body = substr($token, 1);
+            if (strlen($body) !== 1) {
+                if (ctype_alpha($body)) {
+                    foreach (str_split($body) as $flag) {
+                        $options[$flag] = true;
+                    }
+                    continue;
+                }
 
-        $body = substr($token, 1);
-        if (strlen($body) === 1) {
-            $options[$body] = $readOptionValue($tokens, $i);
-            continue;
-        }
-
-        if (ctype_alpha($body)) {
-            foreach (str_split($body) as $flag) {
-                $options[$flag] = true;
+                $options[$body[0]] = substr($body, 1) ?: true;
+                continue;
             }
+        }
+
+        $next = $tokens[$i + 1] ?? null;
+        if ($next === null || $next === '' || ($next[0] ?? '') === '-') {
+            $options[$body] = true;
             continue;
         }
 
-        $options[substr($body, 0, 1)] = substr($body, 1) ?: true;
+        $options[$body] = $next;
+        $i++;
     }
 
     return [
@@ -76,11 +71,6 @@ function pmssParseCliTokens(array $argv): array
  */
 function pmssCliOption(array $parsed, string $long, ?string $short = null, $default = null)
 {
-    if (isset($parsed['options'][$long])) {
-        return $parsed['options'][$long];
-    }
-    if ($short !== null && isset($parsed['options'][$short])) {
-        return $parsed['options'][$short];
-    }
-    return $default;
+    return $parsed['options'][$long]
+        ?? ($short !== null ? ($parsed['options'][$short] ?? $default) : $default);
 }

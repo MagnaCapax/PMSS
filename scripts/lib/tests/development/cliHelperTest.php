@@ -49,4 +49,12 @@ class CliHelperTest extends TestCase
         $parsed = \pmssParseCliTokens(['script.php', '-l64']);
         $this->assertEquals('64', \pmssCliOption($parsed, 'limit', 'l'));
     }
+
+    public function testDoesNotConsumeFollowingOptionAsValue(): void
+    {
+        $parsed = \pmssParseCliTokens(['script.php', '--limit', '--json', '-l', '-v']);
+        $this->assertTrue(\pmssCliOption($parsed, 'limit', 'l'));
+        $this->assertTrue(\pmssCliOption($parsed, 'json'));
+        $this->assertTrue(\pmssCliOption($parsed, 'v'));
+    }
 }
