@@ -64,8 +64,7 @@ function pmssPackageQueueBaselineInstallSet(string $baselinePath): array
             continue;
         }
 
-        $parts = preg_split('/\s+/', $trimmed);
-        if (!is_array($parts) || empty($parts)) {
+        if (empty($parts = preg_split('/\s+/', $trimmed))) {
             continue;
         }
 
@@ -134,7 +133,7 @@ function pmssReportPackageQueueBaselineDiff(?string $baselinePath = null): array
         return $summary;
     }
 
-    foreach (array_keys($queuedPackages) as $package) {
+    foreach ($queuedPackages as $package => $_present) {
         $name = strtolower((string) preg_replace('/:.+$/', '', $package));
         if (isset($baselineSet[$name])) {
             continue;
@@ -187,7 +186,7 @@ function pmssFlushPackageQueue(): void
         $missingContext = $isDefaultTarget ? 'default queue' : ('queue '.$target);
         $installContext = $isDefaultTarget ? 'package queue' : ('package queue '.$target);
 
-        $packages = array_unique(array_filter($packages));
+        $packages = array_filter($packages);
         if (empty($packages)) {
             continue;
         }
@@ -320,7 +319,6 @@ function pmssInstallBestEffort(array $items, string $label = ''): void
             break;
         }
     }
-    $selection = array_unique($selection);
     if (!empty($selection)) {
         pmssQueuePackages($selection);
         return;

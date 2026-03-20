@@ -174,11 +174,9 @@ function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $r
         }
 
         $summary = pmssStorageHealthRaidActivitySummaryParse($activityLine);
-        if ($summary['operation'] === '') {
-            continue;
+        if ($summary['operation'] !== '') {
+            return $summary + ['array' => $homeArray];
         }
-
-        return $summary + ['array' => $homeArray];
     }
 
     return null;
