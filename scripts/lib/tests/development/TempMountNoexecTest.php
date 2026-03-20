@@ -46,6 +46,32 @@ class TempMountNoexecTest extends TestCase
         $this->cleanup($dir);
     }
 
+    public function testSkipsWhenFlagExplicitlyFalse(): void
+    {
+        $dir = $this->makeTempDir('pmss-noexec-false');
+        $fstab = $dir.'/fstab';
+        $mounts = $dir.'/mounts';
+
+        $original = "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0\n";
+        $original .= "tmpfs /dev/shm tmpfs defaults,nosuid,nodev 0 0\n";
+        file_put_contents($fstab, $original);
+        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
+
+        $messages = [];
+        $logger = function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        };
+
+        putenv('PMSS_HARDEN_TMP_NOEXEC=FALSE');
+        putenv('PMSS_DRY_RUN=1');
+        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+
+        $this->assertEquals($original, (string) file_get_contents($fstab));
+        $this->assertTrue($this->messagesContain($messages, 'disabled via PMSS_HARDEN_TMP_NOEXEC'), 'expected explicit-false skip log');
+
+        $this->cleanup($dir);
+    }
+
     public function testAddsNoexecOptionsToFstab(): void
     {
         $dir = $this->makeTempDir('pmss-noexec-add');

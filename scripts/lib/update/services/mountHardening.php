@@ -18,8 +18,7 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
         $log('[SKIP] /tmp and /dev/shm noexec hardening disabled (PMSS_HARDEN_TMP_NOEXEC not set)');
         return;
     }
-    $normalized = strtolower(trim($flag));
-    if (in_array($normalized, ['', '0', 'false', 'no'], true)) {
+    if (in_array(strtolower(trim($flag)), ['', '0', 'false', 'no'], true)) {
         $log('[SKIP] /tmp and /dev/shm noexec hardening disabled via PMSS_HARDEN_TMP_NOEXEC');
         return;
     }
@@ -149,14 +148,12 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
         $log('[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)');
         return;
     }
-    $normalized = strtolower(trim($flag));
-    if (in_array($normalized, ['', '0', 'false', 'no'], true)) {
+    if (in_array(strtolower(trim($flag)), ['', '0', 'false', 'no'], true)) {
         $log('[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS');
         return;
     }
 
-        $size = getenv('PMSS_TMPFS_TMP_SIZE');
-        $size = $size === false ? '' : trim($size);
+        $size = trim((string) getenv('PMSS_TMPFS_TMP_SIZE'));
         if ($size === '') {
             $size = '2G';
         }

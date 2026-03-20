@@ -48,6 +48,31 @@ class TempTmpfsMountTest extends TestCase
         $this->cleanup($dir);
     }
 
+    public function testSkipsWhenFlagExplicitlyFalse(): void
+    {
+        $dir = $this->makeTempDir('pmss-tmpfs-false');
+        $fstab = $dir.'/fstab';
+        $mounts = $dir.'/mounts';
+
+        $original = "UUID=abc / ext4 defaults 0 0\n";
+        file_put_contents($fstab, $original);
+        file_put_contents($mounts, "");
+
+        $messages = [];
+        $logger = function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        };
+
+        putenv('PMSS_HARDEN_TMP_TMPFS=FALSE');
+        putenv('PMSS_DRY_RUN=1');
+        \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
+
+        $this->assertEquals($original, (string) file_get_contents($fstab));
+        $this->assertTrue($this->messagesContain($messages, 'disabled via PMSS_HARDEN_TMP_TMPFS'), 'expected explicit-false skip log');
+
+        $this->cleanup($dir);
+    }
+
     public function testAddsTmpfsEntryWhenMissing(): void
     {
         $dir = $this->makeTempDir('pmss-tmpfs-add');

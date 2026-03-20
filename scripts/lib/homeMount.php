@@ -75,7 +75,7 @@ function pmssIsHomeMounted(): bool
 function pmssRequireHomeMounted(string $context = ''): void
 {
     // Allow operators to bypass the check for non-standard deployments.
-    if ((['1' => true, 'true' => true][strtolower((string) getenv('PMSS_SKIP_HOME_MOUNT_CHECK'))] ?? false) || pmssIsHomeMounted()) {
+    if (in_array(strtolower((string) getenv('PMSS_SKIP_HOME_MOUNT_CHECK')), ['1', 'true'], true) || pmssIsHomeMounted()) {
         return;
     }
 

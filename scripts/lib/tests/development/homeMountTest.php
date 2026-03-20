@@ -154,6 +154,15 @@ MOUNTS;
         $this->assertTrue(true);
     }
 
+    public function testRequireHomeMountedSkipsWhenEnvSetToUppercaseTrue(): void
+    {
+        putenv('PMSS_SKIP_HOME_MOUNT_CHECK=TRUE');
+        putenv('PMSS_HOME_MOUNTED_OVERRIDE=0');
+
+        pmssRequireHomeMounted('test');
+        $this->assertTrue(true);
+    }
+
     public function testRequireHomeMountedPassesWhenMounted(): void
     {
         putenv('PMSS_SKIP_HOME_MOUNT_CHECK=');

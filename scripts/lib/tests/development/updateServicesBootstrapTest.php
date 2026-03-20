@@ -25,6 +25,25 @@ class UpdateServicesBootstrapTest extends TestCase
         );
     }
 
+    public function testHostnameSkipOnValueSkips(): void
+    {
+        $messages = [];
+
+        $this->withEnv([
+            'PMSS_SKIP_HOSTNAME' => 'on',
+            'PMSS_HOSTNAME' => null,
+        ], function () use (&$messages): void {
+            \pmssApplyHostnameConfig(function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            });
+        });
+
+        $this->assertTrue(
+            $this->messagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
+            'expected hostname skip log when PMSS_SKIP_HOSTNAME is set to on'
+        );
+    }
+
     public function testHostnameSkipFalseyValueFallsThroughToMissingHostname(): void
     {
         $messages = [];
