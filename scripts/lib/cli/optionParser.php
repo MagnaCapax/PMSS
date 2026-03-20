@@ -19,7 +19,7 @@ function pmssParseCliTokens(array $argv): array
     $tokens = array_slice($argv, 1);
     $readOptionValue = static function (array $tokens, int &$index) {
         $next = $tokens[$index + 1] ?? null;
-        if ($next === null || $next === '' || $next[0] === '-') {
+        if ($next === null || $next === '' || ($next[0] ?? '') === '-') {
             return true;
         }
         $index++;
@@ -28,8 +28,14 @@ function pmssParseCliTokens(array $argv): array
 
     for ($i = 0; $i < count($tokens); $i++) {
         $token = $tokens[$i];
+        $prefix = $token[0] ?? '';
 
-        if (substr($token, 0, 2) === '--') {
+        if ($prefix !== '-' || $token === '-') {
+            $positionals[] = $token;
+            continue;
+        }
+
+        if (($token[1] ?? '') === '-') {
             $body = substr($token, 2);
             if ($body === '') {
                 continue;
@@ -43,26 +49,20 @@ function pmssParseCliTokens(array $argv): array
             continue;
         }
 
-        if (substr($token, 0, 1) === '-' && strlen($token) > 1) {
-            $body = substr($token, 1);
-            if (strlen($body) === 1) {
-                $options[$body] = $readOptionValue($tokens, $i);
-                continue;
-            }
+        $body = substr($token, 1);
+        if (strlen($body) === 1) {
+            $options[$body] = $readOptionValue($tokens, $i);
+            continue;
+        }
 
-            if (ctype_alpha($body)) {
-                foreach (str_split($body) as $flag) {
-                    $options[$flag] = true;
-                }
-            } else {
-                $key = substr($body, 0, 1);
-                $value = substr($body, 1) ?: true;
-                $options[$key] = $value;
+        if (ctype_alpha($body)) {
+            foreach (str_split($body) as $flag) {
+                $options[$flag] = true;
             }
             continue;
         }
 
-        $positionals[] = $token;
+        $options[substr($body, 0, 1)] = substr($body, 1) ?: true;
     }
 
     return [

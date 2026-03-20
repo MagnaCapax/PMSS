@@ -43,4 +43,10 @@ class CliHelperTest extends TestCase
         $parsed = \pmssParseCliTokens(['script.php', '-l', '64']);
         $this->assertEquals('64', \pmssCliOption($parsed, 'limit', 'l'));
     }
+
+    public function testSupportsShortOptionWithAttachedValue(): void
+    {
+        $parsed = \pmssParseCliTokens(['script.php', '-l64']);
+        $this->assertEquals('64', \pmssCliOption($parsed, 'limit', 'l'));
+    }
 }

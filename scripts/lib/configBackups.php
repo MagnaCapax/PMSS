@@ -68,9 +68,9 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     } else {
         $pmssVersion = 'unknown';
         foreach (array('/etc/seedbox/config/version', '/etc/seedbox/runtime/version') as $path) {
-            $trimmed = trim((string) @file_get_contents($path));
-            if ($trimmed !== '') {
-                $pmssVersion = $trimmed;
+            $detectedVersion = trim((string) @file_get_contents($path));
+            if ($detectedVersion !== '') {
+                $pmssVersion = $detectedVersion;
                 break;
             }
         }
@@ -145,8 +145,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     // Sort by filename (timestamp prefix) descending so we keep the newest ones.
     rsort($files, SORT_STRING);
 
-    $kept = $maxCount > 0 ? array_slice($files, 0, $maxCount) : $files;
-    $keptMap = array_fill_keys($kept, true);
+    $keptMap = array_fill_keys($maxCount > 0 ? array_slice($files, 0, $maxCount) : $files, true);
 
     $cutoff = $ttlSeconds > 0 ? ($nowTs - $ttlSeconds) : null;
     foreach ($files as $file) {
@@ -161,10 +160,8 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
             $remove = true;
         }
 
-        if ($remove) {
-            if (!@unlink($file)) {
-                $log('[WARN] Unable to prune config backup: '.$file);
-            }
+        if ($remove && !@unlink($file)) {
+            $log('[WARN] Unable to prune config backup: '.$file);
         }
     }
 }
