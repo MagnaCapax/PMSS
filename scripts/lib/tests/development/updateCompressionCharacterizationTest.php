@@ -560,6 +560,18 @@ class UpdateCompressionCharacterizationTest extends TestCase
             strpos($src, "function_exists('pmssUserDockerEnabled')") === false,
             'userMaintenance.php should call the required Docker config helper directly'
         );
+        foreach ([
+            "if (!function_exists('pmssRunAndLog'))",
+            "if (!function_exists('pmssUpdateAllUsers'))",
+            "if (!function_exists('pmssEnsureLingerAndDocker'))",
+            "if (!function_exists('pmssEnsureRootlessDockerInstalled'))",
+            "if (!function_exists('pmssEnsureDockerDependencies'))",
+        ] as $deadGuard) {
+            $this->assertTrue(
+                strpos($src, $deadGuard) === false,
+                'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once'
+            );
+        }
     }
 
     public function testDistUpgradeUsesRequiredRepairHelpersDirectly(): void

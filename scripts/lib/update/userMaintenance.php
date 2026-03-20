@@ -15,7 +15,6 @@ require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/../user/userConfigStore.php';
 
-if (!function_exists('pmssRunAndLog')) {
     /**
      * Run a shell command (optionally as the user) and log stdout/stderr + rc to the user's log file.
      */
@@ -41,9 +40,7 @@ if (!function_exists('pmssRunAndLog')) {
         pmssUserLog($user, sprintf('[RC] %s -> %d', $label, (int)$rc));
         return (int)$rc;
     }
-}
 
-if (!function_exists('pmssUpdateAllUsers')) {
     /**
      * Refresh ruTorrent and skeleton data for every provisioned user.
      *
@@ -183,9 +180,7 @@ if (!function_exists('pmssUpdateAllUsers')) {
             'skipped' => $skippedUsers,
         ];
     }
-}
 
-if (!function_exists('pmssEnsureLingerAndDocker')) {
     /**
      * Enable linger, (re)start user@UID systemd instance, and kick rootless Docker for a user.
      * Logs detailed command output to `/var/log/pmss/users/<username>.log` via `pmssUserLog()`.
@@ -256,9 +251,7 @@ if (!function_exists('pmssEnsureLingerAndDocker')) {
             );
         }
     }
-}
 
-if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
     /**
      * Run dockerd-rootless-setuptool.sh for users that do not yet have a
      * per-user docker.service unit. This is intended as a migration helper
@@ -351,9 +344,7 @@ if (!function_exists('pmssEnsureRootlessDockerInstalled')) {
             pmssUserLog($user, '[WARN] Rootless Docker install script completed but docker.service is still missing');
         }
     }
-}
 
-if (!function_exists('pmssEnsureDockerDependencies')) {
     /**
      * Verify Docker dependencies for a user: subuid/subgid and daemon.json storage-driver.
      */
@@ -500,4 +491,3 @@ if (!function_exists('pmssEnsureDockerDependencies')) {
             pmssUserLog($user, '[INFO] Configured Docker storage-driver: fuse-overlayfs');
         }
     }
-}
