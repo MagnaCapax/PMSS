@@ -434,7 +434,8 @@ function pmssResolveDistUpgradeStep(string $currentMajor, string $maxMajor): arr
         ];
     }
 
-    [$from, $next] = pmssDetermineUpgradePath($currentMajor);
+    static $upgradePathMap = ['10' => ['10', '11'], '11' => ['11', '12'], '12' => ['12', '13'], '13' => [null, null]];
+    [$from, $next] = $upgradePathMap[$currentMajor] ?? [null, null];
     if ($from === null || $next === null) {
         return [
             'action'  => 'noop',
@@ -494,21 +495,12 @@ function pmssDistUpgradeIsAllowedMajor(string $major): bool
 }
 
 /**
- * Map current Debian version to the next supported release.
- */
-function pmssDetermineUpgradePath(string $current): array
-{
-    static $map = ['10' => ['10', '11'], '11' => ['11', '12'], '12' => ['12', '13'], '13' => [null, null]];
-    return $map[$current] ?? [null, null];
-}
-
-/**
  * Rewrite /etc/apt sources from one codename to another with security adjustments.
  */
 function pmssRewriteSources(string $fromMajor, string $toMajor): void
 {
-    $from = pmssCodenameForMajor($fromMajor);
-    $to   = pmssCodenameForMajor($toMajor);
+    $from = pmssDistUpgradeIsAllowedMajor($fromMajor) ? pmssDebianCodenameFromMajor((int) $fromMajor) : '';
+    $to   = pmssDistUpgradeIsAllowedMajor($toMajor) ? pmssDebianCodenameFromMajor((int) $toMajor) : '';
     if ($from === '' || $to === '') {
         logMessage('Unable to resolve codenames for upgrade path');
         return;
@@ -757,12 +749,4 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
     if (runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold libcrypt1", true, null, $hasTty) !== 0) {
         logMessage('[WARN] dist-upgrade: libcrypt1 preinstall failed; continuing');
     }
-}
-
-/**
- * Translate Debian major version to codename.
- */
-function pmssCodenameForMajor(string $major): string
-{
-    return pmssDistUpgradeIsAllowedMajor($major) ? pmssDebianCodenameFromMajor((int) $major) : '';
 }

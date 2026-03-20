@@ -26,35 +26,22 @@ if (function_exists('pmssValidateUsername') && !pmssValidateUsername($thisUser))
 }
 if (!is_dir("/home/{$thisUser}")) die("User does not exist\n");
 
-$userIds = pmssPasswdUserIds($thisUser);
-if (!is_array($userIds)) die("No such user\n");
-
-function pmssMaybeUserLog(string $user, string $message): void
-{
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, $message);
-    }
-}
-
-function pmssPasswdUserIds(string $username): ?array
-{
-    $lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if ($lines === false) {
-        return null;
-    }
-    $prefix = $username.':';
+$userIds = null;
+$lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+if ($lines !== false) {
+    $prefix = $thisUser.':';
     foreach ($lines as $line) {
         if (strpos($line, $prefix) !== 0) {
             continue;
         }
         $parts = explode(':', $line);
-        if (count($parts) < 4) {
-            return null;
+        if (count($parts) >= 4) {
+            $userIds = ['uid' => (int) $parts[2], 'gid' => (int) $parts[3]];
         }
-        return ['uid' => (int)$parts[2], 'gid' => (int)$parts[3]];
+        break;
     }
-    return null;
 }
+if (!is_array($userIds)) die("No such user\n");
 
 function chmodPath(string $path, int $perm, bool $recursive = false): void
 {
@@ -140,16 +127,18 @@ if ($homeOwner !== false && $homeGroup !== false &&
         )
     );
     chownPath("/home/{$thisUser}", $userIds['uid'].':'.$userIds['gid']);
-    pmssMaybeUserLog(
-        $thisUser,
-        sprintf(
-            'userPermissions: fixed home ownership (uid=%s gid=%s, was uid=%s gid=%s)',
-            $userIds['uid'],
-            $userIds['gid'],
-            $homeOwner,
-            $homeGroup
-        )
-    );
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog(
+            $thisUser,
+            sprintf(
+                'userPermissions: fixed home ownership (uid=%s gid=%s, was uid=%s gid=%s)',
+                $userIds['uid'],
+                $userIds['gid'],
+                $homeOwner,
+                $homeGroup
+            )
+        );
+    }
 }
 pmssRun(sprintf(
     'find %s -path %s -prune -o -type d -exec chmod 750 {} +',
@@ -163,7 +152,9 @@ if (!is_dir($binDirHidden)) {
     pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDirHidden)));
     chownPath($binDirHidden, "{$thisUser}:{$thisUser}");
     chmodPath($binDirHidden, 0750, true);
-    pmssMaybeUserLog($thisUser, 'userPermissions: created ~/.bin with safe ownership');
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($thisUser, 'userPermissions: created ~/.bin with safe ownership');
+    }
 }
 
 $binDir = "/home/{$thisUser}/bin";
@@ -171,7 +162,9 @@ if (!is_dir($binDir)) {
     pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDir)));
     chownPath($binDir, "{$thisUser}:{$thisUser}");
     chmodPath($binDir, 0750, true);
-    pmssMaybeUserLog($thisUser, 'userPermissions: created ~/bin with safe ownership');
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($thisUser, 'userPermissions: created ~/bin with safe ownership');
+    }
 }
 
 $chmodItems = [
