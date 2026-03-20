@@ -75,4 +75,16 @@ class FilebotInstallerHardeningTest extends TestCase
         $this->assertStringContainsString("pmssBuildCommand('dpkg'", $contents);
         $this->assertStringContainsString('package checksum mismatch', $contents);
     }
+
+    public function testRemoteBinaryKeepsTempCleanupInlineWithFinally(): void
+    {
+        $path = dirname(__DIR__, 2).'/update/apps/remoteBinary.php';
+        $contents = $this->readFile($path);
+
+        $this->assertStringContainsString("tempnam(sys_get_temp_dir(), 'pmss-remote-bin-')", $contents);
+        $this->assertStringContainsString("tempnam(sys_get_temp_dir(), 'pmss-remote-deb-')", $contents);
+        $this->assertStringContainsString('try {', $contents);
+        $this->assertStringContainsString('} finally {', $contents);
+        $this->assertTrue(strpos($contents, 'function pmssRemoteBinary') === false, 'remoteBinary.php should keep temp-file cleanup inline rather than adding a helper wrapper');
+    }
 }

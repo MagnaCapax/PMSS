@@ -16,8 +16,6 @@
  */
 // #TODO Migrate to dpkg baseline/repo-driven install. (GH #131)
 
-require_once __DIR__.'/../runtime/commands.php';
-require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/remoteBinary.php';
 
 $arch = php_uname('m');

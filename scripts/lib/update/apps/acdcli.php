@@ -9,8 +9,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../runtime/commands.php';
-require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/pythonVenv.php';
 
 // Pinned upstream version to avoid unbounded upgrades. (GH #129)

@@ -32,13 +32,11 @@ if ($version < 10) {
         'zsh', 'atop', 'php-cgi', 'php-cli',
         'aria2', 'htop', 'mtr', 'mktorrent',
         'genisoimage', 'xorriso',
-        'uidmap',
         'net-tools', 'nicstat',
         'restic', 'borgbackup', 'borgmatic', 'borgbackup-doc', 'backupninja',
-        'links', 'elinks', 'lynx', 'ethtool', 'zip', 'p7zip-full', 'smartmontools', 'flac', 'lame', 'lame-doc', 'mp3diags', 'gcc', 'g++', 'gettext', 'fuse3', 'glib-networking', 'libglib2.0-dev', 'libfuse-dev', 'apt-transport-https', 'pigz',
-        'python3-cheetah',
+        'links', 'elinks', 'lynx', 'p7zip-full', 'smartmontools', 'flac', 'lame', 'lame-doc', 'mp3diags', 'gcc', 'g++', 'gettext', 'fuse3', 'glib-networking', 'libglib2.0-dev', 'libfuse-dev', 'apt-transport-https', 'pigz',
         // #TODO revisit curl/libcurl upgrades once a consistent backports policy is defined.
-        'unionfs-fuse', 'sshfs', 's3fs',
+        'unionfs-fuse', 'sshfs', 's3fs', 'uidmap',
         'ranger', 'nethack-console',
         'libmozjs-52-0', 'libmozjs-60-0',
         'libarchive-zip-perl', 'libnet-ssleay-perl', 'libhtml-parser-perl', 'libxml-libxml-perl', 'libjson-perl', 'libjson-xs-perl', 'libxml-libxslt-perl',
@@ -51,7 +49,7 @@ if ($version < 10) {
     }
 }
 
-pmssQueuePackages(['libffi-dev', 'libssl-dev', 'libjpeg-dev', 'zlib1g-dev', 'python3', 'python3-dev', 'python3-venv', 'python3-virtualenv', 'python3-pip', 'python3-setuptools', 'python3-wheel']);
+pmssQueuePackages(['libffi-dev', 'libssl-dev', 'libjpeg-dev', 'zlib1g-dev', 'python3-virtualenv', 'python3-setuptools', 'python3-wheel']);
 if (!file_exists('/usr/bin/sabnzbdplus')) { echo "## Installing Sabnzbdplus\n"; pmssQueuePackages(['sabnzbdplus']); }
 
 if ($version < 10) {

@@ -48,4 +48,13 @@ class AcdCliInstallerPinTest extends TestCase
         $this->assertTrue(strpos($contents, 'git+https://github.com/yadayada/acd_cli.git\'') === false, 'Found unpinned git URL usage');
         $this->assertTrue(strpos($contents, 'git+https://github.com/yadayada/acd_cli.git ') === false, 'Found unpinned git URL usage');
     }
+
+    public function testInstallerLetsPythonVenvBootstrapRuntimeHelpers(): void
+    {
+        $contents = $this->loadInstaller();
+
+        $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
+        $this->assertTrue(strpos($contents, "require_once __DIR__.'/../runtime/commands.php';") === false, 'acd_cli installer should rely on pythonVenv.php for runtime helper bootstrap');
+        $this->assertTrue(strpos($contents, "require_once __DIR__.'/../logging.php';") === false, 'acd_cli installer should not duplicate pythonVenv.php logging bootstrap');
+    }
 }

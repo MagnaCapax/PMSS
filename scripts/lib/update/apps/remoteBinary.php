@@ -58,25 +58,25 @@ function pmssInstallPinnedRemoteBinary(
         return;
     }
 
-    if (runStep("Downloading {$label}", pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
-        @unlink($tmp);
-        return;
-    }
+    try {
+        if (runStep("Downloading {$label}", pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
+            return;
+        }
 
-    if ($dryRun) {
-        @unlink($tmp);
-        return;
-    }
+        if ($dryRun) {
+            return;
+        }
 
-    $actualSha = @hash_file('sha256', $tmp);
-    if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
-        $log("[WARN] {$label} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
-        @unlink($tmp);
-        return;
-    }
+        $actualSha = @hash_file('sha256', $tmp);
+        if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
+            $log("[WARN] {$label} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
+            return;
+        }
 
-    runStep("Installing {$label}", pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]));
-    @unlink($tmp);
+        runStep("Installing {$label}", pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]));
+    } finally {
+        @unlink($tmp);
+    }
 }
 
 /**
@@ -104,25 +104,23 @@ function pmssInstallPinnedRemoteDebPackage(
         return false;
     }
 
-    if (runStep("Downloading {$label} package", pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
+    try {
+        if (runStep("Downloading {$label} package", pmssBuildCommand('wget', ['-q', '-O', $tmp, $url])) !== 0) {
+            return false;
+        }
+
+        if ($dryRun) {
+            return true;
+        }
+
+        $actualSha = @hash_file('sha256', $tmp);
+        if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
+            $log("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
+            return false;
+        }
+
+        return runStep("Installing {$label}", pmssBuildCommand('dpkg', ['-i', $tmp])) === 0;
+    } finally {
         @unlink($tmp);
-        return false;
     }
-
-    if ($dryRun) {
-        @unlink($tmp);
-        return true;
-    }
-
-    $actualSha = @hash_file('sha256', $tmp);
-    if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
-        $log("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
-        @unlink($tmp);
-        return false;
-    }
-
-    $installed = runStep("Installing {$label}", pmssBuildCommand('dpkg', ['-i', $tmp])) === 0;
-    @unlink($tmp);
-
-    return $installed;
 }

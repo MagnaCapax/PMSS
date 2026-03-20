@@ -46,5 +46,12 @@ class BtsyncInstallerHardeningTest extends TestCase
         $contents = $this->loadInstaller();
         $this->assertStringContainsString("runStep('Linking btsync shim'", $contents);
     }
-}
 
+    public function testInstallerLetsRemoteBinaryBootstrapRuntimeHelpers(): void
+    {
+        $contents = $this->loadInstaller();
+
+        $this->assertTrue(strpos($contents, "require_once __DIR__.'/../runtime/commands.php';") === false, 'BTSync installer should rely on remoteBinary.php for runtime helper bootstrap');
+        $this->assertTrue(strpos($contents, "require_once __DIR__.'/../logging.php';") === false, 'BTSync installer should not duplicate remoteBinary.php logging bootstrap');
+    }
+}

@@ -123,4 +123,13 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->assertStringContainsString('systemctl unmask watchdog || true', $contents);
         $this->assertStringContainsString('systemctl enable --now watchdog', $contents);
     }
+
+    public function testPackagesBootstrapKeepsDuplicateQueueEntriesPruned(): void
+    {
+        $contents = $this->readInstaller('packages.php');
+
+        foreach (['python3', 'python3-pip', 'python3-venv', 'python3-dev', 'python3-cheetah', 'zip', 'ethtool'] as $package) {
+            $this->assertEquals(1, preg_match_all("/'".preg_quote($package, '/')."'/", $contents), $package.' should appear once in packages.php');
+        }
+    }
 }
