@@ -24,28 +24,6 @@ if (!file_exists($config)) {
     exit(0);
 }
 
-function pmssWireguardPeerUsers(string $path): array
-{
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if ($lines === false) {
-        return [];
-    }
-    $users = [];
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (preg_match('/^#\s*user\s*=\s*([A-Za-z0-9._-]+)\s*$/', $line, $matches)) {
-            $user = $matches[1];
-            if (function_exists('pmssValidateUsername') && !pmssValidateUsername($user)) {
-                continue;
-            }
-            $users[$user] = true;
-        }
-    }
-    $userList = array_keys($users);
-    sort($userList, SORT_NATURAL | SORT_FLAG_CASE);
-    return $userList;
-}
-
 function pmssWireguardLogUsers(array $users, string $message): void
 {
     if (empty($users) || !function_exists('pmssUserLog')) {
@@ -56,7 +34,22 @@ function pmssWireguardLogUsers(array $users, string $message): void
     }
 }
 
-$peerUsers = pmssWireguardPeerUsers($config);
+$peerUsers = [];
+$lines = @file($config, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+if (is_array($lines)) {
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (preg_match('/^#\s*user\s*=\s*([A-Za-z0-9._-]+)\s*$/', $line, $matches)) {
+            $user = $matches[1];
+            if (function_exists('pmssValidateUsername') && !pmssValidateUsername($user)) {
+                continue;
+            }
+            $peerUsers[$user] = true;
+        }
+    }
+    $peerUsers = array_keys($peerUsers);
+    sort($peerUsers, SORT_NATURAL | SORT_FLAG_CASE);
+}
 
 exec('lsmod | grep -q "^wireguard\b"', $null, $moduleStatus);
 if ($moduleStatus !== 0) {

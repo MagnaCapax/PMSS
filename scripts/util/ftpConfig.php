@@ -38,7 +38,43 @@ if (is_array($detected) && isset($detected['version'])) {
     $distroVersion = (int) $detected['version'];
 }
 
-$tlsBlock = buildTlsConfiguration($hostname, $distroVersion);
+$tlsBlock = '';
+$candidates = [];
+if ($hostname !== '') {
+    $candidates[] = "/etc/letsencrypt/live/{$hostname}";
+    if (strpos($hostname, '.') !== false) {
+        [, $domain] = explode('.', $hostname, 2);
+        $candidates[] = "/etc/letsencrypt/live/*.{$domain}";
+    }
+}
+$candidates[] = '/etc/seedbox/config/ssl/proftpd';
+
+foreach ($candidates as $base) {
+    if (!file_exists($base.'/cert.pem') || !file_exists($base.'/privkey.pem') || !file_exists($base.'/fullchain.pem')) {
+        continue;
+    }
+
+    // Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
+    $tlsProtocol = '    TLSProtocol                   TLSv1.2 TLSv1.3';
+    if ($distroVersion > 0 && $distroVersion <= 10) {
+        $tlsProtocol = '    TLSProtocol                   TLSv1.2';
+    }
+
+    $tlsBlock = implode("\n", [
+        '    TLSEngine                     on',
+        '    TLSLog                        /var/log/proftpd/tls.log',
+        $tlsProtocol,
+        '    TLSCipherSuite                HIGH:!aNULL:!MD5:!3DES',
+        '    TLSOptions                    NoSessionReuseRequired',
+        '    TLSRenegotiate                none',
+        '    TLSRSACertificateFile         "'.$base.'/cert.pem"',
+        '    TLSRSACertificateKeyFile      "'.$base.'/privkey.pem"',
+        '    TLSCACertificateFile          "'.$base.'/fullchain.pem"',
+        '    TLSVerifyClient               off',
+        '    TLSRequired                   off',
+    ]);
+    break;
+}
 
 $rendered = str_replace(
     ['%SERVERNAME%', '%TLS_CONFIGURATION%'],
@@ -55,8 +91,16 @@ $runDir = '/var/run/proftpd';
 $daemonUser = 'proftpd';
 $daemonGroup = 'nogroup';
 
-ensureWritableDirectory($logDir, 0750, $daemonUser, $daemonGroup);
-ensureWritableDirectory($runDir, 0750, $daemonUser, $daemonGroup);
+foreach ([$logDir, $runDir] as $path) {
+    if (!is_dir($path) && !@mkdir($path, 0750, true)) {
+        logMessage("Warning: Unable to create {$path}");
+        continue;
+    }
+
+    @chmod($path, 0750);
+    @chown($path, $daemonUser);
+    @chgrp($path, $daemonGroup);
+}
 
 pmssBackupCriticalConfig('proftpd', '/etc/proftpd/proftpd.conf');
 if (@file_put_contents('/etc/proftpd/proftpd.conf', $rendered) === false) {
@@ -79,59 +123,4 @@ if (is_dir('/run/systemd/system')) {
     runStep('Restarting ProFTPD (sysvinit)', '/etc/init.d/proftpd restart');
 } else {
     logMessage('ProFTPD service manager not found; skipped restart');
-}
-
-/**
- * Build the TLS configuration block when certificates are available.
- */
-function buildTlsConfiguration(string $hostname, int $distroVersion = 0): string
-{
-    $candidates = [];
-    $trimmed = trim($hostname);
-    if ($trimmed !== '') {
-        $candidates[] = "/etc/letsencrypt/live/{$trimmed}";
-        if (strpos($trimmed, '.') !== false) {
-            [, $domain] = explode('.', $trimmed, 2);
-            $candidates[] = "/etc/letsencrypt/live/*.{$domain}";
-        }
-    }
-    $candidates[] = '/etc/seedbox/config/ssl/proftpd';
-
-    foreach ($candidates as $base) {
-        if (file_exists($base.'/cert.pem') && file_exists($base.'/privkey.pem') && file_exists($base.'/fullchain.pem')) {
-            // Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
-            $tlsProtocol = '    TLSProtocol                   TLSv1.2 TLSv1.3';
-            if ($distroVersion > 0 && $distroVersion <= 10) {
-                $tlsProtocol = '    TLSProtocol                   TLSv1.2';
-            }
-
-            return implode("\n", [
-                '    TLSEngine                     on',
-                '    TLSLog                        /var/log/proftpd/tls.log',
-                $tlsProtocol,
-                '    TLSCipherSuite                HIGH:!aNULL:!MD5:!3DES',
-                '    TLSOptions                    NoSessionReuseRequired',
-                '    TLSRenegotiate                none',
-                '    TLSRSACertificateFile         "'.$base.'/cert.pem"',
-                '    TLSRSACertificateKeyFile      "'.$base.'/privkey.pem"',
-                '    TLSCACertificateFile          "'.$base.'/fullchain.pem"',
-                '    TLSVerifyClient               off',
-                '    TLSRequired                   off',
-            ]);
-        }
-    }
-
-    return '';
-}
-
-function ensureWritableDirectory(string $path, int $mode, string $owner, string $group): void
-{
-    if (!is_dir($path) && !@mkdir($path, $mode, true)) {
-        logMessage("Warning: Unable to create {$path}");
-        return;
-    }
-
-    @chmod($path, $mode);
-    @chown($path, $owner);
-    @chgrp($path, $group);
 }

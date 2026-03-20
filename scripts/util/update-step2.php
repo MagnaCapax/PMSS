@@ -61,125 +61,6 @@ if (!defined('PMSS_UPDATE_LOCK_ENV')) {
 }
 
 /**
- * Acquire the global update lock when running standalone.
- */
-function pmssUpdateStep2AcquireLock(): void
-{
-    if (getenv(PMSS_UPDATE_LOCK_ENV) === '1') {
-        return;
-    }
-    $dir = dirname(PMSS_UPDATE_LOCK_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
-    $fh = @fopen(PMSS_UPDATE_LOCK_FILE, 'c');
-    if ($fh === false) {
-        logmsg('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE);
-        exit(1);
-    }
-    pmssLogJson(['event' => 'update_lock_wait', 'path' => PMSS_UPDATE_LOCK_FILE]);
-    if (!flock($fh, LOCK_EX)) {
-        logmsg('Unable to acquire update lock (flock failed)');
-        exit(1);
-    }
-    $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
-    putenv(PMSS_UPDATE_LOCK_ENV.'=1');
-    pmssLogJson(['event' => 'update_lock_acquired', 'path' => PMSS_UPDATE_LOCK_FILE]);
-    register_shutdown_function(static function (): void {
-        if (!isset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'])) {
-            return;
-        }
-        @flock($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'], LOCK_UN);
-        @fclose($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
-        unset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
-        putenv(PMSS_UPDATE_LOCK_ENV);
-        pmssLogJson(['event' => 'update_lock_released', 'path' => PMSS_UPDATE_LOCK_FILE]);
-    });
-}
-
-/**
- * Phase 2 preflight checks (disk, dpkg lock, apt cache, network reachability).
- */
-function pmssUpdateStep2Preflight(): void
-{
-    $required = 3.0 * 1024 * 1024 * 1024;
-    $fatalError = false;
-
-    foreach (['/', '/home'] as $path) {
-        if (!is_dir($path)) {
-            continue;
-        }
-        $free = @disk_free_space($path);
-        if ($free === false) {
-            logmsg("[WARN] Unable to determine free space for {$path}");
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'disk_space', 'path' => $path, 'status' => 'warn', 'reason' => 'stat_failed']);
-            continue;
-        }
-        if ($free < $required) {
-            $availableGb = round($free / 1073741824, 2);
-            $requiredGb  = round($required / 1073741824, 2);
-            $fatalError  = true;
-            $payload = [
-                'event'           => 'preflight_error',
-                'check'           => 'disk_space',
-                'path'            => $path,
-                'status'          => 'error',
-                'available_bytes' => $free,
-                'required_bytes'  => $required,
-            ];
-            pmssLogJson($payload);
-            logmsg("Insufficient free space on {$path}: {$availableGb} GiB available, {$requiredGb} GiB required");
-        }
-    }
-
-    // dpkg lock availability (warn only)
-    foreach (['/var/lib/dpkg/lock-frontend', '/var/lib/dpkg/lock'] as $lockFile) {
-        $fh = @fopen($lockFile, 'c');
-        if ($fh === false) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => 'open_failed']);
-            logmsg("[WARN] Unable to open dpkg lock file: {$lockFile}");
-            continue;
-        }
-        $locked = flock($fh, LOCK_EX | LOCK_NB);
-        if (!$locked) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => 'busy']);
-            logmsg("[WARN] dpkg lock appears busy: {$lockFile}");
-        } else {
-            flock($fh, LOCK_UN);
-        }
-        fclose($fh);
-    }
-
-    // apt cache presence/writability (warn only)
-    $aptPaths = ['/var/cache/apt/archives', '/var/lib/apt/lists'];
-    foreach ($aptPaths as $path) {
-        if (!is_dir($path) || !is_writable($path)) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'apt_cache', 'status' => 'warn', 'path' => $path, 'reason' => 'unwritable']);
-            logmsg("[WARN] APT cache path missing or not writable: {$path}");
-        }
-    }
-
-    // Basic network reachability (warn only; skip in dry-run/test mode)
-    $skipNetwork = getenv('PMSS_DRY_RUN') === '1' || getenv('PMSS_TEST_MODE') === '1';
-    if (!$skipNetwork) {
-        $sock = @fsockopen('deb.debian.org', 80, $errno, $errstr, 3.0);
-        if ($sock === false) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'network', 'status' => 'warn', 'reason' => 'unreachable', 'host' => 'deb.debian.org', 'errno' => $errno, 'error' => $errstr]);
-            logmsg('[WARN] Unable to reach deb.debian.org: '.$errstr.' ('.$errno.')');
-        } else {
-            fclose($sock);
-        }
-    }
-
-    if ($fatalError) {
-        logmsg('Preflight checks failed (fatal) - aborting update-step2');
-        exit(1);
-    }
-
-    pmssLogJson(['event' => 'preflight_ok']);
-}
-
-/**
  * Switch legacy lighttpd instances to nginx and refresh configs.
  */
 function pmssConfigureWebStack(int $distroVersion): void
@@ -272,8 +153,113 @@ function pmssUpdateStep2RunClassifiedCallable(string $description, callable $cal
     }
 }
 
-pmssRunProfiledCallable('Acquiring update-step2 lock', 'pmssUpdateStep2AcquireLock');
-pmssRunProfiledCallable('Running update-step2 preflight checks', 'pmssUpdateStep2Preflight');
+pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void {
+    if (getenv(PMSS_UPDATE_LOCK_ENV) === '1') {
+        return;
+    }
+    $dir = dirname(PMSS_UPDATE_LOCK_FILE);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    $fh = @fopen(PMSS_UPDATE_LOCK_FILE, 'c');
+    if ($fh === false) {
+        logmsg('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE);
+        exit(1);
+    }
+    pmssLogJson(['event' => 'update_lock_wait', 'path' => PMSS_UPDATE_LOCK_FILE]);
+    if (!flock($fh, LOCK_EX)) {
+        logmsg('Unable to acquire update lock (flock failed)');
+        exit(1);
+    }
+    $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
+    putenv(PMSS_UPDATE_LOCK_ENV.'=1');
+    pmssLogJson(['event' => 'update_lock_acquired', 'path' => PMSS_UPDATE_LOCK_FILE]);
+    register_shutdown_function(static function (): void {
+        if (!isset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'])) {
+            return;
+        }
+        @flock($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'], LOCK_UN);
+        @fclose($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
+        unset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
+        putenv(PMSS_UPDATE_LOCK_ENV);
+        pmssLogJson(['event' => 'update_lock_released', 'path' => PMSS_UPDATE_LOCK_FILE]);
+    });
+});
+pmssRunProfiledCallable('Running update-step2 preflight checks', static function (): void {
+    $required = 3.0 * 1024 * 1024 * 1024;
+    $fatalError = false;
+
+    foreach (['/', '/home'] as $path) {
+        if (!is_dir($path)) {
+            continue;
+        }
+        $free = @disk_free_space($path);
+        if ($free === false) {
+            logmsg("[WARN] Unable to determine free space for {$path}");
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'disk_space', 'path' => $path, 'status' => 'warn', 'reason' => 'stat_failed']);
+            continue;
+        }
+        if ($free < $required) {
+            $availableGb = round($free / 1073741824, 2);
+            $requiredGb  = round($required / 1073741824, 2);
+            $fatalError  = true;
+            $payload = [
+                'event'           => 'preflight_error',
+                'check'           => 'disk_space',
+                'path'            => $path,
+                'status'          => 'error',
+                'available_bytes' => $free,
+                'required_bytes'  => $required,
+            ];
+            pmssLogJson($payload);
+            logmsg("Insufficient free space on {$path}: {$availableGb} GiB available, {$requiredGb} GiB required");
+        }
+    }
+
+    // dpkg lock availability (warn only)
+    foreach (['/var/lib/dpkg/lock-frontend', '/var/lib/dpkg/lock'] as $lockFile) {
+        $fh = @fopen($lockFile, 'c');
+        if ($fh === false) {
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => 'open_failed']);
+            logmsg("[WARN] Unable to open dpkg lock file: {$lockFile}");
+            continue;
+        }
+        $locked = flock($fh, LOCK_EX | LOCK_NB);
+        if (!$locked) {
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => 'busy']);
+            logmsg("[WARN] dpkg lock appears busy: {$lockFile}");
+        } else {
+            flock($fh, LOCK_UN);
+        }
+        fclose($fh);
+    }
+
+    // apt cache presence/writability (warn only)
+    foreach (['/var/cache/apt/archives', '/var/lib/apt/lists'] as $path) {
+        if (!is_dir($path) || !is_writable($path)) {
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'apt_cache', 'status' => 'warn', 'path' => $path, 'reason' => 'unwritable']);
+            logmsg("[WARN] APT cache path missing or not writable: {$path}");
+        }
+    }
+
+    // Basic network reachability (warn only; skip in dry-run/test mode)
+    if (getenv('PMSS_DRY_RUN') !== '1' && getenv('PMSS_TEST_MODE') !== '1') {
+        $sock = @fsockopen('deb.debian.org', 80, $errno, $errstr, 3.0);
+        if ($sock === false) {
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'network', 'status' => 'warn', 'reason' => 'unreachable', 'host' => 'deb.debian.org', 'errno' => $errno, 'error' => $errstr]);
+            logmsg('[WARN] Unable to reach deb.debian.org: '.$errstr.' ('.$errno.')');
+        } else {
+            fclose($sock);
+        }
+    }
+
+    if ($fatalError) {
+        logmsg('Preflight checks failed (fatal) - aborting update-step2');
+        exit(1);
+    }
+
+    pmssLogJson(['event' => 'preflight_ok']);
+});
 
 // Ensure the root cron template is restored even if the updater exits early.
 // Phase 1 disables `/etc/cron.d/pmss` to avoid cron activity while the tree is
