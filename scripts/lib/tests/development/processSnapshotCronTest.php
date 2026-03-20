@@ -5,6 +5,21 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class ProcessSnapshotCronTest extends TestCase
 {
+    public function testProcessSnapshotKeepsCleanupInline(): void
+    {
+        $repoRoot = dirname(__DIR__, 4);
+        $src = (string) file_get_contents($repoRoot.'/scripts/cron/processSnapshot.php');
+        $wrapperNeedle = '$finish = static function';
+
+        $this->assertTrue(
+            strpos($src, $wrapperNeedle) === false,
+            'processSnapshot.php should keep file-handle cleanup inline in pmssProcessSnapshotRun()'
+        );
+        $this->assertStringContainsString('try {', $src);
+        $this->assertStringContainsString('if ($fh !== false) {', $src);
+        $this->assertStringContainsString('umask($oldUmask);', $src);
+    }
+
     public function testRootCronSchedulesProcessSnapshots(): void
     {
         $repoRoot = dirname(__DIR__, 4);
@@ -22,4 +37,3 @@ class ProcessSnapshotCronTest extends TestCase
         $this->assertTrue(strpos($policy, 'create 0600 root root') !== false, 'process snapshot log should remain root-only');
     }
 }
-

@@ -35,51 +35,51 @@ function pmssProcessSnapshotRun(): int
     $ts = date('Y-m-d\\TH:i:s');
 
     $oldUmask = umask(0077);
-    if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+    $fh = false;
+    try {
+        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+            return 1;
+        }
+
+        $fh = @fopen($logPath, 'ab');
+        if ($fh === false) {
+            return 1;
+        }
+
+        @chmod($logPath, 0600);
+        if (function_exists('flock')) {
+            @flock($fh, LOCK_EX);
+        }
+
+        $ps = trim((string) @shell_exec('command -v ps 2>/dev/null'));
+        if ($ps === '') {
+            @fwrite($fh, $ts.' WARN ps_missing'.PHP_EOL);
+            return 0;
+        }
+
+        // Use auxf to include user, cpu/mem, and the process tree. Add "ww" to avoid truncation.
+        $cmd = $ps.' auxfww 2>&1';
+        $out = [];
+        $rc = 0;
+        @exec($cmd, $out, $rc);
+        if ($rc !== 0) {
+            $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($out, 0, 5))));
+            @fwrite($fh, $ts.' WARN ps_failed rc='.$rc.($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL);
+            return 0;
+        }
+
+        @fwrite($fh, $ts.' SNAPSHOT_BEGIN'.PHP_EOL);
+        foreach ($out as $line) {
+            @fwrite($fh, (string) $line.PHP_EOL);
+        }
+        @fwrite($fh, $ts.' SNAPSHOT_END'.PHP_EOL);
+        return 0;
+    } finally {
+        if ($fh !== false) {
+            @fclose($fh);
+        }
         umask($oldUmask);
-        return 1;
     }
-
-    $fh = @fopen($logPath, 'ab');
-    if ($fh === false) {
-        umask($oldUmask);
-        return 1;
-    }
-
-    $finish = static function (int $code) use ($fh, $oldUmask): int {
-        @fclose($fh);
-        umask($oldUmask);
-        return $code;
-    };
-
-    @chmod($logPath, 0600);
-    if (function_exists('flock')) {
-        @flock($fh, LOCK_EX);
-    }
-
-    $ps = trim((string) @shell_exec('command -v ps 2>/dev/null'));
-    if ($ps === '') {
-        @fwrite($fh, $ts.' WARN ps_missing'.PHP_EOL);
-        return $finish(0);
-    }
-
-    // Use auxf to include user, cpu/mem, and the process tree. Add "ww" to avoid truncation.
-    $cmd = $ps.' auxfww 2>&1';
-    $out = [];
-    $rc = 0;
-    @exec($cmd, $out, $rc);
-    if ($rc !== 0) {
-        $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($out, 0, 5))));
-        @fwrite($fh, $ts.' WARN ps_failed rc='.$rc.($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL);
-        return $finish(0);
-    }
-
-    @fwrite($fh, $ts.' SNAPSHOT_BEGIN'.PHP_EOL);
-    foreach ($out as $line) {
-        @fwrite($fh, (string) $line.PHP_EOL);
-    }
-    @fwrite($fh, $ts.' SNAPSHOT_END'.PHP_EOL);
-    return $finish(0);
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {

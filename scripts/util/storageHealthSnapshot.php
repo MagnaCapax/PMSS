@@ -47,13 +47,6 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     }
     $timestamp = date('c');
     $last = pmssStorageHealthReadLastEntries($logPath);
-    $appendJson = static function (array $entry) use ($logPath): void {
-        @file_put_contents(
-            $logPath,
-            json_encode($entry, JSON_UNESCAPED_SLASHES).PHP_EOL,
-            FILE_APPEND | LOCK_EX
-        );
-    };
 
     $lsblkOut = shell_exec('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE 2>/dev/null');
     $disks = [];
@@ -82,14 +75,14 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         ];
     }
     foreach ($disks as $disk) {
-        $appendJson(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
+        @file_put_contents($logPath, json_encode(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp), JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
         $nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp);
         if (is_array($nvme)) {
-            $appendJson($nvme);
+            @file_put_contents($logPath, json_encode($nvme, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
         }
     }
     foreach (pmssStorageHealthSnapshotRaid($timestamp) as $raid) {
-        $appendJson($raid);
+        @file_put_contents($logPath, json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
     }
 
     if (!$quiet) {

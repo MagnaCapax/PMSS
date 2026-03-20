@@ -65,26 +65,13 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
  */
 function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
 {
-    $processRunning = static function () use ($name): bool {
-        exec('pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1', $_, $status);
-        return $status === 0;
-    };
-
-    $waitForProcessExit = static function (int $waitSeconds) use ($processRunning): bool {
-        $deadline = microtime(true) + max(0, $waitSeconds);
-        while (microtime(true) < $deadline) {
-            if (!$processRunning()) {
-                return true;
-            }
-            usleep(250000); // back off to avoid busy-looping
-        }
-        return !$processRunning();
-    };
-
-    if (!$processRunning()) {
+    $probeOutput = [];
+    exec('pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1', $probeOutput, $probeStatus);
+    if ($probeStatus !== 0) {
         logmsg("[SKIP] {$description} (no {$name} processes)");
         return;
     }
+    $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
 
     if ($systemdUnit !== null && pmssSystemdUnitExists($systemdUnit)) {
         runStep($description.' (stop unit)', 'systemctl stop '.escapeshellarg($systemdUnit).' 2>/dev/null');
@@ -94,13 +81,32 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
 
     runStep($description.' (SIGTERM)', 'pkill -TERM -x '.escapeshellarg($name));
 
-    if ($waitForProcessExit($timeoutSeconds)) {
-        logmsg("[OK] {$description} (graceful stop)");
-        return;
+    $deadline = microtime(true) + max(0, $timeoutSeconds);
+    while (true) {
+        exec($probeCommand, $probeOutput, $probeStatus);
+        if ($probeStatus !== 0) {
+            logmsg("[OK] {$description} (graceful stop)");
+            return;
+        }
+        if (microtime(true) >= $deadline) {
+            break;
+        }
+        usleep(250000); // back off to avoid busy-looping
     }
 
     runStep($description.' (SIGKILL)', 'pkill -KILL -x '.escapeshellarg($name));
-    if (!$waitForProcessExit(5)) {
-        logmsg("[WARN] {$description} processes linger after SIGKILL");
+
+    $deadline = microtime(true) + 5;
+    while (true) {
+        exec($probeCommand, $probeOutput, $probeStatus);
+        if ($probeStatus !== 0) {
+            return;
+        }
+        if (microtime(true) >= $deadline) {
+            break;
+        }
+        usleep(250000); // back off to avoid busy-looping
     }
+
+    logmsg("[WARN] {$description} processes linger after SIGKILL");
 }

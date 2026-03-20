@@ -69,6 +69,26 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('[SKIP] {$description} (no {$name} processes)', $src);
     }
 
+    public function testKillProcessKeepsLocalWaitLoopsInlineWithoutClosures(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/processes.php';
+        $src = @file_get_contents($path);
+        $probeNeedle = '$process'.'Running = static function';
+        $waitNeedle = '$waitFor'.'ProcessExit = static function';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, $probeNeedle) === false,
+            'killProcess() should keep the process probe inline without a local closure'
+        );
+        $this->assertTrue(
+            strpos($src, $waitNeedle) === false,
+            'killProcess() should keep the wait loops inline without a local closure'
+        );
+        $this->assertStringContainsString('$deadline = microtime(true) + max(0, $timeoutSeconds);', $src);
+        $this->assertStringContainsString('usleep(250000);', $src);
+    }
+
     public function testUpdateStep2KeepsMediaareaBootstrapCleanupInline(): void
     {
         $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
@@ -238,6 +258,25 @@ class UpdateCompressionCharacterizationTest extends TestCase
             strpos($facadeSrc, "'disks'") === false,
             'storageHealth.php should stop requiring the removed disks.php module'
         );
+    }
+
+    public function testStorageHealthSnapshotKeepsJsonAppendsInline(): void
+    {
+        $snapshotPath = dirname(__DIR__, 4).'/scripts/util/storageHealthSnapshot.php';
+        $snapshotSrc = @file_get_contents($snapshotPath);
+        $wrapperNeedle = '$append'.'Json = static function';
+
+        $this->assertTrue(is_string($snapshotSrc) && $snapshotSrc !== '', 'Expected to read '.$snapshotPath);
+        $this->assertTrue(
+            strpos($snapshotSrc, $wrapperNeedle) === false,
+            'storageHealthSnapshot.php should keep JSONL appends inline in pmssStorageHealthSnapshotMain()'
+        );
+        $this->assertStringContainsString(
+            'json_encode(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp), JSON_UNESCAPED_SLASHES).PHP_EOL',
+            $snapshotSrc
+        );
+        $this->assertStringContainsString('json_encode($nvme, JSON_UNESCAPED_SLASHES).PHP_EOL', $snapshotSrc);
+        $this->assertStringContainsString('json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL', $snapshotSrc);
     }
 
     public function testStorageHealthFacadeDropsStandaloneExecModule(): void
