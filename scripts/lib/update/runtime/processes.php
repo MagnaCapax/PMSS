@@ -16,10 +16,7 @@ function pmssSystemdUnitExists(string $unit): bool
     if (!is_dir('/run/systemd/system')) {
         return false;
     }
-    $candidate = $unit;
-    if (!preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $candidate)) {
-        $candidate .= '.service';
-    }
+    $candidate = preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit) ? $unit : $unit.'.service';
     exec('systemctl list-unit-files '.escapeshellarg($candidate).' 2>/dev/null', $output, $status);
     if ($status === 0) {
         foreach ($output as $line) {

@@ -38,22 +38,18 @@ if ($singleUserMode) {
     $users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
 }
 
-$startLighttpd = static function (string $user): void {
-    echo "Start lighttpd for user: {$user}\n";
-    passthru('/scripts/startLighttpd ' . $user);
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'lighttpd start requested');
-    }
-};
-
-$restartLighttpd = static function (string $user) use ($startLighttpd): void {
+$restartLighttpd = static function (string $user): void {
     echo "Killing (if any) lighttpd for user: {$user}\n";
     shell_exec("killall -15 -u {$user} lighttpd; killall -15 -u {$user} php-cgi; sleep 5; killall -9 -u {$user} lighttpd; killall -9 -u {$user} php-cgi;");
     usleep(50000);   // brief pause before relaunch
     if (function_exists('pmssUserLog')) {
         pmssUserLog($user, 'lighttpd restart requested');
     }
-    $startLighttpd($user);
+    echo "Start lighttpd for user: {$user}\n";
+    passthru('/scripts/startLighttpd ' . $user);
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, 'lighttpd start requested');
+    }
 };
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
@@ -131,7 +127,11 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
     */
 
     if (empty($instancesLighttpd)) {    // No instances at all? Ok time to start Lighttpd!
-        $startLighttpd($thisUser);
+        echo "Start lighttpd for user: {$thisUser}\n";
+        passthru('/scripts/startLighttpd ' . $thisUser);
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($thisUser, 'lighttpd start requested');
+        }
         continue;
     }
 

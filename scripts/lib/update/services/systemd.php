@@ -30,12 +30,9 @@ function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask)
         $actions[] = ['label' => "Masking {$label} system service", 'command' => 'systemctl mask %s || true'];
     }
 
-    $skipReason = '';
-    if (!$dryRun && !is_dir('/run/systemd/system')) {
-        $skipReason = 'systemd unavailable';
-    } elseif (!$dryRun && !pmssSystemdUnitExists($unit)) {
-        $skipReason = 'unit '.$unit.' missing';
-    }
+    $skipReason = !$dryRun && !is_dir('/run/systemd/system')
+        ? 'systemd unavailable'
+        : (!$dryRun && !pmssSystemdUnitExists($unit) ? 'unit '.$unit.' missing' : '');
     if ($skipReason !== '') {
         foreach ($actions as $action) {
             pmssLogStatus('SKIP', $action['label'].' ('.$skipReason.')');

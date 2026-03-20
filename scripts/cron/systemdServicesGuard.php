@@ -29,7 +29,6 @@ foreach ($specs as $spec) {
     if ($unit === '' || !pmssSystemdUnitExists($unit)) {
         continue;
     }
-    $label = (string) ($spec['label'] ?? $unit);
     $shouldMask = (bool) ($spec['mask'] ?? false);
 
     $active = trim((string) @shell_exec('systemctl is-active '.escapeshellarg($unit).' 2>/dev/null'));
@@ -41,5 +40,5 @@ foreach ($specs as $spec) {
         continue;
     }
 
-    pmssStopDisableMaskSystemdUnit($unit, $label, $shouldMask);
+    pmssStopDisableMaskSystemdUnit($unit, (string) ($spec['label'] ?? $unit), $shouldMask);
 }

@@ -27,21 +27,21 @@ function pmssDebianCodenameFromMajor(int $major): string
 function pmssDetectDistro(): array
 {
     $name = strtolower((string) getDistroName());
-    if ($name === '' && ($name = strtolower(trim((string) @shell_exec('lsb_release -is 2>/dev/null')))) === '') {
+    $name = $name !== '' ? $name : strtolower(trim((string) @shell_exec('lsb_release -is 2>/dev/null')));
+    if ($name === '') {
         $name = 'debian';
         logmsg('Could not detect distro name; defaulting to debian');
     }
 
     $rawVersion = (string) getDistroVersion();
-    if ($rawVersion === '' && ($rawVersion = trim((string) @shell_exec('lsb_release -rs 2>/dev/null'))) === '') {
+    $rawVersion = $rawVersion !== '' ? $rawVersion : trim((string) @shell_exec('lsb_release -rs 2>/dev/null'));
+    if ($rawVersion === '') {
         logmsg('Could not detect distro version; defaulting to 0');
     }
 
     $version  = (int) filter_var($rawVersion, FILTER_SANITIZE_NUMBER_INT) ?: 0;
     $codename = getDistroCodename();
-    if ($codename === '') {
-        $codename = strtolower(trim((string) @shell_exec('lsb_release -cs 2>/dev/null')));
-    }
+    $codename = $codename !== '' ? $codename : strtolower(trim((string) @shell_exec('lsb_release -cs 2>/dev/null')));
 
     $mappedVersion = pmssVersionFromCodename($codename);
     if ($mappedVersion !== 0) {
