@@ -33,7 +33,7 @@ function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask)
     $skipReason = '';
     if (!$dryRun && !is_dir('/run/systemd/system')) {
         $skipReason = 'systemd unavailable';
-    } elseif (!$dryRun && function_exists('pmssSystemdUnitExists') && !pmssSystemdUnitExists($unit)) {
+    } elseif (!$dryRun && !pmssSystemdUnitExists($unit)) {
         $skipReason = 'unit '.$unit.' missing';
     }
     if ($skipReason !== '') {

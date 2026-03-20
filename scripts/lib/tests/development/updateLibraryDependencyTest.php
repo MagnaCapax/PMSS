@@ -97,6 +97,23 @@ class UpdateLibraryDependencyTest extends TestCase
         }
     }
 
+    public function testSystemdServiceGuardUsesSharedProcessesLibraryViaServiceHelper(): void
+    {
+        $serviceSource = $this->loadSource('lib/update/services/systemd.php');
+        $cronSource = $this->loadSource('cron/systemdServicesGuard.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/../runtime/processes.php';", $serviceSource);
+        $this->assertTrue(
+            strpos($serviceSource, "function_exists('pmssSystemdUnitExists')") === false,
+            'services/systemd.php should rely on runtime/processes.php for pmssSystemdUnitExists()'
+        );
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/update/services/systemd.php';", $cronSource);
+        $this->assertTrue(
+            strpos($cronSource, "require_once __DIR__.'/../lib/update/runtime/processes.php';") === false,
+            'systemdServicesGuard.php should rely on services/systemd.php to bootstrap runtime/processes.php'
+        );
+    }
+
     public function testConfigureOpenvpnUsesDirectPmssLogStatus(): void
     {
         $source = $this->loadSource('util/configureOpenvpn.php');

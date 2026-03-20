@@ -12,7 +12,6 @@
  */
 
 require_once __DIR__.'/../lib/update/services/systemd.php';
-require_once __DIR__.'/../lib/update/runtime/processes.php';
 
 if (!defined('PMSS_TEST_MODE') && getenv('PMSS_TEST_MODE') !== '1') {
     requireRoot();
