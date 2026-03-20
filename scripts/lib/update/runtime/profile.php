@@ -59,11 +59,7 @@ function pmssProfileSummary(): void
     ];
     foreach ($profile as $entry) {
         $status = strtoupper((string) ($entry['status'] ?? ''));
-        if (isset($counts[$status])) {
-            $counts[$status]++;
-        } else {
-            $counts['OTHER']++;
-        }
+        $counts[isset($counts[$status]) ? $status : 'OTHER']++;
     }
     logmsg(sprintf(
         'Step status summary: %d OK, %d ERR, %d SKIP, %d other',
@@ -98,9 +94,8 @@ function pmssProfileSummary(): void
     if ($profileOutput === '') {
         return;
     }
-    $dir = dirname($profileOutput);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
+    if (!is_dir($profileDir = dirname($profileOutput))) {
+        @mkdir($profileDir, 0755, true);
     }
     @file_put_contents($profileOutput, json_encode($profile, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }

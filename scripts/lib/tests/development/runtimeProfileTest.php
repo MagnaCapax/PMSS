@@ -146,4 +146,53 @@ class RuntimeProfileTest extends TestCase
         @unlink($tmpJson);
         putenv('PMSS_JSON_LOG');
     }
+
+    public function testProfileSummaryNormalizesKnownStatusesAndBucketsUnknownOnes(): void
+    {
+        $this->resetState();
+
+        $tmpJson = sys_get_temp_dir().'/pmss-profile-json-'.bin2hex(random_bytes(4));
+        putenv('PMSS_JSON_LOG='.$tmpJson);
+
+        pmssRecordProfile([
+            'description' => 'ok-step',
+            'command' => 'true',
+            'status' => 'ok',
+            'rc' => 0,
+            'duration' => 0.1,
+            'dry_run' => false,
+            'stdout_excerpt' => '',
+            'stderr_excerpt' => '',
+        ]);
+        pmssRecordProfile([
+            'description' => 'warn-step',
+            'command' => 'true',
+            'status' => 'warn',
+            'rc' => 0,
+            'duration' => 0.2,
+            'dry_run' => false,
+            'stdout_excerpt' => '',
+            'stderr_excerpt' => '',
+        ]);
+
+        pmssProfileSummary();
+
+        $lines = file($tmpJson, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        $summaryEvents = [];
+        foreach ($lines as $line) {
+            $decoded = json_decode($line, true);
+            if (!is_array($decoded) || ($decoded['event'] ?? '') !== 'profile_summary') {
+                continue;
+            }
+            $summaryEvents[] = $decoded;
+        }
+
+        $this->assertTrue(count($summaryEvents) >= 1, 'Expected at least one profile_summary JSON event');
+        $last = end($summaryEvents);
+        $this->assertEquals(1, $last['status_counts']['OK'] ?? null);
+        $this->assertEquals(1, $last['status_counts']['OTHER'] ?? null);
+
+        @unlink($tmpJson);
+        putenv('PMSS_JSON_LOG');
+    }
 }

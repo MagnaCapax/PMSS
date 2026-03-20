@@ -22,27 +22,24 @@ require_once __DIR__.'/../runtime/processes.php';
 function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask): void
 {
     $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    $actions = [
-        ['label' => "Stopping {$label} system service", 'command' => 'systemctl stop %s || true'],
-        ['label' => "Disabling {$label} system service", 'command' => 'systemctl disable %s || true'],
-    ];
+    $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'];
     if ($mask) {
-        $actions[] = ['label' => "Masking {$label} system service", 'command' => 'systemctl mask %s || true'];
+        $actions['mask'] = 'Masking';
     }
 
     $skipReason = !$dryRun && !is_dir('/run/systemd/system')
         ? 'systemd unavailable'
         : (!$dryRun && !pmssSystemdUnitExists($unit) ? 'unit '.$unit.' missing' : '');
+    $unitEsc = escapeshellarg($unit);
     if ($skipReason !== '') {
-        foreach ($actions as $action) {
-            pmssLogStatus('SKIP', $action['label'].' ('.$skipReason.')');
+        foreach ($actions as $verb => $prefix) {
+            pmssLogStatus('SKIP', $prefix.' '.$label.' system service ('.$skipReason.')');
         }
         return;
     }
 
-    $unitEsc = escapeshellarg($unit);
-    foreach ($actions as $action) {
-        runStep($action['label'], sprintf($action['command'], $unitEsc));
+    foreach ($actions as $verb => $prefix) {
+        runStep($prefix.' '.$label.' system service', 'systemctl '.$verb.' '.$unitEsc.' || true');
     }
 }
 
