@@ -279,6 +279,36 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString('json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL', $snapshotSrc);
     }
 
+    public function testStorageHealthSnapshotKeepsJsonOptionConsumptionInline(): void
+    {
+        $snapshotPath = dirname(__DIR__, 4).'/scripts/util/storageHealthSnapshot.php';
+        $snapshotSrc = @file_get_contents($snapshotPath);
+        $helperSymbol = 'pmssStorageHealthSnapshot'.'ParseCli';
+
+        $this->assertTrue(is_string($snapshotSrc) && $snapshotSrc !== '', 'Expected to read '.$snapshotPath);
+        $this->assertTrue(
+            strpos($snapshotSrc, 'function '.$helperSymbol.'(') === false,
+            'storageHealthSnapshot.php should keep CLI option consumption inside pmssStorageHealthSnapshotMain()'
+        );
+        $this->assertStringContainsString("strpos(\$next, '--') !== 0", $snapshotSrc);
+        $this->assertStringContainsString("if (\$key !== '--json') {", $snapshotSrc);
+    }
+
+    public function testStorageBenchmarkDropsStandaloneCliConsumeHelper(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/util/storageBenchmark.php';
+        $src = @file_get_contents($path);
+        $helperSymbol = 'consume'.'CliValue';
+
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $this->assertTrue(
+            strpos($src, 'function '.$helperSymbol.'(') === false,
+            'storageBenchmark.php should inline CLI option consumption instead of keeping a standalone helper'
+        );
+        $this->assertStringContainsString("'--device-runtime'", $src);
+        $this->assertStringContainsString("'--require-idle'", $src);
+    }
+
     public function testStorageHealthFacadeDropsStandaloneExecModule(): void
     {
         $facadePath = dirname(__DIR__, 4).'/scripts/lib/storageHealth.php';

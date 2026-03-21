@@ -58,65 +58,54 @@ $ddSize = '1G';
 $devRuntime = 30;
 $requireIdle=false; $idleLatencyMs=100; $idleUtilPct=85; $showLast=false;
 
-function consumeCliValue(?string $value, ?string $next, int &$i): ?string
-{
-    if ($value !== null) {
-        return $value;
-    }
-    if ($next !== null && strpos($next, '--') !== 0) {
-        $i++;
-        return $next;
-    }
-    return null;
-}
-
+$stringOptions = [
+    '--target' => 'targetDir',
+    '--size' => 'fileSize',
+    '--json' => 'jsonLog',
+    '--label' => 'label',
+    '--dd-size' => 'ddSize',
+];
+$intOptions = [
+    '--runtime' => 'runtime',
+    '--device-runtime' => 'devRuntime',
+    '--idle-latency-ms' => 'idleLatencyMs',
+    '--idle-util' => 'idleUtilPct',
+];
+$flagOptions = [
+    '--devices' => 'testDevices',
+    '--require-idle' => 'requireIdle',
+    '--show-last' => 'showLast',
+];
 $argvCount = count($argv);
 for ($i=1; $i<$argvCount; $i++) {
     $arg = $argv[$i];
-    $next = ($i+1 < $argvCount) ? $argv[$i+1] : null;
     [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
-    switch ($key) {
-        case '--target':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $targetDir = $val;
-            break;
-        case '--size':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $fileSize = $val;
-            break;
-        case '--runtime':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $runtime = (int)$val;
-            break;
-        case '--json':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $jsonLog = $val;
-            break;
-        case '--label':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $label = $val;
-            break;
-        case '--devices':
-            $testDevices = true; break;
-        case '--dd-size':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $ddSize = $val; break;
-        case '--device-runtime':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $devRuntime = (int)$val; break;
-        case '--require-idle':
-            $requireIdle = true; break;
-        case '--idle-latency-ms':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $idleLatencyMs = (int)$val; break;
-        case '--idle-util':
-            $val = consumeCliValue($val, $next, $i);
-            if ($val !== null) $idleUtilPct = (int)$val; break;
-        case '--show-last':
-            $showLast = true; break;
-        case '--help': case '-h':
-            usage(); exit(0);
+    if ($key === '--help' || $key === '-h') {
+        usage(); exit(0);
     }
+    if (isset($flagOptions[$key])) {
+        ${$flagOptions[$key]} = true;
+        continue;
+    }
+    if (!isset($stringOptions[$key]) && !isset($intOptions[$key])) {
+        continue;
+    }
+
+    if ($val === null) {
+        $next = ($i+1 < $argvCount) ? $argv[$i+1] : null;
+        if ($next === null || strpos($next, '--') === 0) {
+            continue;
+        }
+        $val = $next;
+        $i++;
+    }
+
+    if (isset($stringOptions[$key])) {
+        ${$stringOptions[$key]} = $val;
+        continue;
+    }
+
+    ${$intOptions[$key]} = (int) $val;
 }
 
 function parseSizeSB(string $s): int { if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }

@@ -18,26 +18,26 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         $arg = $argv[$i];
         $next = ($i + 1 < $argc) ? $argv[$i + 1] : null;
         [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
-        switch ($key) {
-            case '--json':
-                if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                    $val = $next;
-                    $i++;
-                }
-                if ($val !== null && $val !== '') {
-                    $logPath = $val;
-                }
-                break;
-            case '--quiet':
-                $quiet = true;
-                break;
-            case '--help':
-            case '-h':
-                echo "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\n";
-                echo "Usage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n";
-                echo "  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n";
-                echo "  --quiet         Suppress the success message (cron-friendly)\n\n";
-                return 0;
+        if ($key === '--quiet') {
+            $quiet = true;
+            continue;
+        }
+        if ($key === '--help' || $key === '-h') {
+            echo "\nStorage health snapshot (SMART/NVMe + mdadm) to JSONL\n";
+            echo "Usage: storageHealthSnapshot.php [--json <path>] [--quiet]\n\n";
+            echo "  --json <path>   JSON Lines output (default /var/log/pmss/storage-health.jsonl)\n";
+            echo "  --quiet         Suppress the success message (cron-friendly)\n\n";
+            return 0;
+        }
+        if ($key !== '--json') {
+            continue;
+        }
+        if ($val === null && $next !== null && strpos($next, '--') !== 0) {
+            $val = $next;
+            $i++;
+        }
+        if ($val !== null && $val !== '') {
+            $logPath = $val;
         }
     }
 

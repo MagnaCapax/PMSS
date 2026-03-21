@@ -55,6 +55,18 @@ class StorageBenchmarkShowLastTest extends TestCase
         $this->assertStringContainsString('randread-small', (string)$out);
     }
 
+    public function testShowLastTreatsShortHelpTokenAsJsonPathValue(): void
+    {
+        $script = dirname(__DIR__, 3).'/util/storageBenchmark.php';
+        $out = shell_exec('php '.escapeshellarg($script).' --show-last --json -h 2>&1');
+
+        $this->assertStringContainsString('No log at -h', (string) $out);
+        $this->assertTrue(
+            strpos((string) $out, 'Storage benchmark (non-destructive)') === false,
+            'Expected --json to consume -h as its value instead of triggering help'
+        );
+    }
+
     public function testShowLastHandlesMalformedLines(): void
     {
         $runId  = '20250102020202-bbb';
