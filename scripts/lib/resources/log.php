@@ -78,11 +78,9 @@ function pmssResourceLogReadCounters(int $uid): ?array
         return null;
     }
 
-    if (is_array($memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid))) {
-        $values += $memoryBreakdown;
-    }
-
-    return $values;
+    return is_array($memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid))
+        ? $values + $memoryBreakdown
+        : $values;
 }
 
 /**

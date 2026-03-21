@@ -42,8 +42,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
         if ($canUserLog) { pmssUserLog($thisUser, 'deluged start requested'); }
     }
  
-    $instancesWeb = shell_exec("pgrep -u{$thisUser} deluge-web");
-    if (empty($instancesWeb)) {
+    if (empty(shell_exec("pgrep -u{$thisUser} deluge-web"))) {
         echo "Start deluge-web for user: {$thisUser}\n";
         passthru("su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'");
         if ($canUserLog) { pmssUserLog($thisUser, 'deluge-web start requested'); }

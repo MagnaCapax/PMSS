@@ -31,13 +31,12 @@ function pmssProcessSnapshotRun(): int
     }
 
     $logPath = (string) (getenv('PMSS_PROCESS_SNAPSHOT_LOG') ?: PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT);
-    $logDir = dirname($logPath);
     $ts = date('Y-m-d\\TH:i:s');
 
     $oldUmask = umask(0077);
     $fh = false;
     try {
-        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+        if (!is_dir(dirname($logPath)) && !@mkdir(dirname($logPath), 0755, true) && !is_dir(dirname($logPath))) {
             return 1;
         }
 
@@ -50,8 +49,7 @@ function pmssProcessSnapshotRun(): int
             @flock($fh, LOCK_EX);
         }
 
-        $ps = trim((string) @shell_exec('command -v ps 2>/dev/null'));
-        if ($ps === '') {
+        if (($ps = trim((string) @shell_exec('command -v ps 2>/dev/null'))) === '') {
             @fwrite($fh, $ts.' WARN ps_missing'.PHP_EOL);
             return 0;
         }

@@ -13,8 +13,7 @@ $args = $argv ?? ($_SERVER['argv'] ?? []);
 $debug = in_array('--debug', $args, true);
 
 $logPrefix = date('c') . ' ';
-$config = '/etc/wireguard/wg0.conf';
-if (!file_exists($config)) {
+if (!file_exists('/etc/wireguard/wg0.conf')) {
     if ($debug) {
         echo $logPrefix . "wireguard config missing; skipping check\n";
     }
@@ -32,7 +31,7 @@ function pmssWireguardLogUsers(array $users, string $message): void
 }
 
 $peerUsers = [];
-$lines = @file($config, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+$lines = @file('/etc/wireguard/wg0.conf', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 if (is_array($lines)) {
     foreach ($lines as $line) {
         $line = trim($line);
