@@ -16,7 +16,6 @@ function pmssStorageHealthSnapshotMain(array $argv): int
 
     for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
         $arg = $argv[$i];
-        $next = ($i + 1 < $argc) ? $argv[$i + 1] : null;
         [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
         if ($key === '--quiet') {
             $quiet = true;
@@ -32,9 +31,8 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         if ($key !== '--json') {
             continue;
         }
-        if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-            $val = $next;
-            $i++;
+        if ($val === null && $i + 1 < $argc && strpos($argv[$i + 1], '--') !== 0) {
+            $val = $argv[++$i];
         }
         if ($val !== null && $val !== '') {
             $logPath = $val;

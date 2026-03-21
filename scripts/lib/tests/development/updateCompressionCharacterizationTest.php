@@ -290,7 +290,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
             strpos($snapshotSrc, 'function '.$helperSymbol.'(') === false,
             'storageHealthSnapshot.php should keep CLI option consumption inside pmssStorageHealthSnapshotMain()'
         );
-        $this->assertStringContainsString("strpos(\$next, '--') !== 0", $snapshotSrc);
+        $this->assertStringContainsString("strpos(\$argv[\$i + 1], '--') !== 0", $snapshotSrc);
+        $this->assertStringContainsString("\$val = \$argv[++\$i];", $snapshotSrc);
         $this->assertStringContainsString("if (\$key !== '--json') {", $snapshotSrc);
     }
 

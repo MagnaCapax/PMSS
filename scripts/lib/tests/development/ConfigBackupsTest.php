@@ -48,6 +48,37 @@ class ConfigBackupsTest extends TestCase
         $this->assertTrue($backup === null);
     }
 
+    public function testBackupHelpersStillWorkWithoutRuntimeLoggerBootstrap(): void
+    {
+        $root = $this->makeTempDir('pmss-backups-src-');
+        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+
+        $source = $root.'/etc/nginx/nginx.conf';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "worker_processes auto;\n");
+
+        $script = 'require '.var_export(dirname(__DIR__, 2).'/configBackups.php', true).'; '
+            .'$backup = pmssBackupCriticalConfig('.var_export('nginx', true).', '.var_export($source, true).', '
+            .var_export(array(
+                'backupRoot' => $backupRoot,
+                'timestamp' => '20260131123456',
+                'ttlSeconds' => 0,
+                'logSuccess' => false,
+            ), true).'); '
+            .'pmssPruneCriticalConfigBackups('.var_export('nginx', true).', '.var_export($source, true).', '
+            .var_export(array(
+                'backupRoot' => $backupRoot,
+                'maxCount' => 10,
+                'ttlSeconds' => 0,
+            ), true).'); '
+            .'echo is_string($backup) ? basename($backup) : "null";';
+
+        $output = @shell_exec(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>&1');
+
+        $this->assertTrue(is_string($output));
+        $this->assertStringContainsString('.bak', $output);
+    }
+
     public function testPruneKeepsNewestNBackups(): void
     {
         $root = $this->makeTempDir('pmss-backups-src-');

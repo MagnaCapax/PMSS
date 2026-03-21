@@ -14,6 +14,16 @@
  * @license GPL-3.0-only
  */
 
+$GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER'] = $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']
+    ?? function (string $message): void {
+        if (defined('STDERR')) {
+            @fwrite(STDERR, $message.PHP_EOL);
+            return;
+        }
+
+        error_log($message);
+    };
+
 /**
  * Create a best-effort backup of a file and prune older backups.
  *
@@ -35,14 +45,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
 {
     $log = $options['logger'] ?? (function_exists('logMessage')
         ? 'logMessage'
-        : function (string $message): void {
-            if (defined('STDERR')) {
-                @fwrite(STDERR, $message.PHP_EOL);
-                return;
-            }
-
-            error_log($message);
-        });
+        : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
     if (
         $service === ''
         || ($sourcePath = trim($sourcePath)) === ''
@@ -111,14 +114,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
 {
     $log = $options['logger'] ?? (function_exists('logMessage')
         ? 'logMessage'
-        : function (string $message): void {
-            if (defined('STDERR')) {
-                @fwrite(STDERR, $message.PHP_EOL);
-                return;
-            }
-
-            error_log($message);
-        });
+        : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
     if ($service === '' || ($sourcePath = trim($sourcePath)) === '' || getenv('PMSS_DRY_RUN') === '1') {
         return;
     }
