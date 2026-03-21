@@ -29,7 +29,9 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
     $hasHostnamectl = trim((string) @shell_exec('command -v hostnamectl')) !== '';
     runStep(
         $hasHostnamectl ? 'Setting hostname via hostnamectl' : 'Setting hostname',
-        sprintf($hasHostnamectl ? 'hostnamectl set-hostname %s' : 'hostname %s', escapeshellarg($hostname))
+        $hasHostnamectl
+            ? pmssBuildCommand('hostnamectl', ['set-hostname', $hostname])
+            : pmssBuildCommand('hostname', [$hostname])
     );
 
     if (is_string($existing = @file_get_contents('/etc/hostname')) && trim($existing) === $hostname) {

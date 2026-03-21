@@ -22,24 +22,23 @@ require_once __DIR__.'/../runtime/processes.php';
 function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask): void
 {
     $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'];
-    if ($mask) {
-        $actions['mask'] = 'Masking';
-    }
+    $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'] + ($mask ? ['mask' => 'Masking'] : []);
 
-    $skipReason = !$dryRun && !is_dir('/run/systemd/system')
-        ? 'systemd unavailable'
-        : (!$dryRun && !pmssSystemdUnitExists($unit) ? 'unit '.$unit.' missing' : '');
-    $unitEsc = escapeshellarg($unit);
-    if ($skipReason !== '') {
-        foreach ($actions as $verb => $prefix) {
-            pmssLogStatus('SKIP', $prefix.' '.$label.' system service ('.$skipReason.')');
+    if (!$dryRun && !is_dir('/run/systemd/system')) {
+        foreach ($actions as $prefix) {
+            pmssLogStatus('SKIP', $prefix.' '.$label.' system service (systemd unavailable)');
+        }
+        return;
+    }
+    if (!$dryRun && !pmssSystemdUnitExists($unit)) {
+        foreach ($actions as $prefix) {
+            pmssLogStatus('SKIP', $prefix.' '.$label.' system service (unit '.$unit.' missing)');
         }
         return;
     }
 
     foreach ($actions as $verb => $prefix) {
-        runStep($prefix.' '.$label.' system service', 'systemctl '.$verb.' '.$unitEsc.' || true');
+        runStep($prefix.' '.$label.' system service', 'systemctl '.$verb.' '.escapeshellarg($unit).' || true');
     }
 }
 
@@ -65,8 +64,7 @@ function pmssEnsureSystemdServicesGuardBootUnit(): void
         return;
     }
 
-    $target = '/etc/systemd/system/pmss-systemd-services-guard.service';
-    runStep('Installing PMSS boot-time systemd services guard unit', sprintf('install -m 0644 %s %s', escapeshellarg($template), escapeshellarg($target)));
+    runStep('Installing PMSS boot-time systemd services guard unit', sprintf('install -m 0644 %s %s', escapeshellarg($template), escapeshellarg('/etc/systemd/system/pmss-systemd-services-guard.service')));
     runStep('Reloading systemd unit files (PMSS services guard)', 'systemctl daemon-reload || true');
     runStep('Enabling PMSS boot-time services guard unit', 'systemctl enable pmss-systemd-services-guard.service || true');
 }
@@ -156,13 +154,9 @@ function pmssPurgeFailedUnbound(): void
         return;
     }
 
-    // Check if unbound service is in failed state
-    $unboundActive = trim((string) @shell_exec('systemctl is-active unbound 2>/dev/null'));
-    if ($unboundActive !== 'failed') {
-        // Service is not in failed state (could be active, inactive, or not installed)
+    if (trim((string) @shell_exec('systemctl is-active unbound 2>/dev/null')) !== 'failed') {
         return;
     }
 
-    // Service is failed - purge the package
     runStep('Purging failed unbound service', aptCmd('purge -y unbound'));
 }

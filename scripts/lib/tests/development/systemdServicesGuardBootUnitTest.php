@@ -40,4 +40,47 @@ class SystemdServicesGuardBootUnitTest extends TestCase
             'systemctl enable pmss-systemd-services-guard.service || true',
         ], $commands);
     }
+
+    public function testStopDisableMaskSystemdUnitKeepsStopDisableMaskOrderInDryRun(): void
+    {
+        $this->reset();
+        putenv('PMSS_DRY_RUN=1');
+
+        try {
+            pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', true);
+        } finally {
+            putenv('PMSS_DRY_RUN');
+        }
+
+        $commands = array_map(static function (array $entry): string {
+            return (string) ($entry['command'] ?? '');
+        }, $GLOBALS['PMSS_PROFILE'] ?? []);
+
+        $this->assertEquals([
+            "systemctl stop 'demo.service' || true",
+            "systemctl disable 'demo.service' || true",
+            "systemctl mask 'demo.service' || true",
+        ], $commands);
+    }
+
+    public function testStopDisableMaskSystemdUnitOmitsMaskWhenDisabled(): void
+    {
+        $this->reset();
+        putenv('PMSS_DRY_RUN=1');
+
+        try {
+            pmssStopDisableMaskSystemdUnit('demo.service', 'Demo', false);
+        } finally {
+            putenv('PMSS_DRY_RUN');
+        }
+
+        $commands = array_map(static function (array $entry): string {
+            return (string) ($entry['command'] ?? '');
+        }, $GLOBALS['PMSS_PROFILE'] ?? []);
+
+        $this->assertEquals([
+            "systemctl stop 'demo.service' || true",
+            "systemctl disable 'demo.service' || true",
+        ], $commands);
+    }
 }
