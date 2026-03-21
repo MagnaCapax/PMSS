@@ -37,9 +37,8 @@ function pmssResourceLogEnsureDir(string $path, int $mode): bool
     if ($path === '' || $path[0] !== '/' || is_link($path) || (file_exists($path) && !is_dir($path))) {
         return false;
     }
-    if (!is_dir($path) && !@mkdir($path, $mode, true)) {
-        return false;
-    }
+
+    @mkdir($path, $mode, true);
     @chmod($path, $mode);
     return is_dir($path);
 }
