@@ -57,4 +57,11 @@ class CliHelperTest extends TestCase
         $this->assertTrue(\pmssCliOption($parsed, 'json'));
         $this->assertTrue(\pmssCliOption($parsed, 'v'));
     }
+
+    public function testTreatsBareDashAsPositionalAndIgnoresBareDoubleDash(): void
+    {
+        $parsed = \pmssParseCliTokens(['script.php', '-', '--', 'extra']);
+        $this->assertEquals(['-', 'extra'], $parsed['arguments']);
+        $this->assertEquals([], $parsed['options']);
+    }
 }

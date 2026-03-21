@@ -20,11 +20,10 @@ $canUserLog = function_exists('pmssUserLog');
 
 // Get & parse users list (optionally for a single user).
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
-$singleUserMode = ($argUserRaw !== '');
-if (!$singleUserMode) {
+if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
-}
-if ($singleUserMode) {
+    $users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
+} else {
     if (!pmssValidateUsername($argUserRaw)) {
         fwrite(STDERR, "Invalid username\n");
         exit(1);
@@ -35,8 +34,6 @@ if ($singleUserMode) {
         exit(1);
     }
     $users = [$argUser];
-} else {
-    $users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
 }
 
 foreach($users AS $thisUser) {    // Loop users checking their instances

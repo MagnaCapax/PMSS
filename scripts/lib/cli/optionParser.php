@@ -16,19 +16,16 @@ function pmssParseCliTokens(array $argv): array
 {
     $options = [];
     $positionals = [];
-    $tokens = array_slice($argv, 1);
-    $tokenCount = count($tokens);
 
-    for ($i = 0; $i < $tokenCount; $i++) {
-        $token = $tokens[$i];
+    for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
+        $token = $argv[$i];
         if (($token[0] ?? '') !== '-' || $token === '-') {
             $positionals[] = $token;
             continue;
         }
 
         if (($token[1] ?? '') === '-') {
-            $body = substr($token, 2);
-            if ($body === '') {
+            if (($body = substr($token, 2)) === '') {
                 continue;
             }
             if (($equalsOffset = strpos($body, '=')) !== false) {
@@ -50,7 +47,7 @@ function pmssParseCliTokens(array $argv): array
             }
         }
 
-        $next = $tokens[$i + 1] ?? null;
+        $next = $argv[$i + 1] ?? null;
         if ($next === null || $next === '' || ($next[0] ?? '') === '-') {
             $options[$body] = true;
             continue;
@@ -60,10 +57,7 @@ function pmssParseCliTokens(array $argv): array
         $i++;
     }
 
-    return [
-        'options' => $options,
-        'arguments' => $positionals,
-    ];
+    return ['options' => $options, 'arguments' => $positionals];
 }
 
 /**

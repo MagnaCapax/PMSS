@@ -41,8 +41,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         }
     }
 
-    $logDir = dirname($logPath);
-    if ($logDir !== '' && !is_dir($logDir)) {
+    if (($logDir = dirname($logPath)) !== '' && !is_dir($logDir)) {
         @mkdir($logDir, 0755, true);
     }
     $timestamp = date('c');
@@ -76,8 +75,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     }
     foreach ($disks as $disk) {
         @file_put_contents($logPath, json_encode(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp), JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
-        $nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp);
-        if (is_array($nvme)) {
+        if (is_array($nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp))) {
             @file_put_contents($logPath, json_encode($nvme, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
         }
     }
