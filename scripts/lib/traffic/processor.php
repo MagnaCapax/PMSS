@@ -90,12 +90,9 @@ class TrafficStatsProcessor
     public function validateUser(string $username): bool
     {
         $baseUser = (string) preg_replace('/-localnet$/', '', $username);
-        if (!is_readable($this->trafficDir.'/'.$username) || !is_dir($this->homeDir.'/'.$baseUser)) {
-            return false;
-        }
-
-        $passwd = @file_get_contents($this->passwdFile);
-        return is_string($passwd)
+        return is_readable($this->trafficDir.'/'.$username)
+            && is_dir($this->homeDir.'/'.$baseUser)
+            && is_string($passwd = @file_get_contents($this->passwdFile))
             && preg_match('/^'.preg_quote($baseUser, '/').':/m', $passwd) === 1;
     }
 
@@ -155,12 +152,10 @@ class TrafficStatsProcessor
         $formatted = [];
         foreach ($rawTotals as $label => $value) {
             $valueMiB = (float) $value;
-            if ($valueMiB > (1024 * 1024)) {
-                $formatted[$label] = round($valueMiB / (1024 * 1024), 2).'TiB';
-                continue;
-            }
             $formatted[$label] = $valueMiB > 1024
-                ? round($valueMiB / 1024, 2).'GiB'
+                ? ($valueMiB > (1024 * 1024)
+                    ? round($valueMiB / (1024 * 1024), 2).'TiB'
+                    : round($valueMiB / 1024, 2).'GiB')
                 : round($valueMiB, 2).'MiB';
         }
         return $formatted;

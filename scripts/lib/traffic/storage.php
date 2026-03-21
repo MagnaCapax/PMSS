@@ -26,9 +26,7 @@ class TrafficStorage
     public function ensureRuntime(): void
     {
         foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
-            if (!is_dir($dir)) {
-                @mkdir($dir, $mode, true);
-            }
+            is_dir($dir) || @mkdir($dir, $mode, true);
         }
     }
 

@@ -89,8 +89,7 @@ class trafficStatistics {
      * @return void
      */
     public function saveUserTraffic( $user, $data ) {
-        $this->storage->ensureRuntime();
-        $this->storage->save($user, $data);
+        $this->storage->ensureRuntime(); $this->storage->save($user, $data);
     }
 
 }
