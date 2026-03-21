@@ -34,7 +34,10 @@ class users extends UserRepository
     {
         parent::__construct();
         $this->refreshUsers();
-        $this->pruneCache();
+        if (!empty($this->users)) {
+            parent::pruneStaleEntries();
+            $this->refreshUsers();
+        }
     }
 
     /**
@@ -176,15 +179,4 @@ class users extends UserRepository
         }
     }
 
-    /**
-     * Prune stale cache entries during construction.
-     */
-    private function pruneCache(): void
-    {
-        if (empty($this->users)) {
-            return;
-        }
-        parent::pruneStaleEntries();
-        $this->refreshUsers();
-    }
 }

@@ -252,7 +252,25 @@ class UserConfigStore
         }
 
         if (!array_key_exists('dockerEnabled', $payload)) {
-            $payload['dockerEnabled'] = !$this->isStorageBoxProductPayload($payload);
+            $payload['dockerEnabled'] = true;
+            foreach (['product', 'productName', 'productType'] as $key) {
+                if (!isset($payload[$key]) || !is_string($payload[$key])) {
+                    continue;
+                }
+                $normalized = strtolower(trim($payload[$key]));
+                if ($normalized === '') {
+                    continue;
+                }
+                $normalized = str_replace(['_', '-'], ' ', $normalized);
+                $normalized = preg_replace('/\s+/', ' ', $normalized);
+                if (!is_string($normalized)) {
+                    continue;
+                }
+                if (strpos($normalized, 'storage') !== false && strpos($normalized, 'box') !== false) {
+                    $payload['dockerEnabled'] = false;
+                    break;
+                }
+            }
         } else {
             // Normalize string booleans to avoid PHP truthiness traps.
             if (is_string($payload['dockerEnabled'])) {
@@ -274,29 +292,6 @@ class UserConfigStore
 
         ksort($payload, SORT_STRING);
         return $payload;
-    }
-
-    private function isStorageBoxProductPayload(array $payload): bool
-    {
-        foreach (['product', 'productName', 'productType'] as $key) {
-            if (!isset($payload[$key]) || !is_string($payload[$key])) {
-                continue;
-            }
-            $normalized = strtolower(trim($payload[$key]));
-            if ($normalized === '') {
-                continue;
-            }
-            $normalized = str_replace(['_', '-'], ' ', $normalized);
-            $normalized = preg_replace('/\s+/', ' ', $normalized);
-            if (!is_string($normalized)) {
-                continue;
-            }
-            if (strpos($normalized, 'storage') !== false && strpos($normalized, 'box') !== false) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function validate(array $payload): bool

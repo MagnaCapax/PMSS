@@ -153,22 +153,14 @@ class ResourceStatsProcessor
 
         foreach ($targets as [$path, $group, $mode, $immutable]) {
             $immutable && $this->setImmutable($path, false);
-            $this->writeAtomic($path, $serialized);
+            $tmp = $path.'.tmp.'.getmypid().'.'.mt_rand(1000, 9999);
+            if (@file_put_contents($tmp, $serialized) === false || !@rename($tmp, $path)) {
+                @unlink($tmp);
+            }
             @chown($path, 'root');
             @chgrp($path, $group);
             @chmod($path, $mode);
             $immutable && $this->setImmutable($path, true);
-        }
-    }
-
-    /**
-     * Write payloads atomically to avoid partial truncation on interruption.
-     */
-    private function writeAtomic(string $path, string $payload): void
-    {
-        $tmp = $path.'.tmp.'.getmypid().'.'.mt_rand(1000, 9999);
-        if (@file_put_contents($tmp, $payload) === false || !@rename($tmp, $path)) {
-            @unlink($tmp);
         }
     }
 
