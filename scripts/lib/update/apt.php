@@ -80,15 +80,9 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
     // Do not implement `/etc/apt/sources.list.d/*.sources` for the main Debian templates
     // without explicit operator instruction/ADR. (Docker deb822 is already in use.)
 
-    if ($distroVersion <= 0) {
-        $log(sprintf('Skipping repository update for %s: unknown version', $distroName));
-        return;
-    }
+    if ($distroVersion <= 0) { $log(sprintf('Skipping repository update for %s: unknown version', $distroName)); return; }
 
-    if ($distroName !== 'debian') {
-        $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName");
-        return;
-    }
+    if ($distroName !== 'debian') { $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName"); return; }
 
     pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
 }

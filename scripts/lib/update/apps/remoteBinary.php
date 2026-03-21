@@ -53,8 +53,7 @@ function pmssInstallPinnedRemoteBinary(
 
     $tmp = tempnam(sys_get_temp_dir(), 'pmss-remote-bin-');
     if ($tmp === false || $tmp === '') {
-        logmsg("[WARN] Unable to create temp file for {$label} download");
-        return;
+        logmsg("[WARN] Unable to create temp file for {$label} download"); return;
     }
 
     try {
@@ -62,14 +61,11 @@ function pmssInstallPinnedRemoteBinary(
             return;
         }
 
-        if ($dryRun) {
-            return;
-        }
+        if ($dryRun) { return; }
 
         $actualSha = @hash_file('sha256', $tmp);
         if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
-            logmsg("[WARN] {$label} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
-            return;
+            logmsg("[WARN] {$label} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')'); return;
         }
 
         runStep("Installing {$label}", pmssBuildCommand('install', ['-m', '0755', $tmp, $destination]));
@@ -98,8 +94,7 @@ function pmssInstallPinnedRemoteDebPackage(
 
     $tmp = tempnam(sys_get_temp_dir(), 'pmss-remote-deb-');
     if ($tmp === false || $tmp === '') {
-        logmsg("[WARN] Unable to create temp file for {$label} package download");
-        return false;
+        logmsg("[WARN] Unable to create temp file for {$label} package download"); return false;
     }
 
     try {
@@ -107,14 +102,11 @@ function pmssInstallPinnedRemoteDebPackage(
             return false;
         }
 
-        if ($dryRun) {
-            return true;
-        }
+        if ($dryRun) { return true; }
 
         $actualSha = @hash_file('sha256', $tmp);
         if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
-            logmsg("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
-            return false;
+            logmsg("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')'); return false;
         }
 
         return runStep("Installing {$label}", pmssBuildCommand('dpkg', ['-i', $tmp])) === 0;

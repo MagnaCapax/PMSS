@@ -42,14 +42,12 @@ function pmssArrUpdate(array $config): void
         ],
     ]));
     if ($payload === false) {
-        $log('Unable to fetch release metadata (network issue?)');
-        return;
+        $log('Unable to fetch release metadata (network issue?)'); return;
     }
 
     $releases = json_decode($payload, true);
     if (!is_array($releases)) {
-        $log('Invalid release metadata payload');
-        return;
+        $log('Invalid release metadata payload'); return;
     }
 
     $asset = null;
@@ -71,8 +69,7 @@ function pmssArrUpdate(array $config): void
         }
     }
     if ($asset === null) {
-        $log('No suitable linux release asset found');
-        return;
+        $log('No suitable linux release asset found'); return;
     }
     [$latestVersion, $downloadUrl, $assetName] = $asset;
 
@@ -127,8 +124,7 @@ function pmssArrUpdate(array $config): void
     }
     $workDir = sys_get_temp_dir().'/'.strtolower($app).'-'.$suffix;
     if (!@mkdir($workDir, 0755, true) && !is_dir($workDir)) {
-        $log('Failed to create temporary workspace');
-        return;
+        $log('Failed to create temporary workspace'); return;
     }
 
     $archivePath = $workDir.'/'.$assetName;
@@ -149,7 +145,5 @@ function pmssArrUpdate(array $config): void
     }
 
     runCommand('rm -rf '.escapeshellarg($workDir));
-    if ($installed) {
-        $log("Installed version {$latestVersion}");
-    }
+    if ($installed) { $log("Installed version {$latestVersion}"); }
 }

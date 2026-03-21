@@ -19,9 +19,7 @@ $venvDir = '/opt/acd_cli';
 $cliBin  = $venvDir.'/bin/acd_cli';
 
 $venv = pmssPythonVenvEnsure($venvDir, 'acd_cli', 'logmsg');
-if (empty($venv)) {
-    return;
-}
+if (empty($venv)) { return; }
 
 $packageProbeStatus = 1;
 @system(escapeshellarg($venv['python']).' -m pip show '.escapeshellarg('acdcli').' 1>/dev/null 2>&1', $packageProbeStatus);
