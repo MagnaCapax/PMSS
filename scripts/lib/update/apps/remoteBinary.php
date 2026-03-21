@@ -34,10 +34,9 @@ function pmssInstallPinnedRemoteBinary(
     bool $refreshWhenPresent
 ): void {
     $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    $log = 'logmsg';
 
     if (strpos($url, 'https://') !== 0) {
-        $log("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
+        logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
         return;
     }
 
@@ -47,14 +46,14 @@ function pmssInstallPinnedRemoteBinary(
         }
         $installedSha = @hash_file('sha256', $destination);
         if (is_string($installedSha) && strtolower($installedSha) === strtolower($expectedSha256)) {
-            $log("[SKIP] {$label} already matches pinned checksum; skipping refresh");
+            logmsg("[SKIP] {$label} already matches pinned checksum; skipping refresh");
             return;
         }
     }
 
     $tmp = tempnam(sys_get_temp_dir(), 'pmss-remote-bin-');
     if ($tmp === false || $tmp === '') {
-        $log("[WARN] Unable to create temp file for {$label} download");
+        logmsg("[WARN] Unable to create temp file for {$label} download");
         return;
     }
 
@@ -69,7 +68,7 @@ function pmssInstallPinnedRemoteBinary(
 
         $actualSha = @hash_file('sha256', $tmp);
         if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
-            $log("[WARN] {$label} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
+            logmsg("[WARN] {$label} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
             return;
         }
 
@@ -91,16 +90,15 @@ function pmssInstallPinnedRemoteDebPackage(
     string $expectedSha256
 ): bool {
     $dryRun = getenv('PMSS_DRY_RUN') === '1';
-    $log = 'logmsg';
 
     if (strpos($url, 'https://') !== 0) {
-        $log("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
+        logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
         return false;
     }
 
     $tmp = tempnam(sys_get_temp_dir(), 'pmss-remote-deb-');
     if ($tmp === false || $tmp === '') {
-        $log("[WARN] Unable to create temp file for {$label} package download");
+        logmsg("[WARN] Unable to create temp file for {$label} package download");
         return false;
     }
 
@@ -115,7 +113,7 @@ function pmssInstallPinnedRemoteDebPackage(
 
         $actualSha = @hash_file('sha256', $tmp);
         if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
-            $log("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
+            logmsg("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
             return false;
         }
 

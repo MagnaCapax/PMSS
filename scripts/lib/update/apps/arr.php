@@ -32,18 +32,15 @@ function pmssArrUpdate(array $config): void
         logMessage($app.': '.$message);
     };
 
-    $headers = [
-        'Accept: application/vnd.github+json',
-        'User-Agent: '.($config['user_agent'] ?? 'PMSS-ARR'),
-    ];
-    $context = stream_context_create([
+    $payload = @file_get_contents($config['releases_url'], false, stream_context_create([
         'http' => [
-            'header'  => $headers,
+            'header'  => [
+                'Accept: application/vnd.github+json',
+                'User-Agent: '.($config['user_agent'] ?? 'PMSS-ARR'),
+            ],
             'timeout' => 15,
         ],
-    ]);
-
-    $payload = @file_get_contents($config['releases_url'], false, $context);
+    ]));
     if ($payload === false) {
         $log('Unable to fetch release metadata (network issue?)');
         return;
