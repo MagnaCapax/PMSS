@@ -122,12 +122,8 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
 
     $serviceDir = $backupRoot.'/'.$service;
-    if (!is_dir($serviceDir)) {
-        return;
-    }
-
     $key = pmssConfigBackupsPathKey($sourcePath);
-    if (empty($files = glob($serviceDir.'/*__'.$key.'*.bak'))) {
+    if (!is_dir($serviceDir) || empty($files = glob($serviceDir.'/*__'.$key.'*.bak'))) {
         return;
     }
 

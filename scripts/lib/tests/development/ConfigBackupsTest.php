@@ -149,6 +149,26 @@ class ConfigBackupsTest extends TestCase
         $this->assertTrue(file_exists($new));
     }
 
+    public function testPruneReturnsQuietlyWhenServiceDirectoryMissing(): void
+    {
+        $root = $this->makeTempDir('pmss-backups-src-');
+        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+
+        $source = $root.'/etc/ssh/sshd_config';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "Port 22\n");
+
+        $messages = array();
+        \pmssPruneCriticalConfigBackups('sshd', $source, array(
+            'backupRoot' => $backupRoot,
+            'logger' => function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            },
+        ));
+
+        $this->assertEquals(array(), $messages);
+    }
+
     public function testPathKeyFallsBackForBlankInput(): void
     {
         $this->assertEquals('unknown_path', \pmssConfigBackupsPathKey(" \n\t "));

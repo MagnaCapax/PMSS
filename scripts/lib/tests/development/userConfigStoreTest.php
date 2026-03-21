@@ -513,6 +513,23 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testGetReturnsNullWhenLegacyAggregateEntryIsNotArray(): void
+    {
+        $this->setUpTempDir();
+        try {
+            @mkdir(dirname($this->legacyUsersJsonPath()), 0755, true);
+            file_put_contents(
+                $this->legacyUsersJsonPath(),
+                json_encode(['users' => ['legacyx' => 'invalid']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            );
+
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertEquals(null, $store->get('legacyx'));
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testLoadAllMergesLegacyAndCanonicalPreferringCanonical(): void
     {
         $this->setUpTempDir();
@@ -546,6 +563,30 @@ class UserConfigStoreTest extends TestCase
             $this->assertEquals(['alice', 'bob'], array_keys($all));
             $this->assertEquals(128, $all['alice']['ramMiB']);
             $this->assertEquals(512, $all['bob']['ramMiB'], 'Canonical per-user file should override legacy aggregate');
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
+    public function testLoadAllSkipsInvalidCanonicalPayloads(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $userDir = $this->configDirPath().'/users';
+            @mkdir($userDir, 0755, true);
+            file_put_contents($userDir.'/alice.json', '{invalid');
+            file_put_contents(
+                $userDir.'/bob.json',
+                json_encode([
+                    'ramMiB' => 256,
+                    'rtorrentPort' => 5200,
+                    'quota' => 20,
+                    'quotaBurst' => 25,
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            );
+
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertEquals(['bob'], array_keys($store->loadAll()));
         } finally {
             $this->tearDownTempDir();
         }

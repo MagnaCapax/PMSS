@@ -64,17 +64,11 @@ class UserConfigStore
         }
 
         $payload = $this->readJsonFile($this->userFilePath($username));
-        if (!is_array($payload)) {
-            $legacy = $this->loadLegacyAggregateMap();
-            if (isset($legacy[$username]) && is_array($legacy[$username])) {
-                $payload = $legacy[$username];
-            }
-        }
-        if (!is_array($payload)) {
-            return null;
+        if (!is_array($payload) && isset(($legacy = $this->loadLegacyAggregateMap())[$username]) && is_array($legacy[$username])) {
+            $payload = $legacy[$username];
         }
 
-        return $this->normalise($payload);
+        return is_array($payload) ? $this->normalise($payload) : null;
     }
 
     public function set(string $username, array $payload): bool
@@ -167,11 +161,9 @@ class UserConfigStore
         if (is_link($configDir)) {
             return;
         }
-        if (!is_dir($configDir)) {
-            if (@mkdir($configDir, 0755, true)) {
-                @chown($configDir, $username);
-                @chgrp($configDir, $username);
-            }
+        if (!is_dir($configDir) && @mkdir($configDir, 0755, true)) {
+            @chown($configDir, $username);
+            @chgrp($configDir, $username);
         }
 
         $payload = $this->normalise($payload);
@@ -203,8 +195,7 @@ class UserConfigStore
         if (!is_dir($this->userDir)) {
             return [];
         }
-        $files = glob($this->userDir.'/*.json');
-        if (!is_array($files) || empty($files)) {
+        if (empty($files = glob($this->userDir.'/*.json'))) {
             return [];
         }
 
@@ -321,19 +312,14 @@ class UserConfigStore
     private function loadLegacyAggregateMap(): array
     {
         $data = $this->readJsonFile($this->legacyAggregatePath);
-        if (!is_array($data)) {
-            return [];
-        }
-        return (isset($data['users']) && is_array($data['users'])) ? $data['users'] : $data;
+        return !is_array($data) ? [] : ((isset($data['users']) && is_array($data['users'])) ? $data['users'] : $data);
     }
 
     private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
     {
         $dir = dirname($path);
-        if (!is_dir($dir)) {
-            if (!@mkdir($dir, 0750, true)) {
-                return false;
-            }
+        if (!is_dir($dir) && !@mkdir($dir, 0750, true)) {
+            return false;
         }
 
         $tmp = @tempnam($dir, 'pmss-json-');

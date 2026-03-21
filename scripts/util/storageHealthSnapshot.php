@@ -48,12 +48,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
     $lsblkOut = shell_exec('lsblk -dn -o KNAME,TYPE,ROTA,MODEL,SERIAL,SIZE 2>/dev/null');
     $disks = [];
     foreach (preg_split('/\r?\n/', trim((string) $lsblkOut)) as $line) {
-        if ($line === '') {
-            continue;
-        }
-
-        $parts = preg_split('/\s+/', trim($line));
-        if (!is_array($parts) || ($partCount = count($parts)) < 3) {
+        if ($line === '' || !is_array($parts = preg_split('/\s+/', trim($line))) || ($partCount = count($parts)) < 3) {
             continue;
         }
 
