@@ -54,9 +54,8 @@ class resourceStatistics
             ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'],
             0.0
         );
-        foreach (($tokenCount >= 9
-            ? ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks']
-            : ['io_read', 'io_write', 'cpu', 'memory', 'tasks']) as $index => $field) {
+        $fields = $tokenCount >= 9 ? ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'] : ['io_read', 'io_write', 'cpu', 'memory', 'tasks'];
+        foreach ($fields as $index => $field) {
             $value = $tokens[$index + 2] ?? '';
             if ($value === '' || !ctype_digit($value)) {
                 return false;
@@ -68,7 +67,7 @@ class resourceStatistics
             return false;
         }
 
-        if ($tokenCount >= 11) {
+        if ($tokenCount > 10) {
             foreach ([9 => 'memory_anon', 10 => 'memory_file'] as $index => $field) {
                 $value = $tokens[$index] ?? '';
                 if ($value === '' || !ctype_digit($value)) {

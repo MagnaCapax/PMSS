@@ -110,4 +110,40 @@ class JournaldLimitsTest extends TestCase
         $this->assertStringContainsString('RateLimitIntervalSec=10s', $data);
         $this->assertStringContainsString('RateLimitBurst=2000', $data);
     }
+
+    public function testDryRunSkipsJournaldRestartAfterWritingTemplate(): void
+    {
+        unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
+
+        $cfgDir = $this->tempDir('cfg');
+        $targetDir = $this->tempDir('journald');
+        file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
+
+        $prevConfig = getenv('PMSS_CONFIG_DIR');
+        $prevJournald = getenv('PMSS_JOURNALD_CONF_DIR');
+        $prevRoot = getenv('PMSS_ROOT_FS_BYTES');
+        $prevDryRun = getenv('PMSS_DRY_RUN');
+
+        putenv('PMSS_CONFIG_DIR='.$cfgDir);
+        putenv('PMSS_JOURNALD_CONF_DIR='.$targetDir);
+        putenv('PMSS_ROOT_FS_BYTES='.(string) $this->gib(10));
+        putenv('PMSS_DRY_RUN=1');
+
+        try {
+            \pmssApplyJournaldLimits();
+        } finally {
+            if ($prevConfig === false) { putenv('PMSS_CONFIG_DIR'); } else { putenv('PMSS_CONFIG_DIR='.$prevConfig); }
+            if ($prevJournald === false) { putenv('PMSS_JOURNALD_CONF_DIR'); } else { putenv('PMSS_JOURNALD_CONF_DIR='.$prevJournald); }
+            if ($prevRoot === false) { putenv('PMSS_ROOT_FS_BYTES'); } else { putenv('PMSS_ROOT_FS_BYTES='.$prevRoot); }
+            if ($prevDryRun === false) { putenv('PMSS_DRY_RUN'); } else { putenv('PMSS_DRY_RUN='.$prevDryRun); }
+        }
+
+        $target = $targetDir.'/pmss-limits.conf';
+        $this->assertTrue(file_exists($target), 'Journald limits file missing in dry-run');
+        $profile = $GLOBALS['PMSS_PROFILE'] ?? [];
+        $last = end($profile);
+        $this->assertEquals('SKIP', $last['status'] ?? '');
+        $this->assertEquals('Restarting systemd-journald to apply log caps (test/dry-run)', $last['description'] ?? '');
+        $this->assertEquals('', $last['command'] ?? '');
+    }
 }

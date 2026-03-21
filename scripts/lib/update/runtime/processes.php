@@ -38,12 +38,12 @@ function pmssSystemdUnitExists(string $unit): bool
  */
 function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action): void
 {
-    if (!is_dir('/run/systemd/system')) {
-        logmsg("[SKIP] {$description} (systemd unavailable)");
-        return;
+    $skipReason = !is_dir('/run/systemd/system') ? 'systemd unavailable' : '';
+    if ($skipReason === '' && !pmssSystemdUnitExists($unit)) {
+        $skipReason = 'unit '.$unit.' missing';
     }
-    if (!pmssSystemdUnitExists($unit)) {
-        logmsg("[SKIP] {$description} (unit {$unit} missing)");
+    if ($skipReason !== '') {
+        logmsg("[SKIP] {$description} ({$skipReason})");
         return;
     }
     $candidate = ($action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit))

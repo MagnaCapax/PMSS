@@ -34,15 +34,15 @@ function pmssParseCliTokens(array $argv): array
             }
         } else {
             $body = substr($token, 1);
-            if (strlen($body) !== 1) {
-                if (ctype_alpha($body)) {
-                    foreach (str_split($body) as $flag) {
-                        $options[$flag] = true;
-                    }
+            if (strlen($body) > 1) {
+                if (!ctype_alpha($body)) {
+                    $options[$body[0]] = substr($body, 1) ?: true;
                     continue;
                 }
 
-                $options[$body[0]] = substr($body, 1) ?: true;
+                foreach (str_split($body) as $flag) {
+                    $options[$flag] = true;
+                }
                 continue;
             }
         }
