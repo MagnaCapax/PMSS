@@ -79,11 +79,8 @@ function pmssRequireHomeMounted(string $context = ''): void
         return;
     }
 
-    // Build a helpful error message.
-    $message = ($context !== '' ? "[{$context}] " : '')."Error: /home is not mounted as a separate filesystem.\n"
+    fwrite(STDERR, ($context !== '' ? "[{$context}] " : '')."Error: /home is not mounted as a separate filesystem.\n"
         ."PMSS requires /home to be mounted. Aborting to prevent data loss.\n"
-        ."If this is intentional (non-standard deployment), set PMSS_SKIP_HOME_MOUNT_CHECK=1.\n";
-
-    fwrite(STDERR, $message);
+        ."If this is intentional (non-standard deployment), set PMSS_SKIP_HOME_MOUNT_CHECK=1.\n");
     exit(1);
 }

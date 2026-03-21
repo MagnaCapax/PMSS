@@ -399,8 +399,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
         $configDir  = $home.'/.config/docker';
         $configFile = $configDir.'/daemon.json';
 
-        $userLog = static function (string $message) use ($user): void { pmssUserLog($user, $message); };
-        if (!pmssEnsureUserHomeDir($user, $home, '.config/docker', 0700, $userLog, 0700)) {
+        if (!pmssEnsureUserHomeDir($user, $home, '.config/docker', 0700, static function (string $message) use ($user): void { pmssUserLog($user, $message); }, 0700)) {
             pmssUserLog($user, '[WARN] Failed to ensure ~/.config/docker');
             return;
         }

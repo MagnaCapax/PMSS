@@ -7,9 +7,7 @@
  * @author PMSS Team
  */
 echo date('Y-m-d H:i:s') . ': Checking Rclone instances' . "\n";
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
-    require_once $pmssUserLogPath;
-}
+if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
 $canUserLog = function_exists('pmssUserLog');
 
 // Get & parse users list

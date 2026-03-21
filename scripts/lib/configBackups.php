@@ -43,10 +43,9 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
 
             error_log($message);
         });
-    $sourcePath = trim($sourcePath);
     if (
         $service === ''
-        || $sourcePath === ''
+        || ($sourcePath = trim($sourcePath)) === ''
         || getenv('PMSS_DRY_RUN') === '1'
         || !is_file($sourcePath)
         || !is_readable($sourcePath)
@@ -68,8 +67,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     } else {
         $pmssVersion = 'unknown';
         foreach (array('/etc/seedbox/config/version', '/etc/seedbox/runtime/version') as $path) {
-            $detectedVersion = trim((string) @file_get_contents($path));
-            if ($detectedVersion !== '') {
+            if (($detectedVersion = trim((string) @file_get_contents($path))) !== '') {
                 $pmssVersion = $detectedVersion;
                 break;
             }
@@ -133,8 +131,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     }
 
     $key = pmssConfigBackupsPathKey($sourcePath);
-    $files = glob($serviceDir.'/*__'.$key.'*.bak');
-    if ($files === false || $files === array()) {
+    if (empty($files = glob($serviceDir.'/*__'.$key.'*.bak'))) {
         return;
     }
 

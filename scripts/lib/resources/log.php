@@ -52,8 +52,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
     $unit = sprintf('user-%d.slice', $uid);
     $cmd = 'systemctl show '.escapeshellarg($unit)
         .' -p IOReadBytes -p IOWriteBytes -p IOReadOperations -p IOWriteOperations -p CPUUsageNSec -p MemoryCurrent -p TasksCurrent';
-    $out = @shell_exec($cmd);
-    if (!is_string($out) || trim($out) === '') {
+    if (!is_string($out = @shell_exec($cmd)) || trim($out) === '') {
         return null;
     }
 
