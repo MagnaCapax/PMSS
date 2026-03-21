@@ -67,19 +67,19 @@ function pmssResourceLogReadCounters(int $uid): ?array
     $values = ['io_read_ops' => 0, 'io_write_ops' => 0];
 
     foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-        if (count($parts = explode('=', $line, 2)) !== 2 || !ctype_digit($parts[1]) || !isset($fieldMap[$parts[0]])) {
+        [$field, $value] = array_pad(explode('=', $line, 2), 2, null);
+        if (!isset($fieldMap[$field]) || !ctype_digit((string) $value)) {
             continue;
         }
-        $values[$fieldMap[$parts[0]]] = (int) $parts[1];
+        $values[$fieldMap[$field]] = (int) $value;
     }
 
     if (!isset($values['io_read'], $values['io_write'], $values['cpu_nsec'], $values['memory'], $values['tasks'])) {
         return null;
     }
 
-    return is_array($memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid))
-        ? $values + $memoryBreakdown
-        : $values;
+    $memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid);
+    return is_array($memoryBreakdown) ? $values + $memoryBreakdown : $values;
 }
 
 /**
@@ -94,26 +94,21 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
     ];
 
     foreach ($paths as $path) {
-        $raw = @file_get_contents($path);
-        if (!is_string($raw) || trim($raw) === '') {
+        if (!is_string($raw = @file_get_contents($path)) || trim($raw) === '') {
             continue;
         }
 
-        $anon = null;
-        $file = null;
+        $breakdown = [];
         foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-            if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
+            [$field, $value] = array_pad(preg_split('/\s+/', trim($line), 2), 2, null);
+            if (($field !== 'anon' && $field !== 'file') || !ctype_digit((string) $value)) {
                 continue;
             }
-            if ($parts[0] === 'anon') {
-                $anon = (int) $parts[1];
-            } elseif ($parts[0] === 'file') {
-                $file = (int) $parts[1];
-            }
+            $breakdown['memory_'.$field] = (int) $value;
         }
 
-        if ($anon !== null && $file !== null) {
-            return ['memory_anon' => $anon, 'memory_file' => $file];
+        if (isset($breakdown['memory_anon'], $breakdown['memory_file'])) {
+            return $breakdown;
         }
     }
 

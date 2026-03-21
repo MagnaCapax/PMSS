@@ -54,26 +54,28 @@ class resourceStatistics
             ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'],
             0.0
         );
-        $fields = ['io_read', 'io_write', 'cpu', 'memory', 'tasks'];
-        $tokenCount >= 9 && array_splice($fields, 2, 0, ['io_read_ops', 'io_write_ops']);
-        foreach ($fields as $index => $field) {
-            if (!ctype_digit($tokens[$index + 2] ?? '')) {
+        foreach (($tokenCount >= 9
+            ? [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks']
+            : [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks']) as $index => $field) {
+            if (!ctype_digit($tokens[$index] ?? '')) {
                 return false;
             }
-            $parsed[$field] = (float) $tokens[$index + 2];
+            $parsed[$field] = (float) $tokens[$index];
         }
 
         if ($tokenCount === 10) {
             return false;
         }
 
-        if ($tokenCount > 10) {
-            foreach ([9 => 'memory_anon', 10 => 'memory_file'] as $index => $field) {
-                if (!ctype_digit($tokens[$index] ?? '')) {
-                    return false;
-                }
-                $parsed[$field] = (float) $tokens[$index];
+        if ($tokenCount <= 10) {
+            return $parsed;
+        }
+
+        foreach ([9 => 'memory_anon', 10 => 'memory_file'] as $index => $field) {
+            if (!ctype_digit($tokens[$index] ?? '')) {
+                return false;
             }
+            $parsed[$field] = (float) $tokens[$index];
         }
 
         return $parsed;
