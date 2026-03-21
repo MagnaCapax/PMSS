@@ -57,8 +57,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         return;
     }
 
-    $override = getenv('PMSS_ROOT_FS_BYTES');
-    $rootBytes = (is_string($override) && $override !== '' && ctype_digit($override))
+    $rootBytes = (($override = getenv('PMSS_ROOT_FS_BYTES')) !== false && $override !== '' && ctype_digit($override))
         ? (int) $override
         : (((($bytes = @disk_total_space('/')) !== false) && is_numeric($bytes) && $bytes > 0) ? (int) $bytes : 0);
     if ($rootBytes <= 0) {

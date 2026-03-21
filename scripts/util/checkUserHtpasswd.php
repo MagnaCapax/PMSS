@@ -39,16 +39,14 @@ if ($argUserRaw !== '') {
     }
     $users = [$argUser];
 } else {
-    $usersRaw = trim((string)shell_exec('/scripts/listUsers.php'));
-    if ($usersRaw === '') {
+    $users = array_filter(array_map('trim', explode("\n", trim((string) shell_exec('/scripts/listUsers.php')))), 'strlen');
+    if ($users === []) {
         die("No users setup - nothing to do\n");
     }
-    $users = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
 }
 
 $globalHtpasswd = '/etc/lighttpd/.htpasswd';
-$globalContents = @file_get_contents($globalHtpasswd);
-if ($globalContents === false || trim($globalContents) === '') {
+if (trim((string) ($globalContents = @file_get_contents($globalHtpasswd))) === '') {
     if ($argUserRaw === '') {
         echo "Global htpasswd file missing or empty, skipping synchronization\n";
     }
@@ -74,11 +72,7 @@ foreach ($users as $thisUser) {
     }
 
     $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
-    if (
-        is_file($userHtpasswd)
-        && ($userHtpasswdContents = @file_get_contents($userHtpasswd)) !== false
-        && strpos($userHtpasswdContents, $thisUser) !== false
-    ) {
+    if (is_file($userHtpasswd) && strpos((string) @file_get_contents($userHtpasswd), $thisUser) !== false) {
         continue;
     }
 

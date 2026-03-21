@@ -27,11 +27,8 @@ if (!is_dir($proftpdDir)) {
     exit(0);
 }
 
-$hostname = strtolower(trim($hostnameRaw));
-$hostname = preg_replace('/[^a-z0-9.-]/', '', $hostname);
-if ($hostname === '') {
-    $hostname = 'localhost';
-}
+$hostname = preg_replace('/[^a-z0-9.-]/', '', strtolower(trim($hostnameRaw)));
+$hostname = $hostname === '' ? 'localhost' : $hostname;
 $detected = \pmssDetectDistro();
 $distroVersion = is_array($detected) && isset($detected['version']) ? (int) $detected['version'] : 0;
 // Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
@@ -99,12 +96,12 @@ if (@file_put_contents('/etc/proftpd/proftpd.conf', $rendered) === false) {
 }
 logMessage('Wrote /etc/proftpd/proftpd.conf');
 
-if (trim((string) @shell_exec('command -v proftpd 2>/dev/null')) !== '') {
-    $testRc = runStep('Validating ProFTPD configuration', 'proftpd -t -c /etc/proftpd/proftpd.conf');
-    if ($testRc !== 0) {
-        logMessage('[WARN] ProFTPD config test failed; skipping restart to avoid stopping a working daemon');
-        exit(0);
-    }
+if (
+    trim((string) @shell_exec('command -v proftpd 2>/dev/null')) !== ''
+    && runStep('Validating ProFTPD configuration', 'proftpd -t -c /etc/proftpd/proftpd.conf') !== 0
+) {
+    logMessage('[WARN] ProFTPD config test failed; skipping restart to avoid stopping a working daemon');
+    exit(0);
 }
 
 if (is_dir('/run/systemd/system')) {
