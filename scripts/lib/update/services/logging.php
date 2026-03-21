@@ -114,13 +114,8 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         $policy['rate_limit_burst']
     ));
 
-    $skipReason = (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true))
-        ? 'test/dry-run'
-        : (!is_dir('/run/systemd/system') ? 'systemd unavailable' : '');
-    if ($skipReason !== '') {
-        pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps ('.$skipReason.')');
-        return;
-    }
+    if (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps (test/dry-run)'); return; }
+    if (!is_dir('/run/systemd/system')) { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps (systemd unavailable)'); return; }
     runStep('Restarting systemd-journald to apply log caps', 'systemctl restart systemd-journald');
 }
 
@@ -216,19 +211,17 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         return;
     }
 
-    $raw = @file_get_contents($template);
-    if ($raw === false) {
+    if (($raw = @file_get_contents($template)) === false) {
         $log('[WARN] Unable to read remote logging template: '.$template);
         return;
     }
 
     // Apply substitutions
-    $repl = [
+    $rendered = strtr($raw, [
         '%%PMSS_RSYSLOG_REMOTE_HOST%%' => $config['host'],
         '%%PMSS_RSYSLOG_REMOTE_PORT%%' => (string) $config['port'],
         '%%PMSS_RSYSLOG_PROTOCOL%%'    => $config['protocol'],
-    ];
-    $rendered = strtr($raw, $repl);
+    ]);
 
     // Deploy to rsyslog.d
     if (!is_dir($targetDir)) {
