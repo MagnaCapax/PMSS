@@ -103,6 +103,28 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertEquals('5', $saved['tasks']['display']['day']);
     }
 
+    public function testProcessUserPersistsMemoryBreakdownCurrentValues(): void
+    {
+        $stats = new StubResourceStatsProcessorStatistics();
+        $processor = $this->makeProcessor($stats);
+
+        $user = 'alice';
+        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
+        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+
+        $now = time();
+        $stats->map[$user] = implode("\n", [
+            date('Y-m-d H:i:s', $now - 120).' 1024 2048 10 20 3600 1048576 4 524288 262144',
+            date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6 1048576 524288',
+        ]);
+
+        $processor->processUser($user, $processor->buildCompareTimes());
+
+        $saved = $this->readSavedResourceStats($user);
+        $this->assertEquals(1048576.0, $saved['memory']['anon']);
+        $this->assertEquals(524288.0, $saved['memory']['file']);
+    }
+
     public function testProcessUserSkipsInvalidUserWithoutPersisting(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();

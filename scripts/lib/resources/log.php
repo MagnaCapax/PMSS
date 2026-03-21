@@ -74,9 +74,53 @@ function pmssResourceLogReadCounters(int $uid): ?array
         $values[$fieldMap[$parts[0]]] = (int) $parts[1];
     }
 
-    return isset($values['io_read'], $values['io_write'], $values['cpu_nsec'], $values['memory'], $values['tasks'])
-        ? $values
-        : null;
+    if (!isset($values['io_read'], $values['io_write'], $values['cpu_nsec'], $values['memory'], $values['tasks'])) {
+        return null;
+    }
+
+    if (is_array($memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid))) {
+        $values += $memoryBreakdown;
+    }
+
+    return $values;
+}
+
+/**
+ * Read cgroup v2 memory.stat counters for the given user slice.
+ */
+function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null): ?array
+{
+    $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
+    $paths = [
+        $root.'/user.slice/user-'.$uid.'.slice/memory.stat',
+        $root.'/unified/user.slice/user-'.$uid.'.slice/memory.stat',
+    ];
+
+    foreach ($paths as $path) {
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || trim($raw) === '') {
+            continue;
+        }
+
+        $anon = null;
+        $file = null;
+        foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
+            if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
+                continue;
+            }
+            if ($parts[0] === 'anon') {
+                $anon = (int) $parts[1];
+            } elseif ($parts[0] === 'file') {
+                $file = (int) $parts[1];
+            }
+        }
+
+        if ($anon !== null && $file !== null) {
+            return ['memory_anon' => $anon, 'memory_file' => $file];
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -104,6 +148,10 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
         $state[$field] = $currentValue;
     }
     $state += ['memory' => (int) $counters['memory'], 'tasks' => (int) $counters['tasks'], 'ts' => time()];
+    if (isset($counters['memory_anon']) && isset($counters['memory_file'])) {
+        $state['memory_anon'] = (int) $counters['memory_anon'];
+        $state['memory_file'] = (int) $counters['memory_file'];
+    }
 
     if ($locked && is_string($payload = json_encode($state))) {
         @ftruncate($handle, 0);

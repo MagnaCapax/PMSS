@@ -630,6 +630,19 @@ function readUserRamLimitBytes() {
 }
 
 function readUserMemoryCurrentBytes() {
+    $resourceData = readUserResourceData();
+    if (!is_array($resourceData)
+        || !isset($resourceData['memory'])
+        || !is_array($resourceData['memory'])
+        || !isset($resourceData['memory']['current'])
+        || !is_numeric($resourceData['memory']['current'])) {
+        return null;
+    }
+
+    return (float) $resourceData['memory']['current'];
+}
+
+function readUserResourceData() {
     $resourcePath = '../.resourceData';
     if (!is_file($resourcePath) || is_link($resourcePath)) {
         return null;
@@ -641,15 +654,27 @@ function readUserMemoryCurrentBytes() {
     }
 
     $resourceData = @unserialize($raw);
+    return is_array($resourceData) ? $resourceData : null;
+}
+
+function readUserMemoryBreakdownBytes() {
+    $resourceData = readUserResourceData();
     if (!is_array($resourceData)
         || !isset($resourceData['memory'])
-        || !is_array($resourceData['memory'])
-        || !isset($resourceData['memory']['current'])
-        || !is_numeric($resourceData['memory']['current'])) {
-        return null;
+        || !is_array($resourceData['memory'])) {
+        return array();
     }
 
-    return (float) $resourceData['memory']['current'];
+    $memory = $resourceData['memory'];
+    $breakdown = array();
+    if (isset($memory['anon']) && is_numeric($memory['anon'])) {
+        $breakdown['anon'] = (float) $memory['anon'];
+    }
+    if (isset($memory['file']) && is_numeric($memory['file'])) {
+        $breakdown['file'] = (float) $memory['file'];
+    }
+
+    return $breakdown;
 }
 
 function readSystemdMemoryCurrentBytes() {
@@ -670,6 +695,47 @@ function readSystemdMemoryCurrentBytes() {
     return (float) $memoryCurrent;
 }
 
+function readSystemdMemoryBreakdownBytes() {
+    $uid = function_exists('posix_getuid') ? (int) posix_getuid() : null;
+    if ($uid === null && function_exists('shell_exec')) {
+        $uidRaw = @shell_exec('/usr/bin/id -u 2>/dev/null');
+        if (is_string($uidRaw) && ctype_digit(trim($uidRaw))) {
+            $uid = (int) trim($uidRaw);
+        }
+    }
+    if (!is_int($uid) || $uid < 0) {
+        return array();
+    }
+
+    foreach (array(
+        '/sys/fs/cgroup/user.slice/user-'.$uid.'.slice/memory.stat',
+        '/sys/fs/cgroup/unified/user.slice/user-'.$uid.'.slice/memory.stat',
+    ) as $path) {
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || trim($raw) === '') {
+            continue;
+        }
+
+        $breakdown = array();
+        foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
+            if (count($parts = preg_split('/\s+/', trim($line), 2)) !== 2 || !ctype_digit($parts[1])) {
+                continue;
+            }
+            if ($parts[0] === 'anon') {
+                $breakdown['anon'] = (float) $parts[1];
+            } elseif ($parts[0] === 'file') {
+                $breakdown['file'] = (float) $parts[1];
+            }
+        }
+
+        if (isset($breakdown['anon'], $breakdown['file'])) {
+            return $breakdown;
+        }
+    }
+
+    return array();
+}
+
 function memoryCreateSection() {
     $currentBytes = readUserMemoryCurrentBytes();
     if ($currentBytes === null) {
@@ -677,19 +743,29 @@ function memoryCreateSection() {
     }
 
     $limitBytes = readUserRamLimitBytes();
+    $memoryBreakdown = readUserMemoryBreakdownBytes();
+    if (!isset($memoryBreakdown['anon'], $memoryBreakdown['file'])) {
+        $memoryBreakdown = readSystemdMemoryBreakdownBytes();
+    }
+    $processBytes = isset($memoryBreakdown['anon']) ? (float) $memoryBreakdown['anon'] : null;
+    $cacheBytes = isset($memoryBreakdown['file']) ? (float) $memoryBreakdown['file'] : null;
 
-    if ($currentBytes === null && $limitBytes === null) {
+    if ($currentBytes === null && $limitBytes === null && $processBytes === null && $cacheBytes === null) {
         return '<h6>RAM Info</h6><b>RAM usage data is unavailable right now.</b><hr />';
     }
 
-    $currentText = ($currentBytes === null)
-        ? 'n/a'
-        : filesize2HumanReadable($currentBytes);
+    $currentText = ($currentBytes === null) ? 'n/a' : filesize2HumanReadable($currentBytes);
+    $processText = ($processBytes === null) ? 'n/a' : filesize2HumanReadable($processBytes);
+    $cacheText = ($cacheBytes === null) ? 'n/a' : filesize2HumanReadable($cacheBytes);
 
     if ($limitBytes === null || $limitBytes <= 0) {
+        $breakdownText = '';
+        if ($processBytes !== null || $cacheBytes !== null) {
+            $breakdownText = '<br />Process memory: '.$processText.'<br />Page cache: '.$cacheText;
+        }
         return <<<EOF
 <h6>RAM Info</h6>
-Current RAM usage: {$currentText}<br />
+Current RAM usage: {$currentText}{$breakdownText}<br />
 RAM limit: n/a
 <hr />
 EOF;
@@ -697,7 +773,7 @@ EOF;
 
     $limitText = filesize2HumanReadable($limitBytes);
 
-    if ($currentBytes === null) {
+    if ($currentBytes === null && $processBytes === null && $cacheBytes === null) {
         return <<<EOF
 <h6>RAM Info</h6>
 Current RAM usage: n/a<br />
@@ -706,17 +782,47 @@ RAM limit: {$limitText}
 EOF;
     }
 
-    $percent = round(($currentBytes / $limitBytes) * 100, 1);
-    if (!is_finite($percent)) {
-        $percent = 0;
+    $warningBytes = $processBytes !== null ? $processBytes : $currentBytes;
+    $warningPercent = round(($warningBytes / $limitBytes) * 100, 1);
+    if (!is_finite($warningPercent)) {
+        $warningPercent = 0;
     }
 
-    $titleText = "{$currentText} / {$limitText}";
-    $gauge = createGauge($titleText, $titleText, $percent);
+    if ($processBytes !== null && $cacheBytes !== null) {
+        $usedBytes = max($processBytes + $cacheBytes, $currentBytes !== null ? $currentBytes : 0);
+        $usedPercent = round(($usedBytes / $limitBytes) * 100, 1);
+        if (!is_finite($usedPercent)) {
+            $usedPercent = 0;
+        }
+        $processPercent = round(($processBytes / $limitBytes) * 100, 1);
+        $cachePercent = round(($cacheBytes / $limitBytes) * 100, 1);
+        $remainingPercent = max(0, 100 - max(0, min(100, $processPercent)) - max(0, min(100, $cachePercent)));
+        if ($remainingPercent < 0) {
+            $remainingPercent = 0;
+        }
+        $titleText = 'Process: '.$processText.' | Cache: '.$cacheText.' | Limit: '.$limitText;
+        $gauge = createStackedGauge(
+            $titleText,
+            $titleText,
+            $usedPercent,
+            array(
+                array('width' => $processPercent, 'color' => '#'.gaugeColor($warningPercent)),
+                array('width' => $cachePercent, 'color' => '#b0bec5'),
+                array('width' => $remainingPercent, 'color' => 'transparent'),
+            )
+        );
+    } else {
+        $percent = round((($currentBytes !== null ? $currentBytes : 0) / $limitBytes) * 100, 1);
+        if (!is_finite($percent)) {
+            $percent = 0;
+        }
+        $titleText = "{$currentText} / {$limitText}";
+        $gauge = createGauge($titleText, $titleText, $percent);
+    }
 
-    if ($percent > 100) {
+    if ($warningPercent > 100) {
         $warning = '<br /><b style="color: red;">RAM LIMIT EXCEEDED</b><br />Processes may be killed (OOM) until memory usage drops.<br />';
-    } elseif ($percent >= 80) {
+    } elseif ($warningPercent >= 80) {
         $warning = '<br /><b style="color: #d2691e;">RAM WARNING</b><br />You are close to your RAM limit. Consider reducing running services or upgrading your plan.<br />';
     } else {
         $warning = '';
@@ -803,6 +909,36 @@ EOF;
     {$inboundLine}{$ratioLine}
     This is rolling past 30 days, <a href="http://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
     <hr />
+EOF;
+}
+
+function createStackedGauge($titleText, $footerText, $percent, $segments) {
+    if (!is_finite($percent)) $percent = 0;
+    $bars = '';
+    $filledPercent = 0;
+    foreach ($segments as $segment) {
+        $width = isset($segment['width']) && is_numeric($segment['width']) ? (float) $segment['width'] : 0;
+        $width = max(0, min(100 - $filledPercent, $width));
+        if ($width <= 0) {
+            continue;
+        }
+        $filledPercent += $width;
+        $color = isset($segment['color']) ? (string) $segment['color'] : 'transparent';
+        $bars .= '<div style="float: left; width: '.$width.'%; background-color: '.$color.'; visibility: visible;">&nbsp;</div>';
+    }
+
+    return <<<EOF
+    <table style="margin: 0; padding: 0;">
+        <tr>
+            <td id="meter-disk-td" title="{$titleText}">
+                <div id="meter-disk-holder">
+                    <span id="meter-disk-text" style="overflow-x: visible; overflow-y: visible;">{$percent}%</span>
+                    {$bars}
+                </div>
+            </td>
+        </tr>
+    </table>
+    <span style="font-size: 1.05em; float: right; text-align: right; line-height: 13px;">{$footerText}</span>
 EOF;
 }
 

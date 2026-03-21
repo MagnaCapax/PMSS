@@ -30,6 +30,10 @@ class ResourceStatsAccumulator
     private $lastMemory = 0.0;
     /** @var float */
     private $lastTasks = 0.0;
+    /** @var float|null */
+    private $lastMemoryAnon = null;
+    /** @var float|null */
+    private $lastMemoryFile = null;
     /** @var int|null */
     private $prevTimestamp = null;
 
@@ -51,6 +55,12 @@ class ResourceStatsAccumulator
         $timestamp = (int) $sample['timestamp'];
         $this->lastMemory = $sampleMemory = (float) $sample['memory'];
         $this->lastTasks = $sampleTasks = (float) $sample['tasks'];
+        if (isset($sample['memory_anon']) && is_numeric($sample['memory_anon'])) {
+            $this->lastMemoryAnon = (float) $sample['memory_anon'];
+        }
+        if (isset($sample['memory_file']) && is_numeric($sample['memory_file'])) {
+            $this->lastMemoryFile = (float) $sample['memory_file'];
+        }
 
         $delta = ($this->prevTimestamp === null) ? 300 : ($timestamp - $this->prevTimestamp);
         $intervalHours = (($delta > 0 && $delta <= 3600) ? $delta : 300) / 3600;
@@ -128,6 +138,8 @@ class ResourceStatsAccumulator
             'daily' => $daily,
             'current_memory' => $this->lastMemory,
             'current_tasks' => $this->lastTasks,
+            'current_memory_anon' => $this->lastMemoryAnon,
+            'current_memory_file' => $this->lastMemoryFile,
         ];
     }
 

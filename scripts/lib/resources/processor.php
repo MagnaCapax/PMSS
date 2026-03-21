@@ -132,6 +132,12 @@ class ResourceStatsProcessor
             ];
         }
         $data['memory']['current'] = $results['current_memory'];
+        if (isset($results['current_memory_anon']) && is_numeric($results['current_memory_anon'])) {
+            $data['memory']['anon'] = (float) $results['current_memory_anon'];
+        }
+        if (isset($results['current_memory_file']) && is_numeric($results['current_memory_file'])) {
+            $data['memory']['file'] = (float) $results['current_memory_file'];
+        }
         $data['tasks']['current'] = $results['current_tasks'];
         $data['daily'] = $results['daily'];
 

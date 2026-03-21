@@ -788,6 +788,12 @@ if ($resourceData === null) {
     $memoryCurrent = isset($resourceData['memory']['current'])
         ? pmssFormatBytesShort($resourceData['memory']['current'])
         : 'n/a';
+    $memoryAnon = isset($resourceData['memory']['anon'])
+        ? pmssFormatBytesShort($resourceData['memory']['anon'])
+        : 'n/a';
+    $memoryFile = isset($resourceData['memory']['file'])
+        ? pmssFormatBytesShort($resourceData['memory']['file'])
+        : 'n/a';
     $tasksCurrent = isset($resourceData['tasks']['current'])
         ? (string)round((float)$resourceData['tasks']['current'], 2)
         : 'n/a';
@@ -873,6 +879,8 @@ CPU Time (month/week/day/hour): <?php echo $cpuDisplay['month'] ?? 'n/a'; ?> / <
         <h6>Memory usage</h6>
         <pre>
 Current Memory: <?php echo $memoryCurrent; ?>
+Process Memory: <?php echo $memoryAnon; ?>
+Page Cache: <?php echo $memoryFile; ?>
 RAM-Hours (month/week/day): <?php echo $ramHoursDisplay['month'] ?? 'n/a'; ?> / <?php echo $ramHoursDisplay['week'] ?? 'n/a'; ?> / <?php echo $ramHoursDisplay['day'] ?? 'n/a'; ?>
 Average Memory (month/week/day): <?php echo $memoryDisplay['month'] ?? 'n/a'; ?> / <?php echo $memoryDisplay['week'] ?? 'n/a'; ?> / <?php echo $memoryDisplay['day'] ?? 'n/a'; ?>
         </pre>

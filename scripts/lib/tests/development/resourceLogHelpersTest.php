@@ -170,6 +170,28 @@ class ResourceLogHelpersTest extends TestCase
         });
     }
 
+    public function testReadMemoryBreakdownParsesMemoryStat(): void
+    {
+        $root = $this->makeRoot();
+        $path = $root.'/user.slice/user-1000.slice';
+        @mkdir($path, 0755, true);
+        file_put_contents($path.'/memory.stat', "anon 123\nfile 456\n");
+
+        $breakdown = \pmssResourceLogReadMemoryBreakdown(1000, $root);
+
+        $this->assertEquals(['memory_anon' => 123, 'memory_file' => 456], $breakdown);
+    }
+
+    public function testReadMemoryBreakdownReturnsNullWhenFieldsMissing(): void
+    {
+        $root = $this->makeRoot();
+        $path = $root.'/user.slice/user-1000.slice';
+        @mkdir($path, 0755, true);
+        file_put_contents($path.'/memory.stat', "anon 123\nslab 456\n");
+
+        $this->assertTrue(\pmssResourceLogReadMemoryBreakdown(1000, $root) === null);
+    }
+
     public function testUpdateStateCreatesStateWhenMissing(): void
     {
         $root = $this->makeRoot();
@@ -187,6 +209,18 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertEquals(7, $result['state']['tasks']);
         $this->assertTrue($result['state']['ts'] > 0);
         $this->assertTrue(is_file($statePath));
+    }
+
+    public function testUpdateStatePersistsMemoryBreakdownWhenAvailable(): void
+    {
+        $root = $this->makeRoot();
+        $statePath = $root.'/state.json';
+        $counters = $this->makeCounters(10, 20, 30, 4096, 7) + ['memory_anon' => 1024, 'memory_file' => 2048];
+
+        $result = \pmssResourceLogUpdateState($statePath, $counters);
+
+        $this->assertEquals(1024, $result['state']['memory_anon']);
+        $this->assertEquals(2048, $result['state']['memory_file']);
     }
 
     public function testUpdateStateComputesDeltaFromPrevious(): void

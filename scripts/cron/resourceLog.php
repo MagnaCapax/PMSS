@@ -32,16 +32,20 @@ foreach ($users as $user) {
     $statePath = $stateDir.'/'.$user.'.json';
     ['delta' => $delta, 'state' => $state] = pmssResourceLogUpdateState($statePath, $counters);
 
-    $line = sprintf(
-        '%s %d %d %d %d %d %d %d',
+    $lineParts = [
         date('Y-m-d H:i:s'),
-        $delta['io_read'],
-        $delta['io_write'],
-        $delta['io_read_ops'],
-        $delta['io_write_ops'],
-        $delta['cpu_nsec'],
-        $state['memory'],
-        $state['tasks']
-    );
+        (string) $delta['io_read'],
+        (string) $delta['io_write'],
+        (string) $delta['io_read_ops'],
+        (string) $delta['io_write_ops'],
+        (string) $delta['cpu_nsec'],
+        (string) $state['memory'],
+        (string) $state['tasks'],
+    ];
+    if (isset($state['memory_anon']) && isset($state['memory_file'])) {
+        $lineParts[] = (string) $state['memory_anon'];
+        $lineParts[] = (string) $state['memory_file'];
+    }
+    $line = implode(' ', $lineParts);
     @file_put_contents($logDir.'/'.$user, $line.PHP_EOL, FILE_APPEND | LOCK_EX);
 }
