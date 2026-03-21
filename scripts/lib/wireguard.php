@@ -9,7 +9,7 @@
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/networkInfo.php';
 require_once __DIR__.'/runtime.php';
-require_once __DIR__.'/logger.php';
+require_once __DIR__.'/log.php';
 require_once __DIR__.'/update/runtime/commands.php';
 
 function wgLog(string $message): void

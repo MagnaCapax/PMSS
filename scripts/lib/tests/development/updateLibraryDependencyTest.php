@@ -55,6 +55,17 @@ class UpdateLibraryDependencyTest extends TestCase
         $this->assertTrue(strpos($source, "require_once __DIR__.'/runtime/commands.php';") === false, 'distro.php should not pull runtime/commands.php just to expose logmsg()');
     }
 
+    public function testWireguardLibraryUsesDirectLegacyLogLibrary(): void
+    {
+        $source = $this->loadSource('lib/wireguard.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/log.php';", $source);
+        $this->assertTrue(
+            strpos($source, "require_once __DIR__.'/logger.php';") === false,
+            'wireguard.php should load log.php directly when it only needs logmsg()'
+        );
+    }
+
     public function testNetworkingLibraryAvoidsRuntimeCommandsBootstrap(): void
     {
         $source = $this->loadSource('lib/update/networking.php');
