@@ -18,13 +18,12 @@ function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): strin
     // Allow tests and recovery scripts to point at alternate config roots.
     $path = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')."/template.sources.$codename";
 
-    $exists = file_exists($path);
-    if (!$exists || ($data = trim((string) @file_get_contents($path))) === '') {
-        $log(($exists ? 'Repository template empty: ' : 'Repository template missing: ').$path);
-        return '';
+    if (($data = trim((string) @file_get_contents($path))) !== '') {
+        return $data."\n";
     }
 
-    return $data."\n";
+    $log((file_exists($path) ? 'Repository template empty: ' : 'Repository template missing: ').$path);
+    return '';
 }
 
 /**
@@ -81,10 +80,12 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
     // without explicit operator instruction/ADR. (Docker deb822 is already in use.)
 
     if ($distroVersion <= 0) { $log(sprintf('Skipping repository update for %s: unknown version', $distroName)); return; }
+    if ($distroName === 'debian') {
+        pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
+        return;
+    }
 
-    if ($distroName !== 'debian') { $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName"); return; }
-
-    pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
+    $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName");
 }
 
 /**

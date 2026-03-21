@@ -202,6 +202,41 @@ class DistroDetectionTest extends TestCase
         }));
     }
 
+    public function testLoadRepoTemplateLogsMissingAndEmptyTemplates(): void
+    {
+        $configDir = sys_get_temp_dir().'/pmss-config-'.bin2hex(random_bytes(4));
+        @mkdir($configDir, 0755, true);
+        $previousConfigDir = getenv('PMSS_CONFIG_DIR');
+        putenv('PMSS_CONFIG_DIR='.$configDir);
+
+        try {
+            $logs = [];
+            $logger = function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            };
+
+            $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
+            $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
+                return strpos($line, 'Repository template missing: ') !== false;
+            }));
+
+            $logs = [];
+            file_put_contents($configDir.'/template.sources.bookworm', " \n\t ");
+            $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
+            $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
+                return strpos($line, 'Repository template empty: ') !== false;
+            }));
+        } finally {
+            if ($previousConfigDir === false) {
+                putenv('PMSS_CONFIG_DIR');
+            } else {
+                putenv('PMSS_CONFIG_DIR='.$previousConfigDir);
+            }
+            @unlink($configDir.'/template.sources.bookworm');
+            @rmdir($configDir);
+        }
+    }
+
     /**
      * Helper to stage an os-release fixture for the duration of the callback.
      */

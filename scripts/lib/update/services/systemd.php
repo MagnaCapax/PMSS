@@ -53,9 +53,7 @@ function pmssEnsureSystemdServicesGuardBootUnit(): void
         return;
     }
 
-    $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
-
-    $template = $cfgDir.'/template.systemd.pmss-systemd-services-guard.service';
+    $template = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/template.systemd.pmss-systemd-services-guard.service';
     if (!is_file($template)) {
         pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (template missing: '.$template.')');
         return;

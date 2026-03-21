@@ -30,31 +30,29 @@ function pmssParseCliTokens(array $argv): array
             continue;
         }
 
-        if ($isLong) {
-            if (($equalsOffset = strpos($body, '=')) !== false) {
-                $options[substr($body, 0, $equalsOffset)] = substr($body, $equalsOffset + 1);
-                continue;
-            }
-        } elseif (strlen($body) > 1) {
-            if (!ctype_alpha($body)) {
+        if ($isLong && ($equalsOffset = strpos($body, '=')) !== false) {
+            $options[substr($body, 0, $equalsOffset)] = substr($body, $equalsOffset + 1);
+            continue;
+        }
+        if (!$isLong && strlen($body) > 1) {
+            if (ctype_alpha($body)) {
+                foreach (str_split($body) as $flag) {
+                    $options[$flag] = true;
+                }
+            } else {
                 $options[$body[0]] = substr($body, 1) ?: true;
-                continue;
-            }
-
-            foreach (str_split($body) as $flag) {
-                $options[$flag] = true;
             }
             continue;
         }
 
         $next = $argv[$i + 1] ?? null;
-        if ($next === null || $next === '' || ($next[0] ?? '') === '-') {
-            $options[$body] = true;
+        if ($next !== null && $next !== '' && ($next[0] ?? '') !== '-') {
+            $options[$body] = $next;
+            $i++;
             continue;
         }
 
-        $options[$body] = $next;
-        $i++;
+        $options[$body] = true;
     }
 
     return ['options' => $options, 'arguments' => $positionals];

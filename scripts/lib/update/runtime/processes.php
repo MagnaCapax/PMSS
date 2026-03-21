@@ -40,10 +40,11 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
 {
     if (!is_dir('/run/systemd/system')) { logmsg("[SKIP] {$description} (systemd unavailable)"); return; }
     if (!pmssSystemdUnitExists($unit)) { logmsg("[SKIP] {$description} (unit {$unit} missing)"); return; }
-    $candidate = ($action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit))
-        ? $unit.'.service'
-        : $unit;
-    runStep($description, 'systemctl '.$action.' '.escapeshellarg($candidate));
+    runStep($description, 'systemctl '.$action.' '.escapeshellarg(
+        $action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit)
+            ? $unit.'.service'
+            : $unit
+    ));
 }
 
 /**
@@ -63,10 +64,12 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
     }
     $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
 
-    if ($systemdUnit !== null && pmssSystemdUnitExists($systemdUnit)) {
-        runStep($description.' (stop unit)', 'systemctl stop '.escapeshellarg($systemdUnit).' 2>/dev/null');
-    } elseif ($systemdUnit !== null && !is_dir('/run/systemd/system')) {
-        logmsg("[WARN] {$description} (systemd unavailable for unit {$systemdUnit})");
+    if ($systemdUnit !== null) {
+        if (!is_dir('/run/systemd/system')) {
+            logmsg("[WARN] {$description} (systemd unavailable for unit {$systemdUnit})");
+        } elseif (pmssSystemdUnitExists($systemdUnit)) {
+            runStep($description.' (stop unit)', 'systemctl stop '.escapeshellarg($systemdUnit).' 2>/dev/null');
+        }
     }
 
     runStep($description.' (SIGTERM)', 'pkill -TERM -x '.escapeshellarg($name));
