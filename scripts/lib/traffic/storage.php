@@ -37,23 +37,18 @@ class TrafficStorage
         $filename = ($this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData').($isLocalUser ? 'Local' : '');
 
         $serialized = serialize($data);
-        $homePath   = $this->homeDir.'/'.$targetUser;
+        $homePath = $this->homeDir.'/'.$targetUser;
+        $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
+        is_dir($homePath) && array_unshift($targets, [$homePath.'/'.$filename, $targetUser, 0640, true]);
 
-        if (is_dir($homePath)) {
-            $userPath = $homePath.'/'.$filename;
-            $this->setImmutable($userPath, false);
-            @file_put_contents($userPath, $serialized);
-            @chown($userPath, 'root');
-            $targetUser !== '' && @chgrp($userPath, $targetUser);
-            @chmod($userPath, 0640);
-            $this->setImmutable($userPath, true);
+        foreach ($targets as [$path, $group, $mode, $immutable]) {
+            $immutable && $this->setImmutable($path, false);
+            @file_put_contents($path, $serialized);
+            @chown($path, 'root');
+            @chgrp($path, $group);
+            @chmod($path, $mode);
+            $immutable && $this->setImmutable($path, true);
         }
-
-        $runtimePath = $this->statsDir.'/'.$user;
-        @file_put_contents($runtimePath, $serialized);
-        @chown($runtimePath, 'root');
-        @chgrp($runtimePath, 'root');
-        @chmod($runtimePath, 0600);
     }
 
     /**

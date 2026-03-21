@@ -148,21 +148,17 @@ class ResourceStatsProcessor
         $serialized = serialize($data);
         $homePath = $this->homeDir.'/'.$user;
 
-        if (is_dir($homePath)) {
-            $userPath = $homePath.'/.resourceData';
-            $this->setImmutable($userPath, false);
-            $this->writeAtomic($userPath, $serialized);
-            @chown($userPath, 'root');
-            $user !== '' && @chgrp($userPath, $user);
-            @chmod($userPath, 0640);
-            $this->setImmutable($userPath, true);
-        }
+        $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
+        is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
 
-        $runtimePath = $this->statsDir.'/'.$user;
-        $this->writeAtomic($runtimePath, $serialized);
-        @chown($runtimePath, 'root');
-        @chgrp($runtimePath, 'root');
-        @chmod($runtimePath, 0600);
+        foreach ($targets as [$path, $group, $mode, $immutable]) {
+            $immutable && $this->setImmutable($path, false);
+            $this->writeAtomic($path, $serialized);
+            @chown($path, 'root');
+            @chgrp($path, $group);
+            @chmod($path, $mode);
+            $immutable && $this->setImmutable($path, true);
+        }
     }
 
     /**
