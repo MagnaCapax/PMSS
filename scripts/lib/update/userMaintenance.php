@@ -30,13 +30,11 @@ require_once __DIR__.'/../user/userConfigStore.php';
             return 127;
         }
         fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]); fclose($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]); fclose($pipes[2]);
+        $stdout = rtrim((string) stream_get_contents($pipes[1])); fclose($pipes[1]);
+        $stderr = rtrim((string) stream_get_contents($pipes[2])); fclose($pipes[2]);
         $rc = proc_close($proc);
-        $out = rtrim((string)$stdout);
-        $err = rtrim((string)$stderr);
-        if ($out !== '') pmssUserLog($user, $out);
-        if ($err !== '') pmssUserLog($user, $err);
+        if ($stdout !== '') pmssUserLog($user, $stdout);
+        if ($stderr !== '') pmssUserLog($user, $stderr);
         pmssUserLog($user, sprintf('[RC] %s -> %d', $label, (int)$rc));
         return (int)$rc;
     }
@@ -57,19 +55,16 @@ require_once __DIR__.'/../user/userConfigStore.php';
         $skippedUsers = 0;
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
         $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
-        $htpasswdHelper = is_file('/scripts/util/checkUserHtpasswd.php') ? '/scripts/util/checkUserHtpasswd.php' : '';
-        $lighttpdChecker = is_file('/scripts/cron/checkLighttpdInstances.php') ? '/scripts/cron/checkLighttpdInstances.php' : '';
         $phases = ['Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)'];
         $postChecks = [];
-        if ($htpasswdHelper !== '') {
+        if (is_file('/scripts/util/checkUserHtpasswd.php')) {
             $phases[] = 'Legacy htpasswd sync';
-            $postChecks['Synchronizing per-user htpasswd'] = $htpasswdHelper;
+            $postChecks['Synchronizing per-user htpasswd'] = '/scripts/util/checkUserHtpasswd.php';
         }
-        if ($lighttpdChecker !== '') {
+        if (is_file('/scripts/cron/checkLighttpdInstances.php')) {
             $phases[] = 'Lighttpd instance check';
-            $postChecks['Checking lighttpd instance'] = $lighttpdChecker;
+            $postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';
         }
-        $phaseSummary = ' phases: '.implode(', ', $phases);
         $recordUserProfile = static function (string $user, string $status, int $rc, float $duration, string $stderrExcerpt = ''): void {
             pmssRecordProfile([
                 'description'    => 'updateUser '.$user,
@@ -101,7 +96,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
                     echo "  \033[33m* {$phase}\033[0m".PHP_EOL;
                 }
             } else {
-                logMessage(sprintf('Updating user %s%s', $userTrim, $phaseSummary));
+                logMessage(sprintf('Updating user %s phases: %s', $userTrim, implode(', ', $phases)));
             }
 
             $userStart = microtime(true);
@@ -163,8 +158,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
         }
 
         $summaryStatus = $processedUsers < $totalUsers ? 'warn' : 'ok';
-        $summaryLine = sprintf('Processed %d of %d users', $processedUsers, $totalUsers);
-        logMessage(($summaryStatus === 'warn' ? '[WARN] ' : '').$summaryLine);
+        logMessage(sprintf('%sProcessed %d of %d users', $summaryStatus === 'warn' ? '[WARN] ' : '', $processedUsers, $totalUsers));
         pmssLogJson([
             'event'     => 'user_maintenance_summary',
             'status'    => $summaryStatus,

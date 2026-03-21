@@ -23,9 +23,7 @@ if (empty($venv)) { return; }
 
 $packageProbeStatus = 1;
 @system(escapeshellarg($venv['python']).' -m pip show '.escapeshellarg('acdcli').' 1>/dev/null 2>&1', $packageProbeStatus);
-if ($packageProbeStatus === 0 && getenv('PMSS_FORCE_ACDCLI_UPDATE') !== '1') {
-    logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
-} else {
+if ($packageProbeStatus !== 0 || getenv('PMSS_FORCE_ACDCLI_UPDATE') === '1') {
     runStep(
         sprintf('Installing acd_cli %s in virtualenv', $acdCliPinnedTag),
         sprintf(
@@ -34,6 +32,8 @@ if ($packageProbeStatus === 0 && getenv('PMSS_FORCE_ACDCLI_UPDATE') !== '1') {
             escapeshellarg(sprintf('git+https://github.com/yadayada/acd_cli.git@%s', $acdCliPinnedCommit))
         )
     );
+} else {
+    logmsg('[SKIP] acd_cli already installed; set PMSS_FORCE_ACDCLI_UPDATE=1 to refresh');
 }
 
 if (is_file($cliBin)) {

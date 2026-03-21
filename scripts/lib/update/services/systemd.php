@@ -24,12 +24,15 @@ function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask)
     $dryRun = getenv('PMSS_DRY_RUN') === '1';
     $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'] + ($mask ? ['mask' => 'Masking'] : []);
 
-    $skipReason = !$dryRun && !is_dir('/run/systemd/system')
-        ? 'systemd unavailable'
-        : (!$dryRun && !pmssSystemdUnitExists($unit) ? 'unit '.$unit.' missing' : '');
-    if ($skipReason !== '') {
+    if (!$dryRun && !is_dir('/run/systemd/system')) {
         foreach ($actions as $prefix) {
-            pmssLogStatus('SKIP', $prefix.' '.$label.' system service ('.$skipReason.')');
+            pmssLogStatus('SKIP', $prefix.' '.$label.' system service (systemd unavailable)');
+        }
+        return;
+    }
+    if (!$dryRun && !pmssSystemdUnitExists($unit)) {
+        foreach ($actions as $prefix) {
+            pmssLogStatus('SKIP', $prefix.' '.$label.' system service (unit '.$unit.' missing)');
         }
         return;
     }
