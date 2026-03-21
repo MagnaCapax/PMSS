@@ -43,12 +43,7 @@ function pmssProfileSummary(): void
 
     // Summarise statuses so operators can see whether any ERR/SKIP steps
     // occurred without scanning the entire log.
-    $counts = [
-        'OK'   => 0,
-        'ERR'  => 0,
-        'SKIP' => 0,
-        'OTHER'=> 0,
-    ];
+    $counts = array_fill_keys(['OK', 'ERR', 'SKIP', 'OTHER'], 0);
     foreach ($profile as $entry) {
         $status = strtoupper((string) ($entry['status'] ?? ''));
         $counts[isset($counts[$status]) ? $status : 'OTHER']++;

@@ -43,8 +43,7 @@ function pmssIsHomeMounted(): bool
         return $override;
     }
 
-    $mountsPath = (string) getenv('PMSS_PROC_MOUNTS_PATH');
-    $mountsPath = $mountsPath !== '' ? $mountsPath : '/proc/mounts';
+    $mountsPath = ((string) getenv('PMSS_PROC_MOUNTS_PATH')) ?: '/proc/mounts';
     if (!is_string($mounts = @file_get_contents($mountsPath))) {
         // If we cannot read /proc/mounts, assume not mounted to be safe.
         return false;

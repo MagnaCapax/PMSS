@@ -30,7 +30,7 @@ function pmssProcessSnapshotRun(): int
         return 1;
     }
 
-    $logPath = getenv('PMSS_PROCESS_SNAPSHOT_LOG') ?: PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT;
+    $logPath = (string) (getenv('PMSS_PROCESS_SNAPSHOT_LOG') ?: PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT);
     $logDir = dirname($logPath);
     $ts = date('Y-m-d\\TH:i:s');
 
@@ -41,8 +41,7 @@ function pmssProcessSnapshotRun(): int
             return 1;
         }
 
-        $fh = @fopen($logPath, 'ab');
-        if ($fh === false) {
+        if (($fh = @fopen($logPath, 'ab')) === false) {
             return 1;
         }
 

@@ -77,12 +77,8 @@ class ResourceStatsProcessor
 
     public function validateUser(string $user): bool
     {
-        if (!is_readable($this->resourceDir.'/'.$user)) {
-            return false;
-        }
-
-        $passwd = @file_get_contents($this->passwdFile);
-        return $passwd !== false
+        return is_readable($this->resourceDir.'/'.$user)
+            && ($passwd = @file_get_contents($this->passwdFile)) !== false
             && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1
             && is_dir($this->homeDir.'/'.$user);
     }
@@ -90,18 +86,19 @@ class ResourceStatsProcessor
     /** Process and persist resource statistics for a single user. */
     public function processUser(string $user, array $compareTimes): void
     {
+        $logPrefix = date('c').': ';
         if (!$this->validateUser($user)) {
-            logMessage(date('c').": Invalid user {$user}");
+            logMessage($logPrefix."Invalid user {$user}");
             return;
         }
 
         if (($dataLines = trim($this->stats->getData($user, (int) ((35 * 24 * 60) / 5)))) === '') {
-            logMessage(date('c').": No data for user {$user}");
+            logMessage($logPrefix."No data for user {$user}");
             return;
         }
 
         if (count($resourceData = array_filter(explode("\n", $dataLines))) < 2) {
-            logMessage(date('c').": Too little data for {$user}");
+            logMessage($logPrefix."Too little data for {$user}");
             return;
         }
 
@@ -109,14 +106,14 @@ class ResourceStatsProcessor
         foreach ($resourceData as $line) {
             $parsed = $this->stats->parseLine($line);
             if ($parsed === false) {
-                logMessage(date('c').": Parsing line failed for {$user}, line: {$line}");
+                logMessage($logPrefix."Parsing line failed for {$user}, line: {$line}");
                 continue;
             }
             $accumulator->addSample($parsed);
         }
 
         if (!$accumulator->hasSamples()) {
-            logMessage(date('c').": No valid samples for {$user}");
+            logMessage($logPrefix."No valid samples for {$user}");
             return;
         }
 
@@ -143,7 +140,7 @@ class ResourceStatsProcessor
 
         $this->ensureRuntime();
         $this->save($user, $data);
-        logMessage(date('c').": Resource stats for {$user} saved, month read bytes: {$results['raw']['io_read']['month']}");
+        logMessage($logPrefix."Resource stats for {$user} saved, month read bytes: {$results['raw']['io_read']['month']}");
     }
 
     /** Persist user resource data to home directory and runtime cache. */
