@@ -110,9 +110,7 @@ function aptCmd(string $args): string
 function pmssBuildCommand(string $program, array $args = []): string
 {
     $prog = escapeshellcmd($program);
-    return empty($args)
-        ? $prog
-        : $prog.' '.implode(' ', array_map(static function ($a) { return escapeshellarg((string)$a); }, $args));
+    return empty($args) ? $prog : $prog.' '.implode(' ', array_map(static function ($a) { return escapeshellarg((string) $a); }, $args));
 }
 
 /**
@@ -120,7 +118,7 @@ function pmssBuildCommand(string $program, array $args = []): string
  */
 function pmssLogStatus(string $status, string $description, int $rc = 0, ?float $duration = null): void
 {
-    $dur = $duration !== null ? $duration : 0.0;
+    $dur = $duration ?? 0.0;
     $statusUpper = strtoupper($status);
     $message  = sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description);
     logMessage($message);

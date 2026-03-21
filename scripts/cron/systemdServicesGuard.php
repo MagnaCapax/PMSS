@@ -21,10 +21,7 @@ if (!is_dir('/run/systemd/system')) {
     exit(0);
 }
 
-$specs = pmssSeedboxSystemServiceSpecs();
-$specs[] = ['unit' => 'apache2', 'label' => 'Apache httpd (legacy)', 'mask' => true];
-
-foreach ($specs as $spec) {
+foreach (array_merge(pmssSeedboxSystemServiceSpecs(), [['unit' => 'apache2', 'label' => 'Apache httpd (legacy)', 'mask' => true]]) as $spec) {
     $unit = (string) ($spec['unit'] ?? '');
     if ($unit === '' || !pmssSystemdUnitExists($unit)) {
         continue;

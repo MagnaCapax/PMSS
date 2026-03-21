@@ -18,8 +18,11 @@ function pmssLoadRepoTemplate(string $codename, ?callable $logger = null): strin
     // Allow tests and recovery scripts to point at alternate config roots.
     $path = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config')."/template.sources.$codename";
 
-    if (!file_exists($path)) { $log("Repository template missing: $path"); return ''; }
-    if (($data = trim((string) @file_get_contents($path))) === '') { $log("Repository template empty: $path"); return ''; }
+    $exists = file_exists($path);
+    if (!$exists || ($data = trim((string) @file_get_contents($path))) === '') {
+        $log(($exists ? 'Repository template empty: ' : 'Repository template missing: ').$path);
+        return '';
+    }
 
     return $data."\n";
 }
@@ -82,12 +85,12 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
         return;
     }
 
-    if ($distroName === 'debian') {
-        pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
+    if ($distroName !== 'debian') {
+        $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName");
         return;
     }
 
-    $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName");
+    pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
 }
 
 /**

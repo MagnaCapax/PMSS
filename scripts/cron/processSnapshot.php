@@ -58,10 +58,9 @@ function pmssProcessSnapshotRun(): int
         }
 
         // Use auxf to include user, cpu/mem, and the process tree. Add "ww" to avoid truncation.
-        $cmd = $ps.' auxfww 2>&1';
         $out = [];
         $rc = 0;
-        @exec($cmd, $out, $rc);
+        @exec($ps.' auxfww 2>&1', $out, $rc);
         if ($rc !== 0) {
             $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($out, 0, 5))));
             @fwrite($fh, $ts.' WARN ps_failed rc='.$rc.($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL);
