@@ -24,9 +24,7 @@ if (strpos($email, '@') == false) die('You need valid e-mail address');
 // the virtualenv install path still required on Debian 10 (buster).
 $domain = trim((string) file_get_contents('/etc/hostname'));
 $distroInfo = pmssDetectDistro();
-$codename = (isset($distroInfo['codename']) && $distroInfo['codename'] !== '')
-    ? $distroInfo['codename']
-    : 'bullseye';
+$codename = $distroInfo['codename'] !== '' ? $distroInfo['codename'] : 'bullseye';
 
 // Debian 10 needs a newer certbot than the archive provides; newer releases
 // use the distro packages.

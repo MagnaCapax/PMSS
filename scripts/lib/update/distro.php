@@ -37,8 +37,7 @@ function pmssDetectDistro(): array
     $version  = (int) filter_var($rawVersion, FILTER_SANITIZE_NUMBER_INT) ?: 0;
     $codename = strtolower((string) (getDistroCodename() ?: trim((string) @shell_exec('lsb_release -cs 2>/dev/null'))));
 
-    $mappedVersion = pmssVersionFromCodename($codename);
-    if ($mappedVersion !== 0) {
+    if (($mappedVersion = pmssVersionFromCodename($codename)) !== 0) {
         if ($mappedVersion !== $version) {
             logmsg(sprintf('Distro codename/version mismatch (%s vs %d); trusting codename', $codename, $version));
         }

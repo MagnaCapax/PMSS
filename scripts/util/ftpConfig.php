@@ -30,20 +30,17 @@ if (!is_dir($proftpdDir)) {
 $hostname = preg_replace('/[^a-z0-9.-]/', '', strtolower(trim($hostnameRaw)));
 $hostname = $hostname === '' ? 'localhost' : $hostname;
 $detected = \pmssDetectDistro();
-$distroVersion = is_array($detected) && isset($detected['version']) ? (int) $detected['version'] : 0;
+$distroVersion = (int) ($detected['version'] ?? 0);
 // Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
 $tlsProtocol = $distroVersion > 0 && $distroVersion <= 10
     ? '    TLSProtocol                   TLSv1.2'
     : '    TLSProtocol                   TLSv1.2 TLSv1.3';
 
 $tlsBlock = '';
-$candidates = [];
-if ($hostname !== '') {
-    $candidates[] = "/etc/letsencrypt/live/{$hostname}";
-    if (strpos($hostname, '.') !== false) {
-        [, $domain] = explode('.', $hostname, 2);
-        $candidates[] = "/etc/letsencrypt/live/*.{$domain}";
-    }
+$candidates = ["/etc/letsencrypt/live/{$hostname}"];
+if (strpos($hostname, '.') !== false) {
+    [, $domain] = explode('.', $hostname, 2);
+    $candidates[] = "/etc/letsencrypt/live/*.{$domain}";
 }
 $candidates[] = '/etc/seedbox/config/ssl/proftpd';
 

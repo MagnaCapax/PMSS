@@ -18,8 +18,7 @@ class TrafficStorage
         $this->homeDir    = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
         $this->runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->statsDir   = rtrim($paths['stats_dir'] ?? $this->runtimeDir.'/trafficStats', '/');
-        $mode = $paths['traffic_mode'] ?? 'egress';
-        $this->trafficMode = in_array($mode, ['egress', 'ingress'], true) ? $mode : 'egress';
+        $this->trafficMode = ($paths['traffic_mode'] ?? 'egress') === 'ingress' ? 'ingress' : 'egress';
     }
 
     /** Ensure runtime directories exist before writing. */
