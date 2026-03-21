@@ -29,8 +29,7 @@ foreach ($users as $user) {
         continue;
     }
 
-    $statePath = $stateDir.'/'.$user.'.json';
-    ['delta' => $delta, 'state' => $state] = pmssResourceLogUpdateState($statePath, $counters);
+    ['delta' => $delta, 'state' => $state] = pmssResourceLogUpdateState($stateDir.'/'.$user.'.json', $counters);
 
     $lineParts = [
         date('Y-m-d H:i:s'),
@@ -46,6 +45,5 @@ foreach ($users as $user) {
         $lineParts[] = (string) $state['memory_anon'];
         $lineParts[] = (string) $state['memory_file'];
     }
-    $line = implode(' ', $lineParts);
-    @file_put_contents($logDir.'/'.$user, $line.PHP_EOL, FILE_APPEND | LOCK_EX);
+    @file_put_contents($logDir.'/'.$user, implode(' ', $lineParts).PHP_EOL, FILE_APPEND | LOCK_EX);
 }

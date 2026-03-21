@@ -134,10 +134,9 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
     $handle = @fopen($statePath, 'c+');
     $locked = $handle !== false && @flock($handle, LOCK_EX);
-    $previousState = [];
-    if ($locked && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))) {
-        $previousState = $decoded;
-    }
+    $previousState = $locked && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))
+        ? $decoded
+        : [];
 
     $state = $delta = [];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {

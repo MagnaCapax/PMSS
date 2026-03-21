@@ -69,8 +69,8 @@ class resourceStatistics
         }
 
         if ($tokenCount >= 11) {
-            foreach (['memory_anon', 'memory_file'] as $index => $field) {
-                $value = $tokens[$index + 9] ?? '';
+            foreach ([9 => 'memory_anon', 10 => 'memory_file'] as $index => $field) {
+                $value = $tokens[$index] ?? '';
                 if ($value === '' || !ctype_digit($value)) {
                     return false;
                 }
