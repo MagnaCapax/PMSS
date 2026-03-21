@@ -382,6 +382,21 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release')", $src);
     }
 
+    public function testRuntimeProfileKeepsStoreInitializationInsideRecordProfile(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/profile.php';
+        $src = @file_get_contents($path);
+        $symbol = 'pmssInit'.'ProfileStore';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertTrue(
+            strpos($src, 'function '.$symbol.'(') === false,
+            'runtime/profile.php should keep profile-store initialization inside pmssRecordProfile()'
+        );
+        $this->assertStringContainsString("if (!is_array(\$GLOBALS['PMSS_PROFILE'] ?? null))", $src);
+        $this->assertStringContainsString("\$GLOBALS['PMSS_PROFILE'][] = \$entry;", $src);
+    }
+
     public function testUserMaintenanceKeepsOptionalPostChecksInline(): void
     {
         $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';

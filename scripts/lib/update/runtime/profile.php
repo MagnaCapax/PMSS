@@ -14,21 +14,13 @@
 require_once __DIR__.'/../logging.php';
 
 /**
- * Ensure the global step profile buffer exists.
- */
-function pmssInitProfileStore(): void
-{
-    if (!is_array($GLOBALS['PMSS_PROFILE'] ?? null)) {
-        $GLOBALS['PMSS_PROFILE'] = [];
-    }
-}
-
-/**
  * Track a single step execution in memory and JSON logs.
  */
 function pmssRecordProfile(array $entry): void
 {
-    pmssInitProfileStore();
+    if (!is_array($GLOBALS['PMSS_PROFILE'] ?? null)) {
+        $GLOBALS['PMSS_PROFILE'] = [];
+    }
     $GLOBALS['PMSS_PROFILE'][] = $entry;
     pmssLogJson(['event' => 'step', 'data' => $entry]);
 }

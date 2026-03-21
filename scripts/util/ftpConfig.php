@@ -34,6 +34,10 @@ if ($hostname === '') {
 }
 $detected = \pmssDetectDistro();
 $distroVersion = is_array($detected) && isset($detected['version']) ? (int) $detected['version'] : 0;
+// Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
+$tlsProtocol = $distroVersion > 0 && $distroVersion <= 10
+    ? '    TLSProtocol                   TLSv1.2'
+    : '    TLSProtocol                   TLSv1.2 TLSv1.3';
 
 $tlsBlock = '';
 $candidates = [];
@@ -50,11 +54,6 @@ foreach ($candidates as $base) {
     if (!file_exists($base.'/cert.pem') || !file_exists($base.'/privkey.pem') || !file_exists($base.'/fullchain.pem')) {
         continue;
     }
-
-    // Debian 10's proftpd-mod-crypto may not support TLSv1.3 → restrict to TLSv1.2 there.
-    $tlsProtocol = $distroVersion > 0 && $distroVersion <= 10
-        ? '    TLSProtocol                   TLSv1.2'
-        : '    TLSProtocol                   TLSv1.2 TLSv1.3';
 
     $tlsBlock = implode("\n", [
         '    TLSEngine                     on',
@@ -82,9 +81,7 @@ if ($tlsBlock === '') {
     $rendered = preg_replace('#\n?<IfModule mod_tls\\.c>.*?</IfModule>#s', '', $rendered);
 }
 
-$logDir = '/var/log/proftpd';
-$runDir = '/var/run/proftpd';
-foreach ([$logDir, $runDir] as $path) {
+foreach (['/var/log/proftpd', '/var/run/proftpd'] as $path) {
     if (!is_dir($path) && !@mkdir($path, 0750, true)) {
         logMessage("Warning: Unable to create {$path}");
         continue;

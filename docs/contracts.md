@@ -114,8 +114,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - aptCmd(string $args): string
   - Returns apt-get command prefix with non-interactive dpkg options.
 
-- pmssInitProfileStore(): void → ensures `$GLOBALS['PMSS_PROFILE']` exists.
-- pmssRecordProfile(array $entry): void → appends entry and emits JSON `step` event.
+- pmssRecordProfile(array $entry): void → lazily initializes `$GLOBALS['PMSS_PROFILE']`, appends the entry, and emits JSON `step` event.
 - pmssProfileSummary(): void → logs status counts and top 5 durations; writes full JSON to `PMSS_PROFILE_OUTPUT` or `(<PMSS_JSON_LOG>.profile.json)`.
 
 ---

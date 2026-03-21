@@ -21,7 +21,7 @@ if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 
-$argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
+$argUserRaw = trim((string) ($argv[1] ?? ''));
 if ($argUserRaw !== '') {
     $argUser = function_exists('pmssNormalizeUsername')
         ? pmssNormalizeUsername($argUserRaw)
@@ -73,8 +73,7 @@ foreach ($users as $thisUser) {
         continue;
     }
 
-    $thisUserDir = "/home/{$thisUser}";
-    $userHtpasswd = $thisUserDir.'/.lighttpd/.htpasswd';
+    $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
     if (
         is_file($userHtpasswd)
         && ($userHtpasswdContents = @file_get_contents($userHtpasswd)) !== false

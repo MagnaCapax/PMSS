@@ -24,11 +24,22 @@ class RuntimeProfileTest extends TestCase
         putenv('PMSS_PROFILE_OUTPUT');
     }
 
-    public function testInitProfileStoreCreatesArray(): void
+    public function testRecordProfileInitializesStoreWhenMissing(): void
     {
         $this->resetState();
         $this->assertTrue(empty($GLOBALS['PMSS_PROFILE'] ?? []));
-        pmssInitProfileStore();
+
+        pmssRecordProfile([
+            'description' => 'Init',
+            'command' => 'true',
+            'status' => 'OK',
+            'rc' => 0,
+            'duration' => 0.0,
+            'dry_run' => false,
+            'stdout_excerpt' => '',
+            'stderr_excerpt' => '',
+        ]);
+
         $this->assertTrue(is_array($GLOBALS['PMSS_PROFILE']));
     }
 
