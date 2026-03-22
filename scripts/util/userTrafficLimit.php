@@ -58,29 +58,14 @@ $show = (pmssCliOption($parsed, 'show') === true);
 $unset = (pmssCliOption($parsed, 'unset') === true);
 $limitRaw = pmssCliOption($parsed, 'limit', 'l', $parsed['arguments'][1] ?? null);
 
-if ($userName === '') {
-    fwrite(STDERR, "Error: missing username.\n".$usage."\n");
-    exit(2);
+// Resolve and validate the target before mutating any persisted state; shared helper keeps the missing username contract: "Error: missing username.\n".$usage."\n"
+$exitCode = null;
+$resolvedUser = pmssTrafficLimitResolveCliUserHome($userName, $usage, $exitCode);
+if ($resolvedUser === null) {
+    exit($exitCode ?? 1);
 }
-
-$userName = function_exists('pmssNormalizeUsername')
-    ? pmssNormalizeUsername($userName)
-    : strtolower(trim($userName));
-
-if (function_exists('pmssValidateUsername') && !pmssValidateUsername($userName)) {
-    fwrite(STDERR, "Error: invalid username: {$userName}\n");
-    exit(2);
-}
-
-requireRoot();
-
-// Check if user exists
-$pw = pmssUserAccountLookup($userName);
-$homeDir = $pw !== null && isset($pw['dir']) ? (string) $pw['dir'] : "/home/{$userName}";
-if (!is_dir($homeDir) || is_link($homeDir)) {
-    fwrite(STDERR, "Error: no such user: {$userName}\n");
-    exit(3);
-}
+$userName = $resolvedUser['user'];
+$homeDir = $resolvedUser['home'];
 
 //Save the configured limit
 $runtimeDir = '/etc/seedbox/runtime/trafficLimits';

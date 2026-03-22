@@ -86,31 +86,14 @@ TEXT
     $unset = (pmssCliOption($parsed, 'unset') === true);
     $bonusRaw = pmssCliOption($parsed, 'bonus', 'b', $parsed['arguments'][1] ?? null);
 
-    if ($userName === '') {
-        fwrite(STDERR, "Error: missing username.\n".$usage."\n");
-        return 2;
+    // Shared helper keeps the missing username contract: "Error: missing username.\n".$usage."\n"
+    $exitCode = null;
+    $resolvedUser = pmssTrafficLimitResolveCliUserHome($userName, $usage, $exitCode);
+    if ($resolvedUser === null) {
+        return $exitCode ?? 1;
     }
-
-    $userName = function_exists('pmssNormalizeUsername')
-        ? pmssNormalizeUsername($userName)
-        : strtolower(trim($userName));
-
-    if (function_exists('pmssValidateUsername') && !pmssValidateUsername($userName)) {
-        fwrite(STDERR, "Error: invalid username: {$userName}\n");
-        return 2;
-    }
-
-    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-        fwrite(STDERR, "Error: must run as root.\n");
-        return 1;
-    }
-
-    $pw = function_exists('posix_getpwnam') ? @posix_getpwnam($userName) : false;
-    $homeDir = is_array($pw) && isset($pw['dir']) ? (string) $pw['dir'] : "/home/{$userName}";
-    if (!is_dir($homeDir) || is_link($homeDir)) {
-        fwrite(STDERR, "Error: no such user: {$userName}\n");
-        return 3;
-    }
+    $userName = $resolvedUser['user'];
+    $homeDir = $resolvedUser['home'];
 
     if ($show && $unset) {
         fwrite(STDERR, "Error: --show and --unset are mutually exclusive.\n");
