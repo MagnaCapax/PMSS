@@ -18,30 +18,8 @@ require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/network/fireqos.php';
 require_once '/scripts/lib/userLifecycle.php';
 // Collect tenant usernames for FireQOS shaping.
-$usersRaw = trim((string) shell_exec('/scripts/listUsers.php'));
-$users    = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
-
-// Defensive validation: ensure usernames from listUsers conform to the core
-// regex so any anomalies are surfaced via users.log and excluded from shaping.
-$validatedUsers = [];
-foreach ($users as $u) {
-    if (!pmssValidateUsername($u)) {
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'network',
-                'validate',
-                $u,
-                [
-                    'status'  => 'ERR',
-                    'message' => 'Skipping invalid username in setupNetwork',
-                ]
-            )
-        );
-        continue;
-    }
-    $validatedUsers[] = $u;
-}
-$users = $validatedUsers;
+$users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
+$users = array_values(array_filter($users, 'pmssValidateUsername'));
 
 // Retrieve persisted interface selections and LAN bypass ranges.
 $networkConfig = networkLoadConfig();

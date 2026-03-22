@@ -22,7 +22,7 @@ $canUserLog = function_exists('pmssUserLog');
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
 if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
-    $users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
+    $users = pmssListManagedUsers();
 } else {
     if (!pmssValidateUsername($argUserRaw)) {
         fwrite(STDERR, "Invalid username\n");
@@ -37,13 +37,7 @@ if ($argUserRaw === '') {
 }
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    $thisUser = trim((string) $thisUser);
-    if ($thisUser === '') continue;
     $homeDir = "/home/{$thisUser}";
-    if (!pmssValidateUsername($thisUser)) {
-        echo "Skipping invalid username: {$thisUser}\n";
-        continue;
-    }
     #TODO Uh Oh next one should be separate script :) This is separate task altogether. Works here too as expected, just a bit confusing
     if (file_exists($homeDir.'/www-disabled') or
         !file_exists($homeDir.'/www')) {

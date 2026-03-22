@@ -16,7 +16,7 @@ if (!pmssResourceLogEnsureDir($logDir, 0755) || !pmssResourceLogEnsureDir($state
     exit(1);
 }
 
-$users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
+$users = pmssListManagedUsers();
 if ($users === []) {
     exit(0);
 }

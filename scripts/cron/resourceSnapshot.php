@@ -10,6 +10,7 @@
 require_once __DIR__.'/../lib/resources/log.php';
 require_once __DIR__.'/../lib/resources.php';
 require_once __DIR__.'/../lib/resources/accumulator.php';
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 
@@ -45,7 +46,7 @@ function pmssResourceSnapshotRun(): int
             @flock($fh, LOCK_EX);
         }
 
-        $users = array_filter(array_map('trim', explode("\n", (string) @shell_exec('/scripts/listUsers.php'))), 'strlen');
+        $users = pmssListManagedUsers();
         if ($users === []) {
             return 0;
         }

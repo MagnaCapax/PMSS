@@ -39,7 +39,7 @@ if ($argUserRaw !== '') {
     }
     $users = [$argUser];
 } else {
-    $users = array_filter(array_map('trim', explode("\n", trim((string) shell_exec('/scripts/listUsers.php')))), 'strlen');
+    $users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
     if ($users === []) {
         die("No users setup - nothing to do\n");
     }

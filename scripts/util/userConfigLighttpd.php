@@ -33,17 +33,7 @@ function pmssUserConfigLighttpdMain(array $argv): int
         fwrite(STDERR, "#### WARNING: DEPRECATED COMMAND (use ".basename(__FILE__).")\n");
     }
 
-    $rawUsers = shell_exec('/scripts/listUsers.php');
-    $users = [];
-    foreach (array_filter(array_map('trim', explode("\n", trim((string) $rawUsers))), 'strlen') as $rawUser) {
-        $normalized = pmssNormalizeUsername($rawUser);
-        if (!pmssValidateUsername($normalized)) {
-            fwrite(STDERR, "Skipping invalid username from listUsers: ".substr($normalized, 0, 20)."\n");
-            continue;
-        }
-        $users[] = $normalized;
-    }
-    $users = array_values(array_unique($users));
+    $users = array_values(array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername'));
     if (count($users) === 0) {
         fwrite(STDERR, "No users setup - nothing to do\n");
         return 0;

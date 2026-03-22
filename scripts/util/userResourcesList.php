@@ -126,8 +126,8 @@ $formatGiB = static function ($value): string {
 
 $store = new UserConfigStore();
 
-$usersRaw = trim((string) shell_exec('/scripts/listUsers.php'));
-if ($usersRaw === '') {
+$users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
+if ($users === []) {
     if ($outputJson) {
         echo "[]\n";
     } elseif (!$outputJsonl) {
@@ -135,7 +135,6 @@ if ($usersRaw === '') {
     }
     exit(0);
 }
-$users = array_filter(array_map('trim', explode("\n", $usersRaw)), 'strlen');
 
 if (!$outputJson && !$outputJsonl) {
     printf($columnFormats[$displayMode], ...$columnHeaders[$displayMode]);
