@@ -87,4 +87,34 @@ abstract class TestCase
             throw new SkipTest($reason);
         }
     }
+
+    /** Create a unique temporary directory for hermetic tests. */
+    protected function pmssMakeTempDir(string $prefix, int $mode = 0755): string
+    {
+        $path = sys_get_temp_dir().'/'.$prefix.bin2hex(random_bytes(6));
+        @mkdir($path, $mode, true);
+        return $path;
+    }
+
+    /** Remove a temporary directory tree created during tests. */
+    protected function pmssRemoveTree(string $path): void
+    {
+        if (!file_exists($path)) {
+            return;
+        }
+
+        $it = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($it as $item) {
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+                continue;
+            }
+            @unlink($item->getPathname());
+        }
+
+        @rmdir($path);
+    }
 }

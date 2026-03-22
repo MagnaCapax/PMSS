@@ -182,8 +182,6 @@ class ConfigBackupsTest extends TestCase
 
     private function makeTempDir(string $prefix): string
     {
-        $path = sys_get_temp_dir().'/'.$prefix.bin2hex(random_bytes(6));
-        @mkdir($path, 0755, true);
-        return $path;
+        return $this->pmssMakeTempDir($prefix);
     }
 }
