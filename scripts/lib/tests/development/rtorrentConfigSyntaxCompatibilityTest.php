@@ -41,6 +41,40 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     }
 
     /**
+     * The skeleton should not ship rTorrent 0.9.8-incompatible legacy directives.
+     */
+    public function testSkeletonRtorrentConfigAvoidsRemovedAndDeprecatedLegacyOptions(): void
+    {
+        $content = $this->readRepoFile('etc/skel/.rtorrent.rc');
+        $forbiddenLines = [
+            'umask = 0002',
+            'use_udp_trackers = yes',
+            'hash_interval = 300',
+            'hash_max_tries = 2',
+            'tracker_numwant = -1',
+            'port_range = 50000-60000',
+            'check_hash = no',
+        ];
+        $requiredLines = [
+            'trackers.numwant.set = -1',
+            'trackers.use_udp.set = yes',
+            'network.port_range.set = 50000-60000',
+            'pieces.hash.on_completion.set = no',
+        ];
+
+        foreach ($forbiddenLines as $line) {
+            $this->assertTrue(
+                strpos($content, $line) === false,
+                'Skeleton still ships legacy line '.$line
+            );
+        }
+
+        foreach ($requiredLines as $line) {
+            $this->assertStringContainsString($line, $content, 'Skeleton is missing modern line '.$line);
+        }
+    }
+
+    /**
      * Keep path handling local to the repo so the test stays hermetic.
      */
     private function readRepoFile(string $relativePath): string
