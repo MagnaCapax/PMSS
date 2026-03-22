@@ -26,7 +26,19 @@ function pmssParseSystemdPropertyOutput(array $propertyNames, string $output): a
 /** @param array<int, string> $propertyNames */
 function pmssBuildSystemdShowCommand(string $unit, array $propertyNames): string
 {
-    return 'systemctl show '.escapeshellarg($unit).' -p '.implode(' -p ', $propertyNames).' 2>/dev/null';
+    $propertyArgs = [];
+    foreach ($propertyNames as $propertyName) {
+        if (!is_string($propertyName) || $propertyName === '') {
+            continue;
+        }
+        $propertyArgs[] = '-p '.escapeshellarg($propertyName);
+    }
+
+    if ($propertyArgs === []) {
+        return 'printf %s ""';
+    }
+
+    return 'systemctl show '.escapeshellarg($unit).' '.implode(' ', $propertyArgs).' 2>/dev/null';
 }
 
 /** @param array<int, string> $propertyNames @return array<string, string> */

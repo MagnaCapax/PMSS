@@ -23,6 +23,24 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
         );
     }
 
+    public function testBuildSystemdShowCommandEscapesUnitAndProperties(): void
+    {
+        $command = \pmssBuildSystemdShowCommand(
+            "user-1000.slice; touch /tmp/pmss-test",
+            ['CPUQuota', "MemoryMax; echo injected"]
+        );
+
+        $this->assertEquals(
+            "systemctl show 'user-1000.slice; touch /tmp/pmss-test' -p 'CPUQuota' -p 'MemoryMax; echo injected' 2>/dev/null",
+            $command
+        );
+    }
+
+    public function testBuildSystemdShowCommandReturnsEmptyPrintfForEmptyProperties(): void
+    {
+        $this->assertEquals('printf %s ""', \pmssBuildSystemdShowCommand('user-1000.slice', []));
+    }
+
     public function testTrailingIntParsesPlainNumericValues(): void
     {
         $this->assertEquals(4096, \pmssSystemdPropertyTrailingInt('4096'));
