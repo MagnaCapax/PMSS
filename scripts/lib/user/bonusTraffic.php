@@ -8,7 +8,7 @@
  * @license GPL-3.0-only
  */
 
-foreach ([__DIR__.'/trafficLimit.php', dirname(__DIR__).'/lighttpd/userFileWrite.php'] as $dependency) {
+foreach ([dirname(__DIR__).'/runtime.php', __DIR__.'/trafficLimit.php', dirname(__DIR__).'/lighttpd/userFileWrite.php'] as $dependency) {
     if (is_file($dependency)) {
         require_once $dependency;
     }
@@ -57,8 +57,7 @@ function pmssBonusTrafficRemove(string $path): bool
  */
 function pmssUserBonusTrafficCli(array $argv): int
 {
-    if (PHP_SAPI !== 'cli') {
-        fwrite(STDERR, "This script must be run from the command line.\n");
+    if (!pmssRequireCli('This script must be run from the command line.', null)) {
         return 1;
     }
 

@@ -18,10 +18,9 @@
  * @author PMSS Team
  */
 
-if (PHP_SAPI !== 'cli') {
-    fwrite(STDERR, "This script must be run from the command line.\n");
-    exit(1);
-}
+require_once __DIR__.'/../lib/runtime.php';
+
+pmssRequireCli();
 
 require_once '/scripts/lib/cli/optionParser.php';
 foreach ([
@@ -73,10 +72,7 @@ if (function_exists('pmssValidateUsername') && !pmssValidateUsername($userName))
     exit(2);
 }
 
-if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-    fwrite(STDERR, "Error: must run as root.\n");
-    exit(1);
-}
+requireRoot();
 
 // Check if user exists
 $pw = function_exists('posix_getpwnam') ? @posix_getpwnam($userName) : false;

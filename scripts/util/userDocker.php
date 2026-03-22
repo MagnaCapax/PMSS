@@ -45,12 +45,10 @@
  * @author PMSS Team
  */
 
-if (PHP_SAPI !== 'cli') {
-    fwrite(STDERR, "This script must be run from the command line.\n");
-    exit(1);
-}
-
 require_once __DIR__.'/../lib/runtime.php';
+
+pmssRequireCli();
+
 require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 

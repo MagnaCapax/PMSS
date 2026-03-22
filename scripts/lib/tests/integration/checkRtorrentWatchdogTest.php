@@ -23,10 +23,9 @@
 
 // --- Guards ---
 
-if (PHP_SAPI !== 'cli') {
-    fwrite(STDERR, "CLI only\n");
-    exit(1);
-}
+require_once dirname(__DIR__, 2).'/runtime.php';
+
+pmssRequireCli('CLI only');
 
 if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
     fwrite(STDERR, "Must run as root\n");

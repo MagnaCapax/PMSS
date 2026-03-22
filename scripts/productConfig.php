@@ -10,10 +10,9 @@
  * @license GPL-3.0-only
  */
 
-if (PHP_SAPI !== 'cli') {
-    fwrite(STDERR, "This script must be run from the command line.\n");
-    exit(1);
-}
+require_once __DIR__.'/lib/runtime.php';
+
+pmssRequireCli();
 
 require_once __DIR__.'/lib/welcomeMessageProductConfig.php';
 
@@ -23,10 +22,7 @@ if (($argv[1] ?? '') === '--help' || ($argv[1] ?? '') === '-h') {
     exit(0);
 }
 
-if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-    fwrite(STDERR, "Error: must run as root.\n");
-    exit(1);
-}
+requireRoot();
 
 $productKey = trim((string) ($argv[1] ?? ''));
 if ($productKey === '') {
@@ -56,4 +52,3 @@ if (trim($welcomeMessage) === '') {
 } else {
     echo "Updated welcome message for product '{$productKey}'.\n";
 }
-

@@ -654,6 +654,25 @@ if (!function_exists('requireRoot')) {
     }
 }
 
+if (!function_exists('pmssRequireCli')) {
+    /**
+     * Enforce CLI execution for script entrypoints and reusable CLI flows.
+     */
+    function pmssRequireCli(string $message = 'This script must be run from the command line.', ?int $failureCode = 1): bool
+    {
+        if (PHP_SAPI === 'cli') {
+            return true;
+        }
+
+        fwrite(STDERR, rtrim($message, "\r\n").PHP_EOL);
+        if ($failureCode !== null) {
+            exit($failureCode);
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('pmssError')) {
     /**
      * Write an error message to STDERR and the log.

@@ -17,10 +17,9 @@
  * @author PMSS Team
  */
 
-if (PHP_SAPI !== 'cli') {
-    fwrite(STDERR, "This script must be run from the command line.\n");
-    exit(1);
-}
+require_once __DIR__.'/lib/runtime.php';
+
+pmssRequireCli();
 
 if ($argc !== 2) {
     fwrite(STDERR, "Usage: /scripts/userSlice.php USERNAME\n");
