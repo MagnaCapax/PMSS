@@ -24,7 +24,7 @@ class AiToolsInstallTest extends TestCase
     public function testPinsNodeAndCodexArtifacts(): void
     {
         $contents = $this->loadInstaller();
-        $this->assertStringContainsString('node-v20.20.0-linux-x64.tar.xz', $contents);
+        $this->assertStringContainsString('node-v22.22.1-linux-x64.tar.xz', $contents);
         $this->assertStringContainsString('codex-x86_64-unknown-linux-musl.tar.gz', $contents);
         $this->assertMatches('/[0-9a-f]{64}/', $contents);
     }
@@ -39,7 +39,7 @@ class AiToolsInstallTest extends TestCase
     {
         $contents = $this->loadInstaller();
         $this->assertStringContainsString('preg_match(\'/^v?([0-9]+)/\', $systemVersion, $match)', $contents);
-        $this->assertStringContainsString('>= 20', $contents);
+        $this->assertStringContainsString('>= 22', $contents);
         $this->assertTrue(strpos($contents, 'function pmssAiTools'.'NodeMajor(') === false, 'Node major parsing should stay inline in the only call site');
     }
 

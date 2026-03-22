@@ -22,7 +22,7 @@ $nodeBinary = '';
 $systemNode = trim((string) @shell_exec('command -v node 2>/dev/null'));
 if ($systemNode !== '') {
     $systemVersion = trim((string) @shell_exec(escapeshellarg($systemNode).' --version 2>/dev/null'));
-    if (preg_match('/^v?([0-9]+)/', $systemVersion, $match) && (int) $match[1] >= 20) {
+    if (preg_match('/^v?([0-9]+)/', $systemVersion, $match) && (int) $match[1] >= 22) {
         $nodeBinary = $systemNode;
     }
 }
@@ -31,11 +31,11 @@ if ($nodeBinary === '') {
     if (!$supportsPinnedArtifacts) {
         $logger('[WARN] Skipping Gemini/Claude install: no pinned Node.js artifact for this CPU architecture');
     } else {
-        $nodeVersion  = '20.20.0';
-        $nodeArchive  = 'node-v20.20.0-linux-x64.tar.xz';
-        $nodeSha256   = '4f48b52acf42130844a3a75e94da0e9629009d09e4101b2304895c24f3fbe609';
+        $nodeVersion  = '22.22.1';
+        $nodeArchive  = 'node-v22.22.1-linux-x64.tar.xz';
+        $nodeSha256   = '9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa';
         $installRoot  = '/opt/pmss/ai-tools';
-        $nodeDir      = $installRoot.'/node-v20.20.0-linux-x64';
+        $nodeDir      = $installRoot.'/node-v22.22.1-linux-x64';
         $nodeBinary   = $nodeDir.'/bin/node';
         $downloadPath = sys_get_temp_dir().'/'.$nodeArchive;
         $downloadUrl  = 'https://nodejs.org/dist/v'.$nodeVersion.'/'.$nodeArchive;
