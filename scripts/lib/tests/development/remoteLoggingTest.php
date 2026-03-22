@@ -147,6 +147,63 @@ class RemoteLoggingTest extends TestCase
         }
     }
 
+    public function testWriteManagedConfigFileRejectsSymlinkTarget(): void
+    {
+        $targetDir = $this->tempDir('rsyslog');
+        $realTarget = $this->tempDir('real').'/50-pmss-remote.conf';
+        $target = $targetDir.'/50-pmss-remote.conf';
+        $messages = [];
+
+        file_put_contents($realTarget, "*.* @@old.example:514\n");
+        symlink($realTarget, $target);
+
+        try {
+            $result = \pmssWriteManagedConfigFile($target, "*.* @new.example:1514\n", 'remote logging config', function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            });
+
+            $this->assertTrue(!$result, 'symlink target must be rejected');
+            $this->assertEquals("*.* @@old.example:514\n", file_get_contents($realTarget));
+            $this->assertTrue($this->messagesContain($messages, 'Unsafe remote logging config target'), 'expected unsafe-target warning');
+        } finally {
+            $this->cleanup($targetDir);
+            $this->cleanup(dirname($realTarget));
+        }
+    }
+
+    public function testRemoteLoggingRejectsSymlinkTargetPath(): void
+    {
+        $cfgDir = $this->tempDir('cfg');
+        $targetDir = $this->tempDir('rsyslog');
+        $realTarget = $this->tempDir('real').'/50-pmss-remote.conf';
+        $target = $targetDir.'/50-pmss-remote.conf';
+        $messages = [];
+
+        file_put_contents($cfgDir.'/logging.conf', implode("\n", [
+            'remote_logging_enabled=1',
+            'remote_host=logserver.example.com',
+            '',
+        ]));
+        file_put_contents($cfgDir.'/template.rsyslog-remote.conf', "*.* @@%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%\n");
+        file_put_contents($realTarget, "*.* @@old.example:514\n");
+        symlink($realTarget, $target);
+
+        try {
+            $this->runRemoteLogging([
+                'PMSS_CONFIG_DIR' => $cfgDir,
+                'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
+            ], $messages);
+
+            $this->assertEquals("*.* @@old.example:514\n", file_get_contents($realTarget));
+            $this->assertTrue($this->messagesContain($messages, 'Unsafe remote logging config target'), 'expected unsafe-target warning');
+            $this->assertTrue(!$this->messagesContain($messages, 'Applied remote logging:'), 'symlink target must prevent apply logging');
+        } finally {
+            $this->cleanup($cfgDir);
+            $this->cleanup($targetDir);
+            $this->cleanup(dirname($realTarget));
+        }
+    }
+
     private function tempDir(string $suffix): string
     {
         $dir = sys_get_temp_dir().'/pmss-remote-logging-'.bin2hex(random_bytes(4)).'-'.$suffix;
