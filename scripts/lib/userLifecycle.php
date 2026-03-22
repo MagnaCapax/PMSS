@@ -150,6 +150,19 @@ function pmssValidateUsername(string $username): bool
 }
 
 /**
+ * Normalize raw CLI/user input and return the username when it is valid.
+ *
+ * This preserves long-standing PMSS caller behavior that accepts harmless
+ * casing and whitespace differences while still enforcing the canonical
+ * username policy before any account or filesystem operations occur.
+ */
+function pmssUsernameNormalizeIfValid(string $rawUsername): ?string
+{
+    $normalized = pmssNormalizeUsername($rawUsername);
+    return pmssValidateUsername($normalized) ? $normalized : null;
+}
+
+/**
  * Provisioning wrapper matching the legacy "Validate*" naming convention.
  */
 function pmssValidateUsernameForCreate(string $username): bool

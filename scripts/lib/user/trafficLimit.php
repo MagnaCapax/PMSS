@@ -185,22 +185,24 @@ if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
     function pmssTrafficLimitResolveCliUserHome($rawUserName, string $usage, ?int &$exitCode = null): ?array
     {
         $exitCode = null;
-        $userName = function_exists('pmssNormalizeUsername')
+        $fail = static function (int $rc, string $message) use (&$exitCode): ?array { fwrite(STDERR, $message); $exitCode = $rc; return null; };
+        $userName = function_exists('pmssUsernameNormalizeIfValid')
+            ? pmssUsernameNormalizeIfValid((string) $rawUserName)
+            : null;
+        $normalizedRawUserName = function_exists('pmssNormalizeUsername')
             ? pmssNormalizeUsername((string) $rawUserName)
             : strtolower(trim((string) $rawUserName));
-        $fail = static function (int $rc, string $message) use (&$exitCode): ?array { fwrite(STDERR, $message); $exitCode = $rc; return null; };
         if ($userName === '') {
             return $fail(2, "Error: missing username.\n".$usage."\n");
         }
-        if (function_exists('pmssValidateUsername') && !pmssValidateUsername($userName)) {
-            return $fail(2, "Error: invalid username: {$userName}\n");
+        if ($userName === null) {
+            return $fail(2, "Error: invalid username: {$normalizedRawUserName}\n");
         }
         if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
             return $fail(1, "Error: must run as root.\n");
         }
         $account = function_exists('pmssUserAccountLookup') ? pmssUserAccountLookup($userName) : null;
-        $pw = function_exists('posix_getpwnam') ? @posix_getpwnam($userName) : false;
-        $homeDir = is_array($account) && isset($account['dir']) ? (string) $account['dir'] : (is_array($pw) && isset($pw['dir']) ? (string) $pw['dir'] : "/home/{$userName}");
+        $homeDir = is_array($account) && isset($account['dir']) ? (string) $account['dir'] : "/home/{$userName}";
         if (!is_dir($homeDir) || is_link($homeDir)) {
             return $fail(3, "Error: no such user: {$userName}\n");
         }

@@ -64,6 +64,20 @@ class UsernameValidationTest extends TestCase
         $this->assertEquals(null, \pmssUsernameCreateValidationError('abc123'));
     }
 
+    public function testUsernameNormalizeIfValidReturnsCanonicalUsernames(): void
+    {
+        $cases = [
+            [' User1 ', 'user1'],
+            ['abc123', 'abc123'],
+            ['user-name', null],
+            ['', null],
+        ];
+
+        foreach ($cases as $case) {
+            $this->assertEquals($case[1], \pmssUsernameNormalizeIfValid($case[0]));
+        }
+    }
+
     public function testInvalidUsernamesFail(): void
     {
         $invalid = [

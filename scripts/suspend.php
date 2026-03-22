@@ -27,9 +27,10 @@ if ($username === '') {
     die($usage."\n");
 }
 
-$username = pmssNormalizeUsername($username);
+$normalizedUsername = pmssUsernameNormalizeIfValid($username);
 // Validate inputs early so we never feed garbage to usermod or log files.
-if (!pmssValidateUsername($username)) {
+if ($normalizedUsername === null) {
+    $username = pmssNormalizeUsername($username);
     pmssUserWriteLogs(
         pmssUserBaseContext(
             'suspend',
@@ -43,6 +44,7 @@ if (!pmssValidateUsername($username)) {
     );
     die("Invalid username: {$username}\n");
 }
+$username = $normalizedUsername;
 
 $homeDir = "/home/{$username}";
 $activeRoot = "$homeDir/www";

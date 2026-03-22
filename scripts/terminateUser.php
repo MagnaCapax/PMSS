@@ -53,9 +53,9 @@ if ($username === '') {
     die($usage . "\n");
 }
 
-$username = pmssNormalizeUsername($username);
-
-if (!pmssValidateUsername($username)) {
+$normalizedUsername = pmssUsernameNormalizeIfValid($username);
+if ($normalizedUsername === null) {
+    $username = pmssNormalizeUsername($username);
     pmssUserWriteLogs(
         pmssUserBaseContext(
             'terminate', 'validate', $username,
@@ -67,6 +67,7 @@ if (!pmssValidateUsername($username)) {
     );
     die("Refusing to terminate invalid username: {$username}\n");
 }
+$username = $normalizedUsername;
 
 // Cross-check against the managed user list to avoid acting on unexpected
 // system accounts. This mirrors scripts/listUsers.php behaviour without

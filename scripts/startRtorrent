@@ -28,19 +28,11 @@ if (is_file($userLifecycleLib)) {
     require_once $userLifecycleLib;
 }
 
-$userRaw = (string) $argv[1];
-$user = function_exists('pmssNormalizeUsername')
-    ? pmssNormalizeUsername($userRaw)
-    : strtolower(trim($userRaw));
-
-$validUser = false;
-if (function_exists('pmssValidateUsername')) {
-    $validUser = pmssValidateUsername($user);
-}
-if (!$validUser) {
-    $validUser = (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $user);
-}
-if (!$validUser) {
+$user = function_exists('pmssUsernameNormalizeIfValid')
+    ? pmssUsernameNormalizeIfValid((string) $argv[1])
+    : null;
+if ($user === null) {
+    $user = strtolower(trim((string) $argv[1]));
     logmsg("Invalid username: {$user}");
     exit(1);
 }

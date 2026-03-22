@@ -41,8 +41,8 @@ function pmssUserConfigLighttpdMain(array $argv): int
     }
 
     if (isset($argv[1]) && $argv[1] !== '') {
-        $argUsername = pmssNormalizeUsername((string)$argv[1]);
-        if (!pmssValidateUsername($argUsername)) {
+        $argUsername = pmssUsernameNormalizeIfValid((string) $argv[1]);
+        if ($argUsername === null) {
             fwrite(STDERR, "Invalid username\n");
             return 1;
         }

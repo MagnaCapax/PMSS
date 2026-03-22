@@ -43,34 +43,16 @@ TXT;
 
     $restartNginx = pmssCliOption($parsed, 'restart', 'r', false) !== false;
 
-    if ($requestedUser !== '' && !pmssValidateUsername($requestedUser)) {
+    if ($requestedUser !== '' && pmssUsernameNormalizeIfValid($requestedUser) === null) {
         fwrite(STDERR, "Invalid username: {$requestedUser}\n");
         return 1;
     }
 
-    // Treat internal tool output as untrusted: validate every username and require
-    // a clean exit code so broken environments do not emit garbage as user data.
-    $userLines = [];
-    $userRc = 0;
-    exec('/scripts/listUsers.php 2>/dev/null', $userLines, $userRc);
-    if ($userRc !== 0) {
-        fwrite(STDERR, "Error: /scripts/listUsers.php failed (rc={$userRc}); aborting.\n");
-        return 1;
-    }
-    if (empty($userLines)) {
+    $users = pmssListManagedUsers('/scripts/listUsers.php');
+    if ($users === []) {
         echo "No users setup - nothing to do\n";
         return 0;
     }
-
-    $usersFiltered = [];
-    foreach ($userLines as $name) {
-        $name = pmssNormalizeUsername((string) $name);
-        if (!pmssValidateUsername($name)) {
-            continue;
-        }
-        $usersFiltered[$name] = true;
-    }
-    $users = array_keys($usersFiltered);
     sort($users, SORT_NATURAL | SORT_FLAG_CASE);
 
     $singleUser = ($requestedUser !== '');

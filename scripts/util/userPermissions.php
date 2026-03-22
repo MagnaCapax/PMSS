@@ -16,29 +16,15 @@ $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
 
 $userRaw = (string) $argv[1];
-$thisUser = function_exists('pmssNormalizeUsername')
-    ? pmssNormalizeUsername($userRaw)
-    : strtolower(trim($userRaw));
-if (function_exists('pmssValidateUsername') && !pmssValidateUsername($thisUser)) {
+$thisUser = function_exists('pmssUsernameNormalizeIfValid')
+    ? pmssUsernameNormalizeIfValid($userRaw)
+    : null;
+if ($thisUser === null) {
     die("Invalid username\n");
 }
 if (!is_dir("/home/{$thisUser}")) die("User does not exist\n");
 
-$userIds = null;
-$lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-if ($lines !== false) {
-    $prefix = $thisUser.':';
-    foreach ($lines as $line) {
-        if (strpos($line, $prefix) !== 0) {
-            continue;
-        }
-        $parts = explode(':', $line);
-        if (count($parts) >= 4) {
-            $userIds = ['uid' => (int) $parts[2], 'gid' => (int) $parts[3]];
-        }
-        break;
-    }
-}
+$userIds = function_exists('pmssUserAccountLookup') ? pmssUserAccountLookup($thisUser) : null;
 if (!is_array($userIds)) die("No such user\n");
 
 function chmodPath(string $path, int $perm, bool $recursive = false): void
