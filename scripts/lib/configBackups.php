@@ -1,16 +1,9 @@
 <?php
 /**
- * PMSS config backup helpers (critical service configs).
- *
- * Purpose:
- * - Create pre-change backups for critical configs (sshd/nginx/proftpd).
- * - Retain a bounded set (TTL + max count) to avoid disk growth.
- *
- * Design notes:
- * - Best-effort only: backup/prune must never be fatal to the caller.
- * - Backups live under /var/backups/pmss/config/<service>/ by default.
- * - Naming includes timestamp + source path key + optional PMSS version/correlation id.
- *
+ * PMSS config backup helpers for critical service configs.
+ * Best-effort only: backup/prune must never be fatal to the caller.
+ * Backups live under /var/backups/pmss/config/<service>/ and names include
+ * timestamp + source path key + optional PMSS version/correlation id.
  * @license GPL-3.0-only
  */
 
@@ -20,7 +13,6 @@ $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER'] = $GLOBALS['PMSS_CONFIG_BACKUPS_
             @fwrite(STDERR, $message.PHP_EOL);
             return;
         }
-
         error_log($message);
     };
 
@@ -43,30 +35,13 @@ $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER'] = $GLOBALS['PMSS_CONFIG_BACKUPS_
  */
 function pmssBackupCriticalConfig(string $service, string $sourcePath, array $options = array()): ?string
 {
-    $log = $options['logger'] ?? (function_exists('logMessage')
-        ? 'logMessage'
-        : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
-    $service = pmssConfigBackupsNormalizeService($service);
-    if (
-        $service === ''
-        || ($sourcePath = trim($sourcePath)) === ''
-        || getenv('PMSS_DRY_RUN') === '1'
-        || !is_file($sourcePath)
-        || !is_readable($sourcePath)
-    ) {
-        if ($service === '') {
-            $log('[WARN] Refusing config backup with invalid service name');
-        }
+    $context = pmssConfigBackupsPrepareContext($service, $sourcePath, $options, true, '[WARN] Refusing config backup with invalid service name');
+    if ($context === null) {
         return null;
     }
-
-    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
-
     $timestamp = isset($options['timestamp']) && preg_match('/^[0-9]{14}$/', (string) $options['timestamp'])
         ? (string) $options['timestamp']
         : date('YmdHis');
-
-    $key = pmssConfigBackupsPathKey($sourcePath);
     $pmssVersion = array_key_exists('pmssVersion', $options)
         ? (string) $options['pmssVersion']
         : (function_exists('getPmssVersion') ? (string) getPmssVersion() : 'unknown');
@@ -79,29 +54,24 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         }
     }
     $correlationId = array_key_exists('correlationId', $options) ? (string) $options['correlationId'] : (string) (getenv('PMSS_CORRELATION_ID') ?: '');
-
-    $serviceDir = $backupRoot.'/'.$service;
-    if (!is_dir($serviceDir) && !@mkdir($serviceDir, 0700, true) && !is_dir($serviceDir)) {
-        $log('[WARN] Unable to create config backup directory: '.$serviceDir);
+    if (!is_dir($context['serviceDir']) && !@mkdir($context['serviceDir'], 0700, true) && !is_dir($context['serviceDir'])) {
+        $context['log']('[WARN] Unable to create config backup directory: '.$context['serviceDir']);
         return null;
     }
-    @chmod($serviceDir, 0700);
-
-    $name = $timestamp.'__'.$key;
+    @chmod($context['serviceDir'], 0700);
+    $name = $timestamp.'__'.$context['key'];
     if (($versionLabel = pmssConfigBackupsSanitizeLabel($pmssVersion)) !== '' && $versionLabel !== 'unknown') { $name .= '__v='.$versionLabel; }
     if (($cidLabel = pmssConfigBackupsSanitizeLabel($correlationId)) !== '') { $name .= '__cid='.$cidLabel; }
-    $backupPath = $serviceDir.'/'.$name.'.bak';
-
-    if (!@copy($sourcePath, $backupPath)) {
-        $log('[WARN] Failed to create config backup for '.$sourcePath.' at '.$backupPath);
+    $backupPath = $context['serviceDir'].'/'.$name.'.bak';
+    if (!@copy($context['sourcePath'], $backupPath)) {
+        $context['log']('[WARN] Failed to create config backup for '.$context['sourcePath'].' at '.$backupPath);
         return null;
     }
     @chmod($backupPath, 0600);
     if (isset($options['logSuccess']) ? (bool) $options['logSuccess'] : function_exists('logMessage')) {
-        $log('Backup written: '.$backupPath);
+        $context['log']('Backup written: '.$backupPath);
     }
-
-    pmssPruneCriticalConfigBackups($service, $sourcePath, $options);
+    pmssPruneCriticalConfigBackups($context['service'], $context['sourcePath'], $options);
     return $backupPath;
 }
 
@@ -114,38 +84,22 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
  */
 function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, array $options = array()): void
 {
-    $log = $options['logger'] ?? (function_exists('logMessage')
-        ? 'logMessage'
-        : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
-    $service = pmssConfigBackupsNormalizeService($service);
-    if ($service === '' || ($sourcePath = trim($sourcePath)) === '' || getenv('PMSS_DRY_RUN') === '1') {
-        if ($service === '') {
-            $log('[WARN] Refusing config backup prune with invalid service name');
-        }
+    $context = pmssConfigBackupsPrepareContext($service, $sourcePath, $options, false, '[WARN] Refusing config backup prune with invalid service name');
+    if ($context === null) {
         return;
     }
-
-    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
-
-    $serviceDir = $backupRoot.'/'.$service;
-    $key = pmssConfigBackupsPathKey($sourcePath);
-    if (!is_dir($serviceDir) || empty($files = glob($serviceDir.'/*__'.$key.'*.bak'))) {
+    if (!is_dir($context['serviceDir']) || empty($files = glob($context['serviceDir'].'/*__'.$context['key'].'*.bak'))) {
         return;
     }
-
     $maxCount = isset($options['maxCount']) ? (int) $options['maxCount'] : 10;
     $ttlSeconds = isset($options['ttlSeconds']) ? (int) $options['ttlSeconds'] : (90 * 86400);
     $nowTs = isset($options['nowTs']) ? (int) $options['nowTs'] : time();
-
     // Sort by filename (timestamp prefix) descending so we keep the newest ones.
     rsort($files, SORT_STRING);
-
     $keptMap = array_fill_keys($maxCount > 0 ? array_slice($files, 0, $maxCount) : $files, true);
-
     $cutoff = $ttlSeconds > 0 ? ($nowTs - $ttlSeconds) : null;
     foreach ($files as $file) {
         $remove = !isset($keptMap[$file]);
-
         if (
             $cutoff !== null
             && preg_match('/^([0-9]{14})__/', basename($file), $matches)
@@ -154,11 +108,37 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
         ) {
             $remove = true;
         }
-
         if ($remove && !@unlink($file)) {
-            $log('[WARN] Unable to prune config backup: '.$file);
+            $context['log']('[WARN] Unable to prune config backup: '.$file);
         }
     }
+}
+
+/** @param array<string,mixed> $options @return array<string,mixed>|null */
+function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, array $options, bool $requireReadableSource, string $invalidServiceMessage): ?array
+{
+    $log = $options['logger'] ?? (function_exists('logMessage')
+        ? 'logMessage'
+        : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
+    $service = pmssConfigBackupsNormalizeService($service);
+    $sourcePath = trim($sourcePath);
+    if ($service === '' || $sourcePath === '' || getenv('PMSS_DRY_RUN') === '1') {
+        if ($service === '') {
+            $log($invalidServiceMessage);
+        }
+        return null;
+    }
+    if ($requireReadableSource && (!is_file($sourcePath) || !is_readable($sourcePath))) {
+        return null;
+    }
+    $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
+    return array(
+        'key' => pmssConfigBackupsPathKey($sourcePath),
+        'log' => $log,
+        'service' => $service,
+        'serviceDir' => $backupRoot.'/'.$service,
+        'sourcePath' => $sourcePath,
+    );
 }
 
 /**
