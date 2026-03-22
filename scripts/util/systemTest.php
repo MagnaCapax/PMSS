@@ -8,8 +8,6 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__.'/../lib/runtime.php';
-
 /**
  * PMSS system status probe.
  *
@@ -19,22 +17,7 @@ require_once __DIR__.'/../lib/runtime.php';
  */
 
 require_once __DIR__.'/../lib/cli/optionParser.php';
-require_once __DIR__.'/../lib/update/osRelease.php';
-
-/**
- * Build a normalized check result structure.
- *
- * Centralizing this helper keeps the returned array shape consistent and
- * avoids subtle drift when new checks are added over time.
- */
-function pmssStatus(string $name, string $status, string $detail = ''): array
-{
-    return [
-        'name'   => $name,
-        'status' => $status,
-        'detail' => $detail,
-    ];
-}
+require_once __DIR__.'/../lib/systemStatus.php';
 
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
 $format = strtolower((string) pmssCliOption($parsed, 'output', 'o', 'text'));
@@ -219,62 +202,21 @@ foreach ($symlinkTargets as $label => [$link, $expected]) {
     }
 }
 
-// Fold in the componentStatus view so operators get a single, richer picture.
-// The helper already focuses on binaries/configs; here we simply import its
-// JSON output when available and prefix entries so name clashes remain obvious.
-$componentJson = trim((string) @shell_exec('php /scripts/util/componentStatus.php --json 2>/dev/null'));
-if ($componentJson !== '') {
-    $decoded = json_decode($componentJson, true);
-    foreach (is_array($decoded['results'] ?? null) ? $decoded['results'] : [] as $entry) {
-        if (!isset($entry['name'], $entry['status'])) {
-            continue;
-        }
-        $name   = 'Component: '.$entry['name'];
-        $status = (string)$entry['status'];
-        $detail = (string) ($entry['detail'] ?? '');
-        $checks[] = pmssStatus($name, $status, $detail);
-    }
+// Fold in the shared component-status view so operators get a single, richer
+// picture without shelling out to a second PHP entrypoint.
+foreach (pmssComponentStatusChecks() as $entry) {
+    $checks[] = pmssStatus(
+        'Component: '.(string) $entry['name'],
+        (string) $entry['status'],
+        (string) ($entry['detail'] ?? '')
+    );
 }
 
-$errors = count(array_filter($checks, static function ($c) { return $c['status'] === 'ERR'; }));
-$warnings = count(array_filter($checks, static function ($c) { return $c['status'] === 'WARN'; }));
-$summary = [
-    'ok'   => count($checks) - $warnings - $errors,
-    'warn' => $warnings,
-    'err'  => $errors,
-];
+$summary = pmssStatusSummary($checks);
 
 if ($format === 'json') {
     echo json_encode(['checks' => $checks, 'summary' => $summary], $prettyFlag ? JSON_PRETTY_PRINT : 0).PHP_EOL;
     exit(0);
 }
 
-// Render summary banner.
-echo "\nPMSS System Check (".date('Y-m-d H:i:s').")\n";
-echo str_repeat('-', 60)."\n";
-
-$isTty = function_exists('posix_isatty') ? posix_isatty(STDOUT) : true;
-foreach ($checks as $result) {
-    $status = strtoupper((string)$result['status']);
-
-    $colour = '';
-    $reset  = '';
-    if ($isTty) {
-        if ($status === 'OK') {
-            $colour = "\033[32m"; // green
-        } elseif ($status === 'WARN') {
-            $colour = "\033[33m"; // yellow
-        } elseif ($status === 'ERR') {
-            $colour = "\033[31m"; // red
-        }
-        if ($colour !== '') {
-            $reset = "\033[0m";
-        }
-    }
-
-    $labelPadded = str_pad('['.$status.']', 9);
-    echo $colour.$labelPadded.$reset.$result['name'].($result['detail'] !== '' ? ' - '.$result['detail'] : '').PHP_EOL;
-}
-
-echo str_repeat('-', 60)."\n";
-echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", $summary['ok'], $summary['warn'], $summary['err']);
+pmssRenderStatusText('PMSS System Check', $checks, $summary, true, 9);
