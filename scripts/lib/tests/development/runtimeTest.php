@@ -33,6 +33,53 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testPmssRequireCliEntrypointScriptLoadsTargetWithAdjustedArgv(): void
+    {
+        $originalGlobalArgv = $GLOBALS['argv'] ?? null;
+        $originalServerArgv = $_SERVER['argv'] ?? null;
+        $originalCapture = $GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] ?? null;
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-');
+        $scriptPath = $tempDir.'/capture.php';
+        file_put_contents(
+            $scriptPath,
+            "<?php\n".
+            "\$GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] = [\n".
+            "    'argv' => \$GLOBALS['argv'] ?? [],\n".
+            "    'serverArgv' => \$_SERVER['argv'] ?? [],\n".
+            "];\n"
+        );
+
+        $GLOBALS['argv'] = ['wrapper.php'];
+        $_SERVER['argv'] = ['wrapper.php'];
+
+        try {
+            \pmssRequireCliEntrypointScript($tempDir, 'capture.php', false, ['--json']);
+            $capture = $GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] ?? null;
+            $this->assertTrue(is_array($capture), 'Expected delegated entrypoint capture');
+            $this->assertEquals(['wrapper.php', '--json'], $capture['argv']);
+            $this->assertEquals($capture['argv'], $capture['serverArgv']);
+        } finally {
+            $this->pmssRemoveTree($tempDir);
+            if ($originalGlobalArgv === null) {
+                unset($GLOBALS['argv']);
+            } else {
+                $GLOBALS['argv'] = $originalGlobalArgv;
+            }
+
+            if ($originalServerArgv === null) {
+                unset($_SERVER['argv']);
+            } else {
+                $_SERVER['argv'] = $originalServerArgv;
+            }
+
+            if ($originalCapture === null) {
+                unset($GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT']);
+            } else {
+                $GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] = $originalCapture;
+            }
+        }
+    }
+
     public function testDefaultCommandTimeoutIs1200Seconds(): void
     {
         $this->assertTrue(defined('PMSS_COMMAND_TIMEOUT_DEFAULT'));

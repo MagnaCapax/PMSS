@@ -703,6 +703,14 @@ if (!function_exists('pmssPrepareCliEntrypoint')) {
     }
 }
 
+if (!function_exists('pmssRequireCliEntrypointScript')) {
+    function pmssRequireCliEntrypointScript(string $baseDir, string $relativePath, bool $rootRequired = false, array $argvAppend = []): void
+    {
+        pmssPrepareCliEntrypoint($rootRequired, $argvAppend);
+        require_once rtrim($baseDir, '/').'/'.ltrim($relativePath, '/');
+    }
+}
+
 if (!function_exists('pmssSnapshotLogOpen')) {
     /**
      * Open a root-only append log for snapshot-style cron jobs.
