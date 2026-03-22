@@ -193,7 +193,8 @@ foreach ($usersOut as $line) {
         rtorrentProcessClearStaleState($unresponsiveState);
         if (file_exists($socketPath)) {
             pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
-            if (!@unlink($socketPath) && file_exists($socketPath)) {
+            $socketRemoved = @unlink($socketPath);
+            if (!$socketRemoved && file_exists($socketPath)) {
                 pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
             }
         }
@@ -268,7 +269,8 @@ foreach ($usersOut as $line) {
         rtorrentProcessClearStaleState($unresponsiveState);
         if (file_exists($socketPath)) {
             pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
-            if (!@unlink($socketPath) && file_exists($socketPath)) {
+            $socketRemoved = @unlink($socketPath);
+            if (!$socketRemoved && file_exists($socketPath)) {
                 pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
             }
         }
