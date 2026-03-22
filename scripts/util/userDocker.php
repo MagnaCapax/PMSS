@@ -77,11 +77,13 @@ if (!in_array($action, $valid, true)) {
 $info = pmssUserAccountLookup($user);
 if ($info === null) { fwrite(STDERR, "Unknown user: {$user}\n"); exit(1); }
 $uid = (int) $info['uid'];
-$dockerSock = "/run/user/{$uid}/docker.sock";
+$runtimeDir = "/run/user/{$uid}";
+$dockerSock = $runtimeDir.'/docker.sock';
 $home = isset($info['dir']) ? (string) $info['dir'] : '';
 $dockerUnitPath = $home !== '' ? $home.'/.config/systemd/user/docker.service' : '';
 $serviceExists = ($dockerUnitPath !== '' && is_file($dockerUnitPath));
 $userDockerStartTimeoutSec = 300;
+$dockerStopCmd = 'pkill -f dockerd-rootless.sh || pkill -f "dockerd-rootless" || pkill dockerd || true';
 
 if ($debug) {
     pmssUserLog($user, sprintf('userDocker: action=%s requested', $action));
@@ -227,33 +229,24 @@ $dockerPids = userDockerCollectPids($user, $debug, $processCheckOk);
 if ($action === 'status') {
     if (!empty($dockerPids)) {
         sort($dockerPids);
-        echo "docker process: running (pid(s): ".implode(', ', $dockerPids).")\n";
-    } elseif (!$processCheckOk) {
-        echo "docker process: unknown (process check failed)\n";
-    } else {
-        echo "docker process: not running\n";
     }
-    if ($serviceExists) {
-        echo "systemd user service unit: present at {$dockerUnitPath}\n";
-    } else {
-        echo "systemd user service unit: missing\n";
-    }
-    if (file_exists($dockerSock)) {
-        echo "docker socket: present at {$dockerSock}\n";
-    } else {
-        echo "docker socket: not found at {$dockerSock}\n";
-    }
+    $socketPresent = file_exists($dockerSock);
+    echo !empty($dockerPids)
+        ? "docker process: running (pid(s): ".implode(', ', $dockerPids).")\n"
+        : ($processCheckOk ? "docker process: not running\n" : "docker process: unknown (process check failed)\n");
+    echo $serviceExists ? "systemd user service unit: present at {$dockerUnitPath}\n" : "systemd user service unit: missing\n";
+    echo $socketPresent ? "docker socket: present at {$dockerSock}\n" : "docker socket: not found at {$dockerSock}\n";
     if ($debug) {
         echo "debug: home={$home}\n";
-        echo "debug: runtime_dir=/run/user/{$uid}\n";
+        echo "debug: runtime_dir={$runtimeDir}\n";
         echo "debug: unit_path={$dockerUnitPath}\n";
         echo "debug: process_check_ok=".($processCheckOk ? 'yes' : 'no')."\n";
         pmssUserLog($user, sprintf(
             'userDocker: debug status home=%s runtime_dir=%s unit_path=%s socket=%s process_check_ok=%s',
             $home,
-            "/run/user/{$uid}",
+            $runtimeDir,
             $dockerUnitPath,
-            file_exists($dockerSock) ? 'present' : 'missing',
+            $socketPresent ? 'present' : 'missing',
             $processCheckOk ? 'yes' : 'no'
         ));
     }
@@ -262,18 +255,19 @@ if ($action === 'status') {
 
 // STOP
 if ($action === 'stop' || $action === 'restart') {
+    pmssUserLog($user, $serviceExists
+        ? 'userDocker: stopping via systemd user service'
+        : 'userDocker: stopping rootless daemon via pkill (no systemd user unit)');
     if ($serviceExists) {
-        pmssUserLog($user, 'userDocker: stopping via systemd user service');
         $stopRc = 0;
         userDockerRunAs($user, 'systemctl --user stop docker.service', $userDockerStartTimeoutSec, $stopRc);
         if ($stopRc === 124) {
             pmssUserLog($user, 'userDocker: systemctl stop timed out; falling back to pkill');
-            userDockerRunAs($user, 'pkill -f dockerd-rootless.sh || pkill -f "dockerd-rootless" || pkill dockerd || true');
+            userDockerRunAs($user, $dockerStopCmd);
         }
     } else {
-        pmssUserLog($user, 'userDocker: stopping rootless daemon via pkill (no systemd user unit)');
         // Best-effort stop for non-systemd rootless: kill dockerd-rootless.sh/dockerd for this user.
-        userDockerRunAs($user, 'pkill -f dockerd-rootless.sh || pkill -f "dockerd-rootless" || pkill dockerd || true');
+        userDockerRunAs($user, $dockerStopCmd);
     }
     if ($action === 'stop') {
         echo "Docker stop requested for {$user}\n";
@@ -313,12 +307,13 @@ if ($action === 'start' || $action === 'restart') {
         echo "Docker already running for {$user} (pid(s): ".implode(', ', $dockerPids)."); skipping start\n";
         exit(0);
     }
-    if (!$startCheckOk && file_exists($dockerSock)) {
+    $socketPresent = file_exists($dockerSock);
+    if (!$startCheckOk && $socketPresent) {
         pmssUserLog($user, 'userDocker: process check failed with socket present; skipping start');
         echo "Docker socket present for {$user}, but process check failed; skipping start\n";
         exit(0);
     }
-    if (file_exists($dockerSock) && $debug) {
+    if ($socketPresent && $debug) {
         pmssUserLog($user, 'userDocker: docker socket present without running dockerd; attempting start');
     }
 
@@ -327,7 +322,7 @@ if ($action === 'start' || $action === 'restart') {
     pmssUserLog($user, 'userDocker: starting rootless daemon via dockerd-rootless.sh (no systemd user unit)');
     $envCmd = sprintf(
         'XDG_RUNTIME_DIR=%s PATH=$PATH:/usr/sbin:/sbin:$HOME/bin nohup dockerd-rootless.sh >/dev/null 2>&1 &',
-        "/run/user/{$uid}"
+        $runtimeDir
     );
     userDockerRunAs($user, $envCmd, $userDockerStartTimeoutSec);
     echo "Docker start requested for {$user} via dockerd-rootless.sh\n";
