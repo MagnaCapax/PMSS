@@ -12,7 +12,7 @@ class ArrUpdateTest extends TestCase
 
     public function testUpdateInstallsReleaseFromLocalArchiveAndCleansWorkspace(): void
     {
-        $baseDir = $this->tempDir('install');
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-install-');
         $app = 'PmssArrInstall'.bin2hex(random_bytes(3));
         $installPath = $baseDir.'/install';
         $extractDir = 'PackageDir';
@@ -47,7 +47,7 @@ class ArrUpdateTest extends TestCase
 
     public function testUpdateKeepsExistingInstallWhenExtractionFails(): void
     {
-        $baseDir = $this->tempDir('extract-fail');
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-extract-fail-');
         $app = 'PmssArrExtractFail'.bin2hex(random_bytes(3));
         $installPath = $baseDir.'/install';
         $extractDir = 'ExpectedDir';
@@ -80,13 +80,6 @@ class ArrUpdateTest extends TestCase
             $this->cleanup($baseDir);
             $this->cleanupGlob($workPattern);
         }
-    }
-
-    private function tempDir(string $suffix): string
-    {
-        $dir = sys_get_temp_dir().'/pmss-arr-update-'.bin2hex(random_bytes(4)).'-'.$suffix;
-        @mkdir($dir, 0700, true);
-        return $dir;
     }
 
     private function createArchive(string $baseDir, string $extractDir, array $files): string

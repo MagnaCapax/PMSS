@@ -6,13 +6,6 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 {
-    private function tempDir(string $prefix): string
-    {
-        $dir = sys_get_temp_dir().'/pmss-systemd-user-at-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        @mkdir($dir, 0700, true);
-        return $dir;
-    }
-
     private function withDropinDir(string $dir, callable $callback): void
     {
         $previous = getenv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR');
@@ -30,7 +23,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
     public function testInstallsConfiguredSoftHardLimits(): void
     {
-        $dir = $this->tempDir('install');
+        $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-install-');
         $this->withDropinDir($dir, function (): void {
             \pmssSystemdUserManagerNoFileLimitInstall([
                 'limitNoFileSoft' => 8192,
@@ -47,7 +40,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
     public function testClampsHardLimitUpToSoftLimit(): void
     {
-        $dir = $this->tempDir('clamp');
+        $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-clamp-');
         $this->withDropinDir($dir, function (): void {
             \pmssSystemdUserManagerNoFileLimitInstall([
                 'limitNoFileSoft' => 4096,
@@ -64,7 +57,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
     public function testSkipsWhenPolicyDoesNotProvideNoFileValues(): void
     {
-        $dir = $this->tempDir('skip');
+        $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-skip-');
         $this->withDropinDir($dir, function (): void {
             \pmssSystemdUserManagerNoFileLimitInstall([
                 'cpuWeight' => 100,
@@ -78,9 +71,9 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
 
     public function testInstallsLogNamespaceDropin(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $sliceDir = $this->tempDir('slice');
-        $dir = $this->tempDir('log-namespace');
+        $cfgDir = $this->pmssMakeTempDir('pmss-systemd-user-at-cfg-');
+        $sliceDir = $this->pmssMakeTempDir('pmss-systemd-user-at-slice-');
+        $dir = $this->pmssMakeTempDir('pmss-systemd-user-at-log-namespace-');
         file_put_contents(
             $cfgDir.'/template.cgroup.user-slice.v2.conf',
             "[Slice]\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n"

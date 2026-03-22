@@ -16,13 +16,6 @@ class JournaldLimitsTest extends TestCase
         return $value * 1024 * 1024;
     }
 
-    private function tempDir(string $prefix): string
-    {
-        $dir = sys_get_temp_dir().'/pmss-journald-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        @mkdir($dir, 0700, true);
-        return $dir;
-    }
-
     public function testSmallRootUsesTwentyPercent(): void
     {
         $rootBytes = $this->gib(20);
@@ -74,8 +67,8 @@ class JournaldLimitsTest extends TestCase
 
     public function testTemplateRenderAndWrite(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $targetDir = $this->tempDir('journald');
+        $cfgDir = $this->pmssMakeTempDir('pmss-journald-cfg-');
+        $targetDir = $this->pmssMakeTempDir('pmss-journald-journald-');
         $template = $cfgDir.'/template.journald.conf.d-pmss-limits.conf';
         $tplBody = "[Journal]\n"
             ."SystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n"
@@ -107,8 +100,8 @@ class JournaldLimitsTest extends TestCase
     {
         unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
 
-        $cfgDir = $this->tempDir('cfg');
-        $targetDir = $this->tempDir('journald');
+        $cfgDir = $this->pmssMakeTempDir('pmss-journald-cfg-');
+        $targetDir = $this->pmssMakeTempDir('pmss-journald-journald-');
         file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
 
         $this->pmssWithEnv([

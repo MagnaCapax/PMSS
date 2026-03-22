@@ -24,7 +24,7 @@ class NetconsoleConfigureTest extends TestCase
 
     public function testSkipsWhenConfigMissing(): void
     {
-        $dir = $this->makeTempDir('missing');
+        $dir = $this->pmssMakeTempDir('pmss-netconsole-missing-');
         $logs = [];
         $this->withNetconsoleEnv($dir, function () use (&$logs): void {
             \pmssNetconsoleConfigure(function (string $message) use (&$logs): void { $logs[] = $message; });
@@ -36,7 +36,7 @@ class NetconsoleConfigureTest extends TestCase
 
     public function testWritesFilesAndReloadsWhenReachable(): void
     {
-        $dir = $this->makeTempDir('reachable');
+        $dir = $this->pmssMakeTempDir('pmss-netconsole-reachable-');
         file_put_contents($dir.'/netconsole', '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
         $calls = [];
 
@@ -59,7 +59,7 @@ class NetconsoleConfigureTest extends TestCase
 
     public function testSkipsEnableWhenTargetIsNotReachable(): void
     {
-        $dir = $this->makeTempDir('unreachable');
+        $dir = $this->pmssMakeTempDir('pmss-netconsole-unreachable-');
         file_put_contents($dir.'/netconsole', '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
 
         $this->withNetconsoleEnv($dir, function () use ($dir): void {
@@ -75,7 +75,7 @@ class NetconsoleConfigureTest extends TestCase
 
     public function testSkipsReloadWhenAlreadyLoadedAndUnchanged(): void
     {
-        $dir = $this->makeTempDir('unchanged');
+        $dir = $this->pmssMakeTempDir('pmss-netconsole-unchanged-');
         $spec = '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff';
         @mkdir($dir.'/modprobe.d', 0755, true);
         @mkdir($dir.'/modules-load.d', 0755, true);
@@ -127,13 +127,6 @@ class NetconsoleConfigureTest extends TestCase
             if (strpos($message, $needle) !== false) return true;
         }
         return false;
-    }
-
-    private function makeTempDir(string $suffix): string
-    {
-        $dir = sys_get_temp_dir().'/pmss-netconsole-'.bin2hex(random_bytes(4)).'-'.$suffix;
-        @mkdir($dir, 0700, true);
-        return $dir;
     }
 
 }
