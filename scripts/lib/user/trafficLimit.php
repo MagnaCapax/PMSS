@@ -106,6 +106,77 @@ if (!function_exists('pmssTrafficLimitWriteGiBFile')) {
     }
 }
 
+if (!function_exists('pmssTrafficLimitEnsureStorageDir')) {
+    /**
+     * Ensure the runtime quota directory exists as a real directory.
+     */
+    function pmssTrafficLimitEnsureStorageDir(string $path): bool
+    {
+        if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false || is_link($path)) {
+            return false;
+        }
+
+        if (function_exists('pmssEnsureDir')) {
+            return pmssEnsureDir($path, 0700, 'root', 'root') && is_dir($path) && !is_link($path);
+        }
+
+        if (!is_dir($path) && !@mkdir($path, 0755, true) && !is_dir($path)) {
+            return false;
+        }
+
+        if (!is_dir($path) || is_link($path)) {
+            return false;
+        }
+
+        return pmssTrafficLimitConvergeFileMode($path, 0700);
+    }
+}
+
+if (!function_exists('pmssTrafficLimitRemoveGiBFile')) {
+    /**
+     * Remove a persisted quota file when it is a real regular file.
+     */
+    function pmssTrafficLimitRemoveGiBFile(string $path): bool
+    {
+        if (is_link($path) || (file_exists($path) && !is_file($path))) {
+            return false;
+        }
+
+        if (!file_exists($path)) {
+            return true;
+        }
+
+        if (@unlink($path)) {
+            clearstatcache(true, $path);
+            return true;
+        }
+
+        clearstatcache(true, $path);
+        return !file_exists($path) && !is_link($path);
+    }
+}
+
+if (!function_exists('pmssTrafficLimitConvergeFileMode')) {
+    /**
+     * Apply the requested mode to a real file or directory, verifying fallback state.
+     */
+    function pmssTrafficLimitConvergeFileMode(string $path, int $mode): bool
+    {
+        if ((!is_file($path) && !is_dir($path)) || is_link($path)) {
+            return false;
+        }
+
+        if (@chmod($path, $mode)) {
+            clearstatcache(true, $path);
+            return true;
+        }
+
+        clearstatcache(true, $path);
+        $perms = @fileperms($path);
+        return $perms !== false && (($perms & 0777) === ($mode & 0777));
+    }
+}
+
 if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
     /**
      * @param mixed $rawUserName

@@ -101,21 +101,18 @@ if ($trafficLimit === null) {
     exit(2);
 }
 
-if (function_exists('pmssEnsureDir')) {
-    pmssEnsureDir($runtimeDir, 0700, 'root', 'root');
-} elseif (!is_dir($runtimeDir)) {
-    @mkdir($runtimeDir, 0755, true);
-    @chmod($runtimeDir, 0700);
+if (!function_exists('pmssTrafficLimitEnsureStorageDir') || !pmssTrafficLimitEnsureStorageDir($runtimeDir)) {
+    fwrite(STDERR, "Error: failed to prepare {$runtimeDir}\n");
+    exit(4);
 }
 
 if ($trafficLimit === 0) {
     foreach (array_keys($targetModes) as $target) {
         if (file_exists($target)) {
-            if (!is_file($target) || is_link($target)) {
+            if (!function_exists('pmssTrafficLimitRemoveGiBFile') || !pmssTrafficLimitRemoveGiBFile($target)) {
                 fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$target}\n");
                 exit(4);
             }
-            @unlink($target);
         }
     }
     if (function_exists('pmssUserLog')) {
@@ -130,7 +127,10 @@ foreach ($targetModes as $target => $mode) {
         fwrite(STDERR, "Error: failed to write {$target}\n");
         exit(4);
     }
-    @chmod($target, $mode);
+    if (!function_exists('pmssTrafficLimitConvergeFileMode') || !pmssTrafficLimitConvergeFileMode($target, $mode)) {
+        fwrite(STDERR, "Error: failed to secure {$target}\n");
+        exit(4);
+    }
 }
 
 if (function_exists('pmssUserLog')) {
