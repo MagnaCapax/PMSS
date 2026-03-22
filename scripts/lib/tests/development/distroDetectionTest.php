@@ -199,6 +199,36 @@ class DistroDetectionTest extends TestCase
     }
 
     /**
+     * Parent directory creation failures should abort before touching sources.list.
+     */
+    public function testSafeWriteSourcesLogsParentDirectoryFailure(): void
+    {
+        $tmpDir = sys_get_temp_dir().'/pmss-apt-parent-'.bin2hex(random_bytes(4));
+        $blocker = $tmpDir.'/blocked';
+        @mkdir($tmpDir, 0755, true);
+        file_put_contents($blocker, 'not-a-directory');
+        putenv('PMSS_APT_SOURCES_PATH='.$blocker.'/sources.list');
+
+        $logs = [];
+        $logger = function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        };
+
+        try {
+            $this->assertTrue(!\pmssSafeWriteSources("deb https://mirror.invalid bookworm main\n", 'Bookworm', $logger));
+            $this->assertTrue((bool) array_filter($logs, static function (string $line) use ($blocker): bool {
+                return strpos($line, '[ERROR] Unable to create parent directory for Bookworm sources.list: '.$blocker) !== false;
+            }));
+            $this->assertTrue(!file_exists($blocker.'/sources.list'));
+            $this->assertTrue(!file_exists($blocker.'/sources.list.pmss-backup'));
+        } finally {
+            putenv('PMSS_APT_SOURCES_PATH');
+            @unlink($blocker);
+            @rmdir($tmpDir);
+        }
+    }
+
+    /**
      * Unsupported distros should emit an informative log message.
      */
     public function testUpdateAptSourcesLogsUnsupportedDistro(): void

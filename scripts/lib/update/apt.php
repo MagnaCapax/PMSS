@@ -51,7 +51,10 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
 
     $current = @file_get_contents($target);
     $dir = dirname($target);
-    is_dir($dir) || @mkdir($dir, 0755, true);
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+        $log("[ERROR] Unable to create parent directory for $label sources.list: $dir");
+        return false;
+    }
     if ($current !== false) {
         $log(@file_put_contents($backup, $current, LOCK_EX) === false
             ? "[WARN] Unable to create backup $backup before updating $label"
@@ -60,8 +63,8 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
 
     if (@file_put_contents($target, $content, LOCK_EX) === false) {
         $log("[ERROR] Failed to write sources.list for $label, attempting restore");
-        if ($current !== false) {
-            @file_put_contents($target, $current, LOCK_EX);
+        if ($current !== false && @file_put_contents($target, $current, LOCK_EX) === false) {
+            $log("[WARN] Failed to restore previous sources.list for $label");
         }
         return false;
     }
