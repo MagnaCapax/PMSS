@@ -63,12 +63,10 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         : date('YmdHis');
 
     $key = pmssConfigBackupsPathKey($sourcePath);
-    if (array_key_exists('pmssVersion', $options)) {
-        $pmssVersion = (string) $options['pmssVersion'];
-    } elseif (function_exists('getPmssVersion')) {
-        $pmssVersion = (string) getPmssVersion();
-    } else {
-        $pmssVersion = 'unknown';
+    $pmssVersion = array_key_exists('pmssVersion', $options)
+        ? (string) $options['pmssVersion']
+        : (function_exists('getPmssVersion') ? (string) getPmssVersion() : 'unknown');
+    if ($pmssVersion === 'unknown') {
         foreach (array('/etc/seedbox/config/version', '/etc/seedbox/runtime/version') as $path) {
             if (($detectedVersion = trim((string) @file_get_contents($path))) !== '') {
                 $pmssVersion = $detectedVersion;
@@ -161,8 +159,7 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
 function pmssConfigBackupsPathKey(string $path): string
 {
     $path = preg_replace('/\\s+/', ' ', trim($path));
-    $path = ltrim(str_replace('/', '_', preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path)), '_');
-    return $path !== '' ? $path : 'unknown_path';
+    return ($path = ltrim(str_replace('/', '_', preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path)), '_')) !== '' ? $path : 'unknown_path';
 }
 
 /**

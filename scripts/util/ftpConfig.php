@@ -71,9 +71,7 @@ $rendered = str_replace(
     $configTemplate
 );
 
-if ($tlsBlock === '') {
-    $rendered = preg_replace('#\n?<IfModule mod_tls\\.c>.*?</IfModule>#s', '', $rendered);
-}
+if ($tlsBlock === '') { $rendered = preg_replace('#\n?<IfModule mod_tls\\.c>.*?</IfModule>#s', '', $rendered); }
 
 foreach (['/var/log/proftpd', '/var/run/proftpd'] as $path) {
     if (!is_dir($path) && !@mkdir($path, 0750, true)) {

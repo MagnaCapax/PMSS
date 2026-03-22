@@ -33,8 +33,6 @@ function pmssInstallPinnedRemoteBinary(
     string $destination,
     bool $refreshWhenPresent
 ): void {
-    $dryRun = getenv('PMSS_DRY_RUN') === '1';
-
     if (strpos($url, 'https://') !== 0) {
         logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
         return;
@@ -61,7 +59,7 @@ function pmssInstallPinnedRemoteBinary(
             return;
         }
 
-        if ($dryRun) { return; }
+        if (getenv('PMSS_DRY_RUN') === '1') { return; }
 
         $actualSha = @hash_file('sha256', $tmp);
         if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
@@ -85,8 +83,6 @@ function pmssInstallPinnedRemoteDebPackage(
     string $url,
     string $expectedSha256
 ): bool {
-    $dryRun = getenv('PMSS_DRY_RUN') === '1';
-
     if (strpos($url, 'https://') !== 0) {
         logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
         return false;
@@ -102,7 +98,7 @@ function pmssInstallPinnedRemoteDebPackage(
             return false;
         }
 
-        if ($dryRun) { return true; }
+        if (getenv('PMSS_DRY_RUN') === '1') { return true; }
 
         $actualSha = @hash_file('sha256', $tmp);
         if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {

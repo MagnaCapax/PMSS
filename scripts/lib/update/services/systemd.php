@@ -21,11 +21,10 @@ require_once __DIR__.'/../runtime/processes.php';
  */
 function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask): void
 {
-    $dryRun = getenv('PMSS_DRY_RUN') === '1';
     $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'] + ($mask ? ['mask' => 'Masking'] : []);
-    $skipReason = !$dryRun && !is_dir('/run/systemd/system')
+    $skipReason = getenv('PMSS_DRY_RUN') !== '1' && !is_dir('/run/systemd/system')
         ? 'systemd unavailable'
-        : (!$dryRun && !pmssSystemdUnitExists($unit) ? 'unit '.$unit.' missing' : '');
+        : (getenv('PMSS_DRY_RUN') !== '1' && !pmssSystemdUnitExists($unit) ? 'unit '.$unit.' missing' : '');
 
     if ($skipReason !== '') {
         foreach ($actions as $prefix) {
