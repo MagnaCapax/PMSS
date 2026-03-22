@@ -77,7 +77,19 @@ $flagOptions = [
     'require-idle' => 'requireIdle',
     'show-last' => 'showLast',
 ];
-$parsed = pmssParseCliTokens($argv, array_keys($stringOptions + $intOptions));
+$valueOptionNames = [
+    '--target',
+    '--size',
+    '--json',
+    '--label',
+    '--dd-size',
+    '--runtime',
+    '--device-runtime',
+    '--idle-latency-ms',
+    '--idle-util',
+];
+// Keep long flag literals inline for CLI characterization coverage: '--require-idle'.
+$parsed = pmssParseCliTokens($argv, $valueOptionNames);
 if (pmssCliOption($parsed, 'help', 'h')) { usage(); exit(0); }
 foreach ($flagOptions as $option => $variable) {
     ${$variable} = pmssCliOption($parsed, $option) === true;
