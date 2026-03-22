@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+namespace PMSS\Tests;
+
 require_once __DIR__.'/../common/TestCase.php';
 
 final class CliWrapperCharacterizationTest extends TestCase
