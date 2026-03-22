@@ -46,6 +46,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
     $log = $options['logger'] ?? (function_exists('logMessage')
         ? 'logMessage'
         : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
+    $service = pmssConfigBackupsNormalizeService($service);
     if (
         $service === ''
         || ($sourcePath = trim($sourcePath)) === ''
@@ -53,6 +54,9 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         || !is_file($sourcePath)
         || !is_readable($sourcePath)
     ) {
+        if ($service === '') {
+            $log('[WARN] Refusing config backup with invalid service name');
+        }
         return null;
     }
 
@@ -113,7 +117,11 @@ function pmssPruneCriticalConfigBackups(string $service, string $sourcePath, arr
     $log = $options['logger'] ?? (function_exists('logMessage')
         ? 'logMessage'
         : $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']);
+    $service = pmssConfigBackupsNormalizeService($service);
     if ($service === '' || ($sourcePath = trim($sourcePath)) === '' || getenv('PMSS_DRY_RUN') === '1') {
+        if ($service === '') {
+            $log('[WARN] Refusing config backup prune with invalid service name');
+        }
         return;
     }
 
@@ -160,6 +168,15 @@ function pmssConfigBackupsPathKey(string $path): string
 {
     $path = preg_replace('/\\s+/', ' ', trim($path));
     return ($path = ltrim(str_replace('/', '_', preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path)), '_')) !== '' ? $path : 'unknown_path';
+}
+
+/**
+ * Normalize a service key used as the backup directory name.
+ */
+function pmssConfigBackupsNormalizeService(string $service): string
+{
+    $service = trim($service);
+    return preg_match('/^[A-Za-z0-9._-]+$/', $service) === 1 ? $service : '';
 }
 
 /**
