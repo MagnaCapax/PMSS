@@ -30,6 +30,7 @@
  */
 
 require_once __DIR__.'/UserValidator.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
 if (!function_exists('pmssUserDockerMinRamMiB')) {
@@ -313,28 +314,16 @@ class UserConfigStore
         if (!is_dir($dir) && !@mkdir($dir, 0750, true)) {
             return false;
         }
-
-        $tmp = @tempnam($dir, 'pmss-json-');
-        if ($tmp === false) {
-            return false;
-        }
         $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($encoded === false) {
-            @unlink($tmp);
             return false;
         }
-        if (@file_put_contents($tmp, $encoded, LOCK_EX) === false) {
-            @unlink($tmp);
-            return false;
-        }
-        if (!@rename($tmp, $path)) {
-            @unlink($tmp);
-            return false;
-        }
-        @chmod($path, $mode);
-        @chown($path, $owner);
-        @chgrp($path, $group);
-        return true;
+
+        return pmssReplaceUserFile($path, $encoded, static function (string $tmp) use ($mode, $owner, $group): void {
+            @chmod($tmp, $mode);
+            @chown($tmp, $owner);
+            @chgrp($tmp, $group);
+        });
     }
 
     private function resolveRamMiBFromSystemdSlice(string $username): int

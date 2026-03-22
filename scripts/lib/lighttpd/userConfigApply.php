@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__.'/../systemdSliceProperties.php';
+require_once __DIR__.'/userFileWrite.php';
 
 function pmssClampLighttpdBandwidthLimits(string $config): string
 {
@@ -354,29 +355,11 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
         return false;
     }
 
-    $dir = dirname($path);
-    if (!is_dir($dir) || is_link($dir)) {
-        return false;
-    }
-    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
-    if ($tmp === false) {
-        return false;
-    }
-    if (file_put_contents($tmp, $metaJson.$configJson) === false) {
-        @unlink($tmp);
-        return false;
-    }
-
-    @chmod($tmp, $mode);
-    @chown($tmp, $owner);
-    @chgrp($tmp, $owner);
-
-    if (!@rename($tmp, $path)) {
-        @unlink($tmp);
-        return false;
-    }
-
-    return true;
+    return pmssReplaceUserFile($path, $metaJson.$configJson, static function (string $tmp) use ($mode, $owner): void {
+        @chmod($tmp, $mode);
+        @chown($tmp, $owner);
+        @chgrp($tmp, $owner);
+    });
 }
 
 // Reverse proxy fragments stay with the lighttpd apply flow because the

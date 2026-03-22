@@ -14,6 +14,7 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /**
  * Apply or refresh the user-specific traffic cap.
@@ -138,25 +139,16 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
         return !is_file($path) || @unlink($path);
     }
 
-    $tmp = $path.'.tmp';
-    if (@file_put_contents($tmp, (string) $value) === false) {
-        return false;
-    }
-    @chmod($tmp, 0640);
-
     $isRoot = function_exists('posix_geteuid') ? (posix_geteuid() === 0) : false;
-    if ($isRoot) {
-        @chown($tmp, 'root');
-        @chgrp($tmp, 'root');
-    } elseif (getenv('PMSS_TEST_MODE') !== '1') {
-        @unlink($tmp);
+    if (!$isRoot && getenv('PMSS_TEST_MODE') !== '1') {
         return false;
     }
 
-    if (!@rename($tmp, $path)) {
-        @unlink($tmp);
-        return false;
-    }
-
-    return true;
+    return pmssReplaceUserFile($path, (string) $value, static function (string $tmp) use ($isRoot): void {
+        @chmod($tmp, 0640);
+        if ($isRoot) {
+            @chown($tmp, 'root');
+            @chgrp($tmp, 'root');
+        }
+    });
 }

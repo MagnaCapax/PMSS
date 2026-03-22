@@ -28,24 +28,38 @@ function pmssUserFileApplyMetadata(string $path, string $owner, int $mode): void
     }
 }
 
-function pmssAtomicWriteFile(string $path, string $content): bool
+/**
+ * Atomically replace a regular file, with optional temp-file preparation.
+ */
+function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTemp = null): bool
 {
     if (!pmssUserFilePathIsSafe($path)) {
         return false;
     }
 
-    $dir = dirname($path);
-    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
-    if ($tmp === false) {
+    $tmp = @tempnam(dirname($path), basename($path).'.pmss-tmp-');
+    if ($tmp === false || @file_put_contents($tmp, $content) === false) {
+        if (is_string($tmp)) {
+            @unlink($tmp);
+        }
         return false;
     }
 
-    if (@file_put_contents($tmp, $content) === false || !@rename($tmp, $path)) {
+    if ($prepareTemp !== null) {
+        $prepareTemp($tmp);
+    }
+
+    if (!@rename($tmp, $path)) {
         @unlink($tmp);
         return false;
     }
 
     return true;
+}
+
+function pmssAtomicWriteFile(string $path, string $content): bool
+{
+    return pmssReplaceUserFile($path, $content);
 }
 
 function pmssWriteUserFile(string $path, string $content, string $owner, int $mode): bool
