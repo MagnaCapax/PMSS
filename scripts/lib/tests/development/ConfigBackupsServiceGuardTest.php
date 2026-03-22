@@ -75,4 +75,45 @@ class ConfigBackupsServiceGuardTest extends TestCase
         $this->pmssRemoveTree($sourceRoot);
         $this->pmssRemoveTree($backupRoot);
     }
+
+    public function testBackupRejectsRelativeSourcePath(): void
+    {
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
+        $messages = [];
+
+        $backup = \pmssBackupCriticalConfig('nginx', 'etc/nginx/nginx.conf', array(
+            'backupRoot' => $backupRoot,
+            'logger' => function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            },
+            'logSuccess' => false,
+        ));
+
+        $this->assertEquals(null, $backup);
+        $this->assertEquals(['[WARN] Refusing config backup for non-absolute source path: etc/nginx/nginx.conf'], $messages);
+        $this->assertEquals(array(), glob($backupRoot.'/nginx/*.bak') ?: array());
+
+        $this->pmssRemoveTree($backupRoot);
+    }
+
+    public function testPruneRejectsRelativeBackupRootWithoutTouchingFilesystem(): void
+    {
+        $sourceRoot = $this->pmssMakeTempDir('pmss-backups-src-');
+        $messages = [];
+        $source = $sourceRoot.'/etc/nginx/nginx.conf';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "worker_processes auto;\n");
+
+        \pmssPruneCriticalConfigBackups('nginx', $source, array(
+            'backupRoot' => 'relative-backups',
+            'logger' => function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            },
+        ));
+
+        $this->assertEquals(['[WARN] Refusing config backup with non-absolute backup root: relative-backups'], $messages);
+        $this->assertTrue(!file_exists('relative-backups'));
+
+        $this->pmssRemoveTree($sourceRoot);
+    }
 }

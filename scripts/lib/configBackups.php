@@ -128,6 +128,10 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
         }
         return null;
     }
+    if (!pmssConfigBackupsPathIsAbsolute($sourcePath)) {
+        $log('[WARN] Refusing config backup for non-absolute source path: '.$sourcePath);
+        return null;
+    }
     if (strpos($sourcePath, "\0") !== false || is_link($sourcePath)) {
         $log('[WARN] Refusing config backup for unsafe source path: '.$sourcePath);
         return null;
@@ -136,6 +140,10 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
         return null;
     }
     $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
+    if (!pmssConfigBackupsPathIsAbsolute($backupRoot)) {
+        $log('[WARN] Refusing config backup with non-absolute backup root: '.$backupRoot);
+        return null;
+    }
     if (
         strpos($backupRoot, "\0") !== false
         || is_link($backupRoot)
@@ -156,6 +164,11 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
         'serviceDir' => $serviceDir,
         'sourcePath' => $sourcePath,
     );
+}
+
+function pmssConfigBackupsPathIsAbsolute(string $path): bool
+{
+    return $path !== '' && strpos($path, '/') === 0;
 }
 
 /**
