@@ -300,4 +300,38 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertEquals(7, $result['delta']['cpu_nsec']);
         $this->assertTrue(!is_file($statePath));
     }
+
+    public function testUpdateStateRejectsRelativeStatePath(): void
+    {
+        $statePath = 'relative/state.json';
+
+        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
+
+        $this->assertEquals(9, $result['delta']['io_read']);
+        $this->assertEquals(8, $result['delta']['io_write']);
+        $this->assertEquals(7, $result['delta']['cpu_nsec']);
+        $this->assertTrue(!is_file($statePath));
+    }
+
+    public function testUpdateStateRejectsSymlinkStatePath(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $root = $this->makeRoot();
+        $target = $root.'/target.json';
+        file_put_contents($target, json_encode(['io_read' => 1]));
+        $statePath = $root.'/state.json';
+        if (!@symlink($target, $statePath)) {
+            throw new SkipTest('symlink creation failed');
+        }
+
+        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
+
+        $this->assertEquals(9, $result['delta']['io_read']);
+        $this->assertEquals(8, $result['delta']['io_write']);
+        $this->assertEquals(7, $result['delta']['cpu_nsec']);
+        $this->assertEquals(['io_read' => 1], $this->readState($target));
+    }
 }
