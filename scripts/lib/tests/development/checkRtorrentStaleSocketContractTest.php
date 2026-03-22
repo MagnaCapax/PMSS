@@ -34,4 +34,15 @@ class checkRtorrentStaleSocketContractTest extends TestCase
             'Executor mismatch recovery should clear stale SCGI socket state before missing-process grace handling'
         );
     }
+
+    public function testUnresponsiveScgiPathRechecksProcessBeforeObserving(): void
+    {
+        $src = $this->loadSource();
+
+        $this->assertMatches(
+            '/\$responsive = rtorrentScgiPing\(\$socketPath, 5\);.*?\$rtorrentPids = rtorrentProcessPgrepExact\(\$user, \'rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?rtorrentProcessClearStaleState\(\$unresponsiveState\);.*?stale socket detected, process not running, cleaning up.*?@unlink\(\$socketPath\);.*?rTorrent missing after SCGI probe; starting.*?\/scripts\/startRtorrent/s',
+            $src,
+            'SCGI recovery should re-check rtorrent liveness and restart instead of entering the unresponsive grace loop'
+        );
+    }
 }

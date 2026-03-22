@@ -353,6 +353,31 @@ foreach ($usersOut as $line) {
             continue;
         }
 
+        // Re-check process liveness before treating the socket as a stuck SCGI endpoint.
+        $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
+        if (empty($rtorrentPids)) {
+            rtorrentProcessClearStaleState($unresponsiveState);
+            if (file_exists($socketPath)) {
+                pmssCheckRtorrentLogBoth(
+                    $user,
+                    'stale socket detected, process not running, cleaning up',
+                    $debug
+                );
+                $socketRemoved = @unlink($socketPath);
+                if (!$socketRemoved && file_exists($socketPath)) {
+                    pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
+                }
+            }
+
+            pmssCheckRtorrentLogBoth($user, 'rTorrent missing after SCGI probe; starting', $debug);
+            $rc = 0;
+            @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
+            pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
+            @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
+            @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
+            continue;
+        }
+
         // Solution 2: Extend grace period if recently restarted (progressive backoff).
         $restartMarker = '/tmp/.pmss-rtorrent-restart-'.$user;
         $restartTs = is_file($restartMarker) ? (int) trim((string) @file_get_contents($restartMarker)) : 0;
