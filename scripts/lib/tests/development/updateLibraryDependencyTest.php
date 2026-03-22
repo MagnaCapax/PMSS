@@ -7,10 +7,7 @@ class UpdateLibraryDependencyTest extends TestCase
 {
     private function loadSource(string $relativePath): string
     {
-        $path = dirname(__DIR__, 4).'/scripts/'.$relativePath;
-        $contents = @file_get_contents($path);
-        $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
-        return $contents;
+        return $this->pmssReadRepoFile('scripts/'.$relativePath);
     }
 
     public function testConfigureOpenvpnUsesDirectRuntimeLibraries(): void

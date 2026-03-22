@@ -7,10 +7,7 @@ class RootCronSystemdServicesGuardTest extends TestCase
 {
     public function testRootCronIncludesSystemdServicesGuard(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $cronPath = $repoRoot.'/etc/seedbox/config/root.cron';
-        $cron = @file_get_contents($cronPath);
-        $this->assertTrue(is_string($cron) && $cron !== '', 'Expected to read '.$cronPath);
+        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
 
         $this->assertTrue(strpos($cron, 'MAILTO=""') !== false, 'root.cron should suppress cron mail');
         $this->assertTrue(strpos($cron, '/scripts/cron/systemdServicesGuard.php') !== false);

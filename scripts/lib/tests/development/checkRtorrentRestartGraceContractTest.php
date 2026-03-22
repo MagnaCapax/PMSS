@@ -7,10 +7,7 @@ class checkRtorrentRestartGraceContractTest extends TestCase
 {
     private function loadSource(): string
     {
-        $path = dirname(__DIR__, 4).'/scripts/cron/checkRtorrent.php';
-        $contents = @file_get_contents($path);
-        $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
-        return $contents;
+        return $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
     }
 
     public function testRestartGraceKeepsStableMarkerAndThresholds(): void
