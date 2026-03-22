@@ -19,7 +19,7 @@ class ListUsersConsumersGuardTest extends TestCase
         ];
 
         foreach ($targets as $file) {
-            $src = (string) file_get_contents(__DIR__.'/../../../../'.$file);
+            $src = $this->pmssReadRepoFile($file);
             $this->assertStringContainsString("pmssListManagedUsers('/scripts/listUsers.php')", $src, $file.' must use pmssListManagedUsers()');
             $this->assertTrue(
                 strpos($src, "array_map('trim', pmssListManagedUsers") === false,
@@ -46,7 +46,7 @@ class ListUsersConsumersGuardTest extends TestCase
         ];
 
         foreach ($targets as $file) {
-            $src = (string) file_get_contents(__DIR__.'/../../../../'.$file);
+            $src = $this->pmssReadRepoFile($file);
             $this->assertStringContainsString('listUsers.php', $src, $file.' must call listUsers.php');
             $this->assertStringContainsString('pmssValidateUsername', $src, $file.' must revalidate usernames from listUsers');
         }

@@ -16,8 +16,7 @@ final class CliWrapperCharacterizationTest extends TestCase
         ];
 
         foreach ($cases as $path => $target) {
-            $source = (string) @file_get_contents(dirname(__DIR__, 4).'/'.$path);
-            $this->assertTrue($source !== '', 'Expected to read '.$path);
+            $source = $this->pmssReadRepoFile($path);
             $this->assertStringContainsString("require_once __DIR__.'/lib/runtime.php';", $source);
             $this->assertStringContainsString("pmssRequireCliEntrypointScript(__DIR__, '{$target}');", $source);
             $this->assertTrue(strpos($source, '$argv') === false, $path.' should stay a thin wrapper');
@@ -26,10 +25,7 @@ final class CliWrapperCharacterizationTest extends TestCase
 
     public function testUserDockerKeepsSharedStopAndSocketGuardsInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/userDocker.php';
-        $source = (string) @file_get_contents($path);
-
-        $this->assertTrue($source !== '', 'Expected to read '.$path);
+        $source = $this->pmssReadRepoFile('scripts/util/userDocker.php');
         $this->assertStringContainsString('$dockerStopCmd =', $source);
         $this->assertStringContainsString('$socketPresent = file_exists($dockerSock);', $source);
         $this->assertStringContainsString('Docker socket present for {$user}, but process check failed; skipping start', $source);

@@ -2,13 +2,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 3).'/cron/quotaSnapshot.php';
 
 class QuotaSnapshotTest extends TestCase
 {
     public function testParserExtractsNumericRowsWithoutGraceColumns(): void
     {
-        require_once dirname(__DIR__, 3).'/cron/quotaSnapshot.php';
-
         $rows = pmssQuotaSnapshotParseRepquotaUserRows([
             '*** Report for user quotas on device /dev/vda1',
             'Block grace time: 7days; Inode grace time: 7days',
@@ -30,8 +29,6 @@ class QuotaSnapshotTest extends TestCase
 
     public function testParserAcceptsHashPrefixedUidsAndIgnoresGraceTokens(): void
     {
-        require_once dirname(__DIR__, 3).'/cron/quotaSnapshot.php';
-
         $rows = pmssQuotaSnapshotParseRepquotaUserRows([
             '#1001 -- 100 200 300 7days 10 20 30 -',
             '#1002 ++ 0 0 0 - 0 0 0 -',
@@ -48,8 +45,6 @@ class QuotaSnapshotTest extends TestCase
 
     public function testParserSkipsNonNumericUsers(): void
     {
-        require_once dirname(__DIR__, 3).'/cron/quotaSnapshot.php';
-
         $rows = pmssQuotaSnapshotParseRepquotaUserRows([
             'root -- 1 2 3 4 5 6',
             'userA -- 1 2 3 4 5 6',

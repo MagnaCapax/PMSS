@@ -73,6 +73,31 @@ function pmssTorrentThrottlePath(string $username): string
 }
 
 /**
+ * Read monthly traffic usage from a serialized user traffic data file.
+ *
+ * Returns the raw monthly total rounded to the nearest integer, or 0 when the
+ * file is missing, symlinked, or invalid.
+ */
+function pmssReadUserTrafficMonth(string $path): int
+{
+    if (!is_file($path) || is_link($path)) {
+        return 0;
+    }
+
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return 0;
+    }
+
+    $data = @unserialize($raw, ['allowed_classes' => false]);
+    if (!is_array($data) || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
+        return 0;
+    }
+
+    return (int) round($data['raw']['month']);
+}
+
+/**
  * Read a root-owned torrent upload throttle (KiB/s) for the user.
  *
  * Returns:
