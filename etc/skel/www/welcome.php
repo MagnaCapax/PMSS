@@ -161,46 +161,6 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
         }
     </script>
 
-<?php
-// April Fool's joke (2022) - disabled after April 1st
-if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
-?>
-    <style>
-        #meter-disk-value {
-            background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
-            background-size: 1800% 1800%;
-            border-radius: 10px;
-            -webkit-animation: rainbow 8s ease infinite;
-            animation: rainbow 8s ease infinite;
-        }
-        @keyframes rainbow {
-            0%   { background-position: 0% 82%; }
-            50%  { background-position: 100% 19%; }
-            100% { background-position: 0% 82%; }
-        }
-        .portfoliobox p,
-        .portfoliobox h6,
-        .portfoliobox a,
-        .portfoliobox span {
-            font-family: 'Comic Sans MS', sans-serif;
-            font-style: italic;
-            font-weight: bold;
-            transform: rotate(-1.5deg);
-            -webkit-transform: rotate(-1.5deg);
-            -moz-transform: rotate(-1.5deg);
-        }
-        #meter-disk-holder { border-radius: 10px; }
-    </style>
-<?php
-}
-?>
-
-    <!--[if lt IE 7]>
-        <script type="text/javascript" src="https://static.pulsedmedia.com/wc/js/unitpngfix.js"></script>
-    <![endif]-->
-    <!--[if lte IE 6]>
-        <link href="https://static.pulsedmedia.com/wc/css/ie6.css" rel="stylesheet" type="text/css" />
-    <![endif]-->
 </head>
 <body>
     <div id="pmss-action-notice" role="status" aria-live="polite"></div>
@@ -222,16 +182,12 @@ if (time() < mktime(13, 0, 0, 4, 2, 2022)) {
                             <li><a href="rutorrent/">access ruTorrent</a></li>
                             <li><a href="data/"><b>access Data directory directly for HTTP downloads</b></a></li>
                             <hr />
-                            <li><a href="https://the.earth.li/~sgtatham/putty/latest/x86/putty.exe">Download Putty (SSH access)</a></li>
-                            <li><a href="https://winscp.net/download/WinSCP-5.21.6-Setup.exe" target="_blank">Download WinSCP (SFTP/SCP access)</a></li>
-                            <li><a href="https://pulsedmedia.com/pulsedBox.air" title="pulsedBox :: Seedbox on your desktop">Download pulsedBox - Seedbox on your desktop (Current version 0.51)</a></li>
-                            <li><a href="https://get.adobe.com/air/" title="Adobe AIR Installation package">Download Adobe AIR framework</a></li>
+                            <li><a href="https://www.putty.org/" target="_blank">Download PuTTY (SSH access)</a></li>
+                            <li><a href="https://winscp.net/eng/download.php" target="_blank">Download WinSCP (SFTP/SCP access)</a></li>
                         </ul>
                         <b>SFTP/FTP Client options</b>
                         <ul>
-                            <li><a href="https://www.smartftp.com/get/SFTPMSI64.exe">Download SmartFTP (FTP access)</a> (Allows multipart/multithreading transfers) - Shareware</li>
                             <li><a href="https://filezilla-project.org/download.php?platform=win64" target="_blank">FileZilla - Popular opensource client</a></li>
-                            <li><a href="https://www.bitkinex.com/ftp/client/bitkinex323.exe" target="_blank">BitKinex - Popular All-In-One SFTP, FTP, WebDAV client. Freeware</a></li>
                         </ul>
 
 <?php
@@ -325,26 +281,8 @@ if (file_exists('openvpn-config.tgz')) {
                         <p><a href="openvpn-config.tgz" title="OpenVPN Configuration">OpenVPN Config Files</a>.</p>
 <?php
 }
-
-if ($vendor['pulsedBox'] == true) {
-?>
-                        <hr />
-                        <h6 style="color: red; font-weight: bold;">pulsedBox NEW alpha version</h6>
-                        <p>We have converted the pulsedBox application to ElectronJS framework — this is still early alpha but you can already test it. .torrent upload via system open does not work currently, but drag'n'drop to ruTorrent does. Please let us know your feedback, bug reports, etc. by contacting support.</p>
-                        <p><a href="https://pulsedmedia.com/pulsedBox-download/pulsedBox.exe">Download pulsedBox alpha version for Windows</a></p>
-
-                        <h6>pulsedBox :: Seedbox on your desktop</h6>
-                        <p>We have created an <a href="https://www.adobe.com/products/air/" target="_blank">Adobe AIR</a> application to bring your seedbox to the Desktop! This makes a Pulsed Media seedbox work like a desktop application — directly adding torrents from websites, folders on your computer, etc!</p>
-                        <p>This software is still in early beta stages, with several known usage issues. Wrong login credentials cause a blank page, and you have to manually associate .torrent files to the application.</p>
-                        <p>To install, first download and run <a href="https://get.adobe.com/air/" title="Adobe AIR Installation package">Adobe AIR</a> package, then <a href="https://pulsedmedia.com/pulsedBox.air" title="pulsedBox :: Seedbox on your desktop">pulsedBox AIR</a> package.</p>
-                        <p style="color: red;">There is an issue with the package due to certs — please check <a href="https://wiki.pulsedmedia.com/index.php/Installing_pulsedBox" title="Pulsed Media Wiki">wiki pulsedBox installation</a> information to install the package.</p>
-<?php
-}
 ?>
 
-                        <h6>IRC - Internet Relay Chat</h6>
-                        <p>You may come and chat with other Pulsed Media users and staff at IRC! Just click the <i>"Chat"</i> tab or login via SSH and type <i>"irssi"</i> — which has been configured on most servers to auto-join the correct network and channel.</p>
-                        <p>Our IRC channel is #PulsedMedia on Freenode network.</p>
                     </div>
 
                     <div class="portfoliodesc">
@@ -401,7 +339,7 @@ echo $announcementItemsHtml;
                         <h6>Need support?</h6>
                         <ul>
                             <li><a href="https://pulsedmedia.com/clients/knowledgebase.php" title="Browse Pulsed Media Knowledgebase">Browse Knowledgebase</a></li>
-                            <li><a href="http://wiki.pulsedmedia.com" title="Pulsed Media Wiki">Browse Wiki</a></li>
+                            <li><a href="https://wiki.pulsedmedia.com" title="Pulsed Media Wiki">Browse Wiki</a></li>
                             <li><a href="https://discord.gg/cGBz52HJtx" target="_blank" title="Join Pulsed Media on Discord">Discord</a></li>
                             <li>Technical: <a href="mailto:support@pulsedmedia.com" title="E-Mail Support">support@pulsedmedia.com</a></li>
                             <li>Billing: <a href="mailto:billing@pulsedmedia.com" title="E-Mail Billing">billing@pulsedmedia.com</a></li>
@@ -470,8 +408,7 @@ function pmssWelcomeIntegerFileRead($path, $clampNegativeToZero = false) {
 
 function pmssWelcomeVendorRead() {
     $vendorDefault = array(
-        'name'      => 'Pulsed Media',
-        'pulsedBox' => true
+        'name' => 'Pulsed Media'
     );
 
     if (!file_exists('/etc/seedbox/config/vendor')) {
@@ -878,7 +815,7 @@ EOF;
 	    <h6>Traffic Info</h6>
 	    Traffic used (30 days): {$trafficUsed}<br />
 	    Traffic limit: Unlimited{$inboundLine}{$ratioLine}<br />
-	    This is rolling past 30 days, <a href="http://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
+	    This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
 	    <hr />
 	EOF;
 	        return;
@@ -907,7 +844,7 @@ EOF;
     {$gauge}
     {$warning}
     {$inboundLine}{$ratioLine}
-    This is rolling past 30 days, <a href="http://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
+    This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
     <hr />
 EOF;
 }
