@@ -6,41 +6,11 @@ require_once dirname(__DIR__, 2).'/update/apps/pythonVenv.php';
 
 class PythonVenvHelperTest extends TestCase
 {
-    /**
-     * @param array<string, string|null> $values
-     */
-    private function withEnv(array $values, callable $callback): void
-    {
-        $previous = [];
-        foreach ($values as $key => $value) {
-            $previous[$key] = getenv($key);
-            if ($value === null) {
-                putenv($key);
-                continue;
-            }
-
-            putenv($key.'='.$value);
-        }
-
-        try {
-            $callback();
-        } finally {
-            foreach ($previous as $key => $value) {
-                if ($value === false) {
-                    putenv($key);
-                    continue;
-                }
-
-                putenv($key.'='.$value);
-            }
-        }
-    }
-
     public function testCustomMissingPythonWarningOverridesDefaultLabelMessage(): void
     {
         $messages = [];
 
-        $this->withEnv(['PATH' => ''], function () use (&$messages): void {
+        $this->pmssWithEnv(['PATH' => ''], function () use (&$messages): void {
             $result = \pmssPythonVenvEnsure(
                 '/tmp/pmss-python-venv-test-missing',
                 'FlexGet',
@@ -60,7 +30,7 @@ class PythonVenvHelperTest extends TestCase
     {
         $messages = [];
 
-        $this->withEnv(['PATH' => ''], function () use (&$messages): void {
+        $this->pmssWithEnv(['PATH' => ''], function () use (&$messages): void {
             $result = \pmssPythonVenvEnsure(
                 '/tmp/pmss-python-venv-test-default',
                 'acd_cli',

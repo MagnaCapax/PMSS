@@ -23,7 +23,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testResolveEndpointPrefersDns(): void
     {
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_DNS_IP'       => '198.51.100.10',
             'PMSS_WG_EXTERNAL_IP'  => null,
             'PMSS_WG_INTERFACE_IP' => null,
@@ -44,7 +44,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testResolveEndpointFallsBackToExternalLookup(): void
     {
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_DNS_IP'       => '10.0.0.1',
             'PMSS_WG_EXTERNAL_IP'  => '203.0.113.5',
             'PMSS_WG_INTERFACE_IP' => '10.0.0.2',
@@ -57,7 +57,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testResolveEndpointUsesInterfaceIp(): void
     {
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_DNS_IP'       => '10.0.0.2',
             'PMSS_WG_EXTERNAL_IP'  => '10.0.0.5',
             'PMSS_WG_INTERFACE_IP' => '198.51.100.20',
@@ -70,7 +70,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testResolveEndpointMarksPrivateInterface(): void
     {
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_DNS_IP'       => '10.0.0.3',
             'PMSS_WG_EXTERNAL_IP'  => '',
             'PMSS_WG_INTERFACE_IP' => '10.0.0.4',
@@ -83,7 +83,7 @@ class WireGuardInstallerTest extends TestCase
 
     public function testResolveEndpointFallsBackToHostname(): void
     {
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_DNS_IP'       => 'seed.example.com',
             'PMSS_WG_EXTERNAL_IP'  => '',
             'PMSS_WG_INTERFACE_IP' => '',
@@ -121,7 +121,7 @@ class WireGuardInstallerTest extends TestCase
 
         $homeBase = $this->createTempDir();
 
-	        $this->withEnv([
+	        $this->pmssWithEnv([
 	            'PMSS_WG_CONFIG_DIR' => $dir,
 	            'PMSS_WG_HOME_BASE'  => $homeBase,
 	            'PMSS_WG_USER_LIST'  => 'dummy',
@@ -149,7 +149,7 @@ class WireGuardInstallerTest extends TestCase
         file_put_contents($homeBase.'/alice/.wireguard-public-key', $aliceKey."\n");
         file_put_contents($homeBase.'/bob/.wireguard-public-key', $bobKey."\n");
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_CONFIG_DIR' => $dir,
             'PMSS_WG_HOME_BASE'  => $homeBase,
             'PMSS_WG_USER_LIST'  => 'alice,bob',
@@ -175,7 +175,7 @@ class WireGuardInstallerTest extends TestCase
         file_put_contents($dir.'/server_private.key', "priv\n");
         file_put_contents($dir.'/server_public.key', "pub\n");
 
-        $this->withEnv([], function () use ($dir): void {
+        $this->pmssWithEnv([], function () use ($dir): void {
             [$priv, $pub] = \wgEnsureKeys($dir);
             $this->assertEquals('priv', $priv);
             $this->assertEquals('pub', $pub);
@@ -186,7 +186,7 @@ class WireGuardInstallerTest extends TestCase
     {
         $dir = $this->createTempDir();
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_PRIVATE_KEY' => 'env-priv',
             'PMSS_WG_PUBLIC_KEY'  => 'env-pub',
         ], function () use ($dir): void {
@@ -202,7 +202,7 @@ class WireGuardInstallerTest extends TestCase
     {
         $dir = $this->createTempDir();
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_WG_PRIVATE_KEY' => '',
         ], function () use ($dir): void {
             [$priv, $pub] = \wgEnsureKeys($dir);
@@ -219,7 +219,7 @@ class WireGuardInstallerTest extends TestCase
         @mkdir($homeBase.'/alice', 0755, true);
         @mkdir($homeBase.'/bob', 0755, true);
 
-	        $this->withEnv([
+	        $this->pmssWithEnv([
 	            'PMSS_WG_HOME_BASE' => $homeBase,
 	            'PMSS_WG_USER_LIST' => 'alice,bob',
 	        ], function (): void {
@@ -263,36 +263,6 @@ class WireGuardInstallerTest extends TestCase
         $this->assertTrue(strpos($source, "require_once __DIR__.'/update.php';") === false, 'wireguard.php should not pull update.php just to get logmsg()');
         $this->assertTrue(strpos($source, "if (!function_exists('logmsg')) {") === false, 'wireguard.php should rely on require_once instead of logmsg guards');
         $this->assertTrue(strpos($source, "if (!function_exists('runStep')) {") === false, 'wireguard.php should rely on require_once instead of runStep guards');
-    }
-
-    /**
-     * Apply temporary environment variable overrides for the duration of a callback.
-     *
-     * @param array<string,?string> $variables
-     */
-    private function withEnv(array $variables, callable $callback): void
-    {
-        $previous = [];
-        foreach ($variables as $name => $value) {
-            $previous[$name] = getenv($name);
-            if ($value === null) {
-                putenv($name);
-            } else {
-                putenv($name.'='.$value);
-            }
-        }
-
-        try {
-            $callback();
-        } finally {
-            foreach ($previous as $name => $value) {
-                if ($value === false) {
-                    putenv($name);
-                } else {
-                    putenv($name.'='.$value);
-                }
-            }
-        }
     }
 
     private function createTempDir(): string

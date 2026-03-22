@@ -6,13 +6,6 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class cgroupSliceTest extends TestCase
 {
-    private function tempDir(string $prefix): string
-    {
-        $d = sys_get_temp_dir().'/pmss-cg-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        @mkdir($d, 0700, true);
-        return $d;
-    }
-
     private function writeTemplate(string $dir, string $name, string $body): string
     {
         $path = rtrim($dir, '/').'/'.$name;
@@ -22,8 +15,8 @@ class cgroupSliceTest extends TestCase
 
     private function renderSlice(string $tplBody, int $cpuThreads, int $memMiB): string
     {
-        $cfgDir = $this->tempDir('cfg-tasks');
-        $drop   = $this->tempDir('drop-tasks');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-tasks-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-tasks-');
 
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', 'ignored');
@@ -40,8 +33,8 @@ class cgroupSliceTest extends TestCase
 
     public function testV2RenderingReplacesPlaceholders(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
 
         $tplBody = "[Slice]\nCPUAccounting=yes\nIOAccounting=yes\nMemoryAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
@@ -67,8 +60,8 @@ class cgroupSliceTest extends TestCase
 
     public function testMemoryConstraintsApplied(): void
     {
-        $cfgDir = $this->tempDir('cfg2');
-        $drop   = $this->tempDir('drop2');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg2-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop2-');
         $tplBody = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', 'ignored');
@@ -85,7 +78,7 @@ class cgroupSliceTest extends TestCase
         $this->assertTrue($high >= 250, 'MemoryHigh below minimum 250MiB');
 
         // Large RAM: MemoryMax <= 95% and about 1.25x MemoryHigh
-        $drop3 = $this->tempDir('drop3');
+        $drop3 = $this->pmssMakeTempDir('pmss-cg-drop3-');
         putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop3);
         putenv('PMSS_TOTAL_MEM_MIB=65536');
         \pmssEnsureSystemdSlices('logmsg');
@@ -100,8 +93,8 @@ class cgroupSliceTest extends TestCase
 
     public function testV1TemplateSelectedWhenModeV1(): void
     {
-        $cfgDir = $this->tempDir('cfgv1');
-        $drop   = $this->tempDir('dropv1');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfgv1-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-dropv1-');
         $v1Body = "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', $v1Body);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', 'ignored');
@@ -119,8 +112,8 @@ class cgroupSliceTest extends TestCase
 
     public function testNoVendorPathsUsedForDropins(): void
     {
-        $cfgDir = $this->tempDir('cfgv3');
-        $drop   = $this->tempDir('dropv3');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfgv3-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-dropv3-');
         $tplBody = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v2.conf', $tplBody);
         $this->writeTemplate($cfgDir, 'template.cgroup.user-slice.v1.conf', $tplBody);
@@ -138,8 +131,8 @@ class cgroupSliceTest extends TestCase
 
     public function testInvalidTemplateLogsWarningAndSkips(): void
     {
-        $cfgDir = $this->tempDir('cfgbad');
-        $drop   = $this->tempDir('dropbad');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfgbad-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-dropbad-');
         // Do not write any template; function should log a warning and return.
         putenv('PMSS_CGROUP_MODE=v2');
         putenv('PMSS_CONFIG_DIR='.$cfgDir);

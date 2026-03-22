@@ -6,17 +6,10 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SystemdSliceRenderingProfiles2Test extends TestCase
 {
-    private function tempDir(string $prefix): string
-    {
-        $d = sys_get_temp_dir().'/pmss-cg-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        @mkdir($d, 0700, true);
-        return $d;
-    }
-
     public function testCpuQuotaRenderedFromPolicyDefault(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         // Minimal v2 template with CPUQuota placeholder
         $tpl = "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
@@ -35,8 +28,8 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
 
     public function testCpuQuotaInfinityPreserved(): void
     {
-        $cfgDir = $this->tempDir('cfginf');
-        $drop   = $this->tempDir('dropinf');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfginf-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-dropinf-');
         $tpl = "[Slice]\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
@@ -53,8 +46,8 @@ class SystemdSliceRenderingProfiles2Test extends TestCase
 
     public function testMountPolicyAppendsIoLinesWhenResolvable(): void
     {
-        $cfgDir = $this->tempDir('cfg2');
-        $drop   = $this->tempDir('drop2');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg2-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop2-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');

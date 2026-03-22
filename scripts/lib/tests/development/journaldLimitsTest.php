@@ -23,23 +23,6 @@ class JournaldLimitsTest extends TestCase
         return $dir;
     }
 
-    private function withEnv(array $values, callable $callback): void
-    {
-        $previous = [];
-        foreach ($values as $key => $value) {
-            $previous[$key] = getenv($key);
-            putenv($value === null ? $key : $key.'='.$value);
-        }
-
-        try {
-            $callback();
-        } finally {
-            foreach ($previous as $key => $value) {
-                putenv($value === false ? $key : $key.'='.$value);
-            }
-        }
-    }
-
     public function testSmallRootUsesTwentyPercent(): void
     {
         $rootBytes = $this->gib(20);
@@ -102,7 +85,7 @@ class JournaldLimitsTest extends TestCase
             ."RateLimitBurst=%%PMSS_JOURNALD_RATE_LIMIT_BURST%%\n";
         file_put_contents($template, $tplBody);
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_CONFIG_DIR' => $cfgDir,
             'PMSS_JOURNALD_CONF_DIR' => $targetDir,
             'PMSS_ROOT_FS_BYTES' => (string) $this->gib(10),
@@ -128,7 +111,7 @@ class JournaldLimitsTest extends TestCase
         $targetDir = $this->tempDir('journald');
         file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_CONFIG_DIR' => $cfgDir,
             'PMSS_JOURNALD_CONF_DIR' => $targetDir,
             'PMSS_ROOT_FS_BYTES' => (string) $this->gib(10),

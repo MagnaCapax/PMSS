@@ -128,4 +128,26 @@ abstract class TestCase
 
         putenv($key.'='.$value);
     }
+
+    /**
+     * Apply temporary environment variable overrides for the duration of a callback.
+     *
+     * @param array<string, string|null> $values
+     */
+    protected function pmssWithEnv(array $values, callable $callback): void
+    {
+        $previous = [];
+        foreach ($values as $key => $value) {
+            $previous[$key] = getenv($key);
+            $this->pmssRestoreEnv($key, $value);
+        }
+
+        try {
+            $callback();
+        } finally {
+            foreach ($previous as $key => $value) {
+                $this->pmssRestoreEnv($key, $value);
+            }
+        }
+    }
 }

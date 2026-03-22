@@ -10,7 +10,7 @@ class UpdateServicesBootstrapTest extends TestCase
     {
         $messages = [];
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_SKIP_HOSTNAME' => 'yes',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
@@ -29,7 +29,7 @@ class UpdateServicesBootstrapTest extends TestCase
     {
         $messages = [];
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_SKIP_HOSTNAME' => 'on',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
@@ -48,7 +48,7 @@ class UpdateServicesBootstrapTest extends TestCase
     {
         $messages = [];
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_SKIP_HOSTNAME' => 'no',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
@@ -71,7 +71,7 @@ class UpdateServicesBootstrapTest extends TestCase
     {
         $messages = [];
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_SKIP_HOSTNAME' => 'FALSE',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
@@ -94,7 +94,7 @@ class UpdateServicesBootstrapTest extends TestCase
     {
         $messages = [];
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_SKIP_QUOTA' => 'on',
             'PMSS_QUOTA_MOUNT' => null,
         ], function () use (&$messages): void {
@@ -114,7 +114,7 @@ class UpdateServicesBootstrapTest extends TestCase
         $messages = [];
         $mount = sys_get_temp_dir().'/pmss-bootstrap-quota-'.bin2hex(random_bytes(4));
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_SKIP_QUOTA' => 'no',
             'PMSS_QUOTA_MOUNT' => $mount,
         ], function () use (&$messages): void {
@@ -138,7 +138,7 @@ class UpdateServicesBootstrapTest extends TestCase
         $messages = [];
         $mount = sys_get_temp_dir().'/pmss-bootstrap-quota-'.bin2hex(random_bytes(4));
 
-        $this->withEnv([
+        $this->pmssWithEnv([
             'PMSS_SKIP_QUOTA' => 'FALSE',
             'PMSS_QUOTA_MOUNT' => $mount,
         ], function () use (&$messages): void {
@@ -155,31 +155,6 @@ class UpdateServicesBootstrapTest extends TestCase
             $this->messagesContain($messages, 'Skipping remount for '.$mount.' (mount path not found)'),
             'uppercase falsey PMSS_SKIP_QUOTA should fall through to normal quota handling'
         );
-    }
-
-    private function withEnv(array $values, callable $callback): void
-    {
-        $previous = [];
-        foreach ($values as $key => $value) {
-            $previous[$key] = getenv($key);
-            if ($value === null) {
-                putenv($key);
-                continue;
-            }
-            putenv($key.'='.$value);
-        }
-
-        try {
-            $callback();
-        } finally {
-            foreach ($previous as $key => $value) {
-                if ($value === false) {
-                    putenv($key);
-                    continue;
-                }
-                putenv($key.'='.$value);
-            }
-        }
     }
 
     private function messagesContain(array $messages, string $needle): bool

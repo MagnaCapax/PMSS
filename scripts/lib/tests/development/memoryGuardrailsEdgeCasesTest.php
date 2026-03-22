@@ -6,17 +6,10 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class MemoryGuardrailsEdgeCasesTest extends TestCase
 {
-    private function tempDir(string $prefix): string
-    {
-        $d = sys_get_temp_dir().'/pmss-cg-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        @mkdir($d, 0700, true);
-        return $d;
-    }
-
     public function testLowRamFloorsAreApplied(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
@@ -34,8 +27,8 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
 
     public function testHugeRamRespects95PercentCap(): void
     {
-        $cfgDir = $this->tempDir('cfg2');
-        $drop   = $this->tempDir('drop2');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg2-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop2-');
         $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
@@ -51,8 +44,8 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
 
     public function testDefaultBurstabilityAlignsTo25Percent(): void
     {
-        $cfgDir = $this->tempDir('cfg3');
-        $drop   = $this->tempDir('drop3');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg3-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop3-');
         $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');

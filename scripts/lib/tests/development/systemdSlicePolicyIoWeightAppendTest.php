@@ -6,17 +6,10 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SystemdSlicePolicyIoWeightAppendTest extends TestCase
 {
-    private function tempDir(string $prefix): string
-    {
-        $d = sys_get_temp_dir().'/pmss-cg-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        @mkdir($d, 0700, true);
-        return $d;
-    }
-
     public function testIODeviceWeightAppendedWhenConfigured(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
@@ -38,8 +31,8 @@ PHP;
 
     public function testIODeviceWeightSkippedOnV1(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', 'ignored');
@@ -61,8 +54,8 @@ PHP;
 
     public function testIOPSLimitsAppendedWhenConfigured(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
@@ -85,8 +78,8 @@ PHP;
 
     public function testBandwidthLimitsAppendedWhenConfigured(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');

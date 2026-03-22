@@ -6,17 +6,10 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SystemdSlicePlaceholdersCoverageTest extends TestCase
 {
-    private function tempDir(string $prefix): string
-    {
-        $d = sys_get_temp_dir().'/pmss-cg-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        @mkdir($d, 0700, true);
-        return $d;
-    }
-
     public function testAllPlaceholdersReplaced(): void
     {
-        $cfgDir = $this->tempDir('cfg');
-        $drop   = $this->tempDir('drop');
+        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
+        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
@@ -29,4 +22,3 @@ class SystemdSlicePlaceholdersCoverageTest extends TestCase
         $this->assertTrue(strpos($out, '%%') === false, 'placeholders remained');
     }
 }
-

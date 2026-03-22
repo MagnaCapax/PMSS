@@ -22,7 +22,7 @@ class ArrUpdateTest extends TestCase
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
 
         try {
-            $this->withEnv([
+            $this->pmssWithEnv([
                 'PATH' => $shimDir.':'.(string) getenv('PATH'),
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
@@ -60,7 +60,7 @@ class ArrUpdateTest extends TestCase
         @file_put_contents($installPath.'/marker.txt', 'existing');
 
         try {
-            $this->withEnv([
+            $this->pmssWithEnv([
                 'PATH' => $shimDir.':'.(string) getenv('PATH'),
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
@@ -161,31 +161,6 @@ SH
         );
         @chmod($curl, 0755);
         return $shimDir;
-    }
-
-    private function withEnv(array $values, callable $callback): void
-    {
-        $previous = [];
-        foreach ($values as $key => $value) {
-            $previous[$key] = getenv($key);
-            if ($value === null) {
-                putenv($key);
-                continue;
-            }
-            putenv($key.'='.$value);
-        }
-
-        try {
-            $callback();
-        } finally {
-            foreach ($previous as $key => $value) {
-                if ($value === false) {
-                    putenv($key);
-                    continue;
-                }
-                putenv($key.'='.$value);
-            }
-        }
     }
 
     private function cleanupGlob(string $pattern): void
