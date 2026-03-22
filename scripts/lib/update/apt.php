@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/logging.php';
+require_once __DIR__.'/distro.php';
 require_once __DIR__.'/../runtime.php';
 
 /**
@@ -88,21 +89,10 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
     $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName");
 }
 
-/**
- * Handle Debian release specific updates.
- */
 function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $repos, callable $log): void
 {
-    static $targets = [
-        8  => ['label' => 'Jessie',   'repo' => 'jessie',   'eol' => true],
-        10 => ['label' => 'Buster',   'repo' => 'buster',   'eol' => true],
-        11 => ['label' => 'Bullseye', 'repo' => 'bullseye', 'eol' => false],
-        12 => ['label' => 'Bookworm', 'repo' => 'bookworm', 'eol' => false],
-        13 => ['label' => 'Trixie',   'repo' => 'trixie',   'eol' => false],
-    ];
-
-    if (!isset($targets[$version])) { $log("Unsupported Debian version: $version"); return; }
-    $target = $targets[$version];
+    $target = pmssDebianReleaseSpecs()[$version] ?? null;
+    if (!is_array($target) || !$target['sources_template']) { $log("Unsupported Debian version: $version"); return; }
     $label = $target['label'];
 
     if (($template = $repos[$target['repo']] ?? '') === '') {
@@ -114,7 +104,6 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
         $log("Debian {$label} repositories already correct");
         return;
     }
-
     if ($target['eol']) {
         // EOL suites lack valid Release timestamps; relax the check.
         if (defined('PMSS_TEST_MODE')) {

@@ -21,6 +21,17 @@ class DistroDetectionTest extends TestCase
         $this->assertEquals(11, \pmssVersionFromCodename('Bullseye'));
     }
 
+    public function testDebianCodenameFromMajorMapsKnownReleases(): void
+    {
+        $this->assertEquals('jessie', \pmssDebianCodenameFromMajor(8));
+        $this->assertEquals('stretch', \pmssDebianCodenameFromMajor(9));
+        $this->assertEquals('buster', \pmssDebianCodenameFromMajor(10));
+        $this->assertEquals('bullseye', \pmssDebianCodenameFromMajor(11));
+        $this->assertEquals('bookworm', \pmssDebianCodenameFromMajor(12));
+        $this->assertEquals('trixie', \pmssDebianCodenameFromMajor(13));
+        $this->assertEquals('', \pmssDebianCodenameFromMajor(99));
+    }
+
     public function testStandaloneDistroLibraryStillBootstrapsLegacyLogmsg(): void
     {
         $path = dirname(__DIR__, 2).'/update/distro.php';
@@ -235,6 +246,19 @@ class DistroDetectionTest extends TestCase
             @unlink($configDir.'/template.sources.bookworm');
             @rmdir($configDir);
         }
+    }
+
+    public function testDebianReleaseSpecsExposeSharedRepositoryMetadata(): void
+    {
+        $specs = \pmssDebianReleaseSpecs();
+
+        $this->assertEquals('stretch', $specs[9]['repo']);
+        $this->assertEquals('Stretch', $specs[9]['label']);
+        $this->assertTrue($specs[9]['eol']);
+        $this->assertTrue($specs[9]['sources_template'] === false);
+        $this->assertEquals('trixie', $specs[13]['repo']);
+        $this->assertTrue($specs[13]['sources_template']);
+        $this->assertTrue($specs[13]['eol'] === false);
     }
 
     /**

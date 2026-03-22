@@ -21,6 +21,21 @@ class UpdateCompressionCharacterizationTest extends TestCase
         );
     }
 
+    public function testAptSourcesDebianSelectionUsesSharedReleaseSpecs(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/lib/update/apt.php';
+        $src = @file_get_contents($path);
+        $legacyTable = 'static $targets = [';
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+
+        $this->assertStringContainsString("require_once __DIR__.'/distro.php';", $src);
+        $this->assertStringContainsString('pmssDebianReleaseSpecs()[$version] ?? null', $src);
+        $this->assertTrue(
+            strpos($src, $legacyTable) === false,
+            'apt.php should not keep a second Debian release target table'
+        );
+    }
+
     public function testUpdateStep2OwnsWebStackConfiguration(): void
     {
         $step2Path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';

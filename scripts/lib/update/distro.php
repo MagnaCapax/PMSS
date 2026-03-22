@@ -9,21 +9,24 @@
 require_once __DIR__.'/../log.php';
 require_once __DIR__.'/osRelease.php';
 
-/**
- * Debian major → codename mapping.
- *
- * Best-effort helper for internal consumers; callers must apply their own
- * allowlists (e.g. dist-upgrade only supports 10–13 today).
- */
+/** @return array<int, array{label:string,repo:string,eol:bool,sources_template:bool}> */
+function pmssDebianReleaseSpecs(): array
+{
+    static $specs = [
+        8  => ['label' => 'Jessie',   'repo' => 'jessie',   'eol' => true,  'sources_template' => true],
+        9  => ['label' => 'Stretch',  'repo' => 'stretch',  'eol' => true,  'sources_template' => false],
+        10 => ['label' => 'Buster',   'repo' => 'buster',   'eol' => true,  'sources_template' => true],
+        11 => ['label' => 'Bullseye', 'repo' => 'bullseye', 'eol' => false, 'sources_template' => true],
+        12 => ['label' => 'Bookworm', 'repo' => 'bookworm', 'eol' => false, 'sources_template' => true],
+        13 => ['label' => 'Trixie',   'repo' => 'trixie',   'eol' => false, 'sources_template' => true],
+    ];
+
+    return $specs;
+}
 function pmssDebianCodenameFromMajor(int $major): string
 {
-    static $reverse = [8 => 'jessie', 9 => 'stretch', 10 => 'buster', 11 => 'bullseye', 12 => 'bookworm', 13 => 'trixie'];
-    return $reverse[$major] ?? '';
+    return pmssDebianReleaseSpecs()[$major]['repo'] ?? '';
 }
-
-/**
- * Detect distro name, major version, and codename with safe fallbacks.
- */
 function pmssDetectDistro(): array
 {
     $name = strtolower((string) (getDistroName() ?: trim((string) @shell_exec('lsb_release -is 2>/dev/null'))));
@@ -38,24 +41,17 @@ function pmssDetectDistro(): array
     $codename = strtolower((string) (getDistroCodename() ?: trim((string) @shell_exec('lsb_release -cs 2>/dev/null'))));
 
     if (($mappedVersion = pmssVersionFromCodename($codename)) !== 0) {
-        if ($mappedVersion !== $version) {
-            logmsg(sprintf('Distro codename/version mismatch (%s vs %d); trusting codename', $codename, $version));
-        }
+        if ($mappedVersion !== $version) { logmsg(sprintf('Distro codename/version mismatch (%s vs %d); trusting codename', $codename, $version)); }
         $version = $mappedVersion;
     }
-
-    return [
-        'name'     => $name,
-        'version'  => $version,
-        'codename' => $codename,
-    ];
+    return ['name' => $name, 'version' => $version, 'codename' => $codename];
 }
-
-/**
- * Map Debian release codenames to their major version numbers.
- */
 function pmssVersionFromCodename(string $codename): int
 {
-    static $map = ['jessie' => 8, 'stretch' => 9, 'buster' => 10, 'bullseye' => 11, 'bookworm' => 12, 'trixie' => 13];
-    return (int) ($map[strtolower($codename)] ?? 0);
+    foreach (pmssDebianReleaseSpecs() as $major => $spec) {
+        if ($spec['repo'] === strtolower($codename)) {
+            return $major;
+        }
+    }
+    return 0;
 }
