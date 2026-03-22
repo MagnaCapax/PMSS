@@ -33,10 +33,10 @@ class users extends UserRepository
     public function __construct()
     {
         parent::__construct();
-        $this->refreshUsers();
+        $this->users = $this->all();
         if (!empty($this->users)) {
             parent::pruneStaleEntries();
-            $this->refreshUsers();
+            $this->users = $this->all();
         }
     }
 
@@ -80,7 +80,8 @@ class users extends UserRepository
     public function addUser(string $username, array $data): void
     {
         if ($this->set($username, $data)) {
-            $this->syncCache(true);
+            $this->users = $this->all();
+            parent::persist();
         }
     }
 
@@ -99,7 +100,7 @@ class users extends UserRepository
     {
         $result = $this->set($username, $data);
         if ($result) {
-            $this->syncCache();
+            $this->users = $this->all();
         }
         return $result;
     }
@@ -117,7 +118,8 @@ class users extends UserRepository
     public function removeUser(string $username): void
     {
         parent::remove($username);
-        $this->syncCache(true);
+        $this->users = $this->all();
+        parent::persist();
     }
 
     /**
@@ -132,7 +134,7 @@ class users extends UserRepository
     {
         $before = count($this->users);
         parent::pruneStaleEntries();
-        $this->refreshUsers();
+        $this->users = $this->all();
         return max(0, $before - count($this->users));
     }
 
@@ -158,25 +160,6 @@ class users extends UserRepository
     public static function listHomeUsers(): array
     {
         return userFilesystem::listHomeUsers();
-    }
-
-    /**
-     * Reload the cached user data from the repository backend.
-     */
-    private function refreshUsers(): void
-    {
-        $this->users = $this->all();
-    }
-
-    /**
-     * Refresh the cache and optionally persist pending database updates.
-     */
-    private function syncCache(bool $persist = false): void
-    {
-        $this->refreshUsers();
-        if ($persist) {
-            parent::persist();
-        }
     }
 
 }

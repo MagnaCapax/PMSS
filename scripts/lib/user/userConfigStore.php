@@ -79,9 +79,11 @@ class UserConfigStore
         }
 
         $payload = $this->normalise($payload);
-        if (!$this->validate($payload)) {
-            error_log('UserConfigStore: refusing to write invalid payload for '.$username);
-            return false;
+        foreach (['ramMiB', 'rtorrentPort', 'quota', 'quotaBurst'] as $key) {
+            if (!array_key_exists($key, $payload) || !is_numeric($payload[$key])) {
+                error_log('UserConfigStore: refusing to write invalid payload for '.$username);
+                return false;
+            }
         }
 
         $path = $this->userFilePath($username);
@@ -283,17 +285,6 @@ class UserConfigStore
 
         ksort($payload, SORT_STRING);
         return $payload;
-    }
-
-    private function validate(array $payload): bool
-    {
-        $required = ['ramMiB', 'rtorrentPort', 'quota', 'quotaBurst'];
-        foreach ($required as $key) {
-            if (!array_key_exists($key, $payload) || !is_numeric($payload[$key])) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private function readJsonFile(string $path): ?array
