@@ -261,6 +261,21 @@ class RtorrentProcessTest extends TestCase
         $this->assertEquals(['php' => [], 'screen' => [], 'all' => []], $result);
     }
 
+    public function testProcessLookupsExposeCommandDetailsByReference(): void
+    {
+        $rc = null;
+        $output = null;
+
+        $this->assertEquals([], rtorrentProcessPgrepExact('nonexistent_user_12345', 'rtorrent', $rc, $output));
+        $this->assertTrue(is_int($rc), 'Expected integer exit code reference');
+        $this->assertTrue(is_array($output), 'Expected raw output reference array');
+
+        $result = rtorrentProcessExecutorPids('nonexistent_user_12345', $rc, $output);
+        $this->assertEquals(['php' => [], 'screen' => [], 'all' => []], $result);
+        $this->assertTrue(is_int($rc), 'Expected integer exit code reference');
+        $this->assertTrue(is_array($output), 'Expected raw output reference array');
+    }
+
     /**
      * Test kill PIDs handles empty array.
      */

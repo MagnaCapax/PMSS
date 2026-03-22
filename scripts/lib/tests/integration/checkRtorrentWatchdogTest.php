@@ -196,9 +196,7 @@ if (!$rtReady) {
 }
 
 // Record PID.
-$pidOut = [];
-@exec('pgrep -u '.escapeshellarg($testUser).' rtorrent', $pidOut);
-$originalPid = (int) trim($pidOut[0] ?? '0');
+$originalPid = (int) (rtorrentProcessPgrepExact($testUser, 'rtorrent')[0] ?? 0);
 check('rtorrent PID obtained', $originalPid > 0);
 emit('INFO', "Original PID: {$originalPid}");
 
@@ -343,9 +341,7 @@ if (function_exists('posix_kill')) {
 check('Old rtorrent PID killed', $oldDead);
 
 // New PID should exist.
-$newPidOut = [];
-@exec('pgrep -u '.escapeshellarg($testUser).' rtorrent', $newPidOut);
-$newPid = (int) trim($newPidOut[0] ?? '0');
+$newPid = (int) (rtorrentProcessPgrepExact($testUser, 'rtorrent')[0] ?? 0);
 check('New rtorrent PID exists', $newPid > 0);
 check('New PID differs from original', $newPid !== $originalPid);
 emit('INFO', "New PID: {$newPid}");

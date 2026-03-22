@@ -5,6 +5,16 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateCompressionCharacterizationTest extends TestCase
 {
+    public function testStartRtorrentReusesSharedProcessLookups(): void
+    {
+        $path = dirname(__DIR__, 4).'/scripts/startRtorrent';
+        $src = @file_get_contents($path);
+
+        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $this->assertStringContainsString("rtorrentProcessPgrepExact(\$user, 'rtorrent', \$rtorrentRc, \$rtorrentOut)", $src);
+        $this->assertStringContainsString("rtorrentProcessExecutorPids(\$user, \$executorRc, \$executorOut)['all']", $src);
+    }
+
     public function testUpdateStep2KeepsInlineLighttpdHardeningStep(): void
     {
         $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';

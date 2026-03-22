@@ -149,18 +149,9 @@ if (is_file($executor) && is_file($skelExecutor) && !is_link($executor)) {
     }
 }
 
-$rtorrentPids = [];
 $rtorrentRc = 0;
 $rtorrentOut = [];
-@exec('pgrep -u '.escapeshellarg($user).' -x rtorrent 2>&1', $rtorrentOut, $rtorrentRc);
-if ($rtorrentRc === 0) {
-    foreach ($rtorrentOut as $line) {
-        $pid = (int) trim((string) $line);
-        if ($pid > 0) {
-            $rtorrentPids[] = $pid;
-        }
-    }
-}
+$rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent', $rtorrentRc, $rtorrentOut);
 if (!empty($rtorrentPids)) {
     logmsg("rTorrent already running for {$user}; skipping start");
     exit(0);
@@ -170,18 +161,9 @@ if ($rtorrentRc !== 0 && $rtorrentRc !== 1) {
     exit(1);
 }
 
-$executorPids = [];
 $executorRc = 0;
 $executorOut = [];
-@exec('pgrep -u '.escapeshellarg($user).' -f '.escapeshellarg('rtorrentExecute\\.php').' 2>&1', $executorOut, $executorRc);
-if ($executorRc === 0) {
-    foreach ($executorOut as $line) {
-        $pid = (int) trim((string) $line);
-        if ($pid > 0) {
-            $executorPids[] = $pid;
-        }
-    }
-}
+$executorPids = rtorrentProcessExecutorPids($user, $executorRc, $executorOut)['all'];
 if (!empty($executorPids)) {
     logmsg("Executor already running for {$user} but rtorrent missing; refusing to start another executor");
     exit(0);

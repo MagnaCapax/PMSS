@@ -30,22 +30,17 @@ if (!defined('SIGKILL')) {
  *
  * @return int[] Array of matching PIDs.
  */
-function rtorrentProcessPgrepExact(string $user, string $comm): array
+function rtorrentProcessPgrepExact(string $user, string $comm, ?int &$rc = null, ?array &$output = null): array
 {
-    $out = [];
-    $rc = 1;
-    @exec('pgrep -u '.escapeshellarg($user).' '.escapeshellarg('^'.$comm), $out, $rc);
-    if ($rc !== 0) {
+    $pgrepOutput = [];
+    $pgrepRc = 1;
+    @exec('pgrep -u '.escapeshellarg($user).' '.escapeshellarg('^'.$comm), $pgrepOutput, $pgrepRc);
+    $output = $pgrepOutput;
+    $rc = $pgrepRc;
+    if ($pgrepRc !== 0) {
         return [];
     }
-    $pids = [];
-    foreach ($out as $line) {
-        $pid = (int) trim((string) $line);
-        if ($pid > 0) {
-            $pids[] = $pid;
-        }
-    }
-    return $pids;
+    return rtorrentProcessNormalizePids($pgrepOutput);
 }
 
 /**
@@ -136,19 +131,21 @@ function rtorrentProcessWaitForStablePids(
  *
  * @return array{php:int[],screen:int[],all:int[]} PIDs grouped by type.
  */
-function rtorrentProcessExecutorPids(string $user): array
+function rtorrentProcessExecutorPids(string $user, ?int &$rc = null, ?array &$output = null): array
 {
-    $out = [];
-    $rc = 0;
-    @exec('ps -u '.escapeshellarg($user).' -o pid=,comm=,args=', $out, $rc);
-    if ($rc !== 0) {
+    $processOutput = [];
+    $processRc = 0;
+    @exec('ps -u '.escapeshellarg($user).' -o pid=,comm=,args=', $processOutput, $processRc);
+    $output = $processOutput;
+    $rc = $processRc;
+    if ($processRc !== 0) {
         return ['php' => [], 'screen' => [], 'all' => []];
     }
 
     $php = [];
     $screen = [];
     $all = [];
-    foreach ($out as $line) {
+    foreach ($processOutput as $line) {
         $line = trim((string) $line);
         if ($line === '' || strpos($line, 'rtorrentExecute.php') === false) {
             continue;
