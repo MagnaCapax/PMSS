@@ -7,6 +7,10 @@
 
 function pmssUserFilePathIsSafe(string $path): bool
 {
+    if (strpos($path, '/') !== 0) {
+        return false;
+    }
+
     if (strpos($path, "\0") !== false || is_link($path) || (file_exists($path) && !is_file($path))) {
         return false;
     }

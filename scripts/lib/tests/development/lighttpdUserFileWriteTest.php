@@ -69,6 +69,12 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertTrue(!file_exists($path));
     }
 
+    public function testAppendUserFileRejectsRelativePath(): void
+    {
+        $this->assertTrue(!\pmssAppendUserFile('relative.htpasswd', "user:hash\n", $this->currentOwner(), 0640));
+        $this->assertTrue(!file_exists('relative.htpasswd'));
+    }
+
     public function testWriteUserFileRejectsSymlinkedParentDirectory(): void
     {
         $realDir = $this->tempDir.'/real';
@@ -77,6 +83,12 @@ class LighttpdUserFileWriteTest extends TestCase
         symlink($realDir, $linkDir);
 
         $this->assertTrue(!\pmssWriteUserFile($linkDir.'/.htpasswd', "user:hash\n", $this->currentOwner(), 0640));
+    }
+
+    public function testWriteUserFileRejectsRelativePath(): void
+    {
+        $this->assertTrue(!\pmssWriteUserFile('relative.htpasswd', "user:hash\n", $this->currentOwner(), 0640));
+        $this->assertTrue(!file_exists('relative.htpasswd'));
     }
 
     public function testCheckUserHtpasswdUsesSafeAppendHelper(): void
