@@ -5,17 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class TrafficLimitCliTextTest extends TestCase
 {
-    private function readScript(): string
-    {
-        $path = dirname(__DIR__, 4).'/scripts/util/userTrafficLimit.php';
-        $contents = @file_get_contents($path);
-        $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
-        return $contents;
-    }
-
     public function testUsageTextKeepsSupportedFormsAndNotes(): void
     {
-        $contents = $this->readScript();
+        $contents = $this->pmssReadRepoFile('scripts/util/userTrafficLimit.php');
         $expectedLines = [
             'Usage:',
             '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
@@ -40,7 +32,7 @@ class TrafficLimitCliTextTest extends TestCase
     {
         $this->assertStringContainsString(
             'Error: missing username.\\n".$usage."\\n',
-            $this->readScript()
+            $this->pmssReadRepoFile('scripts/util/userTrafficLimit.php')
         );
     }
 }

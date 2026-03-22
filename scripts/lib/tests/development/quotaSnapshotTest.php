@@ -61,15 +61,13 @@ class QuotaSnapshotTest extends TestCase
 
     public function testRootCronSchedulesQuotaSnapshots(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $cron = (string) file_get_contents($repoRoot.'/etc/seedbox/config/root.cron');
+        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
         $this->assertTrue(strpos($cron, '/scripts/cron/quotaSnapshot.php') !== false, 'root.cron should schedule quotaSnapshot.php');
     }
 
     public function testLogrotateKeepsQuotaHistoryRootOnly(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $policy = (string) file_get_contents($repoRoot.'/etc/seedbox/config/template.logrotate.pmss');
+        $policy = $this->pmssReadRepoFile('etc/seedbox/config/template.logrotate.pmss');
         $this->assertTrue(strpos($policy, '/var/log/pmss/quota-daily.log') !== false, 'logrotate policy should include quota-daily.log');
         $this->assertTrue(strpos($policy, 'rotate 24') !== false, 'quota log should keep 24 rotations (monthly)');
         $this->assertTrue(strpos($policy, 'create 0600 root root') !== false, 'quota log should remain root-only');

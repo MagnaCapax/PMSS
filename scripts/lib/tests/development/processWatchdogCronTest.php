@@ -7,16 +7,14 @@ class ProcessWatchdogCronTest extends TestCase
 {
     public function testRootCronSchedulesProcessWatchdog(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $cron = (string) file_get_contents($repoRoot.'/etc/seedbox/config/root.cron');
+        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
         $this->assertTrue(strpos($cron, '/scripts/cron/processWatchdog.sh') !== false, 'root.cron should schedule processWatchdog.sh');
         $this->assertTrue(strpos($cron, '*/15 * * * *') !== false, 'processWatchdog should run every 15 minutes');
     }
 
     public function testProcessWatchdogScriptContainsTwoStrikeKillFlow(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $script = (string) file_get_contents($repoRoot.'/scripts/cron/processWatchdog.sh');
+        $script = $this->pmssReadRepoFile('scripts/cron/processWatchdog.sh');
         $this->assertTrue(strpos($script, 'ffmpeg') !== false, 'watchdog should target ffmpeg');
         $this->assertTrue(strpos($script, 'HandBrakeCLI') !== false, 'watchdog should target HandBrakeCLI');
         $this->assertTrue(strpos($script, 'GRACE_SECONDS') !== false, 'watchdog should implement strike grace window');
@@ -24,4 +22,3 @@ class ProcessWatchdogCronTest extends TestCase
         $this->assertTrue(strpos($script, 'kill -KILL') !== false, 'watchdog should escalate to SIGKILL when needed');
     }
 }
-

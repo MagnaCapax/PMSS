@@ -150,4 +150,19 @@ abstract class TestCase
             }
         }
     }
+
+    /** Resolve a repository-relative path from the development test tree. */
+    protected function pmssRepoPath(string $relativePath): string
+    {
+        return dirname(__DIR__, 4).'/'.ltrim($relativePath, '/');
+    }
+
+    /** Read a repository file and fail the test when it is unavailable. */
+    protected function pmssReadRepoFile(string $relativePath): string
+    {
+        $path = $this->pmssRepoPath($relativePath);
+        $contents = @file_get_contents($path);
+        $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
+        return $contents;
+    }
 }
