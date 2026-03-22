@@ -1,0 +1,78 @@
+<?php
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
+
+define('PMSS_CHECK_USER_HTPASSWD_LIB_ONLY', true);
+require_once dirname(__DIR__, 4).'/scripts/util/checkUserHtpasswd.php';
+
+class CheckUserHtpasswdTest extends TestCase
+{
+    private $tempDir = '';
+
+    protected function setUp(): void
+    {
+        $this->tempDir = $this->pmssMakeTempDir('pmss-check-user-htpasswd-');
+    }
+
+    protected function tearDown(): void
+    {
+        $this->pmssRemoveTree($this->tempDir);
+    }
+
+    public function testMissingFileReturnsFalse(): void
+    {
+        $path = $this->tempDir.'/missing.htpasswd';
+
+        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === false);
+    }
+
+    public function testMatchingUserReturnsTrue(): void
+    {
+        $path = $this->tempDir.'/user.htpasswd';
+        file_put_contents($path, "alice:hash\n");
+
+        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
+    }
+
+    public function testAbsentUserReturnsFalse(): void
+    {
+        $path = $this->tempDir.'/user.htpasswd';
+        file_put_contents($path, "bob:hash\n");
+
+        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === false);
+    }
+
+    public function testEmptyFileReturnsFalse(): void
+    {
+        $path = $this->tempDir.'/empty.htpasswd';
+        file_put_contents($path, '');
+
+        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === false);
+    }
+
+    public function testUnreadableFileReturnsNullWhenReadFails(): void
+    {
+        $path = $this->tempDir.'/locked.htpasswd';
+        file_put_contents($path, "alice:hash\n");
+        chmod($path, 0000);
+
+        $result = \pmssCheckUserHtpasswdHasUserEntry($path, 'alice');
+
+        chmod($path, 0600);
+        if ($result !== null && $result !== true) {
+            $this->fail('Unreadable htpasswd should return null when file reads fail');
+        }
+        if ($result === true && function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+            $this->fail('Unreadable htpasswd unexpectedly remained readable');
+        }
+    }
+
+    public function testSourceKeepsOptionalLoggingGuardAndReadErrorMessage(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/checkUserHtpasswd.php');
+
+        $this->assertStringContainsString("function_exists('pmssUserWriteLogs')", $src);
+        $this->assertStringContainsString('Unable to read per-user htpasswd; skipping synchronization', $src);
+    }
+}

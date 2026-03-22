@@ -22,75 +22,122 @@ if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
 
-$argUserRaw = trim((string) ($argv[1] ?? ''));
-if ($argUserRaw !== '') {
-    $argUser = function_exists('pmssNormalizeUsername')
-        ? pmssNormalizeUsername($argUserRaw)
-        : $argUserRaw;
-    if (
-        $argUser !== $argUserRaw
-        || (function_exists('pmssValidateUsername') && !pmssValidateUsername($argUser))
-    ) {
-        fwrite(STDERR, "Invalid username\n");
-        exit(1);
+/**
+ * Write a structured log entry when the optional user logger is available.
+ *
+ * @param array<string, mixed> $fields
+ */
+function pmssCheckUserHtpasswdLog(string $step, string $username, array $fields): void
+{
+    if (!function_exists('pmssUserWriteLogs') || !function_exists('pmssUserBaseContext')) {
+        return;
     }
-    if (pmssUserAccountLookup($argUser) === null) {
-        fwrite(STDERR, "User not found\n");
-        exit(1);
-    }
-    $users = [$argUser];
-} else {
-    $users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
-    if ($users === []) {
-        die("No users setup - nothing to do\n");
-    }
+
+    pmssUserWriteLogs(pmssUserBaseContext('htpasswd', $step, $username, $fields));
 }
 
-$globalHtpasswd = '/etc/lighttpd/.htpasswd';
-if (trim((string) ($globalContents = @file_get_contents($globalHtpasswd))) === '') {
-    if ($argUserRaw === '') {
-        echo "Global htpasswd file missing or empty, skipping synchronization\n";
+/**
+ * Check whether the target htpasswd file already appears to contain the user.
+ *
+ * Returns null when the file exists but cannot be read so callers can skip
+ * destructive writes instead of appending blindly.
+ */
+function pmssCheckUserHtpasswdHasUserEntry(string $path, string $username)
+{
+    if (!is_file($path)) {
+        return false;
     }
-    exit(0);
+
+    $contents = @file_get_contents($path);
+    if ($contents === false) {
+        return null;
+    }
+
+    return strpos($contents, $username) !== false;
 }
 
-$passwords = array_filter(explode("\n", $globalContents), 'strlen');
+function pmssCheckUserHtpasswdMain(array $argv): int
+{
+    $argUserRaw = trim((string) ($argv[1] ?? ''));
+    if ($argUserRaw !== '') {
+        $argUser = function_exists('pmssNormalizeUsername')
+            ? pmssNormalizeUsername($argUserRaw)
+            : $argUserRaw;
+        if (
+            $argUser !== $argUserRaw
+            || (function_exists('pmssValidateUsername') && !pmssValidateUsername($argUser))
+        ) {
+            fwrite(STDERR, "Invalid username\n");
+            return 1;
+        }
+        if (pmssUserAccountLookup($argUser) === null) {
+            fwrite(STDERR, "User not found\n");
+            return 1;
+        }
+        $users = [$argUser];
+    } else {
+        $users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
+        if ($users === []) {
+            echo "No users setup - nothing to do\n";
+            return 0;
+        }
+    }
 
-foreach ($users as $thisUser) {
-    if (!pmssValidateUsername($thisUser)) {
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'htpasswd',
+    $globalHtpasswd = '/etc/lighttpd/.htpasswd';
+    if (trim((string) ($globalContents = @file_get_contents($globalHtpasswd))) === '') {
+        if ($argUserRaw === '') {
+            echo "Global htpasswd file missing or empty, skipping synchronization\n";
+        }
+        return 0;
+    }
+
+    $passwords = array_filter(explode("\n", $globalContents), 'strlen');
+
+    foreach ($users as $thisUser) {
+        if (!pmssValidateUsername($thisUser)) {
+            pmssCheckUserHtpasswdLog(
                 'validate',
                 $thisUser,
                 [
                     'status'  => 'ERR',
                     'message' => 'Skipping invalid username in checkUserHtpasswd',
                 ]
-            )
-        );
-        continue;
-    }
+            );
+            continue;
+        }
 
-    $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
-    if (is_file($userHtpasswd) && strpos((string) @file_get_contents($userHtpasswd), $thisUser) !== false) {
-        continue;
-    }
+        $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
+        $hasExistingEntry = pmssCheckUserHtpasswdHasUserEntry($userHtpasswd, $thisUser);
+        if ($hasExistingEntry === null) {
+            pmssCheckUserHtpasswdLog(
+                'read',
+                $thisUser,
+                [
+                    'status'  => 'ERR',
+                    'message' => 'Unable to read per-user htpasswd; skipping synchronization',
+                    'path'    => $userHtpasswd,
+                ]
+            );
+            continue;
+        }
+        if ($hasExistingEntry) {
+            continue;
+        }
 
-    foreach ($passwords as $thisPassword) {
-        if (strpos($thisPassword, $thisUser.':') === 0) {
+        foreach ($passwords as $thisPassword) {
+            if (strpos($thisPassword, $thisUser.':') !== 0) {
+                continue;
+            }
+
             if (!pmssAppendUserFile($userHtpasswd, $thisPassword."\n", $thisUser, 0640)) {
-                pmssUserWriteLogs(
-                    pmssUserBaseContext(
-                        'htpasswd',
-                        'write',
-                        $thisUser,
-                        [
-                            'status'  => 'ERR',
-                            'message' => 'Unable to append legacy credential to per-user htpasswd',
-                            'path'    => $userHtpasswd,
-                        ]
-                    )
+                pmssCheckUserHtpasswdLog(
+                    'write',
+                    $thisUser,
+                    [
+                        'status'  => 'ERR',
+                        'message' => 'Unable to append legacy credential to per-user htpasswd',
+                        'path'    => $userHtpasswd,
+                    ]
                 );
                 continue;
             }
@@ -107,4 +154,10 @@ foreach ($users as $thisUser) {
             }
         }
     }
+
+    return 0;
+}
+
+if (!defined('PMSS_CHECK_USER_HTPASSWD_LIB_ONLY')) {
+    exit(pmssCheckUserHtpasswdMain($argv));
 }
