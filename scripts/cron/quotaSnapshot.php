@@ -64,14 +64,7 @@ function pmssQuotaSnapshotRun(): int
 
     $ts = date('Y-m-d\\TH:i:s');
 
-    $oldUmask = null;
-    $fh = false;
-    try {
-        $fh = pmssSnapshotLogOpen(__FILE__, $logPath, $oldUmask);
-        if ($fh === false) {
-            return 1;
-        }
-
+    return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($mountLabel, $mountPath, $ts): int {
         // Resolve repquota binary without depending on PATH inherited by cron.
         $repquota = trim((string) @shell_exec('command -v repquota 2>/dev/null'));
         if ($repquota === '') {
@@ -103,14 +96,7 @@ function pmssQuotaSnapshotRun(): int
         }
 
         return 0;
-    } finally {
-        if ($fh !== false) {
-            @fclose($fh);
-        }
-        if ($oldUmask !== null) {
-            umask($oldUmask);
-        }
-    }
+    });
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {

@@ -5,19 +5,13 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class ProcessSnapshotCronTest extends TestCase
 {
-    public function testProcessSnapshotKeepsCleanupInline(): void
+    public function testSnapshotCronScriptsUseSharedSnapshotLogLifecycle(): void
     {
         $repoRoot = dirname(__DIR__, 4);
-        $src = (string) file_get_contents($repoRoot.'/scripts/cron/processSnapshot.php');
-        $wrapperNeedle = '$finish = static function';
-
-        $this->assertTrue(
-            strpos($src, $wrapperNeedle) === false,
-            'processSnapshot.php should keep file-handle cleanup inline in pmssProcessSnapshotRun()'
-        );
-        $this->assertStringContainsString('try {', $src);
-        $this->assertStringContainsString('if ($fh !== false) {', $src);
-        $this->assertStringContainsString('umask($oldUmask);', $src);
+        foreach (['processSnapshot.php', 'quotaSnapshot.php', 'resourceSnapshot.php'] as $script) {
+            $src = (string) file_get_contents($repoRoot.'/scripts/cron/'.$script);
+            $this->assertStringContainsString('pmssWithSnapshotLog(__FILE__, $logPath,', $src, $script.' should use the shared snapshot log lifecycle');
+        }
     }
 
     public function testRootCronSchedulesProcessSnapshots(): void

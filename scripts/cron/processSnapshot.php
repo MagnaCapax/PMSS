@@ -30,14 +30,7 @@ function pmssProcessSnapshotRun(): int
     $logPath = (string) (getenv('PMSS_PROCESS_SNAPSHOT_LOG') ?: PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT);
     $ts = date('Y-m-d\\TH:i:s');
 
-    $oldUmask = null;
-    $fh = false;
-    try {
-        $fh = pmssSnapshotLogOpen(__FILE__, $logPath, $oldUmask);
-        if ($fh === false) {
-            return 1;
-        }
-
+    return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($ts): int {
         if (($ps = trim((string) @shell_exec('command -v ps 2>/dev/null'))) === '') {
             @fwrite($fh, $ts.' WARN ps_missing'.PHP_EOL);
             return 0;
@@ -59,14 +52,7 @@ function pmssProcessSnapshotRun(): int
         }
         @fwrite($fh, $ts.' SNAPSHOT_END'.PHP_EOL);
         return 0;
-    } finally {
-        if ($fh !== false) {
-            @fclose($fh);
-        }
-        if ($oldUmask !== null) {
-            umask($oldUmask);
-        }
-    }
+    });
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
