@@ -16,6 +16,7 @@
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../../runtime.php';
+require_once __DIR__.'/../../lighttpd/userFileWrite.php';
 
 function pmssLoggingRestartSkipReason(): string
 {
@@ -25,30 +26,20 @@ function pmssLoggingRestartSkipReason(): string
 
 function pmssWriteManagedConfigFile(string $target, string $contents, string $label, callable $logger): bool
 {
-    if (strpos($target, "\0") !== false || is_link($target) || (file_exists($target) && !is_file($target))) {
-        $logger('[WARN] Unsafe '.$label.' target: '.$target);
-        return false;
-    }
-
     $targetDir = dirname($target);
     if (!is_dir($targetDir) || is_link($targetDir)) {
         $logger('[WARN] Unsafe '.$label.' directory: '.$targetDir);
         return false;
     }
 
-    $tmpTarget = @tempnam($targetDir, basename($target).'.tmp-');
-    if ($tmpTarget === false || $tmpTarget === '' || is_link($tmpTarget) || !is_file($tmpTarget)) {
-        $logger('[WARN] Unable to stage '.$label.' in '.$targetDir);
-        if (is_string($tmpTarget) && $tmpTarget !== '') {
-            @unlink($tmpTarget);
-        }
+    if (!pmssUserFilePathIsSafe($target)) {
+        $logger('[WARN] Unsafe '.$label.' target: '.$target);
         return false;
     }
 
-    if (@file_put_contents($tmpTarget, $contents) === false) { $logger('[WARN] Unable to write '.$label.': '.$tmpTarget); @unlink($tmpTarget); return false; }
-    @chmod($tmpTarget, 0644);
-    if (@rename($tmpTarget, $target)) { return true; }
-    $logger('[WARN] Unable to install '.$label.': '.$target); @unlink($tmpTarget); return false;
+    return pmssReplaceUserFile($target, $contents, static function (string $tmpTarget): void {
+        @chmod($tmpTarget, 0644);
+    });
 }
 
 /**

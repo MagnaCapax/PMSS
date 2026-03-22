@@ -19,6 +19,7 @@
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';
 require_once __DIR__.'/../lib/quotaSnapshot.php';
+require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
@@ -32,15 +33,6 @@ $logger = new Logger(__FILE__);
  */
 function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0644): bool
 {
-    if (strpos($path, "\0") !== false || is_link($path) || (file_exists($path) && !is_file($path))) {
-        return false;
-    }
-
-    $dir = dirname($path);
-    if (!is_dir($dir) || is_link($dir)) {
-        return false;
-    }
-
     $owner = null;
     $group = null;
     $canAdjustOwnership = function_exists('posix_geteuid') && @posix_geteuid() === 0;
@@ -55,29 +47,15 @@ function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0644)
         }
     }
 
-    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
-    if ($tmp === false) {
-        return false;
-    }
-
-    if (@file_put_contents($tmp, $content, LOCK_EX) === false || !@chmod($tmp, $mode)) {
-        @unlink($tmp);
-        return false;
-    }
-    if ($owner !== null && !@chown($tmp, $owner)) {
-        @unlink($tmp);
-        return false;
-    }
-    if ($group !== null && !@chgrp($tmp, $group)) {
-        @unlink($tmp);
-        return false;
-    }
-    if (!@rename($tmp, $path)) {
-        @unlink($tmp);
-        return false;
-    }
-
-    return true;
+    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($group, $mode, $owner): void {
+        @chmod($tmp, $mode);
+        if ($owner !== null) {
+            @chown($tmp, $owner);
+        }
+        if ($group !== null) {
+            @chgrp($tmp, $group);
+        }
+    });
 }
 
 $logger->msg('Updating quota information');

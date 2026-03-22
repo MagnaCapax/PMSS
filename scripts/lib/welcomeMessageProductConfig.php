@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/welcomeMessage.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /**
  * Set or clear a product-level welcome message template.
@@ -40,36 +41,15 @@ function pmssWelcomeProductMessageSet(
         $rootMap = $productMap;
     }
 
-    $directoryPath = dirname($productMessagesPath);
-    if (
-        strpos($productMessagesPath, "\0") !== false
-        || !is_dir($directoryPath)
-        || is_link($directoryPath)
-        || (file_exists($productMessagesPath) && (!is_file($productMessagesPath) || is_link($productMessagesPath)))
-    ) {
-        return false;
-    }
-
     if (!is_string($encoded = json_encode($rootMap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
         return false;
     }
 
-    $temporaryPath = @tempnam($directoryPath, basename($productMessagesPath).'.pmss-tmp-');
-    if ($temporaryPath === false) {
-        return false;
-    }
-
-    if (@file_put_contents($temporaryPath, $encoded.PHP_EOL, LOCK_EX) === false) {
-        @unlink($temporaryPath);
-        return false;
-    }
-
-    @chmod($temporaryPath, 0640);
-    if (!@rename($temporaryPath, $productMessagesPath)) {
-        @unlink($temporaryPath);
-        return false;
-    }
-
-    @chmod($productMessagesPath, 0640);
-    return true;
+    return pmssReplaceUserFile(
+        $productMessagesPath,
+        $encoded.PHP_EOL,
+        static function (string $temporaryPath): void {
+            @chmod($temporaryPath, 0640);
+        }
+    );
 }

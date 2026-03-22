@@ -1,6 +1,6 @@
 <?php
 /**
- * File writing helpers used by per-user lighttpd configuration.
+ * Managed file writing helpers shared by lighttpd and other PMSS writers.
  *
  * @license GPL-3.0-only
  */
@@ -38,7 +38,7 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     }
 
     $tmp = @tempnam(dirname($path), basename($path).'.pmss-tmp-');
-    if ($tmp === false || @file_put_contents($tmp, $content) === false) {
+    if ($tmp === false || $tmp === '' || is_link($tmp) || !is_file($tmp) || @file_put_contents($tmp, $content) === false) {
         if (is_string($tmp)) {
             @unlink($tmp);
         }
