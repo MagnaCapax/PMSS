@@ -30,6 +30,7 @@
  */
 
 require_once __DIR__.'/UserValidator.php';
+require_once __DIR__.'/../systemdSliceProperties.php';
 
 if (!function_exists('pmssUserDockerMinRamMiB')) {
     /**
@@ -341,37 +342,8 @@ class UserConfigStore
         if (getenv('PMSS_TEST_MODE') === '1') {
             return 0;
         }
-        if (!function_exists('posix_getpwnam')) {
-            return 0;
-        }
-        $pw = @posix_getpwnam($username);
-        if (!is_array($pw) || !isset($pw['uid'])) {
-            return 0;
-        }
-        $uid = (int)$pw['uid'];
-        if ($uid <= 0) {
-            return 0;
-        }
-
-        $unit = sprintf('user-%d.slice', $uid);
-        $cmd = 'systemctl show '.escapeshellarg($unit).' -p MemoryHigh -p MemoryMax 2>/dev/null';
-        $lines = [];
-        $rc = 0;
-        @exec($cmd, $lines, $rc);
-        if ($rc !== 0 || empty($lines)) {
-            return 0;
-        }
-
-        $limits = array();
-        foreach ($lines as $line) {
-            $line = trim((string) $line);
-            if (!preg_match('/^(MemoryMax|MemoryHigh)=(\\d+)$/', $line, $m)) {
-                continue;
-            }
-            $limits[$m[1]] = (int) $m[2];
-        }
-
-        $bytes = !empty($limits['MemoryMax']) ? $limits['MemoryMax'] : (!empty($limits['MemoryHigh']) ? $limits['MemoryHigh'] : 0);
+        $limits = pmssReadUserSlicePropertiesByUsername($username, ['MemoryHigh', 'MemoryMax']);
+        $bytes = (int) (pmssSystemdPropertyTrailingInt($limits['MemoryMax']) ?: pmssSystemdPropertyTrailingInt($limits['MemoryHigh']) ?: 0);
         if ($bytes <= 0) {
             return 0;
         }

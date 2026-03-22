@@ -8,6 +8,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/../systemdSliceProperties.php';
+
 function pmssClampLighttpdBandwidthLimits(string $config): string
 {
     // lighttpd enforces uint16 for kbytes-per-second; overflow breaks startup on newer releases.
@@ -108,17 +110,7 @@ function pmssClampMemoryLimit(int $memoryMiB): int
 
 function pmssExtractCpuQuotaPercent(array $props, array $policyDefaults): int
 {
-    $quota = 0;
-    $raw = trim((string) ($props['CPUQuota'] ?? ''));
-    if ($raw !== '' && stripos($raw, 'infinity') === false && strpos($raw, '%') !== false) {
-        $quota = (int)round((float)$raw);
-    } elseif (
-        is_numeric($props['CPUQuotaPerSecUSec'] ?? null)
-        && is_numeric($props['CPUQuotaPeriodUSec'] ?? null)
-        && (float)$props['CPUQuotaPeriodUSec'] > 0.0
-    ) {
-        $quota = (int)round(((float)$props['CPUQuotaPerSecUSec'] / (float)$props['CPUQuotaPeriodUSec']) * 100);
-    }
+    $quota = (int) (pmssSystemdCpuQuotaPercent($props) ?? 0);
 
     // When quota is explicitly set and not a legacy 85% sentinel, use it as-is.
     if ($quota > 0 && $quota !== 85) {
@@ -585,21 +577,10 @@ function pmssUserConfigLighttpdConfigureUser(
         }
     }
 
-    $props = [];
-    if (function_exists('posix_getpwnam') && is_array($info = posix_getpwnam($thisUser)) && isset($info['uid'])) {
-        $slice = sprintf('user-%d.slice', (int) $info['uid']);
-        $cmd = 'systemctl show '.escapeshellarg($slice).' -p MemoryHigh -p MemoryMax -p CPUQuotaPerSecUSec -p CPUQuotaPeriodUSec -p CPUQuota';
-        $out = @shell_exec($cmd);
-        if (is_string($out)) {
-            foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-                $pos = strpos($line, '=');
-                if ($pos === false) {
-                    continue;
-                }
-                $props[substr($line, 0, $pos)] = substr($line, $pos + 1);
-            }
-        }
-    }
+    $props = pmssReadUserSlicePropertiesByUsername(
+        $thisUser,
+        ['MemoryHigh', 'MemoryMax', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota']
+    );
     $memoryHigh = null;
     foreach (['MemoryHigh', 'MemoryMax'] as $memoryLimitField) {
         if (isset($props[$memoryLimitField]) && ($memoryHigh = pmssParseSizeToMiB($props[$memoryLimitField])) !== null) {

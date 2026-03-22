@@ -18,6 +18,7 @@ if (posix_getuid() !== 0) {
 }
 
 require_once __DIR__.'/../lib/cli/optionParser.php';
+require_once __DIR__.'/../lib/systemdSliceProperties.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
@@ -42,7 +43,6 @@ $columnHeaders = [
 ];
 $columnSeparatorWidths = ['brief' => 120, 'full' => 180];
 
-$notSet = '[not set]';
 $sliceKeys = [
     'MemoryHigh', 'MemoryMax',
     'CPUWeight', 'IOWeight',
@@ -51,46 +51,6 @@ $sliceKeys = [
     'IOReadIOPSMax', 'IOWriteIOPSMax',
     'TasksMax',
 ];
-
-$getSliceProperties = static function (string $slice) use ($notSet, $sliceKeys): array {
-    $cmd = 'systemctl show '.escapeshellarg($slice).' -p '.implode(' -p ', $sliceKeys);
-    $out = shell_exec($cmd);
-
-    $data = array_fill_keys($sliceKeys, $notSet);
-    if (!$out) {
-        return $data;
-    }
-
-    foreach (explode("\n", trim($out)) as $line) {
-        $parts = explode('=', $line, 2);
-        if (count($parts) !== 2) {
-            continue;
-        }
-        $key = $parts[0];
-        $val = trim($parts[1]);
-        if ($val === '' || $val === 'infinity' || $val === $notSet || (ctype_digit($val) && $val > 999999999999999)) {
-            $data[$key] = $notSet;
-            continue;
-        }
-        $data[$key] = $val;
-    }
-
-    return $data;
-};
-
-$parseTrailingInt = static function ($val) use ($notSet): ?int {
-    if (!is_string($val) || $val === '' || $val === $notSet || $val === 'infinity') {
-        return null;
-    }
-    if (preg_match('/(\d+)\s*$/', trim($val), $matches) !== 1) {
-        return null;
-    }
-    $parsed = (int) $matches[1];
-    if ($parsed <= 0) {
-        return null;
-    }
-    return $parsed;
-};
 
 $formatBinary = static function (?int $bytes): string {
     if ($bytes === null || $bytes <= 0) {
@@ -163,22 +123,17 @@ foreach ($users as $user) {
     if ($info === null) continue;
 
     $slice = "user-{$info['uid']}.slice";
-    $props = $getSliceProperties($slice);
-    $cpuQuotaPercent = null;
-    if ($props['CPUQuota'] !== $notSet && strpos($props['CPUQuota'], '%') !== false) {
-        $cpuQuotaPercent = (int) round((float) $props['CPUQuota']);
-    } elseif ($props['CPUQuotaPerSecUSec'] !== $notSet && $props['CPUQuotaPeriodUSec'] !== $notSet && (int) $props['CPUQuotaPeriodUSec'] > 0) {
-        $cpuQuotaPercent = (int) round(((int) $props['CPUQuotaPerSecUSec'] / (int) $props['CPUQuotaPeriodUSec']) * 100);
-    }
-    $readIops = $parseTrailingInt($props['IOReadIOPSMax']);
-    $writeIops = $parseTrailingInt($props['IOWriteIOPSMax']);
-    $memoryHigh = $parseTrailingInt($props['MemoryHigh']);
-    $memoryMax = $parseTrailingInt($props['MemoryMax']);
-    $cpuWeight = ($props['CPUWeight'] !== $notSet) ? (int) $props['CPUWeight'] : null;
-    $ioReadBandwidth = $parseTrailingInt($props['IOReadBandwidthMax']);
-    $ioWriteBandwidth = $parseTrailingInt($props['IOWriteBandwidthMax']);
-    $ioWeight = ($props['IOWeight'] !== $notSet) ? (int) $props['IOWeight'] : null;
-    $tasksMax = $parseTrailingInt($props['TasksMax']);
+    $props = pmssReadSystemdProperties($slice, $sliceKeys);
+    $cpuQuotaPercent = pmssSystemdCpuQuotaPercent($props);
+    $readIops = pmssSystemdPropertyTrailingInt($props['IOReadIOPSMax']);
+    $writeIops = pmssSystemdPropertyTrailingInt($props['IOWriteIOPSMax']);
+    $memoryHigh = pmssSystemdPropertyTrailingInt($props['MemoryHigh']);
+    $memoryMax = pmssSystemdPropertyTrailingInt($props['MemoryMax']);
+    $cpuWeight = is_numeric($props['CPUWeight']) ? (int) $props['CPUWeight'] : null;
+    $ioReadBandwidth = pmssSystemdPropertyTrailingInt($props['IOReadBandwidthMax']);
+    $ioWriteBandwidth = pmssSystemdPropertyTrailingInt($props['IOWriteBandwidthMax']);
+    $ioWeight = is_numeric($props['IOWeight']) ? (int) $props['IOWeight'] : null;
+    $tasksMax = pmssSystemdPropertyTrailingInt($props['TasksMax']);
 
     $userConfig = $store->get($user);
     $diskQuotaGiB = null;
