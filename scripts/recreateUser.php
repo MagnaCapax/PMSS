@@ -68,19 +68,44 @@ $homeDir   = "/home/{$userName}";
 $backupDir = "/home/backup-{$userName}";
 // #TODO consider abstracting path handling into shared helper to keep scripts in sync.
 
+function pmssRequireSafeRecreateUserPath(string $path, string $label): void
+{
+    if (is_link($path)) {
+        fwrite(STDERR, "Refusing to operate on symlinked {$label} path: {$path}\n");
+        exit(1);
+    }
+
+    if (file_exists($path) && !is_dir($path)) {
+        fwrite(STDERR, "Refusing to operate on non-directory {$label} path: {$path}\n");
+        exit(1);
+    }
+}
+
 /* ===== 3. Pre-flight ===== */
 $passwd = pmssUserAccountLookup($userName);
 if ($passwd === null)
     die("User {$userName} does not exist in /etc/passwd - aborting.\n");
-if (is_dir($backupDir))
+pmssRequireSafeRecreateUserPath($homeDir, 'home');
+pmssRequireSafeRecreateUserPath($backupDir, 'backup');
+if (file_exists($backupDir))
     die("Backup directory {$backupDir} already exists - remove or rename it first.\n");
 
 $homeExists = is_dir($homeDir);
+if ($homeExists) {
+    $realHome = realpath($homeDir);
+    if ($realHome === false || $realHome !== $homeDir) {
+        fwrite(STDERR, "Refusing to operate on unexpected home path: {$realHome}\n");
+        exit(1);
+    }
+}
 
 function ensureDir(string $dir, string $owner): void
 {
     if (!is_dir($dir)) {
-        mkdir($dir, 0755, true);
+        if (!@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            fwrite(STDERR, "Unable to create required directory: {$dir}\n");
+            exit(1);
+        }
         pmssRunOrExit('chown -R ' . escapeshellarg($owner) . ':' . escapeshellarg($owner) . ' ' . escapeshellarg($dir));
     }
 }
@@ -98,6 +123,11 @@ if ($homeExists) {
 
 /* ===== 6. Rebuild skeleton ===== */
 pmssRunOrExit('cp -Rp /etc/skel ' . escapeshellarg($homeDir));
+pmssRequireSafeRecreateUserPath($homeDir, 'home');
+if (!is_dir($homeDir)) {
+    fwrite(STDERR, "Validation failed: homeDir missing after skeleton copy\n");
+    exit(1);
+}
 pmssRunOrExit('chown -R ' . escapeshellarg($userName) . ':' . escapeshellarg($userName) . ' ' . escapeshellarg($homeDir));
 
 /* 6a. Guarantee required sub-dirs */
@@ -136,7 +166,11 @@ if ($homeExists) {
 /* ===== 9. Ownership sanity ===== */
 $uid = $passwd['uid'];
 $gid = $passwd['gid'];
-$stat = stat($homeDir);
+$stat = @stat($homeDir);
+if (!is_array($stat)) {
+    fwrite(STDERR, "Validation failed: unable to stat homeDir\n");
+    exit(1);
+}
 if ($stat['uid'] !== $uid || $stat['gid'] !== $gid) {
     fwrite(STDERR, "Validation failed: homeDir ownership mismatch\n");
     exit(1);
