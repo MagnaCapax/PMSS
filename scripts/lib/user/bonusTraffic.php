@@ -8,7 +8,7 @@
  * @license GPL-3.0-only
  */
 
-foreach ([dirname(__DIR__).'/runtime.php', __DIR__.'/trafficLimit.php', dirname(__DIR__).'/lighttpd/userFileWrite.php'] as $dependency) {
+foreach ([dirname(__DIR__).'/runtime.php', __DIR__.'/trafficLimit.php'] as $dependency) {
     if (is_file($dependency)) {
         require_once $dependency;
     }
@@ -19,18 +19,9 @@ foreach ([dirname(__DIR__).'/runtime.php', __DIR__.'/trafficLimit.php', dirname(
  */
 function pmssBonusTrafficReadGiB(string $path): int
 {
-    if (!is_file($path) || is_link($path)) {
-        return 0;
-    }
-    $raw = trim((string) @file_get_contents($path));
-    if ($raw === '') {
-        return 0;
-    }
-    $err = null;
-    $parsed = function_exists('pmssTrafficLimitParseGiB')
-        ? pmssTrafficLimitParseGiB($raw, $err)
-        : (is_numeric($raw) ? (int) $raw : null);
-    return ($parsed !== null && $parsed > 0) ? (int) $parsed : 0;
+    return function_exists('pmssTrafficLimitReadGiBFile')
+        ? pmssTrafficLimitReadGiBFile($path)
+        : 0;
 }
 
 /**
@@ -38,9 +29,8 @@ function pmssBonusTrafficReadGiB(string $path): int
  */
 function pmssBonusTrafficWriteGiB(string $path, int $value): bool
 {
-    return $value >= 0
-        && function_exists('pmssAtomicWriteFile')
-        && pmssAtomicWriteFile($path, (string) $value);
+    return function_exists('pmssTrafficLimitWriteGiBFile')
+        && pmssTrafficLimitWriteGiBFile($path, $value);
 }
 
 /**

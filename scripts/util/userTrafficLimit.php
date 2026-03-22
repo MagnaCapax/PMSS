@@ -94,17 +94,9 @@ if ($show && $unset) {
 }
 
 if ($show) {
-    $limit = 0;
-    if (is_file($userTrafficFile) && !is_link($userTrafficFile)) {
-        $raw = trim((string) @file_get_contents($userTrafficFile));
-        $err = null;
-        if (function_exists('pmssTrafficLimitParseGiB')) {
-            $parsedLimit = pmssTrafficLimitParseGiB($raw, $err);
-            if ($parsedLimit !== null) {
-                $limit = $parsedLimit;
-            }
-        }
-    }
+    $limit = function_exists('pmssTrafficLimitReadGiBFile')
+        ? pmssTrafficLimitReadGiBFile($userTrafficFile)
+        : 0;
     echo "Traffic limit for {$userName}: {$limit} GiB\n";
     exit(0);
 }
@@ -131,35 +123,6 @@ if (function_exists('pmssEnsureDir')) {
     @chmod($runtimeDir, 0700);
 }
 
-$writeFileAtomic = static function (string $path, string $content): bool {
-    if (strpos($path, "\0") !== false) {
-        return false;
-    }
-    if (file_exists($path) && !is_file($path)) {
-        return false;
-    }
-    if (is_link($path) || is_link(dirname($path))) {
-        return false;
-    }
-    $dir = dirname($path);
-    if (!is_dir($dir)) {
-        return false;
-    }
-    $tmp = @tempnam($dir, basename($path).'.pmss-tmp-');
-    if ($tmp === false) {
-        return false;
-    }
-    if (@file_put_contents($tmp, $content, LOCK_EX) === false) {
-        @unlink($tmp);
-        return false;
-    }
-    if (!@rename($tmp, $path)) {
-        @unlink($tmp);
-        return false;
-    }
-    return true;
-};
-
 if ($trafficLimit === 0) {
     foreach (array_keys($targetModes) as $target) {
         if (file_exists($target)) {
@@ -178,7 +141,7 @@ if ($trafficLimit === 0) {
 }
 
 foreach ($targetModes as $target => $mode) {
-    if (!$writeFileAtomic($target, (string) $trafficLimit)) {
+    if (!function_exists('pmssTrafficLimitWriteGiBFile') || !pmssTrafficLimitWriteGiBFile($target, $trafficLimit)) {
         fwrite(STDERR, "Error: failed to write {$target}\n");
         exit(4);
     }

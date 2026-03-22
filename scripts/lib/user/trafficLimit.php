@@ -12,6 +12,10 @@
  * @author PMSS Team
  */
 
+if (is_file(dirname(__DIR__).'/lighttpd/userFileWrite.php')) {
+    require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
+}
+
 if (!function_exists('pmssTrafficLimitParseGiB')) {
     /**
      * Parse a traffic limit value expressed as an integer GiB.
@@ -66,6 +70,39 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
         }
 
         return $value;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitReadGiBFile')) {
+    /**
+     * Read a persisted GiB quota file, returning 0 for missing or invalid data.
+     */
+    function pmssTrafficLimitReadGiBFile(string $path): int
+    {
+        if (!is_file($path) || is_link($path)) {
+            return 0;
+        }
+
+        $raw = trim((string) @file_get_contents($path));
+        if ($raw === '') {
+            return 0;
+        }
+
+        $error = null;
+        $value = pmssTrafficLimitParseGiB($raw, $error);
+        return ($value !== null) ? $value : 0;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitWriteGiBFile')) {
+    /**
+     * Persist a GiB quota file via the shared atomic file writer.
+     */
+    function pmssTrafficLimitWriteGiBFile(string $path, int $value): bool
+    {
+        return $value >= 0
+            && function_exists('pmssAtomicWriteFile')
+            && pmssAtomicWriteFile($path, (string) $value);
     }
 }
 
