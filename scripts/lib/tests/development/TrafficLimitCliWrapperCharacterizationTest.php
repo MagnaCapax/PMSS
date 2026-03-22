@@ -7,6 +7,14 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
 {
+    private function assertStringNotContainsString(string $needle, string $haystack, string $message = ''): void
+    {
+        $this->assertTrue(
+            strpos($haystack, $needle) === false,
+            $message !== '' ? $message : sprintf('Expected string to not contain %s, but it did', var_export($needle, true))
+        );
+    }
+
     public function testUtilityWrapperKeepsUsageTextButDelegatesExecution(): void
     {
         $source = $this->pmssReadRepoFile('scripts/util/userTrafficLimit.php');
