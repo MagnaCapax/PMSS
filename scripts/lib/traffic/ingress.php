@@ -37,6 +37,9 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
  */
 function pmssTrafficIngressReadState(string $path): array
 {
+    if ($path === '' || is_link($path) || (file_exists($path) && !is_file($path))) {
+        return [];
+    }
     $raw = is_file($path) ? @file_get_contents($path) : false;
     if (!is_string($raw) || trim($raw) === '') {
         return [];
@@ -50,10 +53,18 @@ function pmssTrafficIngressReadState(string $path): array
  */
 function pmssTrafficIngressWriteState(string $path, array $state): void
 {
+    if ($path === '' || is_link($path) || (file_exists($path) && !is_file($path))) {
+        return;
+    }
+
     $payload = json_encode($state);
     if (!is_string($payload)) {
         return;
     }
-    @file_put_contents($path, $payload);
+
+    if (@file_put_contents($path, $payload, LOCK_EX) === false) {
+        return;
+    }
+
     @chmod($path, 0600);
 }

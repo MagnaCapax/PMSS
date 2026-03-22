@@ -65,6 +65,23 @@ class TrafficIngressHelpersTest extends TestCase
         $this->assertTrue($loaded === []);
     }
 
+    public function testReadStateRejectsSymlink(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $root = $this->makeRoot();
+        $target = $root.'/target.json';
+        @file_put_contents($target, json_encode(['ingress' => 1]));
+        $path = $root.'/state.json';
+        if (!@symlink($target, $path)) {
+            throw new SkipTest('symlink creation failed');
+        }
+
+        $this->assertTrue(\pmssTrafficIngressReadState($path) === []);
+    }
+
     public function testReadCountersParsesSystemctlOutputViaSharedHelper(): void
     {
         $root = $this->makeRoot();
@@ -111,5 +128,25 @@ class TrafficIngressHelpersTest extends TestCase
                 putenv('PATH='.$originalPath);
             }
         }
+    }
+
+    public function testWriteStateRejectsSymlink(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $root = $this->makeRoot();
+        $target = $root.'/target.json';
+        @file_put_contents($target, json_encode(['ingress' => 5, 'egress' => 6]));
+        $path = $root.'/state.json';
+        if (!@symlink($target, $path)) {
+            throw new SkipTest('symlink creation failed');
+        }
+
+        \pmssTrafficIngressWriteState($path, ['ingress' => 123, 'egress' => 456]);
+
+        $loaded = json_decode((string) file_get_contents($target), true);
+        $this->assertEquals(['ingress' => 5, 'egress' => 6], $loaded);
     }
 }
