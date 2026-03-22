@@ -79,23 +79,21 @@ function pmssStartRtorrentLaunch(string $user, string $home, string $executor): 
 }
 
 /**
- * Wait briefly for rTorrent to appear after launch.
+ * Wait for rTorrent to appear, then verify the same process survives.
  *
- * The executor intentionally sleeps 2-8 seconds before starting rtorrent, so
- * poll for a short window instead of assuming a 1-second check is meaningful.
+ * The executor intentionally sleeps 2-8 seconds before starting rtorrent. A
+ * later crash must not count as a healthy launch, so success requires both
+ * initial appearance and a second survival check for the same PID.
  */
-function pmssStartRtorrentWaitForRtorrent(string $user, int $timeoutSeconds): bool
+function pmssStartRtorrentWaitForRtorrent(string $user, int $startupTimeoutSeconds, int $stabilityWindowSeconds): bool
 {
-    $deadline = microtime(true) + max(1, $timeoutSeconds);
-
-    do {
-        if (!empty(rtorrentProcessPgrepExact($user, 'rtorrent'))) {
-            return true;
-        }
-        usleep(250000);
-    } while (microtime(true) < $deadline);
-
-    return !empty(rtorrentProcessPgrepExact($user, 'rtorrent'));
+    return rtorrentProcessWaitForStablePids(
+        function () use ($user): array {
+            return rtorrentProcessPgrepExact($user, 'rtorrent');
+        },
+        (float) max(1, $startupTimeoutSeconds),
+        (float) max(1, $stabilityWindowSeconds)
+    );
 }
 
 // Basic sanity checks so operators get immediate feedback instead of silent exits.
@@ -243,15 +241,19 @@ if ($psRc === 0 && !empty($psLines)) {
 }
 
 // If rTorrent did not stay up, a broken ~/.rtorrent.rc.custom can be the cause.
-// Use a short startup window plus consecutive-failure counting so the executor's
-// built-in delay and unrelated transient crashes do not trigger false quarantine.
-$startupWaitSeconds = 10;
+// Wait for the executor delay, then require the same rtorrent PID to survive a
+// second health check before clearing the consecutive-failure counter.
+$startupWaitSeconds = 30;
+$startupStabilitySeconds = 30;
 $customConfigFailureLimit = 4;
 $stateDir = '/run/pmss';
 $legacyStateFile = $stateDir.'/startRtorrent-customrc-fail-'.$user.'.ts';
 $failureStateFile = $stateDir.'/startRtorrent-customrc-fail-'.$user.'.count';
 
-if (pmssStartRtorrentWaitForRtorrent($user, $startupWaitSeconds)) {
+logmsg(
+    "[INFO] Waiting up to {$startupWaitSeconds}s for rTorrent to appear for {$user} and {$startupStabilitySeconds}s more to confirm survival"
+);
+if (pmssStartRtorrentWaitForRtorrent($user, $startupWaitSeconds, $startupStabilitySeconds)) {
     rtorrentProcessClearStaleState($legacyStateFile);
     rtorrentProcessClearStaleState($failureStateFile);
     exit(0);
@@ -269,7 +271,7 @@ if ($state['action'] !== 'stale') {
     logmsg(
         "[WARN] rTorrent not running after start for {$user}; failed launch attempt "
         .$state['count'].'/'.$customConfigFailureLimit
-        .' before quarantining .rtorrent.rc.custom'
+        .' before quarantining .rtorrent.rc.custom (launch or survival check failed)'
     );
     exit(0);
 }
@@ -303,7 +305,10 @@ if (!empty($executorPids)) {
 }
 
 pmssStartRtorrentLaunch($user, $home, $executor);
-if (pmssStartRtorrentWaitForRtorrent($user, $startupWaitSeconds)) {
+logmsg(
+    "[INFO] Re-checking rTorrent stability for {$user} after quarantining custom config"
+);
+if (pmssStartRtorrentWaitForRtorrent($user, $startupWaitSeconds, $startupStabilitySeconds)) {
     logmsg("[OK] rTorrent started for {$user} after quarantining custom config");
     if (function_exists('pmssUserLog')) {
         pmssUserLog($user, 'startRtorrent: started after quarantining .rtorrent.rc.custom');

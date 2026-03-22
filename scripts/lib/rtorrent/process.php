@@ -49,6 +49,84 @@ function rtorrentProcessPgrepExact(string $user, string $comm): array
 }
 
 /**
+ * Normalize a PID list to unique positive integers.
+ *
+ * @param mixed $pids Candidate PID list from a probe callback.
+ *
+ * @return int[] Unique positive PIDs.
+ */
+function rtorrentProcessNormalizePids($pids): array
+{
+    if (!is_array($pids)) {
+        return [];
+    }
+
+    $normalized = [];
+    foreach ($pids as $pid) {
+        $pid = (int) $pid;
+        if ($pid > 0) {
+            $normalized[$pid] = $pid;
+        }
+    }
+
+    return array_values($normalized);
+}
+
+/**
+ * Wait for a PID set to appear, then verify at least one original PID survives.
+ *
+ * The caller supplies a probe callback so tests can stay hermetic. Success only
+ * occurs when the same observed PID still exists after the stability window.
+ *
+ * @param callable $pidProvider             Callback returning candidate PIDs.
+ * @param float    $startupTimeoutSeconds   Seconds to wait for first appearance.
+ * @param float    $stabilityWindowSeconds  Seconds the same PID must survive.
+ * @param int      $pollMicroseconds        Poll interval in microseconds.
+ *
+ * @return bool True when at least one initially observed PID survives.
+ */
+function rtorrentProcessWaitForStablePids(
+    callable $pidProvider,
+    float $startupTimeoutSeconds,
+    float $stabilityWindowSeconds,
+    int $pollMicroseconds = 250000
+): bool {
+    $pollMicroseconds = max(1000, $pollMicroseconds);
+    $startupTimeoutSeconds = max(0.0, $startupTimeoutSeconds);
+    $stabilityWindowSeconds = max(0.0, $stabilityWindowSeconds);
+
+    $initialPids = rtorrentProcessNormalizePids($pidProvider());
+    if (empty($initialPids) && $startupTimeoutSeconds > 0.0) {
+        $startupDeadline = microtime(true) + $startupTimeoutSeconds;
+        while (microtime(true) < $startupDeadline) {
+            usleep($pollMicroseconds);
+            $initialPids = rtorrentProcessNormalizePids($pidProvider());
+            if (!empty($initialPids)) {
+                break;
+            }
+        }
+    }
+
+    if (empty($initialPids)) {
+        return false;
+    }
+
+    if ($stabilityWindowSeconds > 0.0) {
+        $stabilityDeadline = microtime(true) + $stabilityWindowSeconds;
+        while (microtime(true) < $stabilityDeadline) {
+            $remainingMicroseconds = (int) (($stabilityDeadline - microtime(true)) * 1000000);
+            if ($remainingMicroseconds <= 0) {
+                break;
+            }
+            usleep(min($pollMicroseconds, $remainingMicroseconds));
+        }
+    }
+
+    $currentPids = rtorrentProcessNormalizePids($pidProvider());
+    return !empty(array_intersect($initialPids, $currentPids));
+}
+
+/**
  * Locate executor-related processes for a user.
  *
  * Parses ps output to find screen sessions and PHP processes running
