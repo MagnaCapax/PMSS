@@ -38,6 +38,21 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
             fclose($pipe);
         }
     };
+    $closeProcess = static function ($process): void {
+        if (function_exists('proc_terminate')) {
+            @proc_terminate($process);
+        }
+        @proc_close($process);
+    };
+    $abortProcess = static function ($process, array $pipes, string $stderr) use ($closePipe, $closeProcess): array {
+        foreach ([0, 1, 2] as $index) {
+            if (array_key_exists($index, $pipes)) {
+                $closePipe($pipes[$index]);
+            }
+        }
+        $closeProcess($process);
+        return ['rc' => 1, 'stdout' => '', 'stderr' => $stderr];
+    };
 
     $descriptor = [
         0 => ['pipe', 'r'],
@@ -55,26 +70,11 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
         || !is_resource($pipes[1])
         || !is_resource($pipes[2])
     ) {
-        foreach ([0, 1, 2] as $index) {
-            if (array_key_exists($index, $pipes)) {
-                $closePipe($pipes[$index]);
-            }
-        }
-        if (function_exists('proc_terminate')) {
-            @proc_terminate($process);
-        }
-        @proc_close($process);
-        return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable'];
+        return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
     }
     fclose($pipes[0]);
     if (!@stream_set_blocking($pipes[1], false) || !@stream_set_blocking($pipes[2], false)) {
-        $closePipe($pipes[1]);
-        $closePipe($pipes[2]);
-        if (function_exists('proc_terminate')) {
-            @proc_terminate($process);
-        }
-        @proc_close($process);
-        return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable'];
+        return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
     }
 
     $stdout = '';
@@ -120,10 +120,7 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
     $closePipe($pipes[2]);
 
     if ($timedOut) {
-        if (function_exists('proc_terminate')) {
-            @proc_terminate($process);
-        }
-        @proc_close($process);
+        $closeProcess($process);
         return ['rc' => 124, 'stdout' => $stdout, 'stderr' => $stderr];
     }
 

@@ -401,6 +401,10 @@ if (!function_exists('runCommand')) {
                 $cmdForShell = 'exec '.$cmd;
             }
         }
+        $pathOverride = getenv('PATH');
+        if ($pathOverride !== false && $pathOverride !== '' && preg_match('/(^|\s)PATH=/', $cmdForShell) !== 1) {
+            $cmdForShell = 'PATH='.escapeshellarg($pathOverride).' '.$cmdForShell;
+        }
         $bash = '/bin/bash -lc '.escapeshellarg($cmdForShell);
         $process = proc_open($bash, $descriptor, $pipes);
         if (!is_resource($process)) {

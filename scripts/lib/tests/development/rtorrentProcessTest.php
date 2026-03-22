@@ -12,38 +12,21 @@ require_once dirname(__DIR__, 2).'/rtorrent/process.php';
 
 class RtorrentProcessTest extends TestCase
 {
-    private $tempDir;
+    private $tempDir = '';
 
     private function removeTree(string $path): void
     {
-        if (is_link($path) || is_file($path)) {
-            @unlink($path);
-            return;
-        }
-        $children = glob($path.'/*');
-        if (is_array($children)) {
-            foreach ($children as $child) {
-                $this->removeTree($child);
-            }
-        }
-        @rmdir($path);
+        $this->pmssRemoveTree($path);
     }
 
-    public function setUp(): void
+    protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-test-'.getmypid();
-        @mkdir($this->tempDir, 0755, true);
+        $this->tempDir = $this->pmssMakeTempDir('pmss-rtorrent-process-');
     }
 
-    public function tearDown(): void
+    protected function tearDown(): void
     {
-        $children = glob($this->tempDir.'/*');
-        if (is_array($children)) {
-            foreach ($children as $child) {
-                $this->removeTree($child);
-            }
-        }
-        @rmdir($this->tempDir);
+        $this->removeTree($this->tempDir);
     }
 
     /**

@@ -69,6 +69,16 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertTrue(!file_exists($path));
     }
 
+    public function testWriteUserFileRejectsSymlinkedParentDirectory(): void
+    {
+        $realDir = $this->tempDir.'/real';
+        $linkDir = $this->tempDir.'/linked';
+        @mkdir($realDir, 0755, true);
+        symlink($realDir, $linkDir);
+
+        $this->assertTrue(!\pmssWriteUserFile($linkDir.'/.htpasswd', "user:hash\n", $this->currentOwner(), 0640));
+    }
+
     public function testCheckUserHtpasswdUsesSafeAppendHelper(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/checkUserHtpasswd.php');
