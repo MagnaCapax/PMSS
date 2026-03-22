@@ -147,6 +147,9 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
 function pmssConfigBackupsPathKey(string $path): string
 {
     $path = preg_replace('/\\s+/', ' ', trim($path));
+    if (preg_match('#/(etc|home|opt|srv|usr|var)(?:/|$)#', $path, $matches, PREG_OFFSET_CAPTURE) === 1) {
+        $path = substr($path, $matches[0][1]);
+    }
     return ($path = ltrim(str_replace('/', '_', preg_replace('/[^A-Za-z0-9._\\/\\-]/', '_', $path)), '_')) !== '' ? $path : 'unknown_path';
 }
 
