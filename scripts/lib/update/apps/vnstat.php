@@ -10,11 +10,6 @@ require_once '/scripts/lib/networkInfo.php';
 
 $link = isset($link) ? (string) $link : '';
 $linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (int) $linkSpeed : 0;
-$debianVersion = is_array($debianVersion ?? null)
-    ? (string) ($debianVersion[0] ?? '0')
-    : (is_string($debianVersion ?? null) ? $debianVersion : '0');
-$debianMajorParts = explode('.', $debianVersion, 2);
-$debianMajor = ctype_digit((string) ($debianMajorParts[0] ?? '')) ? (int) $debianMajorParts[0] : 0;
 
 #TODO This should be in the install script
 #TODO Use an actual config template
@@ -33,12 +28,4 @@ if (file_exists('/etc/vnstat.conf')) {	// Fix some default configs! Especially o
 
     file_put_contents('/etc/vnstat.conf', $vnstatConfig);
     passthru('/etc/init.d/vnstat restart');
-}
-
-
-if ($debianMajor === 8 && $link !== '') {
-    // Fix VNSTAT backup issue & not updating on Deb8 where base install seems broken.
-    `vnstat -u -i {$link}`;
-    `chown -R vnstat:vnstat /var/lib/vnstat`;
-    `/etc/init.d/vnstat restart`;
 }

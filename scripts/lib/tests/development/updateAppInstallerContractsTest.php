@@ -118,16 +118,25 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->assertStringContainsString("passthru('mv /usr/sbin/rclone /usr/bin/rclone')", $contents);
     }
 
-    public function testVnstatInstallerKeepsLegacyConfigAndDebian8Repair(): void
+    public function testVnstatInstallerKeepsSupportedConfigPathOnly(): void
     {
         $contents = $this->readInstaller('vnstat.php');
+        $repairCommand = 'chown -R '.'vnstat:vnstat /var/lib/vnstat';
+        $removedVersionVariable = '$debian'.'Major';
 
         $this->assertStringContainsString("require_once '/scripts/lib/networkInfo.php';", $contents);
         $this->assertStringContainsString("passthru('apt-get install vnstat -y')", $contents);
         $this->assertStringContainsString("str_replace('RateUnit 1', 'RateUnit 0'", $contents);
         $this->assertStringContainsString('MaxBandwidth 100', $contents);
         $this->assertStringContainsString('/etc/init.d/vnstat restart', $contents);
-        $this->assertStringContainsString('chown -R vnstat:vnstat /var/lib/vnstat', $contents);
+        $this->assertTrue(
+            strpos($contents, $repairCommand) === false,
+            'vnstat.php should not keep Debian 8 repair branches for unsupported releases'
+        );
+        $this->assertTrue(
+            strpos($contents, $removedVersionVariable) === false,
+            'vnstat.php should not parse Debian major versions for removed Debian 8 repair logic'
+        );
     }
 
     public function testWatchdogInstallerKeepsTemplateAndDeviceFallbackFlow(): void
