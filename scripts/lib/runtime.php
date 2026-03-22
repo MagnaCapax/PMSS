@@ -703,6 +703,35 @@ if (!function_exists('pmssPrepareCliEntrypoint')) {
     }
 }
 
+if (!function_exists('pmssSnapshotLogOpen')) {
+    /**
+     * Open a root-only append log for snapshot-style cron jobs.
+     *
+     * @return resource|false
+     */
+    function pmssSnapshotLogOpen(string $scriptName, string $logPath, ?int &$oldUmask)
+    {
+        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+            fwrite(STDERR, basename($scriptName)." must be run as root.\n");
+            return false;
+        }
+        $oldUmask = umask(0077);
+        $logDir = dirname($logPath);
+        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+            return false;
+        }
+        $handle = @fopen($logPath, 'ab');
+        if ($handle === false) {
+            return false;
+        }
+        @chmod($logPath, 0600);
+        if (function_exists('flock')) {
+            @flock($handle, LOCK_EX);
+        }
+        return $handle;
+    }
+}
+
 if (!function_exists('pmssError')) {
     /**
      * Write an error message to STDERR and the log.

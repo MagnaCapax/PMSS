@@ -10,6 +10,7 @@
 require_once __DIR__.'/../lib/resources/log.php';
 require_once __DIR__.'/../lib/resources.php';
 require_once __DIR__.'/../lib/resources/accumulator.php';
+require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
@@ -21,29 +22,15 @@ const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
  */
 function pmssResourceSnapshotRun(): int
 {
-    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-        fwrite(STDERR, "resourceSnapshot.php must be run as root.\n");
-        return 1;
-    }
-
     $logPath = getenv('PMSS_RESOURCE_SNAPSHOT_LOG') ?: PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT;
-    $logDir = dirname($logPath);
     $ts = date('Y-m-d\\TH:i:s');
 
-    $oldUmask = umask(0077);
+    $oldUmask = null;
     $fh = false;
     try {
-        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
-            return 1;
-        }
-
-        $fh = @fopen($logPath, 'ab');
+        $fh = pmssSnapshotLogOpen(__FILE__, $logPath, $oldUmask);
         if ($fh === false) {
             return 1;
-        }
-        @chmod($logPath, 0600);
-        if (function_exists('flock')) {
-            @flock($fh, LOCK_EX);
         }
 
         $users = pmssListManagedUsers();
@@ -129,7 +116,9 @@ function pmssResourceSnapshotRun(): int
         if ($fh !== false) {
             @fclose($fh);
         }
-        umask($oldUmask);
+        if ($oldUmask !== null) {
+            umask($oldUmask);
+        }
     }
 }
 

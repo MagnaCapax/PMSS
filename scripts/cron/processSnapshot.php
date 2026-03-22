@@ -16,6 +16,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../lib/runtime.php';
+
 const PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/process-snapshot.log';
 
 /**
@@ -25,28 +27,15 @@ const PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/process-snapshot.log';
  */
 function pmssProcessSnapshotRun(): int
 {
-    if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-        fwrite(STDERR, "processSnapshot.php must be run as root.\n");
-        return 1;
-    }
-
     $logPath = (string) (getenv('PMSS_PROCESS_SNAPSHOT_LOG') ?: PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT);
     $ts = date('Y-m-d\\TH:i:s');
 
-    $oldUmask = umask(0077);
+    $oldUmask = null;
     $fh = false;
     try {
-        if (!is_dir(dirname($logPath)) && !@mkdir(dirname($logPath), 0755, true) && !is_dir(dirname($logPath))) {
+        $fh = pmssSnapshotLogOpen(__FILE__, $logPath, $oldUmask);
+        if ($fh === false) {
             return 1;
-        }
-
-        if (($fh = @fopen($logPath, 'ab')) === false) {
-            return 1;
-        }
-
-        @chmod($logPath, 0600);
-        if (function_exists('flock')) {
-            @flock($fh, LOCK_EX);
         }
 
         if (($ps = trim((string) @shell_exec('command -v ps 2>/dev/null'))) === '') {
@@ -74,7 +63,9 @@ function pmssProcessSnapshotRun(): int
         if ($fh !== false) {
             @fclose($fh);
         }
-        umask($oldUmask);
+        if ($oldUmask !== null) {
+            umask($oldUmask);
+        }
     }
 }
 
