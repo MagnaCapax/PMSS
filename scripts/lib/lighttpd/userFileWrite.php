@@ -64,11 +64,9 @@ function pmssAtomicWriteFile(string $path, string $content): bool
 
 function pmssWriteUserFile(string $path, string $content, string $owner, int $mode): bool
 {
-    if (!pmssAtomicWriteFile($path, $content)) {
-        return false;
-    }
-    pmssUserFileApplyMetadata($path, $owner, $mode);
-    return true;
+    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($owner, $mode): void {
+        pmssUserFileApplyMetadata($tmp, $owner, $mode);
+    });
 }
 
 /**
