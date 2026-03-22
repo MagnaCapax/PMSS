@@ -33,6 +33,12 @@ function pmssStorageHealthReadLastEntries(string $path): array
  */
 function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
 {
+    $closePipe = static function (&$pipe): void {
+        if (is_resource($pipe)) {
+            fclose($pipe);
+        }
+    };
+
     $descriptor = [
         0 => ['pipe', 'r'],
         1 => ['pipe', 'w'],
@@ -43,9 +49,33 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
     if (!is_resource($process)) {
         return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open failed'];
     }
+    if (
+        !isset($pipes[0], $pipes[1], $pipes[2])
+        || !is_resource($pipes[0])
+        || !is_resource($pipes[1])
+        || !is_resource($pipes[2])
+    ) {
+        foreach ([0, 1, 2] as $index) {
+            if (array_key_exists($index, $pipes)) {
+                $closePipe($pipes[$index]);
+            }
+        }
+        if (function_exists('proc_terminate')) {
+            @proc_terminate($process);
+        }
+        @proc_close($process);
+        return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable'];
+    }
     fclose($pipes[0]);
-    stream_set_blocking($pipes[1], false);
-    stream_set_blocking($pipes[2], false);
+    if (!@stream_set_blocking($pipes[1], false) || !@stream_set_blocking($pipes[2], false)) {
+        $closePipe($pipes[1]);
+        $closePipe($pipes[2]);
+        if (function_exists('proc_terminate')) {
+            @proc_terminate($process);
+        }
+        @proc_close($process);
+        return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open pipes unavailable'];
+    }
 
     $stdout = '';
     $stderr = '';
@@ -66,6 +96,7 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
         $write = $except = [];
         $ready = stream_select($read, $write, $except, 0, 200000);
         if ($ready === false) {
+            $stderr .= ($stderr !== '' ? "\n" : '').'stream_select failed';
             break;
         }
         foreach ($read as $stream) {
@@ -85,8 +116,8 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
         }
     }
 
-    fclose($pipes[1]);
-    fclose($pipes[2]);
+    $closePipe($pipes[1]);
+    $closePipe($pipes[2]);
 
     if ($timedOut) {
         if (function_exists('proc_terminate')) {
@@ -97,6 +128,12 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
     }
 
     $rc = proc_close($process);
+    if ($rc === -1 && function_exists('proc_get_status')) {
+        $status = @proc_get_status($process);
+        if (is_array($status) && isset($status['exitcode']) && is_int($status['exitcode']) && $status['exitcode'] >= 0) {
+            $rc = $status['exitcode'];
+        }
+    }
     return ['rc' => (int) $rc, 'stdout' => $stdout, 'stderr' => $stderr];
 }
 
