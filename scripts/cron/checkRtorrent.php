@@ -189,6 +189,15 @@ foreach ($usersOut as $line) {
 
     // --- Missing: No executor and no rTorrent ---
     if (!$executorPresent && empty($rtorrentPids)) {
+        $socketPath = rtorrentScgiSocketPath($user);
+        rtorrentProcessClearStaleState($unresponsiveState);
+        if (file_exists($socketPath)) {
+            pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
+            if (!@unlink($socketPath) && file_exists($socketPath)) {
+                pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
+            }
+        }
+
         $persistentFailureCount = 0;
         if (is_file($startMarkerState)) {
             $persistentFailureState = rtorrentProcessCheckFailureCountState(
@@ -255,6 +264,15 @@ foreach ($usersOut as $line) {
 
     // --- Stale executor: Executor present but rTorrent missing ---
     if ($executorPresent && empty($rtorrentPids)) {
+        $socketPath = rtorrentScgiSocketPath($user);
+        rtorrentProcessClearStaleState($unresponsiveState);
+        if (file_exists($socketPath)) {
+            pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
+            if (!@unlink($socketPath) && file_exists($socketPath)) {
+                pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
+            }
+        }
+
         $state = rtorrentProcessCheckStaleState($missingState, PMSS_RTORRENT_MISSING_GRACE);
 
         if ($state['action'] === 'record') {
