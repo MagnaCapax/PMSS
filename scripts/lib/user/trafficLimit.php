@@ -208,6 +208,100 @@ if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
     }
 }
 
+if (!function_exists('pmssUserTrafficLimitCli')) {
+    function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int
+    {
+        if (!function_exists('pmssRequireCli') && is_file(dirname(__DIR__).'/runtime.php')) require_once dirname(__DIR__).'/runtime.php';
+        if (!function_exists('pmssRequireCli') || !pmssRequireCli('This script must be run from the command line.', null)) {
+            return 1;
+        }
+        $optionParser = dirname(__DIR__).'/cli/optionParser.php';
+        if (!is_file($optionParser)) {
+            fwrite(STDERR, "Error: missing CLI option parser.\n");
+            return 1;
+        }
+        require_once $optionParser;
+        foreach ([dirname(__DIR__).'/userLifecycle.php', __DIR__.'/log.php'] as $dependency) {
+            if (is_file($dependency)) require_once $dependency;
+        }
+        if (!is_string($usage) || $usage === '') {
+            $usage = rtrim(<<<'TEXT'
+Usage:
+  ./userTrafficLimit.php --user=<username> --limit=<GiB>
+  ./userTrafficLimit.php --user=<username> --show
+  ./userTrafficLimit.php --user=<username> --unset
+  ./userTrafficLimit.php <username> <GiB>
+
+Notes:
+  - Limit unit is GiB (monthly quota).
+  - Use 0 (or --unset) to remove a limit.
+TEXT
+            );
+        }
+        $parsed = pmssParseCliTokens($argv);
+        if (pmssCliOption($parsed, 'help', 'h')) {
+            echo $usage."\n";
+            return 0;
+        }
+        $userName = (string) pmssCliOption($parsed, 'user', 'u', $parsed['arguments'][0] ?? '');
+        $show = (pmssCliOption($parsed, 'show') === true);
+        $unset = (pmssCliOption($parsed, 'unset') === true);
+        $limitRaw = pmssCliOption($parsed, 'limit', 'l', $parsed['arguments'][1] ?? null);
+        $exitCode = null;
+        $resolvedUser = pmssTrafficLimitResolveCliUserHome($userName, $usage, $exitCode);
+        if ($resolvedUser === null) return $exitCode ?? 1;
+        $userName = $resolvedUser['user'];
+        $homeDir = $resolvedUser['home'];
+        if ($show && $unset) {
+            fwrite(STDERR, "Error: --show and --unset are mutually exclusive.\n");
+            return 2;
+        }
+        $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
+        $targetModes = [$runtimeDir.'/'.$userName => 0600, $homeDir.'/.trafficLimit' => 0664];
+        if ($show) {
+            $limit = pmssTrafficLimitReadGiBFile($runtimeDir.'/'.$userName);
+            echo "Traffic limit for {$userName}: {$limit} GiB\n";
+            return 0;
+        }
+        if ($unset) $limitRaw = '0';
+        $err = null;
+        $trafficLimit = pmssTrafficLimitParseGiB($limitRaw, $err);
+        if ($trafficLimit === null) {
+            fwrite(STDERR, "Error: invalid --limit value (expected integer GiB): ".($err ?: 'invalid')."\n");
+            return 2;
+        }
+        if (!pmssTrafficLimitEnsureStorageDir($runtimeDir)) {
+            fwrite(STDERR, "Error: failed to prepare {$runtimeDir}\n");
+            return 4;
+        }
+        if ($trafficLimit === 0) {
+            foreach (array_keys($targetModes) as $target) {
+                if (!file_exists($target)) continue;
+                if (!pmssTrafficLimitRemoveGiBFile($target)) {
+                    fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$target}\n");
+                    return 4;
+                }
+            }
+            if (function_exists('pmssUserLog')) pmssUserLog($userName, 'traffic limit unset (GiB quota removed)');
+            echo "Traffic limit for {$userName} set at 0 GiB\n";
+            return 0;
+        }
+        foreach ($targetModes as $target => $mode) {
+            if (!pmssTrafficLimitWriteGiBFile($target, $trafficLimit)) {
+                fwrite(STDERR, "Error: failed to write {$target}\n");
+                return 4;
+            }
+            if (!pmssTrafficLimitConvergeFileMode($target, $mode)) {
+                fwrite(STDERR, "Error: failed to secure {$target}\n");
+                return 4;
+            }
+        }
+        if (function_exists('pmssUserLog')) pmssUserLog($userName, sprintf('traffic limit set to %d GiB (monthly quota)', $trafficLimit));
+        echo "Traffic limit for {$userName} set at {$trafficLimit} GiB\n";
+        return 0;
+    }
+}
+
 if (!function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
     /**
      * Compute progressive post-cap throttling in Mbit based on overage.
