@@ -35,22 +35,53 @@ class UserFilemanagerCompatPatchTest extends TestCase
 
     public function testApplySkeletonFilesPatchesCopiedFilemanager(): void
     {
-        $this->writeSkelFile('www/filemanager.php', "before\n        ob_flush();\nafter\n");
+        $this->writeSkelFile('www/filemanager.php', <<<'PHP'
+before
+        ob_flush();
+    if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
+        $fileName = preg_replace('/\./', '%2e', $fileName, substr_count($fileName, '.') - 1);
+        header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
+    } else {
+        header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
+    }
+        str_replace($range, "-", $range);
+https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js
+https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js
+https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js
+after
+PHP
+);
 
         \pmssUserApplySkeletonFiles($this->context());
 
         $content = (string) file_get_contents($this->targetPath());
         $this->assertTrue(strpos($content, '        @ob_flush();') !== false);
         $this->assertTrue(strpos($content, "\n        ob_flush();\n") === false);
+        $this->assertTrue(strpos($content, 'strstr($_SERVER[\'HTTP_USER_AGENT\'], "MSIE")') === false);
+        $this->assertTrue(strpos($content, 'header("Content-Disposition: $contentDisposition;filename=\\"$fileName\\"");') !== false);
+        $this->assertTrue(strpos($content, '        $range = str_replace("-", "", $range);') !== false);
+        $this->assertTrue(strpos($content, 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js') !== false);
+        $this->assertTrue(strpos($content, 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js') !== false);
+        $this->assertTrue(strpos($content, 'https://cdn.datatables.net/2.0.8/js/dataTables.min.js') !== false);
     }
 
     public function testApplySkeletonFilesLeavesPatchedFilemanagerUntouched(): void
     {
-        $this->writeSkelFile('www/filemanager.php', "before\n        @ob_flush();\nafter\n");
+        $expected = <<<'PHP'
+before
+        @ob_flush();
+    header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
+        $range = str_replace("-", "", $range);
+https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js
+https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js
+https://cdn.datatables.net/2.0.8/js/dataTables.min.js
+after
+PHP;
+        $this->writeSkelFile('www/filemanager.php', $expected);
 
         \pmssUserApplySkeletonFiles($this->context());
 
-        $this->assertEquals("before\n        @ob_flush();\nafter\n", (string) file_get_contents($this->targetPath()));
+        $this->assertEquals($expected, (string) file_get_contents($this->targetPath()));
     }
 
     public function testApplySkeletonFilesSkipsMissingFilemanagerSource(): void

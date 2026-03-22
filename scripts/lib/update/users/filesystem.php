@@ -16,6 +16,52 @@
 function pmssUserApplySkeletonFiles(array $ctx): void
 {
     $user = $ctx['user'];
+    $patchFilemanager = static function (string $path): void {
+        if (!is_file($path)
+            || is_link($path)
+            || !is_string($content = @file_get_contents($path))
+            || $content === '') {
+            return;
+        }
+
+        // Patch tenant copies until the frozen skeleton filemanager source can
+        // be updated upstream without touching the locked tree.
+        $updated = str_replace(
+            [
+                '        ob_flush();',
+                'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js',
+                'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',
+                'https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js',
+                '        str_replace($range, "-", $range);',
+            ],
+            [
+                '        @ob_flush();',
+                'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js',
+                'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js',
+                'https://cdn.datatables.net/2.0.8/js/dataTables.min.js',
+                '        $range = str_replace("-", "", $range);',
+            ],
+            $content
+        );
+
+        $legacyDownloadHeaderBlock = <<<'PHP'
+    if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
+        $fileName = preg_replace('/\./', '%2e', $fileName, substr_count($fileName, '.') - 1);
+        header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
+    } else {
+        header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
+    }
+PHP;
+        $updated = str_replace(
+            $legacyDownloadHeaderBlock,
+            '    header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");',
+            $updated
+        );
+
+        if ($updated !== $content) {
+            @file_put_contents($path, $updated);
+        }
+    };
     $patchTorrentFrontends = static function (string $path, string $requireLine, string $legacyCommand, string $patchedCommand): void {
         if (!is_file($path)
             || is_link($path)
@@ -67,18 +113,7 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         unlink("/home/{$user}/www/phpXplorer");
     }
 
-    // Patch tenant copies until the frozen skeleton filemanager source can be
-    // updated upstream without touching the locked tree.
-    $filemanagerPath = $ctx['home'].'/www/filemanager.php';
-    if (is_file($filemanagerPath)
-        && !is_link($filemanagerPath)
-        && is_string($content = @file_get_contents($filemanagerPath))
-        && $content !== ''
-        && strpos($content, '        @ob_flush();') === false) {
-        if (($updated = str_replace('        ob_flush();', '        @ob_flush();', $content, $replacements)) !== $content && $replacements > 0) {
-            @file_put_contents($filemanagerPath, $updated);
-        }
-    }
+    $patchFilemanager($ctx['home'].'/www/filemanager.php');
 
     // Keep tenant torrent frontend copies off the legacy Python port helpers
     // until the frozen /etc/skel/www sources can be updated directly.
