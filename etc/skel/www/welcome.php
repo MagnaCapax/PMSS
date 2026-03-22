@@ -71,6 +71,11 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
             background: #fff6e5;
             color: #5f3b00;
         }
+        .pmss-raid-notice-error {
+            border-color: #cc8f8f;
+            background: #fff1f1;
+            color: #7a1a1a;
+        }
         .pmss-raid-notice p {
             margin: 8px 0 0;
         }

@@ -156,7 +156,7 @@ function pmssStorageHealthRaidActivitySummaryParse(string $activityLine): array
  * Read current activity for the md array backing /home.
  *
  * @param array<int, array<string,mixed>>|null $raidEntries
- * @return array<string,string>|null
+ * @return array<string,mixed>|null
  */
 function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $raidEntries = null): ?array
 {
@@ -167,19 +167,29 @@ function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $r
 
     $raidEntries = $raidEntries ?? pmssStorageHealthSnapshotRaid(date('c'));
 
+    $degradedNotice = null;
     foreach ($raidEntries as $entry) {
-        $activityLine = trim((string) ($entry['resync'] ?? ''));
-        if ((string) ($entry['array'] ?? '') !== $homeArray || $activityLine === '') {
+        if ((string) ($entry['array'] ?? '') !== $homeArray) {
             continue;
         }
 
-        $summary = pmssStorageHealthRaidActivitySummaryParse($activityLine);
-        if ($summary['operation'] !== '') {
-            return $summary + ['array' => $homeArray];
+        $activityLine = trim((string) ($entry['resync'] ?? ''));
+        if ($activityLine !== '') {
+            $summary = pmssStorageHealthRaidActivitySummaryParse($activityLine);
+            if ($summary['operation'] !== '') {
+                return $summary + ['array' => $homeArray];
+            }
+        }
+
+        if (in_array('degraded', (array) ($entry['flags'] ?? []), true)) {
+            $degradedNotice = [
+                'array' => $homeArray,
+                'flags' => ['degraded'],
+            ];
         }
     }
 
-    return null;
+    return $degradedNotice;
 }
 
 /**
@@ -187,7 +197,21 @@ function pmssStorageHealthHomeRaidActivity(?string $mountsPath = null, ?array $r
  */
 function pmssStorageHealthHomeRaidNoticeHtmlBuild($activity): string
 {
-    if (!is_array($activity) || empty($activity['operation']) || empty($activity['array'])) {
+    if (!is_array($activity) || empty($activity['array'])) {
+        return '';
+    }
+
+    $flags = (array) ($activity['flags'] ?? []);
+    if (in_array('degraded', $flags, true) && empty($activity['operation'])) {
+        return <<<HTML
+<div class="pmss-raid-notice pmss-raid-notice-error" role="alert" aria-live="assertive">
+    <strong><span class="pmss-raid-icon" aria-hidden="true">&#9940;</span> Storage array degraded</strong>
+    <p>A drive in your server's storage array has failed. Your data is still accessible but the array is running without full redundancy. Please contact support if you experience issues.</p>
+</div>
+HTML;
+    }
+
+    if (empty($activity['operation'])) {
         return '';
     }
 

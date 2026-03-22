@@ -110,6 +110,39 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertTrue($activity === null, 'Expected no activity when /home is not backed by md');
     }
 
+    public function testHomeRaidActivityReturnsDegradedNoticeWithoutRebuild(): void
+    {
+        $mountsPath = $this->writeFile('mounts', "/dev/md1 /home ext4 rw 0 0\n");
+        $raidEntries = [
+            ['array' => 'md1', 'flags' => ['degraded'], 'severity' => 'fail'],
+        ];
+
+        $activity = \pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries);
+
+        $this->assertTrue(is_array($activity), 'Expected degraded notice for /home array');
+        $this->assertEquals('md1', $activity['array']);
+        $this->assertEquals(['degraded'], $activity['flags']);
+    }
+
+    public function testHomeRaidActivityPrefersActiveRebuildOverDegradedNotice(): void
+    {
+        $mountsPath = $this->writeFile('mounts', "/dev/md1 /home ext4 rw 0 0\n");
+        $raidEntries = [
+            [
+                'array' => 'md1',
+                'flags' => ['degraded', 'rebuild_in_progress'],
+                'severity' => 'fail',
+                'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec',
+            ],
+        ];
+
+        $activity = \pmssStorageHealthHomeRaidActivity($mountsPath, $raidEntries);
+
+        $this->assertTrue(is_array($activity), 'Expected active rebuild for /home array');
+        $this->assertEquals('recovery', $activity['operation']);
+        $this->assertEquals('7.5%', $activity['progress']);
+    }
+
     public function testHomeRaidNoticeHtmlIncludesAvailableDetails(): void
     {
         $html = \pmssStorageHealthHomeRaidNoticeHtmlBuild([
@@ -135,6 +168,19 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->assertStringContainsString('Home storage maintenance in progress', $html);
         $this->assertStringContainsString('RAID array md0 is running a check', $html);
         $this->assertTrue(strpos($html, 'pmss-raid-meta') === false, 'Meta details should be omitted when no values exist');
+    }
+
+    public function testHomeRaidNoticeHtmlBuildsDegradedAlert(): void
+    {
+        $html = \pmssStorageHealthHomeRaidNoticeHtmlBuild([
+            'array' => 'md1',
+            'flags' => ['degraded'],
+        ]);
+
+        $this->assertStringContainsString('Storage array degraded', $html);
+        $this->assertStringContainsString('without full redundancy', $html);
+        $this->assertStringContainsString('pmss-raid-notice-error', $html);
+        $this->assertTrue(strpos($html, 'Progress:') === false, 'Degraded notice should not show rebuild metadata');
     }
 
     public function testPerformanceStatusUsesCheckOperationInReason(): void
