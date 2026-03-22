@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../resources/userHelpers.php';
+require_once __DIR__.'/../systemdSliceProperties.php';
 
 /**
  * Ensure a directory exists and is safe for use by ingress logging.
@@ -28,33 +29,7 @@ function pmssTrafficIngressEnsureDir(string $path, int $mode): bool
  */
 function pmssTrafficIngressReadCounters(int $uid): ?array
 {
-    if (trim((string) @shell_exec('command -v systemctl 2>/dev/null')) === '') {
-        return null;
-    }
-    $unit = sprintf('user-%d.slice', $uid);
-    $cmd = 'systemctl show '.escapeshellarg($unit).' -p IPIngressBytes -p IPEgressBytes';
-    $out = trim((string) @shell_exec($cmd));
-    if ($out === '') {
-        return null;
-    }
-    $ingress = null;
-    $egress = null;
-    foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-        if (strpos($line, 'IPIngressBytes=') === 0) {
-            $value = substr($line, strlen('IPIngressBytes='));
-            if (ctype_digit($value)) {
-                $ingress = (int) $value;
-            }
-        } elseif (strpos($line, 'IPEgressBytes=') === 0) {
-            $value = substr($line, strlen('IPEgressBytes='));
-            if (ctype_digit($value)) {
-                $egress = (int) $value;
-            }
-        }
-    }
-    return ($ingress === null || $egress === null)
-        ? null
-        : ['ingress' => $ingress, 'egress' => $egress];
+    return pmssReadSystemdIntProperties(sprintf('user-%d.slice', $uid), ['IPIngressBytes' => 'ingress', 'IPEgressBytes' => 'egress']);
 }
 
 /**

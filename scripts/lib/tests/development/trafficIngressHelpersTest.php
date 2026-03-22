@@ -64,4 +64,52 @@ class TrafficIngressHelpersTest extends TestCase
         $loaded = \pmssTrafficIngressReadState($path);
         $this->assertTrue($loaded === []);
     }
+
+    public function testReadCountersParsesSystemctlOutputViaSharedHelper(): void
+    {
+        $root = $this->makeRoot();
+        $binDir = $root.'/bin';
+        @mkdir($binDir, 0755, true);
+        $scriptPath = $binDir.'/systemctl';
+        @file_put_contents($scriptPath, "#!/bin/sh\necho 'IPIngressBytes=123'\necho 'IPEgressBytes=456'\n");
+        @chmod($scriptPath, 0755);
+
+        $originalPath = getenv('PATH');
+        $pathPrefix = ($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '';
+        putenv('PATH='.$binDir.$pathPrefix);
+
+        try {
+            $this->assertEquals(['ingress' => 123, 'egress' => 456], \pmssTrafficIngressReadCounters(1000));
+        } finally {
+            if ($originalPath === false) {
+                putenv('PATH');
+            } else {
+                putenv('PATH='.$originalPath);
+            }
+        }
+    }
+
+    public function testReadCountersReturnsNullWhenRequiredCounterMissing(): void
+    {
+        $root = $this->makeRoot();
+        $binDir = $root.'/bin';
+        @mkdir($binDir, 0755, true);
+        $scriptPath = $binDir.'/systemctl';
+        @file_put_contents($scriptPath, "#!/bin/sh\necho 'IPIngressBytes=123'\n");
+        @chmod($scriptPath, 0755);
+
+        $originalPath = getenv('PATH');
+        $pathPrefix = ($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '';
+        putenv('PATH='.$binDir.$pathPrefix);
+
+        try {
+            $this->assertEquals(null, \pmssTrafficIngressReadCounters(1000));
+        } finally {
+            if ($originalPath === false) {
+                putenv('PATH');
+            } else {
+                putenv('PATH='.$originalPath);
+            }
+        }
+    }
 }

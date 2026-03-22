@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../userLifecycle.php';
+require_once __DIR__.'/../systemdSliceProperties.php';
 
 /**
  * Resolve a username to its UID with a POSIX-first fallback.
@@ -50,35 +51,23 @@ function pmssResourceLogEnsureDir(string $path, int $mode): bool
  */
 function pmssResourceLogReadCounters(int $uid): ?array
 {
-    $unit = sprintf('user-%d.slice', $uid);
-    $cmd = 'systemctl show '.escapeshellarg($unit)
-        .' -p IOReadBytes -p IOWriteBytes -p IOReadOperations -p IOWriteOperations -p CPUUsageNSec -p MemoryCurrent -p TasksCurrent';
-    if (!is_string($out = @shell_exec($cmd)) || trim($out) === '') {
-        return null;
-    }
-
-    $fieldMap = [
-        'IOReadBytes' => 'io_read',
-        'IOWriteBytes' => 'io_write',
-        'CPUUsageNSec' => 'cpu_nsec',
-        'MemoryCurrent' => 'memory',
-        'TasksCurrent' => 'tasks',
-        'IOReadOperations' => 'io_read_ops',
-        'IOWriteOperations' => 'io_write_ops',
-    ];
-    $values = ['io_read_ops' => 0, 'io_write_ops' => 0];
-
-    foreach (preg_split('/\r?\n/', trim($out)) as $line) {
-        [$field, $value] = array_pad(explode('=', $line, 2), 2, null);
-        if (!isset($fieldMap[$field]) || !ctype_digit((string) $value)) {
-            continue;
-        }
-        $values[$fieldMap[$field]] = (int) $value;
-    }
-
-    if (!isset($values['io_read'], $values['io_write'], $values['cpu_nsec'], $values['memory'], $values['tasks'])) {
-        return null;
-    }
+    $values = pmssReadSystemdIntProperties(
+        sprintf('user-%d.slice', $uid),
+        [
+            'IOReadBytes' => 'io_read',
+            'IOWriteBytes' => 'io_write',
+            'IOReadOperations' => 'io_read_ops',
+            'IOWriteOperations' => 'io_write_ops',
+            'CPUUsageNSec' => 'cpu_nsec',
+            'MemoryCurrent' => 'memory',
+            'TasksCurrent' => 'tasks',
+        ],
+        [
+            'IOReadOperations' => 0,
+            'IOWriteOperations' => 0,
+        ]
+    );
+    if (!is_array($values)) return null;
 
     $memoryBreakdown = pmssResourceLogReadMemoryBreakdown($uid);
     return is_array($memoryBreakdown) ? $values + $memoryBreakdown : $values;

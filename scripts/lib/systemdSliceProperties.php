@@ -23,12 +23,41 @@ function pmssParseSystemdPropertyOutput(array $propertyNames, string $output): a
     return $properties;
 }
 
+/** @param array<int, string> $propertyNames */
+function pmssBuildSystemdShowCommand(string $unit, array $propertyNames): string
+{
+    return 'systemctl show '.escapeshellarg($unit).' -p '.implode(' -p ', $propertyNames).' 2>/dev/null';
+}
+
 /** @param array<int, string> $propertyNames @return array<string, string> */
 function pmssReadSystemdProperties(string $unit, array $propertyNames): array
 {
-    $command = 'systemctl show '.escapeshellarg($unit).' -p '.implode(' -p ', $propertyNames).' 2>/dev/null';
-    $output = @shell_exec($command);
+    $output = @shell_exec(pmssBuildSystemdShowCommand($unit, $propertyNames));
     return pmssParseSystemdPropertyOutput($propertyNames, is_string($output) ? $output : '');
+}
+
+/** @param array<string, string> $properties @param array<string, string> $fieldMap @param array<string, int> $defaults @return array<string, int>|null */
+function pmssMapSystemdIntProperties(array $properties, array $fieldMap, array $defaults = []): ?array
+{
+    $values = [];
+    foreach ($fieldMap as $propertyName => $outputField) {
+        $raw = (string) ($properties[$propertyName] ?? '');
+        if (!ctype_digit($raw)) {
+            if (!array_key_exists($propertyName, $defaults)) {
+                return null;
+            }
+            $values[$outputField] = (int) $defaults[$propertyName];
+            continue;
+        }
+        $values[$outputField] = (int) $raw;
+    }
+    return $values;
+}
+
+/** @param array<string, string> $fieldMap @param array<string, int> $defaults @return array<string, int>|null */
+function pmssReadSystemdIntProperties(string $unit, array $fieldMap, array $defaults = []): ?array
+{
+    return pmssMapSystemdIntProperties(pmssReadSystemdProperties($unit, array_keys($fieldMap)), $fieldMap, $defaults);
 }
 
 /** @param array<int, string> $propertyNames @return array<string, string> */

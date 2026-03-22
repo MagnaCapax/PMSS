@@ -9,6 +9,7 @@
 namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
+require_once __DIR__ . '/../systemdSliceProperties.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 
 class Manager
@@ -531,7 +532,7 @@ class Manager
     {
         echo "\n[Config] $slice\n";
         $props = ['CPUWeight','IOWeight','MemoryAccounting','CPUAccounting','IOAccounting','MemoryHigh','MemoryMax','TasksMax','CPUQuotaPerSecUSec','CPUQuotaPeriodUSec'];
-        $out = $this->sys->execute('systemctl show '.escapeshellarg($slice).' -p '.implode(',', $props));
+        $out = $this->sys->execute(\pmssBuildSystemdShowCommand($slice, $props));
         echo $out !== null ? trim($out)."\n" : "(no data)\n";
     }
 
@@ -568,21 +569,11 @@ class Manager
     private function readCurrentProps(string $slice): array
     {
         $props = ['CPUWeight','IOWeight','MemoryHigh','MemoryMax','TasksMax','CPUQuotaPerSecUSec'];
-        $out = $this->sys->execute('systemctl show '.escapeshellarg($slice).' -p '.implode(' -p ', $props));
-        $map = [];
-        if (!is_string($out)) return $map;
-        foreach (preg_split('/?
-/', trim($out)) as $line) {
-            if ($line === '') continue;
-            $pos = strpos($line, '=');
-            if ($pos === false) continue;
-            $k = substr($line, 0, $pos);
-            $v = substr($line, $pos+1);
-            if ($k === 'CPUQuotaPerSecUSec') {
-                $map['CPUQuota'] = $v;
-            } else {
-                $map[$k] = $v;
-            }
+        $out = $this->sys->execute(\pmssBuildSystemdShowCommand($slice, $props));
+        $map = is_string($out) ? \pmssParseSystemdPropertyOutput($props, $out) : [];
+        if (isset($map['CPUQuotaPerSecUSec'])) {
+            $map['CPUQuota'] = $map['CPUQuotaPerSecUSec'];
+            unset($map['CPUQuotaPerSecUSec']);
         }
         return $map;
     }

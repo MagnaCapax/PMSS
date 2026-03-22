@@ -67,4 +67,58 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
 
         $this->assertEquals(null, $quota);
     }
+
+    public function testMapSystemdIntPropertiesAppliesDefaultsForOptionalCounters(): void
+    {
+        $mapped = \pmssMapSystemdIntProperties(
+            [
+                'IOReadBytes' => '11',
+                'IOWriteBytes' => '22',
+                'CPUUsageNSec' => '33',
+                'MemoryCurrent' => '44',
+                'TasksCurrent' => '55',
+            ],
+            [
+                'IOReadBytes' => 'io_read',
+                'IOWriteBytes' => 'io_write',
+                'IOReadOperations' => 'io_read_ops',
+                'IOWriteOperations' => 'io_write_ops',
+                'CPUUsageNSec' => 'cpu_nsec',
+                'MemoryCurrent' => 'memory',
+                'TasksCurrent' => 'tasks',
+            ],
+            [
+                'IOReadOperations' => 0,
+                'IOWriteOperations' => 0,
+            ]
+        );
+
+        $this->assertEquals(
+            [
+                'io_read' => 11,
+                'io_write' => 22,
+                'io_read_ops' => 0,
+                'io_write_ops' => 0,
+                'cpu_nsec' => 33,
+                'memory' => 44,
+                'tasks' => 55,
+            ],
+            $mapped
+        );
+    }
+
+    public function testMapSystemdIntPropertiesRejectsMissingRequiredValues(): void
+    {
+        $mapped = \pmssMapSystemdIntProperties(
+            [
+                'IPIngressBytes' => '10',
+            ],
+            [
+                'IPIngressBytes' => 'ingress',
+                'IPEgressBytes' => 'egress',
+            ]
+        );
+
+        $this->assertEquals(null, $mapped);
+    }
 }
