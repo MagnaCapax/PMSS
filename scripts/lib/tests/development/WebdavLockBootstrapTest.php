@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/util/userConfigLighttpd.php';
 
 class WebdavLockBootstrapTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testCreatesLockFileWithSafePerms(): void
     {
         $dir = $this->makeTempDir('pmss-webdav-lock');
@@ -58,22 +61,4 @@ class WebdavLockBootstrapTest extends TestCase
         return $dir;
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $file) {
-            if ($file->isDir()) {
-                rmdir($file->getPathname());
-            } else {
-                unlink($file->getPathname());
-            }
-        }
-        rmdir($path);
-    }
 }

@@ -6,9 +6,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 
 class LinuxserverInstallScriptTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $tempDir;
     private $homeDir;
     private $fakeBinDir;
@@ -52,32 +55,6 @@ BASH;
     protected function tearDown(): void
     {
         $this->cleanup($this->tempDir);
-    }
-
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-
-        if (is_file($path) || is_link($path)) {
-            @unlink($path);
-            return;
-        }
-
-        $items = scandir($path);
-        if (!is_array($items)) {
-            return;
-        }
-
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $this->cleanup($path.'/'.$item);
-        }
-
-        @rmdir($path);
     }
 
     private function runHelper(array $args, array $env = []): array

@@ -2,10 +2,13 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/resources/show.php';
 
 class ShowResourcesFormatTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testHelpIncludesCoreOptions(): void
     {
         $script = dirname(__DIR__, 3).'/showResources.php';
@@ -145,22 +148,4 @@ class ShowResourcesFormatTest extends TestCase
         $this->assertEquals(['ghost'], $payload['missing']);
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-        @rmdir($path);
-    }
 }

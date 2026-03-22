@@ -14,10 +14,13 @@ namespace {
 
 namespace PMSS\Tests {
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdatePluginsTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testEnsurePluginsReportsMissingSource(): void
     {
         $home = sys_get_temp_dir().'/pmss-plugins-home-'.bin2hex(random_bytes(4));
@@ -122,24 +125,6 @@ class UserUpdatePluginsTest extends TestCase
         return null;
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-        @rmdir($path);
-    }
 }
 
 }

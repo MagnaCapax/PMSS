@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/quota.php';
 
 class QuotaFstabOptionsTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testNoChangeWhenQuotaOptionsPresent(): void
     {
         $dir = sys_get_temp_dir().'/pmss-quota-'.bin2hex(random_bytes(4));
@@ -175,22 +178,4 @@ class QuotaFstabOptionsTest extends TestCase
         return false;
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-        @rmdir($path);
-    }
 }

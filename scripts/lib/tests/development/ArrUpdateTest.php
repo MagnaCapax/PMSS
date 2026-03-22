@@ -2,11 +2,14 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/runtime.php';
 require_once dirname(__DIR__, 2).'/update/apps/arr.php';
 
 class ArrUpdateTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testUpdateInstallsReleaseFromLocalArchiveAndCleansWorkspace(): void
     {
         $baseDir = $this->tempDir('install');
@@ -192,29 +195,4 @@ SH
         }
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-
-        if (is_file($path) || is_link($path)) {
-            @unlink($path);
-            return;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($iterator as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-                continue;
-            }
-            @unlink($item->getPathname());
-        }
-
-        @rmdir($path);
-    }
 }

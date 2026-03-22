@@ -7,6 +7,32 @@ require_once dirname(__DIR__, 3).'/update.php';
 
 class RuntimeTest extends TestCase
 {
+    public function testPmssPrepareCliEntrypointAppendsArgumentsToGlobalArgv(): void
+    {
+        $originalGlobalArgv = $GLOBALS['argv'] ?? null;
+        $originalServerArgv = $_SERVER['argv'] ?? null;
+        $GLOBALS['argv'] = ['wrapper.php'];
+        $_SERVER['argv'] = ['wrapper.php'];
+
+        try {
+            \pmssPrepareCliEntrypoint(false, ['--quiet']);
+            $this->assertEquals(['wrapper.php', '--quiet'], $GLOBALS['argv']);
+            $this->assertEquals($GLOBALS['argv'], $_SERVER['argv']);
+        } finally {
+            if ($originalGlobalArgv === null) {
+                unset($GLOBALS['argv']);
+            } else {
+                $GLOBALS['argv'] = $originalGlobalArgv;
+            }
+
+            if ($originalServerArgv === null) {
+                unset($_SERVER['argv']);
+            } else {
+                $_SERVER['argv'] = $originalServerArgv;
+            }
+        }
+    }
+
     public function testDefaultCommandTimeoutIs1200Seconds(): void
     {
         $this->assertTrue(defined('PMSS_COMMAND_TIMEOUT_DEFAULT'));

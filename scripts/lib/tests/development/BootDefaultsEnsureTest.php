@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class BootDefaultsEnsureTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $prevDryRun;
     protected function setUp(): void { $this->prevDryRun = getenv('PMSS_DRY_RUN'); putenv('PMSS_DRY_RUN=1'); }
     protected function tearDown(): void { $this->prevDryRun === false || $this->prevDryRun === '' ? putenv('PMSS_DRY_RUN') : putenv('PMSS_DRY_RUN='.$this->prevDryRun); }
@@ -70,11 +73,4 @@ class BootDefaultsEnsureTest extends TestCase
         $this->cleanup($dir);
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) { return; }
-        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
-        foreach ($it as $item) { $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname()); }
-        @rmdir($path);
-    }
 }

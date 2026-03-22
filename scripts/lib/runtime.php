@@ -673,6 +673,36 @@ if (!function_exists('pmssRequireCli')) {
     }
 }
 
+if (!function_exists('pmssPrepareCliEntrypoint')) {
+    /**
+     * Apply the standard CLI/bootstrap guard used by thin script wrappers.
+     */
+    function pmssPrepareCliEntrypoint(bool $rootRequired = false, array $argvAppend = []): void
+    {
+        pmssRequireCli();
+        if ($rootRequired) {
+            requireRoot();
+        }
+
+        if (empty($argvAppend)) {
+            return;
+        }
+
+        if (!isset($GLOBALS['argv']) || !is_array($GLOBALS['argv'])) {
+            $GLOBALS['argv'] = $_SERVER['argv'] ?? [];
+        }
+        if (!isset($_SERVER['argv']) || !is_array($_SERVER['argv'])) {
+            $_SERVER['argv'] = $GLOBALS['argv'];
+        }
+
+        foreach ($argvAppend as $arg) {
+            $arg = (string) $arg;
+            $GLOBALS['argv'][] = $arg;
+            $_SERVER['argv'][] = $arg;
+        }
+    }
+}
+
 if (!function_exists('pmssError')) {
     /**
      * Write an error message to STDERR and the log.

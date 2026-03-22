@@ -19,6 +19,6 @@
 
 require_once __DIR__.'/lib/runtime.php';
 
-pmssRequireCli();
+pmssPrepareCliEntrypoint();
 
 require_once __DIR__.'/util/userDocker.php';

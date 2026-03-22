@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/netconsole.php';
 
 class NetconsoleConfigureTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testParsesValidSpec(): void
     {
         $target = \pmssNetconsoleTargetFromSpec('6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
@@ -133,14 +136,4 @@ class NetconsoleConfigureTest extends TestCase
         return $dir;
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!is_dir($path)) return;
-        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
-        foreach ($it as $item) {
-            if ($item->isDir()) @rmdir($item->getPathname());
-            else @unlink($item->getPathname());
-        }
-        @rmdir($path);
-    }
 }

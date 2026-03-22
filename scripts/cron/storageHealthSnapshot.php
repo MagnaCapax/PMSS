@@ -11,10 +11,6 @@
 
 require_once __DIR__.'/../lib/runtime.php';
 
-pmssRequireCli();
-
-requireRoot();
-
-$argv[] = '--quiet';
+pmssPrepareCliEntrypoint(true, ['--quiet']);
 
 require_once __DIR__.'/../util/storageHealthSnapshot.php';
