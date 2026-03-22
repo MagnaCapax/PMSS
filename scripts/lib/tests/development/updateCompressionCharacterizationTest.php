@@ -48,8 +48,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
             strpos($src, 'function '.$symbol) === false,
             'process wait logic should be localized inside killProcess()'
         );
-        $this->assertStringContainsString("runStep(\$description.' (SIGTERM)'", $src);
-        $this->assertStringContainsString("runStep(\$description.' (SIGKILL)'", $src);
+        $this->assertStringContainsString("foreach (['TERM' => max(0, \$timeoutSeconds), 'KILL' => 5] as \$signal => \$waitSeconds)", $src);
+        $this->assertStringContainsString("runStep(\$description.' (SIG'.\$signal.')'", $src);
         $this->assertStringContainsString('graceful stop', $src);
         $this->assertStringContainsString('processes linger after SIGKILL', $src);
     }
@@ -65,7 +65,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
             strpos($src, 'function '.$symbol.'(') === false,
             'process presence checks should stay localized inside killProcess()'
         );
-        $this->assertStringContainsString("exec('pgrep -x '.escapeshellarg(\$name).' >/dev/null 2>&1'", $src);
+        $this->assertStringContainsString("\$probeCommand = 'pgrep -x '.escapeshellarg(\$name).' >/dev/null 2>&1';", $src);
+        $this->assertStringContainsString('exec($probeCommand, $_, $probeStatus);', $src);
         $this->assertStringContainsString('[SKIP] {$description} (no {$name} processes)', $src);
     }
 
@@ -85,7 +86,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             strpos($src, $waitNeedle) === false,
             'killProcess() should keep the wait loops inline without a local closure'
         );
-        $this->assertStringContainsString('$deadline = microtime(true) + max(0, $timeoutSeconds);', $src);
+        $this->assertStringContainsString('$deadline = microtime(true) + $waitSeconds;', $src);
         $this->assertStringContainsString('usleep(250000);', $src);
     }
 

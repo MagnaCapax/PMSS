@@ -57,12 +57,12 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
  */
 function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
 {
-    exec('pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1', $_, $probeStatus);
+    $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
+    exec($probeCommand, $_, $probeStatus);
     if ($probeStatus !== 0) {
         logmsg("[SKIP] {$description} (no {$name} processes)");
         return;
     }
-    $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
 
     if ($systemdUnit !== null) {
         if (!is_dir('/run/systemd/system')) {
@@ -72,33 +72,23 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
         }
     }
 
-    runStep($description.' (SIGTERM)', 'pkill -TERM -x '.escapeshellarg($name));
+    foreach (['TERM' => max(0, $timeoutSeconds), 'KILL' => 5] as $signal => $waitSeconds) {
+        runStep($description.' (SIG'.$signal.')', 'pkill -'.$signal.' -x '.escapeshellarg($name));
 
-    $deadline = microtime(true) + max(0, $timeoutSeconds);
-    while (true) {
-        exec($probeCommand, $_, $probeStatus);
-        if ($probeStatus !== 0) {
-            logmsg("[OK] {$description} (graceful stop)");
-            return;
+        $deadline = microtime(true) + $waitSeconds;
+        while (true) {
+            exec($probeCommand, $_, $probeStatus);
+            if ($probeStatus !== 0) {
+                if ($signal === 'TERM') {
+                    logmsg("[OK] {$description} (graceful stop)");
+                }
+                return;
+            }
+            if (microtime(true) >= $deadline) {
+                break;
+            }
+            usleep(250000); // back off to avoid busy-looping
         }
-        if (microtime(true) >= $deadline) {
-            break;
-        }
-        usleep(250000); // back off to avoid busy-looping
-    }
-
-    runStep($description.' (SIGKILL)', 'pkill -KILL -x '.escapeshellarg($name));
-
-    $deadline = microtime(true) + 5;
-    while (true) {
-        exec($probeCommand, $_, $probeStatus);
-        if ($probeStatus !== 0) {
-            return;
-        }
-        if (microtime(true) >= $deadline) {
-            break;
-        }
-        usleep(250000); // back off to avoid busy-looping
     }
 
     logmsg("[WARN] {$description} processes linger after SIGKILL");

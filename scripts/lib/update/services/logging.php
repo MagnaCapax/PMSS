@@ -114,8 +114,10 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         $policy['rate_limit_burst']
     ));
 
-    if (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps (test/dry-run)'); return; }
-    if (!is_dir('/run/systemd/system')) { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps (systemd unavailable)'); return; }
+    $skipReason = getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)
+        ? 'test/dry-run'
+        : (!is_dir('/run/systemd/system') ? 'systemd unavailable' : '');
+    if ($skipReason !== '') { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps ('.$skipReason.')'); return; }
     runStep('Restarting systemd-journald to apply log caps', 'systemctl restart systemd-journald');
 }
 
