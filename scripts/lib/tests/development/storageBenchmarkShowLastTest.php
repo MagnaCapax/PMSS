@@ -55,6 +55,22 @@ class StorageBenchmarkShowLastTest extends TestCase
         $this->assertStringContainsString('randread-small', (string)$out);
     }
 
+    public function testShowLastIgnoresExtraIntegerOptionsWhileUsingSharedValueDispatch(): void
+    {
+        $runId  = '20250202020203-int';
+        $runTs  = '2025-02-02T02:02:03Z';
+        $entries = [
+            ['timestamp'=>$runTs,'run_id'=>$runId,'run_ts'=>$runTs,'test'=>'preflight-idle','ok'=>true,'ioping_avg_ms'=>1.0,'iostat_util_pct'=>1.0],
+            ['timestamp'=>$runTs,'run_id'=>$runId,'run_ts'=>$runTs,'test'=>'randread-small','params'=>['rw'=>'randread'],
+             'metrics'=>['read_bw_MBps'=>10,'write_bw_MBps'=>0,'read_iops'=>10,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]],
+        ];
+        $log = $this->writeLog($entries);
+        $script = dirname(__DIR__, 3).'/util/storageBenchmark.php';
+        $out = shell_exec('php '.escapeshellarg($script).' --show-last --runtime=15 --device-runtime 45 --idle-util=70 --json '.escapeshellarg($log).' 2>&1');
+        $this->assertStringContainsString('== Storage benchmark (last run) ==', (string)$out);
+        $this->assertStringContainsString('randread-small', (string)$out);
+    }
+
     public function testShowLastTreatsShortHelpTokenAsJsonPathValue(): void
     {
         $script = dirname(__DIR__, 3).'/util/storageBenchmark.php';

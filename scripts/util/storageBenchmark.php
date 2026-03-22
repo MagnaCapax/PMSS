@@ -76,10 +76,9 @@ $flagOptions = [
     '--require-idle' => 'requireIdle',
     '--show-last' => 'showLast',
 ];
-$argvCount = count($argv);
-for ($i=1; $i<$argvCount; $i++) {
-    $arg = $argv[$i];
-    [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
+$valueOptions = $stringOptions + $intOptions;
+for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
+    [$key, $val] = array_pad(explode('=', $argv[$i], 2), 2, null);
     if ($key === '--help' || $key === '-h') {
         usage(); exit(0);
     }
@@ -87,25 +86,19 @@ for ($i=1; $i<$argvCount; $i++) {
         ${$flagOptions[$key]} = true;
         continue;
     }
-    if (!isset($stringOptions[$key]) && !isset($intOptions[$key])) {
+    if (!isset($valueOptions[$key])) {
         continue;
+    }
+
+    if ($val === null && isset($argv[$i + 1]) && strpos($argv[$i + 1], '--') !== 0) {
+        $val = $argv[++$i];
     }
 
     if ($val === null) {
-        $next = ($i+1 < $argvCount) ? $argv[$i+1] : null;
-        if ($next === null || strpos($next, '--') === 0) {
-            continue;
-        }
-        $val = $next;
-        $i++;
-    }
-
-    if (isset($stringOptions[$key])) {
-        ${$stringOptions[$key]} = $val;
         continue;
     }
 
-    ${$intOptions[$key]} = (int) $val;
+    ${$valueOptions[$key]} = isset($intOptions[$key]) ? (int) $val : $val;
 }
 
 function parseSizeSB(string $s): int { if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }
