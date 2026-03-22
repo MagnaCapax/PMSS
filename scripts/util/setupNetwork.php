@@ -147,7 +147,9 @@ $natCommands = [
 ];
 
 // Ensure kernel forwarding remains enabled for tenant networks.
-file_put_contents('/proc/sys/net/ipv4/ip_forward', '1');
+if (@file_put_contents('/proc/sys/net/ipv4/ip_forward', '1') === false) {
+    logMessage('setupNetwork: unable to enable IPv4 forwarding');
+}
 
 $renderedFilter = array_map(
     function (string $cmd) use ($replacements) { return str_replace(array_keys($replacements), array_values($replacements), $cmd); },
