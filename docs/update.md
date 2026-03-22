@@ -148,8 +148,8 @@ table only tracks external/non-Debian sources.
 | `deluge.php` | Installs or upgrades Deluge; Debian 10 path builds from source, newer releases lean on apt packages. | Debian 10 run pulls PyPI wheels and `https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz`; requires `pip`. |
 | `docker.php` | Sets up rootless Docker (docker-ce, buildx, compose) and enables user namespaces. | Adds Docker APT repo (`https://download.docker.com/linux/debian`), fetches Docker GPG key, and downloads `slirp4netns` from GitHub for Debian 10/11. |
 | `filebot.php` | Ensures FileBot 4.9.4 is installed via dpkg. | Fetches `FileBot_4.9.4_amd64.deb` from `http://pulsedmedia.com/remote/pkg/`. |
-| `firehol.php` | Compiles FireHOL firewall suite when missing. | Downloads `firehol-3.1.6.tar.gz` from `http://pulsedmedia.com/remote/pkg/` and builds under `/root/compile`. |
-| `iprange.php` | Builds `iprange` from source after package stage completes. | Requires `PMSS_PACKAGES_READY` flag and toolchain packages; pulls `iprange-1.0.4.tar.gz` from `http://pulsedmedia.com/remote/pkg/`. |
+| `firehol.php` | Compiles FireHOL firewall suite when missing. | Fetches the pinned `firehol-3.1.8.tar.gz` release from GitHub over HTTPS, verifies SHA256, and builds under `/root/compile`. |
+| `iprange.php` | Builds `iprange` from source after package stage completes. | Requires `PMSS_PACKAGES_READY` flag and toolchain packages; fetches the pinned `iprange-1.0.4.tar.xz` release from GitHub over HTTPS with SHA256 verification. |
 | `mono.php` | Installs Mono runtime and clears legacy Sonarr apt entries on old hosts. | Relies on Debian APT; no external mirrors. |
 | `openvpn.php` | Seeds EasyRSA, server/client configs, and writes client bundles to `/etc/skel/www`. | Debian 8 downloads EasyRSA from GitHub (`https://github.com/OpenVPN/easy-rsa/...`); expects templates `template.openvpn.*`. |
 | `pyload.php` | Creates `/opt/pyload` venv and installs `pyload-ng`. | Installs deps via apt then uses pip (PyPI) inside the venv; honours `PMSS_DISTRO_VERSION`. |
@@ -158,7 +158,7 @@ table only tracks external/non-Debian sources.
 | `rclone.php` | Pins or updates rclone binary and man page. | Downloads from `https://downloads.rclone.org/`; optional latest check hits `https://rclone.org/downloads/`; honours `PMSS_RCLONE_FETCH_LATEST`. |
 | `rtorrent.php` | Rebuilds rTorrent/libtorrent (plus xmlrpc-c), refreshes templates, restarts daemons. | Fetches tarballs from `http://pulsedmedia.com/remote/pkg/`, checks out xmlrpc-c via SourceForge SVN; needs build toolchain. |
 | `sonarr.php` | Installs latest Sonarr under `/opt/Sonarr` and records version metadata. | Uses GitHub Releases API (`https://api.github.com/repos/Sonarr/Sonarr`); removes legacy apt repo artifacts. |
-| `syncthing.php` | Ensures syncthing binary matches pinned version. | Downloads binary from `http://pulsedmedia.com/remote/pkg/` into `/usr/bin`. |
+| `syncthing.php` | Ensures syncthing binary matches the pinned amd64 release. | Fetches the pinned upstream tarball from GitHub over HTTPS, verifies SHA256, and installs `syncthing` into `/usr/bin`. |
 | `vnstat.php` | Installs/configures vnStat for the detected uplink. | Uses Debian APT; depends on `scripts/lib/networkInfo.php` for interface info. |
 | `watchdog.php` | Disables and removes the distro watchdog daemon. | APT operations only; no external downloads. |
 | `wireguard.php` | Generates WireGuard keys/configs, publishes README, distributes to user homes. | Requires `wg` binaries (from package phase), templates `template.wireguard.*`, and queries `https://pulsedmedia.com/remote/myip.php` for endpoint detection. |

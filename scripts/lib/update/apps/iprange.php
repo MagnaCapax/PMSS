@@ -7,6 +7,12 @@
  */
 
 require_once __DIR__.'/packages/helpers.php';
+require_once __DIR__.'/remoteBinary.php';
+
+$iprangeVersion = '1.0.4';
+$iprangeArchive = 'iprange-'.$iprangeVersion.'.tar.xz';
+$iprangeUrl = 'https://github.com/firehol/iprange/releases/download/v'.$iprangeVersion.'/'.$iprangeArchive;
+$iprangeSha256 = 'f21aed906da1bd8e4586f981421f79c406a7c8c2efbcf15f268f7d9176148be6';
 
 if (empty($GLOBALS['PMSS_PACKAGES_READY'])) {
     logmsg('[WARN] Skipping iprange build: package phase not complete');
@@ -26,15 +32,24 @@ if (!empty($missing)) {
     return;
 }
 
-runStep('Building iprange from source', implode(' && ', [
-    'set -e',
-    'mkdir -p /root/compile',
-    'cd /root/compile',
-    'rm -rf iprange-1.0.4 iprange-1.0.4.tar.gz',
-    'wget http://pulsedmedia.com/remote/pkg/iprange-1.0.4.tar.gz -O iprange-1.0.4.tar.gz',
-    'tar -xzf iprange-1.0.4.tar.gz',
-    'cd iprange-1.0.4',
-    './configure',
-    'make -j6',
-    'make install'
-]));
+$archivePath = pmssFetchPinnedRemoteFile('iprange '.$iprangeVersion.' source', $iprangeUrl, $iprangeSha256);
+if (!is_string($archivePath) || $archivePath === '') {
+    return;
+}
+
+try {
+    runStep('Building iprange from source', implode(' && ', [
+        'set -e',
+        'mkdir -p /root/compile',
+        'cd /root/compile',
+        'rm -rf '.escapeshellarg('iprange-'.$iprangeVersion).' '.escapeshellarg($iprangeArchive),
+        'cp '.escapeshellarg($archivePath).' '.escapeshellarg($iprangeArchive),
+        'tar -xJf '.escapeshellarg($iprangeArchive),
+        'cd '.escapeshellarg('iprange-'.$iprangeVersion),
+        './configure',
+        'make -j6',
+        'make install'
+    ]));
+} finally {
+    @unlink($archivePath);
+}

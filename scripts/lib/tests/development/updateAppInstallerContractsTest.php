@@ -72,8 +72,11 @@ class UpdateAppInstallerContractsTest extends TestCase
     {
         $contents = $this->readInstaller('iprange.php');
 
+        $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
+        $this->assertStringContainsString("pmssFetchPinnedRemoteFile('iprange '.\$iprangeVersion.' source'", $contents);
+        $this->assertStringContainsString('https://github.com/firehol/iprange/releases/download/v', $contents);
         $this->assertStringContainsString("runStep('Building iprange from source'", $contents);
-        $this->assertStringContainsString('wget http://pulsedmedia.com/remote/pkg/iprange-1.0.4.tar.gz -O iprange-1.0.4.tar.gz', $contents);
+        $this->assertStringContainsString('tar -xJf', $contents);
         $this->assertStringContainsString('make -j6', $contents);
         $this->assertStringContainsString('make install', $contents);
     }
@@ -82,10 +85,25 @@ class UpdateAppInstallerContractsTest extends TestCase
     {
         $contents = $this->readInstaller('syncthing.php');
 
-        $this->assertStringContainsString('syncthing -version 2>/dev/null', $contents);
-        $this->assertStringContainsString('v1.18.2 "Fermium Flea"', $contents);
-        $this->assertStringContainsString('http://pulsedmedia.com/remote/pkg/syncthing', $contents);
-        $this->assertStringContainsString('chmod 755 /usr/bin/syncthing', $contents);
+        $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
+        $this->assertStringContainsString("syncthing version 2>/dev/null", $contents);
+        $this->assertStringContainsString("['x86_64', 'amd64']", $contents);
+        $this->assertStringContainsString('https://github.com/syncthing/syncthing/releases/download/', $contents);
+        $this->assertStringContainsString('syncthing-linux-amd64-', $contents);
+        $this->assertStringContainsString("runStep('Installing Syncthing binary'", $contents);
+        $this->assertStringContainsString('install -m 0755', $contents);
+    }
+
+    public function testFireholInstallerKeepsPinnedSourceBuild(): void
+    {
+        $contents = $this->readInstaller('firehol.php');
+
+        $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
+        $this->assertStringContainsString('https://github.com/firehol/firehol/releases/download/v', $contents);
+        $this->assertStringContainsString("pmssFetchPinnedRemoteFile('FireHOL '.\$fireholVersion.' source'", $contents);
+        $this->assertStringContainsString("runStep('Building FireHOL from source'", $contents);
+        $this->assertStringContainsString('tar -xzf', $contents);
+        $this->assertStringContainsString('./configure', $contents);
     }
 
     public function testRcloneInstallerKeepsLatestFetchAndRelocationGuards(): void
