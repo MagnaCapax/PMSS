@@ -1,6 +1,7 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/TrafficTestCase.php';
 require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
 class StubTrafficStatistics extends \trafficStatistics
@@ -35,7 +36,7 @@ class SpyTrafficStatsProcessor extends \TrafficStatsProcessor
     }
 }
 
-class TrafficStatsProcessorTest extends TestCase
+class TrafficStatsProcessorTest extends TrafficTestCase
 {
     public function testSanitizeUser(): void
     {
@@ -194,23 +195,11 @@ class TrafficStatsProcessorTest extends TestCase
 
     private function makePaths(): array
     {
-        $root = sys_get_temp_dir().'/pmss-traffic-'.bin2hex(random_bytes(4));
-        $paths = [
-            'traffic_dir' => $root.'/traffic',
-            'home_dir'    => $root.'/home',
-            'runtime_dir' => $root.'/run',
-            'passwd_file' => $root.'/passwd',
-        ];
-        @mkdir($paths['traffic_dir'], 0755, true);
-        @mkdir($paths['home_dir'], 0755, true);
-        @mkdir($paths['runtime_dir'], 0755, true);
-        file_put_contents($paths['passwd_file'], "alice:x:1000:1000::{$paths['home_dir']}/alice:/bin/bash\n");
-        return $paths;
+        return $this->makeTrafficPaths('pmss-traffic-', true);
     }
 
     private function createUserFixtures(array $paths, string $user): void
     {
-        file_put_contents($paths['traffic_dir'].'/'.$user, 'seed');
-        @mkdir($paths['home_dir'].'/'.$user, 0755, true);
+        $this->createTrafficUser($paths, $user);
     }
 }

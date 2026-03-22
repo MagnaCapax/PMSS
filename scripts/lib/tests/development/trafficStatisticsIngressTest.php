@@ -1,28 +1,19 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/TrafficTestCase.php';
 require_once dirname(__DIR__, 2).'/traffic.php';
 
-class TrafficStatisticsIngressTest extends TestCase
+class TrafficStatisticsIngressTest extends TrafficTestCase
 {
     private function makePaths(): array
     {
-        $root = sys_get_temp_dir().'/pmss-traffic-'.bin2hex(random_bytes(4));
-        $paths = [
-            'traffic_dir' => $root.'/traffic',
-            'home_dir'    => $root.'/home',
-            'runtime_dir' => $root.'/run',
-        ];
-        @mkdir($paths['traffic_dir'], 0755, true);
-        @mkdir($paths['home_dir'], 0755, true);
-        @mkdir($paths['runtime_dir'], 0755, true);
-        return $paths;
+        return $this->makeTrafficPaths();
     }
 
     private function makeUser(array $paths, string $user): void
     {
-        @mkdir($paths['home_dir'].'/'.$user, 0755, true);
+        $this->createTrafficUser($paths, $user, false);
     }
 
     public function testGetDataUsesCustomTrafficDir(): void

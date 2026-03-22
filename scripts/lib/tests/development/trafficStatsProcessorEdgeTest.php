@@ -1,6 +1,7 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/TrafficTestCase.php';
 require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
 class StubTrafficStatisticsEdge extends \trafficStatistics
@@ -19,7 +20,7 @@ class StubTrafficStatisticsEdge extends \trafficStatistics
     }
 }
 
-class TrafficStatsProcessorEdgeTest extends TestCase
+class TrafficStatsProcessorEdgeTest extends TrafficTestCase
 {
     public function testProcessUserIgnoresErroneousLines(): void
     {
@@ -55,43 +56,16 @@ class TrafficStatsProcessorEdgeTest extends TestCase
 
     private function makePaths(): array
     {
-        $root = sys_get_temp_dir().'/pmss-traffic-edge-'.bin2hex(random_bytes(4));
-        $paths = [
-            'traffic_dir' => $root.'/traffic',
-            'home_dir'    => $root.'/home',
-            'runtime_dir' => $root.'/run',
-            'passwd_file' => $root.'/passwd',
-        ];
-        @mkdir($paths['traffic_dir'], 0755, true);
-        @mkdir($paths['home_dir'], 0755, true);
-        @mkdir($paths['runtime_dir'], 0755, true);
-        file_put_contents($paths['passwd_file'], "alice:x:1000:1000::{$paths['home_dir']}/alice:/bin/bash\n");
-        return $paths;
+        return $this->makeTrafficPaths('pmss-traffic-edge-', true);
     }
 
     private function createUserFixtures(array $paths, string $user): void
     {
-        file_put_contents($paths['traffic_dir'].'/'.$user, 'seed');
-        @mkdir($paths['home_dir'].'/'.$user, 0755, true);
+        $this->createTrafficUser($paths, $user);
     }
 
     private function cleanupPaths(array $paths): void
     {
-        $root = dirname($paths['traffic_dir']);
-        if (!file_exists($root)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-        @rmdir($root);
+        $this->cleanupTrafficPaths($paths);
     }
 }

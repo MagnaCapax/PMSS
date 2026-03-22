@@ -33,8 +33,8 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
     }
     $unit = sprintf('user-%d.slice', $uid);
     $cmd = 'systemctl show '.escapeshellarg($unit).' -p IPIngressBytes -p IPEgressBytes';
-    $out = @shell_exec($cmd);
-    if (!is_string($out) || trim($out) === '') {
+    $out = trim((string) @shell_exec($cmd));
+    if ($out === '') {
         return null;
     }
     $ingress = null;

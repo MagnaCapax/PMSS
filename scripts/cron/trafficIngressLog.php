@@ -20,8 +20,7 @@ if (!pmssTrafficIngressEnsureDir($logDir, 0755) || !pmssTrafficIngressEnsureDir(
     exit(1);
 }
 
-$usersRaw = trim((string) @shell_exec('/scripts/listUsers.php'));
-$users = array_filter(explode("\n", $usersRaw));
+$users = array_filter(explode("\n", trim((string) @shell_exec('/scripts/listUsers.php'))));
 if (empty($users)) {
     exit(0);
 }

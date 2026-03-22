@@ -8,9 +8,7 @@ class TrafficIngressHelpersTest extends TestCase
 {
     private function makeRoot(): string
     {
-        $root = sys_get_temp_dir().'/pmss-ingress-'.bin2hex(random_bytes(4));
-        @mkdir($root, 0700, true);
-        return $root;
+        return $this->pmssMakeTempDir('pmss-ingress-', 0700);
     }
 
     public function testEnsureDirRejectsRelative(): void

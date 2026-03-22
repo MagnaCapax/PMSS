@@ -91,23 +91,21 @@ function pmssReadTorrentThrottle(string $username): ?int
         return null;
     }
 
-    $mode = $stats['mode'] & 0777;
-    if (($mode & 0022) !== 0) { // group/other writable
+    if (($stats['mode'] & 0022) !== 0) { // group/other writable
         return null;
     }
 
-    $testMode = getenv('PMSS_TEST_MODE') === '1';
-    if (!$testMode) {
+    if (getenv('PMSS_TEST_MODE') !== '1') {
         if ((int) $stats['uid'] !== 0) {
             return null;
         }
         if (function_exists('posix_getgrgid')) {
             $group = @posix_getgrgid((int) $stats['gid']);
-            if (is_array($group) && isset($group['name'])) {
-                $groupName = $group['name'];
-                if ($groupName !== 'root' && $groupName !== $username) {
-                    return null;
-                }
+            if (is_array($group) && isset($group['name'])
+                && $group['name'] !== 'root'
+                && $group['name'] !== $username
+            ) {
+                return null;
             }
         }
     }
@@ -132,15 +130,12 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
         return false;
     }
 
-    if ($value <= 0) {
-        if (is_link($path)) {
-            return false;
-        }
-        return !is_file($path) || @unlink($path);
-    }
-
     if (is_link($path)) {
         return false;
+    }
+
+    if ($value <= 0) {
+        return !is_file($path) || @unlink($path);
     }
 
     $tmp = $path.'.tmp';
