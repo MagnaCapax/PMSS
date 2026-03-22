@@ -44,12 +44,19 @@ putenv('PMSS_APT_KEYRING_DIR='.$aptKeyring);
 define('PMSS_TEST_MODE', true);
 require_once dirname(__DIR__, 3).'/update.php';
 
-foreach (glob(__DIR__.'/*Test.php') as $testFile) {
+$testFiles = glob(__DIR__.'/*Test.php') ?: [];
+$repoRoot = dirname(__DIR__, 4);
+$listed = trim((string) @shell_exec('git -C '.escapeshellarg($repoRoot).' ls-files -- '.escapeshellarg(':(glob)scripts/lib/tests/development/*Test.php').' 2>/dev/null'));
+if ($listed !== '' && ($tracked = array_values(array_filter(array_map(static function (string $path) use ($repoRoot): string { return $repoRoot.'/'.$path; }, preg_split('/\r?\n/', $listed) ?: []), 'is_file'))) !== []) {
+    $testFiles = $tracked;
+}
+
+foreach ($testFiles as $testFile) {
     require_once $testFile;
 }
 
 $classes = array_filter(get_declared_classes(), static function ($class) {
-    return is_subclass_of($class, TestCase::class);
+    return is_subclass_of($class, TestCase::class) && !(new \ReflectionClass($class))->isAbstract();
 });
 
 $total = 0;
