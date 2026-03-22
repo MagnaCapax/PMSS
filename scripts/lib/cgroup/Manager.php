@@ -70,6 +70,11 @@ class Manager
             }
         }
 
+        if (($invalidMessage = $this->validateFlagOptions($opt)) !== null) {
+            fwrite(STDERR, $invalidMessage."\n");
+            return 2;
+        }
+
         // Defaults policy
         if (in_array('--defaults', $flags, true)) {
             $policyIoPairs = $this->applyDefaults($opt);
@@ -103,10 +108,20 @@ class Manager
             foreach ($flags as $f) {
                 if (strpos($f, '--'.$flag.'=') === 0) {
                     $spec = substr($f, strlen('--'.$flag.'='));
-                    $ioPairs[] = $prop.'='.str_replace(':',' ', $spec);
+                    $parsedIoPair = $this->parseIoPropertyPair($prop, $spec);
+                    if ($parsedIoPair === null) {
+                        fwrite(STDERR, 'Invalid --'.$flag.' specification: '.$spec."\n");
+                        return 2;
+                    }
+                    $ioPairs[] = $parsedIoPair;
                     $hasIoFlag = true;
                 }
             }
+        }
+
+        if ($device !== '' && preg_match('/\s/', $device) === 1) {
+            fwrite(STDERR, "Invalid --device value: whitespace is not allowed\n");
+            return 2;
         }
 
         // IO Profile
@@ -156,13 +171,24 @@ class Manager
             if ($apply && !$dryRun) {
                 $this->sys->requireRoot();
                 if ($doWipe) {
-                    \runStep('Reverting user slice', 'systemctl revert '.escapeshellarg($slice).' || true');
-                    \runStep('Unlimiting core properties', 'systemctl set-property '.escapeshellarg($slice).' MemoryHigh=infinity MemoryMax=infinity TasksMax=infinity CPUWeight=100 IOWeight=100');
+                    \runStep('Reverting user slice', \pmssBuildCommand('systemctl', ['revert', $slice]).' || true');
+                    \runStep(
+                        'Unlimiting core properties',
+                        \pmssBuildCommand('systemctl', [
+                            'set-property',
+                            $slice,
+                            'MemoryHigh=infinity',
+                            'MemoryMax=infinity',
+                            'TasksMax=infinity',
+                            'CPUWeight=100',
+                            'IOWeight=100',
+                        ])
+                    );
                 } else {
                     $pairs = [];
                     foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
                     $allPairs = array_merge($pairs, $ioPairs);
-                    $cmd = 'systemctl set-property '.escapeshellarg($slice).' '.implode(' ', $allPairs);
+                    $cmd = \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs));
                     \runStep('Applying cgroup properties', $cmd);
                 }
             } else {
@@ -236,6 +262,41 @@ class Manager
         }
 
         return $props;
+    }
+
+    /**
+     * Reject malformed CLI values before they reach systemctl.
+     */
+    private function validateFlagOptions(array $opt): ?string
+    {
+        foreach (['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max'] as $key) {
+            if (isset($opt[$key]) && preg_match('/^-?[0-9]+$/', (string)$opt[$key]) !== 1) {
+                return 'Invalid --'.$key.' value: expected integer';
+            }
+        }
+
+        if (!isset($opt['cpu-quota-percent'])) {
+            return null;
+        }
+
+        $quota = (string)$opt['cpu-quota-percent'];
+        if (strtolower($quota) === 'infinity' || preg_match('/^-?[0-9]+$/', $quota) === 1) {
+            return null;
+        }
+
+        return 'Invalid --cpu-quota-percent value: expected integer or infinity';
+    }
+
+    /**
+     * Convert explicit IO throttle input into a validated systemd property pair.
+     */
+    private function parseIoPropertyPair(string $propertyName, string $spec): ?string
+    {
+        if (preg_match('/^([^:\s]+):([^\s]+)$/', trim($spec), $matches) !== 1) {
+            return null;
+        }
+
+        return $propertyName.'='.$matches[1].' '.$matches[2];
     }
 
     /**

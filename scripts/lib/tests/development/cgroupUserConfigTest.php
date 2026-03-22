@@ -200,6 +200,49 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString('CPUQuota=200%', $res['out']);
     }
 
+    public function testRejectsInvalidCpuWeightValue()
+    {
+        $res = $this->runMgr(['testuser', '--cpu-weight=abc']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
+    public function testRejectsDecimalMemoryHighValue()
+    {
+        $res = $this->runMgr(['testuser', '--memory-high=12.5']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
+    public function testRejectsInvalidCpuQuotaValue()
+    {
+        $res = $this->runMgr(['testuser', '--cpu-quota-percent=fast']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
+    public function testRejectsMalformedIoBandwidthSpec()
+    {
+        $res = $this->runMgr(['testuser', '--io-read-bw=/dev/sda']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
+    public function testRejectsWhitespaceInDeviceValue()
+    {
+        $res = $this->runMgr(['testuser', '--device=/dev/sda bad', '--io-profile=hdd']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
+    public function testApplyBuildsShellSafeIoPropertyArguments()
+    {
+        putenv('PMSS_DRY_RUN=1');
+        try {
+            $res = $this->runMgr(['testuser', '--apply', '--io-read-bw=/dev/sda:5M']);
+        } finally {
+            putenv('PMSS_DRY_RUN');
+        }
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString("'IOReadBandwidthMax=/dev/sda 5M'", $res['out']);
+    }
+
     // -- Profile Tests --
 
     public function testCpuProfileLow()
