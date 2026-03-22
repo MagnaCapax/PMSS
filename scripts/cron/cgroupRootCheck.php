@@ -14,12 +14,11 @@
 // so the main flow reads as detect → decide → apply. Add dry-run toggle.
 
 require_once __DIR__.'/../lib/logger.php';
+require_once __DIR__.'/../lib/systemdSliceProperties.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 $fixes = [];
-foreach (['MemoryHigh', 'MemoryMax', 'TasksMax'] as $prop) {
-    $output = trim((string) @shell_exec('systemctl show user-0.slice -p '.$prop.' 2>/dev/null'));
-    $value = (string) (explode('=', $output, 2)[1] ?? $output);
+foreach (pmssReadSystemdProperties('user-0.slice', ['MemoryHigh', 'MemoryMax', 'TasksMax']) as $prop => $value) {
     if ($value !== '' && strtolower($value) !== 'infinity') {
         $fixes[] = $prop.'=infinity';
     }

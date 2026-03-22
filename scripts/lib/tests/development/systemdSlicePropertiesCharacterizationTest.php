@@ -36,10 +36,10 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
 
     public function testTrailingIntRejectsUnsetInfinityAndZero(): void
     {
-        $this->assertNull(\pmssSystemdPropertyTrailingInt(''));
-        $this->assertNull(\pmssSystemdPropertyTrailingInt('infinity'));
-        $this->assertNull(\pmssSystemdPropertyTrailingInt('[not set]'));
-        $this->assertNull(\pmssSystemdPropertyTrailingInt('0'));
+        $this->assertEquals(null, \pmssSystemdPropertyTrailingInt(''));
+        $this->assertEquals(null, \pmssSystemdPropertyTrailingInt('infinity'));
+        $this->assertEquals(null, \pmssSystemdPropertyTrailingInt('[not set]'));
+        $this->assertEquals(null, \pmssSystemdPropertyTrailingInt('0'));
     }
 
     public function testCpuQuotaPercentPrefersDirectPercent(): void
@@ -65,6 +65,6 @@ class SystemdSlicePropertiesCharacterizationTest extends TestCase
             'CPUQuotaPeriodUSec' => '',
         ]);
 
-        $this->assertNull($quota);
+        $this->assertEquals(null, $quota);
     }
 }

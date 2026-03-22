@@ -10,7 +10,10 @@ class RootGuardCliTest extends TestCase
         $dir = sys_get_temp_dir().'/pmss-stub-'.bin2hex(random_bytes(4));
         @mkdir($dir, 0755, true);
         $bin = $dir.'/systemctl';
-        $script = "#!/usr/bin/env bash\nset -e\nif [[ \"$1\" == show && \"$2\" == user-0.slice ]]; then\n  if [[ \"$3\" == -p && \"$4\" == MemoryHigh ]]; then echo 'MemoryHigh=".$responses['MemoryHigh']."'; exit 0; fi\n  if [[ \"$3\" == -p && \"$4\" == MemoryMax ]]; then echo 'MemoryMax=".$responses['MemoryMax']."'; exit 0; fi\n  if [[ \"$3\" == -p && \"$4\" == TasksMax ]]; then echo 'TasksMax=".$responses['TasksMax']."'; exit 0; fi\nfi\nif [[ \"$1\" == set-property ]]; then exit 0; fi\nexit 0\n";
+        $script = "#!/usr/bin/env bash\nset -e\nif [[ \"$1\" == show && \"$2\" == user-0.slice ]]; then\n  shift 2\n  while [[ $# -gt 1 ]]; do\n    if [[ \"$1\" == -p ]]; then\n      key=\"$2\"\n      case \"\$key\" in\n        MemoryHigh) echo 'MemoryHigh=".$responses['MemoryHigh']."' ;;
+        MemoryMax) echo 'MemoryMax=".$responses['MemoryMax']."' ;;
+        TasksMax) echo 'TasksMax=".$responses['TasksMax']."' ;;
+      esac\n      shift 2\n      continue\n    fi\n    shift\n  done\n  exit 0\nfi\nif [[ \"$1\" == set-property ]]; then exit 0; fi\nexit 0\n";
         file_put_contents($bin, $script);
         @chmod($bin, 0755);
         return $dir;
