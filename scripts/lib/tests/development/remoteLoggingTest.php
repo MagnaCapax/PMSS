@@ -18,14 +18,10 @@ class RemoteLoggingTest extends TestCase
         $messages = [];
 
         try {
-            $this->withEnv([
+            $this->runRemoteLogging([
                 'PMSS_CONFIG_DIR' => $cfgDir,
                 'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
-            ], function () use (&$messages): void {
-                \pmssApplyRemoteLogging(function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                });
-            });
+            ], $messages);
 
             $this->assertTrue(!file_exists($targetDir.'/50-pmss-remote.conf'), 'unexpected remote logging config created');
             $this->assertEquals([], $messages);
@@ -46,14 +42,10 @@ class RemoteLoggingTest extends TestCase
         file_put_contents($target, "*.* @@old.example:514\n");
 
         try {
-            $this->withEnv([
+            $this->runRemoteLogging([
                 'PMSS_CONFIG_DIR' => $cfgDir,
                 'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
-            ], function () use (&$messages): void {
-                \pmssApplyRemoteLogging(function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                });
-            });
+            ], $messages);
 
             $this->assertTrue(!file_exists($target), 'stale remote logging config should be removed');
             $this->assertTrue($this->messagesContain($messages, 'Removed remote logging config (disabled)'), 'expected removal log');
@@ -75,14 +67,10 @@ class RemoteLoggingTest extends TestCase
         file_put_contents($target, "*.* @@old.example:514\n");
 
         try {
-            $this->withEnv([
+            $this->runRemoteLogging([
                 'PMSS_CONFIG_DIR' => $cfgDir,
                 'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
-            ], function () use (&$messages): void {
-                \pmssApplyRemoteLogging(function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                });
-            });
+            ], $messages);
 
             $this->assertTrue(!file_exists($target), 'invalid config should remove stale forwarding file');
             $this->assertTrue($this->messagesContain($messages, 'Remote logging enabled but invalid: Remote host not configured'), 'expected invalid-config warning');
@@ -114,14 +102,10 @@ class RemoteLoggingTest extends TestCase
         ]));
 
         try {
-            $this->withEnv([
+            $this->runRemoteLogging([
                 'PMSS_CONFIG_DIR' => $cfgDir,
                 'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
-            ], function () use (&$messages): void {
-                \pmssApplyRemoteLogging(function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                });
-            });
+            ], $messages);
 
             $this->assertTrue(file_exists($target), 'expected rendered remote logging config');
             $rendered = (string) file_get_contents($target);
@@ -147,14 +131,10 @@ class RemoteLoggingTest extends TestCase
         ]));
 
         try {
-            $this->withEnv([
+            $this->runRemoteLogging([
                 'PMSS_CONFIG_DIR' => $cfgDir,
                 'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
-            ], function () use (&$messages): void {
-                \pmssApplyRemoteLogging(function (string $message) use (&$messages): void {
-                    $messages[] = $message;
-                });
-            });
+            ], $messages);
 
             $this->assertTrue(!file_exists($targetDir.'/50-pmss-remote.conf'), 'target config should not be created without a template');
             $this->assertTrue($this->messagesContain($messages, 'Remote logging template missing'), 'expected missing-template warning');
@@ -171,27 +151,28 @@ class RemoteLoggingTest extends TestCase
         return $dir;
     }
 
+    private function runRemoteLogging(array $values, array &$messages): void
+    {
+        $this->withEnv($values, function () use (&$messages): void {
+            \pmssApplyRemoteLogging(function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            });
+        });
+    }
+
     private function withEnv(array $values, callable $callback): void
     {
         $previous = [];
         foreach ($values as $key => $value) {
             $previous[$key] = getenv($key);
-            if ($value === null) {
-                putenv($key);
-                continue;
-            }
-            putenv($key.'='.$value);
+            putenv($value === null ? $key : $key.'='.$value);
         }
 
         try {
             $callback();
         } finally {
             foreach ($previous as $key => $value) {
-                if ($value === false) {
-                    putenv($key);
-                    continue;
-                }
-                putenv($key.'='.$value);
+                putenv($value === false ? $key : $key.'='.$value);
             }
         }
     }

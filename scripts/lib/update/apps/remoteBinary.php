@@ -14,6 +14,12 @@
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
 
+function pmssPinnedRemoteChecksum(string $path): string
+{
+    $checksum = @hash_file('sha256', $path);
+    return is_string($checksum) ? strtolower($checksum) : '';
+}
+
 /**
  * Fetch a pinned remote file to a temporary path after HTTPS + SHA256 checks.
  *
@@ -29,6 +35,7 @@ function pmssFetchPinnedRemoteFile(
     string $url,
     string $expectedSha256
 ): ?string {
+    $expectedSha256 = strtolower($expectedSha256);
     if (strpos($url, 'https://') !== 0) {
         logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
         return null;
@@ -50,8 +57,8 @@ function pmssFetchPinnedRemoteFile(
         return null;
     }
 
-    $actualSha = @hash_file('sha256', $tmp);
-    if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
+    $actualSha = pmssPinnedRemoteChecksum($tmp);
+    if ($actualSha === '' || $actualSha !== $expectedSha256) {
         logmsg("[WARN] {$label} checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')');
         @unlink($tmp);
         return null;
@@ -79,12 +86,12 @@ function pmssInstallPinnedRemoteBinary(
     string $destination,
     bool $refreshWhenPresent
 ): void {
+    $expectedSha256 = strtolower($expectedSha256);
     if (is_file($destination)) {
         if (!$refreshWhenPresent) {
             return;
         }
-        $installedSha = @hash_file('sha256', $destination);
-        if (is_string($installedSha) && strtolower($installedSha) === strtolower($expectedSha256)) {
+        if (pmssPinnedRemoteChecksum($destination) === $expectedSha256) {
             logmsg("[SKIP] {$label} already matches pinned checksum; skipping refresh");
             return;
         }
@@ -113,6 +120,7 @@ function pmssInstallPinnedRemoteDebPackage(
     string $url,
     string $expectedSha256
 ): bool {
+    $expectedSha256 = strtolower($expectedSha256);
     if (strpos($url, 'https://') !== 0) {
         logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
         return false;
@@ -130,8 +138,8 @@ function pmssInstallPinnedRemoteDebPackage(
 
         if (getenv('PMSS_DRY_RUN') === '1') { return true; }
 
-        $actualSha = @hash_file('sha256', $tmp);
-        if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
+        $actualSha = pmssPinnedRemoteChecksum($tmp);
+        if ($actualSha === '' || $actualSha !== $expectedSha256) {
             logmsg("[WARN] {$label} package checksum mismatch; refusing install (expected {$expectedSha256}, got ".($actualSha ?: 'unknown').')'); return false;
         }
 

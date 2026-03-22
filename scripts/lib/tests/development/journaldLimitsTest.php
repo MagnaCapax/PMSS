@@ -23,6 +23,23 @@ class JournaldLimitsTest extends TestCase
         return $dir;
     }
 
+    private function withEnv(array $values, callable $callback): void
+    {
+        $previous = [];
+        foreach ($values as $key => $value) {
+            $previous[$key] = getenv($key);
+            putenv($value === null ? $key : $key.'='.$value);
+        }
+
+        try {
+            $callback();
+        } finally {
+            foreach ($previous as $key => $value) {
+                putenv($value === false ? $key : $key.'='.$value);
+            }
+        }
+    }
+
     public function testSmallRootUsesTwentyPercent(): void
     {
         $rootBytes = $this->gib(20);
@@ -85,21 +102,13 @@ class JournaldLimitsTest extends TestCase
             ."RateLimitBurst=%%PMSS_JOURNALD_RATE_LIMIT_BURST%%\n";
         file_put_contents($template, $tplBody);
 
-        $prevConfig = getenv('PMSS_CONFIG_DIR');
-        $prevJournald = getenv('PMSS_JOURNALD_CONF_DIR');
-        $prevRoot = getenv('PMSS_ROOT_FS_BYTES');
-
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_JOURNALD_CONF_DIR='.$targetDir);
-        putenv('PMSS_ROOT_FS_BYTES='.(string)$this->gib(10));
-
-        try {
+        $this->withEnv([
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_JOURNALD_CONF_DIR' => $targetDir,
+            'PMSS_ROOT_FS_BYTES' => (string) $this->gib(10),
+        ], function (): void {
             \pmssApplyJournaldLimits();
-        } finally {
-            if ($prevConfig === false) { putenv('PMSS_CONFIG_DIR'); } else { putenv('PMSS_CONFIG_DIR='.$prevConfig); }
-            if ($prevJournald === false) { putenv('PMSS_JOURNALD_CONF_DIR'); } else { putenv('PMSS_JOURNALD_CONF_DIR='.$prevJournald); }
-            if ($prevRoot === false) { putenv('PMSS_ROOT_FS_BYTES'); } else { putenv('PMSS_ROOT_FS_BYTES='.$prevRoot); }
-        }
+        });
 
         $target = $targetDir.'/pmss-limits.conf';
         $this->assertTrue(file_exists($target), 'Journald limits file missing');
@@ -119,24 +128,14 @@ class JournaldLimitsTest extends TestCase
         $targetDir = $this->tempDir('journald');
         file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
 
-        $prevConfig = getenv('PMSS_CONFIG_DIR');
-        $prevJournald = getenv('PMSS_JOURNALD_CONF_DIR');
-        $prevRoot = getenv('PMSS_ROOT_FS_BYTES');
-        $prevDryRun = getenv('PMSS_DRY_RUN');
-
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_JOURNALD_CONF_DIR='.$targetDir);
-        putenv('PMSS_ROOT_FS_BYTES='.(string) $this->gib(10));
-        putenv('PMSS_DRY_RUN=1');
-
-        try {
+        $this->withEnv([
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_JOURNALD_CONF_DIR' => $targetDir,
+            'PMSS_ROOT_FS_BYTES' => (string) $this->gib(10),
+            'PMSS_DRY_RUN' => '1',
+        ], function (): void {
             \pmssApplyJournaldLimits();
-        } finally {
-            if ($prevConfig === false) { putenv('PMSS_CONFIG_DIR'); } else { putenv('PMSS_CONFIG_DIR='.$prevConfig); }
-            if ($prevJournald === false) { putenv('PMSS_JOURNALD_CONF_DIR'); } else { putenv('PMSS_JOURNALD_CONF_DIR='.$prevJournald); }
-            if ($prevRoot === false) { putenv('PMSS_ROOT_FS_BYTES'); } else { putenv('PMSS_ROOT_FS_BYTES='.$prevRoot); }
-            if ($prevDryRun === false) { putenv('PMSS_DRY_RUN'); } else { putenv('PMSS_DRY_RUN='.$prevDryRun); }
-        }
+        });
 
         $target = $targetDir.'/pmss-limits.conf';
         $this->assertTrue(file_exists($target), 'Journald limits file missing in dry-run');

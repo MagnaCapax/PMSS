@@ -17,6 +17,21 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../../runtime.php';
 
+function pmssLoggingRestartSkipReason(): string
+{
+    if (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) { return 'test/dry-run'; }
+    return is_dir('/run/systemd/system') ? '' : 'systemd unavailable';
+}
+
+function pmssWriteManagedConfigFile(string $target, string $contents, string $label, callable $logger): bool
+{
+    $tmpTarget = $target.'.tmp';
+    if (@file_put_contents($tmpTarget, $contents) === false) { $logger('[WARN] Unable to write '.$label.': '.$tmpTarget); return false; }
+    @chmod($tmpTarget, 0644);
+    if (@rename($tmpTarget, $target)) { return true; }
+    $logger('[WARN] Unable to install '.$label.': '.$target); @unlink($tmpTarget); return false;
+}
+
 /**
  * Compute journald caps based on root filesystem size.
  *
@@ -95,14 +110,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
     }
 
     $target = $targetDir.'/pmss-limits.conf';
-    if (@file_put_contents($tmpTarget = $target.'.tmp', $raw) === false) {
-        $log('[WARN] Unable to write journald limits: '.$tmpTarget);
-        return;
-    }
-    @chmod($tmpTarget, 0644);
-    if (!@rename($tmpTarget, $target)) {
-        $log('[WARN] Unable to install journald limits: '.$target);
-        @unlink($tmpTarget);
+    if (!pmssWriteManagedConfigFile($target, $raw, 'journald limits', $log)) {
         return;
     }
 
@@ -114,9 +122,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         $policy['rate_limit_burst']
     ));
 
-    $skipReason = getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)
-        ? 'test/dry-run'
-        : (!is_dir('/run/systemd/system') ? 'systemd unavailable' : '');
+    $skipReason = pmssLoggingRestartSkipReason();
     if ($skipReason !== '') { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps ('.$skipReason.')'); return; }
     runStep('Restarting systemd-journald to apply log caps', 'systemctl restart systemd-journald');
 }
@@ -135,11 +141,10 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
     $template = $cfgDir.'/template.rsyslog-remote.conf';
     $targetDir = pmssResolvePathFromEnv('PMSS_RSYSLOG_CONF_DIR', '/etc/rsyslog.d');
     $target = $targetDir.'/50-pmss-remote.conf';
-    $skipRestart = getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true);
+    $skipRestartReason = pmssLoggingRestartSkipReason();
+    $skipRestart = $skipRestartReason !== '';
 
-    // Check for logging.conf - if not present, silently skip (disabled by default)
     if (!is_file($loggingConf)) {
-        // Silent skip - remote logging disabled by default
         return;
     }
 
@@ -207,7 +212,6 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         return;
     }
 
-    // Check template exists
     if (!is_file($template)) {
         $log('[WARN] Remote logging template missing: '.$template);
         return;
@@ -218,29 +222,18 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         return;
     }
 
-    // Apply substitutions
     $rendered = strtr($raw, [
         '%%PMSS_RSYSLOG_REMOTE_HOST%%' => $config['host'],
         '%%PMSS_RSYSLOG_REMOTE_PORT%%' => (string) $config['port'],
         '%%PMSS_RSYSLOG_PROTOCOL%%'    => $config['protocol'],
     ]);
 
-    // Deploy to rsyslog.d
     if (!is_dir($targetDir)) {
-        // rsyslog not installed or unusual setup; skip silently
         $log('[SKIP] rsyslog conf.d directory not found: '.$targetDir);
         return;
     }
 
-    if (@file_put_contents($tmpTarget = $target.'.tmp', $rendered) === false) {
-        $log('[WARN] Unable to write remote logging config: '.$tmpTarget);
-        return;
-    }
-    @chmod($tmpTarget, 0644);
-
-    if (!@rename($tmpTarget, $target)) {
-        $log('[WARN] Unable to install remote logging config: '.$target);
-        @unlink($tmpTarget);
+    if (!pmssWriteManagedConfigFile($target, $rendered, 'remote logging config', $log)) {
         return;
     }
 
@@ -251,13 +244,11 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         $config['protocol']
     ));
 
-    // Restart rsyslog to apply changes (best-effort)
     if ($skipRestart) {
-        pmssLogStatus('SKIP', 'Restarting rsyslog to apply remote forwarding (test/dry-run)');
+        pmssLogStatus('SKIP', 'Restarting rsyslog to apply remote forwarding ('.$skipRestartReason.')');
         return;
     }
 
-    // Check if rsyslog service exists before attempting restart
     if (!@file_exists('/lib/systemd/system/rsyslog.service') && !@file_exists('/etc/init.d/rsyslog')) {
         $log('[SKIP] rsyslog service not found; config deployed but service not restarted');
         return;

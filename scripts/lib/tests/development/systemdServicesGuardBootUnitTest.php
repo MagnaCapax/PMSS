@@ -13,6 +13,13 @@ class SystemdServicesGuardBootUnitTest extends TestCase
         unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
     }
 
+    private function profileCommands(): array
+    {
+        return array_map(static function (array $entry): string {
+            return (string) ($entry['command'] ?? '');
+        }, $GLOBALS['PMSS_PROFILE'] ?? []);
+    }
+
     public function testBootUnitInstallIsLoggedInDryRun(): void
     {
         $this->reset();
@@ -30,15 +37,11 @@ class SystemdServicesGuardBootUnitTest extends TestCase
         putenv('PMSS_DRY_RUN');
         putenv('PMSS_CONFIG_DIR');
 
-        $commands = array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
-
         $this->assertEquals([
             "install -m 0644 '".$template."' '/etc/systemd/system/pmss-systemd-services-guard.service'",
             'systemctl daemon-reload || true',
             'systemctl enable pmss-systemd-services-guard.service || true',
-        ], $commands);
+        ], $this->profileCommands());
     }
 
     public function testStopDisableMaskSystemdUnitKeepsStopDisableMaskOrderInDryRun(): void
@@ -52,15 +55,11 @@ class SystemdServicesGuardBootUnitTest extends TestCase
             putenv('PMSS_DRY_RUN');
         }
 
-        $commands = array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
-
         $this->assertEquals([
             "systemctl stop 'demo.service' || true",
             "systemctl disable 'demo.service' || true",
             "systemctl mask 'demo.service' || true",
-        ], $commands);
+        ], $this->profileCommands());
     }
 
     public function testStopDisableMaskSystemdUnitOmitsMaskWhenDisabled(): void
@@ -74,13 +73,9 @@ class SystemdServicesGuardBootUnitTest extends TestCase
             putenv('PMSS_DRY_RUN');
         }
 
-        $commands = array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
-
         $this->assertEquals([
             "systemctl stop 'demo.service' || true",
             "systemctl disable 'demo.service' || true",
-        ], $commands);
+        ], $this->profileCommands());
     }
 }
