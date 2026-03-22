@@ -106,8 +106,8 @@ require_once __DIR__.'/../user/userConfigStore.php';
                 // Legacy fix: Detect "CPUQuota=85%" overrides on per-user slices and
                 // bump them to a host-based quota derived from total CPU threads so
                 // users are no longer capped to 85% of a single core.
-                $uinfo = posix_getpwnam($user);
-                if ($uinfo && isset($uinfo['uid'])) {
+                $uinfo = pmssUserAccountLookup($user);
+                if ($uinfo !== null) {
                     $uid = (int)$uinfo['uid'];
                     $sliceDir = '/etc/systemd/system/user-'.$uid.'.slice.d';
                     $needsFix = false;
@@ -252,8 +252,8 @@ require_once __DIR__.'/../user/userConfigStore.php';
      */
     function pmssEnsureRootlessDockerInstalled(string $user): void
     {
-        $uinfo = posix_getpwnam($user);
-        if (!$uinfo || !isset($uinfo['dir'])) {
+        $uinfo = pmssUserAccountLookup($user);
+        if ($uinfo === null || !isset($uinfo['dir'])) {
             pmssUserLog($user, '[WARN] Unable to resolve passwd entry; skipping rootless Docker install');
             return;
         }
@@ -361,8 +361,8 @@ require_once __DIR__.'/../user/userConfigStore.php';
         }
 
         // Resolve home directory
-        $uinfo = posix_getpwnam($user);
-        if (!$uinfo) return;
+        $uinfo = pmssUserAccountLookup($user);
+        if ($uinfo === null) return;
         $home = $uinfo['dir'];
         $uid  = $uinfo['uid'];
         $gid  = $uinfo['gid'];

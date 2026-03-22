@@ -34,7 +34,7 @@ if ($argUserRaw !== '') {
         fwrite(STDERR, "Invalid username\n");
         exit(1);
     }
-    if (function_exists('posix_getpwnam') && posix_getpwnam($argUser) === false) {
+    if (pmssUserAccountLookup($argUser) === null) {
         fwrite(STDERR, "User not found\n");
         exit(1);
     }

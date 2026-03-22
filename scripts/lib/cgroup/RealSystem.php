@@ -10,6 +10,7 @@ namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
 require_once __DIR__ . '/../runtime.php'; // for requireRoot helper if needed
+require_once __DIR__ . '/../userLifecycle.php';
 
 class RealSystem implements SystemInterface
 {
@@ -20,8 +21,8 @@ class RealSystem implements SystemInterface
 
     public function getUid(string $user): int
     {
-        $info = function_exists('posix_getpwnam') ? @posix_getpwnam($user) : false;
-        return is_array($info) && isset($info['uid']) ? (int) $info['uid'] : -1;
+        $info = \pmssUserAccountLookup($user);
+        return $info !== null ? (int) $info['uid'] : -1;
     }
 
     public function execute(string $command): ?string

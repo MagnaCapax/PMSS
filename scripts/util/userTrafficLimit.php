@@ -75,8 +75,8 @@ if (function_exists('pmssValidateUsername') && !pmssValidateUsername($userName))
 requireRoot();
 
 // Check if user exists
-$pw = function_exists('posix_getpwnam') ? @posix_getpwnam($userName) : false;
-$homeDir = is_array($pw) && isset($pw['dir']) ? (string) $pw['dir'] : "/home/{$userName}";
+$pw = pmssUserAccountLookup($userName);
+$homeDir = $pw !== null && isset($pw['dir']) ? (string) $pw['dir'] : "/home/{$userName}";
 if (!is_dir($homeDir) || is_link($homeDir)) {
     fwrite(STDERR, "Error: no such user: {$userName}\n");
     exit(3);

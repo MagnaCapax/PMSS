@@ -100,7 +100,7 @@ if (!is_dir("/home/{$username}")) {
 
 // Ensure a passwd entry exists before continuing so we do not silently act on
 // stray directories or stale state.
-if (function_exists('posix_getpwnam') && @posix_getpwnam($username) === false) {
+if (pmssUserAccountLookup($username) === null) {
     pmssUserWriteLogs(
         pmssUserBaseContext(
             'terminate', 'validate', $username,
@@ -232,17 +232,14 @@ if (file_exists($portFile)) {
 }
 
 // Reset per-user slice properties so no stale limits linger (safe if slice missing)
-if (function_exists('posix_getpwnam')) {
-    $info = posix_getpwnam($username);
-    if (is_array($info) && isset($info['uid'])) {
-        $uid = (int)$info['uid'];
-        // Use systemd revert to drop any drop-ins for user slice if present
-        pmssUserLifecycleStep('terminate', $username,
-            'revert_slice',
-            'systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true',
-            $dryRun
-        );
-    }
+if (($info = pmssUserAccountLookup($username)) !== null) {
+    $uid = (int)$info['uid'];
+    // Use systemd revert to drop any drop-ins for user slice if present
+    pmssUserLifecycleStep('terminate', $username,
+        'revert_slice',
+        'systemctl revert '.escapeshellarg('user-'.$uid.'.slice').' 2>/dev/null || true',
+        $dryRun
+    );
 }
 
 echo "\nDeleting user, user data and HTTP password:\n";
@@ -327,7 +324,7 @@ pmssUserLifecycleStep('terminate', $username,
 @unlink("/etc/nginx/users/{$username}");
 
 $db = new users();
-if (function_exists('posix_getpwnam') && posix_getpwnam($username) !== false) {
+if (pmssUserAccountLookup($username) !== null) {
     // #TODO explore force-removal path when passwd entry lingers to keep DB in sync automatically.
     fwrite(STDERR, "Warning: {$username} still present in /etc/passwd; skipping DB removal.\n");
 } else {

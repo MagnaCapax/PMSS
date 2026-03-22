@@ -159,8 +159,8 @@ foreach ($users as $user) {
         continue;
     }
 
-    $info = posix_getpwnam($user);
-    if (!$info) continue;
+    $info = pmssUserAccountLookup($user);
+    if ($info === null) continue;
 
     $slice = "user-{$info['uid']}.slice";
     $props = $getSliceProperties($slice);

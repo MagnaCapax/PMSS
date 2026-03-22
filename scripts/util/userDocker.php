@@ -46,6 +46,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 pmssRequireCli();
 
@@ -73,11 +74,8 @@ if (!in_array($action, $valid, true)) {
 }
 
 // Resolve UID so we can derive runtime paths.
-$info = function_exists('posix_getpwnam') ? posix_getpwnam($user) : false;
-if ($info === false || !isset($info['uid'])) {
-    fwrite(STDERR, "Unknown user: {$user}\n");
-    exit(1);
-}
+$info = pmssUserAccountLookup($user);
+if ($info === null) { fwrite(STDERR, "Unknown user: {$user}\n"); exit(1); }
 $uid = (int) $info['uid'];
 $dockerSock = "/run/user/{$uid}/docker.sock";
 $home = isset($info['dir']) ? (string) $info['dir'] : '';
@@ -96,9 +94,9 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
     static $timeoutBin = null;
 
     $wrapper = sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($cmd));
-    $target = function_exists('posix_getpwnam') ? posix_getpwnam($user) : false;
+    $target = pmssUserAccountLookup($user);
     $currentUid = function_exists('posix_geteuid') ? (int) posix_geteuid() : -1;
-    if (is_array($target) && isset($target['uid']) && $currentUid > 0 && $currentUid === (int) $target['uid']) {
+    if ($target !== null && $currentUid > 0 && $currentUid === (int) $target['uid']) {
         // When already running as the target user (e.g. per-user web UI),
         // avoid `su` so interactive password prompts do not block automation.
         $wrapper = sprintf('/bin/bash -lc %s', escapeshellarg($cmd));

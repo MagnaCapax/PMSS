@@ -177,6 +177,14 @@ function pmssListManagedUsers(string $command = '/scripts/listUsers.php'): array
     return array_keys($users);
 }
 
+/** @return array<string,mixed>|null */
+function pmssUserAccountLookup(string $username): ?array
+{
+    if (!function_exists('posix_getpwnam')) { return null; }
+    $info = @posix_getpwnam($username);
+    return is_array($info) && isset($info['uid']) ? $info : null;
+}
+
 /**
  * Return machine- and human-friendly create-validation failure details.
  *

@@ -69,8 +69,8 @@ $backupDir = "/home/backup-{$userName}";
 // #TODO consider abstracting path handling into shared helper to keep scripts in sync.
 
 /* ===== 3. Pre-flight ===== */
-$passwd = posix_getpwnam($userName);
-if ($passwd === false)
+$passwd = pmssUserAccountLookup($userName);
+if ($passwd === null)
     die("User {$userName} does not exist in /etc/passwd - aborting.\n");
 if (is_dir($backupDir))
     die("Backup directory {$backupDir} already exists - remove or rename it first.\n");

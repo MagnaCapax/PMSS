@@ -18,6 +18,7 @@
  */
 
 require_once __DIR__.'/lib/runtime.php';
+require_once __DIR__.'/lib/userLifecycle.php';
 
 pmssRequireCli();
 
@@ -28,16 +29,8 @@ if ($argc !== 2) {
 
 $user = $argv[1];
 
-if (!function_exists('posix_getpwnam')) {
-    fwrite(STDERR, "posix_getpwnam() not available; cannot resolve user.\n");
-    exit(1);
-}
-
-$info = posix_getpwnam($user);
-if ($info === false || !isset($info['uid'])) {
-    fwrite(STDERR, "Unknown user: {$user}\n");
-    exit(1);
-}
+$info = pmssUserAccountLookup($user);
+if ($info === null) { fwrite(STDERR, "Unknown user: {$user}\n"); exit(1); }
 
 $uid = (int) $info['uid'];
 $slice = 'user-' . $uid . '.slice';

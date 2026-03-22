@@ -6,12 +6,14 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../userLifecycle.php';
+
 /**
  * Resolve a username to its UID with a POSIX-first fallback.
  */
 function pmssResourceLogLookupUid(string $user): ?int
 {
-    if (function_exists('posix_getpwnam') && is_array($info = @posix_getpwnam($user)) && isset($info['uid'])) {
+    if (($info = pmssUserAccountLookup($user)) !== null) {
         return (int) $info['uid'];
     }
     return ctype_digit($out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'))) ? (int) $out : null;

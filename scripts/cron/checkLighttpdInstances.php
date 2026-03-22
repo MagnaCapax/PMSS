@@ -29,7 +29,7 @@ if ($argUserRaw === '') {
         exit(1);
     }
     $argUser = pmssNormalizeUsername($argUserRaw);
-    if (function_exists('posix_getpwnam') && posix_getpwnam($argUser) === false) {
+    if (pmssUserAccountLookup($argUser) === null) {
         fwrite(STDERR, "User not found\n");
         exit(1);
     }

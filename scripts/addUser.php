@@ -118,11 +118,8 @@ if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
 
 // Preflight: reject existing accounts or orphaned home directories.
 $homePath = "/home/{$user['name']}";
-$userExists = false;
-if (function_exists('posix_getpwnam')) {
-    $pw = @posix_getpwnam($user['name']);
-    $userExists = is_array($pw);
-} else {
+$userExists = pmssUserAccountLookup($user['name']) !== null;
+if (!$userExists) {
     $passwd = @file_get_contents('/etc/passwd');
     $userExists = $passwd !== false && preg_match('/^'.preg_quote($user['name'], '/').':/m', $passwd) === 1;
 }
