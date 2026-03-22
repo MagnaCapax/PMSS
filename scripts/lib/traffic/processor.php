@@ -8,7 +8,6 @@
 
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../traffic.php';
-require_once __DIR__.'/storage.php';
 
 class TrafficStatsProcessor
 {
@@ -20,28 +19,13 @@ class TrafficStatsProcessor
     private $homeDir;
     /** @var string */
     private $passwdFile;
-    /** @var TrafficStorage */
-    private $storage;
 
     public function __construct(trafficStatistics $stats, array $paths = [])
     {
         $this->stats           = $stats;
         $this->trafficDir      = rtrim($paths['traffic_dir'] ?? getenv('PMSS_TRAFFIC_DIR') ?: '/var/log/pmss/traffic', '/');
         $this->homeDir         = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
-        $runtimeDir            = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
         $this->passwdFile      = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
-        $this->storage         = new TrafficStorage([
-            'home_dir'   => $this->homeDir,
-            'runtime_dir'=> $runtimeDir,
-            'stats_dir'  => $runtimeDir.'/trafficStats',
-            'traffic_mode' => $paths['traffic_mode'] ?? 'egress',
-        ]);
-    }
-
-    /** Ensure runtime directories exist prior to processing. */
-    public function ensureRuntime(): void
-    {
-        $this->storage->ensureRuntime();
     }
 
     /** Build comparison timestamps for each window. */

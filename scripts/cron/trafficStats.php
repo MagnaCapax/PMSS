@@ -11,8 +11,9 @@
 
 require_once '/scripts/lib/traffic/processor.php';
 
+// Keep the legacy runtime-preparation side effect before worker dispatch.
+(new TrafficStorage())->ensureRuntime();
 $processor = new TrafficStatsProcessor(new trafficStatistics());
-$processor->ensureRuntime();
 
 if (($user = $processor->detectWorkerUser($argv)) !== null) {
     if (!$processor->validateUser($user)) {

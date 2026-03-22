@@ -61,7 +61,6 @@ class TrafficStatsProcessorTest extends TestCase
         $stub = new StubTrafficStatistics();
         $paths = $this->makePaths();
         $processor = new \TrafficStatsProcessor($stub, $paths);
-        $processor->ensureRuntime();
 
         $user = 'alice';
         $this->createUserFixtures($paths, $user);
@@ -84,7 +83,6 @@ class TrafficStatsProcessorTest extends TestCase
     {
         $paths = $this->makePaths();
         $processor = new \TrafficStatsProcessor(new StubTrafficStatistics(), $paths);
-        $processor->ensureRuntime();
 
         $user = 'alice';
         $this->createUserFixtures($paths, $user);
@@ -98,7 +96,6 @@ class TrafficStatsProcessorTest extends TestCase
         $stub = new StubTrafficStatistics();
         $paths = $this->makePaths();
         $processor = new \TrafficStatsProcessor($stub, $paths);
-        $processor->ensureRuntime();
 
         $user = 'alice';
         $this->createUserFixtures($paths, $user);

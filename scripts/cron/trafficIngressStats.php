@@ -16,8 +16,8 @@ $paths = [
 ];
 
 $stats = new trafficStatistics($paths);
+(new TrafficStorage($paths))->ensureRuntime();
 $processor = new TrafficStatsProcessor($stats, $paths);
-$processor->ensureRuntime();
 
 if (($user = $processor->detectWorkerUser($argv)) !== null) {
     if (!$processor->validateUser($user)) {

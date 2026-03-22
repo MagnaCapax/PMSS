@@ -26,7 +26,6 @@ class TrafficStatsProcessorEdgeTest extends TestCase
         $stub = new StubTrafficStatisticsEdge();
         $paths = $this->makePaths();
         $processor = new \TrafficStatsProcessor($stub, $paths);
-        $processor->ensureRuntime();
         $this->createUserFixtures($paths, 'alice');
 
         // malformed lines mixed with valid-looking but enormous values
