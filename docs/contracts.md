@@ -429,6 +429,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
   - Subdomains: `USERNAME.<host>` proxies to `/public-<user>/`; SHA256 host (`sha256(username.billingId.hostname).<host>`) proxies to `/user-<user>/` with HTTP→HTTPS redirect; hash vhost skipped if `.billingId` missing/invalid.
+  - WebDAV: the external URL format is `https://<server-fqdn>/webdav-<user>/`; the path is never bare `/webdav`.
   - WebDAV: `/webdav-<user>/` is protected by per-user htpasswd at `/home/<user>/.lighttpd/.htpasswd`.
   - WebDAV: make `~/www` writable by creating `/home/<user>/.lighttpd/webdav.www-writable` (default is read-only except `~/www/public`).
   - Side-effects: Writes under `/etc/nginx/` and reloads/restarts nginx via callers.
