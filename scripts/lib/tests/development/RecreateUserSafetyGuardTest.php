@@ -17,8 +17,8 @@ class RecreateUserSafetyGuardTest extends TestCase
     {
         $source = $this->source();
 
-        $this->assertStringContainsString("pmssRequireSafeRecreateUserPath($homeDir, 'home');", $source);
-        $this->assertStringContainsString("pmssRequireSafeRecreateUserPath($backupDir, 'backup');", $source);
+        $this->assertStringContainsString("pmssRequireSafeRecreateUserPath(\$homeDir, 'home');", $source);
+        $this->assertStringContainsString("pmssRequireSafeRecreateUserPath(\$backupDir, 'backup');", $source);
         $this->assertStringContainsString('Refusing to operate on symlinked', $source);
     }
 
