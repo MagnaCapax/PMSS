@@ -35,9 +35,9 @@ function runStep(string $description, string $command): int
     $duration    = microtime(true) - $started;
     // rc reflects the shell return code so downstream logs can inspect rc=0 for success
     $status      = $dryRun ? 'SKIP' : ($rc === 0 ? 'OK' : 'ERR');
-    $lastOutput  = $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] ?? ['stdout' => '', 'stderr' => ''];
-    $stdout      = $dryRun ? '' : ($lastOutput['stdout'] ?? '');
-    $stderr      = $dryRun ? '' : ($lastOutput['stderr'] ?? '');
+    $lastOutput  = $dryRun ? [] : ($GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] ?? []);
+    $stdout      = $lastOutput['stdout'] ?? '';
+    $stderr      = $lastOutput['stderr'] ?? '';
     $stderrShort = $stderr !== '' ? preg_replace('/\s+/', ' ', trim(substr($stderr, 0, 300))) : '';
     $stdoutShort = $stdout !== '' ? preg_replace('/\s+/', ' ', trim(substr($stdout, 0, 300))) : '';
 
@@ -48,23 +48,18 @@ function runStep(string $description, string $command): int
         pmssDumpForkDiagnostics('runStep: '.$description.' :: '.$command, 'logMessage');
     }
 
-    // ANSI colors
-    $cRed    = "\033[31m";
-    $cGreen  = "\033[32m";
-    $cYellow = "\033[33m";
-
-    $color = $status === 'ERR' ? $cRed : ($status === 'SKIP' ? $cYellow : $cGreen);
+    $statusColor = $status === 'ERR' ? "\033[31m" : ($status === 'SKIP' ? "\033[33m" : "\033[32m");
 
     // Colorize the status block: [STATUS ... rc=N]
     $statusBlock = sprintf('[%s%s%s %.3fs rc=%s%d%s]',
-        $color, $status, $cReset,
+        $statusColor, $status, $cReset,
         $duration,
-        ($rc === 0 ? $cGreen : $cRed), $rc, $cReset
+        $rc === 0 ? "\033[32m" : "\033[31m", $rc, $cReset
     );
 
     $message = sprintf('%s %s :: %s', $statusBlock, $description, $command);
     if ($status === 'ERR' && $stderrShort !== '') {
-        $message .= ' :: '.$cRed.$stderrShort.$cReset;
+        $message .= ' :: ' . "\033[31m" . $stderrShort . $cReset;
     }
     // Use structured logger from logging.php to avoid missing logmsg() when
     // this runtime is invoked outside update.php/bootstrap paths.
@@ -120,8 +115,7 @@ function pmssLogStatus(string $status, string $description, int $rc = 0, ?float 
 {
     $dur = $duration ?? 0.0;
     $statusUpper = strtoupper($status);
-    $message  = sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description);
-    logMessage($message);
+    logMessage(sprintf('[%s %.3fs rc=%d] %s', $statusUpper, $dur, $rc, $description));
     pmssRecordProfile([
         'description'    => $description,
         'command'        => '',

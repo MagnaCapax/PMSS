@@ -46,7 +46,7 @@ function pmssProfileSummary(): void
     $counts = array_fill_keys(['OK', 'ERR', 'SKIP', 'OTHER'], 0);
     foreach ($profile as $entry) {
         $status = strtoupper((string) ($entry['status'] ?? ''));
-        $counts[isset($counts[$status]) ? $status : 'OTHER']++;
+        ++$counts[isset($counts[$status]) ? $status : 'OTHER'];
     }
     logmsg(sprintf(
         'Step status summary: %d OK, %d ERR, %d SKIP, %d other',
