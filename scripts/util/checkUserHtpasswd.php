@@ -17,6 +17,7 @@
 // Some kind of htpasswd synchronization from times when lighttpd global instance transition to per-user instances
 
 require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
@@ -78,7 +79,22 @@ foreach ($users as $thisUser) {
 
     foreach ($passwords as $thisPassword) {
         if (strpos($thisPassword, $thisUser.':') === 0) {
-            file_put_contents($userHtpasswd, $thisPassword."\n", FILE_APPEND);
+            if (!pmssAppendUserFile($userHtpasswd, $thisPassword."\n", $thisUser, 0640)) {
+                pmssUserWriteLogs(
+                    pmssUserBaseContext(
+                        'htpasswd',
+                        'write',
+                        $thisUser,
+                        [
+                            'status'  => 'ERR',
+                            'message' => 'Unable to append legacy credential to per-user htpasswd',
+                            'path'    => $userHtpasswd,
+                        ]
+                    )
+                );
+                continue;
+            }
+
             pmssUserLifecycleStep(
                 'htpasswd',
                 $thisUser,
