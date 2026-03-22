@@ -8,6 +8,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__.'/../lib/runtime.php';
+
 /**
  * PMSS system status probe.
  *
@@ -17,6 +19,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__.'/../lib/cli/optionParser.php';
+require_once __DIR__.'/../lib/update/osRelease.php';
 
 /**
  * Build a normalized check result structure.
@@ -43,8 +46,7 @@ $format = ($jsonFlag === true || $format === 'json') ? 'json' : 'text';
 $checks = [];
 
 // Detect OS codename for later comparisons.
-$osInfo    = parse_ini_file('/etc/os-release') ?: [];
-$codename  = strtolower(trim($osInfo['VERSION_CODENAME'] ?? ''));
+$codename = getDistroCodename();
 if ($codename === '') {
     $checks[] = pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing');
 } else {

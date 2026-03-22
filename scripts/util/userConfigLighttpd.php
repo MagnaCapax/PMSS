@@ -13,6 +13,7 @@
  */
 
 require_once dirname(__DIR__).'/lib/update/systemPrep.php';
+require_once dirname(__DIR__).'/lib/update/distro.php';
 require_once dirname(__DIR__).'/lib/userLifecycle.php';
 require_once dirname(__DIR__).'/lib/user/directories.php';
 
@@ -65,18 +66,8 @@ function pmssUserConfigLighttpdMain(array $argv): int
     }
     $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
 
-    $osReleasePath = getenv('PMSS_OS_RELEASE_PATH');
-    if ($osReleasePath === false || $osReleasePath === '') {
-        $osReleasePath = '/etc/os-release';
-    }
-    $distroVersion = 0;
-    if (is_readable($osReleasePath)) {
-        $osReleaseData = @file_get_contents($osReleasePath);
-        if ($osReleaseData !== false
-            && preg_match('/^VERSION_ID=\"?([0-9]+)/m', $osReleaseData, $matches)) {
-            $distroVersion = (int) $matches[1];
-        }
-    }
+    $distroInfo = pmssDetectDistro();
+    $distroVersion = (int) ($distroInfo['version'] ?? 0);
     // Debian 11/12 ship mod_deflate; compress.* triggers deprecation on bookworm.
     if ($distroVersion >= 11) {
         $template = str_replace(

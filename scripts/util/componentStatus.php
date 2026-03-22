@@ -8,6 +8,9 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/update/osRelease.php';
+
 /**
  * PMSS component status reporter.
  *
@@ -20,8 +23,7 @@ $wantJson = isset($options['json']);
 $results = [];
 
 // OS codename and sources alignment.
-$os = parse_ini_file('/etc/os-release') ?: [];
-$codename = strtolower(trim($os['VERSION_CODENAME'] ?? ''));
+$codename = getDistroCodename();
 if ($codename === '') {
     $results[] = ['name' => 'os.codename', 'status' => 'WARN', 'detail' => 'VERSION_CODENAME missing'];
 } else {
