@@ -19,19 +19,4 @@ $stats = new trafficStatistics($paths);
 (new TrafficStorage($paths))->ensureRuntime();
 $processor = new TrafficStatsProcessor($stats, $paths);
 
-if (($user = $processor->detectWorkerUser($argv)) !== null) {
-    if (!$processor->validateUser($user)) {
-        echo "Invalid user specified: {$user}\n";
-        exit(0);
-    }
-
-    $processor->processUser($user, $processor->buildCompareTimes());
-    exit(0);
-}
-
-$users = $processor->discoverUsers();
-if (empty($users)) {
-    die("No users in this system!\n");
-}
-
-$processor->spawnWorkers($_SERVER['argv'][0], $users);
+exit($processor->runCli($argv, $_SERVER['argv'][0]));

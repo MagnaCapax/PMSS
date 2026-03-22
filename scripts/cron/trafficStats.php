@@ -15,19 +15,4 @@ require_once '/scripts/lib/traffic/processor.php';
 (new TrafficStorage())->ensureRuntime();
 $processor = new TrafficStatsProcessor(new trafficStatistics());
 
-if (($user = $processor->detectWorkerUser($argv)) !== null) {
-    if (!$processor->validateUser($user)) {
-        echo "Invalid user specified: {$user}\n";
-        exit(0);
-    }
-
-    $processor->processUser($user, $processor->buildCompareTimes());
-    exit(0);
-}
-
-$users = $processor->discoverUsers();
-if (empty($users)) {
-    die("No users in this system!\n");
-}
-
-$processor->spawnWorkers($_SERVER['argv'][0], $users);
+exit($processor->runCli($argv, $_SERVER['argv'][0]));

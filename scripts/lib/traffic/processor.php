@@ -64,6 +64,29 @@ class TrafficStatsProcessor
         }
     }
 
+    /** Handle the CLI worker-or-spawn flow used by traffic cron entrypoints. */
+    public function runCli(array $argv, string $scriptPath): int
+    {
+        if (($user = $this->detectWorkerUser($argv)) !== null) {
+            if (!$this->validateUser($user)) {
+                echo "Invalid user specified: {$user}\n";
+                return 0;
+            }
+
+            $this->processUser($user, $this->buildCompareTimes());
+            return 0;
+        }
+
+        $users = $this->discoverUsers();
+        if (empty($users)) {
+            echo "No users in this system!\n";
+            return 0;
+        }
+
+        $this->spawnWorkers($scriptPath, $users);
+        return 0;
+    }
+
     /** Sanitize user input by stripping unexpected characters. */
     public function sanitizeUser(string $input): string
     {

@@ -19,6 +19,22 @@ class StubTrafficStatistics extends \trafficStatistics
     }
 }
 
+class SpyTrafficStatsProcessor extends \TrafficStatsProcessor
+{
+    public array $usersToDiscover = [];
+    public array $spawnCalls = [];
+
+    public function discoverUsers(): array
+    {
+        return $this->usersToDiscover;
+    }
+
+    public function spawnWorkers(string $scriptPath, array $users): void
+    {
+        $this->spawnCalls[] = [$scriptPath, $users];
+    }
+}
+
 class TrafficStatsProcessorTest extends TestCase
 {
     public function testSanitizeUser(): void
@@ -113,6 +129,62 @@ class TrafficStatsProcessorTest extends TestCase
 
         $this->assertTrue(isset($stub->saved[$user.'-localnet']));
         $this->assertTrue(isset($stub->saved[$user.'-localnet']['raw']['day']));
+    }
+
+    public function testRunCliProcessesWorkerUser(): void
+    {
+        $stub = new StubTrafficStatistics();
+        $paths = $this->makePaths();
+        $processor = new SpyTrafficStatsProcessor($stub, $paths);
+        $user = 'alice';
+
+        $this->createUserFixtures($paths, $user);
+        $now = time();
+        $stub->map[$user] = implode("\n", [
+            date('Y-m-d H:i:s', $now - 100).': 1048576',
+            date('Y-m-d H:i:s', $now - 86400).': 1048576',
+        ]);
+
+        $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php', $user], '/scripts/cron/trafficStats.php'));
+        $this->assertTrue(isset($stub->saved[$user]));
+        $this->assertEquals([], $processor->spawnCalls);
+    }
+
+    public function testRunCliReportsInvalidWorkerUser(): void
+    {
+        $stub = new StubTrafficStatistics();
+        $processor = new SpyTrafficStatsProcessor($stub, $this->makePaths());
+
+        ob_start();
+        $result = $processor->runCli(['/scripts/cron/trafficStats.php', 'ghost'], '/scripts/cron/trafficStats.php');
+        $output = (string) ob_get_clean();
+
+        $this->assertEquals(0, $result);
+        $this->assertStringContainsString("Invalid user specified: ghost\n", $output);
+        $this->assertEquals([], $stub->saved);
+        $this->assertEquals([], $processor->spawnCalls);
+    }
+
+    public function testRunCliPrintsNoUsersMessageWithoutDiscoveredUsers(): void
+    {
+        $processor = new SpyTrafficStatsProcessor(new StubTrafficStatistics(), $this->makePaths());
+
+        ob_start();
+        $result = $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php');
+        $output = (string) ob_get_clean();
+
+        $this->assertEquals(0, $result);
+        $this->assertStringContainsString("No users in this system!\n", $output);
+        $this->assertEquals([], $processor->spawnCalls);
+    }
+
+    public function testRunCliSpawnsWorkersForDiscoveredUsers(): void
+    {
+        $processor = new SpyTrafficStatsProcessor(new StubTrafficStatistics(), $this->makePaths());
+        $processor->usersToDiscover = ['alice', 'bob'];
+
+        $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'));
+        $this->assertEquals([['/scripts/cron/trafficStats.php', ['alice', 'bob']]], $processor->spawnCalls);
     }
 
     private function makeProcessor(): \TrafficStatsProcessor
