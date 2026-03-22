@@ -73,6 +73,64 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
 }
 
 /**
+ * Persist the APT override that disables Release timestamp validation.
+ */
+function pmssAptWriteValidUntilOverride(?callable $logger = null, ?string $path = null): bool
+{
+    $log = $logger ?: 'logMessage';
+    $target = $path ?: pmssResolvePathFromEnv(
+        'PMSS_APT_VALID_UNTIL_OVERRIDE_PATH',
+        '/etc/apt/apt.conf.d/90ignore-release-date'
+    );
+    $dir = dirname($target);
+
+    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+        $log('[WARN] Unable to create apt.conf.d directory for Release timestamp override: '.$dir);
+        return false;
+    }
+
+    if (@file_put_contents($target, "Acquire::Check-Valid-Until \"false\";\n", LOCK_EX) === false) {
+        $log('[WARN] Unable to write Release timestamp override: '.$target);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Run `apt-get clean` and log failures without aborting the update.
+ *
+ * @param callable|null $runner Optional runner returning `array{rc:int,output:string}`.
+ */
+function pmssAptRunClean(?callable $logger = null, ?callable $runner = null): bool
+{
+    $log = $logger ?: 'logMessage';
+    if ($runner === null) {
+        $runner = static function (): array {
+            $output = [];
+            $rc = 1;
+            @exec('apt-get clean 2>&1', $output, $rc);
+
+            return [
+                'rc' => (int) $rc,
+                'output' => trim(implode("\n", $output)),
+            ];
+        };
+    }
+
+    $result = $runner();
+    $rc = isset($result['rc']) ? (int) $result['rc'] : 1;
+    $output = isset($result['output']) ? trim((string) $result['output']) : '';
+    if ($rc !== 0) {
+        $suffix = ($output === '') ? '' : ' ('.$output.')';
+        $log('[WARN] apt-get clean failed with rc '.$rc.$suffix);
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Ensure /etc/apt/sources.list matches the recommended repository layout.
  */
 function pmssUpdateAptSources(string $distroName, int $distroVersion, string $currentHash,
@@ -112,8 +170,8 @@ function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $re
         if (defined('PMSS_TEST_MODE')) {
             $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
         } else {
-            passthru("echo 'Acquire::Check-Valid-Until \"false\";' >/etc/apt/apt.conf.d/90ignore-release-date");
-            passthru('apt-get clean;');
+            pmssAptWriteValidUntilOverride($log);
+            pmssAptRunClean($log);
         }
     }
     $log("Applied Debian {$label} repository config");

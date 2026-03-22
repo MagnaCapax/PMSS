@@ -71,6 +71,84 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->clearEnv('PMSS_APT_SOURCES_PATH');
     }
 
+    public function testAptWriteValidUntilOverrideCreatesParentDirectories(): void
+    {
+        $dir = sys_get_temp_dir().'/pmss-apt-override-'.bin2hex(random_bytes(4));
+        $target = $dir.'/apt.conf.d/90ignore-release-date';
+        $logs = [];
+        $logger = function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        };
+
+        $result = \pmssAptWriteValidUntilOverride($logger, $target);
+
+        $this->assertTrue($result);
+        $this->assertEquals("Acquire::Check-Valid-Until \"false\";\n", file_get_contents($target));
+        $this->assertEquals([], $logs);
+
+        @unlink($target);
+        @rmdir(dirname($target));
+        @rmdir($dir);
+    }
+
+    public function testAptWriteValidUntilOverrideLogsParentDirectoryFailure(): void
+    {
+        $dir = sys_get_temp_dir().'/pmss-apt-override-blocked-'.bin2hex(random_bytes(4));
+        $blocker = $dir.'/blocked';
+        @mkdir($dir, 0755, true);
+        file_put_contents($blocker, 'not-a-directory');
+        $target = $blocker.'/90ignore-release-date';
+        $logs = [];
+        $logger = function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        };
+
+        $result = \pmssAptWriteValidUntilOverride($logger, $target);
+
+        $this->assertTrue($result === false);
+        $this->assertTrue((bool) array_filter($logs, static function (string $line) use ($blocker): bool {
+            return strpos($line, 'Unable to create apt.conf.d directory for Release timestamp override: '.$blocker) !== false;
+        }));
+        $this->assertTrue(!file_exists($target));
+
+        @unlink($blocker);
+        @rmdir($dir);
+    }
+
+    public function testAptRunCleanReturnsTrueOnSuccess(): void
+    {
+        $logs = [];
+        $logger = function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        };
+        $runner = static function (): array {
+            return ['rc' => 0, 'output' => ''];
+        };
+
+        $result = \pmssAptRunClean($logger, $runner);
+
+        $this->assertTrue($result);
+        $this->assertEquals([], $logs);
+    }
+
+    public function testAptRunCleanLogsFailureOutput(): void
+    {
+        $logs = [];
+        $logger = function (string $message) use (&$logs): void {
+            $logs[] = $message;
+        };
+        $runner = static function (): array {
+            return ['rc' => 100, 'output' => 'simulated apt failure'];
+        };
+
+        $result = \pmssAptRunClean($logger, $runner);
+
+        $this->assertTrue($result === false);
+        $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
+            return strpos($line, 'apt-get clean failed with rc 100 (simulated apt failure)') !== false;
+        }));
+    }
+
     private function makeTempSources(string $content): string
     {
         $path = tempnam(sys_get_temp_dir(), 'pmss-sources-');
@@ -86,4 +164,3 @@ class UpdateHelpersSafeWriteTest extends TestCase
         putenv($name);
     }
 }
-
