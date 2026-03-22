@@ -128,15 +128,32 @@ function pmssConfigBackupsPrepareContext(string $service, string $sourcePath, ar
         }
         return null;
     }
+    if (strpos($sourcePath, "\0") !== false || is_link($sourcePath)) {
+        $log('[WARN] Refusing config backup for unsafe source path: '.$sourcePath);
+        return null;
+    }
     if ($requireReadableSource && (!is_file($sourcePath) || !is_readable($sourcePath))) {
         return null;
     }
     $backupRoot = rtrim((string) ($options['backupRoot'] ?? '/var/backups/pmss/config'), '/') ?: '/var/backups/pmss/config';
+    if (
+        strpos($backupRoot, "\0") !== false
+        || is_link($backupRoot)
+        || (file_exists($backupRoot) && !is_dir($backupRoot))
+    ) {
+        $log('[WARN] Refusing config backup with unsafe backup root: '.$backupRoot);
+        return null;
+    }
+    $serviceDir = $backupRoot.'/'.$service;
+    if (is_link($serviceDir) || (file_exists($serviceDir) && !is_dir($serviceDir))) {
+        $log('[WARN] Refusing config backup with unsafe service directory: '.$serviceDir);
+        return null;
+    }
     return array(
         'key' => pmssConfigBackupsPathKey($sourcePath),
         'log' => $log,
         'service' => $service,
-        'serviceDir' => $backupRoot.'/'.$service,
+        'serviceDir' => $serviceDir,
         'sourcePath' => $sourcePath,
     );
 }

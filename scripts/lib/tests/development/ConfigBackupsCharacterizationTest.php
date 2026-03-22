@@ -61,4 +61,65 @@ class ConfigBackupsCharacterizationTest extends TestCase
             $serviceDir.'/20260131120000__'.$otherKey.'.bak',
         ), $remaining);
     }
+
+    public function testBackupRejectsSymlinkSourcePath(): void
+    {
+        $sourceRoot = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
+        $source = $sourceRoot.'/etc/ssh/sshd_config';
+        $sourceLink = $sourceRoot.'/etc/ssh/sshd_config.link';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "Port 22\n");
+        symlink($source, $sourceLink);
+
+        $backup = \pmssBackupCriticalConfig('sshd', $sourceLink, array(
+            'backupRoot' => $backupRoot,
+            'logSuccess' => false,
+        ));
+
+        $this->assertTrue($backup === null, 'Expected symlinked source path to be rejected');
+        $this->assertEquals(array(), glob($backupRoot.'/sshd/*.bak') ?: array());
+    }
+
+    public function testBackupRejectsSymlinkedServiceDirectory(): void
+    {
+        $sourceRoot = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
+        $outsideRoot = $this->pmssMakeTempDir('pmss-backups-outside-');
+        $source = $sourceRoot.'/etc/nginx/nginx.conf';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "worker_processes auto;\n");
+        symlink($outsideRoot, $backupRoot.'/nginx');
+
+        $backup = \pmssBackupCriticalConfig('nginx', $source, array(
+            'backupRoot' => $backupRoot,
+            'logSuccess' => false,
+        ));
+
+        $this->assertTrue($backup === null, 'Expected symlinked service directory to be rejected');
+        $this->assertEquals(array(), glob($outsideRoot.'/*.bak') ?: array());
+    }
+
+    public function testPruneSkipsSymlinkedServiceDirectory(): void
+    {
+        $sourceRoot = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
+        $outsideRoot = $this->pmssMakeTempDir('pmss-backups-outside-');
+        $source = $sourceRoot.'/etc/proftpd/proftpd.conf';
+        @mkdir(dirname($source), 0755, true);
+        file_put_contents($source, "ServerName pmss\n");
+
+        $sourceKey = \pmssConfigBackupsPathKey($source);
+        $backupPath = $outsideRoot.'/20260131100000__'.$sourceKey.'.bak';
+        file_put_contents($backupPath, 'old');
+        symlink($outsideRoot, $backupRoot.'/proftpd');
+
+        \pmssPruneCriticalConfigBackups('proftpd', $source, array(
+            'backupRoot' => $backupRoot,
+            'maxCount' => 0,
+            'ttlSeconds' => 0,
+        ));
+
+        $this->assertTrue(is_file($backupPath), 'Expected prune to skip symlinked service directory');
+    }
 }
