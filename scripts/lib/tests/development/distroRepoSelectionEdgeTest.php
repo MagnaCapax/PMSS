@@ -2,11 +2,14 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class DistroRepoSelectionEdgeTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testDetectDistroLowercasesId(): void
     {
         $osRelease = $this->writeOsRelease([
@@ -22,7 +25,7 @@ class DistroRepoSelectionEdgeTest extends TestCase
         $this->assertEquals(11, $info['version']);
         $this->assertEquals('bullseye', $info['codename']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testDetectDistroNormalisesUppercaseCodename(): void
@@ -39,7 +42,7 @@ class DistroRepoSelectionEdgeTest extends TestCase
         $this->assertEquals('bookworm', $info['codename']);
         $this->assertEquals(12, $info['version']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testDetectDistroUnknownCodenameKeepsVersion(): void
@@ -56,7 +59,7 @@ class DistroRepoSelectionEdgeTest extends TestCase
         $this->assertEquals(77, $info['version']);
         $this->assertEquals('aurora', $info['codename']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testDetectDistroWhitespaceInCodename(): void
@@ -73,7 +76,7 @@ class DistroRepoSelectionEdgeTest extends TestCase
         $this->assertEquals('trixie', $info['codename']);
         $this->assertEquals(13, $info['version']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testDetectDistroResetCacheSwitchesFiles(): void
@@ -99,26 +102,11 @@ class DistroRepoSelectionEdgeTest extends TestCase
         $secondInfo = \pmssDetectDistro();
         $this->assertEquals(12, $secondInfo['version']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     private function writeOsRelease(array $lines): string
     {
-        return $this->tempFile('os-release', implode("\n", $lines)."\n");
-    }
-
-    private function tempFile(string $prefix, string $content): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-'.$prefix.'-');
-        if ($path === false) {
-            $path = sys_get_temp_dir().'/pmss-'.$prefix.'-'.bin2hex(random_bytes(6));
-        }
-        file_put_contents($path, $content);
-        return $path;
-    }
-
-    private function clearEnv(string $name): void
-    {
-        putenv($name);
+        return $this->pmssWriteTempFile('os-release', implode("\n", $lines)."\n");
     }
 }

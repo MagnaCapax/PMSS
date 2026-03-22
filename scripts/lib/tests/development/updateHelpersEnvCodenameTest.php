@@ -2,54 +2,57 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class UpdateHelpersEnvCodenameTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testGetDistroVersionStripsSuffix(): void
     {
-        $file = $this->tempFile('version', "ID=debian\nVERSION_ID=\"12 (bookworm)\"\n");
+        $file = $this->pmssWriteTempFile('version', "ID=debian\nVERSION_ID=\"12 (bookworm)\"\n", 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         $this->assertEquals('12', \getDistroVersion());
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testGetDistroVersionReturnsRawWhenNonNumeric(): void
     {
-        $file = $this->tempFile('version', "ID=debian\nVERSION_ID=sid\n");
+        $file = $this->pmssWriteTempFile('version', "ID=debian\nVERSION_ID=sid\n", 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         $this->assertEquals('sid', \getDistroVersion());
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testGetDistroNameEmptyWhenMissing(): void
     {
-        $file = $this->tempFile('noname', "VERSION_ID=11\n");
+        $file = $this->pmssWriteTempFile('noname', "VERSION_ID=11\n", 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         $this->assertEquals('', \getDistroName());
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testGetDistroCodenameLowercasesAndTrims(): void
     {
-        $file = $this->tempFile('codename', "ID=debian\nVERSION_CODENAME=  BULLSEYE  \n");
+        $file = $this->pmssWriteTempFile('codename', "ID=debian\nVERSION_CODENAME=  BULLSEYE  \n", 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         $this->assertEquals('bullseye', \getDistroCodename());
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testGetDistroCodenameEmptyWhenNotPresent(): void
     {
-        $file = $this->tempFile('nocodename', "ID=debian\nVERSION_ID=12\n");
+        $file = $this->pmssWriteTempFile('nocodename', "ID=debian\nVERSION_ID=12\n", 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         $this->assertEquals('', \getDistroCodename());
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testPmssVersionFromCodenameUnknownReturnsZero(): void
@@ -59,29 +62,14 @@ class UpdateHelpersEnvCodenameTest extends TestCase
 
     public function testGetPmssVersionTrimsWhitespace(): void
     {
-        $file = $this->tempFile('version-file', "git/main:2025-01-01\n\n");
+        $file = $this->pmssWriteTempFile('version-file', "git/main:2025-01-01\n\n", 'pmss-env');
         $this->assertEquals('git/main:2025-01-01', \getPmssVersion($file));
     }
 
     public function testGetPmssVersionReturnsUnknownForEmptyFile(): void
     {
-        $file = $this->tempFile('empty-version', '');
+        $file = $this->pmssWriteTempFile('empty-version', '', 'pmss-env');
         $this->assertEquals('unknown', \getPmssVersion($file));
     }
 
-    private function tempFile(string $prefix, string $content): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-env-'.$prefix.'-');
-        if ($path === false) {
-            $path = sys_get_temp_dir().'/pmss-env-'.$prefix.'-'.bin2hex(random_bytes(6));
-        }
-        file_put_contents($path, $content);
-        return $path;
-    }
-
-    private function clearEnv(string $name): void
-    {
-        putenv($name);
-    }
 }
-

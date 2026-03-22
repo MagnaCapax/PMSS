@@ -23,9 +23,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 
 class ConfigSyntaxValidationTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $tempDir;
     private $lighttpdBinary;
     private $nginxBinary;
@@ -52,7 +55,7 @@ class ConfigSyntaxValidationTest extends TestCase
     protected function tearDown(): void
     {
         if ($this->tempDir && is_dir($this->tempDir)) {
-            $this->recursiveDelete($this->tempDir);
+            $this->cleanup($this->tempDir);
         }
     }
 
@@ -72,26 +75,6 @@ class ConfigSyntaxValidationTest extends TestCase
         }
 
         return null;
-    }
-
-    private function recursiveDelete(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-        $items = scandir($dir);
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $path = $dir.'/'.$item;
-            if (is_dir($path)) {
-                $this->recursiveDelete($path);
-            } else {
-                @unlink($path);
-            }
-        }
-        @rmdir($dir);
     }
 
     /**

@@ -16,6 +16,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 
 if (!function_exists('pmssDelugeReadWebConf')) {
     require_once dirname(__DIR__, 3).'/util/userConfigLighttpd.php';
@@ -23,6 +24,8 @@ if (!function_exists('pmssDelugeReadWebConf')) {
 
 class DelugeReverseProxyHardeningTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $tempDir;
 
     protected function setUp(): void
@@ -34,28 +37,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
     protected function tearDown(): void
     {
         if ($this->tempDir && is_dir($this->tempDir)) {
-            $this->recursiveDelete($this->tempDir);
+            $this->cleanup($this->tempDir);
         }
-    }
-
-    private function recursiveDelete(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-        $items = scandir($dir);
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $path = $dir.'/'.$item;
-            if (is_dir($path)) {
-                $this->recursiveDelete($path);
-            } else {
-                @unlink($path);
-            }
-        }
-        @rmdir($dir);
     }
 
     private function assertStringNotContainsString(string $needle, string $haystack, string $msg = ''): void

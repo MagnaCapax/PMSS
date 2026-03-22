@@ -2,35 +2,38 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class UpdateHelpersEnvCacheTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testGetOsReleaseDataUsesOverridePath(): void
     {
-        $file = $this->tempFile('override', 'ID=custom');
+        $file = $this->pmssWriteTempFile('override', 'ID=custom', 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         $this->assertEquals('custom', \getOsReleaseData()['ID']);
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testGetOsReleaseDataCachesPerPath(): void
     {
-        $file = $this->tempFile('cache', "ID=test\nVERSION_ID=1\n");
+        $file = $this->pmssWriteTempFile('cache', "ID=test\nVERSION_ID=1\n", 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         $first = \getOsReleaseData();
         file_put_contents($file, "ID=test\nVERSION_ID=2\n");
         $second = \getOsReleaseData();
         $this->assertEquals($first, $second);
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testResetOsReleaseCacheReloadsData(): void
     {
-        $file = $this->tempFile('reload', "ID=test\nVERSION_ID=3\n");
+        $file = $this->pmssWriteTempFile('reload', "ID=test\nVERSION_ID=3\n", 'pmss-env');
         putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
         \getOsReleaseData();
@@ -38,13 +41,13 @@ class UpdateHelpersEnvCacheTest extends TestCase
         \pmssResetOsReleaseCache();
         $data = \getOsReleaseData();
         $this->assertEquals('4', $data['VERSION_ID']);
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testResetCacheLeavesOtherPathsUntouched(): void
     {
-        $first = $this->tempFile('first', "ID=alpha\nVERSION_ID=1\n");
-        $second = $this->tempFile('second', "ID=beta\nVERSION_ID=2\n");
+        $first = $this->pmssWriteTempFile('first', "ID=alpha\nVERSION_ID=1\n", 'pmss-env');
+        $second = $this->pmssWriteTempFile('second', "ID=beta\nVERSION_ID=2\n", 'pmss-env');
 
         putenv('PMSS_OS_RELEASE_PATH='.$first);
         \pmssResetOsReleaseCache();
@@ -56,7 +59,7 @@ class UpdateHelpersEnvCacheTest extends TestCase
         $secondData = \getOsReleaseData();
         $this->assertEquals('beta', $secondData['ID']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     public function testGetOsReleaseDataHandlesMissingFile(): void
@@ -66,21 +69,6 @@ class UpdateHelpersEnvCacheTest extends TestCase
         $data = \getOsReleaseData();
         $this->assertTrue(is_array($data));
         $this->assertEquals([], $data);
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
-    }
-
-    private function tempFile(string $prefix, string $content): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-env-'.$prefix.'-');
-        if ($path === false) {
-            $path = sys_get_temp_dir().'/pmss-env-'.$prefix.'-'.bin2hex(random_bytes(6));
-        }
-        file_put_contents($path, $content);
-        return $path;
-    }
-
-    private function clearEnv(string $name): void
-    {
-        putenv($name);
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 }

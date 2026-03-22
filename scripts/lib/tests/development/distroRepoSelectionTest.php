@@ -2,11 +2,14 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class DistroRepoSelectionTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     /**
      * Ensure known Debian codenames map to the expected major versions.
      */
@@ -36,7 +39,7 @@ class DistroRepoSelectionTest extends TestCase
         $this->assertEquals('bullseye', $info['codename']);
         $this->assertEquals(11, $info['version']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     /**
@@ -56,7 +59,7 @@ class DistroRepoSelectionTest extends TestCase
         $this->assertEquals(42, $info['version']);
         $this->assertEquals('hyperion', $info['codename']);
 
-        $this->clearEnv('PMSS_OS_RELEASE_PATH');
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
     }
 
     /**
@@ -65,7 +68,7 @@ class DistroRepoSelectionTest extends TestCase
     public function testUpdateAptSourcesWritesTemplateForBullseye(): void
     {
         $initial = "deb http://mirror.invalid buster main\n";
-        $target = $this->tempFile('sources', $initial);
+        $target = $this->pmssWriteTempFile('sources', $initial);
         putenv('PMSS_APT_SOURCES_PATH='.$target);
 
         $template = "deb http://mirror.example bullseye main contrib non-free\n";
@@ -90,13 +93,13 @@ class DistroRepoSelectionTest extends TestCase
         $backup = $target.'.pmss-backup';
         $this->assertEquals($initial, file_get_contents($backup));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
     }
 
     public function testUpdateAptSourcesEolSuiteLogsTestModeSkip(): void
     {
         $initial = "deb http://mirror.invalid bullseye main\n";
-        $target = $this->tempFile('sources', $initial);
+        $target = $this->pmssWriteTempFile('sources', $initial);
         putenv('PMSS_APT_SOURCES_PATH='.$target);
 
         $template = "deb http://mirror.example buster main\n";
@@ -119,7 +122,7 @@ class DistroRepoSelectionTest extends TestCase
             return strpos($m, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)') !== false;
         }), 'Expected EOL post-hook to log test-mode skip');
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
     }
 
     /**
@@ -127,28 +130,7 @@ class DistroRepoSelectionTest extends TestCase
      */
     private function writeOsRelease(array $lines): string
     {
-        $file = $this->tempFile('os-release', implode("\n", $lines)."\n");
+        $file = $this->pmssWriteTempFile('os-release', implode("\n", $lines)."\n");
         return $file;
-    }
-
-    /**
-     * Create a temp file with predefined contents, ensuring directories exist.
-     */
-    private function tempFile(string $prefix, string $content): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-'.$prefix.'-');
-        if ($path === false) {
-            $path = sys_get_temp_dir().'/pmss-'.$prefix.'-'.bin2hex(random_bytes(6));
-        }
-        file_put_contents($path, $content);
-        return $path;
-    }
-
-    /**
-     * Clear an environment variable in a portable manner.
-     */
-    private function clearEnv(string $name): void
-    {
-        putenv($name);
     }
 }

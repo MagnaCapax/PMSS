@@ -2,12 +2,15 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/apt.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class DistroRepoSelectionRepoTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testUpdateAptSourcesCreatesParentDirectory(): void
     {
         $dir = sys_get_temp_dir().'/pmss-apt-'.bin2hex(random_bytes(4));
@@ -31,13 +34,13 @@ class DistroRepoSelectionRepoTest extends TestCase
         $this->assertTrue(is_dir($dir));
         $this->assertEquals($template, file_get_contents($target));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
     }
 
     public function testUpdateAptSourcesLeavesFileWhenTemplateEmpty(): void
     {
         $initial = "deb http://existing bullseye main\n";
-        $target = $this->tempFile('sources', $initial);
+        $target = $this->pmssWriteTempFile('sources', $initial);
         putenv('PMSS_APT_SOURCES_PATH='.$target);
 
         \updateAptSources('debian', 11, sha1($initial), [
@@ -48,7 +51,7 @@ class DistroRepoSelectionRepoTest extends TestCase
         $this->assertEquals($initial, file_get_contents($target));
         $this->assertTrue(!file_exists($target.'.pmss-backup'));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
     }
 
     public function testUpdateAptSourcesWithoutExistingFileSkipsBackup(): void
@@ -65,7 +68,7 @@ class DistroRepoSelectionRepoTest extends TestCase
         $this->assertEquals($template, file_get_contents($target));
         $this->assertTrue(!file_exists($target.'.pmss-backup'));
 
-        $this->clearEnv('PMSS_APT_SOURCES_PATH');
+        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
     }
 
     public function testPmssVersionFromCodenameCoversStretch(): void
@@ -73,19 +76,4 @@ class DistroRepoSelectionRepoTest extends TestCase
         $this->assertEquals(9, \pmssVersionFromCodename('stretch'));
     }
 
-    private function tempFile(string $prefix, string $content): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-'.$prefix.'-');
-        if ($path === false) {
-            $path = sys_get_temp_dir().'/pmss-'.$prefix.'-'.bin2hex(random_bytes(6));
-        }
-        file_put_contents($path, $content);
-        return $path;
-    }
-
-    private function clearEnv(string $name): void
-    {
-        putenv($name);
-    }
 }
-
