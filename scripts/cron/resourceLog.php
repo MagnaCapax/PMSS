@@ -41,9 +41,7 @@ foreach ($users as $user) {
         (string) $state['memory'],
         (string) $state['tasks'],
     ];
-    if (isset($state['memory_anon']) && isset($state['memory_file'])) {
-        $lineParts[] = (string) $state['memory_anon'];
-        $lineParts[] = (string) $state['memory_file'];
-    }
+    isset($state['memory_anon'], $state['memory_file'])
+        && array_push($lineParts, (string) $state['memory_anon'], (string) $state['memory_file']);
     @file_put_contents($logDir.'/'.$user, implode(' ', $lineParts).PHP_EOL, FILE_APPEND | LOCK_EX);
 }

@@ -63,21 +63,15 @@ class resourceStatistics
             $parsed[$field] = (float) $tokens[$index];
         }
 
-        if ($tokenCount === 10) {
-            return false;
-        }
-
-        if ($tokenCount <= 10) {
-            return $parsed;
-        }
-
-        foreach ([9 => 'memory_anon', 10 => 'memory_file'] as $index => $field) {
-            if (!ctype_digit($tokens[$index] ?? '')) {
-                return false;
+        if ($tokenCount > 10) {
+            foreach ([9 => 'memory_anon', 10 => 'memory_file'] as $index => $field) {
+                if (!ctype_digit($tokens[$index] ?? '')) {
+                    return false;
+                }
+                $parsed[$field] = (float) $tokens[$index];
             }
-            $parsed[$field] = (float) $tokens[$index];
         }
 
-        return $parsed;
+        return $tokenCount !== 10 ? $parsed : false;
     }
 }
