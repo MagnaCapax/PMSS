@@ -18,11 +18,15 @@ class UserResourcesListTrafficContractsTest extends TestCase
         $this->assertStringContainsString('"/home/{$user}/.trafficData"', $src);
     }
 
-    public function testTrafficDataReadRemainsHermeticAndSafe(): void
+    public function testTrafficStateReadingDelegatesToSharedHelpers(): void
     {
         $src = $this->loadSource();
 
-        $this->assertStringContainsString("['allowed_classes' => false]", $src);
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/user/traffic.php';", $src);
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/user/trafficLimit.php';", $src);
+        $this->assertStringContainsString('pmssTrafficLimitReadGiBFile($trafficLimitPath)', $src);
+        $this->assertStringContainsString('pmssReadUserTrafficMonth($trafficDataPath)', $src);
+        $this->pmssAssertStringNotContainsString('unserialize(', $src);
         $this->assertStringContainsString('max($diskQuotaGiB * 500, 15000)', $src);
     }
 }

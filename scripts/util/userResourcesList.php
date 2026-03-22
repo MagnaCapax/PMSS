@@ -19,6 +19,8 @@ if (posix_getuid() !== 0) {
 
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/systemdSliceProperties.php';
+require_once __DIR__.'/../lib/user/traffic.php';
+require_once __DIR__.'/../lib/user/trafficLimit.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
@@ -148,29 +150,14 @@ foreach ($users as $user) {
         }
     }
 
-    $trafficLimitGiB = null;
     $trafficLimitPath = "/home/{$user}/.trafficLimit";
-    if (is_file($trafficLimitPath) && !is_link($trafficLimitPath)) {
-        $rawTrafficLimit = trim((string) @file_get_contents($trafficLimitPath));
-        if ($rawTrafficLimit !== '' && is_numeric($rawTrafficLimit)) {
-            $parsedTrafficLimit = (int) $rawTrafficLimit;
-            if ($parsedTrafficLimit > 0) {
-                $trafficLimitGiB = $parsedTrafficLimit;
-            }
-        }
+    $trafficLimitGiB = pmssTrafficLimitReadGiBFile($trafficLimitPath);
+    if ($trafficLimitGiB <= 0) {
+        $trafficLimitGiB = null;
     }
 
-    $trafficUsedGiB = 0.0;
     $trafficDataPath = "/home/{$user}/.trafficData";
-    if (is_file($trafficDataPath) && !is_link($trafficDataPath)) {
-        $rawTrafficData = @file_get_contents($trafficDataPath);
-        if (is_string($rawTrafficData) && $rawTrafficData !== '') {
-            $trafficData = @unserialize($rawTrafficData, ['allowed_classes' => false]);
-            if (is_array($trafficData) && isset($trafficData['raw']['month']) && is_numeric($trafficData['raw']['month'])) {
-                $trafficUsedGiB = round(((float) $trafficData['raw']['month']) / 1024, 1);
-            }
-        }
-    }
+    $trafficUsedGiB = round(pmssReadUserTrafficMonth($trafficDataPath) / 1024, 1);
 
     $resourceData = [
         'user' => $user,
