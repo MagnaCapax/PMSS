@@ -8,7 +8,7 @@ class TrafficLimitCliTextTest extends TestCase
     public function testUsageTextKeepsSupportedFormsAndNotes(): void
     {
         $contents = $this->pmssReadRepoFile('scripts/util/userTrafficLimit.php');
-        $expectedLines = [
+        $this->assertOrderedStrings([
             'Usage:',
             '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
             '  ./userTrafficLimit.php --user=<username> --show',
@@ -17,15 +17,7 @@ class TrafficLimitCliTextTest extends TestCase
             'Notes:',
             '  - Limit unit is GiB (monthly quota).',
             '  - Use 0 (or --unset) to remove a limit.',
-        ];
-
-        $offset = -1;
-        foreach ($expectedLines as $line) {
-            $position = strpos($contents, $line);
-            $this->assertTrue($position !== false, 'Missing usage line: '.$line);
-            $this->assertTrue($position > $offset, 'Usage line order changed at: '.$line);
-            $offset = $position;
-        }
+        ], $contents, 'Missing usage line: ', 'Usage line order changed at: ');
     }
 
     public function testMissingUsernamePathStillPrintsUsageText(): void

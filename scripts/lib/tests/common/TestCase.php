@@ -67,6 +67,31 @@ abstract class TestCase
         }
     }
 
+    protected function pmssAssertStringNotContainsString(string $needle, string $haystack, string $message = ''): void
+    {
+        if (strpos($haystack, $needle) !== false) {
+            throw new \AssertionError($message !== '' ? $message : sprintf('Expected string to not contain %s, but it did', var_export($needle, true)));
+        }
+    }
+
+    protected function assertStringContainsAllStrings(array $needles, string $haystack, string $messagePrefix = ''): void
+    {
+        foreach ($needles as $needle) {
+            $this->assertStringContainsString($needle, $haystack, $messagePrefix !== '' ? $messagePrefix.$needle : '');
+        }
+    }
+
+    protected function assertOrderedStrings(array $needles, string $haystack, string $missingPrefix = '', string $orderPrefix = ''): void
+    {
+        $offset = -1;
+        foreach ($needles as $needle) {
+            $position = strpos($haystack, $needle);
+            $this->assertTrue($position !== false, $missingPrefix !== '' ? $missingPrefix.$needle : 'Missing substring: '.$needle);
+            $this->assertTrue($position > $offset, $orderPrefix !== '' ? $orderPrefix.$needle : 'String order changed at: '.$needle);
+            $offset = $position;
+        }
+    }
+
     protected function fail(string $message = ''): void
     {
         throw new \AssertionError($message !== '' ? $message : 'Test failed');

@@ -15,10 +15,6 @@ class ProcessWatchdogCronTest extends TestCase
     public function testProcessWatchdogScriptContainsTwoStrikeKillFlow(): void
     {
         $script = $this->pmssReadRepoFile('scripts/cron/processWatchdog.sh');
-        $this->assertTrue(strpos($script, 'ffmpeg') !== false, 'watchdog should target ffmpeg');
-        $this->assertTrue(strpos($script, 'HandBrakeCLI') !== false, 'watchdog should target HandBrakeCLI');
-        $this->assertTrue(strpos($script, 'GRACE_SECONDS') !== false, 'watchdog should implement strike grace window');
-        $this->assertTrue(strpos($script, 'kill -TERM') !== false, 'watchdog should send SIGTERM first');
-        $this->assertTrue(strpos($script, 'kill -KILL') !== false, 'watchdog should escalate to SIGKILL when needed');
+        $this->assertStringContainsAllStrings(['ffmpeg', 'HandBrakeCLI', 'GRACE_SECONDS', 'kill -TERM', 'kill -KILL'], $script, 'watchdog script is missing: ');
     }
 }

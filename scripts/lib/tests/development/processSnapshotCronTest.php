@@ -22,9 +22,6 @@ class ProcessSnapshotCronTest extends TestCase
     public function testLogrotateKeepsProcessSnapshotHistoryRootOnly(): void
     {
         $policy = $this->pmssReadRepoFile('etc/seedbox/config/template.logrotate.pmss');
-        $this->assertTrue(strpos($policy, '/var/log/pmss/process-snapshot.log') !== false, 'logrotate policy should include process-snapshot.log');
-        $this->assertTrue(strpos($policy, 'weekly') !== false, 'process snapshot log should rotate weekly');
-        $this->assertTrue(strpos($policy, 'rotate 8') !== false, 'process snapshot log should keep 8 rotations');
-        $this->assertTrue(strpos($policy, 'create 0600 root root') !== false, 'process snapshot log should remain root-only');
+        $this->assertStringContainsAllStrings(['/var/log/pmss/process-snapshot.log', 'weekly', 'rotate 8', 'create 0600 root root'], $policy, 'logrotate policy is missing: ');
     }
 }
