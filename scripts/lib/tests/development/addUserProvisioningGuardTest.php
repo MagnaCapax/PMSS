@@ -47,4 +47,17 @@ class AddUserProvisioningGuardTest extends TestCase
         $this->assertTrue($rtorrentPos < $lighttpdPos, 'addUser.php must start rTorrent before lighttpd');
         $this->assertTrue($lighttpdPos < $networkPos, 'addUser.php must refresh network after starting services');
     }
+
+    public function testAddUserRefreshesPatchedTorrentFrontendsBeforeServices(): void
+    {
+        $src = (string) file_get_contents(__DIR__.'/../../../addUser.php');
+        $patchPos = strpos($src, "pmssUserApplySkeletonFiles(['user' => ");
+        $lighttpdPos = strpos($src, '/scripts/startLighttpd');
+
+        $this->assertTrue(strpos($src, "require_once 'lib/update.php';") !== false);
+        $this->assertTrue(strpos($src, "require_once 'lib/update/users/filesystem.php';") !== false);
+        $this->assertTrue($patchPos !== false, 'addUser.php must refresh skeleton frontends after user config');
+        $this->assertTrue($lighttpdPos !== false, 'addUser.php must still start lighttpd');
+        $this->assertTrue($patchPos < $lighttpdPos, 'addUser.php must patch torrent frontends before services start');
+    }
 }

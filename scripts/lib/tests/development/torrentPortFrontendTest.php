@@ -62,6 +62,16 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(strpos($content, '.qbittorrentPort.py') === false);
     }
 
+    public function testApplySkeletonFilesStopsPropagatingLegacyPythonHelpers(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/update/users/filesystem.php');
+
+        $this->assertTrue(strpos($src, "        '.delugePort.py',") === false);
+        $this->assertTrue(strpos($src, "        '.qbittorrentPort.py',") === false);
+        $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') !== false);
+        $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
+    }
+
     public function testDelugePortEnsureUpdatesMismatchedPort(): void
     {
         $home = $this->homePath();

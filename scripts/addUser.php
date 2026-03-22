@@ -41,6 +41,8 @@ require_once 'lib/users.php';
 require_once 'lib/userLifecycle.php';
 require_once 'lib/user/log.php';
 require_once 'lib/homeMount.php';
+require_once 'lib/update.php';
+require_once 'lib/update/users/filesystem.php';
 require_once 'lib/user/add/provisioningRuntime.php';
 require_once 'lib/user/add/systemUserCreate.php';
 require_once 'lib/user/add/userConfigApply.php';
@@ -141,18 +143,9 @@ $hostname = str_replace(array("\n", "\r", "\t"), array('','',''), $hostname);
 
 pmssAddUserSystemUserCreate($user, $homePath);
 pmssAddUserUserConfigApply($userDb, $user, $homePath);
+pmssUserApplySkeletonFiles(['user' => $user['name'], 'home' => $homePath]);
 
 $userHomedirPath = $homePath;
-
-// User data permissions
-#chdir("/home/{$user['name']}");
-#passthru("chmod 777 ./ -R ; chmod 771 ."); //; su {$argv[1]} -c \"screen -fa -d -m rtorrent\" ");
-#shell_exec('chown root.root /home/' . $user['name'] . '/.rtorrent.rc');
-#shell_exec('chmod 775 /home/' . $user['name'] . '/.rtorrent.rc');
-#shell_exec('chown root.root /home/' . $user['name'] . '/www/rutorrent/conf/*');
-#shell_exec('chmod 775 /home/' . $user['name'] . '/www/rutorrent/conf/*');
-
-
 // Execute per server additional config for user creation IF there is any
 if (file_exists('/etc/seedbox/modules/basic/addUser.php')) {
     logProvisionMessage('Initiating basic module for addUser.php');
