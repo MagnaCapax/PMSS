@@ -2,11 +2,14 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserFilemanagerCompatPatchTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $homeRoot;
     private $skelDir;
     private $user;
@@ -152,29 +155,4 @@ PHP;
         }
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-
-        if (is_file($path) || is_link($path)) {
-            @unlink($path);
-            return;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($iterator as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-
-        @rmdir($path);
-    }
 }

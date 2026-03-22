@@ -30,7 +30,7 @@ class BootTuningEnsureTest extends TestCase
 
     public function testWritesBootTuningScript(): void
     {
-        $dir = $this->makeTempDir('script');
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-script-', 0700);
         $messages = [];
         [$script, $service] = $this->runBootTuning($dir, $messages);
 
@@ -49,7 +49,7 @@ class BootTuningEnsureTest extends TestCase
 
     public function testWritesBootTuningService(): void
     {
-        $dir = $this->makeTempDir('service');
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-service-', 0700);
         $messages = [];
         [$script, $service] = $this->runBootTuning($dir, $messages);
 
@@ -63,7 +63,7 @@ class BootTuningEnsureTest extends TestCase
 
     public function testScriptPermissionsAreExecutable(): void
     {
-        $dir = $this->makeTempDir('perms');
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-perms-', 0700);
         $messages = [];
         [$script, $service] = $this->runBootTuning($dir, $messages);
 
@@ -76,7 +76,7 @@ class BootTuningEnsureTest extends TestCase
 
     public function testCreatesTargetDirectories(): void
     {
-        $base = $this->makeTempDir('dirs');
+        $base = $this->pmssMakeTempDir('pmss-boot-tuning-dirs-', 0700);
         $script = $base.'/nested/sbin/pmss-boot-tuning.sh';
         $service = $base.'/nested/systemd/pmss-boot-tuning.service';
         $messages = [];
@@ -94,7 +94,7 @@ class BootTuningEnsureTest extends TestCase
 
     public function testSkipsWhenUpToDate(): void
     {
-        $dir = $this->makeTempDir('skip');
+        $dir = $this->pmssMakeTempDir('pmss-boot-tuning-skip-', 0700);
         $messages = [];
         $this->runBootTuning($dir, $messages);
 
@@ -125,13 +125,6 @@ class BootTuningEnsureTest extends TestCase
         };
         \pmssEnsureBootTuning($logger, $script, $service);
         return [$script, $service];
-    }
-
-    private function makeTempDir(string $prefix): string
-    {
-        $dir = sys_get_temp_dir().'/pmss-boot-tuning-'.bin2hex(random_bytes(4)).'-'.$prefix;
-        mkdir($dir, 0700, true);
-        return $dir;
     }
 
     private function messagesContain(array $messages, string $needle): bool

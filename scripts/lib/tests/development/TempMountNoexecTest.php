@@ -16,13 +16,13 @@ class TempMountNoexecTest extends TestCase
 
     public function tearDown(): void
     {
-        $this->restoreEnv('PMSS_HARDEN_TMP_NOEXEC', $this->prevHardening);
-        $this->restoreEnv('PMSS_DRY_RUN', $this->prevDryRun);
+        $this->pmssRestoreEnv('PMSS_HARDEN_TMP_NOEXEC', $this->prevHardening);
+        $this->pmssRestoreEnv('PMSS_DRY_RUN', $this->prevDryRun);
     }
 
     public function testSkipsWhenFlagDisabled(): void
     {
-        $dir = $this->makeTempDir('pmss-noexec-skip');
+        $dir = $this->pmssMakeTempDir('pmss-noexec-skip-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -43,12 +43,12 @@ class TempMountNoexecTest extends TestCase
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->messagesContain($messages, 'disabled'), 'expected disabled log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testSkipsWhenFlagExplicitlyFalse(): void
     {
-        $dir = $this->makeTempDir('pmss-noexec-false');
+        $dir = $this->pmssMakeTempDir('pmss-noexec-false-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -69,12 +69,12 @@ class TempMountNoexecTest extends TestCase
         $this->assertEquals($original, (string) file_get_contents($fstab));
         $this->assertTrue($this->messagesContain($messages, 'disabled via PMSS_HARDEN_TMP_NOEXEC'), 'expected explicit-false skip log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testAddsNoexecOptionsToFstab(): void
     {
-        $dir = $this->makeTempDir('pmss-noexec-add');
+        $dir = $this->pmssMakeTempDir('pmss-noexec-add-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -99,12 +99,12 @@ class TempMountNoexecTest extends TestCase
         $this->assertStringContainsString('noexec', $updated);
         $this->assertTrue($this->messagesContain($messages, 'Updated /tmp mount options'), 'expected /tmp update log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testRemovesConflictingOptions(): void
     {
-        $dir = $this->makeTempDir('pmss-noexec-conflict');
+        $dir = $this->pmssMakeTempDir('pmss-noexec-conflict-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -129,12 +129,12 @@ class TempMountNoexecTest extends TestCase
         $this->assertTrue(!in_array('suid', $options, true), 'expected suid removed');
         $this->assertTrue(!in_array('dev', $options, true), 'expected dev removed');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testAlreadyHardenedSkips(): void
     {
-        $dir = $this->makeTempDir('pmss-noexec-skip-hardened');
+        $dir = $this->pmssMakeTempDir('pmss-noexec-skip-hardened-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -154,12 +154,12 @@ class TempMountNoexecTest extends TestCase
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->messagesContain($messages, 'already hardened'), 'expected already hardened log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testMountMissingLeavesFstabUntouched(): void
     {
-        $dir = $this->makeTempDir('pmss-noexec-missing');
+        $dir = $this->pmssMakeTempDir('pmss-noexec-missing-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -179,12 +179,12 @@ class TempMountNoexecTest extends TestCase
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->messagesContain($messages, 'not found'), 'expected not found log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testUnreadableFstabWarns(): void
     {
-        $dir = $this->makeTempDir('pmss-noexec-unreadable');
+        $dir = $this->pmssMakeTempDir('pmss-noexec-unreadable-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -204,7 +204,7 @@ class TempMountNoexecTest extends TestCase
         $this->assertTrue($this->messagesContain($messages, 'not readable'), 'expected not readable log');
         chmod($fstab, 0600);
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     private function fstabOptionsForMount(string $fstab, string $mountPoint): array
@@ -237,38 +237,4 @@ class TempMountNoexecTest extends TestCase
         return false;
     }
 
-    private function makeTempDir(string $prefix): string
-    {
-        $dir = sys_get_temp_dir().'/'.$prefix.'-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
-        return $dir;
-    }
-
-    private function restoreEnv(string $key, $value): void
-    {
-        if ($value === false || $value === null) {
-            putenv($key);
-            return;
-        }
-        putenv($key.'='.$value);
-    }
-
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-        @rmdir($path);
-    }
 }

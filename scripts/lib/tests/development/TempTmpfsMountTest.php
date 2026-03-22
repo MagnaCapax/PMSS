@@ -18,14 +18,14 @@ class TempTmpfsMountTest extends TestCase
 
     public function tearDown(): void
     {
-        $this->restoreEnv('PMSS_HARDEN_TMP_TMPFS', $this->prevFlag);
-        $this->restoreEnv('PMSS_TMPFS_TMP_SIZE', $this->prevSize);
-        $this->restoreEnv('PMSS_DRY_RUN', $this->prevDryRun);
+        $this->pmssRestoreEnv('PMSS_HARDEN_TMP_TMPFS', $this->prevFlag);
+        $this->pmssRestoreEnv('PMSS_TMPFS_TMP_SIZE', $this->prevSize);
+        $this->pmssRestoreEnv('PMSS_DRY_RUN', $this->prevDryRun);
     }
 
     public function testSkipsWhenFlagDisabled(): void
     {
-        $dir = $this->makeTempDir('pmss-tmpfs-skip');
+        $dir = $this->pmssMakeTempDir('pmss-tmpfs-skip-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -45,12 +45,12 @@ class TempTmpfsMountTest extends TestCase
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->messagesContain($messages, 'disabled'), 'expected disabled log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testSkipsWhenFlagExplicitlyFalse(): void
     {
-        $dir = $this->makeTempDir('pmss-tmpfs-false');
+        $dir = $this->pmssMakeTempDir('pmss-tmpfs-false-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -70,12 +70,12 @@ class TempTmpfsMountTest extends TestCase
         $this->assertEquals($original, (string) file_get_contents($fstab));
         $this->assertTrue($this->messagesContain($messages, 'disabled via PMSS_HARDEN_TMP_TMPFS'), 'expected explicit-false skip log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testAddsTmpfsEntryWhenMissing(): void
     {
-        $dir = $this->makeTempDir('pmss-tmpfs-add');
+        $dir = $this->pmssMakeTempDir('pmss-tmpfs-add-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -96,12 +96,12 @@ class TempTmpfsMountTest extends TestCase
         $this->assertStringContainsString('tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0', $updated);
         $this->assertTrue($this->messagesContain($messages, 'Added /tmp tmpfs entry'), 'expected add log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testSkipsWhenNonTmpfsEntryExists(): void
     {
-        $dir = $this->makeTempDir('pmss-tmpfs-nontmp');
+        $dir = $this->pmssMakeTempDir('pmss-tmpfs-nontmp-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -121,12 +121,12 @@ class TempTmpfsMountTest extends TestCase
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->messagesContain($messages, 'non-tmpfs'), 'expected non-tmpfs log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testUpdatesTmpfsEntryOptions(): void
     {
-        $dir = $this->makeTempDir('pmss-tmpfs-update');
+        $dir = $this->pmssMakeTempDir('pmss-tmpfs-update-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -153,12 +153,12 @@ class TempTmpfsMountTest extends TestCase
         $this->assertTrue(!in_array('dev', $options, true), 'expected dev removed');
         $this->assertTrue($this->messagesContain($messages, 'Updated /tmp tmpfs options'), 'expected update log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     public function testSizeOverride(): void
     {
-        $dir = $this->makeTempDir('pmss-tmpfs-size');
+        $dir = $this->pmssMakeTempDir('pmss-tmpfs-size-', 0700);
         $fstab = $dir.'/fstab';
         $mounts = $dir.'/mounts';
 
@@ -180,7 +180,7 @@ class TempTmpfsMountTest extends TestCase
         $this->assertStringContainsString('size=512M', $updated);
         $this->assertTrue($this->messagesContain($messages, 'size=512M'), 'expected size override log');
 
-        $this->cleanup($dir);
+        $this->pmssRemoveTree($dir);
     }
 
     private function fstabOptionsForMount(string $fstab, string $mountPoint): array
@@ -213,38 +213,4 @@ class TempTmpfsMountTest extends TestCase
         return false;
     }
 
-    private function makeTempDir(string $prefix): string
-    {
-        $dir = sys_get_temp_dir().'/'.$prefix.'-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
-        return $dir;
-    }
-
-    private function restoreEnv(string $key, $value): void
-    {
-        if ($value === false || $value === null) {
-            putenv($key);
-            return;
-        }
-        putenv($key.'='.$value);
-    }
-
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-        @rmdir($path);
-    }
 }

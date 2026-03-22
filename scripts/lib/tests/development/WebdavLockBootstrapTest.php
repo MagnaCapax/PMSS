@@ -10,7 +10,7 @@ class WebdavLockBootstrapTest extends TestCase
 
     public function testCreatesLockFileWithSafePerms(): void
     {
-        $dir = $this->makeTempDir('pmss-webdav-lock');
+        $dir = $this->pmssMakeTempDir('pmss-webdav-lock-', 0700);
         $userHome = $dir.'/home/deefbox';
         mkdir($userHome.'/.lighttpd', 0700, true);
 
@@ -25,7 +25,7 @@ class WebdavLockBootstrapTest extends TestCase
 
     public function testFixesLockFilePermissions(): void
     {
-        $dir = $this->makeTempDir('pmss-webdav-lock-perms');
+        $dir = $this->pmssMakeTempDir('pmss-webdav-lock-perms-', 0700);
         $userHome = $dir.'/home/deefbox';
         mkdir($userHome.'/.lighttpd', 0700, true);
 
@@ -42,7 +42,7 @@ class WebdavLockBootstrapTest extends TestCase
 
     public function testSkipsWhenLighttpdDirMissing(): void
     {
-        $dir = $this->makeTempDir('pmss-webdav-lock-skip');
+        $dir = $this->pmssMakeTempDir('pmss-webdav-lock-skip-', 0700);
         $userHome = $dir.'/home/deefbox';
         mkdir($userHome, 0700, true);
 
@@ -53,12 +53,4 @@ class WebdavLockBootstrapTest extends TestCase
 
         $this->cleanup($dir);
     }
-
-    private function makeTempDir(string $prefix): string
-    {
-        $dir = sys_get_temp_dir().'/'.$prefix.'-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
-        return $dir;
-    }
-
 }

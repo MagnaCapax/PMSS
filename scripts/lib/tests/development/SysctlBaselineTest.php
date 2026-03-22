@@ -10,7 +10,7 @@ class SysctlBaselineTest extends TestCase
 
     public function testWritesBaselineWithKptrRestrict(): void
     {
-        $dir = $this->makeTempDir('pmss-sysctl');
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-', 0700);
         $target = $dir.'/sysctl.conf';
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -29,7 +29,7 @@ class SysctlBaselineTest extends TestCase
 
     public function testWritesBbrModulesLoadFile(): void
     {
-        $dir = $this->makeTempDir('pmss-sysctl-bbr');
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-bbr-', 0700);
         $target = $dir.'/sysctl.conf';
         $modulesLoad = $dir.'/modules-load.conf';
         $messages = [];
@@ -44,7 +44,7 @@ class SysctlBaselineTest extends TestCase
 
     public function testSkipsWhenUpToDate(): void
     {
-        $dir = $this->makeTempDir('pmss-sysctl-skip');
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-skip-', 0700);
         $target = $dir.'/sysctl.conf';
 
         $messages = [];
@@ -63,7 +63,7 @@ class SysctlBaselineTest extends TestCase
 
     public function testCreatesTargetDirectory(): void
     {
-        $dir = $this->makeTempDir('pmss-sysctl-dir');
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-dir-', 0700);
         $targetDir = $dir.'/nested';
         $target = $targetDir.'/sysctl.conf';
 
@@ -78,7 +78,7 @@ class SysctlBaselineTest extends TestCase
 
     public function testReloadSkipLogWhenDisabled(): void
     {
-        $dir = $this->makeTempDir('pmss-sysctl-reload');
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-reload-', 0700);
         $target = $dir.'/sysctl.conf';
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -90,7 +90,7 @@ class SysctlBaselineTest extends TestCase
 
     public function testUpdatesWhenContentDiffers(): void
     {
-        $dir = $this->makeTempDir('pmss-sysctl-update');
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-update-', 0700);
         $target = $dir.'/sysctl.conf';
         file_put_contents($target, "kernel.kptr_restrict = 0\n");
 
@@ -121,13 +121,6 @@ class SysctlBaselineTest extends TestCase
             }
         }
         return false;
-    }
-
-    private function makeTempDir(string $prefix): string
-    {
-        $dir = sys_get_temp_dir().'/'.$prefix.'-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
-        return $dir;
     }
 
 }

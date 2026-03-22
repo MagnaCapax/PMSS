@@ -8,8 +8,8 @@ class ConfigBackupsTest extends TestCase
 {
     public function testBackupCreatesFileWithMetadataInName(): void
     {
-        $root = $this->makeTempDir('pmss-backups-src-');
-        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+        $root = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/ssh/sshd_config';
         @mkdir(dirname($source), 0755, true);
@@ -38,7 +38,7 @@ class ConfigBackupsTest extends TestCase
 
     public function testBackupReturnsNullWhenSourceMissing(): void
     {
-        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
         $missing = $backupRoot.'/nope.conf';
 
         $backup = \pmssBackupCriticalConfig('sshd', $missing, array(
@@ -50,8 +50,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testBackupHelpersStillWorkWithoutRuntimeLoggerBootstrap(): void
     {
-        $root = $this->makeTempDir('pmss-backups-src-');
-        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+        $root = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/nginx/nginx.conf';
         @mkdir(dirname($source), 0755, true);
@@ -81,8 +81,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testPruneKeepsNewestNBackups(): void
     {
-        $root = $this->makeTempDir('pmss-backups-src-');
-        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+        $root = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/ssh/sshd_config';
         @mkdir(dirname($source), 0755, true);
@@ -118,8 +118,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testPruneDropsBackupsOlderThanTtl(): void
     {
-        $root = $this->makeTempDir('pmss-backups-src-');
-        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+        $root = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/nginx/nginx.conf';
         @mkdir(dirname($source), 0755, true);
@@ -151,8 +151,8 @@ class ConfigBackupsTest extends TestCase
 
     public function testPruneReturnsQuietlyWhenServiceDirectoryMissing(): void
     {
-        $root = $this->makeTempDir('pmss-backups-src-');
-        $backupRoot = $this->makeTempDir('pmss-backups-root-');
+        $root = $this->pmssMakeTempDir('pmss-backups-src-');
+        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/ssh/sshd_config';
         @mkdir(dirname($source), 0755, true);
@@ -180,8 +180,4 @@ class ConfigBackupsTest extends TestCase
         $this->assertEquals('abcd', \pmssConfigBackupsSanitizeLabel('abcd-efgh', 4));
     }
 
-    private function makeTempDir(string $prefix): string
-    {
-        return $this->pmssMakeTempDir($prefix);
-    }
 }

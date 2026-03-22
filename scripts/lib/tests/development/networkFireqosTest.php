@@ -5,41 +5,6 @@ require_once dirname(__DIR__, 2).'/network/fireqos.php';
 
 class NetworkFireqosTest extends TestCase
 {
-    private function createTempDir(string $prefix): string
-    {
-        $path = sys_get_temp_dir().'/'.$prefix.'-'.bin2hex(random_bytes(4));
-        @mkdir($path, 0700, true);
-        return $path;
-    }
-
-    private function removeTempDir(string $path): void
-    {
-        if ($path === '' || !is_dir($path)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $node) {
-            if ($node->isDir()) {
-                @rmdir($node->getPathname());
-            } else {
-                @unlink($node->getPathname());
-            }
-        }
-        @rmdir($path);
-    }
-
-    private function restoreEnv(string $key, $value): void
-    {
-        if ($value === false || $value === null || $value === '') {
-            putenv($key);
-            return;
-        }
-        putenv($key.'='.$value);
-    }
-
     public function testBuildFireqosConfigRendersPlaceholders(): void
     {
         $template = "iface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n";
@@ -64,8 +29,8 @@ class NetworkFireqosTest extends TestCase
 
     public function testBuildFireqosConfigUsesUserThrottleCapWhenEnabled(): void
     {
-        $stateDir = $this->createTempDir('pmss-fireqos-state');
-        $homeDir = $this->createTempDir('pmss-fireqos-home');
+        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
+        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         @mkdir($homeDir.'/root', 0755, true);
         @file_put_contents($stateDir.'/root.enabled', '1');
         @file_put_contents($homeDir.'/root/.throttle', '25');
@@ -83,17 +48,17 @@ class NetworkFireqosTest extends TestCase
             );
             $this->assertTrue(strpos($config, 'class root ceil 25Mbit') !== false);
         } finally {
-            $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
-            $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
-            $this->removeTempDir($stateDir);
-            $this->removeTempDir($homeDir);
+            $this->pmssRestoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir, true);
+            $this->pmssRestoreEnv('PMSS_HOME_DIR', $prevHomeDir, true);
+            $this->pmssRemoveTree($stateDir);
+            $this->pmssRemoveTree($homeDir);
         }
     }
 
     public function testBuildFireqosConfigUsesSlidingThrottleWhenPresent(): void
     {
-        $stateDir = $this->createTempDir('pmss-fireqos-state');
-        $homeDir = $this->createTempDir('pmss-fireqos-home');
+        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
+        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         @mkdir($homeDir.'/root', 0755, true);
         @file_put_contents($stateDir.'/root.enabled', '1');
         @file_put_contents($homeDir.'/root/.throttle', '25');
@@ -112,17 +77,17 @@ class NetworkFireqosTest extends TestCase
             );
             $this->assertTrue(strpos($config, 'class root ceil 333Mbit') !== false);
         } finally {
-            $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
-            $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
-            $this->removeTempDir($stateDir);
-            $this->removeTempDir($homeDir);
+            $this->pmssRestoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir, true);
+            $this->pmssRestoreEnv('PMSS_HOME_DIR', $prevHomeDir, true);
+            $this->pmssRemoveTree($stateDir);
+            $this->pmssRemoveTree($homeDir);
         }
     }
 
     public function testBuildFireqosConfigFallsBackWhenSlidingThrottleInvalid(): void
     {
-        $stateDir = $this->createTempDir('pmss-fireqos-state');
-        $homeDir = $this->createTempDir('pmss-fireqos-home');
+        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
+        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         @mkdir($homeDir.'/root', 0755, true);
         @file_put_contents($stateDir.'/root.enabled', '1');
         @file_put_contents($homeDir.'/root/.throttle', '25');
@@ -141,17 +106,17 @@ class NetworkFireqosTest extends TestCase
             );
             $this->assertTrue(strpos($config, 'class root ceil 25Mbit') !== false);
         } finally {
-            $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
-            $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
-            $this->removeTempDir($stateDir);
-            $this->removeTempDir($homeDir);
+            $this->pmssRestoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir, true);
+            $this->pmssRestoreEnv('PMSS_HOME_DIR', $prevHomeDir, true);
+            $this->pmssRemoveTree($stateDir);
+            $this->pmssRemoveTree($homeDir);
         }
     }
 
     public function testBuildFireqosConfigFallsBackToDefaultCapWhenThrottleMissing(): void
     {
-        $stateDir = $this->createTempDir('pmss-fireqos-state');
-        $homeDir = $this->createTempDir('pmss-fireqos-home');
+        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
+        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         @mkdir($homeDir.'/root', 0755, true);
         @file_put_contents($stateDir.'/root.enabled', '1');
 
@@ -168,17 +133,17 @@ class NetworkFireqosTest extends TestCase
             );
             $this->assertTrue(strpos($config, 'class root ceil 90Mbit') !== false);
         } finally {
-            $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
-            $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
-            $this->removeTempDir($stateDir);
-            $this->removeTempDir($homeDir);
+            $this->pmssRestoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir, true);
+            $this->pmssRestoreEnv('PMSS_HOME_DIR', $prevHomeDir, true);
+            $this->pmssRemoveTree($stateDir);
+            $this->pmssRemoveTree($homeDir);
         }
     }
 
     public function testBuildFireqosConfigSkipsCapWhenNotEnabled(): void
     {
-        $stateDir = $this->createTempDir('pmss-fireqos-state');
-        $homeDir = $this->createTempDir('pmss-fireqos-home');
+        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
+        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
         $templatePath = sys_get_temp_dir().'/fireqos-template-'.bin2hex(random_bytes(4)).'.conf';
         @mkdir($homeDir.'/root', 0755, true);
         @file_put_contents($homeDir.'/root/.throttle', '10');
@@ -199,12 +164,12 @@ class NetworkFireqosTest extends TestCase
             );
             $this->assertTrue(strpos($config, 'ceil') === false);
         } finally {
-            $this->restoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir);
-            $this->restoreEnv('PMSS_HOME_DIR', $prevHomeDir);
-            $this->restoreEnv('PMSS_FIREQOS_TEMPLATE', $prevTemplate);
+            $this->pmssRestoreEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', $prevStateDir, true);
+            $this->pmssRestoreEnv('PMSS_HOME_DIR', $prevHomeDir, true);
+            $this->pmssRestoreEnv('PMSS_FIREQOS_TEMPLATE', $prevTemplate, true);
             @unlink($templatePath);
-            $this->removeTempDir($stateDir);
-            $this->removeTempDir($homeDir);
+            $this->pmssRemoveTree($stateDir);
+            $this->pmssRemoveTree($homeDir);
         }
     }
 }

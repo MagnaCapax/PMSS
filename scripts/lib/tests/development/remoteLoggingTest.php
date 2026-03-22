@@ -2,10 +2,13 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/logging.php';
 
 class RemoteLoggingTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function setUp(): void
     {
         unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
@@ -187,24 +190,4 @@ class RemoteLoggingTest extends TestCase
         return false;
     }
 
-    private function cleanup(string $path): void
-    {
-        if (!file_exists($path)) {
-            return;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($iterator as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-                continue;
-            }
-            @unlink($item->getPathname());
-        }
-
-        @rmdir($path);
-    }
 }

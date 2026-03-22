@@ -2,10 +2,13 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update.php';
 
 class UpdateUserFileSafeWriteTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $homeRoot;
     private $user;
     private $skelDirName;
@@ -155,25 +158,4 @@ class UpdateUserFileSafeWriteTest extends TestCase
         }
     }
 
-    private function cleanup(string $path): void
-    {
-        if ($path === '' || !file_exists($path)) {
-            return;
-        }
-        if (is_file($path) || is_link($path)) {
-            @unlink($path);
-            return;
-        }
-        $items = scandir($path);
-        if (!is_array($items)) {
-            return;
-        }
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $this->cleanup($path.'/'.$item);
-        }
-        @rmdir($path);
-    }
 }

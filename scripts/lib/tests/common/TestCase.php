@@ -117,4 +117,15 @@ abstract class TestCase
 
         @rmdir($path);
     }
+
+    /** Restore a previous environment variable value captured with getenv(). */
+    protected function pmssRestoreEnv(string $key, $value, bool $unsetEmptyString = false): void
+    {
+        if ($value === false || $value === null || ($unsetEmptyString && $value === '')) {
+            putenv($key);
+            return;
+        }
+
+        putenv($key.'='.$value);
+    }
 }
