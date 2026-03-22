@@ -58,6 +58,20 @@ class CliHelperTest extends TestCase
         $this->assertTrue(\pmssCliOption($parsed, 'v'));
     }
 
+    public function testDeclaredLongValueOptionConsumesDashedToken(): void
+    {
+        $parsed = \pmssParseCliTokens(['script.php', '--json', '-h'], ['json']);
+        $this->assertEquals('-h', \pmssCliOption($parsed, 'json'));
+        $this->assertTrue(\pmssCliOption($parsed, 'help', 'h', false) === false);
+    }
+
+    public function testDeclaredShortValueOptionConsumesDashedToken(): void
+    {
+        $parsed = \pmssParseCliTokens(['script.php', '-j', '--help'], ['j']);
+        $this->assertEquals('--help', \pmssCliOption($parsed, 'json', 'j'));
+        $this->assertTrue(\pmssCliOption($parsed, 'help', 'h', false) === false);
+    }
+
     public function testTreatsBareDashAsPositionalAndIgnoresBareDoubleDash(): void
     {
         $parsed = \pmssParseCliTokens(['script.php', '-', '--', 'extra']);

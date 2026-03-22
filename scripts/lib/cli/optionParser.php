@@ -11,11 +11,15 @@
 
 /**
  * Split argv tokens into associative options and positional arguments.
+ * @param array<int,string> $valueOptions Option names that may consume dashed values.
  */
-function pmssParseCliTokens(array $argv): array
+function pmssParseCliTokens(array $argv, array $valueOptions = []): array
 {
     $options = [];
     $positionals = [];
+    $valueOptionLookup = [];
+    foreach ($valueOptions as $option) { $valueOptionLookup[ltrim((string) $option, '-')] = true; }
+    unset($valueOptionLookup['']);
 
     for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
         $token = $argv[$i];
@@ -46,8 +50,9 @@ function pmssParseCliTokens(array $argv): array
         }
 
         $next = $argv[$i + 1] ?? null;
-        $options[$body] = ($next !== null && $next !== '' && ($next[0] ?? '') !== '-') ? $next : true;
-        $i += ($options[$body] !== true) ? 1 : 0;
+        $shouldConsumeNext = $next !== null && $next !== '' && (isset($valueOptionLookup[$body]) || ($next[0] ?? '') !== '-');
+        $options[$body] = $shouldConsumeNext ? $next : true;
+        $i += $shouldConsumeNext ? 1 : 0;
     }
 
     return ['options' => $options, 'arguments' => $positionals];

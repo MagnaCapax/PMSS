@@ -15,6 +15,7 @@
 // Keep runtime flags; preserve non-destructive guarantees and PHP 7.3.
 
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/cli/optionParser.php';
 
 function usage(): void {
     echo <<<'USAGE'
@@ -59,46 +60,39 @@ $devRuntime = 30;
 $requireIdle=false; $idleLatencyMs=100; $idleUtilPct=85; $showLast=false;
 
 $stringOptions = [
-    '--target' => 'targetDir',
-    '--size' => 'fileSize',
-    '--json' => 'jsonLog',
-    '--label' => 'label',
-    '--dd-size' => 'ddSize',
+    'target' => 'targetDir',
+    'size' => 'fileSize',
+    'json' => 'jsonLog',
+    'label' => 'label',
+    'dd-size' => 'ddSize',
 ];
 $intOptions = [
-    '--runtime' => 'runtime',
-    '--device-runtime' => 'devRuntime',
-    '--idle-latency-ms' => 'idleLatencyMs',
-    '--idle-util' => 'idleUtilPct',
+    'runtime' => 'runtime',
+    'device-runtime' => 'devRuntime',
+    'idle-latency-ms' => 'idleLatencyMs',
+    'idle-util' => 'idleUtilPct',
 ];
 $flagOptions = [
-    '--devices' => 'testDevices',
-    '--require-idle' => 'requireIdle',
-    '--show-last' => 'showLast',
+    'devices' => 'testDevices',
+    'require-idle' => 'requireIdle',
+    'show-last' => 'showLast',
 ];
-$valueOptions = $stringOptions + $intOptions;
-for ($i = 1, $argc = count($argv); $i < $argc; $i++) {
-    [$key, $val] = array_pad(explode('=', $argv[$i], 2), 2, null);
-    if ($key === '--help' || $key === '-h') {
-        usage(); exit(0);
+$parsed = pmssParseCliTokens($argv, array_keys($stringOptions + $intOptions));
+if (pmssCliOption($parsed, 'help', 'h')) { usage(); exit(0); }
+foreach ($flagOptions as $option => $variable) {
+    ${$variable} = pmssCliOption($parsed, $option) === true;
+}
+foreach ($stringOptions as $option => $variable) {
+    $value = pmssCliOption($parsed, $option);
+    if ($value !== null && $value !== true) {
+        ${$variable} = (string) $value;
     }
-    if (isset($flagOptions[$key])) {
-        ${$flagOptions[$key]} = true;
-        continue;
+}
+foreach ($intOptions as $option => $variable) {
+    $value = pmssCliOption($parsed, $option);
+    if ($value !== null && $value !== true) {
+        ${$variable} = (int) $value;
     }
-    if (!isset($valueOptions[$key])) {
-        continue;
-    }
-
-    if ($val === null && isset($argv[$i + 1]) && strpos($argv[$i + 1], '--') !== 0) {
-        $val = $argv[++$i];
-    }
-
-    if ($val === null) {
-        continue;
-    }
-
-    ${$valueOptions[$key]} = isset($intOptions[$key]) ? (int) $val : $val;
 }
 
 function parseSizeSB(string $s): int { if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }

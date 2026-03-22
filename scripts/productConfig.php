@@ -11,31 +11,29 @@
  */
 
 require_once __DIR__.'/lib/runtime.php';
+require_once __DIR__.'/lib/cli/optionParser.php';
 
 pmssRequireCli();
 
 require_once __DIR__.'/lib/welcomeMessageProductConfig.php';
 
 $usage = "Usage: productConfig.php PRODUCT --welcome-message=<html>\n";
-if (($argv[1] ?? '') === '--help' || ($argv[1] ?? '') === '-h') {
+$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['welcome-message']);
+if (pmssCliOption($parsed, 'help', 'h')) {
     echo $usage;
     exit(0);
 }
 
 requireRoot();
 
-$productKey = trim((string) ($argv[1] ?? ''));
+$productKey = trim((string) ($parsed['arguments'][0] ?? ''));
 if ($productKey === '') {
     fwrite(STDERR, "Error: missing product.\n".$usage);
     exit(2);
 }
 
-$welcomeMessage = null;
-for ($index = 2; $index < count($argv); $index++) {
-    if (strpos((string) $argv[$index], '--welcome-message=') === 0) {
-        $welcomeMessage = substr((string) $argv[$index], strlen('--welcome-message='));
-    }
-}
+$welcomeMessage = pmssCliOption($parsed, 'welcome-message');
+$welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null : (string) $welcomeMessage;
 
 if ($welcomeMessage === null) {
     fwrite(STDERR, "Error: missing --welcome-message option.\n".$usage);
