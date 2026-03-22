@@ -14,6 +14,21 @@ class RtorrentProcessTest extends TestCase
 {
     private $tempDir;
 
+    private function removeTree(string $path): void
+    {
+        if (is_link($path) || is_file($path)) {
+            @unlink($path);
+            return;
+        }
+        $children = glob($path.'/*');
+        if (is_array($children)) {
+            foreach ($children as $child) {
+                $this->removeTree($child);
+            }
+        }
+        @rmdir($path);
+    }
+
     public function setUp(): void
     {
         $this->tempDir = sys_get_temp_dir().'/pmss-test-'.getmypid();
@@ -22,10 +37,11 @@ class RtorrentProcessTest extends TestCase
 
     public function tearDown(): void
     {
-        // Cleanup temp files.
-        $files = glob($this->tempDir.'/*');
-        foreach ($files as $file) {
-            @unlink($file);
+        $children = glob($this->tempDir.'/*');
+        if (is_array($children)) {
+            foreach ($children as $child) {
+                $this->removeTree($child);
+            }
         }
         @rmdir($this->tempDir);
     }
@@ -283,5 +299,85 @@ class RtorrentProcessTest extends TestCase
         $this->assertTrue(defined('SIGKILL'));
         $this->assertEquals(15, SIGTERM);
         $this->assertEquals(9, SIGKILL);
+    }
+
+    public function testResetSessionDirectoryQuarantinesAndRecreatesDirectory(): void
+    {
+        $home = $this->tempDir.'/alice';
+        $sessionDir = $home.'/session';
+        @mkdir($sessionDir, 0755, true);
+        file_put_contents($sessionDir.'/resume.dat', 'state');
+        $messages = [];
+
+        $result = rtorrentProcessResetSessionDirectory($home, 'alice', function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        });
+
+        $this->assertTrue($result, 'Session reset should succeed for a normal directory');
+        $this->assertTrue(is_dir($sessionDir), 'Session directory should exist after reset');
+        $this->assertTrue(!file_exists($sessionDir.'/resume.dat'), 'Old session files should not remain in the new directory');
+        $this->assertTrue(count(glob($home.'/session.broken-*')) === 1, 'Original directory should be quarantined once');
+        $this->assertTrue(strpos(implode("\n", $messages), 'Quarantined broken session directory') !== false);
+    }
+
+    public function testResetSessionDirectoryCreatesMissingDirectory(): void
+    {
+        $home = $this->tempDir.'/alice';
+        @mkdir($home, 0755, true);
+
+        $result = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
+        });
+
+        $this->assertTrue($result, 'Missing session directory should be created');
+        $this->assertTrue(is_dir($home.'/session'));
+    }
+
+    public function testResetSessionDirectoryRejectsUnexpectedPath(): void
+    {
+        $messages = [];
+
+        $result = rtorrentProcessResetSessionDirectory($this->tempDir.'/alice', 'bob', function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        });
+
+        $this->assertTrue(!$result, 'Unexpected home path should be rejected');
+        $this->assertTrue(strpos(implode("\n", $messages), 'Refusing to reset unexpected session directory') !== false);
+    }
+
+    public function testResetSessionDirectoryRejectsSymlink(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $home = $this->tempDir.'/alice';
+        @mkdir($home, 0755, true);
+        @mkdir($this->tempDir.'/target', 0755, true);
+        @symlink($this->tempDir.'/target', $home.'/session');
+        $messages = [];
+
+        $result = rtorrentProcessResetSessionDirectory($home, 'alice', function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        });
+
+        $this->assertTrue(!$result, 'Symlinked session directory should be rejected');
+        $this->assertTrue(strpos(implode("\n", $messages), 'Refusing to reset symlinked session directory') !== false);
+    }
+
+    public function testResetSessionDirectoryCanRunTwice(): void
+    {
+        $home = $this->tempDir.'/alice';
+        $sessionDir = $home.'/session';
+        @mkdir($sessionDir, 0755, true);
+
+        $first = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
+        });
+        $second = rtorrentProcessResetSessionDirectory($home, 'alice', function (): void {
+        });
+
+        $this->assertTrue($first);
+        $this->assertTrue($second);
+        $this->assertTrue(is_dir($sessionDir));
+        $this->assertTrue(count(glob($home.'/session.broken-*')) >= 1, 'At least one quarantine directory should exist');
     }
 }

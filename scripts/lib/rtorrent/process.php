@@ -218,6 +218,63 @@ function rtorrentProcessClearStaleState(string $stateFile): void
 }
 
 /**
+ * Reset a user's rTorrent session directory conservatively.
+ *
+ * Persistent start failures can leave the session state corrupted. Move the
+ * current directory aside for later inspection, recreate an empty session
+ * directory, and restore expected ownership. The caller decides when this
+ * recovery step is justified.
+ *
+ * @param string   $home   User home directory path.
+ * @param string   $user   Username.
+ * @param callable $logFn  Logging callback: function(string $message, bool $force).
+ *
+ * @return bool True when the session directory is ready for reuse.
+ */
+function rtorrentProcessResetSessionDirectory(string $home, string $user, callable $logFn): bool
+{
+    $home = rtrim($home, '/');
+    $sessionDir = $home.'/session';
+    $expected = '/home/'.$user.'/session';
+    $testMode = defined('PMSS_TEST_MODE') || getenv('PMSS_TEST_MODE') === '1';
+
+    if ((!$testMode && ($sessionDir !== $expected || strpos($sessionDir, '/home/') !== 0))
+        || ($testMode && substr($sessionDir, -strlen('/'.$user.'/session')) !== '/'.$user.'/session')
+    ) {
+        $logFn("Refusing to reset unexpected session directory: {$sessionDir}", true);
+        return false;
+    }
+    if (is_link($sessionDir)) {
+        $logFn("Refusing to reset symlinked session directory: {$sessionDir}", true);
+        return false;
+    }
+
+    if (is_dir($sessionDir)) {
+        $backup = $sessionDir.'.broken-'.date('Ymd_His').'-'.(int) getmypid();
+        if (!@rename($sessionDir, $backup)) {
+            $logFn("Failed to quarantine broken session directory: {$sessionDir}", true);
+            return false;
+        }
+        $logFn("Quarantined broken session directory: {$sessionDir} -> {$backup}", true);
+    }
+
+    if (!is_dir($sessionDir) && !@mkdir($sessionDir, 0755, true) && !is_dir($sessionDir)) {
+        $logFn("Failed to recreate session directory: {$sessionDir}", true);
+        return false;
+    }
+
+    @chown($sessionDir, $user);
+    if (function_exists('posix_getpwnam')) {
+        $pw = @posix_getpwnam($user);
+        if (is_array($pw) && isset($pw['gid'])) {
+            @chgrp($sessionDir, (int) $pw['gid']);
+        }
+    }
+
+    return true;
+}
+
+/**
  * Quarantine a user's custom rTorrent config file.
  *
  * When /home/<user>/.rtorrent.rc.custom exists but is invalid, rTorrent can

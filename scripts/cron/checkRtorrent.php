@@ -16,6 +16,7 @@
  * State tracking (uses /run/pmss/ state files):
  * - Executor-present-but-rtorrent-missing: 180s grace period
  * - SCGI unresponsive: 120s grace period (2 consecutive cron runs)
+ * - Repeated start failures: session reset after 3 misses, escalation after 6
  *
  * Logging:
  * - Stdout: captured by cron for /var/log/pmss/cron/ or mail delivery
@@ -45,6 +46,8 @@ $debug = in_array('--debug', $args, true);
 // Grace periods for transient conditions (seconds).
 define('PMSS_RTORRENT_MISSING_GRACE', 180);
 define('PMSS_RTORRENT_UNRESPONSIVE_GRACE', 120);
+define('PMSS_RTORRENT_START_FAILURE_SESSION_RESET', 3);
+define('PMSS_RTORRENT_START_FAILURE_ESCALATE', 6);
 
 /**
  * Emit a log line to stdout (captured by cron redirection).
@@ -155,10 +158,20 @@ foreach ($usersOut as $line) {
     // State file paths.
     $missingState = $stateDir.'/checkRtorrent-missing-'.$user.'.ts';
     $unresponsiveState = $stateDir.'/checkRtorrent-unresponsive-'.$user.'.ts';
+    $startMarkerState = $stateDir.'/checkRtorrent-started-'.$user.'.ts';
+    $startFailureState = $stateDir.'/checkRtorrent-start-failure-'.$user.'.count';
+    $sessionResetState = $stateDir.'/checkRtorrent-session-reset-'.$user.'.ts';
+    $escalationState = $stateDir.'/checkRtorrent-escalated-'.$user.'.flag';
 
     // Clear state if condition resolved.
     if (!empty($rtorrentPids) || !$executorPresent) {
         rtorrentProcessClearStaleState($missingState);
+    }
+    if (!empty($rtorrentPids) || $executorPresent) {
+        rtorrentProcessClearStaleState($startMarkerState);
+        rtorrentProcessClearStaleState($startFailureState);
+        rtorrentProcessClearStaleState($sessionResetState);
+        rtorrentProcessClearStaleState($escalationState);
     }
 
     // --- Anomaly: Multiple processes ---
@@ -176,6 +189,49 @@ foreach ($usersOut as $line) {
 
     // --- Missing: No executor and no rTorrent ---
     if (!$executorPresent && empty($rtorrentPids)) {
+        $persistentFailureCount = 0;
+        if (is_file($startMarkerState)) {
+            $persistentFailureState = rtorrentProcessCheckFailureCountState(
+                $startFailureState,
+                PMSS_RTORRENT_START_FAILURE_ESCALATE
+            );
+            $persistentFailureCount = $persistentFailureState['count'];
+
+            pmssCheckRtorrentLogBoth(
+                $user,
+                "rTorrent still missing after start attempt; persistent failure {$persistentFailureCount}/"
+                    .PMSS_RTORRENT_START_FAILURE_ESCALATE,
+                $debug
+            );
+
+            if ($persistentFailureCount >= PMSS_RTORRENT_START_FAILURE_SESSION_RESET
+                && !is_file($sessionResetState)
+            ) {
+                if (rtorrentProcessResetSessionDirectory($home, $user, $logCallback)) {
+                    @file_put_contents($sessionResetState, (string) time(), LOCK_EX);
+                    pmssCheckRtorrentLogBoth(
+                        $user,
+                        'persistent start failure recovery: reset session directory',
+                        $debug
+                    );
+                }
+            }
+
+            if ($persistentFailureCount >= PMSS_RTORRENT_START_FAILURE_ESCALATE) {
+                @file_put_contents(
+                    $escalationState,
+                    json_encode(['timestamp' => time(), 'user' => $user, 'count' => $persistentFailureCount]),
+                    LOCK_EX
+                );
+                pmssCheckRtorrentLogBoth(
+                    $user,
+                    'persistent start failure escalated; leaving retry disabled for external monitoring',
+                    $debug
+                );
+                continue;
+            }
+        }
+
         // Solution 1: Stagger starts after reboot to prevent I/O storm.
         if (rtorrentProcessRecentReboot(600)) {
             $delay = rtorrentProcessStaggerDelay($user, 300);
@@ -193,6 +249,7 @@ foreach ($usersOut as $line) {
         @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
         pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
         @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
+        @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
         continue;
     }
 
