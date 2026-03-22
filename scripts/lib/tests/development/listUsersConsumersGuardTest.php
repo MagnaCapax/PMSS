@@ -6,17 +6,40 @@ require_once __DIR__.'/../common/TestCase.php';
 class ListUsersConsumersGuardTest extends TestCase
 {
     /**
-     * Ensure scripts that shell out to /scripts/listUsers.php also trim and
-     * revalidate usernames via pmssValidateUsername before acting on them.
+     * Ensure helper-based consumers rely on pmssListManagedUsers() instead of
+     * re-implementing the legacy listUsers sanitization inline.
      */
-    public function testListUsersConsumersRevalidate(): void
+    public function testHelperConsumersRelyOnSharedManagedUserParser(): void
     {
         $targets = [
-            'scripts/cron/updateQuotas.php',
             'scripts/util/setupNetwork.php',
             'scripts/util/checkUserHtpasswd.php',
             'scripts/util/userResourcesList.php',
             'scripts/util/userConfigLighttpd.php',
+        ];
+
+        foreach ($targets as $file) {
+            $src = (string) file_get_contents(__DIR__.'/../../../../'.$file);
+            $this->assertStringContainsString("pmssListManagedUsers('/scripts/listUsers.php')", $src, $file.' must use pmssListManagedUsers()');
+            $this->assertTrue(
+                strpos($src, "array_map('trim', pmssListManagedUsers") === false,
+                $file.' should not re-trim pmssListManagedUsers() output'
+            );
+            $this->assertTrue(
+                strpos($src, "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')") === false,
+                $file.' should not revalidate pmssListManagedUsers() output inline'
+            );
+        }
+    }
+
+    /**
+     * Ensure scripts that still shell out directly to listUsers.php keep their
+     * own username validation guards.
+     */
+    public function testDirectListUsersConsumersStillRevalidate(): void
+    {
+        $targets = [
+            'scripts/cron/updateQuotas.php',
             'scripts/userTorrents.php',
             'scripts/cron/userTrackerCleaner.php',
             'scripts/cron/trafficIngressLog.php',

@@ -158,10 +158,11 @@ function pmssValidateUsernameForCreate(string $username): bool
 }
 
 /**
- * Return validated managed usernames from the legacy listUsers command.
+ * Return trimmed, normalized, validated managed usernames from listUsers.php.
  *
  * This keeps cron and utility scripts on one parsing path while preserving the
- * long-standing listUsers.php trust boundary for tenant discovery.
+ * long-standing listUsers.php trust boundary for tenant discovery; callers may
+ * consume the returned list directly without re-trimming each raw entry.
  */
 function pmssListManagedUsers(string $command = '/scripts/listUsers.php'): array
 {

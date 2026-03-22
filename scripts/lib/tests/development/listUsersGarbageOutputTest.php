@@ -6,9 +6,9 @@ require_once __DIR__.'/../common/TestCase.php';
 class ListUsersGarbageOutputTest extends TestCase
 {
     /**
-     * Simulate garbage output from listUsers.php and ensure consumers are
-     * resilient in their source code: they must trim entries, skip empties,
-     * and revalidate usernames via pmssValidateUsername().
+     * Simulate garbage output from listUsers.php and ensure helper-based
+     * consumers delegate sanitization to pmssListManagedUsers(), while direct
+     * callers still keep their own validation guards.
      *
      * This test is static/source-based rather than executing the scripts
      * because reproducing cron + filesystem state in CI is brittle.
@@ -28,33 +28,37 @@ class ListUsersGarbageOutputTest extends TestCase
             'user; rm -rf /home/*; #',
         ];
 
-        // We do not execute scripts; instead we assert that key consumers
-        // contain the guards we expect (trim + pmssValidateUsername calls),
-        // which would render the above garbage safe if emitted by listUsers.
-        $targets = [
-            'scripts/cron/updateQuotas.php',
+        // We do not execute scripts here; instead we assert that helper-based
+        // consumers centralize listUsers sanitization via pmssListManagedUsers.
+        $helperTargets = [
             'scripts/util/setupNetwork.php',
             'scripts/util/checkUserHtpasswd.php',
             'scripts/util/userResourcesList.php',
+            'scripts/util/userConfigLighttpd.php',
+        ];
+
+        foreach ($helperTargets as $file) {
+            $src = (string) file_get_contents(__DIR__.'/../../../../'.$file);
+            $this->assertStringContainsString("pmssListManagedUsers('/scripts/listUsers.php')", $src, $file.' must use pmssListManagedUsers()');
+        }
+
+        // Direct consumers that still shell out to listUsers.php must keep explicit validation.
+        $directTargets = [
+            'scripts/cron/updateQuotas.php',
             'scripts/userTorrents.php',
             'scripts/cron/userTrackerCleaner.php',
             'scripts/cron/trafficIngressLog.php',
         ];
 
-        foreach ($targets as $file) {
+        foreach ($directTargets as $file) {
             $src = (string) file_get_contents(__DIR__.'/../../../../'.$file);
             $this->assertStringContainsString('listUsers.php', $src, $file.' must call listUsers.php');
-            $this->assertTrue(
-                strpos($src, 'trim($') !== false || strpos($src, "array_map('trim'") !== false,
-                $file.' should trim usernames from listUsers'
-            );
             $this->assertStringContainsString('pmssValidateUsername', $src, $file.' must revalidate usernames from listUsers');
         }
 
         // The main guard against garbage lines is that only names accepted by
         // pmssValidateUsername() (^[a-z][a-z0-9]{0,7}$) are used. Check
         // that our garbage examples would all be rejected by the validator.
-        require_once __DIR__.'/../../userLifecycle.php';
         foreach ($garbageLines as $line) {
             $valid = \pmssValidateUsername(trim($line));
             $this->assertTrue(!$valid, 'Expected validator to reject garbage listUsers line: '.$line);

@@ -18,8 +18,7 @@ require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/network/fireqos.php';
 require_once '/scripts/lib/userLifecycle.php';
 // Collect tenant usernames for FireQOS shaping.
-$users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
-$users = array_values(array_filter($users, 'pmssValidateUsername'));
+$users = pmssListManagedUsers('/scripts/listUsers.php');
 
 // Retrieve persisted interface selections and LAN bypass ranges.
 $networkConfig = networkLoadConfig();

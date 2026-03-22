@@ -86,7 +86,7 @@ $formatGiB = static function ($value): string {
 
 $store = new UserConfigStore();
 
-$users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
+$users = pmssListManagedUsers('/scripts/listUsers.php');
 if ($users === []) {
     if ($outputJson) {
         echo "[]\n";
@@ -104,21 +104,6 @@ if (!$outputJson && !$outputJsonl) {
 $allData = [];
 
 foreach ($users as $user) {
-    if (!pmssValidateUsername($user)) {
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'resources',
-                'validate',
-                $user,
-                [
-                    'status'  => 'ERR',
-                    'message' => 'Skipping invalid username in userResourcesList',
-                ]
-            )
-        );
-        continue;
-    }
-
     $info = pmssUserAccountLookup($user);
     if ($info === null) continue;
 

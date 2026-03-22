@@ -76,7 +76,7 @@ function pmssCheckUserHtpasswdMain(array $argv): int
         }
         $users = [$argUser];
     } else {
-        $users = array_values(array_filter(array_map('trim', pmssListManagedUsers('/scripts/listUsers.php')), 'strlen'));
+        $users = pmssListManagedUsers('/scripts/listUsers.php');
         if ($users === []) {
             echo "No users setup - nothing to do\n";
             return 0;
@@ -94,18 +94,6 @@ function pmssCheckUserHtpasswdMain(array $argv): int
     $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
     foreach ($users as $thisUser) {
-        if (!pmssValidateUsername($thisUser)) {
-            pmssCheckUserHtpasswdLog(
-                'validate',
-                $thisUser,
-                [
-                    'status'  => 'ERR',
-                    'message' => 'Skipping invalid username in checkUserHtpasswd',
-                ]
-            );
-            continue;
-        }
-
         $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
         $hasExistingEntry = pmssCheckUserHtpasswdHasUserEntry($userHtpasswd, $thisUser);
         if ($hasExistingEntry === null) {
