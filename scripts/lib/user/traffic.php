@@ -65,15 +65,6 @@ function userApplyDiskQuota(array $user): void
 }
 
 /**
- * Resolve the per-user torrent upload throttle file path.
- */
-function pmssTorrentThrottlePath(string $username): string
-{
-    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
-    return rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
-}
-
-/**
  * Read monthly traffic usage from a serialized user traffic data file.
  *
  * Returns the raw monthly total rounded to the nearest integer, or 0 when the
@@ -119,7 +110,8 @@ function pmssReadUserTrafficStates(string $username): array
  */
 function pmssReadTorrentThrottle(string $username): ?int
 {
-    $path = pmssTorrentThrottlePath($username);
+    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
+    $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
     if (!is_file($path) || is_link($path)) {
         return null;
     }
@@ -162,7 +154,8 @@ function pmssReadTorrentThrottle(string $username): ?int
  */
 function pmssWriteTorrentThrottle(string $username, int $value): bool
 {
-    $path = pmssTorrentThrottlePath($username);
+    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
+    $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
     $homeDir = dirname($path);
     if (!is_dir($homeDir) || is_link($homeDir)) {
         return false;

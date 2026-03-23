@@ -118,22 +118,26 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     return true;
 }
 
+function pmssReplaceUserFileWithMetadata(string $path, string $content, int $mode, ?string $owner = null, ?string $group = null): bool
+{
+    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($mode, $owner, $group): void {
+        if ($owner === null) {
+            @chmod($tmpPath, $mode);
+            return;
+        }
+
+        pmssUserFileApplyMetadata($tmpPath, $owner, $mode, $group);
+    });
+}
+
 function pmssAtomicWriteFile(string $path, string $content, ?int $mode = null): bool
 {
-    if ($mode === null) {
-        return pmssReplaceUserFile($path, $content);
-    }
-
-    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($mode): void {
-        @chmod($tmpPath, $mode);
-    });
+    return $mode === null ? pmssReplaceUserFile($path, $content) : pmssReplaceUserFileWithMetadata($path, $content, $mode);
 }
 
 function pmssWriteManagedFile(string $path, string $content, string $owner, ?string $group, int $mode): bool
 {
-    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($owner, $group, $mode): void {
-        pmssUserFileApplyMetadata($tmp, $owner, $mode, $group);
-    });
+    return pmssReplaceUserFileWithMetadata($path, $content, $mode, $owner, $group);
 }
 
 function pmssWriteUserFile(string $path, string $content, string $owner, int $mode): bool

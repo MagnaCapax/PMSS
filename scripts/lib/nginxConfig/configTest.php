@@ -21,14 +21,9 @@ function pmssCreateNginxConfigCommandFromEnv(string $envKey, string $default): s
     return $command !== '' ? $command : $default;
 }
 
-function pmssCreateNginxConfigLogFile(): string
-{
-    return pmssLogDir().'/update.log';
-}
-
 function pmssCreateNginxConfigAppendLog(string $message): void
 {
-    $logFile = pmssCreateNginxConfigLogFile();
+    $logFile = pmssLogDir().'/update.log';
     $logDir = dirname($logFile);
     if (!is_dir($logDir)) {
         @mkdir($logDir, 0755, true);
@@ -37,21 +32,11 @@ function pmssCreateNginxConfigAppendLog(string $message): void
     @file_put_contents($logFile, date('[Y-m-d H:i:s] ').'[createNginxConfig] '.$message."\n", FILE_APPEND | LOCK_EX);
 }
 
-function pmssCreateNginxConfigTestCommand(): string
-{
-    return pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1');
-}
-
-function pmssCreateNginxRestartCommand(): string
-{
-    return pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', 'systemctl restart nginx || /etc/init.d/nginx restart');
-}
-
 function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
 {
     $configTestOutput = [];
     $configTestRc = 0;
-    exec(pmssCreateNginxConfigTestCommand(), $configTestOutput, $configTestRc);
+    exec(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1'), $configTestOutput, $configTestRc);
     $configTestResult = implode("\n", $configTestOutput);
 
     $isTty = pmssStreamIsTty(STDOUT);
@@ -74,7 +59,7 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
     if ($restartNginx) {
         if ($configTestRc === 0) {
             $restartRc = 0;
-            passthru(pmssCreateNginxRestartCommand(), $restartRc);
+            passthru(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', 'systemctl restart nginx || /etc/init.d/nginx restart'), $restartRc);
             if ($restartRc !== 0) {
                 echo "{$cRed}[CRITICAL]{$cReset} nginx restart {$cRed}FAILED{$cReset} (rc={$restartRc})\n";
                 pmssCreateNginxConfigAppendLog("CRITICAL: nginx restart failed (rc={$restartRc})");

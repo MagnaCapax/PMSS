@@ -79,7 +79,7 @@ function pmssApplyRuntimeTemplates(): void
         ['Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf'],
         ['Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec'],
     ] as $action) {
-        runStep($action[0], $action[1]);
+        runStep(...$action);
     }
 
     pmssBackupCriticalConfig('sshd', '/etc/ssh/sshd_config');
@@ -88,7 +88,7 @@ function pmssApplyRuntimeTemplates(): void
         ['Setting sshd_config permissions', 'chmod 644 /etc/ssh/sshd_config'],
         ['Restarting sshd to load updated configuration', '/usr/bin/systemctl restart sshd'],
     ] as $action) {
-        runStep($action[0], $action[1]);
+        runStep(...$action);
     }
 }
 

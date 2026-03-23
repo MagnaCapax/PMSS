@@ -71,6 +71,37 @@ function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?stri
     return ($value !== null && $value !== '') ? $value : null;
 }
 
+function pmssStorageHealthSeverityCounts(array $entries): array
+{
+    $counts = ['ok' => 0, 'warn' => 0, 'fail' => 0];
+    foreach ($entries as $entry) {
+        $severity = (string) ($entry['severity'] ?? 'warn');
+        $counts[isset($counts[$severity]) ? $severity : 'warn']++;
+    }
+
+    return $counts;
+}
+
+function pmssStorageHealthDiskRows(array $smart, array $nvme): array
+{
+    $rows = [];
+    foreach ($smart as $entry) {
+        $rows[] = pmssStorageHealthDiskRowBuild($entry, false);
+    }
+    foreach ($nvme as $entry) {
+        $rows[] = pmssStorageHealthDiskRowBuild($entry, true);
+    }
+
+    usort($rows, static function (array $a, array $b): int {
+        $rank = ['fail' => 0, 'warn' => 1, 'ok' => 2];
+        $ra = $rank[$a['sev']] ?? 1;
+        $rb = $rank[$b['sev']] ?? 1;
+        return $ra !== $rb ? $ra - $rb : strcmp($a['dev'], $b['dev']);
+    });
+
+    return $rows;
+}
+
 function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, string $timestamp, string $jsonPath): void
 {
     $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
@@ -79,14 +110,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
     echo $header.PHP_EOL;
     echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
 
-    $counts = ['ok' => 0, 'warn' => 0, 'fail' => 0];
-    foreach (array_merge($smart, $nvme, $raid) as $entry) {
-        $sev = (string) ($entry['severity'] ?? 'warn');
-        if (!isset($counts[$sev])) {
-            $sev = 'warn';
-        }
-        $counts[$sev]++;
-    }
+    $counts = pmssStorageHealthSeverityCounts(array_merge($smart, $nvme, $raid));
     echo sprintf(
         "Summary: %s ok, %s warn, %s fail\n\n",
         (string) $counts['ok'],
@@ -98,24 +122,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
         echo "Disks\n";
         echo "-----\n";
 
-        $rows = [];
-        foreach ($smart as $entry) {
-            $rows[] = pmssStorageHealthDiskRowBuild($entry, false);
-        }
-
-        foreach ($nvme as $entry) {
-            $rows[] = pmssStorageHealthDiskRowBuild($entry, true);
-        }
-
-        usort($rows, static function (array $a, array $b): int {
-            $rank = ['fail' => 0, 'warn' => 1, 'ok' => 2];
-            $ra = $rank[$a['sev']] ?? 1;
-            $rb = $rank[$b['sev']] ?? 1;
-            if ($ra !== $rb) {
-                return $ra - $rb;
-            }
-            return strcmp($a['dev'], $b['dev']);
-        });
+        $rows = pmssStorageHealthDiskRows($smart, $nvme);
 
         $modelWidth = 12;
         foreach ($rows as $r) {

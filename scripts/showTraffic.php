@@ -28,6 +28,41 @@ function pmssShowTrafficReadStatsPayload(string $statsPath): ?array
     return is_array($data) ? $data : null;
 }
 
+function pmssShowTrafficReadIngressMonth(string $username, bool $localnet): ?float
+{
+    $trafficPaths = pmssTrafficDataPaths($username);
+    $ingressPath = $trafficPaths[$localnet ? 'ingressLocal' : 'ingress'];
+    if (!is_file($ingressPath) || is_link($ingressPath)) {
+        return null;
+    }
+
+    $stats = @stat($ingressPath);
+    if ($stats === false || (int) $stats['uid'] !== 0 || (($stats['mode'] & 0777) & 0022) !== 0) {
+        return null;
+    }
+
+    $ingressGroup = @posix_getgrgid($stats['gid']);
+    $groupName = is_array($ingressGroup) ? ($ingressGroup['name'] ?? '') : '';
+    if ($groupName !== '' && $groupName !== $username && $groupName !== 'root') {
+        return null;
+    }
+
+    $data = pmssShowTrafficReadStatsPayload($ingressPath);
+    return (is_array($data) && isset($data['raw']['month']) && is_numeric($data['raw']['month']))
+        ? (float) $data['raw']['month']
+        : null;
+}
+
+function pmssShowTrafficRateSummary(array $raw): array
+{
+    return [
+        'week' => round(((float) $raw['week'] / (7 * 24 * 60 * 60)), 2),
+        'day' => round(((float) $raw['day'] / (24 * 60 * 60)), 2),
+        'hour' => round(((float) $raw['hour'] / (60 * 60)), 2),
+        '15min' => round(((float) $raw['15min'] / (15 * 60)), 2),
+    ];
+}
+
 function pmssShowTrafficMain(array $argv): int
 {
     $options = getopt('', ['json', 'show-missing', 'help', 'extended', 'sort:', 'color', 'no-color']);
@@ -159,22 +194,7 @@ TXT;
 
         $dataDisplay = array_map('formatTrafficAmount', $data['raw']);
 
-        $inboundMonth = null;
-        $trafficPaths = pmssTrafficDataPaths($baseUser);
-        $ingressPath = $trafficPaths[$isLocalnet ? 'ingressLocal' : 'ingress'];
-        if (is_file($ingressPath) && !is_link($ingressPath)) {
-            $ingressStats = @stat($ingressPath);
-            if ($ingressStats !== false && (int) $ingressStats['uid'] === 0 && (($ingressStats['mode'] & 0777) & 0022) === 0) {
-                $ingressGroup = @posix_getgrgid($ingressStats['gid']);
-                $ingressGroupName = is_array($ingressGroup) ? ($ingressGroup['name'] ?? '') : '';
-                if ($ingressGroupName === '' || $ingressGroupName === $baseUser || $ingressGroupName === 'root') {
-                    $ingressData = pmssShowTrafficReadStatsPayload($ingressPath);
-                    if (is_array($ingressData) && isset($ingressData['raw']['month']) && is_numeric($ingressData['raw']['month'])) {
-                        $inboundMonth = (float) $ingressData['raw']['month'];
-                    }
-                }
-            }
-        }
+        $inboundMonth = pmssShowTrafficReadIngressMonth($baseUser, $isLocalnet);
 
         $inboundRatio = null;
         if ($inboundMonth !== null && (float) $data['raw']['month'] > 0) {
@@ -184,12 +204,7 @@ TXT;
         $inboundDisplay = $inboundMonth !== null ? formatTrafficAmount($inboundMonth) : '-';
         $ratioDisplay = $inboundRatio !== null ? sprintf('%.2f', $inboundRatio) : 'n/a';
 
-        $dataRates = array(
-            'week' => round( ( (float) $data['raw']['week'] / (7 * 24 * 60 * 60) ), 2),
-            'day' => round( ( (float) $data['raw']['day'] / (24 * 60 * 60) ), 2),
-            'hour' => round( ((float) $data['raw']['hour'] / (60 * 60) ), 2),
-            '15min' => round( ((float) $data['raw']['15min'] / (15 * 60) ), 2)
-        );
+        $dataRates = pmssShowTrafficRateSummary($data['raw']);
 
         $displayUser = $isLocalnet ? "{$baseUser} (L)" : $baseUser;
 

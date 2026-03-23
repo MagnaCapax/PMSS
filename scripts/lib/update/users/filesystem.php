@@ -13,6 +13,31 @@
  *
  * @param array $ctx Per-user context from pmssBuildUserContext().
  */
+function pmssUserPatchWritableFile(string $path, callable $patcher): void
+{
+    if (!is_file($path)
+        || is_link($path)
+        || !is_string($content = @file_get_contents($path))
+        || $content === '') {
+        return;
+    }
+
+    $updated = $patcher($content);
+    if (is_string($updated) && $updated !== $content) {
+        @file_put_contents($path, $updated);
+    }
+}
+
+/**
+ * Remove a file or symlink if it still exists.
+ */
+function pmssUserDeletePathIfPresent(string $path): void
+{
+    if ((is_file($path) || is_link($path)) && file_exists($path)) {
+        @unlink($path);
+    }
+}
+
 function pmssUserApplySkeletonFiles(array $ctx): void
 {
     $user = $ctx['user'];
@@ -23,33 +48,6 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         $ctx['home'].'/www/rutorrent/plugins/extsearch/engines/KAT.php',
     ];
     $patchFilemanager = static function (string $path): void {
-        if (!is_file($path)
-            || is_link($path)
-            || !is_string($content = @file_get_contents($path))
-            || $content === '') {
-            return;
-        }
-
-        // Patch tenant copies until the frozen skeleton filemanager source can
-        // be updated upstream without touching the locked tree.
-        $updated = str_replace(
-            [
-                '        ob_flush();',
-                'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js',
-                'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',
-                'https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js',
-                '        str_replace($range, "-", $range);',
-            ],
-            [
-                '        @ob_flush();',
-                'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js',
-                'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js',
-                'https://cdn.datatables.net/2.0.8/js/dataTables.min.js',
-                '        $range = str_replace("-", "", $range);',
-            ],
-            $content
-        );
-
         $legacyDownloadHeaderBlock = <<<'PHP'
     if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
         $fileName = preg_replace('/\./', '%2e', $fileName, substr_count($fileName, '.') - 1);
@@ -58,36 +56,46 @@ function pmssUserApplySkeletonFiles(array $ctx): void
         header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
     }
 PHP;
-        $updated = str_replace(
-            $legacyDownloadHeaderBlock,
-            '    header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");',
-            $updated
-        );
+        pmssUserPatchWritableFile($path, static function (string $content) use ($legacyDownloadHeaderBlock): string {
+            // Patch tenant copies until the frozen skeleton filemanager source can
+            // be updated upstream without touching the locked tree.
+            $updated = str_replace(
+                [
+                    '        ob_flush();',
+                    'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js',
+                    'https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',
+                    'https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js',
+                    '        str_replace($range, "-", $range);',
+                ],
+                [
+                    '        @ob_flush();',
+                    'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js',
+                    'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js',
+                    'https://cdn.datatables.net/2.0.8/js/dataTables.min.js',
+                    '        $range = str_replace("-", "", $range);',
+                ],
+                $content
+            );
 
-        if ($updated !== $content) {
-            @file_put_contents($path, $updated);
-        }
+            return str_replace(
+                $legacyDownloadHeaderBlock,
+                '    header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");',
+                $updated
+            );
+        });
     };
     $patchTorrentFrontends = static function (string $path, string $requireLine, string $legacyCommand, string $patchedCommand): void {
-        if (!is_file($path)
-            || is_link($path)
-            || !is_string($content = @file_get_contents($path))
-            || $content === '') {
-            return;
-        }
-
-        $updated = $content;
-        if (strpos($updated, $requireLine) === false) {
-            $updated = preg_replace('/^<\?php\s*/', $requireLine, $updated, 1, $count);
-            if (!is_string($updated) || $count !== 1) {
-                return;
+        pmssUserPatchWritableFile($path, static function (string $content) use ($requireLine, $legacyCommand, $patchedCommand): ?string {
+            $updated = $content;
+            if (strpos($updated, $requireLine) === false) {
+                $updated = preg_replace('/^<\?php\s*/', $requireLine, $updated, 1, $count);
+                if (!is_string($updated) || $count !== 1) {
+                    return null;
+                }
             }
-        }
-        $updated = str_replace($legacyCommand, $patchedCommand, $updated);
 
-        if ($updated !== $content) {
-            @file_put_contents($path, $updated);
-        }
+            return str_replace($legacyCommand, $patchedCommand, $updated);
+        });
     };
 
     $files = [
@@ -113,17 +121,12 @@ PHP;
         updateUserFile($file, $user);
     }
 
-    if ((is_file($legacyPhpXplorerPath) || is_link($legacyPhpXplorerPath))
-        && file_exists($legacyPhpXplorerPath)) {
-        @unlink($legacyPhpXplorerPath);
-    }
+    pmssUserDeletePathIfPresent($legacyPhpXplorerPath);
 
     // Remove dead extsearch engines from tenant copies until the frozen
     // skeleton ruTorrent tree can be curated directly.
     foreach ($deadExtsearchEnginePaths as $path) {
-        if ((is_file($path) || is_link($path)) && file_exists($path)) {
-            @unlink($path);
-        }
+        pmssUserDeletePathIfPresent($path);
     }
 
     $patchFilemanager($ctx['home'].'/www/filemanager.php');

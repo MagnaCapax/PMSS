@@ -129,7 +129,7 @@ class NginxConfigTestTest extends TestCase
         $this->pmssWithEnv([
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => " \t ",
         ], function (): void {
-            $this->assertEquals('nginx -t 2>&1', \pmssCreateNginxConfigTestCommand());
+            $this->assertEquals('nginx -t 2>&1', \pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1'));
         });
     }
 
@@ -138,7 +138,7 @@ class NginxConfigTestTest extends TestCase
         $this->pmssWithEnv([
             'PMSS_NGINX_RESTART_COMMAND' => " \n ",
         ], function (): void {
-            $this->assertEquals('systemctl restart nginx || /etc/init.d/nginx restart', \pmssCreateNginxRestartCommand());
+            $this->assertEquals('systemctl restart nginx || /etc/init.d/nginx restart', \pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', 'systemctl restart nginx || /etc/init.d/nginx restart'));
         });
     }
 

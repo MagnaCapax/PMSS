@@ -64,7 +64,7 @@ class UserConfigStore
             return null;
         }
 
-        $payload = $this->readJsonFile($this->userDir.'/'.$username.'.json');
+        $payload = $this->readJsonFile($this->userConfigPath($username));
         if (!is_array($payload) && isset(($legacy = $this->loadLegacyAggregateMap())[$username]) && is_array($legacy[$username])) {
             $payload = $legacy[$username];
         }
@@ -86,8 +86,7 @@ class UserConfigStore
             }
         }
 
-        $path = $this->userDir.'/'.$username.'.json';
-        return $this->writeJsonFileAtomic($path, $payload, 0640, 'root', 'root');
+        return $this->writeJsonFileAtomic($this->userConfigPath($username), $payload, 0640, 'root', 'root');
     }
 
     public function remove(string $username): bool
@@ -95,7 +94,7 @@ class UserConfigStore
         if (($username = $this->validatedUsername($username)) === null) {
             return false;
         }
-        $path = $this->userDir.'/'.$username.'.json';
+        $path = $this->userConfigPath($username);
         return !is_file($path) || is_link($path) || @unlink($path);
     }
 
@@ -189,6 +188,11 @@ class UserConfigStore
         return UserValidator::isValidUsername($username) ? $username : null;
     }
 
+    private function userConfigPath(string $username): string
+    {
+        return $this->userDir.'/'.$username.'.json';
+    }
+
     private function loadFromUserDir(): array
     {
         if (!is_dir($this->userDir)) {
@@ -242,7 +246,9 @@ class UserConfigStore
         }
 
         $payload['dockerEnabled'] = array_key_exists('dockerEnabled', $payload)
-            ? $this->normaliseBooleanValue($payload['dockerEnabled'])
+            ? (!is_string($payload['dockerEnabled'])
+                ? (bool) $payload['dockerEnabled']
+                : !in_array(strtolower(trim($payload['dockerEnabled'])), ['false', '0', 'no', 'off', ''], true))
             : !$this->payloadDescribesStorageBox($payload);
 
         // Safety gate: keep rootless Docker disabled for low-memory accounts.
@@ -259,32 +265,19 @@ class UserConfigStore
         return $payload;
     }
 
-    private function normaliseBooleanValue($value): bool
-    {
-        if (!is_string($value)) {
-            return (bool)$value;
-        }
-        return !in_array(strtolower(trim($value)), ['false', '0', 'no', 'off', ''], true);
-    }
-
     private function payloadDescribesStorageBox(array $payload): bool
     {
         foreach (['product', 'productName', 'productType'] as $key) {
-            $normalized = $this->normaliseProductDescriptor($payload[$key] ?? null);
+            $value = $payload[$key] ?? null;
+            $normalized = is_string($value)
+                ? preg_replace('/\s+/', ' ', str_replace(['_', '-'], ' ', strtolower(trim($value))))
+                : '';
+            $normalized = is_string($normalized) ? $normalized : '';
             if ($normalized !== '' && strpos($normalized, 'storage') !== false && strpos($normalized, 'box') !== false) {
                 return true;
             }
         }
         return false;
-    }
-
-    private function normaliseProductDescriptor($value): string
-    {
-        if (!is_string($value)) {
-            return '';
-        }
-        $normalized = preg_replace('/\s+/', ' ', str_replace(['_', '-'], ' ', strtolower(trim($value))));
-        return is_string($normalized) ? $normalized : '';
     }
 
     private function readJsonFile(string $path): ?array
