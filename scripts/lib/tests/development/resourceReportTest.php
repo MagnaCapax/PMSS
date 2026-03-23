@@ -9,21 +9,10 @@ class ResourceReportTest extends TestCase
     /** @var string */
     private $statsDir;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
-        $this->statsDir = sys_get_temp_dir().'/pmss-resource-report-'.mt_rand(1000, 999999);
+        $this->statsDir = $this->pmssMakeTempDir('pmss-resource-report-').'/stats';
         @mkdir($this->statsDir, 0755, true);
-    }
-
-    public function tearDown(): void
-    {
-        if (!is_dir($this->statsDir)) {
-            return;
-        }
-        foreach ((array) glob($this->statsDir.'/*') as $file) {
-            @unlink($file);
-        }
-        @rmdir($this->statsDir);
     }
 
     public function testBuildReportAggregatesRowsAndTotals(): void

@@ -56,19 +56,10 @@ function pmssCheckRutorrentPluginsWriteAccessIni(string $path, string $content):
     $owner = null;
     $group = null;
 
-    if (is_file($path)) {
-        $existingMode = @fileperms($path);
-        $existingOwner = @fileowner($path);
-        $existingGroup = @filegroup($path);
-        if ($existingMode !== false) {
-            $mode = $existingMode & 0777;
-        }
-        if ($existingOwner !== false) {
-            $owner = $existingOwner;
-        }
-        if ($existingGroup !== false) {
-            $group = $existingGroup;
-        }
+    if (is_file($path) && is_array($stat = @stat($path))) {
+        $mode = $stat['mode'] & 0777;
+        $owner = $stat['uid'];
+        $group = $stat['gid'];
     }
 
     if ($mode === null) {
@@ -123,25 +114,18 @@ function pmssCheckRutorrentPluginsSyncUser(string $username, string $accessIni, 
         if (!is_dir($paths['hddquotaSource'])) {
             $ok = false;
         } else {
-            $copyRc = pmssCheckRutorrentPluginsRunCommand(
-                $username,
-                'install_hddquota',
-                'cp -rp '.escapeshellarg($paths['hddquotaSource']).' '.escapeshellarg($paths['plugins']),
-                $runner
-            );
-            $chownRc = pmssCheckRutorrentPluginsRunCommand(
-                $username,
-                'chown_hddquota',
-                'chown '.escapeshellarg($username.':'.$username).' '.escapeshellarg($paths['hddquotaTarget']),
-                $runner
-            );
-            $chmodRc = pmssCheckRutorrentPluginsRunCommand(
-                $username,
-                'chmod_hddquota',
-                'chmod -R 777 '.escapeshellarg($paths['hddquotaTarget']),
-                $runner
-            );
-            $ok = $ok && $copyRc === 0 && $chownRc === 0 && $chmodRc === 0;
+            foreach (array(
+                array('install_hddquota', 'cp -rp '.escapeshellarg($paths['hddquotaSource']).' '.escapeshellarg($paths['plugins'])),
+                array('chown_hddquota', 'chown '.escapeshellarg($username.':'.$username).' '.escapeshellarg($paths['hddquotaTarget'])),
+                array('chmod_hddquota', 'chmod -R 777 '.escapeshellarg($paths['hddquotaTarget'])),
+            ) as $commandSpec) {
+                $ok = pmssCheckRutorrentPluginsRunCommand(
+                    $username,
+                    $commandSpec[0],
+                    $commandSpec[1],
+                    $runner
+                ) === 0 && $ok;
+            }
         }
     }
 

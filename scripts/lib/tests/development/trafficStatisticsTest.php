@@ -5,9 +5,6 @@ require_once dirname(__DIR__, 2).'/traffic.php';
 
 class TrafficStatisticsTest extends TestCase
 {
-    /** @var string[] */
-    private $tempRoots = [];
-
     public function testParseLineValid(): void
     {
         $ts = new \trafficStatistics();
@@ -92,18 +89,9 @@ class TrafficStatisticsTest extends TestCase
         }
     }
 
-    protected function tearDown(): void
-    {
-        foreach ($this->tempRoots as $root) {
-            $this->removeTree($root);
-        }
-        $this->tempRoots = [];
-    }
-
     private function makeTrafficPaths(string $mode): array
     {
-        $root = sys_get_temp_dir().'/pmss-traffic-statistics-'.bin2hex(random_bytes(4));
-        $this->tempRoots[] = $root;
+        $root = $this->pmssMakeTempDir('pmss-traffic-statistics-');
 
         return [
             'traffic_dir' => $root.'/traffic',
@@ -111,31 +99,5 @@ class TrafficStatisticsTest extends TestCase
             'runtime_dir' => $root.'/run',
             'traffic_mode' => $mode,
         ];
-    }
-
-    private function removeTree(string $path): void
-    {
-        if (!is_dir($path)) {
-            return;
-        }
-
-        $entries = scandir($path);
-        if (!is_array($entries)) {
-            return;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-            $child = $path.'/'.$entry;
-            if (is_dir($child) && !is_link($child)) {
-                $this->removeTree($child);
-                continue;
-            }
-            @unlink($child);
-        }
-
-        @rmdir($path);
     }
 }

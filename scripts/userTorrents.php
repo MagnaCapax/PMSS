@@ -15,31 +15,24 @@ require_once __DIR__.'/lib/userLifecycle.php';
 
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 {
+    $counts = ['rtorrent' => 0, 'deluge' => 0, 'qbittorrent' => 0, 'total' => 0];
     if (!pmssUsernameIsValid($username)) {
-        return ['rtorrent' => 0, 'deluge' => 0, 'qbittorrent' => 0, 'total' => 0];
+        return $counts;
     }
 
     $home = $homeDir.'/'.$username;
 
-    $counts = [];
-    foreach ([
-        'rtorrent' => [
-            $home.'/session/*.torrent',
-        ],
-        'deluge' => [
-            $home.'/.config/deluge/state/*.torrent',
-            $home.'/.delugeSession/*.torrent',
-            $home.'/.sessionDeluge/*.torrent',
-        ],
-        'qbittorrent' => [
-            $home.'/.local/share/data/qBittorrent/BT_backup/*.torrent',
-            $home.'/.local/share/data/qBittorrent/BT_backup/*.fastresume',
-            $home.'/.local/share/qBittorrent/BT_backup/*.torrent',
-            $home.'/.local/share/qBittorrent/BT_backup/*.fastresume',
-            $home.'/.config/qBittorrent/BT_backup/*.torrent',
-            $home.'/.config/qBittorrent/BT_backup/*.fastresume',
-        ],
-    ] as $client => $patterns) {
+    $clientPatterns = ['rtorrent' => [$home.'/session/*.torrent'], 'deluge' => [], 'qbittorrent' => []];
+    foreach (['.config/deluge/state', '.delugeSession', '.sessionDeluge'] as $dir) {
+        $clientPatterns['deluge'][] = $home.'/'.$dir.'/*.torrent';
+    }
+    foreach (['.local/share/data/qBittorrent/BT_backup', '.local/share/qBittorrent/BT_backup', '.config/qBittorrent/BT_backup'] as $dir) {
+        foreach (['torrent', 'fastresume'] as $extension) {
+            $clientPatterns['qbittorrent'][] = $home.'/'.$dir.'/*.'.$extension;
+        }
+    }
+
+    foreach ($clientPatterns as $client => $patterns) {
         $seen = [];
         foreach ($patterns as $pattern) {
             foreach (glob($pattern) ?: [] as $path) {

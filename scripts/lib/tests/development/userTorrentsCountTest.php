@@ -8,33 +8,13 @@ class UserTorrentsCountTest extends TestCase
     /** @var string */
     private $tempDir = '';
 
-    private function setUpTempDir(): void
+    protected function setUp(): void
     {
-        $base = sys_get_temp_dir().'/pmss-usertorrents-tests';
-        if (!is_dir($base)) {
-            @mkdir($base, 0755, true);
-        }
-        $this->tempDir = $base.'/run-'.bin2hex(random_bytes(4));
-        @mkdir($this->tempDir, 0755, true);
+        $this->tempDir = $this->pmssMakeTempDir('pmss-usertorrents-');
     }
 
-    private function tearDownTempDir(): void
+    protected function tearDown(): void
     {
-        if ($this->tempDir === '' || !is_dir($this->tempDir)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->tempDir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $path) {
-            if ($path->isDir()) {
-                @rmdir($path->getPathname());
-            } else {
-                @unlink($path->getPathname());
-            }
-        }
-        @rmdir($this->tempDir);
         $this->tempDir = '';
     }
 
@@ -54,106 +34,76 @@ class UserTorrentsCountTest extends TestCase
 
     public function testCountsAllClientsAndTotals(): void
     {
-        $this->setUpTempDir();
-        try {
-            $home = $this->homeDir();
-            // rTorrent
-            $this->makeFile($home.'/alice/session/a.torrent');
-            $this->makeFile($home.'/alice/session/b.torrent');
-            $this->makeFile($home.'/alice/session/c.torrent');
+        $home = $this->homeDir();
+        // rTorrent
+        $this->makeFile($home.'/alice/session/a.torrent');
+        $this->makeFile($home.'/alice/session/b.torrent');
+        $this->makeFile($home.'/alice/session/c.torrent');
 
-            // Deluge (state)
-            $this->makeFile($home.'/alice/.config/deluge/state/111.torrent');
-            $this->makeFile($home.'/alice/.config/deluge/state/222.torrent');
+        // Deluge (state)
+        $this->makeFile($home.'/alice/.config/deluge/state/111.torrent');
+        $this->makeFile($home.'/alice/.config/deluge/state/222.torrent');
 
-            // qBittorrent (BT_backup)
-            $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/x.torrent');
-            $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/y.torrent');
-            $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/z.torrent');
-            $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/w.torrent');
+        // qBittorrent (BT_backup)
+        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/x.torrent');
+        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/y.torrent');
+        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/z.torrent');
+        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/w.torrent');
 
-            $counts = \pmssUserTorrentsCountForUser($home, 'alice');
-            $this->assertEquals(3, $counts['rtorrent']);
-            $this->assertEquals(2, $counts['deluge']);
-            $this->assertEquals(4, $counts['qbittorrent']);
-            $this->assertEquals(9, $counts['total']);
-        } finally {
-            $this->tearDownTempDir();
-        }
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(3, $counts['rtorrent']);
+        $this->assertEquals(2, $counts['deluge']);
+        $this->assertEquals(4, $counts['qbittorrent']);
+        $this->assertEquals(9, $counts['total']);
     }
 
     public function testDedupesQbittorrentTorrentAndFastresumeByBaseName(): void
     {
-        $this->setUpTempDir();
-        try {
-            $home = $this->homeDir();
-            $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.torrent');
-            $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.fastresume');
-            $counts = \pmssUserTorrentsCountForUser($home, 'alice');
-            $this->assertEquals(1, $counts['qbittorrent']);
-            $this->assertEquals(1, $counts['total']);
-        } finally {
-            $this->tearDownTempDir();
-        }
+        $home = $this->homeDir();
+        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.torrent');
+        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.fastresume');
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(1, $counts['qbittorrent']);
+        $this->assertEquals(1, $counts['total']);
     }
 
     public function testDedupesDelugeAcrossMultipleDirs(): void
     {
-        $this->setUpTempDir();
-        try {
-            $home = $this->homeDir();
-            $this->makeFile($home.'/alice/.config/deluge/state/same.torrent');
-            $this->makeFile($home.'/alice/.delugeSession/same.torrent');
-            $counts = \pmssUserTorrentsCountForUser($home, 'alice');
-            $this->assertEquals(1, $counts['deluge']);
-            $this->assertEquals(1, $counts['total']);
-        } finally {
-            $this->tearDownTempDir();
-        }
+        $home = $this->homeDir();
+        $this->makeFile($home.'/alice/.config/deluge/state/same.torrent');
+        $this->makeFile($home.'/alice/.delugeSession/same.torrent');
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(1, $counts['deluge']);
+        $this->assertEquals(1, $counts['total']);
     }
 
     public function testIgnoresEntriesWithEmptyTorrentBaseName(): void
     {
-        $this->setUpTempDir();
-        try {
-            $home = $this->homeDir();
-            $this->makeFile($home.'/alice/session/.torrent');
-            $this->makeFile($home.'/alice/session/good.torrent');
+        $home = $this->homeDir();
+        $this->makeFile($home.'/alice/session/.torrent');
+        $this->makeFile($home.'/alice/session/good.torrent');
 
-            $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
 
-            $this->assertEquals(1, $counts['rtorrent']);
-            $this->assertEquals(1, $counts['total']);
-        } finally {
-            $this->tearDownTempDir();
-        }
+        $this->assertEquals(1, $counts['rtorrent']);
+        $this->assertEquals(1, $counts['total']);
     }
 
     public function testMissingDirsReturnZeros(): void
     {
-        $this->setUpTempDir();
-        try {
-            $home = $this->homeDir();
-            $counts = \pmssUserTorrentsCountForUser($home, 'alice');
-            $this->assertEquals(0, $counts['rtorrent']);
-            $this->assertEquals(0, $counts['deluge']);
-            $this->assertEquals(0, $counts['qbittorrent']);
-            $this->assertEquals(0, $counts['total']);
-        } finally {
-            $this->tearDownTempDir();
-        }
+        $home = $this->homeDir();
+        $counts = \pmssUserTorrentsCountForUser($home, 'alice');
+        $this->assertEquals(0, $counts['rtorrent']);
+        $this->assertEquals(0, $counts['deluge']);
+        $this->assertEquals(0, $counts['qbittorrent']);
+        $this->assertEquals(0, $counts['total']);
     }
 
     public function testInvalidUsernameReturnsZeros(): void
     {
-        $this->setUpTempDir();
-        try {
-            $home = $this->homeDir();
-            $counts = \pmssUserTorrentsCountForUser($home, '../evil');
-            $this->assertEquals(0, $counts['total']);
-        } finally {
-            $this->tearDownTempDir();
-        }
+        $home = $this->homeDir();
+        $counts = \pmssUserTorrentsCountForUser($home, '../evil');
+        $this->assertEquals(0, $counts['total']);
     }
 
     public function testHelpOutputRemainsStable(): void
