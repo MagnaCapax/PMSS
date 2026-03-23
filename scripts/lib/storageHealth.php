@@ -20,7 +20,7 @@ require_once __DIR__.'/storageHealth/smart.php';
 function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timestamp): ?array
 {
     $dev = (string) $disk['path'];
-    if (strpos($dev, 'nvme') === false || trim((string) shell_exec('command -v nvme 2>/dev/null')) === '') {
+    if (strpos($dev, 'nvme') === false || !pmssStorageHealthCommandExists('nvme')) {
         return null;
     }
     $res = pmssStorageHealthExecCapture('nvme smart-log '.escapeshellarg($dev).' 2>/dev/null', 20);
@@ -59,16 +59,12 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
         $flags[] = 'nvme_critical_warning';
     }
     if (($metrics['temperature'] ?? 0) >= 70) {
-        if ($severity === 'ok') {
-            $severity = 'warn';
-        }
+        $severity = pmssStorageHealthWarnSeverity($severity);
         $flags[] = 'hot_nvme';
     }
     $percentageUsed = (int) ($metrics['percentage_used'] ?? 0);
     if ($percentageUsed >= 80) {
-        if ($severity === 'ok') {
-            $severity = 'warn';
-        }
+        $severity = pmssStorageHealthWarnSeverity($severity);
         $flags[] = $percentageUsed >= 95 ? 'wearout_critical' : 'wearout_high';
     }
     $previous = $last['nvme::'.$dev]['metrics'] ?? null;
@@ -77,8 +73,8 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
             if (!isset($metrics[$metric], $previous[$metric]) || $metrics[$metric] <= $previous[$metric]) {
                 continue;
             }
-            if ($metric === 'media_errors' && $severity === 'ok') {
-                $severity = 'warn';
+            if ($metric === 'media_errors') {
+                $severity = pmssStorageHealthWarnSeverity($severity);
             }
             $flags[] = $flag;
         }

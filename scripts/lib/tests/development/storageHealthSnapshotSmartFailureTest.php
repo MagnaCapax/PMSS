@@ -22,21 +22,13 @@ class StorageHealthSnapshotSmartFailureTest extends TestCase
 
     public function testSnapshotSmartReturnsMissingToolFailureBeforeExecution(): void
     {
-        $device = tempnam(sys_get_temp_dir(), 'pmss-smart-readable-');
+        $device = $this->pmssMakeTempFile('pmss-smart-readable-');
         $this->assertTrue($device !== false, 'Expected a temporary device placeholder');
 
-        $originalPath = getenv('PATH');
-        putenv('PATH=');
-        try {
+        $entry = [];
+        $this->pmssWithEnv(['PATH' => ''], function () use ($device, &$entry): void {
             $entry = \pmssStorageHealthSnapshotSmart(['path' => $device, 'kname' => 'sdy'], [], '2025-01-01T00:00:00+00:00');
-        } finally {
-            if ($originalPath === false) {
-                putenv('PATH');
-            } else {
-                putenv('PATH='.$originalPath);
-            }
-            @unlink($device);
-        }
+        });
 
         $this->assertEquals('smartctl missing', $entry['error']);
         $this->assertEquals(['smartctl_missing'], $entry['flags']);

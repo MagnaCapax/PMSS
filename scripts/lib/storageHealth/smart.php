@@ -84,7 +84,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         && strpos($healthUpper, 'BAD') === false;
 
     if (!$healthExplicit) {
-        if ($sev === 'ok') { $sev = 'warn'; }
+        $sev = pmssStorageHealthWarnSeverity($sev);
         $flags[] = 'health_unknown';
     } elseif (!$healthOk) {
         $sev = 'fail';
@@ -95,7 +95,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         if (($metrics[$metric] ?? 0) <= 0) {
             continue;
         }
-        if ($sev === 'ok') { $sev = 'warn'; }
+        $sev = pmssStorageHealthWarnSeverity($sev);
         $flags[] = $flag;
     }
 
@@ -104,7 +104,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         $rota = (int) ($disk['rota'] ?? 1);
         $threshold = ($rota === 1) ? 50 : 70;
         if ($temp >= $threshold) {
-            if ($sev === 'ok') { $sev = 'warn'; }
+            $sev = pmssStorageHealthWarnSeverity($sev);
             $flags[] = ($rota === 1) ? 'hot_hdd' : 'hot_ssd';
         }
     }
@@ -117,7 +117,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
                 continue;
             }
             if ($raiseWarn) {
-                if ($sev === 'ok') { $sev = 'warn'; }
+                $sev = pmssStorageHealthWarnSeverity($sev);
             }
             $flags[] = $metric.'_increase';
         }
@@ -137,7 +137,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
     if (!is_readable($dev)) {
         return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['device_unreadable'], 'warn', 'device unreadable');
     }
-    if (trim((string) shell_exec('command -v smartctl 2>/dev/null')) === '') {
+    if (!pmssStorageHealthCommandExists('smartctl')) {
         return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_missing'], 'warn', 'smartctl missing');
     }
 
@@ -155,8 +155,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
 
     $entry = pmssStorageHealthParseSmartctlOutput($out, $disk, $prevMetrics, $timestamp);
     if ($res['rc'] === 124) {
-        $severity = (string) ($entry['severity'] ?? 'ok');
-        if ($severity === 'ok') { $severity = 'warn'; }
+        $severity = pmssStorageHealthWarnSeverity((string) ($entry['severity'] ?? 'ok'));
         return pmssStorageHealthEntryFinalize($entry, array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout']), $severity);
     }
     return $entry;
