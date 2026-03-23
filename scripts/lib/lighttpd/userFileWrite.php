@@ -23,12 +23,12 @@ function pmssUserFilePathIsSafe(string $path): bool
     return true;
 }
 
-function pmssUserFileApplyMetadata(string $path, string $owner, int $mode): void
+function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?string $group = null): void
 {
     @chmod($path, $mode);
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
         @chown($path, $owner);
-        @chgrp($path, $owner);
+        @chgrp($path, ($group === null || $group === '') ? $owner : $group);
     }
 }
 
@@ -61,16 +61,27 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     return true;
 }
 
-function pmssAtomicWriteFile(string $path, string $content): bool
+function pmssAtomicWriteFile(string $path, string $content, ?int $mode = null): bool
 {
-    return pmssReplaceUserFile($path, $content);
+    if ($mode === null) {
+        return pmssReplaceUserFile($path, $content);
+    }
+
+    return pmssReplaceUserFile($path, $content, static function (string $tmpPath) use ($mode): void {
+        @chmod($tmpPath, $mode);
+    });
+}
+
+function pmssWriteManagedFile(string $path, string $content, string $owner, ?string $group, int $mode): bool
+{
+    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($owner, $group, $mode): void {
+        pmssUserFileApplyMetadata($tmp, $owner, $mode, $group);
+    });
 }
 
 function pmssWriteUserFile(string $path, string $content, string $owner, int $mode): bool
 {
-    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($owner, $mode): void {
-        pmssUserFileApplyMetadata($tmp, $owner, $mode);
-    });
+    return pmssWriteManagedFile($path, $content, $owner, $owner, $mode);
 }
 
 /**

@@ -37,9 +37,7 @@ function pmssWriteManagedConfigFile(string $target, string $contents, string $la
         return false;
     }
 
-    return pmssReplaceUserFile($target, $contents, static function (string $tmpTarget): void {
-        @chmod($tmpTarget, 0644);
-    });
+    return pmssAtomicWriteFile($target, $contents, 0644);
 }
 
 /**

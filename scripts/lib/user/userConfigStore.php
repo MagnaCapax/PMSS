@@ -319,11 +319,7 @@ class UserConfigStore
             return false;
         }
 
-        return pmssReplaceUserFile($path, $encoded, static function (string $tmp) use ($mode, $owner, $group): void {
-            @chmod($tmp, $mode);
-            @chown($tmp, $owner);
-            @chgrp($tmp, $group);
-        });
+        return pmssWriteManagedFile($path, $encoded, $owner, $group, $mode);
     }
 
     private function resolveRamMiBFromSystemdSlice(string $username): int

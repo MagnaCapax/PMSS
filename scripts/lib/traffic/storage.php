@@ -85,11 +85,7 @@ if (!function_exists('pmssTrafficWriteFile')) {
         $immutable && pmssTrafficSetImmutable($path, false);
 
         try {
-            return pmssReplaceUserFile($path, $serialized, static function (string $tmpPath) use ($group, $mode): void {
-                @chmod($tmpPath, $mode);
-                @chown($tmpPath, 'root');
-                @chgrp($tmpPath, $group);
-            });
+            return pmssWriteManagedFile($path, $serialized, 'root', $group, $mode);
         } finally {
             $immutable && pmssTrafficSetImmutable($path, true);
         }

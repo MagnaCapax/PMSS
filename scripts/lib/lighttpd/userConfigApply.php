@@ -355,11 +355,7 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
         return false;
     }
 
-    return pmssReplaceUserFile($path, $metaJson.$configJson, static function (string $tmp) use ($mode, $owner): void {
-        @chmod($tmp, $mode);
-        @chown($tmp, $owner);
-        @chgrp($tmp, $owner);
-    });
+    return pmssWriteUserFile($path, $metaJson.$configJson, $owner, $mode);
 }
 
 // Reverse proxy fragments stay with the lighttpd apply flow because the

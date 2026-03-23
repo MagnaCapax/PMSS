@@ -30,9 +30,7 @@ require_once __DIR__.'/userTransfer/sessionRewrite.php';
  */
 function pmssUserTransferWriteFile(string $path, string $contents, int $mode): void
 {
-    if (pmssReplaceUserFile($path, $contents, static function (string $tmpPath) use ($mode): void {
-        @chmod($tmpPath, $mode);
-    })) {
+    if (pmssAtomicWriteFile($path, $contents, $mode)) {
         return;
     }
 

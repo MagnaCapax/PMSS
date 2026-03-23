@@ -63,7 +63,5 @@ function pmssTrafficIngressWriteState(string $path, array $state): void
         return;
     }
 
-    pmssReplaceUserFile($path, $payload, static function (string $tmp): void {
-        @chmod($tmp, 0600);
-    });
+    pmssAtomicWriteFile($path, $payload, 0600);
 }
