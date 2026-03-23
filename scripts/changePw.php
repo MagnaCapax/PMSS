@@ -37,7 +37,7 @@ pmssRequireHomeMounted('changePw.php');
 if ($password === '') {
     $password = generatePassword();
 }
-    
+
 echo "\t *******  {$username}     new password:   {$password} \n";
 
 // Feed the password via stdin to passwd using printf; quote arguments to avoid
@@ -50,7 +50,8 @@ $cmd = sprintf(
 );
 shell_exec($cmd);
 
-$htpasswdFile = "/home/{$username}/.lighttpd/.htpasswd";
+$homeDir = '/home/'.$username;
+$htpasswdFile = $homeDir.'/.lighttpd/.htpasswd';
 
 $htpasswdCommand = file_exists($htpasswdFile) ? 'htpasswd -b -m' : 'htpasswd -c -b -m';
 
@@ -62,9 +63,9 @@ shell_exec(sprintf(
     escapeshellarg($password)
 ));     // Create http password
 passthru(sprintf(
-    'chown %s /home/%s/.lighttpd/.htpasswd',
+    'chown %s %s',
     escapeshellarg($username.':'.$username),
-    escapeshellarg($username)
+    escapeshellarg($htpasswdFile)
 ));
 
 // Sync password to qBittorrent if installed.
@@ -78,11 +79,6 @@ pmssRestartTorrentServicesAfterPasswordChange($username, false, $qbittorrentUpda
 if ($qbittorrentUpdated) {
     echo "\t *******  qBittorrent password updated\n";
 }
-
-
-
-
-
 
 function generatePassword(): string
 {

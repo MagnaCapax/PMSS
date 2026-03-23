@@ -103,7 +103,7 @@ TXT;
         }
     }
     $users = $usersWithLocalnet;
-    if (count($users) === 0) {
+    if (empty($users)) {
         echo "No users in this system!\n";
         return 0;
     }
@@ -113,7 +113,6 @@ TXT;
     $dataMonthTotalLocal = 0.0;
     $missingStats = [];
     $rows = [];
-    $jsonRows = [];
     $limitCache = [];
     $baseUsers = [];
     $baseUsersWithStats = [];
@@ -126,8 +125,7 @@ TXT;
             : "Legend:\n\t USER: Traffic: Data Month / Week / Day  IN: Month  Ratio  DATARATES: Rate Week / Rate Day / Rate Hour / Rate 15min\n";
     }
 
-    foreach($users AS $thisUser) {
-        //if (!file_exists("/home/{$thisUser}/.trafficData")) continue;
+    foreach ($users as $thisUser) {
         $isLocalnet = substr($thisUser, -strlen('-localnet')) === '-localnet';
         $baseUser = $isLocalnet ? substr($thisUser, 0, -strlen('-localnet')) : $thisUser;
         $baseUsers[$baseUser] = true;
@@ -138,17 +136,10 @@ TXT;
         }
 
         $rawStats = @file_get_contents($statsPath);
-        if (!is_string($rawStats) || $rawStats === '') {
+        $data = is_string($rawStats) && $rawStats !== '' ? @unserialize($rawStats) : null;
+        if (!is_array($data) || empty($data['raw']['month'])) {
             continue;
         }
-
-        $data = @unserialize($rawStats);
-        if (!is_array($data)) {
-            continue;
-        }
-
-        if (empty($data['raw']['month']) or
-            $data['raw']['month'] == 0) continue;
 
         $dataMonthTotal += (float) $data['raw']['month'];
         if ($isLocalnet) {
@@ -246,9 +237,6 @@ TXT;
             'nearLimit' => $nearLimit,
             'rawMiB' => $data['raw'],
         ];
-        //echo "User: {$thisUser} \t Traffic: {$dataDisplay['week']}, day: {$dataDisplay['day']}, hour: {$dataDisplay['hour']}, 15min: {$dataDisplay['15min']}\n";
-        //echo "\tData rates:\t Week: {$dataRates['week']}M/s   Day: {$dataRates['day']}M/s    Hour: {$dataRates['hour']}M/s    15min: {$dataRates['15min']}M/s\n\n";
-
     }
 
     sort($missingStats, SORT_NATURAL | SORT_FLAG_CASE);
@@ -275,8 +263,9 @@ TXT;
     }
 
     if ($asJson) {
-        foreach ($rows as $row) {
-            $jsonRows[] = [
+        $payload = [
+            'users' => array_map(static function (array $row): array {
+                return [
                 'user'    => $row['user'],
                 'display' => [
                     'month' => $row['display']['month'],
@@ -291,10 +280,8 @@ TXT;
                 'overLimit' => $row['overLimit'],
                 'nearLimit' => $row['nearLimit'],
                 'rawMiB'  => $row['rawMiB'],
-            ];
-        }
-        $payload = [
-            'users' => $jsonRows,
+                ];
+            }, $rows),
             'totals' => [
                 'monthMiB'      => round($dataMonthTotal, 2),
                 'monthLocalMiB' => round($dataMonthTotalLocal, 2),
@@ -321,10 +308,7 @@ TXT;
             $pctDisplayRaw = 'n/a';
             $statusLabel = '';
             if ($row['pctUsed'] !== null) {
-                $pctValue = (int) round($row['pctUsed']);
-                if ($pctValue > 999) {
-                    $pctValue = 999;
-                }
+                $pctValue = min(999, (int) round($row['pctUsed']));
                 $pctDisplayRaw = sprintf('%3d%%', $pctValue);
                 if ($row['pctUsed'] >= 100) {
                     $statusLabel = '[OVER]';
@@ -405,6 +389,7 @@ TXT;
 
     return 0;
 }
+
 function formatTrafficAmount($value): string {
     if ( ($value / 1024 / 999) > 1 ) return round( ($value / 1024 / 1024), 2) . 'TiB';
     if ( ($value / 999) > 1 )        return round( ($value / 1024), 2) . 'GiB';

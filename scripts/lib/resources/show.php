@@ -9,6 +9,12 @@
 require_once __DIR__.'/log.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 
+/** @return string[] */
+function pmssResourceMetricNames(): array
+{
+    return ['io_read', 'io_write', 'cpu', 'ram_hours', 'io_read_ops', 'io_write_ops'];
+}
+
 /**
  * Assemble per-user rows, totals, and missing entries.
  *
@@ -18,7 +24,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
 {
     $missingStats = $rows = [];
     $windows = ['month', 'week', 'day', 'hour'];
-    $metrics = ['io_read', 'io_write', 'cpu', 'ram_hours', 'io_read_ops', 'io_write_ops'];
+    $metrics = pmssResourceMetricNames();
     $windowZeros = array_fill_keys($windows, 0.0);
     $totals = array_fill_keys($metrics, $windowZeros) + array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
 
@@ -118,7 +124,7 @@ TEXT;
                 'tasks' => ['current' => $source['tasks_current']],
             ];
 
-            foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metric) {
+            foreach (pmssResourceMetricNames() as $metric) {
                 $payload[$metric] = $source[$metric];
             }
 

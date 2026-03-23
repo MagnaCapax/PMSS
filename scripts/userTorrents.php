@@ -83,7 +83,7 @@ TXT;
     }
     $users = $listUsersResult['users'];
 
-    foreach($users AS $thisUser) {    // Loop users checking their instances
+    foreach ($users as $thisUser) {
         $counts = pmssUserTorrentsCountForUser($homeDir, $thisUser);
         echo ($byClient
             ? "{$thisUser}: total=".number_format($counts['total'])." rtorrent=".number_format($counts['rtorrent'])." deluge=".number_format($counts['deluge'])." qbittorrent=".number_format($counts['qbittorrent'])
