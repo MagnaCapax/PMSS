@@ -70,11 +70,15 @@ function pmssUserTransferBuildSshCommand(string $remoteUser, array $extraOptions
     ], $extraOptions, ['-l '.escapeshellarg($remoteUser)]));
 }
 
-/**
- * Build a strict rsync wrapper script for the transfer flow.
- */
-function pmssUserTransferBuildRsyncScript(array $cfg, array $arguments): string
+/** Build an rsync wrapper script with explicit sources and excludes. */
+function pmssUserTransferBuildRsyncCommand(array $cfg, array $sources, array $excludes = []): string
 {
+    $arguments = array_map(static function (string $item): string { return '--exclude='.escapeshellarg($item); }, $excludes);
+    $prefix = $cfg['remoteUser'].'@'.$cfg['hostname'].':';
+    foreach ($sources as $source) {
+        $arguments[] = escapeshellarg($prefix.$source);
+    }
+
     return "#!/bin/bash\nset -e\n".'rsync -av -e '.escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
         .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/')."\n";
 }
@@ -84,8 +88,6 @@ function pmssUserTransferBuildRsyncScript(array $cfg, array $arguments): string
  */
 function pmssUserTransferBuildRsyncMain(array $cfg): string
 {
-    [$remoteUser, $hostname] = [$cfg['remoteUser'], $cfg['hostname']];
-
     // Keep the exclude list in a stable order for readability and diffing.
     $excludes = [
         '.rtorrent.rc',
@@ -113,13 +115,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.trafficLimit',
     ];
 
-    return pmssUserTransferBuildRsyncScript(
-        $cfg,
-        array_merge(
-            array_map(static function (string $item): string { return '--exclude='.escapeshellarg($item); }, $excludes),
-            [escapeshellarg($remoteUser.'@'.$hostname.':/home/'.$remoteUser.'/')]
-        )
-    );
+    return pmssUserTransferBuildRsyncCommand($cfg, ['/home/'.$cfg['remoteUser'].'/'], $excludes);
 }
 
 /**
@@ -127,22 +123,35 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
  */
 function pmssUserTransferBuildRsyncFinal(array $cfg): string
 {
-    [$remoteUser, $hostname] = [$cfg['remoteUser'], $cfg['hostname']];
-
     // Keep this list explicit; do not rely on brace expansion inside expect.
     $sources = [
-        '/home/'.$remoteUser.'/session',
-        '/home/'.$remoteUser.'/www/rutorrent/share',
-        '/home/'.$remoteUser.'/.lighttpd/custom',
-        '/home/'.$remoteUser.'/.lighttpd/custom.d',
-        '/home/'.$remoteUser.'/.local',
-        '/home/'.$remoteUser.'/www/public',
+        '/home/'.$cfg['remoteUser'].'/session',
+        '/home/'.$cfg['remoteUser'].'/www/rutorrent/share',
+        '/home/'.$cfg['remoteUser'].'/.lighttpd/custom',
+        '/home/'.$cfg['remoteUser'].'/.lighttpd/custom.d',
+        '/home/'.$cfg['remoteUser'].'/.local',
+        '/home/'.$cfg['remoteUser'].'/www/public',
     ];
 
-    return pmssUserTransferBuildRsyncScript(
-        $cfg,
-        array_map(static function (string $source) use ($remoteUser, $hostname): string { return escapeshellarg($remoteUser.'@'.$hostname.':'.$source); }, $sources)
-    );
+    return pmssUserTransferBuildRsyncCommand($cfg, $sources);
+}
+
+/** Run repeated expect/rsync passes, sleeping between intermediate passes. */
+function pmssUserTransferRunPasses(
+    string $description,
+    string $expectPath,
+    string $scriptPath,
+    int $passes,
+    int $sleepMin,
+    int $sleepMax
+): int {
+    $lastRc = 0;
+    for ($i = 1; $i <= $passes; $i++) {
+        $lastRc = runStep(sprintf('%s (pass %d/%d)', $description, $i, $passes), pmssBuildCommand($expectPath, [$scriptPath]));
+        if ($i < $passes) pmssUserTransferSleep($sleepMin, $sleepMax, sprintf('Waiting before next %s pass', strtolower($description)));
+    }
+
+    return $lastRc;
 }
 
 /**
@@ -230,8 +239,8 @@ function pmssUserTransferMain(array $argv): int
             $mainScript = $scratch.'/rsync-main.sh';
             $finalScript = $scratch.'/rsync-final.sh';
             runStep('Validating remote SSH authentication', pmssBuildCommand($expect, [$authProbe]));
-            runStep('Pulling home data (pass 1/'.$cfg['mainPasses'].')', pmssBuildCommand($expect, [$mainScript]));
-            runStep('Pulling volatile data (pass 1/'.$cfg['finalPasses'].')', pmssBuildCommand($expect, [$finalScript]));
+            pmssUserTransferRunPasses('Pulling home data', $expect, $mainScript, 1, 0, 0);
+            pmssUserTransferRunPasses('Pulling volatile data', $expect, $finalScript, 1, 0, 0);
             runStep('Normalising user permissions', pmssBuildCommand('php', [dirname(__DIR__).'/../util/userPermissions.php', $cfg['localUser']]));
             logMessage('[SKIP] Dry run complete');
             return 0;
@@ -319,29 +328,8 @@ function pmssUserTransferMain(array $argv): int
             return 1;
         }
 
-        // Run repeated passes to converge the remote state before the final sync.
-        $lastMainRc = 0;
-        for ($i = 1; $i <= $cfg['mainPasses']; $i++) {
-            $lastMainRc = runStep(
-                sprintf('Pulling home data (pass %d/%d)', $i, $cfg['mainPasses']),
-                pmssBuildCommand($expect, [$mainScript])
-            );
-            if ($i < $cfg['mainPasses']) {
-                pmssUserTransferSleep($cfg['sleepMin'], $cfg['sleepMax'], 'Waiting before next main pass');
-            }
-        }
-
-        // Final sync for volatile paths such as session data.
-        $lastFinalRc = 0;
-        for ($i = 1; $i <= $cfg['finalPasses']; $i++) {
-            $lastFinalRc = runStep(
-                sprintf('Pulling volatile data (pass %d/%d)', $i, $cfg['finalPasses']),
-                pmssBuildCommand($expect, [$finalScript])
-            );
-            if ($i < $cfg['finalPasses']) {
-                pmssUserTransferSleep($cfg['sleepMin'], $cfg['sleepMax'], 'Waiting before next final pass');
-            }
-        }
+        $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $expect, $mainScript, $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
+        $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $expect, $finalScript, $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
 
         pmssUserTransferPostSetup($cfg, $home);
         $cleanup();

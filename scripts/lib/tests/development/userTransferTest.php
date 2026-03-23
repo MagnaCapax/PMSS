@@ -273,6 +273,21 @@ SNAP;
         $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
     }
 
+    public function testSharedRsyncCommandBuilderMatchesSnapshot(): void
+    {
+        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $expected = <<<'SNAP'
+#!/bin/bash
+set -e
+rsync -av -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='www' --exclude='session' 'deefbox@example.com:/home/deefbox/' 'deefbox@example.com:/home/deefbox/.local' '/home/deefbox/'
+SNAP;
+
+        $this->assertEquals(
+            $expected."\n",
+            \pmssUserTransferBuildRsyncCommand($cfg, ['/home/deefbox/', '/home/deefbox/.local'], ['www', 'session'])
+        );
+    }
+
     public function testRewriteBencodedHomePathsAdjustsStringLengths(): void
     {
         $oldPath = '/home/olduser/data/movie';
