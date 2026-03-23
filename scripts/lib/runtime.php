@@ -36,6 +36,10 @@ if (!function_exists('pmssEnvValueIsFalsey')) {
     // Treat empty and explicit disable values as falsey toggles.
     function pmssEnvValueIsFalsey($value): bool { return in_array(pmssEnvValueNormalized($value), ['', '0', 'false', 'no'], true); }
 }
+if (!function_exists('pmssEnvValueIsTruthy')) {
+    // Treat explicit enable values as truthy toggles.
+    function pmssEnvValueIsTruthy($value): bool { return in_array(pmssEnvValueNormalized($value), ['1', 'true', 'yes', 'on'], true); }
+}
 
 if (!function_exists('pmssLogDir')) {
     // Resolve the PMSS log directory, allowing hermetic test overrides.
