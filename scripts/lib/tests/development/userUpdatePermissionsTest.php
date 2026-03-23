@@ -126,8 +126,13 @@ class UserUpdatePermissionsTest extends TestCase
             \pmssTestInstallRunUserStepShim('last');
         }
 
+        $firstStepDescription = '';
+        if (isset($steps[0]) && is_array($steps[0]) && isset($steps[0]['description'])) {
+            $firstStepDescription = (string) $steps[0]['description'];
+        }
+
         $this->assertEquals(1, count($steps));
-        $this->assertEquals('Refreshing user permissions', $steps[0]['description']);
+        $this->assertEquals('Refreshing user permissions', $firstStepDescription);
     }
 
     private function findStepCommand(string $jsonLog, string $needle): ?string
