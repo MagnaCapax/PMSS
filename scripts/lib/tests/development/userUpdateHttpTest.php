@@ -1,11 +1,6 @@
 <?php
 namespace {
-    if (!function_exists('runUserStep')) {
-        function runUserStep(string $user, string $description, string $command): int
-        {
-            return 0;
-        }
-    }
+    pmssTestInstallRunUserStepShim();
 }
 
 namespace PMSS\Tests {

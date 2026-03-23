@@ -1,5 +1,27 @@
 <?php
-namespace PMSS\Tests;
+namespace {
+    if (!function_exists('pmssTestInstallRunUserStepShim')) {
+        function pmssTestInstallRunUserStepShim(string $mode = 'noop'): void
+        {
+            $GLOBALS['PMSS_TEST_RUNUSERSTEP_MODE'] = $mode;
+            if (function_exists('runUserStep')) {
+                return;
+            }
+            function runUserStep(string $user, string $description, string $command): int
+            {
+                $mode = (string) ($GLOBALS['PMSS_TEST_RUNUSERSTEP_MODE'] ?? 'noop');
+                if ($mode === 'profile') {
+                    $GLOBALS['PMSS_PROFILE'][] = ['description' => $description, 'command' => $command];
+                } elseif ($mode === 'last') {
+                    $GLOBALS['PMSS_TEST_RUNUSERSTEP_LAST'] = ['user' => $user, 'description' => $description, 'command' => $command];
+                }
+                return 0;
+            }
+        }
+    }
+}
+
+namespace PMSS\Tests {
 
 class SkipTest extends \Exception {}
 
@@ -254,4 +276,5 @@ abstract class TestCase
     {
         $this->assertEquals($expectedCount, substr_count($this->pmssReadRepoFile($relativePath), $needle), $message);
     }
+}
 }

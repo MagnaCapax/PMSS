@@ -1,15 +1,6 @@
 <?php
 namespace {
-    if (!function_exists('runUserStep')) {
-        function runUserStep(string $user, string $description, string $command): int
-        {
-            $GLOBALS['PMSS_PROFILE'][] = [
-                'description' => $description,
-                'command' => $command,
-            ];
-            return 0;
-        }
-    }
+    pmssTestInstallRunUserStepShim('profile');
 }
 
 namespace PMSS\Tests {
