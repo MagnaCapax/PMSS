@@ -282,6 +282,14 @@ function pmssUserWatchdogRunEnabledUsers(string $enableMarker, array $processNam
     }
 }
 
+/** @param array<int,string> $processNames @param array<int,array<string,mixed>> $serviceSpecs */
+function pmssUserWatchdogRunService(string $heading, string $enableMarker, array $processNames, string $userLogMessage, array $serviceSpecs, ?callable $runningStateBuilder = null, ?string $optionalRequirePath = null, string $homeRoot = '/home', string $command = '/scripts/listUsers.php'): void
+{
+    $heading !== '' && print date('Y-m-d H:i:s') . ': Checking '.$heading." instances\n";
+    $optionalRequirePath !== null && is_file($optionalRequirePath) && require_once $optionalRequirePath;
+    pmssUserWatchdogRunEnabledUsers($enableMarker, $processNames, $userLogMessage, function (string $username) use ($serviceSpecs, $runningStateBuilder): void { pmssUserWatchdogEnsureServices($username, $serviceSpecs, $runningStateBuilder !== null ? (array) $runningStateBuilder($username) : array()); }, $homeRoot, $command);
+}
+
 function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array
 {
     $normalizedUsers = array();
