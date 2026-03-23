@@ -16,14 +16,13 @@ class DelugeCommandSymlinkTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-deluge-command-link-'.bin2hex(random_bytes(6));
-        @mkdir($this->tempDir, 0700, true);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-command-link-', 0700);
         $this->logs = [];
     }
 
     protected function tearDown(): void
     {
-        $this->removePath($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testCreatesSymlinkWhenLocalPathMissing(): void
@@ -135,28 +134,6 @@ class DelugeCommandSymlinkTest extends TestCase
 
     private function removePath(string $path): void
     {
-        if ($path === '' || !file_exists($path)) {
-            return;
-        }
-
-        if (is_link($path) || is_file($path)) {
-            @unlink($path);
-            return;
-        }
-
-        $items = scandir($path);
-        if (!is_array($items)) {
-            @rmdir($path);
-            return;
-        }
-
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $this->removePath($path.'/'.$item);
-        }
-
-        @rmdir($path);
+        $this->cleanup($path);
     }
 }

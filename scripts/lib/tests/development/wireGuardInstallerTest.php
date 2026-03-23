@@ -267,27 +267,13 @@ class WireGuardInstallerTest extends TestCase
 
     private function createTempDir(): string
     {
-        $dir = sys_get_temp_dir().'/pmss-wireguard-tests-'.uniqid('', true);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0700, true);
-        }
+        $dir = $this->pmssMakeNamedTempDir('pmss-wireguard-tests-', 0700);
         $this->cleanupPaths[] = $dir;
         return $dir;
     }
 
     private function removePath(string $path): void
     {
-        if (is_dir($path)) {
-            $items = scandir($path) ?: [];
-            foreach ($items as $item) {
-                if ($item === '.' || $item === '..') {
-                    continue;
-                }
-                $this->removePath($path.'/'.$item);
-            }
-            @rmdir($path);
-        } else {
-            @unlink($path);
-        }
+        $this->cleanup($path);
     }
 }

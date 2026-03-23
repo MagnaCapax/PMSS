@@ -84,26 +84,13 @@ class WireGuardPeersStatusTest extends TestCase
 
     private function createTempDir(): string
     {
-        $dir = sys_get_temp_dir().'/pmss-wireguard-status-'.bin2hex(random_bytes(4));
-        @mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
         $this->cleanupPaths[] = $dir;
         return $dir;
     }
 
     private function removePath(string $path): void
     {
-        if (is_dir($path)) {
-            $items = scandir($path) ?: array();
-            foreach ($items as $item) {
-                if ($item === '.' || $item === '..') {
-                    continue;
-                }
-                $this->removePath($path.'/'.$item);
-            }
-            @rmdir($path);
-            return;
-        }
-
-        @unlink($path);
+        $this->cleanup($path);
     }
 }
