@@ -11,15 +11,19 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
     {
         $path = 'scripts/util/userTrafficLimit.php';
 
-        $this->pmssAssertRepoFileContainsString($path, "require_once __DIR__.'/../lib/runtime.php';");
-        $this->pmssAssertRepoFileContainsString($path, "require_once __DIR__.'/../lib/user/trafficLimit.php';");
-        $this->pmssAssertRepoFileContainsString($path, '  ./userTrafficLimit.php --user=<username> --limit=<GiB>');
-        $this->pmssAssertRepoFileContainsString(
+        $this->pmssAssertRepoFileContainsAllStrings(
             $path,
-            "exit(pmssUserTrafficLimitCli(\$argv ?? (\$_SERVER['argv'] ?? []), \$usage));"
+            [
+                "require_once __DIR__.'/../lib/runtime.php';",
+                "require_once __DIR__.'/../lib/user/trafficLimit.php';",
+                '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
+                "exit(pmssUserTrafficLimitCli(\$argv ?? (\$_SERVER['argv'] ?? []), \$usage));",
+            ]
         );
-        $this->pmssAssertRepoFileNotContainsString($path, 'pmssParseCliTokens($argv');
-        $this->pmssAssertRepoFileNotContainsString($path, 'pmssTrafficLimitWriteGiBFile($target, $trafficLimit)');
+        $this->pmssAssertRepoFileNotContainsStrings(
+            $path,
+            ['pmssParseCliTokens($argv', 'pmssTrafficLimitWriteGiBFile($target, $trafficLimit)']
+        );
     }
 
     public function testLibraryOwnsTheTrafficLimitCliImplementation(): void

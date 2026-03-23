@@ -19,12 +19,18 @@ class ListUsersConsumersGuardTest extends TestCase
         ];
 
         foreach ($targets as $file) {
-            $this->pmssAssertRepoFileContainsString($file, "pmssListManagedUsers('/scripts/listUsers.php')", $file.' must use pmssListManagedUsers()');
-            $this->pmssAssertRepoFileNotContainsString($file, "array_map('trim', pmssListManagedUsers", $file.' should not re-trim pmssListManagedUsers() output');
-            $this->pmssAssertRepoFileNotContainsString(
+            $this->pmssAssertRepoFileContainsAllStrings(
                 $file,
-                "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')",
-                $file.' should not revalidate pmssListManagedUsers() output inline'
+                ["pmssListManagedUsers('/scripts/listUsers.php')"],
+                $file.' must use pmssListManagedUsers()'
+            );
+            $this->pmssAssertRepoFileNotContainsStrings(
+                $file,
+                [
+                    "array_map('trim', pmssListManagedUsers",
+                    "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')",
+                ],
+                $file.' should keep pmssListManagedUsers() output as-is '
             );
         }
     }
@@ -43,8 +49,11 @@ class ListUsersConsumersGuardTest extends TestCase
         ];
 
         foreach ($targets as $file) {
-            $this->pmssAssertRepoFileContainsString($file, 'listUsers.php', $file.' must call listUsers.php');
-            $this->pmssAssertRepoFileContainsString($file, 'pmssValidateUsername', $file.' must revalidate usernames from listUsers');
+            $this->pmssAssertRepoFileContainsAllStrings(
+                $file,
+                ['listUsers.php', 'pmssValidateUsername'],
+                $file.' must keep direct listUsers validation'
+            );
         }
     }
 }

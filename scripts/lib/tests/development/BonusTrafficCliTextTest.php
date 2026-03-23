@@ -7,17 +7,21 @@ class BonusTrafficCliTextTest extends TestCase
 {
     public function testUsageTextKeepsSupportedFormsAndNotes(): void
     {
-        $contents = $this->pmssReadRepoFile('scripts/lib/user/bonusTraffic.php');
-        $this->assertOrderedStrings([
-            'Usage:',
-            '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
-            '  ./userBonusTraffic.php --user=<username> --show',
-            '  ./userBonusTraffic.php --user=<username> --unset',
-            '  ./userBonusTraffic.php <username> <GiB>',
-            'Notes:',
-            '  - Bonus unit is GiB (monthly quota add-on).',
-            '  - Use 0 (or --unset) to remove the bonus.',
-        ], $contents, 'Missing usage line: ', 'Usage line order changed at: ');
+        $this->pmssAssertRepoFileContainsOrderedStrings(
+            'scripts/lib/user/bonusTraffic.php',
+            [
+                'Usage:',
+                '  ./userBonusTraffic.php --user=<username> --bonus=<GiB>',
+                '  ./userBonusTraffic.php --user=<username> --show',
+                '  ./userBonusTraffic.php --user=<username> --unset',
+                '  ./userBonusTraffic.php <username> <GiB>',
+                'Notes:',
+                '  - Bonus unit is GiB (monthly quota add-on).',
+                '  - Use 0 (or --unset) to remove the bonus.',
+            ],
+            'Missing usage line: ',
+            'Usage line order changed at: '
+        );
     }
 
     public function testMissingUsernamePathStillPrintsUsageText(): void

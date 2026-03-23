@@ -209,6 +209,20 @@ abstract class TestCase
         $this->assertStringContainsAllStrings($needles, $this->pmssReadRepoFile($relativePath), $messagePrefix);
     }
 
+    /** Read a repository file and assert ordered substrings. */
+    protected function pmssAssertRepoFileContainsOrderedStrings(string $relativePath, array $needles, string $missingPrefix = '', string $orderPrefix = ''): void
+    {
+        $this->assertOrderedStrings($needles, $this->pmssReadRepoFile($relativePath), $missingPrefix, $orderPrefix);
+    }
+
+    /** Read a repository file and assert that it omits multiple substrings. */
+    protected function pmssAssertRepoFileNotContainsStrings(string $relativePath, array $needles, string $messagePrefix = ''): void
+    {
+        foreach ($needles as $needle) {
+            $this->pmssAssertRepoFileNotContainsString($relativePath, $needle, $messagePrefix !== '' ? $messagePrefix.$needle : '');
+        }
+    }
+
     /** Read a repository file and assert a fixed substring count. */
     protected function pmssAssertRepoFileSubstringCount(string $relativePath, string $needle, int $expectedCount, string $message = ''): void
     {

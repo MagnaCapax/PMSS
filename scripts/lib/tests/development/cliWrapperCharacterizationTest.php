@@ -16,9 +16,14 @@ final class CliWrapperCharacterizationTest extends TestCase
         ];
 
         foreach ($cases as $path => $target) {
-            $this->pmssAssertRepoFileContainsString($path, "require_once __DIR__.'/lib/runtime.php';");
-            $this->pmssAssertRepoFileContainsString($path, "pmssRequireCliEntrypointScript(__DIR__, '{$target}');");
-            $this->pmssAssertRepoFileNotContainsString($path, '$argv', $path.' should stay a thin wrapper');
+            $this->pmssAssertRepoFileContainsAllStrings(
+                $path,
+                [
+                    "require_once __DIR__.'/lib/runtime.php';",
+                    "pmssRequireCliEntrypointScript(__DIR__, '{$target}');",
+                ]
+            );
+            $this->pmssAssertRepoFileNotContainsStrings($path, ['$argv'], $path.' should stay a thin wrapper');
         }
     }
 
