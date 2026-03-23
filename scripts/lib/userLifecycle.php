@@ -199,6 +199,22 @@ function pmssValidateUsernameForCreate(string $username): bool
     return pmssUsernameIsValidForCreate($username);
 }
 
+/** @return array{exitCode:int,users:array<int,string>} */
+function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'): array
+{
+    $lines = array();
+    $exitCode = 0;
+    exec(escapeshellarg($command), $lines, $exitCode);
+    $users = array();
+    foreach ($lines as $rawUser) {
+        $normalized = pmssNormalizeUsername(trim((string) $rawUser));
+        if (pmssValidateUsername($normalized)) {
+            $users[$normalized] = true;
+        }
+    }
+    return array('exitCode' => $exitCode, 'users' => array_keys($users));
+}
+
 /**
  * Return trimmed, normalized, validated managed usernames from listUsers.php.
  *
@@ -208,16 +224,7 @@ function pmssValidateUsernameForCreate(string $username): bool
  */
 function pmssListManagedUsers(string $command = '/scripts/listUsers.php'): array
 {
-    $users = array();
-    foreach (array_filter(array_map('trim', explode("\n", trim((string) @shell_exec($command)))), 'strlen') as $rawUser) {
-        $normalized = pmssNormalizeUsername($rawUser);
-        if (!pmssValidateUsername($normalized)) {
-            continue;
-        }
-        $users[$normalized] = true;
-    }
-
-    return array_keys($users);
+    return pmssListManagedUsersResult($command)['users'];
 }
 
 /** Return true when watchdogs must avoid web-facing services for the user. */

@@ -28,29 +28,27 @@ class ListUsersGarbageOutputTest extends TestCase
             'user; rm -rf /home/*; #',
         ];
 
-        // We do not execute scripts here; instead we assert that helper-based
-        // consumers centralize listUsers sanitization via pmssListManagedUsers.
-        $helperTargets = [
-            'scripts/util/setupNetwork.php',
-            'scripts/util/checkUserHtpasswd.php',
-            'scripts/util/userResourcesList.php',
-            'scripts/util/userConfigLighttpd.php',
-        ];
-
-        foreach ($helperTargets as $file) {
-            $this->pmssAssertRepoFileContainsAllStrings(
-                $file,
-                ["pmssListManagedUsers('/scripts/listUsers.php')"],
-                $file.' must use pmssListManagedUsers()'
-            );
+        foreach ([
+            "pmssListManagedUsers('/scripts/listUsers.php')" => [
+                'scripts/cron/trafficIngressLog.php',
+                'scripts/util/checkRutorrentPlugins.php',
+                'scripts/util/makeMonitoringRules.php',
+                'scripts/util/setupNetwork.php',
+                'scripts/util/checkUserHtpasswd.php',
+                'scripts/util/userResourcesList.php',
+                'scripts/util/userConfigLighttpd.php',
+            ],
+            'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/userTorrents.php'],
+        ] as $needle => $files) {
+            foreach ($files as $file) {
+                $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
+            }
         }
 
         // Direct consumers that still shell out to listUsers.php must keep explicit validation.
         $directTargets = [
             'scripts/cron/updateQuotas.php',
-            'scripts/userTorrents.php',
             'scripts/cron/userTrackerCleaner.php',
-            'scripts/cron/trafficIngressLog.php',
         ];
 
         foreach ($directTargets as $file) {

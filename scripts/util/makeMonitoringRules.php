@@ -9,8 +9,9 @@
 // Configure Ip tables rules for monitoring network traffic usage
 
 require_once '/scripts/lib/network/iptables.php';
+require_once '/scripts/lib/userLifecycle.php';
 
-$users = array_filter(explode("\n", trim(`/scripts/listUsers.php`)), 'strlen');
+$users = pmssListManagedUsers('/scripts/listUsers.php');
 if (!$users) exit(0);
 $users[] = 'www-data';
 

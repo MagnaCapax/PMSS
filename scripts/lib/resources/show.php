@@ -94,14 +94,12 @@ TEXT;
         }
         $users = [$userFilter];
     } else {
-        $lines = [];
-        $rc = 0;
-        exec(escapeshellarg(dirname(__DIR__, 2).'/listUsers.php'), $lines, $rc);
-        if ($rc !== 0) {
+        $listUsersResult = pmssListManagedUsersResult(dirname(__DIR__, 2).'/listUsers.php');
+        if ($listUsersResult['exitCode'] !== 0) {
             fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
             return 1;
         }
-        $users = array_values(array_filter(array_map('trim', $lines), 'pmssResourceLogIsValidUser'));
+        $users = array_values(array_filter($listUsersResult['users'], 'pmssResourceLogIsValidUser'));
         if (empty($users)) {
             die("No users in this system!\n");
         }

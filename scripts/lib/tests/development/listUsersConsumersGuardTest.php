@@ -11,27 +11,34 @@ class ListUsersConsumersGuardTest extends TestCase
      */
     public function testHelperConsumersRelyOnSharedManagedUserParser(): void
     {
-        $targets = [
-            'scripts/util/setupNetwork.php',
-            'scripts/util/checkUserHtpasswd.php',
-            'scripts/util/userResourcesList.php',
-            'scripts/util/userConfigLighttpd.php',
-        ];
-
-        foreach ($targets as $file) {
-            $this->pmssAssertRepoFileContainsAllStrings(
-                $file,
-                ["pmssListManagedUsers('/scripts/listUsers.php')"],
-                $file.' must use pmssListManagedUsers()'
-            );
-            $this->pmssAssertRepoFileNotContainsStrings(
-                $file,
-                [
-                    "array_map('trim', pmssListManagedUsers",
-                    "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')",
-                ],
-                $file.' should keep pmssListManagedUsers() output as-is '
-            );
+        foreach ([
+            "pmssListManagedUsers('/scripts/listUsers.php')" => [
+                'scripts/cron/trafficIngressLog.php',
+                'scripts/util/checkRutorrentPlugins.php',
+                'scripts/util/makeMonitoringRules.php',
+                'scripts/util/setupNetwork.php',
+                'scripts/util/checkUserHtpasswd.php',
+                'scripts/util/userResourcesList.php',
+                'scripts/util/userConfigLighttpd.php',
+            ],
+            'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/userTorrents.php'],
+        ] as $needle => $files) {
+            foreach ($files as $file) {
+                $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
+            }
+            if ($needle !== "pmssListManagedUsers('/scripts/listUsers.php')") {
+                continue;
+            }
+            foreach ($files as $file) {
+                $this->pmssAssertRepoFileNotContainsStrings(
+                    $file,
+                    [
+                        "array_map('trim', pmssListManagedUsers",
+                        "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')",
+                    ],
+                    $file.' should keep pmssListManagedUsers() output as-is '
+                );
+            }
         }
     }
 
@@ -43,9 +50,7 @@ class ListUsersConsumersGuardTest extends TestCase
     {
         $targets = [
             'scripts/cron/updateQuotas.php',
-            'scripts/userTorrents.php',
             'scripts/cron/userTrackerCleaner.php',
-            'scripts/cron/trafficIngressLog.php',
         ];
 
         foreach ($targets as $file) {

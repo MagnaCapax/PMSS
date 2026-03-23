@@ -20,24 +20,13 @@ if (!pmssTrafficIngressEnsureDir($logDir, 0755) || !pmssTrafficIngressEnsureDir(
     exit(1);
 }
 
-$users = array_filter(explode("\n", trim((string) @shell_exec('/scripts/listUsers.php'))));
+$users = pmssListManagedUsers('/scripts/listUsers.php');
 if (empty($users)) {
     exit(0);
 }
 $users[] = 'www-data';
 
 foreach ($users as $user) {
-    $user = trim($user);
-    $normalized = function_exists('pmssNormalizeUsername')
-        ? pmssNormalizeUsername($user)
-        : strtolower($user);
-    if ($normalized !== $user
-        || !preg_match('/^[a-z0-9-]+$/', $user)
-        || ($user !== 'www-data' && function_exists('pmssValidateUsername') && !pmssValidateUsername($user))
-    ) {
-        continue;
-    }
-
     $uid = pmssResourceLogLookupUid($user);
     if ($uid === null) {
         continue;

@@ -6,15 +6,16 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/../lib/userLifecycle.php';
+
 echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
 
 $accessIni = file_get_contents('/etc/seedbox/config/template.rutorrent.access');
 
 // Get & parse users list
-$users = explode("\n", trim((string) shell_exec('/scripts/listUsers.php')));
+$users = pmssListManagedUsers('/scripts/listUsers.php');
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    if (empty($thisUser)) continue;
     echo "\nChecking: {$thisUser}\n";
 
     $userPath = "/home/{$thisUser}/www/rutorrent/plugins/";

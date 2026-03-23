@@ -76,30 +76,14 @@ TXT;
     $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
 
     // Get & parse users list.
-    $lines = [];
-    $rc = 0;
-    exec(escapeshellarg(__DIR__.'/listUsers.php'), $lines, $rc);
-    if ($rc !== 0) {
+    $listUsersResult = pmssListManagedUsersResult(__DIR__.'/listUsers.php');
+    if ($listUsersResult['exitCode'] !== 0) {
         fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
         exit(1);
     }
-    $users = array_filter(array_map('trim', $lines), 'strlen');
+    $users = $listUsersResult['users'];
 
     foreach($users AS $thisUser) {    // Loop users checking their instances
-        if (!pmssValidateUsername($thisUser)) {
-            pmssUserWriteLogs(
-                pmssUserBaseContext(
-                    'torrents',
-                    'validate',
-                    $thisUser,
-                    [
-                        'status'  => 'ERR',
-                        'message' => 'Skipping invalid username in userTorrents',
-                    ]
-                )
-            );
-            continue;
-        }
         $counts = pmssUserTorrentsCountForUser($homeDir, $thisUser);
         echo ($byClient
             ? "{$thisUser}: total=".number_format($counts['total'])." rtorrent=".number_format($counts['rtorrent'])." deluge=".number_format($counts['deluge'])." qbittorrent=".number_format($counts['qbittorrent'])
