@@ -17,6 +17,77 @@ codex_set_error_trap() {
 	trap 'echo "['"$prefix"'] ERROR rc=$? at line $LINENO while: $BASH_COMMAND" >&1' ERR
 }
 
+# Millisecond timestamp helper with a portable fallback.
+codex_now_ms() {
+	local now
+	now="$(date +%s%3N 2>/dev/null || true)"
+	if [[ "$now" =~ ^[0-9]+$ ]]; then
+		printf '%s\n' "$now"
+		return 0
+	fi
+	now="$(date +%s 2>/dev/null || echo 0)"
+	printf '%s000\n' "$now"
+}
+
+# Minimal JSON string escaping for log/event payloads.
+codex_json_escape() {
+	local value="${1:-}"
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//$'\n'/\\n}"
+	value="${value//$'\r'/\\r}"
+	value="${value//$'\t'/\\t}"
+	printf '%s' "$value"
+}
+
+# Derive a compact distro label for event logs.
+codex_detect_distro_label() {
+	local label
+	label="$( (
+		# shellcheck disable=SC1091
+		. /etc/os-release 2>/dev/null || true
+		printf '%s' "${VERSION_CODENAME:-${ID:-unknown}}"
+	) 2>/dev/null )"
+	if [[ -z "$label" ]]; then
+		label="unknown"
+	fi
+	printf '%s\n' "$label"
+}
+
+# Emit a single structured JSONL event for wrapper observability.
+# Fields align with repo observability baseline when feasible.
+codex_emit_event_jsonl() {
+	local log_file="$1" event="$2" level="$3" step="$4" correlation_id="$5"
+	local rc="${6:-}" duration_ms="${7:-}" detail="${8:-}"
+	local log_dir ts host distro rc_json duration_json
+	log_dir="$(dirname "$log_file")"
+	mkdir -p "$log_dir" 2>/dev/null || return 0
+
+	ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	host="$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo unknown)"
+	distro="$(codex_detect_distro_label)"
+	rc_json="null"
+	duration_json="null"
+	if [[ -n "$rc" ]]; then
+		rc_json="$rc"
+	fi
+	if [[ -n "$duration_ms" ]]; then
+		duration_json="$duration_ms"
+	fi
+
+	printf '{"timestamp":"%s","event":"%s","level":"%s","step":"%s","rc":%s,"duration_ms":%s,"host":"%s","distro":"%s","correlationId":"%s","detail":"%s"}\n' \
+		"$(codex_json_escape "$ts")" \
+		"$(codex_json_escape "$event")" \
+		"$(codex_json_escape "$level")" \
+		"$(codex_json_escape "$step")" \
+		"$rc_json" \
+		"$duration_json" \
+		"$(codex_json_escape "$host")" \
+		"$(codex_json_escape "$distro")" \
+		"$(codex_json_escape "$correlation_id")" \
+		"$(codex_json_escape "$detail")" >>"$log_file" 2>/dev/null || true
+}
+
 # List available assistant profiles under the given directory.
 codex_list_agents() {
 	local assist_dir="$1"

@@ -70,6 +70,7 @@ Options:
   --prompt TEXT       Inline prompt text instead of a file
   --context PATH      Append extra context files (repeatable)
   --exec CMD          Assistant command line (default: codex)
+  --event-log PATH    JSONL event log output path (default: \$outdir/events.jsonl)
   --outdir DIR        Output directory for prompt + artifacts (default: temp dir)
   --dry-run           Build prompt and show the command without invoking
   --autocommit        Append autocommit rules into the prompt
@@ -83,6 +84,7 @@ Exec placeholders:
 Environment:
   PMSS_CODEX_RUN_DEBUG=1  Enable bash -x tracing
   PMSS_CODEX_DANGER_FAIL  Fail if dangerous diff patterns are detected (1=fail)
+  PMSS_CODEX_RUN_EVENT_LOG  Default event log path (overridden by --event-log)
   TMPDIR                 Temp directory root for prompt output
 
 Examples:
@@ -117,6 +119,7 @@ prompt_file=""
 custom_prompt=""
 exec_cmd="codex"
 outdir=""
+event_log=""
 dry_run=0
 autocommit=0
 declare -a extra_context=()
@@ -137,6 +140,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--outdir)
 		outdir=${2:-}
+		shift 2 || true
+		;;
+	--event-log)
+		event_log=${2:-}
 		shift 2 || true
 		;;
 	--context)
@@ -165,7 +172,12 @@ done
 if [[ -z "$outdir" ]]; then
 	outdir="$(mktemp -d "${TMP%/}/pmss-codex-run-XXXXXXXX")"
 fi
+if [[ -z "$event_log" ]]; then
+	event_log="${PMSS_CODEX_RUN_EVENT_LOG:-$outdir/events.jsonl}"
+fi
 prompt_out="$outdir/prompt.txt"
+run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}"
+run_start_ms="$(codex_now_ms)"
 
 # Default to Codex with approval prompts for untrusted commands while keeping sandboxing enabled.
 # codex exec (non-interactive) doesn't support --ask-for-approval; detect and skip it.
@@ -316,25 +328,57 @@ fi
 prompt_bytes=$(wc -c <"$prompt_out" | tr -d ' ')
 prompt_lines=$(wc -l <"$prompt_out" | tr -d ' ')
 echo "[codex-run] prompt written: $prompt_out (${prompt_bytes} bytes, ${prompt_lines} lines)" >&1
+echo "[codex-run] run id: $run_id" >&1
+echo "[codex-run] event log: $event_log" >&1
+codex_emit_event_jsonl "$event_log" "runner_start" "info" "build_prompt" "$run_id" "" "" \
+	"prompt=${prompt_out} bytes=${prompt_bytes} lines=${prompt_lines} dry_run=${dry_run} autocommit=${autocommit}"
 
 if [[ "$dry_run" == "1" ]]; then
 	exec_preview="$(codex_exec_preview "$exec_cmd" "$prompt_out")"
 	codex_color_line "33" "[codex-run] would invoke: $exec_preview"
 	echo "[codex-run] dry-run: not invoking assistant (--dry-run)" >&1
+	duration_ms=$(( $(codex_now_ms) - run_start_ms ))
+	codex_emit_event_jsonl "$event_log" "runner_end" "info" "dry_run" "$run_id" "0" "$duration_ms" \
+		"dry-run completed without assistant invocation"
 	exit 0
 fi
 
+invoke_start_ms="$(codex_now_ms)"
+codex_emit_event_jsonl "$event_log" "assistant_invoke_start" "info" "invoke" "$run_id" "" "" \
+	"exec=${exec_cmd%% *}"
+set +e
 codex_invoke "$exec_cmd" "$prompt_out"
+invoke_rc=$?
+set -e
+invoke_duration_ms=$(( $(codex_now_ms) - invoke_start_ms ))
+codex_emit_event_jsonl "$event_log" "assistant_invoke_end" "info" "invoke" "$run_id" "$invoke_rc" "$invoke_duration_ms" \
+	"assistant invocation completed"
+if [[ "$invoke_rc" -ne 0 ]]; then
+	total_duration_ms=$(( $(codex_now_ms) - run_start_ms ))
+	codex_emit_event_jsonl "$event_log" "runner_end" "error" "invoke" "$run_id" "$invoke_rc" "$total_duration_ms" \
+		"assistant invocation failed"
+	exit "$invoke_rc"
+fi
 
 # Security: revert any modifications to frozen pipeline paths (CRITICAL)
 # This catches sandbox escape via .github/, development/, AGENTS.md, .codex-prompt, .gitignore
 if ! codex_scan_frozen_paths "$ROOT"; then
 	echo "[codex-run] WARNING: frozen path violation detected and reverted" >&2
+	codex_emit_event_jsonl "$event_log" "frozen_path_violation" "warn" "scan_frozen_paths" "$run_id" "0" "" \
+		"frozen path modifications were detected and reverted"
 fi
 
 codex_scan_git_diff_for_dangers "$ROOT"
+codex_emit_event_jsonl "$event_log" "danger_scan_complete" "info" "scan_diff" "$run_id" "0" "" \
+	"danger scan completed"
 
 # Security: scan commit messages for PII before they get pushed to public repo
 if ! codex_scan_commit_messages_for_pii "$ROOT"; then
 	echo "[codex-run] WARNING: unpushed commits contain PII — wrapper should block push" >&2
+	codex_emit_event_jsonl "$event_log" "commit_pii_warning" "warn" "scan_commit_messages" "$run_id" "0" "" \
+		"PII-like data detected in unpushed commit messages"
 fi
+
+total_duration_ms=$(( $(codex_now_ms) - run_start_ms ))
+codex_emit_event_jsonl "$event_log" "runner_end" "info" "post_checks" "$run_id" "0" "$total_duration_ms" \
+	"run completed"
