@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/mountHardening.php';
 
 class TempMountNoexecTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $prevHardening;
     private $prevDryRun;
 
@@ -32,16 +35,14 @@ class TempMountNoexecTest extends TestCase
         file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_NOEXEC');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'disabled'), 'expected disabled log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled'), 'expected disabled log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -58,16 +59,14 @@ class TempMountNoexecTest extends TestCase
         file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_NOEXEC=FALSE');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
 
         $this->assertEquals($original, (string) file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'disabled via PMSS_HARDEN_TMP_NOEXEC'), 'expected explicit-false skip log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled via PMSS_HARDEN_TMP_NOEXEC'), 'expected explicit-false skip log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -85,9 +84,7 @@ class TempMountNoexecTest extends TestCase
             "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_NOEXEC=1');
         putenv('PMSS_DRY_RUN=1');
@@ -97,7 +94,7 @@ class TempMountNoexecTest extends TestCase
         $this->assertStringContainsString('/tmp', $updated);
         $this->assertStringContainsString('/dev/shm', $updated);
         $this->assertStringContainsString('noexec', $updated);
-        $this->assertTrue($this->messagesContain($messages, 'Updated /tmp mount options'), 'expected /tmp update log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp mount options'), 'expected /tmp update log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -113,9 +110,7 @@ class TempMountNoexecTest extends TestCase
         file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_NOEXEC=1');
         putenv('PMSS_DRY_RUN=1');
@@ -143,16 +138,14 @@ class TempMountNoexecTest extends TestCase
         file_put_contents($mounts, "tmpfs /tmp tmpfs rw,noexec,nosuid,nodev 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_NOEXEC=1');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'already hardened'), 'expected already hardened log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'already hardened'), 'expected already hardened log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -168,16 +161,14 @@ class TempMountNoexecTest extends TestCase
         file_put_contents($mounts, "tmpfs /dev/shm tmpfs rw,nosuid,nodev 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_NOEXEC=1');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'not found'), 'expected not found log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected not found log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -193,15 +184,13 @@ class TempMountNoexecTest extends TestCase
         chmod($fstab, 0000);
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_NOEXEC=1');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
 
-        $this->assertTrue($this->messagesContain($messages, 'not readable'), 'expected not readable log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
         chmod($fstab, 0600);
 
         $this->pmssRemoveTree($dir);
@@ -225,16 +214,6 @@ class TempMountNoexecTest extends TestCase
             return array_values(array_filter(explode(',', $columns[3]), 'strlen'));
         }
         return [];
-    }
-
-    private function messagesContain(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
     }
 
 }

@@ -15,6 +15,26 @@ trait FilesystemCleanupTrait
         return $path;
     }
 
+    /** Capture string log output into an array for later assertions. */
+    protected function pmssMakeArrayLogger(array &$messages): callable
+    {
+        return function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        };
+    }
+
+    /** Check whether a captured log message contains a given substring. */
+    protected function pmssMessagesContain(array $messages, string $needle): bool
+    {
+        foreach ($messages as $message) {
+            if (strpos($message, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function cleanup(string $path): void
     {
         if (!file_exists($path) && !is_link($path)) {

@@ -81,9 +81,7 @@ class BootTuningEnsureTest extends TestCase
         $service = $base.'/nested/systemd/pmss-boot-tuning.service';
         $messages = [];
 
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
         \pmssEnsureBootTuning($logger, $script, $service);
 
         $this->assertTrue(is_dir(dirname($script)), 'expected script directory to be created');
@@ -102,11 +100,11 @@ class BootTuningEnsureTest extends TestCase
         $this->runBootTuning($dir, $messages);
 
         $this->assertTrue(
-            $this->messagesContain($messages, 'Boot tuning script already present and up to date'),
+            $this->pmssMessagesContain($messages, 'Boot tuning script already present and up to date'),
             'expected boot tuning script skip log'
         );
         $this->assertTrue(
-            $this->messagesContain($messages, 'Boot tuning service already present and up to date'),
+            $this->pmssMessagesContain($messages, 'Boot tuning service already present and up to date'),
             'expected boot tuning service skip log'
         );
 
@@ -120,21 +118,9 @@ class BootTuningEnsureTest extends TestCase
     {
         $script = $dir.'/sbin/pmss-boot-tuning.sh';
         $service = $dir.'/systemd/pmss-boot-tuning.service';
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
         \pmssEnsureBootTuning($logger, $script, $service);
         return [$script, $service];
-    }
-
-    private function messagesContain(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
     }
 
 }

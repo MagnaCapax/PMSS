@@ -12,9 +12,9 @@ class TempDiskBackedMountTest extends TestCase
     public function testSkipsBeforeDebian13(): void
     {
         $messages = [];
-        \pmssConfigureTempDiskBackedMount($this->makeLogger($messages), 12);
+        \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 12);
 
-        $this->assertTrue($this->messagesContain($messages, 'Leaving /tmp mount policy unchanged'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Leaving /tmp mount policy unchanged'));
     }
 
     public function testMasksTmpMountOnDebian13(): void
@@ -28,11 +28,11 @@ class TempDiskBackedMountTest extends TestCase
 
         $messages = [];
         $this->pmssWithPathPrefix($binDir, function () use (&$messages): void {
-            \pmssConfigureTempDiskBackedMount($this->makeLogger($messages), 13);
+            \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 13);
         });
 
         $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
-        $this->assertTrue($this->messagesContain($messages, 'Masked tmp.mount'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Masked tmp.mount'));
     }
 
     public function testMasksTmpMountOnLaterDebianVersions(): void
@@ -56,10 +56,10 @@ class TempDiskBackedMountTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-tmp-missing-', 0700);
         $messages = [];
         $this->pmssWithEnv(['PATH' => $root], function () use (&$messages): void {
-            \pmssConfigureTempDiskBackedMount($this->makeLogger($messages), 13);
+            \pmssConfigureTempDiskBackedMount($this->pmssMakeArrayLogger($messages), 13);
         });
 
-        $this->assertTrue($this->messagesContain($messages, 'systemctl unavailable'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'systemctl unavailable'));
     }
 
     public function testDetectsDebian13FromOsReleaseWhenVersionMissing(): void
@@ -87,21 +87,4 @@ class TempDiskBackedMountTest extends TestCase
         $this->assertEquals("mask tmp.mount\n", (string) file_get_contents($logPath));
     }
 
-    private function makeLogger(array &$messages): callable
-    {
-        return function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
-    }
-
-    private function messagesContain(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

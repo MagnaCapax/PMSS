@@ -18,14 +18,12 @@ class QuotaFstabOptionsTest extends TestCase
         file_put_contents($fstab, $original);
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'Quota options already present'), 'expected skip log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Quota options already present'), 'expected skip log');
 
         $this->cleanup($dir);
     }
@@ -40,9 +38,7 @@ class QuotaFstabOptionsTest extends TestCase
         file_put_contents($fstab, $original);
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
 
@@ -55,7 +51,7 @@ class QuotaFstabOptionsTest extends TestCase
         $backups = glob($fstab.'.pmss-backup-*') ?: [];
         $this->assertEquals(1, count($backups), 'expected exactly one backup');
         $this->assertEquals($original, (string)file_get_contents($backups[0]));
-        $this->assertTrue($this->messagesContain($messages, 'Updated quota options'), 'expected update log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Updated quota options'), 'expected update log');
 
         $this->cleanup($dir);
     }
@@ -69,9 +65,7 @@ class QuotaFstabOptionsTest extends TestCase
         file_put_contents($fstab, "UUID=abc /home ext4 defaults 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
 
@@ -94,14 +88,12 @@ class QuotaFstabOptionsTest extends TestCase
         file_put_contents($fstab, $original);
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'not found'), 'expected not-found log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected not-found log');
 
         $this->cleanup($dir);
     }
@@ -116,13 +108,11 @@ class QuotaFstabOptionsTest extends TestCase
         chmod($fstab, 0000);
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         \pmssEnsureQuotaOptions('/home', null, $logger, $fstab);
 
-        $this->assertTrue($this->messagesContain($messages, 'not readable'), 'expected not-readable log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not-readable log');
         chmod($fstab, 0600);
 
         $this->cleanup($dir);
@@ -136,9 +126,7 @@ class QuotaFstabOptionsTest extends TestCase
         file_put_contents($dir.'/aquota.group', 'x');
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         \pmssWarnUnexpectedQuotaFiles($dir, $logger);
         $this->assertEquals([], $messages);
@@ -157,25 +145,13 @@ class QuotaFstabOptionsTest extends TestCase
         }
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         \pmssWarnUnexpectedQuotaFiles($dir, $logger);
         $this->assertTrue(count($messages) === 1, 'expected exactly one warning');
         $this->assertStringContainsString('aquota.gro\\003', $messages[0]);
 
         $this->cleanup($dir);
-    }
-
-    private function messagesContain(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
     }
 
 }

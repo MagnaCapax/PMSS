@@ -2,10 +2,13 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesBootstrapTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testHostnameSkipTruthyValueSkips(): void
     {
         $messages = [];
@@ -14,13 +17,11 @@ class UpdateServicesBootstrapTest extends TestCase
             'PMSS_SKIP_HOSTNAME' => 'yes',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
-            \pmssApplyHostnameConfig(function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            });
+            \pmssApplyHostnameConfig($this->pmssMakeArrayLogger($messages));
         });
 
         $this->assertTrue(
-            $this->messagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
+            $this->pmssMessagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
             'expected hostname skip log when PMSS_SKIP_HOSTNAME is truthy'
         );
     }
@@ -33,13 +34,11 @@ class UpdateServicesBootstrapTest extends TestCase
             'PMSS_SKIP_HOSTNAME' => 'on',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
-            \pmssApplyHostnameConfig(function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            });
+            \pmssApplyHostnameConfig($this->pmssMakeArrayLogger($messages));
         });
 
         $this->assertTrue(
-            $this->messagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
+            $this->pmssMessagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
             'expected hostname skip log when PMSS_SKIP_HOSTNAME is set to on'
         );
     }
@@ -52,17 +51,15 @@ class UpdateServicesBootstrapTest extends TestCase
             'PMSS_SKIP_HOSTNAME' => 'no',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
-            \pmssApplyHostnameConfig(function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            });
+            \pmssApplyHostnameConfig($this->pmssMakeArrayLogger($messages));
         });
 
         $this->assertTrue(
-            !$this->messagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
+            !$this->pmssMessagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
             'falsey PMSS_SKIP_HOSTNAME must not trigger skip'
         );
         $this->assertTrue(
-            $this->messagesContain($messages, 'No hostname override provided'),
+            $this->pmssMessagesContain($messages, 'No hostname override provided'),
             'falsey PMSS_SKIP_HOSTNAME should fall through to missing-hostname handling'
         );
     }
@@ -75,17 +72,15 @@ class UpdateServicesBootstrapTest extends TestCase
             'PMSS_SKIP_HOSTNAME' => 'FALSE',
             'PMSS_HOSTNAME' => null,
         ], function () use (&$messages): void {
-            \pmssApplyHostnameConfig(function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            });
+            \pmssApplyHostnameConfig($this->pmssMakeArrayLogger($messages));
         });
 
         $this->assertTrue(
-            !$this->messagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
+            !$this->pmssMessagesContain($messages, 'Hostname configuration skipped via PMSS_SKIP_HOSTNAME'),
             'uppercase falsey PMSS_SKIP_HOSTNAME must not trigger skip'
         );
         $this->assertTrue(
-            $this->messagesContain($messages, 'No hostname override provided'),
+            $this->pmssMessagesContain($messages, 'No hostname override provided'),
             'uppercase falsey PMSS_SKIP_HOSTNAME should fall through to missing-hostname handling'
         );
     }
@@ -98,13 +93,11 @@ class UpdateServicesBootstrapTest extends TestCase
             'PMSS_SKIP_QUOTA' => 'on',
             'PMSS_QUOTA_MOUNT' => null,
         ], function () use (&$messages): void {
-            \pmssConfigureQuotaMount(function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            });
+            \pmssConfigureQuotaMount($this->pmssMakeArrayLogger($messages));
         });
 
         $this->assertTrue(
-            $this->messagesContain($messages, 'Quota configuration skipped via PMSS_SKIP_QUOTA'),
+            $this->pmssMessagesContain($messages, 'Quota configuration skipped via PMSS_SKIP_QUOTA'),
             'expected quota skip log when PMSS_SKIP_QUOTA is truthy'
         );
     }
@@ -118,17 +111,15 @@ class UpdateServicesBootstrapTest extends TestCase
             'PMSS_SKIP_QUOTA' => 'no',
             'PMSS_QUOTA_MOUNT' => $mount,
         ], function () use (&$messages): void {
-            \pmssConfigureQuotaMount(function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            });
+            \pmssConfigureQuotaMount($this->pmssMakeArrayLogger($messages));
         });
 
         $this->assertTrue(
-            !$this->messagesContain($messages, 'Quota configuration skipped via PMSS_SKIP_QUOTA'),
+            !$this->pmssMessagesContain($messages, 'Quota configuration skipped via PMSS_SKIP_QUOTA'),
             'falsey PMSS_SKIP_QUOTA must not trigger skip'
         );
         $this->assertTrue(
-            $this->messagesContain($messages, 'Skipping remount for '.$mount.' (mount path not found)'),
+            $this->pmssMessagesContain($messages, 'Skipping remount for '.$mount.' (mount path not found)'),
             'falsey PMSS_SKIP_QUOTA should fall through to normal quota handling'
         );
     }
@@ -142,29 +133,17 @@ class UpdateServicesBootstrapTest extends TestCase
             'PMSS_SKIP_QUOTA' => 'FALSE',
             'PMSS_QUOTA_MOUNT' => $mount,
         ], function () use (&$messages): void {
-            \pmssConfigureQuotaMount(function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            });
+            \pmssConfigureQuotaMount($this->pmssMakeArrayLogger($messages));
         });
 
         $this->assertTrue(
-            !$this->messagesContain($messages, 'Quota configuration skipped via PMSS_SKIP_QUOTA'),
+            !$this->pmssMessagesContain($messages, 'Quota configuration skipped via PMSS_SKIP_QUOTA'),
             'uppercase falsey PMSS_SKIP_QUOTA must not trigger skip'
         );
         $this->assertTrue(
-            $this->messagesContain($messages, 'Skipping remount for '.$mount.' (mount path not found)'),
+            $this->pmssMessagesContain($messages, 'Skipping remount for '.$mount.' (mount path not found)'),
             'uppercase falsey PMSS_SKIP_QUOTA should fall through to normal quota handling'
         );
     }
 
-    private function messagesContain(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

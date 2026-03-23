@@ -57,7 +57,7 @@ class SysctlBaselineTest extends TestCase
         $second = (string)file_get_contents($target);
 
         $this->assertEquals($first, $second, 'expected sysctl file unchanged');
-        $this->assertTrue($this->messagesContain($messages, 'already present and up to date'), 'expected skip log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'already present and up to date'), 'expected skip log');
 
         $this->cleanup($dir);
     }
@@ -84,7 +84,7 @@ class SysctlBaselineTest extends TestCase
         $messages = [];
         $this->runBaseline($target, $messages, false);
 
-        $this->assertTrue($this->messagesContain($messages, 'sysctl reload disabled'), 'expected reload skip log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'expected reload skip log');
 
         $this->cleanup($dir);
     }
@@ -107,21 +107,9 @@ class SysctlBaselineTest extends TestCase
 
     private function runBaseline(string $target, array &$messages, bool $reload, ?string $modulesLoad = null): void
     {
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
         $modulesLoad = $modulesLoad ?? dirname($target).'/modules-load.conf';
         \pmssEnsureLegacySysctlBaseline($logger, $target, $reload, $modulesLoad);
-    }
-
-    private function messagesContain(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private function systemPrepSource(): string

@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/mountHardening.php';
 
 class TempTmpfsMountTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     private $prevFlag;
     private $prevSize;
     private $prevDryRun;
@@ -34,16 +37,14 @@ class TempTmpfsMountTest extends TestCase
         file_put_contents($mounts, "");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_TMPFS');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'disabled'), 'expected disabled log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled'), 'expected disabled log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -59,16 +60,14 @@ class TempTmpfsMountTest extends TestCase
         file_put_contents($mounts, "");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_TMPFS=FALSE');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
 
         $this->assertEquals($original, (string) file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'disabled via PMSS_HARDEN_TMP_TMPFS'), 'expected explicit-false skip log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'disabled via PMSS_HARDEN_TMP_TMPFS'), 'expected explicit-false skip log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -84,9 +83,7 @@ class TempTmpfsMountTest extends TestCase
         file_put_contents($mounts, "");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_TMPFS=1');
         putenv('PMSS_DRY_RUN=1');
@@ -94,7 +91,7 @@ class TempTmpfsMountTest extends TestCase
 
         $updated = (string)file_get_contents($fstab);
         $this->assertStringContainsString('tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0', $updated);
-        $this->assertTrue($this->messagesContain($messages, 'Added /tmp tmpfs entry'), 'expected add log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Added /tmp tmpfs entry'), 'expected add log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -110,16 +107,14 @@ class TempTmpfsMountTest extends TestCase
         file_put_contents($mounts, "");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_TMPFS=1');
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
-        $this->assertTrue($this->messagesContain($messages, 'non-tmpfs'), 'expected non-tmpfs log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'non-tmpfs'), 'expected non-tmpfs log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -135,9 +130,7 @@ class TempTmpfsMountTest extends TestCase
         file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\n");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_TMPFS=1');
         putenv('PMSS_DRY_RUN=1');
@@ -151,7 +144,7 @@ class TempTmpfsMountTest extends TestCase
         $this->assertTrue(!in_array('exec', $options, true), 'expected exec removed');
         $this->assertTrue(!in_array('suid', $options, true), 'expected suid removed');
         $this->assertTrue(!in_array('dev', $options, true), 'expected dev removed');
-        $this->assertTrue($this->messagesContain($messages, 'Updated /tmp tmpfs options'), 'expected update log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp tmpfs options'), 'expected update log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -167,9 +160,7 @@ class TempTmpfsMountTest extends TestCase
         file_put_contents($mounts, "");
 
         $messages = [];
-        $logger = function (string $message) use (&$messages): void {
-            $messages[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($messages);
 
         putenv('PMSS_HARDEN_TMP_TMPFS=1');
         putenv('PMSS_TMPFS_TMP_SIZE=512M');
@@ -178,7 +169,7 @@ class TempTmpfsMountTest extends TestCase
 
         $updated = (string)file_get_contents($fstab);
         $this->assertStringContainsString('size=512M', $updated);
-        $this->assertTrue($this->messagesContain($messages, 'size=512M'), 'expected size override log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'size=512M'), 'expected size override log');
 
         $this->pmssRemoveTree($dir);
     }
@@ -201,16 +192,6 @@ class TempTmpfsMountTest extends TestCase
             return array_values(array_filter(explode(',', $columns[3]), 'strlen'));
         }
         return [];
-    }
-
-    private function messagesContain(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
     }
 
 }
