@@ -11,14 +11,6 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
 /**
- * Reject symlinked path segments before ingress logging creates directories.
- */
-function pmssTrafficIngressPathIsSafe(string $path, bool $directoryTarget): bool
-{
-    return pmssPathTargetIsSafe($path, $directoryTarget);
-}
-
-/**
  * Ensure a directory exists and is safe for use by ingress logging.
  */
 function pmssTrafficIngressEnsureDir(string $path, int $mode): bool

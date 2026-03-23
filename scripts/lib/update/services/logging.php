@@ -19,7 +19,7 @@ require_once __DIR__.'/../runtime/processes.php';
 require_once __DIR__.'/../../runtime.php';
 require_once __DIR__.'/../../lighttpd/userFileWrite.php';
 
-function pmssWriteManagedConfigFile(string $target, string $contents, string $label, callable $logger): bool
+function pmssManagedConfigTargetIsSafe(string $target, string $label, callable $logger): bool
 {
     $targetDir = dirname($target);
     if (!is_dir($targetDir) || is_link($targetDir)) {
@@ -29,6 +29,15 @@ function pmssWriteManagedConfigFile(string $target, string $contents, string $la
 
     if (!pmssUserFilePathIsSafe($target)) {
         $logger('[WARN] Unsafe '.$label.' target: '.$target);
+        return false;
+    }
+
+    return true;
+}
+
+function pmssWriteManagedConfigFile(string $target, string $contents, string $label, callable $logger): bool
+{
+    if (!pmssManagedConfigTargetIsSafe($target, $label, $logger)) {
         return false;
     }
 
@@ -37,14 +46,7 @@ function pmssWriteManagedConfigFile(string $target, string $contents, string $la
 
 function pmssRemoveManagedConfigFile(string $target, string $label, callable $logger): bool
 {
-    $targetDir = dirname($target);
-    if (!is_dir($targetDir) || is_link($targetDir)) {
-        $logger('[WARN] Unsafe '.$label.' directory: '.$targetDir);
-        return false;
-    }
-
-    if (!pmssUserFilePathIsSafe($target)) {
-        $logger('[WARN] Unsafe '.$label.' target: '.$target);
+    if (!pmssManagedConfigTargetIsSafe($target, $label, $logger)) {
         return false;
     }
 
@@ -185,7 +187,7 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
 
             switch ($key) {
                 case 'remote_logging_enabled':
-                    $config['enabled'] = in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
+                    $config['enabled'] = pmssEnvValueIsTruthy($value);
                     break;
                 case 'remote_host':
                     $config['host'] = $value;
