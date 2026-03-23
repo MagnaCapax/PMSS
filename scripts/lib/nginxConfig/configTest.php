@@ -7,56 +7,83 @@
 
 require_once __DIR__.'/../runtime.php';
 
+function pmssCreateNginxConfigLogFile(): string
+{
+    return pmssLogDir().'/update.log';
+}
+
+function pmssCreateNginxConfigAppendLog(string $message): void
+{
+    $logFile = pmssCreateNginxConfigLogFile();
+    $logDir = dirname($logFile);
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+
+    @file_put_contents($logFile, date('[Y-m-d H:i:s] ').'[createNginxConfig] '.$message."\n", FILE_APPEND | LOCK_EX);
+}
+
+function pmssCreateNginxConfigTestCommand(): string
+{
+    $command = getenv('PMSS_NGINX_CONFIG_TEST_COMMAND');
+    if (is_string($command) && $command !== '') {
+        return $command;
+    }
+
+    return 'nginx -t 2>&1';
+}
+
+function pmssCreateNginxRestartCommand(): string
+{
+    $command = getenv('PMSS_NGINX_RESTART_COMMAND');
+    if (is_string($command) && $command !== '') {
+        return $command;
+    }
+
+    return 'systemctl restart nginx || /etc/init.d/nginx restart';
+}
+
 function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
 {
-    // Validate nginx configuration before any restart attempt.
-    // Always run the test to give operators visibility into config health.
-    // Safety: never restart nginx with broken config. If test fails:
-    // - Show CRITICAL error with full nginx -t output
-    // - Log to /var/log/pmss/update.log for post-mortem
-    // - Exit with rc=1 so callers can detect failure
-    // - Refuse to restart even if --restart was requested
-    // #TODO: Consider adding JSON logging (pmssLogJson) once this script is
-    // integrated with the update runtime that provides those helpers.
     $configTestOutput = [];
     $configTestRc = 0;
-    exec('nginx -t 2>&1', $configTestOutput, $configTestRc);
+    exec(pmssCreateNginxConfigTestCommand(), $configTestOutput, $configTestRc);
     $configTestResult = implode("\n", $configTestOutput);
 
-    // ANSI colors for CLI output (stripped by logMessage for file logging).
     $isTty = pmssStreamIsTty(STDOUT);
     $cReset  = $isTty ? "\033[0m"  : '';
     $cRed    = $isTty ? "\033[31m" : '';
     $cGreen  = $isTty ? "\033[32m" : '';
     $cYellow = $isTty ? "\033[33m" : '';
 
-    // Log to PMSS standard log if available.
-    $logFile = '/var/log/pmss/update.log';
-    $logTs = date('[Y-m-d H:i:s] ');
-    $logPrefix = '[createNginxConfig] ';
-
     if ($configTestRc === 0) {
         $statusMsg = "{$cGreen}[OK]{$cReset} nginx configuration test passed";
         echo $statusMsg."\n";
-        @file_put_contents($logFile, $logTs.$logPrefix."nginx -t passed (rc=0)\n", FILE_APPEND | LOCK_EX);
+        pmssCreateNginxConfigAppendLog('nginx -t passed (rc=0)');
     } else {
-        // Critical error: config is broken.
         $criticalMsg = "{$cRed}[CRITICAL]{$cReset} nginx configuration test {$cRed}FAILED{$cReset} (rc={$configTestRc})";
         echo $criticalMsg."\n";
         echo "{$cRed}{$configTestResult}{$cReset}\n";
-        @file_put_contents($logFile, $logTs.$logPrefix."CRITICAL: nginx -t failed (rc={$configTestRc}): {$configTestResult}\n", FILE_APPEND | LOCK_EX);
+        pmssCreateNginxConfigAppendLog("CRITICAL: nginx -t failed (rc={$configTestRc}): {$configTestResult}");
     }
 
     if ($restartNginx) {
         if ($configTestRc === 0) {
-            passthru('systemctl restart nginx || /etc/init.d/nginx restart || true');
+            $restartRc = 0;
+            passthru(pmssCreateNginxRestartCommand(), $restartRc);
+            if ($restartRc !== 0) {
+                echo "{$cRed}[CRITICAL]{$cReset} nginx restart {$cRed}FAILED{$cReset} (rc={$restartRc})\n";
+                pmssCreateNginxConfigAppendLog("CRITICAL: nginx restart failed (rc={$restartRc})");
+                return 1;
+            }
+
             echo "## Done! nginx restarted\n";
-            @file_put_contents($logFile, $logTs.$logPrefix."nginx restarted\n", FILE_APPEND | LOCK_EX);
+            pmssCreateNginxConfigAppendLog('nginx restarted');
         } else {
             echo "{$cRed}## Restart aborted: refusing to restart nginx with broken configuration{$cReset}\n";
             echo "## Fix the errors above, then manually restart:\n";
             echo "   systemctl restart nginx\n";
-            @file_put_contents($logFile, $logTs.$logPrefix."restart aborted due to config test failure\n", FILE_APPEND | LOCK_EX);
+            pmssCreateNginxConfigAppendLog('restart aborted due to config test failure');
             return 1;
         }
     } else {
