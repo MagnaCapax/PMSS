@@ -38,7 +38,7 @@ class ListUsersGarbageOutputTest extends TestCase
                 'scripts/util/userResourcesList.php',
                 'scripts/util/userConfigLighttpd.php',
             ],
-            'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/userTorrents.php'],
+            'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/showTraffic.php', 'scripts/userTorrents.php'],
         ] as $needle => $files) {
             foreach ($files as $file) {
                 $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');

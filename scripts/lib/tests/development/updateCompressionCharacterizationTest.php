@@ -236,6 +236,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             strpos($src, 'function '.$barSymbol.'(') === false,
             'showTraffic.php should keep the extended output bar rendering inside pmssShowTrafficMain()'
         );
+        $this->assertStringContainsString("pmssListManagedUsersResult(__DIR__.'/listUsers.php')", $src);
         $this->assertStringContainsString("substr(\$thisUser, -strlen('-localnet')) === '-localnet'", $src);
         $this->assertStringContainsString("str_repeat('#', \$filled)", $src);
         $this->assertStringContainsString("str_repeat('-', 10 - \$filled)", $src);

@@ -36,6 +36,14 @@ class ShowTrafficFormatTest extends TestCase
         $this->assertTrue(strpos($out, '--no-color') !== false);
     }
 
+    public function testShowTrafficUsesSharedManagedUsersParser(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/showTraffic.php');
+
+        $this->assertStringContainsString("pmssListManagedUsersResult(__DIR__.'/listUsers.php')", $source);
+        $this->pmssAssertStringNotContainsString("exec(escapeshellarg(__DIR__.'/listUsers.php')", $source);
+    }
+
     public function testFormatRateDisplay(): void
     {
         $cases = [

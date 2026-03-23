@@ -6,6 +6,8 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/lib/userLifecycle.php';
+
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     exit(pmssShowTrafficMain($argv));
 }
@@ -78,10 +80,6 @@ TXT;
         }
     }
 
-    $validationLib = __DIR__.'/lib/userLifecycle.php';
-    if (is_file($validationLib)) {
-        require_once $validationLib;
-    }
     require_once __DIR__.'/lib/traffic/storage.php';
     $trafficLimitLib = __DIR__.'/lib/user/trafficLimit.php';
     if (is_file($trafficLimitLib)) {
@@ -90,36 +88,13 @@ TXT;
 
     $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
     $statsDir = $runtimeDir.'/trafficStats';
-    $listUsersLines = [];
-    $listUsersRc = 0;
-    exec(escapeshellarg(__DIR__.'/listUsers.php'), $listUsersLines, $listUsersRc);
-    if ($listUsersRc !== 0) {
+    $listUsersResult = pmssListManagedUsersResult(__DIR__.'/listUsers.php');
+    if ($listUsersResult['exitCode'] !== 0) {
         fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
-        exit(1);
+        return 1;
     }
-    $users = [];
-    $invalidCount = 0;
-    foreach ($listUsersLines as $line) {
-        $user = trim($line);
-        if ($user === '') {
-            continue;
-        }
-        if (preg_match('/^(PHP (Warning|Fatal error|Parse error)|Warning:|Fatal error:|Stack trace:)/', $user)) {
-            fwrite(STDERR, "Error: listUsers.php emitted errors; aborting.\n");
-            exit(1);
-        }
-        $valid = function_exists('pmssValidateUsername')
-            ? pmssValidateUsername($user)
-            : (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/D', $user);
-        if (!$valid) {
-            $invalidCount++;
-            continue;
-        }
-        $users[] = $user;
-    }
-    if ($invalidCount > 0) {
-        fwrite(STDERR, "Warning: skipped {$invalidCount} invalid username entries from listUsers.php.\n");
-    }
+    $users = $listUsersResult['users'];
+
     $usersWithLocalnet = [];
     foreach ($users as $user) {
         $usersWithLocalnet[] = $user;
@@ -129,7 +104,8 @@ TXT;
     }
     $users = $usersWithLocalnet;
     if (count($users) === 0) {
-        die("No users in this system!\n");
+        echo "No users in this system!\n";
+        return 0;
     }
     sort($users, SORT_NATURAL | SORT_FLAG_CASE);
 
