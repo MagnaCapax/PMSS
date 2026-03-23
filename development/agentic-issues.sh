@@ -31,7 +31,7 @@ Usage:
 
 Purpose:
   Fetch open GitHub issues (excluding complete-verify, wontfix,
-  needs-operator-input, needs-investigation) and launch
+  needs-investigation) and launch
   the assistant to implement tractable ones.
 
 Options:
@@ -211,7 +211,7 @@ while IFS=$'\t' read -r num title labels_csv; do
 	fi
 done < <(gh issue list --state open --limit "$candidate_pool" \
 	--json number,title,labels \
-	--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-operator-input" or . == "needs-investigation")) | not) | [(.number|tostring), .title, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null || true)
+	--jq '.[] | select((.labels | map(.name) | any(. == "complete-verify" or . == "wontfix" or . == "needs-investigation")) | not) | [(.number|tostring), .title, ([.labels[].name] | join(","))] | @tsv' 2>/dev/null || true)
 
 if [[ ${#issue_numbers_bug[@]} -gt 0 ]]; then
 	# Throughput rule: if there are open bug tickets, focus on those first.
@@ -227,7 +227,7 @@ if [[ ${#issue_numbers[@]} -gt 1 ]] && command -v shuf >/dev/null 2>&1; then
 fi
 
 if [[ ${#issue_numbers[@]} -eq 0 ]]; then
-	echo "[agentic-issues] No tractable issues (all labeled complete-verify, wontfix, needs-operator-input, or needs-investigation). Skipping." >&1
+	echo "[agentic-issues] No tractable issues (all labeled complete-verify, wontfix, or needs-investigation). Skipping." >&1
 	exit 0
 fi
 

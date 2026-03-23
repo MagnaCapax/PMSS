@@ -55,8 +55,8 @@ Absolutes:
 - Before removing or relaxing any constraint, run:
     git log -n 10 --format="%h %ae %s" --follow -- <file>
   If any author is NOT a bot (non-noreply@ email): the constraint was added by a human
-  contributor. Add `needs-operator-input` label and skip the issue. Do not implement
-  the removal.
+  contributor. Do NOT add a human-delegation label; follow the BLOCKED ISSUE FEEDBACK
+  flow below and skip the implementation. Do not implement the removal.
 - Keep diffs small, idempotent, backward-compatible; reuse existing helpers.
 
 Autocommit: When Autocommit Mode is appended below, "do not commit or push" is VOID.
