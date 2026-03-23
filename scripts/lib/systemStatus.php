@@ -248,7 +248,7 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         $checks[] = pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
     }
 
-    foreach (pmssComponentStatusChecks($runCommand, $pathExists, $readFile) as $entry) {
+    foreach (pmssComponentStatusChecks(['runCommand' => $runCommand, 'pathExists' => $pathExists, 'readFile' => $readFile]) as $entry) {
         $checks[] = pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
     }
 
@@ -256,18 +256,11 @@ function pmssSystemStatusChecks(array $dependencies = []): array
 }
 
 /** Collect the shared component-status checks used by both system probes. */
-function pmssComponentStatusChecks(?callable $commandRunner = null, ?callable $pathExists = null, ?callable $readFile = null): array
+function pmssComponentStatusChecks(array $dependencies = []): array
 {
-    $runCommand = $commandRunner ?? static function (string $command): string {
-        return trim((string) @shell_exec($command));
-    };
-    $pathExists = $pathExists ?? static function (string $path): bool {
-        return is_dir($path) || is_file($path);
-    };
-    $readFile = $readFile ?? static function (string $path): string {
-        $contents = @file_get_contents($path);
-        return $contents === false ? '' : (string) $contents;
-    };
+    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); };
+    $pathExists = $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); };
+    $readFile = $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; };
     $results = [];
     $codename = getDistroCodename();
     $results[] = $codename === ''

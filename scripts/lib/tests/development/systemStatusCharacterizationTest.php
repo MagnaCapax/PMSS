@@ -90,8 +90,8 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testComponentChecksStayStableWithHermeticInputs(): void
     {
-        $checks = pmssComponentStatusChecks(
-            static function (string $command): string {
+        $checks = pmssComponentStatusChecks([
+            'runCommand' => static function (string $command): string {
                 $map = [
                     "command -v 'rtorrent'" => '/usr/bin/rtorrent',
                     "command -v 'nginx'" => '/usr/sbin/nginx',
@@ -102,13 +102,13 @@ final class SystemStatusCharacterizationTest extends TestCase
                 ];
                 return $map[$command] ?? '';
             },
-            static function (string $path): bool {
+            'pathExists' => static function (string $path): bool {
                 return in_array($path, ['/etc/openvpn', '/etc/nginx'], true);
             },
-            static function (string $path): string {
+            'readFile' => static function (string $path): string {
                 return is_file($path) ? (string) file_get_contents($path) : '';
-            }
-        );
+            },
+        ]);
 
         $this->assertEquals(
             [
@@ -199,6 +199,59 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals(42, count($checks));
     }
 
+    public function testSystemStatusCheckOrderStaysStableWithHermeticInputs(): void
+    {
+        $checks = pmssSystemStatusChecks($this->buildSystemStatusDependencies());
+
+        $this->assertEquals(
+            [
+                'OS codename',
+                'Binary: rtorrent',
+                'Binary: nginx',
+                'Binary: lighttpd',
+                'Binary: php',
+                'Binary: proftpd',
+                'Binary: openvpn',
+                'Binary: tar',
+                'Binary: pigz',
+                'Binary: gpg',
+                'Binary: curl',
+                'Binary: wget',
+                'Binary: rsync',
+                'Binary: python3',
+                'Binary: git',
+                'Binary: flexget',
+                'Binary: pyload',
+                'Apt sources',
+                'ProFTPD configuration',
+                'OpenVPN directory',
+                'VPN Easy-RSA',
+                'Seedbox localnet',
+                'Nginx directory',
+                'Seedbox localnet (config)',
+                'Sources codename match',
+                'OpenVPN client artifacts',
+                'Virtualenv: FlexGet binary',
+                'Virtualenv: pyLoad binary',
+                'CLI symlink: flexget',
+                'CLI symlink: pyLoad',
+                'Component: os.codename',
+                'Component: apt.sources',
+                'Component: bin.rtorrent',
+                'Component: bin.nginx',
+                'Component: bin.php',
+                'Component: bin.proftpd',
+                'Component: bin.openvpn',
+                'Component: bin.curl',
+                'Component: config.proftpd',
+                'Component: config.openvpn',
+                'Component: config.seedbox.localnet',
+                'Component: config.nginx',
+            ],
+            array_column($checks, 'name')
+        );
+    }
+
     public function testSystemStatusWarnsWhenSymlinkTargetCannotBeRead(): void
     {
         $dependencies = $this->buildSystemStatusDependencies();
@@ -226,11 +279,16 @@ final class SystemStatusCharacterizationTest extends TestCase
         $systemSource = $this->pmssReadRepoFile('scripts/util/systemTest.php');
         $librarySource = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
 
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $componentSource);
         $this->assertStringContainsString("require_once __DIR__.'/../lib/systemStatus.php';", $componentSource);
+        $this->assertStringContainsString("pmssParseCliTokens(\$argv ?? (\$_SERVER['argv'] ?? []));", $componentSource);
+        $this->pmssAssertStringNotContainsString('getopt(', $componentSource);
+        $this->assertStringContainsString("pmssCliOption(\$parsed, 'json', null, false)", $componentSource);
         $this->assertStringContainsString('pmssComponentStatusChecks()', $componentSource);
         $this->assertStringContainsString('pmssSystemStatusChecks()', $systemSource);
         $this->assertStringContainsString('function pmssStatusJsonEncode(', $librarySource);
         $this->assertStringContainsString('function pmssSystemStatusChecks(', $librarySource);
+        $this->assertStringContainsString('function pmssComponentStatusChecks(array $dependencies = [])', $librarySource);
         $this->assertStringContainsString('pmssStatusJsonEncode([', $componentSource);
         $this->assertStringContainsString('pmssStatusJsonEncode([', $systemSource);
         $this->pmssAssertStringNotContainsString('json_decode($componentJson, true);', $systemSource);
