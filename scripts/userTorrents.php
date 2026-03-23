@@ -70,11 +70,9 @@ TXT;
 
     // Get & parse users list.
     $listUsersResult = pmssListManagedUsersResult(__DIR__.'/listUsers.php');
-    if ($listUsersResult['exitCode'] !== 0) {
-        fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+    if (($users = pmssListManagedUsersFromResult($listUsersResult)) === null) {
         exit(1);
     }
-    $users = $listUsersResult['users'];
 
     foreach ($users as $thisUser) {
         $counts = pmssUserTorrentsCountForUser($homeDir, $thisUser);

@@ -196,7 +196,12 @@ function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'):
     }
     return array('exitCode' => $exitCode, 'users' => array_keys($users));
 }
-
+function pmssListManagedUsersFromResult(array $listUsersResult): ?array
+{
+    if ((int) ($listUsersResult['exitCode'] ?? 1) === 0) return is_array($listUsersResult['users'] ?? null) ? $listUsersResult['users'] : array();
+    fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+    return null;
+}
 /**
  * Return trimmed, normalized, validated managed usernames from listUsers.php.
  *

@@ -136,11 +136,9 @@ TXT;
     $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
     $statsDir = $runtimeDir.'/trafficStats';
     $listUsersResult = pmssListManagedUsersResult(__DIR__.'/listUsers.php');
-    if ($listUsersResult['exitCode'] !== 0) {
-        fwrite(STDERR, "Error: listUsers.php failed; aborting.\n");
+    if (($users = pmssListManagedUsersFromResult($listUsersResult)) === null) {
         return 1;
     }
-    $users = $listUsersResult['users'];
 
     $usersWithLocalnet = [];
     foreach ($users as $user) {
