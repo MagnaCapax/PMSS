@@ -12,7 +12,7 @@ class setupSkelPermissionsLocalnetTraversalContractTest extends TestCase
 
     private function loadSystemTestSource(): string
     {
-        return (string) file_get_contents(__DIR__.'/../../../util/systemTest.php');
+        return (string) file_get_contents(__DIR__.'/../../systemStatus.php');
     }
 
     private function loadStartRtorrentSource(): string
@@ -51,6 +51,7 @@ class setupSkelPermissionsLocalnetTraversalContractTest extends TestCase
     {
         $src = $this->loadSystemTestSource();
 
+        $this->assertStringContainsString('function pmssSystemStatusChecks(', $src);
         $this->assertStringContainsString("foreach (['/etc/seedbox', '/etc/seedbox/config'] as \$dir)", $src);
         $this->assertStringContainsString('missing world-exec (users cannot traverse to localnet)', $src);
     }

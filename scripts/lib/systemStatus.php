@@ -74,6 +74,182 @@ function pmssRenderStatusText(
     echo str_repeat('-', 60)."\n";
     echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", $summary['ok'], $summary['warn'], $summary['err']);
 }
+
+/**
+ * Collect the richer system-test probe used by scripts/util/systemTest.php.
+ *
+ * Dependencies may be overridden in tests to keep the characterization suite
+ * hermetic and independent from host state.
+ */
+function pmssSystemStatusChecks(array $dependencies = []): array
+{
+    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); };
+    $pathExists = $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); };
+    $isFile = $dependencies['isFile'] ?? static function (string $path): bool { return is_file($path); };
+    $isDir = $dependencies['isDir'] ?? static function (string $path): bool { return is_dir($path); };
+    $isExecutable = $dependencies['isExecutable'] ?? static function (string $path): bool { return is_executable($path); };
+    $isLink = $dependencies['isLink'] ?? static function (string $path): bool { return is_link($path); };
+    $readLink = $dependencies['readLink'] ?? static function (string $path): string { return (string) readlink($path); };
+    $readFile = $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; };
+    $filePerms = $dependencies['filePerms'] ?? static function (string $path) { return @fileperms($path); };
+
+    $checks = [];
+    $codename = getDistroCodename();
+    $checks[] = $codename === ''
+        ? pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing')
+        : pmssStatus('OS codename', 'OK', $codename);
+
+    foreach ([
+        'rtorrent' => 'rtorrent -h 2>&1 | head -n 1',
+        'nginx' => 'nginx -v 2>&1',
+        'lighttpd' => 'lighttpd -v 2>&1 | head -n 1',
+        'php' => 'php -v 2>&1 | head -n 1',
+        'proftpd' => 'proftpd -v 2>&1 | head -n 1',
+        'openvpn' => 'openvpn --version 2>&1 | head -n 1',
+        'tar' => 'tar --version 2>&1 | head -n 1',
+        'pigz' => 'pigz --version 2>&1 | head -n 1',
+        'gpg' => 'gpg --version 2>&1 | head -n 1',
+        'curl' => 'curl --version 2>&1 | head -n 1',
+        'wget' => 'wget --version 2>&1 | head -n 1',
+        'rsync' => 'rsync --version 2>&1 | head -n 1',
+        'python3' => 'python3 --version 2>&1 | head -n 1',
+        'git' => 'git --version 2>&1 | head -n 1',
+        'acd_cli' => 'acd_cli --version 2>&1 | head -n 1',
+        'flexget' => 'flexget --version 2>&1 | head -n 1',
+        'pyload' => 'pyload --version 2>&1 | head -n 1',
+    ] as $binary => $infoCommand) {
+        $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+        if ($path === '') {
+            $checks[] = pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
+            continue;
+        }
+
+        $detail = trim((string) $runCommand($infoCommand));
+        $checks[] = pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
+    }
+
+    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
+    foreach ([
+        'Apt sources' => $sourcesPath,
+        'ProFTPD configuration' => '/etc/proftpd/proftpd.conf',
+        'OpenVPN directory' => '/etc/openvpn',
+        'VPN Easy-RSA' => '/etc/openvpn/easy-rsa',
+        'Seedbox localnet' => '/etc/seedbox/localnet',
+        'Nginx directory' => '/etc/nginx',
+    ] as $label => $path) {
+        $exists = $pathExists($path);
+        $checks[] = pmssStatus($label, $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
+    }
+
+    $localnetConfig = '/etc/seedbox/config/localnet';
+    if ($isFile($localnetConfig)) {
+        $issues = [];
+        $configPerms = $filePerms($localnetConfig);
+        if ($configPerms === false) {
+            $issues[] = 'unable to read localnet file permissions';
+        } elseif ((($configPerms & 0777) & 0004) === 0) {
+            $issues[] = sprintf(
+                '%s mode %o missing world-read (rtorrent users may not read filter)',
+                $localnetConfig,
+                $configPerms & 0777
+            );
+        }
+
+        foreach (['/etc/seedbox', '/etc/seedbox/config'] as $dir) {
+            if (!$isDir($dir)) {
+                $issues[] = $dir.' missing';
+                continue;
+            }
+
+            $dirPerms = $filePerms($dir);
+            if ($dirPerms === false) {
+                $issues[] = 'unable to read permissions for '.$dir;
+                continue;
+            }
+            if ((($dirPerms & 0777) & 0001) === 0) {
+                $issues[] = sprintf(
+                    '%s mode %o missing world-exec (users cannot traverse to localnet)',
+                    $dir,
+                    $dirPerms & 0777
+                );
+            }
+        }
+
+        $checks[] = pmssStatus(
+            'Seedbox localnet (config)',
+            $issues === [] ? 'OK' : 'ERR',
+            $issues === [] ? $localnetConfig.' readable via 0664 + traversable dirs' : implode('; ', $issues)
+        );
+    } else {
+        $checks[] = pmssStatus('Seedbox localnet (config)', 'WARN', $localnetConfig.' missing');
+    }
+
+    if ($codename !== '' && $isFile($sourcesPath)) {
+        $sources = $readFile($sourcesPath);
+        $matches = $sources !== '' && stripos($sources, $codename) !== false;
+        $checks[] = pmssStatus(
+            'Sources codename match',
+            $matches ? 'OK' : 'WARN',
+            $matches ? 'sources.list references '.$codename : sprintf('%s not present in sources.list', $codename)
+        );
+    }
+
+    $hostname = trim((string) $readFile('/etc/hostname'));
+    if ($hostname === '') {
+        $checks[] = pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown');
+    } else {
+        $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
+        $slug = str_replace('.', '-', $fqdn);
+        $ovpn = '/home/openvpn-'.$slug.'.ovpn';
+        $crt = '/home/openvpn-'.$slug.'.crt';
+        $checks[] = $isFile($ovpn) && $isFile($crt)
+            ? pmssStatus('OpenVPN client artifacts', 'OK', basename($ovpn).', '.basename($crt))
+            : pmssStatus(
+                'OpenVPN client artifacts',
+                'WARN',
+                'missing: '.implode(', ', array_filter([
+                    !$isFile($ovpn) ? basename($ovpn) : '',
+                    !$isFile($crt) ? basename($crt) : '',
+                ]))
+            );
+    }
+
+    foreach ([
+        'Virtualenv: acd_cli binary' => '/opt/acd_cli/bin/acd_cli',
+        'Virtualenv: FlexGet binary' => '/opt/flexget/bin/flexget',
+        'Virtualenv: pyLoad binary' => '/opt/pyload/bin/pyload',
+    ] as $label => $path) {
+        $valid = $isFile($path) && $isExecutable($path);
+        $checks[] = pmssStatus($label, $valid ? 'OK' : 'WARN', $valid ? $path : $path.' missing or not executable');
+    }
+
+    foreach ([
+        'CLI symlink: acd_cli' => ['/usr/local/bin/acd_cli', '/opt/acd_cli/bin/acd_cli'],
+        'CLI symlink: flexget' => ['/usr/local/bin/flexget', '/opt/flexget/bin/flexget'],
+        'CLI symlink: pyLoad' => ['/usr/local/bin/pyload', '/opt/pyload/bin/pyload'],
+    ] as $label => $target) {
+        $link = $target[0];
+        $expected = $target[1];
+        if ($isLink($link)) {
+            $actual = $readLink($link);
+            $checks[] = pmssStatus(
+                $label,
+                $actual === $expected ? 'OK' : 'WARN',
+                $actual === $expected ? sprintf('%s -> %s', $link, $actual) : sprintf('%s -> %s (expected %s)', $link, $actual, $expected)
+            );
+            continue;
+        }
+
+        $checks[] = pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
+    }
+
+    foreach (pmssComponentStatusChecks($runCommand, $pathExists, $readFile) as $entry) {
+        $checks[] = pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
+    }
+
+    return $checks;
+}
+
 /** Collect the shared component-status checks used by both system probes. */
 function pmssComponentStatusChecks(?callable $commandRunner = null, ?callable $pathExists = null, ?callable $readFile = null): array
 {

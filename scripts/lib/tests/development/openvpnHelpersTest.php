@@ -31,8 +31,9 @@ class OpenvpnHelpersTest extends TestCase
 
     public function testSystemTestUsesMatchingClientArtifactPaths(): void
     {
-        $contents = $this->loadSource('scripts/util/systemTest.php');
+        $contents = $this->loadSource('scripts/lib/systemStatus.php');
 
+        $this->assertStringContainsString('function pmssSystemStatusChecks(', $contents);
         $this->assertStringContainsString("strpos(\$hostname, '.pulsedmedia.com') !== false", $contents);
         $this->assertStringContainsString("str_replace('.', '-', \$fqdn)", $contents);
         $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.ovpn'", $contents);
@@ -41,7 +42,7 @@ class OpenvpnHelpersTest extends TestCase
 
     public function testSystemTestStillWarnsWhenHostnameIsUnknown(): void
     {
-        $contents = $this->loadSource('scripts/util/systemTest.php');
+        $contents = $this->loadSource('scripts/lib/systemStatus.php');
 
         $this->assertStringContainsString("pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown')", $contents);
     }
