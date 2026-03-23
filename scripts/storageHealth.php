@@ -25,11 +25,54 @@ function pmssStorageHealthColor(string $severity, string $text): string
     return "\033[".$code."m".$text."\033[0m";
 }
 
+function pmssStorageHealthFormatInt($value, string $suffix = ''): string
+{
+    return is_int($value) ? (string) $value.$suffix : '-';
+}
+
+function pmssStorageHealthDiskRowBuild(array $entry, bool $nvme): array
+{
+    $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
+    $row = [
+        'sev' => (string) ($entry['severity'] ?? 'warn'),
+        'dev' => (string) ($entry['kname'] ?? ($entry['device'] ?? '')),
+        'size' => (string) ($entry['size'] ?? ''),
+        'model' => (string) ($entry['model'] ?? ''),
+        'flags' => is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '',
+    ];
+
+    if ($nvme) {
+        $temp = $metrics['temperature'] ?? null;
+        return $row + [
+            'health' => 'NVME',
+            'temp' => pmssStorageHealthFormatInt(is_int($temp) ? $temp : null, 'C'),
+            'realloc' => '-',
+            'pend' => pmssStorageHealthFormatInt($metrics['media_errors'] ?? null),
+            'link' => pmssStorageHealthFormatInt($metrics['percentage_used'] ?? null),
+        ];
+    }
+
+    return $row + [
+        'health' => (string) ($metrics['health'] ?? 'UNKNOWN'),
+        'temp' => pmssStorageHealthFormatInt($metrics['temp_c'] ?? null, 'C'),
+        'realloc' => pmssStorageHealthFormatInt($metrics['reallocated'] ?? null),
+        'pend' => pmssStorageHealthFormatInt($metrics['pending'] ?? null),
+        'link' => pmssStorageHealthFormatInt($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null)),
+    ];
+}
+
+function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?string $value): ?string
+{
+    if ($value === null && $index + 1 < $argc && strpos($argv[$index + 1], '--') !== 0) {
+        $index++;
+        $value = $argv[$index];
+    }
+
+    return ($value !== null && $value !== '') ? $value : null;
+}
+
 function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, string $timestamp, string $jsonPath): void
 {
-    $formatInt = static function ($value, string $suffix = ''): string {
-        return is_int($value) ? (string) $value.$suffix : '-';
-    };
     $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
 
     $header = "Storage health (latest snapshot {$timestamp})";
@@ -57,41 +100,11 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
 
         $rows = [];
         foreach ($smart as $entry) {
-            $m = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
-            $device = (string) ($entry['kname'] ?? ($entry['device'] ?? ''));
-            $health = (string) ($m['health'] ?? 'UNKNOWN');
-            $flags = is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '';
-            $rows[] = [
-                'sev' => (string) ($entry['severity'] ?? 'warn'),
-                'dev' => $device,
-                'size' => (string) ($entry['size'] ?? ''),
-                'model' => (string) ($entry['model'] ?? ''),
-                'health' => $health,
-                'temp' => $formatInt($m['temp_c'] ?? null, 'C'),
-                'realloc' => $formatInt($m['reallocated'] ?? null),
-                'pend' => $formatInt($m['pending'] ?? null),
-                'link' => $formatInt($m['link_errors'] ?? ($m['udma_crc'] ?? null)),
-                'flags' => $flags,
-            ];
+            $rows[] = pmssStorageHealthDiskRowBuild($entry, false);
         }
 
         foreach ($nvme as $entry) {
-            $m = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
-            $device = (string) ($entry['kname'] ?? ($entry['device'] ?? ''));
-            $flags = is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '';
-            $temp = $m['temperature'] ?? null;
-            $rows[] = [
-                'sev' => (string) ($entry['severity'] ?? 'warn'),
-                'dev' => $device,
-                'size' => (string) ($entry['size'] ?? ''),
-                'model' => (string) ($entry['model'] ?? ''),
-                'health' => 'NVME',
-                'temp' => $formatInt(is_int($temp) ? $temp : null, 'C'),
-                'realloc' => '-',
-                'pend' => $formatInt($m['media_errors'] ?? null),
-                'link' => $formatInt($m['percentage_used'] ?? null),
-                'flags' => $flags,
-            ];
+            $rows[] = pmssStorageHealthDiskRowBuild($entry, true);
         }
 
         usort($rows, static function (array $a, array $b): int {
@@ -180,19 +193,12 @@ $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/
 $argc = count($argv);
 for ($i = 1; $i < $argc; $i++) {
     $arg = $argv[$i];
-    $next = ($i + 1 < $argc) ? $argv[$i + 1] : null;
     $parts = explode('=', $arg, 2);
     $key = $parts[0];
     $val = count($parts) === 2 ? $parts[1] : null;
     switch ($key) {
         case '--json':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
-            if ($val !== null && $val !== '') {
-                $jsonPath = $val;
-            }
+            $jsonPath = pmssStorageHealthOptionValue($argv, $argc, $i, $val) ?? $jsonPath;
             break;
         case '--raw':
             $raw = true;
@@ -201,21 +207,11 @@ for ($i = 1; $i < $argc; $i++) {
             $onlyProblems = true;
             break;
         case '--device':
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
-            if ($val !== null && $val !== '') {
-                $deviceFilter = $val;
-            }
+            $deviceFilter = pmssStorageHealthOptionValue($argv, $argc, $i, $val) ?? $deviceFilter;
             break;
         case '--user-notice':
             $userNoticeRequested = true;
-            if ($val === null && $next !== null && strpos($next, '--') !== 0) {
-                $val = $next;
-                $i++;
-            }
-            $userNoticePath = $val !== null && $val !== '' ? $val : $defaultNoticePath;
+            $userNoticePath = pmssStorageHealthOptionValue($argv, $argc, $i, $val) ?? $defaultNoticePath;
             break;
         case '--help':
         case '-h':
