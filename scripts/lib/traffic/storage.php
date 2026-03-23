@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../userLifecycle.php';
 
 if (!function_exists('pmssTrafficNormalizeDir')) {
     /** Normalize a PMSS directory path while preserving root as `/`. */
@@ -38,6 +39,22 @@ if (!function_exists('pmssTrafficDataPaths')) {
             'ingress' => $userHome.'/.trafficDataIngress',
             'ingressLocal' => $userHome.'/.trafficDataIngressLocal',
         ];
+    }
+}
+
+if (!function_exists('pmssTrafficUserKeyIsValid')) {
+    /** Validate a traffic storage key, allowing the `-localnet` suffix. */
+    function pmssTrafficUserKeyIsValid(string $user): bool
+    {
+        if ($user === '') {
+            return false;
+        }
+
+        if (substr_compare($user, '-localnet', -9) === 0) {
+            return pmssUsernameIsValid(substr($user, 0, -9));
+        }
+
+        return pmssUsernameIsValid($user);
     }
 }
 
@@ -126,6 +143,10 @@ class TrafficStorage
     /** Persist user traffic data to home directory and runtime cache. */
     public function save(string $user, array $data): void
     {
+        if (!pmssTrafficUserKeyIsValid($user)) {
+            return;
+        }
+
         $isLocalUser = substr_compare($user, '-localnet', -9) === 0;
         $targetUser = $isLocalUser ? substr($user, 0, -9) : $user;
         $trafficPaths = pmssTrafficDataPaths($targetUser, $this->homeDir);

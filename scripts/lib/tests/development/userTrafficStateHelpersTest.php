@@ -132,6 +132,34 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertTrue(is_link($homeTrafficPath));
     }
 
+    public function testTrafficStorageSaveRejectsInvalidUsername(): void
+    {
+        $storage = new \TrafficStorage([
+            'home_dir' => $this->tempDir.'/home',
+            'runtime_dir' => $this->tempDir.'/runtime',
+        ]);
+        $storage->ensureRuntime();
+
+        $storage->save('../evil', ['raw' => ['month' => 1024]]);
+
+        $this->assertTrue(!file_exists($this->tempDir.'/runtime/trafficStats/../evil'));
+        $this->assertTrue(!file_exists($this->tempDir.'/home/../evil/.trafficData'));
+    }
+
+    public function testTrafficStorageSaveRejectsInvalidLocalnetKey(): void
+    {
+        $storage = new \TrafficStorage([
+            'home_dir' => $this->tempDir.'/home',
+            'runtime_dir' => $this->tempDir.'/runtime',
+        ]);
+        $storage->ensureRuntime();
+
+        $storage->save('alice-localnet-extra', ['raw' => ['month' => 1024]]);
+
+        $this->assertTrue(!file_exists($this->tempDir.'/runtime/trafficStats/alice-localnet-extra'));
+        $this->assertTrue(!file_exists($this->tempDir.'/home/alice/.trafficDataIngressLocal'));
+    }
+
     public function testTrafficLimitReadGiBFileReturnsZeroForMissingFile(): void
     {
         $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($this->tempDir.'/missing-limit'));
