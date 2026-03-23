@@ -142,7 +142,6 @@ table only tracks external/non-Debian sources.
 | Module | Installs / Tasks | External Sources & Expectations |
 | --- | --- | --- |
 | `packages.php` | Legacy queue module retained for compatibility tooling; skipped by update-step2. | No longer part of runtime package orchestration. |
-| `acdcli.php` | Installs/upgrades `acd_cli` inside `/opt/acd_cli` virtualenv and links the CLI. | Pulls from GitHub (`git+https://github.com/yadayada/acd_cli.git`) via the venv’s pip; requires python3/venv tooling. |
 | `aiToolsInstall.php` | Installs system-wide Gemini CLI, Claude Code, and pinned Codex CLI for all users. | Downloads pinned Node.js/Codex artifacts over HTTPS and installs npm packages into `/opt/pmss/ai-tools`. |
 | `btsync.php` | Maintains BTSync 1.4/2.2 binaries and Resilio `rslsync` under `/usr/bin`. | Downloads binaries from `http://pulsedmedia.com/remote/pkg/`; needs write access to `/usr/bin`. |
 | `deluge.php` | Installs or upgrades Deluge; Debian 10 path builds from source, newer releases lean on apt packages. | Debian 10 run pulls PyPI wheels and `https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz`; requires `pip`. |

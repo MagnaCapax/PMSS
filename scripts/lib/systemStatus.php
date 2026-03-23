@@ -117,7 +117,6 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         'rsync' => 'rsync --version 2>&1 | head -n 1',
         'python3' => 'python3 --version 2>&1 | head -n 1',
         'git' => 'git --version 2>&1 | head -n 1',
-        'acd_cli' => 'acd_cli --version 2>&1 | head -n 1',
         'flexget' => 'flexget --version 2>&1 | head -n 1',
         'pyload' => 'pyload --version 2>&1 | head -n 1',
     ] as $binary => $infoCommand) {
@@ -218,7 +217,6 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     }
 
     foreach ([
-        'Virtualenv: acd_cli binary' => '/opt/acd_cli/bin/acd_cli',
         'Virtualenv: FlexGet binary' => '/opt/flexget/bin/flexget',
         'Virtualenv: pyLoad binary' => '/opt/pyload/bin/pyload',
     ] as $label => $path) {
@@ -227,7 +225,6 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     }
 
     foreach ([
-        'CLI symlink: acd_cli' => ['/usr/local/bin/acd_cli', '/opt/acd_cli/bin/acd_cli'],
         'CLI symlink: flexget' => ['/usr/local/bin/flexget', '/opt/flexget/bin/flexget'],
         'CLI symlink: pyLoad' => ['/usr/local/bin/pyload', '/opt/pyload/bin/pyload'],
     ] as $label => $target) {

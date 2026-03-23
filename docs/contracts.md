@@ -387,10 +387,6 @@ Environment overrides: `PMSS_WG_CONFIG_DIR`, `PMSS_WG_HOME_BASE`, `PMSS_WG_USER_
 
 These scripts are primarily imperative; treat them as idempotent installers guarded by presence/version checks.
 
-- acdcli.php
-  - Ensures python3/venv/pip, creates venv at `/opt/acd_cli`, installs `acd_cli` from Git, links CLI into `/usr/local/bin/acd_cli`.
-  - Env: honors `PMSS_DRY_RUN` to avoid acting when venv is missing unexpectedly.
-
 - btsync.php
   - Ensures BTSync 1.4/2.2 binaries in `/usr/bin/`; symlinks `/usr/bin/btsync`→2.2; installs/updates Resilio Sync to pinned version.
 

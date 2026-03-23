@@ -33,7 +33,7 @@ class PythonVenvHelperTest extends TestCase
         $this->pmssWithEnv(['PATH' => ''], function () use (&$messages): void {
             $result = \pmssPythonVenvEnsure(
                 '/tmp/pmss-python-venv-test-default',
-                'acd_cli',
+                'pyLoad',
                 static function (string $message) use (&$messages): void {
                     $messages[] = $message;
                 }
@@ -42,6 +42,6 @@ class PythonVenvHelperTest extends TestCase
             $this->assertEquals([], $result);
         });
 
-        $this->assertEquals(['[WARN] Skipping acd_cli setup: python3 missing'], $messages);
+        $this->assertEquals(['[WARN] Skipping pyLoad setup: python3 missing'], $messages);
     }
 }

@@ -8,7 +8,6 @@ require_once __DIR__.'/../common/TestCase.php';
 class BinaryPresenceTest extends TestCase
 {
     private array $binaries = [
-        'acd_cli' => '/usr/local/bin/acd_cli',
         'flexget' => '/usr/local/bin/flexget',
         'pyload'  => '/usr/local/bin/pyload',
     ];

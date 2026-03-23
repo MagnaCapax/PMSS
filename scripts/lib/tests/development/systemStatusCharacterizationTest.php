@@ -55,7 +55,6 @@ final class SystemStatusCharacterizationTest extends TestCase
             'rsync' => ['rsync --version 2>&1 | head -n 1', '/usr/bin/rsync', 'rsync  version 3.2.7'],
             'python3' => ['python3 --version 2>&1 | head -n 1', '/usr/bin/python3', 'Python 3.11.2'],
             'git' => ['git --version 2>&1 | head -n 1', '/usr/bin/git', 'git version 2.39.2'],
-            'acd_cli' => ['acd_cli --version 2>&1 | head -n 1', '/opt/acd_cli/bin/acd_cli', 'acd_cli 0.4.0'],
             'flexget' => ['flexget --version 2>&1 | head -n 1', '/opt/flexget/bin/flexget', '3.8.51'],
             'pyload' => ['pyload --version 2>&1 | head -n 1', '/opt/pyload/bin/pyload', 'pyLoad 0.5.0'],
         ] as $binary => $spec) {
@@ -69,14 +68,13 @@ final class SystemStatusCharacterizationTest extends TestCase
                 return in_array($path, [$sourcesPath, '/etc/proftpd/proftpd.conf', '/etc/openvpn', '/etc/openvpn/easy-rsa', '/etc/seedbox/localnet', '/etc/nginx'], true);
             },
             'isFile' => static function (string $path) use ($sourcesPath): bool {
-                return in_array($path, [$sourcesPath, '/etc/seedbox/config/localnet', '/home/openvpn-host-pulsedmedia-com.ovpn', '/home/openvpn-host-pulsedmedia-com.crt', '/opt/acd_cli/bin/acd_cli', '/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload'], true);
+                return in_array($path, [$sourcesPath, '/etc/seedbox/config/localnet', '/home/openvpn-host-pulsedmedia-com.ovpn', '/home/openvpn-host-pulsedmedia-com.crt', '/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload'], true);
             },
             'isDir' => static function (string $path): bool { return in_array($path, ['/etc/seedbox', '/etc/seedbox/config'], true); },
-            'isExecutable' => static function (string $path): bool { return in_array($path, ['/opt/acd_cli/bin/acd_cli', '/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload'], true); },
-            'isLink' => static function (string $path): bool { return in_array($path, ['/usr/local/bin/acd_cli', '/usr/local/bin/flexget', '/usr/local/bin/pyload'], true); },
+            'isExecutable' => static function (string $path): bool { return in_array($path, ['/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload'], true); },
+            'isLink' => static function (string $path): bool { return in_array($path, ['/usr/local/bin/flexget', '/usr/local/bin/pyload'], true); },
             'readLink' => static function (string $path): string {
                 return [
-                    '/usr/local/bin/acd_cli' => '/opt/acd_cli/bin/acd_cli',
                     '/usr/local/bin/flexget' => '/opt/flexget/bin/flexget',
                     '/usr/local/bin/pyload' => '/opt/pyload/bin/pyload',
                 ][$path] ?? '';
@@ -188,17 +186,17 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals('bookworm', $checks[0]['detail']);
         $this->assertEquals('Binary: rtorrent', $checks[1]['name']);
         $this->assertEquals('rtorrent 0.9.8', $checks[1]['detail']);
-        $this->assertEquals('Seedbox localnet (config)', $checks[24]['name']);
+        $this->assertEquals('Seedbox localnet (config)', $checks[23]['name']);
+        $this->assertEquals('OK', $checks[23]['status']);
+        $this->assertEquals('Sources codename match', $checks[24]['name']);
         $this->assertEquals('OK', $checks[24]['status']);
-        $this->assertEquals('Sources codename match', $checks[25]['name']);
+        $this->assertEquals('OpenVPN client artifacts', $checks[25]['name']);
         $this->assertEquals('OK', $checks[25]['status']);
-        $this->assertEquals('OpenVPN client artifacts', $checks[26]['name']);
-        $this->assertEquals('OK', $checks[26]['status']);
-        $this->assertEquals('CLI symlink: pyLoad', $checks[32]['name']);
-        $this->assertEquals('OK', $checks[32]['status']);
-        $this->assertEquals('Component: os.codename', $checks[33]['name']);
-        $this->assertEquals('Component: config.nginx', $checks[44]['name']);
-        $this->assertEquals(45, count($checks));
+        $this->assertEquals('CLI symlink: pyLoad', $checks[29]['name']);
+        $this->assertEquals('OK', $checks[29]['status']);
+        $this->assertEquals('Component: os.codename', $checks[30]['name']);
+        $this->assertEquals('Component: config.nginx', $checks[41]['name']);
+        $this->assertEquals(42, count($checks));
     }
 
     public function testSystemStatusWarnsWhenSymlinkTargetCannotBeRead(): void
@@ -210,7 +208,6 @@ final class SystemStatusCharacterizationTest extends TestCase
             }
 
             return [
-                '/usr/local/bin/acd_cli' => '/opt/acd_cli/bin/acd_cli',
                 '/usr/local/bin/flexget' => '/opt/flexget/bin/flexget',
                 '/usr/local/bin/pyload' => '/opt/pyload/bin/pyload',
             ][$path] ?? '';
@@ -218,9 +215,9 @@ final class SystemStatusCharacterizationTest extends TestCase
 
         $checks = pmssSystemStatusChecks($dependencies);
 
-        $this->assertEquals('CLI symlink: flexget', $checks[31]['name']);
-        $this->assertEquals('WARN', $checks[31]['status']);
-        $this->assertEquals('/usr/local/bin/flexget symlink target unreadable', $checks[31]['detail']);
+        $this->assertEquals('CLI symlink: flexget', $checks[28]['name']);
+        $this->assertEquals('WARN', $checks[28]['status']);
+        $this->assertEquals('/usr/local/bin/flexget symlink target unreadable', $checks[28]['detail']);
     }
 
     public function testCliScriptsUseSharedComponentStatusHelper(): void
