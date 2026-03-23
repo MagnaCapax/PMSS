@@ -69,7 +69,7 @@ Options:
   --prompt-file PATH  Base prompt text file (required unless --prompt is used)
   --prompt TEXT       Inline prompt text instead of a file
   --context PATH      Append extra context files (repeatable)
-  --exec CMD          Assistant command line (default: codex)
+  --exec CMD          Assistant command line (default: codex exec ##PROMPT_STDIN##)
   --event-log PATH    JSONL event log output path (default: \$outdir/events.jsonl)
   --outdir DIR        Output directory for prompt + artifacts (default: temp dir)
   --dry-run           Build prompt and show the command without invoking
@@ -117,7 +117,7 @@ esac
 
 prompt_file=""
 custom_prompt=""
-exec_cmd="codex"
+exec_cmd="codex exec ##PROMPT_STDIN##"
 outdir=""
 event_log=""
 dry_run=0
@@ -179,8 +179,8 @@ prompt_out="$outdir/prompt.txt"
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}"
 run_start_ms="$(codex_now_ms)"
 
-# Default to Codex with approval prompts for untrusted commands while keeping sandboxing enabled.
-# codex exec (non-interactive) doesn't support --ask-for-approval; detect and skip it.
+# Default to headless Codex for cron/non-interactive workflows while keeping sandboxing enabled.
+# codex exec doesn't support --ask-for-approval; only add approval mode for interactive codex invocations.
 exec_bin="${exec_cmd%% *}"
 is_codex_exec=0
 [[ "$exec_cmd" =~ ^codex[[:space:]]+exec([[:space:]]|$) ]] && is_codex_exec=1
