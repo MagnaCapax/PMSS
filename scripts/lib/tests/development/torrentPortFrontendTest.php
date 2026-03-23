@@ -72,6 +72,27 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
     }
 
+    public function testApplySkeletonFilesRemovesLegacyPhpXplorerFile(): void
+    {
+        $legacyPath = $this->homePath('www/phpXplorer');
+        @mkdir(dirname($legacyPath), 0755, true);
+        file_put_contents($legacyPath, "legacy\n");
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $this->assertTrue(!file_exists($legacyPath));
+    }
+
+    public function testApplySkeletonFilesLeavesLegacyPhpXplorerDirectoryUntouched(): void
+    {
+        $legacyPath = $this->homePath('www/phpXplorer');
+        @mkdir($legacyPath, 0755, true);
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $this->assertTrue(is_dir($legacyPath));
+    }
+
     public function testDelugePortEnsureUpdatesMismatchedPort(): void
     {
         $home = $this->homePath();

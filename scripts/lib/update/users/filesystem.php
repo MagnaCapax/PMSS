@@ -16,6 +16,7 @@
 function pmssUserApplySkeletonFiles(array $ctx): void
 {
     $user = $ctx['user'];
+    $legacyPhpXplorerPath = $ctx['home'].'/www/phpXplorer';
     $patchFilemanager = static function (string $path): void {
         if (!is_file($path)
             || is_link($path)
@@ -107,8 +108,9 @@ PHP;
         updateUserFile($file, $user);
     }
 
-    if (file_exists("/home/{$user}/www/phpXplorer")) {
-        unlink("/home/{$user}/www/phpXplorer");
+    if ((is_file($legacyPhpXplorerPath) || is_link($legacyPhpXplorerPath))
+        && file_exists($legacyPhpXplorerPath)) {
+        @unlink($legacyPhpXplorerPath);
     }
 
     $patchFilemanager($ctx['home'].'/www/filemanager.php');
