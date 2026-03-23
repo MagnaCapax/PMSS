@@ -98,9 +98,9 @@ class MotdTest extends TestCase
 
     public function testRcLocalRestoresCronAndGeneratesMotdAtBoot(): void
     {
-        $path = dirname(__DIR__, 4).'/etc/seedbox/config/template.rc.local';
+        $path = $this->pmssRepoPath('etc/seedbox/config/template.rc.local');
         $this->assertTrue(file_exists($path), 'template.rc.local missing');
-        $data = (string) file_get_contents($path);
+        $data = $this->pmssReadRepoFile('etc/seedbox/config/template.rc.local');
         $this->assertTrue(strpos($data, '/etc/seedbox/config/root.cron') !== false, 'rc.local should reference root.cron template');
         $this->assertTrue(strpos($data, '/etc/cron.d/pmss') !== false, 'rc.local should restore /etc/cron.d/pmss');
         $this->assertTrue(strpos($data, '/scripts/util/motdGenerate.php') !== false, 'rc.local should generate MOTD at boot');

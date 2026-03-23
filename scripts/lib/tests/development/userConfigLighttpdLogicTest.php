@@ -195,7 +195,7 @@ LIGHTTPD;
 
     public function testUserConfigEntryPointKeepsLighttpdApplyHelperWiring(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/userConfigLighttpd.php');
+        $src = $this->pmssReadRepoFile('scripts/util/userConfigLighttpd.php');
 
         $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';", $src);
         $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';") === false);
@@ -207,7 +207,7 @@ LIGHTTPD;
 
     public function testUserConfigApplyOwnsPhpIniMemoryLimitUpdate(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/lighttpd/userConfigApply.php');
+        $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
 
         $this->assertStringContainsString("preg_match('/^memory_limit\\s*=.*$/m', \$phpIniContent)", $src);
         $this->assertStringContainsString('pmssAtomicWriteFile($phpIniPath, $phpIniContent);', $src);
@@ -215,7 +215,7 @@ LIGHTTPD;
 
     public function testUserConfigApplyOwnsMovedHelperFunctions(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/lib/lighttpd/userConfigApply.php');
+        $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
 
         foreach ([
             'pmssClampLighttpdBandwidthLimits',

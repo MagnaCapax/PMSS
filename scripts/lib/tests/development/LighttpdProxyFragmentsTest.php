@@ -7,16 +7,14 @@ class LighttpdProxyFragmentsTest extends TestCase
 {
     public function testTemplateDoesNotEmbedRcloneProxy(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = (string)file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         $this->assertTrue(strpos($template, '/user-##username/rclone/') === false, 'rclone proxy must be in custom fragment');
     }
 
     public function testTemplateDoesNotEmbedQbittorrentProxy(): void
     {
-        $templatePath = dirname(__DIR__, 4).'/etc/seedbox/config/template.lighttpd';
-        $template = (string)file_get_contents($templatePath);
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.lighttpd');
 
         $this->assertTrue(strpos($template, '/user-##username/qbittorrent/') === false, 'qBittorrent proxy must be in custom fragment');
     }

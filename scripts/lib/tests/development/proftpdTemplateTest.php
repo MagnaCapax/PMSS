@@ -26,13 +26,6 @@ class ProftpdTemplateTest extends TestCase
 
     private function loadTemplate(): string
     {
-        $root = dirname(__DIR__, 4);
-        $path = $root.'/etc/seedbox/config/template.proftpd';
-        $data = @file_get_contents($path);
-        if (!is_string($data) || $data === '') {
-            throw new \AssertionError('Unable to load ProFTPD template at '.$path);
-        }
-        return $data;
+        return $this->pmssReadRepoFile('etc/seedbox/config/template.proftpd');
     }
 }
-
