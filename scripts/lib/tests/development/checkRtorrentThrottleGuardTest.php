@@ -10,8 +10,7 @@ class checkRtorrentThrottleGuardTest extends TestCase
      */
     public function testScgiThrottleCallRequiresConfiguredThrottle(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $script = (string) file_get_contents($repoRoot.'/scripts/cron/checkRtorrent.php');
+        $script = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertTrue(
             strpos(
@@ -32,8 +31,7 @@ class checkRtorrentThrottleGuardTest extends TestCase
      */
     public function testHealthyLogRemainsOutsideThrottleGuard(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $script = (string) file_get_contents($repoRoot.'/scripts/cron/checkRtorrent.php');
+        $script = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertMatches(
             '/if \(\$throttle !== null\) \{.*?\}\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s',

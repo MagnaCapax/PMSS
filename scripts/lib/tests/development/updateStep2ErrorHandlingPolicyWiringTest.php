@@ -7,9 +7,7 @@ class UpdateStep2ErrorHandlingPolicyWiringTest extends TestCase
 {
     public function testStepPolicyRuntimeDefinesClassificationConstants(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/stepPolicy.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/stepPolicy.php');
 
         $this->assertStringContainsString('PMSS_UPDATE_STEP_CLASS_SOFT_FAIL', $src);
         $this->assertStringContainsString('PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED', $src);
@@ -19,9 +17,7 @@ class UpdateStep2ErrorHandlingPolicyWiringTest extends TestCase
 
     public function testUpdateStep2MarksCriticalPostPackageStepsMustSucceed(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';", $src);
         $this->assertStringContainsString("pmssUpdateStep2RunClassifiedCallable('Applying runtime service templates'", $src);

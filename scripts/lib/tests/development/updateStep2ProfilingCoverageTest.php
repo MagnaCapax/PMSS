@@ -7,9 +7,7 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
 {
     public function testUpdateStep2UsesProfiledWrappersForModuleCalls(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $this->assertTrue(strpos($src, '#TODO profiling (GH #120)') === false, 'Profiling TODO marker should be removed once coverage is wired');
         $this->assertStringContainsString('function pmssRunProfiledStep(', $src, 'Expected callable profiling helper');
@@ -29,9 +27,7 @@ class UpdateStep2ProfilingCoverageTest extends TestCase
 
     public function testUpdateStep2EmitsProfileSummaryAfterFinalWork(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $summaryIndex = strpos($src, 'pmssProfileSummary();');
         $rootCronIndex = strpos($src, "runStep('Refreshing root cron configuration'");

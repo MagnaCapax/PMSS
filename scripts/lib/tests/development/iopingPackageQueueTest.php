@@ -7,31 +7,20 @@ class IopingPackageQueueTest extends TestCase
 {
     public function testSystemPackagesQueueIncludesIoping(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $path = $repoRoot.'/scripts/lib/update/apps/packages.php';
-        $src = (string) @file_get_contents($path);
-        $this->assertTrue($src !== '', 'Expected to read package bootstrap file');
+        $src = $this->pmssReadRepoFile('scripts/lib/update/apps/packages.php');
         $this->assertTrue(strpos($src, "'ioping'") !== false, 'Expected ioping to be queued as a standard package');
     }
 
     public function testPackageBootstrapIncludesZncPackages(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $path = $repoRoot.'/scripts/lib/update/apps/packages.php';
-        $src = (string) @file_get_contents($path);
-
-        $this->assertTrue($src !== '', 'Expected to read package bootstrap file');
+        $src = $this->pmssReadRepoFile('scripts/lib/update/apps/packages.php');
         $this->assertTrue(strpos($src, "'znc'") !== false, 'Expected ZNC to stay in the package bootstrap queue');
         $this->assertTrue(strpos($src, "'znc-python3'") !== false, 'Expected ZNC Python support to stay queued');
     }
 
     public function testPackageBootstrapKeepsDebian10BackportsKernelQueue(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $path = $repoRoot.'/scripts/lib/update/apps/packages.php';
-        $src = (string) @file_get_contents($path);
-
-        $this->assertTrue($src !== '', 'Expected to read package bootstrap file');
+        $src = $this->pmssReadRepoFile('scripts/lib/update/apps/packages.php');
         $this->assertTrue(strpos($src, "'linux-image-amd64'") !== false, 'Expected Debian 10 kernel queue to remain present');
         $this->assertTrue(strpos($src, "'buster-backports'") !== false, 'Expected Debian 10 backports target to remain present');
     }

@@ -7,10 +7,7 @@ class UpdateStep2SystemServiceHardeningWiringTest extends TestCase
 {
     public function testUpdateStep2WiresSystemdHardeningHelpers(): void
     {
-        $repoRoot = dirname(__DIR__, 4);
-        $path = $repoRoot.'/scripts/util/update-step2.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $this->assertTrue(strpos($src, "require_once __DIR__.'/../lib/update/services/systemd.php';") !== false);
 

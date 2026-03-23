@@ -7,9 +7,7 @@ class UpdateStep2LoggingBootstrapOrderTest extends TestCase
 {
     public function testStandaloneLoggerBootstrapPrecedesFirstProfiledStep(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $loggerRequireIndex = strpos($src, "require_once __DIR__.'/../lib/logger.php';");
         $loggerBootstrapIndex = strpos($src, "new Logger(__FILE__, '/var/log', '/tmp', 'pmss-update', true);");
