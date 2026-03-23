@@ -29,45 +29,38 @@ if (!is_array($userIds)) die("No such user\n");
 
 function chmodPath(string $path, int $perm, bool $recursive = false): void
 {
-    $flag = $recursive ? '-R ' : '';
+    $target = pmssPathShellTarget($path);
+    if ($target === null) {
+        return;
+    }
+
+    pmssRun(sprintf('chmod %s%o %s', $recursive ? '-R ' : '', $perm, $target));
+}
+
+function pmssPathShellTarget(string $path): ?string
+{
     $hasGlob = strpbrk($path, '*?[]') !== false;
 
     if ($hasGlob) {
         $matches = glob($path);
         if ($matches === false || $matches === []) {
-            return;
+            return null;
         }
-        $target = $path;
-    } else {
-        if (!file_exists($path)) {
-            return;
-        }
-        $target = escapeshellarg($path);
+        return $path;
     }
 
-    pmssRun(sprintf('chmod %s%o %s', $flag, $perm, $target));
+    return file_exists($path) ? escapeshellarg($path) : null;
 }
 
 function chownPath(string $path, string $owner, bool $recursive = false): void
 {
-    $flag = $recursive ? '-R ' : '';
-    $hasGlob = strpbrk($path, '*?[]') !== false;
-
-    if ($hasGlob) {
-        $matches = glob($path);
-        if ($matches === false || $matches === []) {
-            return;
-        }
-        $target = $path;
-    } else {
-        if (!file_exists($path)) {
-            return;
-        }
-        $target = escapeshellarg($path);
+    $target = pmssPathShellTarget($path);
+    if ($target === null) {
+        return;
     }
 
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
-    pmssRun(sprintf('chown %s%s %s', $flag, escapeshellarg($owner), $target));
+    pmssRun(sprintf('chown %s%s %s', $recursive ? '-R ' : '', escapeshellarg($owner), $target));
 }
 
 // Best-effort immutable toggle for traffic data files.
@@ -130,24 +123,20 @@ pmssRun(sprintf(
     escapeshellarg("/home/{$thisUser}/.local")
 ));
 
-// Ensure ~/.bin and ~/bin exist with safe permissions and ownership
-$binDirHidden = "/home/{$thisUser}/.bin";
-if (!is_dir($binDirHidden)) {
-    pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDirHidden)));
-    chownPath($binDirHidden, "{$thisUser}:{$thisUser}");
-    chmodPath($binDirHidden, 0750, true);
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($thisUser, 'userPermissions: created ~/.bin with safe ownership');
+// Ensure ~/.bin and ~/bin exist with safe permissions and ownership.
+foreach ([
+    ["/home/{$thisUser}/.bin", 'userPermissions: created ~/.bin with safe ownership'],
+    ["/home/{$thisUser}/bin", 'userPermissions: created ~/bin with safe ownership'],
+] as $binSpec) {
+    $binDir = $binSpec[0];
+    if (is_dir($binDir)) {
+        continue;
     }
-}
-
-$binDir = "/home/{$thisUser}/bin";
-if (!is_dir($binDir)) {
     pmssRun(sprintf('mkdir -p %s', escapeshellarg($binDir)));
     chownPath($binDir, "{$thisUser}:{$thisUser}");
     chmodPath($binDir, 0750, true);
     if (function_exists('pmssUserLog')) {
-        pmssUserLog($thisUser, 'userPermissions: created ~/bin with safe ownership');
+        pmssUserLog($thisUser, $binSpec[1]);
     }
 }
 
@@ -201,11 +190,17 @@ $chownItems = [
     ["/home/{$thisUser}/www/rutorrent/conf/config.php", "root:root"],
 ];
 
+$trafficFiles = [
+    "/home/{$thisUser}/.trafficData",
+    "/home/{$thisUser}/.trafficDataLocal",
+    "/home/{$thisUser}/.trafficDataIngress",
+    "/home/{$thisUser}/.trafficDataIngressLocal",
+];
+
 // Ensure traffic files are mutable while ownership and permissions are repaired.
-pmssSetImmutable("/home/{$thisUser}/.trafficData", false);
-pmssSetImmutable("/home/{$thisUser}/.trafficDataLocal", false);
-pmssSetImmutable("/home/{$thisUser}/.trafficDataIngress", false);
-pmssSetImmutable("/home/{$thisUser}/.trafficDataIngressLocal", false);
+foreach ($trafficFiles as $trafficFile) {
+    pmssSetImmutable($trafficFile, false);
+}
 
 foreach ($chmodItems as $item) {
     $path = $item[0];
@@ -256,10 +251,9 @@ foreach ($chownItems as $item) {
     chownPath($path, $owner, $recursive);
 }
 
-pmssSetImmutable("/home/{$thisUser}/.trafficData", true);
-pmssSetImmutable("/home/{$thisUser}/.trafficDataLocal", true);
-pmssSetImmutable("/home/{$thisUser}/.trafficDataIngress", true);
-pmssSetImmutable("/home/{$thisUser}/.trafficDataIngressLocal", true);
+foreach ($trafficFiles as $trafficFile) {
+    pmssSetImmutable($trafficFile, true);
+}
 
 if (file_exists("/home/{$thisUser}/.ssh")) {
     chmodPath("/home/{$thisUser}/.ssh", 0750);

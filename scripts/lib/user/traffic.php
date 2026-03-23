@@ -97,6 +97,21 @@ function pmssReadUserTrafficMonth(string $path): int
     return (int) round($data['raw']['month']);
 }
 
+/** @return array<string,int> */
+function pmssReadUserTrafficStates(string $username): array
+{
+    $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/').'/'.$username;
+    $totals = [];
+    foreach ([
+        'normal' => $homeDir.'/.trafficData',
+        'local' => $homeDir.'/.trafficDataLocal',
+        'ingress' => $homeDir.'/.trafficDataIngress',
+    ] as $name => $path) {
+        $totals[$name] = pmssReadUserTrafficMonth($path);
+    }
+    return $totals;
+}
+
 /**
  * Read a root-owned torrent upload throttle (KiB/s) for the user.
  *

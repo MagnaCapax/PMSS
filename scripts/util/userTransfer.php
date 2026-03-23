@@ -22,13 +22,6 @@ if (!is_dir('/var/log/pmss')) {
     @mkdir('/var/log/pmss', 0755, true);
 }
 
-// Safety rail: userTransfer performs filesystem and ownership operations and
-// must only run as root. Keep the message aligned with the library helper.
-if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
-    fwrite(STDERR, "This script must be run as root\n");
-    exit(1);
-}
-
 require_once __DIR__.'/../lib/userTransfer.php';
 
 exit(pmssUserTransferMain($argv));

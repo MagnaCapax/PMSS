@@ -6,18 +6,14 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once '/scripts/lib/traffic.php';
-require_once '/scripts/lib/user/traffic.php';
-/* List per user traffic for programmatic fetch */
+declare(strict_types=1);
 
-$users = trim( `/scripts/listUsers.php` );
-$users = explode("\n", $users);
-if (count($users) == 0) die();
+require_once dirname(__DIR__, 2).'/lib/userLifecycle.php';
+require_once dirname(__DIR__, 2).'/lib/user/traffic.php';
 
-foreach($users AS $thisUser) {
-    $userTrafficData[$thisUser]['normal'] = pmssReadUserTrafficMonth("/home/{$thisUser}/.trafficData");
-    $userTrafficData[$thisUser]['local'] = pmssReadUserTrafficMonth("/home/{$thisUser}/.trafficDataLocal");
-    $userTrafficData[$thisUser]['ingress'] = pmssReadUserTrafficMonth("/home/{$thisUser}/.trafficDataIngress");
+$userTrafficData = [];
+foreach (pmssListManagedUsers('/scripts/listUsers.php') as $userName) {
+    $userTrafficData[$userName] = pmssReadUserTrafficStates($userName);
 }
 
-echo serialize( $userTrafficData );
+echo serialize($userTrafficData);
