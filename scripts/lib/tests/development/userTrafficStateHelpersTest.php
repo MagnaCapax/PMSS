@@ -30,7 +30,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $target = $this->tempDir.'/traffic-data-target';
         file_put_contents($target, serialize(['raw' => ['month' => 2048]]));
         $link = $this->tempDir.'/traffic-data-link';
-        symlink($target, $link);
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
         $this->assertEquals(0, \pmssReadUserTrafficMonth($link));
     }
@@ -61,13 +61,11 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testTrafficDataPathsUseEnvOverrideAndModeSuffix(): void
     {
-        putenv('PMSS_HOME_DIR='.$this->tempDir.'/home');
+        $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir.'/home'], function (): void {
+            $paths = \pmssTrafficDataPaths('alice');
 
-        $paths = \pmssTrafficDataPaths('alice');
-
-        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
-
-        putenv('PMSS_HOME_DIR');
+            $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
+        });
     }
 
     public function testTrafficDataPathsExposeCanonicalKeys(): void
@@ -102,7 +100,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $target = $this->tempDir.'/limit-target';
         file_put_contents($target, "500\n");
         $link = $this->tempDir.'/limit-link';
-        symlink($target, $link);
+        $this->pmssCreateSymlinkOrSkip($target, $link);
 
         $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($link));
     }

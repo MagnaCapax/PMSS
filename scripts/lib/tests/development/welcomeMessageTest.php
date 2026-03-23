@@ -10,33 +10,16 @@ class WelcomeMessageTest extends TestCase
 
     private function setUpTempDir(): void
     {
-        $base = sys_get_temp_dir().'/pmss-welcome-message-tests';
-        if (!is_dir($base)) {
-            @mkdir($base, 0755, true);
-        }
-        $this->tempDir = $base.'/run-'.bin2hex(random_bytes(4));
-        @mkdir($this->tempDir, 0755, true);
+        $this->tempDir = $this->pmssMakeTempDir('pmss-welcome-message-', 0755);
     }
 
     private function tearDownTempDir(): void
     {
-        if ($this->tempDir === '' || !is_dir($this->tempDir)) {
+        if ($this->tempDir === '') {
             return;
         }
 
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->tempDir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($iterator as $entry) {
-            if ($entry->isDir()) {
-                @rmdir($entry->getPathname());
-            } else {
-                @unlink($entry->getPathname());
-            }
-        }
-
-        @rmdir($this->tempDir);
+        $this->pmssRemoveTree($this->tempDir);
         $this->tempDir = '';
     }
 

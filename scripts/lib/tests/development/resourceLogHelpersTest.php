@@ -21,29 +21,16 @@ class ResourceLogHelpersTest extends TestCase
         @file_put_contents($scriptPath, $script);
         @chmod($scriptPath, 0755);
 
-        $originalPath = getenv('PATH');
-        $pathPrefix = ($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '';
-        putenv('PATH='.$binDir.$pathPrefix);
-
         try {
-            $callback();
+            $this->pmssWithPathPrefix($binDir, $callback);
         } finally {
-            if ($originalPath === false) {
-                putenv('PATH');
-            } else {
-                putenv('PATH='.$originalPath);
-            }
-            @unlink($scriptPath);
-            @rmdir($binDir);
-            @rmdir($root);
+            $this->pmssRemoveTree($root);
         }
     }
 
     private function makeRoot(): string
     {
-        $root = sys_get_temp_dir().'/pmss-resource-'.bin2hex(random_bytes(4));
-        @mkdir($root, 0700, true);
-        return $root;
+        return $this->pmssMakeTempDir('pmss-resource-', 0700);
     }
 
     private function makeCounters(int $ioRead, int $ioWrite, int $cpuNsec, int $memory, int $tasks, int $ioReadOps = 0, int $ioWriteOps = 0): array
@@ -80,33 +67,22 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testEnsureDirRejectsSymlink(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
         $root = $this->makeRoot();
         $target = $root.'/target';
         @mkdir($target, 0700, true);
         $link = $root.'/link';
-        if (!@symlink($target, $link)) {
-            throw new SkipTest('symlink creation failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $link);
         $this->assertTrue(!\pmssResourceLogEnsureDir($link, 0700));
     }
 
     public function testEnsureDirRejectsSymlinkedParentDirectory(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $root = $this->makeRoot();
         $target = $root.'/target';
         $this->assertTrue(@mkdir($target, 0700, true) || is_dir($target));
 
         $symlinkedParent = $root.'/state';
-        if (!@symlink($target, $symlinkedParent)) {
-            throw new SkipTest('symlink creation failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $symlinkedParent);
 
         $this->assertTrue(!\pmssResourceLogEnsureDir($symlinkedParent.'/daily', 0700));
         $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
@@ -334,17 +310,11 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateRejectsSymlinkStatePath(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $root = $this->makeRoot();
         $target = $root.'/target.json';
         file_put_contents($target, json_encode(['io_read' => 1]));
         $statePath = $root.'/state.json';
-        if (!@symlink($target, $statePath)) {
-            throw new SkipTest('symlink creation failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $statePath);
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
 
@@ -356,18 +326,12 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUpdateStateRejectsSymlinkedParentDirectory(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $root = $this->makeRoot();
         $targetDir = $root.'/target';
         $this->assertTrue(@mkdir($targetDir, 0700, true) || is_dir($targetDir));
 
         $stateDir = $root.'/state';
-        if (!@symlink($targetDir, $stateDir)) {
-            throw new SkipTest('symlink creation failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($targetDir, $stateDir);
 
         $statePath = $stateDir.'/user.json';
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));

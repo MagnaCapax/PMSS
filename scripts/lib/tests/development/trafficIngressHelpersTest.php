@@ -26,16 +26,11 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testEnsureDirRejectsSymlink(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
         $root = $this->makeRoot();
         $target = $root.'/target';
         @mkdir($target, 0700, true);
         $link = $root.'/link';
-        if (!@symlink($target, $link)) {
-            throw new SkipTest('symlink creation failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $link);
         $this->assertTrue(!\pmssTrafficIngressEnsureDir($link, 0700));
     }
 
@@ -68,17 +63,11 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testReadStateRejectsSymlink(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $root = $this->makeRoot();
         $target = $root.'/target.json';
         @file_put_contents($target, json_encode(['ingress' => 1]));
         $path = $root.'/state.json';
-        if (!@symlink($target, $path)) {
-            throw new SkipTest('symlink creation failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $path);
 
         $this->assertTrue(\pmssTrafficIngressReadState($path) === []);
     }
@@ -92,19 +81,9 @@ class TrafficIngressHelpersTest extends TestCase
         @file_put_contents($scriptPath, "#!/bin/sh\necho 'IPIngressBytes=123'\necho 'IPEgressBytes=456'\n");
         @chmod($scriptPath, 0755);
 
-        $originalPath = getenv('PATH');
-        $pathPrefix = ($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '';
-        putenv('PATH='.$binDir.$pathPrefix);
-
-        try {
+        $this->pmssWithPathPrefix($binDir, function (): void {
             $this->assertEquals(['ingress' => 123, 'egress' => 456], \pmssTrafficIngressReadCounters(1000));
-        } finally {
-            if ($originalPath === false) {
-                putenv('PATH');
-            } else {
-                putenv('PATH='.$originalPath);
-            }
-        }
+        });
     }
 
     public function testReadCountersReturnsNullWhenRequiredCounterMissing(): void
@@ -116,34 +95,18 @@ class TrafficIngressHelpersTest extends TestCase
         @file_put_contents($scriptPath, "#!/bin/sh\necho 'IPIngressBytes=123'\n");
         @chmod($scriptPath, 0755);
 
-        $originalPath = getenv('PATH');
-        $pathPrefix = ($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '';
-        putenv('PATH='.$binDir.$pathPrefix);
-
-        try {
+        $this->pmssWithPathPrefix($binDir, function (): void {
             $this->assertEquals(null, \pmssTrafficIngressReadCounters(1000));
-        } finally {
-            if ($originalPath === false) {
-                putenv('PATH');
-            } else {
-                putenv('PATH='.$originalPath);
-            }
-        }
+        });
     }
 
     public function testWriteStateRejectsSymlink(): void
     {
-        if (!function_exists('symlink')) {
-            throw new SkipTest('symlink unavailable');
-        }
-
         $root = $this->makeRoot();
         $target = $root.'/target.json';
         @file_put_contents($target, json_encode(['ingress' => 5, 'egress' => 6]));
         $path = $root.'/state.json';
-        if (!@symlink($target, $path)) {
-            throw new SkipTest('symlink creation failed');
-        }
+        $this->pmssCreateSymlinkOrSkip($target, $path);
 
         \pmssTrafficIngressWriteState($path, ['ingress' => 123, 'egress' => 456]);
 

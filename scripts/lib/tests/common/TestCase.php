@@ -176,6 +176,32 @@ abstract class TestCase
         }
     }
 
+    /** Temporarily prepend a directory to PATH for a callback. */
+    protected function pmssWithPathPrefix(string $prefix, callable $callback): void
+    {
+        $originalPath = getenv('PATH');
+        $path = $prefix.(($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '');
+
+        $this->pmssWithEnv(['PATH' => $path], $callback);
+    }
+
+    /** Skip the current test when symlinks are unavailable. */
+    protected function pmssRequireSymlinkSupport(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+    }
+
+    /** Create a symlink or skip the current test when the platform blocks it. */
+    protected function pmssCreateSymlinkOrSkip(string $target, string $link): void
+    {
+        $this->pmssRequireSymlinkSupport();
+        if (!@symlink($target, $link)) {
+            throw new SkipTest('symlink creation failed');
+        }
+    }
+
     /** Resolve a repository-relative path from the development test tree. */
     protected function pmssRepoPath(string $relativePath): string
     {
