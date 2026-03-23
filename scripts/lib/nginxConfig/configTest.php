@@ -7,6 +7,20 @@
 
 require_once __DIR__.'/../runtime.php';
 
+/**
+ * Read an nginx helper command override without accepting blank values.
+ */
+function pmssCreateNginxConfigCommandFromEnv(string $envKey, string $default): string
+{
+    $command = getenv($envKey);
+    if (!is_string($command)) {
+        return $default;
+    }
+
+    $command = trim($command);
+    return $command !== '' ? $command : $default;
+}
+
 function pmssCreateNginxConfigLogFile(): string
 {
     return pmssLogDir().'/update.log';
@@ -25,22 +39,12 @@ function pmssCreateNginxConfigAppendLog(string $message): void
 
 function pmssCreateNginxConfigTestCommand(): string
 {
-    $command = getenv('PMSS_NGINX_CONFIG_TEST_COMMAND');
-    if (is_string($command) && $command !== '') {
-        return $command;
-    }
-
-    return 'nginx -t 2>&1';
+    return pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1');
 }
 
 function pmssCreateNginxRestartCommand(): string
 {
-    $command = getenv('PMSS_NGINX_RESTART_COMMAND');
-    if (is_string($command) && $command !== '') {
-        return $command;
-    }
-
-    return 'systemctl restart nginx || /etc/init.d/nginx restart';
+    return pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', 'systemctl restart nginx || /etc/init.d/nginx restart');
 }
 
 function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int

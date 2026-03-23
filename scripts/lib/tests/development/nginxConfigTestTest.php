@@ -124,6 +124,24 @@ class NginxConfigTestTest extends TestCase
         });
     }
 
+    public function testWhitespaceOnlyConfigTestCommandFallsBackToDefault(): void
+    {
+        $this->pmssWithEnv([
+            'PMSS_NGINX_CONFIG_TEST_COMMAND' => " \t ",
+        ], function (): void {
+            $this->assertEquals('nginx -t 2>&1', \pmssCreateNginxConfigTestCommand());
+        });
+    }
+
+    public function testWhitespaceOnlyRestartCommandFallsBackToDefault(): void
+    {
+        $this->pmssWithEnv([
+            'PMSS_NGINX_RESTART_COMMAND' => " \n ",
+        ], function (): void {
+            $this->assertEquals('systemctl restart nginx || /etc/init.d/nginx restart', \pmssCreateNginxRestartCommand());
+        });
+    }
+
     private function writeScript(string $name, string $body): void
     {
         $path = $this->tempDir.'/'.$name;
