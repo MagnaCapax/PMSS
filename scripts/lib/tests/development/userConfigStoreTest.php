@@ -378,6 +378,28 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testUsernameNormalizationStaysConsistentAcrossStoreOperations(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB' => 256,
+                'rtorrentPort' => 5000,
+                'quota' => 10,
+                'quotaBurst' => 12,
+            ];
+
+            $this->assertTrue($store->set(' Alice ', $payload));
+            $this->assertTrue(is_array($store->get('ALICE')));
+            $this->assertEquals(true, \pmssUserDockerEnabled(' alice ', $store));
+            $this->assertTrue($store->remove(' alice '));
+            $this->assertEquals(null, $store->get('alice'));
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
+
     public function testInvalidUsernameRejected(): void
     {
         $this->setUpTempDir();

@@ -60,12 +60,11 @@ class UserConfigStore
 
     public function get(string $username): ?array
     {
-        $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
+        if (($username = $this->validatedUsername($username)) === null) {
             return null;
         }
 
-        $payload = $this->readJsonFile($this->userFilePath($username));
+        $payload = $this->readJsonFile($this->userDir.'/'.$username.'.json');
         if (!is_array($payload) && isset(($legacy = $this->loadLegacyAggregateMap())[$username]) && is_array($legacy[$username])) {
             $payload = $legacy[$username];
         }
@@ -75,30 +74,28 @@ class UserConfigStore
 
     public function set(string $username, array $payload): bool
     {
-        $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
+        if (($username = $this->validatedUsername($username)) === null) {
             return false;
         }
 
         $payload = $this->normalise($payload);
-        foreach (['ramMiB', 'rtorrentPort', 'quota', 'quotaBurst'] as $key) {
+        foreach (UserValidator::REQUIRED_FIELDS as $key) {
             if (!array_key_exists($key, $payload) || !is_numeric($payload[$key])) {
                 error_log('UserConfigStore: refusing to write invalid payload for '.$username);
                 return false;
             }
         }
 
-        $path = $this->userFilePath($username);
+        $path = $this->userDir.'/'.$username.'.json';
         return $this->writeJsonFileAtomic($path, $payload, 0640, 'root', 'root');
     }
 
     public function remove(string $username): bool
     {
-        $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
+        if (($username = $this->validatedUsername($username)) === null) {
             return false;
         }
-        $path = $this->userFilePath($username);
+        $path = $this->userDir.'/'.$username.'.json';
         return !is_file($path) || is_link($path) || @unlink($path);
     }
 
@@ -125,9 +122,10 @@ class UserConfigStore
 
     public function setSuspended(string $username, bool $suspended): bool
     {
-        $username = pmssNormalizeUsername($username);
-        $payload = $this->get($username);
-        if (!is_array($payload)) {
+        if (($username = $this->validatedUsername($username)) === null) {
+            return false;
+        }
+        if (!is_array($payload = $this->get($username))) {
             return false;
         }
         $payload['suspended'] = $suspended;
@@ -140,21 +138,22 @@ class UserConfigStore
 
     public function applyFallbacks(string $username, array $payload): array
     {
-        $username = pmssNormalizeUsername($username);
+        $username = $this->validatedUsername($username);
         $payload = $this->normalise($payload);
-        if (empty($payload['ramMiB'])) {
-            $payload['ramMiB'] = $this->resolveRamMiB($username);
-        }
-        if (empty($payload['billingId'])) {
-            $payload['billingId'] = $this->readBillingId($username);
+        if ($username !== null) {
+            if (empty($payload['ramMiB'])) {
+                $payload['ramMiB'] = $this->resolveRamMiB($username);
+            }
+            if (empty($payload['billingId'])) {
+                $payload['billingId'] = $this->readBillingId($username);
+            }
         }
         return $this->normalise($payload);
     }
 
     public function writeUserCache(string $username, array $payload): void
     {
-        $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
+        if (($username = $this->validatedUsername($username)) === null) {
             return;
         }
         $home = "/home/{$username}";
@@ -181,17 +180,13 @@ class UserConfigStore
      */
     public function resolveRamMiB(string $username): int
     {
-        $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
-            return 0;
-        }
-
-        return $this->resolveRamMiBFromSystemdSlice($username);
+        return ($username = $this->validatedUsername($username)) === null ? 0 : $this->resolveRamMiBFromSystemdSlice($username);
     }
 
-    private function userFilePath(string $username): string
+    private function validatedUsername(string $username): ?string
     {
-        return $this->userDir.'/'.$username.'.json';
+        $username = pmssNormalizeUsername($username);
+        return UserValidator::isValidUsername($username) ? $username : null;
     }
 
     private function loadFromUserDir(): array
