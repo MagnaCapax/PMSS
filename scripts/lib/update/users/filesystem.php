@@ -9,9 +9,10 @@
  */
 
 /**
- * Apply skeleton file refreshes and tenant-side compatibility patches.
+ * Apply a text patch to a writable tenant file when it exists.
  *
- * @param array $ctx Per-user context from pmssBuildUserContext().
+ * @param string   $path    Writable file path in the tenant home.
+ * @param callable $patcher Content transformer that returns updated text.
  */
 function pmssUserPatchWritableFile(string $path, callable $patcher): void
 {
