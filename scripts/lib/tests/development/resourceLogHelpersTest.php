@@ -54,14 +54,14 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testEnsureDirRejectsRelative(): void
     {
-        $this->assertTrue(!\pmssResourceLogEnsureDir('relative/path', 0700));
+        $this->assertTrue(!\pmssEnsureSafeDir('relative/path', 0700));
     }
 
     public function testEnsureDirCreatesDirectory(): void
     {
         $root = $this->makeRoot();
         $path = $root.'/state';
-        $this->assertTrue(\pmssResourceLogEnsureDir($path, 0700));
+        $this->assertTrue(\pmssEnsureSafeDir($path, 0700));
         $this->assertTrue(is_dir($path));
     }
 
@@ -72,7 +72,7 @@ class ResourceLogHelpersTest extends TestCase
         @mkdir($target, 0700, true);
         $link = $root.'/link';
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        $this->assertTrue(!\pmssResourceLogEnsureDir($link, 0700));
+        $this->assertTrue(!\pmssEnsureSafeDir($link, 0700));
     }
 
     public function testEnsureDirRejectsSymlinkedParentDirectory(): void
@@ -84,7 +84,7 @@ class ResourceLogHelpersTest extends TestCase
         $symlinkedParent = $root.'/state';
         $this->pmssCreateSymlinkOrSkip($target, $symlinkedParent);
 
-        $this->assertTrue(!\pmssResourceLogEnsureDir($symlinkedParent.'/daily', 0700));
+        $this->assertTrue(!\pmssEnsureSafeDir($symlinkedParent.'/daily', 0700));
         $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
     }
 

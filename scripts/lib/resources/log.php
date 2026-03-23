@@ -34,22 +34,6 @@ function pmssResourceLogIsValidUser(string $user): bool
 }
 
 /**
- * Ensure a directory exists and is safe for resource logging.
- */
-function pmssResourceLogEnsureDir(string $path, int $mode): bool
-{
-    return pmssEnsureSafeDir($path, $mode);
-}
-
-/**
- * Reject symlinked path segments before resource logging touches the filesystem.
- */
-function pmssResourceLogPathIsSafe(string $path, bool $directoryTarget): bool
-{
-    return pmssPathTargetIsSafe($path, $directoryTarget);
-}
-
-/**
  * Read systemd slice counters for the given user.
  */
 function pmssResourceLogReadCounters(int $uid): ?array
@@ -118,7 +102,7 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
  */
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
-    $pathIsSafe = pmssResourceLogPathIsSafe($statePath, false);
+    $pathIsSafe = pmssPathTargetIsSafe($statePath, false);
     $handle = $pathIsSafe ? @fopen($statePath, 'c+') : false;
     $locked = $handle !== false && @flock($handle, LOCK_EX);
     $previousState = $locked && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))

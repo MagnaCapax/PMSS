@@ -11,7 +11,7 @@ require_once '/scripts/lib/resources/log.php';
 $logDir = '/var/log/pmss/resources';
 $stateDir = '/var/run/pmss/resources';
 
-if (!pmssResourceLogEnsureDir($logDir, 0755) || !pmssResourceLogEnsureDir($stateDir, 0700)) {
+if (!pmssEnsureSafeDir($logDir, 0755) || !pmssEnsureSafeDir($stateDir, 0700)) {
     fwrite(STDERR, "Failed to prepare resource log directories.\n");
     exit(1);
 }
