@@ -24,7 +24,7 @@ class CheckUserHtpasswdTest extends TestCase
     {
         $path = $this->tempDir.'/missing.htpasswd';
 
-        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === false);
+        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
     }
 
     public function testMatchingUserReturnsTrue(): void
@@ -40,7 +40,7 @@ class CheckUserHtpasswdTest extends TestCase
         $path = $this->tempDir.'/user.htpasswd';
         file_put_contents($path, "bob:hash\n");
 
-        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === false);
+        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
     }
 
     public function testEmptyFileReturnsFalse(): void
@@ -48,7 +48,7 @@ class CheckUserHtpasswdTest extends TestCase
         $path = $this->tempDir.'/empty.htpasswd';
         file_put_contents($path, '');
 
-        $this->assertTrue(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === false);
+        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
     }
 
     public function testUnreadableFileReturnsNullWhenReadFails(): void

@@ -9,9 +9,9 @@ class UserValidatorTest extends TestCase
     {
         $this->assertTrue(\UserValidator::isValidUsername('alice_01'));
         $this->assertTrue(\UserValidator::isValidUsername('bob-02'));
-        $this->assertTrue(!\UserValidator::isValidUsername('Admin'));
-        $this->assertTrue(!\UserValidator::isValidUsername('bad user'));
-        $this->assertTrue(!\UserValidator::isValidUsername('evil!'));
+        $this->assertFalse(\UserValidator::isValidUsername('Admin'));
+        $this->assertFalse(\UserValidator::isValidUsername('bad user'));
+        $this->assertFalse(\UserValidator::isValidUsername('evil!'));
     }
 
     public function testValidatePayloadRequiresFields(): void
@@ -24,7 +24,7 @@ class UserValidatorTest extends TestCase
         ];
         $this->assertTrue(\UserValidator::validatePayload($valid));
         unset($valid['quotaBurst']);
-        $this->assertTrue(!\UserValidator::validatePayload($valid));
+        $this->assertFalse(\UserValidator::validatePayload($valid));
 
         $legacy = [
             'rtorrentRam'  => 128,

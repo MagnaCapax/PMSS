@@ -96,7 +96,7 @@ class UserConfigLighttpdLogicTest extends TestCase
 
     public function testShouldConfigureLighttpdSkipsNonExistingHome(): void
     {
-        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome('/tmp/pmss-nonexistent-home'));
+        $this->assertFalse(\pmssShouldConfigureLighttpdForHome('/tmp/pmss-nonexistent-home'));
     }
 
     public function testShouldConfigureLighttpdSkipsSuspendedUsers(): void
@@ -105,7 +105,7 @@ class UserConfigLighttpdLogicTest extends TestCase
         $home = $base.'/user';
         @mkdir($home.'/www-disabled', 0755, true);
 
-        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome($home));
+        $this->assertFalse(\pmssShouldConfigureLighttpdForHome($home));
     }
 
     public function testShouldConfigureLighttpdSkipsMissingWebRoot(): void
@@ -114,7 +114,7 @@ class UserConfigLighttpdLogicTest extends TestCase
         $home = $base.'/user';
         @mkdir($home, 0755, true);
 
-        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome($home));
+        $this->assertFalse(\pmssShouldConfigureLighttpdForHome($home));
     }
 
     public function testShouldConfigureLighttpdRequiresRtorrentConfig(): void
@@ -123,7 +123,7 @@ class UserConfigLighttpdLogicTest extends TestCase
         $home = $base.'/user';
         @mkdir($home.'/www', 0755, true);
 
-        $this->assertTrue(!\pmssShouldConfigureLighttpdForHome($home));
+        $this->assertFalse(\pmssShouldConfigureLighttpdForHome($home));
 
         // Add .rtorrent.rc and expect the helper to allow configuration.
         file_put_contents($home.'/.rtorrent.rc', "dummy");
@@ -147,8 +147,8 @@ $HTTP["url"] =~ "^/webdav-user($|/)" {
 LIGHTTPD;
 
         $stripped = \pmssStripLighttpdWebdavConfig($template);
-        $this->assertTrue(strpos($stripped, 'webdav.activate') === false);
-        $this->assertTrue(strpos($stripped, 'PMSS_WEBDAV_BEGIN') === false);
+        $this->assertFalse(strpos($stripped, 'webdav.activate') !== false);
+        $this->assertFalse(strpos($stripped, 'PMSS_WEBDAV_BEGIN') !== false);
         $this->assertTrue(strpos($stripped, 'mod_webdav') !== false);
         $this->assertTrue(strpos($stripped, '#"mod_webdav",') !== false);
     }
@@ -163,7 +163,7 @@ LIGHTTPD;
         symlink($realPath, $linkPath);
 
         try {
-            $this->assertTrue(!\pmssAtomicWriteFile($linkPath, 'updated'));
+            $this->assertFalse(\pmssAtomicWriteFile($linkPath, 'updated'));
             $this->assertEquals('original', file_get_contents($realPath));
         } finally {
             @unlink($linkPath);
@@ -176,11 +176,7 @@ LIGHTTPD;
     {
         $root = sys_get_temp_dir().'/pmss-lighttpd-write-'.uniqid('', true);
         $path = $root.'/custom.conf';
-        $owner = '';
-        if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
-            $ownerInfo = @posix_getpwuid(posix_geteuid());
-            $owner = is_array($ownerInfo) ? (string) ($ownerInfo['name'] ?? '') : '';
-        }
+        $owner = $this->pmssCurrentOwner();
         @mkdir($root, 0755, true);
 
         try {
@@ -198,11 +194,11 @@ LIGHTTPD;
         $src = $this->pmssReadRepoFile('scripts/util/userConfigLighttpd.php');
 
         $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';", $src);
-        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';") === false);
-        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';") === false);
-        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';") === false);
-        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';") === false);
-        $this->assertTrue(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';") === false);
+        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';") !== false);
+        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';") !== false);
+        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';") !== false);
+        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';") !== false);
+        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';") !== false);
     }
 
     public function testUserConfigApplyOwnsPhpIniMemoryLimitUpdate(): void

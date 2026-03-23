@@ -18,24 +18,12 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->pmssRemoveTree($this->tempDir);
     }
 
-    private function currentOwner(): string
-    {
-        if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
-            $ownerInfo = @posix_getpwuid(posix_geteuid());
-            if (is_array($ownerInfo) && isset($ownerInfo['name'])) {
-                return (string) $ownerInfo['name'];
-            }
-        }
-
-        return '';
-    }
-
     public function testAppendUserFileWritesNewFile(): void
     {
         $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
         @mkdir(dirname($path), 0755, true);
 
-        $this->assertTrue(\pmssAppendUserFile($path, "user:hash\n", $this->currentOwner(), 0640));
+        $this->assertTrue(\pmssAppendUserFile($path, "user:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertEquals("user:hash\n", file_get_contents($path));
         $this->assertEquals(0640, fileperms($path) & 0777);
     }
@@ -46,7 +34,7 @@ class LighttpdUserFileWriteTest extends TestCase
         @mkdir(dirname($path), 0755, true);
         file_put_contents($path, "first:hash\n");
 
-        $this->assertTrue(\pmssAppendUserFile($path, "second:hash\n", $this->currentOwner(), 0640));
+        $this->assertTrue(\pmssAppendUserFile($path, "second:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertEquals("first:hash\nsecond:hash\n", file_get_contents($path));
     }
 
@@ -57,7 +45,7 @@ class LighttpdUserFileWriteTest extends TestCase
         file_put_contents($realPath, "user:hash\n");
         symlink($realPath, $linkPath);
 
-        $this->assertTrue(!\pmssAppendUserFile($linkPath, "other:hash\n", $this->currentOwner(), 0640));
+        $this->assertFalse(\pmssAppendUserFile($linkPath, "other:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertEquals("user:hash\n", file_get_contents($realPath));
     }
 
@@ -65,14 +53,14 @@ class LighttpdUserFileWriteTest extends TestCase
     {
         $path = $this->tempDir.'/missing/.lighttpd/.htpasswd';
 
-        $this->assertTrue(!\pmssAppendUserFile($path, "user:hash\n", $this->currentOwner(), 0640));
-        $this->assertTrue(!file_exists($path));
+        $this->assertFalse(\pmssAppendUserFile($path, "user:hash\n", $this->pmssCurrentOwner(), 0640));
+        $this->assertFalse(file_exists($path));
     }
 
     public function testAppendUserFileRejectsRelativePath(): void
     {
-        $this->assertTrue(!\pmssAppendUserFile('relative.htpasswd', "user:hash\n", $this->currentOwner(), 0640));
-        $this->assertTrue(!file_exists('relative.htpasswd'));
+        $this->assertFalse(\pmssAppendUserFile('relative.htpasswd', "user:hash\n", $this->pmssCurrentOwner(), 0640));
+        $this->assertFalse(file_exists('relative.htpasswd'));
     }
 
     public function testWriteUserFileRejectsSymlinkedParentDirectory(): void
@@ -82,13 +70,13 @@ class LighttpdUserFileWriteTest extends TestCase
         @mkdir($realDir, 0755, true);
         symlink($realDir, $linkDir);
 
-        $this->assertTrue(!\pmssWriteUserFile($linkDir.'/.htpasswd', "user:hash\n", $this->currentOwner(), 0640));
+        $this->assertFalse(\pmssWriteUserFile($linkDir.'/.htpasswd', "user:hash\n", $this->pmssCurrentOwner(), 0640));
     }
 
     public function testWriteUserFileRejectsRelativePath(): void
     {
-        $this->assertTrue(!\pmssWriteUserFile('relative.htpasswd', "user:hash\n", $this->currentOwner(), 0640));
-        $this->assertTrue(!file_exists('relative.htpasswd'));
+        $this->assertFalse(\pmssWriteUserFile('relative.htpasswd', "user:hash\n", $this->pmssCurrentOwner(), 0640));
+        $this->assertFalse(file_exists('relative.htpasswd'));
     }
 
     public function testReplaceUserFileCleansTempFileWhenPrepareTempThrows(): void
@@ -112,7 +100,7 @@ class LighttpdUserFileWriteTest extends TestCase
         $after = is_array($after) ? $after : [];
 
         $this->assertEquals($before, $after);
-        $this->assertTrue(!file_exists($path));
+        $this->assertFalse(file_exists($path));
     }
 
     public function testReplaceUserFileRejectsPrepareTempSymlinkSwap(): void
@@ -122,12 +110,12 @@ class LighttpdUserFileWriteTest extends TestCase
         @mkdir(dirname($path), 0755, true);
         file_put_contents($outsidePath, "outside:hash\n");
 
-        $this->assertTrue(!\pmssReplaceUserFile($path, "user:hash\n", static function (string $tmp) use ($outsidePath): void {
+        $this->assertFalse(\pmssReplaceUserFile($path, "user:hash\n", static function (string $tmp) use ($outsidePath): void {
             @unlink($tmp);
             symlink($outsidePath, $tmp);
         }));
 
-        $this->assertTrue(!file_exists($path));
+        $this->assertFalse(file_exists($path));
         $this->assertEquals("outside:hash\n", file_get_contents($outsidePath));
     }
 
@@ -137,6 +125,6 @@ class LighttpdUserFileWriteTest extends TestCase
 
         $this->assertStringContainsString('pmssAppendUserFile(', $src);
         $this->assertStringContainsString('Unable to append legacy credential to per-user htpasswd', $src);
-        $this->assertTrue(strpos($src, 'file_put_contents($userHtpasswd') === false);
+        $this->assertFalse(strpos($src, 'file_put_contents($userHtpasswd') !== false);
     }
 }

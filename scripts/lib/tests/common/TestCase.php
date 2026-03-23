@@ -86,6 +86,11 @@ abstract class TestCase
         }
     }
 
+    protected function assertFalse(bool $condition, string $message = ''): void
+    {
+        $this->assertTrue(!$condition, $message !== '' ? $message : 'Assertion failed: expected false');
+    }
+
     protected function assertEquals($expected, $actual, string $message = ''): void
     {
         if ($expected != $actual) {
@@ -186,6 +191,16 @@ abstract class TestCase
 
         $this->tempPaths[] = $path;
         return $path;
+    }
+
+    /** Return the current process owner name when POSIX account lookups are available. */
+    protected function pmssCurrentOwner(): string
+    {
+        if (!function_exists('posix_geteuid') || !function_exists('posix_getpwuid')) {
+            return '';
+        }
+        $ownerInfo = @posix_getpwuid(posix_geteuid());
+        return is_array($ownerInfo) && isset($ownerInfo['name']) ? (string) $ownerInfo['name'] : '';
     }
 
     /** Remove a temporary directory tree created during tests. */

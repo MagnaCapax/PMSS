@@ -88,7 +88,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
 
         $this->assertEquals('new', file_get_contents($target));
         $leftovers = glob(dirname($target).'/pmss-userfile-*');
-        $this->assertTrue($leftovers === false || count($leftovers) === 0);
+        $this->assertFalse(is_array($leftovers) && count($leftovers) !== 0);
     }
 
     public function testSkipsWhenHomeMissing(): void
@@ -99,7 +99,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $target = $this->homeRoot.'/'.$this->user.'/'.$relative;
         \updateUserFile($relative, $this->user);
 
-        $this->assertTrue(!file_exists($target));
+        $this->assertFalse(file_exists($target));
     }
 
     public function testSkipsWhenTargetIsDirectory(): void
