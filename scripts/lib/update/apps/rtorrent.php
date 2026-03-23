@@ -56,7 +56,7 @@ if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
     return;
 }
 
-$dryRun = getenv('PMSS_DRY_RUN') === '1';
+$dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $log = 'logmsg';
 
 $rtorrentVersion = shell_exec('rtorrent -h');

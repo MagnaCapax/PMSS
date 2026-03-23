@@ -27,7 +27,7 @@ foreach ([
 }
 
 if (!is_file($cliBin)) {
-    if (getenv('PMSS_DRY_RUN') !== '1') logmsg('[WARN] FlexGet binary missing after install');
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) logmsg('[WARN] FlexGet binary missing after install');
     return;
 }
 

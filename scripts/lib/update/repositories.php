@@ -18,7 +18,7 @@ require_once __DIR__.'/runtime/commands.php';
      */
     function pmssEnsureMediaareaRepository(): void
     {
-        $dryRun = getenv('PMSS_DRY_RUN') === '1';
+        $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 
         // Remove legacy MediaArea list files; they now conflict with sources.list.
         foreach (['/etc/apt/sources.list.d/mediaarea.list', '/etc/apt/sources.list.d/mediaarea.sources'] as $target) {
@@ -112,7 +112,7 @@ require_once __DIR__.'/runtime/commands.php';
      */
     function pmssEnsureSonarrKey(): void
     {
-        $dryRun = getenv('PMSS_DRY_RUN') === '1';
+        $dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
         $keyringDir = pmssResolvePathFromEnv('PMSS_APT_KEYRING_DIR', '/etc/apt/keyrings');
         $keyPath = pmssResolvePathFromEnv('PMSS_APT_SONARR_KEY_PATH', $keyringDir.'/sonarr.gpg');
         $legacyKeyPath = pmssResolvePathFromEnv('PMSS_APT_SONARR_LEGACY_KEY_PATH', '/etc/apt/trusted.gpg.d/sonarr.gpg');

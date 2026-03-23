@@ -291,7 +291,7 @@ if (getenv('PMSS_DELUGE_NO_ENTRYPOINT') === '1') {
 $delugeTarballUrl = 'https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz';
 $delugeTarballSha256 = 'c4bd04abfd211b65218be03f3c46d26f44024884de10e01859fb856fdd6f25d8';
 $delugeTarballLabel = 'Deluge 2.0.5 source tarball';
-$dryRun = getenv('PMSS_DRY_RUN') === '1';
+$dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $log = 'logmsg';
 if (empty($debianVersion)) $debianVersion = (string) @file_get_contents('/etc/debian_version');
 

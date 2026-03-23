@@ -35,7 +35,7 @@ function pmssDownloadPinnedRemoteTempFile(
         @unlink($tmp);
         return null;
     }
-    if (getenv('PMSS_DRY_RUN') === '1') {
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
         return $tmp;
     }
 
@@ -62,7 +62,7 @@ function pmssFetchPinnedRemoteFile(string $label, string $url, string $expectedS
     if ($tmp === null) {
         return null;
     }
-    if (getenv('PMSS_DRY_RUN') === '1') {
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
         @unlink($tmp);
         return null;
     }
@@ -117,7 +117,7 @@ function pmssInstallPinnedRemoteDebPackage(string $label, string $url, string $e
     }
 
     try {
-        return getenv('PMSS_DRY_RUN') === '1'
+        return pmssEnvFlagEnabled('PMSS_DRY_RUN')
             || runStep("Installing {$label}", pmssBuildCommand('dpkg', ['-i', $tmp])) === 0;
     } finally {
         @unlink($tmp);

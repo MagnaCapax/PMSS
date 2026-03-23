@@ -12,6 +12,7 @@
 
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
+require_once __DIR__.'/runtime/processes.php';
 require_once __DIR__.'/../runtime.php';
 
 /**
@@ -299,12 +300,8 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
         $log('Installed '.$label.' at '.$path);
     }
 
-    if (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) {
-        pmssLogStatus('SKIP', 'Enabling PMSS boot tuning service (test/dry-run)');
-        return;
-    }
-    if (!is_dir('/run/systemd/system')) {
-        pmssLogStatus('SKIP', 'Enabling PMSS boot tuning service (systemd unavailable)');
+    if (($skipReason = pmssSystemdActionSkipReason(null, true, true)) !== '') {
+        pmssLogStatus('SKIP', 'Enabling PMSS boot tuning service ('.$skipReason.')');
         return;
     }
 

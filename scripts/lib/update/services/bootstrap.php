@@ -101,7 +101,7 @@ function pmssEnsureAuthorizedKeysDirective(): void
 {
     // #TODO Add tests for directive insertion to ensure idempotence and
     //       safe in-place updates of sshd_config.
-    if (getenv('PMSS_DRY_RUN') === '1') {
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
         logMessage('[SKIP] PMSS_DRY_RUN: skipping sshd AuthorizedKeysFile directive enforcement');
         return;
     }

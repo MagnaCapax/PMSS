@@ -243,7 +243,7 @@ pmssRunProfiledCallable('Running update-step2 preflight checks', static function
     }
 
     // Basic network reachability (warn only; skip in dry-run/test mode)
-    if (getenv('PMSS_DRY_RUN') !== '1' && getenv('PMSS_TEST_MODE') !== '1') {
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssEnvFlagEnabled('PMSS_TEST_MODE')) {
         $sock = @fsockopen('deb.debian.org', 80, $errno, $errstr, 3.0);
         if ($sock === false) {
             pmssLogJson(['event' => 'preflight_error', 'check' => 'network', 'status' => 'warn', 'reason' => 'unreachable', 'host' => 'deb.debian.org', 'errno' => $errno, 'error' => $errstr]);
@@ -269,7 +269,7 @@ register_shutdown_function(function () use (&$pmssRootCronRestored): void {
     if ($pmssRootCronRestored) {
         return;
     }
-    if (getenv('PMSS_DRY_RUN') === '1') {
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
         return;
     }
     $helper = '/scripts/util/setupRootCron.php';

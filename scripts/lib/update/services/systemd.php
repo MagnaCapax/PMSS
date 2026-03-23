@@ -22,11 +22,7 @@ require_once __DIR__.'/../runtime/processes.php';
 function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask): void
 {
     $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'] + ($mask ? ['mask' => 'Masking'] : []);
-    $skipReason = getenv('PMSS_DRY_RUN') !== '1' && !is_dir('/run/systemd/system')
-        ? 'systemd unavailable'
-        : (getenv('PMSS_DRY_RUN') !== '1' && !pmssSystemdUnitExists($unit) ? 'unit '.$unit.' missing' : '');
-
-    if ($skipReason !== '') {
+    if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') {
         foreach ($actions as $prefix) {
             pmssLogStatus('SKIP', $prefix.' '.$label.' system service ('.$skipReason.')');
         }
@@ -47,7 +43,7 @@ function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask)
  */
 function pmssEnsureSystemdServicesGuardBootUnit(): void
 {
-    if (getenv('PMSS_DRY_RUN') !== '1' && !is_dir('/run/systemd/system')) {
+    if (($skipReason = pmssSystemdActionSkipReason()) !== '') {
         pmssLogStatus('SKIP', 'Installing PMSS boot-time systemd services guard unit (systemd unavailable)');
         return;
     }
@@ -143,7 +139,7 @@ function pmssStopDisableMaskSeedboxSystemServices(): void
 function pmssPurgeFailedUnbound(): void
 {
     // Skip if systemd is not available (containers, very old systems)
-    if (getenv('PMSS_DRY_RUN') !== '1' && !is_dir('/run/systemd/system')) {
+    if (($skipReason = pmssSystemdActionSkipReason()) !== '') {
         pmssLogStatus('SKIP', 'Checking unbound service status (systemd unavailable)');
         return;
     }

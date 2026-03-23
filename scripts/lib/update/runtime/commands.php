@@ -10,6 +10,8 @@ require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/profile.php';
 require_once __DIR__.'/../../runtime.php';
 
+function pmssEnvFlagEnabled(string $envKey): bool { return getenv($envKey) === '1'; }
+
 /**
  * Execute a shell command, keeping failures soft.
  *
@@ -18,7 +20,7 @@ require_once __DIR__.'/../../runtime.php';
  */
 function runStep(string $description, string $command): int
 {
-    $dryRun  = getenv('PMSS_DRY_RUN') === '1';
+    $dryRun  = pmssEnvFlagEnabled('PMSS_DRY_RUN');
     $started = microtime(true);
     $isTty   = pmssStreamIsTty(STDOUT);
     $cReset  = "\033[0m";

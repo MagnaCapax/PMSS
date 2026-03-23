@@ -8,6 +8,14 @@
 
 require_once __DIR__.'/commands.php';
 
+function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
+{
+    if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) return 'test/dry-run';
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !is_dir('/run/systemd/system')) return 'systemd unavailable';
+    if ($unit !== null && !pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssSystemdUnitExists($unit)) return 'unit '.$unit.' missing';
+    return '';
+}
+
 /**
  * True when systemd knows about the requested unit.
  */
@@ -38,8 +46,7 @@ function pmssSystemdUnitExists(string $unit): bool
  */
 function pmssSystemdUnitActionIfPresent(string $unit, string $description, string $action): void
 {
-    if (!is_dir('/run/systemd/system')) { logmsg("[SKIP] {$description} (systemd unavailable)"); return; }
-    if (!pmssSystemdUnitExists($unit)) { logmsg("[SKIP] {$description} (unit {$unit} missing)"); return; }
+    if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') { logmsg("[SKIP] {$description} ({$skipReason})"); return; }
     runStep($description, 'systemctl '.$action.' '.escapeshellarg(
         $action === 'enable' && !preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit)
             ? $unit.'.service'

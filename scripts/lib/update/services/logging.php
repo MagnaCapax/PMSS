@@ -15,14 +15,9 @@
 
 require_once __DIR__.'/../logging.php';
 require_once __DIR__.'/../runtime/commands.php';
+require_once __DIR__.'/../runtime/processes.php';
 require_once __DIR__.'/../../runtime.php';
 require_once __DIR__.'/../../lighttpd/userFileWrite.php';
-
-function pmssLoggingRestartSkipReason(): string
-{
-    if (getenv('PMSS_DRY_RUN') === '1' || (defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) { return 'test/dry-run'; }
-    return is_dir('/run/systemd/system') ? '' : 'systemd unavailable';
-}
 
 function pmssWriteManagedConfigFile(string $target, string $contents, string $label, callable $logger): bool
 {
@@ -130,7 +125,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         $policy['rate_limit_burst']
     ));
 
-    $skipReason = pmssLoggingRestartSkipReason();
+    $skipReason = pmssSystemdActionSkipReason(null, true, true);
     if ($skipReason !== '') { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps ('.$skipReason.')'); return; }
     runStep('Restarting systemd-journald to apply log caps', 'systemctl restart systemd-journald');
 }
@@ -149,7 +144,7 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
     $template = $cfgDir.'/template.rsyslog-remote.conf';
     $targetDir = pmssResolvePathFromEnv('PMSS_RSYSLOG_CONF_DIR', '/etc/rsyslog.d');
     $target = $targetDir.'/50-pmss-remote.conf';
-    $skipRestartReason = pmssLoggingRestartSkipReason();
+    $skipRestartReason = pmssSystemdActionSkipReason(null, true, true);
     $skipRestart = $skipRestartReason !== '';
 
     if (!is_file($loggingConf)) {

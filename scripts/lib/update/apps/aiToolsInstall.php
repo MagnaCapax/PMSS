@@ -14,7 +14,7 @@ require_once __DIR__.'/../runtime/commands.php';
 
 $logger = 'logmsg';
 $force = getenv('PMSS_FORCE_AI_TOOLS_REFRESH') === '1';
-$dryRun = getenv('PMSS_DRY_RUN') === '1';
+$dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $architecture = php_uname('m');
 $supportsPinnedArtifacts = in_array($architecture, ['x86_64', 'amd64'], true);
 
