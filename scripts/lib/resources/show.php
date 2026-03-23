@@ -7,23 +7,8 @@
  */
 
 require_once __DIR__.'/log.php';
+require_once __DIR__.'/accumulator.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
-
-/** @return string[] */
-function pmssResourceMetricNames(): array
-{
-    return ['io_read', 'io_write', 'cpu', 'ram_hours', 'io_read_ops', 'io_write_ops'];
-}
-
-function pmssResourceWindowNames(): array
-{
-    return ['month', 'week', 'day', 'hour'];
-}
-
-function pmssResourceMetricIsOptional(string $metric): bool
-{
-    return substr($metric, -4) === '_ops';
-}
 
 function pmssResourceSummaryFromData(array $data): array
 {
@@ -40,7 +25,7 @@ function pmssResourcePayloadFromSource(array $source): array
         'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
         'tasks' => ['current' => $source['tasks_current']],
     ];
-    foreach (pmssResourceMetricNames() as $metric) {
+    foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
         $payload[$metric] = $source[$metric];
     }
     return $payload;
@@ -54,8 +39,8 @@ function pmssResourcePayloadFromSource(array $source): array
 function pmssResourceBuildReport(string $statsDir, array $users): array
 {
     $missingStats = $rows = [];
-    $windows = pmssResourceWindowNames();
-    $metrics = pmssResourceMetricNames();
+    $windows = ['month', 'week', 'day', 'hour'];
+    $metrics = ResourceStatsAccumulator::RAW_METRICS;
     $windowZeros = array_fill_keys($windows, 0.0);
     $totals = array_fill_keys($metrics, $windowZeros) + array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
 
@@ -73,7 +58,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $metricValues = $windowZeros;
             foreach ($windows as $label) {
                 $value = $rawMetric[$label] ?? null;
-                if ($value === null && !pmssResourceMetricIsOptional($metric)) {
+                if ($value === null && substr($metric, -4) !== '_ops') {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }

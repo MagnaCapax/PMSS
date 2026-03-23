@@ -123,7 +123,7 @@ class ResourceStatsProcessor
             'memory' => $results['memory'],
             'tasks' => $results['tasks'],
         ];
-        foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks', 'ram_hours'] as $metric) {
+        foreach (array_merge(ResourceStatsAccumulator::RAW_METRICS, ['memory', 'tasks']) as $metric) {
             $data[$metric] = [
                 'raw' => $metricData[$metric],
                 'display' => $this->formatMetricDisplay($metric, $metricData[$metric]),

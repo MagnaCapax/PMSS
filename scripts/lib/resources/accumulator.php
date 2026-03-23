@@ -8,7 +8,7 @@
 
 class ResourceStatsAccumulator
 {
-    private const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
+    public const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
 
     /** @var array */
     private $compareTimes;
