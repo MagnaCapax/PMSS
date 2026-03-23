@@ -14,7 +14,7 @@ require_once __DIR__.'/../logging.php';
 /**
  * Ensure a Python 3 venv exists at $venvDir with pip usable and upgraded.
  *
- * Returns ['python' => <path>, 'pip' => <path>] on success or an empty array on failure.
+ * Returns the venv python path on success or an empty string on failure.
  * Uses runStep() so PMSS_DRY_RUN is honoured; failures are logged and soft.
  */
 function pmssPythonVenvEnsure(
@@ -22,26 +22,22 @@ function pmssPythonVenvEnsure(
     string $label,
     ?callable $logger = null,
     ?string $missingPythonMessage = null
-): array
+): string
 {
     $log = $logger ?: 'logMessage';
-
     $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
     if ($python === '') {
         $log($missingPythonMessage !== null ? $missingPythonMessage : '[WARN] Skipping '.$label.' setup: python3 missing');
-        return [];
+        return '';
     }
-
     if (!is_dir($venvDir)) {
         runStep('Creating '.$label.' virtualenv', sprintf('%s -m venv %s', escapeshellarg($python), escapeshellarg($venvDir)));
     }
 
     $pythonBin = rtrim($venvDir, '/').'/bin/python';
-    $pipBin    = rtrim($venvDir, '/').'/bin/pip';
-
     if (!is_file($pythonBin)) {
         $log('[WARN] '.$label.' virtualenv missing python binary after creation');
-        return [];
+        return '';
     }
 
     // Determine if pip is actually importable, not just if a script exists.
@@ -59,10 +55,38 @@ function pmssPythonVenvEnsure(
         $log('[ERR] '.$label.' virtualenv missing pip after ensurepip; ensure python3-venv is installed and rerun update');
         // List venv bin dir to aid debugging.
         @runStep('Debug '.$label.' venv bin listing', sprintf('ls -la %s || true', escapeshellarg(dirname($pythonBin))));
-        return [];
+        return '';
     }
 
     runStep('Upgrading '.$label.' virtualenv tooling', sprintf('%s -m pip install --upgrade pip setuptools wheel', escapeshellarg($pythonBin)));
+    return $pythonBin;
+}
 
-    return ['python' => $pythonBin, 'pip' => $pipBin];
+/** Install Python packages into an ensured venv and link the exposed CLI. */
+function pmssPythonVenvInstallCli(
+    string $venvDir,
+    string $label,
+    array $installSteps,
+    string $cliBin,
+    string $linkPath,
+    string $missingPythonMessage,
+    string $missingCliMessage,
+    ?callable $logger = null
+): void {
+    $log = $logger ?: 'logmsg';
+    $venvPython = pmssPythonVenvEnsure($venvDir, $label, $log, $missingPythonMessage);
+    if ($venvPython === '') {
+        return;
+    }
+    $venvPython = escapeshellarg($venvPython);
+    foreach ($installSteps as $installStep) {
+        runStep($installStep[0], sprintf('%s -m pip install --upgrade %s', $venvPython, $installStep[1]));
+    }
+    if (!is_file($cliBin)) {
+        if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) $log($missingCliMessage);
+        return;
+    }
+    if (!is_link($linkPath) || readlink($linkPath) !== $cliBin) {
+        runStep('Linking '.$label.' CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg($linkPath)));
+    }
 }

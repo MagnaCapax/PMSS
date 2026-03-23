@@ -21,15 +21,15 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->assertStringContainsString("getenv('PMSS_DISTRO_VERSION')", $contents);
         $this->assertStringContainsString('Skipping pyLoad setup: unsupported Debian release', $contents);
         $this->assertStringContainsString('Skipping pyLoad setup: python3 missing from PATH', $contents);
-        $this->assertStringContainsString("pmssPythonVenvEnsure(\$venvDir, 'pyLoad', 'logmsg', '[WARN] Skipping pyLoad setup: python3 missing from PATH')", $contents);
+        $this->assertStringContainsString('pmssPythonVenvInstallCli(', $contents);
+        $this->assertStringContainsString("'pyLoad'", $contents);
     }
 
     public function testPyloadKeepsInstallAndLinkSteps(): void
     {
         $contents = $this->readInstaller('pyload.php');
 
-        $this->assertStringContainsString("runStep('Installing pyLoad (pyload-ng)'", $contents);
-        $this->assertStringContainsString("runStep('Linking pyLoad CLI'", $contents);
+        $this->assertStringContainsString("['Installing pyLoad (pyload-ng)', 'pyload-ng']", $contents);
         $this->assertStringContainsString('/usr/local/bin/pyload', $contents);
         $this->assertStringContainsString('pyLoad binary missing after install', $contents);
     }
@@ -40,7 +40,8 @@ class UpdateAppInstallerContractsTest extends TestCase
 
         $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
         $this->assertStringContainsString('Skipping FlexGet install: python3 missing from PATH', $contents);
-        $this->assertStringContainsString("pmssPythonVenvEnsure(\$venvDir, 'FlexGet', 'logmsg', '[WARN] Skipping FlexGet install: python3 missing from PATH')", $contents);
+        $this->assertStringContainsString('pmssPythonVenvInstallCli(', $contents);
+        $this->assertStringContainsString("'FlexGet'", $contents);
         $this->assertStringContainsString('FlexGet binary missing after install', $contents);
     }
 
@@ -51,7 +52,6 @@ class UpdateAppInstallerContractsTest extends TestCase
         foreach (['Installing gdrivefs in FlexGet venv', 'Installing FlexGet dependencies', 'Installing FlexGet', 'Installing youtube-dl for FlexGet'] as $stepLabel) {
             $this->assertStringContainsString($stepLabel, $contents);
         }
-        $this->assertStringContainsString("runStep('Linking FlexGet CLI'", $contents);
         $this->assertStringContainsString('/usr/local/bin/flexget', $contents);
     }
 

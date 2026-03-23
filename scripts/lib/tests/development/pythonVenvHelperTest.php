@@ -6,6 +6,29 @@ require_once dirname(__DIR__, 2).'/update/apps/pythonVenv.php';
 
 class PythonVenvHelperTest extends TestCase
 {
+    private function makePythonPath(): string
+    {
+        $stubPath = $this->pmssMakeExecutableStub(
+            'python3',
+            "#!/bin/sh\nexit 0\n",
+            'pmss-python-path-'
+        );
+
+        $systemPath = getenv('PATH');
+        if (!is_string($systemPath) || $systemPath === '') {
+            return $stubPath;
+        }
+
+        return $stubPath.':'.$systemPath;
+    }
+
+    private function makeVenvPython(string $venvDir): void
+    {
+        @mkdir($venvDir.'/bin', 0755, true);
+        file_put_contents($venvDir.'/bin/python', "#!/bin/sh\nexit 0\n");
+        @chmod($venvDir.'/bin/python', 0755);
+    }
+
     public function testCustomMissingPythonWarningOverridesDefaultLabelMessage(): void
     {
         $messages = [];
@@ -20,7 +43,7 @@ class PythonVenvHelperTest extends TestCase
                 '[WARN] Skipping FlexGet install: python3 missing from PATH'
             );
 
-            $this->assertEquals([], $result);
+            $this->assertEquals('', $result);
         });
 
         $this->assertEquals(['[WARN] Skipping FlexGet install: python3 missing from PATH'], $messages);
@@ -39,9 +62,66 @@ class PythonVenvHelperTest extends TestCase
                 }
             );
 
-            $this->assertEquals([], $result);
+            $this->assertEquals('', $result);
         });
 
         $this->assertEquals(['[WARN] Skipping pyLoad setup: python3 missing'], $messages);
+    }
+
+    public function testInstallerLogsMissingCliWhenPackagesFinishWithoutBinary(): void
+    {
+        $messages = [];
+        $venvDir = $this->pmssMakeTempDir('pmss-python-venv-missing-cli-');
+        $this->makeVenvPython($venvDir);
+        $pythonPath = $this->makePythonPath();
+        $linkPath = $this->pmssMakeTempFile('pmss-flexget-link-');
+
+        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $linkPath): void {
+            \pmssPythonVenvInstallCli(
+                $venvDir,
+                'FlexGet',
+                [['Installing FlexGet', 'flexget']],
+                $venvDir.'/bin/flexget',
+                $linkPath,
+                '[WARN] Skipping FlexGet install: python3 missing from PATH',
+                '[WARN] FlexGet binary missing after install',
+                static function (string $message) use (&$messages): void {
+                    $messages[] = $message;
+                }
+            );
+        });
+
+        $this->assertEquals(['[WARN] FlexGet binary missing after install'], $messages);
+    }
+
+    public function testInstallerLinksCliWhenBinaryExists(): void
+    {
+        $messages = [];
+        $venvDir = $this->pmssMakeTempDir('pmss-python-venv-link-cli-');
+        $this->makeVenvPython($venvDir);
+        $pythonPath = $this->makePythonPath();
+        $cliBin = $venvDir.'/bin/pyload';
+        $linkPath = $this->pmssMakeTempDir('pmss-python-link-dir-').'/pyload';
+        file_put_contents($cliBin, "#!/bin/sh\nexit 0\n");
+        @chmod($cliBin, 0755);
+
+        $this->pmssWithEnv(['PATH' => $pythonPath], function () use (&$messages, $venvDir, $cliBin, $linkPath): void {
+            \pmssPythonVenvInstallCli(
+                $venvDir,
+                'pyLoad',
+                [['Installing pyLoad (pyload-ng)', 'pyload-ng']],
+                $cliBin,
+                $linkPath,
+                '[WARN] Skipping pyLoad setup: python3 missing from PATH',
+                '[WARN] pyLoad binary missing after install',
+                static function (string $message) use (&$messages): void {
+                    $messages[] = $message;
+                }
+            );
+        });
+
+        $this->assertEquals([], $messages);
+        $this->assertTrue(is_link($linkPath), 'Expected installer to create a CLI symlink');
+        $this->assertEquals($cliBin, readlink($linkPath));
     }
 }

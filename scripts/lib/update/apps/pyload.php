@@ -17,19 +17,4 @@ $venvDir   = '/opt/pyload';
 $cliBin    = $venvDir.'/bin/pyload';
 
 // Required Python toolchain packages are queued centrally via packages.php
-
-$venv = pmssPythonVenvEnsure($venvDir, 'pyLoad', 'logmsg', '[WARN] Skipping pyLoad setup: python3 missing from PATH');
-if (empty($venv)) {
-    return;
-}
-
-runStep('Installing pyLoad (pyload-ng)', sprintf('%s -m pip install --upgrade pyload-ng', escapeshellarg($venv['python'])));
-
-if (!is_file($cliBin)) {
-    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN')) logmsg('[WARN] pyLoad binary missing after install');
-    return;
-}
-
-if (!is_link('/usr/local/bin/pyload') || readlink('/usr/local/bin/pyload') !== $cliBin) {
-    runStep('Linking pyLoad CLI', sprintf('ln -sf %s %s', escapeshellarg($cliBin), escapeshellarg('/usr/local/bin/pyload')));
-}
+pmssPythonVenvInstallCli($venvDir, 'pyLoad', [['Installing pyLoad (pyload-ng)', 'pyload-ng']], $cliBin, '/usr/local/bin/pyload', '[WARN] Skipping pyLoad setup: python3 missing from PATH', '[WARN] pyLoad binary missing after install', 'logmsg');
