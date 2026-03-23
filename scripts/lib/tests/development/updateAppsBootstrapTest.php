@@ -2,12 +2,9 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/RepoFileReadTrait.php';
 
 class UpdateAppsBootstrapTest extends TestCase
 {
-    use RepoFileReadTrait;
-
     /**
      * @var string
      */
@@ -92,7 +89,7 @@ class UpdateAppsBootstrapTest extends TestCase
 
     public function testUpdateStep2SkipsHelperModulesInAppLoader(): void
     {
-        $contents = $this->readRepoFile('scripts/util/update-step2.php');
+        $contents = $this->pmssReadRepoFile('scripts/util/update-step2.php');
 
         $this->assertStringContainsString("'arr.php'", $contents);
         $this->assertStringContainsString("'pythonVenv.php'", $contents);
@@ -102,7 +99,7 @@ class UpdateAppsBootstrapTest extends TestCase
     public function testPythonVenvInstallersAvoidPackageQueueHelpers(): void
     {
         foreach (['python.php', 'pyload.php'] as $installer) {
-            $contents = $this->readRepoFile('scripts/lib/update/apps/'.$installer);
+            $contents = $this->pmssReadRepoFile('scripts/lib/update/apps/'.$installer);
 
             $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
             $this->assertTrue(
@@ -114,7 +111,7 @@ class UpdateAppsBootstrapTest extends TestCase
 
     public function testArrHelperKeepsSharedRuntimeBootstrapPath(): void
     {
-        $contents = $this->readRepoFile('scripts/lib/update/apps/arr.php');
+        $contents = $this->pmssReadRepoFile('scripts/lib/update/apps/arr.php');
 
         $this->assertStringContainsString("dirname(__DIR__, 2).'/runtime.php'", $contents);
         $this->assertStringContainsString('%s updater: missing runtime helper', $contents);
@@ -124,7 +121,7 @@ class UpdateAppsBootstrapTest extends TestCase
     public function testStarrInstallersDelegateRuntimeBootstrapToArrHelper(): void
     {
         foreach (['radarr.php', 'sonarr.php'] as $installer) {
-            $contents = $this->readRepoFile('scripts/lib/update/apps/'.$installer);
+            $contents = $this->pmssReadRepoFile('scripts/lib/update/apps/'.$installer);
 
             $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);
             $this->assertTrue(

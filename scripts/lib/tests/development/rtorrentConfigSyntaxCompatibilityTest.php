@@ -1,19 +1,17 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/RepoFileReadTrait.php';
+require_once __DIR__.'/../common/TestCase.php';
 
 class rtorrentConfigSyntaxCompatibilityTest extends TestCase
 {
-    use RepoFileReadTrait;
-
     /**
      * PMSS-owned rTorrent config files must avoid commands removed in 0.15.x.
      */
     public function testPmssRtorrentConfigsAvoidRemovedSchedulerAndExecuteAliases(): void
     {
         foreach ($this->rtorrentConfigFiles() as $relativePath) {
-            $content = $this->readRepoFile($relativePath);
+            $content = $this->pmssReadRepoFile($relativePath);
             $forbiddenPatterns = [
                 '/^\s*schedule\s*=/m' => 'schedule',
                 '/^\s*schedule_remove\s*=/m' => 'schedule_remove',
@@ -36,10 +34,10 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     {
         $expectedRssHook = 'schedule2 = rss,0,1800,"execute.nothrow=sh,-c,php ~/www/rutorrent/plugins/rss/update.php& exit 0"';
 
-        $templateContent = $this->readRepoFile('etc/seedbox/config/template.rtorrent.rc');
+        $templateContent = $this->pmssReadRepoFile('etc/seedbox/config/template.rtorrent.rc');
         $this->assertStringContainsString($expectedRssHook, $templateContent);
 
-        $skeletonContent = $this->readRepoFile('etc/skel/.rtorrent.rc');
+        $skeletonContent = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc');
         $this->assertStringContainsString('schedule2 = watch_directory,1,1,"load.start_verbose=~/watch/*.torrent"', $skeletonContent);
         $this->assertStringContainsString($expectedRssHook, $skeletonContent);
     }
@@ -49,7 +47,7 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
      */
     public function testSkeletonRtorrentConfigAvoidsRemovedAndDeprecatedLegacyOptions(): void
     {
-        $content = $this->readRepoFile('etc/skel/.rtorrent.rc');
+        $content = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc');
         $forbiddenLines = [
             'umask = 0002',
             'use_udp_trackers = yes',
