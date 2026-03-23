@@ -28,6 +28,15 @@ if (!function_exists('pmssResolvePathFromEnv')) {
     }
 }
 
+if (!function_exists('pmssEnvValueNormalized')) {
+    // Normalize environment values so flag parsing stays consistent.
+    function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }
+}
+if (!function_exists('pmssEnvValueIsFalsey')) {
+    // Treat empty and explicit disable values as falsey toggles.
+    function pmssEnvValueIsFalsey($value): bool { return in_array(pmssEnvValueNormalized($value), ['', '0', 'false', 'no'], true); }
+}
+
 if (!function_exists('pmssLogDir')) {
     // Resolve the PMSS log directory, allowing hermetic test overrides.
     function pmssLogDir(): string

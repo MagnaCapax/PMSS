@@ -16,7 +16,7 @@ foreach (['../logging.php', '../runtime/commands.php', 'quota.php', '../../confi
 function pmssApplyHostnameConfig(?callable $logger = null): void
 {
     $log = $logger ?: 'logMessage';
-    if (!in_array(strtolower(trim((string) getenv('PMSS_SKIP_HOSTNAME'))), ['', '0', 'false', 'no'], true)) {
+    if (!pmssEnvValueIsFalsey(getenv('PMSS_SKIP_HOSTNAME'))) {
         $log('[SKIP] Hostname configuration skipped via PMSS_SKIP_HOSTNAME');
         return;
     }
@@ -49,7 +49,7 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
 function pmssConfigureQuotaMount(?callable $logger = null): void
 {
     $log = $logger ?: 'logMessage';
-    if (!in_array(strtolower(trim((string) getenv('PMSS_SKIP_QUOTA'))), ['', '0', 'false', 'no'], true)) {
+    if (!pmssEnvValueIsFalsey(getenv('PMSS_SKIP_QUOTA'))) {
         $log('[SKIP] Quota configuration skipped via PMSS_SKIP_QUOTA');
         return;
     }
