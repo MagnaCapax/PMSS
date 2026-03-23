@@ -34,6 +34,19 @@ class TrafficIngressHelpersTest extends TestCase
         $this->assertTrue(!\pmssTrafficIngressEnsureDir($link, 0700));
     }
 
+    public function testEnsureDirRejectsSymlinkedParentDirectory(): void
+    {
+        $root = $this->makeRoot();
+        $target = $root.'/target';
+        $this->assertTrue(@mkdir($target, 0700, true) || is_dir($target));
+
+        $symlinkedParent = $root.'/state';
+        $this->pmssCreateSymlinkOrSkip($target, $symlinkedParent);
+
+        $this->assertTrue(!\pmssTrafficIngressEnsureDir($symlinkedParent.'/daily', 0700));
+        $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
+    }
+
     public function testReadStateMissingReturnsEmpty(): void
     {
         $root = $this->makeRoot();

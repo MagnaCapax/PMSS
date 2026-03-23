@@ -11,11 +11,46 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
 /**
+ * Reject symlinked path segments before ingress logging creates directories.
+ */
+function pmssTrafficIngressPathIsSafe(string $path, bool $directoryTarget): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
+        return false;
+    }
+
+    $segments = explode('/', ltrim($path, '/'));
+    $current = '';
+    $lastIndex = count($segments) - 1;
+    foreach ($segments as $index => $segment) {
+        if ($segment === '') {
+            continue;
+        }
+
+        $current .= '/'.$segment;
+        if (is_link($current)) {
+            return false;
+        }
+
+        $isLeaf = $index === $lastIndex;
+        if (!$isLeaf && file_exists($current) && !is_dir($current)) {
+            return false;
+        }
+        if ($isLeaf && file_exists($current) && ($directoryTarget ? !is_dir($current) : !is_file($current))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Ensure a directory exists and is safe for use by ingress logging.
  */
 function pmssTrafficIngressEnsureDir(string $path, int $mode): bool
 {
-    if ($path === '' || $path[0] !== '/' || is_link($path) || (file_exists($path) && !is_dir($path))) {
+    if (!pmssTrafficIngressPathIsSafe($path, true)) {
         return false;
     }
     if (!is_dir($path) && !@mkdir($path, $mode, true)) {
