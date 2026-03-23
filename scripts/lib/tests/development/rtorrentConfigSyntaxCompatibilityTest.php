@@ -1,8 +1,12 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/RepoFileReadTrait.php';
+
 class rtorrentConfigSyntaxCompatibilityTest extends TestCase
 {
+    use RepoFileReadTrait;
+
     /**
      * PMSS-owned rTorrent config files must avoid commands removed in 0.15.x.
      */
@@ -75,16 +79,6 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     }
 
     /**
-     * Keep path handling local to the repo so the test stays hermetic.
-     */
-    private function readRepoFile(string $relativePath): string
-    {
-        $content = @file_get_contents($this->repoRoot().'/'.$relativePath);
-        $this->assertTrue(is_string($content) && $content !== '', 'Failed to read '.$relativePath);
-        return $content;
-    }
-
-    /**
      * Limit the audit to PMSS-owned config files, excluding the frozen vendor tree.
      */
     private function rtorrentConfigFiles(): array
@@ -94,10 +88,5 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
             'etc/skel/.rtorrent.rc',
             'etc/skel/.rtorrent.rc.custom',
         ];
-    }
-
-    private function repoRoot(): string
-    {
-        return dirname(__DIR__, 4);
     }
 }

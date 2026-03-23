@@ -2,12 +2,15 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/RepoFileReadTrait.php';
 
 class CronInlineCharacterizationTest extends TestCase
 {
+    use RepoFileReadTrait;
+
     public function testBootTuningKeepsFileWritesInline(): void
     {
-        $src = $this->readRuntimeFile('scripts/lib/update/systemPrep.php');
+        $src = $this->readRepoFile('scripts/lib/update/systemPrep.php');
         $wrapperNeedle = '$write'.'Target = static function';
 
         $this->assertTrue(
@@ -22,7 +25,7 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testQbittorrentWatchdogKeepsStartSequenceInline(): void
     {
-        $src = $this->readRuntimeFile('scripts/cron/checkQbittorrentInstances.php');
+        $src = $this->readRepoFile('scripts/cron/checkQbittorrentInstances.php');
         $wrapperNeedle = '$start'.'Qbittorrent = static function';
 
         $this->assertTrue(
@@ -36,7 +39,7 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testRcloneWatchdogKeepsStartSequenceInline(): void
     {
-        $src = $this->readRuntimeFile('scripts/cron/checkRcloneInstances.php');
+        $src = $this->readRepoFile('scripts/cron/checkRcloneInstances.php');
         $wrapperNeedle = '$start'.'Rclone = static function';
 
         $this->assertTrue(
@@ -50,7 +53,7 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testDelugeWatchdogKeepsStartSequencesInline(): void
     {
-        $src = $this->readRuntimeFile('scripts/cron/checkDelugeInstances.php');
+        $src = $this->readRepoFile('scripts/cron/checkDelugeInstances.php');
         $delugedNeedle = '$start'.'Deluged = static function';
         $webNeedle = '$start'.'DelugeWeb = static function';
 
@@ -70,10 +73,10 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testWatchdogsKeepSuspensionAndStartUserLogMessages(): void
     {
-        $lighttpdSrc = $this->readRuntimeFile('scripts/cron/checkLighttpdInstances.php');
-        $qbittorrentSrc = $this->readRuntimeFile('scripts/cron/checkQbittorrentInstances.php');
-        $rcloneSrc = $this->readRuntimeFile('scripts/cron/checkRcloneInstances.php');
-        $delugeSrc = $this->readRuntimeFile('scripts/cron/checkDelugeInstances.php');
+        $lighttpdSrc = $this->readRepoFile('scripts/cron/checkLighttpdInstances.php');
+        $qbittorrentSrc = $this->readRepoFile('scripts/cron/checkQbittorrentInstances.php');
+        $rcloneSrc = $this->readRepoFile('scripts/cron/checkRcloneInstances.php');
+        $delugeSrc = $this->readRepoFile('scripts/cron/checkDelugeInstances.php');
 
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd stopped due to suspension');", $lighttpdSrc);
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd start requested');", $lighttpdSrc);
@@ -87,7 +90,7 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testLighttpdWatchdogKeepsRestartSequenceInline(): void
     {
-        $src = $this->readRuntimeFile('scripts/cron/checkLighttpdInstances.php');
+        $src = $this->readRepoFile('scripts/cron/checkLighttpdInstances.php');
         $wrapperNeedle = '$restart'.'Lighttpd = static function';
 
         $this->assertTrue(
@@ -101,11 +104,4 @@ class CronInlineCharacterizationTest extends TestCase
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd start requested');", $src);
     }
 
-    private function readRuntimeFile(string $relativePath): string
-    {
-        $path = dirname(__DIR__, 4).'/'.$relativePath;
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
-        return (string) $src;
-    }
 }

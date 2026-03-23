@@ -17,6 +17,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
+require_once __DIR__.'/../common/RepoFileReadTrait.php';
 
 if (!function_exists('pmssDelugeReadWebConf')) {
     require_once dirname(__DIR__, 3).'/util/userConfigLighttpd.php';
@@ -25,6 +26,7 @@ if (!function_exists('pmssDelugeReadWebConf')) {
 class DelugeReverseProxyHardeningTest extends TestCase
 {
     use FilesystemCleanupTrait;
+    use RepoFileReadTrait;
 
     private $tempDir;
 
@@ -47,14 +49,6 @@ class DelugeReverseProxyHardeningTest extends TestCase
             strpos($haystack, $needle) === false,
             $msg !== '' ? $msg : "Expected string NOT to contain '$needle'"
         );
-    }
-
-    private function readRepoFile(string $relativePath): string
-    {
-        $path = dirname(__DIR__, 4).'/'.$relativePath;
-        $data = @file_get_contents($path);
-        $this->assertTrue(is_string($data), "Failed to read {$relativePath}");
-        return (string)$data;
     }
 
     // =========================================================================

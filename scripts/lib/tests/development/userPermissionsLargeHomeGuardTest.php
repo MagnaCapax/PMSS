@@ -2,20 +2,15 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/RepoFileReadTrait.php';
 
 class UserPermissionsLargeHomeGuardTest extends TestCase
 {
-    private function readSource(): string
-    {
-        $path = dirname(__DIR__, 4).'/scripts/util/userPermissions.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
-        return $src;
-    }
+    use RepoFileReadTrait;
 
     public function testLargeDataTreeChmodIsNotRecursive(): void
     {
-        $src = $this->readSource();
+        $src = $this->readRepoFile('scripts/util/userPermissions.php');
 
         $this->assertStringContainsString('["/home/{$thisUser}/data", 0750],', $src);
         $this->assertTrue(
@@ -26,7 +21,7 @@ class UserPermissionsLargeHomeGuardTest extends TestCase
 
     public function testLargeDataTreeOwnershipWalkIsPruned(): void
     {
-        $src = $this->readSource();
+        $src = $this->readRepoFile('scripts/util/userPermissions.php');
         $dataPrune = <<<'PHP'
 escapeshellarg("/home/{$thisUser}/data").' -prune -o';
 PHP;
@@ -41,7 +36,7 @@ PHP;
 
     public function testHomeTreeChownUsesOwnershipMismatchFilter(): void
     {
-        $src = $this->readSource();
+        $src = $this->readRepoFile('scripts/util/userPermissions.php');
         $uidFilter = <<<'PHP'
 -not -uid '.(string) $userIds['uid']
 PHP;
