@@ -225,7 +225,6 @@ function pmssUserWatchdogTerminateProcesses(string $username, array $processName
         @passthru('killall -'.$signal.' -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null');
     }
 }
-
 function pmssUserWatchdogProcessRunning(string $username, string $processName): bool
 {
     if ($processName === '') { return false; }
@@ -234,7 +233,6 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
     @exec('pgrep -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
     return $exitCode === 0 && $matches !== array();
 }
-
 function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, string $command, string $userLogMessage): void
 {
     if ($command === '') { return; }
@@ -242,44 +240,44 @@ function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, st
     passthru($command);
     pmssUserLog($username, $userLogMessage);
 }
-
-function pmssUserWatchdogEnsureRunning(string $username, string $processName, string $serviceLabel, string $command, string $userLogMessage): bool
+/** @param array<int,string> $processNames */
+function pmssUserWatchdogRestartProcessesIf(string $username, bool $running, array $processNames, callable $restartNeeded, string $userLogMessage, int $signal = 9, ?callable $terminator = null): bool
 {
-    if (pmssUserWatchdogProcessRunning($username, $processName)) return true;
-    pmssUserWatchdogStartCommand($username, $serviceLabel, $command, $userLogMessage);
+    if (!$running || !$restartNeeded()) { return $running; }
+    $terminator !== null ? $terminator() : pmssUserWatchdogTerminateProcesses($username, $processNames, $signal);
+    pmssUserLog($username, $userLogMessage);
     return false;
 }
-
+/** @param array<int,array<string,mixed>> $serviceSpecs @param array<string,bool> $runningStates @return array<string,bool> */
+function pmssUserWatchdogEnsureServices(string $username, array $serviceSpecs, array $runningStates = array()): array
+{
+    foreach ($serviceSpecs as $serviceSpec) {
+        $processName = isset($serviceSpec['processName']) ? (string) $serviceSpec['processName'] : '';
+        if ($processName === '') { continue; }
+        $command = $serviceSpec['command'] ?? '';
+        is_callable($command) && $command = (string) $command($username);
+        $running = isset($runningStates[$processName]) ? (bool) $runningStates[$processName] : pmssUserWatchdogProcessRunning($username, $processName);
+        !$running && pmssUserWatchdogStartCommand($username, (string) ($serviceSpec['serviceLabel'] ?? $processName), (string) $command, (string) ($serviceSpec['userLogMessage'] ?? ($processName.' start requested')));
+        $runningStates[$processName] = $running;
+    }
+    return $runningStates;
+}
 /** @param array<int,string> $processNames */
-function pmssUserWatchdogHandleSuspended(
-    string $username,
-    array $processNames,
-    string $userLogMessage,
-    string $homeRoot = '/home'
-): bool {
+function pmssUserWatchdogHandleSuspended(string $username, array $processNames, string $userLogMessage, string $homeRoot = '/home'): bool
+{
     if (!pmssUserWebRootUnavailable($username, $homeRoot)) return false;
     echo "User: {$username} is suspended\n";
     pmssUserWatchdogTerminateProcesses($username, $processNames, 9);
     pmssUserLog($username, $userLogMessage);
     return true;
 }
-
 /** Run a watchdog callback for enabled, unsuspended managed users. */
-function pmssUserWatchdogRunEnabledUsers(
-    string $enableMarker,
-    array $processNames,
-    string $userLogMessage,
-    callable $callback,
-    string $homeRoot = '/home',
-    string $command = '/scripts/listUsers.php'): void {
+function pmssUserWatchdogRunEnabledUsers(string $enableMarker, array $processNames, string $userLogMessage, callable $callback, string $homeRoot = '/home', string $command = '/scripts/listUsers.php'): void
+{
     if ($enableMarker === '') { return; }
     $homeRoot = rtrim($homeRoot, '/');
     foreach (pmssListManagedUsers($command) as $username) {
-        if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot)
-            || !is_file($homeRoot.'/'.$username.'/.'.$enableMarker)
-        ) {
-            continue;
-        }
+        if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot) || !is_file($homeRoot.'/'.$username.'/.'.$enableMarker)) { continue; }
         $callback($username);
     }
 }

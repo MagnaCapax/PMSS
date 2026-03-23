@@ -26,7 +26,6 @@ foreach($users AS $thisUser) {
         pmssUserLog($thisUser, 'lighttpd config generated (missing config detected)');
     }
 
-    $lighttpdRunning = pmssUserWatchdogProcessRunning($thisUser, 'lighttpd');
     $phpCgiRunning = pmssUserWatchdogProcessRunning($thisUser, 'php-cgi');
     $socketError = false;
     $socketPaths = pmssLighttpdWatchdogSocketPaths($homeDir, $homeDir.'/.lighttpd.conf');
@@ -49,19 +48,12 @@ foreach($users AS $thisUser) {
             fclose($socket);
         }
     }
-    if ($socketError) {
+    $lighttpdRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $socketError || pmssUserWatchdogProcessRunning($thisUser, 'lighttpd'), ['lighttpd', 'php-cgi'], static function () use ($socketError): bool { return $socketError; }, 'lighttpd restart requested', 15, static function () use ($thisUser): void {
         echo "Killing (if any) lighttpd for user: {$thisUser}\n";
         pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 15);
         sleep(5);
         pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 9);
-        usleep(50000);   // brief pause before relaunch
-        pmssUserLog($thisUser, 'lighttpd restart requested');
-        $lighttpdRunning = false;
-    }
-
-    if ($socketError || !$lighttpdRunning) {    // No instances at all? Ok time to start Lighttpd!
-        pmssUserWatchdogStartCommand($thisUser, 'lighttpd', '/scripts/startLighttpd ' . $thisUser, 'lighttpd start requested');
-        continue;
-    }
-
+        usleep(50000);
+    });
+    pmssUserWatchdogEnsureServices($thisUser, [['processName' => 'lighttpd', 'command' => '/scripts/startLighttpd ' . $thisUser, 'userLogMessage' => 'lighttpd start requested']], ['lighttpd' => $lighttpdRunning]);
 }

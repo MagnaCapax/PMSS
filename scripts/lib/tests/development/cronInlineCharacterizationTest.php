@@ -25,15 +25,15 @@ class CronInlineCharacterizationTest extends TestCase
         foreach ([
             [
                 'scripts/cron/checkQbittorrentInstances.php',
-                ['pmssUserWatchdogProcessRunning($thisUser, \'qbittorrent-nox\')', 'pmssUserWatchdogEnsureRunning($thisUser, \'qbittorrent-nox\'', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox start requested'"],
+                ['pmssUserWatchdogRestartProcessesIf(', 'pmssUserWatchdogEnsureServices($thisUser, [', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox start requested'"],
             ],
             [
                 'scripts/cron/checkRcloneInstances.php',
-                ['pmssUserWatchdogEnsureRunning($thisUser, \'rclone\'', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone start requested'"],
+                ['pmssUserWatchdogEnsureServices($thisUser, [', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone start requested'"],
             ],
             [
                 'scripts/cron/checkDelugeInstances.php',
-                ['pmssUserWatchdogProcessRunning($thisUser, \'deluged\')', 'pmssUserWatchdogTerminateProcesses($thisUser, [\'deluged\', \'deluge-web\'], 9);', 'pmssUserWatchdogEnsureRunning($thisUser, \'deluged\'', 'pmssUserWatchdogEnsureRunning($thisUser, \'deluge-web\'', "'deluged start requested'", "'deluge-web start requested'"],
+                ['pmssUserWatchdogRestartProcessesIf(', 'pmssUserWatchdogEnsureServices($thisUser, [', "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
             ],
         ] as $case) {
             $src = $this->pmssReadRepoFile($case[0]);
@@ -62,15 +62,22 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
 
-        $this->assertStringContainsString('pmssUserWatchdogProcessRunning($thisUser, \'lighttpd\')', $src);
         $this->assertStringContainsString('pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')', $src);
+        $this->assertStringContainsString('pmssUserWatchdogRestartProcessesIf(', $src);
         $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);', $src);
         $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 9);', $src);
-        $this->assertStringContainsString('pmssUserWatchdogStartCommand($thisUser, \'lighttpd\'', $src);
+        $this->assertStringContainsString('pmssUserWatchdogEnsureServices($thisUser, [[\'processName\' => \'lighttpd\'', $src);
         $this->assertStringContainsString('Killing (if any) lighttpd for user: {$thisUser}', $src);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd restart requested');", $src);
-        $this->assertStringContainsString('if ($socketError || !$lighttpdRunning) {', $src);
+        $this->assertStringContainsString("'lighttpd restart requested'", $src);
         $this->assertStringContainsString("'lighttpd start requested'", $src);
+    }
+
+    public function testServiceWatchdogsUseSharedWatchdogSpecHelpers(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
+
+        $this->assertStringContainsString('function pmssUserWatchdogRestartProcessesIf(', $src);
+        $this->assertStringContainsString('function pmssUserWatchdogEnsureServices(', $src);
     }
 
 }
