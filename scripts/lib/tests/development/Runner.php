@@ -3,22 +3,58 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-$versionDir = sys_get_temp_dir().'/pmss-tests-version';
-if (!is_dir($versionDir)) {
-    @mkdir($versionDir, 0755, true);
+function pmssTestRemoveTree(string $path): void
+{
+    if (!file_exists($path) && !is_link($path)) {
+        return;
+    }
+
+    if (is_file($path) || is_link($path)) {
+        @unlink($path);
+        return;
+    }
+
+    $iterator = new \RecursiveIteratorIterator(
+        new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+        \RecursiveIteratorIterator::CHILD_FIRST
+    );
+
+    foreach ($iterator as $item) {
+        if ($item->isDir()) {
+            @rmdir($item->getPathname());
+            continue;
+        }
+
+        @unlink($item->getPathname());
+    }
+
+    @rmdir($path);
 }
+
+$suiteRoot = sys_get_temp_dir().'/pmss-tests-'.bin2hex(random_bytes(6));
+if (!is_dir($suiteRoot)) {
+    @mkdir($suiteRoot, 0755, true);
+}
+
+$versionDir = $suiteRoot.'/version';
+@mkdir($versionDir, 0755, true);
 putenv('PMSS_VERSION_DIR='.$versionDir);
+putenv('PMSS_TEST_TEMP_ROOT='.$suiteRoot);
 // Propagate test mode to child processes invoked via shell_exec
 putenv('PMSS_TEST_MODE=1');
 putenv('PMSS_JSON_LOG');
 putenv('PMSS_PROFILE_OUTPUT');
 
-$testRoot    = sys_get_temp_dir().'/pmss-tests-root';
+$testRoot    = $suiteRoot.'/root';
 $skelDir     = $testRoot.'/skel';
 $networkCfg  = $testRoot.'/network.php';
 $localnetCfg = $testRoot.'/localnet';
 $fireqosTpl  = $testRoot.'/fireqos.tpl';
 $aptKeyring  = $testRoot.'/apt-keyrings';
+
+register_shutdown_function(static function () use ($suiteRoot): void {
+    pmssTestRemoveTree($suiteRoot);
+});
 
 if (!is_dir($skelDir.'/www/rutorrent/plugins/unpack')) {
     @mkdir($skelDir.'/www/rutorrent/plugins/unpack', 0755, true);

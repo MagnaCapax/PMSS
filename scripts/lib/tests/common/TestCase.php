@@ -23,28 +23,48 @@ abstract class TestCase
      */
     private $results = [];
 
+    /**
+     * @var array<int, string>
+     */
+    private $tempPaths = [];
+
     public function run(): array
     {
         $methods = array_filter(get_class_methods($this), static function ($method) {
             return strpos($method, 'test') === 0;
         });
         foreach ($methods as $method) {
+            $status = true;
+            $message = null;
+            $setUpCompleted = false;
             try {
                 if (method_exists($this, 'setUp')) {
                     $this->setUp();
                 }
+                $setUpCompleted = true;
                 $this->$method();
-                if (method_exists($this, 'tearDown')) {
+            } catch (SkipTest $e) {
+                $status = 'skip';
+                $message = $e->getMessage();
+            } catch (\AssertionError $e) {
+                $status = false;
+                $message = $e->getMessage();
+            } catch (\Throwable $e) {
+                $status = false;
+                $message = $e->getMessage();
+            }
+
+            try {
+                if ($setUpCompleted && method_exists($this, 'tearDown')) {
                     $this->tearDown();
                 }
-                $this->results[] = [true, $method, null];
-            } catch (SkipTest $e) {
-                $this->results[] = ['skip', $method, $e->getMessage()];
-            } catch (\AssertionError $e) {
-                $this->results[] = [false, $method, $e->getMessage()];
             } catch (\Throwable $e) {
-                $this->results[] = [false, $method, $e->getMessage()];
+                $status = false;
+                $message = $e->getMessage();
             }
+
+            $this->pmssCleanupTempPaths();
+            $this->results[] = [$status, $method, $message];
         }
         return $this->results;
     }
@@ -129,8 +149,14 @@ abstract class TestCase
     /** Create a unique temporary directory for hermetic tests. */
     protected function pmssMakeTempDir(string $prefix, int $mode = 0755): string
     {
-        $path = sys_get_temp_dir().'/'.$prefix.bin2hex(random_bytes(6));
+        $base = getenv('PMSS_TEST_TEMP_ROOT');
+        if (!is_string($base) || $base === '') {
+            $base = sys_get_temp_dir();
+        }
+
+        $path = rtrim($base, '/').'/'.$prefix.bin2hex(random_bytes(6));
         @mkdir($path, $mode, true);
+        $this->tempPaths[] = $path;
         return $path;
     }
 
@@ -154,6 +180,25 @@ abstract class TestCase
         }
 
         @rmdir($path);
+    }
+
+    /** Remove tracked temporary paths created by the test harness. */
+    private function pmssCleanupTempPaths(): void
+    {
+        foreach (array_reverse($this->tempPaths) as $path) {
+            if (!file_exists($path) && !is_link($path)) {
+                continue;
+            }
+
+            if (is_file($path) || is_link($path)) {
+                @unlink($path);
+                continue;
+            }
+
+            $this->pmssRemoveTree($path);
+        }
+
+        $this->tempPaths = [];
     }
 
     /** Restore a previous environment variable value captured with getenv(). */
