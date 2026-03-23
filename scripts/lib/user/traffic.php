@@ -15,6 +15,7 @@
 
 require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../traffic/storage.php';
 
 /**
  * Apply or refresh the user-specific traffic cap.
@@ -100,15 +101,11 @@ function pmssReadUserTrafficMonth(string $path): int
 /** @return array<string,int> */
 function pmssReadUserTrafficStates(string $username): array
 {
-    $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/').'/'.$username;
     $totals = [];
-    foreach ([
-        'normal' => $homeDir.'/.trafficData',
-        'local' => $homeDir.'/.trafficDataLocal',
-        'ingress' => $homeDir.'/.trafficDataIngress',
-    ] as $name => $path) {
+    foreach (array_intersect_key(pmssTrafficDataPaths($username), ['normal' => true, 'local' => true, 'ingress' => true]) as $name => $path) {
         $totals[$name] = pmssReadUserTrafficMonth($path);
     }
+
     return $totals;
 }
 

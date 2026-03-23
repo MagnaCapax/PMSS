@@ -59,6 +59,39 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals(1536, \pmssReadUserTrafficMonth($path));
     }
 
+    public function testTrafficDataPathsUseEnvOverrideAndModeSuffix(): void
+    {
+        putenv('PMSS_HOME_DIR='.$this->tempDir.'/home');
+
+        $paths = \pmssTrafficDataPaths('alice');
+
+        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
+
+        putenv('PMSS_HOME_DIR');
+    }
+
+    public function testTrafficDataPathsExposeCanonicalKeys(): void
+    {
+        $paths = \pmssTrafficDataPaths('alice', $this->tempDir.'/home');
+
+        $this->assertEquals($this->tempDir.'/home/alice/.trafficData', $paths['normal']);
+        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataLocal', $paths['local']);
+        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngress', $paths['ingress']);
+        $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
+    }
+
+    public function testTrafficLimitAndStatsPathsHonorExplicitBases(): void
+    {
+        $this->assertEquals(
+            $this->tempDir.'/home/alice/.trafficLimit',
+            \pmssTrafficLimitPath('alice', $this->tempDir.'/home')
+        );
+        $this->assertEquals(
+            $this->tempDir.'/runtime/trafficStats/alice-localnet',
+            \pmssTrafficStatsPath('alice-localnet', null, $this->tempDir.'/runtime')
+        );
+    }
+
     public function testTrafficLimitReadGiBFileReturnsZeroForMissingFile(): void
     {
         $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($this->tempDir.'/missing-limit'));

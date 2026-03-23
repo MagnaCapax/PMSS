@@ -15,6 +15,6 @@ class TerminateUserTrafficImmutableTest extends TestCase
         $this->assertTrue($posRemove !== false, 'terminateUser.php should define a remove_home_initial step');
         $this->assertTrue($posClear < $posRemove, 'terminateUser.php should clear immutable traffic files before removing the home directory');
         $this->assertStringContainsString('command -v chattr', $src, 'terminateUser.php should guard immutable clearing with a chattr presence check');
-        $this->assertStringContainsString('.trafficDataIngressLocal', $src, 'terminateUser.php should include the ingress local traffic data file');
+        $this->assertStringContainsString('array_values(pmssTrafficDataPaths($username))', $src, 'terminateUser.php should source all traffic files from the shared helper');
     }
 }

@@ -20,6 +20,7 @@
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/users.php';
 require_once __DIR__.'/lib/homeMount.php';
+require_once __DIR__.'/lib/traffic/storage.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Terminating
 // a user when /home is unavailable could lead to incomplete cleanup or acting on
@@ -257,12 +258,7 @@ pmssUserLifecycleStep('terminate', $username,
     'userdel '.escapeshellarg($username),
     $dryRun
 );
-$trafficFiles = array(
-    "/home/{$username}/.trafficData",
-    "/home/{$username}/.trafficDataLocal",
-    "/home/{$username}/.trafficDataIngress",
-    "/home/{$username}/.trafficDataIngressLocal",
-);
+$trafficFiles = array_values(pmssTrafficDataPaths($username));
 $trafficArgs = array_map('escapeshellarg', $trafficFiles);
 $clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
 pmssUserLifecycleStep('terminate', $username,

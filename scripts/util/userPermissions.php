@@ -11,6 +11,7 @@
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
 if (is_file($pmssUserLifecyclePath = __DIR__.'/../lib/userLifecycle.php')) { require_once $pmssUserLifecyclePath; }
 if (is_file($pmssShellPath = __DIR__.'/../lib/shell.php')) { require_once $pmssShellPath; }
+require_once __DIR__.'/../lib/traffic/storage.php';
 
 $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
@@ -61,29 +62,6 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
 
     // Quote owner spec as a single argument; chown accepts quoted 'user.group'
     pmssRun(sprintf('chown %s%s %s', $recursive ? '-R ' : '', escapeshellarg($owner), $target));
-}
-
-// Best-effort immutable toggle for traffic data files.
-function pmssSetImmutable(string $path, bool $enable): void
-{
-    if (!file_exists($path)) {
-        return;
-    }
-    static $chattrPath = null;
-    if ($chattrPath === null) {
-        $chattrPath = '';
-        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-            if (is_executable($candidate)) {
-                $chattrPath = $candidate;
-                break;
-            }
-        }
-    }
-    if ($chattrPath === '') {
-        return;
-    }
-    $flag = $enable ? '+i' : '-i';
-    @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
 }
 
 // Safer traversal without relying on xargs delimiters; applies to each directory in place.
@@ -171,16 +149,18 @@ $chmodItems = [
     ["/home/{$thisUser}/.sync", 0750],
 ];
 
+$trafficPaths = pmssTrafficDataPaths($thisUser);
+
 $chownItems = [
     ["/home/{$thisUser}/.lighttpd/.htpasswd", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/.lighttpd/", "{$thisUser}:{$thisUser}", true],
     // NOTE: Avoid blanket chown -R on the whole home; exclude known root-owned files/dirs first.
     // The remaining tree is handled by a targeted find below.
     ["/home/{$thisUser}/.quota", "root:{$thisUser}"],
-    ["/home/{$thisUser}/.trafficData", "root:{$thisUser}"],
-    ["/home/{$thisUser}/.trafficDataLocal", "root:{$thisUser}"],
-    ["/home/{$thisUser}/.trafficDataIngress", "root:{$thisUser}"],
-    ["/home/{$thisUser}/.trafficDataIngressLocal", "root:{$thisUser}"],
+    [$trafficPaths['normal'], "root:{$thisUser}"],
+    [$trafficPaths['local'], "root:{$thisUser}"],
+    [$trafficPaths['ingress'], "root:{$thisUser}"],
+    [$trafficPaths['ingressLocal'], "root:{$thisUser}"],
     ["/home/{$thisUser}/data", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings", "{$thisUser}:{$thisUser}"],
     ["/home/{$thisUser}/www/rutorrent/share/users/{$thisUser}/settings/retrackers.dat", "{$thisUser}:{$thisUser}"],
@@ -190,16 +170,11 @@ $chownItems = [
     ["/home/{$thisUser}/www/rutorrent/conf/config.php", "root:root"],
 ];
 
-$trafficFiles = [
-    "/home/{$thisUser}/.trafficData",
-    "/home/{$thisUser}/.trafficDataLocal",
-    "/home/{$thisUser}/.trafficDataIngress",
-    "/home/{$thisUser}/.trafficDataIngressLocal",
-];
+$trafficFiles = array_values($trafficPaths);
 
 // Ensure traffic files are mutable while ownership and permissions are repaired.
 foreach ($trafficFiles as $trafficFile) {
-    pmssSetImmutable($trafficFile, false);
+    pmssTrafficSetImmutable($trafficFile, false);
 }
 
 foreach ($chmodItems as $item) {
@@ -214,10 +189,10 @@ foreach ($chmodItems as $item) {
 // cost when uid/gid ownership is already correct.
 $excludes = [
     "/home/{$thisUser}/.quota",
-    "/home/{$thisUser}/.trafficData",
-    "/home/{$thisUser}/.trafficDataLocal",
-    "/home/{$thisUser}/.trafficDataIngress",
-    "/home/{$thisUser}/.trafficDataIngressLocal",
+    $trafficPaths['normal'],
+    $trafficPaths['local'],
+    $trafficPaths['ingress'],
+    $trafficPaths['ingressLocal'],
     "/home/{$thisUser}/.rtorrent.rc",
     "/home/{$thisUser}/www/rutorrent/conf/config.php",
 ];
@@ -252,7 +227,7 @@ foreach ($chownItems as $item) {
 }
 
 foreach ($trafficFiles as $trafficFile) {
-    pmssSetImmutable($trafficFile, true);
+    pmssTrafficSetImmutable($trafficFile, true);
 }
 
 if (file_exists("/home/{$thisUser}/.ssh")) {

@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../../traffic/storage.php';
+
 /**
  * Run post-provision steps that should not block account creation.
  */
@@ -36,43 +38,25 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
         $zeroRaw = ['month'=>0.0,'week'=>0.0,'day'=>0.0,'hour'=>0.0,'15min'=>0.0];
         $zeroDisplay = ['month'=>'0MiB','week'=>'0MiB','day'=>'0MiB','hour'=>'0MiB','15min'=>'0MiB'];
         $zeroTraffic = ['raw'=>$zeroRaw,'display'=>$zeroDisplay,'daily'=>[]];
-        $runtimeStatsDir = '/var/run/pmss/trafficStats';
-        $chattrPath = null;
-        // Best-effort immutable toggle for traffic data files.
-        $setImmutable = static function (string $path, bool $enable) use (&$chattrPath): void {
-            if (!is_file($path)) {
-                return;
-            }
-            if ($chattrPath === null) {
-                $chattrPath = '';
-                foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-                    if (is_executable($candidate)) {
-                        $chattrPath = $candidate;
-                        break;
-                    }
-                }
-            }
-            if ($chattrPath === '') {
-                return;
-            }
-            @exec($chattrPath.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
-        };
+        $trafficPaths = pmssTrafficDataPaths($user['name'], dirname($homePath));
+        $runtimeStatsPath = pmssTrafficStatsPath($user['name'], '/var/run/pmss/trafficStats');
+        $runtimeStatsDir = dirname($runtimeStatsPath);
         @mkdir($runtimeStatsDir, 0755, true);
         // Home files
-        foreach (['.trafficData', '.trafficDataLocal'] as $suffix) {
-            $trafficPath = $homePath.'/'.$suffix;
-            $setImmutable($trafficPath, false);
+        foreach (['normal', 'local'] as $pathKey) {
+            $trafficPath = $trafficPaths[$pathKey];
+            pmssTrafficSetImmutable($trafficPath, false);
             @file_put_contents($trafficPath, serialize($zeroTraffic));
             @chown($trafficPath, 'root');
             @chgrp($trafficPath, $user['name']);
             @chmod($trafficPath, 0640);
-            $setImmutable($trafficPath, true);
+            pmssTrafficSetImmutable($trafficPath, true);
         }
         // Runtime cache
-        @file_put_contents("$runtimeStatsDir/{$user['name']}", serialize($zeroTraffic));
-        @chown("$runtimeStatsDir/{$user['name']}", 'root');
-        @chgrp("$runtimeStatsDir/{$user['name']}", 'root');
-        @chmod("$runtimeStatsDir/{$user['name']}", 0600);
+        @file_put_contents($runtimeStatsPath, serialize($zeroTraffic));
+        @chown($runtimeStatsPath, 'root');
+        @chgrp($runtimeStatsPath, 'root');
+        @chmod($runtimeStatsPath, 0600);
         logProvisionMessage('Seeded traffic files with zero values');
     } catch (\Throwable $e) {
         logProvisionMessage('Seeding traffic files failed: '.$e->getMessage());
@@ -80,7 +64,8 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
 
     // Ensure .trafficLimit exists even when no limit is configured at creation time.
     if (empty($user['trafficLimit'])) {
-        @file_put_contents("/home/{$user['name']}/.trafficLimit", '0');
-        @chmod("/home/{$user['name']}/.trafficLimit", 0664);
+        $trafficLimitPath = pmssTrafficLimitPath($user['name'], dirname($homePath));
+        @file_put_contents($trafficLimitPath, '0');
+        @chmod($trafficLimitPath, 0664);
     }
 }

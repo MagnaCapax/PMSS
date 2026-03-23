@@ -6,6 +6,69 @@
  * @author PMSS Team
  */
 
+if (!function_exists('pmssTrafficDataPaths')) {
+    /** @return array<string,string> Resolve the canonical per-user traffic data files. */
+    function pmssTrafficDataPaths(string $username, ?string $homeDir = null): array
+    {
+        $homeDir = rtrim($homeDir ?? (getenv('PMSS_HOME_DIR') ?: '/home'), '/');
+        $homeDir = $homeDir !== '' ? $homeDir : '/';
+        $userHome = $homeDir.'/'.$username;
+
+        return [
+            'normal' => $userHome.'/.trafficData',
+            'local' => $userHome.'/.trafficDataLocal',
+            'ingress' => $userHome.'/.trafficDataIngress',
+            'ingressLocal' => $userHome.'/.trafficDataIngressLocal',
+        ];
+    }
+}
+
+if (!function_exists('pmssTrafficLimitPath')) {
+    /** Resolve the per-user persisted traffic limit path. */
+    function pmssTrafficLimitPath(string $username, ?string $homeDir = null): string
+    {
+        $homeDir = rtrim($homeDir ?? (getenv('PMSS_HOME_DIR') ?: '/home'), '/');
+        return ($homeDir !== '' ? $homeDir : '/').'/'.$username.'/.trafficLimit';
+    }
+}
+
+if (!function_exists('pmssTrafficStatsPath')) {
+    /** Resolve the runtime traffic statistics cache path for a user key. */
+    function pmssTrafficStatsPath(string $username, ?string $statsDir = null, ?string $runtimeDir = null): string
+    {
+        if ($statsDir === null) {
+            $runtimeDir = rtrim($runtimeDir ?? (getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss'), '/');
+            $statsDir = ($runtimeDir !== '' ? $runtimeDir : '/').'/trafficStats';
+        }
+
+        $statsDir = rtrim($statsDir, '/');
+        return ($statsDir !== '' ? $statsDir : '/').'/'.$username;
+    }
+}
+
+if (!function_exists('pmssTrafficSetImmutable')) {
+    /** Best-effort immutable toggle for traffic data files. */
+    function pmssTrafficSetImmutable(string $path, bool $enable): void
+    {
+        if (!is_file($path)) {
+            return;
+        }
+
+        static $chattr = null;
+        if ($chattr === null) {
+            $chattr = '';
+            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+                if (is_executable($candidate)) {
+                    $chattr = $candidate;
+                    break;
+                }
+            }
+        }
+
+        $chattr === '' || @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
+    }
+}
+
 class TrafficStorage
 {
     private $homeDir;
@@ -34,44 +97,26 @@ class TrafficStorage
     {
         $isLocalUser = substr_compare($user, '-localnet', -9) === 0;
         $targetUser = $isLocalUser ? substr($user, 0, -9) : $user;
-        $filename = ($this->trafficMode === 'ingress' ? '.trafficDataIngress' : '.trafficData').($isLocalUser ? 'Local' : '');
+        $trafficPaths = pmssTrafficDataPaths($targetUser, $this->homeDir);
+        $trafficKey = $this->trafficMode === 'ingress'
+            ? ($isLocalUser ? 'ingressLocal' : 'ingress')
+            : ($isLocalUser ? 'local' : 'normal');
 
         $serialized = serialize($data);
         $homePath = $this->homeDir.'/'.$targetUser;
-        $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
-        is_dir($homePath) && array_unshift($targets, [$homePath.'/'.$filename, $targetUser, 0640, true]);
+        $targets = [[pmssTrafficStatsPath($user, $this->statsDir), 'root', 0600, false]];
+        is_dir($homePath) && array_unshift(
+            $targets,
+            [$trafficPaths[$trafficKey], $targetUser, 0640, true]
+        );
 
         foreach ($targets as [$path, $group, $mode, $immutable]) {
-            $immutable && $this->setImmutable($path, false);
+            $immutable && pmssTrafficSetImmutable($path, false);
             @file_put_contents($path, $serialized);
             @chown($path, 'root');
             @chgrp($path, $group);
             @chmod($path, $mode);
-            $immutable && $this->setImmutable($path, true);
+            $immutable && pmssTrafficSetImmutable($path, true);
         }
-    }
-
-    /**
-     * Toggle immutable bit when supported (best-effort).
-     */
-    private function setImmutable(string $path, bool $enable): void
-    {
-        if (!is_file($path)) {
-            return;
-        }
-        static $chattr = null;
-        if ($chattr === null) {
-            $chattr = '';
-            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-                if (is_executable($candidate)) {
-                    $chattr = $candidate;
-                    break;
-                }
-            }
-        }
-        if ($chattr === '') {
-            return;
-        }
-        @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
     }
 }

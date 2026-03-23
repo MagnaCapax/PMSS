@@ -82,13 +82,13 @@ TXT;
     if (is_file($validationLib)) {
         require_once $validationLib;
     }
+    require_once __DIR__.'/lib/traffic/storage.php';
     $trafficLimitLib = __DIR__.'/lib/user/trafficLimit.php';
     if (is_file($trafficLimitLib)) {
         require_once $trafficLimitLib;
     }
 
     $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
-    $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
     $statsDir = $runtimeDir.'/trafficStats';
     $listUsersLines = [];
     $listUsersRc = 0;
@@ -182,7 +182,8 @@ TXT;
         $dataDisplay = array_map('formatTrafficAmount', $data['raw']);
 
         $inboundMonth = null;
-        $ingressPath = $homeDir.'/'.$baseUser.'/.trafficDataIngress'.($isLocalnet ? 'Local' : '');
+        $trafficPaths = pmssTrafficDataPaths($baseUser);
+        $ingressPath = $trafficPaths[$isLocalnet ? 'ingressLocal' : 'ingress'];
         if (is_file($ingressPath) && !is_link($ingressPath)) {
             $ingressStats = @stat($ingressPath);
             if ($ingressStats !== false && (int) $ingressStats['uid'] === 0 && (($ingressStats['mode'] & 0777) & 0022) === 0) {
@@ -221,23 +222,10 @@ TXT;
         if (array_key_exists($baseUser, $limitCache)) {
             $limitGiB = $limitCache[$baseUser];
         } else {
-            $limitPath = "{$homeDir}/{$baseUser}/.trafficLimit";
-            if (is_file($limitPath) && !is_link($limitPath)) {
-                $limitRaw = trim((string) @file_get_contents($limitPath));
-                if ($limitRaw !== '') {
-                    if (function_exists('pmssTrafficLimitParseGiB')) {
-                        $err = null;
-                        $parsedLimit = pmssTrafficLimitParseGiB($limitRaw, $err);
-                        if ($parsedLimit !== null && $parsedLimit > 0) {
-                            $limitGiB = $parsedLimit;
-                        }
-                    } elseif (is_numeric($limitRaw)) {
-                        $parsedLimit = (int) $limitRaw;
-                        if ($parsedLimit > 0) {
-                            $limitGiB = $parsedLimit;
-                        }
-                    }
-                }
+            $limitPath = pmssTrafficLimitPath($baseUser);
+            $parsedLimit = pmssTrafficLimitReadGiBFile($limitPath);
+            if ($parsedLimit > 0) {
+                $limitGiB = $parsedLimit;
             }
             $limitCache[$baseUser] = $limitGiB;
         }
