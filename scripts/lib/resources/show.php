@@ -29,7 +29,9 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $totals = array_fill_keys($metrics, $windowZeros) + array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
 
     foreach ($users as $thisUser) {
-        if (!is_string($rawStats = @file_get_contents("{$statsDir}/{$thisUser}")) || $rawStats === '' || !is_array($data = @unserialize($rawStats))) {
+        if (!is_string($rawStats = @file_get_contents("{$statsDir}/{$thisUser}"))
+            || $rawStats === ''
+            || !is_array($data = @unserialize($rawStats, ['allowed_classes' => false]))) {
             $missingStats[] = $thisUser;
             continue;
         }
