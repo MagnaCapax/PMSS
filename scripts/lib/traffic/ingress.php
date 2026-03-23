@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../resources/userHelpers.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
 /**
@@ -37,7 +38,7 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
  */
 function pmssTrafficIngressReadState(string $path): array
 {
-    if ($path === '' || is_link($path) || (file_exists($path) && !is_file($path))) {
+    if ($path === '' || !pmssUserFilePathIsSafe($path)) {
         return [];
     }
     $raw = is_file($path) ? @file_get_contents($path) : false;
@@ -53,7 +54,7 @@ function pmssTrafficIngressReadState(string $path): array
  */
 function pmssTrafficIngressWriteState(string $path, array $state): void
 {
-    if ($path === '' || is_link($path) || (file_exists($path) && !is_file($path))) {
+    if ($path === '' || !pmssUserFilePathIsSafe($path)) {
         return;
     }
 
@@ -62,9 +63,7 @@ function pmssTrafficIngressWriteState(string $path, array $state): void
         return;
     }
 
-    if (@file_put_contents($path, $payload, LOCK_EX) === false) {
-        return;
-    }
-
-    @chmod($path, 0600);
+    pmssReplaceUserFile($path, $payload, static function (string $tmp): void {
+        @chmod($tmp, 0600);
+    });
 }

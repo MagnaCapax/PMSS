@@ -6,6 +6,21 @@ require_once dirname(__DIR__, 2).'/configBackups.php';
 
 class ConfigBackupsServiceGuardTest extends TestCase
 {
+    /** @return array{0:string,1:string} */
+    private function makeBackupRoots(): array
+    {
+        return [$this->pmssMakeTempDir('pmss-backups-src-'), $this->pmssMakeTempDir('pmss-backups-root-')];
+    }
+
+    private function writeSourceFile(string $root, string $relativePath, string $content): string
+    {
+        $path = $root.'/'.ltrim($relativePath, '/');
+        @mkdir(dirname($path), 0755, true);
+        file_put_contents($path, $content);
+
+        return $path;
+    }
+
     public function testNormalizeServiceAcceptsSafeServiceNames(): void
     {
         $this->assertEquals('sshd', \pmssConfigBackupsNormalizeService('sshd'));
@@ -30,12 +45,9 @@ class ConfigBackupsServiceGuardTest extends TestCase
 
     public function testBackupRejectsInvalidServiceWithoutCreatingDirectories(): void
     {
-        $sourceRoot = $this->pmssMakeTempDir('pmss-backups-src-');
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
+        [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
         $messages = [];
-        $source = $sourceRoot.'/etc/nginx/nginx.conf';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "worker_processes auto;\n");
+        $source = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         $backup = \pmssBackupCriticalConfig('../nginx', $source, array(
             'backupRoot' => $backupRoot,
@@ -55,12 +67,9 @@ class ConfigBackupsServiceGuardTest extends TestCase
 
     public function testPruneRejectsInvalidServiceWithoutTouchingFilesystem(): void
     {
-        $sourceRoot = $this->pmssMakeTempDir('pmss-backups-src-');
-        $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
+        [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
         $messages = [];
-        $source = $sourceRoot.'/etc/nginx/nginx.conf';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "worker_processes auto;\n");
+        $source = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         \pmssPruneCriticalConfigBackups('nginx/child', $source, array(
             'backupRoot' => $backupRoot,
@@ -98,11 +107,9 @@ class ConfigBackupsServiceGuardTest extends TestCase
 
     public function testPruneRejectsRelativeBackupRootWithoutTouchingFilesystem(): void
     {
-        $sourceRoot = $this->pmssMakeTempDir('pmss-backups-src-');
+        [$sourceRoot] = $this->makeBackupRoots();
         $messages = [];
-        $source = $sourceRoot.'/etc/nginx/nginx.conf';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "worker_processes auto;\n");
+        $source = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         \pmssPruneCriticalConfigBackups('nginx', $source, array(
             'backupRoot' => 'relative-backups',

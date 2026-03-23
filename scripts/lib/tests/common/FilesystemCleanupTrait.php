@@ -25,18 +25,6 @@ trait FilesystemCleanupTrait
             return;
         }
 
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($iterator as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-                continue;
-            }
-            @unlink($item->getPathname());
-        }
-
-        @rmdir($path);
+        $this->pmssRemoveTree($path);
     }
 }

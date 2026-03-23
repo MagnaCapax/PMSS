@@ -54,6 +54,7 @@ class TrafficIngressHelpersTest extends TestCase
         \pmssTrafficIngressWriteState($path, $payload);
         $loaded = \pmssTrafficIngressReadState($path);
         $this->assertEquals($payload, $loaded);
+        $this->assertEquals(0600, fileperms($path) & 0777);
     }
 
     public function testReadStateInvalidJsonReturnsEmpty(): void
