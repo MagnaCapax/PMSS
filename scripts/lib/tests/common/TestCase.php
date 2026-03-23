@@ -21,7 +21,9 @@ class SkipTest extends \Exception {}
 abstract class TestCase
 {
     use FilesystemCleanupTrait {
+        pmssMakeNamedTempDir as protected;
         pmssMakeNamedTempDir as private pmssTraitMakeNamedTempDir;
+        cleanup as protected;
         cleanup as private pmssTraitCleanup;
     }
 
