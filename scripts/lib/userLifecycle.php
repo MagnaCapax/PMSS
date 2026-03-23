@@ -220,6 +220,40 @@ function pmssListManagedUsers(string $command = '/scripts/listUsers.php'): array
     return array_keys($users);
 }
 
+function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array
+{
+    $managedUsers = array_values(array_unique(array_filter(array_map('pmssNormalizeUsername', $managedUsers), 'pmssValidateUsername')));
+    $rawUsername = trim($rawUsername);
+    if ($rawUsername === '') {
+        if (!empty($options['emitEmptyMessage']) && $managedUsers === []) {
+            $message = isset($options['emptyMessage']) ? (string) $options['emptyMessage'] : "No users setup - nothing to do\n";
+            !empty($options['emptyToStderr']) ? fwrite(STDERR, $message) : print $message;
+        }
+        return array('exitCode' => 0, 'username' => '', 'users' => $managedUsers);
+    }
+
+    $strictInput = !empty($options['strictInput']);
+    $username = $strictInput ? pmssNormalizeUsername($rawUsername) : pmssUsernameNormalizeIfValid($rawUsername);
+    if ($username === null || ($strictInput && ($username !== $rawUsername || !pmssValidateUsername($username)))) {
+        $username = pmssNormalizeUsername($rawUsername);
+        $message = isset($options['invalidMessage']) ? (string) $options['invalidMessage'] : "Invalid username\n";
+        fwrite(STDERR, strpos($message, '%s') === false ? $message : sprintf($message, $username));
+
+        return array('exitCode' => 1, 'username' => $username, 'users' => array());
+    }
+
+    $found = (!empty($options['lookupMode']) && $options['lookupMode'] === 'account')
+        ? pmssUserAccountLookup($username) !== null
+        : in_array($username, $managedUsers, true);
+    if (!$found) {
+        $message = isset($options['notFoundMessage']) ? (string) $options['notFoundMessage'] : "User not found\n";
+        fwrite(STDERR, strpos($message, '%s') === false ? $message : sprintf($message, $username));
+
+        return array('exitCode' => 1, 'username' => $username, 'users' => array());
+    }
+    return array('exitCode' => 0, 'username' => $username, 'users' => array($username));
+}
+
 /** @return array<string,mixed>|null */
 function pmssUserAccountLookup(string $username): ?array
 {

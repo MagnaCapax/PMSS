@@ -32,10 +32,10 @@ TXT;
         return 0;
     }
 
-    $requestedUser = pmssNormalizeUsername((string) pmssCliOption($parsed, 'user', 'u', ''));
+    $requestedUser = (string) pmssCliOption($parsed, 'user', 'u', '');
     $positionals = $parsed['arguments'] ?? [];
     if ($requestedUser === '' && count($positionals) === 1) {
-        $requestedUser = pmssNormalizeUsername((string) $positionals[0]);
+        $requestedUser = (string) $positionals[0];
     } elseif (count($positionals) > 1) {
         fwrite(STDERR, $usage);
         return 1;
@@ -43,26 +43,14 @@ TXT;
 
     $restartNginx = pmssCliOption($parsed, 'restart', 'r', false) !== false;
 
-    if ($requestedUser !== '' && pmssUsernameNormalizeIfValid($requestedUser) === null) {
-        fwrite(STDERR, "Invalid username: {$requestedUser}\n");
-        return 1;
-    }
+    $selection = pmssManagedUsersSelectFromList(pmssListManagedUsers('/scripts/listUsers.php'), $requestedUser, array('emitEmptyMessage' => true, 'invalidMessage' => "Invalid username: %s\n", 'notFoundMessage' => "Username not found: %s\n"));
+    if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];
 
-    $users = pmssListManagedUsers('/scripts/listUsers.php');
-    if ($users === []) {
-        echo "No users setup - nothing to do\n";
-        return 0;
-    }
+    $requestedUser = $selection['username'];
+    $users = $selection['users'];
     sort($users, SORT_NATURAL | SORT_FLAG_CASE);
 
     $singleUser = ($requestedUser !== '');
-    if ($singleUser) {
-        if (!in_array($requestedUser, $users, true)) {
-            fwrite(STDERR, "Username not found: {$requestedUser}\n");
-            return 1;
-        }
-        $users = [$requestedUser];
-    }
 
     $ctx = pmssCreateNginxConfigSetup($requestedUser, $singleUser);
     foreach ($users as $thisUser) {

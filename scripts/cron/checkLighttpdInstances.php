@@ -22,19 +22,12 @@ $canUserLog = function_exists('pmssUserLog');
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
 if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
-    $users = pmssListManagedUsers();
-} else {
-    if (!pmssValidateUsername($argUserRaw)) {
-        fwrite(STDERR, "Invalid username\n");
-        exit(1);
-    }
-    $argUser = pmssNormalizeUsername($argUserRaw);
-    if (pmssUserAccountLookup($argUser) === null) {
-        fwrite(STDERR, "User not found\n");
-        exit(1);
-    }
-    $users = [$argUser];
 }
+$selection = pmssManagedUsersSelectFromList(pmssListManagedUsers(), $argUserRaw, array('lookupMode' => 'account', 'strictInput' => true));
+if ($selection['exitCode'] !== 0) {
+    exit($selection['exitCode']);
+}
+$users = $selection['users'];
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
     $homeDir = "/home/{$thisUser}";

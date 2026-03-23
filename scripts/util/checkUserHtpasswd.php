@@ -59,29 +59,9 @@ function pmssCheckUserHtpasswdHasUserEntry(string $path, string $username)
 function pmssCheckUserHtpasswdMain(array $argv): int
 {
     $argUserRaw = trim((string) ($argv[1] ?? ''));
-    if ($argUserRaw !== '') {
-        $argUser = function_exists('pmssNormalizeUsername')
-            ? pmssNormalizeUsername($argUserRaw)
-            : $argUserRaw;
-        if (
-            $argUser !== $argUserRaw
-            || (function_exists('pmssValidateUsername') && !pmssValidateUsername($argUser))
-        ) {
-            fwrite(STDERR, "Invalid username\n");
-            return 1;
-        }
-        if (pmssUserAccountLookup($argUser) === null) {
-            fwrite(STDERR, "User not found\n");
-            return 1;
-        }
-        $users = [$argUser];
-    } else {
-        $users = pmssListManagedUsers('/scripts/listUsers.php');
-        if ($users === []) {
-            echo "No users setup - nothing to do\n";
-            return 0;
-        }
-    }
+    $selection = pmssManagedUsersSelectFromList(pmssListManagedUsers('/scripts/listUsers.php'), $argUserRaw, array('emitEmptyMessage' => true, 'lookupMode' => 'account', 'strictInput' => true));
+    if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];
+    $users = $selection['users'];
 
     $globalHtpasswd = '/etc/lighttpd/.htpasswd';
     if (trim((string) ($globalContents = @file_get_contents($globalHtpasswd))) === '') {
