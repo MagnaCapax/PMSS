@@ -407,6 +407,7 @@ function pmssRcloneLighttpdProxyFragment(string $user, int $port): string
 # PMSS-managed: rclone reverse proxy.
 
 \$HTTP["url"] =~ "^/user-{$user}/rclone/" {
+  auth.require = ()
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
     "port" => {$port}

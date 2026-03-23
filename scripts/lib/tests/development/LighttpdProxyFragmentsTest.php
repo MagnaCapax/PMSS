@@ -24,6 +24,7 @@ class LighttpdProxyFragmentsTest extends TestCase
         $fragment = \pmssRcloneLighttpdProxyFragment('demo', 4001);
 
         $this->assertStringContainsString('^/user-demo/rclone/', $fragment);
+        $this->assertStringContainsString('auth.require = ()', $fragment);
         $this->assertStringContainsString('"host" => "127.0.0.1"', $fragment);
         $this->assertStringContainsString('"port" => 4001', $fragment);
     }
