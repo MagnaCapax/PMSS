@@ -10,13 +10,7 @@ echo date('Y-m-d H:i:s') . ': Checking Rclone instances' . "\n";
 require_once __DIR__.'/../lib/userLifecycle.php';
 $users = pmssListManagedUsers();
 foreach($users AS $thisUser) {
-    if (pmssUserWebRootUnavailable($thisUser)) {
-            echo "User: {$thisUser} is suspended\n";
-            // Kill only rclone — not all user processes (see GH#210).
-            passthru("killall -9 -u ".escapeshellarg($thisUser)." rclone 2>/dev/null");
-            pmssUserLog($thisUser, 'rclone stopped due to suspension');
-            continue;  //Suspended
-    }
+    if (pmssUserWatchdogHandleSuspended($thisUser, ['rclone'], 'rclone stopped due to suspension')) continue;  //Suspended
 
     // Skip users that have not explicitly enabled rclone support
     if (!file_exists("/home/{$thisUser}/.rcloneEnable")) continue;

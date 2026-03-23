@@ -27,13 +27,7 @@ $users = $selection['users'];
 foreach($users AS $thisUser) {
     $homeDir = "/home/{$thisUser}";
     #TODO Uh Oh next one should be separate script :) This is separate task altogether. Works here too as expected, just a bit confusing
-    if (pmssUserWebRootUnavailable($thisUser)) {
-            echo "User: {$thisUser} is suspended\n";
-            // Kill only lighttpd and php-cgi — not all user processes (see GH#210).
-            passthru("killall -9 -u ".escapeshellarg($thisUser)." lighttpd 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." php-cgi 2>/dev/null");
-            pmssUserLog($thisUser, 'lighttpd stopped due to suspension');
-            continue;  //Suspended
-    }
+    if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped due to suspension')) continue;  //Suspended
 
     // Auto-generate lighttpd config if user has a home directory but missing config.
     // This catches migrated users whose data was transferred but config wasn't generated.

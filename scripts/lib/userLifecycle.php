@@ -217,6 +217,22 @@ function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'
     return is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www');
 }
 
+/** @param array<int,string> $processNames */
+function pmssUserWatchdogHandleSuspended(
+    string $username,
+    array $processNames,
+    string $userLogMessage
+): bool {
+    if (!pmssUserWebRootUnavailable($username)) return false;
+    echo "User: {$username} is suspended\n";
+    foreach ($processNames as $processName) {
+        if (!is_string($processName) || $processName === '') continue;
+        @passthru('killall -9 -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null');
+    }
+    pmssUserLog($username, $userLogMessage);
+    return true;
+}
+
 function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array
 {
     $managedUsers = array_values(array_unique(array_filter(array_map('pmssNormalizeUsername', $managedUsers), 'pmssValidateUsername')));

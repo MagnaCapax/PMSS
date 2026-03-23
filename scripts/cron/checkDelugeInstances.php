@@ -15,13 +15,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 if (is_file($pmssDelugePath = __DIR__.'/../lib/user/deluge.php')) { require_once $pmssDelugePath; }
 $users = pmssListManagedUsers();
 foreach($users AS $thisUser) {
-    if (pmssUserWebRootUnavailable($thisUser)) {
-            echo "User: {$thisUser} is suspended\n";
-            // Kill only deluged and deluge-web — not all user processes (see GH#210).
-            passthru("killall -9 -u ".escapeshellarg($thisUser)." deluged 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." deluge-web 2>/dev/null");
-            pmssUserLog($thisUser, 'deluge stopped due to suspension');
-            continue;  //Suspended
-    }
+    if (pmssUserWatchdogHandleSuspended($thisUser, ['deluged', 'deluge-web'], 'deluge stopped due to suspension')) continue;  //Suspended
 
     if (!file_exists("/home/{$thisUser}/.delugeEnable")) continue;  // Deluge not enabled
     

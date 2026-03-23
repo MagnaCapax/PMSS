@@ -11,13 +11,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 if (is_file($pmssQbittorrentPath = __DIR__.'/../lib/user/qbittorrent.php')) { require_once $pmssQbittorrentPath; }
 $users = pmssListManagedUsers();
 foreach($users AS $thisUser) {
-    if (pmssUserWebRootUnavailable($thisUser)) {
-            echo "User: {$thisUser} is suspended\n";
-            // Kill only qbittorrent-nox — not all user processes (see GH#210).
-            passthru("killall -9 -u ".escapeshellarg($thisUser)." qbittorrent-nox 2>/dev/null");
-            pmssUserLog($thisUser, 'qbittorrent-nox stopped due to suspension');
-            continue;  //Suspended
-    }
+    if (pmssUserWatchdogHandleSuspended($thisUser, ['qbittorrent-nox'], 'qbittorrent-nox stopped due to suspension')) continue;  //Suspended
 
     if (!file_exists("/home/{$thisUser}/.qbittorrentEnable")) continue;  // qBittorrent not enabled
     
