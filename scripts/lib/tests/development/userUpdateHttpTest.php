@@ -104,10 +104,10 @@ class UserUpdateHttpTest extends TestCase
             'user_esc' => escapeshellarg('dummy'),
         ];
 
-        $jsonLog = $this->tmpFile();
+        $jsonLog = $this->pmssMakeTempFile('pmss-json-');
         file_put_contents($jsonLog, '');
 
-        $previous = $this->stashEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
+        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
         putenv('PMSS_DRY_RUN=1');
         putenv('PMSS_JSON_LOG='.$jsonLog);
         putenv('PMSS_SKEL_DIR');
@@ -118,11 +118,10 @@ class UserUpdateHttpTest extends TestCase
             \pmssUserConfigureHttp($ctx);
             $cmd = $this->findStepCommand($jsonLog, 'Copying irssi skeleton config');
         } finally {
-            $this->restoreEnv($previous);
+            $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
             $this->cleanup($home);
         }
-        @unlink($jsonLog);
 
         $expected = sprintf('cp /etc/skel/.irssi/config %s/', escapeshellarg($home.'/.irssi'));
         $this->assertEquals($expected, $cmd ?? '');
@@ -142,10 +141,10 @@ class UserUpdateHttpTest extends TestCase
             'user_esc' => escapeshellarg('dummy'),
         ];
 
-        $jsonLog = $this->tmpFile();
+        $jsonLog = $this->pmssMakeTempFile('pmss-json-');
         file_put_contents($jsonLog, '');
 
-        $previous = $this->stashEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
+        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
         putenv('PMSS_DRY_RUN=1');
         putenv('PMSS_JSON_LOG='.$jsonLog);
         putenv('PMSS_SKEL_DIR='.$skel);
@@ -156,12 +155,11 @@ class UserUpdateHttpTest extends TestCase
             \pmssUserConfigureHttp($ctx);
             $cmd = $this->findStepCommand($jsonLog, 'Copying irssi skeleton config');
         } finally {
-            $this->restoreEnv($previous);
+            $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
             $this->cleanup($home);
             $this->cleanup($skel);
         }
-        @unlink($jsonLog);
 
         $expected = sprintf('cp %s %s/', escapeshellarg($skel.'/.irssi/config'), escapeshellarg($home.'/.irssi'));
         $this->assertEquals($expected, $cmd ?? '');
@@ -189,36 +187,6 @@ class UserUpdateHttpTest extends TestCase
             return isset($entry['command']) ? (string) $entry['command'] : null;
         }
         return null;
-    }
-
-    private function stashEnv(array $names): array
-    {
-        $previous = [];
-        foreach ($names as $name) {
-            $previous[$name] = getenv($name);
-        }
-        return $previous;
-    }
-
-    private function restoreEnv(array $previous): void
-    {
-        foreach ($previous as $name => $value) {
-            if ($value === false) {
-                putenv($name);
-            } else {
-                putenv($name.'='.$value);
-            }
-        }
-    }
-
-    private function tmpFile(): string
-    {
-        $f = tempnam(sys_get_temp_dir(), 'pmss-json-');
-        if ($f === false) {
-            $f = sys_get_temp_dir().'/pmss-json-'.bin2hex(random_bytes(4));
-            touch($f);
-        }
-        return $f;
     }
 
 }

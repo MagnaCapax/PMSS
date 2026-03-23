@@ -26,7 +26,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->homeRoot = sys_get_temp_dir().'/pmss-userfile-'.bin2hex(random_bytes(4));
         @mkdir($this->homeRoot, 0755, true);
 
-        $this->envBackup = $this->stashEnv(['PMSS_HOME_DIR']);
+        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR']);
         putenv('PMSS_HOME_DIR='.$this->homeRoot);
 
         $this->skelDirName = 'pmss-userfile-'.bin2hex(random_bytes(3));
@@ -36,7 +36,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->restoreEnv($this->envBackup);
+        $this->pmssRestoreEnvMap($this->envBackup);
         $this->cleanup($this->homeRoot);
         $this->cleanup($this->skelDirPath);
     }
@@ -135,27 +135,6 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $path = \pmssSkeletonBase().'/'.$relative;
         @mkdir(dirname($path), 0755, true);
         file_put_contents($path, $content);
-    }
-
-    private function stashEnv(array $names): array
-    {
-        $values = [];
-        foreach ($names as $name) {
-            $value = getenv($name);
-            $values[$name] = $value === false ? null : $value;
-        }
-        return $values;
-    }
-
-    private function restoreEnv(array $values): void
-    {
-        foreach ($values as $name => $value) {
-            if ($value === null) {
-                putenv($name);
-            } else {
-                putenv($name.'='.$value);
-            }
-        }
     }
 
 }

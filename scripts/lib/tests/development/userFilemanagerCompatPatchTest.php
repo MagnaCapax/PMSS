@@ -20,7 +20,7 @@ class UserFilemanagerCompatPatchTest extends TestCase
         $this->homeRoot = sys_get_temp_dir().'/pmss-user-filemanager-home-'.bin2hex(random_bytes(4));
         $this->skelDir = sys_get_temp_dir().'/pmss-user-filemanager-skel-'.bin2hex(random_bytes(4));
         $this->user = 'user'.bin2hex(random_bytes(2));
-        $this->envBackup = $this->stashEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
+        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
         @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
         @mkdir($this->skelDir.'/www', 0755, true);
@@ -31,7 +31,7 @@ class UserFilemanagerCompatPatchTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->restoreEnv($this->envBackup);
+        $this->pmssRestoreEnvMap($this->envBackup);
         $this->cleanup($this->homeRoot);
         $this->cleanup($this->skelDir);
     }
@@ -133,26 +133,6 @@ PHP;
         $path = $this->skelDir.'/'.$relative;
         @mkdir(dirname($path), 0755, true);
         file_put_contents($path, $content);
-    }
-
-    private function stashEnv(array $names): array
-    {
-        $previous = [];
-        foreach ($names as $name) {
-            $previous[$name] = getenv($name);
-        }
-        return $previous;
-    }
-
-    private function restoreEnv(array $previous): void
-    {
-        foreach ($previous as $name => $value) {
-            if ($value === false) {
-                putenv($name);
-            } else {
-                putenv($name.'='.$value);
-            }
-        }
     }
 
 }

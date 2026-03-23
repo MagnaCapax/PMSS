@@ -170,6 +170,24 @@ abstract class TestCase
         return $path;
     }
 
+    /** Create and track a unique temporary file for hermetic tests. */
+    protected function pmssMakeTempFile(string $prefix = 'pmss'): string
+    {
+        $base = getenv('PMSS_TEST_TEMP_ROOT');
+        if (!is_string($base) || $base === '') {
+            $base = sys_get_temp_dir();
+        }
+
+        $path = @tempnam($base, $prefix);
+        if ($path === false) {
+            $path = rtrim($base, '/').'/'.$prefix.bin2hex(random_bytes(6));
+            touch($path);
+        }
+
+        $this->tempPaths[] = $path;
+        return $path;
+    }
+
     /** Remove a temporary directory tree created during tests. */
     protected function pmssRemoveTree(string $path): void
     {
@@ -220,6 +238,25 @@ abstract class TestCase
         }
 
         putenv($key.'='.$value);
+    }
+
+    /** Capture current values for a list of environment variables. */
+    protected function pmssCaptureEnv(array $keys): array
+    {
+        $values = [];
+        foreach ($keys as $key) {
+            $values[$key] = getenv($key);
+        }
+
+        return $values;
+    }
+
+    /** Restore a map of environment variables captured with pmssCaptureEnv(). */
+    protected function pmssRestoreEnvMap(array $values, bool $unsetEmptyString = false): void
+    {
+        foreach ($values as $key => $value) {
+            $this->pmssRestoreEnv($key, $value, $unsetEmptyString);
+        }
     }
 
     /**

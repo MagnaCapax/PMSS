@@ -22,7 +22,7 @@ class TorrentPortFrontendTest extends TestCase
         $this->homeRoot = sys_get_temp_dir().'/pmss-torrent-frontends-home-'.$suffix;
         $this->skelDir = sys_get_temp_dir().'/pmss-torrent-frontends-skel-'.$suffix;
         $this->user = 'user'.bin2hex(random_bytes(2));
-        $this->envBackup = $this->stashEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
+        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
         @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
         @mkdir($this->skelDir.'/www', 0755, true);
@@ -33,7 +33,7 @@ class TorrentPortFrontendTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->restoreEnv($this->envBackup);
+        $this->pmssRestoreEnvMap($this->envBackup);
         $this->cleanup($this->homeRoot);
         $this->cleanup($this->skelDir);
     }
@@ -220,26 +220,6 @@ class TorrentPortFrontendTest extends TestCase
         $path = $this->homePath($relative);
         @mkdir(dirname($path), 0755, true);
         file_put_contents($path, $content);
-    }
-
-    private function stashEnv(array $names): array
-    {
-        $previous = [];
-        foreach ($names as $name) {
-            $previous[$name] = getenv($name);
-        }
-        return $previous;
-    }
-
-    private function restoreEnv(array $previous): void
-    {
-        foreach ($previous as $name => $value) {
-            if ($value === false) {
-                putenv($name);
-            } else {
-                putenv($name.'='.$value);
-            }
-        }
     }
 
 }

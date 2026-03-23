@@ -33,7 +33,7 @@ class A00_JsonLogPathTest extends TestCase
     public function testJsonPathReadsEnvOnFirstCall(): void
     {
         $this->resetJsonLogPath();
-        $tmp = $this->tmpFile();
+        $tmp = $this->pmssMakeTempFile('pmss');
         putenv('PMSS_JSON_LOG='.$tmp);
         $this->assertEquals($tmp, \pmssJsonLogPath());
     }
@@ -50,7 +50,7 @@ class A00_JsonLogPathTest extends TestCase
     {
         $this->resetJsonLogPath();
         $this->resetCorrelationId();
-        $path = $this->tmpFile();
+        $path = $this->pmssMakeTempFile('pmss');
         file_put_contents($path, '');
         putenv('PMSS_JSON_LOG='.$path);
         $expectedCorrelationId = \pmssCorrelationId();
@@ -66,7 +66,7 @@ class A00_JsonLogPathTest extends TestCase
     public function testLogJsonRespectsProvidedCorrelationId(): void
     {
         $this->resetJsonLogPath();
-        $path = $this->tmpFile();
+        $path = $this->pmssMakeTempFile('pmss');
         file_put_contents($path, '');
         putenv('PMSS_JSON_LOG='.$path);
         putenv('PMSS_CORRELATION_ID=test-correlation-id');
@@ -75,16 +75,6 @@ class A00_JsonLogPathTest extends TestCase
         $raw = trim(file_get_contents($path));
         $data = json_decode($raw, true);
         $this->assertEquals('test-correlation-id', $data['pmss_correlation_id'] ?? '');
-    }
-
-    private function tmpFile(): string
-    {
-        $f = tempnam(sys_get_temp_dir(), 'pmss');
-        if ($f === false) {
-            $f = sys_get_temp_dir().'/pmss-'.bin2hex(random_bytes(4));
-            touch($f);
-        }
-        return $f;
     }
 
     private function resetJsonLogPath(): void

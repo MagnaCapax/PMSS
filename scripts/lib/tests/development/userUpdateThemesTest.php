@@ -22,10 +22,10 @@ class UserUpdateThemesTest extends TestCase
             'rutorrent_index_sha'=> '',
         ];
 
-        $jsonLog = $this->tmpFile();
+        $jsonLog = $this->pmssMakeTempFile('pmss-user-theme-');
         @file_put_contents($jsonLog, '');
 
-        $previous = $this->stashEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
+        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
         putenv('PMSS_DRY_RUN=1');
         putenv('PMSS_JSON_LOG='.$jsonLog);
         putenv('PMSS_SKEL_DIR='.$skel);
@@ -36,12 +36,11 @@ class UserUpdateThemesTest extends TestCase
             \pmssUserUpdateThemes($ctx);
             $cmd = $this->findStepCommand($jsonLog, 'Installing ruTorrent theme Agent34');
         } finally {
-            $this->restoreEnv($previous);
+            $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
             $this->cleanup($home);
             $this->cleanup($skel);
         }
-        @unlink($jsonLog);
 
         $expected = sprintf(
             'cp -r %s %s',
@@ -78,36 +77,6 @@ class UserUpdateThemesTest extends TestCase
         }
 
         return null;
-    }
-
-    private function stashEnv(array $names): array
-    {
-        $previous = [];
-        foreach ($names as $name) {
-            $previous[$name] = getenv($name);
-        }
-        return $previous;
-    }
-
-    private function restoreEnv(array $previous): void
-    {
-        foreach ($previous as $name => $value) {
-            if ($value === false) {
-                putenv($name);
-            } else {
-                putenv($name.'='.$value);
-            }
-        }
-    }
-
-    private function tmpFile(): string
-    {
-        $file = tempnam(sys_get_temp_dir(), 'pmss-user-theme-');
-        if ($file === false) {
-            $file = sys_get_temp_dir().'/pmss-user-theme-'.bin2hex(random_bytes(4));
-            @touch($file);
-        }
-        return $file;
     }
 
 }

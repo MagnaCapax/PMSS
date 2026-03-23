@@ -120,7 +120,7 @@ class UpdateHelpersTest extends TestCase
 
     public function testGetPmssVersionFromCustomFile(): void
     {
-        $f = $this->tmpFile();
+        $f = $this->pmssMakeTempFile('pmss');
         file_put_contents($f, "git/main:2024-01-01\n");
         $this->assertEquals('git/main:2024-01-01', \getPmssVersion($f));
     }
@@ -130,16 +130,5 @@ class UpdateHelpersTest extends TestCase
         // When template missing, function returns early without changes
         \generateMotd();
         $this->assertTrue(true, 'generateMotd should be a no-op without template');
-    }
-
-    // Utility kept for potential future tests; currently unused in this class.
-    private function tmpFile(): string
-    {
-        $f = tempnam(sys_get_temp_dir(), 'pmss');
-        if ($f === false) {
-            $f = sys_get_temp_dir().'/pmss-'.bin2hex(random_bytes(4));
-            touch($f);
-        }
-        return $f;
     }
 }
