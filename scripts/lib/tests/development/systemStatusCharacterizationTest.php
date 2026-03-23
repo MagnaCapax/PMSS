@@ -112,14 +112,31 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals(['ok' => 2, 'warn' => 1, 'err' => 1], $summary);
     }
 
+    public function testStatusJsonEncodeSubstitutesInvalidUtf8(): void
+    {
+        $json = pmssStatusJsonEncode([
+            'results' => [
+                pmssStatus('bin.php', 'OK', "bad\xB1detail"),
+            ],
+        ]);
+
+        $this->assertStringContainsString('"results"', $json);
+        $this->assertStringContainsString('\\ufffd', $json);
+        $this->assertEquals(JSON_ERROR_NONE, json_last_error());
+    }
+
     public function testCliScriptsUseSharedComponentStatusHelper(): void
     {
         $componentSource = $this->pmssReadRepoFile('scripts/util/componentStatus.php');
         $systemSource = $this->pmssReadRepoFile('scripts/util/systemTest.php');
+        $librarySource = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/systemStatus.php';", $componentSource);
         $this->assertStringContainsString('pmssComponentStatusChecks()', $componentSource);
         $this->assertStringContainsString('pmssComponentStatusChecks()', $systemSource);
+        $this->assertStringContainsString('function pmssStatusJsonEncode(', $librarySource);
+        $this->assertStringContainsString('pmssStatusJsonEncode([', $componentSource);
+        $this->assertStringContainsString('pmssStatusJsonEncode([', $systemSource);
         $this->pmssAssertStringNotContainsString('json_decode($componentJson, true);', $systemSource);
     }
 }

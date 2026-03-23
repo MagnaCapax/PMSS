@@ -215,7 +215,7 @@ foreach (pmssComponentStatusChecks() as $entry) {
 $summary = pmssStatusSummary($checks);
 
 if ($format === 'json') {
-    echo json_encode(['checks' => $checks, 'summary' => $summary], $prettyFlag ? JSON_PRETTY_PRINT : 0).PHP_EOL;
+    echo pmssStatusJsonEncode(['checks' => $checks, 'summary' => $summary], $prettyFlag ? JSON_PRETTY_PRINT : 0).PHP_EOL;
     exit(0);
 }
 

@@ -13,6 +13,24 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
 {
     return ['name' => $name, 'status' => $status, 'detail' => $detail];
 }
+
+/**
+ * Encode a status payload as JSON without letting invalid UTF-8 break output.
+ */
+function pmssStatusJsonEncode(array $payload, int $flags = 0): string
+{
+    $jsonFlags = $flags;
+    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+        $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+    }
+
+    $json = json_encode($payload, $jsonFlags);
+    if ($json !== false) {
+        return $json;
+    }
+
+    return '{"error":"status_json_encode_failed","code":'.(int) json_last_error().'}';
+}
 /** Count OK/WARN/ERR entries for summary banners and JSON payloads. */
 function pmssStatusSummary(array $checks): array
 {

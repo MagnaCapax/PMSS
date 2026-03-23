@@ -23,7 +23,7 @@ $results = pmssComponentStatusChecks();
 $summary = pmssStatusSummary($results);
 
 if ($wantJson) {
-    echo json_encode(['generated_at' => date('c'), 'results' => $results], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL;
+    echo pmssStatusJsonEncode(['generated_at' => date('c'), 'results' => $results], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL;
     exit(0);
 }
 
