@@ -38,8 +38,7 @@ class ListUsersGarbageOutputTest extends TestCase
         ];
 
         foreach ($helperTargets as $file) {
-            $src = $this->pmssReadRepoFile($file);
-            $this->assertStringContainsString("pmssListManagedUsers('/scripts/listUsers.php')", $src, $file.' must use pmssListManagedUsers()');
+            $this->pmssAssertRepoFileContainsString($file, "pmssListManagedUsers('/scripts/listUsers.php')", $file.' must use pmssListManagedUsers()');
         }
 
         // Direct consumers that still shell out to listUsers.php must keep explicit validation.
@@ -51,9 +50,8 @@ class ListUsersGarbageOutputTest extends TestCase
         ];
 
         foreach ($directTargets as $file) {
-            $src = $this->pmssReadRepoFile($file);
-            $this->assertStringContainsString('listUsers.php', $src, $file.' must call listUsers.php');
-            $this->assertStringContainsString('pmssValidateUsername', $src, $file.' must revalidate usernames from listUsers');
+            $this->pmssAssertRepoFileContainsString($file, 'listUsers.php', $file.' must call listUsers.php');
+            $this->pmssAssertRepoFileContainsString($file, 'pmssValidateUsername', $file.' must revalidate usernames from listUsers');
         }
 
         // The main guard against garbage lines is that only names accepted by

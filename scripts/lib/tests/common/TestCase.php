@@ -190,4 +190,28 @@ abstract class TestCase
         $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
         return $contents;
     }
+
+    /** Read a repository file and assert that it contains a substring. */
+    protected function pmssAssertRepoFileContainsString(string $relativePath, string $needle, string $message = ''): void
+    {
+        $this->assertStringContainsString($needle, $this->pmssReadRepoFile($relativePath), $message);
+    }
+
+    /** Read a repository file and assert that it omits a substring. */
+    protected function pmssAssertRepoFileNotContainsString(string $relativePath, string $needle, string $message = ''): void
+    {
+        $this->pmssAssertStringNotContainsString($needle, $this->pmssReadRepoFile($relativePath), $message);
+    }
+
+    /** Read a repository file and assert that it contains multiple substrings. */
+    protected function pmssAssertRepoFileContainsAllStrings(string $relativePath, array $needles, string $messagePrefix = ''): void
+    {
+        $this->assertStringContainsAllStrings($needles, $this->pmssReadRepoFile($relativePath), $messagePrefix);
+    }
+
+    /** Read a repository file and assert a fixed substring count. */
+    protected function pmssAssertRepoFileSubstringCount(string $relativePath, string $needle, int $expectedCount, string $message = ''): void
+    {
+        $this->assertEquals($expectedCount, substr_count($this->pmssReadRepoFile($relativePath), $needle), $message);
+    }
 }

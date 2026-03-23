@@ -22,9 +22,6 @@ class TrafficLimitCliTextTest extends TestCase
 
     public function testMissingUsernamePathStillPrintsUsageText(): void
     {
-        $this->assertStringContainsString(
-            'Error: missing username.\\n".$usage."\\n',
-            $this->pmssReadRepoFile('scripts/util/userTrafficLimit.php')
-        );
+        $this->pmssAssertRepoFileContainsString('scripts/util/userTrafficLimit.php', 'Error: missing username.\\n".$usage."\\n');
     }
 }

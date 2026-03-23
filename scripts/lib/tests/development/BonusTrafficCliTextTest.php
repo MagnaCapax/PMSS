@@ -22,9 +22,6 @@ class BonusTrafficCliTextTest extends TestCase
 
     public function testMissingUsernamePathStillPrintsUsageText(): void
     {
-        $this->assertStringContainsString(
-            'Error: missing username.\\n".$usage."\\n',
-            $this->pmssReadRepoFile('scripts/lib/user/bonusTraffic.php')
-        );
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/bonusTraffic.php', 'Error: missing username.\\n".$usage."\\n');
     }
 }

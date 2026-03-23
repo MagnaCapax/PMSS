@@ -15,13 +15,15 @@ class ProcessSnapshotCronTest extends TestCase
 
     public function testRootCronSchedulesProcessSnapshots(): void
     {
-        $cron = $this->pmssReadRepoFile('etc/seedbox/config/root.cron');
-        $this->assertTrue(strpos($cron, '/scripts/cron/processSnapshot.php') !== false, 'root.cron should schedule processSnapshot.php');
+        $this->pmssAssertRepoFileContainsString('etc/seedbox/config/root.cron', '/scripts/cron/processSnapshot.php', 'root.cron should schedule processSnapshot.php');
     }
 
     public function testLogrotateKeepsProcessSnapshotHistoryRootOnly(): void
     {
-        $policy = $this->pmssReadRepoFile('etc/seedbox/config/template.logrotate.pmss');
-        $this->assertStringContainsAllStrings(['/var/log/pmss/process-snapshot.log', 'weekly', 'rotate 8', 'create 0600 root root'], $policy, 'logrotate policy is missing: ');
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'etc/seedbox/config/template.logrotate.pmss',
+            ['/var/log/pmss/process-snapshot.log', 'weekly', 'rotate 8', 'create 0600 root root'],
+            'logrotate policy is missing: '
+        );
     }
 }

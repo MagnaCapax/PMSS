@@ -16,19 +16,22 @@ final class CliWrapperCharacterizationTest extends TestCase
         ];
 
         foreach ($cases as $path => $target) {
-            $source = $this->pmssReadRepoFile($path);
-            $this->assertStringContainsString("require_once __DIR__.'/lib/runtime.php';", $source);
-            $this->assertStringContainsString("pmssRequireCliEntrypointScript(__DIR__, '{$target}');", $source);
-            $this->assertTrue(strpos($source, '$argv') === false, $path.' should stay a thin wrapper');
+            $this->pmssAssertRepoFileContainsString($path, "require_once __DIR__.'/lib/runtime.php';");
+            $this->pmssAssertRepoFileContainsString($path, "pmssRequireCliEntrypointScript(__DIR__, '{$target}');");
+            $this->pmssAssertRepoFileNotContainsString($path, '$argv', $path.' should stay a thin wrapper');
         }
     }
 
     public function testUserDockerKeepsSharedStopAndSocketGuardsInline(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/userDocker.php');
-        $this->assertStringContainsString('$dockerStopCmd =', $source);
-        $this->assertStringContainsString('$socketPresent = file_exists($dockerSock);', $source);
-        $this->assertStringContainsString('Docker socket present for {$user}, but process check failed; skipping start', $source);
-        $this->assertStringContainsString('Docker start requested for {$user} via dockerd-rootless.sh', $source);
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/util/userDocker.php',
+            [
+                '$dockerStopCmd =',
+                '$socketPresent = file_exists($dockerSock);',
+                'Docker socket present for {$user}, but process check failed; skipping start',
+                'Docker start requested for {$user} via dockerd-rootless.sh',
+            ]
+        );
     }
 }
