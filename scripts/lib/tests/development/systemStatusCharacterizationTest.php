@@ -201,6 +201,28 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals(45, count($checks));
     }
 
+    public function testSystemStatusWarnsWhenSymlinkTargetCannotBeRead(): void
+    {
+        $dependencies = $this->buildSystemStatusDependencies();
+        $dependencies['readLink'] = static function (string $path): string {
+            if ($path === '/usr/local/bin/flexget') {
+                return '';
+            }
+
+            return [
+                '/usr/local/bin/acd_cli' => '/opt/acd_cli/bin/acd_cli',
+                '/usr/local/bin/flexget' => '/opt/flexget/bin/flexget',
+                '/usr/local/bin/pyload' => '/opt/pyload/bin/pyload',
+            ][$path] ?? '';
+        };
+
+        $checks = pmssSystemStatusChecks($dependencies);
+
+        $this->assertEquals('CLI symlink: flexget', $checks[31]['name']);
+        $this->assertEquals('WARN', $checks[31]['status']);
+        $this->assertEquals('/usr/local/bin/flexget symlink target unreadable', $checks[31]['detail']);
+    }
+
     public function testCliScriptsUseSharedComponentStatusHelper(): void
     {
         $componentSource = $this->pmssReadRepoFile('scripts/util/componentStatus.php');

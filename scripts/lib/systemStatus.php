@@ -89,7 +89,10 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     $isDir = $dependencies['isDir'] ?? static function (string $path): bool { return is_dir($path); };
     $isExecutable = $dependencies['isExecutable'] ?? static function (string $path): bool { return is_executable($path); };
     $isLink = $dependencies['isLink'] ?? static function (string $path): bool { return is_link($path); };
-    $readLink = $dependencies['readLink'] ?? static function (string $path): string { return (string) readlink($path); };
+    $readLink = $dependencies['readLink'] ?? static function (string $path): string {
+        $target = readlink($path);
+        return $target === false ? '' : (string) $target;
+    };
     $readFile = $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; };
     $filePerms = $dependencies['filePerms'] ?? static function (string $path) { return @fileperms($path); };
 
@@ -232,6 +235,11 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         $expected = $target[1];
         if ($isLink($link)) {
             $actual = $readLink($link);
+            if ($actual === '') {
+                $checks[] = pmssStatus($label, 'WARN', sprintf('%s symlink target unreadable', $link));
+                continue;
+            }
+
             $checks[] = pmssStatus(
                 $label,
                 $actual === $expected ? 'OK' : 'WARN',
