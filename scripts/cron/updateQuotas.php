@@ -20,9 +20,6 @@ require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/userLifecycle.php';
 require_once __DIR__.'/../lib/quotaSnapshot.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
-    require_once $pmssUserLogPath;
-}
 $logger = new Logger(__FILE__);
 
 /**
@@ -81,7 +78,7 @@ $writeQuotaUserLogs = static function (
             array('status' => $status, 'message' => $contextMessage) + $context
         )
     );
-    if ($mirrorUserLog && function_exists('pmssUserLog')) {
+    if ($mirrorUserLog) {
         pmssUserLog($user, $userLogMessage === null ? $contextMessage : $userLogMessage);
     }
 };

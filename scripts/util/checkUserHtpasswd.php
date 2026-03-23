@@ -18,9 +18,6 @@
 
 require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
-    require_once $pmssUserLogPath;
-}
 
 /**
  * Write a structured log entry when the optional user logger is available.
@@ -117,9 +114,7 @@ function pmssCheckUserHtpasswdMain(array $argv): int
                 'chown '.escapeshellarg($thisUser.':'.$thisUser).' '.escapeshellarg($userHtpasswd),
                 false
             );
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($thisUser, 'htpasswd sync: appended legacy credential to per-user .htpasswd');
-            }
+            pmssUserLog($thisUser, 'htpasswd sync: appended legacy credential to per-user .htpasswd');
         }
     }
 

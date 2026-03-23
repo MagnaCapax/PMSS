@@ -9,32 +9,14 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/user/log.php';
+
 if (!defined('PMSS_USER_LOG_TEXT')) {
     define('PMSS_USER_LOG_TEXT', '/var/log/pmss/users.log');
 }
 
 if (!defined('PMSS_USER_LOG_JSON')) {
     define('PMSS_USER_LOG_JSON', '/var/log/pmss/users.jsonl');
-}
-
-if (!function_exists('pmssUserLogAllowed')) {
-    function pmssUserLogAllowed(): bool
-    {
-        static $cached = null;
-        if ($cached !== null) {
-            return $cached;
-        }
-
-        $uid = function_exists('posix_geteuid') ? @posix_geteuid() : null;
-        if ($uid === null) {
-            $status = @file_get_contents('/proc/self/status');
-            if ($status !== false && preg_match('/^Uid:\\s+(\\d+)/m', $status, $matches)) {
-                $uid = (int) $matches[1];
-            }
-        }
-
-        return $cached = ($uid === 0);
-    }
 }
 
 /**

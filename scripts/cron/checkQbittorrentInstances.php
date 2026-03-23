@@ -7,17 +7,15 @@
  * @author PMSS Team
  */
 echo date('Y-m-d H:i:s') . ': Checking qBittorrent instances' . "\n";
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
 require_once __DIR__.'/../lib/userLifecycle.php';
 if (is_file($pmssQbittorrentPath = __DIR__.'/../lib/user/qbittorrent.php')) { require_once $pmssQbittorrentPath; }
-$canUserLog = function_exists('pmssUserLog');
 $users = pmssListManagedUsers();
 foreach($users AS $thisUser) {
     if (pmssUserWebRootUnavailable($thisUser)) {
             echo "User: {$thisUser} is suspended\n";
             // Kill only qbittorrent-nox — not all user processes (see GH#210).
             passthru("killall -9 -u ".escapeshellarg($thisUser)." qbittorrent-nox 2>/dev/null");
-            if ($canUserLog) { pmssUserLog($thisUser, 'qbittorrent-nox stopped due to suspension'); }
+            pmssUserLog($thisUser, 'qbittorrent-nox stopped due to suspension');
             continue;  //Suspended
     }
 
@@ -27,13 +25,13 @@ foreach($users AS $thisUser) {
     $instances = shell_exec('pgrep -u' . $thisUser . ' qbittorrent-nox');
     if (function_exists('pmssQbittorrentApplyUploadThrottle') && pmssQbittorrentApplyUploadThrottle($thisUser) && !empty($instances)) {
         passthru('killall -u '.escapeshellarg($thisUser).' -TERM qbittorrent-nox 2>/dev/null');
-        if ($canUserLog) { pmssUserLog($thisUser, 'qbittorrent-nox restarted to apply upload throttle'); }
+        pmssUserLog($thisUser, 'qbittorrent-nox restarted to apply upload throttle');
         $instances = '';
     }
     if (empty($instances)) {
         echo "Start qBittorrent for user: {$thisUser}\n";
         passthru("su {$thisUser} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'");
-        if ($canUserLog) { pmssUserLog($thisUser, 'qbittorrent-nox start requested'); }
+        pmssUserLog($thisUser, 'qbittorrent-nox start requested');
     }
  
 
