@@ -29,13 +29,13 @@ require_once __DIR__.'/userTransfer/localUserSafety.php';
  */
 function pmssUserTransferWriteFile(string $path, string $contents, int $mode): void
 {
-    $written = pmssReplaceUserFile($path, $contents, static function (string $tmpPath) use ($mode): void {
+    if (pmssReplaceUserFile($path, $contents, static function (string $tmpPath) use ($mode): void {
         @chmod($tmpPath, $mode);
-    });
-
-    if (!$written) {
-        throw new RuntimeException('Failed writing: '.$path, 1);
+    })) {
+        return;
     }
+
+    throw new RuntimeException('Failed writing: '.$path, 1);
 }
 
 /**
@@ -52,9 +52,7 @@ function pmssUserTransferSleep(int $min, int $max, string $reason): void
     if ($max > $min) {
         try {
             $seconds = random_int($min, $max);
-        } catch (Throwable $e) {
-            $seconds = rand($min, $max);
-        }
+        } catch (Throwable $e) { $seconds = rand($min, $max); }
     }
 
     logMessage(sprintf('[SLEEP] %s (%ds)', $reason, $seconds));

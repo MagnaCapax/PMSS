@@ -8,11 +8,30 @@
 require_once __DIR__.'/sessionRewrite.php';
 
 /**
+ * Build the SSH command shared by rsync wrappers and the auth probe.
+ */
+function pmssUserTransferBuildSshCommand(string $remoteUser, array $extraOptions = []): string
+{
+    return 'ssh '.implode(' ', array_merge([
+        '-o Compression=no', '-o UserKnownHostsFile=/dev/null', '-o StrictHostKeyChecking=no',
+    ], $extraOptions, ['-l '.escapeshellarg($remoteUser)]));
+}
+
+/**
+ * Build a strict rsync wrapper script for the transfer flow.
+ */
+function pmssUserTransferBuildRsyncScript(array $cfg, array $arguments): string
+{
+    return "#!/bin/bash\nset -e\n".'rsync -av -e '.escapeshellarg(pmssUserTransferBuildSshCommand($cfg['remoteUser']))
+        .' '.implode(' ', $arguments).' '.escapeshellarg('/home/'.$cfg['localUser'].'/')."\n";
+}
+
+/**
  * Build the bash script that performs the main rsync pull (excluding volatile paths).
  */
 function pmssUserTransferBuildRsyncMain(array $cfg): string
 {
-    [$remoteUser, $hostname, $localUser] = [$cfg['remoteUser'], $cfg['hostname'], $cfg['localUser']];
+    [$remoteUser, $hostname] = [$cfg['remoteUser'], $cfg['hostname']];
 
     // Keep the exclude list in a stable order for readability and diffing.
     $excludes = [
@@ -41,18 +60,13 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
         '.trafficLimit',
     ];
 
-    $excludeArgs = [];
-    foreach ($excludes as $item) {
-        $excludeArgs[] = '--exclude='.escapeshellarg($item);
-    }
-
-    $ssh = sprintf('ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l %s', escapeshellarg($remoteUser));
-
-    return "#!/bin/bash\nset -e\n"
-        .'rsync -av -e '.escapeshellarg($ssh)
-        .' '.implode(' ', $excludeArgs)
-        .' '.escapeshellarg($remoteUser.'@'.$hostname.':/home/'.$remoteUser.'/')
-        .' '.escapeshellarg('/home/'.$localUser.'/')."\n";
+    return pmssUserTransferBuildRsyncScript(
+        $cfg,
+        array_merge(
+            array_map(static function (string $item): string { return '--exclude='.escapeshellarg($item); }, $excludes),
+            [escapeshellarg($remoteUser.'@'.$hostname.':/home/'.$remoteUser.'/')]
+        )
+    );
 }
 
 /**
@@ -60,7 +74,7 @@ function pmssUserTransferBuildRsyncMain(array $cfg): string
  */
 function pmssUserTransferBuildRsyncFinal(array $cfg): string
 {
-    [$remoteUser, $hostname, $localUser] = [$cfg['remoteUser'], $cfg['hostname'], $cfg['localUser']];
+    [$remoteUser, $hostname] = [$cfg['remoteUser'], $cfg['hostname']];
 
     // Keep this list explicit; do not rely on brace expansion inside expect.
     $sources = [
@@ -72,17 +86,10 @@ function pmssUserTransferBuildRsyncFinal(array $cfg): string
         '/home/'.$remoteUser.'/www/public',
     ];
 
-    $ssh = sprintf('ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l %s', escapeshellarg($remoteUser));
-
-    $args = [];
-    foreach ($sources as $source) {
-        $args[] = escapeshellarg($remoteUser.'@'.$hostname.':'.$source);
-    }
-
-    return "#!/bin/bash\nset -e\n"
-        .'rsync -av -e '.escapeshellarg($ssh)
-        .' '.implode(' ', $args)
-        .' '.escapeshellarg('/home/'.$localUser.'/')."\n";
+    return pmssUserTransferBuildRsyncScript(
+        $cfg,
+        array_map(static function (string $source) use ($remoteUser, $hostname): string { return escapeshellarg($remoteUser.'@'.$hostname.':'.$source); }, $sources)
+    );
 }
 
 /**
@@ -92,16 +99,10 @@ function pmssUserTransferBuildAuthProbe(array $cfg): string
 {
     [$remoteUser, $hostname] = [$cfg['remoteUser'], $cfg['hostname']];
 
-    // Keep SSH flags aligned with rsync wrappers so behaviour is predictable.
-    $ssh = sprintf(
-        'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1 -l %s',
-        escapeshellarg($remoteUser)
-    );
-
-    return "#!/bin/bash\nset -e\n"
-        .$ssh
-        .' '.escapeshellarg($hostname)
-        .' '.escapeshellarg('/bin/true')."\n";
+    return "#!/bin/bash\nset -e\n".pmssUserTransferBuildSshCommand(
+        $remoteUser,
+        ['-o ConnectTimeout=20', '-o NumberOfPasswordPrompts=1']
+    ).' '.escapeshellarg($hostname).' '.escapeshellarg('/bin/true')."\n";
 }
 
 /**

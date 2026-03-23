@@ -231,6 +231,16 @@ class UserTransferTest extends TestCase
         $this->assertStringContainsString("'/bin/true'", $script);
     }
 
+    public function testGeneratedScriptsKeepSharedSshFlagsAligned(): void
+    {
+        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $sharedFlags = 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no';
+
+        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRsyncMain($cfg));
+        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRsyncFinal($cfg));
+        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildAuthProbe($cfg));
+    }
+
     public function testBuildExpectWrapperUsesEnvPassword(): void
     {
         $script = \pmssUserTransferBuildExpectWrapper();
