@@ -112,7 +112,7 @@ if (!function_exists('pmssTrafficLimitEnsureStorageDir')) {
      */
     function pmssTrafficLimitEnsureStorageDir(string $path): bool
     {
-        if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false || is_link($path)) {
+        if (!function_exists('pmssPathTargetIsSafe') || !pmssPathTargetIsSafe($path, true)) {
             return false;
         }
 

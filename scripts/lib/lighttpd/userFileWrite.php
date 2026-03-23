@@ -7,20 +7,67 @@
 
 function pmssUserFilePathIsSafe(string $path): bool
 {
-    if (strpos($path, '/') !== 0) {
+    return pmssPathTargetIsSafe($path, false, true);
+}
+
+/**
+ * Validate a filesystem target and reject symlinked path segments.
+ */
+function pmssPathTargetIsSafe(string $path, bool $directoryTarget, bool $requireParentDirectory = false): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
         return false;
     }
 
-    if (strpos($path, "\0") !== false || is_link($path) || (file_exists($path) && !is_file($path))) {
-        return false;
+    $segments = explode('/', ltrim($path, '/'));
+    $current = '';
+    $lastIndex = count($segments) - 1;
+    foreach ($segments as $index => $segment) {
+        if ($segment === '') {
+            continue;
+        }
+
+        $current .= '/'.$segment;
+        if (is_link($current)) {
+            return false;
+        }
+
+        $isLeaf = $index === $lastIndex;
+        if (!$isLeaf && file_exists($current) && !is_dir($current)) {
+            return false;
+        }
+        if ($isLeaf && file_exists($current) && ($directoryTarget ? !is_dir($current) : !is_file($current))) {
+            return false;
+        }
     }
 
-    $dir = dirname($path);
-    if (!is_dir($dir) || is_link($dir)) {
-        return false;
+    if ($requireParentDirectory) {
+        $directory = dirname($path);
+        if (!is_dir($directory) || is_link($directory)) {
+            return false;
+        }
     }
 
     return true;
+}
+
+/**
+ * Ensure a directory exists when the target path is safe.
+ */
+function pmssEnsureSafeDir(string $path, int $mode): bool
+{
+    if (!pmssPathTargetIsSafe($path, true)) {
+        return false;
+    }
+
+    if (!is_dir($path) && !@mkdir($path, $mode, true) && !is_dir($path)) {
+        return false;
+    }
+
+    @chmod($path, $mode);
+
+    return is_dir($path) && !is_link($path);
 }
 
 function pmssUserFileApplyMetadata(string $path, string $owner, int $mode, ?string $group = null): void

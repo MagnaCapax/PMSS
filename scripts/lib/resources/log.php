@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /**
  * Resolve a username to its UID with a POSIX-first fallback.
@@ -37,13 +38,7 @@ function pmssResourceLogIsValidUser(string $user): bool
  */
 function pmssResourceLogEnsureDir(string $path, int $mode): bool
 {
-    if (!pmssResourceLogPathIsSafe($path, true)) {
-        return false;
-    }
-
-    @mkdir($path, $mode, true);
-    @chmod($path, $mode);
-    return is_dir($path);
+    return pmssEnsureSafeDir($path, $mode);
 }
 
 /**
@@ -51,34 +46,7 @@ function pmssResourceLogEnsureDir(string $path, int $mode): bool
  */
 function pmssResourceLogPathIsSafe(string $path, bool $directoryTarget): bool
 {
-    $path = rtrim($path, '/');
-    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
-        return false;
-    }
-
-    $segments = explode('/', ltrim($path, '/'));
-    $current = '';
-    $lastIndex = count($segments) - 1;
-    foreach ($segments as $index => $segment) {
-        if ($segment === '') {
-            continue;
-        }
-
-        $current .= '/'.$segment;
-        if (is_link($current)) {
-            return false;
-        }
-
-        $isLeaf = $index === $lastIndex;
-        if (!$isLeaf && file_exists($current) && !is_dir($current)) {
-            return false;
-        }
-        if ($isLeaf && file_exists($current) && ($directoryTarget ? !is_dir($current) : !is_file($current))) {
-            return false;
-        }
-    }
-
-    return true;
+    return pmssPathTargetIsSafe($path, $directoryTarget);
 }
 
 /**
