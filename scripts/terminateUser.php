@@ -53,21 +53,11 @@ if ($username === '') {
     die($usage . "\n");
 }
 
-$normalizedUsername = pmssUsernameNormalizeIfValid($username);
-if ($normalizedUsername === null) {
-    $username = pmssNormalizeUsername($username);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'validate', $username,
-            array(
-                'status'  => 'ERR',
-                'message' => 'Rejected username due to validation failure',
-            )
-        )
-    );
-    die("Refusing to terminate invalid username: {$username}\n");
-}
-$username = $normalizedUsername;
+$username = pmssRequireCliUsername(
+    $username,
+    'terminate',
+    "Refusing to terminate invalid username: %s\n"
+);
 
 // Cross-check against the managed user list to avoid acting on unexpected
 // system accounts. This mirrors scripts/listUsers.php behaviour without

@@ -17,23 +17,12 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 $usage = "Usage: setupUserHomePermissions.php USERNAME\n";
 if (empty($argv[1])) die($usage);
 
-$userName = pmssUsernameNormalizeIfValid($argv[1]);
-
-if ($userName === null) {
-    $userName = pmssNormalizeUsername((string) $argv[1]);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'permissions',
-            'validate',
-            $userName,
-            array(
-                'status'  => 'ERR',
-                'message' => 'Rejected username due to validation failure in setupUserHomePermissions',
-            )
-        )
-    );
-    die("Invalid username: {$userName}\n");
-}
+$userName = pmssRequireCliUsername(
+    (string) $argv[1],
+    'permissions',
+    "Invalid username: %s\n",
+    'Rejected username due to validation failure in setupUserHomePermissions'
+);
 
 if (!file_exists("/home/{$userName}")) die("User does not exist\n");
 

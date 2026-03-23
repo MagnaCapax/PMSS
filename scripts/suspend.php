@@ -27,24 +27,8 @@ if ($username === '') {
     die($usage."\n");
 }
 
-$normalizedUsername = pmssUsernameNormalizeIfValid($username);
 // Validate inputs early so we never feed garbage to usermod or log files.
-if ($normalizedUsername === null) {
-    $username = pmssNormalizeUsername($username);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'suspend',
-            'validate',
-            $username,
-            array(
-                'status'  => 'ERR',
-                'message' => 'Rejected username due to validation failure',
-            )
-        )
-    );
-    die("Invalid username: {$username}\n");
-}
-$username = $normalizedUsername;
+$username = pmssRequireCliUsername($username, 'suspend', "Invalid username: %s\n");
 
 $homeDir = "/home/{$username}";
 $activeRoot = "$homeDir/www";

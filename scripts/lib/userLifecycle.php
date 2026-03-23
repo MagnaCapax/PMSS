@@ -163,6 +163,35 @@ function pmssUsernameNormalizeIfValid(string $rawUsername): ?string
 }
 
 /**
+ * Normalize a CLI username argument, log validation failure, and abort on error.
+ *
+ * Shared by operator-facing scripts so they all enforce the same trust boundary
+ * while keeping each script's public error text intact.
+ */
+function pmssRequireCliUsername(string $rawUsername, string $action, string $errorFormat, string $logMessage = 'Rejected username due to validation failure'): string
+{
+    $normalized = pmssUsernameNormalizeIfValid($rawUsername);
+    if ($normalized !== null) {
+        return $normalized;
+    }
+
+    $normalized = pmssNormalizeUsername($rawUsername);
+    pmssUserWriteLogs(
+        pmssUserBaseContext(
+            $action,
+            'validate',
+            $normalized,
+            array(
+                'status'  => 'ERR',
+                'message' => $logMessage,
+            )
+        )
+    );
+
+    die(sprintf($errorFormat, $normalized));
+}
+
+/**
  * Provisioning wrapper matching the legacy "Validate*" naming convention.
  */
 function pmssValidateUsernameForCreate(string $username): bool

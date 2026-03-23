@@ -31,22 +31,12 @@ require_once __DIR__.'/lib/user/passwords.php';
 // a user's password when /home is unavailable would fail or write to stale paths.
 pmssRequireHomeMounted('changePw.php');
 
-$username = pmssUsernameNormalizeIfValid($username);
-if ($username === null) {
-    $username = pmssNormalizeUsername((string) ($argv[1] ?? ''));
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'password',
-            'validate',
-            $username,
-            array(
-                'status'  => 'ERR',
-                'message' => 'Rejected username due to validation failure in changePw.php',
-            )
-        )
-    );
-    die("Invalid username: {$username}\n");
-}
+$username = pmssRequireCliUsername(
+    $username,
+    'password',
+    "Invalid username: %s\n",
+    'Rejected username due to validation failure in changePw.php'
+);
 
 if (!file_exists("/home/{$username}") or
     !is_dir("/home/{$username}")) die("\t**** USER NOT FOUND ****\n\n");
