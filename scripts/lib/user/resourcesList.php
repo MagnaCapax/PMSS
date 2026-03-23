@@ -142,7 +142,7 @@ function pmssUserResourcesListMain(array $argv): int
         fwrite(STDERR, "Error: This script must be run as root to query systemd slices.\n");
         return 1;
     }
-    $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
+    $parsed = pmssParseCliTokens($argv);
     $outputJsonl = (bool) pmssCliOption($parsed, 'jsonl');
     $outputJson = !$outputJsonl && (bool) pmssCliOption($parsed, 'json');
     $briefMode = (bool) pmssCliOption($parsed, 'brief');
