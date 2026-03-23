@@ -17,16 +17,20 @@ class ListUsersConsumersGuardTest extends TestCase
                 'scripts/util/checkRutorrentPlugins.php',
                 'scripts/util/makeMonitoringRules.php',
                 'scripts/util/setupNetwork.php',
-                'scripts/util/checkUserHtpasswd.php',
                 'scripts/lib/user/resourcesList.php',
+            ],
+            'pmssManagedUsersSelectFromCommand(' => [
+                'scripts/cron/checkLighttpdInstances.php',
+                'scripts/util/checkUserHtpasswd.php',
                 'scripts/util/userConfigLighttpd.php',
+                'scripts/lib/nginxConfig/main.php',
             ],
             'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/showTraffic.php', 'scripts/userTorrents.php'],
         ] as $needle => $files) {
             foreach ($files as $file) {
                 $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
             }
-            if ($needle !== "pmssListManagedUsers('/scripts/listUsers.php')") {
+            if ($needle === 'pmssListManagedUsersResult(') {
                 continue;
             }
             foreach ($files as $file) {
@@ -35,6 +39,7 @@ class ListUsersConsumersGuardTest extends TestCase
                     [
                         "array_map('trim', pmssListManagedUsers",
                         "array_filter(pmssListManagedUsers('/scripts/listUsers.php'), 'pmssValidateUsername')",
+                        'pmssManagedUsersSelectFromList(pmssListManagedUsers(',
                     ],
                     $file.' should keep pmssListManagedUsers() output as-is '
                 );

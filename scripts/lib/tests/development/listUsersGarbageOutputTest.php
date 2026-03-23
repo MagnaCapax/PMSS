@@ -34,9 +34,13 @@ class ListUsersGarbageOutputTest extends TestCase
                 'scripts/util/checkRutorrentPlugins.php',
                 'scripts/util/makeMonitoringRules.php',
                 'scripts/util/setupNetwork.php',
-                'scripts/util/checkUserHtpasswd.php',
                 'scripts/lib/user/resourcesList.php',
+            ],
+            'pmssManagedUsersSelectFromCommand(' => [
+                'scripts/cron/checkLighttpdInstances.php',
+                'scripts/util/checkUserHtpasswd.php',
                 'scripts/util/userConfigLighttpd.php',
+                'scripts/lib/nginxConfig/main.php',
             ],
             'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/showTraffic.php', 'scripts/userTorrents.php'],
         ] as $needle => $files) {

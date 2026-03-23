@@ -34,10 +34,9 @@ function pmssUserConfigLighttpdMain(array $argv): int
         fwrite(STDERR, "#### WARNING: DEPRECATED COMMAND (use ".basename(__FILE__).")\n");
     }
 
-    $selection = pmssManagedUsersSelectFromList(pmssListManagedUsers('/scripts/listUsers.php'), (string) ($argv[1] ?? ''), array('emitEmptyMessage' => true, 'emptyToStderr' => true, 'notFoundMessage' => "Username not found\n"));
+    $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', (string) ($argv[1] ?? ''), array('emitEmptyMessage' => true, 'emptyToStderr' => true, 'notFoundMessage' => "Username not found\n"));
     if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];
     $users = $selection['users'];
-
     $portsDirectory = '/etc/seedbox/runtime/ports';
     if (!file_exists($portsDirectory))  {
         @mkdir($portsDirectory, 0600, true);

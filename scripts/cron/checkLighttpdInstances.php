@@ -19,10 +19,8 @@ $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
 if ($argUserRaw === '') {
     echo date('Y-m-d H:i:s') . ': Checking Lighttpd instances' . "\n";
 }
-$selection = pmssManagedUsersSelectFromList(pmssListManagedUsers(), $argUserRaw, array('lookupMode' => 'account', 'strictInput' => true));
-if ($selection['exitCode'] !== 0) {
-    exit($selection['exitCode']);
-}
+$selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $argUserRaw, array('lookupMode' => 'account', 'strictInput' => true));
+if ($selection['exitCode'] !== 0) exit($selection['exitCode']);
 $users = $selection['users'];
 foreach($users AS $thisUser) {
     $homeDir = "/home/{$thisUser}";
@@ -68,9 +66,6 @@ foreach($users AS $thisUser) {
         usleep(50000);   // brief pause before relaunch
         pmssUserLog($thisUser, 'lighttpd restart requested');
     }
-
-
-
     // Let's actually test we get 401 auth requested!
     /* temp disabled, so much log spam and did not achieve desired results.
     $curl = curl_init("http://127.0.0.1/user-{$thisUser}/");

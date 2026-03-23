@@ -61,7 +61,7 @@ TXT;
 
     $restartNginx = pmssCliOption($parsed, 'restart', 'r', false) !== false;
 
-    $selection = pmssManagedUsersSelectFromList(pmssListManagedUsers('/scripts/listUsers.php'), $requestedUser, array('emitEmptyMessage' => true, 'invalidMessage' => "Invalid username: %s\n", 'notFoundMessage' => "Username not found: %s\n"));
+    $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $requestedUser, array('emitEmptyMessage' => true, 'invalidMessage' => "Invalid username: %s\n", 'notFoundMessage' => "Username not found: %s\n"));
     if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];
 
     $requestedUser = $selection['username'];

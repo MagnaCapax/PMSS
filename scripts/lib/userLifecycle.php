@@ -267,6 +267,12 @@ function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername
     return array('exitCode' => 0, 'username' => $username, 'users' => array($username));
 }
 
+/** @return array{exitCode:int,username:string,users:array<int,string>} */
+function pmssManagedUsersSelectFromCommand(string $command = '/scripts/listUsers.php', string $rawUsername = '', array $options = array()): array
+{
+    return pmssManagedUsersSelectFromList(pmssListManagedUsers($command), $rawUsername, $options);
+}
+
 /** @return array<string,mixed>|null */
 function pmssUserAccountLookup(string $username): ?array
 {
