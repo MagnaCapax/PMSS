@@ -41,13 +41,12 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUpdateStep2OwnsWebStackConfiguration(): void
     {
-        $step2Path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
-        $step2Src = @file_get_contents($step2Path);
+        $step2Src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
         $modulePath = dirname(__DIR__, 4).'/scripts/lib/update/webStack.php';
-        $this->assertTrue(is_string($step2Src) && $step2Src !== '', 'Expected to read '.$step2Path);
         $this->assertTrue(!is_file($modulePath), 'Expected one-call update/webStack.php helper file to be removed');
-        $this->assertTrue(
-            strpos($step2Src, "require_once __DIR__.'/../lib/update/webStack.php';") === false,
+        $this->pmssAssertStringNotContainsString(
+            "require_once __DIR__.'/../lib/update/webStack.php';",
+            $step2Src,
             'update-step2.php should stop requiring the removed webStack.php module'
         );
         $this->assertStringContainsString('function pmssConfigureWebStack(int $distroVersion): void', $step2Src);
@@ -86,18 +85,18 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testKillProcessKeepsLocalWaitLoopsInlineWithoutClosures(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/processes.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/processes.php');
         $probeNeedle = '$process'.'Running = static function';
         $waitNeedle = '$waitFor'.'ProcessExit = static function';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
-        $this->assertTrue(
-            strpos($src, $probeNeedle) === false,
+        $this->pmssAssertStringNotContainsString(
+            $probeNeedle,
+            $src,
             'killProcess() should keep the process probe inline without a local closure'
         );
-        $this->assertTrue(
-            strpos($src, $waitNeedle) === false,
+        $this->pmssAssertStringNotContainsString(
+            $waitNeedle,
+            $src,
             'killProcess() should keep the wait loops inline without a local closure'
         );
         $this->assertStringContainsString('$deadline = microtime(true) + $waitSeconds;', $src);
@@ -106,16 +105,15 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUpdateStep2KeepsMediaareaBootstrapCleanupInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
         $symbol = 'pmssCleanup'.'MediaareaBootstrapPackage';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertStringContainsString("pmssRunProfiledStep('Cleaning mediaarea bootstrap package state'", $src);
         $this->assertStringContainsString("dpkg-query -W -f=\${Status} repo-mediaarea 2>/dev/null", $src);
         $this->assertStringContainsString("runStep('Marking repo-mediaarea for deinstallation', \$setSelection);", $src);
-        $this->assertTrue(
-            strpos($src, $symbol) === false,
+        $this->pmssAssertStringNotContainsString(
+            $symbol,
+            $src,
             'update-step2.php should own the mediaarea bootstrap cleanup directly'
         );
     }
@@ -188,14 +186,10 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserConfigKeepsQbittorrentBootstrapInline(): void
     {
-        $userConfigPath = dirname(__DIR__, 4).'/scripts/util/userConfig.php';
-        $userConfigSrc = @file_get_contents($userConfigPath);
-        $libraryPath = dirname(__DIR__, 4).'/scripts/lib/user/qbittorrent.php';
-        $librarySrc = @file_get_contents($libraryPath);
+        $userConfigSrc = $this->pmssReadRepoFile('scripts/util/userConfig.php');
+        $librarySrc = $this->pmssReadRepoFile('scripts/lib/user/qbittorrent.php');
         $symbol = 'userConfigure'.'Qbittorrent';
 
-        $this->assertTrue(is_string($userConfigSrc) && $userConfigSrc !== '', 'Expected to read '.$userConfigPath);
-        $this->assertTrue(is_string($librarySrc) && $librarySrc !== '', 'Expected to read '.$libraryPath);
         $this->assertTrue(
             strpos($librarySrc, 'function '.$symbol.'(') === false,
             'qbittorrent.php should no longer export a one-call user bootstrap wrapper'
@@ -206,10 +200,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testSuspendLandingKeepsTemplateLoadInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/suspend.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/suspend.php');
         $symbol = 'pmssRender'.'SuspendedHtml';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -222,11 +214,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testShowTrafficKeepsLocalnetSplitAndBarRenderingInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/showTraffic.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/showTraffic.php');
         $splitSymbol = 'pmssShowTrafficSplit'.'LocalnetUser';
         $barSymbol = 'pmssShowTrafficRender'.'Bar';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$splitSymbol.'(') === false,
@@ -244,15 +234,11 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testStorageHealthSnapshotKeepsLsblkParsingLocal(): void
     {
-        $snapshotPath = dirname(__DIR__, 4).'/scripts/util/storageHealthSnapshot.php';
-        $snapshotSrc = @file_get_contents($snapshotPath);
+        $snapshotSrc = $this->pmssReadRepoFile('scripts/util/storageHealthSnapshot.php');
         $libraryPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/disks.php';
-        $facadePath = dirname(__DIR__, 4).'/scripts/lib/storageHealth.php';
-        $facadeSrc = @file_get_contents($facadePath);
+        $facadeSrc = $this->pmssReadRepoFile('scripts/lib/storageHealth.php');
         $symbol = 'pmssStorageHealthList'.'DisksFromLsblk';
 
-        $this->assertTrue(is_string($snapshotSrc) && $snapshotSrc !== '', 'Expected to read '.$snapshotPath);
-        $this->assertTrue(is_string($facadeSrc) && $facadeSrc !== '', 'Expected to read '.$facadePath);
         $this->assertTrue(!is_file($libraryPath), 'Expected one-call storageHealth/disks.php helper file to be removed');
         $this->assertTrue(
             strpos($snapshotSrc, $symbol.'(') === false,
@@ -260,21 +246,21 @@ class UpdateCompressionCharacterizationTest extends TestCase
         );
         $this->assertStringContainsString("preg_split('/\\r?\\n/', trim((string) \$lsblkOut))", $snapshotSrc);
         $this->assertStringContainsString("strpos(\$kname, 'loop') === 0", $snapshotSrc);
-        $this->assertTrue(
-            strpos($facadeSrc, "'disks'") === false,
+        $this->pmssAssertStringNotContainsString(
+            "'disks'",
+            $facadeSrc,
             'storageHealth.php should stop requiring the removed disks.php module'
         );
     }
 
     public function testStorageHealthSnapshotKeepsJsonAppendsInline(): void
     {
-        $snapshotPath = dirname(__DIR__, 4).'/scripts/util/storageHealthSnapshot.php';
-        $snapshotSrc = @file_get_contents($snapshotPath);
+        $snapshotSrc = $this->pmssReadRepoFile('scripts/util/storageHealthSnapshot.php');
         $wrapperNeedle = '$append'.'Json = static function';
 
-        $this->assertTrue(is_string($snapshotSrc) && $snapshotSrc !== '', 'Expected to read '.$snapshotPath);
-        $this->assertTrue(
-            strpos($snapshotSrc, $wrapperNeedle) === false,
+        $this->pmssAssertStringNotContainsString(
+            $wrapperNeedle,
+            $snapshotSrc,
             'storageHealthSnapshot.php should rely on the shared JSONL append helper instead of a local wrapper'
         );
         $this->assertStringContainsString("require_once __DIR__.'/../lib/log.php';", $snapshotSrc);
@@ -285,11 +271,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testStorageHealthSnapshotKeepsJsonOptionConsumptionInline(): void
     {
-        $snapshotPath = dirname(__DIR__, 4).'/scripts/util/storageHealthSnapshot.php';
-        $snapshotSrc = @file_get_contents($snapshotPath);
+        $snapshotSrc = $this->pmssReadRepoFile('scripts/util/storageHealthSnapshot.php');
         $helperSymbol = 'pmssStorageHealthSnapshot'.'ParseCli';
 
-        $this->assertTrue(is_string($snapshotSrc) && $snapshotSrc !== '', 'Expected to read '.$snapshotPath);
         $this->assertTrue(
             strpos($snapshotSrc, 'function '.$helperSymbol.'(') === false,
             'storageHealthSnapshot.php should keep CLI option consumption inside pmssStorageHealthSnapshotMain()'
@@ -301,11 +285,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testStorageBenchmarkDropsStandaloneCliConsumeHelper(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/storageBenchmark.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
         $helperSymbol = 'consume'.'CliValue';
 
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
         $this->assertTrue(
             strpos($src, 'function '.$helperSymbol.'(') === false,
             'storageBenchmark.php should inline CLI option consumption instead of keeping a standalone helper'
@@ -316,18 +298,15 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testStorageHealthFacadeDropsStandaloneExecModule(): void
     {
-        $facadePath = dirname(__DIR__, 4).'/scripts/lib/storageHealth.php';
-        $facadeSrc = @file_get_contents($facadePath);
-        $commonPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/common.php';
-        $commonSrc = @file_get_contents($commonPath);
+        $facadeSrc = $this->pmssReadRepoFile('scripts/lib/storageHealth.php');
+        $commonSrc = $this->pmssReadRepoFile('scripts/lib/storageHealth/common.php');
         $libraryPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/exec.php';
         $symbol = 'pmssStorageHealthExec'.'Capture';
 
-        $this->assertTrue(is_string($facadeSrc) && $facadeSrc !== '', 'Expected to read '.$facadePath);
-        $this->assertTrue(is_string($commonSrc) && $commonSrc !== '', 'Expected to read '.$commonPath);
         $this->assertTrue(!is_file($libraryPath), 'Expected one-call storageHealth/exec.php helper file to be removed');
-        $this->assertTrue(
-            strpos($facadeSrc, "'exec'") === false,
+        $this->pmssAssertStringNotContainsString(
+            "'exec'",
+            $facadeSrc,
             'storageHealth.php should stop requiring the removed exec.php module'
         );
         $this->assertStringContainsString('function '.$symbol.'(', $commonSrc);
@@ -336,11 +315,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testResourceSnapshotCronOwnsSnapshotLoop(): void
     {
-        $cronPath = dirname(__DIR__, 4).'/scripts/cron/resourceSnapshot.php';
-        $cronSrc = @file_get_contents($cronPath);
+        $cronSrc = $this->pmssReadRepoFile('scripts/cron/resourceSnapshot.php');
         $libraryPath = dirname(__DIR__, 4).'/scripts/lib/resources/snapshot.php';
         $symbol = 'pmssResource'.'SnapshotRun';
-        $this->assertTrue(is_string($cronSrc) && $cronSrc !== '', 'Expected to read '.$cronPath);
         $this->assertTrue(!is_file($libraryPath), 'Expected one-call resources snapshot library file to be removed');
         $this->assertStringContainsString("require_once __DIR__.'/../lib/resources/log.php';", $cronSrc);
         $this->assertStringContainsString('const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT', $cronSrc);
@@ -351,10 +328,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUpdateLibraryDropsStandaloneSkeletonPathHelper(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update.php');
         $symbol = 'pmssSkeleton'.'Path';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -365,13 +340,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testSkeletonMaintenanceKeepsTorrentFrontendPatchLocal(): void
     {
-        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
-        $filesystemPath = dirname(__DIR__, 4).'/scripts/lib/update/users/filesystem.php';
-        $src = @file_get_contents($usersPath);
-        $filesystemSrc = @file_get_contents($filesystemPath);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/users.php');
+        $filesystemSrc = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
         $symbol = 'pmssUserPatch'.'TorrentFrontends';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(is_string($filesystemSrc) && $filesystemSrc !== '', 'Expected to read '.$filesystemPath);
 
         $this->assertTrue(
             strpos($filesystemSrc, 'function '.$symbol.'(') === false,
@@ -385,13 +356,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserUpdateModuleOwnsRutorrentHelpers(): void
     {
-        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
-        $usersSrc = @file_get_contents($usersPath);
-        $rutorrentPath = dirname(__DIR__, 4).'/scripts/lib/update/users/rutorrent.php';
-        $rutorrentSrc = @file_get_contents($rutorrentPath);
+        $usersSrc = $this->pmssReadRepoFile('scripts/lib/update/users.php');
+        $rutorrentSrc = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
         $symbol = 'pmssUserUpgrade'.'Rutorrent';
-        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(is_string($rutorrentSrc) && $rutorrentSrc !== '', 'Expected to read '.$rutorrentPath);
 
         $this->assertTrue(
             strpos($usersSrc, 'function '.$symbol.'(') === false,
@@ -405,10 +372,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testOsReleaseHelpersKeepPathLookupInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/osRelease.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/osRelease.php');
         $symbol = 'pmssOsRelease'.'Path';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -419,10 +384,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testRuntimeProfileKeepsStoreInitializationInsideRecordProfile(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/profile.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/profile.php');
         $symbol = 'pmssInit'.'ProfileStore';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -434,10 +397,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserMaintenanceKeepsOptionalPostChecksInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssRunUser'.'PostCheck';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -449,10 +410,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserMaintenanceKeepsProfilePayloadLocal(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssBuild'.'UserMaintenanceProfile';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -465,10 +424,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testDockerDependenciesKeepDaemonJsonWritesLocal(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssWrite'.'DockerDaemonConfig';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -480,10 +437,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testRepositoryPrerequisitesKeepSonarrDetectionInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/repositories.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/repositories.php');
         $symbol = 'pmssSonarr'.'SourceLine';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -495,13 +450,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testPluginMaintenanceOwnsRetrackerCleanup(): void
     {
-        $pluginsPath = dirname(__DIR__, 4).'/scripts/lib/update/users/rutorrent.php';
-        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
-        $usersSrc = @file_get_contents($usersPath);
-        $pluginsSrc = @file_get_contents($pluginsPath);
+        $usersSrc = $this->pmssReadRepoFile('scripts/lib/update/users.php');
+        $pluginsSrc = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
         $symbol = 'pmssUserMaintain'.'Retracker';
-        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(is_string($pluginsSrc) && $pluginsSrc !== '', 'Expected to read '.$pluginsPath);
 
         $this->assertTrue(
             strpos($pluginsSrc, 'function '.$symbol.'(') === false,
@@ -514,15 +465,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserUpdateModuleOwnsContextAndHttpHelpers(): void
     {
-        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
-        $usersSrc = @file_get_contents($usersPath);
-        $contextPath = dirname(__DIR__, 4).'/scripts/lib/update/users/context.php';
-        $httpPath = dirname(__DIR__, 4).'/scripts/lib/update/users/http.php';
-        $contextSrc = @file_get_contents($contextPath);
-        $httpSrc = @file_get_contents($httpPath);
-        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(is_string($contextSrc) && $contextSrc !== '', 'Expected to read '.$contextPath);
-        $this->assertTrue(is_string($httpSrc) && $httpSrc !== '', 'Expected to read '.$httpPath);
+        $usersSrc = $this->pmssReadRepoFile('scripts/lib/update/users.php');
+        $contextSrc = $this->pmssReadRepoFile('scripts/lib/update/users/context.php');
+        $httpSrc = $this->pmssReadRepoFile('scripts/lib/update/users/http.php');
 
         $this->assertTrue(
             strpos($usersSrc, 'function pmssBuildUserContext(') === false,
@@ -542,12 +487,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserUpdateModuleOwnsPermissionRefreshHelper(): void
     {
-        $usersPath = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
-        $usersSrc = @file_get_contents($usersPath);
-        $permissionsPath = dirname(__DIR__, 4).'/scripts/lib/update/users/filesystem.php';
-        $permissionsSrc = @file_get_contents($permissionsPath);
-        $this->assertTrue(is_string($usersSrc) && $usersSrc !== '', 'Expected to read '.$usersPath);
-        $this->assertTrue(is_string($permissionsSrc) && $permissionsSrc !== '', 'Expected to read '.$permissionsPath);
+        $usersSrc = $this->pmssReadRepoFile('scripts/lib/update/users.php');
+        $permissionsSrc = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
 
         $this->assertTrue(
             strpos($usersSrc, 'function pmssUserRefreshPermissions(') === false,
@@ -561,53 +502,51 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserDomainModulesDoNotCrossRequireEachOther(): void
     {
-        $base = dirname(__DIR__, 4).'/scripts/lib/update/users';
-        foreach (['context.php', 'http.php', 'filesystem.php', 'rutorrent.php'] as $file) {
-            $path = $base.'/'.$file;
-            $src = @file_get_contents($path);
-            $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
-            $this->assertTrue(
-                strpos($src, "require_once __DIR__.'/") === false,
-                $file.' should not require sibling domain modules'
+        foreach (['context', 'http', 'filesystem', 'rutorrent'] as $module) {
+            $src = $this->pmssReadRepoFile('scripts/lib/update/users/'.$module.'.php');
+            $this->pmssAssertStringNotContainsString(
+                "require_once __DIR__.'/",
+                $src,
+                $module.'.php should not require sibling domain modules'
             );
         }
     }
 
     public function testUserUpdateEntrypointKeepsDirectHandlerSequence(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/users.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/users.php');
 
         $this->assertStringContainsString("'pmssUserConfigureHttp'", $src);
         $this->assertStringContainsString("'pmssUserApplySkeletonFiles'", $src);
         $this->assertStringContainsString("'pmssUserUpgradeRutorrent'", $src);
         $this->assertStringContainsString("'pmssUserRefreshPermissions'", $src);
-        $this->assertTrue(
-            strpos($src, 'Missing handler') === false,
+        $this->pmssAssertStringNotContainsString(
+            'Missing handler',
+            $src,
             'users.php should not keep a dead missing-handler warning branch once domain modules are required directly'
         );
     }
 
     public function testUserMaintenanceKeepsDirectPhaseSummaryAndSummaryLogging(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
 
         $this->assertStringContainsString('Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)', $src);
         $this->assertStringContainsString("pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);", $src);
         $this->assertStringContainsString('pmssLogJson([', $src);
-        $this->assertTrue(
-            strpos($src, "function_exists('pmssUpdateUserEnvironment')") === false,
+        $this->pmssAssertStringNotContainsString(
+            "function_exists('pmssUpdateUserEnvironment')",
+            $src,
             'userMaintenance.php should not guard helpers that are required at file load time'
         );
-        $this->assertTrue(
-            strpos($src, "function_exists('pmssLogJson')") === false,
+        $this->pmssAssertStringNotContainsString(
+            "function_exists('pmssLogJson')",
+            $src,
             'userMaintenance.php should log its JSON summary directly through the required logging runtime'
         );
-        $this->assertTrue(
-            strpos($src, "function_exists('pmssUserDockerEnabled')") === false,
+        $this->pmssAssertStringNotContainsString(
+            "function_exists('pmssUserDockerEnabled')",
+            $src,
             'userMaintenance.php should call the required Docker config helper directly'
         );
         foreach ([
@@ -617,8 +556,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
             "if (!function_exists('pmssEnsureRootlessDockerInstalled'))",
             "if (!function_exists('pmssEnsureDockerDependencies'))",
         ] as $deadGuard) {
-            $this->assertTrue(
-                strpos($src, $deadGuard) === false,
+            $this->pmssAssertStringNotContainsString(
+                $deadGuard,
+                $src,
                 'userMaintenance.php should not keep dead self-guard wrappers once runtime callers use require_once'
             );
         }
@@ -626,29 +566,31 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testDistUpgradeUsesRequiredRepairHelpersDirectly(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/distUpgrade.php';
-        $src = @file_get_contents($path);
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/distUpgrade.php');
 
         $this->assertStringContainsString('pmssEnsureBootDefaults(', $src);
         $this->assertStringContainsString('pmssEnsureRootlessDockerInstalled($user);', $src);
         $this->assertStringContainsString('pmssEnsureDockerDependencies($user);', $src);
         $this->assertStringContainsString("pmssUserLog(\$userTrim, '[SKIP] dist-upgrade: user appears suspended; skipping rootless Docker repair');", $src);
         $this->assertStringContainsString("pmssUserLog(\$user, 'dist-upgrade: rootless Docker repair start');", $src);
-        $this->assertTrue(
-            strpos($src, "function_exists('pmssEnsureBootDefaults')") === false,
+        $this->pmssAssertStringNotContainsString(
+            "function_exists('pmssEnsureBootDefaults')",
+            $src,
             'distUpgrade.php should call the required boot defaults helper directly'
         );
-        $this->assertTrue(
-            strpos($src, "class_exists('users')") === false,
+        $this->pmssAssertStringNotContainsString(
+            'class_exists(\'users\')',
+            $src,
             'distUpgrade.php should not keep a dead users class guard once userMaintenance.php is required'
         );
-        $this->assertTrue(
-            strpos($src, "function_exists('pmssEnsureRootlessDockerInstalled')") === false,
+        $this->pmssAssertStringNotContainsString(
+            "function_exists('pmssEnsureRootlessDockerInstalled')",
+            $src,
             'distUpgrade.php should not keep dead rootless helper guards once userMaintenance.php is required'
         );
-        $this->assertTrue(
-            strpos($src, "function_exists('pmssUserLog')") === false,
+        $this->pmssAssertStringNotContainsString(
+            "function_exists('pmssUserLog')",
+            $src,
             'distUpgrade.php should log through the required user logger directly'
         );
     }

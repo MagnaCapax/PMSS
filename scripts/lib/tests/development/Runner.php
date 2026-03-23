@@ -32,19 +32,7 @@ function pmssTestRemoveTree(string $path): void
 }
 
 $suiteRoot = sys_get_temp_dir().'/pmss-tests-'.bin2hex(random_bytes(6));
-if (!is_dir($suiteRoot)) {
-    @mkdir($suiteRoot, 0755, true);
-}
-
 $versionDir = $suiteRoot.'/version';
-@mkdir($versionDir, 0755, true);
-putenv('PMSS_VERSION_DIR='.$versionDir);
-putenv('PMSS_TEST_TEMP_ROOT='.$suiteRoot);
-// Propagate test mode to child processes invoked via shell_exec
-putenv('PMSS_TEST_MODE=1');
-putenv('PMSS_JSON_LOG');
-putenv('PMSS_PROFILE_OUTPUT');
-
 $testRoot    = $suiteRoot.'/root';
 $skelDir     = $testRoot.'/skel';
 $networkCfg  = $testRoot.'/network.php';
@@ -52,30 +40,48 @@ $localnetCfg = $testRoot.'/localnet';
 $fireqosTpl  = $testRoot.'/fireqos.tpl';
 $aptKeyring  = $testRoot.'/apt-keyrings';
 
+foreach ([$suiteRoot, $versionDir, $testRoot, $aptKeyring] as $dir) {
+    @mkdir($dir, 0755, true);
+}
+
+foreach ([
+    'PMSS_VERSION_DIR' => $versionDir,
+    'PMSS_TEST_TEMP_ROOT' => $suiteRoot,
+    'PMSS_TEST_MODE' => '1',
+    'PMSS_SKEL_DIR' => $skelDir,
+    'PMSS_NETWORK_CONFIG' => $networkCfg,
+    'PMSS_LOCALNET_FILE' => $localnetCfg,
+    'PMSS_FIREQOS_TEMPLATE' => $fireqosTpl,
+    'PMSS_APT_KEYRING_DIR' => $aptKeyring,
+] as $key => $value) {
+    putenv($key.'='.$value);
+}
+
+foreach (['PMSS_JSON_LOG', 'PMSS_PROFILE_OUTPUT'] as $key) {
+    putenv($key);
+}
+
 register_shutdown_function(static function () use ($suiteRoot): void {
     pmssTestRemoveTree($suiteRoot);
 });
 
-if (!is_dir($skelDir.'/www/rutorrent/plugins/unpack')) {
-    @mkdir($skelDir.'/www/rutorrent/plugins/unpack', 0755, true);
-    @mkdir($skelDir.'/www/rutorrent/plugins/theme/themes', 0755, true);
+foreach ([
+    $skelDir.'/www/rutorrent/plugins/unpack',
+    $skelDir.'/www/rutorrent/plugins/theme/themes',
+    $skelDir.'/.irssi',
+] as $dir) {
+    @mkdir($dir, 0755, true);
 }
-if (!is_dir($skelDir.'/.irssi')) {
-    @mkdir($skelDir.'/.irssi', 0755, true);
+
+foreach ([
+    $skelDir.'/.irssi/config' => 'test',
+    $skelDir.'/.rtorrent.rc.custom' => 'test',
+    $networkCfg => "<?php return ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]];",
+    $localnetCfg => "185.148.0.0/22\n",
+    $fireqosTpl => "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n",
+] as $path => $contents) {
+    @file_put_contents($path, $contents);
 }
-@file_put_contents($skelDir.'/.irssi/config', 'test');
-@file_put_contents($skelDir.'/.rtorrent.rc.custom', 'test');
-
-@mkdir($testRoot, 0755, true);
-@file_put_contents($networkCfg, "<?php return ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]];");
-@file_put_contents($localnetCfg, "185.148.0.0/22\n");
-@file_put_contents($fireqosTpl, "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n");
-
-putenv('PMSS_SKEL_DIR='.$skelDir);
-putenv('PMSS_NETWORK_CONFIG='.$networkCfg);
-putenv('PMSS_LOCALNET_FILE='.$localnetCfg);
-putenv('PMSS_FIREQOS_TEMPLATE='.$fireqosTpl);
-putenv('PMSS_APT_KEYRING_DIR='.$aptKeyring);
 
 define('PMSS_TEST_MODE', true);
 require_once dirname(__DIR__, 3).'/update.php';
