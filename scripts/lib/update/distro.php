@@ -27,6 +27,11 @@ function pmssDebianCodenameFromMajor(int $major): string
 {
     return pmssDebianReleaseSpecs()[$major]['repo'] ?? '';
 }
+function pmssDistroVersionFromEnv(?int $fallback = null): int
+{
+    return max(0, (int) (getenv('PMSS_DISTRO_VERSION') ?: 0)) ?: (int) ($fallback ?? 0);
+}
+
 function pmssDetectDistro(): array
 {
     $name = strtolower((string) (getDistroName() ?: trim((string) @shell_exec('lsb_release -is 2>/dev/null'))));
@@ -48,10 +53,6 @@ function pmssDetectDistro(): array
 }
 function pmssVersionFromCodename(string $codename): int
 {
-    foreach (pmssDebianReleaseSpecs() as $major => $spec) {
-        if ($spec['repo'] === strtolower($codename)) {
-            return $major;
-        }
-    }
-    return 0;
+    $major = array_search(strtolower($codename), array_map(static function (array $spec): string { return $spec['repo']; }, pmssDebianReleaseSpecs()), true);
+    return $major === false ? 0 : (int) $major;
 }

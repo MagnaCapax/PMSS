@@ -18,7 +18,7 @@ class UpdateAppInstallerContractsTest extends TestCase
         $contents = $this->readInstaller('pyload.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
-        $this->assertStringContainsString("getenv('PMSS_DISTRO_VERSION')", $contents);
+        $this->assertStringContainsString('pmssDistroVersionFromEnv()', $contents);
         $this->assertStringContainsString('Skipping pyLoad setup: unsupported Debian release', $contents);
         $this->assertStringContainsString('Skipping pyLoad setup: python3 missing from PATH', $contents);
         $this->assertStringContainsString('pmssPythonVenvInstallCli(', $contents);

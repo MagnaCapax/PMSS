@@ -260,7 +260,7 @@ require_once __DIR__.'/runtime/commands.php';
         }
 
         $codename = getenv('PMSS_DISTRO_CODENAME') ?: '';
-        $version  = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+        $version  = pmssDistroVersionFromEnv();
         // Docker apt repo is only supported for current suites (11+); keep Debian 10 and unknown versions on the legacy "skip" path.
         if ($codename === '' && $version >= 11) {
             $codename = pmssDebianCodenameFromMajor($version);

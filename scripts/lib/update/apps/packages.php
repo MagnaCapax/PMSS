@@ -68,7 +68,7 @@ pmssQueuePackages(['sudo', 'expect']);
 
 if (!file_exists('/sbin/ipset')) { pmssQueuePackages(['ipset']); }
 
-$pmssWireguardDistroVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+$pmssWireguardDistroVersion = pmssDistroVersionFromEnv();
 // On Debian 12+ WireGuard is built into the kernel, so we only require the
 // userland tools. Avoid queueing the legacy DKMS package which can wedge
 // kernel upgrades with BUILD_EXCLUSIVE errors.

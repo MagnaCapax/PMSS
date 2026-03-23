@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../../runtime/commands.php';
+require_once __DIR__.'/../../distro.php';
 
 putenv('DEBIAN_FRONTEND=noninteractive');
 putenv('APT_LISTCHANGES_FRONTEND=none');
@@ -100,7 +101,7 @@ function pmssReportPackageQueueBaselineDiff(?string $baselinePath = null): array
     $logNotice = 'logmsg';
 
     if ($baselinePath === null && function_exists('pmssSelectDpkgSelectionsBaseline')) {
-        $detectedVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+        $detectedVersion = pmssDistroVersionFromEnv();
         $baselinePath = pmssSelectDpkgSelectionsBaseline($detectedVersion > 0 ? $detectedVersion : null, $logNotice);
     }
 

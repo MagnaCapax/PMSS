@@ -6,18 +6,16 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../distro.php';
 logmsg('[docker] Starting Docker rootless configuration');
-
 // Disable Docker system service and remove stray socket
 runStep('[docker] Docker: disabling system service', 'systemctl disable --now docker.service docker.socket');
 runStep('[docker] Docker: removing socket file', 'rm -f /var/run/docker.sock');
-
 // Enable unprivileged user namespace cloning (rootless requirement)
 runStep('[docker] Docker: enabling unprivileged user namespaces', "sh -c 'echo kernel.unprivileged_userns_clone = 1 > /etc/sysctl.d/50-rootless.conf'");
 runStep('[docker] Docker: applying sysctl configuration', 'sysctl --system');
-
 // Debian 10 and 11 require additional rootless helpers
-$version = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+$version = pmssDistroVersionFromEnv();
 if ($version > 0 && $version < 12) {
     $archOutput = shell_exec('uname -m 2>/dev/null');
     logmsg("[docker] Command 'uname -m 2>/dev/null' output: ".trim((string) $archOutput));

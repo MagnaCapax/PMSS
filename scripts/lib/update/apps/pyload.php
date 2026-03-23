@@ -7,8 +7,8 @@
  */
 
 require_once __DIR__.'/pythonVenv.php';
-
-if (($distroVersion = (int) (getenv('PMSS_DISTRO_VERSION') ?: 0)) > 0 && $distroVersion < 10) {
+require_once __DIR__.'/../distro.php';
+if (($distroVersion = pmssDistroVersionFromEnv()) > 0 && $distroVersion < 10) {
     logmsg('[WARN] Skipping pyLoad setup: unsupported Debian release');
     return;
 }

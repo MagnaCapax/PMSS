@@ -192,7 +192,7 @@ CONF;
             $droppedUnavailable = [];
             $droppedObsolete    = [];
             $droppedKernel      = [];
-            $runtimeVersion     = $distroVersion !== null ? (int) $distroVersion : (int) (getenv('PMSS_DISTRO_VERSION') ?: 0);
+            $runtimeVersion     = pmssDistroVersionFromEnv($distroVersion);
             foreach ($lines as $idx => $line) {
                 $trimmed = trim($line);
                 if ($trimmed === '') {

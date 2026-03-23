@@ -354,7 +354,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
         }
 
         // 2. Enforce fuse-overlayfs for rootless Docker when available.
-        $distroVersion = (int)(getenv('PMSS_DISTRO_VERSION') ?: 0);
+        $distroVersion = pmssDistroVersionFromEnv();
         if ($distroVersion <= 0) {
             pmssUserLog($user, '[WARN] PMSS_DISTRO_VERSION missing; skipping Docker storage-driver enforcement');
             return;
