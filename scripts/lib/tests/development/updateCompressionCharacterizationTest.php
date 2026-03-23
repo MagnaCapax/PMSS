@@ -7,20 +7,15 @@ class UpdateCompressionCharacterizationTest extends TestCase
 {
     public function testStartRtorrentReusesSharedProcessLookups(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/startRtorrent';
-        $src = @file_get_contents($path);
-
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
+        $src = $this->pmssReadRepoFile('scripts/startRtorrent');
         $this->assertStringContainsString("rtorrentProcessPgrepExact(\$user, 'rtorrent', \$rtorrentRc, \$rtorrentOut)", $src);
         $this->assertStringContainsString("rtorrentProcessExecutorPids(\$user, \$executorRc, \$executorOut)['all']", $src);
     }
 
     public function testUpdateStep2KeepsInlineLighttpdHardeningStep(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/util/update-step2.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/util/update-step2.php');
         $symbol = 'pmssAdjust'.'LighttpdSecurity';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertStringContainsString("pmssRunProfiledStep('Adjusting lighttpd security settings'", $src);
         $this->assertStringContainsString("runStep('Restricting /etc/lighttpd directory permissions', 'chmod 750 /etc/lighttpd');", $src);
@@ -33,10 +28,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testAptSourcesDebianSelectionUsesSharedReleaseSpecs(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/apt.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/apt.php');
         $legacyTable = 'static $targets = [';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertStringContainsString("require_once __DIR__.'/distro.php';", $src);
         $this->assertStringContainsString('pmssDebianReleaseSpecs()[$version] ?? null', $src);
@@ -64,10 +57,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testKillProcessKeepsGracefulAndForcedWaitPhasesLocally(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/processes.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/processes.php');
         $symbol = 'pmssWaitFor'.'ProcessExit';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol) === false,
@@ -81,10 +72,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testKillProcessKeepsProcessProbeLocal(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/runtime/processes.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/processes.php');
         $symbol = 'pmssProcess'.'Running';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -133,10 +122,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testRootlessDockerUnitParsingStaysInsideUserMaintenance(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/userMaintenance.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssReadSystemd'.'UnitExecStartBinary';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol) === false,
@@ -148,10 +135,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUpdateLoggingKeepsCorrelationIdBuildLocal(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/update/logging.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/update/logging.php');
         $symbol = 'pmssBuild'.'CorrelationId';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -164,10 +149,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testBootstrapUpdateKeepsCorrelationIdBuildLocal(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/update.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/update.php');
         $symbol = 'pmssBuild'.'CorrelationId';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -179,10 +162,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testQuotaSnapshotKeepsSizeTokenNormalizationLocal(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/quotaSnapshot.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/quotaSnapshot.php');
         $symbol = 'pmssQuotaSnapshotNormalize'.'SizeToken';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -194,10 +175,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testQbittorrentPortEnsureKeepsAtomicRewriteInline(): void
     {
-        $path = dirname(__DIR__, 4).'/scripts/lib/user/torrentPort.php';
-        $src = @file_get_contents($path);
+        $src = $this->pmssReadRepoFile('scripts/lib/user/torrentPort.php');
         $symbol = 'pmssTorrentPort'.'FileWrite';
-        $this->assertTrue(is_string($src) && $src !== '', 'Expected to read '.$path);
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
@@ -295,14 +274,12 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertTrue(is_string($snapshotSrc) && $snapshotSrc !== '', 'Expected to read '.$snapshotPath);
         $this->assertTrue(
             strpos($snapshotSrc, $wrapperNeedle) === false,
-            'storageHealthSnapshot.php should keep JSONL appends inline in pmssStorageHealthSnapshotMain()'
+            'storageHealthSnapshot.php should rely on the shared JSONL append helper instead of a local wrapper'
         );
-        $this->assertStringContainsString(
-            'json_encode(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp), JSON_UNESCAPED_SLASHES).PHP_EOL',
-            $snapshotSrc
-        );
-        $this->assertStringContainsString('json_encode($nvme, JSON_UNESCAPED_SLASHES).PHP_EOL', $snapshotSrc);
-        $this->assertStringContainsString('json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL', $snapshotSrc);
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/log.php';", $snapshotSrc);
+        $this->assertStringContainsString('pmssJsonLineAppend($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));', $snapshotSrc);
+        $this->assertStringContainsString('pmssJsonLineAppend($logPath, $nvme);', $snapshotSrc);
+        $this->assertStringContainsString('pmssJsonLineAppend($logPath, $raid);', $snapshotSrc);
     }
 
     public function testStorageHealthSnapshotKeepsJsonOptionConsumptionInline(): void

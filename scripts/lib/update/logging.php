@@ -68,7 +68,7 @@ function pmssLogJson(array $payload): void
     if (($correlationId = pmssCorrelationId()) !== '') {
         $payload['pmss_correlation_id'] = $payload['pmss_correlation_id'] ?? $correlationId;
     }
-    @file_put_contents($path, json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+    pmssJsonLineAppend($path, $payload);
 }
 
 if (!function_exists('logMessage')) {

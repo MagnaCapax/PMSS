@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__.'/../lib/storageHealth.php';
+require_once __DIR__.'/../lib/log.php';
 
 function pmssStorageHealthSnapshotMain(array $argv): int
 {
@@ -64,13 +65,13 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         ];
     }
     foreach ($disks as $disk) {
-        @file_put_contents($logPath, json_encode(pmssStorageHealthSnapshotSmart($disk, $last, $timestamp), JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        pmssJsonLineAppend($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
         if (is_array($nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp))) {
-            @file_put_contents($logPath, json_encode($nvme, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+            pmssJsonLineAppend($logPath, $nvme);
         }
     }
     foreach (pmssStorageHealthSnapshotRaid($timestamp) as $raid) {
-        @file_put_contents($logPath, json_encode($raid, JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND | LOCK_EX);
+        pmssJsonLineAppend($logPath, $raid);
     }
 
     if (!$quiet) { echo "Storage health snapshot written to {$logPath}\n"; }

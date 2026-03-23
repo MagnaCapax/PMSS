@@ -29,3 +29,12 @@ if (!function_exists('logmsg')) {
         $GLOBALS['logmsg_default_logger']->msg($message);
     }
 }
+
+if (!function_exists('pmssJsonLineAppend')) {
+    /** Append one payload to a JSON Lines file. */
+    function pmssJsonLineAppend(string $path, array $payload): bool
+    {
+        return is_string($encoded = json_encode($payload, JSON_UNESCAPED_SLASHES))
+            && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
+    }
+}
