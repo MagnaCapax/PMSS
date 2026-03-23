@@ -14,21 +14,17 @@ echo date('Y-m-d H:i:s') . ': Checking Deluge instances' . "\n";
 require_once __DIR__.'/../lib/userLifecycle.php';
 if (is_file($pmssDelugePath = __DIR__.'/../lib/user/deluge.php')) { require_once $pmssDelugePath; }
 pmssUserWatchdogRunEnabledUsers('delugeEnable', ['deluged', 'deluge-web'], 'deluge stopped due to suspension', function (string $thisUser): void {
-    $instances = shell_exec("pgrep -u{$thisUser} deluged");
-    if (function_exists('pmssDelugeApplyUploadThrottle') && pmssDelugeApplyUploadThrottle($thisUser) && !empty($instances)) {
-        passthru("killall -9 -u ".escapeshellarg($thisUser)." deluged 2>/dev/null; killall -9 -u ".escapeshellarg($thisUser)." deluge-web 2>/dev/null");
+    $delugedRunning = pmssUserWatchdogProcessRunning($thisUser, 'deluged');
+    if (function_exists('pmssDelugeApplyUploadThrottle') && pmssDelugeApplyUploadThrottle($thisUser) && $delugedRunning) {
+        pmssUserWatchdogTerminateProcesses($thisUser, ['deluged', 'deluge-web'], 9);
         pmssUserLog($thisUser, 'deluge restarted to apply upload throttle');
-        $instances = '';
+        $delugedRunning = false;
     }
-    if (empty($instances)) {
-        echo "Start deluged for user: {$thisUser}\n";
-        passthru("su {$thisUser} -c 'cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info'");
-        pmssUserLog($thisUser, 'deluged start requested');
+    if (!$delugedRunning) {
+        pmssUserWatchdogStartCommand($thisUser, 'deluged', "su {$thisUser} -c 'cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info'", 'deluged start requested');
     }
  
-    if (empty(shell_exec("pgrep -u{$thisUser} deluge-web"))) {
-        echo "Start deluge-web for user: {$thisUser}\n";
-        passthru("su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'");
-        pmssUserLog($thisUser, 'deluge-web start requested');
+    if (!pmssUserWatchdogProcessRunning($thisUser, 'deluge-web')) {
+        pmssUserWatchdogStartCommand($thisUser, 'deluge-web', "su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'", 'deluge-web start requested');
     }
 });

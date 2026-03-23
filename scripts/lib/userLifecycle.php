@@ -216,6 +216,33 @@ function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'
     return is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www');
 }
 
+/** Shared watchdog helpers keep cron process handling on one path. */
+function pmssUserWatchdogTerminateProcesses(string $username, array $processNames, int $signal = 9): void
+{
+    $signal = $signal === 15 ? 15 : 9;
+    foreach ($processNames as $processName) {
+        if (!is_string($processName) || $processName === '') { continue; }
+        @passthru('killall -'.$signal.' -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null');
+    }
+}
+
+function pmssUserWatchdogProcessRunning(string $username, string $processName): bool
+{
+    if ($processName === '') { return false; }
+    $matches = array();
+    $exitCode = 1;
+    @exec('pgrep -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
+    return $exitCode === 0 && $matches !== array();
+}
+
+function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, string $command, string $userLogMessage): void
+{
+    if ($command === '') { return; }
+    echo "Start {$serviceLabel} for user: {$username}\n";
+    passthru($command);
+    pmssUserLog($username, $userLogMessage);
+}
+
 /** @param array<int,string> $processNames */
 function pmssUserWatchdogHandleSuspended(
     string $username,
@@ -225,10 +252,7 @@ function pmssUserWatchdogHandleSuspended(
 ): bool {
     if (!pmssUserWebRootUnavailable($username, $homeRoot)) return false;
     echo "User: {$username} is suspended\n";
-    foreach ($processNames as $processName) {
-        if (!is_string($processName) || $processName === '') continue;
-        @passthru('killall -9 -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null');
-    }
+    pmssUserWatchdogTerminateProcesses($username, $processNames, 9);
     pmssUserLog($username, $userLogMessage);
     return true;
 }

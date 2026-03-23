@@ -20,89 +20,57 @@ class CronInlineCharacterizationTest extends TestCase
         $this->assertStringContainsString("@rename(\$tmp, \$path)", $src);
     }
 
-    public function testQbittorrentWatchdogKeepsStartSequenceInline(): void
+    public function testServiceWatchdogsUseSharedHelpersAndKeepCommands(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/cron/checkQbittorrentInstances.php');
-        $wrapperNeedle = '$start'.'Qbittorrent = static function';
-
-        $this->assertTrue(
-            strpos($src, $wrapperNeedle) === false,
-            'checkQbittorrentInstances.php should keep the qBittorrent start sequence inline'
-        );
-        $this->assertStringContainsString('Start qBittorrent for user: {$thisUser}', $src);
-        $this->assertStringContainsString('nohup qbittorrent-nox -d >> /dev/null 2>&1 &', $src);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'qbittorrent-nox start requested');", $src);
-    }
-
-    public function testRcloneWatchdogKeepsStartSequenceInline(): void
-    {
-        $src = $this->pmssReadRepoFile('scripts/cron/checkRcloneInstances.php');
-        $wrapperNeedle = '$start'.'Rclone = static function';
-
-        $this->assertTrue(
-            strpos($src, $wrapperNeedle) === false,
-            'checkRcloneInstances.php should keep the rclone start sequence inline'
-        );
-        $this->assertStringContainsString('Start rclone for user: {$thisUser}', $src);
-        $this->assertStringContainsString('--rc-web-gui --rc-addr 127.0.0.1:{$port}', $src);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'rclone start requested');", $src);
-    }
-
-    public function testDelugeWatchdogKeepsStartSequencesInline(): void
-    {
-        $src = $this->pmssReadRepoFile('scripts/cron/checkDelugeInstances.php');
-        $delugedNeedle = '$start'.'Deluged = static function';
-        $webNeedle = '$start'.'DelugeWeb = static function';
-
-        $this->assertTrue(
-            strpos($src, $delugedNeedle) === false,
-            'checkDelugeInstances.php should keep the deluged start sequence inline'
-        );
-        $this->assertTrue(
-            strpos($src, $webNeedle) === false,
-            'checkDelugeInstances.php should keep the deluge-web start sequence inline'
-        );
-        $this->assertStringContainsString('Start deluged for user: {$thisUser}', $src);
-        $this->assertStringContainsString('Start deluge-web for user: {$thisUser}', $src);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluged start requested');", $src);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluge-web start requested');", $src);
+        foreach ([
+            [
+                'scripts/cron/checkQbittorrentInstances.php',
+                ['pmssUserWatchdogProcessRunning($thisUser, \'qbittorrent-nox\')', 'pmssUserWatchdogStartCommand($thisUser, \'qBittorrent\'', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox start requested'"],
+            ],
+            [
+                'scripts/cron/checkRcloneInstances.php',
+                ['pmssUserWatchdogProcessRunning($thisUser, \'rclone\')', 'pmssUserWatchdogStartCommand($thisUser, \'rclone\'', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone start requested'"],
+            ],
+            [
+                'scripts/cron/checkDelugeInstances.php',
+                ['pmssUserWatchdogProcessRunning($thisUser, \'deluged\')', 'pmssUserWatchdogTerminateProcesses($thisUser, [\'deluged\', \'deluge-web\'], 9);', 'pmssUserWatchdogStartCommand($thisUser, \'deluged\'', 'pmssUserWatchdogStartCommand($thisUser, \'deluge-web\'', "'deluged start requested'", "'deluge-web start requested'"],
+            ],
+        ] as $case) {
+            $src = $this->pmssReadRepoFile($case[0]);
+            foreach ($case[1] as $needle) {
+                $this->assertStringContainsString($needle, $src);
+            }
+        }
     }
 
     public function testWatchdogsKeepSuspensionAndStartUserLogMessages(): void
     {
-        $lighttpdSrc = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
-        $qbittorrentSrc = $this->pmssReadRepoFile('scripts/cron/checkQbittorrentInstances.php');
-        $rcloneSrc = $this->pmssReadRepoFile('scripts/cron/checkRcloneInstances.php');
-        $delugeSrc = $this->pmssReadRepoFile('scripts/cron/checkDelugeInstances.php');
-
-        $this->assertStringContainsString('pmssUserWatchdogHandleSuspended(', $lighttpdSrc);
-        $this->assertStringContainsString("'lighttpd stopped due to suspension'", $lighttpdSrc);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd start requested');", $lighttpdSrc);
-        $this->assertStringContainsString('pmssUserWatchdogRunEnabledUsers(', $qbittorrentSrc);
-        $this->assertStringContainsString("'qbittorrent-nox stopped due to suspension'", $qbittorrentSrc);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'qbittorrent-nox start requested');", $qbittorrentSrc);
-        $this->assertStringContainsString('pmssUserWatchdogRunEnabledUsers(', $rcloneSrc);
-        $this->assertStringContainsString("'rclone stopped due to suspension'", $rcloneSrc);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'rclone start requested');", $rcloneSrc);
-        $this->assertStringContainsString('pmssUserWatchdogRunEnabledUsers(', $delugeSrc);
-        $this->assertStringContainsString("'deluge stopped due to suspension'", $delugeSrc);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluged start requested');", $delugeSrc);
+        foreach ([
+            ['scripts/cron/checkLighttpdInstances.php', 'pmssUserWatchdogHandleSuspended(', "'lighttpd stopped due to suspension'", "'lighttpd start requested'"],
+            ['scripts/cron/checkQbittorrentInstances.php', 'pmssUserWatchdogRunEnabledUsers(', "'qbittorrent-nox stopped due to suspension'", "'qbittorrent-nox start requested'"],
+            ['scripts/cron/checkRcloneInstances.php', 'pmssUserWatchdogRunEnabledUsers(', "'rclone stopped due to suspension'", "'rclone start requested'"],
+            ['scripts/cron/checkDelugeInstances.php', 'pmssUserWatchdogRunEnabledUsers(', "'deluge stopped due to suspension'", "'deluged start requested'"],
+        ] as $case) {
+            $src = $this->pmssReadRepoFile($case[0]);
+            $this->assertStringContainsString($case[1], $src);
+            $this->assertStringContainsString($case[2], $src);
+            $this->assertStringContainsString($case[3], $src);
+        }
     }
 
-    public function testLighttpdWatchdogKeepsRestartSequenceInline(): void
+    public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
-        $wrapperNeedle = '$restart'.'Lighttpd = static function';
 
-        $this->assertTrue(
-            strpos($src, $wrapperNeedle) === false,
-            'checkLighttpdInstances.php should keep the lighttpd restart sequence inline'
-        );
+        $this->assertStringContainsString('pmssUserWatchdogProcessRunning($thisUser, \'lighttpd\')', $src);
+        $this->assertStringContainsString('pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')', $src);
+        $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);', $src);
+        $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 9);', $src);
+        $this->assertStringContainsString('pmssUserWatchdogStartCommand($thisUser, \'lighttpd\'', $src);
         $this->assertStringContainsString('Killing (if any) lighttpd for user: {$thisUser}', $src);
-        $this->assertStringContainsString('killall -15 -u {$thisUser} lighttpd; killall -15 -u {$thisUser} php-cgi; sleep 5; killall -9 -u {$thisUser} lighttpd; killall -9 -u {$thisUser} php-cgi;', $src);
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd restart requested');", $src);
-        $this->assertStringContainsString('if ($socketError || empty($instancesLighttpd)) {', $src);
-        $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd start requested');", $src);
+        $this->assertStringContainsString('if ($socketError || !$lighttpdRunning) {', $src);
+        $this->assertStringContainsString("'lighttpd start requested'", $src);
     }
 
 }
