@@ -2,7 +2,6 @@
 namespace PMSS\Tests;
 
 require_once dirname(__DIR__, 2).'/welcomeMessage.php';
-require_once dirname(__DIR__, 2).'/welcomeMessageProductConfig.php';
 
 class WelcomeMessageTest extends TestCase
 {
@@ -274,5 +273,11 @@ class WelcomeMessageTest extends TestCase
         } finally {
             $this->tearDownTempDir();
         }
+    }
+
+    public function testProductConfigUsesUnifiedWelcomeLibrary(): void
+    {
+        $this->pmssAssertRepoFileContainsString('scripts/productConfig.php', "require_once __DIR__.'/lib/welcomeMessage.php';");
+        $this->pmssAssertRepoFileContainsString('scripts/lib/welcomeMessage.php', 'function pmssWelcomeProductMessageSet(');
     }
 }
