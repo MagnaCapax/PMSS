@@ -28,6 +28,16 @@ abstract class TestCase
      */
     private $tempPaths = [];
 
+    /** Provide a shared no-op setup hook for inheriting tests. */
+    protected function setUp(): void
+    {
+    }
+
+    /** Provide a shared no-op teardown hook for inheriting tests. */
+    protected function tearDown(): void
+    {
+    }
+
     public function run(): array
     {
         $methods = array_filter(get_class_methods($this), static function ($method) {

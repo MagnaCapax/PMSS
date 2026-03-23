@@ -59,7 +59,7 @@ function pmssStorageHealthExecCapture(string $cmd, int $timeoutSec = 20): array
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $bash = '/bin/bash -lc '.escapeshellarg($cmd);
+    $bash = '/bin/bash -c '.escapeshellarg($cmd);
     $process = proc_open($bash, $descriptor, $pipes);
     if (!is_resource($process)) {
         return ['rc' => 1, 'stdout' => '', 'stderr' => 'proc_open failed'];
