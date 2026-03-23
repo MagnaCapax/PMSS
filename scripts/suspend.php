@@ -16,6 +16,7 @@
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/user/userConfigStore.php';
+require_once __DIR__.'/lib/user/userFilesystem.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Suspending
 // a user when /home is unavailable would fail or act on stale paths.
@@ -28,15 +29,9 @@ if ($username === '') {
 }
 
 // Validate inputs early so we never feed garbage to usermod or log files.
-$username = pmssRequireCliUsername($username, 'suspend', "Invalid username: %s\n");
-
-$homeDir = "/home/{$username}";
+['username' => $username, 'homeDir' => $homeDir] = userFilesystem::requireCliUserHome($username, 'suspend', "Invalid username: %s\n", "User home %s missing\n");
 $activeRoot = "$homeDir/www";
 $disabledRoot = "$homeDir/www-disabled";
-
-if (!is_dir($homeDir)) {
-    die("User home {$homeDir} missing\n");
-}
 
 // Canonical suspended detection: only the presence of www-disabled matters.
 if (is_dir($disabledRoot)) {

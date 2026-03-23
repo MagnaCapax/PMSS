@@ -6,8 +6,29 @@
  * @author PMSS Team
  */
 
+require_once dirname(__DIR__).'/userLifecycle.php';
+
 class userFilesystem
 {
+    public static function homePath(string $username, string $homeRoot = '/home'): string
+    {
+        return rtrim($homeRoot, '/').'/'.$username;
+    }
+
+    /** @return array{username:string,homeDir:string} */
+    public static function requireCliUserHome(
+        string $rawUsername,
+        string $action,
+        string $errorFormat,
+        string $missingMessage,
+        string $logMessage = 'Rejected username due to validation failure'
+    ): array {
+        $username = pmssRequireCliUsername($rawUsername, $action, $errorFormat, $logMessage);
+        $homeDir = self::homePath($username);
+        if (!is_dir($homeDir)) die(strpos($missingMessage, '%s') === false ? $missingMessage : sprintf($missingMessage, $homeDir));
+        return ['username' => $username, 'homeDir' => $homeDir];
+    }
+
     /**
      * Enumerate home directory names living directly under /home.
      */

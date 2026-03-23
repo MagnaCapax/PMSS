@@ -11,19 +11,13 @@
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
 if (is_file($pmssUserLifecyclePath = __DIR__.'/../lib/userLifecycle.php')) { require_once $pmssUserLifecyclePath; }
 if (is_file($pmssShellPath = __DIR__.'/../lib/shell.php')) { require_once $pmssShellPath; }
+require_once __DIR__.'/../lib/user/userFilesystem.php';
 require_once __DIR__.'/../lib/traffic/storage.php';
 
 $usage = 'Usage: ./userPermissions.php USERNAME';
 if (empty($argv[1]) ) die('need user name. ' . $usage . "\n");
 
-$userRaw = (string) $argv[1];
-$thisUser = function_exists('pmssUsernameNormalizeIfValid')
-    ? pmssUsernameNormalizeIfValid($userRaw)
-    : null;
-if ($thisUser === null) {
-    die("Invalid username\n");
-}
-if (!is_dir("/home/{$thisUser}")) die("User does not exist\n");
+['username' => $thisUser, 'homeDir' => $homeDir] = userFilesystem::requireCliUserHome((string) $argv[1], 'permissions', "Invalid username\n", "User does not exist\n");
 
 $userIds = function_exists('pmssUserAccountLookup') ? pmssUserAccountLookup($thisUser) : null;
 if (!is_array($userIds)) die("No such user\n");
@@ -66,22 +60,22 @@ function chownPath(string $path, string $owner, bool $recursive = false): void
 
 // Safer traversal without relying on xargs delimiters; applies to each directory in place.
 // Skip ~/.local entirely to avoid interfering with per-user application data (e.g. Docker overlays).
-$homeOwner = @fileowner("/home/{$thisUser}");
-$homeGroup = @filegroup("/home/{$thisUser}");
+$homeOwner = @fileowner($homeDir);
+$homeGroup = @filegroup($homeDir);
 if ($homeOwner !== false && $homeGroup !== false &&
     ($homeOwner !== $userIds['uid'] || $homeGroup !== $userIds['gid'])) {
     fwrite(
         STDERR,
         sprintf(
             "[WARN] Fixing home directory ownership for %s (uid=%s gid=%s expected uid=%s gid=%s)\n",
-            "/home/{$thisUser}",
+            $homeDir,
             $homeOwner,
             $homeGroup,
             $userIds['uid'],
             $userIds['gid']
         )
     );
-    chownPath("/home/{$thisUser}", $userIds['uid'].':'.$userIds['gid']);
+    chownPath($homeDir, $userIds['uid'].':'.$userIds['gid']);
     if (function_exists('pmssUserLog')) {
         pmssUserLog(
             $thisUser,

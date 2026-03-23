@@ -26,20 +26,13 @@ if ($username === '') {
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/user/passwords.php';
+require_once __DIR__.'/lib/user/userFilesystem.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Changing
 // a user's password when /home is unavailable would fail or write to stale paths.
 pmssRequireHomeMounted('changePw.php');
 
-$username = pmssRequireCliUsername(
-    $username,
-    'password',
-    "Invalid username: %s\n",
-    'Rejected username due to validation failure in changePw.php'
-);
-
-if (!file_exists("/home/{$username}") or
-    !is_dir("/home/{$username}")) die("\t**** USER NOT FOUND ****\n\n");
+['username' => $username] = userFilesystem::requireCliUserHome($username, 'password', "Invalid username: %s\n", "\t**** USER NOT FOUND ****\n\n", 'Rejected username due to validation failure in changePw.php');
 
 if ($password === '') {
     $password = generatePassword();
