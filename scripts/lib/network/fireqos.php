@@ -5,6 +5,21 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/../userLifecycle.php';
+
+/**
+ * Resolve a validated username to its uid for FireQOS class generation.
+ */
+function networkFireqosLookupUid(string $username): ?int
+{
+    if (!pmssValidateUsername($username)) {
+        return null;
+    }
+
+    $uid = trim((string) @shell_exec('id -u '.escapeshellarg($username).' 2>/dev/null'));
+    return ctype_digit($uid) ? (int) $uid : null;
+}
+
 function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string
 {
     $templatePath = getenv('PMSS_FIREQOS_TEMPLATE') ?: '/etc/seedbox/config/template.fireqos';
@@ -42,8 +57,7 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
     };
 
     foreach ($users as $username) {
-        $uid = trim((string) shell_exec("id -u {$username}"));
-        if ($uid === '') {
+        if (networkFireqosLookupUid($username) === null) {
             continue;
         }
 

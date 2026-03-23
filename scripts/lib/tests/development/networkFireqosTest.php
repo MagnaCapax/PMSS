@@ -199,4 +199,25 @@ class NetworkFireqosTest extends TestCase
             $this->pmssRemoveTree($homeDir);
         }
     }
+
+    public function testBuildFireqosConfigRejectsInvalidUsernamesBeforeUidLookup(): void
+    {
+        $markerPath = sys_get_temp_dir().'/pmss-fireqos-injection-'.bin2hex(random_bytes(4));
+        $username = 'root; touch '.escapeshellarg($markerPath);
+
+        try {
+            $config = \networkBuildFireqosConfig(
+                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 80]],
+                [$username, 'root'],
+                []
+            );
+        } finally {
+            $created = file_exists($markerPath);
+            @unlink($markerPath);
+        }
+
+        $this->assertTrue($created === false);
+        $this->assertTrue(strpos($config, 'class root ') !== false);
+        $this->assertTrue(strpos($config, $username) === false);
+    }
 }
