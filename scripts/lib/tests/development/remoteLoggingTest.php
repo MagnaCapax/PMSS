@@ -202,6 +202,37 @@ class RemoteLoggingTest extends TestCase
         }
     }
 
+    public function testDisabledLoggingPreservesSymlinkedTargetDirectory(): void
+    {
+        $cfgDir = $this->tempDir('cfg');
+        $realTargetDir = $this->tempDir('real-rsyslog');
+        $targetDir = sys_get_temp_dir().'/pmss-remote-logging-'.bin2hex(random_bytes(4)).'-rsyslog-link';
+        $target = $targetDir.'/50-pmss-remote.conf';
+        $realTarget = $realTargetDir.'/50-pmss-remote.conf';
+        $messages = [];
+
+        file_put_contents($cfgDir.'/logging.conf', "remote_logging_enabled=0\n");
+        file_put_contents($realTarget, "*.* @@old.example:514\n");
+        symlink($realTargetDir, $targetDir);
+
+        try {
+            $this->runRemoteLogging([
+                'PMSS_CONFIG_DIR' => $cfgDir,
+                'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
+            ], $messages);
+
+            $this->assertEquals("*.* @@old.example:514\n", file_get_contents($realTarget));
+            $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe remote logging config directory'), 'expected unsafe-directory warning');
+            $this->assertTrue(!$this->pmssMessagesContain($messages, 'Removed remote logging config (disabled)'), 'unsafe directory must prevent stale-config removal log');
+        } finally {
+            $this->cleanup($cfgDir);
+            if (is_link($targetDir)) {
+                @unlink($targetDir);
+            }
+            $this->cleanup($realTargetDir);
+        }
+    }
+
     private function tempDir(string $suffix): string
     {
         $dir = sys_get_temp_dir().'/pmss-remote-logging-'.bin2hex(random_bytes(4)).'-'.$suffix;

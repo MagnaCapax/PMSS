@@ -35,6 +35,22 @@ function pmssWriteManagedConfigFile(string $target, string $contents, string $la
     return pmssAtomicWriteFile($target, $contents, 0644);
 }
 
+function pmssRemoveManagedConfigFile(string $target, string $label, callable $logger): bool
+{
+    $targetDir = dirname($target);
+    if (!is_dir($targetDir) || is_link($targetDir)) {
+        $logger('[WARN] Unsafe '.$label.' directory: '.$targetDir);
+        return false;
+    }
+
+    if (!pmssUserFilePathIsSafe($target)) {
+        $logger('[WARN] Unsafe '.$label.' target: '.$target);
+        return false;
+    }
+
+    return @unlink($target);
+}
+
 /**
  * Compute journald caps based on root filesystem size.
  *
@@ -203,7 +219,7 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         if (!is_file($target)) {
             return;
         }
-        if (!@unlink($target)) {
+        if (!pmssRemoveManagedConfigFile($target, 'remote logging config', $log)) {
             $log('[WARN] Unable to remove remote logging config: '.$target);
             return;
         }
