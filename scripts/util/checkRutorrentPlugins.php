@@ -7,30 +7,27 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/rutorrentPlugins.php';
 
-echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
+function pmssCheckRutorrentPluginsMain(array $argv): int
+{
+    echo date('Y-m-d H:i:s') . ': Checking rTorrent instances' . "\n";
 
-$accessIni = file_get_contents('/etc/seedbox/config/template.rutorrent.access');
-
-// Get & parse users list
-$users = pmssListManagedUsers('/scripts/listUsers.php');
-
-foreach($users AS $thisUser) {    // Loop users checking their instances
-    echo "\nChecking: {$thisUser}\n";
-
-    $userPath = "/home/{$thisUser}/www/rutorrent/plugins/";
-
-    if (file_exists($userPath . 'diskspace')) {
-        echo "Disk space exists - deleting!\n";
-        shell_exec("rm -rf {$userPath}diskspace");
+    $accessIni = @file_get_contents('/etc/seedbox/config/template.rutorrent.access');
+    if ($accessIni === false) {
+        fwrite(STDERR, "Unable to read /etc/seedbox/config/template.rutorrent.access\n");
+        return 1;
     }
-    
-    if (!file_exists($userPath . 'hddquota')) {
-        echo "HDD Quota does not exist - adding!\n";
-        shell_exec("cp -rp /etc/skel/www/rutorrent/plugins/hddquota {$userPath}");
-        shell_exec("chown {$thisUser}:{$thisUser} {$userPath}hddquota");
-        shell_exec("chmod -R 777 {$userPath}hddquota");
+
+    $users = pmssListManagedUsers('/scripts/listUsers.php');
+    foreach ($users as $thisUser) {
+        echo "\nChecking: {$thisUser}\n";
+        pmssCheckRutorrentPluginsSyncUser($thisUser, $accessIni);
     }
-    
-    file_put_contents("/home/{$thisUser}/www/rutorrent/conf/access.ini", $accessIni);
+
+    return 0;
+}
+
+if (!defined('PMSS_CHECK_RUTORRENT_PLUGINS_LIB_ONLY')) {
+    exit(pmssCheckRutorrentPluginsMain($argv));
 }
