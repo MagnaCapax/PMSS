@@ -13,6 +13,21 @@ if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE
     exit(pmssShowTrafficMain($argv));
 }
 
+/**
+ * Read a serialized traffic stats payload without allowing object wakeups.
+ *
+ * @return array|null
+ */
+function pmssShowTrafficReadStatsPayload(string $statsPath): ?array
+{
+    $rawStats = @file_get_contents($statsPath);
+    $data = is_string($rawStats) && $rawStats !== ''
+        ? @unserialize($rawStats, ['allowed_classes' => false])
+        : null;
+
+    return is_array($data) ? $data : null;
+}
+
 function pmssShowTrafficMain(array $argv): int
 {
     $options = getopt('', ['json', 'show-missing', 'help', 'extended', 'sort:', 'color', 'no-color']);
@@ -132,9 +147,8 @@ TXT;
             continue;
         }
 
-        $rawStats = @file_get_contents($statsPath);
-        $data = is_string($rawStats) && $rawStats !== '' ? @unserialize($rawStats) : null;
-        if (!is_array($data) || empty($data['raw']['month'])) {
+        $data = pmssShowTrafficReadStatsPayload($statsPath);
+        if ($data === null || empty($data['raw']['month'])) {
             continue;
         }
 
@@ -154,10 +168,7 @@ TXT;
                 $ingressGroup = @posix_getgrgid($ingressStats['gid']);
                 $ingressGroupName = is_array($ingressGroup) ? ($ingressGroup['name'] ?? '') : '';
                 if ($ingressGroupName === '' || $ingressGroupName === $baseUser || $ingressGroupName === 'root') {
-                    $ingressRaw = @file_get_contents($ingressPath);
-                    $ingressData = is_string($ingressRaw) && $ingressRaw !== ''
-                        ? @unserialize($ingressRaw, ['allowed_classes' => false])
-                        : null;
+                    $ingressData = pmssShowTrafficReadStatsPayload($ingressPath);
                     if (is_array($ingressData) && isset($ingressData['raw']['month']) && is_numeric($ingressData['raw']['month'])) {
                         $inboundMonth = (float) $ingressData['raw']['month'];
                     }
