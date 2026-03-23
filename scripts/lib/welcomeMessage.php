@@ -21,6 +21,14 @@ function pmssWelcomeReadJson(string $path): array
 }
 
 /**
+ * Read the product template map regardless of root-file shape.
+ */
+function pmssWelcomeProductMessageMap(array $rootMap): array
+{
+    return is_array($rootMap['products'] ?? null) ? $rootMap['products'] : $rootMap;
+}
+
+/**
  * Resolve and render the contextual welcome message for a user.
  */
 function pmssWelcomeMessageForUser(
@@ -45,8 +53,7 @@ function pmssWelcomeMessageForUser(
         ? $userConfig['welcomeMessage']
         : '';
     if ($template === '' && $productKey !== '') {
-        $messageMap = pmssWelcomeReadJson($productMessagesPath);
-        $messageMap = is_array($messageMap['products'] ?? null) ? $messageMap['products'] : $messageMap;
+        $messageMap = pmssWelcomeProductMessageMap(pmssWelcomeReadJson($productMessagesPath));
         if (!is_string($template = $messageMap[$productKey] ?? null)) {
             $template = '';
             foreach ($messageMap as $mapKey => $mapValue) {

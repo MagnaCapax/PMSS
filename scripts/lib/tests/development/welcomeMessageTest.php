@@ -240,4 +240,39 @@ class WelcomeMessageTest extends TestCase
             $this->tearDownTempDir();
         }
     }
+
+    public function testPlainAndNestedProductMapsRenderIdenticallyAfterRoundTrip(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $home = $this->makeUserHome();
+            @file_put_contents($home.'/.config/pmss-user.json', json_encode(['product' => 'm1000'], JSON_UNESCAPED_SLASHES));
+
+            $plainPath = $this->tempDir.'/welcomeMessages-plain.json';
+            $nestedPath = $this->tempDir.'/welcomeMessages-nested.json';
+            @file_put_contents($plainPath, json_encode(['free-tier' => 'legacy'], JSON_UNESCAPED_SLASHES));
+            @file_put_contents($nestedPath, json_encode(['meta' => ['updatedBy' => 'test'], 'products' => ['free-tier' => 'legacy']], JSON_UNESCAPED_SLASHES));
+
+            $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>{{product}}/{{username}}</p>', $plainPath));
+            $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>{{product}}/{{username}}</p>', $nestedPath));
+
+            $this->assertEquals(
+                '<p>m1000/alice</p>',
+                \pmssWelcomeMessageForUser([], $home, 'alice', $plainPath)
+            );
+            $this->assertEquals(
+                '<p>m1000/alice</p>',
+                \pmssWelcomeMessageForUser([], $home, 'alice', $nestedPath)
+            );
+
+            $plainDecoded = json_decode((string) @file_get_contents($plainPath), true);
+            $nestedDecoded = json_decode((string) @file_get_contents($nestedPath), true);
+            $this->assertTrue(is_array($plainDecoded), 'Plain product map must remain a plain root map');
+            $this->assertTrue(!isset($plainDecoded['products']), 'Plain product map should not gain a nested products wrapper');
+            $this->assertEquals('<p>{{product}}/{{username}}</p>', $plainDecoded['m1000'] ?? null);
+            $this->assertEquals('<p>{{product}}/{{username}}</p>', $nestedDecoded['products']['m1000'] ?? null);
+        } finally {
+            $this->tearDownTempDir();
+        }
+    }
 }

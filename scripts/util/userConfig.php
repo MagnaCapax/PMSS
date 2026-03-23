@@ -15,6 +15,7 @@
 foreach (['traffic', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
     require_once __DIR__.'/../lib/user/'.$module.'.php';
 }
+require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 
@@ -24,21 +25,12 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 
 $usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
-$rawArgs = $argv ?? ($_SERVER['argv'] ?? []);
-$args = [];
-$uploadThrottleKib = null;
-$welcomeMessage = null;
-foreach ($rawArgs as $arg) {
-    if (strpos($arg, '--upload-throttle-kib=') === 0) {
-        $uploadThrottleKib = substr($arg, strlen('--upload-throttle-kib='));
-        continue;
-    }
-    if (strpos($arg, '--welcome-message=') === 0) {
-        $welcomeMessage = substr($arg, strlen('--welcome-message='));
-        continue;
-    }
-    $args[] = $arg;
-}
+$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message']);
+$args = array_merge([''], $parsed['arguments']);
+$uploadThrottleKib = pmssCliOption($parsed, 'upload-throttle-kib');
+$uploadThrottleKib = ($uploadThrottleKib === true || $uploadThrottleKib === null) ? null : (string) $uploadThrottleKib;
+$welcomeMessage = pmssCliOption($parsed, 'welcome-message');
+$welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null : (string) $welcomeMessage;
 $usage .= ' [--upload-throttle-kib=KIB] [--welcome-message=HTML]';
 $usage .= "\n   or: ./userConfig.php USERNAME --welcome-message=HTML";
 $fullConfigMode = !empty($args[1]) && !empty($args[2]) && !empty($args[3]);
@@ -121,7 +113,7 @@ if ($welcomeOnlyMode) {
         }
     }
 
-    if (trim($welcomeMessage) === '') {
+    if (trim((string) $welcomeMessage) === '') {
         unset($payload['welcomeMessage']);
     } else {
         $payload['welcomeMessage'] = $welcomeMessage;
