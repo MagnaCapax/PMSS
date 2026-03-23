@@ -134,7 +134,7 @@ foreach ($usersOut as $line) {
     }
 
     // Suspended users: kill only rtorrent and executor — not all user processes (see GH#210).
-    if (file_exists($home.'/www-disabled') || !is_dir($home.'/www')) {
+    if (pmssUserWebRootUnavailable($user)) {
         $null = [];
         $rc = 0;
         @exec('killall -9 -u '.escapeshellarg($user).' rtorrent 2>/dev/null; killall -9 -u '.escapeshellarg($user).' .rtorrentExecute.php 2>/dev/null', $null, $rc);

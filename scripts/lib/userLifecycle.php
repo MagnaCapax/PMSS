@@ -220,6 +220,14 @@ function pmssListManagedUsers(string $command = '/scripts/listUsers.php'): array
     return array_keys($users);
 }
 
+/** Return true when watchdogs must avoid web-facing services for the user. */
+function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'): bool
+{
+    $homeDir = rtrim($homeRoot, '/').'/'.$username;
+
+    return is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www');
+}
+
 function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array
 {
     $managedUsers = array_values(array_unique(array_filter(array_map('pmssNormalizeUsername', $managedUsers), 'pmssValidateUsername')));

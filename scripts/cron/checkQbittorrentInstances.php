@@ -8,15 +8,12 @@
  */
 echo date('Y-m-d H:i:s') . ': Checking qBittorrent instances' . "\n";
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
+require_once __DIR__.'/../lib/userLifecycle.php';
 if (is_file($pmssQbittorrentPath = __DIR__.'/../lib/user/qbittorrent.php')) { require_once $pmssQbittorrentPath; }
 $canUserLog = function_exists('pmssUserLog');
-
-// Get & parse users list
-$users = array_filter(explode("\n", trim((string) shell_exec('/scripts/listUsers.php'))));
-
-foreach($users AS $thisUser) {    // Loop users checking their instances
-    if (file_exists("/home/{$thisUser}/www-disabled") or
-        !file_exists("/home/{$thisUser}/www")) {
+$users = pmssListManagedUsers();
+foreach($users AS $thisUser) {
+    if (pmssUserWebRootUnavailable($thisUser)) {
             echo "User: {$thisUser} is suspended\n";
             // Kill only qbittorrent-nox — not all user processes (see GH#210).
             passthru("killall -9 -u ".escapeshellarg($thisUser)." qbittorrent-nox 2>/dev/null");

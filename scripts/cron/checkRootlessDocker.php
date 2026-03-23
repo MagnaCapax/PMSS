@@ -11,6 +11,7 @@
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/runtime.php';
 require_once '/scripts/lib/user/log.php';
+require_once '/scripts/lib/userLifecycle.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 
 $logger = new Logger(__FILE__);
@@ -27,12 +28,11 @@ $logDockerMessage = static function (string $message) use ($logger, $mirrorLegac
 };
 
 $logDockerMessage('Checking rootless Docker services');
-
-$users = array_filter(explode("\n", trim(shell_exec('/scripts/listUsers.php'))));
+$users = pmssListManagedUsers();
 $userConfigStore = new UserConfigStore();
 
 foreach ($users as $user) {
-    if (file_exists("/home/{$user}/www-disabled") || !file_exists("/home/{$user}/www")) {
+    if (pmssUserWebRootUnavailable($user)) {
         $logDockerMessage("User {$user} is suspended");
         continue;
     }
