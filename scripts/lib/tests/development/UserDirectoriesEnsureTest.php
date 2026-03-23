@@ -15,8 +15,7 @@ class UserDirectoriesEnsureTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-user-dir-ensure-'.getmypid();
-        @mkdir($this->tempDir, 0700, true);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-user-dir-ensure-', 0700);
 
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
         $pw = function_exists('posix_getpwuid') ? posix_getpwuid($uid) : null;
@@ -25,29 +24,12 @@ class UserDirectoriesEnsureTest extends TestCase
 
     protected function tearDown(): void
     {
-        if ($this->tempDir && is_dir($this->tempDir)) {
-            $this->recursiveDelete($this->tempDir);
-        }
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     private function recursiveDelete(string $dir): void
     {
-        if (!is_dir($dir)) {
-            return;
-        }
-        $items = scandir($dir);
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $path = $dir.'/'.$item;
-            if (is_dir($path) && !is_link($path)) {
-                $this->recursiveDelete($path);
-            } else {
-                @unlink($path);
-            }
-        }
-        @rmdir($dir);
+        $this->cleanup($dir);
     }
 
     public function testCreatesNestedPathWithParentModeAndLeafMode(): void

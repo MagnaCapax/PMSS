@@ -16,17 +16,17 @@ class RtorrentProcessTest extends TestCase
 
     private function removeTree(string $path): void
     {
-        $this->pmssRemoveTree($path);
+        $this->cleanup($path);
     }
 
     protected function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-rtorrent-process-');
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-rtorrent-process-');
     }
 
     protected function tearDown(): void
     {
-        $this->removeTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     /**

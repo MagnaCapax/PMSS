@@ -13,13 +13,12 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-lighttpd-watchdog-'.bin2hex(random_bytes(4));
-        @mkdir($this->tempDir, 0755, true);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-watchdog-');
     }
 
     protected function tearDown(): void
     {
-        $this->removeTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testBuildsOnlyStartupSocketPathsWhenConfigHasDemandSpawnedWorkers(): void
@@ -124,19 +123,6 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
     private function removeTree(string $path): void
     {
-        if (!file_exists($path)) {
-            return;
-        }
-
-        if (is_file($path) || is_link($path)) {
-            @unlink($path);
-            return;
-        }
-
-        foreach ((array) glob($path.'/*') as $childPath) {
-            $this->removeTree($childPath);
-        }
-
-        @rmdir($path);
+        $this->cleanup($path);
     }
 }

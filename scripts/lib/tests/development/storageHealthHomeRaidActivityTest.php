@@ -10,44 +10,25 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir().'/pmss-storage-health-home-'.bin2hex(random_bytes(4));
+        $this->pmssAssignTempDirProperty('tmpDir', 'pmss-storage-health-home-', 0700);
         @mkdir($this->tmpDir.'/sys/class/block', 0700, true);
         @mkdir($this->tmpDir.'/dev/mapper', 0700, true);
     }
 
     protected function tearDown(): void
     {
-        $this->removeTree($this->tmpDir);
+        $this->pmssCleanupTempDirProperty('tmpDir');
     }
 
     private function removeTree(string $path): void
     {
-        if (!is_dir($path)) {
-            @unlink($path);
-            return;
-        }
-
-        $entries = @scandir($path);
-        if (!is_array($entries)) {
-            @rmdir($path);
-            return;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-            $this->removeTree($path.'/'.$entry);
-        }
-
-        @rmdir($path);
+        $this->cleanup($path);
     }
 
     private function writeFile(string $relativePath, string $content): string
     {
         $path = $this->tmpDir.'/'.$relativePath;
-        @mkdir(dirname($path), 0700, true);
-        file_put_contents($path, $content);
+        $this->pmssWriteFile($path, $content, 0700);
         return $path;
     }
 

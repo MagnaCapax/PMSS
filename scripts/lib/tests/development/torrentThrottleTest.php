@@ -10,16 +10,15 @@ class TorrentThrottleTest extends TestCase
 
     public function setUp(): void
     {
-        $this->homeRoot = sys_get_temp_dir().'/pmss-throttle-'.uniqid('', true);
+        $this->pmssAssignTempDirProperty('homeRoot', 'pmss-throttle-');
         $this->user = 'alice';
-        @mkdir($this->homeRoot, 0755, true);
         @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
         putenv('PMSS_HOME_DIR='.$this->homeRoot);
     }
 
     public function tearDown(): void
     {
-        $this->removeTree($this->homeRoot);
+        $this->pmssCleanupTempDirProperty('homeRoot');
         putenv('PMSS_HOME_DIR');
     }
 
@@ -37,25 +36,7 @@ class TorrentThrottleTest extends TestCase
 
     private function removeTree(string $path): void
     {
-        if (!is_dir($path)) {
-            return;
-        }
-        $items = scandir($path);
-        if (!is_array($items)) {
-            return;
-        }
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $full = $path.'/'.$item;
-            if (is_dir($full) && !is_link($full)) {
-                $this->removeTree($full);
-            } else {
-                @unlink($full);
-            }
-        }
-        @rmdir($path);
+        $this->cleanup($path);
     }
 
     public function testReadReturnsNullWhenMissing(): void

@@ -10,35 +10,17 @@ class LighttpdUserDirectoryPrepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->base = sys_get_temp_dir().'/pmss-lighttpd-dirprep-'.uniqid('', true);
-        @mkdir($this->base, 0700, true);
+        $this->pmssAssignTempDirProperty('base', 'pmss-lighttpd-dirprep-', 0700);
     }
 
     protected function tearDown(): void
     {
-        if (is_dir($this->base)) {
-            $this->recursiveDelete($this->base);
-        }
+        $this->pmssCleanupTempDirProperty('base');
     }
 
     private function recursiveDelete(string $dir): void
     {
-        $items = @scandir($dir);
-        if (!is_array($items)) {
-            return;
-        }
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $path = $dir.'/'.$item;
-            if (is_dir($path) && !is_link($path)) {
-                $this->recursiveDelete($path);
-            } else {
-                @unlink($path);
-            }
-        }
-        @rmdir($dir);
+        $this->cleanup($dir);
     }
 
     public function testCreatesDirectoriesAndCustomFile(): void
@@ -90,4 +72,3 @@ class LighttpdUserDirectoryPrepTest extends TestCase
         $this->assertTrue(!is_dir($elsewhere.'/custom.d'));
     }
 }
-
