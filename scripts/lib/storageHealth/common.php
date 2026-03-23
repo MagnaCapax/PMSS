@@ -26,6 +26,33 @@ function pmssStorageHealthReadLastEntries(string $path): array
     return $last;
 }
 
+/** @param array<string, mixed> $disk @return array<string, mixed> */
+function pmssStorageHealthDeviceEntryBuild(string $kind, array $disk, string $timestamp, int $defaultRota): array
+{
+    return [
+        'timestamp' => $timestamp,
+        'kind' => $kind,
+        'device' => (string) ($disk['path'] ?? ''),
+        'kname' => (string) ($disk['kname'] ?? ''),
+        'model' => (string) ($disk['model'] ?? ''),
+        'serial' => (string) ($disk['serial'] ?? ''),
+        'rota' => (int) ($disk['rota'] ?? $defaultRota),
+        'size' => (string) ($disk['size'] ?? ''),
+    ];
+}
+
+/** @param array<string, mixed> $entry @param array<int, string> $flags @return array<string, mixed> */
+function pmssStorageHealthEntryFinalize(array $entry, array $flags, string $severity, ?string $error = null): array
+{
+    if ($error !== null) {
+        $entry['error'] = $error;
+    }
+    $entry['flags'] = array_values(array_unique($flags));
+    $entry['severity'] = $severity;
+    $entry['ok'] = ($severity === 'ok');
+    return $entry;
+}
+
 /**
  * Execute a shell command with captured output (no streaming).
  *

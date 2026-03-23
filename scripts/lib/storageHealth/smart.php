@@ -15,17 +15,7 @@
  */
 function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $prevMetrics, string $timestamp): array
 {
-    $dev = (string) $disk['path'];
-    $entry = [
-        'timestamp' => $timestamp,
-        'kind' => 'smart',
-        'device' => $dev,
-        'kname' => (string) ($disk['kname'] ?? ''),
-        'model' => (string) ($disk['model'] ?? ''),
-        'serial' => (string) ($disk['serial'] ?? ''),
-        'rota' => (int) ($disk['rota'] ?? 1),
-        'size' => (string) ($disk['size'] ?? ''),
-    ];
+    $entry = pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1);
 
     $defaultMetrics = [
         'health' => 'UNKNOWN',
@@ -40,10 +30,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
     if (stripos($out, 'Device is in STANDBY') !== false || stripos($out, 'Device is in SLEEP') !== false) {
         $entry['metrics'] = $defaultMetrics;
         $entry['metrics']['health'] = 'STANDBY';
-        $entry['flags'] = ['standby'];
-        $entry['severity'] = 'ok';
-        $entry['ok'] = true;
-        return $entry;
+        return pmssStorageHealthEntryFinalize($entry, ['standby'], 'ok');
     }
 
     $metrics = $defaultMetrics;
@@ -136,10 +123,7 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
         }
     }
 
-    $entry['flags'] = $flags;
-    $entry['severity'] = $sev;
-    $entry['ok'] = ($sev === 'ok');
-    return $entry;
+    return pmssStorageHealthEntryFinalize($entry, $flags, $sev);
 }
 
 /**
@@ -150,31 +134,18 @@ function pmssStorageHealthParseSmartctlOutput(string $out, array $disk, ?array $
 function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timestamp): array
 {
     $dev = (string) $disk['path'];
-    $base = [
-        'timestamp' => $timestamp,
-        'kind' => 'smart',
-        'device' => $dev,
-        'kname' => (string) ($disk['kname'] ?? ''),
-        'model' => (string) ($disk['model'] ?? ''),
-        'serial' => (string) ($disk['serial'] ?? ''),
-        'rota' => (int) ($disk['rota'] ?? 1),
-        'size' => (string) ($disk['size'] ?? ''),
-        'ok' => false,
-        'severity' => 'warn',
-    ];
-
     if (!is_readable($dev)) {
-        return $base + ['error' => 'device unreadable', 'flags' => ['device_unreadable']];
+        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['device_unreadable'], 'warn', 'device unreadable');
     }
     if (trim((string) shell_exec('command -v smartctl 2>/dev/null')) === '') {
-        return $base + ['error' => 'smartctl missing', 'flags' => ['smartctl_missing']];
+        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_missing'], 'warn', 'smartctl missing');
     }
 
     $cmd = 'smartctl -n standby,now -H -A -i '.escapeshellarg($dev);
     $res = pmssStorageHealthExecCapture($cmd, 25);
     $out = $res['stdout']."\n".$res['stderr'];
     if (trim($out) === '') {
-        return $base + ['error' => 'smartctl produced no output', 'flags' => ['smartctl_empty']];
+        return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_empty'], 'warn', 'smartctl produced no output');
     }
 
     $prevMetrics = $last['smart::'.$dev]['metrics'] ?? null;
@@ -184,9 +155,9 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
 
     $entry = pmssStorageHealthParseSmartctlOutput($out, $disk, $prevMetrics, $timestamp);
     if ($res['rc'] === 124) {
-        if (($entry['severity'] ?? 'ok') === 'ok') { $entry['severity'] = 'warn'; }
-        $entry['ok'] = false;
-        $entry['flags'] = array_values(array_unique(array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout'])));
+        $severity = (string) ($entry['severity'] ?? 'ok');
+        if ($severity === 'ok') { $severity = 'warn'; }
+        return pmssStorageHealthEntryFinalize($entry, array_merge((array) ($entry['flags'] ?? []), ['smartctl_timeout']), $severity);
     }
     return $entry;
 }

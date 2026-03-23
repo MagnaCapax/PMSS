@@ -50,17 +50,8 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
         $unit = strtoupper($matches[2] ?? 'C');
         $metrics['temperature'] = $unit === 'K' ? ($value - 273) : $value;
     }
-    $entry = [
-        'timestamp' => $timestamp,
-        'kind' => 'nvme',
-        'device' => $dev,
-        'kname' => (string) ($disk['kname'] ?? ''),
-        'model' => (string) ($disk['model'] ?? ''),
-        'serial' => (string) ($disk['serial'] ?? ''),
-        'rota' => (int) ($disk['rota'] ?? 0),
-        'size' => (string) ($disk['size'] ?? ''),
-        'metrics' => $metrics,
-    ];
+    $entry = pmssStorageHealthDeviceEntryBuild('nvme', $disk, $timestamp, 0);
+    $entry['metrics'] = $metrics;
     $flags = [];
     $severity = 'ok';
     if (($metrics['critical_warnings'] ?? 0) > 0) {
@@ -92,10 +83,7 @@ function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timesta
             $flags[] = $flag;
         }
     }
-    $entry['flags'] = $flags;
-    $entry['severity'] = $severity;
-    $entry['ok'] = $severity === 'ok';
-    return $entry;
+    return pmssStorageHealthEntryFinalize($entry, $flags, $severity);
 }
 /**
  * Read mdadm array status from `/proc/mdstat`.
