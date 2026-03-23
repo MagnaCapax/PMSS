@@ -66,6 +66,24 @@ class CheckRutorrentPluginsTest extends TestCase
         $this->assertEquals(array(), $commands);
     }
 
+    public function testSyncUserPreservesExistingAccessIniMode(): void
+    {
+        $paths = $this->pmssPaths();
+        $this->pmssCreateUserTree('alice', false, true);
+
+        $accessPath = $paths['homeRoot'].'/alice/www/rutorrent/conf/access.ini';
+        file_put_contents($accessPath, "allow=0\n");
+        chmod($accessPath, 0640);
+
+        $ok = \pmssCheckRutorrentPluginsSyncUser('alice', "allow=1\n", $paths, function (): int {
+            return 0;
+        });
+
+        $this->assertTrue($ok === true);
+        $this->assertEquals("allow=1\n", (string) file_get_contents($accessPath));
+        $this->assertEquals(0640, fileperms($accessPath) & 0777);
+    }
+
     public function testSyncUserReturnsFalseWhenPluginDirectoryMissing(): void
     {
         $paths = $this->pmssPaths();
@@ -88,6 +106,27 @@ class CheckRutorrentPluginsTest extends TestCase
         });
 
         $this->assertTrue($ok === false);
+    }
+
+    public function testSyncUserRejectsSymlinkedAccessIniTarget(): void
+    {
+        $paths = $this->pmssPaths();
+        $this->pmssCreateUserTree('alice', false, true);
+
+        $outsideDir = $this->pmssMakeTempDir('pmss-rutorrent-access-target-');
+        $outsidePath = $outsideDir.'/access.ini';
+        file_put_contents($outsidePath, "allow=0\n");
+
+        $accessPath = $paths['homeRoot'].'/alice/www/rutorrent/conf/access.ini';
+        $this->pmssCreateSymlinkOrSkip($outsidePath, $accessPath);
+
+        $ok = \pmssCheckRutorrentPluginsSyncUser('alice', "allow=1\n", $paths, function (): int {
+            return 0;
+        });
+
+        $this->assertTrue($ok === false);
+        $this->assertEquals("allow=0\n", (string) file_get_contents($outsidePath));
+        $this->assertTrue(is_link($accessPath));
     }
 
     private function pmssPaths(): array

@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/userLifecycle.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 
 /**
  * Build the fixed ruTorrent plugin paths for a managed user.
@@ -41,6 +42,50 @@ function pmssCheckRutorrentPluginsRunCommand(string $username, string $step, str
     }
 
     return pmssUserLifecycleStep('rutorrent_plugins', $username, $step, $command, false);
+}
+
+/**
+ * Replace the managed ruTorrent access file without following symlinks.
+ *
+ * Existing mode and ownership are preserved so the safety rail does not change
+ * the long-standing on-disk policy for already-managed files.
+ */
+function pmssCheckRutorrentPluginsWriteAccessIni(string $path, string $content): bool
+{
+    $mode = null;
+    $owner = null;
+    $group = null;
+
+    if (is_file($path)) {
+        $existingMode = @fileperms($path);
+        $existingOwner = @fileowner($path);
+        $existingGroup = @filegroup($path);
+        if ($existingMode !== false) {
+            $mode = $existingMode & 0777;
+        }
+        if ($existingOwner !== false) {
+            $owner = $existingOwner;
+        }
+        if ($existingGroup !== false) {
+            $group = $existingGroup;
+        }
+    }
+
+    if ($mode === null) {
+        $mode = 0666 & ~umask();
+    }
+
+    return pmssReplaceUserFile($path, $content, static function (string $tmp) use ($group, $mode, $owner): void {
+        @chmod($tmp, $mode);
+        if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+            if ($owner !== null) {
+                @chown($tmp, $owner);
+            }
+            if ($group !== null) {
+                @chgrp($tmp, $group);
+            }
+        }
+    });
 }
 
 /**
@@ -104,5 +149,5 @@ function pmssCheckRutorrentPluginsSyncUser(string $username, string $accessIni, 
         return false;
     }
 
-    return @file_put_contents($paths['accessIni'], $accessIni) !== false && $ok;
+    return pmssCheckRutorrentPluginsWriteAccessIni($paths['accessIni'], $accessIni) && $ok;
 }
