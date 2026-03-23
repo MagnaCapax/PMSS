@@ -9,8 +9,6 @@
 echo date('Y-m-d H:i:s') . ': Checking Rclone instances' . "\n";
 require_once __DIR__.'/../lib/userLifecycle.php';
 pmssUserWatchdogRunEnabledUsers('rcloneEnable', ['rclone'], 'rclone stopped due to suspension', function (string $thisUser): void {
-    if (!pmssUserWatchdogProcessRunning($thisUser, 'rclone')) {
-        $port = (int) file_get_contents("/home/{$thisUser}/.rclonePort");
-        pmssUserWatchdogStartCommand($thisUser, 'rclone', "su {$thisUser} -c 'cd ~; nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &'", 'rclone start requested');
-    }
+    $port = (int) file_get_contents("/home/{$thisUser}/.rclonePort");
+    pmssUserWatchdogEnsureRunning($thisUser, 'rclone', 'rclone', "su {$thisUser} -c 'cd ~; nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &'", 'rclone start requested');
 });

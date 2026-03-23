@@ -20,11 +20,7 @@ pmssUserWatchdogRunEnabledUsers('delugeEnable', ['deluged', 'deluge-web'], 'delu
         pmssUserLog($thisUser, 'deluge restarted to apply upload throttle');
         $delugedRunning = false;
     }
-    if (!$delugedRunning) {
-        pmssUserWatchdogStartCommand($thisUser, 'deluged', "su {$thisUser} -c 'cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info'", 'deluged start requested');
-    }
+    !$delugedRunning && pmssUserWatchdogEnsureRunning($thisUser, 'deluged', 'deluged', "su {$thisUser} -c 'cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info'", 'deluged start requested');
  
-    if (!pmssUserWatchdogProcessRunning($thisUser, 'deluge-web')) {
-        pmssUserWatchdogStartCommand($thisUser, 'deluge-web', "su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'", 'deluge-web start requested');
-    }
+    pmssUserWatchdogEnsureRunning($thisUser, 'deluge-web', 'deluge-web', "su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'", 'deluge-web start requested');
 });

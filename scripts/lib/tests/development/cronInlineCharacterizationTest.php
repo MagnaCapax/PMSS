@@ -25,15 +25,15 @@ class CronInlineCharacterizationTest extends TestCase
         foreach ([
             [
                 'scripts/cron/checkQbittorrentInstances.php',
-                ['pmssUserWatchdogProcessRunning($thisUser, \'qbittorrent-nox\')', 'pmssUserWatchdogStartCommand($thisUser, \'qBittorrent\'', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox start requested'"],
+                ['pmssUserWatchdogProcessRunning($thisUser, \'qbittorrent-nox\')', 'pmssUserWatchdogEnsureRunning($thisUser, \'qbittorrent-nox\'', 'nohup qbittorrent-nox -d >> /dev/null 2>&1 &', "'qbittorrent-nox start requested'"],
             ],
             [
                 'scripts/cron/checkRcloneInstances.php',
-                ['pmssUserWatchdogProcessRunning($thisUser, \'rclone\')', 'pmssUserWatchdogStartCommand($thisUser, \'rclone\'', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone start requested'"],
+                ['pmssUserWatchdogEnsureRunning($thisUser, \'rclone\'', '--rc-web-gui --rc-addr 127.0.0.1:{$port}', "'rclone start requested'"],
             ],
             [
                 'scripts/cron/checkDelugeInstances.php',
-                ['pmssUserWatchdogProcessRunning($thisUser, \'deluged\')', 'pmssUserWatchdogTerminateProcesses($thisUser, [\'deluged\', \'deluge-web\'], 9);', 'pmssUserWatchdogStartCommand($thisUser, \'deluged\'', 'pmssUserWatchdogStartCommand($thisUser, \'deluge-web\'', "'deluged start requested'", "'deluge-web start requested'"],
+                ['pmssUserWatchdogProcessRunning($thisUser, \'deluged\')', 'pmssUserWatchdogTerminateProcesses($thisUser, [\'deluged\', \'deluge-web\'], 9);', 'pmssUserWatchdogEnsureRunning($thisUser, \'deluged\'', 'pmssUserWatchdogEnsureRunning($thisUser, \'deluge-web\'', "'deluged start requested'", "'deluge-web start requested'"],
             ],
         ] as $case) {
             $src = $this->pmssReadRepoFile($case[0]);

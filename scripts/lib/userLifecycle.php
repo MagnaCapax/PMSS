@@ -243,6 +243,13 @@ function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, st
     pmssUserLog($username, $userLogMessage);
 }
 
+function pmssUserWatchdogEnsureRunning(string $username, string $processName, string $serviceLabel, string $command, string $userLogMessage): bool
+{
+    if (pmssUserWatchdogProcessRunning($username, $processName)) return true;
+    pmssUserWatchdogStartCommand($username, $serviceLabel, $command, $userLogMessage);
+    return false;
+}
+
 /** @param array<int,string> $processNames */
 function pmssUserWatchdogHandleSuspended(
     string $username,

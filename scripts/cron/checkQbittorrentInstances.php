@@ -16,7 +16,5 @@ pmssUserWatchdogRunEnabledUsers('qbittorrentEnable', ['qbittorrent-nox'], 'qbitt
         pmssUserLog($thisUser, 'qbittorrent-nox restarted to apply upload throttle');
         $qbittorrentRunning = false;
     }
-    if (!$qbittorrentRunning) {
-        pmssUserWatchdogStartCommand($thisUser, 'qBittorrent', "su {$thisUser} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'", 'qbittorrent-nox start requested');
-    }
+    !$qbittorrentRunning && pmssUserWatchdogEnsureRunning($thisUser, 'qbittorrent-nox', 'qBittorrent', "su {$thisUser} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'", 'qbittorrent-nox start requested');
 });
