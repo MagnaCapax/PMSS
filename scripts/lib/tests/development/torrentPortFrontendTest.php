@@ -93,6 +93,52 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(is_dir($legacyPath));
     }
 
+    public function testApplySkeletonFilesRemovesDeadExtsearchEngineFiles(): void
+    {
+        foreach (['RARbgTorrentAPI.php', 'Demonoid.php', 'KAT.php'] as $engine) {
+            $this->writeUserFile('www/rutorrent/plugins/extsearch/engines/'.$engine, "<?php\n");
+        }
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        foreach (['RARbgTorrentAPI.php', 'Demonoid.php', 'KAT.php'] as $engine) {
+            $this->assertTrue(!file_exists($this->homePath('www/rutorrent/plugins/extsearch/engines/'.$engine)));
+        }
+    }
+
+    public function testApplySkeletonFilesRemovesDeadExtsearchEngineSymlinks(): void
+    {
+        $targetPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/target.php');
+        $linkPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/KAT.php');
+        $this->writeUserFile('www/rutorrent/plugins/extsearch/engines/target.php', "<?php\n");
+        @symlink($targetPath, $linkPath);
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $this->assertTrue(!file_exists($linkPath));
+        $this->assertTrue(file_exists($targetPath));
+    }
+
+    public function testApplySkeletonFilesLeavesDeadExtsearchEngineDirectoriesUntouched(): void
+    {
+        $directoryPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/Demonoid.php');
+        @mkdir($directoryPath, 0755, true);
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $this->assertTrue(is_dir($directoryPath));
+    }
+
+    public function testApplySkeletonFilesLeavesLiveExtsearchEnginesUntouched(): void
+    {
+        $liveEnginePath = $this->homePath('www/rutorrent/plugins/extsearch/engines/Custom.php');
+        $this->writeUserFile('www/rutorrent/plugins/extsearch/engines/Custom.php', "<?php\n");
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $this->assertTrue(file_exists($liveEnginePath));
+    }
+
     public function testDelugePortEnsureUpdatesMismatchedPort(): void
     {
         $home = $this->homePath();
@@ -165,6 +211,13 @@ class TorrentPortFrontendTest extends TestCase
     private function writeSkelFile(string $relative, string $content): void
     {
         $path = $this->skelDir.'/'.$relative;
+        @mkdir(dirname($path), 0755, true);
+        file_put_contents($path, $content);
+    }
+
+    private function writeUserFile(string $relative, string $content): void
+    {
+        $path = $this->homePath($relative);
         @mkdir(dirname($path), 0755, true);
         file_put_contents($path, $content);
     }

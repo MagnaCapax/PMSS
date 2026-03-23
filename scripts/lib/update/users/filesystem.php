@@ -17,6 +17,11 @@ function pmssUserApplySkeletonFiles(array $ctx): void
 {
     $user = $ctx['user'];
     $legacyPhpXplorerPath = $ctx['home'].'/www/phpXplorer';
+    $deadExtsearchEnginePaths = [
+        $ctx['home'].'/www/rutorrent/plugins/extsearch/engines/RARbgTorrentAPI.php',
+        $ctx['home'].'/www/rutorrent/plugins/extsearch/engines/Demonoid.php',
+        $ctx['home'].'/www/rutorrent/plugins/extsearch/engines/KAT.php',
+    ];
     $patchFilemanager = static function (string $path): void {
         if (!is_file($path)
             || is_link($path)
@@ -111,6 +116,14 @@ PHP;
     if ((is_file($legacyPhpXplorerPath) || is_link($legacyPhpXplorerPath))
         && file_exists($legacyPhpXplorerPath)) {
         @unlink($legacyPhpXplorerPath);
+    }
+
+    // Remove dead extsearch engines from tenant copies until the frozen
+    // skeleton ruTorrent tree can be curated directly.
+    foreach ($deadExtsearchEnginePaths as $path) {
+        if ((is_file($path) || is_link($path)) && file_exists($path)) {
+            @unlink($path);
+        }
     }
 
     $patchFilemanager($ctx['home'].'/www/filemanager.php');
