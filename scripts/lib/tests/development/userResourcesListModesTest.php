@@ -7,7 +7,7 @@ class UserResourcesListModesTest extends TestCase
 {
     private function loadSource(): string
     {
-        return (string) file_get_contents(__DIR__.'/../../../util/userResourcesList.php');
+        return (string) file_get_contents(__DIR__.'/../../../lib/user/resourcesList.php');
     }
 
     public function testBriefAndFullModesAreWired(): void

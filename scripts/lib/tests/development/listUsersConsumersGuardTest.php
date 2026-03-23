@@ -18,7 +18,7 @@ class ListUsersConsumersGuardTest extends TestCase
                 'scripts/util/makeMonitoringRules.php',
                 'scripts/util/setupNetwork.php',
                 'scripts/util/checkUserHtpasswd.php',
-                'scripts/util/userResourcesList.php',
+                'scripts/lib/user/resourcesList.php',
                 'scripts/util/userConfigLighttpd.php',
             ],
             'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/showTraffic.php', 'scripts/userTorrents.php'],
