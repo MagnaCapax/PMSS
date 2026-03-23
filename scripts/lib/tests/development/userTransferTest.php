@@ -249,6 +249,30 @@ class UserTransferTest extends TestCase
         $this->assertTrue(strpos($script, 'send "{$') === false, 'expected password not embedded in script');
     }
 
+    public function testGeneratedTransferScriptsMatchSnapshot(): void
+    {
+        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
+        $expectedMain = <<<'SNAP'
+#!/bin/bash
+set -e
+rsync -av -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' --exclude='.rtorrent.rc' --exclude='.config/qBittorrent/qBittorrent.conf' --exclude='.config/deluge/core.conf' --exclude='.config/deluge/web.conf' --exclude='.cache' --exclude='www' --exclude='session' --exclude='www/rutorrent/share' --exclude='.lighttpd' --exclude='.logs' --exclude='.local' --exclude='.lighttpd.conf' --exclude='.quota' --exclude='.rtorrentExecuteRun' --exclude='.trafficData' --exclude='.trafficDataLocal' --exclude='.trafficDataIngress' --exclude='.trafficDataIngressLocal' --exclude='rTorrentLog' --exclude='.bonusQuota' --exclude='.bonusTraffic' --exclude='.billingId' --exclude='.trafficLimit' 'deefbox@example.com:/home/deefbox/' '/home/deefbox/'
+SNAP;
+        $expectedFinal = <<<'SNAP'
+#!/bin/bash
+set -e
+rsync -av -e 'ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -l '\''deefbox'\''' 'deefbox@example.com:/home/deefbox/session' 'deefbox@example.com:/home/deefbox/www/rutorrent/share' 'deefbox@example.com:/home/deefbox/.lighttpd/custom' 'deefbox@example.com:/home/deefbox/.lighttpd/custom.d' 'deefbox@example.com:/home/deefbox/.local' 'deefbox@example.com:/home/deefbox/www/public' '/home/deefbox/'
+SNAP;
+        $expectedAuth = <<<'SNAP'
+#!/bin/bash
+set -e
+ssh -o Compression=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1 -l 'deefbox' 'example.com' '/bin/true'
+SNAP;
+
+        $this->assertEquals($expectedMain."\n", \pmssUserTransferBuildRsyncMain($cfg));
+        $this->assertEquals($expectedFinal."\n", \pmssUserTransferBuildRsyncFinal($cfg));
+        $this->assertEquals($expectedAuth."\n", \pmssUserTransferBuildAuthProbe($cfg));
+    }
+
     public function testRewriteBencodedHomePathsAdjustsStringLengths(): void
     {
         $oldPath = '/home/olduser/data/movie';
