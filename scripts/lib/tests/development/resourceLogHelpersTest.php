@@ -93,6 +93,25 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!\pmssResourceLogEnsureDir($link, 0700));
     }
 
+    public function testEnsureDirRejectsSymlinkedParentDirectory(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $root = $this->makeRoot();
+        $target = $root.'/target';
+        $this->assertTrue(@mkdir($target, 0700, true) || is_dir($target));
+
+        $symlinkedParent = $root.'/state';
+        if (!@symlink($target, $symlinkedParent)) {
+            throw new SkipTest('symlink creation failed');
+        }
+
+        $this->assertTrue(!\pmssResourceLogEnsureDir($symlinkedParent.'/daily', 0700));
+        $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
+    }
+
     public function testUserValidationRejectsUppercase(): void
     {
         $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));
@@ -333,5 +352,29 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertEquals(8, $result['delta']['io_write']);
         $this->assertEquals(7, $result['delta']['cpu_nsec']);
         $this->assertEquals(['io_read' => 1], $this->readState($target));
+    }
+
+    public function testUpdateStateRejectsSymlinkedParentDirectory(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $root = $this->makeRoot();
+        $targetDir = $root.'/target';
+        $this->assertTrue(@mkdir($targetDir, 0700, true) || is_dir($targetDir));
+
+        $stateDir = $root.'/state';
+        if (!@symlink($targetDir, $stateDir)) {
+            throw new SkipTest('symlink creation failed');
+        }
+
+        $statePath = $stateDir.'/user.json';
+        $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
+
+        $this->assertEquals(9, $result['delta']['io_read']);
+        $this->assertEquals(8, $result['delta']['io_write']);
+        $this->assertEquals(7, $result['delta']['cpu_nsec']);
+        $this->assertTrue(!is_file($targetDir.'/user.json'), 'must not write state via symlinked parent');
     }
 }

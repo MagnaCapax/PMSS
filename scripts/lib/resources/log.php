@@ -37,13 +37,48 @@ function pmssResourceLogIsValidUser(string $user): bool
  */
 function pmssResourceLogEnsureDir(string $path, int $mode): bool
 {
-    if ($path === '' || $path[0] !== '/' || is_link($path) || (file_exists($path) && !is_dir($path))) {
+    if (!pmssResourceLogPathIsSafe($path, true)) {
         return false;
     }
 
     @mkdir($path, $mode, true);
     @chmod($path, $mode);
     return is_dir($path);
+}
+
+/**
+ * Reject symlinked path segments before resource logging touches the filesystem.
+ */
+function pmssResourceLogPathIsSafe(string $path, bool $directoryTarget): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
+        return false;
+    }
+
+    $segments = explode('/', ltrim($path, '/'));
+    $current = '';
+    $lastIndex = count($segments) - 1;
+    foreach ($segments as $index => $segment) {
+        if ($segment === '') {
+            continue;
+        }
+
+        $current .= '/'.$segment;
+        if (is_link($current)) {
+            return false;
+        }
+
+        $isLeaf = $index === $lastIndex;
+        if (!$isLeaf && file_exists($current) && !is_dir($current)) {
+            return false;
+        }
+        if ($isLeaf && file_exists($current) && ($directoryTarget ? !is_dir($current) : !is_file($current))) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**
@@ -115,10 +150,7 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
  */
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
-    $pathIsSafe = $statePath !== ''
-        && $statePath[0] === '/'
-        && !is_link($statePath)
-        && (!file_exists($statePath) || is_file($statePath));
+    $pathIsSafe = pmssResourceLogPathIsSafe($statePath, false);
     $handle = $pathIsSafe ? @fopen($statePath, 'c+') : false;
     $locked = $handle !== false && @flock($handle, LOCK_EX);
     $previousState = $locked && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))
