@@ -27,6 +27,33 @@ class NetworkFireqosTest extends TestCase
         }
     }
 
+    public function testBuildFireqosConfigFallsBackQuietlyWhenTemplateMissing(): void
+    {
+        $prevTemplate = getenv('PMSS_FIREQOS_TEMPLATE');
+        $warnings = [];
+        putenv('PMSS_FIREQOS_TEMPLATE='.sys_get_temp_dir().'/pmss-fireqos-missing-'.bin2hex(random_bytes(4)).'.conf');
+
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = [$severity, $message];
+            return true;
+        });
+
+        try {
+            $config = \networkBuildFireqosConfig(
+                ['interface' => 'eth2', 'speed' => 1234, 'throttle' => ['max' => 100]],
+                [],
+                []
+            );
+        } finally {
+            restore_error_handler();
+            $this->pmssRestoreEnv('PMSS_FIREQOS_TEMPLATE', $prevTemplate, true);
+        }
+
+        $this->assertEquals([], $warnings);
+        $this->assertTrue(strpos($config, 'interface eth2') !== false);
+        $this->assertTrue(strpos($config, 'rate 1234') !== false);
+    }
+
     public function testBuildFireqosConfigUsesUserThrottleCapWhenEnabled(): void
     {
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);

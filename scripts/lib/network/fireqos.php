@@ -8,7 +8,7 @@
 function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string
 {
     $templatePath = getenv('PMSS_FIREQOS_TEMPLATE') ?: '/etc/seedbox/config/template.fireqos';
-    $template = file_get_contents($templatePath);
+    $template = is_file($templatePath) ? @file_get_contents($templatePath) : false;
     if ($template === false) {
         $template = "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n";
     }
