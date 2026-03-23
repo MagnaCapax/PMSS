@@ -296,6 +296,10 @@ class Manager
             return null;
         }
 
+        if (strpos($matches[1], '/dev/') !== 0 || strpos($matches[1], "\0") !== false || strpos($matches[2], "\0") !== false) {
+            return null;
+        }
+
         return $propertyName.'='.$matches[1].' '.$matches[2];
     }
 

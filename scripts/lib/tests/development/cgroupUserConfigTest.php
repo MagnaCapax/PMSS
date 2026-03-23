@@ -224,6 +224,18 @@ class CgroupUserConfigTest extends TestCase
         $this->assertEquals(2, $res['rc']);
     }
 
+    public function testRejectsRelativeIoBandwidthDeviceSpec()
+    {
+        $res = $this->runMgr(['testuser', '--io-read-bw=tmp/device:5M']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
+    public function testRejectsNonDeviceIoBandwidthPathSpec()
+    {
+        $res = $this->runMgr(['testuser', '--io-read-bw=/tmp/device:5M']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
     public function testRejectsWhitespaceInDeviceValue()
     {
         $res = $this->runMgr(['testuser', '--device=/dev/sda bad', '--io-profile=hdd']);
