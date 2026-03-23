@@ -115,17 +115,10 @@ class RuntimeTest extends TestCase
 
     public function testRunCommandAptTimeoutFloorIgnoresLowerEnvTimeout(): void
     {
-        $prev = getenv('PMSS_COMMAND_TIMEOUT');
-        putenv('PMSS_COMMAND_TIMEOUT=1');
-        try {
+        $rc = null;
+        $this->pmssWithEnv(['PMSS_COMMAND_TIMEOUT' => '1'], function () use (&$rc): void {
             $rc = \runCommand('echo apt-get; sleep 2', false, function (string $m): void {});
-        } finally {
-            if ($prev === false) {
-                putenv('PMSS_COMMAND_TIMEOUT');
-            } else {
-                putenv('PMSS_COMMAND_TIMEOUT='.$prev);
-            }
-        }
+        });
         $this->assertEquals(0, $rc);
     }
 

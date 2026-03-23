@@ -21,21 +21,6 @@ class PackageQueueTest extends TestCase
         putenv('PMSS_PACKAGE_INSTALL_ERRORS');
     }
 
-    private function withDryRun(callable $callback): void
-    {
-        $previous = getenv('PMSS_DRY_RUN');
-        putenv('PMSS_DRY_RUN=1');
-        try {
-            $callback();
-        } finally {
-            if ($previous === false) {
-                putenv('PMSS_DRY_RUN');
-            } else {
-                putenv('PMSS_DRY_RUN='.$previous);
-            }
-        }
-    }
-
     private function writeBaseline(array $rows): string
     {
         $path = tempnam(sys_get_temp_dir(), 'pmss-baseline-');
@@ -69,7 +54,7 @@ class PackageQueueTest extends TestCase
     public function testFlushPackageQueueClearsQueue(): void
     {
         pmssQueuePackages(['foo']);
-        $this->withDryRun(static function (): void {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], static function (): void {
             pmssFlushPackageQueue();
         });
         $this->assertEquals([], $GLOBALS['PMSS_PACKAGE_QUEUE']);
@@ -80,7 +65,7 @@ class PackageQueueTest extends TestCase
         $GLOBALS['PMSS_PACKAGE_QUEUE'] = [PMSS_PACKAGE_QUEUE_DEFAULT => []];
         $GLOBALS['PMSS_PACKAGE_WARNINGS'] = ['warn', 'warn', 'warn2'];
         $GLOBALS['PMSS_PACKAGE_ERRORS'] = ['err'];
-        $this->withDryRun(static function (): void {
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], static function (): void {
             pmssFlushPackageQueue();
         });
         $this->assertEquals([], $GLOBALS['PMSS_PACKAGE_WARNINGS']);

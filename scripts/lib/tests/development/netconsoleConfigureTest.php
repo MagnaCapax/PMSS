@@ -26,7 +26,7 @@ class NetconsoleConfigureTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-netconsole-missing-');
         $logs = [];
-        $this->withNetconsoleEnv($dir, function () use (&$logs): void {
+        $this->pmssWithEnv($this->netconsoleEnv($dir), function () use (&$logs): void {
             \pmssNetconsoleConfigure(function (string $message) use (&$logs): void { $logs[] = $message; });
         });
 
@@ -40,7 +40,7 @@ class NetconsoleConfigureTest extends TestCase
         file_put_contents($dir.'/netconsole', '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
         $calls = [];
 
-        $this->withNetconsoleEnv($dir, function () use (&$calls): void {
+        $this->pmssWithEnv($this->netconsoleEnv($dir), function () use (&$calls): void {
             \pmssNetconsoleConfigure(function (): void {
             }, function (string $description, string $command) use (&$calls): int {
                 $calls[] = [$description, $command];
@@ -62,7 +62,7 @@ class NetconsoleConfigureTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-netconsole-unreachable-');
         file_put_contents($dir.'/netconsole', '6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');
 
-        $this->withNetconsoleEnv($dir, function () use ($dir): void {
+        $this->pmssWithEnv($this->netconsoleEnv($dir), function () use ($dir): void {
             \pmssNetconsoleConfigure(function (): void {
             }, function (): int {
                 return 1;
@@ -84,8 +84,9 @@ class NetconsoleConfigureTest extends TestCase
         file_put_contents($dir.'/modules-load.d/pmss-netconsole.conf', "netconsole\n");
         $calls = [];
 
-        $this->withNetconsoleEnv($dir, function () use (&$calls): void {
-            putenv('PMSS_NETCONSOLE_MODULE_LOADED=1');
+        $env = $this->netconsoleEnv($dir);
+        $env['PMSS_NETCONSOLE_MODULE_LOADED'] = '1';
+        $this->pmssWithEnv($env, function () use (&$calls): void {
             \pmssNetconsoleConfigure(function (): void {
             }, function (string $description, string $command) use (&$calls): int {
                 $calls[] = [$description, $command];
@@ -98,27 +99,14 @@ class NetconsoleConfigureTest extends TestCase
         $this->cleanup($dir);
     }
 
-    private function withNetconsoleEnv(string $dir, callable $callback): void
+    private function netconsoleEnv(string $dir): array
     {
-        $env = [
+        return [
             'PMSS_NETCONSOLE_CONFIG_PATH' => $dir.'/netconsole',
             'PMSS_NETCONSOLE_MODPROBE_PATH' => $dir.'/modprobe.d/netconsole.conf',
             'PMSS_NETCONSOLE_MODULES_LOAD_PATH' => $dir.'/modules-load.d/pmss-netconsole.conf',
             'PMSS_NETCONSOLE_MODULE_LOADED' => '',
         ];
-        $previous = [];
-        foreach ($env as $key => $value) {
-            $previous[$key] = getenv($key);
-            putenv($key.'='.$value);
-        }
-        try {
-            $callback();
-        } finally {
-            foreach ($previous as $key => $value) {
-                if ($value === false) putenv($key);
-                else putenv($key.'='.$value);
-            }
-        }
     }
 
     private function contains(array $messages, string $needle): bool

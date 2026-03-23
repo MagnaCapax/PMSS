@@ -131,14 +131,11 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         $this->withTempConfigTemplates(['trixie' => $template], function () use ($template): void {
             $this->withTempSources('legacy', function (string $target) use ($template): void {
                 $logs = [];
-                putenv('PMSS_DRY_RUN=1');
-                try {
+                $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use (&$logs): void {
                     \pmssRefreshRepositories('debian', 13, function (string $msg) use (&$logs): void {
                         $logs[] = $msg;
                     });
-                } finally {
-                    putenv('PMSS_DRY_RUN');
-                }
+                });
                 $this->assertEquals($template, file_get_contents($target));
                 $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'Applied Debian Trixie repository config') !== false; }));
             });
@@ -176,17 +173,11 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         }
         @chmod($path, 0600);
 
-        $previous = getenv('PMSS_APT_SOURCES_PATH');
-        putenv('PMSS_APT_SOURCES_PATH='.$path);
-
         try {
-            $callback($path);
+            $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $path], function () use ($callback, $path): void {
+                $callback($path);
+            });
         } finally {
-            if ($previous === false) {
-                putenv('PMSS_APT_SOURCES_PATH');
-            } else {
-                putenv('PMSS_APT_SOURCES_PATH='.$previous);
-            }
             $backup = $path.'.pmss-backup';
             if (file_exists($backup)) {
                 @unlink($backup);
@@ -211,17 +202,11 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
             @chmod($path, 0600);
         }
 
-        $previous = getenv('PMSS_CONFIG_DIR');
-        putenv('PMSS_CONFIG_DIR='.$dir);
-
         try {
-            $callback($dir);
+            $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $dir], function () use ($callback, $dir): void {
+                $callback($dir);
+            });
         } finally {
-            if ($previous === false) {
-                putenv('PMSS_CONFIG_DIR');
-            } else {
-                putenv('PMSS_CONFIG_DIR='.$previous);
-            }
             foreach ((glob($dir.'/template.sources.*') ?: []) as $file) {
                 @unlink($file);
             }

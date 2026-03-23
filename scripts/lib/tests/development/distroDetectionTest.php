@@ -138,14 +138,9 @@ class DistroDetectionTest extends TestCase
         $logger = function (string $message) use (&$logs): void {
             $logs[] = $message;
         };
-        $originalDryRun = getenv('PMSS_DRY_RUN');
-        putenv('PMSS_DRY_RUN=1');
-        \pmssRefreshRepositories('debian', 0, $logger);
-        if ($originalDryRun === false) {
-            putenv('PMSS_DRY_RUN');
-        } else {
-            putenv('PMSS_DRY_RUN='.$originalDryRun);
-        }
+        $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($logger): void {
+            \pmssRefreshRepositories('debian', 0, $logger);
+        });
         $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
             return strpos($line, 'reusing existing sources') !== false;
         }), 'Expected reuse notice when version unresolved');
@@ -164,7 +159,6 @@ class DistroDetectionTest extends TestCase
             }
             $sources = $tmpDir.'/sources.list';
             file_put_contents($sources, "deb https://old.invalid stable main\n");
-            putenv('PMSS_APT_SOURCES_PATH='.$sources);
 
             $logs = [];
             $logger = function (string $message) use (&$logs): void {
@@ -172,13 +166,15 @@ class DistroDetectionTest extends TestCase
             };
 
             try {
-                \pmssUpdateAptSources('debian', 12, sha1('different'), [
-                    'bookworm' => $template,
-                    'bullseye' => '',
-                    'buster'   => '',
-                    'jessie'   => '',
-                    'trixie'   => '',
-                ], $logger);
+                $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $sources], function () use ($template, $logger): void {
+                    \pmssUpdateAptSources('debian', 12, sha1('different'), [
+                        'bookworm' => $template,
+                        'bullseye' => '',
+                        'buster'   => '',
+                        'jessie'   => '',
+                        'trixie'   => '',
+                    ], $logger);
+                });
 
                 $this->assertEquals($template, file_get_contents($sources));
                 $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
@@ -192,7 +188,6 @@ class DistroDetectionTest extends TestCase
                 if (file_exists($backup)) {
                     unlink($backup);
                 }
-                putenv('PMSS_APT_SOURCES_PATH');
                 @rmdir($tmpDir);
             }
         });
@@ -207,7 +202,6 @@ class DistroDetectionTest extends TestCase
         $blocker = $tmpDir.'/blocked';
         @mkdir($tmpDir, 0755, true);
         file_put_contents($blocker, 'not-a-directory');
-        putenv('PMSS_APT_SOURCES_PATH='.$blocker.'/sources.list');
 
         $logs = [];
         $logger = function (string $message) use (&$logs): void {
@@ -215,14 +209,15 @@ class DistroDetectionTest extends TestCase
         };
 
         try {
-            $this->assertTrue(!\pmssSafeWriteSources("deb https://mirror.invalid bookworm main\n", 'Bookworm', $logger));
+            $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $blocker.'/sources.list'], function () use ($logger): void {
+                $this->assertTrue(!\pmssSafeWriteSources("deb https://mirror.invalid bookworm main\n", 'Bookworm', $logger));
+            });
             $this->assertTrue((bool) array_filter($logs, static function (string $line) use ($blocker): bool {
                 return strpos($line, '[ERROR] Unable to create parent directory for Bookworm sources.list: '.$blocker) !== false;
             }));
             $this->assertTrue(!file_exists($blocker.'/sources.list'));
             $this->assertTrue(!file_exists($blocker.'/sources.list.pmss-backup'));
         } finally {
-            putenv('PMSS_APT_SOURCES_PATH');
             @unlink($blocker);
             @rmdir($tmpDir);
         }
@@ -247,32 +242,27 @@ class DistroDetectionTest extends TestCase
     {
         $configDir = sys_get_temp_dir().'/pmss-config-'.bin2hex(random_bytes(4));
         @mkdir($configDir, 0755, true);
-        $previousConfigDir = getenv('PMSS_CONFIG_DIR');
-        putenv('PMSS_CONFIG_DIR='.$configDir);
 
         try {
-            $logs = [];
-            $logger = function (string $message) use (&$logs): void {
-                $logs[] = $message;
-            };
+            $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($configDir): void {
+                $logs = [];
+                $logger = function (string $message) use (&$logs): void {
+                    $logs[] = $message;
+                };
 
-            $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
-            $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-                return strpos($line, 'Repository template missing: ') !== false;
-            }));
+                $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
+                $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
+                    return strpos($line, 'Repository template missing: ') !== false;
+                }));
 
-            $logs = [];
-            file_put_contents($configDir.'/template.sources.bookworm', " \n\t ");
-            $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
-            $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-                return strpos($line, 'Repository template empty: ') !== false;
-            }));
+                $logs = [];
+                file_put_contents($configDir.'/template.sources.bookworm', " \n\t ");
+                $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
+                $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
+                    return strpos($line, 'Repository template empty: ') !== false;
+                }));
+            });
         } finally {
-            if ($previousConfigDir === false) {
-                putenv('PMSS_CONFIG_DIR');
-            } else {
-                putenv('PMSS_CONFIG_DIR='.$previousConfigDir);
-            }
             @unlink($configDir.'/template.sources.bookworm');
             @rmdir($configDir);
         }
@@ -301,24 +291,17 @@ class DistroDetectionTest extends TestCase
             throw new \RuntimeException('Unable to allocate os-release fixture');
         }
         file_put_contents($file, $this->renderOsRelease($fields));
-        putenv('PMSS_OS_RELEASE_PATH='.$file);
         \pmssResetOsReleaseCache();
-        $originalPath = $maskLsbRelease ? getenv('PATH') : null;
+
+        $env = ['PMSS_OS_RELEASE_PATH' => $file];
         if ($maskLsbRelease) {
-            putenv('PATH='.sys_get_temp_dir());
+            $env['PATH'] = sys_get_temp_dir();
         }
+
         try {
-            $callback();
+            $this->pmssWithEnv($env, $callback);
         } finally {
-            if ($maskLsbRelease) {
-                if ($originalPath === false || $originalPath === null) {
-                    putenv('PATH');
-                } else {
-                    putenv('PATH='.$originalPath);
-                }
-            }
             @unlink($file);
-            putenv('PMSS_OS_RELEASE_PATH');
             \pmssResetOsReleaseCache();
         }
     }
@@ -333,11 +316,11 @@ class DistroDetectionTest extends TestCase
         foreach ($templates as $codename => $content) {
             file_put_contents($dir."/template.sources.$codename", $content);
         }
-        putenv('PMSS_CONFIG_DIR='.$dir);
         try {
-            $callback($dir);
+            $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $dir], function () use ($callback, $dir): void {
+                $callback($dir);
+            });
         } finally {
-            putenv('PMSS_CONFIG_DIR');
             foreach ((glob($dir.'/template.sources.*') ?: []) as $item) {
                 @unlink($item);
             }
