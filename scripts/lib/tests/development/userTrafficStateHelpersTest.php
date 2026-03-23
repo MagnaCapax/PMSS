@@ -90,6 +90,48 @@ class UserTrafficStateHelpersTest extends TestCase
         );
     }
 
+    public function testTrafficStorageSaveRejectsSymlinkedRuntimeStatsFile(): void
+    {
+        $storage = new \TrafficStorage([
+            'home_dir' => $this->tempDir.'/home',
+            'runtime_dir' => $this->tempDir.'/runtime',
+        ]);
+        $storage->ensureRuntime();
+
+        $target = $this->tempDir.'/runtime-target';
+        file_put_contents($target, 'keep-me');
+        $statsPath = \pmssTrafficStatsPath('alice', null, $this->tempDir.'/runtime');
+        $this->pmssCreateSymlinkOrSkip($target, $statsPath);
+
+        $storage->save('alice', ['raw' => ['month' => 2048]]);
+
+        $this->assertEquals('keep-me', file_get_contents($target));
+        $this->assertTrue(is_link($statsPath));
+    }
+
+    public function testTrafficStorageSaveRejectsSymlinkedHomeTrafficFile(): void
+    {
+        $homeDir = $this->tempDir.'/home';
+        $runtimeDir = $this->tempDir.'/runtime';
+        @mkdir($homeDir.'/alice', 0755, true);
+
+        $storage = new \TrafficStorage([
+            'home_dir' => $homeDir,
+            'runtime_dir' => $runtimeDir,
+        ]);
+        $storage->ensureRuntime();
+
+        $target = $this->tempDir.'/home-target';
+        file_put_contents($target, 'keep-home');
+        $homeTrafficPath = \pmssTrafficDataPaths('alice', $homeDir)['normal'];
+        $this->pmssCreateSymlinkOrSkip($target, $homeTrafficPath);
+
+        $storage->save('alice', ['raw' => ['month' => 4096]]);
+
+        $this->assertEquals('keep-home', file_get_contents($target));
+        $this->assertTrue(is_link($homeTrafficPath));
+    }
+
     public function testTrafficLimitReadGiBFileReturnsZeroForMissingFile(): void
     {
         $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($this->tempDir.'/missing-limit'));

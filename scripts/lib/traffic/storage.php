@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
+
 if (!function_exists('pmssTrafficDataPaths')) {
     /** @return array<string,string> Resolve the canonical per-user traffic data files. */
     function pmssTrafficDataPaths(string $username, ?string $homeDir = null): array
@@ -50,7 +52,7 @@ if (!function_exists('pmssTrafficSetImmutable')) {
     /** Best-effort immutable toggle for traffic data files. */
     function pmssTrafficSetImmutable(string $path, bool $enable): void
     {
-        if (!is_file($path)) {
+        if (!is_file($path) || is_link($path)) {
             return;
         }
 
@@ -66,6 +68,26 @@ if (!function_exists('pmssTrafficSetImmutable')) {
         }
 
         $chattr === '' || @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
+    }
+}
+
+if (!function_exists('pmssTrafficWriteFile')) {
+    /**
+     * Persist one traffic state file through the shared atomic writer.
+     */
+    function pmssTrafficWriteFile(string $path, string $serialized, string $group, int $mode, bool $immutable): bool
+    {
+        $immutable && pmssTrafficSetImmutable($path, false);
+
+        try {
+            return pmssReplaceUserFile($path, $serialized, static function (string $tmpPath) use ($group, $mode): void {
+                @chmod($tmpPath, $mode);
+                @chown($tmpPath, 'root');
+                @chgrp($tmpPath, $group);
+            });
+        } finally {
+            $immutable && pmssTrafficSetImmutable($path, true);
+        }
     }
 }
 
@@ -111,12 +133,7 @@ class TrafficStorage
         );
 
         foreach ($targets as [$path, $group, $mode, $immutable]) {
-            $immutable && pmssTrafficSetImmutable($path, false);
-            @file_put_contents($path, $serialized);
-            @chown($path, 'root');
-            @chgrp($path, $group);
-            @chmod($path, $mode);
-            $immutable && pmssTrafficSetImmutable($path, true);
+            pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable);
         }
     }
 }
