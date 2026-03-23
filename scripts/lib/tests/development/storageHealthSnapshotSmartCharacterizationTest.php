@@ -36,16 +36,11 @@ final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
 
     private function pmssCreateReadableDevice(): string
     {
-        $device = tempnam($this->pmssMakeTempDir('pmss-smart-device-'), 'dev-');
-        $this->assertTrue($device !== false, 'Expected a temporary device placeholder');
-        return (string) $device;
+        return $this->pmssMakeReadableTempPath('pmss-smart-device-', 'dev-');
     }
 
     private function pmssCreateSmartctlStubDir(string $script): string
     {
-        $binDir = $this->pmssMakeTempDir('pmss-smart-bin-');
-        file_put_contents($binDir.'/smartctl', $script);
-        @chmod($binDir.'/smartctl', 0755);
-        return $binDir;
+        return $this->pmssMakeExecutableStub('smartctl', $script, 'pmss-smart-bin-');
     }
 }

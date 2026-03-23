@@ -79,17 +79,13 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
 
     private function createFakeNvmeDevice(): string
     {
-        $dir = $this->pmssMakeTempDir('pmss-nvme-device-');
-        $path = $dir.'/dev-nvme0n1';
+        $path = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
         file_put_contents($path, 'device');
         return $path;
     }
 
     private function createNvmeStubDir(string $script): string
     {
-        $binDir = $this->pmssMakeTempDir('pmss-nvme-bin-');
-        file_put_contents($binDir.'/nvme', $script);
-        @chmod($binDir.'/nvme', 0755);
-        return $binDir;
+        return $this->pmssMakeExecutableStub('nvme', $script, 'pmss-nvme-bin-');
     }
 }

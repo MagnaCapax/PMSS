@@ -193,6 +193,23 @@ abstract class TestCase
         return $path;
     }
 
+    /** Create a tracked readable file under a fresh temporary directory. */
+    protected function pmssMakeReadableTempPath(string $dirPrefix, string $filePrefix = 'pmss'): string
+    {
+        $path = tempnam($this->pmssMakeTempDir($dirPrefix), $filePrefix);
+        $this->assertTrue($path !== false, 'Expected a temporary readable path');
+        return (string) $path;
+    }
+
+    /** Create an executable test stub in a fresh PATH directory. */
+    protected function pmssMakeExecutableStub(string $binaryName, string $script, string $dirPrefix): string
+    {
+        $binDir = $this->pmssMakeTempDir($dirPrefix);
+        file_put_contents($binDir.'/'.$binaryName, $script);
+        @chmod($binDir.'/'.$binaryName, 0755);
+        return $binDir;
+    }
+
     /** Return the current process owner name when POSIX account lookups are available. */
     protected function pmssCurrentOwner(): string
     {
@@ -374,5 +391,36 @@ abstract class TestCase
     {
         $this->assertEquals($expectedCount, substr_count($this->pmssReadRepoFile($relativePath), $needle), $message);
     }
+
+    /** Find the recorded command for a JSON step log entry matching a description substring. */
+    protected function pmssFindJsonStepCommand(string $jsonLog, string $needle): ?string
+    {
+        $lines = @file($jsonLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!is_array($lines)) {
+            return null;
+        }
+
+        foreach ($lines as $line) {
+            $decoded = json_decode($line, true);
+            if (!is_array($decoded) || ($decoded['event'] ?? '') !== 'step') {
+                continue;
+            }
+
+            $entry = $decoded['data'] ?? null;
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $description = (string) ($entry['description'] ?? '');
+            if (strpos($description, $needle) === false) {
+                continue;
+            }
+
+            return isset($entry['command']) ? (string) $entry['command'] : null;
+        }
+
+        return null;
+    }
+
 }
 }

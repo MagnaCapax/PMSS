@@ -22,8 +22,7 @@ class StorageHealthSnapshotSmartFailureTest extends TestCase
 
     public function testSnapshotSmartReturnsMissingToolFailureBeforeExecution(): void
     {
-        $device = $this->pmssMakeTempFile('pmss-smart-readable-');
-        $this->assertTrue($device !== false, 'Expected a temporary device placeholder');
+        $device = $this->pmssMakeReadableTempPath('pmss-smart-readable-', 'dev-');
 
         $entry = [];
         $this->pmssWithEnv(['PATH' => ''], function () use ($device, &$entry): void {

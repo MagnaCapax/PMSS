@@ -116,7 +116,7 @@ class UserUpdateHttpTest extends TestCase
         $cmd = null;
         try {
             \pmssUserConfigureHttp($ctx);
-            $cmd = $this->findStepCommand($jsonLog, 'Copying irssi skeleton config');
+            $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config');
         } finally {
             $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
@@ -153,7 +153,7 @@ class UserUpdateHttpTest extends TestCase
         $cmd = null;
         try {
             \pmssUserConfigureHttp($ctx);
-            $cmd = $this->findStepCommand($jsonLog, 'Copying irssi skeleton config');
+            $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Copying irssi skeleton config');
         } finally {
             $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
@@ -167,26 +167,7 @@ class UserUpdateHttpTest extends TestCase
 
     private function findStepCommand(string $jsonLog, string $needle): ?string
     {
-        $lines = @file($jsonLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if (!is_array($lines)) {
-            return null;
-        }
-        foreach ($lines as $line) {
-            $decoded = json_decode($line, true);
-            if (!is_array($decoded) || ($decoded['event'] ?? '') !== 'step') {
-                continue;
-            }
-            $entry = $decoded['data'] ?? null;
-            if (!is_array($entry)) {
-                continue;
-            }
-            $description = (string) ($entry['description'] ?? '');
-            if (strpos($description, $needle) === false) {
-                continue;
-            }
-            return isset($entry['command']) ? (string) $entry['command'] : null;
-        }
-        return null;
+        return $this->pmssFindJsonStepCommand($jsonLog, $needle);
     }
 
 }
