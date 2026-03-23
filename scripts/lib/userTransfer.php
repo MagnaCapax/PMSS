@@ -20,6 +20,7 @@
 
 require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/runtime/commands.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/userTransfer/cliParse.php';
 require_once __DIR__.'/userTransfer/localUserSafety.php';
 
@@ -28,10 +29,13 @@ require_once __DIR__.'/userTransfer/localUserSafety.php';
  */
 function pmssUserTransferWriteFile(string $path, string $contents, int $mode): void
 {
-    if (@file_put_contents($path, $contents) === false) {
+    $written = pmssReplaceUserFile($path, $contents, static function (string $tmpPath) use ($mode): void {
+        @chmod($tmpPath, $mode);
+    });
+
+    if (!$written) {
         throw new RuntimeException('Failed writing: '.$path, 1);
     }
-    @chmod($path, $mode);
 }
 
 /**

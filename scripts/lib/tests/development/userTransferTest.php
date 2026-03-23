@@ -381,6 +381,30 @@ class UserTransferTest extends TestCase
         }, 'Failed writing: ');
     }
 
+    public function testWriteFileRejectsSymlinkTarget(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-userTransfer-symlink-'.uniqid('', true);
+        $realTarget = $base.'-real';
+        $target = $base.'-link';
+        file_put_contents($realTarget, 'original');
+        symlink($realTarget, $target);
+
+        try {
+            $this->assertThrowsRuntime(static function () use ($target): void {
+                \pmssUserTransferWriteFile($target, 'payload', 0600);
+            }, 'Failed writing: ');
+
+            $this->assertEquals('original', (string) file_get_contents($realTarget));
+        } finally {
+            if (is_link($target) || file_exists($target)) {
+                @unlink($target);
+            }
+            if (file_exists($realTarget)) {
+                @unlink($realTarget);
+            }
+        }
+    }
+
     public function testSleepReturnsImmediatelyDuringDryRun(): void
     {
         putenv('PMSS_DRY_RUN=1');
