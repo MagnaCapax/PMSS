@@ -91,6 +91,46 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertTrue(!file_exists('relative.htpasswd'));
     }
 
+    public function testReplaceUserFileCleansTempFileWhenPrepareTempThrows(): void
+    {
+        $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
+        @mkdir(dirname($path), 0755, true);
+
+        $before = glob(dirname($path).'/.htpasswd.pmss-tmp-*');
+        $before = is_array($before) ? $before : [];
+
+        try {
+            \pmssReplaceUserFile($path, "user:hash\n", static function (): void {
+                throw new \RuntimeException('metadata failure');
+            });
+            $this->fail('Expected pmssReplaceUserFile() to rethrow callback failure.');
+        } catch (\RuntimeException $exception) {
+            $this->assertEquals('metadata failure', $exception->getMessage());
+        }
+
+        $after = glob(dirname($path).'/.htpasswd.pmss-tmp-*');
+        $after = is_array($after) ? $after : [];
+
+        $this->assertEquals($before, $after);
+        $this->assertTrue(!file_exists($path));
+    }
+
+    public function testReplaceUserFileRejectsPrepareTempSymlinkSwap(): void
+    {
+        $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
+        $outsidePath = $this->tempDir.'/outside.htpasswd';
+        @mkdir(dirname($path), 0755, true);
+        file_put_contents($outsidePath, "outside:hash\n");
+
+        $this->assertTrue(!\pmssReplaceUserFile($path, "user:hash\n", static function (string $tmp) use ($outsidePath): void {
+            @unlink($tmp);
+            symlink($outsidePath, $tmp);
+        }));
+
+        $this->assertTrue(!file_exists($path));
+        $this->assertEquals("outside:hash\n", file_get_contents($outsidePath));
+    }
+
     public function testCheckUserHtpasswdUsesSafeAppendHelper(): void
     {
         $src = $this->pmssReadRepoFile('scripts/util/checkUserHtpasswd.php');

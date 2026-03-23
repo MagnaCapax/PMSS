@@ -50,7 +50,17 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
     }
 
     if ($prepareTemp !== null) {
-        $prepareTemp($tmp);
+        try {
+            $prepareTemp($tmp);
+        } catch (\Throwable $exception) {
+            @unlink($tmp);
+            throw $exception;
+        }
+    }
+
+    if (is_link($tmp) || !is_file($tmp)) {
+        @unlink($tmp);
+        return false;
     }
 
     if (!@rename($tmp, $path)) {
