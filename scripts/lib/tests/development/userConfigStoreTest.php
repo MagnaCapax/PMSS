@@ -37,32 +37,12 @@ class UserConfigStoreTest extends TestCase
 
     private function setUpTempDir(): void
     {
-        $base = sys_get_temp_dir().'/pmss-userconfigstore-tests';
-        if (!is_dir($base)) {
-            @mkdir($base, 0755, true);
-        }
-        $this->tempDir = $base.'/store-'.bin2hex(random_bytes(4));
-        @mkdir($this->tempDir, 0755, true);
+        $this->pmssAssignTempDirProperty('tempDir', 'store', 0755, sys_get_temp_dir().'/pmss-userconfigstore-tests');
     }
 
     private function tearDownTempDir(): void
     {
-        if ($this->tempDir === '' || !is_dir($this->tempDir)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->tempDir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $path) {
-            if ($path->isDir()) {
-                @rmdir($path->getPathname());
-            } else {
-                @unlink($path->getPathname());
-            }
-        }
-        @rmdir($this->tempDir);
-        $this->tempDir = '';
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     private function basePayload(array $overrides = []): array

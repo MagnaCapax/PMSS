@@ -15,32 +15,12 @@ class UserRepositoryTest extends TestCase
 
     private function setUpTempDir(): void
     {
-        $base = sys_get_temp_dir().'/pmss-userrepo-tests';
-        if (!is_dir($base)) {
-            @mkdir($base, 0755, true);
-        }
-        $this->tempDir = $base.'/repo-'.bin2hex(random_bytes(4));
-        @mkdir($this->tempDir, 0755, true);
+        $this->pmssAssignTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
     }
 
     private function tearDownTempDir(): void
     {
-        if (empty($this->tempDir) || !is_dir($this->tempDir)) {
-            return;
-        }
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->tempDir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $path) {
-            if ($path->isDir()) {
-                @rmdir($path->getPathname());
-            } else {
-                @unlink($path->getPathname());
-            }
-        }
-        @rmdir($this->tempDir);
-        $this->tempDir = '';
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testPersistAndReload(): void

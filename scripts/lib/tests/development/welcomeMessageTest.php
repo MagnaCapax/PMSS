@@ -10,17 +10,12 @@ class WelcomeMessageTest extends TestCase
 
     private function setUpTempDir(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-welcome-message-', 0755);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
     }
 
     private function tearDownTempDir(): void
     {
-        if ($this->tempDir === '') {
-            return;
-        }
-
-        $this->pmssRemoveTree($this->tempDir);
-        $this->tempDir = '';
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     private function makeUserHome(): string

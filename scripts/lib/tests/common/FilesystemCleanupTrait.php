@@ -3,6 +3,46 @@ namespace PMSS\Tests;
 
 trait FilesystemCleanupTrait
 {
+    /** Build a named temporary directory, optionally under a stable base path. */
+    protected function pmssMakeNamedTempDir(string $prefix, int $mode = 0755, ?string $baseDir = null): string
+    {
+        if ($baseDir === null) {
+            return $this->pmssMakeTempDir($prefix, $mode);
+        }
+
+        $this->pmssEnsureDir($baseDir, 0755);
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $path = $baseDir.'/'.trim($prefix, '-').'-'.bin2hex(random_bytes(4));
+            if (@mkdir($path, $mode, true)) {
+                return $path;
+            }
+        }
+
+        return $this->pmssMakeTempDir($prefix, $mode);
+    }
+
+    /** Assign a temporary directory to a test property so setup code stays shared. */
+    protected function pmssAssignTempDirProperty(
+        string $propertyName,
+        string $prefix,
+        int $mode = 0755,
+        ?string $baseDir = null
+    ): void {
+        $this->{$propertyName} = $this->pmssMakeNamedTempDir($prefix, $mode, $baseDir);
+    }
+
+    /** Remove a temporary directory stored on a test property and clear the slot. */
+    protected function pmssCleanupTempDirProperty(string $propertyName): void
+    {
+        $path = (string)($this->{$propertyName} ?? '');
+        if ($path === '') {
+            return;
+        }
+
+        $this->cleanup($path);
+        $this->{$propertyName} = '';
+    }
+
     /** Ensure a directory exists for hermetic filesystem fixtures. */
     protected function pmssEnsureDir(string $path, int $mode = 0755): void
     {
