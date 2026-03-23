@@ -12,6 +12,24 @@ require_once __DIR__.'/setup.php';
 require_once __DIR__.'/userConfigsGenerate.php';
 require_once __DIR__.'/configTest.php';
 
+/**
+ * Apply chmod to files matched by a glob without relying on shell expansion.
+ *
+ * This keeps permission hardening aligned with historical intent while
+ * quoting every path before it reaches the shell.
+ */
+function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
+{
+    $matches = glob($pattern);
+    if (!is_array($matches) || $matches === array()) {
+        return;
+    }
+
+    sort($matches, SORT_STRING);
+    $quotedPaths = array_map('escapeshellarg', $matches);
+    passthru(sprintf('chmod %o %s', $mode, implode(' ', $quotedPaths)));
+}
+
 function pmssCreateNginxConfigMain(array $argv): int
 {
     $usage = <<<TXT
@@ -60,13 +78,9 @@ TXT;
     $subdomainConfigDir = (string)($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d');
     // Permission hardening for generated nginx configs.
     // Disallow config reading by anyone else.
-    if (glob('/etc/nginx/users/*')) {
-        passthru('chmod 640 /etc/nginx/users/*');
-    }
-    if (glob($subdomainConfigDir.'/pmss-user-*.conf')) {
-        passthru('chmod 640 '.$subdomainConfigDir.'/pmss-user-*.conf');
-    }
-    passthru('chmod 640 /etc/nginx/*.conf');
+    pmssCreateNginxConfigChmodGlob(0640, '/etc/nginx/users/*');
+    pmssCreateNginxConfigChmodGlob(0640, $subdomainConfigDir.'/pmss-user-*.conf');
+    pmssCreateNginxConfigChmodGlob(0640, '/etc/nginx/*.conf');
 
     return pmssCreateNginxConfigTestAndMaybeRestart($restartNginx);
 }
