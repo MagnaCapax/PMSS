@@ -152,6 +152,37 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals('codename mismatch', $checks[1]['detail']);
     }
 
+    public function testComponentChecksTreatWhitespaceBinaryPathsAsMissing(): void
+    {
+        $checks = pmssComponentStatusChecks([
+            'runCommand' => static function (string $command): string {
+                if ($command === "command -v 'nginx'") {
+                    return " \n\t ";
+                }
+
+                $map = [
+                    "command -v 'rtorrent'" => '/usr/bin/rtorrent',
+                    "command -v 'php'" => '/usr/bin/php',
+                    "command -v 'proftpd'" => '/usr/sbin/proftpd',
+                    "command -v 'openvpn'" => '/usr/sbin/openvpn',
+                    "command -v 'curl'" => '/usr/bin/curl',
+                ];
+
+                return $map[$command] ?? '';
+            },
+            'pathExists' => static function (string $path): bool {
+                return in_array($path, ['/etc/openvpn', '/etc/nginx'], true);
+            },
+            'readFile' => static function (string $path): string {
+                return is_file($path) ? (string) file_get_contents($path) : '';
+            },
+        ]);
+
+        $this->assertEquals('bin.nginx', $checks[3]['name']);
+        $this->assertEquals('WARN', $checks[3]['status']);
+        $this->assertEquals('', $checks[3]['detail']);
+    }
+
     public function testStatusSummaryCountsOkWarnAndErr(): void
     {
         $summary = pmssStatusSummary([

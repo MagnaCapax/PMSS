@@ -15,6 +15,14 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
 }
 
 /**
+ * Normalize shell/helper command output before status checks inspect it.
+ */
+function pmssStatusCommandOutput(string $output): string
+{
+    return trim($output);
+}
+
+/**
  * Encode a status payload as JSON without letting invalid UTF-8 break output.
  */
 function pmssStatusJsonEncode(array $payload, int $flags = 0): string
@@ -83,7 +91,7 @@ function pmssRenderStatusText(
  */
 function pmssSystemStatusChecks(array $dependencies = []): array
 {
-    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); };
+    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return pmssStatusCommandOutput((string) @shell_exec($command)); };
     $pathExists = $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); };
     $isFile = $dependencies['isFile'] ?? static function (string $path): bool { return is_file($path); };
     $isDir = $dependencies['isDir'] ?? static function (string $path): bool { return is_dir($path); };
@@ -120,13 +128,13 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         'flexget' => 'flexget --version 2>&1 | head -n 1',
         'pyload' => 'pyload --version 2>&1 | head -n 1',
     ] as $binary => $infoCommand) {
-        $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+        $path = pmssStatusCommandOutput((string) $runCommand('command -v '.escapeshellarg($binary)));
         if ($path === '') {
             $checks[] = pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
             continue;
         }
 
-        $detail = trim((string) $runCommand($infoCommand));
+        $detail = pmssStatusCommandOutput((string) $runCommand($infoCommand));
         $checks[] = pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
     }
 
@@ -258,7 +266,7 @@ function pmssSystemStatusChecks(array $dependencies = []): array
 /** Collect the shared component-status checks used by both system probes. */
 function pmssComponentStatusChecks(array $dependencies = []): array
 {
-    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); };
+    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return pmssStatusCommandOutput((string) @shell_exec($command)); };
     $pathExists = $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); };
     $readFile = $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; };
     $results = [];
@@ -279,7 +287,7 @@ function pmssComponentStatusChecks(array $dependencies = []): array
         $results[] = pmssStatus('apt.sources', 'WARN', 'missing sources.list');
     }
     foreach (['rtorrent', 'nginx', 'php', 'proftpd', 'openvpn', 'curl'] as $binary) {
-        $path = $runCommand('command -v '.escapeshellarg($binary));
+        $path = pmssStatusCommandOutput((string) $runCommand('command -v '.escapeshellarg($binary)));
         $results[] = pmssStatus('bin.'.$binary, $path !== '' ? 'OK' : 'WARN', $path);
     }
 
