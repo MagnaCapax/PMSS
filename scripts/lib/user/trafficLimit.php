@@ -259,9 +259,10 @@ TEXT
             return 2;
         }
         $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
-        $targetModes = [$runtimeDir.'/'.$userName => 0600, $homeDir.'/.trafficLimit' => 0664];
+        $runtimePath = $runtimeDir.'/'.$userName;
+        $targetModes = [$runtimePath => 0600, $homeDir.'/.trafficLimit' => 0664];
         if ($show) {
-            $limit = pmssTrafficLimitReadGiBFile($runtimeDir.'/'.$userName);
+            $limit = pmssTrafficLimitReadGiBFile($runtimePath);
             echo "Traffic limit for {$userName}: {$limit} GiB\n";
             return 0;
         }
@@ -276,19 +277,17 @@ TEXT
             fwrite(STDERR, "Error: failed to prepare {$runtimeDir}\n");
             return 4;
         }
-        if ($trafficLimit === 0) {
-            foreach (array_keys($targetModes) as $target) {
+        $removingLimit = ($trafficLimit === 0);
+        foreach ($targetModes as $target => $mode) {
+            if ($removingLimit) {
                 if (!file_exists($target)) continue;
                 if (!pmssTrafficLimitRemoveGiBFile($target)) {
                     fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$target}\n");
                     return 4;
                 }
+                continue;
             }
-            if (function_exists('pmssUserLog')) pmssUserLog($userName, 'traffic limit unset (GiB quota removed)');
-            echo "Traffic limit for {$userName} set at 0 GiB\n";
-            return 0;
-        }
-        foreach ($targetModes as $target => $mode) {
+
             if (!pmssTrafficLimitWriteGiBFile($target, $trafficLimit)) {
                 fwrite(STDERR, "Error: failed to write {$target}\n");
                 return 4;
@@ -297,6 +296,11 @@ TEXT
                 fwrite(STDERR, "Error: failed to secure {$target}\n");
                 return 4;
             }
+        }
+        if ($removingLimit) {
+            if (function_exists('pmssUserLog')) pmssUserLog($userName, 'traffic limit unset (GiB quota removed)');
+            echo "Traffic limit for {$userName} set at 0 GiB\n";
+            return 0;
         }
         if (function_exists('pmssUserLog')) pmssUserLog($userName, sprintf('traffic limit set to %d GiB (monthly quota)', $trafficLimit));
         echo "Traffic limit for {$userName} set at {$trafficLimit} GiB\n";
@@ -429,21 +433,11 @@ if (!function_exists('pmssTrafficLimitSelectTieredCapMbit')) {
             return ['effective' => $postCapMbit, 'matched' => null];
         }
 
-        usort(
-            $normalizedStages,
-            static function (array $left, array $right): int {
-                if ($left['overagePercent'] !== $right['overagePercent']) {
-                    return ($left['overagePercent'] < $right['overagePercent']) ? 1 : -1;
-                }
-                if ($left['minOverageGiB'] !== $right['minOverageGiB']) {
-                    return ($left['minOverageGiB'] < $right['minOverageGiB']) ? 1 : -1;
-                }
-                if ($left['index'] === $right['index']) {
-                    return 0;
-                }
-                return ($left['index'] < $right['index']) ? -1 : 1;
-            }
-        );
+        usort($normalizedStages, static function (array $left, array $right): int {
+            return ($right['overagePercent'] <=> $left['overagePercent'])
+                ?: ($right['minOverageGiB'] <=> $left['minOverageGiB'])
+                ?: ($left['index'] <=> $right['index']);
+        });
 
         foreach ($normalizedStages as $stage) {
             if ($overagePercent < $stage['overagePercent']) {
@@ -454,14 +448,9 @@ if (!function_exists('pmssTrafficLimitSelectTieredCapMbit')) {
             }
 
             $effectiveCapMbit = min($postCapMbit, (int) $stage['capMbit']);
-            return [
-                'effective' => $effectiveCapMbit,
-                'matched'   => [
-                    'overagePercent' => (float) $stage['overagePercent'],
-                    'minOverageGiB'  => (float) $stage['minOverageGiB'],
-                    'capMbit'        => (int) $stage['capMbit'],
-                ],
-            ];
+            unset($stage['index']);
+
+            return ['effective' => $effectiveCapMbit, 'matched' => $stage];
         }
 
         return ['effective' => $postCapMbit, 'matched' => null];
