@@ -5,14 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UserResourcesListTrafficContractsTest extends TestCase
 {
-    private function loadSource(): string
-    {
-        return (string) file_get_contents(__DIR__.'/../../../util/userResourcesList.php');
-    }
-
     public function testTrafficStatePathsRemainStable(): void
     {
-        $src = $this->loadSource();
+        $src = $this->pmssReadRepoFile('scripts/util/userResourcesList.php');
 
         $this->assertStringContainsString('"/home/{$user}/.trafficLimit"', $src);
         $this->assertStringContainsString('"/home/{$user}/.trafficData"', $src);
@@ -20,7 +15,7 @@ class UserResourcesListTrafficContractsTest extends TestCase
 
     public function testTrafficStateReadingDelegatesToSharedHelpers(): void
     {
-        $src = $this->loadSource();
+        $src = $this->pmssReadRepoFile('scripts/util/userResourcesList.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/user/traffic.php';", $src);
         $this->assertStringContainsString("require_once __DIR__.'/../lib/user/trafficLimit.php';", $src);

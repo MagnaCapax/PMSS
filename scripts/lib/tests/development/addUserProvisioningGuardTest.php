@@ -8,14 +8,14 @@ class AddUserProvisioningGuardTest extends TestCase
 {
     public function testAddUserUsesPerUserLock(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../../addUser.php');
+        $src = $this->pmssReadRepoFile('scripts/addUser.php');
         $this->assertTrue(strpos($src, 'pmss-addUser-') !== false, 'addUser.php must use per-user lock file');
         $this->assertTrue(strpos($src, 'flock(') !== false, 'addUser.php must acquire a lock');
     }
 
     public function testAddUserEmitsSummaryMarker(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../user/add/provisioningRuntime.php');
+        $src = $this->pmssReadRepoFile('scripts/lib/user/add/provisioningRuntime.php');
         $this->assertTrue(strpos($src, '###ADDUSER:') !== false, 'addUser must emit summary markers');
         $this->assertTrue(strpos($src, '###ADDUSER_JSON:') !== false, 'addUser must emit JSON summary markers');
     }
@@ -23,20 +23,20 @@ class AddUserProvisioningGuardTest extends TestCase
     public function testAddUserRuntimeInitStaysWithProvisioningRuntimeHelpers(): void
     {
         $this->assertTrue(function_exists('\pmssAddUserRuntimeInit'));
-        $src = (string) file_get_contents(__DIR__.'/../../user/add/provisioningRuntime.php');
+        $src = $this->pmssReadRepoFile('scripts/lib/user/add/provisioningRuntime.php');
         $this->assertTrue(strpos($src, 'function pmssAddUserRuntimeInit(') !== false);
     }
 
     public function testAddUserWrapperStaysSmall(): void
     {
-        $lines = file(__DIR__.'/../../../addUser.php', FILE_IGNORE_NEW_LINES);
+        $lines = file($this->pmssRepoPath('scripts/addUser.php'), FILE_IGNORE_NEW_LINES);
         $this->assertTrue(is_array($lines), 'addUser.php must be readable');
         $this->assertTrue(count($lines) <= 200, 'addUser.php must stay under 200 lines');
     }
 
     public function testAddUserStillStartsServicesAndRefreshesNetwork(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../../addUser.php');
+        $src = $this->pmssReadRepoFile('scripts/addUser.php');
         $rtorrentPos = strpos($src, '/scripts/startRtorrent');
         $lighttpdPos = strpos($src, '/scripts/startLighttpd');
         $networkPos = strpos($src, '/scripts/util/setupNetwork.php');
@@ -50,7 +50,7 @@ class AddUserProvisioningGuardTest extends TestCase
 
     public function testAddUserRefreshesPatchedTorrentFrontendsBeforeServices(): void
     {
-        $src = (string) file_get_contents(__DIR__.'/../../../addUser.php');
+        $src = $this->pmssReadRepoFile('scripts/addUser.php');
         $patchPos = strpos($src, "pmssUserApplySkeletonFiles(['user' => ");
         $lighttpdPos = strpos($src, '/scripts/startLighttpd');
 

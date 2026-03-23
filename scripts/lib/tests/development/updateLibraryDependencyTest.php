@@ -5,14 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateLibraryDependencyTest extends TestCase
 {
-    private function loadSource(string $relativePath): string
-    {
-        return $this->pmssReadRepoFile($relativePath);
-    }
-
     private function assertRepoFileDependencyContract(string $path, array $required, array $forbidden = [], string $forbiddenMessage = ''): void
     {
-        $contents = $this->loadSource($path);
+        $contents = $this->pmssReadRepoFile($path);
         $this->assertStringContainsAllStrings($required, $contents);
         foreach ($forbidden as $needle) {
             $this->pmssAssertStringNotContainsString($needle, $contents, $forbiddenMessage);

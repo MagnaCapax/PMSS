@@ -5,17 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class userConfigCommandContractsTest extends TestCase
 {
-    private function loadSource(string $relativePath): string
-    {
-        $path = dirname(__DIR__, 4).'/scripts/'.$relativePath;
-        $contents = @file_get_contents($path);
-        $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
-        return $contents;
-    }
-
     private function loadUserConfigSubsystemSource(): string
     {
-        return $this->loadSource('util/userConfig.php');
+        return $this->pmssReadRepoFile('scripts/util/userConfig.php');
     }
 
     public function testRutorrentConfigUpdateContractRemainsStable(): void
