@@ -189,9 +189,9 @@ function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'):
     exec(escapeshellarg($command), $lines, $exitCode);
     $users = array();
     foreach ($lines as $rawUser) {
-        $normalized = pmssNormalizeUsername(trim((string) $rawUser));
-        if (pmssValidateUsername($normalized)) {
-            $users[$normalized] = true;
+        $trimmed = trim((string) $rawUser);
+        if (pmssValidateUsername($trimmed)) {
+            $users[pmssNormalizeUsername($trimmed)] = true;
         }
     }
     return array('exitCode' => $exitCode, 'users' => array_keys($users));
@@ -235,7 +235,15 @@ function pmssUserWatchdogHandleSuspended(
 
 function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array
 {
-    $managedUsers = array_values(array_unique(array_filter(array_map('pmssNormalizeUsername', $managedUsers), 'pmssValidateUsername')));
+    $normalizedUsers = array();
+    foreach ($managedUsers as $managedUser) {
+        $trimmed = trim((string) $managedUser);
+        if (!pmssValidateUsername($trimmed)) {
+            continue;
+        }
+        $normalizedUsers[pmssNormalizeUsername($trimmed)] = true;
+    }
+    $managedUsers = array_keys($normalizedUsers);
     $rawUsername = trim($rawUsername);
     if ($rawUsername === '') {
         if (!empty($options['emitEmptyMessage']) && $managedUsers === []) {

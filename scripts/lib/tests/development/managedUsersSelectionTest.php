@@ -30,6 +30,15 @@ class ManagedUsersSelectionTest extends TestCase
         $this->assertEquals(['user1', 'user2'], $selection['users']);
     }
 
+    public function testManagedUsersSelectFromListRejectsInvalidRawUsernamesBeforeNormalizing(): void
+    {
+        $selection = \pmssManagedUsersSelectFromList([' user1 ', 'INVALID', 'user1', 'user2']);
+
+        $this->assertEquals(0, $selection['exitCode']);
+        $this->assertEquals('', $selection['username']);
+        $this->assertEquals(['user1', 'user2'], $selection['users']);
+    }
+
     public function testManagedUsersSelectFromCommandFindsSpecificManagedUser(): void
     {
         $this->writeListUsersScript("echo \"user1\\nuser2\\n\";");
