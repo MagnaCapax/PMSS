@@ -533,6 +533,7 @@ pmssRunProfiledStep('Running post-update web refresh', static function (): void 
     runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
 });
 
+pmssRunProfiledCallable('Configuring /tmp disk-backed baseline', 'pmssConfigureTempDiskBackedMount', ['logmsg', $distroVersion]);
 pmssRunProfiledCallable('Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']);
 pmssRunProfiledCallable('Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']);
 

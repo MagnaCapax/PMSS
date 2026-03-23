@@ -180,7 +180,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 ## System Preparation
 
 - pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true, ?string $modulesLoadOverride=null): void
-  - Writes `/etc/sysctl.d/1-pmss-defaults.conf` (override path) with the legacy baseline.
+  - Writes `/etc/sysctl.d/99-pmss.conf` (override path) with the legacy baseline.
   - Ensures `/etc/modules-load.d/pmss-bbr.conf` contains `tcp_bbr` (override path).
   - When `$reload=true`, runs `sysctl --system` to apply the baseline.
 
@@ -260,7 +260,8 @@ Sub-handlers:
 
 - pmssEnsureLocaleBaseline(): void → ensures `en_US.UTF-8` base locale (including `LC_TIME`), sets system timezone to `Europe/Helsinki`, and calls `Motd::motdGenerate()`.
 
-- pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true): void → writes legacy BFQ/sysctl defaults (default_qdisc, tcp_congestion_control, ip_forward, fs.protected_*, ptrace_scope, kptr_restrict) to `/etc/sysctl.d/1-pmss-defaults.conf` and runs `sysctl --system` unless reload is disabled.
+- pmssEnsureLegacySysctlBaseline(?callable $logger=null, ?string $targetOverride=null, bool $reload=true): void → writes legacy BFQ/sysctl defaults (default_qdisc, tcp_congestion_control, ip_forward, fs.protected_*, ptrace_scope, kptr_restrict) to `/etc/sysctl.d/99-pmss.conf` and runs `sysctl --system` unless reload is disabled.
+- pmssConfigureTempDiskBackedMount(?callable $logger=null, ?int $distroVersion=null): void → on Debian 13+ masks `tmp.mount` so `/tmp` stays disk-backed by default; earlier releases are left unchanged and explicit PMSS tmpfs hardening remains opt-in.
 - pmssNetconsoleConfigure(callable $logger, ?callable $runner=null): void → when `/etc/seedbox/config/netconsole` contains a valid kernel `netconsole=` spec and the target MAC is reachable, writes `/etc/modprobe.d/netconsole.conf`, enables module autoload, and reloads `netconsole`.
 - pmssEnsureBootTuning(?callable $logger=null): void → installs `/usr/local/sbin/pmss-boot-tuning.sh` and `/etc/systemd/system/pmss-boot-tuning.service` from templates, replaces `%%PMSS_BOOT_TUNING_SCRIPT%%`, enables/starts the unit, records `/etc/seedbox/config/hardware.json` when the boot script runs, and skips systemd actions in test/dry-run or when systemd is unavailable.
 - pmssEnsureBootDefaults(?callable $logger=null, ?string $fstabPath=null, ?string $grubPath=null, ?string $grubOption=null, ?array $extraGrubOptions=null, ?array $extraGrubSettings=null): void → enforces `/proc` `hidepid=2`, ensures required grub cmdline options, and optionally pins explicit grub settings such as serial-console directives.

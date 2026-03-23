@@ -152,7 +152,7 @@ require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
 function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targetOverride = null, bool $reload = true, ?string $modulesLoadOverride = null): void
 {
     $log             = $logger ?: 'logMessage';
-    $target          = $targetOverride ?? '/etc/sysctl.d/1-pmss-defaults.conf';
+    $target          = $targetOverride ?? '/etc/sysctl.d/99-pmss.conf';
     $modulesLoadPath = $modulesLoadOverride ?? '/etc/modules-load.d/pmss-bbr.conf';
     // Persist TCP BBR module loading across reboots.
     $modulesContent = "# PMSS: enable TCP BBR\ntcp_bbr\n";
@@ -200,6 +200,36 @@ SYSCTL;
 
     $reload ? runStep('Reloading sysctl configuration', 'sysctl --system') : $log('[SKIP] sysctl reload disabled');
     $log('Refreshed legacy sysctl defaults at '.$target);
+}
+
+/**
+ * Keep /tmp disk-backed on Debian 13+ by masking the systemd tmpfs unit.
+ */
+function pmssConfigureTempDiskBackedMount(?callable $logger = null, ?int $distroVersion = null): void
+{
+    $log = $logger ?: 'logMessage';
+    if ($distroVersion === null && function_exists('pmssDetectDistro')) {
+        $detected = pmssDetectDistro();
+        $distroVersion = isset($detected['version']) ? (int) $detected['version'] : 0;
+    }
+
+    if ((int) $distroVersion < 13) {
+        $log('[SKIP] Leaving /tmp mount policy unchanged before Debian 13');
+        return;
+    }
+
+    if (trim((string) @shell_exec('command -v systemctl 2>/dev/null')) === '') {
+        $log('[WARN] systemctl unavailable; unable to mask tmp.mount');
+        return;
+    }
+
+    $rc = runStep('Masking systemd tmp.mount to keep /tmp disk-backed', 'systemctl mask tmp.mount');
+    if ($rc !== 0) {
+        $log('[WARN] Failed to mask tmp.mount; /tmp may stay tmpfs-backed until corrected');
+        return;
+    }
+
+    $log('Masked tmp.mount to keep /tmp disk-backed');
 }
 
 /**

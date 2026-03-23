@@ -445,7 +445,7 @@ fi
 
 # Ensure baseline sysctl, bashrc, and permissions only once.
 install_sysctl_defaults() {
-	local target="/etc/sysctl.d/1-pmss-defaults.conf"
+	local target="/etc/sysctl.d/99-pmss.conf"
 	cat <<'CONF' >"$target"
 # Pulsed Media Config
 block/sda/queue/scheduler = bfq
@@ -464,6 +464,67 @@ block/sdf/queue/read_ahead_kb = 1024
 
 net.ipv4.ip_forward = 1
 CONF
+}
+
+install_detect_debian_major() {
+	local codename=""
+	local version=""
+
+	if [ -r /etc/os-release ]; then
+		# shellcheck disable=SC1091
+		. /etc/os-release
+		codename="${VERSION_CODENAME:-}"
+		version="${VERSION_ID:-}"
+	fi
+
+	case "${codename,,}" in
+	trixie)
+		echo 13
+		return 0
+		;;
+	bookworm)
+		echo 12
+		return 0
+		;;
+	bullseye)
+		echo 11
+		return 0
+		;;
+	buster)
+		echo 10
+		return 0
+		;;
+	esac
+
+	version="${version%%.*}"
+	if [[ "$version" =~ ^[0-9]+$ ]]; then
+		echo "$version"
+		return 0
+	fi
+
+	echo 0
+}
+
+install_configure_temp_disk_backed_mount() {
+	local distro_major
+	distro_major="$(install_detect_debian_major)"
+
+	if [ "$distro_major" -lt 13 ]; then
+		log_info "Leaving /tmp mount policy unchanged for Debian ${distro_major}"
+		return 0
+	fi
+
+	if ! command -v systemctl >/dev/null 2>&1; then
+		log_warn "systemctl unavailable; unable to mask tmp.mount on Debian ${distro_major}"
+		return 0
+	fi
+
+	if ! run_cmd systemctl mask tmp.mount; then
+		log_warn "Failed to mask tmp.mount on Debian ${distro_major}; /tmp may stay tmpfs-backed until corrected"
+		return 0
+	fi
+
+	log_info "Masked tmp.mount to keep /tmp disk-backed on Debian ${distro_major}"
 }
 
 install_root_shell_defaults() {
@@ -824,6 +885,7 @@ echo "$VERSION" >/etc/seedbox/config/version
 
 log_step "Deploying legacy BFQ/sysctl tuning (ensure rc.local unchanged)"
 install_sysctl_defaults
+install_configure_temp_disk_backed_mount
 
 log_step "Configuring root shell defaults"
 install_root_shell_defaults

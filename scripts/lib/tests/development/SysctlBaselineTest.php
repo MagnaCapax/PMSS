@@ -23,6 +23,7 @@ class SysctlBaselineTest extends TestCase
         $this->assertStringContainsString('kernel.kptr_restrict = 1', $content);
         $this->assertStringContainsString('kernel.yama.ptrace_scope = 1', $content);
         $this->assertStringContainsString('fs.protected_regular = 2', $content);
+        $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->systemPrepSource());
 
         $this->cleanup($dir);
     }
@@ -121,6 +122,11 @@ class SysctlBaselineTest extends TestCase
             }
         }
         return false;
+    }
+
+    private function systemPrepSource(): string
+    {
+        return (string) file_get_contents(dirname(__DIR__, 2).'/update/systemPrep.php');
     }
 
 }

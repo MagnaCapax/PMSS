@@ -171,7 +171,8 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 3. Immediately refresh APT repositories and apply the codename-selected dpkg baseline
    _before_ any other orchestration (this ordering is mandatory for all regressions).
 4. Prepare the host (cgroups, systemd slices, base permissions, MOTD, locales) and
-   reapply legacy installer defaults (sysctl tuning, root shell config, `/home`
+   reapply legacy installer defaults (late-order sysctl tuning, Debian 13+
+   `/tmp` disk-backed baseline, root shell config, `/home`
    permissions, hostname/quota overrides exported by `install.sh`).
 5. Apply repository templates, refresh apt indexes, migrate legacy files.
 6. Run application installers under `scripts/lib/update/apps/*.php`.
