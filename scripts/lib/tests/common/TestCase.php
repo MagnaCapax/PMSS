@@ -14,10 +14,17 @@ namespace {
 
 namespace PMSS\Tests {
 
+require_once __DIR__.'/FilesystemCleanupTrait.php';
+
 class SkipTest extends \Exception {}
 
 abstract class TestCase
 {
+    use FilesystemCleanupTrait {
+        pmssMakeNamedTempDir as private pmssTraitMakeNamedTempDir;
+        cleanup as private pmssTraitCleanup;
+    }
+
     /**
      * @var array<int, array{0:bool|string,1:string,2:?string}>
      */
@@ -208,6 +215,33 @@ abstract class TestCase
         file_put_contents($binDir.'/'.$binaryName, $script);
         @chmod($binDir.'/'.$binaryName, 0755);
         return $binDir;
+    }
+
+    /** Assign a temporary directory to a test property, including private child properties. */
+    protected function pmssAssignTempDirProperty(
+        string $propertyName,
+        string $prefix,
+        int $mode = 0755,
+        ?string $baseDir = null
+    ): void {
+        $path = $this->pmssTraitMakeNamedTempDir($prefix, $mode, $baseDir);
+        $property = new \ReflectionProperty($this, $propertyName);
+        $property->setAccessible(true);
+        $property->setValue($this, $path);
+    }
+
+    /** Remove a temporary directory stored on a test property, including private child properties. */
+    protected function pmssCleanupTempDirProperty(string $propertyName): void
+    {
+        $property = new \ReflectionProperty($this, $propertyName);
+        $property->setAccessible(true);
+        $path = (string) $property->getValue($this);
+        if ($path === '') {
+            return;
+        }
+
+        $this->pmssTraitCleanup($path);
+        $property->setValue($this, '');
     }
 
     /** Return the current process owner name when POSIX account lookups are available. */
