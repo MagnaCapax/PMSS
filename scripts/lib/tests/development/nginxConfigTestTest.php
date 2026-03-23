@@ -2,18 +2,21 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/nginxConfig/configTest.php';
 
 class NginxConfigTestTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     /** @var string */
     private $tempDir;
 
     protected function setUp(): void
     {
         $this->tempDir = $this->pmssMakeTempDir('pmss-nginx-config-test-', 0700);
-        @mkdir($this->tempDir.'/bin', 0755, true);
-        @mkdir($this->tempDir.'/logs', 0755, true);
+        $this->pmssEnsureDir($this->tempDir.'/bin');
+        $this->pmssEnsureDir($this->tempDir.'/logs');
     }
 
     public function testConfigTestPassesWithoutRestart(): void
@@ -124,7 +127,7 @@ class NginxConfigTestTest extends TestCase
     private function writeScript(string $name, string $body): void
     {
         $path = $this->tempDir.'/'.$name;
-        @file_put_contents($path, $body);
+        $this->pmssWriteFile($path, $body);
         @chmod($path, 0755);
     }
 

@@ -3,6 +3,19 @@ namespace PMSS\Tests;
 
 trait FilesystemCleanupTrait
 {
+    /** Ensure a directory exists for hermetic filesystem fixtures. */
+    protected function pmssEnsureDir(string $path, int $mode = 0755): void
+    {
+        if (!is_dir($path)) @mkdir($path, $mode, true);
+    }
+
+    /** Write fixture content while creating parent directories when needed. */
+    protected function pmssWriteFile(string $path, string $content, int $dirMode = 0755): void
+    {
+        $this->pmssEnsureDir(dirname($path), $dirMode);
+        @file_put_contents($path, $content);
+    }
+
     /** Create a temporary file with deterministic PMSS-style naming. */
     protected function pmssWriteTempFile(string $prefix, string $content, string $namespace = 'pmss'): string
     {

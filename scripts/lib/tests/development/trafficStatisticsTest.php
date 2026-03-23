@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/traffic.php';
 
 class TrafficStatisticsTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     public function testParseLineValid(): void
     {
         $ts = new \trafficStatistics();
@@ -38,8 +41,7 @@ class TrafficStatisticsTest extends TestCase
     public function testGetDataClampsNonPositivePeriodsToOneLine(): void
     {
         $paths = $this->makeTrafficPaths('egress');
-        @mkdir($paths['traffic_dir'], 0755, true);
-        file_put_contents($paths['traffic_dir'].'/alice', "first\nsecond\n");
+        $this->pmssWriteFile($paths['traffic_dir'].'/alice', "first\nsecond\n");
 
         $stats = new \trafficStatistics($paths);
         $this->assertEquals('second', $stats->getData('alice', 0));
@@ -48,7 +50,7 @@ class TrafficStatisticsTest extends TestCase
     public function testSaveUserTrafficWritesHomeAndRuntimeFilesInEgressMode(): void
     {
         $paths = $this->makeTrafficPaths('egress');
-        @mkdir($paths['home_dir'].'/alice', 0755, true);
+        $this->pmssEnsureDir($paths['home_dir'].'/alice');
 
         $stats = new \trafficStatistics($paths);
         $payload = [
@@ -70,7 +72,7 @@ class TrafficStatisticsTest extends TestCase
     public function testSaveUserTrafficUsesIngressLocalnetFilename(): void
     {
         $paths = $this->makeTrafficPaths('ingress');
-        @mkdir($paths['home_dir'].'/alice', 0755, true);
+        $this->pmssEnsureDir($paths['home_dir'].'/alice');
 
         $stats = new \trafficStatistics($paths);
         $payload = [

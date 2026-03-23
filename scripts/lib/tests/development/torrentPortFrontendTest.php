@@ -24,8 +24,8 @@ class TorrentPortFrontendTest extends TestCase
         $this->user = 'user'.bin2hex(random_bytes(2));
         $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
-        @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
-        @mkdir($this->skelDir.'/www', 0755, true);
+        $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
+        $this->pmssEnsureDir($this->skelDir.'/www');
 
         putenv('PMSS_HOME_DIR='.$this->homeRoot);
         putenv('PMSS_SKEL_DIR='.$this->skelDir);
@@ -75,8 +75,7 @@ class TorrentPortFrontendTest extends TestCase
     public function testApplySkeletonFilesRemovesLegacyPhpXplorerFile(): void
     {
         $legacyPath = $this->homePath('www/phpXplorer');
-        @mkdir(dirname($legacyPath), 0755, true);
-        file_put_contents($legacyPath, "legacy\n");
+        $this->pmssWriteFile($legacyPath, "legacy\n");
 
         \pmssUserApplySkeletonFiles($this->context());
 
@@ -197,29 +196,18 @@ class TorrentPortFrontendTest extends TestCase
         }
     }
 
-    private function context(): array
-    {
-        return ['user' => $this->user, 'home' => $this->homePath()];
-    }
+    private function context(): array { return ['user' => $this->user, 'home' => $this->homePath()]; }
 
-    private function homePath(string $relative = ''): string
-    {
-        $base = $this->homeRoot.'/'.$this->user;
-        return $relative === '' ? $base : $base.'/'.$relative;
-    }
+    private function homePath(string $relative = ''): string { return $relative === '' ? $this->homeRoot.'/'.$this->user : $this->homeRoot.'/'.$this->user.'/'.$relative; }
 
     private function writeSkelFile(string $relative, string $content): void
     {
-        $path = $this->skelDir.'/'.$relative;
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, $content);
+        $this->pmssWriteFile($this->skelDir.'/'.$relative, $content);
     }
 
     private function writeUserFile(string $relative, string $content): void
     {
-        $path = $this->homePath($relative);
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, $content);
+        $this->pmssWriteFile($this->homePath($relative), $content);
     }
 
 }

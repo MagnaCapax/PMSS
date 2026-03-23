@@ -1,10 +1,13 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/userTorrents.php';
 
 class UserTorrentsCountTest extends TestCase
 {
+    use FilesystemCleanupTrait;
+
     /** @var string */
     private $tempDir = '';
 
@@ -13,42 +16,25 @@ class UserTorrentsCountTest extends TestCase
         $this->tempDir = $this->pmssMakeTempDir('pmss-usertorrents-');
     }
 
-    protected function tearDown(): void
-    {
-        $this->tempDir = '';
-    }
-
-    private function homeDir(): string
-    {
-        return $this->tempDir.'/home';
-    }
-
-    private function makeFile(string $path): void
-    {
-        $dir = dirname($path);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        @file_put_contents($path, 'test');
-    }
+    private function homeDir(): string { return $this->tempDir.'/home'; }
 
     public function testCountsAllClientsAndTotals(): void
     {
         $home = $this->homeDir();
         // rTorrent
-        $this->makeFile($home.'/alice/session/a.torrent');
-        $this->makeFile($home.'/alice/session/b.torrent');
-        $this->makeFile($home.'/alice/session/c.torrent');
+        $this->pmssWriteFile($home.'/alice/session/a.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/session/b.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/session/c.torrent', 'test');
 
         // Deluge (state)
-        $this->makeFile($home.'/alice/.config/deluge/state/111.torrent');
-        $this->makeFile($home.'/alice/.config/deluge/state/222.torrent');
+        $this->pmssWriteFile($home.'/alice/.config/deluge/state/111.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/.config/deluge/state/222.torrent', 'test');
 
         // qBittorrent (BT_backup)
-        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/x.torrent');
-        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/y.torrent');
-        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/z.torrent');
-        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/w.torrent');
+        $this->pmssWriteFile($home.'/alice/.local/share/qBittorrent/BT_backup/x.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/.local/share/qBittorrent/BT_backup/y.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/.local/share/qBittorrent/BT_backup/z.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/.local/share/qBittorrent/BT_backup/w.torrent', 'test');
 
         $counts = \pmssUserTorrentsCountForUser($home, 'alice');
         $this->assertEquals(3, $counts['rtorrent']);
@@ -60,8 +46,8 @@ class UserTorrentsCountTest extends TestCase
     public function testDedupesQbittorrentTorrentAndFastresumeByBaseName(): void
     {
         $home = $this->homeDir();
-        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.torrent');
-        $this->makeFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.fastresume');
+        $this->pmssWriteFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/.local/share/qBittorrent/BT_backup/abc.fastresume', 'test');
         $counts = \pmssUserTorrentsCountForUser($home, 'alice');
         $this->assertEquals(1, $counts['qbittorrent']);
         $this->assertEquals(1, $counts['total']);
@@ -70,8 +56,8 @@ class UserTorrentsCountTest extends TestCase
     public function testDedupesDelugeAcrossMultipleDirs(): void
     {
         $home = $this->homeDir();
-        $this->makeFile($home.'/alice/.config/deluge/state/same.torrent');
-        $this->makeFile($home.'/alice/.delugeSession/same.torrent');
+        $this->pmssWriteFile($home.'/alice/.config/deluge/state/same.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/.delugeSession/same.torrent', 'test');
         $counts = \pmssUserTorrentsCountForUser($home, 'alice');
         $this->assertEquals(1, $counts['deluge']);
         $this->assertEquals(1, $counts['total']);
@@ -80,8 +66,8 @@ class UserTorrentsCountTest extends TestCase
     public function testIgnoresEntriesWithEmptyTorrentBaseName(): void
     {
         $home = $this->homeDir();
-        $this->makeFile($home.'/alice/session/.torrent');
-        $this->makeFile($home.'/alice/session/good.torrent');
+        $this->pmssWriteFile($home.'/alice/session/.torrent', 'test');
+        $this->pmssWriteFile($home.'/alice/session/good.torrent', 'test');
 
         $counts = \pmssUserTorrentsCountForUser($home, 'alice');
 
