@@ -8,6 +8,7 @@
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../resources.php';
 require_once __DIR__.'/accumulator.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 class ResourceStatsProcessor
 {
@@ -153,13 +154,7 @@ class ResourceStatsProcessor
 
         foreach ($targets as [$path, $group, $mode, $immutable]) {
             $immutable && $this->setImmutable($path, false);
-            $tmp = $path.'.tmp.'.getmypid().'.'.mt_rand(1000, 9999);
-            if (@file_put_contents($tmp, $serialized) === false || !@rename($tmp, $path)) {
-                @unlink($tmp);
-            }
-            @chown($path, 'root');
-            @chgrp($path, $group);
-            @chmod($path, $mode);
+            pmssWriteManagedFile($path, $serialized, 'root', $group, $mode);
             $immutable && $this->setImmutable($path, true);
         }
     }

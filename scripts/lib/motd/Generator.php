@@ -9,6 +9,7 @@
 /** MOTD generator (class-based). */
 
 require_once __DIR__.'/../update/distro.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 class Motd
 {
@@ -38,10 +39,7 @@ class Motd
                 ? true
                 : in_array(strtolower((string) $colorEnabled), ['1', 'true', 'yes', 'on'], true)
         );
-        file_put_contents($outPath, $rendered);
-        @chmod($outPath, 0644);
-        @chown($outPath, 'root');
-        @chgrp($outPath, 'root');
+        pmssWriteManagedFile($outPath, $rendered, 'root', 'root', 0644);
 
         // Align PAM motd behavior so users see MOTD once (and non-root can read it).
         if ($outPath === '/etc/motd') {
@@ -174,15 +172,9 @@ class Motd
         }
         $dynamicPath = '/run/motd.dynamic';
         if ($usesDynamic && !$usesStatic) {
-            file_put_contents($dynamicPath, $rendered);
-            @chmod($dynamicPath, 0644);
-            @chown($dynamicPath, 'root');
-            @chgrp($dynamicPath, 'root');
+            pmssWriteManagedFile($dynamicPath, $rendered, 'root', 'root', 0644);
         } elseif ($usesDynamic && $usesStatic) {
-            file_put_contents($dynamicPath, '');
-            @chmod($dynamicPath, 0644);
-            @chown($dynamicPath, 'root');
-            @chgrp($dynamicPath, 'root');
+            pmssWriteManagedFile($dynamicPath, '', 'root', 'root', 0644);
         }
     }
 

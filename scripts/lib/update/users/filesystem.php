@@ -172,8 +172,9 @@ function pmssUserRefreshPermissions(array $ctx): void
     }
 
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
-    if (file_exists($rcCustomPath)
-        && in_array(sha1((string) file_get_contents($rcCustomPath)), ['dcf21704d49910d1670b3fdd04b37e640b755889', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
+    $rcCustomContent = (!is_file($rcCustomPath) || is_link($rcCustomPath)) ? false : @file_get_contents($rcCustomPath);
+    if (is_string($rcCustomContent)
+        && in_array(sha1($rcCustomContent), ['dcf21704d49910d1670b3fdd04b37e640b755889', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
         $skelRcCustomPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.rtorrent.rc.custom';
         runUserStep(
             $user,

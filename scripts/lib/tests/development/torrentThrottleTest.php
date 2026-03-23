@@ -115,4 +115,22 @@ class TorrentThrottleTest extends TestCase
         symlink($this->homeRoot.'/'.$this->user.'/target', $path);
         $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 10), 'Expected write to fail on symlink');
     }
+
+    public function testWriteRejectsDirectoryWhenRemovingThrottle(): void
+    {
+        $path = $this->throttlePath();
+        @mkdir($path, 0755, true);
+
+        $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 0), 'Expected removal to fail on directory');
+        $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched');
+    }
+
+    public function testWriteRejectsDirectoryWhenWritingThrottle(): void
+    {
+        $path = $this->throttlePath();
+        @mkdir($path, 0755, true);
+
+        $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 10), 'Expected write to fail on directory');
+        $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched');
+    }
 }

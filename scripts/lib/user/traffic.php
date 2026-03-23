@@ -172,6 +172,10 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
         return false;
     }
 
+    if (file_exists($path) && !is_file($path)) {
+        return false;
+    }
+
     if ($value <= 0) {
         return !is_file($path) || @unlink($path);
     }

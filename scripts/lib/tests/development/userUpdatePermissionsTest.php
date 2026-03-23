@@ -102,6 +102,34 @@ class UserUpdatePermissionsTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function testRefreshPermissionsSkipsDirectoryRcCustomWithoutWarnings(): void
+    {
+        \pmssTestInstallRunUserStepShim('profile');
+        $home = sys_get_temp_dir().'/pmss-perm-dir-'.bin2hex(random_bytes(4));
+        mkdir($home, 0755, true);
+        mkdir($home.'/.rtorrent.rc.custom', 0755, true);
+
+        $ctx = [
+            'user'     => 'dummy',
+            'home'     => $home,
+            'user_esc' => escapeshellarg('dummy'),
+        ];
+
+        $GLOBALS['PMSS_PROFILE'] = [];
+
+        try {
+            \pmssUserRefreshPermissions($ctx);
+            $steps = $GLOBALS['PMSS_PROFILE'] ?? [];
+        } finally {
+            unset($GLOBALS['PMSS_PROFILE']);
+            $this->cleanup($home);
+            \pmssTestInstallRunUserStepShim('last');
+        }
+
+        $this->assertEquals(1, count($steps));
+        $this->assertEquals('Refreshing user permissions', $steps[0]['description']);
+    }
+
     private function findStepCommand(string $jsonLog, string $needle): ?string
     {
         $lines = @file($jsonLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
