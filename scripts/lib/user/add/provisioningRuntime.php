@@ -10,6 +10,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../../runtime.php';
+
 /**
  * Initialise runtime knobs used by addUser provisioning runs.
  *
@@ -30,19 +32,16 @@ function pmssAddUserRuntimeInit(): void
      * close the SSH channel and deliver SIGHUP/SIGPIPE. Ignoring those signals
      * helps the provisioning continue while logs are written to disk.
      */
-    if (function_exists('posix_isatty')) {
-        $hasTty = @posix_isatty(STDIN) || @posix_isatty(STDOUT) || @posix_isatty(STDERR);
-        if (!$hasTty) {
-            if (function_exists('posix_setsid')) {
-                @posix_setsid();
+    if (!pmssStreamIsTty(STDIN) && !pmssStreamIsTty(STDOUT) && !pmssStreamIsTty(STDERR)) {
+        if (function_exists('posix_setsid')) {
+            @posix_setsid();
+        }
+        if (function_exists('pcntl_signal')) {
+            if (defined('SIGHUP')) {
+                @pcntl_signal(SIGHUP, SIG_IGN);
             }
-            if (function_exists('pcntl_signal')) {
-                if (defined('SIGHUP')) {
-                    @pcntl_signal(SIGHUP, SIG_IGN);
-                }
-                if (defined('SIGPIPE')) {
-                    @pcntl_signal(SIGPIPE, SIG_IGN);
-                }
+            if (defined('SIGPIPE')) {
+                @pcntl_signal(SIGPIPE, SIG_IGN);
             }
         }
     }

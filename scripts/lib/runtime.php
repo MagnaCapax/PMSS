@@ -65,6 +65,31 @@ if (!function_exists('logMessage')) {
     }
 }
 
+if (!function_exists('pmssStreamIsTty')) {
+    /** Detect whether a stream resource is attached to a terminal. */
+    function pmssStreamIsTty($stream, bool $defaultWhenUnavailable = false): bool
+    {
+        if (!is_resource($stream)) {
+            return $defaultWhenUnavailable;
+        }
+        if (function_exists('stream_isatty')) {
+            return @stream_isatty($stream);
+        }
+        if (function_exists('posix_isatty')) {
+            return @posix_isatty($stream);
+        }
+        return $defaultWhenUnavailable;
+    }
+}
+
+if (!function_exists('pmssStandardStreamsAreTty')) {
+    /** Detect whether all standard streams are attached to terminals. */
+    function pmssStandardStreamsAreTty(): bool
+    {
+        return pmssStreamIsTty(STDIN) && pmssStreamIsTty(STDOUT) && pmssStreamIsTty(STDERR);
+    }
+}
+
 if (!function_exists('pmssOutputIndicatesForkFailure')) {
     /**
      * Detect common fork-related failure strings in captured command output.
@@ -336,7 +361,7 @@ if (!function_exists('runCommand')) {
     function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null, bool $inheritTty = false): int
     {
         $log = $logger ?? 'logMessage';
-        $isInteractive = function_exists('posix_isatty') && posix_isatty(STDOUT);
+        $isInteractive = pmssStreamIsTty(STDOUT);
         $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
         $timeoutSec = PMSS_COMMAND_TIMEOUT_DEFAULT;
         if ($timeoutEnv !== false && $timeoutEnv !== '' && ctype_digit($timeoutEnv)) {
@@ -362,8 +387,8 @@ if (!function_exists('runCommand')) {
         }
 
         $useInheritedIO = false;
-        if ($inheritTty && function_exists('posix_isatty')) {
-            $useInheritedIO = posix_isatty(STDIN) && posix_isatty(STDOUT) && posix_isatty(STDERR);
+        if ($inheritTty) {
+            $useInheritedIO = pmssStandardStreamsAreTty();
         }
 
         if ($useInheritedIO) {
@@ -504,7 +529,7 @@ if (!function_exists('runCommand')) {
 
             $message = '[WARN] Failed to launch command: '.$cmd.$hint.$cgInfo.$procInfo.'; possible process limit exhaustion (check pids.max / ulimit -u)';
             $log($message);
-            $isTty = function_exists('posix_isatty') && posix_isatty(STDERR);
+            $isTty = pmssStreamIsTty(STDERR);
             $banner = $isTty ? "\033[1;31m[FORK]\033[0m " : '[FORK] ';
             fwrite(STDERR, $banner.$message.PHP_EOL);
             pmssDumpForkDiagnostics('proc_open failed: '.$cmd, $log);
@@ -782,7 +807,7 @@ if (!function_exists('pmssError')) {
     function pmssError(string $message): void
     {
         // Use ANSI red for visibility if interactive, otherwise plain text
-        $isTty = function_exists('posix_isatty') && posix_isatty(STDERR);
+        $isTty = pmssStreamIsTty(STDERR);
         $prefix = $isTty ? "\033[31m[ERROR]\033[0m " : "[ERROR] ";
         
         fwrite(STDERR, $prefix . $message . PHP_EOL);

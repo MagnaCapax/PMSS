@@ -7,6 +7,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/lib/userLifecycle.php';
+require_once __DIR__.'/lib/runtime.php';
 
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     exit(pmssShowTrafficMain($argv));
@@ -64,11 +65,7 @@ TXT;
         if ($colorRequested || $noColorRequested) {
             $useColor = $colorRequested;
         } else {
-            if (function_exists('stream_isatty')) {
-                $useColor = @stream_isatty(STDOUT);
-            } elseif (function_exists('posix_isatty')) {
-                $useColor = @posix_isatty(STDOUT);
-            }
+            $useColor = pmssStreamIsTty(STDOUT);
             $term = getenv('TERM');
             if ($term === false || $term === '' || $term === 'dumb') {
                 $useColor = false;

@@ -248,7 +248,7 @@ function pmssUserTransferMain(array $argv): int
         if ($fromEnv !== false && $fromEnv !== '') {
             $password = $fromEnv;
         } else {
-            $isTty = function_exists('posix_isatty') && posix_isatty(STDIN);
+            $isTty = pmssStreamIsTty(STDIN);
             if (!$isTty) {
                 throw new RuntimeException('Password missing (set PMSS_USER_TRANSFER_PASSWORD for non-interactive runs)', 1);
             }

@@ -50,7 +50,7 @@ function pmssRenderStatusText(
 {
     echo ($leadingNewline ? "\n" : '').$title.' ('.date('Y-m-d H:i:s').")\n";
     echo str_repeat('-', 60)."\n";
-    $isTty = $useColour && (function_exists('posix_isatty') ? posix_isatty(STDOUT) : true);
+    $isTty = $useColour && pmssStreamIsTty(STDOUT, true);
     foreach ($checks as $result) {
         $status = strtoupper((string) ($result['status'] ?? ''));
         $label = str_pad('['.$status.']', $labelWidth);

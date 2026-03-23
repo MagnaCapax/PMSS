@@ -20,7 +20,7 @@ function runStep(string $description, string $command): int
 {
     $dryRun  = getenv('PMSS_DRY_RUN') === '1';
     $started = microtime(true);
-    $isTty   = function_exists('posix_isatty') && posix_isatty(STDOUT);
+    $isTty   = pmssStreamIsTty(STDOUT);
     $cReset  = "\033[0m";
     // Emit a start banner for interactive operators so hangs show which step is running.
     if ($isTty) {

@@ -18,7 +18,7 @@ require_once __DIR__.'/lib/storageHealth.php';
 
 function pmssStorageHealthColor(string $severity, string $text): string
 {
-    if (!function_exists('posix_isatty') || !posix_isatty(STDOUT)) {
+    if (!pmssStreamIsTty(STDOUT)) {
         return $text;
     }
     $code = ['ok' => '32', 'warn' => '33', 'fail' => '31'][$severity] ?? '0';

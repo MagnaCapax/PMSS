@@ -54,7 +54,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
         $processedUsers = 0;
         $skippedUsers = 0;
         logMessage(sprintf('Per-user maintenance: %d user(s) to process', $totalUsers));
-        $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
+        $isTty = pmssStreamIsTty(STDOUT);
         $phases = ['Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)'];
         $postChecks = [];
         if (is_file('/scripts/util/checkUserHtpasswd.php')) {
@@ -210,7 +210,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
         }
 
         pmssUserLog($user, sprintf('== Linger/Docker kick for %s (uid=%s) on host %s ==', $user, $uid, gethostname()));
-        if (function_exists('posix_isatty') && posix_isatty(STDOUT)) {
+        if (pmssStreamIsTty(STDOUT)) {
             echo "\033[36m[LINGER/DOCKER] {$user}\033[0m".PHP_EOL;
         } else {
             logMessage('[LINGER/DOCKER] '.$user);

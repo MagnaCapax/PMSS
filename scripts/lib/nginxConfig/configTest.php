@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/../runtime.php';
+
 function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
 {
     // Validate nginx configuration before any restart attempt.
@@ -22,7 +24,7 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
     $configTestResult = implode("\n", $configTestOutput);
 
     // ANSI colors for CLI output (stripped by logMessage for file logging).
-    $isTty = function_exists('posix_isatty') && posix_isatty(STDOUT);
+    $isTty = pmssStreamIsTty(STDOUT);
     $cReset  = $isTty ? "\033[0m"  : '';
     $cRed    = $isTty ? "\033[31m" : '';
     $cGreen  = $isTty ? "\033[32m" : '';
@@ -69,4 +71,3 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
 
     return 0;
 }
-

@@ -16,7 +16,7 @@ require_once '/scripts/lib/user/userConfigStore.php';
 
 $logger = new Logger(__FILE__);
 // Mirror messages to the legacy logfile when stdout is interactive.
-$mirrorLegacy = !function_exists('posix_isatty') || posix_isatty(STDOUT);
+$mirrorLegacy = pmssStreamIsTty(STDOUT, true);
 
 // Log both via the shared Logger and the historical cron redirect target.
 $logDockerMessage = static function (string $message) use ($logger, $mirrorLegacy): void {

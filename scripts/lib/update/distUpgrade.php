@@ -87,6 +87,19 @@ function pmssRunDistUpgrade(?string $maxTarget = null): int
     return 0;
 }
 
+/** Build the apt environment and interactive flag for dist-upgrade commands. */
+function pmssDistUpgradeAptEnv(bool $warnWhenInteractiveUnavailable = true): array
+{
+    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
+    $hasTty = $interactiveRequested && pmssStandardStreamsAreTty();
+    if ($warnWhenInteractiveUnavailable && $interactiveRequested && !$hasTty) {
+        logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
+    }
+
+    return ['DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
+        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a', $hasTty];
+}
+
 /**
  * Ensure fuse-overlayfs is present after dist-upgrade so rootless Docker keeps working.
  *
@@ -121,13 +134,7 @@ function pmssEnsureFuseOverlayfsAfterDistUpgrade(string $toMajor): void
         return;
     }
 
-    $hasTty = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1'
-        && function_exists('posix_isatty')
-        && posix_isatty(STDIN)
-        && posix_isatty(STDOUT)
-        && posix_isatty(STDERR);
-    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
-        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    list($env, $hasTty) = pmssDistUpgradeAptEnv(false);
 
     logMessage('dist-upgrade: ensuring fuse-overlayfs is installed for rootless Docker');
     $rc = runCommand("$env apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold fuse-overlayfs", true, null, $hasTty);
@@ -377,17 +384,7 @@ function pmssRepairNginxAfterDistUpgrade(): void
         return;
     }
 
-    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
-    $hasTty = $interactiveRequested
-        && function_exists('posix_isatty')
-        && posix_isatty(STDIN)
-        && posix_isatty(STDOUT)
-        && posix_isatty(STDERR);
-    if ($interactiveRequested && !$hasTty) {
-        logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
-    }
-    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
-        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    list($env, $hasTty) = pmssDistUpgradeAptEnv();
 
     runCommand("$env apt-get purge -y 'nginx*'", true, null, $hasTty);
     if (!pmssWaitForDpkgLocks()) {
@@ -597,17 +594,7 @@ function pmssDpkgLockActive(array $paths): bool
  */
 function pmssExecuteUpgrade(): bool
 {
-    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
-    $hasTty = $interactiveRequested
-        && function_exists('posix_isatty')
-        && posix_isatty(STDIN)
-        && posix_isatty(STDOUT)
-        && posix_isatty(STDERR);
-    if ($interactiveRequested && !$hasTty) {
-        logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
-    }
-    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
-        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    list($env, $hasTty) = pmssDistUpgradeAptEnv();
     $opts = '-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold';
 
     if (!pmssWaitForDpkgLocks()) {
@@ -728,17 +715,7 @@ function pmssEnsureLibcryptBeforeUpgrade(string $fromMajor, string $toMajor): vo
         return;
     }
 
-    $interactiveRequested = getenv('PMSS_DIST_UPGRADE_INTERACTIVE') === '1';
-    $hasTty = $interactiveRequested
-        && function_exists('posix_isatty')
-        && posix_isatty(STDIN)
-        && posix_isatty(STDOUT)
-        && posix_isatty(STDERR);
-    if ($interactiveRequested && !$hasTty) {
-        logMessage('[WARN] PMSS_DIST_UPGRADE_INTERACTIVE=1 requested, but no TTY detected; continuing in noninteractive mode.');
-    }
-    $env = 'DEBIAN_FRONTEND='.($hasTty ? 'readline' : 'noninteractive')
-        .' APT_LISTCHANGES_FRONTEND=none UCF_FORCE_CONFDEF=1 UCF_FORCE_CONFOLD=1 NEEDRESTART_MODE=a';
+    list($env, $hasTty) = pmssDistUpgradeAptEnv();
 
     runCommand("$env apt-get update", true, null, $hasTty);
     if (!pmssWaitForDpkgLocks()) {
