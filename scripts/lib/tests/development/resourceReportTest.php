@@ -15,9 +15,14 @@ class ResourceReportTest extends TestCase
         @mkdir($this->statsDir, 0755, true);
     }
 
+    private function writeUserStats(string $user, array $values): void
+    {
+        $this->writeUserData($user, $this->buildStatsPayload($values));
+    }
+
     public function testBuildReportAggregatesRowsAndTotals(): void
     {
-        $this->writeUserData('alice', $this->buildStatsPayload([
+        $this->writeUserStats('alice', [
             'io_read' => ['month' => 1000, 'week' => 100, 'day' => 10, 'hour' => 1],
             'io_write' => ['month' => 2000, 'week' => 200, 'day' => 20, 'hour' => 2],
             'io_read_ops' => ['month' => 3000, 'week' => 300, 'day' => 30, 'hour' => 3],
@@ -27,8 +32,8 @@ class ResourceReportTest extends TestCase
             'memory_current' => 700,
             'memory_avg_month' => 70,
             'tasks_current' => 7,
-        ]));
-        $this->writeUserData('bob', $this->buildStatsPayload([
+        ]);
+        $this->writeUserStats('bob', [
             'io_read' => ['month' => 11, 'week' => 12, 'day' => 13, 'hour' => 14],
             'io_write' => ['month' => 21, 'week' => 22, 'day' => 23, 'hour' => 24],
             'io_read_ops' => ['month' => 31, 'week' => 32, 'day' => 33, 'hour' => 34],
@@ -38,7 +43,7 @@ class ResourceReportTest extends TestCase
             'memory_current' => 71,
             'memory_avg_month' => 72,
             'tasks_current' => 73,
-        ]));
+        ]);
 
         $report = \pmssResourceBuildReport($this->statsDir, ['alice', 'bob']);
 

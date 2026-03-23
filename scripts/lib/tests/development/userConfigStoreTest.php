@@ -65,6 +65,25 @@ class UserConfigStoreTest extends TestCase
         $this->tempDir = '';
     }
 
+    private function basePayload(array $overrides = []): array
+    {
+        return $overrides + [
+            'ramMiB' => 128,
+            'rtorrentPort' => 5000,
+            'quota' => 5,
+            'quotaBurst' => 6,
+        ];
+    }
+
+    private function persistAndReload(string $username, array $payload): array
+    {
+        $store = new \UserConfigStore($this->configDirPath());
+        $this->assertTrue($store->set($username, $payload));
+        $reloaded = $store->get($username);
+        $this->assertTrue(is_array($reloaded));
+        return $reloaded;
+    }
+
     public function testSetAndGetRoundTripPreservesUnknownKeysAndForcesTrafficLimit(): void
     {
         $this->setUpTempDir();
@@ -135,16 +154,7 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'       => 128,
-                'rtorrentPort' => 5001,
-                'quota'        => 5,
-                'quotaBurst'   => 6,
-            ];
-            $this->assertTrue($store->set('carol', $payload));
-            $reloaded = $store->get('carol');
-            $this->assertTrue(is_array($reloaded));
+            $reloaded = $this->persistAndReload('carol', $this->basePayload(['rtorrentPort' => 5001]));
             $this->assertEquals(0, $reloaded['billingId']);
             $this->assertEquals(false, $reloaded['suspended']);
         } finally {
@@ -156,16 +166,10 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'       => 512,
+            $reloaded = $this->persistAndReload('docked', $this->basePayload([
+                'ramMiB' => 512,
                 'rtorrentPort' => 5002,
-                'quota'        => 5,
-                'quotaBurst'   => 6,
-            ];
-            $this->assertTrue($store->set('docked', $payload));
-            $reloaded = $store->get('docked');
-            $this->assertTrue(is_array($reloaded));
+            ]));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();
@@ -176,17 +180,11 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'       => 512,
+            $reloaded = $this->persistAndReload('dockst', $this->basePayload([
+                'ramMiB' => 512,
                 'rtorrentPort' => 5007,
-                'quota'        => 5,
-                'quotaBurst'   => 6,
-                'productType'  => 'storage-box',
-            ];
-            $this->assertTrue($store->set('dockst', $payload));
-            $reloaded = $store->get('dockst');
-            $this->assertTrue(is_array($reloaded));
+                'productType' => 'storage-box',
+            ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();
@@ -197,18 +195,12 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'        => 512,
-                'rtorrentPort'  => 5008,
-                'quota'         => 5,
-                'quotaBurst'    => 6,
-                'product'       => 'Storage Box 100',
+            $reloaded = $this->persistAndReload('docksx', $this->basePayload([
+                'ramMiB' => 512,
+                'rtorrentPort' => 5008,
+                'product' => 'Storage Box 100',
                 'dockerEnabled' => true,
-            ];
-            $this->assertTrue($store->set('docksx', $payload));
-            $reloaded = $store->get('docksx');
-            $this->assertTrue(is_array($reloaded));
+            ]));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();
@@ -219,17 +211,10 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'        => 128,
-                'rtorrentPort'  => 5003,
-                'quota'         => 5,
-                'quotaBurst'    => 6,
+            $reloaded = $this->persistAndReload('dockoff', $this->basePayload([
+                'rtorrentPort' => 5003,
                 'dockerEnabled' => 0,
-            ];
-            $this->assertTrue($store->set('dockoff', $payload));
-            $reloaded = $store->get('dockoff');
-            $this->assertTrue(is_array($reloaded));
+            ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();
@@ -240,17 +225,10 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'        => 128,
-                'rtorrentPort'  => 5004,
-                'quota'         => 5,
-                'quotaBurst'    => 6,
+            $reloaded = $this->persistAndReload('dockstr', $this->basePayload([
+                'rtorrentPort' => 5004,
                 'dockerEnabled' => 'false',
-            ];
-            $this->assertTrue($store->set('dockstr', $payload));
-            $reloaded = $store->get('dockstr');
-            $this->assertTrue(is_array($reloaded));
+            ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();
@@ -261,17 +239,11 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'        => 512,
-                'rtorrentPort'  => 5005,
-                'quota'         => 5,
-                'quotaBurst'    => 6,
+            $reloaded = $this->persistAndReload('dockon', $this->basePayload([
+                'ramMiB' => 512,
+                'rtorrentPort' => 5005,
                 'dockerEnabled' => 'true',
-            ];
-            $this->assertTrue($store->set('dockon', $payload));
-            $reloaded = $store->get('dockon');
-            $this->assertTrue(is_array($reloaded));
+            ]));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();
@@ -282,17 +254,11 @@ class UserConfigStoreTest extends TestCase
     {
         $this->setUpTempDir();
         try {
-            $store = new \UserConfigStore($this->configDirPath());
-            $payload = [
-                'ramMiB'        => 244,
-                'rtorrentPort'  => 5006,
-                'quota'         => 5,
-                'quotaBurst'    => 6,
+            $reloaded = $this->persistAndReload('docklow', $this->basePayload([
+                'ramMiB' => 244,
+                'rtorrentPort' => 5006,
                 'dockerEnabled' => true,
-            ];
-            $this->assertTrue($store->set('docklow', $payload));
-            $reloaded = $store->get('docklow');
-            $this->assertTrue(is_array($reloaded));
+            ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
             $this->tearDownTempDir();

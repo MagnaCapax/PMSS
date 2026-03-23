@@ -241,34 +241,9 @@ class UserConfigStore
             $payload['suspended'] = (bool)$payload['suspended'];
         }
 
-        if (!array_key_exists('dockerEnabled', $payload)) {
-            $payload['dockerEnabled'] = true;
-            foreach (['product', 'productName', 'productType'] as $key) {
-                if (!isset($payload[$key]) || !is_string($payload[$key])) {
-                    continue;
-                }
-                $normalized = strtolower(trim($payload[$key]));
-                if ($normalized === '') {
-                    continue;
-                }
-                $normalized = str_replace(['_', '-'], ' ', $normalized);
-                $normalized = preg_replace('/\s+/', ' ', $normalized);
-                if (!is_string($normalized)) {
-                    continue;
-                }
-                if (strpos($normalized, 'storage') !== false && strpos($normalized, 'box') !== false) {
-                    $payload['dockerEnabled'] = false;
-                    break;
-                }
-            }
-        } else {
-            // Normalize string booleans to avoid PHP truthiness traps.
-            if (is_string($payload['dockerEnabled'])) {
-                $value = strtolower(trim($payload['dockerEnabled']));
-                $payload['dockerEnabled'] = !in_array($value, ['false', '0', 'no', 'off', ''], true);
-            }
-            $payload['dockerEnabled'] = (bool)$payload['dockerEnabled'];
-        }
+        $payload['dockerEnabled'] = array_key_exists('dockerEnabled', $payload)
+            ? $this->normaliseBooleanValue($payload['dockerEnabled'])
+            : !$this->payloadDescribesStorageBox($payload);
 
         // Safety gate: keep rootless Docker disabled for low-memory accounts.
         if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) && (int)$payload['ramMiB'] > 0) {
@@ -282,6 +257,34 @@ class UserConfigStore
 
         ksort($payload, SORT_STRING);
         return $payload;
+    }
+
+    private function normaliseBooleanValue($value): bool
+    {
+        if (!is_string($value)) {
+            return (bool)$value;
+        }
+        return !in_array(strtolower(trim($value)), ['false', '0', 'no', 'off', ''], true);
+    }
+
+    private function payloadDescribesStorageBox(array $payload): bool
+    {
+        foreach (['product', 'productName', 'productType'] as $key) {
+            $normalized = $this->normaliseProductDescriptor($payload[$key] ?? null);
+            if ($normalized !== '' && strpos($normalized, 'storage') !== false && strpos($normalized, 'box') !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function normaliseProductDescriptor($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+        $normalized = preg_replace('/\s+/', ' ', str_replace(['_', '-'], ' ', strtolower(trim($value))));
+        return is_string($normalized) ? $normalized : '';
     }
 
     private function readJsonFile(string $path): ?array

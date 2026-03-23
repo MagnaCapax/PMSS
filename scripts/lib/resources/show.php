@@ -15,6 +15,37 @@ function pmssResourceMetricNames(): array
     return ['io_read', 'io_write', 'cpu', 'ram_hours', 'io_read_ops', 'io_write_ops'];
 }
 
+function pmssResourceWindowNames(): array
+{
+    return ['month', 'week', 'day', 'hour'];
+}
+
+function pmssResourceMetricIsOptional(string $metric): bool
+{
+    return substr($metric, -4) === '_ops';
+}
+
+function pmssResourceSummaryFromData(array $data): array
+{
+    return [
+        'memory_current' => (float) ($data['memory']['current'] ?? 0.0),
+        'memory_avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
+        'tasks_current' => (float) ($data['tasks']['current'] ?? 0.0),
+    ];
+}
+
+function pmssResourcePayloadFromSource(array $source): array
+{
+    $payload = [
+        'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
+        'tasks' => ['current' => $source['tasks_current']],
+    ];
+    foreach (pmssResourceMetricNames() as $metric) {
+        $payload[$metric] = $source[$metric];
+    }
+    return $payload;
+}
+
 /**
  * Assemble per-user rows, totals, and missing entries.
  *
@@ -23,7 +54,7 @@ function pmssResourceMetricNames(): array
 function pmssResourceBuildReport(string $statsDir, array $users): array
 {
     $missingStats = $rows = [];
-    $windows = ['month', 'week', 'day', 'hour'];
+    $windows = pmssResourceWindowNames();
     $metrics = pmssResourceMetricNames();
     $windowZeros = array_fill_keys($windows, 0.0);
     $totals = array_fill_keys($metrics, $windowZeros) + array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
@@ -42,7 +73,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $metricValues = $windowZeros;
             foreach ($windows as $label) {
                 $value = $rawMetric[$label] ?? null;
-                if ($value === null && substr($metric, -4) !== '_ops') {
+                if ($value === null && !pmssResourceMetricIsOptional($metric)) {
                     $missingStats[] = $thisUser;
                     continue 3;
                 }
@@ -51,11 +82,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $windowMetrics[$metric] = $metricValues;
         }
 
-        $summary = [
-            'memory_current' => (float) ($data['memory']['current'] ?? 0.0),
-            'memory_avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
-            'tasks_current' => (float) ($data['tasks']['current'] ?? 0.0),
-        ];
+        $summary = pmssResourceSummaryFromData($data);
 
         foreach ($windowMetrics as $metric => $values) {
             foreach ($values as $label => $value) {
@@ -120,21 +147,9 @@ TEXT;
     ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
     if (isset($options['json'])) {
-        $buildPayload = static function (array $source): array {
-            $payload = [
-                'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
-                'tasks' => ['current' => $source['tasks_current']],
-            ];
-
-            foreach (pmssResourceMetricNames() as $metric) {
-                $payload[$metric] = $source[$metric];
-            }
-
-            return $payload;
-        };
         echo json_encode([
-            'users' => array_map($buildPayload, $rows),
-            'totals' => $buildPayload($totals),
+            'users' => array_map('pmssResourcePayloadFromSource', $rows),
+            'totals' => pmssResourcePayloadFromSource($totals),
             'missing' => $missingStats,
         ])."\n";
         return 0;
