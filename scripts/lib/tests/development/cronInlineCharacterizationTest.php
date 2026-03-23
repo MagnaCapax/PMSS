@@ -78,13 +78,13 @@ class CronInlineCharacterizationTest extends TestCase
         $this->assertStringContainsString('pmssUserWatchdogHandleSuspended(', $lighttpdSrc);
         $this->assertStringContainsString("'lighttpd stopped due to suspension'", $lighttpdSrc);
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'lighttpd start requested');", $lighttpdSrc);
-        $this->assertStringContainsString('pmssUserWatchdogHandleSuspended(', $qbittorrentSrc);
+        $this->assertStringContainsString('pmssUserWatchdogRunEnabledUsers(', $qbittorrentSrc);
         $this->assertStringContainsString("'qbittorrent-nox stopped due to suspension'", $qbittorrentSrc);
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'qbittorrent-nox start requested');", $qbittorrentSrc);
-        $this->assertStringContainsString('pmssUserWatchdogHandleSuspended(', $rcloneSrc);
+        $this->assertStringContainsString('pmssUserWatchdogRunEnabledUsers(', $rcloneSrc);
         $this->assertStringContainsString("'rclone stopped due to suspension'", $rcloneSrc);
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'rclone start requested');", $rcloneSrc);
-        $this->assertStringContainsString('pmssUserWatchdogHandleSuspended(', $delugeSrc);
+        $this->assertStringContainsString('pmssUserWatchdogRunEnabledUsers(', $delugeSrc);
         $this->assertStringContainsString("'deluge stopped due to suspension'", $delugeSrc);
         $this->assertStringContainsString("pmssUserLog(\$thisUser, 'deluged start requested');", $delugeSrc);
     }

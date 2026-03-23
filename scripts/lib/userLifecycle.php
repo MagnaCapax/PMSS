@@ -213,7 +213,6 @@ function pmssListManagedUsers(string $command = '/scripts/listUsers.php'): array
 function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'): bool
 {
     $homeDir = rtrim($homeRoot, '/').'/'.$username;
-
     return is_dir($homeDir.'/www-disabled') || !is_dir($homeDir.'/www');
 }
 
@@ -221,9 +220,10 @@ function pmssUserWebRootUnavailable(string $username, string $homeRoot = '/home'
 function pmssUserWatchdogHandleSuspended(
     string $username,
     array $processNames,
-    string $userLogMessage
+    string $userLogMessage,
+    string $homeRoot = '/home'
 ): bool {
-    if (!pmssUserWebRootUnavailable($username)) return false;
+    if (!pmssUserWebRootUnavailable($username, $homeRoot)) return false;
     echo "User: {$username} is suspended\n";
     foreach ($processNames as $processName) {
         if (!is_string($processName) || $processName === '') continue;
@@ -231,6 +231,26 @@ function pmssUserWatchdogHandleSuspended(
     }
     pmssUserLog($username, $userLogMessage);
     return true;
+}
+
+/** Run a watchdog callback for enabled, unsuspended managed users. */
+function pmssUserWatchdogRunEnabledUsers(
+    string $enableMarker,
+    array $processNames,
+    string $userLogMessage,
+    callable $callback,
+    string $homeRoot = '/home',
+    string $command = '/scripts/listUsers.php'): void {
+    if ($enableMarker === '') { return; }
+    $homeRoot = rtrim($homeRoot, '/');
+    foreach (pmssListManagedUsers($command) as $username) {
+        if (pmssUserWatchdogHandleSuspended($username, $processNames, $userLogMessage, $homeRoot)
+            || !is_file($homeRoot.'/'.$username.'/.'.$enableMarker)
+        ) {
+            continue;
+        }
+        $callback($username);
+    }
 }
 
 function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array

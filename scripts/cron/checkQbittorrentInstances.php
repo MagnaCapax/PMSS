@@ -9,12 +9,7 @@
 echo date('Y-m-d H:i:s') . ': Checking qBittorrent instances' . "\n";
 require_once __DIR__.'/../lib/userLifecycle.php';
 if (is_file($pmssQbittorrentPath = __DIR__.'/../lib/user/qbittorrent.php')) { require_once $pmssQbittorrentPath; }
-$users = pmssListManagedUsers();
-foreach($users AS $thisUser) {
-    if (pmssUserWatchdogHandleSuspended($thisUser, ['qbittorrent-nox'], 'qbittorrent-nox stopped due to suspension')) continue;  //Suspended
-
-    if (!file_exists("/home/{$thisUser}/.qbittorrentEnable")) continue;  // qBittorrent not enabled
-    
+pmssUserWatchdogRunEnabledUsers('qbittorrentEnable', ['qbittorrent-nox'], 'qbittorrent-nox stopped due to suspension', function (string $thisUser): void {
     // pgrep returns running qbittorrent-nox processes owned by the user
     $instances = shell_exec('pgrep -u' . $thisUser . ' qbittorrent-nox');
     if (function_exists('pmssQbittorrentApplyUploadThrottle') && pmssQbittorrentApplyUploadThrottle($thisUser) && !empty($instances)) {
@@ -27,6 +22,4 @@ foreach($users AS $thisUser) {
         passthru("su {$thisUser} -c 'cd ~; nohup qbittorrent-nox -d >> /dev/null 2>&1 &'");
         pmssUserLog($thisUser, 'qbittorrent-nox start requested');
     }
- 
-
-}
+});
