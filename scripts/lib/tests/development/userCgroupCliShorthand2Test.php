@@ -2,20 +2,15 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/UserConfigCgroupCliTrait.php';
 
 class UserCgroupCliShorthand2Test extends TestCase
 {
-    private function runCli(array $args, array $env = []): string
-    {
-        $cmd = 'php '.escapeshellarg(getcwd().'/scripts/util/userConfigCgroup.php').' '.implode(' ', array_map('escapeshellarg', $args));
-        $envExport = '';
-        foreach ($env as $k=>$v) { $envExport .= $k.'='.escapeshellarg($v).' '; }
-        return (string)@shell_exec($envExport.$cmd.' 2>&1');
-    }
+    use UserConfigCgroupCliTrait;
 
     public function testDeviceHomeResolutionPlannedIo(): void
     {
-        $out = $this->runCli(['root', '--apply', '--dry-run', '--device=/home', '--io-profile=hdd'], [
+        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--device=/home', '--io-profile=hdd'], [
             'PMSS_HOME_DEVICE' => '/dev/pmssHOME',
         ]);
         $this->assertStringContainsString('user=root', $out);
@@ -26,7 +21,7 @@ class UserCgroupCliShorthand2Test extends TestCase
 
     public function testSingleCpuWeightFlagOnly(): void
     {
-        $out = $this->runCli(['root', '--apply', '--dry-run', '--cpu-weight=300']);
+        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--cpu-weight=300']);
         $this->assertStringContainsString('Planned properties', $out);
         $this->assertStringContainsString('CPUWeight=300', $out);
         // Memory should not be planned unless explicitly provided
@@ -36,9 +31,8 @@ class UserCgroupCliShorthand2Test extends TestCase
 
     public function testMemProfileHeavySetsHigh(): void
     {
-        $out = $this->runCli(['root', '--apply', '--dry-run', '--mem-profile=heavy']);
+        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--mem-profile=heavy']);
         $this->assertStringContainsString('Planned properties', $out);
         $this->assertStringContainsString('MemoryHigh=1024M', $out);
     }
 }
-

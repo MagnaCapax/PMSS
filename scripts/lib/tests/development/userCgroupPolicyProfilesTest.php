@@ -2,9 +2,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/UserConfigCgroupCliTrait.php';
 
 class UserCgroupPolicyProfilesTest extends TestCase
 {
+    use UserConfigCgroupCliTrait;
+
     private function createPolicyDir(array $policy): string
     {
         $directory = sys_get_temp_dir().'/pmss-cgroup-policy-profiles-'.bin2hex(random_bytes(4));
@@ -15,20 +18,6 @@ class UserCgroupPolicyProfilesTest extends TestCase
 
         return $directory;
     }
-
-    private function runCli(array $args, array $env = []): string
-    {
-        $command = 'php '.escapeshellarg(getcwd().'/scripts/util/userConfigCgroup.php').' '
-            .implode(' ', array_map('escapeshellarg', $args));
-
-        $envExport = '';
-        foreach ($env as $key => $value) {
-            $envExport .= $key.'='.escapeshellarg($value).' ';
-        }
-
-        return (string) @shell_exec($envExport.$command.' 2>&1');
-    }
-
     public function testCpuProfileUsesPolicyFamilyWhenDefined(): void
     {
         $configDirectory = $this->createPolicyDir([
@@ -37,7 +26,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--cpu-profile=balanced'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
@@ -53,7 +42,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--tasks-profile=service'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
@@ -69,7 +58,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--mem-profile=streaming'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
@@ -82,7 +71,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
     {
         $configDirectory = $this->createPolicyDir([]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--cpu-profile=low'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
@@ -98,7 +87,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--cpu-profile=low'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
@@ -122,7 +111,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=hdd'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
@@ -148,7 +137,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=archive'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );
@@ -172,7 +161,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
             ],
         ]);
 
-        $output = $this->runCli(
+        $output = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--device=/dev/sda', '--io-profile=bulk'],
             ['PMSS_CONFIG_DIR' => $configDirectory]
         );

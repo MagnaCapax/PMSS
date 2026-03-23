@@ -2,9 +2,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once __DIR__.'/../common/UserConfigCgroupCliTrait.php';
 
 class PolicyOverridePrecedenceTest extends TestCase
 {
+    use UserConfigCgroupCliTrait;
+
     private function createPolicyDir(string $suffix, string $body): string
     {
         $cfgDir = sys_get_temp_dir().'/pmss-cg-'.bin2hex(random_bytes(4)).'-'.$suffix;
@@ -13,18 +16,10 @@ class PolicyOverridePrecedenceTest extends TestCase
         return $cfgDir;
     }
 
-    private function runCli(array $args, array $env = []): string
-    {
-        $cmd = 'php '.escapeshellarg(getcwd().'/scripts/util/userConfigCgroup.php').' '.implode(' ', array_map('escapeshellarg', $args));
-        $envExport = '';
-        foreach ($env as $k=>$v) { $envExport .= $k.'='.escapeshellarg($v).' '; }
-        return (string)@shell_exec($envExport.$cmd.' 2>&1');
-    }
-
     public function testDefaultsApplyWhenExplicitMissing(): void
     {
         $cfgDir = $this->createPolicyDir('policy', "<?php return ['cpuWeight'=>123,'ioWeight'=>321,'tasksMax'=>777];\n");
-        $out = $this->runCli(['root', '--apply', '--dry-run', '--defaults'], [ 'PMSS_CONFIG_DIR' => $cfgDir ]);
+        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--defaults'], ['PMSS_CONFIG_DIR' => $cfgDir]);
         $this->assertStringContainsString('CPUWeight=123', $out);
         $this->assertStringContainsString('IOWeight=321', $out);
         $this->assertStringContainsString('TasksMax=777', $out);
@@ -33,7 +28,7 @@ class PolicyOverridePrecedenceTest extends TestCase
     public function testExplicitOverridesPolicyDefaults(): void
     {
         $cfgDir = $this->createPolicyDir('policy2', "<?php return ['cpuWeight'=>111];\n");
-        $out = $this->runCli(['root', '--apply', '--dry-run', '--defaults', '--cpu-weight=999'], [ 'PMSS_CONFIG_DIR' => $cfgDir ]);
+        $out = $this->pmssRunUserConfigCgroupCli(['root', '--apply', '--dry-run', '--defaults', '--cpu-weight=999'], ['PMSS_CONFIG_DIR' => $cfgDir]);
         $this->assertStringContainsString('CPUWeight=999', $out);
     }
 
@@ -44,7 +39,7 @@ class PolicyOverridePrecedenceTest extends TestCase
             "<?php return ['mounts' => ['/home' => ['ioWeight' => 320, 'readBw' => '25M', 'writeBw' => '10M', 'readIops' => 150, 'writeIops' => 90]]];\n"
         );
 
-        $out = $this->runCli(
+        $out = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--defaults'],
             ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
         );
@@ -63,7 +58,7 @@ class PolicyOverridePrecedenceTest extends TestCase
             "<?php return ['mounts' => ['/home' => ['readBw' => '25M']]];\n"
         );
 
-        $out = $this->runCli(
+        $out = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--defaults', '--io-read-bw=/dev/manual:9M'],
             ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
         );
@@ -79,7 +74,7 @@ class PolicyOverridePrecedenceTest extends TestCase
             "<?php return ['mounts' => ['/home' => ['readBw' => '25M']]];\n"
         );
 
-        $out = $this->runCli(
+        $out = $this->pmssRunUserConfigCgroupCli(
             ['root', '--apply', '--dry-run', '--defaults', '--device=/dev/manual', '--io-profile=hdd'],
             ['PMSS_CONFIG_DIR' => $cfgDir, 'PMSS_HOME_DEVICE' => '/dev/testhome']
         );
