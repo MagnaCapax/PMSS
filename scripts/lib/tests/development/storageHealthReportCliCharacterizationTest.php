@@ -5,6 +5,22 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class StorageHealthReportCliCharacterizationTest extends TestCase
 {
+    private function storageHealthScriptPath(): string
+    {
+        return dirname(__DIR__, 4).'/scripts/storageHealth.php';
+    }
+
+    private function runStorageHealthCommand(string $jsonPath, string $extraArgs = ''): string
+    {
+        $command = escapeshellarg(PHP_BINARY)
+            .' '.escapeshellarg($this->storageHealthScriptPath())
+            .' --json '.escapeshellarg($jsonPath)
+            .($extraArgs !== '' ? ' '.$extraArgs : '')
+            .' 2>&1';
+
+        return (string) shell_exec($command);
+    }
+
     public function testOnlyProblemsAndDeviceFilterKeepLatestMatchingEntry(): void
     {
         $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
@@ -45,12 +61,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             ], JSON_UNESCAPED_SLASHES),
         ])."\n");
 
-        $script = dirname(__DIR__, 4).'/scripts/storageHealth.php';
-        $command = escapeshellarg(PHP_BINARY)
-            .' '.escapeshellarg($script)
-            .' --json '.escapeshellarg((string) $jsonPath)
-            .' --device sdb --only-problems 2>&1';
-        $output = (string) shell_exec($command);
+        $output = $this->runStorageHealthCommand((string) $jsonPath, '--device sdb --only-problems');
 
         $this->assertStringContainsString('Performance status: OK', $output);
         $this->assertStringContainsString('Summary: 0 ok, 0 warn, 1 fail', $output);
@@ -102,11 +113,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             ], JSON_UNESCAPED_SLASHES),
         ])."\n");
 
-        $script = dirname(__DIR__, 4).'/scripts/storageHealth.php';
-        $command = escapeshellarg(PHP_BINARY)
-            .' '.escapeshellarg($script)
-            .' --json '.escapeshellarg((string) $jsonPath).' 2>&1';
-        $output = (string) shell_exec($command);
+        $output = $this->runStorageHealthCommand((string) $jsonPath);
 
         $failPos = strpos($output, 'Failing Disk');
         $warnPos = strpos($output, 'Fast Flash');
@@ -121,5 +128,60 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             (bool) preg_match('/Fast Flash.*NVME.*61C.*0.*85/', $output),
             'Expected NVMe rows to keep temperature, media-error, and wear columns aligned'
         );
+    }
+
+    public function testUserNoticeWritesPerformanceLimitedPayload(): void
+    {
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $noticePath = $this->pmssMakeTempPath('pmss-storage-health-notice-', '.json');
+
+        file_put_contents((string) $jsonPath, json_encode([
+            'timestamp' => '2025-01-01T00:00:03+00:00',
+            'kind' => 'raid',
+            'array' => 'md0',
+            'level' => 'raid1',
+            'state' => 'active',
+            'detail' => 'recovery = 1.0% (1/100)',
+            'severity' => 'warn',
+            'flags' => ['rebuild_in_progress'],
+            'operation' => 'recovery',
+        ], JSON_UNESCAPED_SLASHES)."\n");
+
+        $this->runStorageHealthCommand(
+            (string) $jsonPath,
+            '--user-notice='.escapeshellarg((string) $noticePath)
+        );
+
+        $this->assertTrue(is_file($noticePath), 'Expected user notice file to be created');
+        $notice = json_decode((string) file_get_contents($noticePath), true);
+        $this->assertTrue(is_array($notice), 'Expected user notice to contain JSON');
+        $this->assertEquals('performance_limited', $notice['status'] ?? null, 'Expected performance-limited notice status');
+        $this->assertEquals('md0', $notice['array'] ?? null, 'Expected notice to preserve the affected array');
+        $this->assertEquals('RAID md0 recovery in progress', $notice['reason'] ?? null, 'Expected notice reason to match rebuild status');
+    }
+
+    public function testUserNoticeClearsStaleFileWhenPerformanceReturnsToNormal(): void
+    {
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $noticePath = $this->pmssMakeTempFile('pmss-storage-health-notice-');
+
+        file_put_contents((string) $jsonPath, json_encode([
+            'timestamp' => '2025-01-01T00:00:03+00:00',
+            'kind' => 'raid',
+            'array' => 'md0',
+            'level' => 'raid1',
+            'state' => 'active',
+            'detail' => 'sda1[0] sdb1[1]',
+            'severity' => 'ok',
+            'flags' => [],
+        ], JSON_UNESCAPED_SLASHES)."\n");
+        file_put_contents((string) $noticePath, "stale\n");
+
+        $this->runStorageHealthCommand(
+            (string) $jsonPath,
+            '--user-notice='.escapeshellarg((string) $noticePath)
+        );
+
+        $this->assertFalse(is_file($noticePath), 'Expected stale user notice to be removed');
     }
 }

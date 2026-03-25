@@ -40,6 +40,45 @@ function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?stri
     return ($value !== null && $value !== '') ? $value : null;
 }
 
+/**
+ * Persist the user-facing notice atomically so readers never see partial JSON.
+ *
+ * @param array<string, string> $payload
+ */
+function pmssStorageHealthWriteUserNotice(string $userNoticePath, array $payload): void
+{
+    $userNoticeDir = dirname($userNoticePath);
+    if ($userNoticeDir !== '' && !is_dir($userNoticeDir) && !@mkdir($userNoticeDir, 0755, true) && !is_dir($userNoticeDir)) {
+        return;
+    }
+
+    $json = json_encode($payload, JSON_UNESCAPED_SLASHES);
+    if (!is_string($json) || $json === '') {
+        return;
+    }
+
+    $tempPath = $userNoticePath.'.'.uniqid('tmp-', true);
+    if (@file_put_contents($tempPath, $json.PHP_EOL, LOCK_EX) === false) {
+        @unlink($tempPath);
+        return;
+    }
+
+    if (!@rename($tempPath, $userNoticePath)) {
+        @unlink($tempPath);
+        return;
+    }
+
+    @chmod($userNoticePath, 0644);
+}
+
+/** Remove a stale user-facing notice when storage performance returns to normal. */
+function pmssStorageHealthClearUserNotice(string $userNoticePath): void
+{
+    if (is_file($userNoticePath)) {
+        @unlink($userNoticePath);
+    }
+}
+
 function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
 {
     $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
@@ -247,20 +286,15 @@ $perfStatus = pmssStorageHealthPerformanceStatus($raid);
 
 if ($userNoticeRequested && $userNoticePath !== '') {
     if ($perfStatus !== null) {
-        $userNoticeDir = dirname($userNoticePath);
-        if ($userNoticeDir !== '' && !is_dir($userNoticeDir)) {
-            @mkdir($userNoticeDir, 0755, true);
-        }
         $payload = [
             'timestamp' => $latestTs !== '' ? $latestTs : date('c'),
             'status' => $perfStatus['status'],
             'reason' => $perfStatus['reason'],
             'array' => $perfStatus['array'],
         ];
-        @file_put_contents($userNoticePath, json_encode($payload, JSON_UNESCAPED_SLASHES).PHP_EOL);
-        @chmod($userNoticePath, 0644);
-    } elseif (is_file($userNoticePath)) {
-        @unlink($userNoticePath);
+        pmssStorageHealthWriteUserNotice($userNoticePath, $payload);
+    } else {
+        pmssStorageHealthClearUserNotice($userNoticePath);
     }
 }
 
