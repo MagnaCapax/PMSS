@@ -17,8 +17,9 @@ foreach (['traffic', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
 }
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
-require_once __DIR__.'/../lib/update.php';
+require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 /**
  * Main entry point for user configuration changes.

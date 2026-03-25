@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/rtorrentConfig.php';
+require_once __DIR__.'/rutorrent/config.php';
 // Bootstrap the structured update logger before the generic runtime fallback
 // so update helpers always keep the context-aware logging contract.
 require_once __DIR__.'/update/logging.php';
@@ -178,54 +179,6 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
 
     // Avoid shelling out for simple chmod/chown: fork failures are common during updates.
     $applyPermissions($targetFile);
-}
-
-/**
- * Update ruTorrent configuration for a given user.
- *
- * This function reads ruTorrent configuration template files,
- * replaces placeholders with user-specific paths, and writes the updated
- * configuration to the user's ruTorrent directory.
- *
- * @param string $username The username for which to update the configuration.
- * @param int    $scgiPort The SCGI port for ruTorrent configuration (currently not used).
- *
- * @return void
- */
-function updateRutorrentConfig($username, $scgiPort) {
-    $templateConfigPath = '/etc/seedbox/config/template.rutorrent.config';
-    $templateAccessPath = '/etc/seedbox/config/template.rutorrent.access';
-    
-    $rutorrentConfig = file_get_contents($templateConfigPath);
-    $accessIni       = file_get_contents($templateAccessPath);
-    
-    if ($rutorrentConfig === false || $accessIni === false) {
-        echo "Failed to read ruTorrent template files.\n";
-        return;
-    }
-
-    $homeDir = "/home/{$username}";
-    $rutorrentDir = $homeDir.'/www/rutorrent';
-    foreach ([
-        '$scgi_host = "";' => '$scgi_host = "unix://'.$homeDir.'/.rtorrent.socket";',
-        '$tempDirectory = null;' => "\$tempDirectory = '{$homeDir}/.tmp/';",
-        '$topDirectory = \'/\';' => "\$topDirectory = '{$homeDir}/';",
-        '$log_file = \'/tmp/errors.log\';' => "\$log_file = '{$rutorrentDir}/errors.log';",
-    ] as $search => $replace) {
-        $rutorrentConfig = str_replace($search, $replace, $rutorrentConfig);
-    }
-
-    $configPath = $rutorrentDir.'/conf/config.php';
-    $accessPath = $rutorrentDir.'/conf/access.ini';
-    
-    if (file_put_contents($configPath, $rutorrentConfig) === false) {
-        echo "Failed to write ruTorrent config to {$configPath}\n";
-        return;
-    }
-    if (file_put_contents($accessPath, $accessIni) === false) {
-        echo "Failed to write ruTorrent access config to {$accessPath}\n";
-        return;
-    }
 }
 
 /**
