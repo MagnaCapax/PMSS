@@ -200,6 +200,19 @@ abstract class TestCase
         return $path;
     }
 
+    /** Reserve and track a unique temporary filesystem path for hermetic tests. */
+    protected function pmssMakeTempPath(string $prefix, string $suffix = ''): string
+    {
+        $base = getenv('PMSS_TEST_TEMP_ROOT');
+        if (!is_string($base) || $base === '') {
+            $base = sys_get_temp_dir();
+        }
+
+        $path = rtrim($base, '/').'/'.$prefix.bin2hex(random_bytes(6)).$suffix;
+        $this->tempPaths[] = $path;
+        return $path;
+    }
+
     /** Create a tracked readable file under a fresh temporary directory. */
     protected function pmssMakeReadableTempPath(string $dirPrefix, string $filePrefix = 'pmss'): string
     {

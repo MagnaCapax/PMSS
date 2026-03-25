@@ -1,28 +1,21 @@
 <?php
 namespace PMSS\Tests {
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserRutorrentRssCompatPatchTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testCompatibilityPatchesLegacyRssObFlushCall(): void
     {
         $home = $this->createHome();
         $path = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($path, "before\nob_flush();\nafter\n");
 
-        try {
-            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-            $content = (string) file_get_contents($path);
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $content = (string) file_get_contents($path);
 
-            $this->assertTrue(strpos($content, '@ob_flush();') !== false);
-            $this->assertTrue(strpos($content, "\nob_flush();\n") === false);
-        } finally {
-            $this->cleanup($home);
-        }
+        $this->assertTrue(strpos($content, '@ob_flush();') !== false);
+        $this->assertTrue(strpos($content, "\nob_flush();\n") === false);
     }
 
     public function testCompatibilityLeavesPatchedRssObFlushCallUntouched(): void
@@ -31,25 +24,17 @@ class UserRutorrentRssCompatPatchTest extends TestCase
         $path = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($path, "before\n@ob_flush();\nafter\n");
 
-        try {
-            $before = (string) file_get_contents($path);
-            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-            $this->assertEquals($before, (string) file_get_contents($path));
-        } finally {
-            $this->cleanup($home);
-        }
+        $before = (string) file_get_contents($path);
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $this->assertEquals($before, (string) file_get_contents($path));
     }
 
     public function testCompatibilitySkipsMissingRssTarget(): void
     {
         $home = $this->createHome();
 
-        try {
-            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-            $this->assertTrue(!file_exists($home.'/www/rutorrent/plugins/rss/action.php'));
-        } finally {
-            $this->cleanup($home);
-        }
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $this->assertTrue(!file_exists($home.'/www/rutorrent/plugins/rss/action.php'));
     }
 
     public function testCompatibilitySkipsSymlinkedRssTarget(): void
@@ -60,13 +45,8 @@ class UserRutorrentRssCompatPatchTest extends TestCase
         file_put_contents($target, "before\nob_flush();\nafter\n");
         @symlink($target, $link);
 
-        try {
-            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-            $this->assertEquals("before\nob_flush();\nafter\n", (string) file_get_contents($target));
-        } finally {
-            @unlink($target);
-            $this->cleanup($home);
-        }
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $this->assertEquals("before\nob_flush();\nafter\n", (string) file_get_contents($target));
     }
 
     public function testCompatibilityLeavesNonMatchingRssContentUntouched(): void
@@ -75,25 +55,21 @@ class UserRutorrentRssCompatPatchTest extends TestCase
         $path = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($path, "before\nflush();\nafter\n");
 
-        try {
-            $before = (string) file_get_contents($path);
-            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-            $this->assertEquals($before, (string) file_get_contents($path));
-        } finally {
-            $this->cleanup($home);
-        }
+        $before = (string) file_get_contents($path);
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $this->assertEquals($before, (string) file_get_contents($path));
     }
 
     private function createHome(): string
     {
-        $home = sys_get_temp_dir().'/pmss-rutorrent-rss-home-'.bin2hex(random_bytes(4));
+        $home = $this->pmssMakeTempDir('pmss-rutorrent-rss-home-');
         @mkdir($home.'/www/rutorrent/plugins/rss', 0755, true);
         return $home;
     }
 
     private function tempPath(string $suffix): string
     {
-        return sys_get_temp_dir().'/pmss-user-rutorrent-rss-'.$suffix.'-'.bin2hex(random_bytes(4)).'.php';
+        return $this->pmssMakeTempPath('pmss-user-rutorrent-rss-'.$suffix.'-', '.php');
     }
 
 }

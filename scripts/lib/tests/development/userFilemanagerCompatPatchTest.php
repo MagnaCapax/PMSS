@@ -2,14 +2,11 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserFilemanagerCompatPatchTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $homeRoot;
     private $skelDir;
     private $user;
@@ -17,8 +14,8 @@ class UserFilemanagerCompatPatchTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->homeRoot = sys_get_temp_dir().'/pmss-user-filemanager-home-'.bin2hex(random_bytes(4));
-        $this->skelDir = sys_get_temp_dir().'/pmss-user-filemanager-skel-'.bin2hex(random_bytes(4));
+        $this->homeRoot = $this->pmssMakeTempDir('pmss-user-filemanager-home-');
+        $this->skelDir = $this->pmssMakeTempDir('pmss-user-filemanager-skel-');
         $this->user = 'user'.bin2hex(random_bytes(2));
         $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
@@ -32,8 +29,6 @@ class UserFilemanagerCompatPatchTest extends TestCase
     protected function tearDown(): void
     {
         $this->pmssRestoreEnvMap($this->envBackup);
-        $this->cleanup($this->homeRoot);
-        $this->cleanup($this->skelDir);
     }
 
     public function testApplySkeletonFilesPatchesCopiedFilemanager(): void
@@ -106,8 +101,6 @@ PHP;
         \pmssUserApplySkeletonFiles($this->context());
 
         $this->assertEquals("before\n        ob_flush();\nafter\n", (string) file_get_contents($target));
-
-        @unlink($target);
     }
 
     private function context(): array
@@ -120,7 +113,7 @@ PHP;
 
     private function tempPath(string $suffix): string
     {
-        return sys_get_temp_dir().'/pmss-user-filemanager-'.$suffix.'-'.bin2hex(random_bytes(4)).'.php';
+        return $this->pmssMakeTempPath('pmss-user-filemanager-'.$suffix.'-', '.php');
     }
 
     private function targetPath(): string

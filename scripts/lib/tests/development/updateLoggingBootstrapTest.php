@@ -88,7 +88,7 @@ class UpdateLoggingBootstrapTest extends TestCase
 
     private function emitJsonLog(string $statement, string $bootstrap = ''): array
     {
-        $path = sys_get_temp_dir().'/pmss-update-log-'.bin2hex(random_bytes(4)).'.jsonl';
+        $path = $this->pmssMakeTempPath('pmss-update-log-', '.jsonl');
         $script = $bootstrap
             .'putenv('.var_export('PMSS_JSON_LOG='.$path, true).'); '
             .'$GLOBALS["PMSS_JSON_LOG_PATH"] = null; '
@@ -97,7 +97,6 @@ class UpdateLoggingBootstrapTest extends TestCase
         $this->runLibraryScript($script);
 
         $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        @unlink($path);
 
         $this->assertTrue(is_array($lines) && !empty($lines), 'Expected JSON log output at '.$path);
         $decoded = json_decode((string) end($lines), true);

@@ -13,16 +13,20 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
         $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
-        putenv('PMSS_CGROUP_MODE=v2');
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
-        putenv('PMSS_TOTAL_MEM_MIB=512');
-        \pmssEnsureSystemdSlices('logmsg');
-        $content = (string)file_get_contents($drop.'/15-pmss.conf');
-        preg_match('/MemoryHigh=(\d+)M/', $content, $m1);
-        preg_match('/MemoryMax=(\d+)M/', $content, $m2);
-        $this->assertTrue(((int)$m1[1]) >= 250, 'MemoryHigh floor not enforced');
-        $this->assertTrue(((int)$m2[1]) <= (int)floor(512*0.95), 'MemoryMax cap not enforced');
+
+        $this->pmssWithEnv([
+            'PMSS_CGROUP_MODE' => 'v2',
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_SYSTEMD_USER_SLICE_DIR' => $drop,
+            'PMSS_TOTAL_MEM_MIB' => '512',
+        ], function () use ($drop): void {
+            \pmssEnsureSystemdSlices('logmsg');
+            $content = (string)file_get_contents($drop.'/15-pmss.conf');
+            preg_match('/MemoryHigh=(\d+)M/', $content, $m1);
+            preg_match('/MemoryMax=(\d+)M/', $content, $m2);
+            $this->assertTrue(((int)$m1[1]) >= 250, 'MemoryHigh floor not enforced');
+            $this->assertTrue(((int)$m2[1]) <= (int)floor(512*0.95), 'MemoryMax cap not enforced');
+        });
     }
 
     public function testHugeRamRespects95PercentCap(): void
@@ -32,14 +36,18 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
         $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
-        putenv('PMSS_CGROUP_MODE=v2');
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
-        putenv('PMSS_TOTAL_MEM_MIB=65536');
-        \pmssEnsureSystemdSlices('logmsg');
-        $content = (string)file_get_contents($drop.'/15-pmss.conf');
-        preg_match('/MemoryMax=(\d+)M/', $content, $m);
-        $this->assertTrue(((int)$m[1]) <= (int)floor(65536*0.95));
+
+        $this->pmssWithEnv([
+            'PMSS_CGROUP_MODE' => 'v2',
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_SYSTEMD_USER_SLICE_DIR' => $drop,
+            'PMSS_TOTAL_MEM_MIB' => '65536',
+        ], function () use ($drop): void {
+            \pmssEnsureSystemdSlices('logmsg');
+            $content = (string)file_get_contents($drop.'/15-pmss.conf');
+            preg_match('/MemoryMax=(\d+)M/', $content, $m);
+            $this->assertTrue(((int)$m[1]) <= (int)floor(65536*0.95));
+        });
     }
 
     public function testDefaultBurstabilityAlignsTo25Percent(): void
@@ -49,19 +57,22 @@ class MemoryGuardrailsEdgeCasesTest extends TestCase
         $tpl = "[Slice]\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
         file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
-        putenv('PMSS_CGROUP_MODE=v2');
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
-        putenv('PMSS_TOTAL_MEM_MIB=10240');
 
-        \pmssEnsureSystemdSlices('logmsg');
-        $content = (string)file_get_contents($drop.'/15-pmss.conf');
-        preg_match('/MemoryHigh=(\d+)M/', $content, $m1);
-        preg_match('/MemoryMax=(\d+)M/', $content, $m2);
+        $this->pmssWithEnv([
+            'PMSS_CGROUP_MODE' => 'v2',
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_SYSTEMD_USER_SLICE_DIR' => $drop,
+            'PMSS_TOTAL_MEM_MIB' => '10240',
+        ], function () use ($drop): void {
+            \pmssEnsureSystemdSlices('logmsg');
+            $content = (string)file_get_contents($drop.'/15-pmss.conf');
+            preg_match('/MemoryHigh=(\d+)M/', $content, $m1);
+            preg_match('/MemoryMax=(\d+)M/', $content, $m2);
 
-        $high = (int)($m1[1] ?? 0);
-        $max  = (int)($m2[1] ?? 0);
-        $this->assertTrue($high > 0 && $max > 0, 'Failed to parse MemoryHigh/MemoryMax from drop-in');
-        $this->assertEquals((int)floor($high * 1.25), $max, 'Expected default MemoryMax to be 25% above MemoryHigh');
+            $high = (int)($m1[1] ?? 0);
+            $max  = (int)($m2[1] ?? 0);
+            $this->assertTrue($high > 0 && $max > 0, 'Failed to parse MemoryHigh/MemoryMax from drop-in');
+            $this->assertEquals((int)floor($high * 1.25), $max, 'Expected default MemoryMax to be 25% above MemoryHigh');
+        });
     }
 }
