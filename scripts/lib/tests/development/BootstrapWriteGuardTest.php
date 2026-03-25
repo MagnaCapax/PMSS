@@ -65,7 +65,7 @@ class BootstrapWriteGuardTest extends TestCase
         $this->assertStringContainsString("'../../lighttpd/userFileWrite.php'", $source);
         $this->assertStringContainsString('function pmssBootstrapWriteRootOwnedFile(string $path, string $contents, ?callable $logger = null): bool', $source);
         $this->assertStringContainsString('pmssWriteManagedFile($path, $contents, \'root\', \'root\', 0644)', $source);
-        $this->assertStringContainsString("pmssBootstrapWriteRootOwnedFile('/etc/hostname', $hostname.PHP_EOL, $log)", $source);
+        $this->assertStringContainsString('pmssBootstrapWriteRootOwnedFile(\'/etc/hostname\', $hostname.PHP_EOL, $log)', $source);
         $this->assertStringContainsString('pmssBootstrapWriteRootOwnedFile($sshdConfig, $updated)', $source);
         $this->assertFalse(strpos($source, "file_put_contents('/etc/hostname'") !== false);
         $this->assertFalse(strpos($source, 'file_put_contents($sshdConfig, $updated)') !== false);
