@@ -10,27 +10,6 @@ require_once __DIR__.'/log.php';
 require_once __DIR__.'/accumulator.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 
-function pmssResourceSummaryFromData(array $data): array
-{
-    return [
-        'memory_current' => (float) ($data['memory']['current'] ?? 0.0),
-        'memory_avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
-        'tasks_current' => (float) ($data['tasks']['current'] ?? 0.0),
-    ];
-}
-
-function pmssResourcePayloadFromSource(array $source): array
-{
-    $payload = [
-        'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
-        'tasks' => ['current' => $source['tasks_current']],
-    ];
-    foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
-        $payload[$metric] = $source[$metric];
-    }
-    return $payload;
-}
-
 /**
  * Assemble per-user rows, totals, and missing entries.
  *
@@ -67,7 +46,11 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $windowMetrics[$metric] = $metricValues;
         }
 
-        $summary = pmssResourceSummaryFromData($data);
+        $summary = [
+            'memory_current' => (float) ($data['memory']['current'] ?? 0.0),
+            'memory_avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
+            'tasks_current' => (float) ($data['tasks']['current'] ?? 0.0),
+        ];
 
         foreach ($windowMetrics as $metric => $values) {
             foreach ($values as $label => $value) {
@@ -131,9 +114,21 @@ TEXT;
     ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
     if (isset($options['json'])) {
+        $payloadFromSource = static function (array $source): array {
+            $payload = [
+                'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
+                'tasks' => ['current' => $source['tasks_current']],
+            ];
+            foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
+                $payload[$metric] = $source[$metric];
+            }
+
+            return $payload;
+        };
+
         echo json_encode([
-            'users' => array_map('pmssResourcePayloadFromSource', $rows),
-            'totals' => pmssResourcePayloadFromSource($totals),
+            'users' => array_map($payloadFromSource, $rows),
+            'totals' => $payloadFromSource($totals),
             'missing' => $missingStats,
         ])."\n";
         return 0;

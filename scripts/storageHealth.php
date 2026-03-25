@@ -30,27 +30,6 @@ function pmssStorageHealthFormatInt($value, string $suffix = ''): string
     return is_int($value) ? (string) $value.$suffix : '-';
 }
 
-function pmssStorageHealthDiskRowBuild(array $entry): array
-{
-    $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
-    $kind = (string) ($entry['kind'] ?? 'smart');
-    $row = [
-        'sev' => (string) ($entry['severity'] ?? 'warn'),
-        'dev' => (string) ($entry['kname'] ?? ($entry['device'] ?? '')),
-        'size' => (string) ($entry['size'] ?? ''),
-        'model' => (string) ($entry['model'] ?? ''),
-        'flags' => is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '',
-    ];
-
-    $row['health'] = $kind === 'nvme' ? 'NVME' : (string) ($metrics['health'] ?? 'UNKNOWN');
-    $row['temp'] = pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['temperature'] ?? null) : ($metrics['temp_c'] ?? null), 'C');
-    $row['realloc'] = $kind === 'nvme' ? '-' : pmssStorageHealthFormatInt($metrics['reallocated'] ?? null);
-    $row['pend'] = pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['media_errors'] ?? null) : ($metrics['pending'] ?? null));
-    $row['link'] = pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['percentage_used'] ?? null) : ($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null)));
-
-    return $row;
-}
-
 function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?string $value): ?string
 {
     if ($value === null && $index + 1 < $argc && strpos($argv[$index + 1], '--') !== 0) {
@@ -61,31 +40,6 @@ function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?stri
     return ($value !== null && $value !== '') ? $value : null;
 }
 
-function pmssStorageHealthSeverityCounts(array $entries): array
-{
-    $counts = ['ok' => 0, 'warn' => 0, 'fail' => 0];
-    foreach ($entries as $entry) {
-        $severity = (string) ($entry['severity'] ?? 'warn');
-        $counts[isset($counts[$severity]) ? $severity : 'warn']++;
-    }
-
-    return $counts;
-}
-
-function pmssStorageHealthDiskRows(array $entries): array
-{
-    $rows = array_map('pmssStorageHealthDiskRowBuild', $entries);
-
-    usort($rows, static function (array $a, array $b): int {
-        $rank = ['fail' => 0, 'warn' => 1, 'ok' => 2];
-        $ra = $rank[$a['sev']] ?? 1;
-        $rb = $rank[$b['sev']] ?? 1;
-        return $ra !== $rb ? $ra - $rb : strcmp($a['dev'], $b['dev']);
-    });
-
-    return $rows;
-}
-
 function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
 {
     $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
@@ -94,7 +48,11 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
     echo $header.PHP_EOL;
     echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
 
-    $counts = pmssStorageHealthSeverityCounts(array_merge($disks, $raid));
+    $counts = ['ok' => 0, 'warn' => 0, 'fail' => 0];
+    foreach (array_merge($disks, $raid) as $entry) {
+        $severity = (string) ($entry['severity'] ?? 'warn');
+        $counts[isset($counts[$severity]) ? $severity : 'warn']++;
+    }
     echo sprintf(
         "Summary: %s ok, %s warn, %s fail\n\n",
         (string) $counts['ok'],
@@ -106,7 +64,30 @@ function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestam
         echo "Disks\n";
         echo "-----\n";
 
-        $rows = pmssStorageHealthDiskRows($disks);
+        $rows = array_map(static function (array $entry): array {
+            $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
+            $kind = (string) ($entry['kind'] ?? 'smart');
+
+            return [
+                'sev' => (string) ($entry['severity'] ?? 'warn'),
+                'dev' => (string) ($entry['kname'] ?? ($entry['device'] ?? '')),
+                'size' => (string) ($entry['size'] ?? ''),
+                'model' => (string) ($entry['model'] ?? ''),
+                'flags' => is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '',
+                'health' => $kind === 'nvme' ? 'NVME' : (string) ($metrics['health'] ?? 'UNKNOWN'),
+                'temp' => pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['temperature'] ?? null) : ($metrics['temp_c'] ?? null), 'C'),
+                'realloc' => $kind === 'nvme' ? '-' : pmssStorageHealthFormatInt($metrics['reallocated'] ?? null),
+                'pend' => pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['media_errors'] ?? null) : ($metrics['pending'] ?? null)),
+                'link' => pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['percentage_used'] ?? null) : ($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null))),
+            ];
+        }, $disks);
+
+        usort($rows, static function (array $a, array $b): int {
+            $rank = ['fail' => 0, 'warn' => 1, 'ok' => 2];
+            $ra = $rank[$a['sev']] ?? 1;
+            $rb = $rank[$b['sev']] ?? 1;
+            return $ra !== $rb ? $ra - $rb : strcmp($a['dev'], $b['dev']);
+        });
 
         $modelWidth = 12;
         foreach ($rows as $r) {
