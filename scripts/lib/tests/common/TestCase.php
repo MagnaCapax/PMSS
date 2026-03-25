@@ -208,6 +208,18 @@ abstract class TestCase
         return (string) $path;
     }
 
+    /** Keep named temp-dir creation available to child test cases via an explicit wrapper. */
+    protected function pmssMakeNamedTempDir(string $prefix, int $mode = 0755, ?string $baseDir = null): string
+    {
+        return $this->pmssTraitMakeNamedTempDir($prefix, $mode, $baseDir);
+    }
+
+    /** Keep recursive cleanup available to child test cases via an explicit wrapper. */
+    protected function cleanup(string $path): void
+    {
+        $this->pmssTraitCleanup($path);
+    }
+
     /** Create an executable test stub in a fresh PATH directory. */
     protected function pmssMakeExecutableStub(string $binaryName, string $script, string $dirPrefix): string
     {
