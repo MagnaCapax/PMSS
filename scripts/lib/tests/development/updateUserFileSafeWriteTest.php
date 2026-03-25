@@ -116,6 +116,28 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->assertTrue(is_dir($target));
     }
 
+    public function testCopyToUserSpaceReturnsFalseWhenParentDirectoryMissing(): void
+    {
+        $source = $this->pmssMakeTempFile('pmss-copy-source-');
+        file_put_contents($source, 'data');
+
+        $target = $this->homeRoot.'/'.$this->user.'/missing/target.txt';
+
+        $this->assertFalse(\copyToUserSpace($source, $target, $this->user));
+        $this->assertFalse(is_file($target));
+    }
+
+    public function testCopyToUserSpaceReturnsTrueWhenCopySucceeds(): void
+    {
+        $home = $this->ensureUserHome();
+        $source = $this->pmssMakeTempFile('pmss-copy-source-');
+        $target = $home.'/copied.txt';
+        file_put_contents($source, 'payload');
+
+        $this->assertTrue(\copyToUserSpace($source, $target, $this->user));
+        $this->assertEquals('payload', file_get_contents($target));
+    }
+
     private function ensureUserHome(): string
     {
         $home = $this->homeRoot.'/'.$this->user;

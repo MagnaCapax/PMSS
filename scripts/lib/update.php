@@ -107,8 +107,9 @@ function updateUserFile($file, $user) {
     }
 
     if (!file_exists($targetFile)) {
-        copyToUserSpace($sourceFile, $targetFile, $user);
-        logMessage("[user:{$user}] Added skeleton file: {$file}");
+        if (copyToUserSpace($sourceFile, $targetFile, $user)) {
+            logMessage("[user:{$user}] Added skeleton file: {$file}");
+        }
         return;
     }
 
@@ -126,8 +127,9 @@ function updateUserFile($file, $user) {
         return;
     }
 
-    copyToUserSpace($sourceFile, $targetFile, $user);
-    logMessage("[user:{$user}] Updated skeleton file: {$file}");
+    if (copyToUserSpace($sourceFile, $targetFile, $user)) {
+        logMessage("[user:{$user}] Updated skeleton file: {$file}");
+    }
 }
 
 /**
@@ -137,13 +139,13 @@ function updateUserFile($file, $user) {
  * @param string $targetFile The target file path in the user's home directory.
  * @param string $user       The username for setting file ownership.
  *
- * @return void
+ * @return bool True when the file was copied into place.
  */
 function copyToUserSpace($sourceFile, $targetFile, $user) {
     $parent = dirname($targetFile);
     if (!is_dir($parent)) {
         logMessage("[user:{$user}] Failed to copy; parent directory missing: {$parent}");
-        return;
+        return false;
     }
 
     $applyPermissions = static function (string $path) use ($targetFile, $user): void {
@@ -161,12 +163,12 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
     $tempFile = @tempnam($parent, 'pmss-userfile-');
     if ($tempFile === false) {
         logMessage("[user:{$user}] Failed to create temp file in {$parent}");
-        return;
+        return false;
     }
     if (!copy($sourceFile, $tempFile)) {
         @unlink($tempFile);
         logMessage("[user:{$user}] Failed to copy {$sourceFile} to temp file for {$targetFile}");
-        return;
+        return false;
     }
 
     $applyPermissions($tempFile);
@@ -174,11 +176,12 @@ function copyToUserSpace($sourceFile, $targetFile, $user) {
     if (!@rename($tempFile, $targetFile)) {
         @unlink($tempFile);
         logMessage("[user:{$user}] Failed to move temp file into place: {$targetFile}");
-        return;
+        return false;
     }
 
     // Avoid shelling out for simple chmod/chown: fork failures are common during updates.
     $applyPermissions($targetFile);
+    return true;
 }
 
 /**
