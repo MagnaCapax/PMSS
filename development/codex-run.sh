@@ -83,6 +83,7 @@ Exec placeholders:
 
 Environment:
   PMSS_CODEX_RUN_DEBUG=1  Enable bash -x tracing
+  PMSS_CODEX_NO_SANDBOX=1  Skip automatic --sandbox workspace-write injection
   PMSS_CODEX_DANGER_FAIL  Fail if dangerous diff patterns are detected (1=fail)
   PMSS_CODEX_RUN_EVENT_LOG  Default event log path (overridden by --event-log)
   TMPDIR                 Temp directory root for prompt output
@@ -184,7 +185,7 @@ run_start_ms="$(codex_now_ms)"
 exec_bin="${exec_cmd%% *}"
 is_codex_exec=0
 [[ "$exec_cmd" =~ ^codex[[:space:]]+exec([[:space:]]|$) ]] && is_codex_exec=1
-if [[ "$exec_bin" == "codex" ]]; then
+if [[ "$exec_bin" == "codex" && "${PMSS_CODEX_NO_SANDBOX:-0}" != "1" ]]; then
 	if [[ "$exec_cmd" == "codex" ]]; then
 		exec_cmd="codex --sandbox workspace-write --ask-for-approval untrusted"
 	elif [[ "$is_codex_exec" == "1" && "$exec_cmd" == "codex exec" ]]; then
@@ -194,6 +195,11 @@ if [[ "$exec_bin" == "codex" ]]; then
 		if [[ "$is_codex_exec" == "0" ]]; then
 			[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval untrusted"
 		fi
+	fi
+elif [[ "$exec_bin" == "codex" && "${PMSS_CODEX_NO_SANDBOX:-0}" == "1" ]]; then
+	echo "[codex-run] NOTICE: sandbox disabled via PMSS_CODEX_NO_SANDBOX=1" >&1
+	if [[ "$is_codex_exec" == "0" ]]; then
+		[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval untrusted"
 	fi
 fi
 
