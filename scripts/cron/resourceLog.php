@@ -43,5 +43,7 @@ foreach ($users as $user) {
     ];
     isset($state['memory_anon'], $state['memory_file'])
         && array_push($lineParts, (string) $state['memory_anon'], (string) $state['memory_file']);
-    @file_put_contents($logDir.'/'.$user, implode(' ', $lineParts).PHP_EOL, FILE_APPEND | LOCK_EX);
+    if (!pmssAppendUserFile($logDir.'/'.$user, implode(' ', $lineParts).PHP_EOL, 'root', 0644)) {
+        fwrite(STDERR, "Failed to append resource log for {$user}.\n");
+    }
 }

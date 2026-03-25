@@ -88,6 +88,14 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
     }
 
+    public function testCronScriptUsesSafeAppendHelper(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 3).'/cron/resourceLog.php');
+
+        $this->assertStringContainsString("pmssAppendUserFile(\$logDir.'/'.\$user", $source);
+        $this->assertTrue(strpos($source, "@file_put_contents(\$logDir.'/'.\$user") === false);
+    }
+
     public function testUserValidationRejectsUppercase(): void
     {
         $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));
