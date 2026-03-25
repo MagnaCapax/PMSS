@@ -6,8 +6,23 @@
  * @author PMSS Team
  */
 
-foreach (['../logging.php', '../runtime/commands.php', 'quota.php', '../../configBackups.php', '../../runtime.php'] as $relativePath) {
+foreach (['../logging.php', '../runtime/commands.php', 'quota.php', '../../configBackups.php', '../../runtime.php', '../../lighttpd/userFileWrite.php'] as $relativePath) {
     require_once __DIR__.'/'.$relativePath;
+}
+
+/**
+ * Write a root-owned config file through the shared guarded writer.
+ */
+function pmssBootstrapWriteRootOwnedFile(string $path, string $contents, ?callable $logger = null): bool
+{
+    if (pmssWriteManagedFile($path, $contents, 'root', 'root', 0644)) {
+        return true;
+    }
+
+    $log = $logger ?: 'logMessage';
+    $log('[WARN] Failed to update '.$path);
+
+    return false;
 }
 
 /**
@@ -39,7 +54,9 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
         return;
     }
 
-    @file_put_contents('/etc/hostname', $hostname.PHP_EOL);
+    if (!pmssBootstrapWriteRootOwnedFile('/etc/hostname', $hostname.PHP_EOL, $log)) {
+        return;
+    }
     $log('Updated /etc/hostname to '.$hostname);
 }
 
@@ -116,7 +133,11 @@ function pmssEnsureAuthorizedKeysDirective(): void
 
     echo "# Allowing SSH Key based authentication.\n";
     pmssBackupCriticalConfig('sshd', $sshdConfig);
-    @copy($sshdConfig, '/etc/ssh/pmss.sshd_config');
-    file_put_contents($sshdConfig, $updated);
+    if (!@copy($sshdConfig, '/etc/ssh/pmss.sshd_config')) {
+        logMessage('[WARN] Failed to refresh /etc/ssh/pmss.sshd_config backup copy');
+    }
+    if (!pmssBootstrapWriteRootOwnedFile($sshdConfig, $updated)) {
+        return;
+    }
     runStep('Restarting sshd service after config update', '/etc/init.d/ssh restart');
 }
