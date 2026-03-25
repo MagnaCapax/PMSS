@@ -41,12 +41,19 @@ function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?stri
 }
 
 /**
- * Persist the user-facing notice atomically so readers never see partial JSON.
+ * Persist or clear the user-facing notice without exposing partial JSON.
  *
- * @param array<string, string> $payload
+ * @param array<string, string>|null $payload
  */
-function pmssStorageHealthWriteUserNotice(string $userNoticePath, array $payload): void
+function pmssStorageHealthSyncUserNotice(string $userNoticePath, ?array $payload): void
 {
+    if ($payload === null) {
+        if (is_file($userNoticePath)) {
+            @unlink($userNoticePath);
+        }
+        return;
+    }
+
     $userNoticeDir = dirname($userNoticePath);
     if ($userNoticeDir !== '' && !is_dir($userNoticeDir) && !@mkdir($userNoticeDir, 0755, true) && !is_dir($userNoticeDir)) {
         return;
@@ -69,14 +76,6 @@ function pmssStorageHealthWriteUserNotice(string $userNoticePath, array $payload
     }
 
     @chmod($userNoticePath, 0644);
-}
-
-/** Remove a stale user-facing notice when storage performance returns to normal. */
-function pmssStorageHealthClearUserNotice(string $userNoticePath): void
-{
-    if (is_file($userNoticePath)) {
-        @unlink($userNoticePath);
-    }
 }
 
 function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
@@ -285,17 +284,16 @@ if ($onlyProblems) {
 $perfStatus = pmssStorageHealthPerformanceStatus($raid);
 
 if ($userNoticeRequested && $userNoticePath !== '') {
+    $noticePayload = null;
     if ($perfStatus !== null) {
-        $payload = [
+        $noticePayload = [
             'timestamp' => $latestTs !== '' ? $latestTs : date('c'),
             'status' => $perfStatus['status'],
             'reason' => $perfStatus['reason'],
             'array' => $perfStatus['array'],
         ];
-        pmssStorageHealthWriteUserNotice($userNoticePath, $payload);
-    } else {
-        pmssStorageHealthClearUserNotice($userNoticePath);
     }
+    pmssStorageHealthSyncUserNotice($userNoticePath, $noticePayload);
 }
 
 if ($raw) {

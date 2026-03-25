@@ -160,6 +160,35 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $this->assertEquals('RAID md0 recovery in progress', $notice['reason'] ?? null, 'Expected notice reason to match rebuild status');
     }
 
+    public function testUserNoticeAcceptsSeparatePathArgument(): void
+    {
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $noticePath = $this->pmssMakeTempPath('pmss-storage-health-separate-', '.json');
+
+        file_put_contents((string) $jsonPath, json_encode([
+            'timestamp' => '2025-01-01T00:00:03+00:00',
+            'kind' => 'raid',
+            'array' => 'md1',
+            'level' => 'raid1',
+            'state' => 'active',
+            'detail' => 'check = 1.0% (1/100)',
+            'severity' => 'warn',
+            'flags' => ['rebuild_in_progress'],
+            'operation' => 'check',
+        ], JSON_UNESCAPED_SLASHES)."\n");
+
+        $this->runStorageHealthCommand(
+            (string) $jsonPath,
+            '--user-notice '.escapeshellarg((string) $noticePath)
+        );
+
+        $this->assertTrue(is_file($noticePath), 'Expected separate-path user notice file to be created');
+        $notice = json_decode((string) file_get_contents($noticePath), true);
+        $this->assertTrue(is_array($notice), 'Expected separate-path user notice to contain JSON');
+        $this->assertEquals('md1', $notice['array'] ?? null, 'Expected separate-path notice to keep the array name');
+        $this->assertEquals('RAID md1 check in progress', $notice['reason'] ?? null, 'Expected separate-path notice reason to match the activity');
+    }
+
     public function testUserNoticeClearsStaleFileWhenPerformanceReturnsToNormal(): void
     {
         $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
