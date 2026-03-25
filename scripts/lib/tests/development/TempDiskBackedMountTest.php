@@ -1,14 +1,12 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
+require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class TempDiskBackedMountTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testSkipsBeforeDebian13(): void
     {
         $messages = [];

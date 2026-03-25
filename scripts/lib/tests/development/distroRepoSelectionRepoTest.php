@@ -2,15 +2,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/apt.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class DistroRepoSelectionRepoTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testUpdateAptSourcesCreatesParentDirectory(): void
     {
         $dir = sys_get_temp_dir().'/pmss-apt-'.bin2hex(random_bytes(4));

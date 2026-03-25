@@ -1,13 +1,11 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
+require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/netconsole.php';
 
 class NetconsoleConfigureTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testParsesValidSpec(): void
     {
         $target = \pmssNetconsoleTargetFromSpec('6665@192.0.2.10/eth0,6666@192.0.2.20/aa:bb:cc:dd:ee:ff');

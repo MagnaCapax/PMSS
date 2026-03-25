@@ -1,13 +1,11 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
+require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/update/services/mountHardening.php';
 
 class TempMountNoexecTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $prevHardening;
     private $prevDryRun;
 

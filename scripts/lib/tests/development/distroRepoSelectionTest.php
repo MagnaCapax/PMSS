@@ -2,14 +2,11 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class DistroRepoSelectionTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     /**
      * Ensure known Debian codenames map to the expected major versions.
      */
