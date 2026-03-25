@@ -54,6 +54,23 @@ function pmssRemoveManagedConfigFile(string $target, string $label, callable $lo
 }
 
 /**
+ * Ensure a managed config directory exists without traversing unsafe paths.
+ */
+function pmssEnsureManagedConfigDir(string $targetDir, string $label, callable $logger): bool
+{
+    if (is_dir($targetDir) && !is_link($targetDir)) {
+        return true;
+    }
+
+    if (!pmssEnsureSafeDir($targetDir, 0755)) {
+        $logger('[WARN] Unable to prepare '.$label.' directory: '.$targetDir);
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Compute journald caps based on root filesystem size.
  *
  * @return array{system_max_use_bytes:int,system_keep_free_bytes:int,runtime_max_use_bytes:int,rate_limit_interval_sec:int,rate_limit_burst:int}
@@ -125,8 +142,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
     $raw = strtr($raw, $repl);
 
     $targetDir = pmssResolvePathFromEnv('PMSS_JOURNALD_CONF_DIR', '/etc/systemd/journald.conf.d');
-    if (!is_dir($targetDir) && !@mkdir($targetDir, 0755, true)) {
-        $log('[WARN] Unable to create journald config dir: '.$targetDir);
+    if (!pmssEnsureManagedConfigDir($targetDir, 'journald config', $log)) {
         return;
     }
 

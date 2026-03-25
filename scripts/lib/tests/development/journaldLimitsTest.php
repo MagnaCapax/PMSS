@@ -121,4 +121,27 @@ class JournaldLimitsTest extends TestCase
         $this->assertEquals('Restarting systemd-journald to apply log caps (test/dry-run)', $last['description'] ?? '');
         $this->assertEquals('', $last['command'] ?? '');
     }
+
+    public function testJournaldLimitsRejectsSymlinkedTargetDir(): void
+    {
+        $cfgDir = $this->pmssMakeTempDir('pmss-journald-cfg-');
+        $root = $this->pmssMakeTempDir('pmss-journald-root-');
+        $realTargetDir = $root.'/real';
+        $this->pmssEnsureDir($realTargetDir, 0755);
+        $linkTargetDir = $root.'/journald-conf';
+        $this->pmssCreateSymlinkOrSkip($realTargetDir, $linkTargetDir);
+        file_put_contents($cfgDir.'/template.journald.conf.d-pmss-limits.conf', "[Journal]\nSystemMaxUse=%%PMSS_JOURNALD_SYSTEM_MAX_USE%%\n");
+
+        $messages = [];
+        $this->pmssWithEnv([
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_JOURNALD_CONF_DIR' => $linkTargetDir,
+            'PMSS_ROOT_FS_BYTES' => (string) $this->gib(10),
+        ], function () use (&$messages): void {
+            \pmssApplyJournaldLimits($this->pmssMakeArrayLogger($messages));
+        });
+
+        $this->assertTrue(!file_exists($realTargetDir.'/pmss-limits.conf'), 'must not write through symlinked journald dir');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to prepare journald config directory'), 'expected safe-directory warning');
+    }
 }
