@@ -42,24 +42,13 @@ function pmssStorageHealthDiskRowBuild(array $entry): array
         'flags' => is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '',
     ];
 
-    if ($kind === 'nvme') {
-        $temp = $metrics['temperature'] ?? null;
-        return $row + [
-            'health' => 'NVME',
-            'temp' => pmssStorageHealthFormatInt(is_int($temp) ? $temp : null, 'C'),
-            'realloc' => '-',
-            'pend' => pmssStorageHealthFormatInt($metrics['media_errors'] ?? null),
-            'link' => pmssStorageHealthFormatInt($metrics['percentage_used'] ?? null),
-        ];
-    }
+    $row['health'] = $kind === 'nvme' ? 'NVME' : (string) ($metrics['health'] ?? 'UNKNOWN');
+    $row['temp'] = pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['temperature'] ?? null) : ($metrics['temp_c'] ?? null), 'C');
+    $row['realloc'] = $kind === 'nvme' ? '-' : pmssStorageHealthFormatInt($metrics['reallocated'] ?? null);
+    $row['pend'] = pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['media_errors'] ?? null) : ($metrics['pending'] ?? null));
+    $row['link'] = pmssStorageHealthFormatInt($kind === 'nvme' ? ($metrics['percentage_used'] ?? null) : ($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null)));
 
-    return $row + [
-        'health' => (string) ($metrics['health'] ?? 'UNKNOWN'),
-        'temp' => pmssStorageHealthFormatInt($metrics['temp_c'] ?? null, 'C'),
-        'realloc' => pmssStorageHealthFormatInt($metrics['reallocated'] ?? null),
-        'pend' => pmssStorageHealthFormatInt($metrics['pending'] ?? null),
-        'link' => pmssStorageHealthFormatInt($metrics['link_errors'] ?? ($metrics['udma_crc'] ?? null)),
-    ];
+    return $row;
 }
 
 function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?string $value): ?string
