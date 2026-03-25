@@ -17,7 +17,6 @@ require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 foreach ([
     '/scripts/lib/user/trafficLimit.php',
-    __DIR__.'/../lib/user/bonusTraffic.php',
     __DIR__.'/../lib/user/log.php',
 ] as $dependency) {
     if (is_file($dependency)) {
@@ -72,9 +71,7 @@ if (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) &&
     $progressiveThrottleGracePercent = (float) $networkConfig['throttle']['progressiveThrottleGracePercent'];
 }
 $progressiveThrottleGracePercent = max(0.0, $progressiveThrottleGracePercent);
-$overageThrottleStages = function_exists('pmssTrafficLimitDefaultOverageStages')
-    ? pmssTrafficLimitDefaultOverageStages()
-    : [];
+$overageThrottleStages = pmssTrafficLimitDefaultOverageStages();
 if (isset($networkConfig['throttle']['overageStages']) && is_array($networkConfig['throttle']['overageStages'])) {
     $overageThrottleStages = $networkConfig['throttle']['overageStages'];
 }
@@ -97,9 +94,7 @@ foreach($users AS $thisUser) {
     }
     $trafficLimit = (float) $trafficLimitRaw;
     $bonusTrafficFile = "/home/{$thisUser}/.bonusTraffic";
-    $bonusTraffic = function_exists('pmssBonusTrafficReadGiB')
-        ? pmssBonusTrafficReadGiB($bonusTrafficFile)
-        : 0;
+    $bonusTraffic = pmssTrafficLimitReadGiBFile($bonusTrafficFile);
 //    var_dump($data);
     $trafficUsageGiB = ($data['raw']['month'] / 1024);   // Set to GiB
     $trafficLimit += $bonusTraffic;

@@ -8,39 +8,8 @@
  * @license GPL-3.0-only
  */
 
-foreach ([dirname(__DIR__).'/runtime.php', __DIR__.'/trafficLimit.php'] as $dependency) {
-    if (is_file($dependency)) {
-        require_once $dependency;
-    }
-}
-
-/**
- * Read bonus traffic GiB from a file, returning 0 when missing/invalid.
- */
-function pmssBonusTrafficReadGiB(string $path): int
-{
-    return function_exists('pmssTrafficLimitReadGiBFile')
-        ? pmssTrafficLimitReadGiBFile($path)
-        : 0;
-}
-
-/**
- * Atomically write bonus traffic GiB to a file.
- */
-function pmssBonusTrafficWriteGiB(string $path, int $value): bool
-{
-    return function_exists('pmssTrafficLimitWriteGiBFile')
-        && pmssTrafficLimitWriteGiBFile($path, $value);
-}
-
-/**
- * Remove the bonus traffic file when safe to do so.
- */
-function pmssBonusTrafficRemove(string $path): bool
-{
-    return !file_exists($path)
-        || (is_file($path) && !is_link($path) && @unlink($path));
-}
+require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/trafficLimit.php';
 
 /**
  * Execute the bonus traffic CLI flow. Returns an exit code.
@@ -51,13 +20,14 @@ function pmssUserBonusTrafficCli(array $argv): int
         return 1;
     }
 
-    if (!is_file('/scripts/lib/cli/optionParser.php')) {
+    $optionParser = dirname(__DIR__).'/cli/optionParser.php';
+    if (!is_file($optionParser)) {
         fwrite(STDERR, "Error: missing CLI option parser.\n");
         return 1;
     }
-    require_once '/scripts/lib/cli/optionParser.php';
+    require_once $optionParser;
 
-    foreach (['/scripts/lib/userLifecycle.php', '/scripts/lib/user/log.php'] as $dependency) {
+    foreach ([dirname(__DIR__).'/userLifecycle.php', __DIR__.'/log.php'] as $dependency) {
         if (is_file($dependency)) {
             require_once $dependency;
         }
@@ -103,7 +73,7 @@ TEXT
     $bonusFile = $homeDir.'/.bonusTraffic';
 
     if ($show) {
-        $bonus = pmssBonusTrafficReadGiB($bonusFile);
+        $bonus = pmssTrafficLimitReadGiBFile($bonusFile);
         echo "Bonus traffic for {$userName}: {$bonus} GiB\n";
         return 0;
     }
@@ -112,10 +82,6 @@ TEXT
         $bonusRaw = '0';
     }
 
-    if (!function_exists('pmssTrafficLimitParseGiB')) {
-        fwrite(STDERR, "Error: missing bonus traffic parser helper.\n");
-        return 1;
-    }
     $err = null;
     $bonusTraffic = pmssTrafficLimitParseGiB($bonusRaw, $err);
     if ($bonusTraffic === null) {
@@ -124,26 +90,22 @@ TEXT
     }
 
     if ($bonusTraffic === 0) {
-        if (!pmssBonusTrafficRemove($bonusFile)) {
+        if (!pmssTrafficLimitRemoveGiBFile($bonusFile)) {
             fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$bonusFile}\n");
             return 4;
         }
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($userName, 'bonus traffic unset (GiB add-on removed)');
-        }
+        pmssUserLog($userName, 'bonus traffic unset (GiB add-on removed)');
         echo "Bonus traffic for {$userName} set to 0 GiB\n";
         return 0;
     }
 
-    if (!pmssBonusTrafficWriteGiB($bonusFile, (int) $bonusTraffic)) {
+    if (!pmssTrafficLimitWriteGiBFile($bonusFile, (int) $bonusTraffic)) {
         fwrite(STDERR, "Error: failed to write {$bonusFile}\n");
         return 4;
     }
     @chmod($bonusFile, 0664);
 
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($userName, sprintf('bonus traffic set to %d GiB (monthly add-on)', $bonusTraffic));
-    }
+    pmssUserLog($userName, sprintf('bonus traffic set to %d GiB (monthly add-on)', $bonusTraffic));
 
     echo "Bonus traffic for {$userName} set to {$bonusTraffic} GiB\n";
     return 0;
