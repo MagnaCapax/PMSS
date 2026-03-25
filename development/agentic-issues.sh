@@ -188,18 +188,6 @@ while IFS=$'\t' read -r num title labels_csv; do
 		continue
 	fi
 
-	# Skip pure enhancement backlog by default. Keep mixed-type issues
-	# (e.g. enhancement + stability/security/bug) in scope.
-	if has_label "$labels_csv" "enhancement" \
-		&& ! has_label "$labels_csv" "bug" \
-		&& ! has_label "$labels_csv" "security" \
-		&& ! has_label "$labels_csv" "stability" \
-		&& ! has_label "$labels_csv" "performance" \
-		&& ! has_label "$labels_csv" "refactor"; then
-		echo "[agentic-issues] SKIP #$num (pure enhancement backlog): $title" >&1
-		continue
-	fi
-
 	if has_label "$labels_csv" "bug"; then
 		issue_numbers_bug+=("$num")
 	elif has_label "$labels_csv" "security"; then
