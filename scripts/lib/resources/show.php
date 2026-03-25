@@ -105,9 +105,7 @@ TEXT;
         if (empty($users)) {
             die("No users in this system!\n");
         }
-        if (is_file($statsDir.'/www-data')) {
-            $users[] = 'www-data';
-        }
+        if (is_file($statsDir.'/www-data')) { $users[] = 'www-data'; }
         sort($users, SORT_NATURAL | SORT_FLAG_CASE);
     }
 
@@ -169,9 +167,7 @@ TEXT;
 
     if (!empty($missingStats)) {
         echo "* Missing resource stats for ".count($missingStats)." users (run resourceStats to rebuild).\n";
-        if (isset($options['show-missing'])) {
-            echo "* Missing: ".implode(' ', $missingStats)."\n";
-        }
+        if (isset($options['show-missing'])) { echo "* Missing: ".implode(' ', $missingStats)."\n"; }
     }
 
     return 0;

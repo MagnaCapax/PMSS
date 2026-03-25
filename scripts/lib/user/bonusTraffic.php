@@ -28,9 +28,7 @@ function pmssUserBonusTrafficCli(array $argv): int
     require_once $optionParser;
 
     foreach ([dirname(__DIR__).'/userLifecycle.php', __DIR__.'/log.php'] as $dependency) {
-        if (is_file($dependency)) {
-            require_once $dependency;
-        }
+        if (is_file($dependency)) { require_once $dependency; }
     }
 
     $parsed = pmssParseCliTokens($argv);
@@ -78,9 +76,7 @@ TEXT
         return 0;
     }
 
-    if ($unset) {
-        $bonusRaw = '0';
-    }
+    if ($unset) { $bonusRaw = '0'; }
 
     $err = null;
     $bonusTraffic = pmssTrafficLimitParseGiB($bonusRaw, $err);
