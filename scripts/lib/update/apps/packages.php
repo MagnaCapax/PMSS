@@ -14,8 +14,7 @@ pmssQueuePackages(['lighttpd', 'lighttpd-mod-webdav']);
 pmssInstallProftpdStack($version);
 
 if ($version < 10) {
-    logmsg('[WARN] Skipping system utility install: unsupported Debian release');
-    logmsg('[WARN] Skipping media/network tool install: unsupported Debian release');
+    foreach (['system utility install', 'media/network tool install'] as $label) { logmsg('[WARN] Skipping '.$label.': unsupported Debian release'); }
 } else {
     pmssQueuePackages(['screen', 'mc', 'wget', 'gawk', 'subversion', 'libtool', 'sqlite', 'locate', 'ntpdate', 'build-essential', 'pkg-config', 'autoconf', 'automake', 'python3', 'python3-pip', 'python3-venv', 'python3-dev']);
     pmssInstallBestEffort(['libncurses6'], 'ncurses runtime');
@@ -50,7 +49,17 @@ if ($version < 10) {
 }
 
 pmssQueuePackages(['libffi-dev', 'libssl-dev', 'libjpeg-dev', 'zlib1g-dev', 'python3-virtualenv', 'python3-setuptools', 'python3-wheel']);
-if (!file_exists('/usr/bin/sabnzbdplus')) { echo "## Installing Sabnzbdplus\n"; pmssQueuePackages(['sabnzbdplus']); }
+foreach ([
+    ['/usr/bin/sabnzbdplus', ['sabnzbdplus'], "## Installing Sabnzbdplus\n"],
+    ['/usr/bin/mkvextract', ['mkvtoolnix'], ''],
+    ['/usr/sbin/openvpn', ['openvpn', 'easy-rsa'], ''],
+    ['/sbin/ipset', ['ipset'], ''],
+] as [$binaryPath, $packages, $notice]) {
+    if (!file_exists($binaryPath)) {
+        $notice === '' || print $notice;
+        pmssQueuePackages($packages);
+    }
+}
 
 if ($version < 10) {
     logmsg('[WARN] Skipping ZNC stack: unsupported Debian release');
@@ -59,14 +68,7 @@ if ($version < 10) {
 
     // ffmpeg ships via the dpkg baselines; no additional queueing required here.
 }
-
-if (!file_exists('/usr/bin/mkvextract')) { pmssQueuePackages(['mkvtoolnix']); }
-
-if (!file_exists('/usr/sbin/openvpn')) { pmssQueuePackages(['openvpn', 'easy-rsa']); }
-
 pmssQueuePackages(['sudo', 'expect']);
-
-if (!file_exists('/sbin/ipset')) { pmssQueuePackages(['ipset']); }
 
 $pmssWireguardDistroVersion = pmssDistroVersionFromEnv();
 // On Debian 12+ WireGuard is built into the kernel, so we only require the

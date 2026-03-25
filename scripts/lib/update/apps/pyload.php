@@ -13,8 +13,7 @@ if (($distroVersion = pmssDistroVersionFromEnv()) > 0 && $distroVersion < 10) {
     return;
 }
 
-$venvDir   = '/opt/pyload';
-$cliBin    = $venvDir.'/bin/pyload';
+$venvDir = '/opt/pyload';
 
 // Required Python toolchain packages are queued centrally via packages.php
-pmssPythonVenvInstallCli($venvDir, 'pyLoad', [['Installing pyLoad (pyload-ng)', 'pyload-ng']], $cliBin, '/usr/local/bin/pyload', '[WARN] Skipping pyLoad setup: python3 missing from PATH', '[WARN] pyLoad binary missing after install', 'logmsg');
+pmssPythonVenvInstallCli($venvDir, 'pyLoad', [['Installing pyLoad (pyload-ng)', 'pyload-ng']], $venvDir.'/bin/pyload', '/usr/local/bin/pyload', '[WARN] Skipping pyLoad setup: python3 missing from PATH', '[WARN] pyLoad binary missing after install', 'logmsg');

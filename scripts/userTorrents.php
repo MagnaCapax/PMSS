@@ -22,23 +22,22 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 
     $home = $homeDir.'/'.$username;
 
-    $clientPatterns = ['rtorrent' => [$home.'/session/*.torrent'], 'deluge' => [], 'qbittorrent' => []];
-    foreach (['.config/deluge/state', '.delugeSession', '.sessionDeluge'] as $dir) {
-        $clientPatterns['deluge'][] = $home.'/'.$dir.'/*.torrent';
-    }
-    foreach (['.local/share/data/qBittorrent/BT_backup', '.local/share/qBittorrent/BT_backup', '.config/qBittorrent/BT_backup'] as $dir) {
-        foreach (['torrent', 'fastresume'] as $extension) {
-            $clientPatterns['qbittorrent'][] = $home.'/'.$dir.'/*.'.$extension;
-        }
-    }
+    $clientPatterns = [
+        'rtorrent' => ['session'],
+        'deluge' => ['.config/deluge/state', '.delugeSession', '.sessionDeluge'],
+        'qbittorrent' => ['.local/share/data/qBittorrent/BT_backup', '.local/share/qBittorrent/BT_backup', '.config/qBittorrent/BT_backup'],
+    ];
 
     foreach ($clientPatterns as $client => $patterns) {
         $seen = [];
+        $suffixes = $client === 'qbittorrent' ? ['/*.torrent', '/*.fastresume'] : ['/*.torrent'];
         foreach ($patterns as $pattern) {
-            foreach (glob($pattern) ?: [] as $path) {
-                $name = pathinfo(basename($path), PATHINFO_FILENAME);
-                if ($name !== '' && $name !== '.' && $name !== '..') {
-                    $seen[$name] = true;
+            foreach ($suffixes as $suffix) {
+                foreach (glob($home.'/'.$pattern.$suffix) ?: [] as $path) {
+                    $name = pathinfo(basename($path), PATHINFO_FILENAME);
+                    if ($name !== '' && $name !== '.' && $name !== '..') {
+                        $seen[$name] = true;
+                    }
                 }
             }
         }
