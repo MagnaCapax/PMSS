@@ -30,9 +30,10 @@ function pmssStorageHealthFormatInt($value, string $suffix = ''): string
     return is_int($value) ? (string) $value.$suffix : '-';
 }
 
-function pmssStorageHealthDiskRowBuild(array $entry, bool $nvme): array
+function pmssStorageHealthDiskRowBuild(array $entry): array
 {
     $metrics = is_array($entry['metrics'] ?? null) ? $entry['metrics'] : [];
+    $kind = (string) ($entry['kind'] ?? 'smart');
     $row = [
         'sev' => (string) ($entry['severity'] ?? 'warn'),
         'dev' => (string) ($entry['kname'] ?? ($entry['device'] ?? '')),
@@ -41,7 +42,7 @@ function pmssStorageHealthDiskRowBuild(array $entry, bool $nvme): array
         'flags' => is_array($entry['flags'] ?? null) ? implode(',', $entry['flags']) : '',
     ];
 
-    if ($nvme) {
+    if ($kind === 'nvme') {
         $temp = $metrics['temperature'] ?? null;
         return $row + [
             'health' => 'NVME',
@@ -82,15 +83,9 @@ function pmssStorageHealthSeverityCounts(array $entries): array
     return $counts;
 }
 
-function pmssStorageHealthDiskRows(array $smart, array $nvme): array
+function pmssStorageHealthDiskRows(array $entries): array
 {
-    $rows = [];
-    foreach ($smart as $entry) {
-        $rows[] = pmssStorageHealthDiskRowBuild($entry, false);
-    }
-    foreach ($nvme as $entry) {
-        $rows[] = pmssStorageHealthDiskRowBuild($entry, true);
-    }
+    $rows = array_map('pmssStorageHealthDiskRowBuild', $entries);
 
     usort($rows, static function (array $a, array $b): int {
         $rank = ['fail' => 0, 'warn' => 1, 'ok' => 2];
@@ -102,7 +97,7 @@ function pmssStorageHealthDiskRows(array $smart, array $nvme): array
     return $rows;
 }
 
-function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, string $timestamp, string $jsonPath): void
+function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void
 {
     $markLabelMap = ['ok' => 'OK', 'warn' => '!!', 'fail' => 'XX'];
 
@@ -110,7 +105,7 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
     echo $header.PHP_EOL;
     echo str_repeat('=', strlen($header)).PHP_EOL.PHP_EOL;
 
-    $counts = pmssStorageHealthSeverityCounts(array_merge($smart, $nvme, $raid));
+    $counts = pmssStorageHealthSeverityCounts(array_merge($disks, $raid));
     echo sprintf(
         "Summary: %s ok, %s warn, %s fail\n\n",
         (string) $counts['ok'],
@@ -118,11 +113,11 @@ function pmssStorageHealthPrintTable(array $smart, array $nvme, array $raid, str
         (string) $counts['fail']
     );
 
-    if (!empty($smart) || !empty($nvme)) {
+    if (!empty($disks)) {
         echo "Disks\n";
         echo "-----\n";
 
-        $rows = pmssStorageHealthDiskRows($smart, $nvme);
+        $rows = pmssStorageHealthDiskRows($disks);
 
         $modelWidth = 12;
         foreach ($rows as $r) {
@@ -200,9 +195,7 @@ $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/
 $argc = count($argv);
 for ($i = 1; $i < $argc; $i++) {
     $arg = $argv[$i];
-    $parts = explode('=', $arg, 2);
-    $key = $parts[0];
-    $val = count($parts) === 2 ? $parts[1] : null;
+    [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
     switch ($key) {
         case '--json':
             $jsonPath = pmssStorageHealthOptionValue($argv, $argc, $i, $val) ?? $jsonPath;
@@ -240,21 +233,21 @@ if (!is_file($jsonPath)) {
 }
 
 $last = pmssStorageHealthReadLastEntries($jsonPath);
-$smart = [];
-$nvme = [];
+$disks = [];
 $raid = [];
 $latestTs = '';
-foreach ($last as $key => $entry) {
+foreach ($last as $entry) {
     $ts = (string) ($entry['timestamp'] ?? '');
+    $kind = (string) ($entry['kind'] ?? '');
     if ($ts !== '' && ($latestTs === '' || strcmp($ts, $latestTs) > 0)) {
         $latestTs = $ts;
     }
-    if (strpos($key, 'smart::') === 0) {
-        $smart[] = $entry;
-    } elseif (strpos($key, 'nvme::') === 0) {
-        $nvme[] = $entry;
-    } elseif (strpos($key, 'raid::') === 0) {
+    if ($kind === 'raid') {
         $raid[] = $entry;
+        continue;
+    }
+    if ($kind === 'smart' || $kind === 'nvme') {
+        $disks[] = $entry;
     }
 }
 
@@ -269,16 +262,14 @@ if (is_string($deviceFilter) && $deviceFilter !== '') {
         return ($kname !== '' && $kname === $wantKname)
             || ($device !== '' && ($device === '/dev/'.$wantKname || $device === $wantKname));
     };
-    $smart = array_values(array_filter($smart, $filter));
-    $nvme = array_values(array_filter($nvme, $filter));
+    $disks = array_values(array_filter($disks, $filter));
 }
 
 if ($onlyProblems) {
     $filterProblems = static function (array $entry): bool {
         return (string) ($entry['severity'] ?? 'warn') !== 'ok';
     };
-    $smart = array_values(array_filter($smart, $filterProblems));
-    $nvme = array_values(array_filter($nvme, $filterProblems));
+    $disks = array_values(array_filter($disks, $filterProblems));
     $raid = array_values(array_filter($raid, $filterProblems));
 }
 
@@ -304,14 +295,13 @@ if ($userNoticeRequested && $userNoticePath !== '') {
 }
 
 if ($raw) {
-    $all = array_merge($smart, $nvme, $raid);
-    foreach ($all as $entry) {
+    foreach (array_merge($disks, $raid) as $entry) {
         echo json_encode($entry, JSON_UNESCAPED_SLASHES).PHP_EOL;
     }
     exit(0);
 }
 
-if (empty($smart) && empty($nvme) && empty($raid)) {
+if (empty($disks) && empty($raid)) {
     echo "No storage health entries found in {$jsonPath}\n";
     exit(1);
 }
@@ -322,4 +312,4 @@ if ($perfStatus !== null) {
     echo "Performance status: OK\n\n";
 }
 
-pmssStorageHealthPrintTable($smart, $nvme, $raid, $latestTs !== '' ? $latestTs : 'unknown', $jsonPath);
+pmssStorageHealthPrintTable($disks, $raid, $latestTs !== '' ? $latestTs : 'unknown', $jsonPath);
