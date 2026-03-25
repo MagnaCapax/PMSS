@@ -75,7 +75,7 @@ Workflow (Do This Now):
   - Touches frozen paths (etc/skel/www subdirs or non-approved files, vendor trees, dpkg selections)
   - Requires multi-server coordination or production deployment
   - Is an investigation/research issue with no clear code fix
-  - Would take more than ~200 lines of changes
+- Would take more than ~500 lines of changes (partial progress with wip: prefix is acceptable)
   - Requires making a validation check, minimum, maximum, constraint, or security guard
     less restrictive (removing it, lowering a threshold, widening allowed values, making
     an exception into a warning, or making a guard optional) — the root fix belongs in
@@ -103,7 +103,9 @@ Workflow (Do This Now):
   * scripts/testing/docblock-lint.sh
   * scripts/testing/doctrine-lint.sh
 - One commit per issue. Include "Refs #N" in the commit message.
-- Commit prefix: fix: for bugs, feat: for features, security: for security issues.
+- Partial progress IS acceptable: if the issue is too large for one session, commit what compiles and passes tests with a wip: prefix. Do NOT throw away working code because the issue is not 100% complete.
+- For complex issues, multiple commits are allowed. Each must pass verification and include Refs #N.
+- Commit prefix: fix: for bugs, feat: for features, security: for security issues, wip: for partial progress on complex issues.
 - After commit: gh issue edit N --add-label complete-verify (best-effort).
 
 Context to open (paths in this workspace):
