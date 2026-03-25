@@ -20,23 +20,6 @@ require_once __DIR__.'/../runtime/processes.php';
 require_once __DIR__.'/../../runtime.php';
 
 /**
- * Ensure a managed config directory exists without traversing unsafe paths.
- */
-function pmssEnsureManagedConfigDir(string $targetDir, string $label, callable $logger): bool
-{
-    if (is_dir($targetDir) && !is_link($targetDir)) {
-        return true;
-    }
-
-    if (!pmssEnsureSafeDir($targetDir, 0755)) {
-        $logger('[WARN] Unable to prepare '.$label.' directory: '.$targetDir);
-        return false;
-    }
-
-    return true;
-}
-
-/**
  * Compute journald caps based on root filesystem size.
  *
  * @return array{system_max_use_bytes:int,system_keep_free_bytes:int,runtime_max_use_bytes:int,rate_limit_interval_sec:int,rate_limit_burst:int}
@@ -61,6 +44,51 @@ function pmssJournaldLimitsForRootBytes(int $rootBytes): array
         'rate_limit_interval_sec'=> 10,
         'rate_limit_burst'       => 2000,
     ];
+}
+
+/**
+ * Read remote logging config while ignoring malformed lines and unknown keys.
+ *
+ * @return array{enabled:bool,host:string,port:int,protocol:string}
+ */
+function pmssRemoteLoggingReadConfig(string $loggingConf): array
+{
+    $config = ['enabled' => false, 'host' => '', 'port' => 514, 'protocol' => 'tcp'];
+    if (!is_readable($loggingConf) || ($rawConfig = @file_get_contents($loggingConf)) === false || trim($rawConfig) === '') {
+        return $config;
+    }
+
+    $parsed = @parse_ini_string($rawConfig, false, INI_SCANNER_RAW);
+    if (!is_array($parsed)) {
+        return $config;
+    }
+    $config['enabled'] = isset($parsed['remote_logging_enabled'])
+        ? pmssEnvValueIsTruthy($parsed['remote_logging_enabled'])
+        : $config['enabled'];
+    $config['host'] = isset($parsed['remote_host'])
+        ? trim((string) $parsed['remote_host'])
+        : $config['host'];
+    $port = trim((string) ($parsed['remote_port'] ?? ''));
+    if (ctype_digit($port) && ($parsedPort = (int) $port) > 0 && $parsedPort <= 65535) {
+        $config['port'] = $parsedPort;
+    }
+    $protocol = strtolower(trim((string) ($parsed['remote_protocol'] ?? '')));
+    if (in_array($protocol, ['tcp', 'udp'], true)) {
+        $config['protocol'] = $protocol;
+    }
+    return $config;
+}
+
+/**
+ * Explain why remote logging should not be applied.
+ */
+function pmssRemoteLoggingInvalidReason(array $config): string
+{
+    if (!$config['enabled']) { return 'Remote logging not enabled'; }
+    if ($config['host'] === '') { return 'Remote host not configured'; }
+    return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host']) === 1
+        ? ''
+        : 'Invalid remote host format';
 }
 
 /**
@@ -108,7 +136,8 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
     $raw = strtr($raw, $repl);
 
     $targetDir = pmssResolvePathFromEnv('PMSS_JOURNALD_CONF_DIR', '/etc/systemd/journald.conf.d');
-    if (!pmssEnsureManagedConfigDir($targetDir, 'journald config', $log)) {
+    if ((!is_dir($targetDir) || is_link($targetDir)) && !pmssEnsureSafeDir($targetDir, 0755)) {
+        $log('[WARN] Unable to prepare journald config directory: '.$targetDir);
         return;
     }
 
@@ -151,48 +180,8 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         return;
     }
 
-    $config = [
-        'enabled'  => false,
-        'host'     => '',
-        'port'     => 514,
-        'protocol' => 'tcp',
-    ];
-    if (is_readable($loggingConf) && ($rawConfig = @file_get_contents($loggingConf)) !== false && trim($rawConfig) !== '') {
-        foreach (preg_split('/\r?\n/', $rawConfig) ?: [] as $line) {
-            $line = trim($line);
-            if ($line === '' || $line[0] === '#' || $line[0] === ';' || count($parts = explode('=', $line, 2)) !== 2) {
-                continue;
-            }
-
-            $key = strtolower(trim($parts[0]));
-            $value = trim($parts[1]);
-
-            switch ($key) {
-                case 'remote_logging_enabled':
-                    $config['enabled'] = pmssEnvValueIsTruthy($value);
-                    break;
-                case 'remote_host':
-                    $config['host'] = $value;
-                    break;
-                case 'remote_port':
-                    if (ctype_digit($value) && ($port = (int) $value) > 0 && $port <= 65535) {
-                        $config['port'] = $port;
-                    }
-                    break;
-                case 'remote_protocol':
-                    if (in_array($lower = strtolower($value), ['tcp', 'udp'], true)) {
-                        $config['protocol'] = $lower;
-                    }
-                    break;
-            }
-        }
-    }
-
-    $invalidReason = !$config['enabled']
-        ? 'Remote logging not enabled'
-        : ($config['host'] === ''
-            ? 'Remote host not configured'
-            : (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.\-:]+$/', $config['host']) ? '' : 'Invalid remote host format'));
+    $config = pmssRemoteLoggingReadConfig($loggingConf);
+    $invalidReason = pmssRemoteLoggingInvalidReason($config);
 
     if ($invalidReason !== '') {
         if ($config['enabled']) {
