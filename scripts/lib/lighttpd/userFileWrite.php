@@ -110,6 +110,11 @@ function pmssReplaceUserFile(string $path, string $content, ?callable $prepareTe
         return false;
     }
 
+    if (!pmssUserFilePathIsSafe($path)) {
+        @unlink($tmp);
+        return false;
+    }
+
     if (!@rename($tmp, $path)) {
         @unlink($tmp);
         return false;

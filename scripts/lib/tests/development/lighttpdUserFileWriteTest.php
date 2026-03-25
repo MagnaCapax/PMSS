@@ -119,6 +119,25 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertEquals("outside:hash\n", file_get_contents($outsidePath));
     }
 
+    public function testReplaceUserFileRejectsParentDirectorySwapBeforeRename(): void
+    {
+        $managedDir = $this->tempDir.'/user/.lighttpd';
+        $movedDir = $this->tempDir.'/user/.lighttpd-real';
+        $path = $managedDir.'/.htpasswd';
+        @mkdir($managedDir, 0755, true);
+
+        $this->assertFalse(\pmssReplaceUserFile($path, "user:hash\n", static function (string $tmp) use ($managedDir, $movedDir): void {
+            rename($managedDir, $movedDir);
+            symlink($movedDir, $managedDir);
+            clearstatcache(true, $tmp);
+        }));
+
+        $this->assertTrue(is_link($managedDir));
+        $this->assertFalse(file_exists($path));
+        $this->assertFalse(file_exists($movedDir.'/.htpasswd'));
+        $this->assertEquals(0, count(glob($movedDir.'/.htpasswd.pmss-tmp-*') ?: []));
+    }
+
     public function testCheckUserHtpasswdUsesSafeAppendHelper(): void
     {
         $src = $this->pmssReadRepoFile('scripts/util/checkUserHtpasswd.php');
