@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
+
 /**
  * Write an explicit warning when nginx config generation skips a user.
  */
@@ -17,6 +19,20 @@ function pmssCreateNginxConfigLogSkippedUser(string $user, string $reason): void
     if (function_exists('pmssUserLog')) {
         pmssUserLog($user, $message);
     }
+}
+
+/**
+ * Persist a generated nginx config through the shared guarded writer.
+ */
+function pmssCreateNginxConfigWriteFile(string $path, string $content, string $user, string $label): bool
+{
+    if (pmssWriteManagedFile($path, $content, 'root', 'root', 0640)) {
+        return true;
+    }
+
+    pmssCreateNginxConfigLogSkippedUser($user, 'failed to write '.$label.' ('.$path.')');
+
+    return false;
 }
 
 /**
@@ -66,7 +82,9 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
                 array($publicHost, $thisUser, $nginxSslBlock),
                 (string)$ctx['publicSuspendedTemplate']
             );
-            file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig);
+            if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig, $thisUser, 'public suspended subdomain config')) {
+                return;
+            }
 
             $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
             if ($billingId !== null) {
@@ -76,11 +94,15 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
                     array($hashHost, $thisUser, $nginxSslBlock),
                     (string)$ctx['privateSuspendedTemplate']
                 );
-                file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig);
+                if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig, $thisUser, 'private suspended subdomain config')) {
+                    return;
+                }
             }
         }
         $userConfig = str_replace('##username', $thisUser, $suspendedTemplate);
-        file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
+        if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user suspended config')) {
+            return;
+        }
         if (function_exists('pmssUserLog')) {
             pmssUserLog($thisUser, 'nginx config regenerated (suspended template)');
         }
@@ -113,7 +135,9 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
             array($publicHost, $thisUser, (string)$serverPort, $nginxSslBlock),
             (string)$ctx['publicSubdomainTemplate']
         );
-        file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig);
+        if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig, $thisUser, 'public subdomain config')) {
+            return;
+        }
 
         $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
         if ($billingId !== null) {
@@ -123,7 +147,9 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
                 array($hashHost, $thisUser, (string)$serverPort, $nginxSslBlock),
                 (string)$ctx['privateSubdomainTemplate']
             );
-            file_put_contents($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig);
+            if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig, $thisUser, 'private subdomain config')) {
+                return;
+            }
         }
     }
 
@@ -168,7 +194,9 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     $userConfig = str_replace($placeholders, $replacements, $userTemplate);
 
-    file_put_contents("/etc/nginx/users/{$thisUser}", $userConfig);
+    if (!pmssCreateNginxConfigWriteFile("/etc/nginx/users/{$thisUser}", $userConfig, $thisUser, 'user config')) {
+        return;
+    }
     if (function_exists('pmssUserLog')) {
         pmssUserLog($thisUser, 'nginx config regenerated');
     }
