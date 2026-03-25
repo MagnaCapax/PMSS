@@ -14,6 +14,7 @@
  */
 require_once '/scripts/lib/rtorrentConfig.php';
 require_once '/scripts/lib/network/config.php';
+require_once '/scripts/lib/userLifecycle.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 foreach ([
     '/scripts/lib/user/trafficLimit.php',
@@ -27,8 +28,7 @@ if (!file_exists('/var/run/pmss/trafficLimits')) `mkdir -p /var/run/pmss/traffic
 
 $trafficLimitPeriod = 3 * 24 * 60 * 60;     // 3 days limiting period
 
-$users = trim( `/scripts/listUsers.php` );
-$users = array_filter(explode("\n", $users));
+$users = pmssListManagedUsers('/scripts/listUsers.php');
 if (count($users) == 0) die("No users in this system!\n");
 
 $networkConfig = networkLoadConfig();

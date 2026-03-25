@@ -8,10 +8,10 @@ class UpdateQuotasGuardTest extends TestCase
     public function testUpdateQuotasSkipsEmptyAndInvalidUsers(): void
     {
         $src = (string) file_get_contents(__DIR__.'/../../../cron/updateQuotas.php');
-        $this->assertStringContainsString("array_map('trim', explode(\"\\n\", trim((string) shell_exec('/scripts/listUsers.php'))))", $src, 'updateQuotas.php must trim usernames before the loop');
+        $this->assertStringContainsString("pmssListManagedUsers('/scripts/listUsers.php')", $src, 'updateQuotas.php must use the shared listUsers helper');
         $this->assertTrue(strpos($src, '$thisUser = trim($thisUser);') === false, 'updateQuotas.php should avoid redundant in-loop trimming after prefiltering');
         $this->assertTrue(strpos($src, "if (\$thisUser === '') {") === false, 'updateQuotas.php should avoid redundant empty-user guards after prefiltering');
-        $this->assertStringContainsString('!pmssValidateUsername($thisUser)', $src, 'updateQuotas.php must revalidate usernames from listUsers');
+        $this->assertTrue(strpos($src, "shell_exec('/scripts/listUsers.php')") === false, 'updateQuotas.php should not shell out to listUsers.php inline');
 
         // Quota handling must be split into safe PHP filesystem operations and a
         // single, quoted quota invocation. Snapshot writes must use the shared

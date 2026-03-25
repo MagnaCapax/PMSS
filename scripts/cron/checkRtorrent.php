@@ -95,13 +95,12 @@ if ($lockHandle === false || !@flock($lockHandle, LOCK_EX | LOCK_NB)) {
 
 pmssCheckRtorrentLog('Checking rTorrent instances', false, $debug);
 
-$usersOut = [];
-$usersRc = 0;
-@exec('/scripts/listUsers.php', $usersOut, $usersRc);
-if ($usersRc !== 0) {
-    pmssCheckRtorrentLog('ERROR: listUsers.php failed (rc='.$usersRc.'); aborting run', true, $debug);
+$listUsersResult = pmssListManagedUsersResult('/scripts/listUsers.php');
+if ((int) $listUsersResult['exitCode'] !== 0) {
+    pmssCheckRtorrentLog('ERROR: listUsers.php failed (rc='.(int) $listUsersResult['exitCode'].'); aborting run', true, $debug);
     exit(1);
 }
+$users = $listUsersResult['users'];
 
 $changedConfig = [];
 $stateDir = '/run/pmss';
@@ -114,18 +113,7 @@ $logCallback = function (string $msg, bool $force) use ($debug): void {
     pmssCheckRtorrentLog($msg, $force, $debug);
 };
 
-foreach ($usersOut as $line) {
-    $user = trim((string) $line);
-    if ($user === '') {
-        continue;
-    }
-    $userIsValid = function_exists('pmssValidateUsername')
-        ? pmssValidateUsername($user)
-        : (bool) preg_match('/^[a-z][a-z0-9]{0,7}$/', $user);
-    if (!$userIsValid) {
-        pmssCheckRtorrentLog("Skipping invalid username: {$user}", false, $debug);
-        continue;
-    }
+foreach ($users as $user) {
 
     $home = '/home/'.$user;
     if (!is_dir($home)) {

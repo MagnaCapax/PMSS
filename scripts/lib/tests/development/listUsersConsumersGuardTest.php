@@ -13,6 +13,9 @@ class ListUsersConsumersGuardTest extends TestCase
     {
         foreach ([
             "pmssListManagedUsers('/scripts/listUsers.php')" => [
+                'scripts/cron/trafficLog.php',
+                'scripts/cron/trafficLimits.php',
+                'scripts/cron/updateQuotas.php',
                 'scripts/cron/trafficIngressLog.php',
                 'scripts/util/checkRutorrentPlugins.php',
                 'scripts/util/makeMonitoringRules.php',
@@ -25,7 +28,13 @@ class ListUsersConsumersGuardTest extends TestCase
                 'scripts/util/userConfigLighttpd.php',
                 'scripts/lib/nginxConfig/main.php',
             ],
-            'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/showTraffic.php', 'scripts/userTorrents.php'],
+            'pmssListManagedUsersResult(' => [
+                'scripts/cron/checkRtorrent.php',
+                'scripts/cron/userTrackerCleaner.php',
+                'scripts/lib/resources/show.php',
+                'scripts/showTraffic.php',
+                'scripts/userTorrents.php',
+            ],
         ] as $needle => $files) {
             foreach ($files as $file) {
                 $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
@@ -51,18 +60,25 @@ class ListUsersConsumersGuardTest extends TestCase
      * Ensure scripts that still shell out directly to listUsers.php keep their
      * own username validation guards.
      */
-    public function testDirectListUsersConsumersStillRevalidate(): void
+    public function testMigratedConsumersDropLegacyListUsersShelling(): void
     {
         $targets = [
+            'scripts/cron/trafficLog.php',
+            'scripts/cron/trafficLimits.php',
             'scripts/cron/updateQuotas.php',
+            'scripts/cron/checkRtorrent.php',
             'scripts/cron/userTrackerCleaner.php',
         ];
 
         foreach ($targets as $file) {
-            $this->pmssAssertRepoFileContainsAllStrings(
+            $this->pmssAssertRepoFileNotContainsStrings(
                 $file,
-                ['listUsers.php', 'pmssValidateUsername'],
-                $file.' must keep direct listUsers validation'
+                [
+                    "shell_exec('/scripts/listUsers.php')",
+                    "@exec('/scripts/listUsers.php",
+                    "`/scripts/listUsers.php`",
+                ],
+                $file.' must use shared listUsers helpers instead of inline shelling'
             );
         }
     }

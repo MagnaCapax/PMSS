@@ -10,18 +10,18 @@ class checkRtorrentUsernameValidationContractTest extends TestCase
         return (string) file_get_contents(__DIR__.'/../../../cron/checkRtorrent.php');
     }
 
-    public function testSharedUsernameValidatorRemainsPreferred(): void
+    public function testSharedListUsersParserRemainsPreferred(): void
     {
         $src = $this->loadSource();
 
-        $this->assertStringContainsString("function_exists('pmssValidateUsername')", $src);
-        $this->assertStringContainsString('pmssValidateUsername($user)', $src);
+        $this->assertStringContainsString("pmssListManagedUsersResult('/scripts/listUsers.php')", $src);
     }
 
-    public function testLegacyRegexFallbackRemainsAvailable(): void
+    public function testLegacyInlineUsernameParsingStaysRemoved(): void
     {
         $src = $this->loadSource();
 
-        $this->assertStringContainsString('/^[a-z][a-z0-9]{0,7}$/', $src);
+        $this->assertTrue(strpos($src, "@exec('/scripts/listUsers.php'") === false);
+        $this->assertTrue(strpos($src, '/^[a-z][a-z0-9]{0,7}$/') === false);
     }
 }

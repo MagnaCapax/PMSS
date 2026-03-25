@@ -30,6 +30,9 @@ class ListUsersGarbageOutputTest extends TestCase
 
         foreach ([
             "pmssListManagedUsers('/scripts/listUsers.php')" => [
+                'scripts/cron/trafficLog.php',
+                'scripts/cron/trafficLimits.php',
+                'scripts/cron/updateQuotas.php',
                 'scripts/cron/trafficIngressLog.php',
                 'scripts/util/checkRutorrentPlugins.php',
                 'scripts/util/makeMonitoringRules.php',
@@ -42,25 +45,17 @@ class ListUsersGarbageOutputTest extends TestCase
                 'scripts/util/userConfigLighttpd.php',
                 'scripts/lib/nginxConfig/main.php',
             ],
-            'pmssListManagedUsersResult(' => ['scripts/lib/resources/show.php', 'scripts/showTraffic.php', 'scripts/userTorrents.php'],
+            'pmssListManagedUsersResult(' => [
+                'scripts/cron/checkRtorrent.php',
+                'scripts/cron/userTrackerCleaner.php',
+                'scripts/lib/resources/show.php',
+                'scripts/showTraffic.php',
+                'scripts/userTorrents.php',
+            ],
         ] as $needle => $files) {
             foreach ($files as $file) {
                 $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
             }
-        }
-
-        // Direct consumers that still shell out to listUsers.php must keep explicit validation.
-        $directTargets = [
-            'scripts/cron/updateQuotas.php',
-            'scripts/cron/userTrackerCleaner.php',
-        ];
-
-        foreach ($directTargets as $file) {
-            $this->pmssAssertRepoFileContainsAllStrings(
-                $file,
-                ['listUsers.php', 'pmssValidateUsername'],
-                $file.' must keep direct listUsers validation'
-            );
         }
 
         // The main guard against garbage lines is that only names accepted by

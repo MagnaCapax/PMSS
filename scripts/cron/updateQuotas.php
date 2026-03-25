@@ -57,7 +57,7 @@ function pmssQuotaSnapshotWrite(string $path, string $content, int $mode = 0644)
 
 $logger->msg('Updating quota information');
 // Get & parse users list
-$users = array_filter(array_map('trim', explode("\n", trim((string) shell_exec('/scripts/listUsers.php')))), 'strlen');
+$users = pmssListManagedUsers('/scripts/listUsers.php');
 
 // Keep the structured quota event payload and the optional per-user log line in
 // one place so status/message pairs stay aligned across outcomes.
@@ -85,20 +85,6 @@ $writeQuotaUserLogs = static function (
 
 foreach ($users as $thisUser) {
 #TODO Check that quota is working
-    if (!pmssValidateUsername($thisUser)) {
-        $logger->msg("Skipping invalid username {$thisUser} during quota refresh");
-        $writeQuotaUserLogs(
-            $thisUser,
-            'validate',
-            'ERR',
-            'Invalid username encountered during quota refresh',
-            [],
-            null,
-            false
-        );
-        continue;
-    }
-
     // Invariant: verify the resolved home directory matches the expected
     // /home/<username> prefix before touching any files.
     $expectedHome = "/home/{$thisUser}";

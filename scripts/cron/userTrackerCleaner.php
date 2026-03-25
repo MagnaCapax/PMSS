@@ -176,14 +176,12 @@ $filterDomainList = array(
 );
 
 // Get & parse users list
-$usersLines = array();
-$usersRc = 0;
-@exec('/scripts/listUsers.php 2>&1', $usersLines, $usersRc);
-if ($usersRc !== 0) {
-    pmssTrackerCleanerLog("ERR: /scripts/listUsers.php failed (rc={$usersRc}); skipping run.");
+$listUsersResult = pmssListManagedUsersResult('/scripts/listUsers.php');
+if ((int) $listUsersResult['exitCode'] !== 0) {
+    pmssTrackerCleanerLog('ERR: /scripts/listUsers.php failed (rc='.(int) $listUsersResult['exitCode'].'); skipping run.');
     exit(0);
 }
-$users = array_filter(array_map('trim', $usersLines), 'strlen');
+$users = $listUsersResult['users'];
 if (count($users) === 0) {
     pmssTrackerCleanerLog('SKIP: no users returned by /scripts/listUsers.php.');
     exit(0);
@@ -203,21 +201,7 @@ $anyWork = false;
 $anyChanges = false;
 
 foreach($users AS $thisUser) {    // Loop users checking their instances
-    if (!pmssValidateUsername($thisUser)) {
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'trackerCleaner',
-                'validate',
-                $thisUser,
-                [
-                    'status'  => 'ERR',
-                    'message' => 'Skipping invalid username in userTrackerCleaner',
-                ]
-            )
-        );
-        continue;
-    }
-    
+
     $userVerboseLog = '';
     $userVerboseLog .= pmssTrackerCleanerTimestamp()." run_start user={$thisUser}\n";
 
