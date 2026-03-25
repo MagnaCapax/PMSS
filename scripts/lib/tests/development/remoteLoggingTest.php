@@ -2,13 +2,10 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/logging.php';
 
 class RemoteLoggingTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function setUp(): void
     {
         unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);

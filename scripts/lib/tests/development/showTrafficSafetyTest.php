@@ -2,7 +2,6 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/showTraffic.php';
 
 class ShowTrafficSafetyWakeupProbe
@@ -23,8 +22,6 @@ class ShowTrafficSafetyWakeupProbe
 
 class ShowTrafficSafetyTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     /** @var string */
     private $statsPath;
 

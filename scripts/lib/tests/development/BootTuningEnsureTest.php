@@ -2,13 +2,10 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class BootTuningEnsureTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     /** @var string|false */
     private $prevConfigDir = false;
 

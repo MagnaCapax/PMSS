@@ -2,13 +2,10 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesBootstrapTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testHostnameSkipTruthyValueSkips(): void
     {
         $messages = [];

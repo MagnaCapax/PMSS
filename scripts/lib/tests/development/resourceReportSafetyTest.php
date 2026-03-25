@@ -2,7 +2,6 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/resources/show.php';
 
 class ResourceReportSafetyWakeupProbe
@@ -23,8 +22,6 @@ class ResourceReportSafetyWakeupProbe
 
 class resourceReportSafetyTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     /** @var string */
     private $runtimeDir;
 
