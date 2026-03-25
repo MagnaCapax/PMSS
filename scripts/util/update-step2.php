@@ -65,6 +65,8 @@ if (!defined('PMSS_UPDATE_LOCK_ENV')) {
  */
 function pmssConfigureWebStack(int $distroVersion): void
 {
+    pmssUpdateStep2MarkWebRefreshRequired();
+
     // Stop nginx first so package upgrades and template refreshes never race against an active daemon.
     runStep('Stopping nginx prior to configuration refresh', 'systemctl stop nginx || /etc/init.d/nginx stop || true');
     runStep($distroVersion < 10 ? 'Stopping lighttpd (init.d)' : 'Stopping lighttpd (systemd)', '/etc/init.d/lighttpd stop');
@@ -152,6 +154,67 @@ function pmssUpdateStep2RunClassifiedCallable(string $description, callable $cal
         pmssUpdateStep2HandleClassifiedFailure($description, $classification, 1, $reason);
     }
 }
+
+/**
+ * Mark that nginx has been stopped and needs a final refresh before exit.
+ */
+function pmssUpdateStep2MarkWebRefreshRequired(): void
+{
+    $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_REQUIRED'] = true;
+}
+
+/**
+ * Mark that the final nginx refresh has completed successfully.
+ */
+function pmssUpdateStep2MarkWebRefreshCompleted(): void
+{
+    $GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_COMPLETED'] = true;
+}
+
+/**
+ * Attempt a best-effort nginx config regeneration if update-step2 exits early.
+ */
+function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
+{
+    register_shutdown_function(static function (): void {
+        $refreshRequired = !empty($GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_REQUIRED']);
+        $refreshCompleted = !empty($GLOBALS['PMSS_UPDATE_STEP2_WEB_REFRESH_COMPLETED']);
+        $scriptCompleted = !empty($GLOBALS['PMSS_UPDATE_STEP2_COMPLETED']);
+        if (!$refreshRequired || $refreshCompleted || $scriptCompleted) {
+            return;
+        }
+
+        if (!file_exists('/scripts/util/createNginxConfig.php')) {
+            logmsg('[WARN] update-step2 exited before final nginx refresh; createNginxConfig.php missing');
+            return;
+        }
+
+        $error = error_get_last();
+        $reason = 'early_exit';
+        if (is_array($error) && isset($error['message']) && is_string($error['message']) && $error['message'] !== '') {
+            $reason = $error['message'];
+        }
+
+        logmsg('[WARN] update-step2 exited before final nginx refresh; attempting rescue run (reason: '.$reason.')');
+        pmssLogJson([
+            'event' => 'post_update_web_refresh_rescue',
+            'status' => 'start',
+            'reason' => $reason,
+        ]);
+
+        $rc = 0;
+        passthru('/scripts/util/createNginxConfig.php --restart', $rc);
+
+        pmssLogJson([
+            'event' => 'post_update_web_refresh_rescue',
+            'status' => $rc === 0 ? 'ok' : 'error',
+            'rc' => $rc,
+        ]);
+        logmsg(sprintf('[WARN] Rescue nginx refresh completed with rc=%d', $rc));
+    });
+}
+
+pmssUpdateStep2RegisterWebRefreshShutdownGuard();
 
 pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void {
     if (getenv(PMSS_UPDATE_LOCK_ENV) === '1') {
@@ -530,7 +593,10 @@ if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {
 runStep('Restricting atop binary permissions', 'chmod 750 /usr/bin/atop');
 
 pmssRunProfiledStep('Running post-update web refresh', static function (): void {
-    runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
+    $refreshRc = runStep('Post-update nginx configuration refresh', '/scripts/util/createNginxConfig.php --restart');
+    if ($refreshRc === 0) {
+        pmssUpdateStep2MarkWebRefreshCompleted();
+    }
 });
 
 pmssRunProfiledCallable('Configuring /tmp disk-backed baseline', 'pmssConfigureTempDiskBackedMount', ['logmsg', $distroVersion]);
@@ -581,6 +647,7 @@ try {
 pmssRunProfiledCallable('Refreshing MOTD', ['Motd', 'motdGenerate']);
 
 // Mark the end of phase 2 and emit the final summary after all work completed.
+$GLOBALS['PMSS_UPDATE_STEP2_COMPLETED'] = true;
 pmssProfileSummary();
 
 pmssLogJson(['event' => 'phase', 'name' => 'update-step2', 'status' => 'end']);

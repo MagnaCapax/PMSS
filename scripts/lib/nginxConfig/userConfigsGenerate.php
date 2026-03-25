@@ -6,6 +6,20 @@
  */
 
 /**
+ * Write an explicit warning when nginx config generation skips a user.
+ */
+function pmssCreateNginxConfigLogSkippedUser(string $user, string $reason): void
+{
+    $message = sprintf('WARN: skipping nginx config for %s: %s', $user, $reason);
+    if (function_exists('pmssCreateNginxConfigAppendLog')) {
+        pmssCreateNginxConfigAppendLog($message);
+    }
+    if (function_exists('pmssUserLog')) {
+        pmssUserLog($user, $message);
+    }
+}
+
+/**
  * Generate per-user configs under /etc/nginx/users and optional subdomain vhosts.
  */
 function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $singleUser): void
@@ -74,6 +88,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     }
 
     if (!file_exists($homeDir.'/.rtorrent.rc')) {
+        pmssCreateNginxConfigLogSkippedUser($thisUser, 'missing .rtorrent.rc prerequisite');
         return;
     }
 
@@ -87,6 +102,7 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         $serverPort = (int) trim((string) @file_get_contents($portFile));
     }
     if ($serverPort < 1024 || $serverPort > 65535) {
+        pmssCreateNginxConfigLogSkippedUser($thisUser, 'lighttpd port missing or invalid after refresh attempt ('.$portFile.')');
         return;
     }
 
@@ -157,4 +173,3 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         pmssUserLog($thisUser, 'nginx config regenerated');
     }
 }
-
