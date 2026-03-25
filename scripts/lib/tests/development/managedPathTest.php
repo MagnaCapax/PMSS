@@ -4,7 +4,7 @@ require_once dirname(__DIR__, 2).'/update/environment.php';
 
 use PMSS\Tests\TestCase;
 
-class UpdateEnvironmentManagedFileTest extends TestCase
+class ManagedPathTest extends TestCase
 {
     public function testManagedPathAcceptsRegularFileTarget(): void
     {
@@ -12,7 +12,7 @@ class UpdateEnvironmentManagedFileTest extends TestCase
         $path = $root.'/managed.conf';
         $messages = [];
 
-        $this->assertTrue(\pmssUpdateEnvironmentManagedPathIsSafe($path, 'test target', $this->pmssMakeArrayLogger($messages)));
+        $this->assertTrue(\pmssManagedPathIsSafe($path, 'test target', $this->pmssMakeArrayLogger($messages)));
         $this->assertEquals([], $messages);
     }
 
@@ -25,7 +25,7 @@ class UpdateEnvironmentManagedFileTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($realDir, $linkDir);
         $messages = [];
 
-        $this->assertFalse(\pmssUpdateEnvironmentManagedPathIsSafe($linkDir.'/managed.conf', 'test target', $this->pmssMakeArrayLogger($messages)));
+        $this->assertFalse(\pmssManagedPathIsSafe($linkDir.'/managed.conf', 'test target', $this->pmssMakeArrayLogger($messages)));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target directory'));
     }
 
@@ -36,7 +36,7 @@ class UpdateEnvironmentManagedFileTest extends TestCase
         file_put_contents($parentFile, 'x');
         $messages = [];
 
-        $this->assertFalse(\pmssUpdateEnvironmentManagedPathIsSafe($parentFile.'/managed.conf', 'test target', $this->pmssMakeArrayLogger($messages)));
+        $this->assertFalse(\pmssManagedPathIsSafe($parentFile.'/managed.conf', 'test target', $this->pmssMakeArrayLogger($messages)));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target directory'));
     }
 
@@ -46,7 +46,7 @@ class UpdateEnvironmentManagedFileTest extends TestCase
         $path = $root.'/managed.conf';
         $messages = [];
 
-        $this->assertTrue(\pmssUpdateEnvironmentWriteManagedFile($path, "alpha\n", 'test target', $this->pmssMakeArrayLogger($messages)));
+        $this->assertTrue(\pmssWriteManagedPathFile($path, "alpha\n", 'test target', $this->pmssMakeArrayLogger($messages)));
         $this->assertEquals("alpha\n", file_get_contents($path));
         $this->assertEquals([], $messages);
     }
@@ -60,7 +60,21 @@ class UpdateEnvironmentManagedFileTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($target, $link);
         $messages = [];
 
-        $this->assertFalse(\pmssUpdateEnvironmentWriteManagedFile($link, "new\n", 'test target', $this->pmssMakeArrayLogger($messages)));
+        $this->assertFalse(\pmssWriteManagedPathFile($link, "new\n", 'test target', $this->pmssMakeArrayLogger($messages)));
+        $this->assertEquals("old\n", file_get_contents($target));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
+    }
+
+    public function testManagedRemoveRejectsSymlinkTarget(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-remove-link-');
+        $target = $root.'/target.conf';
+        file_put_contents($target, "old\n");
+        $link = $root.'/managed.conf';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $messages = [];
+
+        $this->assertFalse(\pmssRemoveManagedPathFile($link, 'test target', $this->pmssMakeArrayLogger($messages)));
         $this->assertEquals("old\n", file_get_contents($target));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
     }

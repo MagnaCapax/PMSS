@@ -14,43 +14,7 @@
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/apps/packages/helpers.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
-
-/**
- * Validate a managed environment file target before mutating it.
- */
-function pmssUpdateEnvironmentManagedPathIsSafe(string $path, string $label, callable $logger): bool
-{
-    $targetDir = dirname($path);
-    if (!is_dir($targetDir) || is_link($targetDir)) {
-        $logger('[WARN] Unsafe '.$label.' directory: '.$targetDir);
-        return false;
-    }
-
-    if (!pmssUserFilePathIsSafe($path)) {
-        $logger('[WARN] Unsafe '.$label.' target: '.$path);
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * Atomically replace a managed environment file when the target is safe.
- */
-function pmssUpdateEnvironmentWriteManagedFile(string $path, string $contents, string $label, callable $logger): bool
-{
-    if (!pmssUpdateEnvironmentManagedPathIsSafe($path, $label, $logger)) {
-        return false;
-    }
-
-    if (!pmssAtomicWriteFile($path, $contents, 0644)) {
-        $logger('[WARN] Unable to write '.$label.' at '.$path);
-        return false;
-    }
-
-    return true;
-}
+require_once __DIR__.'/managedPath.php';
 
 /**
      * Remove lingering MediaArea apt sources and cached bootstrap packages.
@@ -65,11 +29,11 @@ function pmssUpdateEnvironmentWriteManagedFile(string $path, string $contents, s
         runStep('Removing legacy MediaArea apt preferences/keys', 'rm -f /etc/apt/preferences.d/mediaarea* /etc/apt/trusted.gpg.d/mediaarea*.gpg');
 
         $sources = '/etc/apt/sources.list';
-        if (pmssUpdateEnvironmentManagedPathIsSafe($sources, 'apt sources.list', 'logMessage') && is_readable($sources)) {
+        if (pmssManagedPathIsSafe($sources, 'apt sources.list', 'logMessage') && is_readable($sources)) {
             $data = @file_get_contents($sources);
             if ($data !== false && preg_match('/^[ \t]*[^#\r\n].*mediaarea/im', $data) === 1) {
                 $backup = $sources.'.pmss-backup-'.date('YmdHis');
-                if (!pmssUpdateEnvironmentManagedPathIsSafe($backup, 'apt sources.list backup', 'logMessage')) {
+                if (!pmssManagedPathIsSafe($backup, 'apt sources.list backup', 'logMessage')) {
                     return;
                 }
                 if (!@copy($sources, $backup)) {
@@ -77,7 +41,7 @@ function pmssUpdateEnvironmentWriteManagedFile(string $path, string $contents, s
                     return;
                 }
                 $mutated = preg_replace('/^([ \t]*)([^#\r\n].*mediaarea.*)$/im', '$1# PMSS-disabled mediaarea: $2', $data);
-                if ($mutated !== null && $mutated !== $data && !pmssUpdateEnvironmentWriteManagedFile($sources, $mutated, 'apt sources.list', 'logMessage')) {
+                if ($mutated !== null && $mutated !== $data && !pmssWriteManagedPathFile($sources, $mutated, 'apt sources.list', 'logMessage')) {
                     return;
                 }
             }
@@ -113,7 +77,7 @@ CONF;
 
         $existing = @file_get_contents($path);
         if ($existing === false || trim($existing) !== trim($contents)) {
-            if (!pmssUpdateEnvironmentWriteManagedFile($path, $contents, 'apt non-interactive configuration', $log)) {
+            if (!pmssWriteManagedPathFile($path, $contents, 'apt non-interactive configuration', $log)) {
                 return;
             }
             @chmod($path, 0644);

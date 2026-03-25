@@ -158,7 +158,7 @@ class RemoteLoggingTest extends TestCase
         symlink($realTarget, $target);
 
         try {
-            $result = \pmssWriteManagedConfigFile($target, "*.* @new.example:1514\n", 'remote logging config', $this->pmssMakeArrayLogger($messages));
+            $result = \pmssWriteManagedPathFile($target, "*.* @new.example:1514\n", 'remote logging config', $this->pmssMakeArrayLogger($messages));
 
             $this->assertTrue(!$result, 'symlink target must be rejected');
             $this->assertEquals("*.* @@old.example:514\n", file_get_contents($realTarget));

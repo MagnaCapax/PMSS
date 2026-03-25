@@ -14,44 +14,10 @@
  */
 
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../runtime/processes.php';
 require_once __DIR__.'/../../runtime.php';
-require_once __DIR__.'/../../lighttpd/userFileWrite.php';
-
-function pmssManagedConfigTargetIsSafe(string $target, string $label, callable $logger): bool
-{
-    $targetDir = dirname($target);
-    if (!is_dir($targetDir) || is_link($targetDir)) {
-        $logger('[WARN] Unsafe '.$label.' directory: '.$targetDir);
-        return false;
-    }
-
-    if (!pmssUserFilePathIsSafe($target)) {
-        $logger('[WARN] Unsafe '.$label.' target: '.$target);
-        return false;
-    }
-
-    return true;
-}
-
-function pmssWriteManagedConfigFile(string $target, string $contents, string $label, callable $logger): bool
-{
-    if (!pmssManagedConfigTargetIsSafe($target, $label, $logger)) {
-        return false;
-    }
-
-    return pmssAtomicWriteFile($target, $contents, 0644);
-}
-
-function pmssRemoveManagedConfigFile(string $target, string $label, callable $logger): bool
-{
-    if (!pmssManagedConfigTargetIsSafe($target, $label, $logger)) {
-        return false;
-    }
-
-    return @unlink($target);
-}
 
 /**
  * Ensure a managed config directory exists without traversing unsafe paths.
@@ -147,7 +113,7 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
     }
 
     $target = $targetDir.'/pmss-limits.conf';
-    if (!pmssWriteManagedConfigFile($target, $raw, 'journald limits', $log)) {
+    if (!pmssWriteManagedPathFile($target, $raw, 'journald limits', $log)) {
         return;
     }
 
@@ -237,7 +203,7 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         if (!is_file($target)) {
             return;
         }
-        if (!pmssRemoveManagedConfigFile($target, 'remote logging config', $log)) {
+        if (!pmssRemoveManagedPathFile($target, 'remote logging config', $log)) {
             $log('[WARN] Unable to remove remote logging config: '.$target);
             return;
         }
@@ -270,7 +236,7 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         return;
     }
 
-    if (!pmssWriteManagedConfigFile($target, $rendered, 'remote logging config', $log)) {
+    if (!pmssWriteManagedPathFile($target, $rendered, 'remote logging config', $log)) {
         return;
     }
 
