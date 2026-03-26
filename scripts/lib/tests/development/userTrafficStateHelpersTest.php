@@ -128,6 +128,24 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertTrue(is_link($statsPath));
     }
 
+    public function testTrafficStorageEnsureRuntimeRejectsSymlinkedRuntimeDir(): void
+    {
+        $targetRuntime = $this->tempDir.'/runtime-target';
+        @mkdir($targetRuntime, 0755, true);
+        $runtimeLink = $this->tempDir.'/runtime-link';
+        $this->pmssCreateSymlinkOrSkip($targetRuntime, $runtimeLink);
+
+        $storage = new \TrafficStorage([
+            'home_dir' => $this->tempDir.'/home',
+            'runtime_dir' => $runtimeLink,
+        ]);
+
+        $storage->ensureRuntime();
+
+        $this->assertTrue(is_link($runtimeLink));
+        $this->assertTrue(!is_dir($targetRuntime.'/trafficStats'));
+    }
+
     public function testTrafficStorageSaveRejectsSymlinkedHomeTrafficFile(): void
     {
         $homeDir = $this->tempDir.'/home';

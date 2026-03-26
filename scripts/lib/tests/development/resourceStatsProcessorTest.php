@@ -75,6 +75,20 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue(is_dir($this->paths['runtime_dir'].'/resourceStats'));
     }
 
+    public function testEnsureRuntimeRejectsSymlinkedRuntimeDir(): void
+    {
+        $targetRuntime = dirname($this->paths['runtime_dir']).'/runtime-target';
+        @mkdir($targetRuntime, 0755, true);
+        @rmdir($this->paths['runtime_dir']);
+        $this->pmssCreateSymlinkOrSkip($targetRuntime, $this->paths['runtime_dir']);
+
+        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
+        $processor->ensureRuntime();
+
+        $this->assertTrue(is_link($this->paths['runtime_dir']));
+        $this->assertTrue(!is_dir($targetRuntime.'/resourceStats'));
+    }
+
     public function testProcessUserPersistsMetricsAndDisplays(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();

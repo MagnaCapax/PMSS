@@ -40,7 +40,7 @@ class ResourceStatsProcessor
     public function ensureRuntime(): void
     {
         foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
-            is_dir($dir) || @mkdir($dir, $mode, true);
+            pmssEnsureSafeDir($dir, $mode);
         }
     }
 
