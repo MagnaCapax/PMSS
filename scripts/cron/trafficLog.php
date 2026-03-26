@@ -9,6 +9,7 @@
 // Cron job log file paths match the cron schedule in root.cron
 
 require_once '/scripts/lib/logger.php';
+require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/userLifecycle.php';
 $logger = new Logger(__FILE__);
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
@@ -28,18 +29,8 @@ if (count($users) == 0) exit;    // Nothing to collect
 $users[] = 'www-data';  // Add www-data instance, we want to see this account aswell
 
 // Load optional localnet definitions for counting LAN traffic separately.
-// Multiple networks may be listed one per line. If the file is missing
-// create one with the default Pulsed Media LAN range so admins know where
-// to customise it.
-$localnets = ['185.148.0.0/22']; // #TODO Refactor hardcoded value
-if (file_exists('/etc/seedbox/config/localnet')) {
-    $cfg = trim(file_get_contents('/etc/seedbox/config/localnet'));
-    if ($cfg !== '') {
-        $localnets = preg_split('/\r?\n/', $cfg);
-    }
-} else {
-    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n"); // #TODO Refactor hardcoded value
-	}
+// Multiple networks may be listed one per line in the central localnet config.
+$localnets = networkLoadLocalnets();
 	// Provides $link and $linkSpeed variables used for threshold checks
 	require_once '/scripts/lib/networkInfo.php';
 	$linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (float) $linkSpeed : null;

@@ -9,6 +9,7 @@
 // Configure Ip tables rules for monitoring network traffic usage
 
 require_once '/scripts/lib/network/iptables.php';
+require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/userLifecycle.php';
 
 $users = pmssListManagedUsers('/scripts/listUsers.php');
@@ -20,19 +21,8 @@ $mark = 1;
 // Owner match is required for per-user accounting; skip if unavailable.
 if (!networkIptablesOwnerMatchAvailable()) exit(0);
 
-$localnets = ['185.148.0.0/22']; // #TODO Refactor hardcoded value
 // Multiple networks may be defined, one per line, to mark "local" traffic.
-if (file_exists('/etc/seedbox/config/localnet')) {
-    $cfg = trim(file_get_contents('/etc/seedbox/config/localnet'));
-    if ($cfg !== '') {
-        $localnets = preg_split('/\r?\n/', $cfg);
-        $localnets = $localnets ? array_filter($localnets, 'strlen') : [];
-    }
-} else {
-    file_put_contents('/etc/seedbox/config/localnet', "185.148.0.0/22\n"); // #TODO Refactor hardcoded value
-}
-
-$localnets = $localnets ?: [];
+$localnets = networkLoadLocalnets();
 $lastLocalNet = $localnets ? end($localnets) : '';
 
 foreach ($users as $thisUser) {
