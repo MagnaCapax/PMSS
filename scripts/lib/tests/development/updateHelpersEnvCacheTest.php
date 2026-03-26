@@ -7,6 +7,31 @@ require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class UpdateHelpersEnvCacheTest extends TestCase
 {
+    public function testOsReleaseHelpersLoadStandaloneWithRuntimeDependency(): void
+    {
+        $file = $this->pmssWriteTempFile('standalone', "ID=debian\nVERSION_ID=12\n", 'pmss-env');
+        $repoRoot = dirname(__DIR__, 4);
+        $script = <<<'PHP'
+putenv('PMSS_OS_RELEASE_PATH='.__OS_RELEASE__);
+require_once __REPO_ROOT__.'/scripts/lib/update/osRelease.php';
+\pmssResetOsReleaseCache();
+echo \getOsReleaseData()['ID'] ?? '';
+PHP;
+
+        $script = str_replace(
+            ['__REPO_ROOT__', '__OS_RELEASE__'],
+            [var_export($repoRoot, true), var_export($file, true)],
+            $script
+        );
+
+        $output = trim((string) @shell_exec(
+            'PMSS_TEST_MODE=1 '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>&1'
+        ));
+
+        $this->assertEquals('debian', $output);
+        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+    }
+
     public function testGetOsReleaseDataUsesOverridePath(): void
     {
         $file = $this->pmssWriteTempFile('override', 'ID=custom', 'pmss-env');

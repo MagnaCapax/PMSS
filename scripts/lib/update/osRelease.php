@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../runtime.php';
+
 $GLOBALS['PMSS_OS_RELEASE_CACHE'] = $GLOBALS['PMSS_OS_RELEASE_CACHE'] ?? [];
 
 /**
