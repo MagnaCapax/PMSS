@@ -25,11 +25,6 @@ class ResourceStatsProcessorTest extends TestCase
         $this->paths = $this->makePaths();
     }
 
-    public function tearDown(): void
-    {
-        $this->cleanupPaths($this->paths);
-    }
-
     public function testDiscoverUsersReturnsNaturalSortedFiles(): void
     {
         file_put_contents($this->paths['resource_dir'].'/user2', 'seed');
@@ -234,7 +229,7 @@ class ResourceStatsProcessorTest extends TestCase
      */
     private function makePaths(): array
     {
-        $root = sys_get_temp_dir().'/pmss-resource-processor-'.bin2hex(random_bytes(4));
+        $root = $this->pmssMakeTempDir('pmss-resource-processor-');
         $paths = [
             'resource_dir' => $root.'/resources',
             'home_dir' => $root.'/home',
@@ -248,33 +243,5 @@ class ResourceStatsProcessorTest extends TestCase
         file_put_contents($paths['passwd_file'], "alice:x:1000:1000::{$paths['home_dir']}/alice:/bin/bash\n");
 
         return $paths;
-    }
-
-    /**
-     * @param array<string, string> $paths
-     */
-    private function cleanupPaths(array $paths): void
-    {
-        if (empty($paths['resource_dir'])) {
-            return;
-        }
-
-        $root = dirname($paths['resource_dir']);
-        if (!is_dir($root)) {
-            return;
-        }
-
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
-            }
-        }
-        @rmdir($root);
     }
 }

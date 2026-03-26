@@ -6,19 +6,10 @@ require_once dirname(__DIR__, 2).'/traffic.php';
 
 class TrafficStatisticsIngressTest extends TrafficTestCase
 {
-    private function makePaths(): array
-    {
-        return $this->makeTrafficPaths();
-    }
-
-    private function makeUser(array $paths, string $user): void
-    {
-        $this->createTrafficUser($paths, $user, false);
-    }
 
     public function testGetDataUsesCustomTrafficDir(): void
     {
-        $paths = $this->makePaths();
+        $paths = $this->makeTrafficPaths();
         $user = 'alice';
         @file_put_contents($paths['traffic_dir'].'/'.$user, date('Y-m-d H:i:s').": 1048576\n");
         $stats = new \trafficStatistics($paths);
@@ -28,8 +19,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
 
     public function testSaveUserTrafficWritesDefaultFile(): void
     {
-        $paths = $this->makePaths();
-        $this->makeUser($paths, 'alice');
+        $paths = $this->makeTrafficPaths();
+        $this->createTrafficUser($paths, 'alice', false);
         $stats = new \trafficStatistics($paths);
         $stats->saveUserTraffic('alice', ['raw' => ['month' => 1], 'display' => [], 'daily' => []]);
         $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficData'));
@@ -37,8 +28,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
 
     public function testSaveUserTrafficWritesIngressFile(): void
     {
-        $paths = $this->makePaths();
-        $this->makeUser($paths, 'alice');
+        $paths = $this->makeTrafficPaths();
+        $this->createTrafficUser($paths, 'alice', false);
         $paths['traffic_mode'] = 'ingress';
         $stats = new \trafficStatistics($paths);
         $stats->saveUserTraffic('alice', ['raw' => ['month' => 1], 'display' => [], 'daily' => []]);
@@ -47,8 +38,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
 
     public function testSaveUserTrafficIngressLocalnetSuffixWritesLocalFile(): void
     {
-        $paths = $this->makePaths();
-        $this->makeUser($paths, 'alice');
+        $paths = $this->makeTrafficPaths();
+        $this->createTrafficUser($paths, 'alice', false);
         $paths['traffic_mode'] = 'ingress';
         $stats = new \trafficStatistics($paths);
         $stats->saveUserTraffic('alice-localnet', ['raw' => ['month' => 1], 'display' => [], 'daily' => []]);
@@ -57,8 +48,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
 
     public function testSaveUserTrafficInvalidModeFallsBackToEgress(): void
     {
-        $paths = $this->makePaths();
-        $this->makeUser($paths, 'alice');
+        $paths = $this->makeTrafficPaths();
+        $this->createTrafficUser($paths, 'alice', false);
         $paths['traffic_mode'] = 'bogus';
         $stats = new \trafficStatistics($paths);
         $stats->saveUserTraffic('alice', ['raw' => ['month' => 1], 'display' => [], 'daily' => []]);

@@ -25,47 +25,27 @@ class TrafficStatsProcessorEdgeTest extends TrafficTestCase
     public function testProcessUserIgnoresErroneousLines(): void
     {
         $stub = new StubTrafficStatisticsEdge();
-        $paths = $this->makePaths();
+        $paths = $this->makeTrafficPaths('pmss-traffic-edge-', true);
         $processor = new \TrafficStatsProcessor($stub, $paths);
-        $this->createUserFixtures($paths, 'alice');
+        $this->createTrafficUser($paths, 'alice');
 
         // malformed lines mixed with valid-looking but enormous values
         $stub->map['alice'] = "bogus line\n".
             date('Y-m-d H:i:s', time() - 60).": 999999999999\n".
             "another bad line";
 
-        try {
-            $processor->processUser('alice', $processor->buildCompareTimes());
-            $this->assertTrue(isset($stub->saved['alice']), 'Processor should persist zeroed totals');
-            $this->assertEquals(0.0, $stub->saved['alice']['raw']['month']);
-        } finally {
-            $this->cleanupPaths($paths);
-        }
+        $processor->processUser('alice', $processor->buildCompareTimes());
+        $this->assertTrue(isset($stub->saved['alice']), 'Processor should persist zeroed totals');
+        $this->assertEquals(0.0, $stub->saved['alice']['raw']['month']);
     }
 
     public function testValidateUserFalseWhenMissingPasswd(): void
     {
         $stub = new StubTrafficStatisticsEdge();
-        $paths = $this->makePaths();
+        $paths = $this->makeTrafficPaths('pmss-traffic-edge-', true);
         @unlink($paths['passwd_file']);
         $processor = new \TrafficStatsProcessor($stub, $paths);
-        $this->createUserFixtures($paths, 'ghost');
+        $this->createTrafficUser($paths, 'ghost');
         $this->assertTrue(!$processor->validateUser('ghost'));
-        $this->cleanupPaths($paths);
-    }
-
-    private function makePaths(): array
-    {
-        return $this->makeTrafficPaths('pmss-traffic-edge-', true);
-    }
-
-    private function createUserFixtures(array $paths, string $user): void
-    {
-        $this->createTrafficUser($paths, $user);
-    }
-
-    private function cleanupPaths(array $paths): void
-    {
-        $this->cleanupTrafficPaths($paths);
     }
 }
