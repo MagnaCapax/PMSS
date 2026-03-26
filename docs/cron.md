@@ -58,7 +58,9 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `cpuStat.php` – Periodically record CPU usage statistics.
 - `diskIostat.php` – Collect disk I/O metrics for later analysis.
 - `storageHealthSnapshot.php` – Append SMART/NVMe/mdadm health snapshots to
-  `/var/log/pmss/storage-health.jsonl` without waking standby disks.
+  `/var/log/pmss/storage-health.jsonl` without waking standby disks. The root
+  cron template runs it twice daily (06:00 and 18:00), and the PMSS logrotate
+  policy retains the JSONL plus the cron wrapper log.
 - `processSnapshot.php` – Append process tree snapshots for postmortem analysis (root-only log at `/var/log/pmss/process-snapshot.log`).
 - `quotaSnapshot.php` – Append daily quota usage snapshots (machine-parseable; root-only log at `/var/log/pmss/quota-daily.log`).
 - `trafficLimits.php` – Refresh per-user traffic throttling configuration (supports staged overage caps via `overageStages` and progressive post-cap reduction via `progressiveThrottleEnabled`, `progressiveThrottleFloorPercent`, and `progressiveThrottleGracePercent` in `/etc/seedbox/config/network`).
