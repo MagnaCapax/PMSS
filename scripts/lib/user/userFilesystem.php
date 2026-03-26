@@ -115,9 +115,17 @@ class userFilesystem
                 $valid[] = $name;
             }
         }
-        
         sort($valid, SORT_NATURAL | SORT_FLAG_CASE);
         return $valid;
+    }
+
+    public static function withAdditionalUsers(array $users, array $additionalUsers): array
+    {
+        foreach ($users === [] ? [] : $additionalUsers as $additionalUser) {
+            $additionalUser = trim((string) $additionalUser);
+            $additionalUser !== '' && pmssNormalizeUsername($additionalUser) === $additionalUser && preg_match('/^[a-z0-9-]+$/', $additionalUser) === 1 && $users[] = $additionalUser;
+        }
+        return array_values(array_unique($users));
     }
 
     /**

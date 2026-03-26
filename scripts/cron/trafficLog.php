@@ -10,7 +10,7 @@
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/network/config.php';
-require_once '/scripts/lib/userLifecycle.php';
+require_once '/scripts/lib/user/userFilesystem.php';
 $logger = new Logger(__FILE__);
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
@@ -24,9 +24,8 @@ if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
 
 
 $logdir = '/var/log/pmss/traffic/';
-$users = pmssListManagedUsers('/scripts/listUsers.php');
+$users = userFilesystem::withAdditionalUsers(pmssListManagedUsers('/scripts/listUsers.php'), ['www-data']);
 if (count($users) == 0) exit;    // Nothing to collect
-$users[] = 'www-data';  // Add www-data instance, we want to see this account aswell
 
 // Load optional localnet definitions for counting LAN traffic separately.
 // Multiple networks may be listed one per line in the central localnet config.

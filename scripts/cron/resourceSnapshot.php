@@ -11,7 +11,7 @@ require_once __DIR__.'/../lib/resources/log.php';
 require_once __DIR__.'/../lib/resources.php';
 require_once __DIR__.'/../lib/resources/accumulator.php';
 require_once __DIR__.'/../lib/runtime.php';
-require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/user/userFilesystem.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 
@@ -26,12 +26,10 @@ function pmssResourceSnapshotRun(): int
     $ts = date('Y-m-d\\TH:i:s');
 
     return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($ts): int {
-        $users = pmssListManagedUsers();
+        $users = userFilesystem::withAdditionalUsers(pmssListManagedUsers(), ['www-data']);
         if ($users === []) {
             return 0;
         }
-        $users[] = 'www-data';
-
         $stats = new resourceStatistics();
         $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
 

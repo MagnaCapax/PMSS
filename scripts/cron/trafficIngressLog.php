@@ -7,7 +7,7 @@
  * @author PMSS Team
  */
 
-require_once '/scripts/lib/userLifecycle.php';
+require_once '/scripts/lib/user/userFilesystem.php';
 require_once '/scripts/lib/traffic/ingress.php';
 require_once '/scripts/lib/networkInfo.php';
 
@@ -20,12 +20,10 @@ if (!pmssTrafficIngressEnsureDir($logDir, 0755) || !pmssTrafficIngressEnsureDir(
     exit(1);
 }
 
-$users = pmssListManagedUsers('/scripts/listUsers.php');
+$users = userFilesystem::withAdditionalUsers(pmssListManagedUsers('/scripts/listUsers.php'), ['www-data']);
 if (empty($users)) {
     exit(0);
 }
-$users[] = 'www-data';
-
 foreach ($users as $user) {
     $uid = pmssResourceLogLookupUid($user);
     if ($uid === null) {

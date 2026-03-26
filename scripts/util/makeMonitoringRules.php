@@ -10,11 +10,10 @@
 
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/network/config.php';
-require_once '/scripts/lib/userLifecycle.php';
+require_once '/scripts/lib/user/userFilesystem.php';
 
-$users = pmssListManagedUsers('/scripts/listUsers.php');
+$users = userFilesystem::withAdditionalUsers(pmssListManagedUsers('/scripts/listUsers.php'), ['www-data']);
 if (!$users) exit(0);
-$users[] = 'www-data';
 
 $mark = 1;
 
