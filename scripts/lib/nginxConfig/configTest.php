@@ -8,7 +8,7 @@
 require_once __DIR__.'/../runtime.php';
 
 /**
- * Read an nginx helper command override without accepting blank values.
+ * Read an nginx helper command override without accepting blank or multiline values.
  */
 function pmssCreateNginxConfigCommandFromEnv(string $envKey, string $default): string
 {
@@ -18,7 +18,11 @@ function pmssCreateNginxConfigCommandFromEnv(string $envKey, string $default): s
     }
 
     $command = trim($command);
-    return $command !== '' ? $command : $default;
+    if ($command === '' || strpos($command, "\0") !== false || strpos($command, "\n") !== false || strpos($command, "\r") !== false) {
+        return $default;
+    }
+
+    return $command;
 }
 
 function pmssCreateNginxConfigAppendLog(string $message): void
