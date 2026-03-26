@@ -14,6 +14,7 @@ require_once __DIR__.'/lib/runtime.php';
 
 pmssRequireCli();
 
+require_once __DIR__.'/lib/lighttpd/userFileWrite.php';
 require_once __DIR__.'/lib/storageHealth.php';
 
 function pmssStorageHealthColor(string $severity, string $text): string
@@ -47,6 +48,10 @@ function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?stri
  */
 function pmssStorageHealthSyncUserNotice(string $userNoticePath, ?array $payload): void
 {
+    if (!pmssUserFilePathIsSafe($userNoticePath)) {
+        return;
+    }
+
     if ($payload === null) {
         if (is_file($userNoticePath)) {
             @unlink($userNoticePath);
@@ -55,7 +60,8 @@ function pmssStorageHealthSyncUserNotice(string $userNoticePath, ?array $payload
     }
 
     $userNoticeDir = dirname($userNoticePath);
-    if ($userNoticeDir !== '' && !is_dir($userNoticeDir) && !@mkdir($userNoticeDir, 0755, true) && !is_dir($userNoticeDir)) {
+    // Keep the notice on the same guarded write path as other managed files.
+    if ($userNoticeDir !== '' && !pmssEnsureSafeDir($userNoticeDir, 0755)) {
         return;
     }
 
@@ -64,18 +70,9 @@ function pmssStorageHealthSyncUserNotice(string $userNoticePath, ?array $payload
         return;
     }
 
-    $tempPath = $userNoticePath.'.'.uniqid('tmp-', true);
-    if (@file_put_contents($tempPath, $json.PHP_EOL, LOCK_EX) === false) {
-        @unlink($tempPath);
+    if (!pmssAtomicWriteFile($userNoticePath, $json.PHP_EOL, 0644)) {
         return;
     }
-
-    if (!@rename($tempPath, $userNoticePath)) {
-        @unlink($tempPath);
-        return;
-    }
-
-    @chmod($userNoticePath, 0644);
 }
 
 function pmssStorageHealthPrintTable(array $disks, array $raid, string $timestamp, string $jsonPath): void

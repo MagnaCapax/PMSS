@@ -213,4 +213,33 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
 
         $this->assertFalse(is_file($noticePath), 'Expected stale user notice to be removed');
     }
+
+    public function testUserNoticeRejectsSymlinkTarget(): void
+    {
+        $jsonPath = $this->pmssMakeTempFile('pmss-storage-health-jsonl-');
+        $realNoticePath = $this->pmssMakeTempFile('pmss-storage-health-real-notice-');
+        $linkNoticePath = $this->pmssMakeTempPath('pmss-storage-health-link-notice-', '.json');
+
+        file_put_contents((string) $jsonPath, json_encode([
+            'timestamp' => '2025-01-01T00:00:03+00:00',
+            'kind' => 'raid',
+            'array' => 'md0',
+            'level' => 'raid1',
+            'state' => 'active',
+            'detail' => 'recovery = 1.0% (1/100)',
+            'severity' => 'warn',
+            'flags' => ['rebuild_in_progress'],
+            'operation' => 'recovery',
+        ], JSON_UNESCAPED_SLASHES)."\n");
+        file_put_contents((string) $realNoticePath, "safe\n");
+        symlink((string) $realNoticePath, (string) $linkNoticePath);
+
+        $this->runStorageHealthCommand(
+            (string) $jsonPath,
+            '--user-notice='.escapeshellarg((string) $linkNoticePath)
+        );
+
+        $this->assertTrue(is_link($linkNoticePath), 'Expected symlinked notice path to remain a symlink');
+        $this->assertEquals("safe\n", file_get_contents($realNoticePath), 'Expected symlink target to stay untouched');
+    }
 }
