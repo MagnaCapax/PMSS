@@ -158,6 +158,7 @@ hr {background-color: #4b4b4b;}
 //   \------------------------- Internal name, must be alphanumeric and
 //                              must not start with a number.
 
+$frameData = array();
 if (file_exists('../.customFrames')) {
     $file = new SplFileObject('../.customFrames');
     while (!$file->eof()) {

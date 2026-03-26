@@ -112,6 +112,7 @@ PHP;
         'radarr-sonarr.txt',
         'www/deluge.php',
         'www/filemanager.php',
+        'www/index.php',
         'www/openvpn-config.tgz',
         'www/qbittorrent.php',
         'www/rutorrent/js/content.js',
