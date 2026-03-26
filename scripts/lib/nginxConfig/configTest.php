@@ -25,9 +25,7 @@ function pmssCreateNginxConfigAppendLog(string $message): void
 {
     $logFile = pmssLogDir().'/update.log';
     $logDir = dirname($logFile);
-    if (!is_dir($logDir)) {
-        @mkdir($logDir, 0755, true);
-    }
+    pmssDirEnsureExists($logDir, 0755);
 
     @file_put_contents($logFile, date('[Y-m-d H:i:s] ').'[createNginxConfig] '.$message."\n", FILE_APPEND | LOCK_EX);
 }

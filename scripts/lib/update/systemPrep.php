@@ -279,7 +279,7 @@ function pmssEnsureBootTuning(?callable $logger = null, ?string $scriptTarget = 
         }
 
         $dir = dirname($path);
-        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+        if (!pmssDirEnsureExists($dir, 0755)) {
             $log('[WARN] Unable to create '.$label.' directory: '.$dir);
             continue;
         }

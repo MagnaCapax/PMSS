@@ -61,7 +61,7 @@ function pmssNetconsoleConfigure(callable $log, ?callable $runner = null): void
     $changed = false;
     foreach ([$optionsPath => "options netconsole netconsole={$spec}\n", $modulesLoadPath => "netconsole\n"] as $path => $body) {
         $dir = dirname($path);
-        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
+        if (!pmssDirEnsureExists($dir, 0755)) {
             $log('[WARN] Failed to create netconsole directory '.$dir);
             continue;
         }

@@ -29,6 +29,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../runtime.php';
+
 require_once __DIR__.'/UserValidator.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
@@ -163,7 +165,7 @@ class UserConfigStore
         if (is_link($configDir)) {
             return;
         }
-        if (!is_dir($configDir) && @mkdir($configDir, 0755, true)) {
+        if (!is_dir($configDir) && pmssDirEnsureExists($configDir, 0755)) {
             @chown($configDir, $username);
             @chgrp($configDir, $username);
         }
@@ -302,7 +304,7 @@ class UserConfigStore
     private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
     {
         $dir = dirname($path);
-        if (!is_dir($dir) && !@mkdir($dir, 0750, true)) {
+        if (!pmssDirEnsureExists($dir, 0750)) {
             return false;
         }
         $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

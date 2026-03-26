@@ -12,6 +12,7 @@
  */
 
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../../runtime.php';
 
 /**
  * Track a single step execution in memory and JSON logs.
@@ -81,8 +82,6 @@ function pmssProfileSummary(): void
     if ($profileOutput === '') {
         return;
     }
-    if (!is_dir($profileDir = dirname($profileOutput))) {
-        @mkdir($profileDir, 0755, true);
-    }
+    pmssDirEnsureExists(dirname($profileOutput), 0755);
     @file_put_contents($profileOutput, json_encode($profile, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }

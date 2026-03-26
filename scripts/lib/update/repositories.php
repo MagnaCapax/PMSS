@@ -42,9 +42,7 @@ require_once __DIR__.'/runtime/commands.php';
         }
 
         $dir = dirname($keyPath);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
+        pmssDirEnsureExists($dir, 0755);
 
         $tmpPath = $keyPath.'.tmp';
         @unlink($tmpPath);
@@ -348,7 +346,7 @@ require_once __DIR__.'/runtime/commands.php';
         }
         if ($aptRc === 0) {
             // Touch the periodic stamp so tools like MOTD know the index is fresh
-            @mkdir('/var/lib/apt/periodic', 0755, true);
+            pmssDirEnsureExists('/var/lib/apt/periodic', 0755);
             @touch('/var/lib/apt/periodic/update-success-stamp');
         } else {
             logMessage('[WARN] apt-get update failed; not updating /var/lib/apt/periodic/update-success-stamp');

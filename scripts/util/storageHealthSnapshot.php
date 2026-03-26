@@ -37,9 +37,7 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         }
     }
 
-    if (($logDir = dirname($logPath)) !== '' && !is_dir($logDir)) {
-        @mkdir($logDir, 0755, true);
-    }
+    if (($logDir = dirname($logPath)) !== '') { pmssDirEnsureExists($logDir, 0755); }
     $timestamp = date('c');
     $last = pmssStorageHealthReadLastEntries($logPath);
 

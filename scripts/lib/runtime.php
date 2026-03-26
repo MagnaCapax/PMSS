@@ -51,6 +51,9 @@ if (!function_exists('pmssLogDir')) {
         return pmssResolvePathFromEnv('PMSS_LOG_DIR', PMSS_LOG_DIR_DEFAULT);
     }
 }
+if (!function_exists('pmssDirEnsureExists')) {
+    function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path); }
+}
 
 if (!function_exists('pmssRuntimeDir')) {
     // Resolve the PMSS runtime directory, allowing hermetic test overrides.
@@ -777,7 +780,7 @@ if (!function_exists('pmssSnapshotLogOpen')) {
         }
         $oldUmask = umask(0077);
         $logDir = dirname($logPath);
-        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
+        if (!pmssDirEnsureExists($logDir, 0755)) {
             return false;
         }
         $handle = @fopen($logPath, 'ab');

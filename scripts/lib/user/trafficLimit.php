@@ -10,7 +10,9 @@
  *
  * @license GPL-3.0-only
  * @author PMSS Team
- */
+*/
+
+require_once dirname(__DIR__).'/runtime.php';
 
 if (is_file(dirname(__DIR__).'/lighttpd/userFileWrite.php')) {
     require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
@@ -120,7 +122,7 @@ if (!function_exists('pmssTrafficLimitEnsureStorageDir')) {
             return pmssEnsureDir($path, 0700, 'root', 'root') && is_dir($path) && !is_link($path);
         }
 
-        if (!is_dir($path) && !@mkdir($path, 0755, true) && !is_dir($path)) {
+        if (!pmssDirEnsureExists($path, 0755)) {
             return false;
         }
 

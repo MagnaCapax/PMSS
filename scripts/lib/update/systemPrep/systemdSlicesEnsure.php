@@ -26,7 +26,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
     $soft = $soft ?: $hard;
     $hard = max($soft, $hard);
     $dropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
-    if (!is_dir($dropDir) && !@mkdir($dropDir, 0755, true)) {
+    if (!pmssDirEnsureExists($dropDir, 0755)) {
         $log('[WARN] Failed to create user@.service drop-in dir '.$dropDir);
         return;
     }
@@ -204,7 +204,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         // Keep user manager logs isolated by namespace to reduce
         // cross-tenant journald mixing on shared hosts.
         $userAtDropDir = pmssResolvePathFromEnv('PMSS_SYSTEMD_USER_AT_SERVICE_DIR', '/etc/systemd/system/user@.service.d');
-        if (!is_dir($userAtDropDir) && !@mkdir($userAtDropDir, 0755, true)) {
+        if (!pmssDirEnsureExists($userAtDropDir, 0755)) {
             $log('[WARN] Failed to create user@.service drop-in dir '.$userAtDropDir);
         } else {
             $userAtTarget = $userAtDropDir.'/30-pmss-log-namespace.conf';

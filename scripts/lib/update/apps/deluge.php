@@ -265,7 +265,7 @@ function pmssEnsureDelugeCommandSymlink(string $command, string $systemPath, str
             $log('[DRYRUN] Would create Deluge command directory: '.$localDir);
             return true;
         }
-        if (!@mkdir($localDir, 0755, true) && !is_dir($localDir)) {
+        if (!pmssDirEnsureExists($localDir, 0755)) {
             $log('[WARN] Failed to create Deluge command directory: '.$localDir);
             return false;
         }

@@ -7,6 +7,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/runtime.php';
+
 $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER'] = $GLOBALS['PMSS_CONFIG_BACKUPS_FALLBACK_LOGGER']
     ?? function (string $message): void {
         if (defined('STDERR')) {
@@ -54,7 +56,7 @@ function pmssBackupCriticalConfig(string $service, string $sourcePath, array $op
         }
     }
     $correlationId = array_key_exists('correlationId', $options) ? (string) $options['correlationId'] : (string) (getenv('PMSS_CORRELATION_ID') ?: '');
-    if (!is_dir($context['serviceDir']) && !@mkdir($context['serviceDir'], 0700, true) && !is_dir($context['serviceDir'])) {
+    if (!pmssDirEnsureExists($context['serviceDir'], 0700)) {
         $context['log']('[WARN] Unable to create config backup directory: '.$context['serviceDir']);
         return null;
     }

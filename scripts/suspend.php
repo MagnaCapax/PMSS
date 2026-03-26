@@ -136,12 +136,12 @@ function pmssCreateSuspendedLanding(string $homeDir, string $username): bool
     $suspendRoot = $homeDir.'/www';
     $publicDir = $suspendRoot.'/public';
 
-    if (!is_dir($suspendRoot) && !@mkdir($suspendRoot, 0755, true)) {
+    if (!pmssDirEnsureExists($suspendRoot, 0755)) {
         echo "Failed to create {$suspendRoot}\n";
         return false;
     }
     if (!is_dir($publicDir)) {
-        if (!@mkdir($publicDir, 0755, true)) {
+        if (!pmssDirEnsureExists($publicDir, 0755)) {
             echo "Failed to create {$publicDir}\n";
             return false;
         }

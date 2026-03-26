@@ -10,6 +10,8 @@
  * @license   Proprietary
  */
 
+require_once __DIR__.'/../runtime.php';
+
 // Signal constants for systems without pcntl.
 if (!defined('SIGTERM')) {
     define('SIGTERM', 15);
@@ -333,7 +335,7 @@ function rtorrentProcessResetSessionDirectory(string $home, string $user, callab
         $logFn("Quarantined broken session directory: {$sessionDir} -> {$backup}", true);
     }
 
-    if (!is_dir($sessionDir) && !@mkdir($sessionDir, 0755, true) && !is_dir($sessionDir)) {
+    if (!pmssDirEnsureExists($sessionDir, 0755)) {
         $logFn("Failed to recreate session directory: {$sessionDir}", true);
         return false;
     }

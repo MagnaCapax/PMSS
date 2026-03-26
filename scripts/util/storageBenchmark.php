@@ -129,7 +129,7 @@ if ($showLast) {
 
 if (pmssCommandPath('fio')===''){ fwrite(STDERR,"Error: 'fio' not found.\n"); exit(1);} 
 if (!is_dir($targetDir)||!is_writable($targetDir)){ fwrite(STDERR,"Error: target not writable: {$targetDir}\n"); exit(1);} 
-if (!is_dir(dirname($jsonLog))) @mkdir(dirname($jsonLog),0755,true);
+pmssDirEnsureExists(dirname($jsonLog), 0755);
 
 $runId=date('YmdHis').'-'.bin2hex(random_bytes(3)); $runTs=date('c');
 $fs=trim((string) shell_exec('stat -f -c %T '.escapeshellarg($targetDir))); $mntDev=trim((string) shell_exec('df -P '.escapeshellarg($targetDir).' | awk ' . escapeshellarg('NR==2 {print $1}') ));

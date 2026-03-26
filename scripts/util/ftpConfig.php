@@ -74,7 +74,7 @@ $rendered = str_replace(
 if ($tlsBlock === '') { $rendered = preg_replace('#\n?<IfModule mod_tls\\.c>.*?</IfModule>#s', '', $rendered); }
 
 foreach (['/var/log/proftpd', '/var/run/proftpd'] as $path) {
-    if (!is_dir($path) && !@mkdir($path, 0750, true)) {
+    if (!pmssDirEnsureExists($path, 0750)) {
         logMessage("Warning: Unable to create {$path}");
         continue;
     }

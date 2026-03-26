@@ -51,7 +51,7 @@ function pmssSafeWriteSources(string $content, string $label, ?callable $logger 
 
     $current = @file_get_contents($target);
     $dir = dirname($target);
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+    if (!pmssDirEnsureExists($dir, 0755)) {
         $log("[ERROR] Unable to create parent directory for $label sources.list: $dir");
         return false;
     }
@@ -84,7 +84,7 @@ function pmssAptWriteValidUntilOverride(?callable $logger = null, ?string $path 
     );
     $dir = dirname($target);
 
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+    if (!pmssDirEnsureExists($dir, 0755)) {
         $log('[WARN] Unable to create apt.conf.d directory for Release timestamp override: '.$dir);
         return false;
     }

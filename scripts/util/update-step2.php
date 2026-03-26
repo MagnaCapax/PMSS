@@ -251,9 +251,7 @@ pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void 
         return;
     }
     $dir = dirname(PMSS_UPDATE_LOCK_FILE);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
+    pmssDirEnsureExists($dir, 0755);
     $fh = @fopen(PMSS_UPDATE_LOCK_FILE, 'c');
     if ($fh === false) {
         logmsg('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE);

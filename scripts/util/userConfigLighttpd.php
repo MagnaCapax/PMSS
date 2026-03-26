@@ -39,13 +39,13 @@ function pmssUserConfigLighttpdMain(array $argv): int
     $users = $selection['users'];
     $portsDirectory = '/etc/seedbox/runtime/ports';
     if (!file_exists($portsDirectory))  {
-        @mkdir($portsDirectory, 0600, true);
+        pmssDirEnsureExists($portsDirectory, 0600);
     }
     if (is_dir($portsDirectory) && !is_link($portsDirectory)) {
         @chmod($portsDirectory, 0600);
     }
     if (!file_exists('/root/backups')) {
-        @mkdir('/root/backups', 0755, true);
+        pmssDirEnsureExists('/root/backups', 0755);
     }
     $template = file_get_contents("/etc/seedbox/config/template.lighttpd");
 
