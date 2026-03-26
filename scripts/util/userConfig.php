@@ -62,14 +62,13 @@ $user = [
 ];
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
 
-// Safely get the user ID
-$output = [];
-$return_var = 0;
-exec('id -u ' . escapeshellarg($user['name']), $output, $return_var);
-if ($return_var !== 0) {
-    die("Failed to get user ID for {$user['name']}\n");
+$passwdEntry = pmssPasswdEntryLookup($user['name']);
+if ($passwdEntry === null) {
+    die("No such user in passwd list\n");
 }
-$user['id'] = (int) trim($output[0]);
+
+$account = pmssUserAccountLookup($user['name']) ?? $passwdEntry;
+$user['id'] = (int) ($account['uid'] ?? 0);
 
 if (isset($args[4])) {
     $user['trafficLimit'] = (int) $args[4];
@@ -78,13 +77,10 @@ if (isset($args[4])) {
 if ($user['id'] < 1000) {
     die("No system ID or user does not exist\n");
 }
-if (!file_exists("/home/{$user['name']}")) {
+$expectedHome = "/home/{$user['name']}";
+$accountHome = rtrim((string) ($passwdEntry['dir'] ?? ($account['dir'] ?? '')), '/');
+if ($accountHome !== $expectedHome || !file_exists($expectedHome)) {
     die("User does not exist\n");
-}
-
-$userList = file_get_contents('/etc/passwd');
-if (strpos($userList, $user['name']) === false) {
-    die("No such user in passwd list\n");
 }
 
 $presenceIndices = [

@@ -343,10 +343,47 @@ function pmssManagedUsersSelectFromCommand(string $command = '/scripts/listUsers
     return pmssManagedUsersSelectFromList(pmssListManagedUsers($command), $rawUsername, $options);
 }
 
+/** @return array{name:string,uid:int,gid:int,dir:string}|null */
+function pmssPasswdEntryLookup(string $username, string $passwdPath = '/etc/passwd'): ?array
+{
+    $normalized = pmssUsernameNormalizeIfValid($username);
+    if ($normalized === null || !is_file($passwdPath) || is_link($passwdPath)) {
+        return null;
+    }
+
+    $lines = @file($passwdPath, FILE_IGNORE_NEW_LINES);
+    if (!is_array($lines)) {
+        return null;
+    }
+
+    $prefix = $normalized.':';
+    foreach ($lines as $line) {
+        if (!is_string($line) || strpos($line, $prefix) !== 0) {
+            continue;
+        }
+
+        $parts = explode(':', $line);
+        if (count($parts) < 7) {
+            return null;
+        }
+
+        return array(
+            'name' => (string) $parts[0],
+            'uid' => (int) $parts[2],
+            'gid' => (int) $parts[3],
+            'dir' => (string) $parts[5],
+        );
+    }
+
+    return null;
+}
+
 /** @return array<string,mixed>|null */
 function pmssUserAccountLookup(string $username): ?array
 {
-    if (!function_exists('posix_getpwnam')) { return null; }
+    if (!function_exists('posix_getpwnam')) {
+        return pmssPasswdEntryLookup($username);
+    }
     $info = @posix_getpwnam($username);
     return is_array($info) && isset($info['uid']) ? $info : null;
 }

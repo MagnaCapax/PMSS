@@ -78,6 +78,35 @@ class UsernameValidationTest extends TestCase
         }
     }
 
+    public function testPasswdEntryLookupRequiresExactUserMatch(): void
+    {
+        $passwd = $this->pmssMakeTempDir('pmss-passwd-').'/passwd';
+        file_put_contents($passwd, implode("\n", [
+            'alice2:x:1000:1000::/home/alice2:/bin/bash',
+            'alice:x:1001:1001::/home/alice:/bin/bash',
+            '',
+        ]));
+
+        $entry = \pmssPasswdEntryLookup('alice', $passwd);
+
+        $this->assertTrue(is_array($entry));
+        $this->assertEquals('alice', $entry['name']);
+        $this->assertEquals(1001, $entry['uid']);
+        $this->assertEquals('/home/alice', $entry['dir']);
+    }
+
+    public function testPasswdEntryLookupRejectsInvalidUsernameAndSymlinkPath(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-passwd-link-');
+        $passwd = $root.'/passwd';
+        $link = $root.'/passwd.link';
+        file_put_contents($passwd, "alice:x:1001:1001::/home/alice:/bin/bash\n");
+        symlink($passwd, $link);
+
+        $this->assertEquals(null, \pmssPasswdEntryLookup('../alice', $passwd));
+        $this->assertEquals(null, \pmssPasswdEntryLookup('alice', $link));
+    }
+
     public function testInvalidUsernamesFail(): void
     {
         $invalid = [
