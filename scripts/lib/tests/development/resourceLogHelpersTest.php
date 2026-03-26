@@ -9,23 +9,10 @@ class ResourceLogHelpersTest extends TestCase
 {
     private function withFakeSystemctl(array $outputLines, callable $callback): void
     {
-        $root = $this->makeRoot();
-        $binDir = $root.'/bin';
-        @mkdir($binDir, 0755, true);
-
-        $scriptPath = $binDir.'/systemctl';
-        $script = "#!/bin/sh\n";
-        foreach ($outputLines as $line) {
-            $script .= "echo '".str_replace("'", "'\\''", $line)."'\n";
-        }
-        @file_put_contents($scriptPath, $script);
-        @chmod($scriptPath, 0755);
-
-        try {
-            $this->pmssWithPathPrefix($binDir, $callback);
-        } finally {
-            $this->pmssRemoveTree($root);
-        }
+        $this->pmssWithPathPrefix(
+            $this->pmssMakeLineOutputStub('systemctl', $outputLines, 'pmss-resource-systemctl-'),
+            $callback
+        );
     }
 
     private function makeRoot(): string

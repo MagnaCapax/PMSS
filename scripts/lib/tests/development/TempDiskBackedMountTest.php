@@ -17,12 +17,8 @@ class TempDiskBackedMountTest extends TestCase
 
     public function testMasksTmpMountOnDebian13(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-tmp-mask-', 0700);
-        $binDir = $root.'/bin';
-        $logPath = $root.'/systemctl.log';
-        @mkdir($binDir, 0755, true);
-        @file_put_contents($binDir.'/systemctl', "#!/bin/sh\nprintf '%s\n' \"$*\" >>".escapeshellarg($logPath)."\nexit 0\n");
-        @chmod($binDir.'/systemctl', 0755);
+        $logPath = $this->pmssMakeTempPath('pmss-tmp-mask-', '.log');
+        $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-mask-bin-');
 
         $messages = [];
         $this->pmssWithPathPrefix($binDir, function () use (&$messages): void {
@@ -35,12 +31,8 @@ class TempDiskBackedMountTest extends TestCase
 
     public function testMasksTmpMountOnLaterDebianVersions(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-tmp-mask-later-', 0700);
-        $binDir = $root.'/bin';
-        $logPath = $root.'/systemctl.log';
-        @mkdir($binDir, 0755, true);
-        @file_put_contents($binDir.'/systemctl', "#!/bin/sh\nprintf '%s\n' \"$*\" >>".escapeshellarg($logPath)."\nexit 0\n");
-        @chmod($binDir.'/systemctl', 0755);
+        $logPath = $this->pmssMakeTempPath('pmss-tmp-mask-later-', '.log');
+        $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-mask-later-bin-');
 
         $this->pmssWithPathPrefix($binDir, function (): void {
             \pmssConfigureTempDiskBackedMount(null, 14);
@@ -63,12 +55,9 @@ class TempDiskBackedMountTest extends TestCase
     public function testDetectsDebian13FromOsReleaseWhenVersionMissing(): void
     {
         $root = $this->pmssMakeTempDir('pmss-tmp-detect-', 0700);
-        $binDir = $root.'/bin';
-        $logPath = $root.'/systemctl.log';
+        $logPath = $this->pmssMakeTempPath('pmss-tmp-detect-', '.log');
         $osRelease = $root.'/os-release';
-        @mkdir($binDir, 0755, true);
-        @file_put_contents($binDir.'/systemctl', "#!/bin/sh\nprintf '%s\n' \"$*\" >>".escapeshellarg($logPath)."\nexit 0\n");
-        @chmod($binDir.'/systemctl', 0755);
+        $binDir = $this->pmssMakeInvocationLogStub('systemctl', $logPath, 'pmss-tmp-detect-bin-');
         @file_put_contents($osRelease, "ID=debian\nVERSION_ID=12\nVERSION_CODENAME=trixie\n");
 
         $previous = getenv('PMSS_OS_RELEASE_PATH');

@@ -6,11 +6,6 @@ require_once dirname(__DIR__, 2).'/traffic/ingress.php';
 
 class TrafficIngressHelpersTest extends TestCase
 {
-    private function makeRoot(): string
-    {
-        return $this->pmssMakeTempDir('pmss-ingress-', 0700);
-    }
-
     public function testEnsureDirRejectsRelative(): void
     {
         $this->assertTrue(!\pmssTrafficIngressEnsureDir('relative/path', 0700));
@@ -18,7 +13,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testEnsureDirCreatesDirectory(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $path = $root.'/state';
         $this->assertTrue(\pmssTrafficIngressEnsureDir($path, 0700));
         $this->assertTrue(is_dir($path));
@@ -26,7 +21,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testEnsureDirRejectsSymlink(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $target = $root.'/target';
         $this->pmssEnsureDir($target, 0700);
         $link = $root.'/link';
@@ -36,7 +31,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testEnsureDirRejectsSymlinkedParentDirectory(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $target = $root.'/target';
         $this->pmssEnsureDir($target, 0700);
 
@@ -49,14 +44,14 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testReadStateMissingReturnsEmpty(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $state = \pmssTrafficIngressReadState($root.'/missing.json');
         $this->assertTrue($state === []);
     }
 
     public function testWriteStateRoundTrip(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $path = $root.'/state.json';
         $payload = ['ingress' => 123, 'egress' => 456];
         \pmssTrafficIngressWriteState($path, $payload);
@@ -67,7 +62,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testReadStateInvalidJsonReturnsEmpty(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $path = $root.'/bad.json';
         $this->pmssWriteFile($path, 'not-json');
         $loaded = \pmssTrafficIngressReadState($path);
@@ -76,7 +71,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testReadStateRejectsSymlink(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $target = $root.'/target.json';
         $this->pmssWriteFile($target, json_encode(['ingress' => 1]));
         $path = $root.'/state.json';
@@ -87,12 +82,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testReadCountersParsesSystemctlOutputViaSharedHelper(): void
     {
-        $root = $this->makeRoot();
-        $binDir = $root.'/bin';
-        $this->pmssEnsureDir($binDir);
-        $scriptPath = $binDir.'/systemctl';
-        $this->pmssWriteFile($scriptPath, "#!/bin/sh\necho 'IPIngressBytes=123'\necho 'IPEgressBytes=456'\n");
-        @chmod($scriptPath, 0755);
+        $binDir = $this->pmssMakeLineOutputStub('systemctl', ['IPIngressBytes=123', 'IPEgressBytes=456'], 'pmss-ingress-systemctl-');
 
         $this->pmssWithPathPrefix($binDir, function (): void {
             $this->assertEquals(['ingress' => 123, 'egress' => 456], \pmssTrafficIngressReadCounters(1000));
@@ -101,12 +91,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testReadCountersReturnsNullWhenRequiredCounterMissing(): void
     {
-        $root = $this->makeRoot();
-        $binDir = $root.'/bin';
-        $this->pmssEnsureDir($binDir);
-        $scriptPath = $binDir.'/systemctl';
-        $this->pmssWriteFile($scriptPath, "#!/bin/sh\necho 'IPIngressBytes=123'\n");
-        @chmod($scriptPath, 0755);
+        $binDir = $this->pmssMakeLineOutputStub('systemctl', ['IPIngressBytes=123'], 'pmss-ingress-systemctl-');
 
         $this->pmssWithPathPrefix($binDir, function (): void {
             $this->assertEquals(null, \pmssTrafficIngressReadCounters(1000));
@@ -115,7 +100,7 @@ class TrafficIngressHelpersTest extends TestCase
 
     public function testWriteStateRejectsSymlink(): void
     {
-        $root = $this->makeRoot();
+        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $target = $root.'/target.json';
         $this->pmssWriteFile($target, json_encode(['ingress' => 5, 'egress' => 6]));
         $path = $root.'/state.json';

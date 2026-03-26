@@ -18,7 +18,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
     public function testSnapshotNvmeParsesMetricsAndFlags(): void
     {
         $device = $this->createFakeNvmeDevice();
-        $stubDir = $this->createNvmeStubDir(implode("\n", [
+        $stubDir = $this->pmssMakeExecutableStub('nvme', implode("\n", [
             '#!/bin/sh',
             'cat <<\'EOF\'',
             'critical_warning : 1',
@@ -27,7 +27,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
             'num_err_log_entries : 9',
             'percentage_used : 96',
             'EOF',
-        ])."\n");
+        ])."\n", 'pmss-nvme-bin-');
 
         $this->pmssWithPathPrefix($stubDir, function () use ($device): void {
             $entry = \pmssStorageHealthSnapshotNvme([
@@ -53,7 +53,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
     public function testSnapshotNvmeTracksMetricGrowthAgainstPreviousEntry(): void
     {
         $device = $this->createFakeNvmeDevice();
-        $stubDir = $this->createNvmeStubDir(implode("\n", [
+        $stubDir = $this->pmssMakeExecutableStub('nvme', implode("\n", [
             '#!/bin/sh',
             'cat <<\'EOF\'',
             'critical_warning : 0',
@@ -62,7 +62,7 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
             'num_err_log_entries : 7',
             'percentage_used : 10',
             'EOF',
-        ])."\n");
+        ])."\n", 'pmss-nvme-bin-');
 
         $this->pmssWithPathPrefix($stubDir, function () use ($device): void {
             $entry = \pmssStorageHealthSnapshotNvme(
@@ -82,10 +82,5 @@ final class StorageHealthSnapshotNvmeTest extends TestCase
         $path = $this->pmssMakeReadableTempPath('pmss-nvme-device-', 'dev-');
         file_put_contents($path, 'device');
         return $path;
-    }
-
-    private function createNvmeStubDir(string $script): string
-    {
-        return $this->pmssMakeExecutableStub('nvme', $script, 'pmss-nvme-bin-');
     }
 }

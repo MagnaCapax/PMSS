@@ -233,6 +233,27 @@ abstract class TestCase
         return $binDir;
     }
 
+    /** Create a stub that prints fixed lines to stdout for parser tests. */
+    protected function pmssMakeLineOutputStub(string $binaryName, array $outputLines, string $dirPrefix): string
+    {
+        $script = "#!/bin/sh\n";
+        foreach ($outputLines as $line) {
+            $script .= "printf '%s\\n' ".escapeshellarg($line)."\n";
+        }
+
+        return $this->pmssMakeExecutableStub($binaryName, $script, $dirPrefix);
+    }
+
+    /** Create a stub that appends every invocation to a log file. */
+    protected function pmssMakeInvocationLogStub(string $binaryName, string $logPath, string $dirPrefix): string
+    {
+        return $this->pmssMakeExecutableStub(
+            $binaryName,
+            "#!/bin/sh\nprintf '%s\\n' \"\$*\" >>".escapeshellarg($logPath)."\nexit 0\n",
+            $dirPrefix
+        );
+    }
+
     /** Assign a temporary directory to a test property, including private child properties. */
     protected function pmssAssignTempDirProperty(
         string $propertyName,

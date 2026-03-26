@@ -8,14 +8,14 @@ final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
 {
     public function testSnapshotSmartKeepsLegacyUdmaCrcHistoryCompatible(): void
     {
-        $device = $this->pmssCreateReadableDevice();
-        $stubDir = $this->pmssCreateSmartctlStubDir(implode("\n", [
+        $device = $this->pmssMakeReadableTempPath('pmss-smart-device-', 'dev-');
+        $stubDir = $this->pmssMakeExecutableStub('smartctl', implode("\n", [
             '#!/bin/sh',
             'cat <<\'EOF\'',
             'SMART overall-health self-assessment test result: PASSED',
             '199 UDMA_CRC_Error_Count    0x003e   200   200   000    Old_age   Always       -       4',
             'EOF',
-        ])."\n");
+        ])."\n", 'pmss-smart-bin-');
 
         $this->pmssWithPathPrefix($stubDir, function () use ($device): void {
             $entry = \pmssStorageHealthSnapshotSmart(
@@ -32,15 +32,5 @@ final class StorageHealthSnapshotSmartCharacterizationTest extends TestCase
             $this->assertEquals('ok', $entry['severity']);
             $this->assertTrue($entry['ok']);
         });
-    }
-
-    private function pmssCreateReadableDevice(): string
-    {
-        return $this->pmssMakeReadableTempPath('pmss-smart-device-', 'dev-');
-    }
-
-    private function pmssCreateSmartctlStubDir(string $script): string
-    {
-        return $this->pmssMakeExecutableStub('smartctl', $script, 'pmss-smart-bin-');
     }
 }
