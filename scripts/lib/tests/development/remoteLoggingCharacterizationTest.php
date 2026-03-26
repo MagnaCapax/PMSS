@@ -45,4 +45,39 @@ class RemoteLoggingCharacterizationTest extends TestCase
             'Expected apply log to reflect defaulted port and protocol'
         );
     }
+
+    public function testTemplateReplacementStaysGlobalAcrossRepeatedPlaceholders(): void
+    {
+        $cfgDir = $this->pmssMakeTempDir('pmss-remote-logging-char-cfg-');
+        $targetDir = $this->pmssMakeTempDir('pmss-remote-logging-char-rsyslog-');
+        $target = $targetDir.'/50-pmss-remote.conf';
+
+        file_put_contents($cfgDir.'/logging.conf', implode("\n", [
+            'remote_logging_enabled=1',
+            'remote_host=mirror.example.net',
+            'remote_port=10514',
+            'remote_protocol=udp',
+            '',
+        ]));
+        file_put_contents($cfgDir.'/template.rsyslog-remote.conf', implode("\n", [
+            '*.* @%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%',
+            '# copy=%%PMSS_RSYSLOG_REMOTE_HOST%%:%%PMSS_RSYSLOG_REMOTE_PORT%%',
+            '# protocol=%%PMSS_RSYSLOG_PROTOCOL%%/%%PMSS_RSYSLOG_PROTOCOL%%',
+            '',
+        ]));
+
+        $this->pmssWithEnv([
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_RSYSLOG_CONF_DIR' => $targetDir,
+            'PMSS_DRY_RUN' => '1',
+        ], function (): void {
+            \pmssApplyRemoteLogging();
+        });
+
+        $this->assertTrue(file_exists($target), 'Expected rendered remote logging config');
+        $rendered = (string) file_get_contents($target);
+        $this->assertStringContainsString('*.* @mirror.example.net:10514', $rendered);
+        $this->assertStringContainsString('# copy=mirror.example.net:10514', $rendered);
+        $this->assertStringContainsString('# protocol=udp/udp', $rendered);
+    }
 }

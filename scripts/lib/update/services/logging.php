@@ -1,13 +1,6 @@
 <?php
 /**
- * Remote logging configuration for PMSS hosts.
- *
- * Reads configuration from /etc/seedbox/config/logging.conf if it exists
- * and deploys rsyslog remote forwarding config when enabled.
- *
- * This module is BEST-EFFORT ONLY: failures never abort the update process.
- * Remote logging is DISABLED by default and must be explicitly enabled
- * via logging.conf.
+ * Best-effort journald and remote logging configuration helpers.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -19,6 +12,26 @@ require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../runtime/processes.php';
 require_once __DIR__.'/../../runtime.php';
 
+/** Read a logging template and replace placeholders in one pass. */
+function pmssRenderLoggingTemplate(
+    string $template,
+    array $replacements,
+    string $missingMessage,
+    string $readErrorMessage,
+    callable $logger
+): ?string {
+    if (!is_file($template)) {
+        $logger($missingMessage.$template);
+        return null;
+    }
+    $raw = @file_get_contents($template);
+    if ($raw === false) {
+        $logger($readErrorMessage.$template);
+        return null;
+    }
+    return strtr($raw, $replacements);
+}
+
 /**
  * Compute journald caps based on root filesystem size.
  *
@@ -27,16 +40,12 @@ require_once __DIR__.'/../../runtime.php';
 function pmssJournaldLimitsForRootBytes(int $rootBytes): array
 {
     $gib = 1024 * 1024 * 1024;
-
     // < 50GiB gets 20% with a 2GiB floor; larger roots use 20GiB flat.
     $systemMax = max(2 * $gib, $rootBytes < 50 * $gib ? (int) floor($rootBytes * 0.20) : 20 * $gib);
-
     // Keep free 5% of root, clamped to 1-10GiB.
     $systemKeepFree = max(1 * $gib, min(10 * $gib, (int) floor($rootBytes * 0.05)));
-
     // Runtime max defaults to 10% of SystemMaxUse, clamped to 256MiB-2GiB.
     $runtimeMax = max(256 * 1024 * 1024, min(2 * $gib, (int) floor($systemMax / 10)));
-
     return [
         'system_max_use_bytes'   => $systemMax,
         'system_keep_free_bytes' => $systemKeepFree,
@@ -79,9 +88,7 @@ function pmssRemoteLoggingReadConfig(string $loggingConf): array
     return $config;
 }
 
-/**
- * Explain why remote logging should not be applied.
- */
+/** Explain why remote logging should not be applied. */
 function pmssRemoteLoggingInvalidReason(array $config): string
 {
     if (!$config['enabled']) { return 'Remote logging not enabled'; }
@@ -99,11 +106,6 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
     $log = $logger ?: 'logMessage';
     $cfgDir = pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config');
     $template = $cfgDir.'/template.journald.conf.d-pmss-limits.conf';
-    if (!is_file($template)) {
-        $log('[SKIP] Journald limits template missing: '.$template);
-        return;
-    }
-
     $rootBytes = (($override = getenv('PMSS_ROOT_FS_BYTES')) !== false && $override !== '' && ctype_digit($override))
         ? (int) $override
         : (((($bytes = @disk_total_space('/')) !== false) && is_numeric($bytes) && $bytes > 0) ? (int) $bytes : 0);
@@ -111,12 +113,6 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         $log('[WARN] Unable to determine root filesystem size; skipping journald limits');
         return;
     }
-
-    if (($raw = @file_get_contents($template)) === false) {
-        $log('[WARN] Unable to read journald limits template: '.$template);
-        return;
-    }
-
     $policy = pmssJournaldLimitsForRootBytes($rootBytes);
     $gib = 1024 * 1024 * 1024;
     $repl = [];
@@ -133,19 +129,21 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         '%%PMSS_JOURNALD_RATE_LIMIT_INTERVAL%%' => $policy['rate_limit_interval_sec'].'s',
         '%%PMSS_JOURNALD_RATE_LIMIT_BURST%%'    => (string) $policy['rate_limit_burst'],
     ];
-    $raw = strtr($raw, $repl);
-
+    $rendered = pmssRenderLoggingTemplate(
+        $template,
+        $repl,
+        '[SKIP] Journald limits template missing: ',
+        '[WARN] Unable to read journald limits template: ',
+        $log
+    );
+    if ($rendered === null) return;
     $targetDir = pmssResolvePathFromEnv('PMSS_JOURNALD_CONF_DIR', '/etc/systemd/journald.conf.d');
     if ((!is_dir($targetDir) || is_link($targetDir)) && !pmssEnsureSafeDir($targetDir, 0755)) {
         $log('[WARN] Unable to prepare journald config directory: '.$targetDir);
         return;
     }
-
     $target = $targetDir.'/pmss-limits.conf';
-    if (!pmssWriteManagedPathFile($target, $raw, 'journald limits', $log)) {
-        return;
-    }
-
+    if (!pmssWriteManagedPathFile($target, $rendered, 'journald limits', $log)) return;
     $log(sprintf(
         'Applied journald limits: SystemMaxUse=%s RuntimeMaxUse=%s RateLimit=%ss/%d',
         $repl['%%PMSS_JOURNALD_SYSTEM_MAX_USE%%'],
@@ -153,7 +151,6 @@ function pmssApplyJournaldLimits(?callable $logger = null): void
         $policy['rate_limit_interval_sec'],
         $policy['rate_limit_burst']
     ));
-
     $skipReason = pmssSystemdActionSkipReason(null, true, true);
     if ($skipReason !== '') { pmssLogStatus('SKIP', 'Restarting systemd-journald to apply log caps ('.$skipReason.')'); return; }
     runStep('Restarting systemd-journald to apply log caps', 'systemctl restart systemd-journald');
@@ -175,14 +172,9 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
     $target = $targetDir.'/50-pmss-remote.conf';
     $skipRestartReason = pmssSystemdActionSkipReason(null, true, true);
     $skipRestart = $skipRestartReason !== '';
-
-    if (!is_file($loggingConf)) {
-        return;
-    }
-
+    if (!is_file($loggingConf)) return;
     $config = pmssRemoteLoggingReadConfig($loggingConf);
     $invalidReason = pmssRemoteLoggingInvalidReason($config);
-
     if ($invalidReason !== '') {
         if ($config['enabled']) {
             // Only warn if explicitly enabled but misconfigured
@@ -203,44 +195,33 @@ function pmssApplyRemoteLogging(?callable $logger = null): void
         }
         return;
     }
-
-    if (!is_file($template)) {
-        $log('[WARN] Remote logging template missing: '.$template);
-        return;
-    }
-
-    if (($raw = @file_get_contents($template)) === false) {
-        $log('[WARN] Unable to read remote logging template: '.$template);
-        return;
-    }
-
-    $rendered = strtr($raw, [
-        '%%PMSS_RSYSLOG_REMOTE_HOST%%' => $config['host'],
-        '%%PMSS_RSYSLOG_REMOTE_PORT%%' => (string) $config['port'],
-        '%%PMSS_RSYSLOG_PROTOCOL%%'    => $config['protocol'],
-    ]);
-
+    $rendered = pmssRenderLoggingTemplate(
+        $template,
+        [
+            '%%PMSS_RSYSLOG_REMOTE_HOST%%' => $config['host'],
+            '%%PMSS_RSYSLOG_REMOTE_PORT%%' => (string) $config['port'],
+            '%%PMSS_RSYSLOG_PROTOCOL%%'    => $config['protocol'],
+        ],
+        '[WARN] Remote logging template missing: ',
+        '[WARN] Unable to read remote logging template: ',
+        $log
+    );
+    if ($rendered === null) return;
     if (!is_dir($targetDir)) {
         $log('[SKIP] rsyslog conf.d directory not found: '.$targetDir);
         return;
     }
-
-    if (!pmssWriteManagedPathFile($target, $rendered, 'remote logging config', $log)) {
-        return;
-    }
-
+    if (!pmssWriteManagedPathFile($target, $rendered, 'remote logging config', $log)) return;
     $log(sprintf(
         'Applied remote logging: %s:%d (%s)',
         $config['host'],
         $config['port'],
         $config['protocol']
     ));
-
     if ($skipRestart) {
         pmssLogStatus('SKIP', 'Restarting rsyslog to apply remote forwarding ('.$skipRestartReason.')');
         return;
     }
-
     if (!@file_exists('/lib/systemd/system/rsyslog.service') && !@file_exists('/etc/init.d/rsyslog')) {
         $log('[SKIP] rsyslog service not found; config deployed but service not restarted');
         return;
