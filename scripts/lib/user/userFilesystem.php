@@ -63,9 +63,7 @@ class userFilesystem
             }
         }
 
-        $names = array_keys($users);
-        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
-        return $names;
+        return self::sortUsernames(array_keys($users));
     }
 
     /**
@@ -94,9 +92,7 @@ class userFilesystem
             }
             $names[$name] = true;
         }
-        $result = array_keys($names);
-        sort($result, SORT_NATURAL | SORT_FLAG_CASE);
-        return $result;
+        return self::sortUsernames(array_keys($names));
     }
 
     /**
@@ -115,8 +111,7 @@ class userFilesystem
                 $valid[] = $name;
             }
         }
-        sort($valid, SORT_NATURAL | SORT_FLAG_CASE);
-        return $valid;
+        return self::sortUsernames($valid);
     }
 
     public static function withAdditionalUsers(array $users, array $additionalUsers): array
@@ -126,6 +121,13 @@ class userFilesystem
             $additionalUser !== '' && pmssNormalizeUsername($additionalUser) === $additionalUser && preg_match('/^[a-z0-9-]+$/', $additionalUser) === 1 && $users[] = $additionalUser;
         }
         return array_values(array_unique($users));
+    }
+
+    /** Keep user listings in one natural, case-insensitive order. */
+    private static function sortUsernames(array $names): array
+    {
+        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+        return $names;
     }
 
     /**

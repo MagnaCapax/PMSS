@@ -10,6 +10,12 @@ foreach (['../logging.php', '../managedPath.php', '../runtime/commands.php', 'qu
     require_once __DIR__.'/'.$relativePath;
 }
 
+/** Execute a stable list of bootstrap actions through the profiled step runner. */
+function pmssRunBootstrapActions(array $actions): void
+{
+    foreach ($actions as $action) { runStep(...$action); }
+}
+
 /**
  * Apply hostname overrides provided by the installer.
  */
@@ -72,7 +78,7 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
  */
 function pmssApplyRuntimeTemplates(): void
 {
-    foreach ([
+    pmssRunBootstrapActions([
         ['Updating rc.local template', 'cp /etc/seedbox/config/template.rc.local /etc/rc.local'],
         ['Setting rc.local ownership', 'chown root:root /etc/rc.local'],
         ['Setting rc.local permissions', 'chmod 750 /etc/rc.local'],
@@ -80,18 +86,14 @@ function pmssApplyRuntimeTemplates(): void
         ['Installing systemd system.conf template', 'cp /etc/seedbox/config/template.systemd.system.conf /etc/systemd/system.conf'],
         ['Setting permissions on systemd system.conf', 'chmod 644 /etc/systemd/system.conf'],
         ['Reexecuting systemd to pick up configuration', '/usr/bin/systemctl daemon-reexec'],
-    ] as $action) {
-        runStep(...$action);
-    }
+    ]);
 
     pmssBackupCriticalConfig('sshd', '/etc/ssh/sshd_config');
-    foreach ([
+    pmssRunBootstrapActions([
         ['Installing sshd configuration template', 'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config'],
         ['Setting sshd_config permissions', 'chmod 644 /etc/ssh/sshd_config'],
         ['Restarting sshd to load updated configuration', '/usr/bin/systemctl restart sshd'],
-    ] as $action) {
-        runStep(...$action);
-    }
+    ]);
 }
 
 /**

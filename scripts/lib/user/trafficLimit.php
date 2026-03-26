@@ -10,7 +10,7 @@
  *
  * @license GPL-3.0-only
  * @author PMSS Team
-*/
+ */
 
 require_once dirname(__DIR__).'/runtime.php';
 
@@ -92,7 +92,7 @@ if (!function_exists('pmssTrafficLimitReadGiBFile')) {
 
         $error = null;
         $value = pmssTrafficLimitParseGiB($raw, $error);
-        return ($value !== null) ? $value : 0;
+        return $value !== null ? $value : 0;
     }
 }
 
@@ -144,15 +144,7 @@ if (!function_exists('pmssTrafficLimitRemoveGiBFile')) {
             return false;
         }
 
-        if (!file_exists($path)) {
-            return true;
-        }
-
-        if (@unlink($path)) {
-            clearstatcache(true, $path);
-            return true;
-        }
-
+        file_exists($path) && @unlink($path);
         clearstatcache(true, $path);
         return !file_exists($path) && !is_link($path);
     }

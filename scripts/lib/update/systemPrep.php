@@ -15,12 +15,18 @@ require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/runtime/processes.php';
 require_once __DIR__.'/../runtime.php';
 
+/** Read a non-negative integer override from the environment. */
+function pmssSystemPrepReadDigitEnv(string $key): ?int
+{
+    return (($override = getenv($key)) !== false && ctype_digit($override)) ? (int) $override : null;
+}
+
 /**
  * Return total system memory in MiB (rounded).
  */
 function pmssTotalMemMiB(): int
 {
-    if (is_string($override = getenv('PMSS_TOTAL_MEM_MIB')) && ctype_digit($override)) {
+    if (($override = pmssSystemPrepReadDigitEnv('PMSS_TOTAL_MEM_MIB')) !== null) {
         return (int) $override;
     }
 
@@ -34,7 +40,7 @@ function pmssTotalMemMiB(): int
  */
 function pmssTotalCpuThreads(): int
 {
-    if (is_string($override = getenv('PMSS_TOTAL_CPU_THREADS')) && ctype_digit($override)) {
+    if (($override = pmssSystemPrepReadDigitEnv('PMSS_TOTAL_CPU_THREADS')) !== null) {
         return (int) $override;
     }
 

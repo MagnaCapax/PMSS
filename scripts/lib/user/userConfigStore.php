@@ -298,7 +298,9 @@ class UserConfigStore
     private function loadLegacyAggregateMap(): array
     {
         $data = $this->readJsonFile($this->legacyAggregatePath);
-        return !is_array($data) ? [] : ((isset($data['users']) && is_array($data['users'])) ? $data['users'] : $data);
+        return is_array($data)
+            ? (isset($data['users']) && is_array($data['users']) ? $data['users'] : $data)
+            : [];
     }
 
     private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
@@ -368,14 +370,10 @@ if (!function_exists('pmssUserDockerEnabled')) {
         }
 
         $payload = $store->get($username);
-        if (!is_array($payload)) {
-            $payload = [];
-        }
-
-        $configuredRamMiB = 0;
-        if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB'])) {
-            $configuredRamMiB = (int) $payload['ramMiB'];
-        }
+        $payload = is_array($payload) ? $payload : [];
+        $configuredRamMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB'])
+            ? (int) $payload['ramMiB']
+            : 0;
 
         if (array_key_exists('dockerEnabled', $payload) && !(bool) $payload['dockerEnabled']) {
             return false;
@@ -391,9 +389,6 @@ if (!function_exists('pmssUserDockerEnabled')) {
             return false;
         }
 
-        if (!array_key_exists('dockerEnabled', $payload)) {
-            return true;
-        }
-        return (bool) $payload['dockerEnabled'];
+        return !array_key_exists('dockerEnabled', $payload) || (bool) $payload['dockerEnabled'];
     }
 }
