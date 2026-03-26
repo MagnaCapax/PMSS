@@ -22,8 +22,7 @@ class BootDefaultsEnsureTest extends TestCase
         ];
 
         foreach ($cases as $case) {
-            $dir = sys_get_temp_dir().'/pmss-boot-defaults-'.bin2hex(random_bytes(4)).'-'.$case['label'];
-            mkdir($dir, 0700, true);
+            $dir = $this->pmssMakeTempDir('pmss-boot-defaults-'.$case['label'].'-', 0700);
             $fstab = $dir.'/fstab'; $grub = $dir.'/grub';
             file_put_contents($fstab, $case['fstab']); file_put_contents($grub, $case['grub']."\n");
             $originalGrub = (string)file_get_contents($grub);
@@ -34,15 +33,13 @@ class BootDefaultsEnsureTest extends TestCase
             $updatedGrub = (string)file_get_contents($grub);
             if (!empty($case['grubUnchanged'])) { $this->assertEquals($originalGrub, $updatedGrub, 'case '.$case['label'].' grub unchanged'); }
             elseif (isset($case['expectGrub'])) { $this->assertStringContainsString($case['expectGrub'], $updatedGrub, 'case '.$case['label'].' grub'); }
-            $this->cleanup($dir);
         }
     }
 
     public function testBootDefaultsSupportsSerialConsoleSettings(): void
     {
         $logger = static function (string $message): void { };
-        $dir = sys_get_temp_dir().'/pmss-boot-defaults-serial-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-boot-defaults-serial-', 0700);
 
         $fstab = $dir.'/fstab';
         $grub = $dir.'/grub';
@@ -66,8 +63,6 @@ class BootDefaultsEnsureTest extends TestCase
         $this->assertStringContainsString('console=ttyS0,115200n8', $updatedGrub);
         $this->assertStringContainsString('GRUB_TERMINAL="console serial"', $updatedGrub);
         $this->assertStringContainsString('GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"', $updatedGrub);
-
-        $this->cleanup($dir);
     }
 
 }

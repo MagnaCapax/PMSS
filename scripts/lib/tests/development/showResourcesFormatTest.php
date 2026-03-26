@@ -13,7 +13,7 @@ class ShowResourcesFormatTest extends TestCase
 
     private function makeRuntimeDir(): string
     {
-        return sys_get_temp_dir().'/pmss-show-runtime-'.bin2hex(random_bytes(4));
+        return $this->pmssMakeTempDir('pmss-show-runtime-');
     }
 
     private function writeResourceStats(string $runtimeDir, string $user, array $payload): void
@@ -73,7 +73,6 @@ class ShowResourcesFormatTest extends TestCase
             .' php '.escapeshellarg($this->scriptPath()).' --user=alice 2>&1'
         );
 
-        $this->cleanup($runtimeDir);
         $this->assertTrue(strpos($out, '2.00 TiB') !== false);
     }
 
@@ -89,7 +88,6 @@ class ShowResourcesFormatTest extends TestCase
             $rc
         );
 
-        $this->cleanup($runtimeDir);
         $textOutput = implode("\n", $output);
         $this->assertEquals(0, $rc);
         $this->assertTrue(strpos($textOutput, '1.0 hrs') !== false);
@@ -117,7 +115,6 @@ class ShowResourcesFormatTest extends TestCase
             .' php '.escapeshellarg($this->scriptPath()).' --json --user=alice 2>&1'
         );
 
-        $this->cleanup($runtimeDir);
         $payload = json_decode($json, true);
         $this->assertTrue(is_array($payload));
         $this->assertEquals(6.0, $payload['users']['alice']['memory']['current']);
@@ -137,7 +134,6 @@ class ShowResourcesFormatTest extends TestCase
             .' php '.escapeshellarg($this->scriptPath()).' --json --user=ghost 2>&1'
         );
 
-        $this->cleanup($runtimeDir);
         $payload = json_decode($json, true);
         $this->assertTrue(is_array($payload));
         $this->assertEquals([], $payload['users']);

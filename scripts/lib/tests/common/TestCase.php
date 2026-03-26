@@ -55,9 +55,7 @@ abstract class TestCase
             $message = null;
             $setUpCompleted = false;
             try {
-                if (method_exists($this, 'setUp')) {
-                    $this->setUp();
-                }
+                $this->setUp();
                 $setUpCompleted = true;
                 $this->$method();
             } catch (SkipTest $e) {
@@ -72,7 +70,7 @@ abstract class TestCase
             }
 
             try {
-                if ($setUpCompleted && method_exists($this, 'tearDown')) {
+                if ($setUpCompleted) {
                     $this->tearDown();
                 }
             } catch (\Throwable $e) {
@@ -159,13 +157,6 @@ abstract class TestCase
         $notRoot = function_exists('posix_geteuid') ? (posix_geteuid() !== 0) : true;
         $noSystemd = !is_dir('/run/systemd/system');
         return $notRoot || $noSystemd;
-    }
-
-    protected function skipIfSandbox(string $reason = 'sandboxed environment'): void
-    {
-        if ($this->isSandbox()) {
-            throw new SkipTest($reason);
-        }
     }
 
     /** Create a unique temporary directory for hermetic tests. */

@@ -28,8 +28,7 @@ class NetconsoleConfigureTest extends TestCase
             \pmssNetconsoleConfigure(function (string $message) use (&$logs): void { $logs[] = $message; });
         });
 
-        $this->assertTrue($this->contains($logs, 'No netconsole configuration'), 'expected missing-config skip log');
-        $this->cleanup($dir);
+        $this->assertTrue($this->pmssMessagesContain($logs, 'No netconsole configuration'), 'expected missing-config skip log');
     }
 
     public function testWritesFilesAndReloadsWhenReachable(): void
@@ -52,7 +51,6 @@ class NetconsoleConfigureTest extends TestCase
             return $call[0];
         }, $calls);
         $this->assertTrue(in_array('Loading netconsole kernel module', $descriptions, true), 'expected netconsole module load step');
-        $this->cleanup($dir);
     }
 
     public function testSkipsEnableWhenTargetIsNotReachable(): void
@@ -67,8 +65,6 @@ class NetconsoleConfigureTest extends TestCase
             });
             $this->assertTrue(!is_file($dir.'/modprobe.d/netconsole.conf'), 'expected config write to be skipped');
         });
-
-        $this->cleanup($dir);
     }
 
     public function testSkipsReloadWhenAlreadyLoadedAndUnchanged(): void
@@ -94,7 +90,6 @@ class NetconsoleConfigureTest extends TestCase
 
         $this->assertEquals(1, count($calls));
         $this->assertEquals('Verifying netconsole target reachability', $calls[0][0]);
-        $this->cleanup($dir);
     }
 
     private function netconsoleEnv(string $dir): array
@@ -105,14 +100,6 @@ class NetconsoleConfigureTest extends TestCase
             'PMSS_NETCONSOLE_MODULES_LOAD_PATH' => $dir.'/modules-load.d/pmss-netconsole.conf',
             'PMSS_NETCONSOLE_MODULE_LOADED' => '',
         ];
-    }
-
-    private function contains(array $messages, string $needle): bool
-    {
-        foreach ($messages as $message) {
-            if (strpos($message, $needle) !== false) return true;
-        }
-        return false;
     }
 
 }

@@ -12,8 +12,7 @@ class BootTuningEnsureTest extends TestCase
     protected function setUp(): void
     {
         $this->prevConfigDir = getenv('PMSS_CONFIG_DIR');
-        $repoRoot = dirname(__DIR__, 4);
-        putenv('PMSS_CONFIG_DIR='.$repoRoot.'/etc/seedbox/config');
+        putenv('PMSS_CONFIG_DIR='.$this->pmssRepoPath('etc/seedbox/config'));
     }
 
     protected function tearDown(): void
@@ -40,8 +39,6 @@ class BootTuningEnsureTest extends TestCase
         $this->assertStringContainsString('"swap_is_fast":', $content);
         $this->assertStringContainsString('"nic_speed_mbps":', $content);
         $this->assertTrue(file_exists($service), 'expected boot tuning service to be written');
-
-        $this->cleanup($dir);
     }
 
     public function testWritesBootTuningService(): void
@@ -54,8 +51,6 @@ class BootTuningEnsureTest extends TestCase
         $content = (string)file_get_contents($service);
         $this->assertStringContainsString('ExecStart='.$script, $content);
         $this->assertStringContainsString('WantedBy=multi-user.target', $content);
-
-        $this->cleanup($dir);
     }
 
     public function testScriptPermissionsAreExecutable(): void
@@ -67,8 +62,6 @@ class BootTuningEnsureTest extends TestCase
         $perms = fileperms($script) & 0777;
         $this->assertEquals(0755, $perms, 'expected boot tuning script to be executable');
         $this->assertTrue(file_exists($service), 'expected service to exist for permissions test');
-
-        $this->cleanup($dir);
     }
 
     public function testCreatesTargetDirectories(): void
@@ -83,8 +76,6 @@ class BootTuningEnsureTest extends TestCase
 
         $this->assertTrue(is_dir(dirname($script)), 'expected script directory to be created');
         $this->assertTrue(is_dir(dirname($service)), 'expected service directory to be created');
-
-        $this->cleanup($base);
     }
 
     public function testSkipsWhenUpToDate(): void
@@ -104,8 +95,6 @@ class BootTuningEnsureTest extends TestCase
             $this->pmssMessagesContain($messages, 'Boot tuning service already present and up to date'),
             'expected boot tuning service skip log'
         );
-
-        $this->cleanup($dir);
     }
 
     /**

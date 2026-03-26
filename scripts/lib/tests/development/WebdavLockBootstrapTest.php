@@ -17,8 +17,6 @@ class WebdavLockBootstrapTest extends TestCase
         $lockFile = $userHome.'/.lighttpd/webdav.lock.db';
         $this->assertTrue(is_file($lockFile), 'expected lock file created');
         $this->assertEquals(0600, fileperms($lockFile) & 0777, 'expected 0600 lock perms');
-
-        $this->cleanup($dir);
     }
 
     public function testFixesLockFilePermissions(): void
@@ -34,8 +32,6 @@ class WebdavLockBootstrapTest extends TestCase
         \pmssEnsureWebdavLockDatabase('deefbox', $userHome);
 
         $this->assertEquals(0600, fileperms($lockFile) & 0777, 'expected perms tightened');
-
-        $this->cleanup($dir);
     }
 
     public function testSkipsWhenLighttpdDirMissing(): void
@@ -48,7 +44,5 @@ class WebdavLockBootstrapTest extends TestCase
 
         $lockFile = $userHome.'/.lighttpd/webdav.lock.db';
         $this->assertTrue(!file_exists($lockFile), 'expected no lock file when .lighttpd missing');
-
-        $this->cleanup($dir);
     }
 }

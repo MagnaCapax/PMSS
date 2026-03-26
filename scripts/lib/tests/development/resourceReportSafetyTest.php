@@ -33,15 +33,10 @@ class resourceReportSafetyTest extends TestCase
 
     public function setUp(): void
     {
-        $this->runtimeDir = sys_get_temp_dir().'/pmss-resource-safety-'.bin2hex(random_bytes(4));
+        $this->runtimeDir = $this->pmssMakeTempDir('pmss-resource-safety-');
         $this->statsDir = $this->runtimeDir.'/resourceStats';
         $this->markerPath = $this->runtimeDir.'/wakeup-marker';
         @mkdir($this->statsDir, 0755, true);
-    }
-
-    public function tearDown(): void
-    {
-        $this->cleanup($this->runtimeDir);
     }
 
     public function testBuildReportRejectsSerializedObjectsWithoutWakeup(): void
