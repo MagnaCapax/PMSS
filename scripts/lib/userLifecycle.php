@@ -463,6 +463,32 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
 }
 
 /**
+ * Convert arbitrary log fields into a single-line text-safe representation.
+ */
+function pmssUserLifecycleFormatTextField($value): string
+{
+    if ($value === null) {
+        return '';
+    }
+
+    if (is_bool($value)) {
+        $text = $value ? 'true' : 'false';
+    } elseif (is_scalar($value)) {
+        $text = (string) $value;
+    } elseif (is_object($value) && method_exists($value, '__toString')) {
+        $text = (string) $value;
+    } else {
+        $text = gettype($value);
+    }
+
+    $normalized = str_replace(array("\r", "\n", "\t", "\0"), ' ', $text);
+    $normalized = preg_replace('/[[:cntrl:]]+/', ' ', $normalized);
+    $normalized = preg_replace('/\s+/', ' ', trim((string) $normalized));
+
+    return is_string($normalized) ? $normalized : '';
+}
+
+/**
  * Write a user lifecycle audit record to both JSON and human-readable logs.
  */
 function pmssUserWriteLogs(array $payload): void
@@ -482,12 +508,12 @@ function pmssUserWriteLogs(array $payload): void
 
     // Text line for operators
     $ts      = date('[Y-m-d H:i:s] ');
-    $status  = $payload['status'] ?? 'INFO';
-    $action  = $payload['action'] ?? 'unknown';
-    $phase   = $payload['phase'] ?? 'unknown';
-    $user    = $payload['username'] ?? '';
-    $message = isset($payload['message']) ? ' msg='.$payload['message'] : '';
-    $step    = isset($payload['step']) ? ' step='.$payload['step'] : '';
+    $status  = pmssUserLifecycleFormatTextField($payload['status'] ?? 'INFO');
+    $action  = pmssUserLifecycleFormatTextField($payload['action'] ?? 'unknown');
+    $phase   = pmssUserLifecycleFormatTextField($payload['phase'] ?? 'unknown');
+    $user    = pmssUserLifecycleFormatTextField($payload['username'] ?? '');
+    $message = isset($payload['message']) ? ' msg='.pmssUserLifecycleFormatTextField($payload['message']) : '';
+    $step    = isset($payload['step']) ? ' step='.pmssUserLifecycleFormatTextField($payload['step']) : '';
 
     $text = $ts.'user='.$user.' action='.$action.' phase='.$phase.' status='.$status.$step.$message;
     @file_put_contents(PMSS_USER_LOG_TEXT, $text.PHP_EOL, FILE_APPEND | LOCK_EX);
