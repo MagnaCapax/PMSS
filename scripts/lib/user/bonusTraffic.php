@@ -8,7 +8,6 @@
  * @license GPL-3.0-only
  */
 
-require_once dirname(__DIR__).'/runtime.php';
 require_once __DIR__.'/trafficLimit.php';
 
 /**
@@ -16,19 +15,8 @@ require_once __DIR__.'/trafficLimit.php';
  */
 function pmssUserBonusTrafficCli(array $argv): int
 {
-    if (!pmssRequireCli('This script must be run from the command line.', null)) {
+    if (!pmssUserTrafficCliBootstrap()) {
         return 1;
-    }
-
-    $optionParser = dirname(__DIR__).'/cli/optionParser.php';
-    if (!is_file($optionParser)) {
-        fwrite(STDERR, "Error: missing CLI option parser.\n");
-        return 1;
-    }
-    require_once $optionParser;
-
-    foreach ([dirname(__DIR__).'/userLifecycle.php', __DIR__.'/log.php'] as $dependency) {
-        if (is_file($dependency)) { require_once $dependency; }
     }
 
     $parsed = pmssParseCliTokens($argv);

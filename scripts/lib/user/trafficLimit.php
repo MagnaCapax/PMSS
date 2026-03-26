@@ -210,21 +210,37 @@ if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
     }
 }
 
-if (!function_exists('pmssUserTrafficLimitCli')) {
-    function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int
+if (!function_exists('pmssUserTrafficCliBootstrap')) {
+    function pmssUserTrafficCliBootstrap(): bool
     {
-        if (!function_exists('pmssRequireCli') && is_file(dirname(__DIR__).'/runtime.php')) require_once dirname(__DIR__).'/runtime.php';
-        if (!function_exists('pmssRequireCli') || !pmssRequireCli('This script must be run from the command line.', null)) {
-            return 1;
+        if (!function_exists('pmssRequireCli') && is_file(dirname(__DIR__).'/runtime.php')) {
+            require_once dirname(__DIR__).'/runtime.php';
         }
+        if (!function_exists('pmssRequireCli') || !pmssRequireCli('This script must be run from the command line.', null)) {
+            return false;
+        }
+
         $optionParser = dirname(__DIR__).'/cli/optionParser.php';
         if (!is_file($optionParser)) {
             fwrite(STDERR, "Error: missing CLI option parser.\n");
-            return 1;
+            return false;
         }
         require_once $optionParser;
         foreach ([dirname(__DIR__).'/userLifecycle.php', __DIR__.'/log.php'] as $dependency) {
-            if (is_file($dependency)) require_once $dependency;
+            if (is_file($dependency)) {
+                require_once $dependency;
+            }
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('pmssUserTrafficLimitCli')) {
+    function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int
+    {
+        if (!pmssUserTrafficCliBootstrap()) {
+            return 1;
         }
         if (!is_string($usage) || $usage === '') {
             $usage = rtrim(<<<'TEXT'

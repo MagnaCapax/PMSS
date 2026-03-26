@@ -47,6 +47,7 @@ final class BonusTrafficTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/bonusTraffic.php');
 
+        $this->assertStringContainsString('pmssUserTrafficCliBootstrap()', $source);
         $this->assertStringContainsString('pmssTrafficLimitReadGiBFile($bonusFile)', $source);
         $this->assertStringContainsString('pmssTrafficLimitRemoveGiBFile($bonusFile)', $source);
         $this->assertStringContainsString('pmssTrafficLimitWriteGiBFile($bonusFile, (int) $bonusTraffic)', $source);

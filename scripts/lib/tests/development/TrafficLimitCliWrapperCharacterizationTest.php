@@ -31,6 +31,7 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/lib/user/trafficLimit.php',
             [
+                'function pmssUserTrafficCliBootstrap(): bool',
                 'function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int',
                 '$targetModes = [',
                 'Traffic limit for {$userName}: {$limit} GiB',

@@ -124,7 +124,7 @@ TXT;
         $isLocalnet = substr($thisUser, -strlen('-localnet')) === '-localnet';
         $baseUser = $isLocalnet ? substr($thisUser, 0, -strlen('-localnet')) : $thisUser;
         $baseUsers[$baseUser] = true;
-        $statsPath = "{$statsDir}/{$thisUser}";
+        $statsPath = pmssTrafficStatsPath($thisUser, $statsDir);
         if (!is_file($statsPath)) {
             $missingStats[] = $thisUser;
             continue;
@@ -145,18 +145,9 @@ TXT;
         $trafficPaths = pmssTrafficDataPaths($baseUser);
         $ingressPath = $trafficPaths[$isLocalnet ? 'ingressLocal' : 'ingress'];
         $inboundMonth = null;
-        if (is_file($ingressPath) && !is_link($ingressPath)) {
-            $stats = @stat($ingressPath);
-            if ($stats !== false && (int) $stats['uid'] === 0 && (($stats['mode'] & 0777) & 0022) === 0) {
-                $ingressGroup = @posix_getgrgid($stats['gid']);
-                $groupName = is_array($ingressGroup) ? ($ingressGroup['name'] ?? '') : '';
-                if ($groupName === '' || $groupName === $baseUser || $groupName === 'root') {
-                    $ingressData = pmssTrafficReadSerializedArrayFile($ingressPath);
-                    if (is_array($ingressData) && isset($ingressData['raw']['month']) && is_numeric($ingressData['raw']['month'])) {
-                        $inboundMonth = (float) $ingressData['raw']['month'];
-                    }
-                }
-            }
+        $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
+        if ($ingressData !== null) {
+            $inboundMonth = (float) $ingressData['raw']['month'];
         }
 
         $inboundRatio = null;
