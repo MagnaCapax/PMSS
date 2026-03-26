@@ -49,7 +49,7 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
     return $counts;
 }
 
-pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int {
+pmssRunCliEntrypoint(__FILE__, static function (): int {
     // Options.
     $options = getopt('', ['by-client', 'help']);
     if (isset($options['help'])) {
