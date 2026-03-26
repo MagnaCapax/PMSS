@@ -15,13 +15,22 @@ class UserConfigLighttpdLogicTest extends TestCase
     public function testProcessPlanFollowsCpuQuota(): void
     {
         $plan = \pmssComputePhpProcessPlan(100);
-        $this->assertEquals(2, $plan['max_procs']);
-        $this->assertEquals(2, $plan['children']);
-        $this->assertEquals(4, $plan['totalThreads']);
+        $this->assertEquals(1, $plan['max_procs']);
+        $this->assertEquals(6, $plan['children']);
+        $this->assertEquals(6, $plan['totalThreads']);
 
         $planHigh = \pmssComputePhpProcessPlan(250);
-        $this->assertEquals(5, $planHigh['max_procs']);
-        $this->assertEquals(10, $planHigh['totalThreads']);
+        $this->assertEquals(2, $planHigh['max_procs']);
+        $this->assertEquals(12, $planHigh['totalThreads']);
+    }
+
+    public function testProcessPlanCapsHighQuotaAtEightPhpProcessGroups(): void
+    {
+        $plan = \pmssComputePhpProcessPlan(1200);
+
+        $this->assertEquals(8, $plan['max_procs']);
+        $this->assertEquals(6, $plan['children']);
+        $this->assertEquals(48, $plan['totalThreads']);
     }
 
     public function testCpuQuotaLegacy85UsesThreadBasedDefault(): void

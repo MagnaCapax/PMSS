@@ -17,7 +17,7 @@ require_once dirname(__DIR__).'/lib/update/distro.php';
 require_once dirname(__DIR__).'/lib/userLifecycle.php';
 require_once dirname(__DIR__).'/lib/user/directories.php';
 
-const PMSS_LIGHTTPD_CHILDREN_PER_PROC = 2;
+const PMSS_LIGHTTPD_CHILDREN_PER_PROC = 6;
 const PMSS_PHP_MEMORY_MIN_MB = 125;
 const PMSS_PHP_MEMORY_MAX_MB = 1024;
 // Minimum/maximum total php-cgi threads per user (max-procs * children).
