@@ -46,6 +46,7 @@ require_once 'lib/update/users/filesystem.php';
 require_once 'lib/user/add/provisioningRuntime.php';
 require_once 'lib/user/add/systemUserCreate.php';
 require_once 'lib/user/add/userConfigApply.php';
+require_once 'lib/user/add/artifactVerification.php';
 require_once 'lib/user/add/postProvision.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Creating
@@ -186,5 +187,6 @@ if (mkdir($retrackerConfigPath, 0777, true)) {
     passthru("chown {$user['name']}:{$user['name']} /home/{$user['name']}/www/rutorrent/share/users/{$user['name']}/torrents");
 }*/
 pmssAddUserPostProvision($user, $homePath);
+pmssAddUserVerifyArtifactsOrFail($user['name'], $homePath);
 
 finalizeProvision('SUCCESS', 'completed', 0);
