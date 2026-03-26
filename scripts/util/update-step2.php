@@ -625,8 +625,7 @@ runStep('Refreshing root cron configuration', '/scripts/util/setupRootCron.php')
 $pmssRootCronRestored = true;
 
 // Record successful completion for MOTD/monitoring.
-@file_put_contents('/var/run/pmss/updated', date('Y-m-d H:i:s'));
-@chmod('/var/run/pmss/updated', 0644);
+pmssWriteManagedPathFile('/var/run/pmss/updated', date('Y-m-d H:i:s'), 'update completion marker', 'logmsg');
 
 // Surface log locations for operators to review after updates.
 try {

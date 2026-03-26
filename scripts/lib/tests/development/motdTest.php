@@ -69,6 +69,7 @@ class MotdTest extends TestCase
         $this->assertTrue(file_exists($path), 'update-step2.php missing');
         $lines = file($path, FILE_IGNORE_NEW_LINES);
         $this->assertTrue(is_array($lines) && count($lines) > 0, 'unable to read update-step2.php');
+        $source = implode("\n", $lines);
         $lastIdx = -1;
         $updatedIdx = -1;
         $cronIdx = -1;
@@ -89,6 +90,7 @@ class MotdTest extends TestCase
         $this->assertTrue($lastIdx >= 0, 'MOTD refresh is not referenced in update-step2.php');
         $this->assertTrue($updatedIdx >= 0, 'update-step2.php should record /var/run/pmss/updated');
         $this->assertTrue($cronIdx >= 0, 'update-step2.php should restore root cron via setupRootCron.php');
+        $this->assertTrue(strpos($source, "pmssWriteManagedPathFile('/var/run/pmss/updated'") !== false, 'update-step2.php should use shared managed-path writes for /var/run/pmss/updated');
         $this->assertTrue($updatedIdx < $lastIdx, '/var/run/pmss/updated should be written before MOTD refresh');
         $this->assertTrue($cronIdx < $lastIdx, 'Root cron should be restored before MOTD refresh');
         $total = count($lines);
