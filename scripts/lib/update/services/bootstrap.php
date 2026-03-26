@@ -6,23 +6,8 @@
  * @author PMSS Team
  */
 
-foreach (['../logging.php', '../runtime/commands.php', 'quota.php', '../../configBackups.php', '../../runtime.php', '../../lighttpd/userFileWrite.php'] as $relativePath) {
+foreach (['../logging.php', '../managedPath.php', '../runtime/commands.php', 'quota.php', '../../configBackups.php', '../../runtime.php'] as $relativePath) {
     require_once __DIR__.'/'.$relativePath;
-}
-
-/**
- * Write a root-owned config file through the shared guarded writer.
- */
-function pmssBootstrapWriteRootOwnedFile(string $path, string $contents, ?callable $logger = null): bool
-{
-    if (pmssWriteManagedFile($path, $contents, 'root', 'root', 0644)) {
-        return true;
-    }
-
-    $log = $logger ?: 'logMessage';
-    $log('[WARN] Failed to update '.$path);
-
-    return false;
 }
 
 /**
@@ -54,7 +39,7 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
         return;
     }
 
-    if (!pmssBootstrapWriteRootOwnedFile('/etc/hostname', $hostname.PHP_EOL, $log)) {
+    if (!pmssWriteManagedPathFile('/etc/hostname', $hostname.PHP_EOL, 'hostname', $log, 'root', 'root')) {
         return;
     }
     $log('Updated /etc/hostname to '.$hostname);
@@ -133,8 +118,8 @@ function pmssEnsureAuthorizedKeysDirective(): void
 
     echo "# Allowing SSH Key based authentication.\n";
     pmssBackupCriticalConfig('sshd', $sshdConfig);
-    pmssBootstrapWriteRootOwnedFile('/etc/ssh/pmss.sshd_config', $config);
-    if (!pmssBootstrapWriteRootOwnedFile($sshdConfig, $updated)) {
+    pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', $config, 'sshd backup config', 'logMessage', 'root', 'root');
+    if (!pmssWriteManagedPathFile($sshdConfig, $updated, 'sshd config', 'logMessage', 'root', 'root')) {
         return;
     }
     runStep('Restarting sshd service after config update', '/etc/init.d/ssh restart');

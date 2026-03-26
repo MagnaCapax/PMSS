@@ -2,10 +2,11 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/update/managedPath.php';
 require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 /**
- * Verify bootstrap config writers keep guarded root-owned writes.
+ * Verify bootstrap config writers stay on the shared guarded managed-path flow.
  */
 class BootstrapWriteGuardTest extends TestCase
 {
@@ -21,52 +22,51 @@ class BootstrapWriteGuardTest extends TestCase
         $this->pmssRemoveTree($this->tempDir);
     }
 
-    public function testRootOwnedWriterStoresContent(): void
+    public function testManagedPathWriterStoresContentWithRootMetadata(): void
     {
         $path = $this->tempDir.'/etc/hostname';
         @mkdir(dirname($path), 0755, true);
 
-        $this->assertTrue(\pmssBootstrapWriteRootOwnedFile($path, "pmss-host\n"));
+        $this->assertTrue(\pmssWriteManagedPathFile($path, "pmss-host\n", 'hostname', 'logMessage', 'root', 'root'));
         $this->assertEquals("pmss-host\n", (string) file_get_contents($path));
         $this->assertEquals(0644, fileperms($path) & 0777);
     }
 
-    public function testRootOwnedWriterReplacesExistingRegularFile(): void
+    public function testManagedPathWriterReplacesExistingRegularFile(): void
     {
         $path = $this->tempDir.'/etc/ssh/sshd_config';
         @mkdir(dirname($path), 0755, true);
         file_put_contents($path, "old\n");
 
-        $this->assertTrue(\pmssBootstrapWriteRootOwnedFile($path, "new\n"));
+        $this->assertTrue(\pmssWriteManagedPathFile($path, "new\n", 'sshd config', 'logMessage', 'root', 'root'));
         $this->assertEquals("new\n", (string) file_get_contents($path));
     }
 
-    public function testRootOwnedWriterRejectsSymlinkTarget(): void
+    public function testManagedPathWriterRejectsSymlinkTarget(): void
     {
         $realPath = $this->tempDir.'/real';
         $linkPath = $this->tempDir.'/link';
         file_put_contents($realPath, "keep\n");
         symlink($realPath, $linkPath);
 
-        $this->assertFalse(\pmssBootstrapWriteRootOwnedFile($linkPath, "replace\n"));
+        $this->assertFalse(\pmssWriteManagedPathFile($linkPath, "replace\n", 'sshd config', 'logMessage', 'root', 'root'));
         $this->assertEquals("keep\n", (string) file_get_contents($realPath));
     }
 
-    public function testRootOwnedWriterRejectsRelativePath(): void
+    public function testManagedPathWriterRejectsRelativePath(): void
     {
-        $this->assertFalse(\pmssBootstrapWriteRootOwnedFile('relative-sshd_config', "nope\n"));
+        $this->assertFalse(\pmssWriteManagedPathFile('relative-sshd_config', "nope\n", 'sshd config', 'logMessage', 'root', 'root'));
         $this->assertFalse(file_exists('relative-sshd_config'));
     }
 
-    public function testBootstrapUsesGuardedWriterForHostnameAndSshdConfig(): void
+    public function testBootstrapUsesSharedManagedPathWriterForHostnameAndSshdConfig(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/services/bootstrap.php');
 
-        $this->assertStringContainsString("'../../lighttpd/userFileWrite.php'", $source);
-        $this->assertStringContainsString('function pmssBootstrapWriteRootOwnedFile(string $path, string $contents, ?callable $logger = null): bool', $source);
-        $this->assertStringContainsString('pmssWriteManagedFile($path, $contents, \'root\', \'root\', 0644)', $source);
-        $this->assertStringContainsString('pmssBootstrapWriteRootOwnedFile(\'/etc/hostname\', $hostname.PHP_EOL, $log)', $source);
-        $this->assertStringContainsString('pmssBootstrapWriteRootOwnedFile($sshdConfig, $updated)', $source);
+        $this->assertStringContainsString("'../managedPath.php'", $source);
+        $this->assertStringContainsString("pmssWriteManagedPathFile('/etc/hostname', \$hostname.PHP_EOL, 'hostname', \$log, 'root', 'root')", $source);
+        $this->assertStringContainsString("pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', \$config, 'sshd backup config', 'logMessage', 'root', 'root')", $source);
+        $this->assertStringContainsString("pmssWriteManagedPathFile(\$sshdConfig, \$updated, 'sshd config', 'logMessage', 'root', 'root')", $source);
         $this->assertFalse(strpos($source, "file_put_contents('/etc/hostname'") !== false);
         $this->assertFalse(strpos($source, 'file_put_contents($sshdConfig, $updated)') !== false);
     }

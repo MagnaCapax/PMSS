@@ -51,6 +51,20 @@ class ManagedPathTest extends TestCase
         $this->assertEquals([], $messages);
     }
 
+    public function testManagedWriteAppliesRequestedModeWhenMetadataProvided(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-write-meta-');
+        $path = $root.'/managed.conf';
+        $messages = [];
+
+        $this->assertTrue(
+            \pmssWriteManagedPathFile($path, "alpha\n", 'test target', $this->pmssMakeArrayLogger($messages), 'root', 'root', 0600)
+        );
+        $this->assertEquals("alpha\n", file_get_contents($path));
+        $this->assertEquals(0600, fileperms($path) & 0777);
+        $this->assertEquals([], $messages);
+    }
+
     public function testManagedWriteRejectsSymlinkTarget(): void
     {
         $root = $this->pmssMakeTempDir('pmss-env-target-link-');

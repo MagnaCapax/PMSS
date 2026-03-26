@@ -30,13 +30,24 @@ function pmssManagedPathIsSafe(string $path, string $label, callable $logger): b
 /**
  * Atomically replace a managed file when the target is safe.
  */
-function pmssWriteManagedPathFile(string $path, string $contents, string $label, callable $logger): bool
+function pmssWriteManagedPathFile(
+    string $path,
+    string $contents,
+    string $label,
+    callable $logger,
+    ?string $owner = null,
+    ?string $group = null,
+    int $mode = 0644
+): bool
 {
     if (!pmssManagedPathIsSafe($path, $label, $logger)) {
         return false;
     }
 
-    if (!pmssAtomicWriteFile($path, $contents, 0644)) {
+    $written = $owner === null
+        ? pmssAtomicWriteFile($path, $contents, $mode)
+        : pmssWriteManagedFile($path, $contents, $owner, $group, $mode);
+    if (!$written) {
         $logger('[WARN] Unable to write '.$label.' at '.$path);
         return false;
     }

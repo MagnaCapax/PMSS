@@ -11,7 +11,7 @@ class UpdateServicesBootstrapTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/services/bootstrap.php');
 
         $this->assertStringContainsString(
-            "pmssBootstrapWriteRootOwnedFile('/etc/ssh/pmss.sshd_config', \$config);",
+            "pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', \$config, 'sshd backup config', 'logMessage', 'root', 'root');",
             $src,
             'Expected sshd backup copy to use the guarded root-owned writer'
         );
