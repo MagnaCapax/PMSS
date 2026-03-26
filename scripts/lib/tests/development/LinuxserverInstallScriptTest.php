@@ -6,12 +6,9 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 
 class LinuxserverInstallScriptTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $tempDir;
     private $homeDir;
     private $fakeBinDir;

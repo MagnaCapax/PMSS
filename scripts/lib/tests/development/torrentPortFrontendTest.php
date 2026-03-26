@@ -2,15 +2,12 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 require_once dirname(__DIR__, 2).'/user/torrentPort.php';
 
 class TorrentPortFrontendTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $homeRoot;
     private $skelDir;
     private $user;
@@ -40,7 +37,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testApplySkeletonFilesPatchesDelugeFrontendToUsePhpHelper(): void
     {
-        $this->writeSkelFile('www/deluge.php', "<?php\nfunction startDeluge() {\n    shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');\n}\n");
+        $this->pmssWriteRelativeFile($this->skelDir, 'www/deluge.php', "<?php\nfunction startDeluge() {\n    shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');\n}\n");
 
         \pmssUserApplySkeletonFiles($this->context());
 
@@ -52,7 +49,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testApplySkeletonFilesPatchesQbittorrentFrontendToUsePhpHelper(): void
     {
-        $this->writeSkelFile('www/qbittorrent.php', "<?php\nfunction startQbittorrent() {\n    passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');\n}\n");
+        $this->pmssWriteRelativeFile($this->skelDir, 'www/qbittorrent.php', "<?php\nfunction startQbittorrent() {\n    passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');\n}\n");
 
         \pmssUserApplySkeletonFiles($this->context());
 
@@ -95,7 +92,7 @@ class TorrentPortFrontendTest extends TestCase
     public function testApplySkeletonFilesRemovesDeadExtsearchEngineFiles(): void
     {
         foreach (['RARbgTorrentAPI.php', 'Demonoid.php', 'KAT.php'] as $engine) {
-            $this->writeUserFile('www/rutorrent/plugins/extsearch/engines/'.$engine, "<?php\n");
+            $this->pmssWriteRelativeFile($this->homePath(), 'www/rutorrent/plugins/extsearch/engines/'.$engine, "<?php\n");
         }
 
         \pmssUserApplySkeletonFiles($this->context());
@@ -109,7 +106,7 @@ class TorrentPortFrontendTest extends TestCase
     {
         $targetPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/target.php');
         $linkPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/KAT.php');
-        $this->writeUserFile('www/rutorrent/plugins/extsearch/engines/target.php', "<?php\n");
+        $this->pmssWriteRelativeFile($this->homePath(), 'www/rutorrent/plugins/extsearch/engines/target.php', "<?php\n");
         @symlink($targetPath, $linkPath);
 
         \pmssUserApplySkeletonFiles($this->context());
@@ -131,7 +128,7 @@ class TorrentPortFrontendTest extends TestCase
     public function testApplySkeletonFilesLeavesLiveExtsearchEnginesUntouched(): void
     {
         $liveEnginePath = $this->homePath('www/rutorrent/plugins/extsearch/engines/Custom.php');
-        $this->writeUserFile('www/rutorrent/plugins/extsearch/engines/Custom.php', "<?php\n");
+        $this->pmssWriteRelativeFile($this->homePath(), 'www/rutorrent/plugins/extsearch/engines/Custom.php', "<?php\n");
 
         \pmssUserApplySkeletonFiles($this->context());
 
@@ -199,15 +196,5 @@ class TorrentPortFrontendTest extends TestCase
     private function context(): array { return ['user' => $this->user, 'home' => $this->homePath()]; }
 
     private function homePath(string $relative = ''): string { return $relative === '' ? $this->homeRoot.'/'.$this->user : $this->homeRoot.'/'.$this->user.'/'.$relative; }
-
-    private function writeSkelFile(string $relative, string $content): void
-    {
-        $this->pmssWriteFile($this->skelDir.'/'.$relative, $content);
-    }
-
-    private function writeUserFile(string $relative, string $content): void
-    {
-        $this->pmssWriteFile($this->homePath($relative), $content);
-    }
 
 }

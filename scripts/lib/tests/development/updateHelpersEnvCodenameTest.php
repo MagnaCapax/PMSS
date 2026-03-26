@@ -2,14 +2,11 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 3).'/update.php';
 require_once dirname(__DIR__, 2).'/update/distro.php';
 
 class UpdateHelpersEnvCodenameTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testGetDistroVersionStripsSuffix(): void
     {
         $file = $this->pmssWriteTempFile('version', "ID=debian\nVERSION_ID=\"12 (bookworm)\"\n", 'pmss-env');

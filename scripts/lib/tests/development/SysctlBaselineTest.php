@@ -1,13 +1,10 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SysctlBaselineTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testWritesBaselineWithKptrRestrict(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-', 0700);

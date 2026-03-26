@@ -23,12 +23,9 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 
 class ConfigSyntaxValidationTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $tempDir;
     private $lighttpdBinary;
     private $nginxBinary;

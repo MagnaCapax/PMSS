@@ -16,7 +16,6 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 
 if (!function_exists('pmssDelugeReadWebConf')) {
     require_once dirname(__DIR__, 3).'/util/userConfigLighttpd.php';
@@ -24,8 +23,6 @@ if (!function_exists('pmssDelugeReadWebConf')) {
 
 class DelugeReverseProxyHardeningTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $tempDir;
 
     protected function setUp(): void

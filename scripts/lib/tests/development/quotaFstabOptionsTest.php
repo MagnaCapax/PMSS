@@ -1,13 +1,10 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/services/quota.php';
 
 class QuotaFstabOptionsTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testNoChangeWhenQuotaOptionsPresent(): void
     {
         $dir = sys_get_temp_dir().'/pmss-quota-'.bin2hex(random_bytes(4));

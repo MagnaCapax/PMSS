@@ -33,7 +33,7 @@ class UserFilemanagerCompatPatchTest extends TestCase
 
     public function testApplySkeletonFilesPatchesCopiedFilemanager(): void
     {
-        $this->writeSkelFile('www/filemanager.php', <<<'PHP'
+        $this->pmssWriteRelativeFile($this->skelDir, 'www/filemanager.php', <<<'PHP'
 before
         ob_flush();
     if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
@@ -75,7 +75,7 @@ https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js
 https://cdn.datatables.net/2.0.8/js/dataTables.min.js
 after
 PHP;
-        $this->writeSkelFile('www/filemanager.php', $expected);
+        $this->pmssWriteRelativeFile($this->skelDir, 'www/filemanager.php', $expected);
 
         \pmssUserApplySkeletonFiles($this->context());
 
@@ -90,7 +90,7 @@ PHP;
 
     public function testApplySkeletonFilesSkipsSymlinkedFilemanagerTarget(): void
     {
-        $this->writeSkelFile('www/filemanager.php', "before\n        ob_flush();\nafter\n");
+        $this->pmssWriteRelativeFile($this->skelDir, 'www/filemanager.php', "before\n        ob_flush();\nafter\n");
         @mkdir(dirname($this->targetPath()), 0755, true);
 
         $target = $this->tempPath('patch-symlink-target');
@@ -119,13 +119,6 @@ PHP;
     private function targetPath(): string
     {
         return $this->homeRoot.'/'.$this->user.'/www/filemanager.php';
-    }
-
-    private function writeSkelFile(string $relative, string $content): void
-    {
-        $path = $this->skelDir.'/'.$relative;
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, $content);
     }
 
 }

@@ -41,7 +41,6 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 // Load the functions we are testing
@@ -51,8 +50,6 @@ if (!function_exists('pmssWebdavWwwPolicyBlock')) {
 
 class WebdavSecurityTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $tempDir;
 
     protected function setUp(): void

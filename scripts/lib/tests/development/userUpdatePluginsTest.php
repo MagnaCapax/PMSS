@@ -5,13 +5,10 @@ namespace {
 
 namespace PMSS\Tests {
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdatePluginsTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testEnsurePluginsReportsMissingSource(): void
     {
         $home = sys_get_temp_dir().'/pmss-plugins-home-'.bin2hex(random_bytes(4));

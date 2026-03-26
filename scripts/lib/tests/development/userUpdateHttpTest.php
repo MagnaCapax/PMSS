@@ -5,13 +5,10 @@ namespace {
 
 namespace PMSS\Tests {
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserUpdateHttpTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testConfigureHttpDisablesQbittorrentReverseProxyChecks(): void
     {
         $home = sys_get_temp_dir().'/pmss-http-qbittorrent-'.bin2hex(random_bytes(4));

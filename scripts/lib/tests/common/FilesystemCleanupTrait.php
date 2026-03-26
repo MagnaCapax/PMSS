@@ -56,6 +56,12 @@ trait FilesystemCleanupTrait
         @file_put_contents($path, $content);
     }
 
+    /** Write fixture content beneath a base directory so tests can share relative-path setup. */
+    protected function pmssWriteRelativeFile(string $baseDir, string $relativePath, string $content, int $dirMode = 0755): void
+    {
+        $this->pmssWriteFile(rtrim($baseDir, '/').'/'.ltrim($relativePath, '/'), $content, $dirMode);
+    }
+
     /** Create a temporary file with deterministic PMSS-style naming. */
     protected function pmssWriteTempFile(string $prefix, string $content, string $namespace = 'pmss'): string
     {

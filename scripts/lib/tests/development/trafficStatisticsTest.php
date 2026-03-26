@@ -1,13 +1,10 @@
 <?php
 namespace PMSS\Tests;
 
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/traffic.php';
 
 class TrafficStatisticsTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     public function testParseLineValid(): void
     {
         $ts = new \trafficStatistics();

@@ -2,13 +2,10 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../common/FilesystemCleanupTrait.php';
 require_once dirname(__DIR__, 2).'/update.php';
 
 class UpdateUserFileSafeWriteTest extends TestCase
 {
-    use FilesystemCleanupTrait;
-
     private $homeRoot;
     private $user;
     private $skelDirName;
@@ -45,7 +42,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     {
         $home = $this->ensureUserHome();
         $relative = $this->skelRelative('nested/dir/config.txt');
-        $this->writeSkelFile($relative, 'alpha');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'alpha');
 
         \updateUserFile($relative, $this->user);
 
@@ -59,7 +56,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     {
         $home = $this->ensureUserHome();
         $relative = $this->skelRelative('same.txt');
-        $this->writeSkelFile($relative, 'same');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'same');
 
         $target = $home.'/'.$relative;
         @mkdir(dirname($target), 0755, true);
@@ -78,7 +75,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     {
         $home = $this->ensureUserHome();
         $relative = $this->skelRelative('diff.txt');
-        $this->writeSkelFile($relative, 'new');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'new');
 
         $target = $home.'/'.$relative;
         @mkdir(dirname($target), 0755, true);
@@ -94,7 +91,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     public function testSkipsWhenHomeMissing(): void
     {
         $relative = $this->skelRelative('missing-home.txt');
-        $this->writeSkelFile($relative, 'data');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
 
         $target = $this->homeRoot.'/'.$this->user.'/'.$relative;
         \updateUserFile($relative, $this->user);
@@ -106,7 +103,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
     {
         $home = $this->ensureUserHome();
         $relative = $this->skelRelative('dir-target.txt');
-        $this->writeSkelFile($relative, 'data');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
 
         $target = $home.'/'.$relative;
         @mkdir($target, 0755, true);
@@ -150,13 +147,6 @@ class UpdateUserFileSafeWriteTest extends TestCase
     private function skelRelative(string $suffix): string
     {
         return $this->skelDirName.'/'.$suffix;
-    }
-
-    private function writeSkelFile(string $relative, string $content): void
-    {
-        $path = \pmssSkeletonBase().'/'.$relative;
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, $content);
     }
 
 }
