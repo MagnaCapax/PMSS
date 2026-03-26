@@ -303,11 +303,15 @@ abstract class TestCase
             \RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($it as $item) {
+            if ($item->isLink() || $item->isFile()) {
+                @unlink($item->getPathname());
+                continue;
+            }
+
             if ($item->isDir()) {
                 @rmdir($item->getPathname());
                 continue;
             }
-            @unlink($item->getPathname());
         }
 
         @rmdir($path);

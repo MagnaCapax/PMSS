@@ -20,17 +20,58 @@ function pmssTestRemoveTree(string $path): void
     );
 
     foreach ($iterator as $item) {
+        if ($item->isLink() || $item->isFile()) {
+            @unlink($item->getPathname());
+            continue;
+        }
+
         if ($item->isDir()) {
             @rmdir($item->getPathname());
             continue;
         }
-
-        @unlink($item->getPathname());
     }
 
     @rmdir($path);
 }
 
+/**
+ * Capture PMSS-prefixed temp artifacts so the suite can remove only what it created.
+ *
+ * Some older tests still allocate fixtures directly under sys_get_temp_dir()
+ * instead of PMSS_TEST_TEMP_ROOT. Track those paths at the runner boundary so
+ * the suite does not leak directories or files across repeated runs.
+ *
+ * @return array<int, string>
+ */
+function pmssTestListTempArtifacts(): array
+{
+    $paths = glob(sys_get_temp_dir().'/pmss-*');
+    if ($paths === false) {
+        return [];
+    }
+
+    sort($paths);
+    return $paths;
+}
+
+/**
+ * Remove PMSS-prefixed temp artifacts that were created during the current suite run.
+ *
+ * @param array<int, string> $before
+ */
+function pmssTestCleanupNewTempArtifacts(array $before): void
+{
+    $beforeMap = array_fill_keys($before, true);
+    foreach (pmssTestListTempArtifacts() as $path) {
+        if (isset($beforeMap[$path])) {
+            continue;
+        }
+
+        pmssTestRemoveTree($path);
+    }
+}
+
+$tempArtifactsBefore = pmssTestListTempArtifacts();
 $suiteRoot = sys_get_temp_dir().'/pmss-tests-'.bin2hex(random_bytes(6));
 $versionDir = $suiteRoot.'/version';
 $testRoot    = $suiteRoot.'/root';
@@ -61,8 +102,9 @@ foreach (['PMSS_JSON_LOG', 'PMSS_PROFILE_OUTPUT'] as $key) {
     putenv($key);
 }
 
-register_shutdown_function(static function () use ($suiteRoot): void {
+register_shutdown_function(static function () use ($suiteRoot, $tempArtifactsBefore): void {
     pmssTestRemoveTree($suiteRoot);
+    pmssTestCleanupNewTempArtifacts($tempArtifactsBefore);
 });
 
 foreach ([
