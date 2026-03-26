@@ -172,6 +172,29 @@ function pmssUpdateStep2MarkWebRefreshCompleted(): void
 }
 
 /**
+ * Attempt a best-effort nginx start when the final refresh could not finish.
+ */
+function pmssUpdateStep2StartNginxShutdownFallback(string $reason): void
+{
+    logmsg('[WARN] update-step2 exited with nginx still pending final refresh; attempting direct start (reason: '.$reason.')');
+    pmssLogJson([
+        'event' => 'post_update_nginx_start_fallback',
+        'status' => 'start',
+        'reason' => $reason,
+    ]);
+
+    $rc = 0;
+    passthru('systemctl start nginx 2>/dev/null || /etc/init.d/nginx start 2>/dev/null', $rc);
+
+    pmssLogJson([
+        'event' => 'post_update_nginx_start_fallback',
+        'status' => $rc === 0 ? 'ok' : 'error',
+        'rc' => $rc,
+    ]);
+    logmsg(sprintf('[WARN] Direct nginx start fallback completed with rc=%d', $rc));
+}
+
+/**
  * Attempt a best-effort nginx config regeneration if update-step2 exits early.
  */
 function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
@@ -186,6 +209,7 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
 
         if (!file_exists('/scripts/util/createNginxConfig.php')) {
             logmsg('[WARN] update-step2 exited before final nginx refresh; createNginxConfig.php missing');
+            pmssUpdateStep2StartNginxShutdownFallback('create_nginx_config_missing');
             return;
         }
 
@@ -211,6 +235,12 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
             'rc' => $rc,
         ]);
         logmsg(sprintf('[WARN] Rescue nginx refresh completed with rc=%d', $rc));
+        if ($rc === 0) {
+            pmssUpdateStep2MarkWebRefreshCompleted();
+            return;
+        }
+
+        pmssUpdateStep2StartNginxShutdownFallback('web_refresh_rescue_failed');
     });
 }
 
