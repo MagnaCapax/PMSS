@@ -133,9 +133,7 @@ function pmssEnsureAuthorizedKeysDirective(): void
 
     echo "# Allowing SSH Key based authentication.\n";
     pmssBackupCriticalConfig('sshd', $sshdConfig);
-    if (!@copy($sshdConfig, '/etc/ssh/pmss.sshd_config')) {
-        logMessage('[WARN] Failed to refresh /etc/ssh/pmss.sshd_config backup copy');
-    }
+    pmssBootstrapWriteRootOwnedFile('/etc/ssh/pmss.sshd_config', $config);
     if (!pmssBootstrapWriteRootOwnedFile($sshdConfig, $updated)) {
         return;
     }

@@ -6,6 +6,17 @@ require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesBootstrapTest extends TestCase
 {
+    public function testAuthorizedKeysDirectiveUsesGuardedBackupWriter(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/lib/update/services/bootstrap.php');
+
+        $this->assertStringContainsString(
+            "pmssBootstrapWriteRootOwnedFile('/etc/ssh/pmss.sshd_config', \$config);",
+            $src,
+            'Expected sshd backup copy to use the guarded root-owned writer'
+        );
+    }
+
     public function testHostnameSkipTruthyValueSkips(): void
     {
         $messages = [];
