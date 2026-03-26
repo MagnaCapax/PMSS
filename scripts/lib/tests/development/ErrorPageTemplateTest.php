@@ -28,6 +28,16 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
+    public function testAuthenticationErrorPageDefinesImageVariantsAndHomeLink(): void
+    {
+        $contents = $this->pmssReadRepoFile('var/www/error-401.html');
+        $this->assertEquals(3, substr_count($contents, '.png'));
+        $this->assertStringContainsString('/401_images/401-1.png', $contents);
+        $this->assertStringContainsString('/401_images/401-2.png', $contents);
+        $this->assertStringContainsString('/401_images/401-3.png', $contents);
+        $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
+    }
+
     public function testForbiddenErrorPageIncludesFriendlyTextAndHomeLink(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-403.html');
@@ -36,32 +46,29 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
-    public function testForbiddenErrorPageDefinesThreeImageVariants(): void
+    public function testForbiddenErrorPageDefinesTwentyTwoImageVariants(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-403.html');
-        $this->assertEquals(3, substr_count($contents, '.png'));
+        $this->assertEquals(22, substr_count($contents, '.png'));
         $this->assertStringContainsString('/404_images/404-1.png', $contents);
-        $this->assertStringContainsString('/404_images/404-2.png', $contents);
-        $this->assertStringContainsString('/404_images/404-3.png', $contents);
+        $this->assertStringContainsString('/404_images/404-22.png', $contents);
     }
 
-    public function testNotFoundErrorPageDefinesThreeImageVariantsAndHomeLink(): void
+    public function testNotFoundErrorPageDefinesTwentyTwoImageVariantsAndHomeLink(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-404.html');
-        $this->assertEquals(3, substr_count($contents, '.png'));
+        $this->assertEquals(22, substr_count($contents, '.png'));
         $this->assertStringContainsString('/404_images/404-1.png', $contents);
-        $this->assertStringContainsString('/404_images/404-2.png', $contents);
-        $this->assertStringContainsString('/404_images/404-3.png', $contents);
+        $this->assertStringContainsString('/404_images/404-22.png', $contents);
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
-    public function testBadGatewayErrorPageDefinesThreeImageVariantsAndHomeLink(): void
+    public function testBadGatewayErrorPageDefinesThirteenImageVariantsAndHomeLink(): void
     {
         $contents = $this->pmssReadRepoFile('var/www/error-502.html');
-        $this->assertEquals(3, substr_count($contents, '.png'));
+        $this->assertEquals(13, substr_count($contents, '.png'));
         $this->assertStringContainsString('/502_images/502-1.png', $contents);
-        $this->assertStringContainsString('/502_images/502-2.png', $contents);
-        $this->assertStringContainsString('/502_images/502-3.png', $contents);
+        $this->assertStringContainsString('/502_images/502-13.png', $contents);
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 

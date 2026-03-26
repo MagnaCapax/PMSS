@@ -2,6 +2,9 @@
   <span class="error-message">401 - Authentication Required</span>
   <br />
   <div class="content-container">
+    <div id="image-container">
+      <img alt="401 - Authentication Required" id="error-image" />
+    </div>
     <div class="error-description">
       <p>
         This area is protected by account authentication. Enter your PMSS username
@@ -26,6 +29,14 @@
 </div>
 
 <script>
+  const variants = ['/401_images/401-1.png', '/401_images/401-2.png', '/401_images/401-3.png'];
+  const imageElement = document.getElementById('error-image');
+  imageElement.src = variants[Math.floor(Math.random() * variants.length)];
+  imageElement.classList.add('error-image');
+  imageElement.addEventListener('error', function () {
+    imageElement.style.display = 'none';
+  });
+
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.type = 'text/css';
