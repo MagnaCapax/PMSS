@@ -53,6 +53,10 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
   survives a post-launch stability window, so brief crashes do not clear the
   failed-start counter.
 - `checkLighttpdInstances.php` – Confirm each user’s lighttpd/php-cgi pair and probe the php-cgi sockets that should exist immediately after startup before restarting the stack.
+- `lighttpdAccessLogTrim.php` – Truncate `~/.lighttpd/access.log` in place once
+  it exceeds 100 MiB so long-lived reverse-proxied web UIs do not silently
+  consume user quota. The root cron template runs it hourly and logs trims to
+  `/var/log/pmss/lighttpdAccessLogTrim.log`.
 - `checkQbittorrentInstances.php` – Restart qBittorrent if processes exit.
 - `checkRcloneInstances.php` – Maintain rclone mount processes.
 - `cpuStat.php` – Periodically record CPU usage statistics.

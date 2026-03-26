@@ -6,6 +6,7 @@ MAILTO=""
 # m h  dom mon dow   command
 */2 * * * *    root /scripts/cron/checkRtorrent.php >> /var/log/pmss/checkRtorrent.log 2>&1
 * * * * *    root sleep 45; /scripts/cron/checkLighttpdInstances.php >> /var/log/pmss/checkLighttpdInstances.log 2>&1
+17 * * * *   root    /scripts/cron/lighttpdAccessLogTrim.php >> /var/log/pmss/lighttpdAccessLogTrim.log 2>&1
 5 */2 * * *    root sleep 75; /scripts/cron/userTrackerCleaner.php >> /var/log/pmss/userTrackerCleaner.log 2>&1
 * * * * *    root sleep 45; /scripts/cron/checkDelugeInstances.php >> /var/log/pmss/checkDelugeInstances.log 2>&1
 */2 * * * *    root sleep 17; /scripts/cron/checkRcloneInstances.php >> /var/log/pmss/checkRcloneInstances.log 2>&1

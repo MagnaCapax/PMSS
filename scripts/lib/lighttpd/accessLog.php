@@ -1,0 +1,70 @@
+<?php
+/**
+ * Oversized per-user lighttpd access log helpers.
+ *
+ * @license GPL-3.0-only
+ */
+
+require_once __DIR__.'/userFileWrite.php';
+
+/**
+ * Keep per-user access logs bounded to limit quota and I/O drift.
+ */
+function pmssLighttpdAccessLogThresholdBytes(): int
+{
+    return 100 * 1024 * 1024;
+}
+
+/**
+ * Truncate a regular lighttpd access log in place once it exceeds the limit.
+ *
+ * @return array<string, int|string>
+ */
+function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
+{
+    if ($thresholdBytes < 0 || !pmssUserFilePathIsSafe($path) || !is_file($path) || is_link($path)) {
+        return ['status' => 'skip', 'reason' => 'unsafe_target'];
+    }
+
+    $pathStat = @lstat($path);
+    if (!is_array($pathStat) || (($pathStat['mode'] ?? 0) & 0170000) !== 0100000) {
+        return ['status' => 'skip', 'reason' => 'not_regular_file'];
+    }
+
+    $handle = @fopen($path, 'c+');
+    if (!is_resource($handle)) {
+        return ['status' => 'error', 'reason' => 'open_failed'];
+    }
+
+    $handleStat = @fstat($handle);
+    if (
+        !is_array($handleStat)
+        || ($pathStat['dev'] ?? null) !== ($handleStat['dev'] ?? null)
+        || ($pathStat['ino'] ?? null) !== ($handleStat['ino'] ?? null)
+    ) {
+        @fclose($handle);
+        return ['status' => 'skip', 'reason' => 'path_changed'];
+    }
+
+    if (($handleStat['nlink'] ?? 1) !== 1) {
+        @fclose($handle);
+        return ['status' => 'skip', 'reason' => 'multiple_links'];
+    }
+
+    $sizeBefore = (int) ($handleStat['size'] ?? 0);
+    if ($sizeBefore <= $thresholdBytes) {
+        @fclose($handle);
+        return ['status' => 'skip', 'reason' => 'below_threshold', 'sizeBefore' => $sizeBefore];
+    }
+
+    if (!@ftruncate($handle, 0)) {
+        @fclose($handle);
+        return ['status' => 'error', 'reason' => 'truncate_failed', 'sizeBefore' => $sizeBefore];
+    }
+
+    @fflush($handle);
+    @fclose($handle);
+    clearstatcache(true, $path);
+
+    return ['status' => 'trimmed', 'sizeBefore' => $sizeBefore, 'sizeAfter' => (int) @filesize($path)];
+}
