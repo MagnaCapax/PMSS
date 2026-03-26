@@ -25,6 +25,25 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals(0, \pmssReadUserTrafficMonth($this->tempDir.'/missing'));
     }
 
+    public function testSharedTrafficPayloadReaderReturnsSerializedArrays(): void
+    {
+        $path = $this->tempDir.'/traffic-data-array';
+        $expected = ['raw' => ['month' => 1536.4], 'extra' => ['week' => 12]];
+        file_put_contents($path, serialize($expected));
+
+        $this->assertEquals($expected, \pmssTrafficReadSerializedArrayFile($path));
+    }
+
+    public function testSharedTrafficPayloadReaderRejectsSymlinkedFile(): void
+    {
+        $target = $this->tempDir.'/traffic-data-target';
+        file_put_contents($target, serialize(['raw' => ['month' => 2048]]));
+        $link = $this->tempDir.'/traffic-data-link-for-array-reader';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+
+        $this->assertEquals(null, \pmssTrafficReadSerializedArrayFile($link));
+    }
+
     public function testReadUserTrafficMonthRejectsSymlinkedFile(): void
     {
         $target = $this->tempDir.'/traffic-data-target';

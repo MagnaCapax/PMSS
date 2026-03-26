@@ -14,6 +14,7 @@
  */
 require_once '/scripts/lib/rtorrentConfig.php';
 require_once '/scripts/lib/network/config.php';
+require_once '/scripts/lib/traffic/storage.php';
 require_once '/scripts/lib/userLifecycle.php';
 require_once '/scripts/lib/user/userConfigStore.php';
 foreach ([
@@ -83,7 +84,7 @@ foreach($users AS $thisUser) {
     if (!file_exists($trafficDataFile) or
         !file_exists($userTrafficLimitFile) ) continue;
 
-    $data = pmssReadTrafficData($trafficDataFile, $thisUser);
+    $data = pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser);
     if ($data === null) {
         echo date('Y-m-d H:i:s') . ": Skipping {$thisUser}, invalid traffic data file\n";
         continue;
@@ -269,47 +270,6 @@ foreach($users AS $thisUser) {
         }
 
     }
-}
-
-/**
- * Safely read traffic data snapshot for a user, enforcing ownership and structure.
- */
-function pmssReadTrafficData(string $path, string $username): ?array
-{
-    if (is_link($path)) {
-        return null;
-    }
-
-    $stats = @stat($path);
-    if ($stats === false || $stats['uid'] !== 0) {
-        return null;
-    }
-
-    $mode = $stats['mode'] & 0777;
-    if (($mode & 0022) !== 0) { // group/other writable
-        return null;
-    }
-
-    $group = @posix_getgrgid($stats['gid']);
-    if ($group !== false && $group['name'] !== $username && $group['name'] !== 'root') {
-        return null;
-    }
-
-    $blob = @file_get_contents($path);
-    if ($blob === false || $blob === '') {
-        return null;
-    }
-
-    $data = @unserialize($blob, ['allowed_classes' => false]);
-    if (!is_array($data) || !isset($data['raw']) || !is_array($data['raw'])) {
-        return null;
-    }
-
-    if (!isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
-        return null;
-    }
-
-    return $data;
 }
 
 function setRateLimit($user, $trafficCapMbit, $enable=true) {

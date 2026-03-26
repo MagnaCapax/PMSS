@@ -8,24 +8,10 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/runtime.php';
+require_once __DIR__.'/lib/traffic/storage.php';
 
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     exit(pmssShowTrafficMain($argv));
-}
-
-/**
- * Read a serialized traffic stats payload without allowing object wakeups.
- *
- * @return array|null
- */
-function pmssShowTrafficReadStatsPayload(string $statsPath): ?array
-{
-    $rawStats = @file_get_contents($statsPath);
-    $data = is_string($rawStats) && $rawStats !== ''
-        ? @unserialize($rawStats, ['allowed_classes' => false])
-        : null;
-
-    return is_array($data) ? $data : null;
 }
 
 function pmssShowTrafficMain(array $argv): int
@@ -92,7 +78,6 @@ TXT;
         }
     }
 
-    require_once __DIR__.'/lib/traffic/storage.php';
     $trafficLimitLib = __DIR__.'/lib/user/trafficLimit.php';
     if (is_file($trafficLimitLib)) {
         require_once $trafficLimitLib;
@@ -145,7 +130,7 @@ TXT;
             continue;
         }
 
-        $data = pmssShowTrafficReadStatsPayload($statsPath);
+        $data = pmssTrafficReadSerializedArrayFile($statsPath);
         if ($data === null || empty($data['raw']['month'])) {
             continue;
         }
@@ -166,7 +151,7 @@ TXT;
                 $ingressGroup = @posix_getgrgid($stats['gid']);
                 $groupName = is_array($ingressGroup) ? ($ingressGroup['name'] ?? '') : '';
                 if ($groupName === '' || $groupName === $baseUser || $groupName === 'root') {
-                    $ingressData = pmssShowTrafficReadStatsPayload($ingressPath);
+                    $ingressData = pmssTrafficReadSerializedArrayFile($ingressPath);
                     if (is_array($ingressData) && isset($ingressData['raw']['month']) && is_numeric($ingressData['raw']['month'])) {
                         $inboundMonth = (float) $ingressData['raw']['month'];
                     }

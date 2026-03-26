@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/showTraffic.php';
+require_once dirname(__DIR__, 3).'/lib/traffic/storage.php';
 
 class ShowTrafficSafetyWakeupProbe
 {
@@ -43,9 +43,9 @@ class ShowTrafficSafetyTest extends TestCase
         $this->cleanup(dirname(dirname($this->statsPath)));
     }
 
-    public function testReadStatsPayloadRejectsSerializedObjectsWithoutWakeup(): void
+    public function testSharedTrafficPayloadReaderRejectsSerializedObjectsWithoutWakeup(): void
     {
-        $payload = \pmssShowTrafficReadStatsPayload($this->statsPath);
+        $payload = \pmssTrafficReadSerializedArrayFile($this->statsPath);
 
         $this->assertEquals(null, $payload);
         $this->assertTrue(!file_exists($this->markerPath));

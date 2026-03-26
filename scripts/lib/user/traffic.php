@@ -72,17 +72,8 @@ function userApplyDiskQuota(array $user): void
  */
 function pmssReadUserTrafficMonth(string $path): int
 {
-    if (!is_file($path) || is_link($path)) {
-        return 0;
-    }
-
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || $raw === '') {
-        return 0;
-    }
-
-    $data = @unserialize($raw, ['allowed_classes' => false]);
-    if (!is_array($data) || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
+    $data = pmssTrafficReadSerializedArrayFile($path);
+    if ($data === null || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
         return 0;
     }
 

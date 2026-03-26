@@ -78,6 +78,51 @@ if (!function_exists('pmssTrafficStatsPath')) {
     }
 }
 
+if (!function_exists('pmssTrafficReadSerializedArrayFile')) {
+    /**
+     * Read a serialized array payload without allowing object wakeups.
+     */
+    function pmssTrafficReadSerializedArrayFile(string $path): ?array
+    {
+        if (!is_file($path) || is_link($path)) {
+            return null;
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $data = @unserialize($raw, ['allowed_classes' => false]);
+        return is_array($data) ? $data : null;
+    }
+}
+
+if (!function_exists('pmssTrafficReadRootOwnedStatsPayload')) {
+    /**
+     * Read a trusted traffic stats payload owned by root and grouped to the user.
+     */
+    function pmssTrafficReadRootOwnedStatsPayload(string $path, string $username): ?array
+    {
+        $stats = @stat($path);
+        if ($stats === false || (int) $stats['uid'] !== 0 || (($stats['mode'] & 0777) & 0022) !== 0) {
+            return null;
+        }
+
+        $group = @posix_getgrgid((int) $stats['gid']);
+        if ($group !== false && isset($group['name']) && $group['name'] !== $username && $group['name'] !== 'root') {
+            return null;
+        }
+
+        $data = pmssTrafficReadSerializedArrayFile($path);
+        if ($data === null || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
+            return null;
+        }
+
+        return $data;
+    }
+}
+
 if (!function_exists('pmssTrafficSetImmutable')) {
     /** Best-effort immutable toggle for traffic data files. */
     function pmssTrafficSetImmutable(string $path, bool $enable): void
