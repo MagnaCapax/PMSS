@@ -8,6 +8,49 @@ require_once __DIR__.'/../common/TestCase.php';
  */
 class NginxConfigSkipLoggingTest extends TestCase
 {
+    public function testSkipHelperMirrorsWarningsToSharedAndUserLogs(): void
+    {
+        $repoRoot = dirname(__DIR__, 4);
+        $script = <<<'PHP'
+$repoRoot = __REPO_ROOT__;
+$GLOBALS['PMSS_NGINX_SKIP_APPEND_LOGS'] = [];
+$GLOBALS['PMSS_NGINX_SKIP_USER_LOGS'] = [];
+
+function pmssCreateNginxConfigAppendLog(string $message): void
+{
+    $GLOBALS['PMSS_NGINX_SKIP_APPEND_LOGS'][] = $message;
+}
+
+function pmssUserLog(string $user, string $message): void
+{
+    $GLOBALS['PMSS_NGINX_SKIP_USER_LOGS'][] = [$user, $message];
+}
+
+require $repoRoot.'/scripts/lib/nginxConfig/userConfigsGenerate.php';
+
+pmssCreateNginxConfigLogSkippedUser('alice', 'missing .rtorrent.rc prerequisite');
+
+echo json_encode([
+    'append' => $GLOBALS['PMSS_NGINX_SKIP_APPEND_LOGS'],
+    'user' => $GLOBALS['PMSS_NGINX_SKIP_USER_LOGS'],
+]);
+PHP;
+
+        $script = str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script);
+        $output = (string) @shell_exec(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>/dev/null');
+        $decoded = json_decode($output, true);
+
+        $this->assertTrue(is_array($decoded), 'Expected JSON output, got: '.trim($output));
+        $this->assertEquals(
+            ['WARN: skipping nginx config for alice: missing .rtorrent.rc prerequisite'],
+            $decoded['append']
+        );
+        $this->assertEquals(
+            [['alice', 'WARN: skipping nginx config for alice: missing .rtorrent.rc prerequisite']],
+            $decoded['user']
+        );
+    }
+
     public function testGeneratorLogsMissingRtorrentPrerequisite(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
