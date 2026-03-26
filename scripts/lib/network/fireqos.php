@@ -8,22 +8,9 @@
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../runtime.php';
 
-/**
- * Resolve a validated username to its uid for FireQOS class generation.
- */
-function networkFireqosLookupUid(string $username): ?int
-{
-    if (!pmssValidateUsername($username)) {
-        return null;
-    }
-
-    $uid = trim((string) @shell_exec('id -u '.escapeshellarg($username).' 2>/dev/null'));
-    return ctype_digit($uid) ? (int) $uid : null;
-}
-
 function networkBuildFireqosConfig(array $networkConfig, array $users, array $localnets): string
 {
-    $templatePath = getenv('PMSS_FIREQOS_TEMPLATE') ?: '/etc/seedbox/config/template.fireqos';
+    $templatePath = pmssResolvePathFromEnv('PMSS_FIREQOS_TEMPLATE', '/etc/seedbox/config/template.fireqos');
     $template = is_file($templatePath) ? @file_get_contents($templatePath) : false;
     if ($template === false) {
         $template = "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n";
@@ -36,8 +23,8 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
 
     $fireqosConfigUsers = '';
     $fireqosMark = 1;
-    $limitStateDir = getenv('PMSS_TRAFFIC_LIMIT_STATE_DIR') ?: '/var/run/pmss/trafficLimits';
-    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
+    $limitStateDir = pmssResolvePathFromEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', '/var/run/pmss/trafficLimits');
+    $homeDir = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
     $defaultCapMbit = 100;
     if (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throttle']['max'])) {
         $defaultCapMbit = (int) $networkConfig['throttle']['max'];
@@ -58,7 +45,12 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
     };
 
     foreach ($users as $username) {
-        if (networkFireqosLookupUid($username) === null) {
+        if (!pmssValidateUsername($username)) {
+            continue;
+        }
+
+        $uid = trim((string) @shell_exec('id -u '.escapeshellarg($username).' 2>/dev/null'));
+        if (!ctype_digit($uid)) {
             continue;
         }
 
