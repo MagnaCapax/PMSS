@@ -55,6 +55,4 @@ function pmssProcessSnapshotRun(): int
     });
 }
 
-if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    exit(pmssProcessSnapshotRun());
-}
+pmssRunCliEntrypoint(__FILE__, 'pmssProcessSnapshotRun');

@@ -753,6 +753,13 @@ if (!function_exists('pmssRequireCliEntrypointScript')) {
     }
 }
 
+if (!function_exists('pmssRunCliEntrypoint')) {
+    function pmssRunCliEntrypoint(string $scriptPath, callable $main): void
+    {
+        if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === $scriptPath) exit((int) $main());
+    }
+}
+
 if (!function_exists('pmssSnapshotLogOpen')) {
     /**
      * Open a root-only append log for snapshot-style cron jobs.

@@ -322,7 +322,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("require_once __DIR__.'/../lib/resources/log.php';", $cronSrc);
         $this->assertStringContainsString('const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT', $cronSrc);
         $this->assertStringContainsString('new ResourceStatsAccumulator([\'day\' => $threshold])', $cronSrc);
-        $this->assertStringContainsString('exit(pmssResourceSnapshotRun());', $cronSrc);
+        $this->assertStringContainsString("pmssRunCliEntrypoint(__FILE__, 'pmssResourceSnapshotRun');", $cronSrc);
         $this->assertStringContainsString('function '.$symbol.'(): int', $cronSrc);
     }
 

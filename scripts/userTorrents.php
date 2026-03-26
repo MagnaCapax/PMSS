@@ -11,6 +11,7 @@
  *
  * @license GPL-3.0-only
  */
+require_once __DIR__.'/lib/runtime.php';
 require_once __DIR__.'/lib/userLifecycle.php';
 
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
@@ -48,7 +49,7 @@ function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
     return $counts;
 }
 
-if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int {
     // Options.
     $options = getopt('', ['by-client', 'help']);
     if (isset($options['help'])) {
@@ -80,5 +81,5 @@ TXT;
             : "{$thisUser}: ".number_format($counts['total']))."\n";
     }
 
-    exit(0);
-}
+    return 0;
+});

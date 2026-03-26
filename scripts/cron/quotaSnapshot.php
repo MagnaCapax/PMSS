@@ -99,6 +99,4 @@ function pmssQuotaSnapshotRun(): int
     });
 }
 
-if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    exit(pmssQuotaSnapshotRun());
-}
+pmssRunCliEntrypoint(__FILE__, 'pmssQuotaSnapshotRun');

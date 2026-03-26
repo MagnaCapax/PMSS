@@ -108,6 +108,4 @@ function pmssResourceSnapshotRun(): int
     });
 }
 
-if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    exit(pmssResourceSnapshotRun());
-}
+pmssRunCliEntrypoint(__FILE__, 'pmssResourceSnapshotRun');

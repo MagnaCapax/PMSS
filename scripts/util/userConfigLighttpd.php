@@ -85,6 +85,4 @@ function pmssUserConfigLighttpdMain(array $argv): int
     return 0;
 }
 
-if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
-    exit(pmssUserConfigLighttpdMain($argv));
-}
+pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int { return pmssUserConfigLighttpdMain($argv); });
