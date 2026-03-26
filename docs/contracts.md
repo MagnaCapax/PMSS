@@ -510,5 +510,5 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## Notes for Agentic Coding
 - Prefer high-level helpers (`runStep`, `pmssRefreshRepositories`, `pmssApplyDpkgSelections`, `pmssUpdateUserEnvironment`) to keep logs/profile consistent.
 - Honor environment overrides in tests (`PMSS_*` flags) to avoid mutating the real system.
-- Treat `etc/skel/www` and vendor code as read-only.
+- Treat `etc/skel/www` as guarded rather than blanket-frozen: only make minimal, targeted changes when a GitHub issue already includes a posted adversarial review. Treat vendor code as read-only unless a narrower rule explicitly allows the change.
 - Keep destructive actions guarded and idempotent; reuse existing conventions.
