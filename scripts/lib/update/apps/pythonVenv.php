@@ -25,7 +25,7 @@ function pmssPythonVenvEnsure(
 ): string
 {
     $log = $logger ?: 'logMessage';
-    $python = trim((string) @shell_exec('command -v python3 2>/dev/null'));
+    $python = pmssCommandPath('python3');
     if ($python === '') {
         $log($missingPythonMessage !== null ? $missingPythonMessage : '[WARN] Skipping '.$label.' setup: python3 missing');
         return '';

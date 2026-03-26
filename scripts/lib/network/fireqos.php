@@ -6,6 +6,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/../userLifecycle.php';
+require_once __DIR__.'/../runtime.php';
 
 /**
  * Resolve a validated username to its uid for FireQOS class generation.
@@ -106,8 +107,7 @@ function networkApplyFireqos(string $config): void
         @mkdir('/var/log/pmss', 0755, true);
     }
     @file_put_contents('/etc/seedbox/config/fireqos.conf', $config);
-    $hasFireqos = trim((string)@shell_exec('command -v fireqos 2>/dev/null')) !== '';
-    if ($hasFireqos) {
+    if (pmssCommandPath('fireqos') !== '') {
         @shell_exec('fireqos start /etc/seedbox/config/fireqos.conf >> /var/log/pmss/fireqos.log 2>&1');
     }
 }

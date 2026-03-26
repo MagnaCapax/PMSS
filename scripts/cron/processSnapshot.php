@@ -31,7 +31,7 @@ function pmssProcessSnapshotRun(): int
     $ts = date('Y-m-d\\TH:i:s');
 
     return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($ts): int {
-        if (($ps = trim((string) @shell_exec('command -v ps 2>/dev/null'))) === '') {
+        if (($ps = pmssCommandPath('ps')) === '') {
             @fwrite($fh, $ts.' WARN ps_missing'.PHP_EOL);
             return 0;
         }

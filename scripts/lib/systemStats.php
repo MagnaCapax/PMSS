@@ -6,6 +6,8 @@
  * @author  PMSS Team
  */
 
+require_once __DIR__.'/runtime.php';
+
 /**
  * Collect a single snapshot of system metrics for logging.
  *
@@ -128,7 +130,7 @@ function pmssSystemStatsCollect(): array
         }
     }
 
-    $hasIoping = trim((string)@shell_exec('command -v ioping 2>/dev/null')) !== '';
+    $hasIoping = pmssCommandPath('ioping') !== '';
     $iopingRoot = $hasIoping ? $iopingMs('/') : 'na';
     $iopingHome = $hasIoping ? $iopingMs('/home') : 'na';
     $topMem = 'na';

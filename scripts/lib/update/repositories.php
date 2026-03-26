@@ -50,7 +50,7 @@ require_once __DIR__.'/runtime/commands.php';
         @unlink($tmpPath);
 
         $keyUrl = 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xC10E11090EC0E438';
-        $fetchCmd = trim((string) @shell_exec('command -v wget 2>/dev/null')) !== ''
+        $fetchCmd = pmssCommandPath('wget') !== ''
             ? sprintf('wget -qO %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl))
             : sprintf('curl -fsSL -o %s %s', escapeshellarg($tmpPath), escapeshellarg($keyUrl));
 

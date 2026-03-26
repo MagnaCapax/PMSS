@@ -35,7 +35,7 @@ $clientOvpn   = '/home/openvpn-'.$slug.'.ovpn';
 $clientCrt    = '/home/openvpn-'.$slug.'.crt';
 
 // Fast-path using the same binary/config/artifact checks expected by systemTest.
-$alreadyConfigured = trim((string) @shell_exec('command -v openvpn 2>/dev/null')) !== ''
+$alreadyConfigured = pmssCommandPath('openvpn') !== ''
     && is_file($serverConf)
     && (is_file($easyRsaDir.'/pki/ca.crt') || is_file($easyRsaDir.'/pki/issued/server.crt'))
     && is_file($clientOvpn)

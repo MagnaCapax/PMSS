@@ -38,11 +38,11 @@ function wgListHomeUsers(): array
 
 function wgSupports(): bool
 {
-    exec('command -v wg', $out, $rc);
-    if ($rc !== 0) {
+    $supported = pmssCommandPath('wg') !== '';
+    if (!$supported) {
         wgLog('wg binary not available on PATH');
     }
-    return $rc === 0;
+    return $supported;
 }
 
 /**

@@ -20,7 +20,7 @@ require_once __DIR__.'/storageHealth/smart.php';
 function pmssStorageHealthSnapshotNvme(array $disk, array $last, string $timestamp): ?array
 {
     $dev = (string) $disk['path'];
-    if (strpos($dev, 'nvme') === false || !pmssStorageHealthCommandExists('nvme')) {
+    if (strpos($dev, 'nvme') === false || pmssCommandPath('nvme') === '') {
         return null;
     }
     $res = pmssStorageHealthExecCapture('nvme smart-log '.escapeshellarg($dev).' 2>/dev/null', 20);

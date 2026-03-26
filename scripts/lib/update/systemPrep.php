@@ -219,7 +219,7 @@ function pmssConfigureTempDiskBackedMount(?callable $logger = null, ?int $distro
         return;
     }
 
-    if (trim((string) @shell_exec('command -v systemctl 2>/dev/null')) === '') {
+    if (pmssCommandPath('systemctl') === '') {
         $log('[WARN] systemctl unavailable; unable to mask tmp.mount');
         return;
     }
@@ -502,7 +502,7 @@ function pmssEnsureBootDefaults(
     }
     // Apply grub changes when possible and warn about reboot.
     if ($grubChanged) {
-        $hasUpdateGrub = trim((string) @shell_exec('command -v update-grub 2>/dev/null')) !== '';
+        $hasUpdateGrub = pmssCommandPath('update-grub') !== '';
         if ($hasUpdateGrub) {
             runStep('Updating GRUB configuration', 'update-grub');
         } else {

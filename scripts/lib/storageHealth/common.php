@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../runtime.php';
+
 /**
  * Read the latest entry per (kind, device/array) key from a JSONL file.
  *
@@ -58,13 +60,6 @@ function pmssStorageHealthWarnSeverity(string $severity): string
 {
     return $severity === 'ok' ? 'warn' : $severity;
 }
-
-/** Check whether a required storage-health helper binary exists on PATH. */
-function pmssStorageHealthCommandExists(string $binary): bool
-{
-    return trim((string) @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null')) !== '';
-}
-
 /**
  * Execute a shell command with captured output (no streaming).
  *

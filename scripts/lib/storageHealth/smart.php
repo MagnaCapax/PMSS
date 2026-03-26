@@ -137,7 +137,7 @@ function pmssStorageHealthSnapshotSmart(array $disk, array $last, string $timest
     if (!is_readable($dev)) {
         return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['device_unreadable'], 'warn', 'device unreadable');
     }
-    if (!pmssStorageHealthCommandExists('smartctl')) {
+    if (pmssCommandPath('smartctl') === '') {
         return pmssStorageHealthEntryFinalize(pmssStorageHealthDeviceEntryBuild('smart', $disk, $timestamp, 1), ['smartctl_missing'], 'warn', 'smartctl missing');
     }
 

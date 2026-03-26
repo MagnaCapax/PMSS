@@ -359,7 +359,7 @@ function pmssMdstatHasDegradedArrays(string $mdstat): bool
  */
 function pmssRepairNginxAfterDistUpgrade(): void
 {
-    $nginxPath = trim((string) @shell_exec('command -v nginx 2>/dev/null'));
+    $nginxPath = pmssCommandPath('nginx');
     if ($nginxPath === '') {
         logMessage('[SKIP] dist-upgrade: nginx not installed; skipping ABI check');
         return;
@@ -536,7 +536,7 @@ function pmssRewriteSources(string $fromMajor, string $toMajor): void
  */
 function pmssWaitForDpkgLocks(int $timeoutSeconds = 1800, int $sleepSeconds = 5): bool
 {
-    $fuser = trim((string) @shell_exec('command -v fuser 2>/dev/null'));
+    $fuser = pmssCommandPath('fuser');
     if ($fuser === '') {
         logMessage('[WARN] dist-upgrade: fuser not available; skipping dpkg lock checks');
         return true;

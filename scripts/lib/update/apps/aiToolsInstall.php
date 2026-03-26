@@ -19,7 +19,7 @@ $architecture = php_uname('m');
 $supportsPinnedArtifacts = in_array($architecture, ['x86_64', 'amd64'], true);
 
 $nodeBinary = '';
-$systemNode = trim((string) @shell_exec('command -v node 2>/dev/null'));
+$systemNode = pmssCommandPath('node');
 if ($systemNode !== '') {
     $systemVersion = trim((string) @shell_exec(escapeshellarg($systemNode).' --version 2>/dev/null'));
     if (preg_match('/^v?([0-9]+)/', $systemVersion, $match) && (int) $match[1] >= 22) {
@@ -63,7 +63,7 @@ if ($nodeBinary === '') {
 if ($nodeBinary !== '') {
     $npmBinary = dirname($nodeBinary).'/npm';
     if (!is_executable($npmBinary)) {
-        $npmBinary = trim((string) @shell_exec('command -v npm 2>/dev/null'));
+        $npmBinary = pmssCommandPath('npm');
     }
 
     foreach ([

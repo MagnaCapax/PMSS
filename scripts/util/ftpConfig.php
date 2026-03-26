@@ -92,7 +92,7 @@ if (@file_put_contents('/etc/proftpd/proftpd.conf', $rendered) === false) {
 logMessage('Wrote /etc/proftpd/proftpd.conf');
 
 if (
-    trim((string) @shell_exec('command -v proftpd 2>/dev/null')) !== ''
+    pmssCommandPath('proftpd') !== ''
     && runStep('Validating ProFTPD configuration', 'proftpd -t -c /etc/proftpd/proftpd.conf') !== 0
 ) {
     logMessage('[WARN] ProFTPD config test failed; skipping restart to avoid stopping a working daemon');

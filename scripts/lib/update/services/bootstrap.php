@@ -26,7 +26,7 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
         return;
     }
 
-    $hasHostnamectl = trim((string) @shell_exec('command -v hostnamectl')) !== '';
+    $hasHostnamectl = pmssCommandPath('hostnamectl') !== '';
     runStep(
         $hasHostnamectl ? 'Setting hostname via hostnamectl' : 'Setting hostname',
         $hasHostnamectl

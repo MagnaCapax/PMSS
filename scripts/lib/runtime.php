@@ -27,6 +27,9 @@ if (!function_exists('pmssResolvePathFromEnv')) {
         return $value !== '' ? $value : rtrim($default, '/');
     }
 }
+if (!function_exists('pmssCommandPath')) {
+    function pmssCommandPath(string $binary): string { $binary = trim($binary); return $binary === '' ? '' : trim((string) @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null')); }
+}
 
 if (!function_exists('pmssEnvValueNormalized')) {
     // Normalize environment values so flag parsing stays consistent.

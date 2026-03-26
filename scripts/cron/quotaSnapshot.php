@@ -66,7 +66,7 @@ function pmssQuotaSnapshotRun(): int
 
     return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($mountLabel, $mountPath, $ts): int {
         // Resolve repquota binary without depending on PATH inherited by cron.
-        $repquota = trim((string) @shell_exec('command -v repquota 2>/dev/null'));
+        $repquota = pmssCommandPath('repquota');
         if ($repquota === '') {
             @fwrite($fh, $ts.' WARN repquota_missing'.PHP_EOL);
             return 0;
