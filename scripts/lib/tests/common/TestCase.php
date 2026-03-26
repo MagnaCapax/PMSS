@@ -481,5 +481,17 @@ abstract class TestCase
         return null;
     }
 
+    /** Check whether a buffered test log contains a substring. */
+    protected function pmssLogBufferContains(array $messages, string $needle): bool
+    {
+        foreach ($messages as $message) {
+            if (strpos($message, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 }
 }

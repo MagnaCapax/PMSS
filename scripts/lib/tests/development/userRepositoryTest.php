@@ -18,11 +18,6 @@ class UserRepositoryTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
     }
 
-    private function tearDownTempDir(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     public function testPersistAndReload(): void
     {
         $this->setUpTempDir();
@@ -48,7 +43,7 @@ class UserRepositoryTest extends TestCase
             $this->assertEquals(512, $users['alice']['ramMiB']);
             $this->assertEquals('keep-me', $users['alice']['customNote']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -69,7 +64,7 @@ class UserRepositoryTest extends TestCase
             $this->assertEquals(256, $reloaded['ramMiB']);
             $this->assertTrue(isset($reloaded['rtorrentRam']), 'Legacy key should be preserved');
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -84,7 +79,7 @@ class UserRepositoryTest extends TestCase
                 'quotaBurst' => 50,
             ]) === false);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 }

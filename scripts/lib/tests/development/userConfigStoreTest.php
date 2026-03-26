@@ -40,11 +40,6 @@ class UserConfigStoreTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'store', 0755, sys_get_temp_dir().'/pmss-userconfigstore-tests');
     }
 
-    private function tearDownTempDir(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     private function basePayload(array $overrides = []): array
     {
         return $overrides + [
@@ -84,7 +79,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertEquals('keep-me', $reloaded['customNote']);
             $this->assertEquals(0, $reloaded['trafficLimit']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -105,7 +100,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertTrue(is_array($reloaded));
             $this->assertEquals(15, $reloaded['trafficCapMbit']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -126,7 +121,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertEquals(256, $reloaded['ramMiB']);
             $this->assertTrue(isset($reloaded['rtorrentRam']));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -138,7 +133,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertEquals(0, $reloaded['billingId']);
             $this->assertEquals(false, $reloaded['suspended']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -152,7 +147,7 @@ class UserConfigStoreTest extends TestCase
             ]));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -167,7 +162,7 @@ class UserConfigStoreTest extends TestCase
             ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -183,7 +178,7 @@ class UserConfigStoreTest extends TestCase
             ]));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -197,7 +192,7 @@ class UserConfigStoreTest extends TestCase
             ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -211,7 +206,7 @@ class UserConfigStoreTest extends TestCase
             ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -226,7 +221,7 @@ class UserConfigStoreTest extends TestCase
             ]));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -241,7 +236,7 @@ class UserConfigStoreTest extends TestCase
             ]));
             $this->assertEquals(false, $reloaded['dockerEnabled']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -252,7 +247,7 @@ class UserConfigStoreTest extends TestCase
             $store = new \UserConfigStore($this->configDirPath());
             $this->assertEquals(true, \pmssUserDockerEnabled('alice', $store));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -271,7 +266,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertTrue($store->set('dockno', $payload));
             $this->assertEquals(false, \pmssUserDockerEnabled('dockno', $store));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -290,7 +285,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertTrue($store->set('dockruntime', $payload));
             $this->assertEquals(false, \pmssUserDockerEnabled('dockruntime', $store));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -309,7 +304,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertTrue($store->set('dockok', $payload));
             $this->assertEquals(true, \pmssUserDockerEnabled('dockok', $store));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -320,7 +315,7 @@ class UserConfigStoreTest extends TestCase
             $store = new \UserConfigStore($this->configDirPath());
             $this->assertEquals(false, \pmssUserDockerEnabled('../evil', $store));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -342,7 +337,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertTrue($store->remove(' alice '));
             $this->assertEquals(null, $store->get('alice'));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -360,7 +355,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertTrue($store->set('../evil', $payload) === false);
             $this->assertTrue($store->get('../evil') === null);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -375,7 +370,7 @@ class UserConfigStoreTest extends TestCase
                 'quotaBurst' => 12,
             ]) === false);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -389,7 +384,7 @@ class UserConfigStoreTest extends TestCase
             $store = new \UserConfigStore($this->configDirPath());
             $this->assertTrue($store->get('alice') === null);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -410,7 +405,7 @@ class UserConfigStoreTest extends TestCase
             $store = new \UserConfigStore($this->configDirPath());
             $this->assertTrue($store->get('alice') === null, 'Symlinked user config must be ignored');
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -431,7 +426,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertTrue($store->remove('erin'));
             $this->assertTrue(!file_exists($userFile));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -451,7 +446,7 @@ class UserConfigStoreTest extends TestCase
             $all = $store->loadAll();
             $this->assertEquals(['alice', 'bob'], array_keys($all));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -477,7 +472,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertEquals(256, $payload['ramMiB']);
             $this->assertEquals(0, $payload['trafficLimit']);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -494,7 +489,7 @@ class UserConfigStoreTest extends TestCase
             $store = new \UserConfigStore($this->configDirPath());
             $this->assertEquals(null, $store->get('legacyx'));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -532,7 +527,7 @@ class UserConfigStoreTest extends TestCase
             $this->assertEquals(128, $all['alice']['ramMiB']);
             $this->assertEquals(512, $all['bob']['ramMiB'], 'Canonical per-user file should override legacy aggregate');
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -556,7 +551,7 @@ class UserConfigStoreTest extends TestCase
             $store = new \UserConfigStore($this->configDirPath());
             $this->assertEquals(['bob'], array_keys($store->loadAll()));
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 }

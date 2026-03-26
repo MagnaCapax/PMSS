@@ -71,7 +71,7 @@ class DelugeFindCallerCompatPatchTest extends TestCase
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
         $this->assertEquals($original, $content, 'Dry-run must not modify file content');
-        $this->assertTrue($this->logContains('Would patch Deluge findCaller signature'), 'Expected dry-run log message');
+        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Would patch Deluge findCaller signature'), 'Expected dry-run log message');
     }
 
     public function testPatchRejectsSymlinkPath(): void
@@ -94,18 +94,4 @@ class DelugeFindCallerCompatPatchTest extends TestCase
         $this->logs[] = $message;
     }
 
-    private function logContains(string $needle): bool
-    {
-        foreach ($this->logs as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function removePath(string $path): void
-    {
-        $this->cleanup($path);
-    }
 }

@@ -13,11 +13,6 @@ class WelcomeMessageTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
     }
 
-    private function tearDownTempDir(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     private function makeUserHome(): string
     {
         $home = $this->tempDir.'/home/alice';
@@ -39,7 +34,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser(['totalSpace' => 214748364800], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('<p>Hello alice / 200 GiB</p>', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -54,7 +49,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('<b>m1000/1024</b>', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -72,7 +67,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('<b>M900/alice</b>', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -87,7 +82,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('ok M500', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -108,7 +103,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('primary m500', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -135,7 +130,7 @@ class WelcomeMessageTest extends TestCase
             $this->assertEquals('<p>old</p>', $stored['products']['free-tier'] ?? '');
             $this->assertEquals('<p>new</p>', $stored['products']['m1000'] ?? '');
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -151,7 +146,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('hi', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -165,7 +160,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser([], $home, '<script>alert(1)</script>', $this->tempDir.'/missing.json');
             $this->assertEquals('user=&lt;script&gt;alert(1)&lt;/script&gt;', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -179,7 +174,7 @@ class WelcomeMessageTest extends TestCase
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/missing.json');
             $this->assertEquals('', $message);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -197,7 +192,7 @@ class WelcomeMessageTest extends TestCase
             $this->assertEquals('<p>hello</p>', $decoded['products']['free-tier'] ?? null);
             $this->assertEquals('<p>legacy</p>', $decoded['products']['m1000'] ?? null);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -214,7 +209,7 @@ class WelcomeMessageTest extends TestCase
             $this->assertTrue(is_array($decoded), 'Message map must decode as array');
             $this->assertTrue(!isset($decoded['free-tier']), 'Entry must be removed when template is empty');
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
@@ -249,7 +244,7 @@ class WelcomeMessageTest extends TestCase
             $this->assertEquals('<p>{{product}}/{{username}}</p>', $plainDecoded['m1000'] ?? null);
             $this->assertEquals('<p>{{product}}/{{username}}</p>', $nestedDecoded['products']['m1000'] ?? null);
         } finally {
-            $this->tearDownTempDir();
+            $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 

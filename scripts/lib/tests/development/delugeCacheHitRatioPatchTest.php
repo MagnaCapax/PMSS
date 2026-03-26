@@ -63,7 +63,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
         $this->assertEquals($original, $content, 'Dry-run must not modify file content');
-        $this->assertTrue($this->logContains('Would patch Deluge cache hit ratio'), 'Expected dry-run log message');
+        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Would patch Deluge cache hit ratio'), 'Expected dry-run log message');
     }
 
     public function testPatchReturnsFalseWhenCacheRatioLineMissing(): void
@@ -87,7 +87,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
 
         $this->assertTrue($result === false, 'Expected patch to fail without an else block');
         $this->assertEquals($original, $content, 'Failed patch must not modify file content');
-        $this->assertTrue($this->logContains('Unable to locate Deluge cache ratio else block'), 'Expected missing else warning');
+        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Unable to locate Deluge cache ratio else block'), 'Expected missing else warning');
     }
 
     public function testPatchRejectsSymlinkPath(): void
@@ -115,18 +115,4 @@ class DelugeCacheHitRatioPatchTest extends TestCase
         return "class Core:\n    def update_stats(self):\n        if blocks_read:\n            self.session_status['read_hit_ratio'] = (\n                self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n            )\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
     }
 
-    private function logContains(string $needle): bool
-    {
-        foreach ($this->logs as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function removePath(string $path): void
-    {
-        $this->cleanup($path);
-    }
 }

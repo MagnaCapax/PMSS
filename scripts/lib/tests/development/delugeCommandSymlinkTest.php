@@ -67,7 +67,7 @@ class DelugeCommandSymlinkTest extends TestCase
         $this->assertTrue(is_file($localPath), 'Expected dry-run to keep legacy file in place');
         $this->assertTrue(!is_link($localPath), 'Expected dry-run to avoid creating symlink');
         $this->assertEquals($legacy, (string) file_get_contents($localPath));
-        $this->assertTrue($this->logContains('Would replace legacy Deluge command path'), 'Expected dry-run replace log');
+        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Would replace legacy Deluge command path'), 'Expected dry-run replace log');
     }
 
     public function testReturnsTrueWhenCorrectSymlinkAlreadyExists(): void
@@ -92,7 +92,7 @@ class DelugeCommandSymlinkTest extends TestCase
         $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, [$this, 'collectLog']);
 
         $this->assertTrue($result === false, 'Expected missing system binary to fail refresh');
-        $this->assertTrue($this->logContains('missing system binary'), 'Expected missing binary warning log');
+        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'missing system binary'), 'Expected missing binary warning log');
     }
 
     public function testRejectsDirectoryAtLocalCommandPath(): void
@@ -105,7 +105,7 @@ class DelugeCommandSymlinkTest extends TestCase
 
         $this->assertTrue($result === false, 'Expected directory local path to be rejected');
         $this->assertTrue(is_dir($localPath), 'Expected directory path to remain untouched');
-        $this->assertTrue($this->logContains('Refusing to replace Deluge command directory'), 'Expected directory guard warning');
+        $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Refusing to replace Deluge command directory'), 'Expected directory guard warning');
     }
 
     public function collectLog(string $message): void
@@ -122,18 +122,4 @@ class DelugeCommandSymlinkTest extends TestCase
         return $path;
     }
 
-    private function logContains(string $needle): bool
-    {
-        foreach ($this->logs as $message) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function removePath(string $path): void
-    {
-        $this->cleanup($path);
-    }
 }
