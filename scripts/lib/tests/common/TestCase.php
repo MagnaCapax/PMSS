@@ -204,6 +204,21 @@ abstract class TestCase
         return $path;
     }
 
+    /** Create a tracked JSON-lines fixture path under a fresh temporary directory. */
+    protected function pmssMakeJsonLogPath(string $dirPrefix, string $filename = 'fixture.jsonl'): string
+    {
+        return $this->pmssMakeTempDir($dirPrefix, 0700).'/'.$filename;
+    }
+
+    /** Append fixture lines, encoding arrays as JSON and preserving raw strings. */
+    protected function pmssAppendFixtureLines(string $path, array $lines): void
+    {
+        foreach ($lines as $line) {
+            $payload = is_array($line) ? json_encode($line) : (string) $line;
+            file_put_contents($path, $payload."\n", FILE_APPEND);
+        }
+    }
+
     /** Create a tracked readable file under a fresh temporary directory. */
     protected function pmssMakeReadableTempPath(string $dirPrefix, string $filePrefix = 'pmss'): string
     {

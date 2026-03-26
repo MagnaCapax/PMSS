@@ -13,18 +13,17 @@ class MotdHealthWarningsTest extends TestCase
 
     public function testMotdShowsStorageWarningsFromHealthLog(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-motd-health-'.bin2hex(random_bytes(3));
-        @mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-motd-health-', 0700);
         $tpl = $this->writeTemp($dir, 'template.motd', "Host: %HOSTNAME%\n");
         $out = $dir.'/motd.txt';
-        $log = $dir.'/health.jsonl';
+        $log = $this->pmssMakeJsonLogPath('pmss-motd-health-log-', 'health.jsonl');
 
         // RAID degraded
-        file_put_contents($log, json_encode(['timestamp'=>date('c'),'kind'=>'raid','array'=>'md0','level'=>'raid5','state'=>'active','detail'=>'[5/4] [UU_U]','severity'=>'fail','ok'=>false])."\n", FILE_APPEND);
-        // NVMe critical warning
-        file_put_contents($log, json_encode(['timestamp'=>date('c'),'kind'=>'nvme','device'=>'/dev/nvme0n1','metrics'=>['critical_warnings'=>1]])."\n", FILE_APPEND);
-        // SMART UDMA CRC increased
-        file_put_contents($log, json_encode(['timestamp'=>date('c'),'kind'=>'smart','device'=>'/dev/sda','flags'=>['udma_crc_increase']])."\n", FILE_APPEND);
+        $this->pmssAppendFixtureLines($log, [
+            ['timestamp'=>date('c'),'kind'=>'raid','array'=>'md0','level'=>'raid5','state'=>'active','detail'=>'[5/4] [UU_U]','severity'=>'fail','ok'=>false],
+            ['timestamp'=>date('c'),'kind'=>'nvme','device'=>'/dev/nvme0n1','metrics'=>['critical_warnings'=>1]],
+            ['timestamp'=>date('c'),'kind'=>'smart','device'=>'/dev/sda','flags'=>['udma_crc_increase']],
+        ]);
 
         putenv('PMSS_MOTD_TEMPLATE_PATH='.$tpl);
         putenv('PMSS_MOTD_OUTPUT_PATH='.$out);
@@ -40,8 +39,7 @@ class MotdHealthWarningsTest extends TestCase
 
     public function testMotdHandlesMalformedHealthLogGracefully(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-motd-health-bad-'.bin2hex(random_bytes(3));
-        @mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-motd-health-bad-', 0700);
         $tpl = $this->writeTemp($dir, 'template.motd', "Hello %HOSTNAME%\n");
         $out = $dir.'/motd.txt';
         $log = $dir.'/health.jsonl';
@@ -55,8 +53,7 @@ class MotdHealthWarningsTest extends TestCase
 
     public function testMotdWithoutHealthLogHasNoStorageWarn(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-motd-nohealth-'.bin2hex(random_bytes(3));
-        @mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-motd-nohealth-', 0700);
         $tpl = $this->writeTemp($dir, 'template.motd', "Hello %HOSTNAME%\n");
         $out = $dir.'/motd.txt';
         putenv('PMSS_MOTD_TEMPLATE_PATH='.$tpl);
@@ -67,4 +64,3 @@ class MotdHealthWarningsTest extends TestCase
         $this->assertTrue(strpos($content, 'Storage WARN:') === false, 'Storage WARN unexpectedly present');
     }
 }
-

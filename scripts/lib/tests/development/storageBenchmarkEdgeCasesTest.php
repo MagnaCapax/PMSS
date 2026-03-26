@@ -5,20 +5,12 @@ class StorageBenchmarkEdgeCasesTest extends TestCase
 {
     private function logPath(): string
     {
-        $dir = sys_get_temp_dir().'/pmss-bench-edge-'.bin2hex(random_bytes(3));
-        @mkdir($dir, 0700, true);
-        return $dir.'/benchmark-storage.jsonl';
+        return $this->pmssMakeJsonLogPath('pmss-bench-edge-', 'benchmark-storage.jsonl');
     }
 
     private function writeLines(string $path, array $lines): void
     {
-        foreach ($lines as $line) {
-            if (is_array($line)) {
-                file_put_contents($path, json_encode($line)."\n", FILE_APPEND);
-            } else {
-                file_put_contents($path, (string)$line."\n", FILE_APPEND);
-            }
-        }
+        $this->pmssAppendFixtureLines($path, $lines);
     }
 
     private function runShowLast(string $log): string

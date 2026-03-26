@@ -5,9 +5,7 @@ class StorageBenchSecurityTest extends TestCase
 {
     private function mklog(): string
     {
-        $dir = sys_get_temp_dir().'/pmss-bench-sec-'.bin2hex(random_bytes(3));
-        @mkdir($dir, 0700, true);
-        return $dir.'/benchmark-storage.jsonl';
+        return $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
     }
 
     private function runShow(string $path): string
@@ -20,9 +18,7 @@ class StorageBenchSecurityTest extends TestCase
 
     private function write(string $path, array $entries): void
     {
-        foreach ($entries as $e) {
-            file_put_contents($path, json_encode($e)."\n", FILE_APPEND);
-        }
+        $this->pmssAppendFixtureLines($path, $entries);
     }
 
     public function testPathTraversalInJsonPathIsRead(): void

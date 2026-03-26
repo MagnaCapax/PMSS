@@ -5,12 +5,8 @@ class StorageBenchmarkShowLastTest extends TestCase
 {
     private function writeLog(array $entries): string
     {
-        $dir = sys_get_temp_dir().'/pmss-bench-'.bin2hex(random_bytes(3));
-        @mkdir($dir, 0700, true);
-        $log = $dir.'/benchmark-storage.jsonl';
-        foreach ($entries as $e) {
-            file_put_contents($log, json_encode($e)."\n", FILE_APPEND);
-        }
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-', 'benchmark-storage.jsonl');
+        $this->pmssAppendFixtureLines($log, $entries);
         return $log;
     }
 
