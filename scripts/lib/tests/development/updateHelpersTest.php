@@ -19,9 +19,7 @@ class UpdateHelpersTest extends TestCase
             .'require '.var_export(dirname(__DIR__, 2).'/update/apt.php', true).'; '
             .'pmssLoadRepoTemplate("this-code-name-does-not-exist");';
 
-        $output = trim((string) @shell_exec(
-            'PMSS_TEST_MODE=1 '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>/dev/null'
-        ));
+        $output = trim($this->pmssRunInlinePhp($script, ['PMSS_TEST_MODE' => '1']));
 
         @rmdir($configDir);
 

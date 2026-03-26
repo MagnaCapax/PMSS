@@ -92,9 +92,7 @@ class UserTorrentsCountTest extends TestCase
 
     public function testHelpOutputRemainsStable(): void
     {
-        $output = shell_exec(
-            escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 3).'/userTorrents.php').' --help'
-        );
+        $output = $this->pmssRunPhpScript(dirname(__DIR__, 3).'/userTorrents.php', ['--help'], [], '');
 
         $this->assertTrue(is_string($output));
 

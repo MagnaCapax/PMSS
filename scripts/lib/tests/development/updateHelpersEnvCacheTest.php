@@ -24,9 +24,7 @@ PHP;
             $script
         );
 
-        $output = trim((string) @shell_exec(
-            'PMSS_TEST_MODE=1 '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>&1'
-        ));
+        $output = trim($this->pmssRunInlinePhp($script, ['PMSS_TEST_MODE' => '1'], '2>&1'));
 
         $this->assertEquals('debian', $output);
         $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);

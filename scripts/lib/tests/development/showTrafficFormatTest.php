@@ -23,9 +23,7 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testHelpIncludesJsonOption(): void
     {
-        $out = shell_exec(
-            escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 3).'/showTraffic.php').' --help'
-        );
+        $out = $this->pmssRunPhpScript(dirname(__DIR__, 3).'/showTraffic.php', ['--help'], [], '');
 
         $this->assertTrue(is_string($out));
         $this->assertTrue(strpos($out, '--json') !== false);

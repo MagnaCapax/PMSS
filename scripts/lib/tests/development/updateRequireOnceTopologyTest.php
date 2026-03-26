@@ -53,8 +53,6 @@ echo 'ok';
 PHP;
 
         $script = str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script);
-        $command = 'PMSS_TEST_MODE=1 '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>&1';
-
-        $this->assertEquals('ok', trim((string) @shell_exec($command)));
+        $this->assertEquals('ok', trim($this->pmssRunInlinePhp($script, ['PMSS_TEST_MODE' => '1'], '2>&1')));
     }
 }

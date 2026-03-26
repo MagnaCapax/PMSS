@@ -15,8 +15,7 @@ class StorageBenchSecurityTest extends TestCase
         if ($this->isSandbox()) {
             throw new SkipTest('skip in sandbox');
         }
-        $script = dirname(__DIR__, 3).'/util/storageBenchmark.php';
-        return (string) shell_exec('php '.escapeshellarg($script).' --show-last --json '.escapeshellarg($path).' 2>&1');
+        return $this->pmssRunPhpScript(dirname(__DIR__, 3).'/util/storageBenchmark.php', ['--show-last', '--json', $path]);
     }
 
     private function write(string $path, array $entries): void

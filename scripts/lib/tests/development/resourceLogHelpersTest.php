@@ -92,8 +92,7 @@ class ResourceLogHelpersTest extends TestCase
     {
         $script = 'require_once '.var_export(dirname(__DIR__, 2).'/resources/userHelpers.php', true).';'
             .'echo (function_exists("pmssResourceLogLookupUid") && function_exists("pmssResourceLogIsValidUser")) ? "ok" : "fail";';
-        $command = escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script);
-        $this->assertEquals('ok', trim((string) @shell_exec($command)));
+        $this->assertEquals('ok', trim($this->pmssRunInlinePhp($script, [], '')));
     }
 
     public function testReadCountersParsesSystemctlOutput(): void

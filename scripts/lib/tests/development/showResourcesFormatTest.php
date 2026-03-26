@@ -11,6 +11,11 @@ class ShowResourcesFormatTest extends TestCase
         return dirname(__DIR__, 3).'/showResources.php';
     }
 
+    private function runScript(array $arguments, array $environment = []): string
+    {
+        return $this->pmssRunPhpScript($this->scriptPath(), $arguments, $environment);
+    }
+
     private function makeRuntimeDir(): string
     {
         return $this->pmssMakeTempDir('pmss-show-runtime-');
@@ -39,7 +44,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testHelpIncludesCoreOptions(): void
     {
-        $out = (string) shell_exec('php '.escapeshellarg($this->scriptPath()).' --help 2>&1');
+        $out = $this->runScript(['--help']);
 
         $this->assertTrue(strpos($out, '--json') !== false);
         $this->assertTrue(strpos($out, '--show-missing') !== false);
@@ -49,7 +54,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testHelpOutputMatchesSnapshot(): void
     {
-        $out = (string) shell_exec('php '.escapeshellarg($this->scriptPath()).' --help 2>&1');
+        $out = $this->runScript(['--help']);
 
         $this->assertEquals(
             "Usage: showResources.php [--json] [--show-missing] [--user=<username>]\n\n"
@@ -68,10 +73,7 @@ class ShowResourcesFormatTest extends TestCase
         $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload([
             'io_read' => ['raw' => ['month' => 2 * 1024 * 1024 * 1024 * 1024, 'week' => 1, 'day' => 1, 'hour' => 1]],
         ]));
-        $out = (string) shell_exec(
-            'PMSS_RUNTIME_DIR='.escapeshellarg($runtimeDir)
-            .' php '.escapeshellarg($this->scriptPath()).' --user=alice 2>&1'
-        );
+        $out = $this->runScript(['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $this->assertTrue(strpos($out, '2.00 TiB') !== false);
     }
@@ -110,10 +112,7 @@ class ShowResourcesFormatTest extends TestCase
             'tasks' => ['current' => 9.0],
             'ignored_field' => ['month' => 999.0],
         ]);
-        $json = (string) shell_exec(
-            'PMSS_RUNTIME_DIR='.escapeshellarg($runtimeDir)
-            .' php '.escapeshellarg($this->scriptPath()).' --json --user=alice 2>&1'
-        );
+        $json = $this->runScript(['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $payload = json_decode($json, true);
         $this->assertTrue(is_array($payload));
@@ -129,10 +128,7 @@ class ShowResourcesFormatTest extends TestCase
         $runtimeDir = $this->makeRuntimeDir();
         @mkdir($runtimeDir.'/resourceStats', 0755, true);
 
-        $json = (string) shell_exec(
-            'PMSS_RUNTIME_DIR='.escapeshellarg($runtimeDir)
-            .' php '.escapeshellarg($this->scriptPath()).' --json --user=ghost 2>&1'
-        );
+        $json = $this->runScript(['--json', '--user=ghost'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $payload = json_decode($json, true);
         $this->assertTrue(is_array($payload));

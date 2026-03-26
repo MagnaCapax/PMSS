@@ -14,6 +14,11 @@ class StorageBenchmarkShowLastTest extends TestCase
         return $log;
     }
 
+    private function runShowLast(array $arguments): string
+    {
+        return $this->pmssRunPhpScript(dirname(__DIR__, 3).'/util/storageBenchmark.php', $arguments);
+    }
+
     public function testShowLastParsesAndPrintsSummary(): void
     {
         $runId  = '20250101010101-aaa';
@@ -30,7 +35,7 @@ class StorageBenchmarkShowLastTest extends TestCase
             ['timestamp'=>$runTs,'run_id'=>$runId,'run_ts'=>$runTs,'device'=>'/dev/sda','test'=>'device-seqread-dd','metrics'=>['seqread_MBps'=>250.5,'elapsed_s'=>4.0]],
         ];
         $log = $this->writeLog($entries);
-        $out = shell_exec('php '.escapeshellarg(dirname(__DIR__, 3).'/util/storageBenchmark.php').' --show-last --json '.escapeshellarg($log).' 2>&1');
+        $out = $this->runShowLast(['--show-last', '--json', $log]);
         $this->assertTrue(is_string($out) && $out !== '', 'no output from storageBenchmark --show-last');
         $this->assertStringContainsString('== Storage benchmark (last run) ==', $out);
         $this->assertStringContainsString('File-backed tests', $out);
@@ -49,8 +54,7 @@ class StorageBenchmarkShowLastTest extends TestCase
              'metrics'=>['read_bw_MBps'=>10,'write_bw_MBps'=>0,'read_iops'=>10,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]],
         ];
         $log = $this->writeLog($entries);
-        $script = dirname(__DIR__, 3).'/util/storageBenchmark.php';
-        $out = shell_exec('php '.escapeshellarg($script).' --show-last --json='.escapeshellarg($log).' 2>&1');
+        $out = $this->runShowLast(['--show-last', '--json='.$log]);
         $this->assertStringContainsString('== Storage benchmark (last run) ==', (string)$out);
         $this->assertStringContainsString('randread-small', (string)$out);
     }
@@ -65,16 +69,14 @@ class StorageBenchmarkShowLastTest extends TestCase
              'metrics'=>['read_bw_MBps'=>10,'write_bw_MBps'=>0,'read_iops'=>10,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]],
         ];
         $log = $this->writeLog($entries);
-        $script = dirname(__DIR__, 3).'/util/storageBenchmark.php';
-        $out = shell_exec('php '.escapeshellarg($script).' --show-last --runtime=15 --device-runtime 45 --idle-util=70 --json '.escapeshellarg($log).' 2>&1');
+        $out = $this->runShowLast(['--show-last', '--runtime=15', '--device-runtime', '45', '--idle-util=70', '--json', $log]);
         $this->assertStringContainsString('== Storage benchmark (last run) ==', (string)$out);
         $this->assertStringContainsString('randread-small', (string)$out);
     }
 
     public function testShowLastTreatsShortHelpTokenAsJsonPathValue(): void
     {
-        $script = dirname(__DIR__, 3).'/util/storageBenchmark.php';
-        $out = shell_exec('php '.escapeshellarg($script).' --show-last --json -h 2>&1');
+        $out = $this->runShowLast(['--show-last', '--json', '-h']);
 
         $this->assertStringContainsString('No log at -h', (string) $out);
         $this->assertTrue(
@@ -94,7 +96,7 @@ class StorageBenchmarkShowLastTest extends TestCase
             ['timestamp'=>$runTs,'run_id'=>$runId,'run_ts'=>$runTs,'test'=>'randread-small','params'=>['rw'=>'randread'],
              'metrics'=>['read_bw_MBps'=>1,'write_bw_MBps'=>0,'read_iops'=>1,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]],
         ]);
-        $out = shell_exec('php '.escapeshellarg(dirname(__DIR__, 3).'/util/storageBenchmark.php').' --show-last --json '.escapeshellarg($log).' 2>&1');
+        $out = $this->runShowLast(['--show-last', '--json', $log]);
         $this->assertStringContainsString('Storage benchmark (last run)', $out);
         $this->assertStringContainsString('randread-small', $out);
     }
@@ -111,7 +113,7 @@ class StorageBenchmarkShowLastTest extends TestCase
             ['timestamp'=>$newer,'run_id'=>'new','run_ts'=>$newer,'test'=>'randread-small','params'=>['rw'=>'randread'],
              'metrics'=>['read_bw_MBps'=>2,'write_bw_MBps'=>0,'read_iops'=>2,'write_iops'=>0,'read_p95_ms'=>2,'write_p95_ms'=>0]],
         ]);
-        $out = shell_exec('php '.escapeshellarg(dirname(__DIR__, 3).'/util/storageBenchmark.php').' --show-last --json '.escapeshellarg($log).' 2>&1');
+        $out = $this->runShowLast(['--show-last', '--json', $log]);
         // Only the newer result value should appear
         $this->assertMatches('/\t2[.,]00\t0[.,]00\t2[.,]0\t0[.,]0\t2[.,]00\t0[.,]00/', $out);
     }
@@ -122,7 +124,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         $log = $this->writeLog([
             ['timestamp'=>$runTs,'run_id'=>'only','run_ts'=>$runTs,'test'=>'preflight-idle','ok'=>true,'ioping_avg_ms'=>12.3,'iostat_util_pct'=>40],
         ]);
-        $out = shell_exec('php '.escapeshellarg(dirname(__DIR__, 3).'/util/storageBenchmark.php').' --show-last --json '.escapeshellarg($log).' 2>&1');
+        $out = $this->runShowLast(['--show-last', '--json', $log]);
         $this->assertStringContainsString('Preflight: ioping=12.3 ms', $out);
     }
 }

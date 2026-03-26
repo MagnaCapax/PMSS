@@ -37,10 +37,8 @@ echo json_encode([
 PHP;
 
         $script = str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script);
-        $output = (string) @shell_exec(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>/dev/null');
-        $decoded = json_decode($output, true);
+        $decoded = $this->pmssRunInlinePhpJson($script);
 
-        $this->assertTrue(is_array($decoded), 'Expected JSON output, got: '.trim($output));
         $this->assertEquals(
             ['WARN: skipping nginx config for alice: missing .rtorrent.rc prerequisite'],
             $decoded['append']

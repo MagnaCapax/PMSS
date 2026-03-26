@@ -64,8 +64,7 @@ class UpdateAppsBootstrapTest extends TestCase
             $this->assertTrue(@copy($sourcePath, $targetPath), 'Unable to copy '.$file.' into sandbox');
         }
 
-        $command = 'php -r '.escapeshellarg('include '.var_export($sandboxDir.'/'.$installerFile, true).';').' 2>&1';
-        $output = @shell_exec($command);
+        $output = $this->pmssRunInlinePhp('include '.var_export($sandboxDir.'/'.$installerFile, true).';', [], '2>&1');
         $this->assertTrue(is_string($output), 'Unable to execute sandboxed installer');
 
         return $output;

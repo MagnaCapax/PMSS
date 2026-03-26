@@ -73,7 +73,7 @@ class ConfigBackupsTest extends TestCase
             ), true).'); '
             .'echo is_string($backup) ? basename($backup) : "null";';
 
-        $output = @shell_exec(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>&1');
+        $output = $this->pmssRunInlinePhp($script, [], '2>&1');
 
         $this->assertTrue(is_string($output));
         $this->assertStringContainsString('.bak', $output);

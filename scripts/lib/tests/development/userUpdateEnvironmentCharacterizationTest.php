@@ -33,7 +33,7 @@ PHP
 PHP
         );
 
-        $result = $this->runPhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script));
+        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), ['PMSS_TEST_MODE' => '1']);
 
         $this->assertEquals([], $result['steps']);
         $this->assertEquals([], $result['linger']);
@@ -100,7 +100,7 @@ PHP
 PHP
         );
 
-        $result = $this->runPhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script));
+        $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), ['PMSS_TEST_MODE' => '1']);
 
         $this->assertStringContainsString('***** Updating user alice', $result['output']);
         $this->assertEquals(['alice'], $result['linger']);
@@ -123,19 +123,6 @@ PHP
                 'Refreshing user permissions',
             ]
         );
-    }
-
-    /**
-     * Execute a short PHP snippet and decode the emitted JSON payload.
-     */
-    private function runPhpJson(string $script): array
-    {
-        $output = (string) @shell_exec(
-            'PMSS_TEST_MODE=1 '.escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>/dev/null'
-        );
-        $decoded = json_decode($output, true);
-        $this->assertTrue(is_array($decoded), 'Expected JSON output, got: '.trim($output));
-        return $decoded;
     }
 
     /**

@@ -108,7 +108,6 @@ class UpdateLoggingBootstrapTest extends TestCase
     private function runLibraryScript(string $script): string
     {
         $libraryPath = dirname(__DIR__, 2).'/update.php';
-        $command = 'PMSS_TEST_MODE=1 php -r '.escapeshellarg('require '.var_export($libraryPath, true).'; '.$script).' 2>/dev/null';
-        return trim((string) @shell_exec($command));
+        return trim($this->pmssRunInlinePhp('require '.var_export($libraryPath, true).'; '.$script, ['PMSS_TEST_MODE' => '1']));
     }
 }

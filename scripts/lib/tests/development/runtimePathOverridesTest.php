@@ -83,8 +83,7 @@ class RuntimePathOverridesTest extends TestCase
         $logDir = '/tmp/pmss-log-bootstrap-'.bin2hex(random_bytes(4));
         $libraryPath = dirname(__DIR__, 3).'/lib/update.php';
         $script = 'require '.var_export($libraryPath, true).'; echo PMSS_LOG_FILE;';
-        $command = 'PMSS_LOG_DIR='.escapeshellarg($logDir).' php -r '.escapeshellarg($script).' 2>/dev/null';
-        $output = trim((string) @shell_exec($command));
+        $output = trim($this->pmssRunInlinePhp($script, ['PMSS_LOG_DIR' => $logDir]));
 
         $this->assertEquals($logDir.'/update.log', $output);
     }

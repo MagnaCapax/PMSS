@@ -397,6 +397,39 @@ abstract class TestCase
         $this->pmssWithEnv(['PATH' => $path], $callback);
     }
 
+    protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
+    {
+        $command = $this->pmssBuildCommandEnvironmentPrefix($environment).escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script);
+        return (string) @shell_exec($stderrRedirect !== '' ? $command.' '.$stderrRedirect : $command);
+    }
+
+    protected function pmssRunInlinePhpJson(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): array
+    {
+        $output = $this->pmssRunInlinePhp($script, $environment, $stderrRedirect);
+        $decoded = json_decode($output, true);
+        $this->assertTrue(is_array($decoded), 'Expected JSON output, got: '.trim($output));
+        return $decoded;
+    }
+
+    protected function pmssRunPhpScript(string $scriptPath, array $arguments = [], array $environment = [], string $stderrRedirect = '2>&1'): string
+    {
+        $command = $this->pmssBuildCommandEnvironmentPrefix($environment).escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
+        foreach ($arguments as $argument) {
+            $command .= ' '.escapeshellarg((string) $argument);
+        }
+        return (string) @shell_exec($stderrRedirect !== '' ? $command.' '.$stderrRedirect : $command);
+    }
+
+    private function pmssBuildCommandEnvironmentPrefix(array $environment): string
+    {
+        $prefix = '';
+        foreach ($environment as $key => $value) {
+            $this->assertMatches('/^[A-Z0-9_]+$/', (string) $key, 'Invalid inline PHP env key: '.$key);
+            $prefix .= $key.'='.escapeshellarg((string) $value).' ';
+        }
+        return $prefix;
+    }
+
     /** Skip the current test when symlinks are unavailable. */
     protected function pmssRequireSymlinkSupport(): void
     {

@@ -123,10 +123,6 @@ PHP;
             $script
         );
 
-        $output = (string) @shell_exec(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script).' 2>/dev/null');
-        $decoded = json_decode($output, true);
-        $this->assertTrue(is_array($decoded), 'Expected JSON output, got: '.trim($output));
-
-        return $decoded;
+        return $this->pmssRunInlinePhpJson($script);
     }
 }
