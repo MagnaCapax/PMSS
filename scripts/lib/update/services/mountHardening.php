@@ -30,10 +30,8 @@ function pmssMountHardeningReadMounts(string $mountsPath): array
     $lines = @file($mountsPath, FILE_IGNORE_NEW_LINES);
     if ($lines === false) return $mounts;
     foreach ($lines as $line) {
-        $trim = trim($line);
-        if ($trim === '') continue;
-        $columns = preg_split('/\s+/', $trim);
-        if (count($columns) < 4) continue;
+        $columns = pmssConfigLineColumns($line, 4, []);
+        if ($columns === []) continue;
         $mounts[$columns[1]] = ['type' => $columns[2], 'options' => array_values(array_filter(explode(',', $columns[3]), 'strlen'))];
     }
     return $mounts;
@@ -87,14 +85,8 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
                 $missing = [];
                 $removed = [];
                 foreach ($lines as $idx => $line) {
-                    $trim = trim($line);
-                    if ($trim === '' || $trim[0] === '#') {
-                        continue;
-                    }
-                    $columns = preg_split('/\s+/', $trim);
-                    if (count($columns) < 4) {
-                        continue;
-                    }
+                    $columns = pmssConfigLineColumns($line, 4);
+                    if ($columns === []) continue;
                     if ($columns[1] !== $mountPoint) {
                         continue;
                     }
@@ -196,14 +188,8 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
     $changed = false;
     $added = false;
     foreach ($lines as $idx => $line) {
-        $trim = trim($line);
-        if ($trim === '' || $trim[0] === '#') {
-            continue;
-        }
-        $columns = preg_split('/\s+/', $trim);
-        if (count($columns) < 4) {
-            continue;
-        }
+        $columns = pmssConfigLineColumns($line, 4);
+        if ($columns === []) continue;
         if ($columns[1] !== '/tmp') {
             continue;
         }

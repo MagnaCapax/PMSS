@@ -378,12 +378,8 @@ function pmssEnsureBootDefaults(
         // Locate existing /proc entry when present.
         $found = false;
         foreach ($lines as $idx => $line) {
-            $trim = trim($line);
-            if ($trim === '' || $trim[0] === '#') {
-                continue;
-            }
-            $columns = preg_split('/\s+/', $trim);
-            if (count($columns) < 4 || $columns[1] !== '/proc' || $columns[2] !== 'proc') {
+            $columns = pmssConfigLineColumns($line, 4);
+            if ($columns === [] || $columns[1] !== '/proc' || $columns[2] !== 'proc') {
                 continue;
             }
             $found = true;
@@ -535,10 +531,8 @@ function pmssEnsureLocaleBaseline(): void
         $gen = @file_get_contents('/etc/locale.gen');
         if (is_string($gen)) {
             foreach (preg_split('/\r?\n/', $gen) as $line) {
-                $trim = trim($line);
-                if ($trim === '' || $trim[0] === '#') {
-                    continue;
-                }
+                $trim = pmssConfigLineTrimmed($line);
+                if ($trim === '') continue;
                 if (stripos($trim, $locale.' UTF-8') === 0) {
                     $enabled = true;
                     break;

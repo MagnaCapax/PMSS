@@ -43,6 +43,27 @@ if (!function_exists('pmssEnvValueIsTruthy')) {
     // Treat explicit enable values as truthy toggles.
     function pmssEnvValueIsTruthy($value): bool { return in_array(pmssEnvValueNormalized($value), ['1', 'true', 'yes', 'on'], true); }
 }
+if (!function_exists('pmssConfigLineTrimmed')) {
+    // Trim a config line and drop blank/commented entries.
+    function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): string
+    {
+        $trimmed = trim($line);
+        foreach ($commentPrefixes as $prefix) {
+            if ($trimmed !== '' && $prefix !== '' && strpos($trimmed, $prefix) === 0) return '';
+        }
+        return $trimmed;
+    }
+}
+if (!function_exists('pmssConfigLineColumns')) {
+    // Split an active config line into whitespace-separated columns.
+    function pmssConfigLineColumns(string $line, int $minColumns = 0, array $commentPrefixes = ['#']): array
+    {
+        $trimmed = pmssConfigLineTrimmed($line, $commentPrefixes);
+        if ($trimmed === '') return [];
+        $columns = preg_split('/\s+/', $trimmed);
+        return is_array($columns) && count($columns) >= $minColumns ? $columns : [];
+    }
+}
 
 if (!function_exists('pmssLogDir')) {
     // Resolve the PMSS log directory, allowing hermetic test overrides.

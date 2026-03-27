@@ -37,12 +37,8 @@ function pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions = nul
     $changed = false;
 
     foreach ($lines as $idx => $line) {
-        $trim = trim($line);
-        if ($trim === '' || $trim[0] === '#') {
-            continue;
-        }
-        $columns = preg_split('/\s+/', $trim);
-        if (!is_array($columns) || count($columns) < 4 || $columns[1] !== $mountPoint) {
+        $columns = pmssConfigLineColumns($line, 4);
+        if ($columns === [] || $columns[1] !== $mountPoint) {
             continue;
         }
 

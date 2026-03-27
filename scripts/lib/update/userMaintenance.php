@@ -268,10 +268,8 @@ require_once __DIR__.'/../user/userConfigStore.php';
             $lines = @file($unit, FILE_IGNORE_NEW_LINES);
             if ($lines !== false) {
                 foreach ($lines as $line) {
-                    $trim = trim($line);
-                    if ($trim === '' || $trim[0] === '#' || $trim[0] === ';') {
-                        continue;
-                    }
+                    $trim = pmssConfigLineTrimmed($line, ['#', ';']);
+                    if ($trim === '') continue;
                     if (strpos($trim, 'ExecStart=') !== 0) {
                         continue;
                     }
