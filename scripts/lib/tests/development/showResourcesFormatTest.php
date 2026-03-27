@@ -6,19 +6,9 @@ require_once dirname(__DIR__, 2).'/resources/show.php';
 
 class ShowResourcesFormatTest extends TestCase
 {
-    private function scriptPath(): string
-    {
-        return dirname(__DIR__, 3).'/showResources.php';
-    }
-
     private function runScript(array $arguments, array $environment = []): string
     {
-        return $this->pmssRunPhpScript($this->scriptPath(), $arguments, $environment);
-    }
-
-    private function makeRuntimeDir(): string
-    {
-        return $this->pmssMakeTempDir('pmss-show-runtime-');
+        return $this->pmssRunPhpScript($this->pmssRepoPath('scripts/showResources.php'), $arguments, $environment);
     }
 
     private function writeResourceStats(string $runtimeDir, string $user, array $payload): void
@@ -69,7 +59,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testFormatBytesTiB(): void
     {
-        $runtimeDir = $this->makeRuntimeDir();
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload([
             'io_read' => ['raw' => ['month' => 2 * 1024 * 1024 * 1024 * 1024, 'week' => 1, 'day' => 1, 'hour' => 1]],
         ]));
@@ -80,10 +70,10 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testUserFilteredOutputFormatsCpuRamAndIops(): void
     {
-        $runtimeDir = $this->makeRuntimeDir();
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload());
         $result = $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->scriptPath()).' --user=alice',
+            escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->pmssRepoPath('scripts/showResources.php')).' --user=alice',
             ['PMSS_RUNTIME_DIR' => $runtimeDir]
         );
 
@@ -97,7 +87,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testUserFilteredJsonOutputKeepsExpectedPayloadShape(): void
     {
-        $runtimeDir = $this->makeRuntimeDir();
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         $this->writeResourceStats($runtimeDir, 'alice', [
             'io_read' => ['raw' => ['month' => 1.0, 'week' => 1.0, 'day' => 1.0, 'hour' => 1.0]],
             'io_write' => ['raw' => ['month' => 2.0, 'week' => 2.0, 'day' => 2.0, 'hour' => 2.0]],
@@ -122,7 +112,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testUserFilteredJsonOutputMarksMissingWithoutRows(): void
     {
-        $runtimeDir = $this->makeRuntimeDir();
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         @mkdir($runtimeDir.'/resourceStats', 0755, true);
 
         $json = $this->runScript(['--json', '--user=ghost'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
