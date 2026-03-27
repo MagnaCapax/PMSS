@@ -11,17 +11,46 @@ require_once __DIR__.'/../lib/runtime.php';
 
 $usage = "Usage: portManager.php [view|assign|release] USER [SERVICE]\n";
 if ($argc < 3) die($usage);
-$action = strtolower($argv[1]);
-$user   = $argv[2];
-$service = isset($argv[3]) ? $argv[3] : 'lighttpd';
-$portDir = '/etc/seedbox/runtime/ports';
-if (!file_exists($portDir)) mkdir($portDir, 0755, true);
-$portFile = "$portDir/{$service}-{$user}";
+
+/**
+ * Service names are persisted in filenames, so keep them path-safe.
+ */
+function pmssPortManagerServiceIsValid(string $service): bool
+{
+    return preg_match('/^[a-z][a-z0-9-]{0,31}$/', $service) === 1;
+}
+
+$action = strtolower(trim($argv[1]));
+$user = trim($argv[2]);
+$service = isset($argv[3]) ? strtolower(trim($argv[3])) : 'lighttpd';
 
 $lifecyclePath = __DIR__.'/../lib/userLifecycle.php';
 if (is_file($lifecyclePath)) {
     require_once $lifecyclePath;
 }
+
+if (!in_array($action, ['view', 'assign', 'release'], true)) {
+    die($usage);
+}
+
+if ((function_exists('pmssValidateUsername') && !pmssValidateUsername($user))
+    || (!function_exists('pmssValidateUsername') && preg_match('/^[a-z][a-z0-9]{0,7}$/', $user) !== 1)) {
+    fwrite(STDERR, "Error: invalid username\n");
+    exit(1);
+}
+
+if (!pmssPortManagerServiceIsValid($service)) {
+    fwrite(STDERR, "Error: invalid service\n");
+    exit(1);
+}
+
+$portDir = pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', '/etc/seedbox/runtime/ports');
+if (!pmssDirEnsureExists($portDir, 0755)) {
+    fwrite(STDERR, "Error: unable to initialize port directory\n");
+    exit(1);
+}
+
+$portFile = "$portDir/{$service}-{$user}";
 
 /**
  * Write a port assignment event to the shared user logs when available.
@@ -47,8 +76,10 @@ function pmssPortManagerLog(string $user, string $action, string $service, ?int 
     );
 }
 
+$lockHandle = false;
 if ($action === 'assign' || $action === 'release') {
-    if (pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-portManager-'.$service.'.lock') === false) {
+    $lockHandle = pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-portManager-'.$service.'.lock');
+    if ($lockHandle === false) {
         pmssPortManagerLog($user, $action, $service, null, 'WARN', 'lock_failed');
     }
 }
@@ -56,26 +87,30 @@ if ($action === 'assign' || $action === 'release') {
 switch ($action) {
     case 'view':
         if (file_exists($portFile)) {
-            echo trim(file_get_contents($portFile)) . "\n";
+            echo trim((string) @file_get_contents($portFile)) . "\n";
         } else echo "No port assigned\n";
         break;
 
     case 'assign':
         if (file_exists($portFile)) {
-            $existing = (int) trim((string) file_get_contents($portFile));
+            $existing = (int) trim((string) @file_get_contents($portFile));
             echo $existing . "\n";
             pmssPortManagerLog($user, 'assign', $service, $existing, 'SKIP', 'already_assigned');
             break;
         }
         $used = [];
-        foreach (glob("$portDir/{$service}-*") as $f) {
+        foreach ((glob("$portDir/{$service}-*") ?: []) as $f) {
             $p = (int) trim(@file_get_contents($f));
             if ($p) $used[$p] = true;
         }
         do {
             $port = rand(2000, 38000);
         } while (isset($used[$port]));
-        file_put_contents($portFile, $port);
+        if (@file_put_contents($portFile, $port, LOCK_EX) === false) {
+            fwrite(STDERR, "Error: failed to persist port assignment\n");
+            pmssPortManagerLog($user, 'assign', $service, $port, 'ERR', 'write_failed');
+            exit(1);
+        }
         chmod($portFile, 0640);
         echo $port . "\n";
         pmssPortManagerLog($user, 'assign', $service, $port, 'OK', 'assigned');
@@ -83,12 +118,21 @@ switch ($action) {
 
     case 'release':
         if (file_exists($portFile)) {
-            unlink($portFile);
+            if (!@unlink($portFile)) {
+                fwrite(STDERR, "Error: failed to release port\n");
+                pmssPortManagerLog($user, 'release', $service, null, 'ERR', 'release_failed');
+                exit(1);
+            }
             echo "Port released\n";
             pmssPortManagerLog($user, 'release', $service, null, 'OK', 'released');
         } else echo "No port assigned\n";
         break;
     default:
         die($usage);
+}
+
+if ($lockHandle !== false) {
+    @flock($lockHandle, LOCK_UN);
+    @fclose($lockHandle);
 }
 ?>

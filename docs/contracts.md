@@ -463,6 +463,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/portManager.php assign <user> lighttpd
   - Behavior: Assigns a unique port for the user’s lighttpd; persists reservation.
+  - Safety: rejects invalid usernames/service names before building reservation paths; `PMSS_PORT_MANAGER_DIR` may override the reservation directory for hermetic tests.
 
 - scripts/util/systemTest.php
   - Behavior: Read-only probe of system readiness (binary versions, config presence);

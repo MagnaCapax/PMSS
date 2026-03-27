@@ -13,6 +13,8 @@ Usage: portManager.php [view|assign|release] USER [SERVICE]
 Port information is stored under `/etc/seedbox/runtime/ports` using files named `SERVICE-USER`.
 Assignments are guarded by a per-service lock to avoid concurrent collisions and
 mirrored to the shared user logs when available.
+Invalid usernames and service names are rejected before any reservation path is built.
+Tests may override the reservation directory with `PMSS_PORT_MANAGER_DIR`.
 
 Example:
 
