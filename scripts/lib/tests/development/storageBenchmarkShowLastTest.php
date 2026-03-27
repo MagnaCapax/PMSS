@@ -114,6 +114,29 @@ class StorageBenchmarkShowLastTest extends TestCase
         $this->assertMatches('/\t2[.,]00\t0[.,]00\t2[.,]0\t0[.,]0\t2[.,]00\t0[.,]00/', $out);
     }
 
+    public function testShowLastMatchesMixedRunSnapshot(): void
+    {
+        $runId = '2025-01-05T05:05:05Z-snap';
+        $runTs = '2025-01-05T05:05:05Z';
+        $log = $this->writeLog([
+            ['timestamp' => $runTs, 'run_id' => $runId, 'run_ts' => $runTs, 'label' => 'array-a', 'test' => 'preflight-idle', 'ok' => true, 'ioping_avg_ms' => 1.5, 'iostat_util_pct' => 2],
+            ['timestamp' => $runTs, 'run_id' => $runId, 'run_ts' => $runTs, 'label' => 'array-a', 'test' => 'randread-small', 'params' => ['rw' => 'randread'], 'metrics' => ['read_bw_MBps' => 123.45, 'write_bw_MBps' => 0, 'read_iops' => 456.7, 'write_iops' => 0, 'read_p95_ms' => 3.21, 'write_p95_ms' => 0]],
+            ['timestamp' => $runTs, 'run_id' => $runId, 'run_ts' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'test' => 'device-seqread-dd', 'metrics' => ['seqread_MBps' => 250.5, 'elapsed_s' => 4.0]],
+            ['timestamp' => $runTs, 'run_id' => $runId, 'run_ts' => $runTs, 'label' => 'array-a', 'device' => '/dev/sda', 'test' => 'dev-randread-4k', 'metrics' => ['read_bw_MBps' => 12.34, 'read_iops' => 567.8, 'read_p95_ms' => 0.91]],
+        ]);
+
+        $expected = "\n== Storage benchmark (last run) ==\nRun ID: {$runId}  Time: {$runTs}  Label: array-a\n\n";
+        $expected .= "Preflight: ioping=1.5 ms util=2%\n\n";
+        $expected .= "File-backed tests\n";
+        $expected .= "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n";
+        $expected .= sprintf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n", 'randread-small', 123.45, 0.0, 456.7, 0.0, 3.21, 0.0);
+        $expected .= "\nPer-device tests\n/dev/sda\n";
+        $expected .= sprintf("  %-18s seq_MB/s=%.2f t=%.2fs\n", 'device-seqread-dd', 250.5, 4.0);
+        $expected .= sprintf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", 'dev-randread-4k', 12.34, 567.8, 0.91);
+
+        $this->assertSame($expected, $this->runShowLast(['--show-last', '--json', $log]));
+    }
+
     public function testShowLastPrintsPreflightOnlyIfNoTests(): void
     {
         $runTs  = '2025-01-04T03:03:03Z';

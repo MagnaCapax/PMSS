@@ -7,12 +7,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-// TODO(complexity-refactor): Separate CLI parsing + shelling from core
-// measurement/aggregation. Extract small, testable helpers for:
-//  - size parsing and cap logic
-//  - idle detection (ioping/iostat)
-//  - fio command generation and result parsing
-// Keep runtime flags; preserve non-destructive guarantees and PHP 7.3.
+// TODO(complexity-refactor): Split the remaining execution path away from CLI parsing.
 
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
@@ -110,21 +105,11 @@ foreach ($intOptions as $option => $variable) {
 
 function parseSizeSB(string $s): int { if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }
 function iopingAvg(?string $target): ?float { $bin=pmssCommandPath('ioping'); if($bin==='') return null; $cmd=escapeshellcmd($bin).' -c 10 -i 0.1 -D '.escapeshellarg($target).' 2>&1 | tail -n1'; $out=trim((string) shell_exec($cmd)); if(preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i',$out,$m)){ $v=(float)$m[1]; $u=strtolower($m[2]); return $u==='us'?$v/1000.0:($u==='s'?$v*1000.0:$v);} return null; }
+function storageBenchmarkPrintLastRun(array $run, string $lastId): void { $first=$run[0]; $labelStr=(isset($first['label']) && $first['label']!=='') ? ('  Label: '.$first['label']) : ''; echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".($first['run_ts'] ?? '').$labelStr."\n\n"; foreach ($run as $entry) { if (($entry['test'] ?? '')==='preflight-idle'){ echo "Preflight: ioping=".($entry['ioping_avg_ms']??'n/a')." ms util=".($entry['iostat_util_pct']??'n/a')."%\n\n"; break; } } echo "File-backed tests\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n"; foreach ($run as $entry){ if (isset($entry['test']) && empty($entry['device']) && (($entry['params']['rw']??'')!=='')) { $metrics=$entry['metrics']??[]; printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n",$entry['test'],$metrics['read_bw_MBps']??0,$metrics['write_bw_MBps']??0,$metrics['read_iops']??0,$metrics['write_iops']??0,$metrics['read_p95_ms']??0,$metrics['write_p95_ms']??0); } } echo "\nPer-device tests\n"; $devices=[]; foreach($run as $entry){ if(isset($entry['device'])) $devices[$entry['device']][]=$entry; } foreach ($devices as $device=>$entries){ echo $device."\n"; foreach ($entries as $entry){ $test=$entry['test']; $metrics=$entry['metrics']??[]; if($test==='device-seqread-dd') printf("  %-18s seq_MB/s=%.2f t=%.2fs\n",$test,$metrics['seqread_MBps']??0,$metrics['elapsed_s']??0); elseif(strpos($test,'dev-randread')===0) printf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n",$test,$metrics['read_bw_MBps']??0,$metrics['read_iops']??0,$metrics['read_p95_ms']??0); elseif($test==='device-ioping') printf("  %-18s avg_ms=%.2f\n",$test,$metrics['ioping_avg_ms']??0);} } }
+function storageBenchmarkShowLast(string $jsonLog): int { if (!is_file($jsonLog)) { fwrite(STDERR,"No log at {$jsonLog}\n"); return 1; } $entries=[]; $lastId=''; $lastTs=''; foreach (file($jsonLog, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) ?: [] as $line) { $entry=json_decode($line,true); if (!is_array($entry) || !isset($entry['run_id']) || !is_string($entry['run_id']) || $entry['run_id']==='') continue; $entries[]=$entry; $runTs=(isset($entry['run_ts']) && is_string($entry['run_ts'])) ? $entry['run_ts'] : ''; if ($runTs>$lastTs){$lastTs=$runTs;$lastId=$entry['run_id'];} } if ($lastId===''){ echo "No runs found.\n"; return 0; } storageBenchmarkPrintLastRun(array_values(array_filter($entries, function ($entry) use ($lastId) { return (($entry['run_id'] ?? '') === $lastId); })), $lastId); return 0; }
 
 if ($showLast) {
-    if (!is_file($jsonLog)) { fwrite(STDERR,"No log at {$jsonLog}\n"); exit(1);} 
-    $lines = file($jsonLog, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) ?: [];
-    $entries=[]; $lastId=''; $lastTs='';
-    foreach ($lines as $line) { $j=json_decode($line,true); if (!is_array($j)) continue; if (!empty($j['run_id'])) { $entries[]=$j; if (($j['run_ts']??'')>$lastTs){$lastTs=$j['run_ts'];$lastId=$j['run_id'];}} }
-    if ($lastId===''){ echo "No runs found.\n"; exit(0);} $run=array_values(array_filter($entries, function ($e) use ($lastId) { return (($e['run_id'] ?? '') === $lastId); }));
-    $labelStr = (isset($run[0]['label']) && $run[0]['label']!=='') ? ('  Label: '.$run[0]['label']) : '';
-    echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".$run[0]['run_ts'].$labelStr."\n\n";
-    foreach ($run as $e) { if (($e['test']??'')==='preflight-idle'){ echo "Preflight: ioping=".($e['ioping_avg_ms']??'n/a')." ms util=".($e['iostat_util_pct']??'n/a')."%\n\n"; break; } }
-    echo "File-backed tests\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n";
-    foreach ($run as $e){ if (isset($e['test']) && empty($e['device']) && ($e['params']['rw']??'')!=='') { $m=$e['metrics']??[]; printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n",$e['test'],$m['read_bw_MBps']??0,$m['write_bw_MBps']??0,$m['read_iops']??0,$m['write_iops']??0,$m['read_p95_ms']??0,$m['write_p95_ms']??0); } }
-    echo "\nPer-device tests\n"; $devs=[]; foreach($run as $e){ if(isset($e['device'])) $devs[$e['device']][]=$e; }
-    foreach ($devs as $dev=>$arr){ echo $dev."\n"; foreach ($arr as $e){ $t=$e['test']; $m=$e['metrics']??[]; if($t==='device-seqread-dd') printf("  %-18s seq_MB/s=%.2f t=%.2fs\n",$t,$m['seqread_MBps']??0,$m['elapsed_s']??0); elseif(strpos($t,'dev-randread')===0) printf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n",$t,$m['read_bw_MBps']??0,$m['read_iops']??0,$m['read_p95_ms']??0); elseif($t==='device-ioping') printf("  %-18s avg_ms=%.2f\n",$t,$m['ioping_avg_ms']??0);} }
-    exit(0);
+    exit(storageBenchmarkShowLast($jsonLog));
 }
 
 if (pmssCommandPath('fio')===''){ fwrite(STDERR,"Error: 'fio' not found.\n"); exit(1);} 
