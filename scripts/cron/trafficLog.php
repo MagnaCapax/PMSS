@@ -24,7 +24,7 @@ if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
 
 
 $logdir = '/var/log/pmss/traffic/';
-$users = userFilesystem::withAdditionalUsers(pmssListManagedUsers('/scripts/listUsers.php'), ['www-data']);
+$users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
 if (count($users) == 0) exit;    // Nothing to collect
 
 // Load optional localnet definitions for counting LAN traffic separately.

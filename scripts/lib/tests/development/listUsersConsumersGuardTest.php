@@ -12,13 +12,17 @@ class ListUsersConsumersGuardTest extends TestCase
     public function testHelperConsumersRelyOnSharedManagedUserParser(): void
     {
         foreach ([
-            "pmssListManagedUsers('/scripts/listUsers.php')" => [
+            "userFilesystem::listManagedUsersWithAdditionalUsers(['www-data'])" => [
+                'scripts/cron/resourceLog.php',
+                'scripts/cron/resourceSnapshot.php',
                 'scripts/cron/trafficLog.php',
+                'scripts/cron/trafficIngressLog.php',
+                'scripts/util/makeMonitoringRules.php',
+            ],
+            "pmssListManagedUsers('/scripts/listUsers.php')" => [
                 'scripts/cron/trafficLimits.php',
                 'scripts/cron/updateQuotas.php',
-                'scripts/cron/trafficIngressLog.php',
                 'scripts/util/checkRutorrentPlugins.php',
-                'scripts/util/makeMonitoringRules.php',
                 'scripts/util/setupNetwork.php',
                 'scripts/lib/user/resourcesList.php',
             ],

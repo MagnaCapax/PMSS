@@ -12,7 +12,7 @@ require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/user/userFilesystem.php';
 
-$users = userFilesystem::withAdditionalUsers(pmssListManagedUsers('/scripts/listUsers.php'), ['www-data']);
+$users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
 if (!$users) exit(0);
 
 $mark = 1;

@@ -16,7 +16,7 @@ if (!pmssEnsureSafeDir($logDir, 0755) || !pmssEnsureSafeDir($stateDir, 0700)) {
     exit(1);
 }
 
-$users = userFilesystem::withAdditionalUsers(pmssListManagedUsers(), ['www-data']);
+$users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
 if ($users === []) {
     exit(0);
 }

@@ -20,7 +20,7 @@ if (!pmssTrafficIngressEnsureDir($logDir, 0755) || !pmssTrafficIngressEnsureDir(
     exit(1);
 }
 
-$users = userFilesystem::withAdditionalUsers(pmssListManagedUsers('/scripts/listUsers.php'), ['www-data']);
+$users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
 if (empty($users)) {
     exit(0);
 }

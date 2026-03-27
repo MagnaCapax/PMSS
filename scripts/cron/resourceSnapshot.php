@@ -21,7 +21,7 @@ function pmssResourceSnapshotRun(): int
     $ts = date('Y-m-d\\TH:i:s');
 
     return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($ts): int {
-        $users = userFilesystem::withAdditionalUsers(pmssListManagedUsers(), ['www-data']);
+        $users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
         if ($users === []) {
             return 0;
         }

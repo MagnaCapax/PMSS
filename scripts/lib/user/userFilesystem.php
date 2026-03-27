@@ -123,6 +123,14 @@ class userFilesystem
         return array_values(array_unique($users));
     }
 
+    /**
+     * Compose the canonical managed-user list with validated additional users.
+     */
+    public static function listManagedUsersWithAdditionalUsers(array $additionalUsers, string $command = '/scripts/listUsers.php'): array
+    {
+        return self::withAdditionalUsers(pmssListManagedUsers($command), $additionalUsers);
+    }
+
     /** Keep user listings in one natural, case-insensitive order. */
     private static function sortUsernames(array $names): array
     {

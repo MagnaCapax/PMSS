@@ -5,14 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class checkRtorrentStaleSocketContractTest extends TestCase
 {
-    private function loadSource(): string
-    {
-        return $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
-    }
-
     public function testMissingProcessStartPathClearsStaleSocketBeforeRestart(): void
     {
-        $src = $this->loadSource();
+        $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertMatches(
             '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?rtorrentProcessClearStaleState\(\$unresponsiveState\);.*?stale socket detected, process not running, cleaning up.*?@unlink\(\$socketPath\);.*?\/scripts\/startRtorrent/s',
@@ -23,7 +18,7 @@ class checkRtorrentStaleSocketContractTest extends TestCase
 
     public function testExecutorMismatchPathCleansSocketBeforeGraceTracking(): void
     {
-        $src = $this->loadSource();
+        $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertMatches(
             '/if \(\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?rtorrentProcessClearStaleState\(\$unresponsiveState\);.*?stale socket detected, process not running, cleaning up.*?@unlink\(\$socketPath\);.*?rtorrentProcessCheckStaleState\(\$missingState, PMSS_RTORRENT_MISSING_GRACE\);/s',
@@ -34,7 +29,7 @@ class checkRtorrentStaleSocketContractTest extends TestCase
 
     public function testUnresponsiveScgiPathRechecksProcessBeforeObserving(): void
     {
-        $src = $this->loadSource();
+        $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertMatches(
             '/\$responsive = rtorrentScgiPing\(\$socketPath, 5\);.*?\$rtorrentPids = rtorrentProcessPgrepExact\(\$user, \'rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?rtorrentProcessClearStaleState\(\$unresponsiveState\);.*?stale socket detected, process not running, cleaning up.*?@unlink\(\$socketPath\);.*?rTorrent missing after SCGI probe; starting.*?\/scripts\/startRtorrent/s',
