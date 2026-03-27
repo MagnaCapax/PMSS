@@ -17,7 +17,7 @@ class WireGuardInstallerTest extends TestCase
     public function __destruct()
     {
         foreach ($this->cleanupPaths as $path) {
-            $this->removePath($path);
+            $this->cleanup($path);
         }
     }
 
@@ -272,8 +272,4 @@ class WireGuardInstallerTest extends TestCase
         return $dir;
     }
 
-    private function removePath(string $path): void
-    {
-        $this->cleanup($path);
-    }
 }

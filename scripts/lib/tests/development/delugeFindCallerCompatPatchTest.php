@@ -14,10 +14,14 @@ class DelugeFindCallerCompatPatchTest extends TestCase
     /** @var array<int,string> */
     private $logs = [];
 
+    /** @var callable */
+    private $logger;
+
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-findcaller-', 0700);
         $this->logs = [];
+        $this->logger = $this->pmssMakeArrayLogger($this->logs);
     }
 
     protected function tearDown(): void
@@ -30,7 +34,7 @@ class DelugeFindCallerCompatPatchTest extends TestCase
         $path = $this->tempDir.'/log.py';
         file_put_contents($path, "class Logging:\n    def findCaller(self, stack_info=False):  # NOQA: N802\n        return ('x', 1, 'y', None)\n");
 
-        $result = \pmssPatchDelugeFindCallerSignature($path, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeFindCallerSignature($path, false, $this->logger);
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result, 'Expected legacy signature to be patched');
@@ -43,7 +47,7 @@ class DelugeFindCallerCompatPatchTest extends TestCase
         $original = "class Logging:\n    def findCaller(self, stack_info=False, stacklevel=1):\n        return ('x', 1, 'y', None)\n";
         file_put_contents($path, $original);
 
-        $result = \pmssPatchDelugeFindCallerSignature($path, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeFindCallerSignature($path, false, $this->logger);
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result, 'Expected patched signature to be accepted');
@@ -55,7 +59,7 @@ class DelugeFindCallerCompatPatchTest extends TestCase
         $path = $this->tempDir.'/log.py';
         file_put_contents($path, "class Logging:\n    def not_find_caller(self):\n        return None\n");
 
-        $result = \pmssPatchDelugeFindCallerSignature($path, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeFindCallerSignature($path, false, $this->logger);
 
         $this->assertTrue($result === false, 'Expected no-op when signature is absent');
     }
@@ -66,7 +70,7 @@ class DelugeFindCallerCompatPatchTest extends TestCase
         $original = "class Logging:\n    def findCaller(self, stack_info=False):\n        return ('x', 1, 'y', None)\n";
         file_put_contents($path, $original);
 
-        $result = \pmssPatchDelugeFindCallerSignature($path, true, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeFindCallerSignature($path, true, $this->logger);
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
@@ -82,16 +86,11 @@ class DelugeFindCallerCompatPatchTest extends TestCase
         file_put_contents($realPath, $original);
         @symlink($realPath, $linkPath);
 
-        $result = \pmssPatchDelugeFindCallerSignature($linkPath, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeFindCallerSignature($linkPath, false, $this->logger);
         $content = (string) file_get_contents($realPath);
 
         $this->assertTrue($result === false, 'Expected symlink path to be refused');
         $this->assertEquals($original, $content, 'Symlink target must remain unchanged');
-    }
-
-    public function collectLog(string $message): void
-    {
-        $this->logs[] = $message;
     }
 
 }

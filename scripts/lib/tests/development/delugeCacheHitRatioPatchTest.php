@@ -14,10 +14,14 @@ class DelugeCacheHitRatioPatchTest extends TestCase
     /** @var array<int,string> */
     private $logs = [];
 
+    /** @var callable */
+    private $logger;
+
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-cache-hit-ratio-', 0700);
         $this->logs = [];
+        $this->logger = $this->pmssMakeArrayLogger($this->logs);
     }
 
     protected function tearDown(): void
@@ -30,7 +34,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
         $path = $this->tempDir.'/core.py';
         file_put_contents($path, $this->legacyCacheRatioSource());
 
-        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, $this->logger);
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result, 'Expected legacy cache ratio block to be patched');
@@ -45,7 +49,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
         $original = "class Core:\n    def update_stats(self):\n        if blocks_read:\n            try:\n                self.session_status['read_hit_ratio'] = (\n                    self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n                )\n            except KeyError:\n                self.session_status['read_hit_ratio'] = 0.0\n        else:\n            self.session_status['read_hit_ratio'] = 0.0\n";
         file_put_contents($path, $original);
 
-        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, $this->logger);
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result, 'Expected already-guarded block to be accepted');
@@ -58,7 +62,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
         $original = $this->legacyCacheRatioSource();
         file_put_contents($path, $original);
 
-        $result = \pmssPatchDelugeCacheHitRatio($path, true, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeCacheHitRatio($path, true, $this->logger);
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result, 'Expected dry-run patch to report success');
@@ -71,7 +75,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
         $path = $this->tempDir.'/core.py';
         file_put_contents($path, "class Core:\n    def update_stats(self):\n        self.session_status['other_metric'] = 1\n");
 
-        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, $this->logger);
 
         $this->assertTrue($result === false, 'Expected no-op when cache ratio line is absent');
     }
@@ -82,7 +86,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
         $original = "class Core:\n    def update_stats(self):\n        if blocks_read:\n            self.session_status['read_hit_ratio'] = (\n                self.session_status['disk.num_blocks_cache_hits'] / blocks_read\n            )\n";
         file_put_contents($path, $original);
 
-        $result = \pmssPatchDelugeCacheHitRatio($path, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeCacheHitRatio($path, false, $this->logger);
         $content = (string) file_get_contents($path);
 
         $this->assertTrue($result === false, 'Expected patch to fail without an else block');
@@ -98,16 +102,11 @@ class DelugeCacheHitRatioPatchTest extends TestCase
         file_put_contents($realPath, $original);
         @symlink($realPath, $linkPath);
 
-        $result = \pmssPatchDelugeCacheHitRatio($linkPath, false, [$this, 'collectLog']);
+        $result = \pmssPatchDelugeCacheHitRatio($linkPath, false, $this->logger);
         $content = (string) file_get_contents($realPath);
 
         $this->assertTrue($result === false, 'Expected symlink path to be refused');
         $this->assertEquals($original, $content, 'Symlink target must remain unchanged');
-    }
-
-    public function collectLog(string $message): void
-    {
-        $this->logs[] = $message;
     }
 
     private function legacyCacheRatioSource(): string

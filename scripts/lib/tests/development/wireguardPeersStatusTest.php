@@ -78,9 +78,4 @@ class WireGuardPeersStatusTest extends TestCase
     {
         return $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
     }
-
-    private function removePath(string $path): void
-    {
-        $this->cleanup($path);
-    }
 }

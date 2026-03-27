@@ -20,11 +20,6 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->pmssCleanupTempDirProperty('tmpDir');
     }
 
-    private function removeTree(string $path): void
-    {
-        $this->cleanup($path);
-    }
-
     private function writeFile(string $relativePath, string $content): string
     {
         $path = $this->tmpDir.'/'.$relativePath;

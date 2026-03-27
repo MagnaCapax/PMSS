@@ -34,11 +34,6 @@ class TorrentThrottleTest extends TestCase
         chmod($path, $mode);
     }
 
-    private function removeTree(string $path): void
-    {
-        $this->cleanup($path);
-    }
-
     public function testReadReturnsNullWhenMissing(): void
     {
         $this->assertEquals(null, pmssReadTorrentThrottle($this->user));

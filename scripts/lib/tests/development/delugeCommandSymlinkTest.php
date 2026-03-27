@@ -14,10 +14,14 @@ class DelugeCommandSymlinkTest extends TestCase
     /** @var array<int,string> */
     private $logs = [];
 
+    /** @var callable */
+    private $logger;
+
     protected function setUp(): void
     {
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-command-link-', 0700);
         $this->logs = [];
+        $this->logger = $this->pmssMakeArrayLogger($this->logs);
     }
 
     protected function tearDown(): void
@@ -30,7 +34,7 @@ class DelugeCommandSymlinkTest extends TestCase
         $systemPath = $this->makeExecutable('usr/bin/deluged');
         $localPath = $this->tempDir.'/usr/local/bin/deluged';
 
-        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, [$this, 'collectLog']);
+        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, $this->logger);
 
         $this->assertTrue($result, 'Expected missing /usr/local command path to be created as symlink');
         $this->assertTrue(is_link($localPath), 'Expected local command path to be a symlink');
@@ -45,7 +49,7 @@ class DelugeCommandSymlinkTest extends TestCase
         file_put_contents($localPath, "#!/bin/sh\necho legacy\n");
         @chmod($localPath, 0755);
 
-        $result = \pmssEnsureDelugeCommandSymlink('deluge-web', $systemPath, $localPath, false, [$this, 'collectLog']);
+        $result = \pmssEnsureDelugeCommandSymlink('deluge-web', $systemPath, $localPath, false, $this->logger);
 
         $this->assertTrue($result, 'Expected legacy /usr/local binary to be replaced');
         $this->assertTrue(is_link($localPath), 'Expected legacy binary path to become a symlink');
@@ -61,7 +65,7 @@ class DelugeCommandSymlinkTest extends TestCase
         file_put_contents($localPath, $legacy);
         @chmod($localPath, 0755);
 
-        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, true, [$this, 'collectLog']);
+        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, true, $this->logger);
 
         $this->assertTrue($result, 'Expected dry-run to report success for replaceable legacy path');
         $this->assertTrue(is_file($localPath), 'Expected dry-run to keep legacy file in place');
@@ -77,7 +81,7 @@ class DelugeCommandSymlinkTest extends TestCase
         @mkdir(dirname($localPath), 0755, true);
         @symlink($systemPath, $localPath);
 
-        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, [$this, 'collectLog']);
+        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, $this->logger);
 
         $this->assertTrue($result, 'Expected already-correct symlink to remain valid');
         $this->assertTrue(is_link($localPath), 'Expected local command path to remain a symlink');
@@ -89,7 +93,7 @@ class DelugeCommandSymlinkTest extends TestCase
         $systemPath = $this->tempDir.'/usr/bin/deluged';
         $localPath = $this->tempDir.'/usr/local/bin/deluged';
 
-        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, [$this, 'collectLog']);
+        $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, false, $this->logger);
 
         $this->assertTrue($result === false, 'Expected missing system binary to fail refresh');
         $this->assertTrue($this->pmssLogBufferContains($this->logs, 'missing system binary'), 'Expected missing binary warning log');
@@ -101,16 +105,11 @@ class DelugeCommandSymlinkTest extends TestCase
         $localPath = $this->tempDir.'/usr/local/bin/deluge-web';
         @mkdir($localPath, 0755, true);
 
-        $result = \pmssEnsureDelugeCommandSymlink('deluge-web', $systemPath, $localPath, false, [$this, 'collectLog']);
+        $result = \pmssEnsureDelugeCommandSymlink('deluge-web', $systemPath, $localPath, false, $this->logger);
 
         $this->assertTrue($result === false, 'Expected directory local path to be rejected');
         $this->assertTrue(is_dir($localPath), 'Expected directory path to remain untouched');
         $this->assertTrue($this->pmssLogBufferContains($this->logs, 'Refusing to replace Deluge command directory'), 'Expected directory guard warning');
-    }
-
-    public function collectLog(string $message): void
-    {
-        $this->logs[] = $message;
     }
 
     private function makeExecutable(string $relativePath): string

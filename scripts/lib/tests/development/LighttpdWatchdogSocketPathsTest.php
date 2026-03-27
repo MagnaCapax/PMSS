@@ -120,9 +120,4 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
 
         return $configPath;
     }
-
-    private function removeTree(string $path): void
-    {
-        $this->cleanup($path);
-    }
 }
