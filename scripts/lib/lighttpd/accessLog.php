@@ -28,35 +28,22 @@ function pmssLighttpdAccessLogTrimFile(string $path, int $thresholdBytes): array
     }
 
     $handle = @fopen($path, 'c+');
-    if (!is_resource($handle)) {
-        return ['status' => 'error', 'reason' => 'open_failed'];
-    }
+    if (!is_resource($handle)) return ['status' => 'error', 'reason' => 'open_failed'];
+    if (!@flock($handle, LOCK_EX | LOCK_NB)) { @fclose($handle); return ['status' => 'skip', 'reason' => 'lock_busy']; }
 
     $handleStat = @fstat($handle);
     if (
         !is_array($handleStat)
         || ($pathStat['dev'] ?? null) !== ($handleStat['dev'] ?? null)
         || ($pathStat['ino'] ?? null) !== ($handleStat['ino'] ?? null)
-    ) {
-        @fclose($handle);
-        return ['status' => 'skip', 'reason' => 'path_changed'];
-    }
+    ) { @fclose($handle); return ['status' => 'skip', 'reason' => 'path_changed']; }
 
-    if (($handleStat['nlink'] ?? 1) !== 1) {
-        @fclose($handle);
-        return ['status' => 'skip', 'reason' => 'multiple_links'];
-    }
+    if (($handleStat['nlink'] ?? 1) !== 1) { @fclose($handle); return ['status' => 'skip', 'reason' => 'multiple_links']; }
 
     $sizeBefore = (int) ($handleStat['size'] ?? 0);
-    if ($sizeBefore <= $thresholdBytes) {
-        @fclose($handle);
-        return ['status' => 'skip', 'reason' => 'below_threshold', 'sizeBefore' => $sizeBefore];
-    }
+    if ($sizeBefore <= $thresholdBytes) { @fclose($handle); return ['status' => 'skip', 'reason' => 'below_threshold', 'sizeBefore' => $sizeBefore]; }
 
-    if (!@ftruncate($handle, 0)) {
-        @fclose($handle);
-        return ['status' => 'error', 'reason' => 'truncate_failed', 'sizeBefore' => $sizeBefore];
-    }
+    if (!@ftruncate($handle, 0)) { @fclose($handle); return ['status' => 'error', 'reason' => 'truncate_failed', 'sizeBefore' => $sizeBefore]; }
 
     @fflush($handle);
     @fclose($handle);

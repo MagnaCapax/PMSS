@@ -80,6 +80,26 @@ class LighttpdAccessLogTest extends TestCase
         $this->assertEquals(128, filesize($linkedPath));
     }
 
+    public function testTrimFileSkipsBusyLog(): void
+    {
+        $path = $this->tempDir.'/alice/.lighttpd/access.log';
+        @mkdir(dirname($path), 0755, true);
+        file_put_contents($path, str_repeat('x', 128));
+
+        $lockHandle = fopen($path, 'c+');
+        $this->assertTrue(is_resource($lockHandle));
+        $this->assertTrue(flock($lockHandle, LOCK_EX | LOCK_NB));
+
+        $result = \pmssLighttpdAccessLogTrimFile($path, 64);
+
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+
+        $this->assertEquals('skip', $result['status']);
+        $this->assertEquals('lock_busy', $result['reason']);
+        $this->assertEquals(128, filesize($path));
+    }
+
     public function testTrimFileRejectsRelativePath(): void
     {
         $result = \pmssLighttpdAccessLogTrimFile('access.log', 64);
