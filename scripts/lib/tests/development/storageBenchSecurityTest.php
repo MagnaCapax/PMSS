@@ -1,6 +1,8 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/TestCase.php';
+
 class StorageBenchSecurityTest extends TestCase
 {
     private function runShow(string $path): string
@@ -8,7 +10,7 @@ class StorageBenchSecurityTest extends TestCase
         if ($this->isSandbox()) {
             throw new SkipTest('skip in sandbox');
         }
-        return $this->pmssRunPhpScript($this->pmssRepoPath('scripts/util/storageBenchmark.php'), ['--show-last', '--json', $path]);
+        return $this->pmssRunStorageBenchmarkShowLast($path);
     }
 
     public function testPathTraversalInJsonPathIsRead(): void
@@ -62,16 +64,16 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testDeviceFieldLooksLikeShellInjection(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $rid='inj'; $ts=date('c');
-        $this->pmssAppendFixtureLines($log, [["run_id"=>$rid,"run_ts"=>$ts,"test"=>'preflight-idle','ok'=>true], ["run_id"=>$rid,"run_ts"=>$ts,"device"=>'$(id)','test'=>'device-seqread-dd','metrics'=>['seqread_MBps'=>1,'elapsed_s'=>1]]]);
+        $rid='inj'; $ts=date('c');
+        $log = $this->pmssWriteStorageBenchmarkLog([["run_id"=>$rid,"run_ts"=>$ts,"test"=>'preflight-idle','ok'=>true], ["run_id"=>$rid,"run_ts"=>$ts,"device"=>'$(id)','test'=>'device-seqread-dd','metrics'=>['seqread_MBps'=>1,'elapsed_s'=>1]]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('Per-device tests', $out);
     }
 
     public function testMetricsLookLikeCommands(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $rid='cmd'; $ts=date('c');
-        $this->pmssAppendFixtureLines($log, [["run_id"=>$rid,"run_ts"=>$ts,'test'=>'preflight-idle','ok'=>true], ["run_id"=>$rid,"run_ts"=>$ts,'test'=>'randread-small','params'=>['rw'=>'randread'], 'metrics'=>['read_bw_MBps'=>'`rm -rf /`','write_bw_MBps'=>0,'read_iops'=>0,'write_iops'=>0,'read_p95_ms'=>0,'write_p95_ms'=>0]]]);
+        $rid='cmd'; $ts=date('c');
+        $log = $this->pmssWriteStorageBenchmarkLog([["run_id"=>$rid,"run_ts"=>$ts,'test'=>'preflight-idle','ok'=>true], ["run_id"=>$rid,"run_ts"=>$ts,'test'=>'randread-small','params'=>['rw'=>'randread'], 'metrics'=>['read_bw_MBps'=>'`rm -rf /`','write_bw_MBps'=>0,'read_iops'=>0,'write_iops'=>0,'read_p95_ms'=>0,'write_p95_ms'=>0]]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('randread-small', $out);
     }
@@ -103,8 +105,8 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testRunTsExtremelyLongString(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $rid='longts'; $ts=str_repeat('2025-01-01T00:00:00Z', 10);
-        $this->pmssAppendFixtureLines($log, [['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true]]);
+        $rid='longts'; $ts=str_repeat('2025-01-01T00:00:00Z', 10);
+        $log = $this->pmssWriteStorageBenchmarkLog([['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('Run ID: '.$rid, $out);
     }
@@ -119,8 +121,8 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testObjectMetricsDoNotCrash(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $rid='obj'; $ts=date('c');
-        $this->pmssAppendFixtureLines($log,[ ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true], ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'randread-small','params'=>['rw'=>'randread'],'metrics'=>['nested'=>['x'=>1]]] ]);
+        $rid='obj'; $ts=date('c');
+        $log = $this->pmssWriteStorageBenchmarkLog([ ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true], ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'randread-small','params'=>['rw'=>'randread'],'metrics'=>['nested'=>['x'=>1]]] ], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('randread-small', $out);
     }
@@ -151,8 +153,8 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testNestedMetricsIgnoreUnknown(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $rid='nest'; $ts=date('c');
-        $this->pmssAppendFixtureLines($log,[ ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true], ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'seqread-large','params'=>['rw'=>'read'],'metrics'=>['deep'=>['a'=>1]]] ]);
+        $rid='nest'; $ts=date('c');
+        $log = $this->pmssWriteStorageBenchmarkLog([ ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true], ['run_id'=>$rid,'run_ts'=>$ts,'test'=>'seqread-large','params'=>['rw'=>'read'],'metrics'=>['deep'=>['a'=>1]]] ], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('seqread-large', $out);
     }
@@ -168,32 +170,31 @@ class StorageBenchSecurityTest extends TestCase
 
     public function testVeryLargeUnicodeLabel(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $label=str_repeat('嗨', 1000);
-        $this->pmssAppendFixtureLines($log, [['run_id'=>'ul','run_ts'=>date('c'),'label'=>$label,'test'=>'preflight-idle','ok'=>true]]);
+        $label=str_repeat('嗨', 1000);
+        $log = $this->pmssWriteStorageBenchmarkLog([['run_id'=>'ul','run_ts'=>date('c'),'label'=>$label,'test'=>'preflight-idle','ok'=>true]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('Storage benchmark (last run)', $out);
     }
 
     public function testDevicePathTraversalStringDoesNotCrash(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $rid='trav'; $ts=date('c');
-        $this->pmssAppendFixtureLines($log, [['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true], ['run_id'=>$rid,'run_ts'=>$ts,'device'=>'/dev/../../etc/passwd','test'=>'device-seqread-dd','metrics'=>['seqread_MBps'=>1,'elapsed_s'=>1]]]);
+        $rid='trav'; $ts=date('c');
+        $log = $this->pmssWriteStorageBenchmarkLog([['run_id'=>$rid,'run_ts'=>$ts,'test'=>'preflight-idle','ok'=>true], ['run_id'=>$rid,'run_ts'=>$ts,'device'=>'/dev/../../etc/passwd','test'=>'device-seqread-dd','metrics'=>['seqread_MBps'=>1,'elapsed_s'=>1]]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('Per-device tests', $out);
     }
 
     public function testVeryOldRunTsStillParses(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
-        $this->pmssAppendFixtureLines($log,[ ['run_id'=>'old','run_ts'=>'1999-01-01T00:00:00Z','test'=>'preflight-idle','ok'=>true] ]);
+        $log = $this->pmssWriteStorageBenchmarkLog([['run_id'=>'old','run_ts'=>'1999-01-01T00:00:00Z','test'=>'preflight-idle','ok'=>true]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('Run ID: old', $out);
     }
 
     public function testLabelWithNewlinesIsTolerated(): void
     {
-        $log=$this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); $label="line1\nline2";
-        $this->pmssAppendFixtureLines($log,[ ['run_id'=>'nl','run_ts'=>date('c'),'label'=>$label,'test'=>'preflight-idle','ok'=>true] ]);
+        $label="line1\nline2";
+        $log = $this->pmssWriteStorageBenchmarkLog([['run_id'=>'nl','run_ts'=>date('c'),'label'=>$label,'test'=>'preflight-idle','ok'=>true]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('Storage benchmark (last run)', $out);
     }

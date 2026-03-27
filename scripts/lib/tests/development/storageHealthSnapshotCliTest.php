@@ -8,7 +8,6 @@ class StorageHealthSnapshotCliTest extends TestCase
     public function testHelpShowsUsage(): void
     {
         $result = $this->runSnapshotCommand(['--help']);
-
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('Usage: storageHealthSnapshot.php', $result['output']);
     }
@@ -17,7 +16,6 @@ class StorageHealthSnapshotCliTest extends TestCase
     {
         $jsonPath = $this->pmssMakeTempPath('pmss-storage-health-snapshot-', '.jsonl');
         $result = $this->runSnapshotCommand(['--json', $jsonPath]);
-
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('Storage health snapshot written to '.$jsonPath, $result['output']);
         $this->assertTrue(is_file($jsonPath), 'expected JSONL file to be created');
@@ -28,7 +26,6 @@ class StorageHealthSnapshotCliTest extends TestCase
     {
         $jsonPath = $this->pmssMakeTempPath('pmss-storage-health-snapshot-', '.jsonl');
         $result = $this->runSnapshotCommand(['--json', $jsonPath, '--quiet']);
-
         $this->assertSame(0, $result['rc']);
         $this->assertSame('', trim($result['output']));
         $this->assertTrue(is_file($jsonPath), 'expected quiet mode to still write the snapshot');
@@ -38,7 +35,6 @@ class StorageHealthSnapshotCliTest extends TestCase
     {
         $jsonPath = $this->pmssMakeTempPath('pmss-storage-health-inline-', '.jsonl');
         $result = $this->runSnapshotCommand(['--json='.$jsonPath]);
-
         $this->assertSame(0, $result['rc']);
         $this->assertTrue(is_file($jsonPath), 'expected inline --json option to be honored');
         $this->assertStringContainsString('"device":"/dev/pmssfake0"', (string) file_get_contents($jsonPath));
@@ -48,7 +44,6 @@ class StorageHealthSnapshotCliTest extends TestCase
     {
         $parentPath = $this->pmssMakeTempFile('pmss-storage-health-parent-');
         $result = $this->runSnapshotCommand(['--json', $parentPath.'/child.jsonl']);
-
         $this->assertSame(1, $result['rc']);
         $this->assertStringContainsString('Failed to create storage health log directory', $result['output']);
     }

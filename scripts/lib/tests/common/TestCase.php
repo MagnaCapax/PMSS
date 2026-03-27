@@ -232,6 +232,13 @@ abstract class TestCase
         return $this->pmssMakeTempDir($dirPrefix, 0700).'/'.$filename;
     }
 
+    /** Create a storage benchmark JSONL fixture and append the supplied entries. */
+    protected function pmssWriteStorageBenchmarkLog(array $entries, string $dirPrefix = 'pmss-bench-'): string
+    {
+        $log = $this->pmssMakeJsonLogPath($dirPrefix, 'benchmark-storage.jsonl');
+        $this->pmssAppendFixtureLines($log, $entries);
+        return $log;
+    }
     /** Persist serialized fixture data while ensuring the parent path exists. */
     protected function pmssWriteSerializedFixture(string $path, $value): void
     {
@@ -538,6 +545,15 @@ abstract class TestCase
         }
 
         return $this->pmssRunShellCommand($command, $environment, $stderrRedirect);
+    }
+
+    /** Execute `storageBenchmark.php --show-last` for the provided JSONL log. */
+    protected function pmssRunStorageBenchmarkShowLast(string $logPath, array $arguments = []): string
+    {
+        return $this->pmssRunPhpScript(
+            $this->pmssRepoPath('scripts/util/storageBenchmark.php'),
+            array_merge(['--show-last'], $arguments, ['--json', $logPath])
+        );
     }
 
     private function pmssBuildCommandEnvironmentPrefix(array $environment): string
