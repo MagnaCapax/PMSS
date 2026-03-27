@@ -84,6 +84,31 @@ function pmssCheckRtorrentLogBoth(string $user, string $message, bool $debug): v
     }
 }
 
+// Clear a stale SCGI socket before restart or grace tracking.
+function pmssCheckRtorrentCleanupStaleSocket(string $user, string $socketPath, string $unresponsiveState, bool $debug): void
+{
+    rtorrentProcessClearStaleState($unresponsiveState);
+    if (!file_exists($socketPath)) {
+        return;
+    }
+
+    pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
+    $socketRemoved = @unlink($socketPath);
+    if (!$socketRemoved && file_exists($socketPath)) {
+        pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
+    }
+}
+
+// Start rTorrent and refresh the restart markers used by recovery paths.
+function pmssCheckRtorrentStart(string $user, string $startMarkerState, bool $debug): void
+{
+    $rc = 0;
+    @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
+    pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
+    @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
+    @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
+}
+
 // --- Main execution ---
 
 if (pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRtorrent.lock'), true) === false) {
@@ -176,14 +201,7 @@ foreach ($users as $user) {
     // --- Missing: No executor and no rTorrent ---
     if (!$executorPresent && empty($rtorrentPids)) {
         $socketPath = rtorrentScgiSocketPath($user);
-        rtorrentProcessClearStaleState($unresponsiveState);
-        if (file_exists($socketPath)) {
-            pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
-            $socketRemoved = @unlink($socketPath);
-            if (!$socketRemoved && file_exists($socketPath)) {
-                pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
-            }
-        }
+        pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $unresponsiveState, $debug);
 
         $persistentFailureCount = 0;
         if (is_file($startMarkerState)) {
@@ -241,25 +259,14 @@ foreach ($users as $user) {
             pmssCheckRtorrentLogBoth($user, 'rTorrent missing; starting', $debug);
         }
 
-        $rc = 0;
-        @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
-        pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-        @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
-        @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
+        pmssCheckRtorrentStart($user, $startMarkerState, $debug);
         continue;
     }
 
     // --- Stale executor: Executor present but rTorrent missing ---
     if ($executorPresent && empty($rtorrentPids)) {
         $socketPath = rtorrentScgiSocketPath($user);
-        rtorrentProcessClearStaleState($unresponsiveState);
-        if (file_exists($socketPath)) {
-            pmssCheckRtorrentLogBoth($user, 'stale socket detected, process not running, cleaning up', $debug);
-            $socketRemoved = @unlink($socketPath);
-            if (!$socketRemoved && file_exists($socketPath)) {
-                pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
-            }
-        }
+        pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $unresponsiveState, $debug);
 
         $state = rtorrentProcessCheckStaleState($missingState, PMSS_RTORRENT_MISSING_GRACE);
 
@@ -342,25 +349,10 @@ foreach ($users as $user) {
         // Re-check process liveness before treating the socket as a stuck SCGI endpoint.
         $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
         if (empty($rtorrentPids)) {
-            rtorrentProcessClearStaleState($unresponsiveState);
-            if (file_exists($socketPath)) {
-                pmssCheckRtorrentLogBoth(
-                    $user,
-                    'stale socket detected, process not running, cleaning up',
-                    $debug
-                );
-                $socketRemoved = @unlink($socketPath);
-                if (!$socketRemoved && file_exists($socketPath)) {
-                    pmssCheckRtorrentLogBoth($user, "stale socket cleanup failed (socket={$socketPath})", $debug);
-                }
-            }
+            pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $unresponsiveState, $debug);
 
             pmssCheckRtorrentLogBoth($user, 'rTorrent missing after SCGI probe; starting', $debug);
-            $rc = 0;
-            @passthru('/scripts/startRtorrent '.escapeshellarg($user), $rc);
-            pmssCheckRtorrentLog("startRtorrent {$user} completed (rc={$rc})", true, $debug);
-            @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
-            @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
+            pmssCheckRtorrentStart($user, $startMarkerState, $debug);
             continue;
         }
 

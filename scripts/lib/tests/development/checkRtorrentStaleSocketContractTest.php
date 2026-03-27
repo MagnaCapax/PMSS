@@ -5,36 +5,37 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class checkRtorrentStaleSocketContractTest extends TestCase
 {
-    public function testMissingProcessStartPathClearsStaleSocketBeforeRestart(): void
+    public function testMissingProcessStartPathUsesSharedCleanupBeforeRestart(): void
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
+        $this->assertStringContainsString('function pmssCheckRtorrentCleanupStaleSocket(', $src);
         $this->assertMatches(
-            '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?rtorrentProcessClearStaleState\(\$unresponsiveState\);.*?stale socket detected, process not running, cleaning up.*?@unlink\(\$socketPath\);.*?\/scripts\/startRtorrent/s',
+            '/if \(!\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?pmssCheckRtorrentStart\(\$user, \$startMarkerState, \$debug\);/s',
             $src,
-            'Missing-process recovery should clear stale SCGI socket state before requesting startRtorrent'
+            'Missing-process recovery should use the shared stale-socket cleanup before starting rTorrent'
         );
     }
 
-    public function testExecutorMismatchPathCleansSocketBeforeGraceTracking(): void
+    public function testExecutorMismatchPathUsesSharedCleanupBeforeGraceTracking(): void
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertMatches(
-            '/if \(\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?rtorrentProcessClearStaleState\(\$unresponsiveState\);.*?stale socket detected, process not running, cleaning up.*?@unlink\(\$socketPath\);.*?rtorrentProcessCheckStaleState\(\$missingState, PMSS_RTORRENT_MISSING_GRACE\);/s',
+            '/if \(\$executorPresent && empty\(\$rtorrentPids\)\) \{.*?\$socketPath = rtorrentScgiSocketPath\(\$user\);.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rtorrentProcessCheckStaleState\(\$missingState, PMSS_RTORRENT_MISSING_GRACE\);/s',
             $src,
-            'Executor mismatch recovery should clear stale SCGI socket state before missing-process grace handling'
+            'Executor mismatch recovery should use the shared stale-socket cleanup before missing-process grace handling'
         );
     }
 
-    public function testUnresponsiveScgiPathRechecksProcessBeforeObserving(): void
+    public function testUnresponsiveScgiPathUsesSharedCleanupBeforeRestart(): void
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertMatches(
-            '/\$responsive = rtorrentScgiPing\(\$socketPath, 5\);.*?\$rtorrentPids = rtorrentProcessPgrepExact\(\$user, \'rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?rtorrentProcessClearStaleState\(\$unresponsiveState\);.*?stale socket detected, process not running, cleaning up.*?@unlink\(\$socketPath\);.*?rTorrent missing after SCGI probe; starting.*?\/scripts\/startRtorrent/s',
+            '/\$responsive = rtorrentScgiPing\(\$socketPath, 5\);.*?\$rtorrentPids = rtorrentProcessPgrepExact\(\$user, \'rtorrent\'\);.*?if \(empty\(\$rtorrentPids\)\) \{.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rTorrent missing after SCGI probe; starting.*?pmssCheckRtorrentStart\(\$user, \$startMarkerState, \$debug\);/s',
             $src,
-            'SCGI recovery should re-check rtorrent liveness and restart instead of entering the unresponsive grace loop'
+            'SCGI recovery should reuse the shared cleanup and restart helpers after re-checking process liveness'
         );
     }
 }

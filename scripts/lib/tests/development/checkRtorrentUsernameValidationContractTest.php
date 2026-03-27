@@ -10,6 +10,7 @@ class checkRtorrentUsernameValidationContractTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
         $this->assertStringContainsString("pmssListManagedUsersResult('/scripts/listUsers.php')", $src);
+        $this->assertStringContainsString('function pmssCheckRtorrentCleanupStaleSocket(', $src);
     }
 
     public function testLegacyInlineUsernameParsingStaysRemoved(): void
@@ -18,5 +19,6 @@ class checkRtorrentUsernameValidationContractTest extends TestCase
 
         $this->assertTrue(strpos($src, "@exec('/scripts/listUsers.php'") === false);
         $this->assertTrue(strpos($src, '/^[a-z][a-z0-9]{0,7}$/') === false);
+        $this->assertStringContainsString('function pmssCheckRtorrentStart(', $src);
     }
 }

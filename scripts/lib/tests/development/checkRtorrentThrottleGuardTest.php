@@ -5,9 +5,6 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class checkRtorrentThrottleGuardTest extends TestCase
 {
-    /**
-     * Ensure the watchdog only applies SCGI throttle when a throttle file exists.
-     */
     public function testScgiThrottleCallRequiresConfiguredThrottle(): void
     {
         $script = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
@@ -26,13 +23,11 @@ class checkRtorrentThrottleGuardTest extends TestCase
         );
     }
 
-    /**
-     * Ensure the healthy path still logs after the optional throttle update.
-     */
     public function testHealthyLogRemainsOutsideThrottleGuard(): void
     {
         $script = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
 
+        $this->assertStringContainsString('function pmssCheckRtorrentStart(', $script);
         $this->assertMatches(
             '/if \(\$throttle !== null\) \{.*?\}\s*pmssCheckRtorrentLog\("rTorrent healthy for \{\$user\}", false, \$debug\);/s',
             $script,

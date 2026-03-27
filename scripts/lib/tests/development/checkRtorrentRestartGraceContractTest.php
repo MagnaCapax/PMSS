@@ -10,6 +10,7 @@ class checkRtorrentRestartGraceContractTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/cron/checkRtorrent.php',
             [
+                'function pmssCheckRtorrentStart(',
                 "'/tmp/.pmss-rtorrent-restart-'.\$user",
                 '$restartAge < 7200',
                 '$restartAge < 14400',
