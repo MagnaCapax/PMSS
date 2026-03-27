@@ -3,8 +3,8 @@
  * Utilities for retrieving network interface details.
  *
  * Including this file defines `$link` and `$linkSpeed` variables for the
- * primary interface and its speed in Mbps. Configuration values from
- * `/etc/seedbox/config/network` are used when available and otherwise
+ * primary interface and its speed in Mbps. Configuration values from the
+ * seedbox network config are used when available and otherwise
  * detection falls back to `ip` and `ethtool`.
  *
  * Verified to work on Debian 10, 11 and 12. Older releases like Debian 8
@@ -17,7 +17,8 @@
 /** Determine the primary network interface name. */
 function detectPrimaryInterface(): string
 {
-    $config = file_exists('/etc/seedbox/config/network') ? include '/etc/seedbox/config/network' : null;
+    $configPath = '/etc/seedbox/config/network';
+    $config = file_exists($configPath) ? include $configPath : null;
     if (is_array($config) && !empty($config['interface'])) {
         return (string) $config['interface'];
     }
@@ -29,7 +30,8 @@ function detectPrimaryInterface(): string
 /** Detect interface speed in Mbps using configuration or ethtool. */
 function getLinkSpeed(string $iface): int
 {
-    $config = file_exists('/etc/seedbox/config/network') ? include '/etc/seedbox/config/network' : null;
+    $configPath = '/etc/seedbox/config/network';
+    $config = file_exists($configPath) ? include $configPath : null;
     if (is_array($config) && isset($config['speed'])) {
         return (int) $config['speed'];
     }
