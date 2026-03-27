@@ -17,7 +17,7 @@ class ResourceReportTest extends TestCase
 
     private function writeUserStats(string $user, array $values): void
     {
-        $this->writeUserData($user, $this->buildStatsPayload($values));
+        $this->writeUserData($user, $this->pmssBuildResourceStatsPayloadFromValues($values));
     }
 
     public function testBuildReportAggregatesRowsAndTotals(): void
@@ -65,7 +65,7 @@ class ResourceReportTest extends TestCase
 
     public function testBuildReportMarksMissingWhenRequiredMetricMissing(): void
     {
-        $payload = $this->buildStatsPayload([
+        $payload = $this->pmssBuildResourceStatsPayloadFromValues([
             'io_read' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
             'io_write' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
             'io_read_ops' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
@@ -87,7 +87,7 @@ class ResourceReportTest extends TestCase
 
     public function testBuildReportDefaultsMissingOpsWindowsToZero(): void
     {
-        $payload = $this->buildStatsPayload([
+        $payload = $this->pmssBuildResourceStatsPayloadFromValues([
             'io_read' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
             'io_write' => ['month' => 2, 'week' => 2, 'day' => 2, 'hour' => 2],
             'cpu' => ['month' => 3, 'week' => 3, 'day' => 3, 'hour' => 3],
@@ -109,23 +109,6 @@ class ResourceReportTest extends TestCase
 
     private function writeUserData(string $user, array $data): void
     {
-        @file_put_contents($this->statsDir.'/'.$user, serialize($data));
-    }
-
-    private function buildStatsPayload(array $values): array
-    {
-        return [
-            'io_read' => ['raw' => $values['io_read']],
-            'io_write' => ['raw' => $values['io_write']],
-            'io_read_ops' => ['raw' => $values['io_read_ops'] ?? []],
-            'io_write_ops' => ['raw' => $values['io_write_ops'] ?? []],
-            'cpu' => ['raw' => $values['cpu']],
-            'memory' => [
-                'current' => $values['memory_current'],
-                'raw' => ['month' => $values['memory_avg_month']],
-            ],
-            'ram_hours' => ['raw' => $values['ram_hours']],
-            'tasks' => ['current' => $values['tasks_current']],
-        ];
+        $this->pmssWriteSerializedFixture($this->statsDir.'/'.$user, $data);
     }
 }

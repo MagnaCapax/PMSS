@@ -11,35 +11,7 @@ class ListUsersConsumersGuardTest extends TestCase
      */
     public function testHelperConsumersRelyOnSharedManagedUserParser(): void
     {
-        foreach ([
-            "userFilesystem::listManagedUsersWithAdditionalUsers(['www-data'])" => [
-                'scripts/cron/resourceLog.php',
-                'scripts/cron/resourceSnapshot.php',
-                'scripts/cron/trafficLog.php',
-                'scripts/cron/trafficIngressLog.php',
-                'scripts/util/makeMonitoringRules.php',
-            ],
-            "pmssListManagedUsers('/scripts/listUsers.php')" => [
-                'scripts/cron/trafficLimits.php',
-                'scripts/cron/updateQuotas.php',
-                'scripts/util/checkRutorrentPlugins.php',
-                'scripts/util/setupNetwork.php',
-                'scripts/lib/user/resourcesList.php',
-            ],
-            'pmssManagedUsersSelectFromCommand(' => [
-                'scripts/cron/checkLighttpdInstances.php',
-                'scripts/util/checkUserHtpasswd.php',
-                'scripts/util/userConfigLighttpd.php',
-                'scripts/lib/nginxConfig/main.php',
-            ],
-            'pmssListManagedUsersResult(' => [
-                'scripts/cron/checkRtorrent.php',
-                'scripts/cron/userTrackerCleaner.php',
-                'scripts/lib/resources/show.php',
-                'scripts/showTraffic.php',
-                'scripts/userTorrents.php',
-            ],
-        ] as $needle => $files) {
+        foreach ($this->pmssListUsersConsumerMap() as $needle => $files) {
             foreach ($files as $file) {
                 $this->pmssAssertRepoFileContainsAllStrings($file, [$needle], $file.' must use shared listUsers parsing');
             }

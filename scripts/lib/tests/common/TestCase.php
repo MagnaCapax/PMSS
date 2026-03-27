@@ -218,6 +218,65 @@ abstract class TestCase
         return $this->pmssMakeTempDir($dirPrefix, 0700).'/'.$filename;
     }
 
+    /** Persist serialized fixture data while ensuring the parent path exists. */
+    protected function pmssWriteSerializedFixture(string $path, $value): void
+    {
+        @mkdir(dirname($path), 0755, true);
+        @file_put_contents($path, serialize($value));
+    }
+
+    /** Build the serialized resource stats shape used by report-oriented tests. */
+    protected function pmssBuildResourceStatsPayloadFromValues(array $values): array
+    {
+        return [
+            'io_read' => ['raw' => $values['io_read']],
+            'io_write' => ['raw' => $values['io_write']],
+            'io_read_ops' => ['raw' => $values['io_read_ops'] ?? []],
+            'io_write_ops' => ['raw' => $values['io_write_ops'] ?? []],
+            'cpu' => ['raw' => $values['cpu']],
+            'memory' => [
+                'current' => $values['memory_current'],
+                'raw' => ['month' => $values['memory_avg_month']],
+            ],
+            'ram_hours' => ['raw' => $values['ram_hours']],
+            'tasks' => ['current' => $values['tasks_current']],
+        ];
+    }
+
+    /** Keep shared source-based listUsers consumer assertions in one place. */
+    protected function pmssListUsersConsumerMap(): array
+    {
+        return [
+            "userFilesystem::listManagedUsersWithAdditionalUsers(['www-data'])" => [
+                'scripts/cron/resourceLog.php',
+                'scripts/cron/resourceSnapshot.php',
+                'scripts/cron/trafficLog.php',
+                'scripts/cron/trafficIngressLog.php',
+                'scripts/util/makeMonitoringRules.php',
+            ],
+            "pmssListManagedUsers('/scripts/listUsers.php')" => [
+                'scripts/cron/trafficLimits.php',
+                'scripts/cron/updateQuotas.php',
+                'scripts/util/checkRutorrentPlugins.php',
+                'scripts/util/setupNetwork.php',
+                'scripts/lib/user/resourcesList.php',
+            ],
+            'pmssManagedUsersSelectFromCommand(' => [
+                'scripts/cron/checkLighttpdInstances.php',
+                'scripts/util/checkUserHtpasswd.php',
+                'scripts/util/userConfigLighttpd.php',
+                'scripts/lib/nginxConfig/main.php',
+            ],
+            'pmssListManagedUsersResult(' => [
+                'scripts/cron/checkRtorrent.php',
+                'scripts/cron/userTrackerCleaner.php',
+                'scripts/lib/resources/show.php',
+                'scripts/showTraffic.php',
+                'scripts/userTorrents.php',
+            ],
+        ];
+    }
+
     /** Append fixture lines, encoding arrays as JSON and preserving raw strings. */
     protected function pmssAppendFixtureLines(string $path, array $lines): void
     {

@@ -13,9 +13,7 @@ class ShowResourcesFormatTest extends TestCase
 
     private function writeResourceStats(string $runtimeDir, string $user, array $payload): void
     {
-        $statsDir = $runtimeDir.'/resourceStats';
-        @mkdir($statsDir, 0755, true);
-        @file_put_contents($statsDir.'/'.$user, serialize($payload));
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/'.$user, $payload);
     }
 
     private function sampleUsagePayload(array $overrides = []): array
