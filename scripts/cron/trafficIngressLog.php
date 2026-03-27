@@ -25,8 +25,7 @@ if (empty($users)) {
     exit(0);
 }
 foreach ($users as $user) {
-    $uid = pmssResourceLogLookupUid($user);
-    if ($uid === null) {
+    if (($uid = pmssResourceLogLookupManagedUid($user)) === null) {
         continue;
     }
 

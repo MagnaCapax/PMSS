@@ -29,7 +29,7 @@ function pmssResourceSnapshotRun(): int
         $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
 
         foreach ($users as $user) {
-            if (!pmssResourceLogIsValidUser($user) || ($uid = pmssResourceLogLookupUid($user)) === null) {
+            if (($uid = pmssResourceLogLookupManagedUid($user)) === null) {
                 continue;
             }
 

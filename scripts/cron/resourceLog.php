@@ -21,9 +21,7 @@ if ($users === []) {
     exit(0);
 }
 foreach ($users as $user) {
-    if (!pmssResourceLogIsValidUser($user)
-        || ($uid = pmssResourceLogLookupUid($user)) === null
-        || ($counters = pmssResourceLogReadCounters($uid)) === null) {
+    if (($uid = pmssResourceLogLookupManagedUid($user)) === null || ($counters = pmssResourceLogReadCounters($uid)) === null) {
         continue;
     }
 

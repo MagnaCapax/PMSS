@@ -10,6 +10,7 @@
 
 require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/network/config.php';
+require_once '/scripts/lib/resources/log.php';
 require_once '/scripts/lib/user/userFilesystem.php';
 
 $users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
@@ -25,8 +26,8 @@ $localnets = networkLoadLocalnets();
 $lastLocalNet = $localnets ? end($localnets) : '';
 
 foreach ($users as $thisUser) {
-    $thisUid = trim( shell_exec("id -u {$thisUser}") );
-    if ($thisUid === '') continue;	// User does not exist anymore
+    $thisUid = pmssResourceLogLookupManagedUid($thisUser);
+    if ($thisUid === null) continue;	// User does not exist anymore
 
     foreach ($localnets as $thisLocalNet) {
         echo "/sbin/iptables -A OUTPUT -d {$thisLocalNet} -m owner --uid-owner {$thisUid} -j ACCEPT\n";

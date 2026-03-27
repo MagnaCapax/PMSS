@@ -88,6 +88,11 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));
     }
 
+    public function testManagedUidLookupRejectsInvalidUser(): void
+    {
+        $this->assertSame(null, \pmssResourceLogLookupManagedUid('Alice'));
+    }
+
     public function testLegacyUserHelpersPathStillExportsFunctions(): void
     {
         $script = 'require_once '.var_export(dirname(__DIR__, 2).'/resources/userHelpers.php', true).';'

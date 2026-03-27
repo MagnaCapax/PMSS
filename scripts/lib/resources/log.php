@@ -34,6 +34,14 @@ function pmssResourceLogIsValidUser(string $user): bool
 }
 
 /**
+ * Resolve a validated managed username to its UID.
+ */
+function pmssResourceLogLookupManagedUid(string $user): ?int
+{
+    return pmssResourceLogIsValidUser($user) ? pmssResourceLogLookupUid($user) : null;
+}
+
+/**
  * Read systemd slice counters for the given user.
  */
 function pmssResourceLogReadCounters(int $uid): ?array

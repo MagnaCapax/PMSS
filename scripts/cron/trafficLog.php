@@ -10,19 +10,12 @@
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/network/config.php';
+require_once '/scripts/lib/resources/log.php';
 require_once '/scripts/lib/user/userFilesystem.php';
 $logger = new Logger(__FILE__);
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
-/**
- * Collect traffic usage statistics
- *
- * @copyright (C) Magna Capax Finland Oy 2023
- * @author Aleksi
- */
-
-
 $logdir = '/var/log/pmss/traffic/';
 $users = userFilesystem::listManagedUsersWithAdditionalUsers(['www-data']);
 if (count($users) == 0) exit;    // Nothing to collect
@@ -54,22 +47,16 @@ chmod($thisUsageFile, 0600);
 $logger->msg("Collecting data");
 
 foreach($users AS $thisUser) {
-    $thisUid = trim( shell_exec("id -u {$thisUser}") );
+    $thisUid = pmssResourceLogLookupManagedUid($thisUser);
+    if ($thisUid === null) continue;
     $thisUserTraffic = 0;
     $thisUserTrafficLocal = 0;
 
-        // Get this specific users data consumption
     $thisUserTraffic = (int) `grep "0.0.0.0/0            owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | awk '{print $2}'`;
-    if ($localnets !== false &&
-        count($localnets) > 0) {
+    if ($localnets) {
             foreach ($localnets AS $thisLocalNet)
                 $thisUserTrafficLocal += (int) `grep "{$thisLocalNet}       owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | awk '{print $2}'`;
-                //echo "Loggin {$thisLocalNet} for {$thisUser}/{$thisUid} result {$thisUserTrafficLocal}\n";
         }
-
-    $thisUserTraffic = (int) trim( $thisUserTraffic );
-    $thisUserTrafficLocal = (int) trim( $thisUserTrafficLocal );
-
 
 		// Do not log if usage was MORE than linkspeed for the past 5 minutes.
 	    if ($linkSpeed !== null && $linkSpeed > 0) {
@@ -94,12 +81,8 @@ foreach($users AS $thisUser) {
 	        }
 	    }
 
-
-
-        // Append this collection stats to the user's log file
     if ($thisUserTraffic > 0) file_put_contents($logdir . $thisUser, date('Y-m-d H:i:s') . ": {$thisUserTraffic}\n", FILE_APPEND);
 
-        // Apped to -localnet usage if that is being employed
     if ($thisUserTrafficLocal > 0)
         file_put_contents($logdir . $thisUser . '-localnet', date('Y-m-d H:i:s') . ": {$thisUserTrafficLocal}\n", FILE_APPEND);
 
@@ -110,7 +93,6 @@ foreach($users AS $thisUser) {
 $trafficUnmatched = (int) `grep "Chain OUTPUT (" {$thisUsageFile} | tr -s [:blank:]| cut -d' ' -f7`;
 if ($trafficUnmatched > 0) {
     file_put_contents($logdir . 'unmatched-traffic', date('Y-m-d H:i:s') . ": {$trafficUnmatched}", FILE_APPEND);
-    
 }
 
 // Remove the temp file, not required anymore
