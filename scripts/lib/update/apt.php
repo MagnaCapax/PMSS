@@ -143,36 +143,32 @@ function pmssUpdateAptSources(string $distroName, int $distroVersion, string $cu
 
     if ($distroVersion <= 0) { $log(sprintf('Skipping repository update for %s: unknown version', $distroName)); return; }
     if ($distroName === 'debian') {
-        pmssUpdateAptSourcesDebian($distroVersion, $currentHash, $repos, $log);
+        $version = $distroVersion;
+        $target = pmssDebianReleaseSpecs()[$version] ?? null;
+        if (!is_array($target) || !$target['sources_template']) { $log("Unsupported Debian version: $version"); return; }
+        $label = $target['label'];
+
+        if (($template = $repos[$target['repo']] ?? '') === '') {
+            $log("{$label} template missing, leaving sources.list untouched");
+            return;
+        }
+
+        if ($currentHash === sha1($template) || !pmssSafeWriteSources($template, $label, $log)) {
+            $log("Debian {$label} repositories already correct");
+            return;
+        }
+        if ($target['eol']) {
+            // EOL suites lack valid Release timestamps; relax the check.
+            if (defined('PMSS_TEST_MODE')) {
+                $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
+            } else {
+                pmssAptWriteValidUntilOverride($log);
+                pmssAptRunClean($log);
+            }
+        }
+        $log("Applied Debian {$label} repository config");
         return;
     }
 
     $log($distroName === 'ubuntu' ? 'Ubuntu is not supported yet.' : "Unsupported distro: $distroName");
-}
-
-function pmssUpdateAptSourcesDebian(int $version, string $currentHash, array $repos, callable $log): void
-{
-    $target = pmssDebianReleaseSpecs()[$version] ?? null;
-    if (!is_array($target) || !$target['sources_template']) { $log("Unsupported Debian version: $version"); return; }
-    $label = $target['label'];
-
-    if (($template = $repos[$target['repo']] ?? '') === '') {
-        $log("{$label} template missing, leaving sources.list untouched");
-        return;
-    }
-
-    if ($currentHash === sha1($template) || !pmssSafeWriteSources($template, $label, $log)) {
-        $log("Debian {$label} repositories already correct");
-        return;
-    }
-    if ($target['eol']) {
-        // EOL suites lack valid Release timestamps; relax the check.
-        if (defined('PMSS_TEST_MODE')) {
-            $log('PMSS_TEST_MODE: skipping apt conf/clean ('.$label.')');
-        } else {
-            pmssAptWriteValidUntilOverride($log);
-            pmssAptRunClean($log);
-        }
-    }
-    $log("Applied Debian {$label} repository config");
 }

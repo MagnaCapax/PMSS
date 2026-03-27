@@ -20,7 +20,7 @@ class LighttpdAccessLogTest extends TestCase
 
     public function testThresholdMatchesOneHundredMiB(): void
     {
-        $this->assertEquals(100 * 1024 * 1024, \pmssLighttpdAccessLogThresholdBytes());
+        $this->assertEquals(100 * 1024 * 1024, \PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES);
     }
 
     public function testTrimFileTruncatesOversizedRegularFile(): void

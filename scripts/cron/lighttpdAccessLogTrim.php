@@ -14,7 +14,7 @@ require_once __DIR__.'/../lib/lighttpd/accessLog.php';
 $debug = in_array('--debug', $argv ?? ($_SERVER['argv'] ?? []), true);
 $logger = new Logger(__FILE__);
 $trimmed = 0;
-$thresholdBytes = pmssLighttpdAccessLogThresholdBytes();
+$thresholdBytes = PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES;
 
 foreach (users::listHomeUsers() as $thisUser) {
     $logPath = "/home/{$thisUser}/.lighttpd/access.log";

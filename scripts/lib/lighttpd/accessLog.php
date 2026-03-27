@@ -7,12 +7,8 @@
 
 require_once __DIR__.'/userFileWrite.php';
 
-/**
- * Keep per-user access logs bounded to limit quota and I/O drift.
- */
-function pmssLighttpdAccessLogThresholdBytes(): int
-{
-    return 100 * 1024 * 1024;
+if (!defined('PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES')) {
+    define('PMSS_LIGHTTPD_ACCESS_LOG_THRESHOLD_BYTES', 100 * 1024 * 1024);
 }
 
 /**
