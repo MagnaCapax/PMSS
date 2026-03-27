@@ -2958,12 +2958,7 @@ function fm_download_file($fileLocation, $fileName, $chunkSize  = 1024)
     $contentDisposition = 'attachment';
 
 
-    if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
-        $fileName = preg_replace('/\./', '%2e', $fileName, substr_count($fileName, '.') - 1);
-        header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
-    } else {
-        header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
-    }
+    header("Content-Disposition: $contentDisposition;filename=\"$fileName\"");
 
     header("Accept-Ranges: bytes");
     $range = 0;
@@ -2971,7 +2966,7 @@ function fm_download_file($fileLocation, $fileName, $chunkSize  = 1024)
 
     if (isset($_SERVER['HTTP_RANGE'])) {
         list($a, $range) = explode("=", $_SERVER['HTTP_RANGE']);
-        str_replace($range, "-", $range);
+        $range = str_replace("-", "", $range);
         $size2 = $size - 1;
         $new_length = $size - $range;
         header("HTTP/1.1 206 Partial Content");
@@ -2996,7 +2991,7 @@ function fm_download_file($fileLocation, $fileName, $chunkSize  = 1024)
     while (!feof($fp) and (connection_status() == 0)) {
         print(@fread($fp, 1024*$chunkSize));
         flush();
-        ob_flush();
+        @ob_flush();
 //        sleep(1);
     }
     fclose($fp);
@@ -3449,7 +3444,7 @@ global $lang, $root_url, $favicon_path;
     {
     ?>
 </div>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.slim.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
 </body>
 </html>
@@ -3714,9 +3709,9 @@ $isStickyNavBar = $sticky_navbar ? 'navbar-fixed' : 'navbar-normal';
     {
     ?>
 </div>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
-<script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ekko-lightbox/5.3.0/ekko-lightbox.min.js"></script>
 <?php if (FM_USE_HIGHLIGHTJS): ?>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.3/highlight.min.js"></script>
