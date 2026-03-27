@@ -42,7 +42,7 @@ require_once 'lib/userLifecycle.php';
 require_once 'lib/user/log.php';
 require_once 'lib/homeMount.php';
 require_once 'lib/update.php';
-require_once 'lib/update/users/filesystem.php';
+require_once 'lib/update/users.php';
 require_once 'lib/user/add/provisioningRuntime.php';
 require_once 'lib/user/add/systemUserCreate.php';
 require_once 'lib/user/add/userConfigApply.php';
@@ -142,7 +142,7 @@ $hostname = str_replace(array("\n", "\r", "\t"), array('','',''), $hostname);
 
 pmssAddUserSystemUserCreate($user, $homePath);
 pmssAddUserUserConfigApply($userDb, $user, $homePath);
-pmssUserApplySkeletonFiles(['user' => $user['name'], 'home' => $homePath]);
+pmssUpdateUserEnvironment($user['name']);
 
 $userHomedirPath = $homePath;
 // Execute per server additional config for user creation IF there is any

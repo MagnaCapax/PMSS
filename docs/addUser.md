@@ -25,6 +25,7 @@ On success the script:
 - creates the Unix user and home directory
 - assigns an HTTP service port via `portManager.php`
 - writes rTorrent/ruTorrent configuration
+- converges the full per-user update environment before services start
 - enables quotas and traffic limits
 - starts rTorrent and lighttpd
 - emits a summary marker (`###ADDUSER:SUCCESS|FAIL|ERROR`) to stdout and `/var/log/pmss/addUser.log`

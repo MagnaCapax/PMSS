@@ -51,13 +51,13 @@ class AddUserProvisioningGuardTest extends TestCase
     public function testAddUserRefreshesPatchedTorrentFrontendsBeforeServices(): void
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
-        $patchPos = strpos($src, "pmssUserApplySkeletonFiles(['user' => ");
+        $patchPos = strpos($src, "pmssUpdateUserEnvironment(");
         $lighttpdPos = strpos($src, '/scripts/startLighttpd');
 
         $this->assertTrue(strpos($src, "require_once 'lib/update.php';") !== false);
-        $this->assertTrue(strpos($src, "require_once 'lib/update/users/filesystem.php';") !== false);
-        $this->assertTrue($patchPos !== false, 'addUser.php must refresh skeleton frontends after user config');
+        $this->assertTrue(strpos($src, "require_once 'lib/update/users.php';") !== false);
+        $this->assertTrue($patchPos !== false, 'addUser.php must converge the full user environment after user config');
         $this->assertTrue($lighttpdPos !== false, 'addUser.php must still start lighttpd');
-        $this->assertTrue($patchPos < $lighttpdPos, 'addUser.php must patch torrent frontends before services start');
+        $this->assertTrue($patchPos < $lighttpdPos, 'addUser.php must converge user environment before services start');
     }
 }
