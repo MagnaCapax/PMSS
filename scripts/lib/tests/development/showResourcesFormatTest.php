@@ -82,16 +82,13 @@ class ShowResourcesFormatTest extends TestCase
     {
         $runtimeDir = $this->makeRuntimeDir();
         $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload());
-        $output = [];
-        $rc = 0;
-        exec(
-            'PMSS_RUNTIME_DIR='.escapeshellarg($runtimeDir).' php '.escapeshellarg($this->scriptPath()).' --user=alice 2>&1',
-            $output,
-            $rc
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->scriptPath()).' --user=alice',
+            ['PMSS_RUNTIME_DIR' => $runtimeDir]
         );
 
-        $textOutput = implode("\n", $output);
-        $this->assertEquals(0, $rc);
+        $textOutput = $result['output'];
+        $this->assertEquals(0, $result['rc']);
         $this->assertTrue(strpos($textOutput, '1.0 hrs') !== false);
         $this->assertTrue(strpos($textOutput, '2.50 GB-hrs') !== false);
         $this->assertTrue(strpos($textOutput, '1.00 GiB') !== false);

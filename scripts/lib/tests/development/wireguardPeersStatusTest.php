@@ -5,19 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class WireGuardPeersStatusTest extends TestCase
 {
-    /** @var array<int,string> */
-    private $cleanupPaths = array();
-
-    public function __destruct()
-    {
-        foreach ($this->cleanupPaths as $path) {
-            $this->removePath($path);
-        }
-    }
-
     public function testStatusScriptReportsConfiguredPeersAndRuntimeCounters(): void
     {
-        $configDir = $this->createTempDir();
+        $configDir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
         $configPath = $configDir.'/wg0.conf';
         file_put_contents(
             $configPath,
@@ -48,7 +38,7 @@ class WireGuardPeersStatusTest extends TestCase
 
     public function testStatusScriptReportsMissingConfigPath(): void
     {
-        $configDir = $this->createTempDir();
+        $configDir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
         $output = $this->runScript($configDir, "");
 
         $this->assertStringContainsString('WireGuard config not found at '.$configDir.'/wg0.conf', $output);
@@ -57,7 +47,7 @@ class WireGuardPeersStatusTest extends TestCase
 
     private function runScript(string $configDir, string $dumpOutput): string
     {
-        $binDir = $this->createTempDir().'/bin';
+        $binDir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700).'/bin';
         @mkdir($binDir, 0755, true);
 
         $wgScript = "#!/bin/sh\n";
@@ -73,20 +63,20 @@ class WireGuardPeersStatusTest extends TestCase
 
         $path = getenv('PATH');
         $path = ($path === false || $path === '') ? $binDir : $binDir.':'.$path;
-        $command = 'PMSS_WG_CONFIG_DIR='.escapeshellarg($configDir)
-            .' PATH='.escapeshellarg($path)
-            .' '.escapeshellarg(PHP_BINARY).' '
-            .escapeshellarg(dirname(__DIR__, 3).'/wireguardPeersStatus.php')
-            .' 2>&1';
 
-        return (string) shell_exec($command);
+        return $this->pmssRunPhpScript(
+            dirname(__DIR__, 3).'/wireguardPeersStatus.php',
+            [],
+            [
+                'PMSS_WG_CONFIG_DIR' => $configDir,
+                'PATH' => $path,
+            ]
+        );
     }
 
     private function createTempDir(): string
     {
-        $dir = $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
-        $this->cleanupPaths[] = $dir;
-        return $dir;
+        return $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
     }
 
     private function removePath(string $path): void

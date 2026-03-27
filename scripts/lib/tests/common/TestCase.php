@@ -420,10 +420,33 @@ abstract class TestCase
         $this->pmssWithEnv(['PATH' => $path], $callback);
     }
 
+    /** Run a shell command with optional environment overrides and return combined output. */
+    protected function pmssRunShellCommand(string $command, array $environment = [], string $stderrRedirect = '2>&1'): string
+    {
+        $command = $this->pmssBuildCommandEnvironmentPrefix($environment).$command;
+        return (string) @shell_exec($stderrRedirect !== '' ? $command.' '.$stderrRedirect : $command);
+    }
+
+    /** @return array{rc:int, output:string, lines:array<int, string>} */
+    protected function pmssExecShellCommand(string $command, array $environment = [], string $stderrRedirect = '2>&1'): array
+    {
+        $output = [];
+        $rc = 0;
+        @exec(
+            $this->pmssBuildCommandEnvironmentPrefix($environment).$command.($stderrRedirect !== '' ? ' '.$stderrRedirect : ''),
+            $output,
+            $rc
+        );
+        return [
+            'rc' => $rc,
+            'output' => implode("\n", $output),
+            'lines' => $output,
+        ];
+    }
+
     protected function pmssRunInlinePhp(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): string
     {
-        $command = $this->pmssBuildCommandEnvironmentPrefix($environment).escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script);
-        return (string) @shell_exec($stderrRedirect !== '' ? $command.' '.$stderrRedirect : $command);
+        return $this->pmssRunShellCommand(escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script), $environment, $stderrRedirect);
     }
 
     protected function pmssRunInlinePhpJson(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): array
@@ -436,11 +459,12 @@ abstract class TestCase
 
     protected function pmssRunPhpScript(string $scriptPath, array $arguments = [], array $environment = [], string $stderrRedirect = '2>&1'): string
     {
-        $command = $this->pmssBuildCommandEnvironmentPrefix($environment).escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
+        $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
         foreach ($arguments as $argument) {
             $command .= ' '.escapeshellarg((string) $argument);
         }
-        return (string) @shell_exec($stderrRedirect !== '' ? $command.' '.$stderrRedirect : $command);
+
+        return $this->pmssRunShellCommand($command, $environment, $stderrRedirect);
     }
 
     private function pmssBuildCommandEnvironmentPrefix(array $environment): string
