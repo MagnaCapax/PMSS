@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/logging.php';
+require_once __DIR__.'/managedPath.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/runtime/processes.php';
 require_once __DIR__.'/../runtime.php';
@@ -362,16 +363,6 @@ function pmssEnsureBootDefaults(
         }
     }
 
-    $writeWithBackup = static function (string $path, array $contentLines, string $label) use ($log): void {
-        $backup = $path.'.pmss-backup-'.date('YmdHis');
-        if (!@copy($path, $backup)) {
-            $log('[WARN] Unable to create '.$label.' backup at '.$backup);
-        }
-        if (@file_put_contents($path, implode(PHP_EOL, $contentLines).PHP_EOL) === false) {
-            $log('[WARN] Failed writing updated '.$path);
-        }
-    };
-
     // /proc hidepid baseline.
     $fstabChanged = false;
     if (is_readable($fstabPath) && ($lines = file($fstabPath, FILE_IGNORE_NEW_LINES)) !== false) {
@@ -417,7 +408,7 @@ function pmssEnsureBootDefaults(
         }
         // Write fstab only when content changed, with a backup.
         if ($fstabChanged) {
-            $writeWithBackup($fstabPath, $lines, 'fstab');
+            pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log);
 
             // Remount /proc after fstab changes so the runtime view matches.
             $command = pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']);
@@ -497,7 +488,7 @@ function pmssEnsureBootDefaults(
 
         // Persist grub updates only when modified, keeping a backup.
         if ($grubChanged) {
-            $writeWithBackup($grubPath, $lines, 'grub');
+            pmssWriteManagedPathFileWithBackup($grubPath, $lines, 'grub', $log);
         }
     } else {
         $log('[WARN] '.$grubPath.' not readable; skipping grub cmdline update');

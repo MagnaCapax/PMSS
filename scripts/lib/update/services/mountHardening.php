@@ -6,6 +6,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../../runtime.php';
 
@@ -35,18 +36,6 @@ function pmssMountHardeningReadMounts(string $mountsPath): array
         $mounts[$columns[1]] = ['type' => $columns[2], 'options' => array_values(array_filter(explode(',', $columns[3]), 'strlen'))];
     }
     return $mounts;
-}
-
-/** Persist fstab updates with a timestamped backup. */
-function pmssMountHardeningWriteFstab(string $fstabPath, array $lines, callable $logger): void
-{
-    $backup = $fstabPath.'.pmss-backup-'.date('YmdHis');
-    if (!@copy($fstabPath, $backup)) $logger('[WARN] Unable to create fstab backup at '.$backup);
-    if (@file_put_contents($fstabPath, implode(PHP_EOL, $lines).PHP_EOL) === false) {
-        $logger('[WARN] Failed writing updated '.$fstabPath);
-        return;
-    }
-    $logger('[WARN] Wrote updated '.$fstabPath.' (backup '.$backup.')');
 }
 
 /** Ensure /tmp and /dev/shm are mounted with noexec/nosuid/nodev when enabled. */
@@ -122,7 +111,7 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
                 if (!$found) {
                     $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstabPath.'; skipping fstab hardening');
                 } elseif ($changed) {
-                    pmssMountHardeningWriteFstab($fstabPath, $lines, $log);
+                    pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log, true);
                 }
             }
         }
@@ -252,7 +241,7 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
     }
 
     if ($changed) {
-        pmssMountHardeningWriteFstab($fstabPath, $lines, $log);
+        pmssWriteManagedPathFileWithBackup($fstabPath, $lines, 'fstab', $log, true);
     }
 
     if (!is_dir('/tmp') || is_link('/tmp')) {

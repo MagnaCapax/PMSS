@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../../runtime.php';
 
 /**
@@ -65,15 +66,7 @@ function pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions = nul
     }
 
     if ($changed) {
-        $backup = $fstab.'.pmss-backup-'.date('YmdHis');
-        if (!@copy($fstab, $backup)) {
-            $log('[WARN] Unable to create fstab backup at '.$backup);
-        }
-        if (@file_put_contents($fstab, implode(PHP_EOL, $lines).PHP_EOL) === false) {
-            $log('[WARN] Failed writing updated '.$fstab);
-        } else {
-            $log('[WARN] Wrote updated '.$fstab.' (backup '.$backup.')');
-        }
+        pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
     }
 }
 

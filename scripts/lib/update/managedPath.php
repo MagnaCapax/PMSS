@@ -55,6 +55,27 @@ function pmssWriteManagedPathFile(
     return true;
 }
 
+/** Persist a managed file from line content while keeping a timestamped backup. */
+function pmssWriteManagedPathFileWithBackup(
+    string $path, array $contentLines, string $label, callable $logger, bool $logSuccess = false,
+    ?string $owner = null, ?string $group = null, int $mode = 0644
+): bool
+{
+    if (!pmssManagedPathIsSafe($path, $label, $logger)) return false;
+    $backup = '';
+    if (file_exists($path)) {
+        $backup = $path.'.pmss-backup-'.date('YmdHis');
+        if (!@copy($path, $backup)) $logger('[WARN] Unable to create '.$label.' backup at '.$backup);
+    }
+    $contents = implode(PHP_EOL, $contentLines).PHP_EOL;
+    $written = $owner === null
+        ? pmssAtomicWriteFile($path, $contents, $mode)
+        : pmssWriteManagedFile($path, $contents, $owner, $group, $mode);
+    if (!$written) { $logger('[WARN] Failed writing updated '.$path); return false; }
+    if ($logSuccess && $backup !== '') $logger('[WARN] Wrote updated '.$path.' (backup '.$backup.')');
+    return true;
+}
+
 /**
  * Remove a managed file when the target is safe.
  */

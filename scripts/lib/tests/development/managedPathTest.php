@@ -79,6 +79,53 @@ class ManagedPathTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
     }
 
+    public function testManagedWriteWithBackupPreservesOriginalAndLogsSuccess(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-write-backup-');
+        $path = $root.'/managed.conf';
+        file_put_contents($path, "before\n");
+        $messages = [];
+
+        $this->assertTrue(
+            \pmssWriteManagedPathFileWithBackup(
+                $path,
+                ['after', 'value'],
+                'test target',
+                $this->pmssMakeArrayLogger($messages),
+                true
+            )
+        );
+
+        $this->assertEquals("after\nvalue\n", file_get_contents($path));
+        $backups = glob($path.'.pmss-backup-*') ?: [];
+        $this->assertEquals(1, count($backups), 'expected exactly one backup');
+        $this->assertEquals("before\n", file_get_contents($backups[0]));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Wrote updated '.$path.' (backup '));
+    }
+
+    public function testManagedWriteWithBackupRejectsSymlinkTarget(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-write-backup-link-');
+        $target = $root.'/target.conf';
+        file_put_contents($target, "before\n");
+        $link = $root.'/managed.conf';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+        $messages = [];
+
+        $this->assertFalse(
+            \pmssWriteManagedPathFileWithBackup(
+                $link,
+                ['after'],
+                'test target',
+                $this->pmssMakeArrayLogger($messages),
+                true
+            )
+        );
+        $this->assertEquals("before\n", file_get_contents($target));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
+        $this->assertEquals([], glob($link.'.pmss-backup-*') ?: []);
+    }
+
     public function testManagedRemoveRejectsSymlinkTarget(): void
     {
         $root = $this->pmssMakeTempDir('pmss-env-remove-link-');
