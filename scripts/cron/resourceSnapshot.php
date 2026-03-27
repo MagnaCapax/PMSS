@@ -15,11 +15,6 @@ require_once __DIR__.'/../lib/user/userFilesystem.php';
 
 const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/resource-daily.log';
 
-/**
- * Capture and persist one snapshot.
- *
- * @return int exit code
- */
 function pmssResourceSnapshotRun(): int
 {
     $logPath = getenv('PMSS_RESOURCE_SNAPSHOT_LOG') ?: PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT;
@@ -80,11 +75,11 @@ function pmssResourceSnapshotRun(): int
             }
 
             if ($metrics === null) {
-                @fwrite($fh, $ts.' WARN resource_missing user='.$user.PHP_EOL);
+                pmssSnapshotWriteWarn($fh, $ts, 'resource_missing', ['user' => $user]);
                 continue;
             }
 
-            @fwrite(
+            pmssSnapshotWriteLine(
                 $fh,
                 sprintf(
                     '%s %d %d %d %d %d %.4f %.2f %d %d',
@@ -98,7 +93,7 @@ function pmssResourceSnapshotRun(): int
                     $metrics['tasks'],
                     (int) round($metrics['io_read_ops']),
                     (int) round($metrics['io_write_ops'])
-                ).PHP_EOL
+                )
             );
         }
 

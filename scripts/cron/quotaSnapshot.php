@@ -1,21 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * Cron task: quota snapshot.
- *
- * Records a daily snapshot of per-user quota usage for /home in a stable,
- * machine-parseable format. This data is used for capacity planning and later
- * time-series aggregation (tracked separately).
- *
- * Output file (root-only): /var/log/pmss/quota-daily.log (0600)
- *
- * Line format:
- *   2026-02-01T00:00:00 <uid> <blocks_used> <blocks_soft> <blocks_hard> <files_used> <files_soft> <files_hard>
- *
- * Notes:
- * - Uses numeric UIDs to reduce privacy surface in logs.
- * - Best-effort: failures are logged (date-prefixed) but do not exit non-zero
- *   to avoid cron noise.
+ * Cron task: record daily /home quota usage as stable numeric rows.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -51,11 +37,6 @@ function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
     return $rows;
 }
 
-/**
- * Capture and persist one snapshot.
- *
- * @return int exit code
- */
 function pmssQuotaSnapshotRun(): int
 {
     $mountPath = getenv('PMSS_QUOTA_SNAPSHOT_MOUNT') ?: PMSS_QUOTA_SNAPSHOT_MOUNT_DEFAULT;
@@ -65,10 +46,9 @@ function pmssQuotaSnapshotRun(): int
     $ts = date('Y-m-d\\TH:i:s');
 
     return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($mountLabel, $mountPath, $ts): int {
-        // Resolve repquota binary without depending on PATH inherited by cron.
         $repquota = pmssCommandPath('repquota');
         if ($repquota === '') {
-            @fwrite($fh, $ts.' WARN repquota_missing'.PHP_EOL);
+            pmssSnapshotWriteWarn($fh, $ts, 'repquota_missing');
             return 0;
         }
 
@@ -77,22 +57,21 @@ function pmssQuotaSnapshotRun(): int
         $rc = 0;
         @exec($cmd, $output, $rc);
         if ($rc !== 0) {
-            $excerpt = trim(preg_replace('/\\s+/', ' ', implode(' ', array_slice($output, 0, 5))));
-            @fwrite(
-                $fh,
-                $ts.' WARN repquota_failed rc='.$rc.' mount='.$mountLabel.($excerpt !== '' ? ' msg='.substr($excerpt, 0, 300) : '').PHP_EOL
-            );
+            pmssSnapshotWriteWarn($fh, $ts, 'repquota_failed', [
+                'rc' => $rc,
+                'mount' => $mountLabel,
+            ], $output);
             return 0;
         }
 
         $rows = pmssQuotaSnapshotParseRepquotaUserRows($output);
         if (empty($rows)) {
-            @fwrite($fh, $ts.' WARN repquota_no_rows mount='.$mountLabel.PHP_EOL);
+            pmssSnapshotWriteWarn($fh, $ts, 'repquota_no_rows', ['mount' => $mountLabel]);
             return 0;
         }
 
         foreach ($rows as $row) {
-            @fwrite($fh, $ts.' '.implode(' ', $row).PHP_EOL);
+            pmssSnapshotWriteLine($fh, $ts.' '.implode(' ', $row));
         }
 
         return 0;

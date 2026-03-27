@@ -10,6 +10,7 @@ class ProcessSnapshotCronTest extends TestCase
         foreach (['processSnapshot.php', 'quotaSnapshot.php', 'resourceSnapshot.php'] as $script) {
             $src = $this->pmssReadRepoFile('scripts/cron/'.$script);
             $this->assertStringContainsString('pmssWithSnapshotLog(__FILE__, $logPath,', $src, $script.' should use the shared snapshot log lifecycle');
+            $this->assertStringContainsString('pmssSnapshotWriteWarn(', $src, $script.' should share snapshot warning formatting');
         }
     }
 

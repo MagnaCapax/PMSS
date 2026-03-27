@@ -826,6 +826,38 @@ if (!function_exists('pmssWithSnapshotLog')) {
     }
 }
 
+if (!function_exists('pmssSnapshotWriteLine')) {
+    // Append one newline-terminated line to a snapshot log.
+    function pmssSnapshotWriteLine($handle, string $line): void
+    {
+        @fwrite($handle, $line.PHP_EOL);
+    }
+}
+
+if (!function_exists('pmssSnapshotWriteWarn')) {
+    // Append a normalized warning line to a snapshot log.
+    function pmssSnapshotWriteWarn($handle, string $timestamp, string $code, array $fields = [], array $output = []): void
+    {
+        if ($output !== []) {
+            $excerpt = trim((string) preg_replace('/\s+/', ' ', implode(' ', array_slice($output, 0, 5))));
+            if ($excerpt !== '') {
+                $fields['msg'] = substr($excerpt, 0, 300);
+            }
+        }
+
+        $line = $timestamp.' WARN '.$code;
+        foreach ($fields as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $line .= ' '.$key.'='.(string) $value;
+        }
+
+        pmssSnapshotWriteLine($handle, $line);
+    }
+}
+
 if (!function_exists('pmssError')) {
     /**
      * Write an error message to STDERR and the log.
