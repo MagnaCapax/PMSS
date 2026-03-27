@@ -91,15 +91,18 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
 
 function networkApplyFireqos(string $config): void
 {
-    // Ensure target paths exist and FireQOS is available before attempting start.
-    if (!is_dir('/etc/seedbox/config')) {
-        @mkdir('/etc/seedbox/config', 0755, true);
+    $configPath = pmssResolvePathFromEnv('PMSS_FIREQOS_CONFIG_PATH', '/etc/seedbox/config/fireqos.conf');
+    $logPath = pmssResolvePathFromEnv('PMSS_FIREQOS_LOG_PATH', '/var/log/pmss/fireqos.log');
+
+    // Ensure the rendered policy is on disk before attempting a restart.
+    if (!pmssDirEnsureExists(dirname($configPath), 0755) || !pmssDirEnsureExists(dirname($logPath), 0755)) {
+        return;
     }
-    if (!is_dir('/var/log/pmss')) {
-        @mkdir('/var/log/pmss', 0755, true);
+    if (@file_put_contents($configPath, $config) === false) {
+        return;
     }
-    @file_put_contents('/etc/seedbox/config/fireqos.conf', $config);
+
     if (pmssCommandPath('fireqos') !== '') {
-        @shell_exec('fireqos start /etc/seedbox/config/fireqos.conf >> /var/log/pmss/fireqos.log 2>&1');
+        @shell_exec('fireqos start '.escapeshellarg($configPath).' >> '.escapeshellarg($logPath).' 2>&1');
     }
 }

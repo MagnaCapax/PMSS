@@ -5,6 +5,63 @@ require_once dirname(__DIR__, 2).'/network/fireqos.php';
 
 class NetworkFireqosTest extends TestCase
 {
+    public function testApplyFireqosWritesConfigAndStartsCommand(): void
+    {
+        $configDir = $this->pmssMakeTempDir('pmss-fireqos-config-', 0700);
+        $logDir = $this->pmssMakeTempDir('pmss-fireqos-log-', 0700);
+        $binDir = $this->pmssMakeTempDir('pmss-fireqos-bin-', 0700);
+        $markerPath = $this->pmssMakeTempPath('pmss-fireqos-marker-');
+        $configPath = $configDir.'/fireqos.conf';
+        $logPath = $logDir.'/fireqos.log';
+        $path = getenv('PATH');
+        $path = is_string($path) ? $path : '';
+
+        $this->pmssWriteFile(
+            $binDir.'/fireqos',
+            "#!/bin/sh\nprintf '%s\\n' \"$*\" > ".escapeshellarg($markerPath)."\nprintf 'started\\n'\n"
+        );
+        @chmod($binDir.'/fireqos', 0755);
+
+        $this->pmssWithEnv([
+            'PATH' => $binDir.($path !== '' ? ':'.$path : ''),
+            'PMSS_FIREQOS_CONFIG_PATH' => $configPath,
+            'PMSS_FIREQOS_LOG_PATH' => $logPath,
+        ], function () use ($configPath, $logPath, $markerPath): void {
+            \networkApplyFireqos("interface eth0\nrate 1000\n");
+
+            $this->assertEquals("interface eth0\nrate 1000\n", (string) @file_get_contents($configPath));
+            $this->assertEquals('start '.$configPath, trim((string) @file_get_contents($markerPath)));
+            $this->assertStringContainsString('started', (string) @file_get_contents($logPath));
+        });
+    }
+
+    public function testApplyFireqosSkipsStartWhenConfigPathCannotBeCreated(): void
+    {
+        $blockedParent = $this->pmssMakeTempFile('pmss-fireqos-blocked-');
+        $logDir = $this->pmssMakeTempDir('pmss-fireqos-log-', 0700);
+        $binDir = $this->pmssMakeTempDir('pmss-fireqos-bin-', 0700);
+        $markerPath = $this->pmssMakeTempPath('pmss-fireqos-marker-');
+        $path = getenv('PATH');
+        $path = is_string($path) ? $path : '';
+
+        $this->pmssWriteFile(
+            $binDir.'/fireqos',
+            "#!/bin/sh\nprintf '%s\\n' \"$*\" > ".escapeshellarg($markerPath)."\n"
+        );
+        @chmod($binDir.'/fireqos', 0755);
+
+        $this->pmssWithEnv([
+            'PATH' => $binDir.($path !== '' ? ':'.$path : ''),
+            'PMSS_FIREQOS_CONFIG_PATH' => $blockedParent.'/fireqos.conf',
+            'PMSS_FIREQOS_LOG_PATH' => $logDir.'/fireqos.log',
+        ], function () use ($blockedParent, $markerPath): void {
+            \networkApplyFireqos("interface eth0\nrate 1000\n");
+
+            $this->assertFalse(file_exists($blockedParent.'/fireqos.conf'));
+            $this->assertFalse(file_exists($markerPath));
+        });
+    }
+
     public function testBuildFireqosConfigRendersPlaceholders(): void
     {
         $template = "iface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n";
