@@ -7,7 +7,7 @@ Describe what changed and why. Link issues/ADRs.
 - [ ] Tests added/updated (dev suite)
 - [ ] CI passes (lint, tests)
 - [ ] ADR added/updated (if decision changed)
-- [ ] No changes to frozen paths (e.g., `etc/skel/www`) without approval
+- [ ] No changes to vendor/third-party trees without approval
 
 ## Validation Notes
 Provide dry-run logs or steps when touching updater/orchestration.

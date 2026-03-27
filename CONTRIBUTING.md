@@ -18,7 +18,7 @@ Thanks for your interest in contributing. Please follow the rails below to keep 
 5. Open a PR referencing ADRs or issues.
 
 ## Guardrails
-- Do not modify `etc/skel/www` unless the task is backed by a GitHub issue with a posted adversarial review, and keep any such change minimal and targeted. Do not modify third-party/vendor code without explicit approval.
+- Do not modify third-party/vendor code (e.g., ruTorrent upstream, _lib/) without explicit approval. First-party skel files are editable normally.
 - Treat dpkg baselines as immutable snapshots; refreshes follow `docs/dpkg-baseline.md` and do not require an ADR.
 - Keep development tests hermetic — no network/system mutations.
 

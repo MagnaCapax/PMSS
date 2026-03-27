@@ -54,7 +54,7 @@ Development tests must avoid network/system changes; production tests and the CL
 - `/etc/seedbox/config/template.*` (rc.local, systemd.conf, nginx, proftpd, etc.) are copied by service helpers.
 - `/etc/seedbox/config/template.sources.<suite>` defines apt sources for each distro.
 - Generated configs under `/etc` must be idempotent: invoking the matching `scripts/util/*Config*.php` multiple times converges on the same safe state without accumulating duplicate directives or diverging permissions.
-- `etc/skel/www` is guarded, not blanket-frozen: changes require a GitHub issue with a posted adversarial review and must stay minimal and targeted (bugfixes, dead code removal, dependency updates, PHP compatibility patches, or curation).
+- `etc/skel/www` first-party files are editable normally. Bundled vendor/third-party trees remain read-only unless explicitly approved.
 
 ## Logs & Profile
 - Plain log: `/var/log/pmss-update.log`

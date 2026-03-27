@@ -34,7 +34,7 @@ Task-relevant reads (based on what the issue touches):
 Must Follow:
 - PHP 7.3 compatibility for all PHP runtime code.
 - Updater topology: install.sh -> scripts/update.php (bootstrap/minimal) -> scripts/util/update-step2.php (orchestration/profiling).
-- etc/skel/www/ is mostly frozen: ONLY etc/skel/www/{welcome,index,stats,info}.php may be edited. All other files and ALL subdirectories (rutorrent/, _lib/, data/, watch/, etc.) are locked. Do not modify third-party/vendor bundles or scripts/lib/update/dpkg/selections*.txt.
+- Treat bundled vendor/third-party trees (e.g., ruTorrent upstream, _lib/) as read-only unless explicitly approved. First-party skel files are editable. Do not modify scripts/lib/update/dpkg/selections*.txt.
 - Language/deps: Bash-first; PHP for complex flows; do not introduce Python; avoid new dependencies without explicit approval.
 - Doctrine: Deletion-First; Minimal Edits; One Flow; Pit of Success; No Aliases; Context-First naming.
 - Observability: route shelling through runStep(); prefer structured logs.
@@ -72,7 +72,7 @@ Workflow (Do This Now):
 - For EACH issue, assess: can this be fully resolved within this session?
   SKIP if the issue:
   - Requires external system access (SSH, package install, DC visit)
-  - Touches frozen paths (etc/skel/www subdirs or non-approved files, vendor trees, dpkg selections)
+  - Touches vendor/third-party trees or dpkg selections
   - Requires multi-server coordination or production deployment
   - Is an investigation/research issue with no clear code fix
 - Would take more than ~500 lines of changes (partial progress with wip: prefix is acceptable)

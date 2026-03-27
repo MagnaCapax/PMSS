@@ -26,4 +26,4 @@ For your top 3 picks to tackle next, also include a short, human-readable breakd
 - Risks (1–3 bullets; what could break / where to be cautious)
 - Verification steps (2–6 bullets; specific commands or checks)
 
-If asked, exclude issues labeled complete-verify or those touching etc/skel/www or vendor trees."
+If asked, exclude issues labeled complete-verify or those touching vendor/third-party trees."

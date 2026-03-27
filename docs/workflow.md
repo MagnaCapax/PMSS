@@ -25,4 +25,4 @@
 - [ ] Code + tests + docs included
 - [ ] ADR added/updated when decisions changed
 - [ ] CI passes (see `.github/workflows/ci.yml`)
-- [ ] Any `etc/skel/www` change is backed by a GitHub issue with a posted adversarial review and remains minimal and targeted
+- [ ] No changes to vendor/third-party trees without approval
