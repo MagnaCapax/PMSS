@@ -22,15 +22,12 @@ class NetworkInfoCharacterizationTest extends TestCase
         $this->assertSame($result['speed'], $result['linkSpeed']);
     }
 
-    public function testConfigProbeStaysInlineAfterHelperRemoval(): void
+    public function testConfigProbeDelegatesToSharedHelper(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/networkInfo.php');
-        $removedHelper = 'pmssLoadSeedbox'.'NetworkConfig';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$removedHelper.'(') === false,
-            'networkInfo.php should keep the one-call config probe inline inside each detector'
-        );
-        $this->assertSame(2, substr_count($src, '/etc/seedbox/config/network'));
+        $this->assertStringContainsString("require_once __DIR__.'/network/config.php';", $src);
+        $this->assertStringContainsString('networkLoadConfig()', $src);
+        $this->assertSame(0, substr_count($src, '/etc/seedbox/config/network'));
     }
 }

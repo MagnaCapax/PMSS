@@ -21,5 +21,24 @@ class NetworkInfoTest extends TestCase
         $this->assertTrue(is_int($speed));
         $this->assertTrue($speed > 0);
     }
-}
 
+    public function testDetectPrimaryInterfaceUsesSharedConfigOverride(): void
+    {
+        $tmp = $this->pmssMakeTempPath('pmss-network-info-', '.php');
+        file_put_contents($tmp, "<?php return ['interface' => 'bond9'];");
+
+        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
+            $this->assertSame('bond9', \detectPrimaryInterface());
+        });
+    }
+
+    public function testGetLinkSpeedUsesSharedConfigOverride(): void
+    {
+        $tmp = $this->pmssMakeTempPath('pmss-network-info-', '.php');
+        file_put_contents($tmp, "<?php return ['speed' => '4321'];");
+
+        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
+            $this->assertSame(4321, \getLinkSpeed('eth0'));
+        });
+    }
+}

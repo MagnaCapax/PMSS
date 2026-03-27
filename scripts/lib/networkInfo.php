@@ -14,11 +14,11 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/network/config.php';
 /** Determine the primary network interface name. */
 function detectPrimaryInterface(): string
 {
-    $configPath = '/etc/seedbox/config/network';
-    $config = file_exists($configPath) ? include $configPath : null;
+    $config = networkLoadConfig();
     if (is_array($config) && !empty($config['interface'])) {
         return (string) $config['interface'];
     }
@@ -30,8 +30,7 @@ function detectPrimaryInterface(): string
 /** Detect interface speed in Mbps using configuration or ethtool. */
 function getLinkSpeed(string $iface): int
 {
-    $configPath = '/etc/seedbox/config/network';
-    $config = file_exists($configPath) ? include $configPath : null;
+    $config = networkLoadConfig();
     if (is_array($config) && isset($config['speed'])) {
         return (int) $config['speed'];
     }
