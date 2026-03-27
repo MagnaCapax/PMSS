@@ -104,6 +104,14 @@ abstract class TestCase
         }
     }
 
+    protected function assertSame($expected, $actual, string $message = ''): void
+    {
+        if ($expected !== $actual) {
+            $msg = $message !== '' ? $message : sprintf('Expected %s, got %s', var_export($expected, true), var_export($actual, true));
+            throw new \AssertionError($msg);
+        }
+    }
+
     protected function assertMatches(string $pattern, string $value, string $message = ''): void
     {
         if (!preg_match($pattern, $value)) {
