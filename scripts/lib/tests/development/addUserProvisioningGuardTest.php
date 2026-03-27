@@ -10,7 +10,7 @@ class AddUserProvisioningGuardTest extends TestCase
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
         $this->assertTrue(strpos($src, 'pmss-addUser-') !== false, 'addUser.php must use per-user lock file');
-        $this->assertTrue(strpos($src, 'flock(') !== false, 'addUser.php must acquire a lock');
+        $this->assertTrue(strpos($src, 'pmssLockFileAcquire(') !== false, 'addUser.php must acquire a lock');
     }
 
     public function testAddUserEmitsSummaryMarker(): void

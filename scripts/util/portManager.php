@@ -7,6 +7,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../lib/runtime.php';
+
 $usage = "Usage: portManager.php [view|assign|release] USER [SERVICE]\n";
 if ($argc < 3) die($usage);
 $action = strtolower($argv[1]);
@@ -46,10 +48,7 @@ function pmssPortManagerLog(string $user, string $action, string $service, ?int 
 }
 
 if ($action === 'assign' || $action === 'release') {
-    $lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
-    $lockPath = $lockBase.'/pmss-portManager-'.$service.'.lock';
-    $lockHandle = @fopen($lockPath, 'c');
-    if ($lockHandle === false || !@flock($lockHandle, LOCK_EX)) {
+    if (pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-portManager-'.$service.'.lock') === false) {
         pmssPortManagerLog($user, $action, $service, null, 'WARN', 'lock_failed');
     }
 }

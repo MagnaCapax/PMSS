@@ -104,21 +104,19 @@ if ($usernameValidationError !== null) {
     exit(1);
 }
 
-// Prevent overlapping addUser runs for the same username to avoid UID/GID races.
-$lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
-$lockPath = $lockBase.'/pmss-addUser-'.$user['name'].'.lock';
-$lockHandle = @fopen($lockPath, 'c');
+$lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-addUser-'.$user['name'].'.lock';
+$lockBusy = false;
+$lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, true, $lockBusy);
 if ($lockHandle === false) {
     logProvisionMessage("FATAL: Unable to open lock file: {$lockPath}");
     finalizeProvision('ERROR', 'lock_open_failed', 1);
     exit(1);
 }
-if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+if ($lockBusy) {
     logProvisionMessage('FATAL: Another addUser is already running for this user');
     finalizeProvision('ERROR', 'lock_busy', 1);
     exit(1);
 }
-
 // Preflight: reject existing accounts or orphaned home directories.
 $homePath = "/home/{$user['name']}";
 $userExists = pmssUserAccountLookup($user['name']) !== null;

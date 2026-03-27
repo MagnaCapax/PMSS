@@ -11,10 +11,8 @@
  * @author PMSS Team
  */
 
-// Avoid overlapping watchdog runs when cron is delayed or storage is saturated.
-$lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkInstances.lock';
-$lockHandle = @fopen($lockPath, 'c');
-if ($lockHandle === false || !@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+require_once __DIR__.'/../lib/runtime.php';
+if (pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkInstances.lock', true) === false) {
     exit(0);
 }
 

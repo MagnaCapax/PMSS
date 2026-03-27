@@ -21,15 +21,14 @@ if (($user = $processor->detectWorkerUser($argv)) !== null) {
     exit(0);
 }
 
-// Prevent overlapping cron runs by holding a process-wide lock.
 $lockFile = '/var/run/pmss/resourceStats.lock';
-$lockHandle = @fopen($lockFile, 'c+');
+$lockBusy = false;
+$lockHandle = pmssLockFileAcquire($lockFile, true, 'c+', false, true, $lockBusy);
 if ($lockHandle !== false) {
-    if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    if ($lockBusy) {
         exit(0);
     }
-    ftruncate($lockHandle, 0);
-    fwrite($lockHandle, (string) getmypid());
+    pmssLockHandleWritePid($lockHandle);
 } else {
     logMessage(date('c').": Unable to open lock file {$lockFile} for resourceStats");
 }

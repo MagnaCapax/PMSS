@@ -30,6 +30,7 @@
  * @license   Proprietary
  */
 
+require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/rtorrent/scgi.php';
 require_once __DIR__.'/../lib/rtorrent/process.php';
@@ -85,10 +86,7 @@ function pmssCheckRtorrentLogBoth(string $user, string $message, bool $debug): v
 
 // --- Main execution ---
 
-// Avoid concurrent watchdog executions (cron overlap, manual runs).
-$lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkRtorrent.lock';
-$lockHandle = @fopen($lockPath, 'c');
-if ($lockHandle === false || !@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+if (pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkRtorrent.lock', true) === false) {
     pmssCheckRtorrentLog('checkRtorrent already running; skipping', false, $debug);
     exit(0);
 }

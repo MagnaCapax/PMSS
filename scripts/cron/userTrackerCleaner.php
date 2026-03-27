@@ -20,6 +20,7 @@
 include '/scripts/lib/devristo/Torrent.php';
 include '/scripts/lib/devristo/Bee.php';
 include '/scripts/lib/devristo/File.php';
+require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
@@ -122,25 +123,23 @@ function pmssTrackerCleanerPathIsSafe(string $path, string $expectedPrefix): boo
 }
 
 $lockPath = '/run/lock/pmss-userTrackerCleaner.lock';
-$lockHandle = @fopen($lockPath, 'c');
+$lockBusy = false;
+$lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, false, $lockBusy);
 if ($lockHandle === false) {
     pmssTrackerCleanerLog("WARN: Unable to open lock file {$lockPath}; continuing without single-instance guard.");
 } else {
-    if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    if ($lockBusy) {
         @rewind($lockHandle);
         $existingPid = trim((string) stream_get_contents($lockHandle));
         if ($existingPid === '') {
             $existingPid = 'unknown';
         }
         pmssTrackerCleanerLog("SKIP: already running (lock held, pid={$existingPid}).");
+        @fclose($lockHandle);
         exit(0);
     }
-    @ftruncate($lockHandle, 0);
-    @fwrite($lockHandle, (string) getmypid());
-    @fflush($lockHandle);
+    pmssLockHandleWritePid($lockHandle);
 }
-
-
 
 $filterList = array(
 //    'udp://',

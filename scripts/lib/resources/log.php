@@ -103,8 +103,8 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
     $pathIsSafe = pmssPathTargetIsSafe($statePath, false);
-    $handle = $pathIsSafe ? @fopen($statePath, 'c+') : false;
-    $locked = $handle !== false && @flock($handle, LOCK_EX);
+    $handle = $pathIsSafe ? pmssLockFileAcquire($statePath, false, 'c+') : false;
+    $locked = $handle !== false;
     $previousState = $locked && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))
         ? $decoded
         : [];

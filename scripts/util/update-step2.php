@@ -250,18 +250,12 @@ pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void 
     if (getenv(PMSS_UPDATE_LOCK_ENV) === '1') {
         return;
     }
-    $dir = dirname(PMSS_UPDATE_LOCK_FILE);
-    pmssDirEnsureExists($dir, 0755);
-    $fh = @fopen(PMSS_UPDATE_LOCK_FILE, 'c');
+    $fh = pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, false, 'c', true);
     if ($fh === false) {
         logmsg('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE);
         exit(1);
     }
     pmssLogJson(['event' => 'update_lock_wait', 'path' => PMSS_UPDATE_LOCK_FILE]);
-    if (!flock($fh, LOCK_EX)) {
-        logmsg('Unable to acquire update lock (flock failed)');
-        exit(1);
-    }
     $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
     putenv(PMSS_UPDATE_LOCK_ENV.'=1');
     pmssLogJson(['event' => 'update_lock_acquired', 'path' => PMSS_UPDATE_LOCK_FILE]);
@@ -309,19 +303,15 @@ pmssRunProfiledCallable('Running update-step2 preflight checks', static function
 
     // dpkg lock availability (warn only)
     foreach (['/var/lib/dpkg/lock-frontend', '/var/lib/dpkg/lock'] as $lockFile) {
-        $fh = @fopen($lockFile, 'c');
+        $lockBusy = false;
+        $fh = pmssLockFileAcquire($lockFile, true, 'c', false, true, $lockBusy);
         if ($fh === false) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => 'open_failed']);
-            logmsg("[WARN] Unable to open dpkg lock file: {$lockFile}");
+            $reason = $lockBusy ? 'busy' : 'open_failed';
+            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => $reason]);
+            logmsg($lockBusy ? "[WARN] dpkg lock appears busy: {$lockFile}" : "[WARN] Unable to open dpkg lock file: {$lockFile}");
             continue;
         }
-        $locked = flock($fh, LOCK_EX | LOCK_NB);
-        if (!$locked) {
-            pmssLogJson(['event' => 'preflight_error', 'check' => 'dpkg_lock', 'status' => 'warn', 'path' => $lockFile, 'reason' => 'busy']);
-            logmsg("[WARN] dpkg lock appears busy: {$lockFile}");
-        } else {
-            flock($fh, LOCK_UN);
-        }
+        flock($fh, LOCK_UN);
         fclose($fh);
     }
 

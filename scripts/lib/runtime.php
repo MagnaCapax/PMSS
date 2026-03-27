@@ -76,6 +76,23 @@ if (!function_exists('pmssDirEnsureExists')) {
     function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path); }
 }
 
+if (!function_exists('pmssLockFileAcquire')) {
+    function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)
+    {
+        $busy = false;
+        if ($createParentDir && !pmssDirEnsureExists(dirname($path), 0755)) return false;
+        if (($handle = @fopen($path, $mode)) === false) return false;
+        if (!@flock($handle, LOCK_EX | ($nonBlocking ? LOCK_NB : 0))) {
+            $busy = true;
+            if ($closeOnBusy) { @fclose($handle); return false; }
+        }
+        return $handle;
+    }
+}
+if (!function_exists('pmssLockHandleWritePid')) {
+    function pmssLockHandleWritePid($handle): void { @ftruncate($handle, 0); @rewind($handle); @fwrite($handle, (string) getmypid()); @fflush($handle); }
+}
+
 if (!function_exists('pmssRuntimeDir')) {
     // Resolve the PMSS runtime directory, allowing hermetic test overrides.
     function pmssRuntimeDir(): string

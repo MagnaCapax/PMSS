@@ -10,6 +10,7 @@
  * @copyright 2010-2025 Magna Capax Finland Oy
  */
 require_once __DIR__.'/lib/logger.php';
+require_once __DIR__.'/lib/runtime.php';
 $userLogLib = __DIR__.'/lib/user/log.php';
 if (is_file($userLogLib)) {
     require_once $userLogLib;
@@ -100,20 +101,17 @@ if (!file_exists($userConfig)) {
     exit(1);
 }
 
-// Make start idempotent and race-safe: multiple cron/watchdog invocations must
-// converge to a single screen+executor+rTorrent process set.
-$lockBase = is_dir('/run/lock') ? '/run/lock' : '/tmp';
-$lockPath = $lockBase.'/pmss-startRtorrent-'.$user.'.lock';
-$lockHandle = @fopen($lockPath, 'c');
+$lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-startRtorrent-'.$user.'.lock';
+$lockBusy = false;
+$lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, true, $lockBusy);
 if ($lockHandle === false) {
     logmsg("[WARN] Failed to open lock file {$lockPath}; refusing to start rTorrent");
     exit(1);
 }
-if (!@flock($lockHandle, LOCK_EX | LOCK_NB)) {
+if ($lockBusy) {
     logmsg("[INFO] Another startRtorrent is already running for {$user}; skipping");
     exit(0);
 }
-
 // If the executor script exists but is missing the lock guard, refresh it from
 // /etc/skel so watchdog-driven starts do not spawn duplicate rTorrent processes.
 $executor = $home.'/.rtorrentExecute.php';
