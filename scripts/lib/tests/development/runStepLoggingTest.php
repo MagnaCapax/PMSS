@@ -16,15 +16,10 @@ class RunStepLoggingTest extends TestCase
 {
     public static array $logMessages = [];
 
-    private function reset(): void
-    {
-        self::$logMessages = [];
-        unset($GLOBALS['PMSS_LAST_COMMAND_OUTPUT'], $GLOBALS['PMSS_PROFILE']);
-    }
-
     public function testDryRunSkipsCommand(): void
     {
-        $this->reset();
+        self::$logMessages = [];
+        $this->pmssResetRuntimeProfile();
         putenv('PMSS_DRY_RUN=1');
         runStep('Dry run noop', 'echo should-not-run');
         putenv('PMSS_DRY_RUN');
@@ -34,7 +29,8 @@ class RunStepLoggingTest extends TestCase
 
     public function testStdoutStderrTruncated(): void
     {
-        $this->reset();
+        self::$logMessages = [];
+        $this->pmssResetRuntimeProfile();
         $long = str_repeat('x', 1000);
         runStep('Echo long', 'php -r '.escapeshellarg('fwrite(STDOUT, str_repeat("x", 1000)); fwrite(STDERR, str_repeat("y", 1000));'));
         $profile = $GLOBALS['PMSS_PROFILE'][0];

@@ -8,21 +8,9 @@ require_once dirname(__DIR__, 2).'/update/services/systemd.php';
 
 class SystemdServicesGuardBootUnitTest extends TestCase
 {
-    private function reset(): void
-    {
-        unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
-    }
-
-    private function profileCommands(): array
-    {
-        return array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
-    }
-
     public function testBootUnitInstallIsLoggedInDryRun(): void
     {
-        $this->reset();
+        $this->pmssResetRuntimeProfile();
 
         $tmp = sys_get_temp_dir().'/pmss-systemd-boot-unit-'.bin2hex(random_bytes(4));
         @mkdir($tmp, 0755, true);
@@ -41,12 +29,12 @@ class SystemdServicesGuardBootUnitTest extends TestCase
             "install -m 0644 '".$template."' '/etc/systemd/system/pmss-systemd-services-guard.service'",
             'systemctl daemon-reload || true',
             'systemctl enable pmss-systemd-services-guard.service || true',
-        ], $this->profileCommands());
+        ], $this->pmssProfileCommands());
     }
 
     public function testStopDisableMaskSystemdUnitKeepsStopDisableMaskOrderInDryRun(): void
     {
-        $this->reset();
+        $this->pmssResetRuntimeProfile();
         putenv('PMSS_DRY_RUN=1');
 
         try {
@@ -59,12 +47,12 @@ class SystemdServicesGuardBootUnitTest extends TestCase
             "systemctl stop 'demo.service' || true",
             "systemctl disable 'demo.service' || true",
             "systemctl mask 'demo.service' || true",
-        ], $this->profileCommands());
+        ], $this->pmssProfileCommands());
     }
 
     public function testStopDisableMaskSystemdUnitOmitsMaskWhenDisabled(): void
     {
-        $this->reset();
+        $this->pmssResetRuntimeProfile();
         putenv('PMSS_DRY_RUN=1');
 
         try {
@@ -76,6 +64,6 @@ class SystemdServicesGuardBootUnitTest extends TestCase
         $this->assertEquals([
             "systemctl stop 'demo.service' || true",
             "systemctl disable 'demo.service' || true",
-        ], $this->profileCommands());
+        ], $this->pmssProfileCommands());
     }
 }

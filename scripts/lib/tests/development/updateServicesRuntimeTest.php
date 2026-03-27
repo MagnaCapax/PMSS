@@ -8,14 +8,9 @@ require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesRuntimeTest extends TestCase
 {
-    private function reset(): void
-    {
-        unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
-    }
-
     public function testApplyRuntimeTemplatesLogsCommandsInStableOrderDuringDryRun(): void
     {
-        $this->reset();
+        $this->pmssResetRuntimeProfile();
         putenv('PMSS_DRY_RUN=1');
 
         try {
@@ -24,9 +19,7 @@ class UpdateServicesRuntimeTest extends TestCase
             putenv('PMSS_DRY_RUN');
         }
 
-        $commands = array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
+        $commands = $this->pmssProfileCommands();
 
         $this->assertEquals([
             'cp /etc/seedbox/config/template.rc.local /etc/rc.local',

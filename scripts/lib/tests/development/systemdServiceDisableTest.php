@@ -8,21 +8,14 @@ require_once dirname(__DIR__, 2).'/update/services/systemd.php';
 
 class SystemdServiceDisableTest extends TestCase
 {
-    private function reset(): void
-    {
-        unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
-    }
-
     public function testSeedboxSystemServicesDisableIsLoggedInDryRun(): void
     {
-        $this->reset();
+        $this->pmssResetRuntimeProfile();
         putenv('PMSS_DRY_RUN=1');
         pmssStopDisableMaskSeedboxSystemServices();
         putenv('PMSS_DRY_RUN');
 
-        $commands = array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
+        $commands = $this->pmssProfileCommands();
 
         $joined = implode("\n", $commands);
         $this->assertTrue(strpos($joined, "systemctl stop 'deluged'") !== false);

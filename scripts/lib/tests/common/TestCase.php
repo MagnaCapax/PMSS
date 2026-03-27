@@ -45,6 +45,20 @@ abstract class TestCase
     {
     }
 
+    /** Reset the shared runtime profile globals between dry-run assertions. */
+    protected function pmssResetRuntimeProfile(): void
+    {
+        unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
+    }
+
+    /** Return recorded runtime commands from the shared dry-run profile. */
+    protected function pmssProfileCommands(): array
+    {
+        return array_map(static function (array $entry): string {
+            return (string) ($entry['command'] ?? '');
+        }, $GLOBALS['PMSS_PROFILE'] ?? []);
+    }
+
     public function run(): array
     {
         $methods = array_filter(get_class_methods($this), static function ($method) {

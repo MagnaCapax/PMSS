@@ -55,12 +55,12 @@ BASH
         putenv('PMSS_TEST_PGREP_STATE='.$this->tempDir.'/state');
         putenv('PMSS_TEST_COMMAND_LOG='.$this->tempDir.'/commands.log');
         putenv('PMSS_TEST_KILL_MODE='.$this->tempDir.'/kill-mode');
-        unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
+        $this->pmssResetRuntimeProfile();
     }
 
     protected function tearDown(): void
     {
-        unset($GLOBALS['PMSS_PROFILE'], $GLOBALS['PMSS_LAST_COMMAND_OUTPUT']);
+        $this->pmssResetRuntimeProfile();
         putenv('PMSS_TEST_PGREP_STATE');
         putenv('PMSS_TEST_COMMAND_LOG');
         putenv('PMSS_TEST_KILL_MODE');
@@ -80,7 +80,7 @@ BASH
     {
         \killProcess('demo', 'Stopping demo process', null, 0);
 
-        $this->assertEquals([], $this->profileCommands());
+        $this->assertEquals([], $this->pmssProfileCommands());
     }
 
     public function testKillProcessStopsAfterSigtermWhenProcessExits(): void
@@ -92,7 +92,7 @@ BASH
 
         $this->assertEquals([
             "pkill -TERM -x 'demo'",
-        ], $this->profileCommands());
+        ], $this->pmssProfileCommands());
     }
 
     public function testKillProcessEscalatesToSigkillWhenProcessSurvivesSigterm(): void
@@ -105,17 +105,7 @@ BASH
         $this->assertEquals([
             "pkill -TERM -x 'demo'",
             "pkill -KILL -x 'demo'",
-        ], $this->profileCommands());
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function profileCommands(): array
-    {
-        return array_map(static function (array $entry): string {
-            return (string) ($entry['command'] ?? '');
-        }, $GLOBALS['PMSS_PROFILE'] ?? []);
+        ], $this->pmssProfileCommands());
     }
 
     private function writeExecutable(string $name, string $content): void
