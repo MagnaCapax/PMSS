@@ -10,12 +10,12 @@ class LighttpdUserFileWriteTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-lighttpd-user-write-');
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-user-write-');
     }
 
     protected function tearDown(): void
     {
-        $this->pmssRemoveTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testAppendUserFileWritesNewFile(): void

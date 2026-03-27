@@ -10,12 +10,12 @@ class CheckRutorrentPluginsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-rutorrent-plugins-');
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-rutorrent-plugins-');
     }
 
     protected function tearDown(): void
     {
-        $this->pmssRemoveTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testSyncUserRejectsInvalidUsername(): void

@@ -13,12 +13,12 @@ class NginxConfigWriteGuardTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-nginx-config-write-');
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-nginx-config-write-');
     }
 
     protected function tearDown(): void
     {
-        $this->pmssRemoveTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testWriteFileStoresContentWithManagedPermissions(): void

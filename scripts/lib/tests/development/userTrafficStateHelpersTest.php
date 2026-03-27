@@ -12,12 +12,12 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-traffic-state-');
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-traffic-state-');
     }
 
     public function tearDown(): void
     {
-        $this->pmssRemoveTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testReadUserTrafficMonthReturnsZeroForMissingFile(): void

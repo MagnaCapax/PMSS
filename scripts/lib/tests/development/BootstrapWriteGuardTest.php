@@ -14,12 +14,12 @@ class BootstrapWriteGuardTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-bootstrap-write-');
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-bootstrap-write-');
     }
 
     protected function tearDown(): void
     {
-        $this->pmssRemoveTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testManagedPathWriterStoresContentWithRootMetadata(): void

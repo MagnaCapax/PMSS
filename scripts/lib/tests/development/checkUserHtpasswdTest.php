@@ -12,12 +12,12 @@ class CheckUserHtpasswdTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-check-user-htpasswd-');
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-check-user-htpasswd-');
     }
 
     protected function tearDown(): void
     {
-        $this->pmssRemoveTree($this->tempDir);
+        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testMissingFileReturnsFalse(): void
