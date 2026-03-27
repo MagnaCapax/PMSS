@@ -194,8 +194,7 @@ function pmssReleaseUpdateLock(): void
     }
 
     if (isset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'])) {
-        @flock($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'], LOCK_UN);
-        @fclose($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
+        pmssLockHandleRelease($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
         unset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
     }
     putenv(PMSS_UPDATE_LOCK_ENV);

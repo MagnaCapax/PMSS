@@ -92,7 +92,12 @@ if (!function_exists('pmssLockFileAcquire')) {
 if (!function_exists('pmssLockHandleWritePid')) {
     function pmssLockHandleWritePid($handle): void { @ftruncate($handle, 0); @rewind($handle); @fwrite($handle, (string) getmypid()); @fflush($handle); }
 }
-
+if (!function_exists('pmssRuntimeLockPath')) {
+    function pmssRuntimeLockPath(string $basename): string { return (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/'.ltrim($basename, '/'); }
+}
+if (!function_exists('pmssLockHandleRelease')) {
+    function pmssLockHandleRelease($handle, bool $unlock = true): void { $unlock && @flock($handle, LOCK_UN); @fclose($handle); }
+}
 if (!function_exists('pmssRuntimeDir')) {
     // Resolve the PMSS runtime directory, allowing hermetic test overrides.
     function pmssRuntimeDir(): string

@@ -86,7 +86,7 @@ function pmssCheckRtorrentLogBoth(string $user, string $message, bool $debug): v
 
 // --- Main execution ---
 
-if (pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkRtorrent.lock', true) === false) {
+if (pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRtorrent.lock'), true) === false) {
     pmssCheckRtorrentLog('checkRtorrent already running; skipping', false, $debug);
     exit(0);
 }

@@ -132,8 +132,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
     }
 
     if ($handle !== false) {
-        $locked && @flock($handle, LOCK_UN);
-        @fclose($handle);
+        pmssLockHandleRelease($handle, $locked);
     }
 
     return ['delta' => $delta, 'state' => $state];

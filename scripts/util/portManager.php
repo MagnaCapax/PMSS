@@ -78,7 +78,7 @@ function pmssPortManagerLog(string $user, string $action, string $service, ?int 
 
 $lockHandle = false;
 if ($action === 'assign' || $action === 'release') {
-    $lockHandle = pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-portManager-'.$service.'.lock');
+    $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager-'.$service.'.lock'));
     if ($lockHandle === false) {
         pmssPortManagerLog($user, $action, $service, null, 'WARN', 'lock_failed');
     }
@@ -132,7 +132,6 @@ switch ($action) {
 }
 
 if ($lockHandle !== false) {
-    @flock($lockHandle, LOCK_UN);
-    @fclose($lockHandle);
+    pmssLockHandleRelease($lockHandle);
 }
 ?>

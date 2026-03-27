@@ -101,7 +101,7 @@ if (!file_exists($userConfig)) {
     exit(1);
 }
 
-$lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-startRtorrent-'.$user.'.lock';
+$lockPath = pmssRuntimeLockPath('pmss-startRtorrent-'.$user.'.lock');
 $lockBusy = false;
 $lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, true, $lockBusy);
 if ($lockHandle === false) {

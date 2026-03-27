@@ -12,7 +12,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-if (pmssLockFileAcquire((is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-checkInstances.lock', true) === false) {
+if (pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkInstances.lock'), true) === false) {
     exit(0);
 }
 

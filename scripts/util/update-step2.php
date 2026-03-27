@@ -263,8 +263,7 @@ pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void 
         if (!isset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'])) {
             return;
         }
-        @flock($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'], LOCK_UN);
-        @fclose($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
+        pmssLockHandleRelease($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
         unset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE']);
         putenv(PMSS_UPDATE_LOCK_ENV);
         pmssLogJson(['event' => 'update_lock_released', 'path' => PMSS_UPDATE_LOCK_FILE]);
@@ -311,8 +310,7 @@ pmssRunProfiledCallable('Running update-step2 preflight checks', static function
             logmsg($lockBusy ? "[WARN] dpkg lock appears busy: {$lockFile}" : "[WARN] Unable to open dpkg lock file: {$lockFile}");
             continue;
         }
-        flock($fh, LOCK_UN);
-        fclose($fh);
+        pmssLockHandleRelease($fh, false);
     }
 
     // apt cache presence/writability (warn only)
