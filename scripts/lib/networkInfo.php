@@ -14,27 +14,12 @@
  * @author PMSS Team
  */
 
-/**
- * Load the persisted network configuration when available.
- *
- * @return array|null Returns the config array or null when not present/invalid.
- */
-function pmssLoadSeedboxNetworkConfig(): ?array
-{
-    if (!file_exists('/etc/seedbox/config/network')) {
-        return null;
-    }
-
-    $cfg = include '/etc/seedbox/config/network';
-    return is_array($cfg) ? $cfg : null;
-}
-
 /** Determine the primary network interface name. */
 function detectPrimaryInterface(): string
 {
-    $cfg = pmssLoadSeedboxNetworkConfig();
-    if ($cfg !== null && !empty($cfg['interface'])) {
-        return (string) $cfg['interface'];
+    $config = file_exists('/etc/seedbox/config/network') ? include '/etc/seedbox/config/network' : null;
+    if (is_array($config) && !empty($config['interface'])) {
+        return (string) $config['interface'];
     }
 
     $iface = trim((string) shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'"));
@@ -44,9 +29,9 @@ function detectPrimaryInterface(): string
 /** Detect interface speed in Mbps using configuration or ethtool. */
 function getLinkSpeed(string $iface): int
 {
-    $cfg = pmssLoadSeedboxNetworkConfig();
-    if ($cfg !== null && isset($cfg['speed'])) {
-        return (int) $cfg['speed'];
+    $config = file_exists('/etc/seedbox/config/network') ? include '/etc/seedbox/config/network' : null;
+    if (is_array($config) && isset($config['speed'])) {
+        return (int) $config['speed'];
     }
 
     if ($iface === '') {
@@ -54,11 +39,7 @@ function getLinkSpeed(string $iface): int
     }
 
     $raw = shell_exec("/sbin/ethtool {$iface} 2>/dev/null | grep 'Speed:'");
-    if ($raw && preg_match('/Speed:\s*(\d+)Mb/', $raw, $m)) {
-        return (int)$m[1];
-    }
-
-    return 1000; // default if detection fails
+    return $raw && preg_match('/Speed:\s*(\d+)Mb/', $raw, $m) ? (int) $m[1] : 1000;
 }
 
 $link = detectPrimaryInterface();
