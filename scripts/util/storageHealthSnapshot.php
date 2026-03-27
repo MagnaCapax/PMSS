@@ -37,7 +37,11 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         }
     }
 
-    if (($logDir = dirname($logPath)) !== '') { pmssDirEnsureExists($logDir, 0755); }
+    if (($logDir = dirname($logPath)) !== '' && !pmssDirEnsureExists($logDir, 0755)) {
+        fwrite(STDERR, "Failed to create storage health log directory {$logDir}\n");
+        return 1;
+    }
+
     $timestamp = date('c');
     $last = pmssStorageHealthReadLastEntries($logPath);
 
@@ -63,13 +67,25 @@ function pmssStorageHealthSnapshotMain(array $argv): int
         ];
     }
     foreach ($disks as $disk) {
-        pmssJsonLineAppend($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
+        $smartWritten = pmssJsonLineAppend($logPath, pmssStorageHealthSnapshotSmart($disk, $last, $timestamp));
+        if (!$smartWritten) {
+            fwrite(STDERR, "Failed to write storage health snapshot to {$logPath}\n");
+            return 1;
+        }
         if (is_array($nvme = pmssStorageHealthSnapshotNvme($disk, $last, $timestamp))) {
-            pmssJsonLineAppend($logPath, $nvme);
+            $nvmeWritten = pmssJsonLineAppend($logPath, $nvme);
+            if (!$nvmeWritten) {
+                fwrite(STDERR, "Failed to write storage health snapshot to {$logPath}\n");
+                return 1;
+            }
         }
     }
     foreach (pmssStorageHealthSnapshotRaid($timestamp) as $raid) {
-        pmssJsonLineAppend($logPath, $raid);
+        $raidWritten = pmssJsonLineAppend($logPath, $raid);
+        if (!$raidWritten) {
+            fwrite(STDERR, "Failed to write storage health snapshot to {$logPath}\n");
+            return 1;
+        }
     }
 
     if (!$quiet) { echo "Storage health snapshot written to {$logPath}\n"; }
