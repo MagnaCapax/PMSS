@@ -70,14 +70,7 @@ $writeQuotaUserLogs = static function (
     ?string $userLogMessage = null,
     bool $mirrorUserLog = true
 ): void {
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'quota',
-            $action,
-            $user,
-            array('status' => $status, 'message' => $contextMessage) + $context
-        )
-    );
+    pmssUserLifecycleContextLog('quota', $action, $user, array('status' => $status, 'message' => $contextMessage) + $context);
     if ($mirrorUserLog) {
         pmssUserLog($user, $userLogMessage === null ? $contextMessage : $userLogMessage);
     }

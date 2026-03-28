@@ -53,4 +53,12 @@ class userLifecycleLoggingTest extends TestCase
         $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['message'])", $source);
         $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['step'])", $source);
     }
+
+    public function testContextLogHelperDelegatesToBaseContextAndWriter(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
+
+        $this->assertStringContainsString('function pmssUserLifecycleContextLog(', $source);
+        $this->assertStringContainsString('pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));', $source);
+    }
 }

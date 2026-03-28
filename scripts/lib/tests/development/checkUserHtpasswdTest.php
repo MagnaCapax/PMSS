@@ -72,7 +72,7 @@ class CheckUserHtpasswdTest extends TestCase
     {
         $src = (string) file_get_contents(dirname(__DIR__, 4).'/scripts/util/checkUserHtpasswd.php');
 
-        $this->assertStringContainsString("function_exists('pmssUserWriteLogs')", $src);
+        $this->assertStringContainsString("pmssUserLifecycleContextLog('htpasswd'", $src);
         $this->assertStringContainsString('Unable to read per-user htpasswd; skipping synchronization', $src);
     }
 }

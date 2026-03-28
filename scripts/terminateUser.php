@@ -65,43 +65,28 @@ $username = pmssRequireCliUsername(
 // spawning a separate process.
 $knownUsers = users::listHomeUsers();
 if (!in_array($username, $knownUsers, true)) {
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'validate', $username,
-            array(
-                'status'  => 'ERR',
-                'message' => 'Username not present in managed user list',
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('terminate', 'validate', $username, array(
+        'status'  => 'ERR',
+        'message' => 'Username not present in managed user list',
+    ));
     die("\t**** USER NOT FOUND IN MANAGED LIST ****\n\n");
 }
 
 if (!is_dir("/home/{$username}")) {
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'validate', $username,
-            array(
-                'status'  => 'ERR',
-                'message' => 'Home directory missing',
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('terminate', 'validate', $username, array(
+        'status'  => 'ERR',
+        'message' => 'Home directory missing',
+    ));
     die("\t**** USER HOME NOT FOUND ****\n\n");
 }
 
 // Ensure a passwd entry exists before continuing so we do not silently act on
 // stray directories or stale state.
 if (pmssUserAccountLookup($username) === null) {
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'validate', $username,
-            array(
-                'status'  => 'ERR',
-                'message' => 'Username not present in /etc/passwd',
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('terminate', 'validate', $username, array(
+        'status'  => 'ERR',
+        'message' => 'Username not present in /etc/passwd',
+    ));
     die("Refusing to terminate {$username}: no passwd entry found\n");
 }
 
@@ -111,29 +96,19 @@ if (pmssUserAccountLookup($username) === null) {
 $expectedHome = "/home/{$username}";
 $realHome = realpath($expectedHome);
 if ($realHome === false || strpos($realHome, $expectedHome) !== 0) {
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'invariant_home_prefix', $username,
-            array(
-                'status'        => 'ERR',
-                'message'       => 'Refusing to operate on unexpected home path',
-                'expected_home' => $expectedHome,
-                'real_home'     => $realHome,
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('terminate', 'invariant_home_prefix', $username, array(
+        'status'        => 'ERR',
+        'message'       => 'Refusing to operate on unexpected home path',
+        'expected_home' => $expectedHome,
+        'real_home'     => $realHome,
+    ));
     die("Refusing to operate on '{$realHome}' for user {$username}\n");
 }
 
 $overallStart = microtime(true);
-pmssUserWriteLogs(
-    pmssUserBaseContext(
-        'terminate', 'start', $username,
-        array(
-            'dry_run' => $dryRun,
-        )
-    )
-);
+pmssUserLifecycleContextLog('terminate', 'start', $username, array(
+    'dry_run' => $dryRun,
+));
 
 echo "\n\t *** TERMINATE USER:  {$username} *** \n";
 
@@ -141,30 +116,20 @@ while (!in_array($continue, array('Y', 'N'))) {
     echo "Do you want to continue (Y/N)? ";
     $input = fgets(STDIN);
     if ($input === false) {
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                'terminate', 'confirm', $username,
-                array(
-                    'status'  => 'ERR',
-                    'message' => 'Unable to read confirmation input (EOF). Re-run with --confirm for non-interactive use.',
-                )
-            )
-        );
+        pmssUserLifecycleContextLog('terminate', 'confirm', $username, array(
+            'status'  => 'ERR',
+            'message' => 'Unable to read confirmation input (EOF). Re-run with --confirm for non-interactive use.',
+        ));
         fwrite(STDERR, "Error: confirmation input unavailable (EOF). Re-run with --confirm.\n");
         exit(1);
     }
     $continue = strtoupper(trim($input));
 }
 if ($continue == 'N') {
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'abort', $username,
-            array(
-                'status'  => 'SKIP',
-                'message' => 'Operator declined confirmation',
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('terminate', 'abort', $username, array(
+        'status'  => 'SKIP',
+        'message' => 'Operator declined confirmation',
+    ));
     die("\n");
 }
 
@@ -211,16 +176,11 @@ if (file_exists($portFile)) {
     if (is_dir($portsBase) && count(glob($portsBase . '/*')) === 0) {
         rmdir($portsBase);
     }
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'cleanup_ports', $username,
-            array(
-                'status'  => 'OK',
-                'ports'   => $ports,
-                'dry_run' => $dryRun,
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('terminate', 'cleanup_ports', $username, array(
+        'status'  => 'OK',
+        'ports'   => $ports,
+        'dry_run' => $dryRun,
+    ));
 }
 
 // Reset per-user slice properties so no stale limits linger (safe if slice missing)
@@ -316,15 +276,10 @@ if (pmssUserAccountLookup($username) !== null) {
     fwrite(STDERR, "Warning: {$username} still present in /etc/passwd; skipping DB removal.\n");
 } else {
     $db->removeUser($username);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'terminate', 'remove_user_db', $username,
-            array(
-                'status'  => 'OK',
-                'dry_run' => $dryRun,
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('terminate', 'remove_user_db', $username, array(
+        'status'  => 'OK',
+        'dry_run' => $dryRun,
+    ));
 }
 
 // If attemps 1 and 2 failed ...
@@ -350,15 +305,10 @@ pmssUserLifecycleStep('terminate', $username,
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 
 $overallDuration = microtime(true) - $overallStart;
-pmssUserWriteLogs(
-    pmssUserBaseContext(
-        'terminate', 'end', $username,
-        array(
-            'status'            => 'OK',
-            'dry_run'           => $dryRun,
-            'overall_duration'  => round($overallDuration, 4),
-        )
-    )
-);
+pmssUserLifecycleContextLog('terminate', 'end', $username, array(
+    'status'           => 'OK',
+    'dry_run'          => $dryRun,
+    'overall_duration' => round($overallDuration, 4),
+));
 
 echo "\n## Done. User termination flow completed.\n";

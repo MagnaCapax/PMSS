@@ -26,11 +26,7 @@ require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
  */
 function pmssCheckUserHtpasswdLog(string $step, string $username, array $fields): void
 {
-    if (!function_exists('pmssUserWriteLogs') || !function_exists('pmssUserBaseContext')) {
-        return;
-    }
-
-    pmssUserWriteLogs(pmssUserBaseContext('htpasswd', $step, $username, $fields));
+    pmssUserLifecycleContextLog('htpasswd', $step, $username, $fields);
 }
 
 /**

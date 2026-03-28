@@ -158,17 +158,10 @@ function pmssRequireCliUsername(string $rawUsername, string $action, string $err
     }
 
     $normalized = pmssNormalizeUsername($rawUsername);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            $action,
-            'validate',
-            $normalized,
-            array(
-                'status'  => 'ERR',
-                'message' => $logMessage,
-            )
-        )
-    );
+    pmssUserLifecycleContextLog($action, 'validate', $normalized, array(
+        'status'  => 'ERR',
+        'message' => $logMessage,
+    ));
 
     die(sprintf($errorFormat, $normalized));
 }
@@ -463,6 +456,14 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
 }
 
 /**
+ * Write a structured user lifecycle event from action/phase fields.
+ */
+function pmssUserLifecycleContextLog(string $action, string $phase, string $username, array $extra = array()): void
+{
+    pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));
+}
+
+/**
  * Convert arbitrary log fields into a single-line text-safe representation.
  */
 function pmssUserLifecycleFormatTextField($value): string
@@ -526,21 +527,14 @@ function pmssUserLifecycleStep(string $action, string $username, string $step, s
 {
     $started = microtime(true);
     if ($dryRun) {
-        pmssUserWriteLogs(
-            pmssUserBaseContext(
-                $action,
-                $step,
-                $username,
-                array(
-                    'step'     => $step,
-                    'command'  => $command,
-                    'rc'       => 0,
-                    'duration' => 0.0,
-                    'dry_run'  => true,
-                    'status'   => 'SKIP',
-                )
-            )
-        );
+        pmssUserLifecycleContextLog($action, $step, $username, array(
+            'step'     => $step,
+            'command'  => $command,
+            'rc'       => 0,
+            'duration' => 0.0,
+            'dry_run'  => true,
+            'status'   => 'SKIP',
+        ));
         echo "[DRY-RUN][{$action}] {$step}: {$command}\n";
         return 0;
     }
@@ -549,21 +543,14 @@ function pmssUserLifecycleStep(string $action, string $username, string $step, s
     @passthru($command, $rc);
     $duration = microtime(true) - $started;
 
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            $action,
-            $step,
-            $username,
-            array(
-                'step'     => $step,
-                'command'  => $command,
-                'rc'       => $rc,
-                'duration' => round($duration, 4),
-                'dry_run'  => false,
-                'status'   => $rc === 0 ? 'OK' : 'ERR',
-            )
-        )
-    );
+    pmssUserLifecycleContextLog($action, $step, $username, array(
+        'step'     => $step,
+        'command'  => $command,
+        'rc'       => $rc,
+        'duration' => round($duration, 4),
+        'dry_run'  => false,
+        'status'   => $rc === 0 ? 'OK' : 'ERR',
+    ));
 
     return $rc;
 }

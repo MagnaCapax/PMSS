@@ -36,31 +36,17 @@ $disabledRoot = "$homeDir/www-disabled";
 // Canonical suspended detection: only the presence of www-disabled matters.
 if (is_dir($disabledRoot)) {
     (new UserConfigStore())->setSuspended($username, true);
-    pmssUserWriteLogs(
-        pmssUserBaseContext(
-            'suspend',
-            'already_suspended',
-            $username,
-            array(
-                'status'  => 'SKIP',
-                'message' => 'User already suspended',
-            )
-        )
-    );
+    pmssUserLifecycleContextLog('suspend', 'already_suspended', $username, array(
+        'status'  => 'SKIP',
+        'message' => 'User already suspended',
+    ));
     die("User already suspended\n");
 }
 
-pmssUserWriteLogs(
-    pmssUserBaseContext(
-        'suspend',
-        'start',
-        $username,
-        array(
-            'status'   => 'INFO',
-            'home_dir' => $homeDir,
-        )
-    )
-);
+pmssUserLifecycleContextLog('suspend', 'start', $username, array(
+    'status'   => 'INFO',
+    'home_dir' => $homeDir,
+));
 
 pmssUserLifecycleStep('suspend', $username, 'lock_account', 'usermod -L '.escapeshellarg($username), false);
 pmssUserLifecycleStep('suspend', $username, 'set_expiry', 'usermod --expiredate 1 '.escapeshellarg($username), false);
@@ -112,19 +98,12 @@ if ($restartRc !== 0) {
     pmssUserLifecycleStep('suspend', $username, 'restart_nginx_init', '/etc/init.d/nginx restart', false);
 }
 
-pmssUserWriteLogs(
-    pmssUserBaseContext(
-        'suspend',
-        'end',
-        $username,
-        array(
-            'status'         => $landingMessage === '' ? 'OK' : 'WARN',
-            'home_dir'       => $homeDir,
-            'landing_created'=> $landingCreated,
-            'message'        => $landingMessage === '' ? 'User suspended' : $landingMessage,
-        )
-    )
-);
+pmssUserLifecycleContextLog('suspend', 'end', $username, array(
+    'status'          => $landingMessage === '' ? 'OK' : 'WARN',
+    'home_dir'        => $homeDir,
+    'landing_created' => $landingCreated,
+    'message'         => $landingMessage === '' ? 'User suspended' : $landingMessage,
+));
 
 /**
  * Generate the suspended landing page content.
