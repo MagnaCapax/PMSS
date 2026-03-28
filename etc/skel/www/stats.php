@@ -801,13 +801,20 @@ if ($resourceData === null) {
     $ioDailyLabels = [];
     $ioDailyRead = [];
     $ioDailyWrite = [];
+    $iopsDailyAverage = [];
+    $cpuDailyHours = [];
     if (isset($resourceData['daily']) && is_array($resourceData['daily'])) {
         foreach ($resourceData['daily'] as $day => $totals) {
             $ioDailyLabels[] = $day;
             $readBytes = isset($totals['io_read']) ? (float)$totals['io_read'] : 0.0;
             $writeBytes = isset($totals['io_write']) ? (float)$totals['io_write'] : 0.0;
+            $readOps = isset($totals['io_read_ops']) ? (float)$totals['io_read_ops'] : 0.0;
+            $writeOps = isset($totals['io_write_ops']) ? (float)$totals['io_write_ops'] : 0.0;
+            $cpuNanoseconds = isset($totals['cpu']) ? (float)$totals['cpu'] : 0.0;
             $ioDailyRead[] = round($readBytes / 1024 / 1024, 2);
             $ioDailyWrite[] = round($writeBytes / 1024 / 1024, 2);
+            $iopsDailyAverage[] = round(($readOps + $writeOps) / 86400, 2);
+            $cpuDailyHours[] = round(($cpuNanoseconds / 1000000000) / 3600, 4);
         }
     }
     ?>
@@ -863,6 +870,41 @@ I/O Write (month/week/day/hour): <?php echo $ioWriteDisplay['month'] ?? 'n/a'; ?
                 });
             });
             </script>
+            <div class="traffic-chart">
+                <canvas id="iopsChart" width="600" height="250"></canvas>
+            </div>
+            <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                if (typeof Chart === 'undefined') return;
+                const ctx = document.getElementById('iopsChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode($ioDailyLabels); ?>,
+                        datasets: [{
+                            label: 'Daily Average IOPS (ops/s)',
+                            data: <?php echo json_encode($iopsDailyAverage); ?>,
+                            fill: true,
+                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                            borderColor: 'rgb(255, 193, 7)',
+                            tension: 0.4,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            });
+            </script>
         <?php else: ?>
             <div class="docker-note">Chart requires 2+ days of data.</div>
         <?php endif; ?>
@@ -873,6 +915,45 @@ I/O Write (month/week/day/hour): <?php echo $ioWriteDisplay['month'] ?? 'n/a'; ?
         <pre>
 CPU Time (month/week/day/hour): <?php echo $cpuDisplay['month'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['week'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['day'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['hour'] ?? 'n/a'; ?>
         </pre>
+        <?php if (count($cpuDailyHours) >= 2): ?>
+            <div class="traffic-chart">
+                <canvas id="cpuChart" width="600" height="250"></canvas>
+            </div>
+            <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                if (typeof Chart === 'undefined') return;
+                const ctx = document.getElementById('cpuChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode($ioDailyLabels); ?>,
+                        datasets: [{
+                            label: 'Daily CPU (hours)',
+                            data: <?php echo json_encode($cpuDailyHours); ?>,
+                            fill: true,
+                            backgroundColor: 'rgba(129, 199, 132, 0.2)',
+                            borderColor: 'rgb(129, 199, 132)',
+                            tension: 0.4,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            });
+            </script>
+        <?php else: ?>
+            <div class="docker-note">Chart requires 2+ days of data.</div>
+        <?php endif; ?>
     </div>
 
     <div class="stats-block">
