@@ -64,6 +64,28 @@ if (!function_exists('pmssConfigLineColumns')) {
         return is_array($columns) && count($columns) >= $minColumns ? $columns : [];
     }
 }
+if (!function_exists('pmssConfigOptionsUpdatePlan')) {
+    // Build updated comma-separated config options after required additions/removals.
+    function pmssConfigOptionsUpdatePlan(string $optionList, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false): array
+    {
+        $options = array_values(array_filter(explode(',', $optionList), 'strlen'));
+        if ($dropDefaultsOnly && $options === ['defaults']) {
+            $options = [];
+        }
+        $removed = [];
+        foreach ($removeOptions as $removeOption) {
+            $index = array_search($removeOption, $options, true);
+            if ($index === false) {
+                continue;
+            }
+            unset($options[$index]);
+            $removed[] = $removeOption;
+        }
+        $options = array_values($options);
+        $added = array_values(array_diff($requiredOptions, $options));
+        return ['options' => array_merge($options, $added), 'added' => $added, 'removed' => $removed];
+    }
+}
 
 if (!function_exists('pmssLogDir')) {
     // Resolve the PMSS log directory, allowing hermetic test overrides.

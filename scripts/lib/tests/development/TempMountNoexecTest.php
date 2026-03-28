@@ -41,8 +41,6 @@ class TempMountNoexecTest extends TestCase
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'disabled'), 'expected disabled log');
-
-        $this->pmssRemoveTree($dir);
     }
 
     public function testSkipsWhenFlagExplicitlyFalse(): void
@@ -65,8 +63,6 @@ class TempMountNoexecTest extends TestCase
 
         $this->assertEquals($original, (string) file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'disabled via PMSS_HARDEN_TMP_NOEXEC'), 'expected explicit-false skip log');
-
-        $this->pmssRemoveTree($dir);
     }
 
     public function testAddsNoexecOptionsToFstab(): void
@@ -93,8 +89,6 @@ class TempMountNoexecTest extends TestCase
         $this->assertStringContainsString('/dev/shm', $updated);
         $this->assertStringContainsString('noexec', $updated);
         $this->assertTrue($this->pmssMessagesContain($messages, 'Updated /tmp mount options'), 'expected /tmp update log');
-
-        $this->pmssRemoveTree($dir);
     }
 
     public function testRemovesConflictingOptions(): void
@@ -121,8 +115,6 @@ class TempMountNoexecTest extends TestCase
         $this->assertTrue(!in_array('exec', $options, true), 'expected exec removed');
         $this->assertTrue(!in_array('suid', $options, true), 'expected suid removed');
         $this->assertTrue(!in_array('dev', $options, true), 'expected dev removed');
-
-        $this->pmssRemoveTree($dir);
     }
 
     public function testAlreadyHardenedSkips(): void
@@ -144,8 +136,6 @@ class TempMountNoexecTest extends TestCase
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'already hardened'), 'expected already hardened log');
-
-        $this->pmssRemoveTree($dir);
     }
 
     public function testMountMissingLeavesFstabUntouched(): void
@@ -167,8 +157,6 @@ class TempMountNoexecTest extends TestCase
 
         $this->assertEquals($original, (string)file_get_contents($fstab));
         $this->assertTrue($this->pmssMessagesContain($messages, 'not found'), 'expected not found log');
-
-        $this->pmssRemoveTree($dir);
     }
 
     public function testUnreadableFstabWarns(): void
@@ -190,8 +178,6 @@ class TempMountNoexecTest extends TestCase
 
         $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
         chmod($fstab, 0600);
-
-        $this->pmssRemoveTree($dir);
     }
 
     private function fstabOptionsForMount(string $fstab, string $mountPoint): array

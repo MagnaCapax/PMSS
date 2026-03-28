@@ -80,22 +80,14 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
                         continue;
                     }
                     $found = true;
-                    $options = array_values(array_filter(explode(',', $columns[3]), 'strlen'));
-                    foreach ($conflicts as $conflict) {
-                        $pos = array_search($conflict, $options, true);
-                        if ($pos === false) {
-                            continue;
-                        }
-                        unset($options[$pos]);
-                        $removed[] = $conflict;
-                    }
-                    $options = array_values($options);
-                    $missing = array_values(array_diff($required, $options));
+                    $plan = pmssConfigOptionsUpdatePlan($columns[3], $required, $conflicts);
+                    $missing = $plan['added'];
+                    $removed = $plan['removed'];
                     if ($missing === [] && $removed === []) {
                         $log('[SKIP] '.$mountPoint.' already hardened in '.$fstabPath);
                         break;
                     }
-                    $columns[3] = implode(',', array_merge($options, $missing));
+                    $columns[3] = implode(',', $plan['options']);
                     $lines[$idx] = implode("\t", $columns);
                     $changed = true;
                     $msg = '[WARN] Updated '.$mountPoint.' mount options in '.$fstabPath;
@@ -188,18 +180,10 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
             return;
         }
 
-        $options = array_values(array_filter(explode(',', $columns[3]), 'strlen'));
-        $original = $options;
-        $removed = [];
-
-        foreach ($conflicts as $conflict) {
-            $pos = array_search($conflict, $options, true);
-            if ($pos !== false) {
-                unset($options[$pos]);
-                $removed[] = $conflict;
-            }
-        }
-        $options = array_values($options);
+        $original = array_values(array_filter(explode(',', $columns[3]), 'strlen'));
+        $plan = pmssConfigOptionsUpdatePlan($columns[3], $required, $conflicts);
+        $options = $plan['options'];
+        $removed = $plan['removed'];
 
         $sizeOption = 'size='.$size;
         $sizeIndex = null;
