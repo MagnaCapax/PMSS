@@ -8,10 +8,24 @@
 
 require_once __DIR__.'/commands.php';
 
+/**
+ * Reject unit names that could be misparsed at the systemctl boundary.
+ */
+function pmssSystemdUnitNameIsSafe(string $unit): bool
+{
+    $unit = trim($unit);
+    if ($unit === '' || strpos($unit, '-') === 0) {
+        return false;
+    }
+
+    return preg_match('/^[A-Za-z0-9:_.@\\-]+$/', $unit) === 1;
+}
+
 function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = false, bool $skipInStrictTestMode = false): string
 {
     if (($skipInDryRun && pmssEnvFlagEnabled('PMSS_DRY_RUN')) || ($skipInStrictTestMode && defined('PMSS_TEST_MODE') && PMSS_TEST_MODE === true)) return 'test/dry-run';
     if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && !is_dir('/run/systemd/system')) return 'systemd unavailable';
+    if ($unit !== null && !pmssSystemdUnitNameIsSafe($unit)) return 'invalid unit name';
     if ($unit !== null && !pmssEnvFlagEnabled('PMSS_DRY_RUN') && !pmssSystemdUnitExists($unit)) return 'unit '.$unit.' missing';
     return '';
 }
@@ -22,6 +36,10 @@ function pmssSystemdActionSkipReason(?string $unit = null, bool $skipInDryRun = 
 function pmssSystemdUnitExists(string $unit): bool
 {
     if (!is_dir('/run/systemd/system')) {
+        return false;
+    }
+    $unit = trim($unit);
+    if (!pmssSystemdUnitNameIsSafe($unit)) {
         return false;
     }
     $candidate = preg_match('/\.(service|socket|timer|target|mount|path|slice|scope)$/', $unit) ? $unit : $unit.'.service';
