@@ -71,6 +71,11 @@ function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
             'legacy' => 'ob_flush();',
             'patched' => '@ob_flush();',
         ],
+        [
+            'path' => $ctx['home'].'/www/rutorrent/plugins/hddquota/action.php',
+            'legacy' => 'return $field;',
+            'patched' => 'return (int) $field;',
+        ],
     ] as $patch) {
         if (!is_file($patch['path'])
             || is_link($patch['path'])

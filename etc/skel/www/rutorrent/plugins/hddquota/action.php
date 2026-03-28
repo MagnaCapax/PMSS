@@ -44,12 +44,12 @@ class userQuota {
         if ($abbreviation == 'G') $iterations = 3;
         if ($abbreviation == 'T') $iterations = 4;
         if ($iterations != 0) {
-            $field = (int) substr($field, 0, strlen($field));
+            $field = (int) substr($field, 0, -1);
             for($i=0; $i<$iterations; ++$i)
                 $field = $field * 1024;
         }
         
-        return $field;
+        return (int) $field;
     }
     
    static function parseData() {
