@@ -13,15 +13,28 @@ class UserRepositoryTest extends TestCase
         return $this->tempDir.'/seedbox/config';
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpTempDir();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->pmssCleanupTempDirProperty('tempDir');
+        parent::tearDown();
+    }
+
     private function setUpTempDir(): void
     {
+        if ($this->tempDir !== null && $this->tempDir !== '') {
+            return;
+        }
         $this->pmssAssignTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
     }
 
     public function testPersistAndReload(): void
     {
-        $this->setUpTempDir();
-        try {
             $repo = new \UserRepository($this->configDirPath());
             $this->assertEquals([], $repo->all());
 
@@ -42,15 +55,10 @@ class UserRepositoryTest extends TestCase
             $this->assertTrue(isset($users['alice']));
             $this->assertEquals(512, $users['alice']['ramMiB']);
             $this->assertEquals('keep-me', $users['alice']['customNote']);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testLegacyRtorrentRamIsAccepted(): void
     {
-        $this->setUpTempDir();
-        try {
             $repo = new \UserRepository($this->configDirPath());
             $payload = [
                 'rtorrentRam'  => 256,
@@ -63,23 +71,15 @@ class UserRepositoryTest extends TestCase
             $this->assertTrue(is_array($reloaded));
             $this->assertEquals(256, $reloaded['ramMiB']);
             $this->assertTrue(isset($reloaded['rtorrentRam']), 'Legacy key should be preserved');
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testInvalidPayloadIsRejected(): void
     {
-        $this->setUpTempDir();
-        try {
             $repo = new \UserRepository($this->configDirPath());
             $this->assertTrue($repo->set('badUser', [
                 'ramMiB'     => 128,
                 'quota'      => 40,
                 'quotaBurst' => 50,
             ]) === false);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 }

@@ -422,6 +422,13 @@ abstract class TestCase
         $property->setValue($this, '');
     }
 
+    /** Build an environment array with a stub directory prepended to PATH. */
+    protected function pmssPathPrefixedEnvironment(string $prefix, array $environment = []): array
+    {
+        $environment['PATH'] = $prefix.':'.(string) getenv('PATH');
+        return $environment;
+    }
+
     /** Return the current process owner name when POSIX account lookups are available. */
     protected function pmssCurrentOwner(): string
     {

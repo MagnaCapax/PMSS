@@ -57,8 +57,10 @@ class StorageHealthSnapshotCliTest extends TestCase
             'pmss-storage-health-lsblk-'
         );
 
-        return $this->pmssRunRepoPhpScriptCommand('scripts/util/storageHealthSnapshot.php', $arguments, [
-            'PATH' => $stubDir.':'.(string) getenv('PATH'),
-        ]);
+        return $this->pmssRunRepoPhpScriptCommand(
+            'scripts/util/storageHealthSnapshot.php',
+            $arguments,
+            $this->pmssPathPrefixedEnvironment($stubDir)
+        );
     }
 }

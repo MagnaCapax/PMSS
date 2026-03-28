@@ -8,8 +8,23 @@ class WelcomeMessageTest extends TestCase
     /** @var string */
     private $tempDir = '';
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpTempDir();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->pmssCleanupTempDirProperty('tempDir');
+        parent::tearDown();
+    }
+
     private function setUpTempDir(): void
     {
+        if ($this->tempDir !== '') {
+            return;
+        }
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
     }
 
@@ -22,8 +37,6 @@ class WelcomeMessageTest extends TestCase
 
     public function testUserMessageOverridesProductTemplate(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents(
                 $home.'/.config/pmss-user.json',
@@ -33,30 +46,20 @@ class WelcomeMessageTest extends TestCase
 
             $message = \pmssWelcomeMessageForUser(['totalSpace' => 214748364800], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('<p>Hello alice / 200 GiB</p>', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductTemplateRendersWhenNoUserOverrideExists(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents($home.'/.config/pmss-user.json', json_encode(['product' => 'm1000', 'ramMiB' => 1024], JSON_UNESCAPED_SLASHES));
             @file_put_contents($this->tempDir.'/welcomeMessages.json', json_encode(['m1000' => '<b>{{product}}/{{ramMiB}}</b>'], JSON_UNESCAPED_SLASHES));
 
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('<b>m1000/1024</b>', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductNameAliasReadsNestedProductsMap(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents($home.'/.config/pmss-user.json', json_encode(['productName' => 'M900'], JSON_UNESCAPED_SLASHES));
             @file_put_contents(
@@ -66,30 +69,20 @@ class WelcomeMessageTest extends TestCase
 
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('<b>M900/alice</b>', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductLookupIsCaseInsensitive(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents($home.'/.config/pmss-user.json', json_encode(['product' => 'M500'], JSON_UNESCAPED_SLASHES));
             @file_put_contents($this->tempDir.'/welcomeMessages.json', json_encode(['m500' => 'ok {{product}}'], JSON_UNESCAPED_SLASHES));
 
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('ok M500', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductFieldWinsOverProductNameWhenBothExist(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents(
                 $home.'/.config/pmss-user.json',
@@ -102,15 +95,10 @@ class WelcomeMessageTest extends TestCase
 
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('primary m500', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductMessageSetPreservesNestedProductsMapShape(): void
     {
-        $this->setUpTempDir();
-        try {
             $messagesPath = $this->tempDir.'/welcomeMessages.json';
             @file_put_contents(
                 $messagesPath,
@@ -129,15 +117,10 @@ class WelcomeMessageTest extends TestCase
             $this->assertEquals('test', $stored['meta']['updatedBy'] ?? '');
             $this->assertEquals('<p>old</p>', $stored['products']['free-tier'] ?? '');
             $this->assertEquals('<p>new</p>', $stored['products']['m1000'] ?? '');
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductFallsBackToDotProductFile(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents($home.'/.product', "free-tier\n");
             @file_put_contents($home.'/.config/pmss-user.json', json_encode([], JSON_UNESCAPED_SLASHES));
@@ -145,43 +128,28 @@ class WelcomeMessageTest extends TestCase
 
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
             $this->assertEquals('hi', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testSubstitutionsAreEscaped(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents($home.'/.config/pmss-user.json', json_encode(['welcomeMessage' => 'user={{username}}'], JSON_UNESCAPED_SLASHES));
 
             $message = \pmssWelcomeMessageForUser([], $home, '<script>alert(1)</script>', $this->tempDir.'/missing.json');
             $this->assertEquals('user=&lt;script&gt;alert(1)&lt;/script&gt;', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testMissingConfigurationReturnsEmptyMessage(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents($home.'/.config/pmss-user.json', json_encode([], JSON_UNESCAPED_SLASHES));
 
             $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/missing.json');
             $this->assertEquals('', $message);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductMessageSetWritesNestedProductsMap(): void
     {
-        $this->setUpTempDir();
-        try {
             $messagesPath = $this->tempDir.'/welcomeMessages.json';
             @file_put_contents($messagesPath, json_encode(['products' => ['m1000' => '<p>legacy</p>']], JSON_UNESCAPED_SLASHES));
 
@@ -191,15 +159,10 @@ class WelcomeMessageTest extends TestCase
             $this->assertTrue(is_array($decoded), 'Message map must decode as array');
             $this->assertEquals('<p>hello</p>', $decoded['products']['free-tier'] ?? null);
             $this->assertEquals('<p>legacy</p>', $decoded['products']['m1000'] ?? null);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductMessageSetClearsMessageWhenTemplateIsEmpty(): void
     {
-        $this->setUpTempDir();
-        try {
             $messagesPath = $this->tempDir.'/welcomeMessages.json';
             @file_put_contents($messagesPath, json_encode(['free-tier' => '<p>old</p>'], JSON_UNESCAPED_SLASHES));
 
@@ -208,15 +171,10 @@ class WelcomeMessageTest extends TestCase
 
             $this->assertTrue(is_array($decoded), 'Message map must decode as array');
             $this->assertTrue(!isset($decoded['free-tier']), 'Entry must be removed when template is empty');
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testPlainAndNestedProductMapsRenderIdenticallyAfterRoundTrip(): void
     {
-        $this->setUpTempDir();
-        try {
             $home = $this->makeUserHome();
             @file_put_contents($home.'/.config/pmss-user.json', json_encode(['product' => 'm1000'], JSON_UNESCAPED_SLASHES));
 
@@ -243,9 +201,6 @@ class WelcomeMessageTest extends TestCase
             $this->assertTrue(!isset($plainDecoded['products']), 'Plain product map should not gain a nested products wrapper');
             $this->assertEquals('<p>{{product}}/{{username}}</p>', $plainDecoded['m1000'] ?? null);
             $this->assertEquals('<p>{{product}}/{{username}}</p>', $nestedDecoded['products']['m1000'] ?? null);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
     }
 
     public function testProductConfigUsesUnifiedWelcomeLibrary(): void
