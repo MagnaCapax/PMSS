@@ -38,30 +38,21 @@ TXT;
     // followed by a positional token, which makes boolean flags fragile.
     $tokens = array_slice($argv, 1);
     $positionals = [];
-    $options = [
-        'mainPasses' => 31,
-        'finalPasses' => 3,
-        'sleepMin' => 60,
-        'sleepMax' => 360,
-        'verifyThreshold' => 90,
-        'noSleep' => false,
-        'dryRun' => false,
-        'printPassword' => false,
-        'help' => false,
+    $optionSpecs = [
+        'main-passes' => ['field' => 'mainPasses', 'default' => 31, 'expectsValue' => true],
+        'final-passes' => ['field' => 'finalPasses', 'default' => 3, 'expectsValue' => true],
+        'sleep-min' => ['field' => 'sleepMin', 'default' => 60, 'expectsValue' => true],
+        'sleep-max' => ['field' => 'sleepMax', 'default' => 360, 'expectsValue' => true],
+        'verify-threshold' => ['field' => 'verifyThreshold', 'default' => 90, 'expectsValue' => true],
+        'help' => ['field' => 'help', 'default' => false, 'expectsValue' => false],
+        'no-sleep' => ['field' => 'noSleep', 'default' => false, 'expectsValue' => false],
+        'dry-run' => ['field' => 'dryRun', 'default' => false, 'expectsValue' => false],
+        'print-password' => ['field' => 'printPassword', 'default' => false, 'expectsValue' => false],
     ];
-    $flagOptions = [
-        'help' => 'help',
-        'no-sleep' => 'noSleep',
-        'dry-run' => 'dryRun',
-        'print-password' => 'printPassword',
-    ];
-    $integerOptions = [
-        'main-passes' => 'mainPasses',
-        'final-passes' => 'finalPasses',
-        'sleep-min' => 'sleepMin',
-        'sleep-max' => 'sleepMax',
-        'verify-threshold' => 'verifyThreshold',
-    ];
+    $options = [];
+    foreach ($optionSpecs as $spec) {
+        $options[$spec['field']] = $spec['default'];
+    }
 
     for ($i = 0, $tokenCount = count($tokens); $i < $tokenCount; $i++) {
         $token = $tokens[$i];
@@ -72,14 +63,15 @@ TXT;
 
         if (substr($token, 0, 2) === '--') {
             [$key, $value] = array_pad(explode('=', substr($token, 2), 2), 2, null);
+            $spec = $optionSpecs[$key] ?? null;
 
-            if (isset($flagOptions[$key])) {
-                $options[$flagOptions[$key]] = true;
-                continue;
+            if ($spec === null) {
+                throw new RuntimeException('Unknown option: --'.$key, 1);
             }
 
-            if (!isset($integerOptions[$key])) {
-                throw new RuntimeException('Unknown option: --'.$key, 1);
+            if (!$spec['expectsValue']) {
+                $options[$spec['field']] = true;
+                continue;
             }
 
             if ($value === null) {
@@ -92,7 +84,7 @@ TXT;
                 throw new RuntimeException('Invalid value for --'.$key.' (expected integer)', 1);
             }
 
-            $options[$integerOptions[$key]] = (int) $value;
+            $options[$spec['field']] = (int) $value;
             continue;
         }
 
@@ -133,17 +125,21 @@ TXT;
         throw new RuntimeException('Invalid hostname', 1);
     }
 
-    if ($options['mainPasses'] < 1 || $options['mainPasses'] > 500) {
-        throw new RuntimeException('Invalid --main-passes (expected 1..500)', 1);
-    }
-    if ($options['finalPasses'] < 1 || $options['finalPasses'] > 100) {
-        throw new RuntimeException('Invalid --final-passes (expected 1..100)', 1);
+    foreach ([
+        'main-passes' => [1, 500],
+        'final-passes' => [1, 100],
+        'verify-threshold' => [1, 100],
+    ] as $key => $range) {
+        $field = $optionSpecs[$key]['field'];
+        if ($options[$field] < $range[0] || $options[$field] > $range[1]) {
+            throw new RuntimeException(
+                sprintf('Invalid --%s (expected %d..%d)', $key, $range[0], $range[1]),
+                1
+            );
+        }
     }
     if ($options['sleepMin'] < 0 || $options['sleepMax'] < 0) {
         throw new RuntimeException('Invalid sleep values (expected non-negative integers)', 1);
-    }
-    if ($options['verifyThreshold'] < 1 || $options['verifyThreshold'] > 100) {
-        throw new RuntimeException('Invalid --verify-threshold (expected 1..100)', 1);
     }
     if ($options['sleepMax'] < $options['sleepMin']) {
         throw new RuntimeException('Invalid sleep range (sleep-max must be >= sleep-min)', 1);
@@ -152,19 +148,18 @@ TXT;
         $options['sleepMin'] = $options['sleepMax'] = 0;
     }
 
-    return [
+    $cfg = [
         'localUser' => $localUser,
         'remoteUser' => $remoteUser,
         'hostname' => $hostname,
         'suffixAppended' => $suffixAppended,
-        'mainPasses' => $options['mainPasses'],
-        'finalPasses' => $options['finalPasses'],
-        'sleepMin' => $options['sleepMin'],
-        'sleepMax' => $options['sleepMax'],
-        'verifyThreshold' => $options['verifyThreshold'],
-        'dryRun' => $options['dryRun'],
-        'printPassword' => $options['printPassword'],
     ];
+
+    foreach (['mainPasses', 'finalPasses', 'sleepMin', 'sleepMax', 'verifyThreshold', 'dryRun', 'printPassword'] as $field) {
+        $cfg[$field] = $options[$field];
+    }
+
+    return $cfg;
 }
 
 /**

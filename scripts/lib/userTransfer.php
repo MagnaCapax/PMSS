@@ -237,16 +237,15 @@ function pmssUserTransferMain(array $argv): int
             $cfg['verifyThreshold']
         ));
 
+        $scratchFiles = ['expect' => 'transfer.expect', 'authProbe' => 'auth-probe.sh', 'mainScript' => 'rsync-main.sh', 'finalScript' => 'rsync-final.sh', 'remoteSizeScript' => 'remote-size.sh'];
+
         // Dry runs should be fully non-interactive and avoid writing temp scripts.
         if ($cfg['dryRun']) {
-            $scratch = '/root/pmss-userTransfer-<generated>';
-            $expect = $scratch.'/transfer.expect';
-            $authProbe = $scratch.'/auth-probe.sh';
-            $mainScript = $scratch.'/rsync-main.sh';
-            $finalScript = $scratch.'/rsync-final.sh';
-            runStep('Validating remote SSH authentication', pmssBuildCommand($expect, [$authProbe]));
-            pmssUserTransferRunPasses('Pulling home data', $expect, $mainScript, 1, 0, 0);
-            pmssUserTransferRunPasses('Pulling volatile data', $expect, $finalScript, 1, 0, 0);
+            $scratchPaths = [];
+            foreach ($scratchFiles as $key => $name) $scratchPaths[$key] = '/root/pmss-userTransfer-<generated>/'.$name;
+            runStep('Validating remote SSH authentication', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['authProbe']]));
+            pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], 1, 0, 0);
+            pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], 1, 0, 0);
             runStep('Normalising user permissions', pmssBuildCommand('php', [dirname(__DIR__).'/../util/userPermissions.php', $cfg['localUser']]));
             logMessage('[SKIP] Dry run complete');
             return 0;
@@ -287,6 +286,7 @@ function pmssUserTransferMain(array $argv): int
             }
             $password = $pass1;
         }
+        $cleanup = static function (): void {};
         putenv('PMSS_USER_TRANSFER_PASSWORD='.$password);
 
         try {
@@ -300,11 +300,12 @@ function pmssUserTransferMain(array $argv): int
         }
         @chmod($scratch, 0700);
 
-        $paths = [];
-        $cleanup = function () use (&$paths, $scratch): void {
-            foreach ($paths as $p) {
-                if ($p !== '' && file_exists($p)) {
-                    @unlink($p);
+        $scratchPaths = [];
+        foreach ($scratchFiles as $key => $name) $scratchPaths[$key] = $scratch.'/'.$name;
+        $cleanup = function () use ($scratchPaths, $scratch): void {
+            foreach ($scratchPaths as $path) {
+                if (file_exists($path)) {
+                    @unlink($path);
                 }
             }
             if (is_dir($scratch)) {
@@ -313,46 +314,44 @@ function pmssUserTransferMain(array $argv): int
         };
         register_shutdown_function($cleanup);
 
-        // Generate scripts under /root with restrictive permissions.
-        $expect = $scratch.'/transfer.expect';
-        $authProbe = $scratch.'/auth-probe.sh';
-        $mainScript = $scratch.'/rsync-main.sh';
-        $finalScript = $scratch.'/rsync-final.sh';
-        $remoteSizeScript = $scratch.'/remote-size.sh';
+        foreach ([
+            'expect' => pmssUserTransferBuildExpectWrapper()."\n",
+            'authProbe' => pmssUserTransferBuildAuthProbe($cfg),
+            'mainScript' => pmssUserTransferBuildRsyncMain($cfg),
+            'finalScript' => pmssUserTransferBuildRsyncFinal($cfg),
+            'remoteSizeScript' => pmssUserTransferBuildRemoteSizeProbe($cfg),
+        ] as $key => $contents) {
+            pmssUserTransferWriteFile($scratchPaths[$key], $contents, 0700);
+        }
 
-        $paths = [$expect, $authProbe, $mainScript, $finalScript, $remoteSizeScript];
-        pmssUserTransferWriteFile($expect, pmssUserTransferBuildExpectWrapper()."\n", 0700);
-        pmssUserTransferWriteFile($authProbe, pmssUserTransferBuildAuthProbe($cfg), 0700);
-        pmssUserTransferWriteFile($mainScript, pmssUserTransferBuildRsyncMain($cfg), 0700);
-        pmssUserTransferWriteFile($finalScript, pmssUserTransferBuildRsyncFinal($cfg), 0700);
-        pmssUserTransferWriteFile($remoteSizeScript, pmssUserTransferBuildRemoteSizeProbe($cfg), 0700);
+        try {
+            // Validate credentials first so a bad password does not burn dozens of rsync passes.
+            $authRc = runStep('Validating remote SSH authentication', pmssBuildCommand($scratchPaths['expect'], [$scratchPaths['authProbe']]));
+            if ($authRc !== 0) {
+                logMessage(sprintf('[ERR] Aborting user transfer: remote authentication pre-flight failed (rc=%d)', $authRc));
+                return 1;
+            }
 
-        // Validate credentials first so a bad password does not burn dozens of rsync passes.
-        $authRc = runStep('Validating remote SSH authentication', pmssBuildCommand($expect, [$authProbe]));
-        if ($authRc !== 0) {
-            logMessage(sprintf('[ERR] Aborting user transfer: remote authentication pre-flight failed (rc=%d)', $authRc));
+            $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $scratchPaths['expect'], $scratchPaths['mainScript'], $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
+            $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $scratchPaths['expect'], $scratchPaths['finalScript'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
+
+            pmssUserTransferPostSetup($cfg, $home, $scratchPaths['expect'], $scratchPaths['remoteSizeScript']);
+
+            if ($cfg['printPassword']) {
+                logMessage('[WARN] Remote password: '.$password);
+            }
+
+            if ($lastMainRc !== 0 || $lastFinalRc !== 0) {
+                logMessage(sprintf('[WARN] User transfer finished with errors (main rc=%d, final rc=%d)', $lastMainRc, $lastFinalRc));
+                return 1;
+            }
+
+            logMessage('[OK] User transfer complete');
+            return 0;
+        } finally {
             $cleanup();
             putenv('PMSS_USER_TRANSFER_PASSWORD');
-            return 1;
         }
-
-        $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $expect, $mainScript, $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
-        $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $expect, $finalScript, $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
-
-        pmssUserTransferPostSetup($cfg, $home, $expect, $remoteSizeScript);
-        $cleanup();
-        putenv('PMSS_USER_TRANSFER_PASSWORD');
-
-        if ($cfg['printPassword']) {
-            logMessage('[WARN] Remote password: '.$password);
-        }
-
-        if ($lastMainRc !== 0 || $lastFinalRc !== 0) {
-            logMessage(sprintf('[WARN] User transfer finished with errors (main rc=%d, final rc=%d)', $lastMainRc, $lastFinalRc));
-            return 1;
-        }
-        logMessage('[OK] User transfer complete');
-        return 0;
     } catch (RuntimeException $e) {
         $code = $e->getCode();
         if ($code === 0) {

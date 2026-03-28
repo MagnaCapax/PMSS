@@ -75,6 +75,7 @@ class UserTransferTest extends TestCase
         $this->assertEquals('remote01', $cfg['remoteUser']);
         $this->assertEquals('example.com', $cfg['hostname']);
         $this->assertTrue(!$cfg['suffixAppended'], 'expected no suffix appended');
+        $this->assertEquals([31, 3, 60, 360, 90, false, false], [$cfg['mainPasses'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax'], $cfg['verifyThreshold'], $cfg['dryRun'], $cfg['printPassword']]);
     }
 
     public function testParseCliNormalisesUsernamesToLowercase(): void
