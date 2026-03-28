@@ -252,7 +252,7 @@ if (file_exists('/usr/bin/rclone') && file_exists('rclone.php')) {
 if ((file_exists('/usr/bin/qbittorrent-nox') || file_exists('/usr/local/bin/qbittorrent-nox')) && file_exists('qbittorrent.php')) {
 ?>
                         <h6>qBittorrent</h6>
-                        <p>qBittorrent username is your own username and password is <code>adminadmin</code> by default. Change password once logged in. If you get 503, try restarting Lighttpd — port may have changed.</p>
+                        <p>qBittorrent username is your own username and password matches your account password. Change it once logged in if you want a separate WebUI password. If you get 503, try restarting Lighttpd — port may have changed.</p>
 <?php
     if (!file_exists('../.qbittorrentEnable')) {
 ?>
