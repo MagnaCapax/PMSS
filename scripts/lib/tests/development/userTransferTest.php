@@ -112,6 +112,7 @@ class UserTransferTest extends TestCase
             ."  --final-passes N    Number of passes for the final rsync (default 3)\n"
             ."  --sleep-min N       Minimum sleep seconds between passes (default 60)\n"
             ."  --sleep-max N       Maximum sleep seconds between passes (default 360)\n"
+            ."  --verify-threshold N Warn if local size is below N% of remote (default 90)\n"
             ."  --no-sleep          Disable sleeping between passes\n"
             ."  --dry-run           Log planned steps without executing commands\n"
             ."  --print-password    Print the supplied password at the end (unsafe)\n"
@@ -180,6 +181,20 @@ class UserTransferTest extends TestCase
         $this->assertEquals(0, $cfg['sleepMax']);
     }
 
+    public function testParseCliAcceptsVerifyThreshold(): void
+    {
+        $cfg = \pmssUserTransferParseCli(['userTransfer.php', '--verify-threshold=95', 'deefbox', 'example.com']);
+
+        $this->assertEquals(95, $cfg['verifyThreshold']);
+    }
+
+    public function testParseCliRejectsInvalidVerifyThreshold(): void
+    {
+        $this->assertThrowsRuntime(static function (): void {
+            \pmssUserTransferParseCli(['userTransfer.php', '--verify-threshold=101', 'deefbox', 'example.com']);
+        }, 'verify-threshold');
+    }
+
     public function testParseCliRejectsSleepRangeInversion(): void
     {
         $this->assertThrowsRuntime(static function (): void {
@@ -231,6 +246,17 @@ class UserTransferTest extends TestCase
         $this->assertStringContainsString("'/bin/true'", $script);
     }
 
+    public function testBuildRemoteSizeProbeUsesByteAccurateDu(): void
+    {
+        $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'remote01', 'hostname' => 'example.com', 'verifyThreshold' => 90];
+        $script = \pmssUserTransferBuildRemoteSizeProbe($cfg);
+
+        $this->assertStringContainsString('-o NumberOfPasswordPrompts=1', $script);
+        $this->assertStringContainsString("'example.com'", $script);
+        $this->assertStringContainsString("/home/remote01/", $script);
+        $this->assertStringContainsString("'du '\\''-sb'\\''", $script);
+    }
+
     public function testGeneratedScriptsKeepSharedSshFlagsAligned(): void
     {
         $cfg = ['localUser' => 'deefbox', 'remoteUser' => 'deefbox', 'hostname' => 'example.com'];
@@ -239,6 +265,38 @@ class UserTransferTest extends TestCase
         $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRsyncMain($cfg));
         $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRsyncFinal($cfg));
         $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildAuthProbe($cfg));
+        $this->assertStringContainsString($sharedFlags, \pmssUserTransferBuildRemoteSizeProbe($cfg + ['verifyThreshold' => 90]));
+    }
+
+    public function testParseDuBytesReturnsLeadingByteCount(): void
+    {
+        $this->assertEquals(12345, \pmssUserTransferParseDuBytes("12345\t/home/deefbox/\n"));
+    }
+
+    public function testParseDuBytesRejectsUnreadableOutput(): void
+    {
+        $this->assertEquals(null, \pmssUserTransferParseDuBytes("du: cannot access '/home/deefbox': Permission denied\n"));
+    }
+
+    public function testEvaluateCompletenessWarnsWhenBelowThreshold(): void
+    {
+        $warning = \pmssUserTransferEvaluateCompleteness(1000, 850, 90);
+
+        $this->assertTrue(is_array($warning), 'expected warning payload');
+        $this->assertEquals(1000, $warning['remoteBytes']);
+        $this->assertEquals(850, $warning['localBytes']);
+        $this->assertEquals(90, $warning['verifyThreshold']);
+        $this->assertEquals(85.0, $warning['localPercent']);
+    }
+
+    public function testEvaluateCompletenessAllowsHealthyTransfer(): void
+    {
+        $this->assertEquals(null, \pmssUserTransferEvaluateCompleteness(1000, 950, 90));
+    }
+
+    public function testEvaluateCompletenessSkipsZeroRemoteSize(): void
+    {
+        $this->assertEquals(null, \pmssUserTransferEvaluateCompleteness(0, 0, 90));
     }
 
     public function testBuildExpectWrapperUsesEnvPassword(): void

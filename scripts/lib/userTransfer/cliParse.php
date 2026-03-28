@@ -22,6 +22,7 @@ Options:
   --final-passes N    Number of passes for the final rsync (default 3)
   --sleep-min N       Minimum sleep seconds between passes (default 60)
   --sleep-max N       Maximum sleep seconds between passes (default 360)
+  --verify-threshold N Warn if local size is below N% of remote (default 90)
   --no-sleep          Disable sleeping between passes
   --dry-run           Log planned steps without executing commands
   --print-password    Print the supplied password at the end (unsafe)
@@ -42,6 +43,7 @@ TXT;
         'finalPasses' => 3,
         'sleepMin' => 60,
         'sleepMax' => 360,
+        'verifyThreshold' => 90,
         'noSleep' => false,
         'dryRun' => false,
         'printPassword' => false,
@@ -58,6 +60,7 @@ TXT;
         'final-passes' => 'finalPasses',
         'sleep-min' => 'sleepMin',
         'sleep-max' => 'sleepMax',
+        'verify-threshold' => 'verifyThreshold',
     ];
 
     for ($i = 0, $tokenCount = count($tokens); $i < $tokenCount; $i++) {
@@ -139,6 +142,9 @@ TXT;
     if ($options['sleepMin'] < 0 || $options['sleepMax'] < 0) {
         throw new RuntimeException('Invalid sleep values (expected non-negative integers)', 1);
     }
+    if ($options['verifyThreshold'] < 1 || $options['verifyThreshold'] > 100) {
+        throw new RuntimeException('Invalid --verify-threshold (expected 1..100)', 1);
+    }
     if ($options['sleepMax'] < $options['sleepMin']) {
         throw new RuntimeException('Invalid sleep range (sleep-max must be >= sleep-min)', 1);
     }
@@ -155,6 +161,7 @@ TXT;
         'finalPasses' => $options['finalPasses'],
         'sleepMin' => $options['sleepMin'],
         'sleepMax' => $options['sleepMax'],
+        'verifyThreshold' => $options['verifyThreshold'],
         'dryRun' => $options['dryRun'],
         'printPassword' => $options['printPassword'],
     ];

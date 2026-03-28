@@ -22,6 +22,7 @@ require_once __DIR__.'/userLifecycle.php';
 require_once __DIR__.'/update/runtime/commands.php';
 require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/userTransfer/cliParse.php';
+require_once __DIR__.'/userTransfer/completenessVerify.php';
 require_once __DIR__.'/userTransfer/localUserSafety.php';
 require_once __DIR__.'/userTransfer/sessionRewrite.php';
 
@@ -227,7 +228,14 @@ function pmssUserTransferMain(array $argv): int
 
         logMessage('[START] User transfer initialised');
         logMessage(sprintf('[INFO] Local user=%s Remote user=%s Host=%s', $cfg['localUser'], $cfg['remoteUser'], $cfg['hostname']));
-        logMessage(sprintf('[INFO] Main passes=%d Final passes=%d Sleep=%d..%d', $cfg['mainPasses'], $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']));
+        logMessage(sprintf(
+            '[INFO] Main passes=%d Final passes=%d Sleep=%d..%d Verify threshold=%d%%',
+            $cfg['mainPasses'],
+            $cfg['finalPasses'],
+            $cfg['sleepMin'],
+            $cfg['sleepMax'],
+            $cfg['verifyThreshold']
+        ));
 
         // Dry runs should be fully non-interactive and avoid writing temp scripts.
         if ($cfg['dryRun']) {
@@ -310,12 +318,14 @@ function pmssUserTransferMain(array $argv): int
         $authProbe = $scratch.'/auth-probe.sh';
         $mainScript = $scratch.'/rsync-main.sh';
         $finalScript = $scratch.'/rsync-final.sh';
+        $remoteSizeScript = $scratch.'/remote-size.sh';
 
-        $paths = [$expect, $authProbe, $mainScript, $finalScript];
+        $paths = [$expect, $authProbe, $mainScript, $finalScript, $remoteSizeScript];
         pmssUserTransferWriteFile($expect, pmssUserTransferBuildExpectWrapper()."\n", 0700);
         pmssUserTransferWriteFile($authProbe, pmssUserTransferBuildAuthProbe($cfg), 0700);
         pmssUserTransferWriteFile($mainScript, pmssUserTransferBuildRsyncMain($cfg), 0700);
         pmssUserTransferWriteFile($finalScript, pmssUserTransferBuildRsyncFinal($cfg), 0700);
+        pmssUserTransferWriteFile($remoteSizeScript, pmssUserTransferBuildRemoteSizeProbe($cfg), 0700);
 
         // Validate credentials first so a bad password does not burn dozens of rsync passes.
         $authRc = runStep('Validating remote SSH authentication', pmssBuildCommand($expect, [$authProbe]));
@@ -329,7 +339,7 @@ function pmssUserTransferMain(array $argv): int
         $lastMainRc = pmssUserTransferRunPasses('Pulling home data', $expect, $mainScript, $cfg['mainPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
         $lastFinalRc = pmssUserTransferRunPasses('Pulling volatile data', $expect, $finalScript, $cfg['finalPasses'], $cfg['sleepMin'], $cfg['sleepMax']);
 
-        pmssUserTransferPostSetup($cfg, $home);
+        pmssUserTransferPostSetup($cfg, $home, $expect, $remoteSizeScript);
         $cleanup();
         putenv('PMSS_USER_TRANSFER_PASSWORD');
 
@@ -357,7 +367,7 @@ function pmssUserTransferMain(array $argv): int
 /**
  * Apply post-transfer steps (rename ruTorrent user dir, normalise permissions, restart marker).
  */
-function pmssUserTransferPostSetup(array $cfg, string $home): void
+function pmssUserTransferPostSetup(array $cfg, string $home, string $expectPath, string $remoteSizeScriptPath): void
 {
     $localUser = $cfg['localUser'];
     $remoteUser = $cfg['remoteUser'];
@@ -402,4 +412,8 @@ function pmssUserTransferPostSetup(array $cfg, string $home): void
     } else {
         logMessage('[WARN] Skipping rTorrent restart marker (www dir missing or unsafe)');
     }
+
+    // Advisory only: keep the existing exit-code semantics while surfacing
+    // suspiciously incomplete copies before operators clean up the source.
+    pmssUserTransferVerifyCompleteness($cfg, $home, $expectPath, $remoteSizeScriptPath);
 }
