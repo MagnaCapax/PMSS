@@ -21,21 +21,19 @@ if (!is_dir('/run/systemd/system')) {
     exit(0);
 }
 
-foreach (array_merge(pmssSeedboxSystemServiceSpecs(), [['unit' => 'apache2', 'label' => 'Apache httpd (legacy)', 'mask' => true]]) as $spec) {
-    $unit = (string) ($spec['unit'] ?? '');
+foreach (pmssSeedboxSystemServiceSpecs() + ['apache2' => 'Apache httpd (legacy)'] as $unit => $label) {
     if ($unit === '' || !pmssSystemdUnitExists($unit)) {
         continue;
     }
-    $shouldMask = (bool) ($spec['mask'] ?? false);
 
     $active = trim((string) @shell_exec('systemctl is-active '.escapeshellarg($unit).' 2>/dev/null'));
     $enabled = trim((string) @shell_exec('systemctl is-enabled '.escapeshellarg($unit).' 2>/dev/null'));
 
     if (($active !== 'active' && $active !== 'activating')
-        && ($shouldMask ? ($enabled === 'masked') : ($enabled !== 'enabled'))
+        && $enabled === 'masked'
     ) {
         continue;
     }
 
-    pmssStopDisableMaskSystemdUnit($unit, (string) ($spec['label'] ?? $unit), $shouldMask);
+    pmssStopDisableMaskSystemdUnit($unit, $label, true);
 }

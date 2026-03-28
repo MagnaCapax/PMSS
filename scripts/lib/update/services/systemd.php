@@ -65,40 +65,40 @@ function pmssEnsureSystemdServicesGuardBootUnit(): void
  * Keep this list conservative and system-wide only. Per-user instances are
  * managed by PMSS cron/util scripts and must not be impacted.
  *
- * @return array<int, array{unit:string,label:string,mask:bool}>
+ * @return array<string, string>
  */
 function pmssSeedboxSystemServiceSpecs(): array
 {
     return [
-        ['unit' => 'lighttpd', 'label' => 'lighttpd', 'mask' => true],
-        ['unit' => 'deluged', 'label' => 'Deluge daemon', 'mask' => true],
-        ['unit' => 'deluge-web', 'label' => 'Deluge Web UI', 'mask' => true],
-        ['unit' => 'transmission-daemon', 'label' => 'Transmission daemon', 'mask' => true],
-        ['unit' => 'redis-server', 'label' => 'Redis server', 'mask' => true],
-        ['unit' => 'memcached', 'label' => 'Memcached', 'mask' => true],
-        ['unit' => 'rpcbind', 'label' => 'rpcbind', 'mask' => true],
-        ['unit' => 'rpcbind.socket', 'label' => 'rpcbind socket', 'mask' => true],
-        ['unit' => 'nfs-kernel-server', 'label' => 'NFS kernel server', 'mask' => true],
-        ['unit' => 'nfs-server', 'label' => 'NFS server', 'mask' => true],
-        ['unit' => 'nfs-idmapd', 'label' => 'NFS idmapd', 'mask' => true],
-        ['unit' => 'rpc-statd', 'label' => 'rpc-statd', 'mask' => true],
-        ['unit' => 'smbd', 'label' => 'Samba smbd', 'mask' => true],
-        ['unit' => 'nmbd', 'label' => 'Samba nmbd', 'mask' => true],
-        ['unit' => 'samba', 'label' => 'Samba (meta)', 'mask' => true],
-        ['unit' => 'avahi-daemon', 'label' => 'Avahi mDNS', 'mask' => true],
-        ['unit' => 'avahi-daemon.socket', 'label' => 'Avahi mDNS socket', 'mask' => true],
-        ['unit' => 'cups', 'label' => 'CUPS printing', 'mask' => true],
-        ['unit' => 'cups.socket', 'label' => 'CUPS socket', 'mask' => true],
-        ['unit' => 'cups.path', 'label' => 'CUPS path', 'mask' => true],
-        ['unit' => 'cups-browsed', 'label' => 'CUPS browsed', 'mask' => true],
+        'lighttpd' => 'lighttpd',
+        'deluged' => 'Deluge daemon',
+        'deluge-web' => 'Deluge Web UI',
+        'transmission-daemon' => 'Transmission daemon',
+        'redis-server' => 'Redis server',
+        'memcached' => 'Memcached',
+        'rpcbind' => 'rpcbind',
+        'rpcbind.socket' => 'rpcbind socket',
+        'nfs-kernel-server' => 'NFS kernel server',
+        'nfs-server' => 'NFS server',
+        'nfs-idmapd' => 'NFS idmapd',
+        'rpc-statd' => 'rpc-statd',
+        'smbd' => 'Samba smbd',
+        'nmbd' => 'Samba nmbd',
+        'samba' => 'Samba (meta)',
+        'avahi-daemon' => 'Avahi mDNS',
+        'avahi-daemon.socket' => 'Avahi mDNS socket',
+        'cups' => 'CUPS printing',
+        'cups.socket' => 'CUPS socket',
+        'cups.path' => 'CUPS path',
+        'cups-browsed' => 'CUPS browsed',
         // Docker must run rootless per-user; the system daemon must stay off.
-        ['unit' => 'docker.service', 'label' => 'Docker (system)', 'mask' => true],
-        ['unit' => 'docker.socket', 'label' => 'Docker socket (system)', 'mask' => true],
-        ['unit' => 'containerd', 'label' => 'containerd (system)', 'mask' => true],
+        'docker.service' => 'Docker (system)',
+        'docker.socket' => 'Docker socket (system)',
+        'containerd' => 'containerd (system)',
         // Exim4 is pulled in indirectly; PMSS does not use a system MTA.
-        ['unit' => 'exim4', 'label' => 'Exim4 MTA', 'mask' => true],
+        'exim4' => 'Exim4 MTA',
         // qBittorrent-nox typically runs per-user; this is a no-op on hosts without a unit.
-        ['unit' => 'qbittorrent-nox', 'label' => 'qBittorrent (system)', 'mask' => true],
+        'qbittorrent-nox' => 'qBittorrent (system)',
     ];
 }
 
@@ -110,8 +110,8 @@ function pmssSeedboxSystemServiceSpecs(): array
  */
 function pmssStopDisableMaskSeedboxSystemServices(): void
 {
-    foreach (pmssSeedboxSystemServiceSpecs() as $spec) {
-        pmssStopDisableMaskSystemdUnit($spec['unit'], $spec['label'], $spec['mask']);
+    foreach (pmssSeedboxSystemServiceSpecs() as $unit => $label) {
+        pmssStopDisableMaskSystemdUnit($unit, $label, true);
     }
 
     runStep('Purging exim4 packages', aptCmd('purge -y exim4 exim4-base exim4-config exim4-daemon-light'));
