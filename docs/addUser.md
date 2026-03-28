@@ -28,10 +28,15 @@ Resource options:
 - `--io-read-iops=/dev/DEVICE:IOPS`
 - `--io-write-iops=/dev/DEVICE:IOPS`
 - `--cpu-quota-percent=PERCENT|infinity`
+- `--docker-enabled=true|false`
 
 Named options override legacy positional values when both are supplied, so existing
 automation keeps working while operators can skip earlier optional slots when they
 only want to set later resource knobs.
+
+`--docker-enabled=` lets the provisioning caller store the initial rootless Docker
+policy explicitly. PMSS no longer infers that policy from product-name strings when
+enforcement code reads the per-user config.
 
 Usernames are normalised to lowercase and must match `[a-z][a-z0-9]{2,7}`—a
 leading letter followed by 2–7 lowercase letters or digits (3–8 characters

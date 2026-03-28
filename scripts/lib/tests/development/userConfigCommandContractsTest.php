@@ -49,11 +49,12 @@ class userConfigCommandContractsTest extends TestCase
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $source);
         $this->assertStringContainsString(
-            "pmssParseCliTokens(\$argv ?? (\$_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message'])",
+            "pmssParseCliTokens(\$argv ?? (\$_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled'])",
             $source
         );
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'upload-throttle-kib')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'welcome-message')", $source);
+        $this->assertStringContainsString("pmssCliOption(\$parsed, 'docker-enabled')", $source);
         $this->assertTrue(
             strpos($source, "strpos(\$arg, '--upload-throttle-kib=')") === false,
             'userConfig.php should not keep a manual --upload-throttle-kib scan'
@@ -61,6 +62,10 @@ class userConfigCommandContractsTest extends TestCase
         $this->assertTrue(
             strpos($source, "strpos(\$arg, '--welcome-message=')") === false,
             'userConfig.php should not keep a manual --welcome-message scan'
+        );
+        $this->assertTrue(
+            strpos($source, "strpos(\$arg, '--docker-enabled=')") === false,
+            'userConfig.php should not keep a manual --docker-enabled scan'
         );
     }
 

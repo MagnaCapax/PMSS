@@ -151,7 +151,7 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
-    public function testDockerEnabledDefaultsFalseForStorageProduct(): void
+    public function testDockerEnabledIgnoresProductMetadataWhenUnset(): void
     {
         $this->setUpTempDir();
         try {
@@ -160,13 +160,13 @@ class UserConfigStoreTest extends TestCase
                 'rtorrentPort' => 5007,
                 'productType' => 'storage-box',
             ]));
-            $this->assertEquals(false, $reloaded['dockerEnabled']);
+            $this->assertEquals(true, $reloaded['dockerEnabled']);
         } finally {
             $this->pmssCleanupTempDirProperty('tempDir');
         }
     }
 
-    public function testDockerEnabledExplicitValueOverridesStorageDefault(): void
+    public function testDockerEnabledExplicitValueStillWinsWhenProductMetadataExists(): void
     {
         $this->setUpTempDir();
         try {

@@ -19,8 +19,8 @@
  * - trafficLimit (int) Always written as 0 (traffic caps live in runtime files).
  * - trafficCapMbit (int) Post-limit ceiling in Mbit (0/absent uses server default).
  * - suspended (bool)   Best-effort mirror of suspension state (marker remains www-disabled).
- * - dockerEnabled (bool) Rootless Docker enablement (default true; false by
- *   default for Storage Box products).
+ * - dockerEnabled (bool) Rootless Docker enablement (default true unless the
+ *   provisioner stores an explicit override).
  * - CPUWeight/IOWeight/IOReadBW/... pass-through for future resource controls.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
@@ -251,7 +251,7 @@ class UserConfigStore
             ? (!is_string($payload['dockerEnabled'])
                 ? (bool) $payload['dockerEnabled']
                 : !in_array(strtolower(trim($payload['dockerEnabled'])), ['false', '0', 'no', 'off', ''], true))
-            : !$this->payloadDescribesStorageBox($payload);
+            : true;
 
         // Safety gate: keep rootless Docker disabled for low-memory accounts.
         if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) && (int)$payload['ramMiB'] > 0) {
@@ -265,21 +265,6 @@ class UserConfigStore
 
         ksort($payload, SORT_STRING);
         return $payload;
-    }
-
-    private function payloadDescribesStorageBox(array $payload): bool
-    {
-        foreach (['product', 'productName', 'productType'] as $key) {
-            $value = $payload[$key] ?? null;
-            $normalized = is_string($value)
-                ? preg_replace('/\s+/', ' ', str_replace(['_', '-'], ' ', strtolower(trim($value))))
-                : '';
-            $normalized = is_string($normalized) ? $normalized : '';
-            if ($normalized !== '' && strpos($normalized, 'storage') !== false && strpos($normalized, 'box') !== false) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private function readJsonFile(string $path): ?array

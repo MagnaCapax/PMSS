@@ -22,18 +22,47 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 /**
+ * Parse the explicit rootless Docker toggle passed by provisioning callers.
+ */
+function pmssUserConfigParseDockerEnabledOption($rawOption): ?bool
+{
+    if ($rawOption === null) {
+        return null;
+    }
+    if ($rawOption === true || $rawOption === '') {
+        throw new InvalidArgumentException('--docker-enabled requires true or false');
+    }
+
+    $normalized = strtolower(trim((string) $rawOption));
+    if (in_array($normalized, ['true', '1', 'yes', 'on'], true)) {
+        return true;
+    }
+    if (in_array($normalized, ['false', '0', 'no', 'off'], true)) {
+        return false;
+    }
+
+    throw new InvalidArgumentException('Invalid --docker-enabled value');
+}
+
+/**
  * Main entry point for user configuration changes.
  */
 
 
 $usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
-$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message']);
+$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled']);
 $args = array_merge([''], $parsed['arguments']);
 $uploadThrottleKib = pmssCliOption($parsed, 'upload-throttle-kib');
 $uploadThrottleKib = ($uploadThrottleKib === true || $uploadThrottleKib === null) ? null : (string) $uploadThrottleKib;
 $welcomeMessage = pmssCliOption($parsed, 'welcome-message');
 $welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null : (string) $welcomeMessage;
-$usage .= ' [--upload-throttle-kib=KIB] [--welcome-message=HTML]';
+$dockerEnabledOption = pmssCliOption($parsed, 'docker-enabled');
+try {
+    $dockerEnabled = pmssUserConfigParseDockerEnabledOption($dockerEnabledOption);
+} catch (InvalidArgumentException $exception) {
+    die($exception->getMessage()."\n");
+}
+$usage .= ' [--upload-throttle-kib=KIB] [--welcome-message=HTML] [--docker-enabled=true|false]';
 $usage .= "\n   or: ./userConfig.php USERNAME --welcome-message=HTML";
 $fullConfigMode = !empty($args[1]) && !empty($args[2]) && !empty($args[3]);
 $welcomeOnlyMode = !empty($args[1]) && $welcomeMessage !== null && empty($args[2]) && empty($args[3]);
@@ -43,6 +72,9 @@ if (!$fullConfigMode && !$welcomeOnlyMode) {
 
 if ($welcomeOnlyMode && $uploadThrottleKib !== null) {
     die("--upload-throttle-kib requires RAM and quota arguments\n");
+}
+if ($welcomeOnlyMode && $dockerEnabled !== null) {
+    die("--docker-enabled requires RAM and quota arguments\n");
 }
 
 // The $user array is populated from sanitized command-line arguments ($args)
@@ -139,6 +171,9 @@ foreach (['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWri
 $payload['billingId'] = $payload['billingId'] ?? 0;
 if ($payload['billingId'] === 0) {
     $payload = $store->applyFallbacks($user['name'], $payload);
+}
+if ($dockerEnabled !== null) {
+    $payload['dockerEnabled'] = $dockerEnabled;
 }
 
 // Optional per-user welcome banner override for welcome.php.

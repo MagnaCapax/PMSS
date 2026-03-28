@@ -33,6 +33,7 @@ function pmssAddUserCliUsage(): string
         '  --io-read-iops=/dev/DEVICE:IOPS',
         '  --io-write-iops=/dev/DEVICE:IOPS',
         '  --cpu-quota-percent=PERCENT|infinity',
+        '  --docker-enabled=true|false',
         '',
         'Other options:',
         '  -h, --help',
@@ -78,6 +79,7 @@ function pmssAddUserParseCli(array $argv): array
         'io-read-iops',
         'io-write-iops',
         'cpu-quota-percent',
+        'docker-enabled',
     ]);
     if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
         return ['help' => true, 'usage' => pmssAddUserCliUsage()];
@@ -114,6 +116,14 @@ function pmssAddUserParseCli(array $argv): array
         }
     }
 
+    $dockerEnabled = pmssCliOption($parsed, 'docker-enabled', null, null);
+    if ($dockerEnabled === true || $dockerEnabled === '') {
+        throw new InvalidArgumentException('--docker-enabled requires true or false');
+    }
+    if ($dockerEnabled !== null) {
+        $user['dockerEnabled'] = (string) $dockerEnabled;
+    }
+
     if (isset($user['torrentThrottle'])) {
         if (!is_numeric($user['torrentThrottle']) || (int) $user['torrentThrottle'] < 0) {
             throw new InvalidArgumentException('Invalid upload throttle value');
@@ -131,4 +141,3 @@ function pmssAddUserParseCli(array $argv): array
         'user' => $user,
     ];
 }
-

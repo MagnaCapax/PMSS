@@ -14,6 +14,7 @@ class addUserCliTest extends TestCase
         $this->assertStringContainsString('--cpu-weight=WEIGHT', $usage);
         $this->assertStringContainsString('--io-read-bw=/dev/DEVICE:RATE', $usage);
         $this->assertStringContainsString('--cpu-quota-percent=PERCENT|infinity', $usage);
+        $this->assertStringContainsString('--docker-enabled=true|false', $usage);
         $this->assertStringContainsString('--help', $usage);
     }
 
@@ -54,6 +55,7 @@ class addUserCliTest extends TestCase
             '--io-write-iops=/dev/sda:200',
             '--cpu-quota-percent=150',
             '--traffic-cap-mbit=80',
+            '--docker-enabled=false',
         ]);
 
         $this->assertSame('200', $cli['user']['CPUWeight']);
@@ -64,6 +66,24 @@ class addUserCliTest extends TestCase
         $this->assertSame('/dev/sda:200', $cli['user']['IOWriteIOPS']);
         $this->assertSame('150', $cli['user']['cpuQuotaPercent']);
         $this->assertSame('80', $cli['user']['trafficCapMbit']);
+        $this->assertSame('false', $cli['user']['dockerEnabled']);
+    }
+
+    public function testDockerEnabledRequiresExplicitValue(): void
+    {
+        try {
+            \pmssAddUserParseCli([
+                'addUser.php',
+                '--user=alice',
+                '--password=secret',
+                '--ram-mib=512',
+                '--disk-quota-gib=100',
+                '--docker-enabled',
+            ]);
+            $this->fail('docker-enabled must require a value');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame('--docker-enabled requires true or false', $exception->getMessage());
+        }
     }
 
     public function testLongOptionsOverrideLegacyPositionals(): void
@@ -110,10 +130,11 @@ class addUserCliTest extends TestCase
             'CPUWeight' => '200',
             'cpuQuotaPercent' => '150',
             'torrentThrottle' => 16,
+            'dockerEnabled' => 'false',
         ]);
 
         $this->assertStringContainsString("'/scripts/util/userConfig.php' 'alice' '512' '100' '' '200' '' '' '' '' '' '150'", $command);
         $this->assertStringContainsString("'--upload-throttle-kib=16'", $command);
+        $this->assertStringContainsString("'--docker-enabled=false'", $command);
     }
 }
-

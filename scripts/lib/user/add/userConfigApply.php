@@ -42,6 +42,9 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
     if (isset($user['torrentThrottle']) && is_numeric($user['torrentThrottle'])) {
         $command[] = '--upload-throttle-kib='.(string) $user['torrentThrottle'];
     }
+    if (isset($user['dockerEnabled']) && $user['dockerEnabled'] !== '') {
+        $command[] = '--docker-enabled='.(string) $user['dockerEnabled'];
+    }
 
     return implode(' ', array_map('escapeshellarg', $command));
 }
@@ -74,6 +77,9 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
     );
     if (isset($user['trafficCapMbit']) && is_numeric($user['trafficCapMbit'])) {
         $payload['trafficCapMbit'] = (int) $user['trafficCapMbit'];
+    }
+    if (isset($user['dockerEnabled']) && $user['dockerEnabled'] !== '') {
+        $payload['dockerEnabled'] = $user['dockerEnabled'];
     }
     $userDb->addUser($user['name'], $payload);
 
