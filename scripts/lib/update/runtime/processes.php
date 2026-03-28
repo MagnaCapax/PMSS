@@ -82,6 +82,12 @@ function pmssSystemdUnitActionIfPresent(string $unit, string $description, strin
  */
 function killProcess(string $name, string $description, ?string $systemdUnit = null, int $timeoutSeconds = 10): void
 {
+    $name = trim($name);
+    if (!pmssCommandBinaryNameIsSafe($name)) {
+        logmsg("[WARN] {$description} (invalid process name)");
+        return;
+    }
+
     $probeCommand = 'pgrep -x '.escapeshellarg($name).' >/dev/null 2>&1';
     exec($probeCommand, $_, $probeStatus);
     if ($probeStatus !== 0) {
@@ -90,7 +96,9 @@ function killProcess(string $name, string $description, ?string $systemdUnit = n
     }
 
     if ($systemdUnit !== null) {
-        if (!is_dir('/run/systemd/system')) {
+        if (!pmssSystemdUnitNameIsSafe($systemdUnit)) {
+            logmsg("[WARN] {$description} (invalid systemd unit {$systemdUnit})");
+        } elseif (!is_dir('/run/systemd/system')) {
             logmsg("[WARN] {$description} (systemd unavailable for unit {$systemdUnit})");
         } elseif (pmssSystemdUnitExists($systemdUnit)) {
             runStep($description.' (stop unit)', 'systemctl stop '.escapeshellarg($systemdUnit).' 2>/dev/null');

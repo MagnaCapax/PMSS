@@ -83,6 +83,15 @@ BASH
         $this->assertEquals([], $this->pmssProfileCommands());
     }
 
+    public function testKillProcessSkipsUnsafeProcessName(): void
+    {
+        @file_put_contents($this->tempDir.'/state', "running\n");
+
+        \killProcess('demo name', 'Stopping demo process', null, 0);
+
+        $this->assertEquals([], $this->pmssProfileCommands());
+    }
+
     public function testKillProcessStopsAfterSigtermWhenProcessExits(): void
     {
         @file_put_contents($this->tempDir.'/state', "running\n");
@@ -105,6 +114,18 @@ BASH
         $this->assertEquals([
             "pkill -TERM -x 'demo'",
             "pkill -KILL -x 'demo'",
+        ], $this->pmssProfileCommands());
+    }
+
+    public function testKillProcessSkipsUnsafeSystemdUnitButStillKillsProcess(): void
+    {
+        @file_put_contents($this->tempDir.'/state', "running\n");
+        @file_put_contents($this->tempDir.'/kill-mode', "term\n");
+
+        \killProcess('demo', 'Stopping demo process', 'demo service', 1);
+
+        $this->assertEquals([
+            "pkill -TERM -x 'demo'",
         ], $this->pmssProfileCommands());
     }
 
