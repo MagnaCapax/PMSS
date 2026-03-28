@@ -43,6 +43,22 @@ class CheckUserHtpasswdTest extends TestCase
         $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, 'alice') === true);
     }
 
+    public function testEmptyUsernameReturnsFalseWithoutTreatingEveryFileAsMatched(): void
+    {
+        $path = $this->tempDir.'/user.htpasswd';
+        file_put_contents($path, "alice:hash\n");
+
+        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, '') === true);
+    }
+
+    public function testUnsafeUsernameReturnsFalseBeforeReadingContents(): void
+    {
+        $path = $this->tempDir.'/user.htpasswd';
+        file_put_contents($path, "alice:hash\n");
+
+        $this->assertFalse(\pmssCheckUserHtpasswdHasUserEntry($path, '../alice') === true);
+    }
+
     public function testEmptyFileReturnsFalse(): void
     {
         $path = $this->tempDir.'/empty.htpasswd';
@@ -74,5 +90,6 @@ class CheckUserHtpasswdTest extends TestCase
 
         $this->assertStringContainsString("pmssUserLifecycleContextLog('htpasswd'", $src);
         $this->assertStringContainsString('Unable to read per-user htpasswd; skipping synchronization', $src);
+        $this->assertStringContainsString('Skipping htpasswd sync for invalid username', $src);
     }
 }

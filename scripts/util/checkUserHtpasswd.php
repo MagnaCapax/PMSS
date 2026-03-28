@@ -20,6 +20,16 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 
 /**
+ * Keep legacy htpasswd sync on the shared managed-username rules.
+ */
+function pmssCheckUserHtpasswdUsernameIsValid(string $username): bool
+{
+    return function_exists('pmssValidateUsername')
+        ? pmssValidateUsername($username)
+        : preg_match('/^[a-z][a-z0-9]{0,7}$/', trim($username)) === 1;
+}
+
+/**
  * Write a structured log entry when the optional user logger is available.
  *
  * @param array<string, mixed> $fields
@@ -37,6 +47,11 @@ function pmssCheckUserHtpasswdLog(string $step, string $username, array $fields)
  */
 function pmssCheckUserHtpasswdHasUserEntry(string $path, string $username)
 {
+    $username = trim($username);
+    if (!pmssCheckUserHtpasswdUsernameIsValid($username)) {
+        return false;
+    }
+
     if (!is_file($path)) {
         return false;
     }
@@ -66,6 +81,18 @@ function pmssCheckUserHtpasswdMain(array $argv): int
     $passwords = array_filter(explode("\n", $globalContents), 'strlen');
 
     foreach ($users as $thisUser) {
+        if (!pmssCheckUserHtpasswdUsernameIsValid($thisUser)) {
+            pmssCheckUserHtpasswdLog(
+                'validate',
+                trim((string) $thisUser),
+                [
+                    'status'  => 'ERR',
+                    'message' => 'Skipping htpasswd sync for invalid username',
+                ]
+            );
+            continue;
+        }
+
         $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
         $hasExistingEntry = pmssCheckUserHtpasswdHasUserEntry($userHtpasswd, $thisUser);
         if ($hasExistingEntry === null) {
