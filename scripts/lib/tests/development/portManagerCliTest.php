@@ -7,11 +7,7 @@ final class PortManagerCliTest extends TestCase
 {
     private function runPortManager(array $arguments, array $environment = []): array
     {
-        return $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->pmssRepoPath('scripts/util/portManager.php')).' '
-            .implode(' ', array_map('escapeshellarg', $arguments)),
-            $environment
-        );
+        return $this->pmssRunRepoPhpScriptCommand('scripts/util/portManager.php', $arguments, $environment);
     }
 
     public function testAssignPersistsPortInsideOverrideDirectory(): void

@@ -45,10 +45,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             ], JSON_UNESCAPED_SLASHES),
         ])."\n");
 
-        $output = $this->pmssRunPhpScript(
-            dirname(__DIR__, 4).'/scripts/storageHealth.php',
-            ['--json', (string) $jsonPath, '--device', 'sdb', '--only-problems']
-        );
+        $output = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--device', 'sdb', '--only-problems']);
 
         $this->assertStringContainsString('Performance status: OK', $output);
         $this->assertStringContainsString('Summary: 0 ok, 0 warn, 1 fail', $output);
@@ -100,7 +97,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             ], JSON_UNESCAPED_SLASHES),
         ])."\n");
 
-        $output = $this->pmssRunPhpScript(dirname(__DIR__, 4).'/scripts/storageHealth.php', ['--json', (string) $jsonPath]);
+        $output = $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath]);
 
         $failPos = strpos($output, 'Failing Disk');
         $warnPos = strpos($output, 'Fast Flash');
@@ -134,10 +131,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'operation' => 'recovery',
         ], JSON_UNESCAPED_SLASHES)."\n");
 
-        $this->pmssRunPhpScript(
-            dirname(__DIR__, 4).'/scripts/storageHealth.php',
-            ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]
-        );
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]);
 
         $this->assertTrue(is_file($noticePath), 'Expected user notice file to be created');
         $notice = json_decode((string) file_get_contents($noticePath), true);
@@ -164,10 +158,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
             'operation' => 'check',
         ], JSON_UNESCAPED_SLASHES)."\n");
 
-        $this->pmssRunPhpScript(
-            dirname(__DIR__, 4).'/scripts/storageHealth.php',
-            ['--json', (string) $jsonPath, '--user-notice', (string) $noticePath]
-        );
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice', (string) $noticePath]);
 
         $this->assertTrue(is_file($noticePath), 'Expected separate-path user notice file to be created');
         $notice = json_decode((string) file_get_contents($noticePath), true);
@@ -193,10 +184,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         ], JSON_UNESCAPED_SLASHES)."\n");
         file_put_contents((string) $noticePath, "stale\n");
 
-        $this->pmssRunPhpScript(
-            dirname(__DIR__, 4).'/scripts/storageHealth.php',
-            ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]
-        );
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]);
 
         $this->assertFalse(is_file($noticePath), 'Expected stale user notice to be removed');
     }
@@ -221,10 +209,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         file_put_contents((string) $realNoticePath, "safe\n");
         symlink((string) $realNoticePath, (string) $linkNoticePath);
 
-        $this->pmssRunPhpScript(
-            dirname(__DIR__, 4).'/scripts/storageHealth.php',
-            ['--json', (string) $jsonPath, '--user-notice='.(string) $linkNoticePath]
-        );
+        $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $linkNoticePath]);
 
         $this->assertTrue(is_link($linkNoticePath), 'Expected symlinked notice path to remain a symlink');
         $this->assertEquals("safe\n", file_get_contents($realNoticePath), 'Expected symlink target to stay untouched');

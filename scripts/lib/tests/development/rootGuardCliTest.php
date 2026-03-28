@@ -18,7 +18,7 @@ class RootGuardCliTest extends TestCase
     private function runCheck(array $responses): string
     {
         $stubPath = $this->makeSystemctlStub($responses);
-        return $this->pmssRunPhpScript(getcwd().'/scripts/cron/cgroupRootCheck.php', [], ['PATH' => $stubPath.':'.getenv('PATH')]);
+        return $this->pmssRunRepoPhpScript('scripts/cron/cgroupRootCheck.php', [], ['PATH' => $stubPath.':'.getenv('PATH')]);
     }
 
     public function testRootAlreadyUnlimited(): void

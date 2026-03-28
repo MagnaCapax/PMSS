@@ -23,7 +23,7 @@ class ShowTrafficFormatTest extends TestCase
 
     public function testHelpIncludesJsonOption(): void
     {
-        $out = $this->pmssRunPhpScript(dirname(__DIR__, 3).'/showTraffic.php', ['--help'], [], '');
+        $out = $this->pmssRunRepoPhpScript('scripts/showTraffic.php', ['--help'], [], '');
 
         $this->assertTrue(is_string($out));
         $this->assertTrue(strpos($out, '--json') !== false);

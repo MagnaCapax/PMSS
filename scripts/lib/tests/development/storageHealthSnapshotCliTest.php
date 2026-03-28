@@ -57,12 +57,7 @@ class StorageHealthSnapshotCliTest extends TestCase
             'pmss-storage-health-lsblk-'
         );
 
-        $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->pmssRepoPath('scripts/util/storageHealthSnapshot.php'));
-        foreach ($arguments as $argument) {
-            $command .= ' '.escapeshellarg((string) $argument);
-        }
-
-        return $this->pmssExecShellCommand($command, [
+        return $this->pmssRunRepoPhpScriptCommand('scripts/util/storageHealthSnapshot.php', $arguments, [
             'PATH' => $stubDir.':'.(string) getenv('PATH'),
         ]);
     }

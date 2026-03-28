@@ -545,21 +545,47 @@ abstract class TestCase
         return $decoded;
     }
 
-    protected function pmssRunPhpScript(string $scriptPath, array $arguments = [], array $environment = [], string $stderrRedirect = '2>&1'): string
+    /** Build a PHP CLI command with safely escaped arguments. */
+    private function pmssBuildPhpCommand(string $scriptPath, array $arguments = []): string
     {
         $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
         foreach ($arguments as $argument) {
             $command .= ' '.escapeshellarg((string) $argument);
         }
 
-        return $this->pmssRunShellCommand($command, $environment, $stderrRedirect);
+        return $command;
+    }
+
+    protected function pmssRunPhpScript(string $scriptPath, array $arguments = [], array $environment = [], string $stderrRedirect = '2>&1'): string
+    {
+        return $this->pmssRunShellCommand(
+            $this->pmssBuildPhpCommand($scriptPath, $arguments),
+            $environment,
+            $stderrRedirect
+        );
+    }
+
+    /** Run a repository PHP entry point by relative path. */
+    protected function pmssRunRepoPhpScript(string $relativePath, array $arguments = [], array $environment = [], string $stderrRedirect = '2>&1'): string
+    {
+        return $this->pmssRunPhpScript($this->pmssRepoPath($relativePath), $arguments, $environment, $stderrRedirect);
+    }
+
+    /** @return array{rc:int, output:string, lines:array<int, string>} */
+    protected function pmssRunRepoPhpScriptCommand(string $relativePath, array $arguments = [], array $environment = [], string $stderrRedirect = '2>&1'): array
+    {
+        return $this->pmssExecShellCommand(
+            $this->pmssBuildPhpCommand($this->pmssRepoPath($relativePath), $arguments),
+            $environment,
+            $stderrRedirect
+        );
     }
 
     /** Execute `storageBenchmark.php --show-last` for the provided JSONL log. */
     protected function pmssRunStorageBenchmarkShowLast(string $logPath, array $arguments = []): string
     {
-        return $this->pmssRunPhpScript(
-            $this->pmssRepoPath('scripts/util/storageBenchmark.php'),
+        return $this->pmssRunRepoPhpScript(
+            'scripts/util/storageBenchmark.php',
             array_merge(['--show-last'], $arguments, ['--json', $logPath])
         );
     }

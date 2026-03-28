@@ -40,7 +40,7 @@ class StorageBenchmarkShowLastTest extends TestCase
              'metrics'=>['read_bw_MBps'=>10,'write_bw_MBps'=>0,'read_iops'=>10,'write_iops'=>0,'read_p95_ms'=>1,'write_p95_ms'=>0]],
         ];
         $log = $this->pmssWriteStorageBenchmarkLog($entries);
-        $out = $this->pmssRunPhpScript($this->pmssRepoPath('scripts/util/storageBenchmark.php'), ['--show-last', '--json='.$log]);
+        $out = $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json='.$log]);
         $this->assertStringContainsString('== Storage benchmark (last run) ==', (string)$out);
         $this->assertStringContainsString('randread-small', (string)$out);
     }
@@ -62,7 +62,7 @@ class StorageBenchmarkShowLastTest extends TestCase
 
     public function testShowLastTreatsShortHelpTokenAsJsonPathValue(): void
     {
-        $out = $this->pmssRunPhpScript($this->pmssRepoPath('scripts/util/storageBenchmark.php'), ['--show-last', '--json', '-h']);
+        $out = $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', '-h']);
 
         $this->assertStringContainsString('No log at -h', (string) $out);
         $this->assertTrue(
@@ -124,7 +124,7 @@ class StorageBenchmarkShowLastTest extends TestCase
         $expected .= sprintf("  %-18s seq_MB/s=%.2f t=%.2fs\n", 'device-seqread-dd', 250.5, 4.0);
         $expected .= sprintf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n", 'dev-randread-4k', 12.34, 567.8, 0.91);
 
-        $this->assertSame($expected, $this->pmssRunPhpScript($this->pmssRepoPath('scripts/util/storageBenchmark.php'), ['--show-last', '--json', $log]));
+        $this->assertSame($expected, $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', $log]));
     }
 
     public function testShowLastPrintsPreflightOnlyIfNoTests(): void

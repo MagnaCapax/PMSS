@@ -8,7 +8,7 @@ class ShowResourcesFormatTest extends TestCase
 {
     private function runScript(array $arguments, array $environment = []): string
     {
-        return $this->pmssRunPhpScript($this->pmssRepoPath('scripts/showResources.php'), $arguments, $environment);
+        return $this->pmssRunRepoPhpScript('scripts/showResources.php', $arguments, $environment);
     }
 
     private function writeResourceStats(string $runtimeDir, string $user, array $payload): void
@@ -70,10 +70,7 @@ class ShowResourcesFormatTest extends TestCase
     {
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload());
-        $result = $this->pmssExecShellCommand(
-            escapeshellarg(PHP_BINARY).' '.escapeshellarg($this->pmssRepoPath('scripts/showResources.php')).' --user=alice',
-            ['PMSS_RUNTIME_DIR' => $runtimeDir]
-        );
+        $result = $this->pmssRunRepoPhpScriptCommand('scripts/showResources.php', ['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $textOutput = $result['output'];
         $this->assertEquals(0, $result['rc']);
