@@ -24,7 +24,7 @@ function pmssStopDisableMaskSystemdUnit(string $unit, string $label, bool $mask)
     $actions = ['stop' => 'Stopping', 'disable' => 'Disabling'] + ($mask ? ['mask' => 'Masking'] : []);
     if (($skipReason = pmssSystemdActionSkipReason($unit)) !== '') {
         foreach ($actions as $prefix) {
-            pmssLogStatus('SKIP', $prefix.' '.$label.' system service ('.$skipReason.')');
+            logmsg('[SKIP] '.$prefix.' '.$label.' system service ('.$skipReason.')');
         }
         return;
     }
