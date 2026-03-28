@@ -3,7 +3,9 @@
 The `addUser.php` script provisions a seedbox account with the required quota and rTorrent settings.
 
 ```
-Usage: addUser.php USERNAME PASSWORD MAX_RAM_MB DISK_QUOTA_IN_GB [trafficLimitGB]
+Usage:
+  addUser.php USERNAME PASSWORD MAX_RAM_MB DISK_QUOTA_IN_GB [TRAFFIC_LIMIT_GB] [TRAFFIC_CAP_MBIT] [UPLOAD_THROTTLE_KIB]
+  addUser.php --user=USERNAME --password=PASSWORD --ram-mib=MAX_RAM_MB --disk-quota-gib=DISK_QUOTA_IN_GB [RESOURCE_OPTIONS]
 ```
 
 Arguments:
@@ -11,7 +13,25 @@ Arguments:
 - **PASSWORD** – set the initial password (use `rand` for a random password)
 - **MAX_RAM_MB** – account memory limit (used for cgroups and rTorrent tuning)
 - **DISK_QUOTA_IN_GB** – storage quota
-- **trafficLimitGB** (optional) – monthly traffic cap
+- **TRAFFIC_LIMIT_GB** (optional) – monthly traffic cap
+- **TRAFFIC_CAP_MBIT** (optional) – sustained traffic cap written to the user config store
+- **UPLOAD_THROTTLE_KIB** (optional) – torrent upload throttle persisted for rTorrent and qBittorrent
+
+Resource options:
+- `--traffic-limit-gb=GIB`
+- `--traffic-cap-mbit=MBIT`
+- `--upload-throttle-kib=KIB`
+- `--cpu-weight=WEIGHT`
+- `--io-weight=WEIGHT`
+- `--io-read-bw=/dev/DEVICE:RATE`
+- `--io-write-bw=/dev/DEVICE:RATE`
+- `--io-read-iops=/dev/DEVICE:IOPS`
+- `--io-write-iops=/dev/DEVICE:IOPS`
+- `--cpu-quota-percent=PERCENT|infinity`
+
+Named options override legacy positional values when both are supplied, so existing
+automation keeps working while operators can skip earlier optional slots when they
+only want to set later resource knobs.
 
 Usernames are normalised to lowercase and must match `[a-z][a-z0-9]{2,7}`—a
 leading letter followed by 2–7 lowercase letters or digits (3–8 characters
@@ -42,9 +62,9 @@ Operational notes:
 Example:
 
 ```
-/scripts/addUser.php alice rand 512 100 500
+/scripts/addUser.php --user=alice --password=rand --ram-mib=512 --disk-quota-gib=100 --traffic-limit-gb=500 --cpu-weight=200 --cpu-quota-percent=150
 ```
 
-This adds user `alice` with a random password, 512 MB account RAM limit, 100 GB disk quota and a 500 GB monthly traffic limit.
+This adds user `alice` with a random password, 512 MB account RAM limit, 100 GB disk quota, a 500 GB monthly traffic limit, and explicit CPU controls.
 
 **Documentation quality**: The script itself is largely uncommented and could benefit from a more detailed explanation of the setup steps performed.

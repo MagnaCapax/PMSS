@@ -9,6 +9,44 @@
 require_once __DIR__.'/../passwords.php';
 
 /**
+ * Build the canonical userConfig command for addUser provisioning.
+ */
+function pmssAddUserBuildUserConfigCommand(array $user): string
+{
+    $command = [
+        '/scripts/util/userConfig.php',
+        (string) $user['name'],
+        (string) $user['memory'],
+        (string) $user['quota'],
+    ];
+    $optionalArgs = [
+        4 => isset($user['trafficLimit']) ? (string) $user['trafficLimit'] : '',
+        5 => isset($user['CPUWeight']) ? (string) $user['CPUWeight'] : '',
+        6 => isset($user['IOWeight']) ? (string) $user['IOWeight'] : '',
+        7 => isset($user['IOReadBW']) ? (string) $user['IOReadBW'] : '',
+        8 => isset($user['IOWriteBW']) ? (string) $user['IOWriteBW'] : '',
+        9 => isset($user['IOReadIOPS']) ? (string) $user['IOReadIOPS'] : '',
+        10 => isset($user['IOWriteIOPS']) ? (string) $user['IOWriteIOPS'] : '',
+        11 => isset($user['cpuQuotaPercent']) ? (string) $user['cpuQuotaPercent'] : '',
+        12 => isset($user['trafficCapMbit']) ? (string) $user['trafficCapMbit'] : '',
+    ];
+    $lastOptionalIndex = 3;
+    foreach ($optionalArgs as $index => $value) {
+        if ($value !== '') {
+            $lastOptionalIndex = $index;
+        }
+    }
+    for ($index = 4; $index <= $lastOptionalIndex; $index++) {
+        $command[] = $optionalArgs[$index];
+    }
+    if (isset($user['torrentThrottle']) && is_numeric($user['torrentThrottle'])) {
+        $command[] = '--upload-throttle-kib='.(string) $user['torrentThrottle'];
+    }
+
+    return implode(' ', array_map('escapeshellarg', $command));
+}
+
+/**
  * Return the canonical nginx user config path for a provisioned account.
  */
 function pmssAddUserExpectedNginxConfigPath(string $userName): string
@@ -46,15 +84,7 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
     );
 
     // Configure quota, rtorrent and ruTorrent.
-    $userConfigCmd = sprintf(
-        '/scripts/util/userConfig.php %s %s %s',
-        escapeshellarg($user['name']),
-        escapeshellarg($user['memory']),
-        escapeshellarg($user['quota'])
-    );
-    if (isset($user['torrentThrottle']) && is_numeric($user['torrentThrottle'])) {
-        $userConfigCmd .= ' --upload-throttle-kib='.escapeshellarg((string) $user['torrentThrottle']);
-    }
+    $userConfigCmd = pmssAddUserBuildUserConfigCommand($user);
     if (runProvisionStep('Apply user configuration', $userConfigCmd) !== 0) {
         logProvisionMessage('FATAL: User configuration failed; aborting provisioning');
         finalizeProvision('FAIL', 'user_config_failed', 1);

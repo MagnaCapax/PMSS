@@ -483,11 +483,13 @@ Automation often invokes these utilities; below are expected inputs and effects.
 ## User Management (CLI)
 
 - scripts/addUser.php USERNAME PASSWORD RAM_MiB QUOTA_GiB [trafficLimitGB]
+  - Alternate form: `scripts/addUser.php --user=USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=QUOTA_GiB [resource options]`
   - Behavior: Creates Unix user with `/etc/skel`, sets password or generates one,
     sets expiry far future, ensures bash shell, records to per-user config store (`/etc/seedbox/config/users/<user>.json`),
     assigns lighttpd port, applies config (`userConfig.php`), configures per-user
     lighttpd, regenerates nginx, starts rTorrent and lighttpd, refreshes network,
     queues permission fix; optional traffic limit persists to runtime traffic files (user config store always writes `trafficLimit=0`).
+  - Resource passthrough: Supports optional `--traffic-limit-gb`, `--traffic-cap-mbit`, `--upload-throttle-kib`, `--cpu-weight`, `--io-weight`, `--io-read-bw`, `--io-write-bw`, `--io-read-iops`, `--io-write-iops`, and `--cpu-quota-percent` flags while preserving the legacy positional form.
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
   - Guardrails: Rejects reserved system/service usernames to avoid future account collisions.
   - Fail-fast: Aborts on existing user, orphaned home directory, failed `useradd`,

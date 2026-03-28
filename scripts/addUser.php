@@ -12,28 +12,18 @@
  * @author PMSS Team
  */
 
-// Shell-facing usage string; keep the CLI contract explicit for operators.
-$usage = 'Usage: addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [trafficLimitGB] [trafficCapMbit] [uploadThrottleKib]';
-if (empty($argv[1]) or
-    empty($argv[2]) or
-    empty($argv[3]) or 
-    empty($argv[4]) ) die($usage . "\n");
-    
-$user = array(
-    'name'      => $argv[1],
-    'password'  => $argv[2],
-    'memory'    => $argv[3],
-    'quota'     => $argv[4]    
-);
-if (isset($argv[5])) $user['trafficLimit'] = (int) $argv[5];
-if (isset($argv[6])) $user['trafficCapMbit'] = (int) $argv[6];
-if (isset($argv[7])) {
-    if (!is_numeric($argv[7]) || (int) $argv[7] < 0) {
-        die("Invalid upload throttle value\n");
-    }
-    $user['torrentThrottle'] = (int) $argv[7];
+require_once 'lib/user/add/cli.php';
+
+try {
+    $cli = pmssAddUserParseCli($argv ?? ($_SERVER['argv'] ?? []));
+} catch (InvalidArgumentException $exception) {
+    die($exception->getMessage() . "\n");
 }
-if ($user['password'] == 'rand') $user['password'] = '';
+if (!empty($cli['help'])) {
+    echo $cli['usage'] . "\n";
+    exit(0);
+}
+$user = $cli['user'];
 
 require_once 'lib/runtime.php';
 require_once 'lib/rtorrentConfig.php';
