@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../resources/userHelpers.php';
+require_once __DIR__.'/../resources/log.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 

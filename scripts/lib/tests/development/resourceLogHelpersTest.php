@@ -93,11 +93,13 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertSame(null, \pmssResourceLogLookupManagedUid('Alice'));
     }
 
-    public function testLegacyUserHelpersPathStillExportsFunctions(): void
+    public function testTrafficIngressLoadsResourceHelpersDirectly(): void
     {
-        $script = 'require_once '.var_export(dirname(__DIR__, 2).'/resources/userHelpers.php', true).';'
-            .'echo (function_exists("pmssResourceLogLookupUid") && function_exists("pmssResourceLogIsValidUser")) ? "ok" : "fail";';
-        $this->assertEquals('ok', trim($this->pmssRunInlinePhp($script, [], '')));
+        $ingressSrc = $this->pmssReadRepoFile('scripts/lib/traffic/ingress.php');
+        $legacyPath = dirname(__DIR__, 3).'/resources/'.'user'.'Helpers.php';
+
+        $this->assertStringContainsString("require_once __DIR__.'/../resources/log.php';", $ingressSrc);
+        $this->assertTrue(!is_file($legacyPath), 'Expected the legacy resource helper shim to be removed');
     }
 
     public function testReadCountersParsesSystemctlOutput(): void
