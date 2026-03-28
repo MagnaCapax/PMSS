@@ -7,8 +7,7 @@ class NetworkConfigTest extends TestCase
 {
     public function testLoadConfigUsesOverride(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-network-config-', '.php');
-        file_put_contents($tmp, "<?php return ['interface' => 'eth9'];");
+        $tmp = $this->pmssWritePhpArrayFixture(['interface' => 'eth9'], 'pmss-network-config-');
 
         $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
             $config = \networkLoadConfig();

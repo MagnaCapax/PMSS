@@ -24,10 +24,8 @@ class NetworkInfoCharacterizationTest extends TestCase
 
     public function testConfigProbeDelegatesToSharedHelper(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/networkInfo.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/network/config.php';", $src);
-        $this->assertStringContainsString('networkLoadConfig()', $src);
-        $this->assertSame(0, substr_count($src, '/etc/seedbox/config/network'));
+        $path = 'scripts/lib/networkInfo.php';
+        $this->pmssAssertRepoFileContainsAllStrings($path, ["require_once __DIR__.'/network/config.php';", 'networkLoadConfig()']);
+        $this->pmssAssertRepoFileSubstringCount($path, '/etc/seedbox/config/network', 0);
     }
 }

@@ -61,13 +61,13 @@ class BootstrapWriteGuardTest extends TestCase
 
     public function testBootstrapUsesSharedManagedPathWriterForHostnameAndSshdConfig(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/services/bootstrap.php');
-
-        $this->assertStringContainsString("'../managedPath.php'", $source);
-        $this->assertStringContainsString("pmssWriteManagedPathFile('/etc/hostname', \$hostname.PHP_EOL, 'hostname', \$log, 'root', 'root')", $source);
-        $this->assertStringContainsString("pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', \$config, 'sshd backup config', 'logMessage', 'root', 'root')", $source);
-        $this->assertStringContainsString("pmssWriteManagedPathFile(\$sshdConfig, \$updated, 'sshd config', 'logMessage', 'root', 'root')", $source);
-        $this->assertFalse(strpos($source, "file_put_contents('/etc/hostname'") !== false);
-        $this->assertFalse(strpos($source, 'file_put_contents($sshdConfig, $updated)') !== false);
+        $path = 'scripts/lib/update/services/bootstrap.php';
+        $this->pmssAssertRepoFileContainsAllStrings($path, [
+            "'../managedPath.php'",
+            "pmssWriteManagedPathFile('/etc/hostname', \$hostname.PHP_EOL, 'hostname', \$log, 'root', 'root')",
+            "pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', \$config, 'sshd backup config', 'logMessage', 'root', 'root')",
+            "pmssWriteManagedPathFile(\$sshdConfig, \$updated, 'sshd config', 'logMessage', 'root', 'root')",
+        ]);
+        $this->pmssAssertRepoFileNotContainsStrings($path, ["file_put_contents('/etc/hostname'", 'file_put_contents($sshdConfig, $updated)']);
     }
 }

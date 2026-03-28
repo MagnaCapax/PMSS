@@ -7,18 +7,16 @@ class checkRtorrentUsernameValidationContractTest extends TestCase
 {
     public function testSharedListUsersParserRemainsPreferred(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
-
-        $this->assertStringContainsString("pmssListManagedUsersResult('/scripts/listUsers.php')", $src);
-        $this->assertStringContainsString('function pmssCheckRtorrentCleanupStaleSocket(', $src);
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/cron/checkRtorrent.php',
+            ["pmssListManagedUsersResult('/scripts/listUsers.php')", 'function pmssCheckRtorrentCleanupStaleSocket(']
+        );
     }
 
     public function testLegacyInlineUsernameParsingStaysRemoved(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/cron/checkRtorrent.php');
-
-        $this->assertTrue(strpos($src, "@exec('/scripts/listUsers.php'") === false);
-        $this->assertTrue(strpos($src, '/^[a-z][a-z0-9]{0,7}$/') === false);
-        $this->assertStringContainsString('function pmssCheckRtorrentStart(', $src);
+        $path = 'scripts/cron/checkRtorrent.php';
+        $this->pmssAssertRepoFileNotContainsStrings($path, ["@exec('/scripts/listUsers.php'", '/^[a-z][a-z0-9]{0,7}$/']);
+        $this->pmssAssertRepoFileContainsString($path, 'function pmssCheckRtorrentStart(');
     }
 }

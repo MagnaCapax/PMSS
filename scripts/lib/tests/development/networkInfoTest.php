@@ -34,8 +34,7 @@ class NetworkInfoTest extends TestCase
 
     public function testDetectPrimaryInterfaceUsesSharedConfigOverride(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-network-info-', '.php');
-        file_put_contents($tmp, "<?php return ['interface' => 'bond9'];");
+        $tmp = $this->pmssWritePhpArrayFixture(['interface' => 'bond9'], 'pmss-network-info-');
 
         $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
             $this->assertSame('bond9', \detectPrimaryInterface());
@@ -44,8 +43,7 @@ class NetworkInfoTest extends TestCase
 
     public function testGetLinkSpeedUsesSharedConfigOverride(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-network-info-', '.php');
-        file_put_contents($tmp, "<?php return ['speed' => '4321'];");
+        $tmp = $this->pmssWritePhpArrayFixture(['speed' => '4321'], 'pmss-network-info-');
 
         $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
             $this->assertSame(4321, \getLinkSpeed('eth0'));
@@ -59,8 +57,7 @@ class NetworkInfoTest extends TestCase
 
     public function testDetectPrimaryInterfaceIgnoresUnsafeConfigOverride(): void
     {
-        $tmp = $this->pmssMakeTempPath('pmss-network-info-', '.php');
-        file_put_contents($tmp, "<?php return ['interface' => 'eth0; touch /tmp/pwned'];");
+        $tmp = $this->pmssWritePhpArrayFixture(['interface' => 'eth0; touch /tmp/pwned'], 'pmss-network-info-');
 
         $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
             $iface = \detectPrimaryInterface();

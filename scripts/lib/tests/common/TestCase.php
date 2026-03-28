@@ -226,6 +226,14 @@ abstract class TestCase
         return $path;
     }
 
+    /** Write a PHP array fixture that can be loaded with include/require. */
+    protected function pmssWritePhpArrayFixture(array $value, string $prefix = 'pmss-fixture-'): string
+    {
+        $path = $this->pmssMakeTempPath($prefix, '.php');
+        file_put_contents($path, "<?php return ".var_export($value, true).";\n");
+        return $path;
+    }
+
     /** Create a tracked JSON-lines fixture path under a fresh temporary directory. */
     protected function pmssMakeJsonLogPath(string $dirPrefix, string $filename = 'fixture.jsonl'): string
     {
@@ -614,6 +622,12 @@ abstract class TestCase
     protected function pmssAssertRepoFileContainsAllStrings(string $relativePath, array $needles, string $messagePrefix = ''): void
     {
         $this->assertStringContainsAllStrings($needles, $this->pmssReadRepoFile($relativePath), $messagePrefix);
+    }
+
+    /** Read a repository file and assert that it matches a regex. */
+    protected function pmssAssertRepoFileMatches(string $relativePath, string $pattern, string $message = ''): void
+    {
+        $this->assertMatches($pattern, $this->pmssReadRepoFile($relativePath), $message);
     }
 
     /** Read a repository file and assert ordered substrings. */
