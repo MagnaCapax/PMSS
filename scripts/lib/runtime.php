@@ -27,8 +27,25 @@ if (!function_exists('pmssResolvePathFromEnv')) {
         return $value !== '' ? $value : rtrim($default, '/');
     }
 }
+if (!function_exists('pmssCommandBinaryNameIsSafe')) {
+    // Accept only bare binary names before crossing the shell boundary.
+    function pmssCommandBinaryNameIsSafe(string $binary): bool
+    {
+        return preg_match('/^[A-Za-z0-9._+-]+$/', $binary) === 1;
+    }
+}
 if (!function_exists('pmssCommandPath')) {
-    function pmssCommandPath(string $binary): string { $binary = trim($binary); return $binary === '' ? '' : trim((string) @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null')); }
+    // Resolve an executable path for a safe bare binary name.
+    function pmssCommandPath(string $binary): string
+    {
+        $binary = trim($binary);
+        if ($binary === '' || !pmssCommandBinaryNameIsSafe($binary)) {
+            return '';
+        }
+
+        $resolved = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
+        return is_string($resolved) ? trim($resolved) : '';
+    }
 }
 
 if (!function_exists('pmssEnvValueNormalized')) {
