@@ -16,22 +16,12 @@
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/user/userConfigStore.php';
-require_once __DIR__.'/lib/user/userFilesystem.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Suspending
 // a user when /home is unavailable would fail or act on stale paths.
 pmssRequireHomeMounted('suspend.php');
 
-$usage = 'suspend.php USERNAME';
-$username = $argv[1] ?? '';
-if ($username === '') {
-    die($usage."\n");
-}
-
-// Validate inputs early so we never feed garbage to usermod or log files.
-['username' => $username, 'homeDir' => $homeDir] = userFilesystem::requireCliUserHome($username, 'suspend', "Invalid username: %s\n", "User home %s missing\n");
-$activeRoot = "$homeDir/www";
-$disabledRoot = "$homeDir/www-disabled";
+['username' => $username, 'homeDir' => $homeDir, 'activeRoot' => $activeRoot, 'disabledRoot' => $disabledRoot] = pmssUserLifecycleRequireUserRoots($argv, 'suspend.php', 'suspend');
 
 // Canonical suspended detection: only the presence of www-disabled matters.
 if (is_dir($disabledRoot)) {
@@ -85,18 +75,13 @@ if (!is_dir($activeRoot)) {
 // Best-effort: mirror the suspension state in the user config store.
 (new UserConfigStore())->setSuspended($username, is_dir($disabledRoot));
 
-pmssUserLifecycleStep(
+pmssUserLifecycleRefreshNginxConfig(
     'suspend',
     $username,
+    false,
     'refresh_nginx_config',
-    'php /scripts/util/createNginxConfig.php --user '.escapeshellarg($username),
-    false
+    'php /scripts/util/createNginxConfig.php --user '.escapeshellarg($username)
 );
-// Prefer systemd when available but keep init.d fallback for older hosts.
-$restartRc = pmssUserLifecycleStep('suspend', $username, 'restart_nginx_systemctl', 'systemctl restart nginx', false);
-if ($restartRc !== 0) {
-    pmssUserLifecycleStep('suspend', $username, 'restart_nginx_init', '/etc/init.d/nginx restart', false);
-}
 
 pmssUserLifecycleContextLog('suspend', 'end', $username, array(
     'status'          => $landingMessage === '' ? 'OK' : 'WARN',

@@ -15,96 +15,19 @@
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
 require_once __DIR__.'/lib/user/userConfigStore.php';
-require_once __DIR__.'/lib/user/userFilesystem.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Unsuspending
 // a user when /home is unavailable would fail or act on stale paths.
 pmssRequireHomeMounted('unsuspend.php');
 
-$usage = 'unsuspend.php USERNAME';
-$username = $argv[1] ?? '';
-if ($username === '') {
-    die($usage."\n");
-}
-
-// This script is invoked by operators/automation. Validate inputs early so we
-// never feed garbage to usermod or log files.
-['username' => $username, 'homeDir' => $homeDir] = userFilesystem::requireCliUserHome($username, 'unsuspend', "Invalid username: %s\n", "User home %s missing\n");
-$activeRoot = "$homeDir/www";
-$disabledRoot = "$homeDir/www-disabled";
-
-$hasSuspendedContent = static function (string $candidate): bool {
-    if (!is_dir($candidate)) {
-        return false;
-    }
-    if (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {
-        return true;
-    }
-    $entries = @scandir($candidate);
-    if ($entries === false) {
-        return false;
-    }
-    $entries = array_values(array_diff($entries, array('.', '..')));
-    if (empty($entries)) {
-        return false;
-    }
-    $allowed = array('index.html', 'public');
-    foreach ($entries as $entry) {
-        if (!in_array($entry, $allowed, true)) {
-            return true;
-        }
-    }
-    $publicPath = $candidate.'/public';
-    if (!is_dir($publicPath)) {
-        return true;
-    }
-    $publicEntries = @scandir($publicPath);
-    if ($publicEntries === false) {
-        return true;
-    }
-    $publicEntries = array_values(array_diff($publicEntries, array('.', '..')));
-    foreach ($publicEntries as $entry) {
-        if ($entry !== 'index.html') {
-            return true;
-        }
-    }
-    return false;
-};
-
-$findSuspendedBackup = static function (string $homeDir) use ($hasSuspendedContent): ?string {
-    $candidates = glob($homeDir.'/www-suspended-*', GLOB_NOSORT);
-    if (!is_array($candidates) || empty($candidates)) {
-        return null;
-    }
-    $ranked = array();
-    foreach ($candidates as $candidate) {
-        if (!$hasSuspendedContent($candidate)) {
-            continue;
-        }
-        $mtime = @filemtime($candidate);
-        $ranked[] = array(
-            'path' => $candidate,
-            'mtime' => ($mtime === false ? 0 : $mtime),
-        );
-    }
-    if (empty($ranked)) {
-        return null;
-    }
-    usort($ranked, static function (array $a, array $b): int {
-        if ($a['mtime'] === $b['mtime']) {
-            return strcmp($b['path'], $a['path']);
-        }
-        return ($b['mtime'] <=> $a['mtime']);
-    });
-    return $ranked[0]['path'];
-};
+['username' => $username, 'homeDir' => $homeDir, 'activeRoot' => $activeRoot, 'disabledRoot' => $disabledRoot] = pmssUserLifecycleRequireUserRoots($argv, 'unsuspend.php', 'unsuspend');
 
 $restoredFromBackup = false;
 // Canonical suspended detection: only the presence of www-disabled matters.
 // Recovery path: if both www-disabled and www are absent, restore a backup.
 if (!is_dir($disabledRoot)) {
     if (!is_dir($activeRoot)) {
-        $candidate = $findSuspendedBackup($homeDir);
+        $candidate = pmssUserLifecycleFindSuspendedBackup($homeDir);
         if ($candidate !== null && @rename($candidate, $activeRoot)) {
             echo "Notice: restored {$activeRoot} from {$candidate}\n";
             $restoredFromBackup = true;
@@ -154,31 +77,13 @@ if (is_dir($disabledRoot) && !@rename($disabledRoot, $activeRoot)) {
 // Best-effort: mirror the state in the user config store (marker is canonical).
 (new UserConfigStore())->setSuspended($username, is_dir($disabledRoot));
 
-pmssUserLifecycleStep(
+pmssUserLifecycleRefreshNginxConfig(
     'unsuspend',
     $username,
+    false,
     'refresh_nginx_config',
-    'php /scripts/util/createNginxConfig.php --user '.escapeshellarg($username),
-    false
+    'php /scripts/util/createNginxConfig.php --user '.escapeshellarg($username)
 );
-
-// Prefer systemd when available but keep init.d fallback for older hosts.
-$restartRc = pmssUserLifecycleStep(
-    'unsuspend',
-    $username,
-    'restart_nginx_systemctl',
-    'systemctl restart nginx',
-    false
-);
-if ($restartRc !== 0) {
-    pmssUserLifecycleStep(
-        'unsuspend',
-        $username,
-        'restart_nginx_init',
-        '/etc/init.d/nginx restart',
-        false
-    );
-}
 
 pmssUserLifecycleContextLog('unsuspend', 'start_rtorrent', $username, array(
     'status'   => 'INFO',

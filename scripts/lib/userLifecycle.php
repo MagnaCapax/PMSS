@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/user/log.php';
+require_once __DIR__.'/user/userFilesystem.php';
 
 if (!defined('PMSS_USER_LOG_TEXT')) {
     define('PMSS_USER_LOG_TEXT', '/var/log/pmss/users.log');
@@ -553,6 +554,92 @@ function pmssUserLifecycleStep(string $action, string $username, string $step, s
     ));
 
     return $rc;
+}
+
+/** @return array<string,string> */
+function pmssUserLifecycleRequireUserRoots(array $argv, string $scriptName, string $action): array
+{
+    $username = (string) ($argv[1] ?? '');
+    if ($username === '') {
+        die($scriptName." USERNAME\n");
+    }
+    ['username' => $username, 'homeDir' => $homeDir] = userFilesystem::requireCliUserHome(
+        $username,
+        $action,
+        "Invalid username: %s\n",
+        "User home %s missing\n"
+    );
+
+    return array(
+        'username' => $username,
+        'homeDir' => $homeDir,
+        'activeRoot' => $homeDir.'/www',
+        'disabledRoot' => $homeDir.'/www-disabled',
+    );
+}
+
+/**
+ * Find the newest suspended web backup that still contains user content.
+ */
+function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
+{
+    $candidates = glob($homeDir.'/www-suspended-*', GLOB_NOSORT);
+    if (!is_array($candidates) || empty($candidates)) {
+        return null;
+    }
+    $ranked = array();
+    $hasSuspendedContent = static function (string $candidate): bool {
+        if (!is_dir($candidate) || is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php')) {
+            return is_dir($candidate) && (is_dir($candidate.'/rutorrent') || is_file($candidate.'/index.php'));
+        }
+        $entries = @scandir($candidate);
+        if ($entries === false || empty(array_diff($entries, array('.', '..')))) {
+            return false;
+        }
+        foreach (array_diff($entries, array('.', '..')) as $entry) {
+            if ($entry !== 'index.html' && $entry !== 'public') {
+                return true;
+            }
+        }
+        $publicEntries = @scandir($candidate.'/public');
+        return $publicEntries === false || count(array_diff($publicEntries, array('.', '..', 'index.html'))) > 0;
+    };
+    foreach ($candidates as $candidate) {
+        if (!$hasSuspendedContent($candidate)) {
+            continue;
+        }
+        $mtime = @filemtime($candidate);
+        $ranked[] = array('path' => $candidate, 'mtime' => $mtime === false ? 0 : $mtime);
+    }
+    if (empty($ranked)) {
+        return null;
+    }
+    usort($ranked, static function (array $a, array $b): int {
+        if ($a['mtime'] === $b['mtime']) {
+            return strcmp($b['path'], $a['path']);
+        }
+        return $b['mtime'] <=> $a['mtime'];
+    });
+
+    return $ranked[0]['path'];
+}
+
+/** @param array<string,string> $restartOptions */
+function pmssUserLifecycleRefreshNginxConfig(string $action, string $username, bool $dryRun, string $configStep, string $configCommand, array $restartOptions = array(), ?callable $stepRunner = null): int
+{
+    $runner = $stepRunner ?? 'pmssUserLifecycleStep';
+    $systemctlStep = isset($restartOptions['systemctlStep']) ? (string) $restartOptions['systemctlStep'] : 'restart_nginx_systemctl';
+    $systemctlCommand = isset($restartOptions['systemctlCommand']) ? (string) $restartOptions['systemctlCommand'] : 'systemctl restart nginx';
+    $initStep = isset($restartOptions['initStep']) ? (string) $restartOptions['initStep'] : 'restart_nginx_init';
+    $initCommand = isset($restartOptions['initCommand']) ? (string) $restartOptions['initCommand'] : '/etc/init.d/nginx restart';
+
+    $runner($action, $username, $configStep, $configCommand, $dryRun);
+    $restartRc = (int) $runner($action, $username, $systemctlStep, $systemctlCommand, $dryRun);
+    if ($restartRc === 0) {
+        return 0;
+    }
+
+    return (int) $runner($action, $username, $initStep, $initCommand, $dryRun);
 }
 
 /**

@@ -61,4 +61,25 @@ class userLifecycleLoggingTest extends TestCase
         $this->assertStringContainsString('function pmssUserLifecycleContextLog(', $source);
         $this->assertStringContainsString('pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));', $source);
     }
+
+    public function testRefreshNginxConfigKeepsFallbackOrder(): void
+    {
+        $cases = array(
+            array('suspend', 'refresh_nginx_config', 'php /scripts/util/createNginxConfig.php --user \'alice\'', array(), null, array('refresh_nginx_config', 'restart_nginx_systemctl')),
+            array('terminate', 'regen_nginx_user_configs', '/scripts/util/createNginxConfig.php', array('systemctlStep' => 'restart_nginx', 'initStep' => 'restart_nginx_init'), 'restart_nginx', array('regen_nginx_user_configs', 'restart_nginx', 'restart_nginx_init')),
+        );
+
+        foreach ($cases as $case) {
+            $calls = array();
+            $result = \pmssUserLifecycleRefreshNginxConfig($case[0], 'alice', false, $case[1], $case[2], $case[3], static function (string $action, string $username, string $step, string $command, bool $dryRun) use (&$calls, $case): int {
+                $calls[] = array('action' => $action, 'username' => $username, 'step' => $step, 'command' => $command, 'dryRun' => $dryRun);
+                return $step === $case[4] ? 1 : 0;
+            });
+
+            $this->assertSame(0, $result);
+            $this->assertSame($case[5], array_column($calls, 'step'));
+            $this->assertSame('alice', $calls[0]['username']);
+            $this->assertFalse($calls[0]['dryRun']);
+        }
+    }
 }

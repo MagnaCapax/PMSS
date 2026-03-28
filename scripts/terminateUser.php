@@ -232,16 +232,17 @@ pmssUserLifecycleStep('terminate', $username,
     $dryRun
 );
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
-pmssUserLifecycleStep('terminate', $username,
+pmssUserLifecycleRefreshNginxConfig(
+    'terminate',
+    $username,
+    $dryRun,
     'regen_nginx_user_configs',
     '/scripts/util/createNginxConfig.php',
-    $dryRun
+    array(
+        'systemctlStep' => 'restart_nginx',
+        'initStep' => 'restart_nginx_init',
+    )
 );   // Reconfig nginx
-pmssUserLifecycleStep('terminate', $username,
-    'restart_nginx',
-    'systemctl restart nginx || /etc/init.d/nginx restart || true',
-    $dryRun
-);
 pmssUserLifecycleStep('terminate', $username,
     'userdel_groupdel_retry',
     'userdel '.escapeshellarg($username),
