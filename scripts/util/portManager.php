@@ -76,6 +76,20 @@ function pmssPortManagerLog(string $user, string $action, string $service, ?int 
     );
 }
 
+/**
+ * Read a persisted port assignment and reject malformed or out-of-range data.
+ */
+function pmssPortManagerReadAssignedPort(string $portFile): ?int
+{
+    $raw = @file_get_contents($portFile);
+    if ($raw === false) {
+        return null;
+    }
+
+    $port = (int) trim((string) $raw);
+    return $port >= 1 && $port <= 65535 ? $port : null;
+}
+
 $lockHandle = false;
 if ($action === 'assign' || $action === 'release') {
     $lockHandle = pmssLockFileAcquire(pmssRuntimeLockPath('pmss-portManager-'.$service.'.lock'));
@@ -87,21 +101,33 @@ if ($action === 'assign' || $action === 'release') {
 switch ($action) {
     case 'view':
         if (file_exists($portFile)) {
-            echo trim((string) @file_get_contents($portFile)) . "\n";
+            $assignedPort = pmssPortManagerReadAssignedPort($portFile);
+            if ($assignedPort === null) {
+                fwrite(STDERR, "Error: invalid stored port assignment\n");
+                exit(1);
+            }
+            echo $assignedPort . "\n";
         } else echo "No port assigned\n";
         break;
 
     case 'assign':
         if (file_exists($portFile)) {
-            $existing = (int) trim((string) @file_get_contents($portFile));
+            $existing = pmssPortManagerReadAssignedPort($portFile);
+            if ($existing === null) {
+                fwrite(STDERR, "Error: invalid stored port assignment\n");
+                pmssPortManagerLog($user, 'assign', $service, null, 'ERR', 'invalid_existing_assignment');
+                exit(1);
+            }
             echo $existing . "\n";
             pmssPortManagerLog($user, 'assign', $service, $existing, 'SKIP', 'already_assigned');
             break;
         }
         $used = [];
         foreach ((glob("$portDir/{$service}-*") ?: []) as $f) {
-            $p = (int) trim(@file_get_contents($f));
-            if ($p) $used[$p] = true;
+            $assignedPort = pmssPortManagerReadAssignedPort($f);
+            if ($assignedPort !== null) {
+                $used[$assignedPort] = true;
+            }
         }
         do {
             $port = rand(2000, 38000);
@@ -111,7 +137,9 @@ switch ($action) {
             pmssPortManagerLog($user, 'assign', $service, $port, 'ERR', 'write_failed');
             exit(1);
         }
-        chmod($portFile, 0640);
+        if (!@chmod($portFile, 0640)) {
+            pmssPortManagerLog($user, 'assign', $service, $port, 'WARN', 'chmod_failed');
+        }
         echo $port . "\n";
         pmssPortManagerLog($user, 'assign', $service, $port, 'OK', 'assigned');
         break;

@@ -35,6 +35,29 @@ final class PortManagerCliTest extends TestCase
         $this->assertSame('24567', trim($result['output']));
     }
 
+    public function testAssignFailsWhenExistingPortFileIsMalformed(): void
+    {
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        file_put_contents($portDir.'/lighttpd-alice', "not-a-port\n");
+
+        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
+    }
+
+    public function testAssignIgnoresMalformedSiblingAssignments(): void
+    {
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        file_put_contents($portDir.'/lighttpd-bob', "not-a-port\n");
+
+        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+
+        $this->assertSame(0, $result['rc']);
+        $this->assertMatches('/^\d+$/', trim($result['output']));
+        $this->assertTrue(is_file($portDir.'/lighttpd-alice'));
+    }
+
     public function testReleaseRemovesAssignedPort(): void
     {
         $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
@@ -45,6 +68,17 @@ final class PortManagerCliTest extends TestCase
         $this->assertSame(0, $result['rc']);
         $this->assertStringContainsString('Port released', $result['output']);
         $this->assertFalse(file_exists($portDir.'/lighttpd-alice'));
+    }
+
+    public function testViewFailsWhenStoredAssignmentIsMalformed(): void
+    {
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        file_put_contents($portDir.'/lighttpd-alice', "not-a-port\n");
+
+        $result = $this->runPortManager(['view', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
     }
 
     public function testRejectsInvalidUsernameBeforeTouchingFilesystem(): void
