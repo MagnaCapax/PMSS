@@ -35,35 +35,19 @@ foreach ($users as $user) {
     }
 
     $statePath = $stateDir.'/'.$user.'.json';
-    $state = pmssTrafficIngressReadState($statePath);
-
-    $currentIngress = (int) $counters['ingress'];
-    $previousIngress = isset($state['ingress']) ? (int) $state['ingress'] : null;
-    $delta = ($previousIngress !== null && $currentIngress >= $previousIngress)
-        ? $currentIngress - $previousIngress
-        : $currentIngress;
-
-    $state = [
-        'ingress' => $currentIngress,
-        'egress'  => (int) $counters['egress'],
-        'ts'      => time(),
-    ];
-    pmssTrafficIngressWriteState($statePath, $state);
+    ['delta' => $delta, 'previous_ingress' => $previousIngress] = pmssTrafficIngressUpdateState($statePath, $counters);
 
     if ($delta > 0) {
-        if ($linkSpeed > 0) {
-            $maxDelta = ($linkSpeed * 1000 * 1000 * 60 * 5) * 0.9;
-            if ($delta > $maxDelta) {
-                $previousDisplay = $previousIngress !== null ? $previousIngress : 'n/a';
-                pmssAppendRootTimestampedLogEntry(
-                    $logDir.'/error.log',
-                    ": User {$user} ingress exceeds 90% link max: {$delta}\nDEBUG COUNTERS: ingress={$currentIngress} previous={$previousDisplay}\n"
-                );
-                if (function_exists('pmssUserLog')) {
-                    pmssUserLog($user, sprintf('ingress anomaly: usage exceeds 90%% link max (%d bytes)', $delta));
-                }
-                continue;
+        if (pmssResourceLogExceedsFiveMinuteLinkBudget($delta, $linkSpeed)) {
+            $previousDisplay = $previousIngress !== null ? $previousIngress : 'n/a';
+            pmssAppendRootTimestampedLogEntry(
+                $logDir.'/error.log',
+                ": User {$user} ingress exceeds 90% link max: {$delta}\nDEBUG COUNTERS: ingress={$counters['ingress']} previous={$previousDisplay}\n"
+            );
+            if (function_exists('pmssUserLog')) {
+                pmssUserLog($user, sprintf('ingress anomaly: usage exceeds 90%% link max (%d bytes)', $delta));
             }
+            continue;
         }
 
         pmssAppendRootTimestampedLogEntry($logDir.'/'.$user, ": {$delta}\n");

@@ -59,16 +59,15 @@ foreach($users AS $thisUser) {
         }
 
 		// Do not log if usage was MORE than linkspeed for the past 5 minutes.
-	    if ($linkSpeed !== null && $linkSpeed > 0) {
-	        if ($thisUserTraffic > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
+	    if (pmssResourceLogExceedsFiveMinuteLinkBudget($thisUserTraffic, $linkSpeed)) {
 	            pmssAppendRootTimestampedLogEntry($logdir . 'error.log', ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n");
                 if (function_exists('pmssUserLog')) {
                     pmssUserLog($thisUser, sprintf('traffic anomaly: usage exceeds 90%% link max (%d bytes)', $thisUserTraffic));
                 }
 	            continue;  
-	        }
-	        // Note: variable name typo caused undefined output; use the correct value
-	        if ($thisUserTrafficLocal > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
+	    }
+	    // Note: variable name typo caused undefined output; use the correct value
+	    if (pmssResourceLogExceedsFiveMinuteLinkBudget($thisUserTrafficLocal, $linkSpeed)) {
 	            pmssAppendRootTimestampedLogEntry(
 	                $logdir . 'error.log',
 	                ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n"
@@ -77,7 +76,6 @@ foreach($users AS $thisUser) {
                     pmssUserLog($thisUser, sprintf('traffic anomaly: local usage exceeds 90%% link max (%d bytes)', $thisUserTrafficLocal));
                 }
 	            continue;
-	        }
 	    }
 
     if ($thisUserTraffic > 0) pmssAppendRootTimestampedLogEntry($logdir . $thisUser, ": {$thisUserTraffic}\n");

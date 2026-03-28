@@ -47,6 +47,16 @@ function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $m
 }
 
 /**
+ * Check whether five minutes of usage exceed 90% of the configured link budget.
+ */
+function pmssResourceLogExceedsFiveMinuteLinkBudget(int $bytes, ?float $linkSpeed): bool
+{
+    return $linkSpeed !== null
+        && $linkSpeed > 0
+        && $bytes > ($linkSpeed * 1000 * 1000 * 60 * 5) * 0.9;
+}
+
+/**
  * Read systemd slice counters for the given user.
  */
 function pmssResourceLogReadCounters(int $uid): ?array

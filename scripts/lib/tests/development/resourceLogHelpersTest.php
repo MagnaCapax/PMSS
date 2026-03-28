@@ -93,6 +93,13 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(strpos($ingressSource, "@file_put_contents(\$logDir.'/'.\$user") === false);
     }
 
+    public function testFiveMinuteLinkBudgetThresholdChecks(): void
+    {
+        $this->assertTrue(!\pmssResourceLogExceedsFiveMinuteLinkBudget(100, null));
+        $this->assertTrue(!\pmssResourceLogExceedsFiveMinuteLinkBudget(200000000, 100.0));
+        $this->assertTrue(\pmssResourceLogExceedsFiveMinuteLinkBudget(30000000000, 100.0));
+    }
+
     public function testUserValidationRejectsUppercase(): void
     {
         $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));

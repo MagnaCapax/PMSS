@@ -42,72 +42,66 @@ class TrafficIngressHelpersTest extends TestCase
         $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
     }
 
-    public function testReadStateMissingReturnsEmpty(): void
-    {
-        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
-        $state = \pmssTrafficIngressReadState($root.'/missing.json');
-        $this->assertTrue($state === []);
-    }
-
-    public function testWriteStateRoundTrip(): void
+    public function testUpdateStateMissingReturnsCurrentCountersAndWritesState(): void
     {
         $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $path = $root.'/state.json';
-        $payload = ['ingress' => 123, 'egress' => 456];
-        \pmssTrafficIngressWriteState($path, $payload);
-        $loaded = \pmssTrafficIngressReadState($path);
-        $this->assertEquals($payload, $loaded);
+        $result = \pmssTrafficIngressUpdateState($path, ['ingress' => 123, 'egress' => 456]);
+        $this->assertEquals(123, $result['delta']);
+        $this->assertEquals(null, $result['previous_ingress']);
+        $loaded = json_decode((string) file_get_contents($path), true);
+        $this->assertEquals(123, $loaded['ingress']);
+        $this->assertEquals(456, $loaded['egress']);
         $this->assertEquals(0600, fileperms($path) & 0777);
     }
 
-    public function testReadStateInvalidJsonReturnsEmpty(): void
+    public function testUpdateStateHandlesStoredStateScenarios(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
-        $path = $root.'/bad.json';
-        $this->pmssWriteFile($path, 'not-json');
-        $loaded = \pmssTrafficIngressReadState($path);
-        $this->assertTrue($loaded === []);
+        $cases = [
+            [json_encode(['ingress' => 100, 'egress' => 200, 'ts' => 1]), ['ingress' => 160, 'egress' => 260], 60, 100],
+            [json_encode(['ingress' => 500, 'egress' => 200, 'ts' => 1]), ['ingress' => 40, 'egress' => 80], 40, 500],
+            ['not-json', ['ingress' => 77, 'egress' => 88], 77, null],
+        ];
+        foreach ($cases as [$seed, $counters, $expectedDelta, $expectedPrevious]) {
+            $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
+            $path = $root.'/state.json';
+            $this->pmssWriteFile($path, $seed);
+            $result = \pmssTrafficIngressUpdateState($path, $counters);
+            $this->assertEquals($expectedDelta, $result['delta']);
+            $this->assertEquals($expectedPrevious, $result['previous_ingress']);
+        }
     }
 
-    public function testReadStateRejectsSymlink(): void
+    public function testReadCountersHandlesPresentAndMissingMetrics(): void
     {
-        $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
-        $target = $root.'/target.json';
-        $this->pmssWriteFile($target, json_encode(['ingress' => 1]));
-        $path = $root.'/state.json';
-        $this->pmssCreateSymlinkOrSkip($target, $path);
-
-        $this->assertTrue(\pmssTrafficIngressReadState($path) === []);
+        $cases = [
+            [['IPIngressBytes=123', 'IPEgressBytes=456'], ['ingress' => 123, 'egress' => 456]],
+            [['IPIngressBytes=123'], null],
+        ];
+        foreach ($cases as [$output, $expected]) {
+            $binDir = $this->pmssMakeLineOutputStub('systemctl', $output, 'pmss-ingress-systemctl-');
+            $this->pmssWithPathPrefix($binDir, function () use ($expected): void {
+                $this->assertEquals($expected, \pmssTrafficIngressReadCounters(1000));
+            });
+        }
     }
 
-    public function testReadCountersParsesSystemctlOutputViaSharedHelper(): void
+    public function testUpdateStateRejectsUnsafePaths(): void
     {
-        $binDir = $this->pmssMakeLineOutputStub('systemctl', ['IPIngressBytes=123', 'IPEgressBytes=456'], 'pmss-ingress-systemctl-');
+        $relativePath = 'relative/state.json';
+        $relativeResult = \pmssTrafficIngressUpdateState($relativePath, ['ingress' => 123, 'egress' => 456]);
+        $this->assertEquals(123, $relativeResult['delta']);
+        $this->assertEquals(null, $relativeResult['previous_ingress']);
+        $this->assertTrue(!is_file($relativePath));
 
-        $this->pmssWithPathPrefix($binDir, function (): void {
-            $this->assertEquals(['ingress' => 123, 'egress' => 456], \pmssTrafficIngressReadCounters(1000));
-        });
-    }
-
-    public function testReadCountersReturnsNullWhenRequiredCounterMissing(): void
-    {
-        $binDir = $this->pmssMakeLineOutputStub('systemctl', ['IPIngressBytes=123'], 'pmss-ingress-systemctl-');
-
-        $this->pmssWithPathPrefix($binDir, function (): void {
-            $this->assertEquals(null, \pmssTrafficIngressReadCounters(1000));
-        });
-    }
-
-    public function testWriteStateRejectsSymlink(): void
-    {
         $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $target = $root.'/target.json';
         $this->pmssWriteFile($target, json_encode(['ingress' => 5, 'egress' => 6]));
         $path = $root.'/state.json';
         $this->pmssCreateSymlinkOrSkip($target, $path);
-
-        \pmssTrafficIngressWriteState($path, ['ingress' => 123, 'egress' => 456]);
-
+        $result = \pmssTrafficIngressUpdateState($path, ['ingress' => 123, 'egress' => 456]);
+        $this->assertEquals(123, $result['delta']);
+        $this->assertEquals(null, $result['previous_ingress']);
         $loaded = json_decode((string) file_get_contents($target), true);
         $this->assertEquals(['ingress' => 5, 'egress' => 6], $loaded);
     }

@@ -7,7 +7,6 @@
  */
 
 require_once __DIR__.'/../resources/log.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
 /**
@@ -19,26 +18,29 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
 }
 
 /**
- * Load the last-seen counters from a state file.
+ * Update the ingress state file and compute the latest delta.
+ *
+ * @return array{delta: int, previous_ingress: ?int}
  */
-function pmssTrafficIngressReadState(string $path): array
+function pmssTrafficIngressUpdateState(string $path, array $counters): array
 {
-    return pmssJsonFileReadAssoc($path, true) ?? [];
-}
+    $previousState = pmssJsonFileReadAssoc($path, true) ?? [];
+    $currentIngress = (int) $counters['ingress'];
+    $previousIngress = isset($previousState['ingress']) ? (int) $previousState['ingress'] : null;
+    $state = [
+        'ingress' => $currentIngress,
+        'egress' => (int) $counters['egress'],
+        'ts' => time(),
+    ];
 
-/**
- * Persist the latest counters to a state file.
- */
-function pmssTrafficIngressWriteState(string $path, array $state): void
-{
-    if ($path === '' || !pmssUserFilePathIsSafe($path)) {
-        return;
+    if ($path !== '' && pmssUserFilePathIsSafe($path) && is_string($payload = json_encode($state))) {
+        pmssAtomicWriteFile($path, $payload, 0600);
     }
 
-    $payload = json_encode($state);
-    if (!is_string($payload)) {
-        return;
-    }
-
-    pmssAtomicWriteFile($path, $payload, 0600);
+    return [
+        'delta' => ($previousIngress !== null && $currentIngress >= $previousIngress)
+            ? $currentIngress - $previousIngress
+            : $currentIngress,
+        'previous_ingress' => $previousIngress,
+    ];
 }
