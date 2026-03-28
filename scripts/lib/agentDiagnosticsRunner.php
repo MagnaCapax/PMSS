@@ -19,6 +19,12 @@ function pmssAgentDiagnosticsScriptRoot(): string
     return dirname(__DIR__, 2);
 }
 
+/** Resolve an internal PMSS script path through the diagnostics script root. */
+function pmssAgentDiagnosticsScriptPath(string $relativePath): string
+{
+    return pmssAgentDiagnosticsScriptRoot().'/'.ltrim($relativePath, '/');
+}
+
 /** Read an optional diagnostics input file, honoring a test override path. */
 function pmssAgentDiagnosticsReadFile(string $envKey, string $defaultPath): string
 {
@@ -38,7 +44,7 @@ function pmssAgentDiagnosticsCapture(string $command): array
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $process = @proc_open('/bin/bash -lc '.escapeshellarg($command), $descriptor, $pipes);
+    $process = @proc_open('/bin/bash -c '.escapeshellarg($command), $descriptor, $pipes);
     if (!is_resource($process)) {
         return ['rc' => 1, 'stdout' => '', 'stderr' => 'Failed to launch command'];
     }
@@ -59,7 +65,7 @@ function pmssAgentDiagnosticsCapture(string $command): array
 /** Execute a repository PHP script relative to the diagnostics script root. */
 function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = []): array
 {
-    $scriptPath = pmssAgentDiagnosticsScriptRoot().'/'.ltrim($relativePath, '/');
+    $scriptPath = pmssAgentDiagnosticsScriptPath($relativePath);
     $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
     foreach ($arguments as $argument) {
         $command .= ' '.escapeshellarg((string) $argument);
@@ -99,4 +105,3 @@ function pmssAgentDiagnosticsOutputLines(array $result): array
     $lines = preg_split('/\r?\n/', trim((string) $result['stdout']));
     return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen'));
 }
-

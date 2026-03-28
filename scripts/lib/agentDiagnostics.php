@@ -135,7 +135,11 @@ function pmssAgentDiagnosticsMain(array $argv): int
 
     $user = trim((string) pmssCliOption($parsed, 'user', 'u', ''));
     if ($user !== '') {
-        $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $user, ['strictInput' => true]);
+        $selection = pmssManagedUsersSelectFromCommand(
+            pmssAgentDiagnosticsScriptPath('scripts/listUsers.php'),
+            $user,
+            ['strictInput' => true]
+        );
         if ((int) $selection['exitCode'] !== 0) {
             return (int) $selection['exitCode'];
         }
@@ -155,4 +159,3 @@ function pmssAgentDiagnosticsMain(array $argv): int
     echo pmssAgentDiagnosticsRenderText($payload);
     return 0;
 }
-
