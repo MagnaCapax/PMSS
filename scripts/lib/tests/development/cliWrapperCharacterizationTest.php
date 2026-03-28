@@ -39,4 +39,16 @@ final class CliWrapperCharacterizationTest extends TestCase
             ]
         );
     }
+
+    public function testPortManagerUsesSharedCliEntrypoint(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'scripts/util/portManager.php',
+            [
+                'function pmssPortManagerMain(array $argv): int',
+                'pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int {',
+                'return pmssPortManagerMain($argv);',
+            ]
+        );
+    }
 }
