@@ -69,6 +69,24 @@ class TorrentPortFrontendTest extends TestCase
         $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
     }
 
+    public function testShippedDelugeFrontendUsesPhpPortHelper(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/deluge.php');
+
+        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
+        $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') !== false);
+        $this->assertTrue(strpos($src, '.delugePort.py') === false);
+    }
+
+    public function testShippedQbittorrentFrontendUsesPhpPortHelper(): void
+    {
+        $src = (string) file_get_contents(dirname(__DIR__, 4).'/etc/skel/www/qbittorrent.php');
+
+        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
+        $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
+        $this->assertTrue(strpos($src, '.qbittorrentPort.py') === false);
+    }
+
     public function testApplySkeletonFilesRemovesLegacyPhpXplorerFile(): void
     {
         $legacyPath = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/phpXplorer');

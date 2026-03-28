@@ -1,4 +1,5 @@
 <?php
+require_once '/scripts/lib/user/torrentPort.php';
 /**
 * PMSS: User Frontend: Deluge start/disable/restart file
 *
@@ -29,5 +30,8 @@ switch($action) {
 }
 
 function startDeluge() {
-    shell_exec('nohup python3 /home/$(whoami)/.delugePort.py; deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');
+    if (function_exists('pmssDelugePortEnsureCurrentUser')) {
+        pmssDelugePortEnsureCurrentUser();
+    }
+    shell_exec('nohup deluged -l /home/$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');
 }

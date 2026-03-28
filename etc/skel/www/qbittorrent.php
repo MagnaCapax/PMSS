@@ -1,4 +1,5 @@
 <?php
+require_once '/scripts/lib/user/torrentPort.php';
 /**
 * PMSS: User Frontend: qBittorrent start/disable/restart file
 *
@@ -30,6 +31,8 @@ switch($action) {
 }
 
 function startQbittorrent() {    // this actually calls the function to start rTorrent :)
-    passthru('python3 /home/$(whoami)/.qbittorrentPort.py; zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &');
+    if (function_exists('pmssQbittorrentPortEnsureCurrentUser')) {
+        pmssQbittorrentPortEnsureCurrentUser();
+    }
+    passthru('zsh -c "qbittorrent-nox -d" >> /dev/null 2>&1 &');
 }
-
