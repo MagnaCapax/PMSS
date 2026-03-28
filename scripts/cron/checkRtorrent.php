@@ -34,6 +34,8 @@ require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/log.php';
 require_once __DIR__.'/../lib/rtorrent/scgi.php';
 require_once __DIR__.'/../lib/rtorrent/process.php';
+require_once __DIR__.'/../lib/rtorrentConfig.php';
+require_once __DIR__.'/../lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/traffic.php';
 
 $lifecycle = __DIR__.'/../lib/userLifecycle.php';
@@ -109,6 +111,77 @@ function pmssCheckRtorrentStart(string $user, string $startMarkerState, bool $de
     @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
 }
 
+/**
+ * Rebuild a missing per-user rTorrent config from the canonical templates.
+ *
+ * @param string $user  Username whose config should be recreated.
+ * @param string $home  User home directory.
+ * @param bool   $debug Debug mode.
+ *
+ * @return bool True when the config exists after recovery.
+ */
+function pmssCheckRtorrentRecoverMissingConfig(string $user, string $home, bool $debug): bool
+{
+    if (!is_dir($home)) {
+        return false;
+    }
+
+    pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc detected; regenerating', $debug);
+
+    $userConfigStore = new UserConfigStore();
+    $payload = $userConfigStore->get($user);
+    $payload = $userConfigStore->applyFallbacks($user, is_array($payload) ? $payload : []);
+    $ramMiB = (int) ($payload['ramMiB'] ?? 0);
+    if ($ramMiB <= 0) {
+        pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery skipped (unable to resolve ramMiB)', $debug);
+        return false;
+    }
+
+    $dhtDefault = @file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.dht');
+    $pexDefault = @file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.pex');
+    if (!is_string($dhtDefault) || !is_string($pexDefault)) {
+        pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery failed (defaults unavailable)', $debug);
+        return false;
+    }
+
+    $resources = [];
+    $resourceFile = '/etc/seedbox/config/system.rtorrent.resources';
+    if (is_file($resourceFile)) {
+        $resourceData = @file_get_contents($resourceFile);
+        if (is_string($resourceData)) {
+            $loadedResources = @unserialize($resourceData);
+            if (is_array($loadedResources)) {
+                $resources = $loadedResources;
+            }
+        }
+    }
+
+    $configInput = [
+        'ram' => $ramMiB,
+        'dht' => $dhtDefault,
+        'pex' => $pexDefault,
+        'uploadThrottle' => (($throttle = pmssReadTorrentThrottle($user)) === null) ? 0 : $throttle,
+    ];
+    if (isset($payload['rtorrentPort']) && is_numeric($payload['rtorrentPort']) && (int) $payload['rtorrentPort'] > 0) {
+        $configInput['scgiPort'] = (int) $payload['rtorrentPort'];
+    }
+
+    try {
+        $rtorrentConfig = new rtorrentConfig($resources);
+        $configuration = $rtorrentConfig->createConfig($configInput);
+        if (!$rtorrentConfig->writeConfig($user, $configuration['configFile'])) {
+            pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery failed (write error)', $debug);
+            return false;
+        }
+    } catch (Throwable $exception) {
+        pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovery failed: '.$exception->getMessage(), $debug);
+        return false;
+    }
+
+    pmssCheckRtorrentLogBoth($user, 'missing .rtorrent.rc recovered', $debug);
+    return true;
+}
+
 // --- Main execution ---
 
 if (pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkRtorrent.lock'), true) === false) {
@@ -153,9 +226,11 @@ foreach ($users as $user) {
         continue;
     }
 
-    // Only manage users with rTorrent config.
+    // Recreate the canonical config before evaluating process health.
     if (!is_file($home.'/.rtorrent.rc')) {
-        continue;
+        if (!pmssCheckRtorrentRecoverMissingConfig($user, $home, $debug)) {
+            continue;
+        }
     }
 
     // Gather process state.
