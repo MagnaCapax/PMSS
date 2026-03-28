@@ -75,12 +75,22 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
     }
 
-    public function testCronScriptUsesSafeAppendHelper(): void
+    public function testTimestampedAppendHelperAndCronConsumers(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 3).'/cron/resourceLog.php');
-
-        $this->assertStringContainsString("pmssAppendUserFile(\$logDir.'/'.\$user", $source);
-        $this->assertTrue(strpos($source, "@file_put_contents(\$logDir.'/'.\$user") === false);
+        $root = $this->makeRoot();
+        $path = $root.'/resource.log';
+        $this->assertTrue(\pmssAppendRootTimestampedLogEntry($path, ": 123\n"));
+        $this->assertTrue((bool) preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}: 123\n$/', (string) file_get_contents($path)));
+        $resourceSource = (string) file_get_contents(dirname(__DIR__, 3).'/cron/resourceLog.php');
+        $trafficSource = $this->pmssReadRepoFile('scripts/cron/trafficLog.php');
+        $ingressSource = $this->pmssReadRepoFile('scripts/cron/trafficIngressLog.php');
+        $this->assertStringContainsString("pmssAppendRootTimestampedLogEntry(\$logDir.'/'.\$user", $resourceSource);
+        $this->assertTrue(strpos($resourceSource, "pmssAppendUserFile(\$logDir.'/'.\$user") === false);
+        $this->assertTrue(strpos($resourceSource, "@file_put_contents(\$logDir.'/'.\$user") === false);
+        $this->assertStringContainsString('pmssAppendRootTimestampedLogEntry(', $trafficSource);
+        $this->assertStringContainsString('pmssAppendRootTimestampedLogEntry(', $ingressSource);
+        $this->assertTrue(strpos($trafficSource, "file_put_contents(\$logdir . \$thisUser") === false);
+        $this->assertTrue(strpos($ingressSource, "@file_put_contents(\$logDir.'/'.\$user") === false);
     }
 
     public function testUserValidationRejectsUppercase(): void

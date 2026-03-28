@@ -8,14 +8,14 @@ class TrafficIngressHelpersTest extends TestCase
 {
     public function testEnsureDirRejectsRelative(): void
     {
-        $this->assertTrue(!\pmssTrafficIngressEnsureDir('relative/path', 0700));
+        $this->assertTrue(!\pmssEnsureSafeDir('relative/path', 0700));
     }
 
     public function testEnsureDirCreatesDirectory(): void
     {
         $root = $this->pmssMakeTempDir('pmss-ingress-', 0700);
         $path = $root.'/state';
-        $this->assertTrue(\pmssTrafficIngressEnsureDir($path, 0700));
+        $this->assertTrue(\pmssEnsureSafeDir($path, 0700));
         $this->assertTrue(is_dir($path));
     }
 
@@ -26,7 +26,7 @@ class TrafficIngressHelpersTest extends TestCase
         $this->pmssEnsureDir($target, 0700);
         $link = $root.'/link';
         $this->pmssCreateSymlinkOrSkip($target, $link);
-        $this->assertTrue(!\pmssTrafficIngressEnsureDir($link, 0700));
+        $this->assertTrue(!\pmssEnsureSafeDir($link, 0700));
     }
 
     public function testEnsureDirRejectsSymlinkedParentDirectory(): void
@@ -38,7 +38,7 @@ class TrafficIngressHelpersTest extends TestCase
         $symlinkedParent = $root.'/state';
         $this->pmssCreateSymlinkOrSkip($target, $symlinkedParent);
 
-        $this->assertTrue(!\pmssTrafficIngressEnsureDir($symlinkedParent.'/daily', 0700));
+        $this->assertTrue(!\pmssEnsureSafeDir($symlinkedParent.'/daily', 0700));
         $this->assertTrue(!is_dir($target.'/daily'), 'must not create directories via symlinked parent');
     }
 

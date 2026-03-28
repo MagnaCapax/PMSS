@@ -15,7 +15,7 @@ $logDir = '/var/log/pmss/traffic-ingress';
 $stateDir = '/var/run/pmss/trafficIngress';
 $linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (float) $linkSpeed : null;
 
-if (!pmssTrafficIngressEnsureDir($logDir, 0755) || !pmssTrafficIngressEnsureDir($stateDir, 0700)) {
+if (!pmssEnsureSafeDir($logDir, 0755) || !pmssEnsureSafeDir($stateDir, 0700)) {
     fwrite(STDERR, "Failed to prepare ingress traffic directories.\n");
     exit(1);
 }
@@ -55,10 +55,10 @@ foreach ($users as $user) {
             $maxDelta = ($linkSpeed * 1000 * 1000 * 60 * 5) * 0.9;
             if ($delta > $maxDelta) {
                 $previousDisplay = $previousIngress !== null ? $previousIngress : 'n/a';
-                $message = date('Y-m-d H:i:s')
-                    .": User {$user} ingress exceeds 90% link max: {$delta}\n"
-                    ."DEBUG COUNTERS: ingress={$currentIngress} previous={$previousDisplay}\n";
-                @file_put_contents($logDir.'/error.log', $message, FILE_APPEND);
+                pmssAppendRootTimestampedLogEntry(
+                    $logDir.'/error.log',
+                    ": User {$user} ingress exceeds 90% link max: {$delta}\nDEBUG COUNTERS: ingress={$currentIngress} previous={$previousDisplay}\n"
+                );
                 if (function_exists('pmssUserLog')) {
                     pmssUserLog($user, sprintf('ingress anomaly: usage exceeds 90%% link max (%d bytes)', $delta));
                 }
@@ -66,6 +66,6 @@ foreach ($users as $user) {
             }
         }
 
-        @file_put_contents($logDir.'/'.$user, date('Y-m-d H:i:s').": {$delta}\n", FILE_APPEND);
+        pmssAppendRootTimestampedLogEntry($logDir.'/'.$user, ": {$delta}\n");
     }
 }

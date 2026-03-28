@@ -11,14 +11,6 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
 /**
- * Ensure a directory exists and is safe for use by ingress logging.
- */
-function pmssTrafficIngressEnsureDir(string $path, int $mode): bool
-{
-    return pmssEnsureSafeDir($path, $mode);
-}
-
-/**
  * Read systemd IPAccounting counters for the user's slice.
  */
 function pmssTrafficIngressReadCounters(int $uid): ?array
@@ -31,15 +23,7 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
  */
 function pmssTrafficIngressReadState(string $path): array
 {
-    if ($path === '' || !pmssUserFilePathIsSafe($path)) {
-        return [];
-    }
-    $raw = is_file($path) ? @file_get_contents($path) : false;
-    if (!is_string($raw) || trim($raw) === '') {
-        return [];
-    }
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
+    return pmssJsonFileReadAssoc($path, true) ?? [];
 }
 
 /**

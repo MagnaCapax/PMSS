@@ -140,6 +140,18 @@ function pmssAtomicWriteFile(string $path, string $content, ?int $mode = null): 
     return $mode === null ? pmssReplaceUserFile($path, $content) : pmssReplaceUserFileWithMetadata($path, $content, $mode);
 }
 
+function pmssJsonFileReadAssoc(string $path, bool $safePathRequired = false): ?array
+{
+    if ($path === '' || ($safePathRequired && !pmssUserFilePathIsSafe($path)) || !is_file($path) || is_link($path)) {
+        return null;
+    }
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || trim($raw) === '') {
+        return null;
+    }
+    return is_array($decoded = json_decode($raw, true)) ? $decoded : null;
+}
+
 function pmssWriteManagedFile(string $path, string $content, string $owner, ?string $group, int $mode): bool
 {
     return pmssReplaceUserFileWithMetadata($path, $content, $mode, $owner, $group);

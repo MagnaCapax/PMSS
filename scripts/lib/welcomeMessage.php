@@ -17,11 +17,7 @@ if (!function_exists('pmssReplaceUserFile') && is_file(__DIR__.'/lighttpd/userFi
  */
 function pmssWelcomeReadJson(string $path): array
 {
-    if (!is_file($path) || is_link($path) || !is_string($raw = @file_get_contents($path)) || trim($raw) === '') {
-        return [];
-    }
-
-    return is_array($decoded = json_decode($raw, true)) ? $decoded : [];
+    return pmssJsonFileReadAssoc($path) ?? [];
 }
 
 /**

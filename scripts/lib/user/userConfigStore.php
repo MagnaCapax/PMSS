@@ -284,15 +284,7 @@ class UserConfigStore
 
     private function readJsonFile(string $path): ?array
     {
-        if (!is_file($path) || is_link($path)) {
-            return null;
-        }
-        $raw = @file_get_contents($path);
-        if ($raw === false || trim($raw) === '') {
-            return null;
-        }
-        $data = json_decode($raw, true);
-        return is_array($data) ? $data : null;
+        return pmssJsonFileReadAssoc($path);
     }
 
     private function loadLegacyAggregateMap(): array

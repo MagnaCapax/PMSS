@@ -41,6 +41,11 @@ function pmssResourceLogLookupManagedUid(string $user): ?int
     return pmssResourceLogIsValidUser($user) ? pmssResourceLogLookupUid($user) : null;
 }
 
+function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $mode = 0644): bool
+{
+    return pmssAppendUserFile($path, date('Y-m-d H:i:s').$message, 'root', $mode);
+}
+
 /**
  * Read systemd slice counters for the given user.
  */

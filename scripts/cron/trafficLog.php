@@ -61,7 +61,7 @@ foreach($users AS $thisUser) {
 		// Do not log if usage was MORE than linkspeed for the past 5 minutes.
 	    if ($linkSpeed !== null && $linkSpeed > 0) {
 	        if ($thisUserTraffic > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
-	            file_put_contents($logdir . 'error.log', date('Y-m-d H:i:s') . ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n", FILE_APPEND);
+	            pmssAppendRootTimestampedLogEntry($logdir . 'error.log', ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n");
                 if (function_exists('pmssUserLog')) {
                     pmssUserLog($thisUser, sprintf('traffic anomaly: usage exceeds 90%% link max (%d bytes)', $thisUserTraffic));
                 }
@@ -69,10 +69,9 @@ foreach($users AS $thisUser) {
 	        }
 	        // Note: variable name typo caused undefined output; use the correct value
 	        if ($thisUserTrafficLocal > ($linkSpeed * 1000 * 1000 * 60 * 5)*0.9) {
-	            file_put_contents(
+	            pmssAppendRootTimestampedLogEntry(
 	                $logdir . 'error.log',
-	                date('Y-m-d H:i:s') . ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n",
-	                FILE_APPEND
+	                ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n"
 	            );
                 if (function_exists('pmssUserLog')) {
                     pmssUserLog($thisUser, sprintf('traffic anomaly: local usage exceeds 90%% link max (%d bytes)', $thisUserTrafficLocal));
@@ -81,10 +80,10 @@ foreach($users AS $thisUser) {
 	        }
 	    }
 
-    if ($thisUserTraffic > 0) file_put_contents($logdir . $thisUser, date('Y-m-d H:i:s') . ": {$thisUserTraffic}\n", FILE_APPEND);
+    if ($thisUserTraffic > 0) pmssAppendRootTimestampedLogEntry($logdir . $thisUser, ": {$thisUserTraffic}\n");
 
     if ($thisUserTrafficLocal > 0)
-        file_put_contents($logdir . $thisUser . '-localnet', date('Y-m-d H:i:s') . ": {$thisUserTrafficLocal}\n", FILE_APPEND);
+        pmssAppendRootTimestampedLogEntry($logdir . $thisUser . '-localnet', ": {$thisUserTrafficLocal}\n");
 
     // API push removed; central collector now uses pull workflow.
 }
@@ -92,7 +91,7 @@ foreach($users AS $thisUser) {
 // Let's take unmatched!
 $trafficUnmatched = (int) `grep "Chain OUTPUT (" {$thisUsageFile} | tr -s [:blank:]| cut -d' ' -f7`;
 if ($trafficUnmatched > 0) {
-    file_put_contents($logdir . 'unmatched-traffic', date('Y-m-d H:i:s') . ": {$trafficUnmatched}", FILE_APPEND);
+    pmssAppendRootTimestampedLogEntry($logdir . 'unmatched-traffic', ": {$trafficUnmatched}");
 }
 
 // Remove the temp file, not required anymore
