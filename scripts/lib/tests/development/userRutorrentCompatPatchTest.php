@@ -7,7 +7,7 @@ class UserRutorrentCompatPatchTest extends TestCase
 {
     public function testCompatibilityPatchesLegacyScheduleExpression(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-home-', 'www/rutorrent/php');
         $path = $home.'/www/rutorrent/php/settings.php';
         file_put_contents($path, "prefix\n((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\nsuffix\n");
 
@@ -20,7 +20,7 @@ class UserRutorrentCompatPatchTest extends TestCase
 
     public function testCompatibilityLeavesPatchedScheduleExpressionUntouched(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-home-', 'www/rutorrent/php');
         $path = $home.'/www/rutorrent/php/settings.php';
         file_put_contents($path, "prefix\n((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n");
 
@@ -31,7 +31,7 @@ class UserRutorrentCompatPatchTest extends TestCase
 
     public function testCompatibilitySkipsMissingSettingsTarget(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-home-', 'www/rutorrent/php');
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
         $this->assertTrue(!file_exists($home.'/www/rutorrent/php/settings.php'));
@@ -39,8 +39,8 @@ class UserRutorrentCompatPatchTest extends TestCase
 
     public function testCompatibilitySkipsSymlinkedSettingsTarget(): void
     {
-        $home = $this->createHome();
-        $target = $this->tempPath('symlink-target');
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-home-', 'www/rutorrent/php');
+        $target = $this->pmssMakeTempPhpPath('pmss-user-rutorrent-', 'symlink-target');
         $link = $home.'/www/rutorrent/php/settings.php';
         file_put_contents($target, "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
         @symlink($target, $link);
@@ -51,25 +51,13 @@ class UserRutorrentCompatPatchTest extends TestCase
 
     public function testCompatibilityLeavesNonMatchingSettingsContentUntouched(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-home-', 'www/rutorrent/php');
         $path = $home.'/www/rutorrent/php/settings.php';
         file_put_contents($path, "prefix\n\$interval = \$interval * 60;\nsuffix\n");
 
         $before = (string) file_get_contents($path);
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
         $this->assertEquals($before, (string) file_get_contents($path));
-    }
-
-    private function createHome(): string
-    {
-        $home = $this->pmssMakeTempDir('pmss-rutorrent-home-');
-        @mkdir($home.'/www/rutorrent/php', 0755, true);
-        return $home;
-    }
-
-    private function tempPath(string $suffix): string
-    {
-        return $this->pmssMakeTempPath('pmss-user-rutorrent-'.$suffix.'-', '.php');
     }
 
 }

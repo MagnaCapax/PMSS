@@ -41,7 +41,7 @@ class TorrentPortFrontendTest extends TestCase
 
         \pmssUserApplySkeletonFiles($this->context());
 
-        $content = (string) file_get_contents($this->homePath('www/deluge.php'));
+        $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/deluge.php'));
         $this->assertTrue(strpos($content, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
         $this->assertTrue(strpos($content, 'pmssDelugePortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($content, '.delugePort.py') === false);
@@ -53,7 +53,7 @@ class TorrentPortFrontendTest extends TestCase
 
         \pmssUserApplySkeletonFiles($this->context());
 
-        $content = (string) file_get_contents($this->homePath('www/qbittorrent.php'));
+        $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/qbittorrent.php'));
         $this->assertTrue(strpos($content, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
         $this->assertTrue(strpos($content, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($content, '.qbittorrentPort.py') === false);
@@ -71,7 +71,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testApplySkeletonFilesRemovesLegacyPhpXplorerFile(): void
     {
-        $legacyPath = $this->homePath('www/phpXplorer');
+        $legacyPath = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/phpXplorer');
         $this->pmssWriteFile($legacyPath, "legacy\n");
 
         \pmssUserApplySkeletonFiles($this->context());
@@ -81,7 +81,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testApplySkeletonFilesLeavesLegacyPhpXplorerDirectoryUntouched(): void
     {
-        $legacyPath = $this->homePath('www/phpXplorer');
+        $legacyPath = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/phpXplorer');
         @mkdir($legacyPath, 0755, true);
 
         \pmssUserApplySkeletonFiles($this->context());
@@ -92,21 +92,21 @@ class TorrentPortFrontendTest extends TestCase
     public function testApplySkeletonFilesRemovesDeadExtsearchEngineFiles(): void
     {
         foreach (['RARbgTorrentAPI.php', 'Demonoid.php', 'KAT.php'] as $engine) {
-            $this->pmssWriteRelativeFile($this->homePath(), 'www/rutorrent/plugins/extsearch/engines/'.$engine, "<?php\n");
+            $this->pmssWriteRelativeFile($this->pmssUserHomePath($this->homeRoot, $this->user), 'www/rutorrent/plugins/extsearch/engines/'.$engine, "<?php\n");
         }
 
         \pmssUserApplySkeletonFiles($this->context());
 
         foreach (['RARbgTorrentAPI.php', 'Demonoid.php', 'KAT.php'] as $engine) {
-            $this->assertTrue(!file_exists($this->homePath('www/rutorrent/plugins/extsearch/engines/'.$engine)));
+            $this->assertTrue(!file_exists($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/rutorrent/plugins/extsearch/engines/'.$engine)));
         }
     }
 
     public function testApplySkeletonFilesRemovesDeadExtsearchEngineSymlinks(): void
     {
-        $targetPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/target.php');
-        $linkPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/KAT.php');
-        $this->pmssWriteRelativeFile($this->homePath(), 'www/rutorrent/plugins/extsearch/engines/target.php', "<?php\n");
+        $targetPath = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/rutorrent/plugins/extsearch/engines/target.php');
+        $linkPath = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/rutorrent/plugins/extsearch/engines/KAT.php');
+        $this->pmssWriteRelativeFile($this->pmssUserHomePath($this->homeRoot, $this->user), 'www/rutorrent/plugins/extsearch/engines/target.php', "<?php\n");
         @symlink($targetPath, $linkPath);
 
         \pmssUserApplySkeletonFiles($this->context());
@@ -117,7 +117,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testApplySkeletonFilesLeavesDeadExtsearchEngineDirectoriesUntouched(): void
     {
-        $directoryPath = $this->homePath('www/rutorrent/plugins/extsearch/engines/Demonoid.php');
+        $directoryPath = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/rutorrent/plugins/extsearch/engines/Demonoid.php');
         @mkdir($directoryPath, 0755, true);
 
         \pmssUserApplySkeletonFiles($this->context());
@@ -127,8 +127,8 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testApplySkeletonFilesLeavesLiveExtsearchEnginesUntouched(): void
     {
-        $liveEnginePath = $this->homePath('www/rutorrent/plugins/extsearch/engines/Custom.php');
-        $this->pmssWriteRelativeFile($this->homePath(), 'www/rutorrent/plugins/extsearch/engines/Custom.php', "<?php\n");
+        $liveEnginePath = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/rutorrent/plugins/extsearch/engines/Custom.php');
+        $this->pmssWriteRelativeFile($this->pmssUserHomePath($this->homeRoot, $this->user), 'www/rutorrent/plugins/extsearch/engines/Custom.php', "<?php\n");
 
         \pmssUserApplySkeletonFiles($this->context());
 
@@ -137,7 +137,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testDelugePortEnsureUpdatesMismatchedPort(): void
     {
-        $home = $this->homePath();
+        $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
         @mkdir($home.'/.config/deluge', 0755, true);
         file_put_contents($home.'/.delugePort', "34567\n");
         file_put_contents($home.'/.config/deluge/web.conf', "{\"file\":1,\"format\":1}{\"port\":12345,\"sessions\":[]}");
@@ -150,7 +150,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testQbittorrentPortEnsureUpdatesMismatchedPort(): void
     {
-        $home = $this->homePath();
+        $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
         @mkdir($home.'/.config/qBittorrent', 0755, true);
         file_put_contents($home.'/.qbittorrentPort', "45678\n");
         file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=12345\n");
@@ -163,7 +163,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testQbittorrentPortEnsureRejectsMissingWebUiPort(): void
     {
-        $home = $this->homePath();
+        $home = $this->pmssUserHomePath($this->homeRoot, $this->user);
         @mkdir($home.'/.config/qBittorrent', 0755, true);
         file_put_contents($home.'/.qbittorrentPort', "45678\n");
         file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nLocale=en\n");
@@ -173,7 +173,7 @@ class TorrentPortFrontendTest extends TestCase
 
     public function testTorrentPortExpectedReadAcceptsValidRange(): void
     {
-        $path = $this->homePath('.expected-port');
+        $path = $this->pmssUserHomePath($this->homeRoot, $this->user, '.expected-port');
         file_put_contents($path, "45678\n");
 
         $this->assertEquals(45678, \pmssTorrentPortExpectedRead($path));
@@ -182,9 +182,9 @@ class TorrentPortFrontendTest extends TestCase
     public function testTorrentPortExpectedReadRejectsInvalidValues(): void
     {
         $cases = [
-            ['path' => $this->homePath('.expected-port-text'), 'content' => "abc\n"],
-            ['path' => $this->homePath('.expected-port-low'), 'content' => "80\n"],
-            ['path' => $this->homePath('.expected-port-high'), 'content' => "70000\n"],
+            ['path' => $this->pmssUserHomePath($this->homeRoot, $this->user, '.expected-port-text'), 'content' => "abc\n"],
+            ['path' => $this->pmssUserHomePath($this->homeRoot, $this->user, '.expected-port-low'), 'content' => "80\n"],
+            ['path' => $this->pmssUserHomePath($this->homeRoot, $this->user, '.expected-port-high'), 'content' => "70000\n"],
         ];
 
         foreach ($cases as $case) {
@@ -193,8 +193,6 @@ class TorrentPortFrontendTest extends TestCase
         }
     }
 
-    private function context(): array { return ['user' => $this->user, 'home' => $this->homePath()]; }
-
-    private function homePath(string $relative = ''): string { return $relative === '' ? $this->homeRoot.'/'.$this->user : $this->homeRoot.'/'.$this->user.'/'.$relative; }
+    private function context(): array { return $this->pmssUserHomeContext($this->homeRoot, $this->user); }
 
 }

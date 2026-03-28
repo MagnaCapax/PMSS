@@ -7,7 +7,7 @@ class UserRutorrentRssCompatPatchTest extends TestCase
 {
     public function testCompatibilityPatchesLegacyRssObFlushCall(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-rss-home-', 'www/rutorrent/plugins/rss');
         $path = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($path, "before\nob_flush();\nafter\n");
 
@@ -20,7 +20,7 @@ class UserRutorrentRssCompatPatchTest extends TestCase
 
     public function testCompatibilityLeavesPatchedRssObFlushCallUntouched(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-rss-home-', 'www/rutorrent/plugins/rss');
         $path = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($path, "before\n@ob_flush();\nafter\n");
 
@@ -31,7 +31,7 @@ class UserRutorrentRssCompatPatchTest extends TestCase
 
     public function testCompatibilitySkipsMissingRssTarget(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-rss-home-', 'www/rutorrent/plugins/rss');
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
         $this->assertTrue(!file_exists($home.'/www/rutorrent/plugins/rss/action.php'));
@@ -39,8 +39,8 @@ class UserRutorrentRssCompatPatchTest extends TestCase
 
     public function testCompatibilitySkipsSymlinkedRssTarget(): void
     {
-        $home = $this->createHome();
-        $target = $this->tempPath('patch-symlink-target');
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-rss-home-', 'www/rutorrent/plugins/rss');
+        $target = $this->pmssMakeTempPhpPath('pmss-user-rutorrent-rss-', 'patch-symlink-target');
         $link = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($target, "before\nob_flush();\nafter\n");
         @symlink($target, $link);
@@ -51,25 +51,13 @@ class UserRutorrentRssCompatPatchTest extends TestCase
 
     public function testCompatibilityLeavesNonMatchingRssContentUntouched(): void
     {
-        $home = $this->createHome();
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-rss-home-', 'www/rutorrent/plugins/rss');
         $path = $home.'/www/rutorrent/plugins/rss/action.php';
         file_put_contents($path, "before\nflush();\nafter\n");
 
         $before = (string) file_get_contents($path);
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
         $this->assertEquals($before, (string) file_get_contents($path));
-    }
-
-    private function createHome(): string
-    {
-        $home = $this->pmssMakeTempDir('pmss-rutorrent-rss-home-');
-        @mkdir($home.'/www/rutorrent/plugins/rss', 0755, true);
-        return $home;
-    }
-
-    private function tempPath(string $suffix): string
-    {
-        return $this->pmssMakeTempPath('pmss-user-rutorrent-rss-'.$suffix.'-', '.php');
     }
 
 }

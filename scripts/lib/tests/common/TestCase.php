@@ -226,6 +226,36 @@ abstract class TestCase
         return $path;
     }
 
+    /** Create a tracked temporary PHP fixture path keyed by a readable suffix. */
+    protected function pmssMakeTempPhpPath(string $prefix, string $suffix): string
+    {
+        return $this->pmssMakeTempPath($prefix.$suffix.'-', '.php');
+    }
+
+    /** Create a temporary home fixture and seed one relative directory tree. */
+    protected function pmssMakeUserHomeTree(string $prefix, string $relativeDir = ''): string
+    {
+        $home = $this->pmssMakeTempDir($prefix);
+        if ($relativeDir !== '') {
+            @mkdir($home.'/'.ltrim($relativeDir, '/'), 0755, true);
+        }
+
+        return $home;
+    }
+
+    /** Build a user-home path under a caller-provided temporary home root. */
+    protected function pmssUserHomePath(string $homeRoot, string $user, string $relative = ''): string
+    {
+        $home = rtrim($homeRoot, '/').'/'.$user;
+        return $relative === '' ? $home : $home.'/'.ltrim($relative, '/');
+    }
+
+    /** Build the standard user/home context array consumed by fixture helpers. */
+    protected function pmssUserHomeContext(string $homeRoot, string $user): array
+    {
+        return ['user' => $user, 'home' => $this->pmssUserHomePath($homeRoot, $user)];
+    }
+
     /** Write a PHP array fixture that can be loaded with include/require. */
     protected function pmssWritePhpArrayFixture(array $value, string $prefix = 'pmss-fixture-'): string
     {

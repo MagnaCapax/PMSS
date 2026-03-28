@@ -50,9 +50,9 @@ after
 PHP
 );
 
-        \pmssUserApplySkeletonFiles($this->context());
+        \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
-        $content = (string) file_get_contents($this->targetPath());
+        $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php'));
         $this->assertTrue(strpos($content, '        @ob_flush();') !== false);
         $this->assertTrue(strpos($content, "\n        ob_flush();\n") === false);
         $this->assertTrue(strpos($content, 'strstr($_SERVER[\'HTTP_USER_AGENT\'], "MSIE")') === false);
@@ -77,48 +77,30 @@ after
 PHP;
         $this->pmssWriteRelativeFile($this->skelDir, 'www/filemanager.php', $expected);
 
-        \pmssUserApplySkeletonFiles($this->context());
+        \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
-        $this->assertEquals($expected, (string) file_get_contents($this->targetPath()));
+        $this->assertEquals($expected, (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php')));
     }
 
     public function testApplySkeletonFilesSkipsMissingFilemanagerSource(): void
     {
-        \pmssUserApplySkeletonFiles($this->context());
-        $this->assertTrue(!file_exists($this->targetPath()));
+        \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
+        $this->assertTrue(!file_exists($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php')));
     }
 
     public function testApplySkeletonFilesSkipsSymlinkedFilemanagerTarget(): void
     {
         $this->pmssWriteRelativeFile($this->skelDir, 'www/filemanager.php', "before\n        ob_flush();\nafter\n");
-        @mkdir(dirname($this->targetPath()), 0755, true);
+        @mkdir(dirname($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php')), 0755, true);
 
-        $target = $this->tempPath('patch-symlink-target');
-        $link = $this->targetPath();
+        $target = $this->pmssMakeTempPhpPath('pmss-user-filemanager-', 'patch-symlink-target');
+        $link = $this->pmssUserHomePath($this->homeRoot, $this->user, 'www/filemanager.php');
         file_put_contents($target, "before\n        ob_flush();\nafter\n");
         @symlink($target, $link);
 
-        \pmssUserApplySkeletonFiles($this->context());
+        \pmssUserApplySkeletonFiles($this->pmssUserHomeContext($this->homeRoot, $this->user));
 
         $this->assertEquals("before\n        ob_flush();\nafter\n", (string) file_get_contents($target));
-    }
-
-    private function context(): array
-    {
-        return [
-            'user' => $this->user,
-            'home' => $this->homeRoot.'/'.$this->user,
-        ];
-    }
-
-    private function tempPath(string $suffix): string
-    {
-        return $this->pmssMakeTempPath('pmss-user-filemanager-'.$suffix.'-', '.php');
-    }
-
-    private function targetPath(): string
-    {
-        return $this->homeRoot.'/'.$this->user.'/www/filemanager.php';
     }
 
 }
