@@ -8,6 +8,7 @@
  */
 
 require_once '/scripts/lib/user/userFilesystem.php';
+require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/traffic/ingress.php';
 require_once '/scripts/lib/networkInfo.php';
 
@@ -38,15 +39,8 @@ foreach ($users as $user) {
     ['delta' => $delta, 'previous_ingress' => $previousIngress] = pmssTrafficIngressUpdateState($statePath, $counters);
 
     if ($delta > 0) {
-        if (pmssResourceLogExceedsFiveMinuteLinkBudget($delta, $linkSpeed)) {
-            $previousDisplay = $previousIngress !== null ? $previousIngress : 'n/a';
-            pmssAppendRootTimestampedLogEntry(
-                $logDir.'/error.log',
-                ": User {$user} ingress exceeds 90% link max: {$delta}\nDEBUG COUNTERS: ingress={$counters['ingress']} previous={$previousDisplay}\n"
-            );
-            if (function_exists('pmssUserLog')) {
-                pmssUserLog($user, sprintf('ingress anomaly: usage exceeds 90%% link max (%d bytes)', $delta));
-            }
+        $previousDisplay = $previousIngress !== null ? $previousIngress : 'n/a';
+        if (pmssTrafficBudgetExceeded($logDir.'/error.log', $user, 'ingress', $delta, $linkSpeed, "DEBUG COUNTERS: ingress={$counters['ingress']} previous={$previousDisplay}", 'ingress anomaly: usage exceeds 90%% link max (%d bytes)')) {
             continue;
         }
 

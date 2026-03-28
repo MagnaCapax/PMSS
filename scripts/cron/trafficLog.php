@@ -11,7 +11,9 @@
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/network/config.php';
 require_once '/scripts/lib/resources/log.php';
+require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/user/userFilesystem.php';
+
 $logger = new Logger(__FILE__);
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
@@ -38,43 +40,22 @@ if (!empty($monitoringRules)) {
     passthru($monitoringRules);
 }
 
-$thisUsageFile = '/tmp/trusage-' . date('Y-m-d_Hi') . '-' . sha1( time() . rand(0,1500000) );  // If too predictable filename someone could in theory intercept ...
-if (!file_put_contents($thisUsageFile, $usage)) die( date('Y-m-d H:i:s') . ": Could not write data usage file {$thisUsageFile} with {$usage}\n\n");
-chmod($thisUsageFile, 0600);
-
-//echo "Data: \n {$usage} \n";
+$parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);
 
 $logger->msg("Collecting data");
 
 foreach($users AS $thisUser) {
     $thisUid = pmssResourceLogLookupManagedUid($thisUser);
     if ($thisUid === null) continue;
-    $thisUserTraffic = 0;
-    $thisUserTrafficLocal = 0;
-
-    $thisUserTraffic = (int) `grep "0.0.0.0/0            owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | awk '{print $2}'`;
-    if ($localnets) {
-            foreach ($localnets AS $thisLocalNet)
-                $thisUserTrafficLocal += (int) `grep "{$thisLocalNet}       owner UID match {$thisUid}" {$thisUsageFile} | grep "ACCEPT" | tr -s [:blank:] | awk '{print $2}'`;
-        }
+    $thisUserTraffic = $parsedUsage['traffic'][$thisUid] ?? 0;
+    $thisUserTrafficLocal = $parsedUsage['local'][$thisUid] ?? 0;
 
 		// Do not log if usage was MORE than linkspeed for the past 5 minutes.
-	    if (pmssResourceLogExceedsFiveMinuteLinkBudget($thisUserTraffic, $linkSpeed)) {
-	            pmssAppendRootTimestampedLogEntry($logdir . 'error.log', ": User {$thisUser} traffic exceeds 90% link max: {$thisUserTraffic}\nDEBUG USAGE DATA:\n{$usage}\n");
-                if (function_exists('pmssUserLog')) {
-                    pmssUserLog($thisUser, sprintf('traffic anomaly: usage exceeds 90%% link max (%d bytes)', $thisUserTraffic));
-                }
+	    if (pmssTrafficBudgetExceeded($logdir . 'error.log', $thisUser, 'traffic', $thisUserTraffic, $linkSpeed, "DEBUG USAGE DATA:\n{$usage}", 'traffic anomaly: usage exceeds 90%% link max (%d bytes)')) {
 	            continue;  
 	    }
 	    // Note: variable name typo caused undefined output; use the correct value
-	    if (pmssResourceLogExceedsFiveMinuteLinkBudget($thisUserTrafficLocal, $linkSpeed)) {
-	            pmssAppendRootTimestampedLogEntry(
-	                $logdir . 'error.log',
-	                ": User {$thisUser} LOCAL traffic exceeds 90% link max: {$thisUserTrafficLocal}\nDEBUG USAGE DATA:\n{$usage}\n"
-	            );
-                if (function_exists('pmssUserLog')) {
-                    pmssUserLog($thisUser, sprintf('traffic anomaly: local usage exceeds 90%% link max (%d bytes)', $thisUserTrafficLocal));
-                }
+	    if (pmssTrafficBudgetExceeded($logdir . 'error.log', $thisUser, 'LOCAL traffic', $thisUserTrafficLocal, $linkSpeed, "DEBUG USAGE DATA:\n{$usage}", 'traffic anomaly: local usage exceeds 90%% link max (%d bytes)')) {
 	            continue;
 	    }
 
@@ -87,10 +68,7 @@ foreach($users AS $thisUser) {
 }
 
 // Let's take unmatched!
-$trafficUnmatched = (int) `grep "Chain OUTPUT (" {$thisUsageFile} | tr -s [:blank:]| cut -d' ' -f7`;
+$trafficUnmatched = $parsedUsage['unmatched'];
 if ($trafficUnmatched > 0) {
     pmssAppendRootTimestampedLogEntry($logdir . 'unmatched-traffic', ": {$trafficUnmatched}");
 }
-
-// Remove the temp file, not required anymore
-unlink($thisUsageFile);

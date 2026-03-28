@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/resources/log.php';
+require_once dirname(__DIR__, 2).'/traffic.php';
 require_once dirname(__DIR__, 2).'/userLifecycle.php';
 
 class ResourceLogHelpersTest extends TestCase
@@ -98,6 +99,67 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertTrue(!\pmssResourceLogExceedsFiveMinuteLinkBudget(100, null));
         $this->assertTrue(!\pmssResourceLogExceedsFiveMinuteLinkBudget(200000000, 100.0));
         $this->assertTrue(\pmssResourceLogExceedsFiveMinuteLinkBudget(30000000000, 100.0));
+    }
+
+    public function testParseTrafficRuleReadsAcceptOwnerMatchLines(): void
+    {
+        $rule = \pmssTrafficParseOutputRule(
+            '5 2048 ACCEPT all -- * * 0.0.0.0/0 185.148.0.0/22 owner UID match 1001'
+        );
+
+        $this->assertEquals(
+            ['bytes' => 2048, 'destination' => '185.148.0.0/22', 'uid' => 1001],
+            $rule
+        );
+    }
+
+    public function testParseTrafficRuleRejectsHeadersAndMalformedOwnerMatches(): void
+    {
+        $cases = [
+            'Chain OUTPUT (policy ACCEPT 2 packets, 512 bytes)',
+            'pkts bytes target prot opt in out source destination',
+            '5 2048 ACCEPT all -- * * 0.0.0.0/0 185.148.0.0/22 owner GID match 1001',
+            '5 nope ACCEPT all -- * * 0.0.0.0/0 0.0.0.0/0 owner UID match 1001',
+        ];
+
+        foreach ($cases as $line) {
+            $this->assertSame(null, \pmssTrafficParseOutputRule($line));
+        }
+    }
+
+    public function testParseTrafficUsageAggregatesTrafficLocalnetsAndUnmatchedBytes(): void
+    {
+        $usage = implode("\n", [
+            'Chain OUTPUT (policy ACCEPT 3 packets, 512 bytes)',
+            'pkts bytes target prot opt in out source destination',
+            '1 100 ACCEPT all -- * * 0.0.0.0/0 0.0.0.0/0 owner UID match 1000',
+            '2 250 ACCEPT all -- * * 0.0.0.0/0 185.148.0.0/22 owner UID match 1000',
+            '3 400 ACCEPT all -- * * 0.0.0.0/0 185.148.0.0/22 owner UID match 1001',
+            '4 300 ACCEPT all -- * * 0.0.0.0/0 0.0.0.0/0 owner UID match 1001',
+            '5 999 ACCEPT all -- * * 0.0.0.0/0 10.0.0.0/8 owner UID match 1001',
+        ]);
+
+        $parsed = \pmssTrafficParseOutputUsage($usage, ['185.148.0.0/22']);
+
+        $this->assertEquals([1000 => 100, 1001 => 300], $parsed['traffic']);
+        $this->assertEquals([1000 => 250, 1001 => 400], $parsed['local']);
+        $this->assertEquals(512, $parsed['unmatched']);
+    }
+
+    public function testTrafficLogUsesSharedUsageParserInsteadOfTempFileGreps(): void
+    {
+        $trafficSource = $this->pmssReadRepoFile('scripts/cron/trafficLog.php');
+        $trafficLibrarySource = $this->pmssReadRepoFile('scripts/lib/traffic.php');
+        $ingressSource = $this->pmssReadRepoFile('scripts/cron/trafficIngressLog.php');
+
+        $this->assertStringContainsString('$parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);', $trafficSource);
+        $this->assertStringContainsString('function pmssTrafficBudgetExceeded(', $trafficLibrarySource);
+        $this->assertStringContainsString('pmssTrafficBudgetExceeded(', $trafficSource);
+        $this->assertStringContainsString('pmssTrafficBudgetExceeded(', $ingressSource);
+        $this->assertTrue(strpos($trafficSource, '$thisUsageFile') === false);
+        $this->assertTrue(strpos($trafficSource, 'grep "0.0.0.0/0') === false);
+        $this->assertTrue(strpos($trafficSource, 'grep "Chain OUTPUT ("') === false);
+        $this->assertTrue(strpos($trafficSource, 'unlink($thisUsageFile)') === false);
     }
 
     public function testUserValidationRejectsUppercase(): void
