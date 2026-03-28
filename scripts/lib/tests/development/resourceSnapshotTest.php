@@ -10,9 +10,9 @@ class ResourceSnapshotTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'etc/seedbox/config/root.cron',
             [
-                '/scripts/cron/resourceLog.php',
-                '/scripts/cron/resourceStats.php',
-                '/scripts/cron/resourceSnapshot.php',
+                '*/5 * * * *   root    /scripts/cron/resourceLog.php >> /var/log/pmss/resourceLog.log 2>&1',
+                '0 0 * * *   root    /scripts/cron/resourceSnapshot.php >/dev/null 2>&1',
+                '25,55 * * * *   root    /bin/sleep 30; /scripts/cron/resourceStats.php >> /var/log/pmss/resourceStats.log 2>&1',
             ]
         );
     }
