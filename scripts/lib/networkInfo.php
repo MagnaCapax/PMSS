@@ -15,15 +15,26 @@
  */
 
 require_once __DIR__.'/network/config.php';
+
+/** Normalize interface names before they reach shell commands. */
+function networkInterfaceNameNormalized(string $iface): string
+{
+    $iface = trim($iface);
+    return $iface !== '' && preg_match('/^[A-Za-z0-9_.:-]+$/', $iface) === 1 ? $iface : '';
+}
+
 /** Determine the primary network interface name. */
 function detectPrimaryInterface(): string
 {
     $config = networkLoadConfig();
     if (is_array($config) && !empty($config['interface'])) {
-        return (string) $config['interface'];
+        $iface = networkInterfaceNameNormalized((string) $config['interface']);
+        if ($iface !== '') {
+            return $iface;
+        }
     }
 
-    $iface = trim((string) shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'"));
+    $iface = networkInterfaceNameNormalized(trim((string) shell_exec("/sbin/ip route | awk '/default/ {print \$5; exit}'")));
     return $iface !== '' ? $iface : 'eth0';
 }
 
@@ -35,11 +46,12 @@ function getLinkSpeed(string $iface): int
         return (int) $config['speed'];
     }
 
+    $iface = networkInterfaceNameNormalized($iface);
     if ($iface === '') {
         return 1000;
     }
 
-    $raw = shell_exec("/sbin/ethtool {$iface} 2>/dev/null | grep 'Speed:'");
+    $raw = shell_exec('/sbin/ethtool '.escapeshellarg($iface).' 2>/dev/null');
     return $raw && preg_match('/Speed:\s*(\d+)Mb/', $raw, $m) ? (int) $m[1] : 1000;
 }
 

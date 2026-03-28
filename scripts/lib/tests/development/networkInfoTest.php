@@ -7,6 +7,16 @@ require_once dirname(__DIR__, 2).'/networkInfo.php';
 
 class NetworkInfoTest extends TestCase
 {
+    public function testNetworkInterfaceNameNormalizedKeepsSafeNames(): void
+    {
+        $this->assertSame('bond0.100', \networkInterfaceNameNormalized(' bond0.100 '));
+    }
+
+    public function testNetworkInterfaceNameNormalizedRejectsUnsafeNames(): void
+    {
+        $this->assertSame('', \networkInterfaceNameNormalized('eth0; touch /tmp/pwned'));
+    }
+
     public function testDetectPrimaryInterfaceReturnsString(): void
     {
         $iface = \detectPrimaryInterface();
@@ -39,6 +49,24 @@ class NetworkInfoTest extends TestCase
 
         $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
             $this->assertSame(4321, \getLinkSpeed('eth0'));
+        });
+    }
+
+    public function testGetLinkSpeedFallsBackForUnsafeInterfaceName(): void
+    {
+        $this->assertSame(1000, \getLinkSpeed('eth0 && rm -rf /'));
+    }
+
+    public function testDetectPrimaryInterfaceIgnoresUnsafeConfigOverride(): void
+    {
+        $tmp = $this->pmssMakeTempPath('pmss-network-info-', '.php');
+        file_put_contents($tmp, "<?php return ['interface' => 'eth0; touch /tmp/pwned'];");
+
+        $this->pmssWithEnv(['PMSS_NETWORK_CONFIG' => $tmp], function (): void {
+            $iface = \detectPrimaryInterface();
+            $this->assertTrue($iface !== '');
+            $this->assertSame('', \networkInterfaceNameNormalized('eth0; touch /tmp/pwned'));
+            $this->assertTrue($iface !== 'eth0; touch /tmp/pwned');
         });
     }
 }
