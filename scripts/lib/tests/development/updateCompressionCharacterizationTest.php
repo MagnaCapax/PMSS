@@ -488,13 +488,13 @@ class UpdateCompressionCharacterizationTest extends TestCase
     public function testUserUpdateModuleOwnsPermissionRefreshHelper(): void
     {
         $usersSrc = $this->pmssReadRepoFile('scripts/lib/update/users.php');
-        $permissionsSrc = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        $permissionsSrc = $this->pmssReadRepoFile('scripts/lib/update/users/permissions.php');
 
         $this->assertTrue(
             strpos($usersSrc, 'function pmssUserRefreshPermissions(') === false,
-            'users.php should delegate permission refresh to filesystem.php'
+            'users.php should delegate permission refresh to permissions.php'
         );
-        $this->assertStringContainsString("require_once __DIR__.'/users/filesystem.php';", $usersSrc);
+        $this->assertStringContainsString("require_once __DIR__.'/users/permissions.php';", $usersSrc);
         $this->assertStringContainsString('function pmssUserRefreshPermissions(', $permissionsSrc);
         $this->assertStringContainsString('PMSS_USER_PERMISSIONS_TIMEOUT', $permissionsSrc);
         $this->assertStringContainsString("'-c3'", $permissionsSrc);
@@ -502,7 +502,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
     public function testUserDomainModulesDoNotCrossRequireEachOther(): void
     {
-        foreach (['context', 'http', 'filesystem', 'rutorrent'] as $module) {
+        foreach (['context', 'http', 'filesystem', 'permissions', 'rutorrent'] as $module) {
             $src = $this->pmssReadRepoFile('scripts/lib/update/users/'.$module.'.php');
             $this->pmssAssertStringNotContainsString(
                 "require_once __DIR__.'/",

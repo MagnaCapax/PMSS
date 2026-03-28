@@ -26,7 +26,7 @@ class UserMaintenancePartialCompletionGuardTest extends TestCase
 
     public function testUserPermissionsRefreshUsesScopedTimeoutAndIonice(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
+        $src = $this->pmssReadRepoFile('scripts/lib/update/users/permissions.php');
 
         $this->assertStringContainsString('PMSS_USER_PERMISSIONS_TIMEOUT', $src);
         $this->assertStringContainsString('PMSS_COMMAND_TIMEOUT', $src);

@@ -12,6 +12,7 @@ require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/users/context.php';
 require_once __DIR__.'/users/http.php';
 require_once __DIR__.'/users/filesystem.php';
+require_once __DIR__.'/users/permissions.php';
 require_once __DIR__.'/users/rutorrent.php';
 
 /**
