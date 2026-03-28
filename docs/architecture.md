@@ -46,7 +46,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 - Development runner: `php scripts/lib/tests/development/Runner.php`
 - Production scaffolding: `php scripts/lib/tests/production/Runner.php`
 - Shared helpers: `scripts/lib/tests/common/`
-- CLI probes: `/scripts/util/systemTest.php`, `/scripts/util/componentStatus.php`
+- CLI probes: `/scripts/util/systemTest.php`, `/scripts/util/componentStatus.php`, `/scripts/util/agentDiagnostics.php`
 
 Development tests must avoid network/system changes; production tests and the CLI probe are intended for curated post-provision runs.
 

@@ -1,0 +1,102 @@
+<?php
+/**
+ * Command and file helpers for agent diagnostics collection.
+ *
+ * Keeps shelling and JSON decoding in one place so the collector can stay
+ * focused on section assembly.
+ *
+ * @license GPL-3.0-only
+ */
+declare(strict_types=1);
+
+/** Resolve the repository root used for internal script calls. */
+function pmssAgentDiagnosticsScriptRoot(): string
+{
+    $override = getenv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT');
+    if (is_string($override) && $override !== '') {
+        return rtrim($override, '/');
+    }
+    return dirname(__DIR__, 2);
+}
+
+/** Read an optional diagnostics input file, honoring a test override path. */
+function pmssAgentDiagnosticsReadFile(string $envKey, string $defaultPath): string
+{
+    $path = getenv($envKey);
+    if (!is_string($path) || $path === '') {
+        $path = $defaultPath;
+    }
+    $contents = @file_get_contents($path);
+    return is_string($contents) ? $contents : '';
+}
+
+/** Execute a shell command and capture stdout, stderr, and rc. */
+function pmssAgentDiagnosticsCapture(string $command): array
+{
+    $descriptor = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $process = @proc_open('/bin/bash -lc '.escapeshellarg($command), $descriptor, $pipes);
+    if (!is_resource($process)) {
+        return ['rc' => 1, 'stdout' => '', 'stderr' => 'Failed to launch command'];
+    }
+
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return [
+        'rc' => (int) proc_close($process),
+        'stdout' => is_string($stdout) ? $stdout : '',
+        'stderr' => is_string($stderr) ? $stderr : '',
+    ];
+}
+
+/** Execute a repository PHP script relative to the diagnostics script root. */
+function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = []): array
+{
+    $scriptPath = pmssAgentDiagnosticsScriptRoot().'/'.ltrim($relativePath, '/');
+    $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
+    foreach ($arguments as $argument) {
+        $command .= ' '.escapeshellarg((string) $argument);
+    }
+    return pmssAgentDiagnosticsCapture($command);
+}
+
+/** Decode JSON output from a command result or return an error payload. */
+function pmssAgentDiagnosticsDecodeJson(array $result, string $label): array
+{
+    if ((int) $result['rc'] !== 0) {
+        return [
+            'error' => $label.' failed',
+            'rc' => (int) $result['rc'],
+            'stderr' => trim((string) $result['stderr']),
+        ];
+    }
+
+    $decoded = json_decode((string) $result['stdout'], true);
+    if (!is_array($decoded)) {
+        return [
+            'error' => $label.' returned invalid JSON',
+            'rc' => (int) $result['rc'],
+            'stdout' => trim((string) $result['stdout']),
+        ];
+    }
+
+    return $decoded;
+}
+
+/** Split command stdout into trimmed non-empty lines. */
+function pmssAgentDiagnosticsOutputLines(array $result): array
+{
+    if ((int) $result['rc'] !== 0) {
+        return [];
+    }
+    $lines = preg_split('/\r?\n/', trim((string) $result['stdout']));
+    return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen'));
+}
+

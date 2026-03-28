@@ -121,6 +121,16 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 ## Logging & JSON Events
 
+## Agent Diagnostics – `scripts/util/agentDiagnostics.php`
+
+- pmssAgentDiagnosticsMain(array $argv): int
+  - Inputs: `--json`, `--pretty`, `--user USERNAME`, `--help`.
+  - Output: text report by default, or JSON envelope with `timestamp`, `hostname`, `version`, `user`, and `sections`.
+  - Side-effects: none intended; collects read-only command and file snapshots.
+  - Validation: requires root outside `PMSS_TEST_MODE=1`; `--user` is validated through managed-user selection before per-user sections run.
+
+---
+
 - pmssLogDir(): string → `PMSS_LOG_DIR` or `/var/log/pmss`.
 - pmssRuntimeDir(): string → `PMSS_RUNTIME_DIR` or `/var/run/pmss`.
 - pmssStateDir(): string → `PMSS_STATE_DIR` or `/var/lib/pmss`.
