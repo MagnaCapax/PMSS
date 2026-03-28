@@ -102,6 +102,25 @@ class SysctlBaselineTest extends TestCase
         $this->cleanup($dir);
     }
 
+    public function testWarnsWhenSysctlTargetWriteFails(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-fail-', 0700);
+        $blocked = $dir.'/blocked';
+        $target = $blocked.'/sysctl.conf';
+        $messages = [];
+
+        file_put_contents($blocked, "not a directory\n");
+
+        $this->runBaseline($target, $messages, false);
+
+        $this->assertFalse(file_exists($target), 'expected sysctl file write to fail');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to write legacy sysctl defaults'), 'expected write failure warning');
+        $this->assertFalse($this->pmssMessagesContain($messages, 'Refreshed legacy sysctl defaults'), 'did not expect success log');
+        $this->assertFalse($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'did not expect reload log after failed write');
+
+        $this->cleanup($dir);
+    }
+
     private function runBaseline(string $target, array &$messages, bool $reload, ?string $modulesLoad = null): void
     {
         $logger = $this->pmssMakeArrayLogger($messages);

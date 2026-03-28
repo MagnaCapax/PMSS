@@ -162,6 +162,7 @@ function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targe
     $log             = $logger ?: 'logMessage';
     $target          = $targetOverride ?? '/etc/sysctl.d/99-pmss.conf';
     $modulesLoadPath = $modulesLoadOverride ?? '/etc/modules-load.d/pmss-bbr.conf';
+    $sysctlWriteOk   = false;
     // Persist TCP BBR module loading across reboots.
     $modulesContent = "# PMSS: enable TCP BBR\ntcp_bbr\n";
 
@@ -183,10 +184,15 @@ SYSCTL;
     $existing = @file_get_contents($target);
     $sysctlUpToDate = $existing !== false && trim($existing) === trim($content);
     if ($sysctlUpToDate) {
+        $sysctlWriteOk = true;
         $log('[SKIP] Legacy sysctl defaults already present and up to date');
     } else {
         @mkdir(dirname($target), 0755, true);
-        @file_put_contents($target, $content.PHP_EOL);
+        if (@file_put_contents($target, $content.PHP_EOL) === false) {
+            $log('[WARN] Unable to write legacy sysctl defaults at '.$target);
+        } else {
+            $sysctlWriteOk = true;
+        }
     }
 
     $modulesExisting = @file_get_contents($modulesLoadPath);
@@ -202,7 +208,7 @@ SYSCTL;
         }
     }
 
-    if ($sysctlUpToDate) {
+    if ($sysctlUpToDate || !$sysctlWriteOk) {
         return;
     }
 
