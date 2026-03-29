@@ -62,6 +62,9 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
 
+        $this->assertStringContainsString("pmssLighttpdWatchdogDeleteErrorPage(\$thisUser)", $src);
+        $this->assertStringContainsString('pmssLighttpdWatchdogWriteErrorPage(', $src);
+        $this->assertStringContainsString('pmssLighttpdWatchdogDetectReason(', $src);
         $this->assertStringContainsString('pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')', $src);
         $this->assertStringContainsString('pmssUserWatchdogRestartProcessesIf(', $src);
         $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);', $src);

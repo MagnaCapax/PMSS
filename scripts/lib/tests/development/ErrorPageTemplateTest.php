@@ -72,4 +72,30 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
+    public function testBadGatewayErrorPageRestoresActionableRecoveryGuidance(): void
+    {
+        $contents = $this->pmssReadRepoFile('var/www/error-502.html');
+        $this->assertStringContainsString('Your disk quota is full', $contents);
+        $this->assertStringContainsString('connect with SFTP and delete files', $contents);
+        $this->assertStringContainsString('account is suspended', $contents);
+        $this->assertStringContainsString('server-wide storage pressure', $contents);
+    }
+
+    public function testUserNginxTemplateUsesPerUser502FallbackPage(): void
+    {
+        $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
+        $this->assertEquals(3, substr_count($contents, 'error_page 502 /error-502-##username.html;'));
+        $this->assertStringContainsString('location = /error-502-##username.html {', $contents);
+        $this->assertStringContainsString('try_files $uri /error-502.html;', $contents);
+    }
+
+    public function testPrivateSubdomainTemplateUsesPerUser502FallbackPage(): void
+    {
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $contents = \pmssNginxUserSubdomainTemplates()['private'];
+        $this->assertEquals(4, substr_count($contents, 'error_page 502 /error-502-##user##.html;'));
+        $this->assertStringContainsString('location = /error-502-##user##.html {', $contents);
+        $this->assertStringContainsString('try_files $uri /error-502.html;', $contents);
+    }
+
 }

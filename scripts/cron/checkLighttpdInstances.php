@@ -7,6 +7,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
+require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
@@ -18,7 +19,10 @@ if ($selection['exitCode'] !== 0) exit($selection['exitCode']);
 $users = $selection['users'];
 foreach($users AS $thisUser) {
     $homeDir = "/home/{$thisUser}";
-    if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped due to suspension')) continue;  //Suspended
+    if (pmssUserWatchdogHandleSuspended($thisUser, ['lighttpd', 'php-cgi'], 'lighttpd stopped due to suspension')) {
+        pmssLighttpdWatchdogDeleteErrorPage($thisUser);
+        continue;
+    }
 
     if (!file_exists($homeDir.'/.lighttpd.conf') && is_dir($homeDir)) {
         echo "Config missing for user: {$thisUser} — generating\n";
@@ -48,7 +52,17 @@ foreach($users AS $thisUser) {
             fclose($socket);
         }
     }
-    $lighttpdRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $socketError || pmssUserWatchdogProcessRunning($thisUser, 'lighttpd'), ['lighttpd', 'php-cgi'], static function () use ($socketError): bool { return $socketError; }, 'lighttpd restart requested', 15, static function () use ($thisUser): void {
+    $lighttpdRunningBeforeRestart = pmssUserWatchdogProcessRunning($thisUser, 'lighttpd');
+    if ($socketError || !$lighttpdRunningBeforeRestart) {
+        pmssLighttpdWatchdogWriteErrorPage(
+            $thisUser,
+            pmssLighttpdWatchdogDetectReason($thisUser, $homeDir, $homeDir.'/.lighttpd.conf', $socketError)
+        );
+    } else {
+        pmssLighttpdWatchdogDeleteErrorPage($thisUser);
+    }
+
+    $lighttpdRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $socketError || $lighttpdRunningBeforeRestart, ['lighttpd', 'php-cgi'], static function () use ($socketError): bool { return $socketError; }, 'lighttpd restart requested', 15, static function () use ($thisUser): void {
         echo "Killing (if any) lighttpd for user: {$thisUser}\n";
         pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 15);
         sleep(5);

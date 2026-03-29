@@ -94,7 +94,7 @@ server {
         limit_rate_after 1024m;
         limit_rate 102400k;
         limit_conn addr 16;
-        error_page 502 /error-502.html;
+        error_page 502 /error-502-##user##.html;
     }
 
     # When apps generate absolute /user-<user>/... URLs, avoid double-prefixing
@@ -110,7 +110,7 @@ server {
         limit_rate_after 1024m;
         limit_rate 102400k;
         limit_conn addr 16;
-        error_page 502 /error-502.html;
+        error_page 502 /error-502-##user##.html;
     }
 
     location / {
@@ -122,7 +122,7 @@ server {
         limit_rate_after 1024m;
         limit_rate 102400k;
         limit_conn addr 16;
-        error_page 502 /error-502.html;
+        error_page 502 /error-502-##user##.html;
     }
 
     location /webdav-##user##/ {
@@ -136,12 +136,13 @@ server {
         limit_rate_after 100m;
         limit_rate 102400k;
         limit_conn addr 16;
-        error_page 502 /error-502.html;
+        error_page 502 /error-502-##user##.html;
     }
 
-    location = /error-502.html {
+    location = /error-502-##user##.html {
         root /var/www;
         internal;
+        try_files $uri /error-502.html;
     }
 }
 NGINX;
