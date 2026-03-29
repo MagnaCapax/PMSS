@@ -422,6 +422,25 @@ abstract class TestCase
         return $this->pmssSystemdSliceDropinRead($fixture['dropDir'], $name);
     }
 
+    /** Render the canonical drop-in directly from fixture options. */
+    protected function pmssSystemdSliceRender(array $options = [], string $name = '15-pmss.conf'): string
+    {
+        return $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare($options), $name);
+    }
+    /** Build a simple `[Slice]` template with optional directives before `TasksMax`. */
+    protected function pmssSystemdSliceTasksTemplate(array $directives = []): string
+    {
+        $lines = ['[Slice]'];
+        foreach ($directives as $directive) { $lines[] = (string) $directive; }
+        $lines[] = 'TasksMax=%%USER_CGROUP_TASKS_MAX%%';
+        return implode("\n", $lines)."\n";
+    }
+    /** Build a PHP policy fixture matching the on-disk cgroup policy contract. */
+    protected function pmssSystemdSlicePolicySource(array $policy): string
+    {
+        return '<?php return '.var_export($policy, true).";\n";
+    }
+
     /** Keep named temp-dir creation available to child test cases via an explicit wrapper. */
     protected function pmssMakeNamedTempDir(string $prefix, int $mode = 0755, ?string $baseDir = null): string
     {

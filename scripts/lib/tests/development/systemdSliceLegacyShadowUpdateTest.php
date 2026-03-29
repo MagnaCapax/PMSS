@@ -18,7 +18,7 @@ class SystemdSliceLegacyShadowUpdateTest extends TestCase
         $this->pmssSystemdSliceEnsure($this->pmssSystemdSliceFixturePrepare([
             'cfgPrefix' => 'pmss-cg-cfg-shadow-',
             'dropDir' => $drop,
-            'v2Template' => "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n",
+            'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'totalCpuThreads' => 2,
             'totalMemMiB' => 1024,
         ]));

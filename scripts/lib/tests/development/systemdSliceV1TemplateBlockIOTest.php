@@ -8,14 +8,13 @@ class SystemdSliceV1TemplateBlockIOTest extends TestCase
 {
     public function testV1TemplateIncludesBlockIOAccounting(): void
     {
-        $v1Body = "[Slice]\nBlockIOAccounting=yes\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+        $out = $this->pmssSystemdSliceRender([
             'cfgPrefix' => 'pmss-cg-cfgv1b-',
             'dropPrefix' => 'pmss-cg-dropv1b-',
             'mode' => 'v1',
-            'v1Template' => $v1Body,
+            'v1Template' => $this->pmssSystemdSliceTasksTemplate(['BlockIOAccounting=yes']),
             'totalMemMiB' => 4096,
-        ]));
+        ]);
         $this->assertTrue(strpos($out, 'BlockIOAccounting=yes') !== false, 'v1 template lost BlockIOAccounting');
     }
 }

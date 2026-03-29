@@ -14,7 +14,7 @@ class SystemdSliceRootOverrideWrittenTest extends TestCase
 
         $fixture = $this->pmssSystemdSliceFixturePrepare([
             'dropDir' => $drop,
-            'v2Template' => "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n",
+            'v2Template' => $this->pmssSystemdSliceTasksTemplate(),
             'totalMemMiB' => 1024,
         ]);
 
