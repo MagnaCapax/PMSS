@@ -92,35 +92,24 @@ if ($action === 'get') {
     exit(0);
 }
 
-if ($action === 'unset') {
-    if (array_key_exists($key, $payload)) {
+if ($action === 'unset' || $action === 'set') {
+    $statusMessage = ($action === 'set') ? 'setting_updated' : 'setting_removed';
+    if ($action === 'set') {
+        $value = $argv[4] ?? null;
+        if ($value === null) {
+            fwrite(STDERR, $usage);
+            exit(1);
+        }
+        $payload[$key] = $value;
+    } elseif (array_key_exists($key, $payload)) {
         unset($payload[$key]);
     }
-    if (!$store->set($user, $payload)) {
-        pmssUserSettingLog($user, 'unset', 'ERR', 'failed_to_save', array('key' => $key));
+    if (!$store->persist($user, $payload)) {
+        pmssUserSettingLog($user, $action, 'ERR', 'failed_to_save', array('key' => $key));
         fwrite(STDERR, "Failed to save settings\n");
         exit(1);
     }
-    $store->writeUserCache($user, $payload);
-    pmssUserSettingLog($user, 'unset', 'OK', 'setting_removed', array('key' => $key));
-    echo "OK\n";
-    exit(0);
-}
-
-if ($action === 'set') {
-    $value = $argv[4] ?? null;
-    if ($value === null) {
-        fwrite(STDERR, $usage);
-        exit(1);
-    }
-    $payload[$key] = $value;
-    if (!$store->set($user, $payload)) {
-        pmssUserSettingLog($user, 'set', 'ERR', 'failed_to_save', array('key' => $key));
-        fwrite(STDERR, "Failed to save settings\n");
-        exit(1);
-    }
-    $store->writeUserCache($user, $payload);
-    pmssUserSettingLog($user, 'set', 'OK', 'setting_updated', array('key' => $key));
+    pmssUserSettingLog($user, $action, 'OK', $statusMessage, array('key' => $key));
     echo "OK\n";
     exit(0);
 }

@@ -84,6 +84,40 @@ class userConfigCliCharacterizationTest extends TestCase
         $this->assertFalse($presence['CPUWeight']);
     }
 
+    public function testApplyPersistedResourcesUsesSharedPersistedKeyList(): void
+    {
+        $payload = \pmssUserConfigCliApplyPersistedResources(
+            [
+                'CPUWeight' => 100,
+                'trafficLimit' => 0,
+            ],
+            [
+                'CPUWeight' => 200,
+                'trafficLimit' => 900,
+                'trafficCapMbit' => 12,
+            ],
+            [
+                'CPUWeight' => true,
+                'trafficCapMbit' => true,
+                'trafficLimit' => true,
+            ]
+        );
+
+        $this->assertSame(200, $payload['CPUWeight']);
+        $this->assertSame(12, $payload['trafficCapMbit']);
+        $this->assertSame(0, $payload['trafficLimit']);
+    }
+
+    public function testApplyWelcomeMessageSetsAndClearsBanner(): void
+    {
+        $withBanner = \pmssUserConfigApplyWelcomeMessage(['quota' => 100], '<b>Hello</b>');
+        $this->assertSame('<b>Hello</b>', $withBanner['welcomeMessage']);
+
+        $withoutBanner = \pmssUserConfigApplyWelcomeMessage($withBanner, '   ');
+        $this->assertFalse(array_key_exists('welcomeMessage', $withoutBanner));
+        $this->assertSame(100, $withoutBanner['quota']);
+    }
+
     public function testCgroupResourceArgsUseSharedFlagMapOnce(): void
     {
         $args = \pmssUserConfigCliBuildCgroupResourceArgs([

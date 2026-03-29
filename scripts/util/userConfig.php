@@ -93,17 +93,11 @@ if ($welcomeOnlyMode) {
         }
     }
 
-    if (trim((string) $welcomeMessage) === '') {
-        unset($payload['welcomeMessage']);
-    } else {
-        $payload['welcomeMessage'] = $welcomeMessage;
-    }
-
-    if (!$store->set($user['name'], $payload)) {
+    $payload = pmssUserConfigApplyWelcomeMessage($payload, $welcomeMessage);
+    if (!$store->persist($user['name'], $payload)) {
         fwrite(STDERR, "Error: failed to persist user config for {$user['name']}\n");
         exit(1);
     }
-    $store->writeUserCache($user['name'], $payload);
     exit(0);
 }
 
@@ -113,11 +107,7 @@ $payload['rtorrentPort'] = isset($existing['rtorrentPort']) ? (int) $existing['r
 $payload['quota'] = $user['quota'];
 $payload['quotaBurst'] = (int) round(((float) $user['quota']) * 1.25);
 $payload['trafficLimit'] = 0;
-foreach (['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit'] as $key) {
-    if (!empty($presence[$key])) {
-        $payload[$key] = $user[$key];
-    }
-}
+$payload = pmssUserConfigCliApplyPersistedResources($payload, $user, $presence);
 $payload['billingId'] = $payload['billingId'] ?? 0;
 if ($payload['billingId'] === 0) {
     $payload = $store->applyFallbacks($user['name'], $payload);
@@ -125,22 +115,11 @@ if ($payload['billingId'] === 0) {
 if ($dockerEnabled !== null) {
     $payload['dockerEnabled'] = $dockerEnabled;
 }
+$payload = pmssUserConfigApplyWelcomeMessage($payload, $welcomeMessage);
 
-// Optional per-user welcome banner override for welcome.php.
-if ($welcomeMessage !== null) {
-    if (trim($welcomeMessage) === '') {
-        unset($payload['welcomeMessage']);
-    } else {
-        $payload['welcomeMessage'] = $welcomeMessage;
-    }
-}
-
-if (!$store->set($user['name'], $payload)) {
+if (!$store->persist($user['name'], $payload)) {
     fwrite(STDERR, "Warning: failed to persist user config for {$user['name']}\n");
-} else {
-    $store->writeUserCache($user['name'], $payload);
 }
-
 // Write optional torrent upload throttle before touching heavyweight services so limits
 // persist even if later steps bail out.
 if ($uploadThrottleKib !== null) {
@@ -175,9 +154,7 @@ $rtorrentConfig->writeConfig($user['name'], $configuration['configFile']);
 $scgiPort = (int) ($configuration['config']['scgiPort'] ?? 0);
 if ($scgiPort > 0 && (!isset($payload['rtorrentPort']) || (int) $payload['rtorrentPort'] !== $scgiPort)) {
     $payload['rtorrentPort'] = $scgiPort;
-    if ($store->set($user['name'], $payload)) {
-        $store->writeUserCache($user['name'], $payload);
-    } else {
+    if (!$store->persist($user['name'], $payload)) {
         fwrite(STDERR, "Warning: failed to persist rtorrentPort for {$user['name']}\n");
     }
 }

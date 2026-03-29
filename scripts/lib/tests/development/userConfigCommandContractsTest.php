@@ -88,6 +88,7 @@ class userConfigCommandContractsTest extends TestCase
 
         $this->assertStringContainsString("pmssUserConfigCliPositionalResources(\$args, 'userConfigIndex')", $source);
         $this->assertStringContainsString("pmssUserConfigCliPersistedPositionalPresence(\$args)", $source);
+        $this->assertStringContainsString("pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", $source);
         $this->assertStringContainsString("pmssUserConfigCliBuildCgroupResourceArgs(\$user)", $source);
         $this->assertTrue(
             strpos($source, "'--cpu-weight=' . \$user['CPUWeight']") === false,
@@ -96,6 +97,22 @@ class userConfigCommandContractsTest extends TestCase
         $this->assertTrue(
             strpos($source, "'--io-weight=' . \$user['IOWeight']") === false,
             'userConfig.php should not keep a duplicated io-weight flag path'
+        );
+        $this->assertTrue(
+            strpos($source, "['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit']") === false,
+            'userConfig.php should not keep a duplicated persisted-resource key list'
+        );
+    }
+
+    public function testUserConfigUsesSharedWelcomeAndPersistFlows(): void
+    {
+        $source = $this->loadUserConfigSubsystemSource();
+
+        $this->assertStringContainsString("pmssUserConfigApplyWelcomeMessage(\$payload, \$welcomeMessage)", $source);
+        $this->assertStringContainsString("\$store->persist(\$user['name'], \$payload)", $source);
+        $this->assertTrue(
+            strpos($source, 'writeUserCache(') === false,
+            'userConfig.php should not bypass the shared persist flow'
         );
     }
 }

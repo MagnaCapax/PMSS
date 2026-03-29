@@ -132,6 +132,11 @@ class UserConfigStore
             return false;
         }
         $payload['suspended'] = $suspended;
+        return $this->persist($username, $payload);
+    }
+
+    public function persist(string $username, array $payload): bool
+    {
         if (!$this->set($username, $payload)) {
             return false;
         }
@@ -154,7 +159,7 @@ class UserConfigStore
         return $this->normalise($payload);
     }
 
-    public function writeUserCache(string $username, array $payload): void
+    private function writeUserCache(string $username, array $payload): void
     {
         if (($username = $this->validatedUsername($username)) === null) {
             return;

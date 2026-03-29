@@ -84,12 +84,40 @@ function pmssUserConfigCliPersistedPositionalPresence(array $args): array
 {
     $presence = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (!empty($spec['persist'])) {
-            $presence[$key] = array_key_exists($spec['userConfigIndex'], $args)
-                && $args[$spec['userConfigIndex']] !== '';
+        if (empty($spec['persist'])) {
+            continue;
         }
+        $presence[$key] = array_key_exists($spec['userConfigIndex'], $args)
+            && $args[$spec['userConfigIndex']] !== '';
     }
     return $presence;
+}
+
+/** @return array<string,mixed> Copy explicit persisted resources into a payload. */
+function pmssUserConfigCliApplyPersistedResources(array $payload, array $user, array $presence): array
+{
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        if (empty($spec['persist'])) {
+            continue;
+        }
+        if (!empty($presence[$key]) && array_key_exists($key, $user)) {
+            $payload[$key] = $user[$key];
+        }
+    }
+    return $payload;
+}
+
+/** @return array<string,mixed> Apply or clear the per-user welcome banner. */
+function pmssUserConfigApplyWelcomeMessage(array $payload, ?string $welcomeMessage): array
+{
+    if ($welcomeMessage !== null) {
+        if (trim($welcomeMessage) === '') {
+            unset($payload['welcomeMessage']);
+        } else {
+            $payload['welcomeMessage'] = $welcomeMessage;
+        }
+    }
+    return $payload;
 }
 
 /** @return array<int,string> Render sparse userConfig positionals. */
