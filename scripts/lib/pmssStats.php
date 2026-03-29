@@ -14,6 +14,7 @@ require_once __DIR__.'/rtorrent/scgi.php';
 require_once __DIR__.'/traffic/storage.php';
 require_once __DIR__.'/update.php';
 require_once __DIR__.'/user/userConfigStore.php';
+require_once __DIR__.'/cli/optionParser.php';
 
 /**
  * Resolve the effective user, home, and local PMSS paths for stats reads.
@@ -594,12 +595,9 @@ function pmssStatsRenderText(array $stats, array $options = []): string
  */
 function pmssStatsParseOptions(array $argv)
 {
-    $options = getopt('', ['full', 'json', 'mini', 'no-header', 'help']);
-    if ($options === false) {
-        return false;
-    }
+    $parsed = pmssParseCliTokens($argv);
 
-    if (isset($options['help'])) {
+    if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
         $self = basename($argv[0] ?? 'pmss-stats.php');
         echo <<<TEXT
 Usage: {$self} [--full] [--json] [--mini] [--no-header]
@@ -616,10 +614,10 @@ TEXT;
     }
 
     return [
-        'full' => isset($options['full']),
-        'json' => isset($options['json']),
-        'mini' => isset($options['mini']),
-        'no_header' => isset($options['no-header']),
+        'full' => pmssCliOption($parsed, 'full', null, false) !== false,
+        'json' => pmssCliOption($parsed, 'json', null, false) !== false,
+        'mini' => pmssCliOption($parsed, 'mini', null, false) !== false,
+        'no_header' => pmssCliOption($parsed, 'no-header', null, false) !== false,
     ];
 }
 
