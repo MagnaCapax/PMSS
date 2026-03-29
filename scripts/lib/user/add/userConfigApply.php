@@ -19,20 +19,7 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
         (string) $user['memory'],
         (string) $user['quota'],
     ];
-    $optionalArgs = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $optionalArgs[$spec['userConfigIndex']] = isset($user[$key]) ? (string) $user[$key] : '';
-    }
-    $lastOptionalIndex = 3;
-    foreach ($optionalArgs as $index => $value) {
-        if ($value !== '') {
-            $lastOptionalIndex = $index;
-        }
-    }
-    ksort($optionalArgs);
-    for ($index = 4; $index <= $lastOptionalIndex; $index++) {
-        $command[] = $optionalArgs[$index];
-    }
+    $command = array_merge($command, pmssUserConfigCliBuildUserConfigPositionals($user));
     if (isset($user['torrentThrottle']) && is_numeric($user['torrentThrottle'])) {
         $command[] = '--upload-throttle-kib='.(string) $user['torrentThrottle'];
     }

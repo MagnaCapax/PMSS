@@ -23,41 +23,16 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 /**
- * Parse the explicit rootless Docker toggle passed by provisioning callers.
- */
-function pmssUserConfigParseDockerEnabledOption($rawOption): ?bool
-{
-    if ($rawOption === null) {
-        return null;
-    }
-    if ($rawOption === true || $rawOption === '') {
-        throw new InvalidArgumentException('--docker-enabled requires true or false');
-    }
-
-    $normalized = strtolower(trim((string) $rawOption));
-    if (in_array($normalized, ['true', '1', 'yes', 'on'], true)) {
-        return true;
-    }
-    if (in_array($normalized, ['false', '0', 'no', 'off'], true)) {
-        return false;
-    }
-
-    throw new InvalidArgumentException('Invalid --docker-enabled value');
-}
-
-/**
  * Main entry point for user configuration changes.
  */
 $usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled']);
 $args = array_merge([''], $parsed['arguments']);
-$uploadThrottleKib = pmssCliOption($parsed, 'upload-throttle-kib');
-$uploadThrottleKib = ($uploadThrottleKib === true || $uploadThrottleKib === null) ? null : (string) $uploadThrottleKib;
 $welcomeMessage = pmssCliOption($parsed, 'welcome-message');
 $welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null : (string) $welcomeMessage;
-$dockerEnabledOption = pmssCliOption($parsed, 'docker-enabled');
 try {
-    $dockerEnabled = pmssUserConfigParseDockerEnabledOption($dockerEnabledOption);
+    $uploadThrottleKib = pmssUserConfigCliParseUploadThrottleOption(pmssCliOption($parsed, 'upload-throttle-kib'));
+    $dockerEnabled = pmssUserConfigParseDockerEnabledOption(pmssCliOption($parsed, 'docker-enabled'));
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage()."\n");
 }
@@ -83,13 +58,7 @@ $user = [
     'memory'    => (int) $args[2],
     'quota'     => (int) $args[3],
 ];
-foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-    $value = array_key_exists($spec['userConfigIndex'], $args) ? $args[$spec['userConfigIndex']] : $spec['default'];
-    if ($spec['parse'] === 'int' && $value !== null) {
-        $value = (int) $value;
-    }
-    $user[$key] = $value;
-}
+$user = array_merge($user, pmssUserConfigCliPositionalResources($args, 'userConfigIndex'));
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
 
 $passwdEntry = pmssPasswdEntryLookup($user['name']);
@@ -100,10 +69,6 @@ if ($passwdEntry === null) {
 $account = pmssUserAccountLookup($user['name']) ?? $passwdEntry;
 $user['id'] = (int) ($account['uid'] ?? 0);
 
-if (isset($args[4])) {
-    $user['trafficLimit'] = (int) $args[4];
-}
-
 if ($user['id'] < 1000) {
     die("No system ID or user does not exist\n");
 }
@@ -113,12 +78,7 @@ if ($accountHome !== $expectedHome || !file_exists($expectedHome)) {
     die("User does not exist\n");
 }
 
-$presence = [];
-foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-    if (!empty($spec['persist'])) {
-        $presence[$key] = array_key_exists($spec['userConfigIndex'], $args);
-    }
-}
+$presence = pmssUserConfigCliPersistedPositionalPresence($args);
 
 $store = new UserConfigStore();
 $existing = $store->get($user['name']) ?? [];
@@ -184,14 +144,7 @@ if (!$store->set($user['name'], $payload)) {
 // Write optional torrent upload throttle before touching heavyweight services so limits
 // persist even if later steps bail out.
 if ($uploadThrottleKib !== null) {
-    if ($uploadThrottleKib === '' || !is_numeric($uploadThrottleKib)) {
-        die("Invalid --upload-throttle-kib value\n");
-    }
-    $throttleValue = (int) $uploadThrottleKib;
-    if ($throttleValue < 0) {
-        die("Upload throttle must be >= 0\n");
-    }
-    if (!pmssWriteTorrentThrottle($user['name'], $throttleValue)) {
+    if (!pmssWriteTorrentThrottle($user['name'], $uploadThrottleKib)) {
         fwrite(STDERR, "Warning: failed to write torrent upload throttle for {$user['name']}\n");
     }
 }
@@ -280,20 +233,8 @@ $args = [
     '--memory-high=' . $user['memory'],
 ];
 
-if (!empty($user['CPUWeight']) && $user['CPUWeight'] > 0) {
-    $args[] = '--cpu-weight=' . $user['CPUWeight'];
-}
-if (!empty($user['IOWeight']) && $user['IOWeight'] > 0) {
-    $args[] = '--io-weight=' . $user['IOWeight'];
-}
-
 // Optional I/O throttles
-foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-    if (empty($spec['cgroupFlag']) || empty($user[$key])) {
-        continue;
-    }
-    $args[] = $spec['cgroupFlag'].$user[$key];
-}
+$args = array_merge($args, pmssUserConfigCliBuildCgroupResourceArgs($user));
 if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
     $quotaVal = $user['cpuQuotaPercent'];
     $quotaLabel = (is_string($quotaVal) && strtolower((string) $quotaVal) === 'infinity')

@@ -56,7 +56,7 @@ class userConfigCommandContractsTest extends TestCase
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'upload-throttle-kib')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'welcome-message')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'docker-enabled')", $source);
-        $this->assertStringContainsString("foreach (pmssUserConfigCliResourceSpecs() as \$key => \$spec)", $source);
+        $this->assertStringContainsString("pmssUserConfigCliPositionalResources(\$args, 'userConfigIndex')", $source);
         $this->assertTrue(
             strpos($source, "strpos(\$arg, '--upload-throttle-kib=')") === false,
             'userConfig.php should not keep a manual --upload-throttle-kib scan'
@@ -86,8 +86,16 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("\$value = array_key_exists(\$spec['userConfigIndex'], \$args) ? \$args[\$spec['userConfigIndex']] : \$spec['default'];", $source);
-        $this->assertStringContainsString("if (!empty(\$spec['persist'])) {", $source);
-        $this->assertStringContainsString("if (empty(\$spec['cgroupFlag']) || empty(\$user[\$key])) {", $source);
+        $this->assertStringContainsString("pmssUserConfigCliPositionalResources(\$args, 'userConfigIndex')", $source);
+        $this->assertStringContainsString("pmssUserConfigCliPersistedPositionalPresence(\$args)", $source);
+        $this->assertStringContainsString("pmssUserConfigCliBuildCgroupResourceArgs(\$user)", $source);
+        $this->assertTrue(
+            strpos($source, "'--cpu-weight=' . \$user['CPUWeight']") === false,
+            'userConfig.php should not keep a duplicated cpu-weight flag path'
+        );
+        $this->assertTrue(
+            strpos($source, "'--io-weight=' . \$user['IOWeight']") === false,
+            'userConfig.php should not keep a duplicated io-weight flag path'
+        );
     }
 }
