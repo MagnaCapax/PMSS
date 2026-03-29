@@ -901,7 +901,7 @@ if [ "$RUN_UPDATE" = true ]; then
 	log_info "Update logs: /var/log/pmss/update.log (bootstrap), /var/log/pmss-update.log (phase 2), /var/log/pmss-update.jsonl (JSON)"
 	run_cmd /scripts/update.php "${UPDATE_ARGS[@]}"
 	run_cmd /scripts/util/setupRootCron.php
-	run_cmd /scripts/util/setupSkelPermissions.php
+	run_cmd /scripts/util/setupPermissions.php
 	run_cmd /scripts/util/quotaFix.php
 	run_cmd /scripts/util/ftpConfig.php
 else

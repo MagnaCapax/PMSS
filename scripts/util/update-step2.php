@@ -619,7 +619,7 @@ pmssRunProfiledCallable('Configuring /tmp disk-backed baseline', 'pmssConfigureT
 pmssRunProfiledCallable('Configuring /tmp tmpfs mount policy', 'pmssConfigureTempTmpfsMount', ['logmsg']);
 pmssRunProfiledCallable('Configuring /tmp noexec hardening', 'pmssConfigureTempMountNoexec', ['logmsg']);
 
-runStep('Refreshing skeleton permissions', '/scripts/util/setupSkelPermissions.php');
+runStep('Refreshing system permissions', '/scripts/util/setupPermissions.php');
 runStep('Refreshing FTP configuration', '/scripts/util/ftpConfig.php');
 
 $logrotateTemplate = '/etc/seedbox/config/template.logrotate.pmss';

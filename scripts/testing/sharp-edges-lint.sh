@@ -25,7 +25,7 @@ phpAllowlistedFile() {
   case "$1" in
     # Command arrays passed to wrappers; line-level scan cannot see wrapper context.
     "$ROOT_DIR/scripts/terminateUser.php") return 0 ;;
-    "$ROOT_DIR/scripts/util/setupSkelPermissions.php") return 0 ;;
+    "$ROOT_DIR/scripts/util/setupPermissions.php") return 0 ;;
     "$ROOT_DIR/scripts/util/configureOpenvpn.php") return 0 ;;
     "$ROOT_DIR/scripts/lib/update/apps/iprange.php") return 0 ;;
 

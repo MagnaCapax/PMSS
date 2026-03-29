@@ -640,12 +640,12 @@ function restoreRootCronBestEffort(string $context): void
  * phase 2 must rerun the dedicated helper to restore expected traversal and
  * file visibility for tenant-facing services.
  */
-function restoreSkelPermissionsBestEffort(string $context): void
+function restorePermissionsBestEffort(string $context): void
 {
-    $helper = '/scripts/util/setupSkelPermissions.php';
+    $helper = '/scripts/util/setupPermissions.php';
 
     if (!file_exists($helper)) {
-        logmsg('[WARN] setupSkelPermissions.php missing; cannot refresh skeleton/config permissions after '.$context);
+        logmsg('[WARN] setupPermissions.php missing; cannot refresh system permissions after '.$context);
         return;
     }
 
@@ -968,7 +968,7 @@ function runUpdateStep2(bool $dryRun): void
     }
     logEvent('update_step2_end', $details);
     if ($rc !== 0) {
-        restoreSkelPermissionsBestEffort('update-step2 failure');
+        restorePermissionsBestEffort('update-step2 failure');
         fatal('update-step2.php exited with status '.$rc, $rc);
     }
 }
@@ -1174,7 +1174,7 @@ function bootstrapMain(array $argv): void
         // continue to see readable config under /etc/seedbox after the
         // initial hardening in stageSnapshot().
         if (!$options['dry_run']) {
-            restoreSkelPermissionsBestEffort('--scripts-only run');
+            restorePermissionsBestEffort('--scripts-only run');
         }
         if (!$options['dry_run'] && file_exists('/scripts/util/ftpConfig.php')) {
             logmsg('[INFO] Refreshing FTP configuration for --scripts-only run');

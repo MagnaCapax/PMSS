@@ -174,7 +174,7 @@ if (file_exists($localnet)) {
     exec($checkCmd, $output, $rc);
     if ($rc !== 0) {
         logmsg("[WARN] {$localnet} exists but is not readable by {$user}; rTorrent will likely fail with a localnet ip filter error.");
-        logmsg("[HINT] Run '/scripts/util/setupSkelPermissions.php' as root or check: ls -ld /etc/seedbox /etc/seedbox/config {$localnet}");
+        logmsg("[HINT] Run '/scripts/util/setupPermissions.php' as root or check: ls -ld /etc/seedbox /etc/seedbox/config {$localnet}");
     }
 }
 

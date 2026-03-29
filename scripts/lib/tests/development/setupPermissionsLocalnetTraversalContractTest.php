@@ -3,11 +3,11 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 
-class setupSkelPermissionsLocalnetTraversalContractTest extends TestCase
+class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 {
-    private function loadSetupSkelPermissionsSource(): string
+    private function loadSetupPermissionsSource(): string
     {
-        return (string) file_get_contents(__DIR__.'/../../../util/setupSkelPermissions.php');
+        return (string) file_get_contents(__DIR__.'/../../../util/setupPermissions.php');
     }
 
     private function loadSystemTestSource(): string
@@ -22,7 +22,7 @@ class setupSkelPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testSeedboxParentTraversalStepRemainsInPermissionTargets(): void
     {
-        $src = $this->loadSetupSkelPermissionsSource();
+        $src = $this->loadSetupPermissionsSource();
 
         $this->assertStringContainsString("'/etc/seedbox' => [", $src);
         $this->assertStringContainsString("'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']", $src);
@@ -30,19 +30,19 @@ class setupSkelPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testSeedboxParentTraversalRunsBeforeConfigTreeNormalization(): void
     {
-        $src = $this->loadSetupSkelPermissionsSource();
+        $src = $this->loadSetupPermissionsSource();
 
         $parentPos = strpos($src, "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']");
         $configPos = strpos($src, '@chmod($configDir, 0775);');
 
-        $this->assertTrue($parentPos !== false, 'setupSkelPermissions.php should preserve /etc/seedbox traversal before config normalization');
-        $this->assertTrue($configPos !== false, 'setupSkelPermissions.php should keep the config directory traversable');
+        $this->assertTrue($parentPos !== false, 'setupPermissions.php should preserve /etc/seedbox traversal before config normalization');
+        $this->assertTrue($configPos !== false, 'setupPermissions.php should keep the config directory traversable');
         $this->assertTrue($parentPos < $configPos, 'Parent traversal fix must run before /etc/seedbox/config normalization');
     }
 
     public function testConfigDirectoryRootKeepsTraversePermission(): void
     {
-        $src = $this->loadSetupSkelPermissionsSource();
+        $src = $this->loadSetupPermissionsSource();
 
         $this->assertStringContainsString('@chmod($configDir, 0775);', $src);
     }
