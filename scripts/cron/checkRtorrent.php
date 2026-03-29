@@ -81,9 +81,7 @@ function pmssCheckRtorrentLog(string $message, bool $force = false, bool $debug 
 function pmssCheckRtorrentLogBoth(string $user, string $message, bool $debug): void
 {
     pmssCheckRtorrentLog($message, true, $debug);
-    if (function_exists('pmssUserLog')) {
-        pmssUserLog($user, 'checkRtorrent: '.$message);
-    }
+    pmssUserLog($user, 'checkRtorrent: '.$message);
 }
 
 // Clear a stale SCGI socket before restart or grace tracking.
