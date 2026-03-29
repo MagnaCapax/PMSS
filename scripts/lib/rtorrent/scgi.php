@@ -138,8 +138,13 @@ function rtorrentScgiFormatXmlrpcParamsCall(string $method, array $params = []):
  */
 function rtorrentScgiSend(string $socketPath, string $request, int $timeout = 5)
 {
-    // Validate socket path exists before attempting connection.
-    if (!file_exists($socketPath)) {
+    // Reject invalid boundaries before touching the socket path.
+    if ($socketPath === '' || $request === '' || $timeout < 1) {
+        return false;
+    }
+
+    // Validate the target exists and still resolves to a Unix socket.
+    if (!file_exists($socketPath) || @filetype($socketPath) !== 'socket') {
         return false;
     }
 
@@ -149,7 +154,10 @@ function rtorrentScgiSend(string $socketPath, string $request, int $timeout = 5)
     }
 
     // Set read/write timeout on the stream.
-    stream_set_timeout($socket, $timeout);
+    if (!stream_set_timeout($socket, $timeout)) {
+        @fclose($socket);
+        return false;
+    }
 
     $written = @fwrite($socket, $request);
     if ($written === false || $written < strlen($request)) {

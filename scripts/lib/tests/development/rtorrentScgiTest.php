@@ -159,6 +159,44 @@ class RtorrentScgiTest extends TestCase
     }
 
     /**
+     * Test SCGI send rejects empty requests before opening sockets.
+     */
+    public function testScgiSendReturnsFalseForEmptyRequest(): void
+    {
+        $fakePath = '/tmp/pmss-test-nonexistent-' . getmypid() . '.socket';
+        $result = rtorrentScgiSend($fakePath, '', 1);
+
+        $this->assertTrue($result === false, 'Send should return false for empty requests');
+    }
+
+    /**
+     * Test SCGI send rejects invalid timeout values.
+     */
+    public function testScgiSendReturnsFalseForInvalidTimeout(): void
+    {
+        $fakePath = '/tmp/pmss-test-nonexistent-' . getmypid() . '.socket';
+        $result = rtorrentScgiSend($fakePath, 'test', 0);
+
+        $this->assertTrue($result === false, 'Send should return false for invalid timeouts');
+    }
+
+    /**
+     * Test SCGI send rejects regular files at the socket boundary.
+     */
+    public function testScgiSendReturnsFalseForRegularFilePath(): void
+    {
+        $path = sys_get_temp_dir() . '/pmss-rtorrent-scgi-file-' . getmypid();
+        file_put_contents($path, "not-a-socket\n");
+
+        try {
+            $result = rtorrentScgiSend($path, 'test', 1);
+            $this->assertTrue($result === false, 'Send should return false for regular file paths');
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /**
      * Test complete request/response cycle formatting.
      */
     public function testCompleteRequestFormatting(): void
