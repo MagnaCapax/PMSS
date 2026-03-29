@@ -8,17 +8,11 @@ class SystemdSlicePlaceholdersCoverageTest extends TestCase
 {
     public function testAllPlaceholdersReplaced(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
-        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nIOWeight=%%USER_CGROUP_IO_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\nCPUQuota=%%USER_CGROUP_CPU_QUOTA%%\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
-        putenv('PMSS_CGROUP_MODE=v2');
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
-        putenv('PMSS_TOTAL_MEM_MIB=4096');
-        \pmssEnsureSystemdSlices('logmsg');
-        $out = (string)file_get_contents($drop.'/15-pmss.conf');
+        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+            'v2Template' => $tpl,
+            'totalMemMiB' => 4096,
+        ]));
         $this->assertTrue(strpos($out, '%%') === false, 'placeholders remained');
     }
 }

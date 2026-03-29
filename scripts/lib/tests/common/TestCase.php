@@ -353,6 +353,75 @@ abstract class TestCase
         return (string) $path;
     }
 
+    /**
+     * Prepare a hermetic systemd user-slice fixture with templates, policy, and env overrides.
+     *
+     * @param array<string, mixed> $options
+     * @return array{cfgDir:string,dropDir:string,env:array<string,string>}
+     */
+    protected function pmssSystemdSliceFixturePrepare(array $options = []): array
+    {
+        $cfgDir = $this->pmssMakeTempDir(isset($options['cfgPrefix']) ? (string) $options['cfgPrefix'] : 'pmss-cg-cfg-');
+        $dropDir = isset($options['dropDir'])
+            ? (string) $options['dropDir']
+            : $this->pmssMakeTempDir(isset($options['dropPrefix']) ? (string) $options['dropPrefix'] : 'pmss-cg-drop-');
+
+        $v1Template = array_key_exists('v1Template', $options) ? $options['v1Template'] : 'ignored';
+        $v2Template = array_key_exists('v2Template', $options) ? $options['v2Template'] : 'ignored';
+
+        if ($v1Template !== null) {
+            $this->pmssWriteFile($cfgDir.'/template.cgroup.user-slice.v1.conf', (string) $v1Template);
+        }
+        if ($v2Template !== null) {
+            $this->pmssWriteFile($cfgDir.'/template.cgroup.user-slice.v2.conf', (string) $v2Template);
+        }
+        if (array_key_exists('policy', $options)) {
+            $this->pmssWriteFile($cfgDir.'/cgroup.policy.php', (string) $options['policy']);
+        }
+
+        $env = [
+            'PMSS_CGROUP_MODE' => isset($options['mode']) ? (string) $options['mode'] : 'v2',
+            'PMSS_CONFIG_DIR' => $cfgDir,
+            'PMSS_SYSTEMD_USER_SLICE_DIR' => $dropDir,
+            'PMSS_TOTAL_MEM_MIB' => (string) (isset($options['totalMemMiB']) ? $options['totalMemMiB'] : 2048),
+        ];
+        if (isset($options['totalCpuThreads'])) {
+            $env['PMSS_TOTAL_CPU_THREADS'] = (string) $options['totalCpuThreads'];
+        }
+        if (isset($options['env']) && is_array($options['env'])) {
+            foreach ($options['env'] as $key => $value) {
+                $env[(string) $key] = (string) $value;
+            }
+        }
+
+        return [
+            'cfgDir' => $cfgDir,
+            'dropDir' => $dropDir,
+            'env' => $env,
+        ];
+    }
+
+    /** @param array{env:array<string,string>} $fixture */
+    protected function pmssSystemdSliceEnsure(array $fixture): void
+    {
+        $this->pmssWithEnv($fixture['env'], function (): void {
+            \pmssEnsureSystemdSlices('logmsg');
+        });
+    }
+
+    /** Read the canonical systemd user-slice drop-in emitted by the fixture. */
+    protected function pmssSystemdSliceDropinRead(string $dropDir, string $name = '15-pmss.conf'): string
+    {
+        return (string) file_get_contents(rtrim($dropDir, '/').'/'.$name);
+    }
+
+    /** @param array{dropDir:string,env:array<string,string>} $fixture */
+    protected function pmssSystemdSliceDropinRender(array $fixture, string $name = '15-pmss.conf'): string
+    {
+        $this->pmssSystemdSliceEnsure($fixture);
+        return $this->pmssSystemdSliceDropinRead($fixture['dropDir'], $name);
+    }
+
     /** Keep named temp-dir creation available to child test cases via an explicit wrapper. */
     protected function pmssMakeNamedTempDir(string $prefix, int $mode = 0755, ?string $baseDir = null): string
     {

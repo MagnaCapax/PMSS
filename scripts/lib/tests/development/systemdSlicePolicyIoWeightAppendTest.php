@@ -8,111 +8,76 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
 {
     public function testIODeviceWeightAppendedWhenConfigured(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
-        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
         $policy = <<<'PHP'
 <?php return [
   'tasksMax'=>512,
   'mounts' => [ '/' => ['ioWeight'=>90] ],
 ];
 PHP;
-        file_put_contents($cfgDir.'/cgroup.policy.php', $policy);
 
-        $this->pmssWithEnv([
-            'PMSS_CGROUP_MODE' => 'v2',
-            'PMSS_CONFIG_DIR' => $cfgDir,
-            'PMSS_SYSTEMD_USER_SLICE_DIR' => $drop,
-            'PMSS_TOTAL_MEM_MIB' => '2048',
-        ], function () use ($drop): void {
-            \pmssEnsureSystemdSlices('logmsg');
-            $out = (string)file_get_contents($drop.'/15-pmss.conf');
-            $this->assertTrue(strpos($out, 'IODeviceWeight=') !== false, 'IODeviceWeight not appended');
-        });
+        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+            'v2Template' => $tpl,
+            'policy' => $policy,
+            'totalMemMiB' => 2048,
+        ]));
+        $this->assertTrue(strpos($out, 'IODeviceWeight=') !== false, 'IODeviceWeight not appended');
     }
 
     public function testIODeviceWeightSkippedOnV1(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
-        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', $tpl);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', 'ignored');
         $policy = <<<'PHP'
 <?php return [
   'tasksMax'=>512,
   'mounts' => [ '/' => ['ioWeight'=>90] ],
 ];
 PHP;
-        file_put_contents($cfgDir.'/cgroup.policy.php', $policy);
 
-        $this->pmssWithEnv([
-            'PMSS_CGROUP_MODE' => 'v1',
-            'PMSS_CONFIG_DIR' => $cfgDir,
-            'PMSS_SYSTEMD_USER_SLICE_DIR' => $drop,
-            'PMSS_TOTAL_MEM_MIB' => '2048',
-        ], function () use ($drop): void {
-            \pmssEnsureSystemdSlices('logmsg');
-            $out = (string)file_get_contents($drop.'/15-pmss.conf');
-            $this->assertTrue(strpos($out, 'IODeviceWeight=') === false, 'IODeviceWeight should be skipped on v1');
-        });
+        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+            'mode' => 'v1',
+            'v1Template' => $tpl,
+            'policy' => $policy,
+            'totalMemMiB' => 2048,
+        ]));
+        $this->assertTrue(strpos($out, 'IODeviceWeight=') === false, 'IODeviceWeight should be skipped on v1');
     }
 
     public function testIOPSLimitsAppendedWhenConfigured(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
-        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
         $policy = <<<'PHP'
 <?php return [
   'tasksMax'=>512,
   'mounts' => [ '/' => ['readIops'=>77, 'writeIops'=>88] ],
 ];
 PHP;
-        file_put_contents($cfgDir.'/cgroup.policy.php', $policy);
 
-        $this->pmssWithEnv([
-            'PMSS_CGROUP_MODE' => 'v2',
-            'PMSS_CONFIG_DIR' => $cfgDir,
-            'PMSS_SYSTEMD_USER_SLICE_DIR' => $drop,
-            'PMSS_TOTAL_MEM_MIB' => '2048',
-        ], function () use ($drop): void {
-            \pmssEnsureSystemdSlices('logmsg');
-            $out = (string)file_get_contents($drop.'/15-pmss.conf');
-            $this->assertTrue(strpos($out, 'IOReadIOPSMax=') !== false, 'IOReadIOPSMax not appended');
-            $this->assertTrue(strpos($out, 'IOWriteIOPSMax=') !== false, 'IOWriteIOPSMax not appended');
-        });
+        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+            'v2Template' => $tpl,
+            'policy' => $policy,
+            'totalMemMiB' => 2048,
+        ]));
+        $this->assertTrue(strpos($out, 'IOReadIOPSMax=') !== false, 'IOReadIOPSMax not appended');
+        $this->assertTrue(strpos($out, 'IOWriteIOPSMax=') !== false, 'IOWriteIOPSMax not appended');
     }
 
     public function testBandwidthLimitsAppendedWhenConfigured(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
-        $drop   = $this->pmssMakeTempDir('pmss-cg-drop-');
         $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
         $policy = <<<'PHP'
 <?php return [
   'tasksMax'=>512,
   'mounts' => [ '/' => ['readBw'=>'100M', 'writeBw'=>'120M'] ],
 ];
 PHP;
-        file_put_contents($cfgDir.'/cgroup.policy.php', $policy);
 
-        $this->pmssWithEnv([
-            'PMSS_CGROUP_MODE' => 'v2',
-            'PMSS_CONFIG_DIR' => $cfgDir,
-            'PMSS_SYSTEMD_USER_SLICE_DIR' => $drop,
-            'PMSS_TOTAL_MEM_MIB' => '2048',
-        ], function () use ($drop): void {
-            \pmssEnsureSystemdSlices('logmsg');
-            $out = (string)file_get_contents($drop.'/15-pmss.conf');
-            $this->assertTrue(strpos($out, 'IOReadBandwidthMax=') !== false, 'IOReadBandwidthMax not appended');
-            $this->assertTrue(strpos($out, 'IOWriteBandwidthMax=') !== false, 'IOWriteBandwidthMax not appended');
-        });
+        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+            'v2Template' => $tpl,
+            'policy' => $policy,
+            'totalMemMiB' => 2048,
+        ]));
+        $this->assertTrue(strpos($out, 'IOReadBandwidthMax=') !== false, 'IOReadBandwidthMax not appended');
+        $this->assertTrue(strpos($out, 'IOWriteBandwidthMax=') !== false, 'IOWriteBandwidthMax not appended');
     }
 }

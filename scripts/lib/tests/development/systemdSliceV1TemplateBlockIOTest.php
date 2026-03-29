@@ -8,17 +8,14 @@ class SystemdSliceV1TemplateBlockIOTest extends TestCase
 {
     public function testV1TemplateIncludesBlockIOAccounting(): void
     {
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfgv1b-');
-        $drop   = $this->pmssMakeTempDir('pmss-cg-dropv1b-');
-        $v1Body = "[Slice]\nBlockIOAccounting=yes\nCPUWeight=%%USER_CGROUP_CPU_WEIGHT%%\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\nMemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M\nMemoryMax=%%USER_CGROUP_MEMORY_MAX%%M\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', $v1Body);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', 'ignored');
-        putenv('PMSS_CGROUP_MODE=v1');
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
-        putenv('PMSS_TOTAL_MEM_MIB=2048');
-        \pmssEnsureSystemdSlices('logmsg');
-        $out = (string)file_get_contents($drop.'/15-pmss.conf');
-        $this->assertStringContainsString('BlockIOAccounting=yes', $out);
+        $v1Body = "[Slice]\nBlockIOAccounting=yes\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
+        $out = $this->pmssSystemdSliceDropinRender($this->pmssSystemdSliceFixturePrepare([
+            'cfgPrefix' => 'pmss-cg-cfgv1b-',
+            'dropPrefix' => 'pmss-cg-dropv1b-',
+            'mode' => 'v1',
+            'v1Template' => $v1Body,
+            'totalMemMiB' => 4096,
+        ]));
+        $this->assertTrue(strpos($out, 'BlockIOAccounting=yes') !== false, 'v1 template lost BlockIOAccounting');
     }
 }

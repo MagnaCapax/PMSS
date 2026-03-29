@@ -11,19 +11,20 @@ class SystemdSliceRootOverrideWrittenTest extends TestCase
         $base = $this->pmssMakeTempDir('pmss-cg-basedir-');
         $drop = $base.'/user-.slice.d';
         @mkdir($drop, 0755, true);
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-');
-        $tpl = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
-        putenv('PMSS_CGROUP_MODE=v2');
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
-        putenv('PMSS_TOTAL_MEM_MIB=1024');
-        \pmssEnsureSystemdSlices('logmsg');
+
+        $fixture = $this->pmssSystemdSliceFixturePrepare([
+            'dropDir' => $drop,
+            'v2Template' => "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n",
+            'totalMemMiB' => 1024,
+        ]);
+
+        $this->pmssSystemdSliceEnsure($fixture);
+
         $rootDrop = $base.'/user-0.slice.d/99-zz-pmss-unlimited.conf';
         $this->assertTrue(file_exists($rootDrop), 'Root override missing');
-        $data = (string)file_get_contents($rootDrop);
-        $this->assertStringContainsString('MemoryHigh=infinity', $data);
+        $data = (string) file_get_contents($rootDrop);
         $this->assertStringContainsString('TasksMax=infinity', $data);
+        $this->assertStringContainsString('MemoryHigh=infinity', $data);
+        $this->assertStringContainsString('MemoryMax=infinity', $data);
     }
 }

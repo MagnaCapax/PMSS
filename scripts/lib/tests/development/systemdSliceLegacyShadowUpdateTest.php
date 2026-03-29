@@ -12,21 +12,16 @@ class SystemdSliceLegacyShadowUpdateTest extends TestCase
         $drop = $base.'/user-.slice.d';
         @mkdir($drop, 0755, true);
 
-        $cfgDir = $this->pmssMakeTempDir('pmss-cg-cfg-shadow-');
-        $tpl    = "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n";
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v2.conf', $tpl);
-        file_put_contents($cfgDir.'/template.cgroup.user-slice.v1.conf', 'ignored');
-
         $legacyShadow = $drop.'/99-pmss.conf';
         file_put_contents($legacyShadow, "[Slice]\nTasksMax=1000\n");
 
-        putenv('PMSS_CGROUP_MODE=v2');
-        putenv('PMSS_CONFIG_DIR='.$cfgDir);
-        putenv('PMSS_SYSTEMD_USER_SLICE_DIR='.$drop);
-        putenv('PMSS_TOTAL_CPU_THREADS=2');
-        putenv('PMSS_TOTAL_MEM_MIB=1024');
-
-        \pmssEnsureSystemdSlices('logmsg');
+        $this->pmssSystemdSliceEnsure($this->pmssSystemdSliceFixturePrepare([
+            'cfgPrefix' => 'pmss-cg-cfg-shadow-',
+            'dropDir' => $drop,
+            'v2Template' => "[Slice]\nTasksMax=%%USER_CGROUP_TASKS_MAX%%\n",
+            'totalCpuThreads' => 2,
+            'totalMemMiB' => 1024,
+        ]));
 
         $this->assertTrue(file_exists($legacyShadow), 'Legacy shadow file missing after run');
         $data = (string) file_get_contents($legacyShadow);
