@@ -433,6 +433,10 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Renders per-user lighttpd vhost/fastcgi config from templates. With a username, targets only that user; otherwise (no args) refreshes all.
   - Side-effects: Writes files under `/home/<user>/.lighttpd/` and lighttpd config directories.
 
+- scripts/cron/checkLighttpdInstances.php [<user>]
+  - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy.
+  - Per-user toggle: when user config `lighttpdEnabled` is false, kills any running `lighttpd`/`php-cgi` for that user, removes the watchdog error page, and skips restart. Default remains true.
+
 - scripts/util/createNginxConfig.php
   - Behavior: Regenerates nginx global and per-user config from templates; adds per-user subdomain vhosts under `/etc/nginx/conf.d/pmss-user-*.conf` when `/etc/hostname` is a valid FQDN.
   - Subdomains: `USERNAME.<host>` proxies to `/public-<user>/`; SHA256 host (`sha256(username.billingId.hostname).<host>`) proxies to `/user-<user>/` with HTTP→HTTPS redirect; hash vhost skipped if `.billingId` missing/invalid.

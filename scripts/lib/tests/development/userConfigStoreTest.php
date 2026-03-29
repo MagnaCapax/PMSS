@@ -151,6 +151,20 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testLighttpdEnabledDefaultsTrue(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $reloaded = $this->persistAndReload('lighton', $this->basePayload([
+                'ramMiB' => 512,
+                'rtorrentPort' => 5012,
+            ]));
+            $this->assertEquals(true, $reloaded['lighttpdEnabled']);
+        } finally {
+            $this->pmssCleanupTempDirProperty('tempDir');
+        }
+    }
+
     public function testDockerEnabledIgnoresProductMetadataWhenUnset(): void
     {
         $this->setUpTempDir();
@@ -220,6 +234,21 @@ class UserConfigStoreTest extends TestCase
                 'dockerEnabled' => 'true',
             ]));
             $this->assertEquals(true, $reloaded['dockerEnabled']);
+        } finally {
+            $this->pmssCleanupTempDirProperty('tempDir');
+        }
+    }
+
+    public function testLighttpdEnabledNormalisesFalseString(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $reloaded = $this->persistAndReload('lightoff', $this->basePayload([
+                'ramMiB' => 512,
+                'rtorrentPort' => 5013,
+                'lighttpdEnabled' => 'false',
+            ]));
+            $this->assertEquals(false, $reloaded['lighttpdEnabled']);
         } finally {
             $this->pmssCleanupTempDirProperty('tempDir');
         }
@@ -314,6 +343,47 @@ class UserConfigStoreTest extends TestCase
         try {
             $store = new \UserConfigStore($this->configDirPath());
             $this->assertEquals(false, \pmssUserDockerEnabled('../evil', $store));
+        } finally {
+            $this->pmssCleanupTempDirProperty('tempDir');
+        }
+    }
+
+    public function testPmssUserLighttpdEnabledDefaultsTrueWhenMissing(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertEquals(true, \pmssUserLighttpdEnabled('alice', $store));
+        } finally {
+            $this->pmssCleanupTempDirProperty('tempDir');
+        }
+    }
+
+    public function testPmssUserLighttpdEnabledRespectsFalse(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $payload = [
+                'ramMiB' => 512,
+                'rtorrentPort' => 5103,
+                'quota' => 50,
+                'quotaBurst' => 62,
+                'lighttpdEnabled' => false,
+            ];
+            $this->assertTrue($store->set('lightno', $payload));
+            $this->assertEquals(false, \pmssUserLighttpdEnabled('lightno', $store));
+        } finally {
+            $this->pmssCleanupTempDirProperty('tempDir');
+        }
+    }
+
+    public function testPmssUserLighttpdEnabledRejectsInvalidUsername(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertEquals(false, \pmssUserLighttpdEnabled('../evil', $store));
         } finally {
             $this->pmssCleanupTempDirProperty('tempDir');
         }

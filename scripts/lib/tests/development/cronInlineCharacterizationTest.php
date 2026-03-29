@@ -62,6 +62,7 @@ class CronInlineCharacterizationTest extends TestCase
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
 
+        $this->assertStringContainsString("pmssUserLighttpdEnabled(\$thisUser)", $src);
         $this->assertStringContainsString("pmssLighttpdWatchdogDeleteErrorPage(\$thisUser)", $src);
         $this->assertStringContainsString('pmssLighttpdWatchdogWriteErrorPage(', $src);
         $this->assertStringContainsString('pmssLighttpdWatchdogDetectReason(', $src);
@@ -70,6 +71,7 @@ class CronInlineCharacterizationTest extends TestCase
         $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);', $src);
         $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 9);', $src);
         $this->assertStringContainsString('pmssUserWatchdogEnsureServices($thisUser, [[\'processName\' => \'lighttpd\'', $src);
+        $this->assertStringContainsString('lighttpd disabled by config; terminating web stack', $src);
         $this->assertStringContainsString('Killing (if any) lighttpd for user: {$thisUser}', $src);
         $this->assertStringContainsString("'lighttpd restart requested'", $src);
         $this->assertStringContainsString("'lighttpd start requested'", $src);

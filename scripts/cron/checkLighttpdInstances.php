@@ -23,6 +23,12 @@ foreach($users AS $thisUser) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser);
         continue;
     }
+    if (function_exists('pmssUserLighttpdEnabled') && !pmssUserLighttpdEnabled($thisUser)) {
+        echo "User {$thisUser}: lighttpd disabled by config; terminating web stack.\n";
+        pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 15);
+        pmssLighttpdWatchdogDeleteErrorPage($thisUser);
+        continue;
+    }
 
     if (!file_exists($homeDir.'/.lighttpd.conf') && is_dir($homeDir)) {
         echo "Config missing for user: {$thisUser} — generating\n";

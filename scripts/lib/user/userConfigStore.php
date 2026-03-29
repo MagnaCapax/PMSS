@@ -21,6 +21,8 @@
  * - suspended (bool)   Best-effort mirror of suspension state (marker remains www-disabled).
  * - dockerEnabled (bool) Rootless Docker enablement (default true unless the
  *   provisioner stores an explicit override).
+ * - lighttpdEnabled (bool) Per-user lighttpd/php-cgi watchdog enablement
+ *   (default true unless the operator stores an explicit override).
  * - CPUWeight/IOWeight/IOReadBW/... pass-through for future resource controls.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
@@ -253,6 +255,12 @@ class UserConfigStore
                 : !in_array(strtolower(trim($payload['dockerEnabled'])), ['false', '0', 'no', 'off', ''], true))
             : true;
 
+        $payload['lighttpdEnabled'] = array_key_exists('lighttpdEnabled', $payload)
+            ? (!is_string($payload['lighttpdEnabled'])
+                ? (bool) $payload['lighttpdEnabled']
+                : !in_array(strtolower(trim($payload['lighttpdEnabled'])), ['false', '0', 'no', 'off', ''], true))
+            : true;
+
         // Safety gate: keep rootless Docker disabled for low-memory accounts.
         if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) && (int)$payload['ramMiB'] > 0) {
             if ((int)$payload['ramMiB'] < pmssUserDockerMinRamMiB()) {
@@ -367,5 +375,29 @@ if (!function_exists('pmssUserDockerEnabled')) {
         }
 
         return !array_key_exists('dockerEnabled', $payload) || (bool) $payload['dockerEnabled'];
+    }
+}
+
+if (!function_exists('pmssUserLighttpdEnabled')) {
+    /**
+     * Check whether the per-user lighttpd/php-cgi web stack should run.
+     */
+    function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = null): bool
+    {
+        $username = pmssNormalizeUsername($username);
+        if (!UserValidator::isValidUsername($username)) {
+            return false;
+        }
+
+        if ($store === null) {
+            $store = new UserConfigStore();
+        }
+
+        $payload = $store->get($username);
+        if (!is_array($payload)) {
+            return true;
+        }
+
+        return !array_key_exists('lighttpdEnabled', $payload) || (bool) $payload['lighttpdEnabled'];
     }
 }
