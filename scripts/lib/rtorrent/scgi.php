@@ -67,6 +67,64 @@ function rtorrentScgiFormatXmlrpcIntCall(string $method, int $value): string
 }
 
 /**
+ * Format one xmlrpc value node for a small subset of scalar and list params.
+ *
+ * The PMSS rTorrent callers only need integers, strings, booleans, and lists
+ * of those same values for lightweight stats and maintenance calls.
+ *
+ * @param mixed $value Parameter value to encode.
+ *
+ * @return string Xmlrpc value fragment.
+ */
+function rtorrentScgiFormatXmlrpcValue($value): string
+{
+    if (is_int($value)) {
+        return '<value><int>' . $value . '</int></value>';
+    }
+
+    if (is_bool($value)) {
+        return '<value><boolean>' . ($value ? '1' : '0') . '</boolean></value>';
+    }
+
+    if (is_float($value)) {
+        return '<value><double>' . $value . '</double></value>';
+    }
+
+    if (is_array($value)) {
+        $items = '';
+        foreach ($value as $item) {
+            $items .= rtorrentScgiFormatXmlrpcValue($item);
+        }
+
+        return '<value><array><data>' . $items . '</data></array></value>';
+    }
+
+    return '<value><string>' . htmlspecialchars((string) $value, ENT_XML1, 'UTF-8') . '</string></value>';
+}
+
+/**
+ * Build an xmlrpc call with arbitrary parameters.
+ *
+ * @param string     $method xmlrpc method name.
+ * @param array<int, mixed> $params Ordered xmlrpc parameters.
+ *
+ * @return string The xmlrpc request XML.
+ */
+function rtorrentScgiFormatXmlrpcParamsCall(string $method, array $params = []): string
+{
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+        . '<methodCall>'
+        . '<methodName>' . htmlspecialchars($method, ENT_XML1, 'UTF-8') . '</methodName>'
+        . '<params>';
+
+    foreach ($params as $param) {
+        $xml .= '<param>' . rtorrentScgiFormatXmlrpcValue($param) . '</param>';
+    }
+
+    return $xml . '</params></methodCall>';
+}
+
+/**
  * Send an SCGI request to a Unix socket and return the response.
  *
  * Handles connection timeout and read timeout separately. Returns false on
@@ -131,17 +189,135 @@ function rtorrentScgiSend(string $socketPath, string $request, int $timeout = 5)
  */
 function rtorrentScgiCallInt(string $socketPath, string $method, int $value, int $timeout = 5): bool
 {
-    $xmlrpc = rtorrentScgiFormatXmlrpcIntCall($method, $value);
+    return rtorrentScgiCall($socketPath, $method, [$value], $timeout) !== false;
+}
+
+/**
+ * Extract the xmlrpc body from an SCGI response.
+ *
+ * @param string $response Raw SCGI response including headers.
+ *
+ * @return string|false Xml body when present, otherwise false.
+ */
+function rtorrentScgiExtractXmlBody(string $response)
+{
+    $offset = strpos($response, '<?xml');
+    if ($offset === false) {
+        return false;
+    }
+
+    return substr($response, $offset);
+}
+
+/**
+ * Decode one xmlrpc value node into a PHP scalar or nested list.
+ *
+ * @param \SimpleXMLElement $valueNode Xmlrpc value node.
+ *
+ * @return mixed
+ */
+function rtorrentScgiDecodeXmlrpcValue(\SimpleXMLElement $valueNode)
+{
+    $children = $valueNode->children();
+    if (count($children) === 0) {
+        return (string) $valueNode;
+    }
+
+    /** @var \SimpleXMLElement $child */
+    $child = $children[0];
+    $name = $child->getName();
+
+    if ($name === 'int' || $name === 'i4' || $name === 'i8') {
+        return (int) ((string) $child);
+    }
+
+    if ($name === 'double') {
+        return (float) ((string) $child);
+    }
+
+    if ($name === 'boolean') {
+        return ((string) $child) === '1';
+    }
+
+    if ($name === 'string') {
+        return (string) $child;
+    }
+
+    if ($name === 'array') {
+        $values = [];
+        foreach ($child->data->value as $item) {
+            $values[] = rtorrentScgiDecodeXmlrpcValue($item);
+        }
+
+        return $values;
+    }
+
+    if ($name === 'struct') {
+        $values = [];
+        foreach ($child->member as $member) {
+            $values[(string) $member->name] = rtorrentScgiDecodeXmlrpcValue($member->value);
+        }
+
+        return $values;
+    }
+
+    return (string) $child;
+}
+
+/**
+ * Decode a raw SCGI xmlrpc response into its first value payload.
+ *
+ * Returns false for transport-level success paired with xmlrpc faults or
+ * malformed response bodies.
+ *
+ * @param string $response Raw SCGI response.
+ *
+ * @return mixed False on decode failure or xmlrpc fault, otherwise first value.
+ */
+function rtorrentScgiDecodeResponse(string $response)
+{
+    $xmlBody = rtorrentScgiExtractXmlBody($response);
+    if ($xmlBody === false || !function_exists('simplexml_load_string')) {
+        return false;
+    }
+
+    $xml = @simplexml_load_string($xmlBody);
+    if (!($xml instanceof \SimpleXMLElement)) {
+        return false;
+    }
+
+    if (isset($xml->fault->value)) {
+        return false;
+    }
+
+    if (!isset($xml->params->param->value)) {
+        return false;
+    }
+
+    return rtorrentScgiDecodeXmlrpcValue($xml->params->param->value);
+}
+
+/**
+ * Send an xmlrpc call and decode the first response value.
+ *
+ * @param string            $socketPath Absolute path to the rTorrent Unix socket.
+ * @param string            $method     xmlrpc method name.
+ * @param array<int, mixed> $params     Ordered parameter list.
+ * @param int               $timeout    Timeout in seconds.
+ *
+ * @return mixed False on transport/decode failure, otherwise decoded value.
+ */
+function rtorrentScgiCall(string $socketPath, string $method, array $params = [], int $timeout = 5)
+{
+    $xmlrpc = rtorrentScgiFormatXmlrpcParamsCall($method, $params);
     $request = rtorrentScgiFormatRequest($xmlrpc);
 
     $response = rtorrentScgiSend($socketPath, $request, $timeout);
     if ($response === false) {
         return false;
     }
-    if (strpos($response, '<fault>') !== false) {
-        return false;
-    }
-    return strpos($response, '<value>') !== false;
+
+    return rtorrentScgiDecodeResponse($response);
 }
 
 /**
@@ -158,17 +334,7 @@ function rtorrentScgiCallInt(string $socketPath, string $method, int $value, int
  */
 function rtorrentScgiPing(string $socketPath, int $timeout = 5): bool
 {
-    $xmlrpc = rtorrentScgiFormatXmlrpcCall('system.api_version');
-    $request = rtorrentScgiFormatRequest($xmlrpc);
-
-    $response = rtorrentScgiSend($socketPath, $request, $timeout);
-    if ($response === false) {
-        return false;
-    }
-
-    // A valid xmlrpc response contains <value> tags.
-    // We don't parse the full response; just verify it looks valid.
-    return strpos($response, '<value>') !== false;
+    return rtorrentScgiCall($socketPath, 'system.api_version', [], $timeout) !== false;
 }
 
 /**

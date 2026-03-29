@@ -74,6 +74,34 @@ class RtorrentScgiTest extends TestCase
     }
 
     /**
+     * Test xmlrpc params call supports string and list parameters.
+     */
+    public function testXmlrpcParamsCallFormatsStringAndListValues(): void
+    {
+        $xml = rtorrentScgiFormatXmlrpcParamsCall('d.multicall2', ['main', 'd.get_hash=', ['nested', 1]]);
+
+        $this->assertStringContainsString('<methodName>d.multicall2</methodName>', $xml);
+        $this->assertStringContainsString('<string>main</string>', $xml);
+        $this->assertStringContainsString('<string>d.get_hash=</string>', $xml);
+        $this->assertStringContainsString('<array><data>', $xml);
+        $this->assertStringContainsString('<int>1</int>', $xml);
+    }
+
+    /**
+     * Test xmlrpc response decoding returns scalar and array payloads.
+     */
+    public function testDecodeResponseParsesScalarAndArrayValues(): void
+    {
+        $scalar = "Status: 200 OK\r\n\r\n<?xml version=\"1.0\"?><methodResponse><params><param><value><i8>42</i8></value></param></params></methodResponse>";
+        $decodedScalar = rtorrentScgiDecodeResponse($scalar);
+        $this->assertEquals(42, $decodedScalar);
+
+        $array = "Status: 200 OK\r\n\r\n<?xml version=\"1.0\"?><methodResponse><params><param><value><array><data><value><string>a</string></value><value><string>b</string></value></data></array></value></param></params></methodResponse>";
+        $decodedArray = rtorrentScgiDecodeResponse($array);
+        $this->assertEquals(['a', 'b'], $decodedArray);
+    }
+
+    /**
      * Test xmlrpc call escapes special characters in method name.
      */
     public function testXmlrpcCallEscapesSpecialChars(): void
