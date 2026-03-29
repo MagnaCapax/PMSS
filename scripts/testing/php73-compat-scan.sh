@@ -23,7 +23,7 @@ if command -v rg >/dev/null 2>&1; then
 else
   IS_RG=0
   SEARCHER=(grep -RIn)
-  EXCLUDES=(--exclude-dir=vendor --exclude-dir=scripts/lib/tests --include='*.php')
+  EXCLUDES=(--exclude-dir=vendor --exclude-dir=tests --include='*.php')
 fi
 
 fail=0
