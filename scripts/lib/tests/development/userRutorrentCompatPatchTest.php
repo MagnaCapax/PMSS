@@ -60,6 +60,27 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->assertEquals($before, (string) file_get_contents($path));
     }
 
+    public function testCompatibilityPatchesAllKnownTargetsInSinglePass(): void
+    {
+        $home = $this->pmssMakeUserHomeTree('pmss-rutorrent-home-', 'www/rutorrent/php');
+        mkdir($home.'/www/rutorrent/plugins/rss', 0755, true);
+        mkdir($home.'/www/rutorrent/plugins/hddquota', 0755, true);
+
+        $settingsPath = $home.'/www/rutorrent/php/settings.php';
+        $rssPath = $home.'/www/rutorrent/plugins/rss/action.php';
+        $hddquotaPath = $home.'/www/rutorrent/plugins/hddquota/action.php';
+
+        file_put_contents($settingsPath, "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
+        file_put_contents($rssPath, "ob_flush();\n");
+        file_put_contents($hddquotaPath, "return \$field;\n");
+
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+
+        $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', (string) file_get_contents($settingsPath));
+        $this->assertStringContainsString('@ob_flush();', (string) file_get_contents($rssPath));
+        $this->assertStringContainsString('return (int) $field;', (string) file_get_contents($hddquotaPath));
+    }
+
 }
 
 }

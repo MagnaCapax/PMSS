@@ -77,19 +77,15 @@ function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
             'patched' => 'return (int) $field;',
         ],
     ] as $patch) {
-        if (!is_file($patch['path'])
-            || is_link($patch['path'])
-            || !is_string($content = @file_get_contents($patch['path']))
-            || $content === ''
-            || strpos($content, $patch['patched']) !== false) {
-            continue;
-        }
+        pmssUserPatchWritableFile($patch['path'], static function (string $content) use ($patch): string {
+            if (strpos($content, $patch['patched']) !== false) {
+                return $content;
+            }
 
-        if (($updated = str_replace($patch['legacy'], $patch['patched'], $content, $replacements)) === $content || $replacements < 1) {
-            continue;
-        }
+            $updated = str_replace($patch['legacy'], $patch['patched'], $content, $replacements);
 
-        @file_put_contents($patch['path'], $updated);
+            return $replacements > 0 ? $updated : $content;
+        });
     }
 }
 
