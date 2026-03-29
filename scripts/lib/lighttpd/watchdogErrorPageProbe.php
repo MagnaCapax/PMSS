@@ -39,18 +39,27 @@ function pmssLighttpdWatchdogParseDfInodeUsePercent(string $output): ?int
     return null;
 }
 
+/** Execute a watchdog probe command and capture its combined output and rc. */
+function pmssLighttpdWatchdogCommandCapture(string $binary, string $arguments): ?array
+{
+    $path = function_exists('pmssCommandPath') ? pmssCommandPath($binary) : '';
+    if ($path === '') {
+        return null;
+    }
+
+    $lines = array();
+    $exitCode = 0;
+    @exec($path.' '.$arguments, $lines, $exitCode);
+    return array('output' => $lines !== array() ? implode(PHP_EOL, $lines).PHP_EOL : '', 'exitCode' => $exitCode);
+}
+
 /** Inspect quota state live when possible, otherwise fall back to ~/.quota. */
 function pmssLighttpdWatchdogQuotaExceeded(string $username, string $homeDir): bool
 {
     $output = '';
-    $quotaPath = function_exists('pmssCommandPath') ? pmssCommandPath('quota') : '';
-    if ($quotaPath !== '') {
-        $lines = array();
-        $exitCode = 0;
-        @exec($quotaPath.' -u '.escapeshellarg($username).' -s 2>/dev/null', $lines, $exitCode);
-        if ($lines !== array()) {
-            $output = implode(PHP_EOL, $lines).PHP_EOL;
-        }
+    $quotaResult = pmssLighttpdWatchdogCommandCapture('quota', '-u '.escapeshellarg($username).' -s 2>/dev/null');
+    if ($quotaResult !== null && $quotaResult['output'] !== '') {
+        $output = $quotaResult['output'];
     }
 
     if ($output === '') {
@@ -69,15 +78,12 @@ function pmssLighttpdWatchdogQuotaExceeded(string $username, string $homeDir): b
 /** Return true when root inode usage is at or above the watchdog threshold. */
 function pmssLighttpdWatchdogRootInodesExhausted(string $mountPath = '/'): bool
 {
-    $dfPath = function_exists('pmssCommandPath') ? pmssCommandPath('df') : '';
-    if ($dfPath === '') {
+    $dfResult = pmssLighttpdWatchdogCommandCapture('df', '-i '.escapeshellarg($mountPath).' 2>/dev/null');
+    if ($dfResult === null) {
         return false;
     }
 
-    $lines = array();
-    $exitCode = 0;
-    @exec($dfPath.' -i '.escapeshellarg($mountPath).' 2>/dev/null', $lines, $exitCode);
-    $usagePercent = pmssLighttpdWatchdogParseDfInodeUsePercent(implode(PHP_EOL, $lines));
+    $usagePercent = pmssLighttpdWatchdogParseDfInodeUsePercent($dfResult['output']);
 
     return $usagePercent !== null && $usagePercent >= 95;
 }
@@ -89,16 +95,12 @@ function pmssLighttpdWatchdogConfigInvalid(string $configPath): bool
         return true;
     }
 
-    $lighttpdPath = function_exists('pmssCommandPath') ? pmssCommandPath('lighttpd') : '';
-    if ($lighttpdPath === '') {
+    $lighttpdResult = pmssLighttpdWatchdogCommandCapture('lighttpd', '-t -f '.escapeshellarg($configPath).' 2>&1');
+    if ($lighttpdResult === null) {
         return false;
     }
 
-    $output = array();
-    $exitCode = 0;
-    @exec($lighttpdPath.' -t -f '.escapeshellarg($configPath).' 2>&1', $output, $exitCode);
-
-    return $exitCode !== 0;
+    return $lighttpdResult['exitCode'] !== 0;
 }
 
 /** Diagnose the most helpful 502 status page for an unhealthy user web stack. */

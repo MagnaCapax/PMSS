@@ -105,3 +105,16 @@ function pmssAgentDiagnosticsOutputLines(array $result): array
     $lines = preg_split('/\r?\n/', trim((string) $result['stdout']));
     return array_values(array_filter(is_array($lines) ? $lines : [], 'strlen'));
 }
+
+/** Return trimmed command stdout or a fallback when nothing useful was emitted. */
+function pmssAgentDiagnosticsCommandText(string $command, string $fallback = ''): string
+{
+    $text = trim((string) pmssAgentDiagnosticsCapture($command)['stdout']);
+    return $text !== '' ? $text : $fallback;
+}
+
+/** Execute a repository PHP script and decode its JSON payload. */
+function pmssAgentDiagnosticsPhpJson(string $relativePath, array $arguments, string $label): array
+{
+    return pmssAgentDiagnosticsDecodeJson(pmssAgentDiagnosticsPhpScript($relativePath, $arguments), $label);
+}

@@ -39,32 +39,20 @@ function pmssAgentDiagnosticsCollectBaseSections(): array
             'fstab' => pmssAgentDiagnosticsReadFile('PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', '/etc/fstab'),
         ],
         'services' => [
-            'nginx' => trim((string) pmssAgentDiagnosticsCapture('systemctl is-active nginx 2>/dev/null')['stdout']) ?: 'unknown',
-            'proftpd' => trim((string) pmssAgentDiagnosticsCapture('systemctl is-active proftpd 2>/dev/null')['stdout']) ?: 'unknown',
-            'cron' => trim((string) pmssAgentDiagnosticsCapture('systemctl is-active cron 2>/dev/null')['stdout']) ?: 'unknown',
-            'ssh' => trim((string) pmssAgentDiagnosticsCapture('systemctl is-active ssh 2>/dev/null')['stdout']) ?: 'unknown',
-            'rtorrent_count' => (int) trim((string) pmssAgentDiagnosticsCapture('pgrep -cx rtorrent 2>/dev/null')['stdout']),
-            'lighttpd_count' => (int) trim((string) pmssAgentDiagnosticsCapture('pgrep -cx lighttpd 2>/dev/null')['stdout']),
+            'nginx' => pmssAgentDiagnosticsCommandText('systemctl is-active nginx 2>/dev/null', 'unknown'),
+            'proftpd' => pmssAgentDiagnosticsCommandText('systemctl is-active proftpd 2>/dev/null', 'unknown'),
+            'cron' => pmssAgentDiagnosticsCommandText('systemctl is-active cron 2>/dev/null', 'unknown'),
+            'ssh' => pmssAgentDiagnosticsCommandText('systemctl is-active ssh 2>/dev/null', 'unknown'),
+            'rtorrent_count' => (int) pmssAgentDiagnosticsCommandText('pgrep -cx rtorrent 2>/dev/null'),
+            'lighttpd_count' => (int) pmssAgentDiagnosticsCommandText('pgrep -cx lighttpd 2>/dev/null'),
         ],
-        'system_test' => pmssAgentDiagnosticsDecodeJson(
-            pmssAgentDiagnosticsPhpScript('scripts/util/systemTest.php', ['--json']),
-            'systemTest.php --json'
-        ),
+        'system_test' => pmssAgentDiagnosticsPhpJson('scripts/util/systemTest.php', ['--json'], 'systemTest.php --json'),
         'users' => [
             'list' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsPhpScript('scripts/listUsers.php')),
-            'consistency' => pmssAgentDiagnosticsDecodeJson(
-                pmssAgentDiagnosticsPhpScript('scripts/util/checkUsers.php', ['--json']),
-                'checkUsers.php --json'
-            ),
+            'consistency' => pmssAgentDiagnosticsPhpJson('scripts/util/checkUsers.php', ['--json'], 'checkUsers.php --json'),
         ],
-        'resources' => pmssAgentDiagnosticsDecodeJson(
-            pmssAgentDiagnosticsPhpScript('scripts/util/userResourcesList.php', ['--full', '--json']),
-            'userResourcesList.php --full --json'
-        ),
-        'traffic' => pmssAgentDiagnosticsDecodeJson(
-            pmssAgentDiagnosticsPhpScript('scripts/showTraffic.php', ['--json']),
-            'showTraffic.php --json'
-        ),
+        'resources' => pmssAgentDiagnosticsPhpJson('scripts/util/userResourcesList.php', ['--full', '--json'], 'userResourcesList.php --full --json'),
+        'traffic' => pmssAgentDiagnosticsPhpJson('scripts/showTraffic.php', ['--json'], 'showTraffic.php --json'),
     ];
 }
 
@@ -72,13 +60,10 @@ function pmssAgentDiagnosticsCollectBaseSections(): array
 function pmssAgentDiagnosticsCollectUserSections(string $user): array
 {
     return [
-        'user_settings' => pmssAgentDiagnosticsDecodeJson(
-            pmssAgentDiagnosticsPhpScript('scripts/userSetting.php', ['view', $user]),
-            'userSetting.php view'
-        ),
-        'user_identity' => ['raw' => trim((string) pmssAgentDiagnosticsCapture('id '.escapeshellarg($user))['stdout'])],
-        'user_quota' => ['raw' => trim((string) pmssAgentDiagnosticsCapture('quota -u '.escapeshellarg($user).' 2>/dev/null')['stdout'])],
-        'user_disk' => ['raw' => trim((string) pmssAgentDiagnosticsCapture('du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null')['stdout'])],
+        'user_settings' => pmssAgentDiagnosticsPhpJson('scripts/userSetting.php', ['view', $user], 'userSetting.php view'),
+        'user_identity' => ['raw' => pmssAgentDiagnosticsCommandText('id '.escapeshellarg($user))],
+        'user_quota' => ['raw' => pmssAgentDiagnosticsCommandText('quota -u '.escapeshellarg($user).' 2>/dev/null')],
+        'user_disk' => ['raw' => pmssAgentDiagnosticsCommandText('du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null')],
         'user_processes' => pmssAgentDiagnosticsOutputLines(
             pmssAgentDiagnosticsCapture('pgrep -u '.escapeshellarg($user).' -a 2>/dev/null')
         ),
