@@ -15,24 +15,24 @@ MAILTO=""
 
 1 * * * *   root /scripts/cron/checkDirectories.php >> /var/log/pmss/checkDirectories.log 2>&1
 */10 * * * *   root /scripts/cron/checkGui.php >> /dev/null 2>&1
-* * * * *   root ps -o pid= -C rtorrent|xargs -n1 -I'{1}' ionice -c2 -n3 -p{1}
-* * * * *   root ps -o pid= -C deluged|xargs -n1 -I'{1}' ionice -c2 -n3 -p{1}
-* * * * *   root ps -o pid= -C qbittorrent-nox|xargs -n1 -I'{1}' ionice -c2 -n3 -p{1}
-* * * * *   root ps -o pid= -C bash|xargs -n1 -I'{1}' ionice -c1 -n2 -p{1}
-* * * * *   root ps -o pid= -C php|xargs -n1 -I'{1}' ionice -c2 -n6 -p{1}
-* * * * *   root ps -o pid= -C rar|xargs -n1 -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C unrar|xargs -n1 -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C tar|xargs -n1 -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C mktorrent|xargs -n1 -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C sftp-server|xargs -n1 -I'{1}' ionice -c2 -n7 -p{1}
-* * * * *   root ps -o pid= -C cp|xargs -n1 -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C proftpd|xargs -n1 -I'{1}' ionice -c2 -n7 -p{1}
-* * * * *   root ps -o pid= -C mono|xargs -n1 -I'{1}' renice -n 17 -p {1}
-* * * * *   root ps -o pid= -C ffmpeg|xargs -n1 -I'{1}' renice -n 18 -p {1}
-* * * * *   root ps -o pid= -C ffmpeg|xargs -n1 -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C rclone|xargs -n1 -I'{1}' renice -n 17 -p {1}
-* * * * *   root ps -o pid= -C rclone|xargs -n1 -I'{1}' ionice -c3 -p{1}
-* * * * *   root ps -o pid= -C xmrig|xargs -n1 -I'{1}' renice -n 19 -p {1}
+* * * * *   root ps -o pid= -C rtorrent|xargs -I'{1}' ionice -c2 -n3 -p{1}
+* * * * *   root ps -o pid= -C deluged|xargs -I'{1}' ionice -c2 -n3 -p{1}
+* * * * *   root ps -o pid= -C qbittorrent-nox|xargs -I'{1}' ionice -c2 -n3 -p{1}
+* * * * *   root ps -o pid= -C bash|xargs -I'{1}' ionice -c1 -n2 -p{1}
+* * * * *   root ps -o pid= -C php|xargs -I'{1}' ionice -c2 -n6 -p{1}
+* * * * *   root ps -o pid= -C rar|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid= -C unrar|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid= -C tar|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid= -C mktorrent|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid= -C sftp-server|xargs -I'{1}' ionice -c2 -n7 -p{1}
+* * * * *   root ps -o pid= -C cp|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid= -C proftpd|xargs -I'{1}' ionice -c2 -n7 -p{1}
+* * * * *   root ps -o pid= -C mono|xargs -I'{1}' renice -n 17 -p {1}
+* * * * *   root ps -o pid= -C ffmpeg|xargs -I'{1}' renice -n 18 -p {1}
+* * * * *   root ps -o pid= -C ffmpeg|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid= -C rclone|xargs -I'{1}' renice -n 17 -p {1}
+* * * * *   root ps -o pid= -C rclone|xargs -I'{1}' ionice -c3 -p{1}
+* * * * *   root ps -o pid= -C xmrig|xargs -I'{1}' renice -n 19 -p {1}
 
 
 #*/4 * * * * root /usr/bin/php -q /scripts/cron/checkHttpd.php >> /var/log/pmss/checkHttpd.log 2>&1
