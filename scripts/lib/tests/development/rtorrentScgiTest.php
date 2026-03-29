@@ -53,7 +53,7 @@ class RtorrentScgiTest extends TestCase
     public function testXmlrpcCallFormattingProducesValidXml(): void
     {
         $method = 'system.api_version';
-        $xml = rtorrentScgiFormatXmlrpcCall($method);
+        $xml = rtorrentScgiFormatXmlrpcParamsCall($method);
 
         $this->assertStringContainsString('<?xml version="1.0"', $xml);
         $this->assertStringContainsString('<methodCall>', $xml);
@@ -66,7 +66,7 @@ class RtorrentScgiTest extends TestCase
      */
     public function testXmlrpcIntCallFormattingProducesValidXml(): void
     {
-        $xml = rtorrentScgiFormatXmlrpcIntCall('throttle.global_up.max_rate.set', 42);
+        $xml = rtorrentScgiFormatXmlrpcParamsCall('throttle.global_up.max_rate.set', [42]);
 
         $this->assertStringContainsString('<methodName>throttle.global_up.max_rate.set</methodName>', $xml);
         $this->assertStringContainsString('<int>42</int>', $xml);
@@ -107,7 +107,7 @@ class RtorrentScgiTest extends TestCase
     public function testXmlrpcCallEscapesSpecialChars(): void
     {
         $method = 'test<>&method';
-        $xml = rtorrentScgiFormatXmlrpcCall($method);
+        $xml = rtorrentScgiFormatXmlrpcParamsCall($method);
 
         // Special chars should be escaped.
         $this->assertStringContainsString('&lt;', $xml);
@@ -202,7 +202,7 @@ class RtorrentScgiTest extends TestCase
     public function testCompleteRequestFormatting(): void
     {
         $method = 'system.hostname';
-        $xmlrpc = rtorrentScgiFormatXmlrpcCall($method);
+        $xmlrpc = rtorrentScgiFormatXmlrpcParamsCall($method);
         $request = rtorrentScgiFormatRequest($xmlrpc);
 
         // Verify the full request structure.

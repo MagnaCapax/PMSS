@@ -90,4 +90,13 @@ class MediaStackPanelTest extends TestCase
         $this->assertStringContainsString('install-media-stack.sh', $command);
         $this->assertStringContainsString("USER='alice'", $command);
     }
+
+    public function testHomePathBuildsStableInstallerPaths(): void
+    {
+        $home = '/home/alice/';
+
+        $this->assertSame('/home/alice/install-media-stack.sh', \pmssMediaStackPanelHomePath($home, 'install-media-stack.sh'));
+        $this->assertSame('/home/alice/.install-media-stack.log', \pmssMediaStackPanelHomePath($home, '.install-media-stack.log'));
+        $this->assertSame('/home/alice/.install-media-stack-web.pid', \pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
+    }
 }

@@ -9,27 +9,11 @@
  */
 
 /**
- * Resolve the copied media stack installer path in the tenant home.
+ * Resolve a media-stack helper path relative to the tenant home.
  */
-function pmssMediaStackPanelScriptPath(string $home): string
+function pmssMediaStackPanelHomePath(string $home, string $suffix): string
 {
-    return rtrim($home, '/').'/install-media-stack.sh';
-}
-
-/**
- * Resolve the shared installer log path written by install-media-stack.sh.
- */
-function pmssMediaStackPanelLogPath(string $home): string
-{
-    return rtrim($home, '/').'/.install-media-stack.log';
-}
-
-/**
- * Resolve the lightweight pid file used by the web launcher.
- */
-function pmssMediaStackPanelPidPath(string $home): string
-{
-    return rtrim($home, '/').'/.install-media-stack-web.pid';
+    return rtrim($home, '/').'/'.$suffix;
 }
 
 /**
@@ -85,7 +69,7 @@ function pmssMediaStackPanelInstalled(string $home): bool
  */
 function pmssMediaStackPanelStartGateRead(string $home): array
 {
-    $scriptPath = pmssMediaStackPanelScriptPath($home);
+    $scriptPath = pmssMediaStackPanelHomePath($home, 'install-media-stack.sh');
     if (!is_file($scriptPath)) {
         return array('ok' => false, 'message' => 'Media stack installer is missing from this account.');
     }
@@ -114,7 +98,7 @@ function pmssMediaStackPanelStartGateRead(string $home): array
  */
 function pmssMediaStackPanelPidRead(string $home): int
 {
-    $raw = @file_get_contents(pmssMediaStackPanelPidPath($home));
+    $raw = @file_get_contents(pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
     return is_string($raw) ? (int) trim($raw) : 0;
 }
 
@@ -139,7 +123,7 @@ function pmssMediaStackPanelPidRunning(int $pid): bool
  */
 function pmssMediaStackPanelLogTailRead(string $home, int $maxBytes = 6000): string
 {
-    $path = pmssMediaStackPanelLogPath($home);
+    $path = pmssMediaStackPanelHomePath($home, '.install-media-stack.log');
     if (!is_file($path) || ($size = @filesize($path)) === false) {
         return '';
     }
@@ -184,8 +168,8 @@ function pmssMediaStackPanelUrlsBuild(string $username, string $hostname): array
  */
 function pmssMediaStackPanelStartCommandBuild(string $home, string $username): string
 {
-    $scriptPath = pmssMediaStackPanelScriptPath($home);
-    $pidPath = pmssMediaStackPanelPidPath($home);
+    $scriptPath = pmssMediaStackPanelHomePath($home, 'install-media-stack.sh');
+    $pidPath = pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid');
 
     $innerCommand = 'cd '.escapeshellarg($home)
         .' && rm -f -- '.escapeshellarg($pidPath)

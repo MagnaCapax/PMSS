@@ -28,45 +28,6 @@ function rtorrentScgiFormatRequest(string $xmlData): string
 }
 
 /**
- * Build a minimal xmlrpc method call with no parameters.
- *
- * Used for health checks where we just need to verify the instance responds.
- *
- * @param string $method The xmlrpc method name (e.g., 'system.api_version').
- *
- * @return string The xmlrpc request XML.
- */
-function rtorrentScgiFormatXmlrpcCall(string $method): string
-{
-    return '<?xml version="1.0" encoding="UTF-8"?>'
-        . '<methodCall>'
-        . '<methodName>' . htmlspecialchars($method, ENT_XML1, 'UTF-8') . '</methodName>'
-        . '<params></params>'
-        . '</methodCall>';
-}
-
-/**
- * Build an xmlrpc call with a single integer parameter.
- *
- * Used for lightweight settings updates (e.g. throttle adjustments).
- *
- * @param string $method The xmlrpc method name.
- * @param int    $value  Integer parameter to send.
- *
- * @return string The xmlrpc request XML.
- */
-function rtorrentScgiFormatXmlrpcIntCall(string $method, int $value): string
-{
-    return '<?xml version="1.0" encoding="UTF-8"?>'
-        . '<methodCall>'
-        . '<methodName>' . htmlspecialchars($method, ENT_XML1, 'UTF-8') . '</methodName>'
-        . '<params>'
-        . '<param><value><int>' . $value . '</int></value></param>'
-        . '</params>'
-        . '</methodCall>';
-}
-
-/**
  * Format one xmlrpc value node for a small subset of scalar and list params.
  *
  * The PMSS rTorrent callers only need integers, strings, booleans, and lists

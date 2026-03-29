@@ -44,13 +44,12 @@ function pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname)
 function pmssMediaStackPanelStartHandle($home, $username, $hostname)
 {
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        pmssMediaStackPanelJsonRespond(array(
-            'message' => 'Media stack install start requires POST.',
-            'html' => pmssMediaStackPanelHtmlBuild(pmssMediaStackPanelStatusRead($home, $username, $hostname)),
-            'canStart' => true,
-            'poll' => false,
-            'state' => 'blocked',
-        ), 405);
+        $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
+        $payload['message'] = 'Media stack install start requires POST.';
+        $payload['canStart'] = true;
+        $payload['poll'] = false;
+        $payload['state'] = 'blocked';
+        pmssMediaStackPanelJsonRespond($payload, 405);
     }
 
     $status = pmssMediaStackPanelStatusRead($home, $username, $hostname);
@@ -63,12 +62,12 @@ function pmssMediaStackPanelStartHandle($home, $username, $hostname)
         pmssMediaStackPanelJsonRespond(pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname), 409);
     }
 
-    $logPath = pmssMediaStackPanelLogPath($home);
+    $logPath = pmssMediaStackPanelHomePath($home, '.install-media-stack.log');
     if (is_file($logPath)) {
         @rename($logPath, $logPath.'.previous');
     }
 
-    @unlink(pmssMediaStackPanelPidPath($home));
+    @unlink(pmssMediaStackPanelHomePath($home, '.install-media-stack-web.pid'));
     @shell_exec(pmssMediaStackPanelStartCommandBuild($home, $username));
 
     $payload = pmssMediaStackPanelStatusPayloadBuild($home, $username, $hostname);
