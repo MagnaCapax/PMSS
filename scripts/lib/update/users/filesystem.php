@@ -113,11 +113,13 @@ PHP;
         'www/deluge.php',
         'www/filemanager.php',
         'www/index.php',
+        'www/mediaStack.php',
         'www/openvpn-config.tgz',
         'www/qbittorrent.php',
         'www/rutorrent/js/content.js',
         'www/rutorrent/php/settings.php',
         'www/rutorrent/plugins/theme/conf.php',
+        'www/welcome.php',
     ];
     foreach ($files as $file) {
         updateUserFile($file, $user);

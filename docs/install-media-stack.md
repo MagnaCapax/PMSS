@@ -17,6 +17,11 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Safe defaults: localhost binding; randomized high ports; aliases to launch in `tmux`.
 - Logging: colored console output and log tee to `~/.install-media-stack.log`.
 
+## Web Panel Wrapper
+- The welcome page can launch the installer without SSH for the first run.
+- The wrapper intentionally stops at first-install scope: once `~/.bin` or Jellyfin data already exist, reruns must happen over SSH because the script asks for confirmation before removing those paths.
+- The wrapper does not pre-generate Jellyfin credentials; the admin account is created in Jellyfin’s first-run wizard after the install completes.
+
 ## Compatibility Matrix
 - Debian 12 (bookworm): uses latest Servarr download/update endpoints + .NET 8.
 - Debian 11 (bullseye) and Debian 10 (buster): .NET 8 supported; Radarr GLIBC fallback:

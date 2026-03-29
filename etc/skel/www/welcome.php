@@ -20,6 +20,9 @@ if (file_exists('/scripts/lib/welcomeAnnouncements.php')) {
 if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
     require_once '/scripts/lib/webCgroupMemoryStatus.php';
 }
+if (file_exists('/scripts/lib/user/mediaStackPanel.php')) {
+    require_once '/scripts/lib/user/mediaStackPanel.php';
+}
 
 $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
@@ -30,6 +33,7 @@ $contextualWelcomeMessage = $pageState['contextualWelcomeMessage'];
 $delugePasswordHelpersAvailable = $pageState['delugePasswordHelpersAvailable'];
 $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
+$mediaStackStatus = $pageState['mediaStackStatus'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
 $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
 $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
@@ -67,6 +71,37 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
             color: #666;
             font-size: 0.9em;
         }
+        .pmss-media-stack-box {
+            margin: 10px 0 14px;
+            padding: 12px 14px;
+            border: 1px solid #78a5d6;
+            background: #edf4ff;
+            color: #1a3d66;
+        }
+        .pmss-media-stack-state-installed {
+            border-color: #6aaf71;
+            background: #edf9ef;
+            color: #234f27;
+        }
+        .pmss-media-stack-state-failed,
+        .pmss-media-stack-state-blocked {
+            border-color: #cc8f8f;
+            background: #fff1f1;
+            color: #7a1a1a;
+        }
+        .pmss-media-stack-box ul {
+            margin: 8px 0 0 18px;
+        }
+        .pmss-media-stack-box pre {
+            margin-top: 10px;
+            max-height: 220px;
+            overflow: auto;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #c8d7eb;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
         .pmss-raid-notice {
             margin: 12px 0 18px;
             padding: 12px 14px;
@@ -93,6 +128,7 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
     </style>
     <script type="text/javascript">
         var pmssActionNoticeTimer = null;
+        var pmssMediaStackPollTimer = null;
 
         function pmssShowActionNotice(message, isError) {
             var notice = $('#pmss-action-notice');
@@ -164,6 +200,78 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
                 error: function() {
                     pmssSetActionLoading(button, false);
                     pmssShowActionNotice('Action failed. Please try again in a moment.', true);
+                }
+            });
+        }
+
+        function pmssMediaStackPollSchedule(delay) {
+            if (pmssMediaStackPollTimer !== null) {
+                window.clearTimeout(pmssMediaStackPollTimer);
+                pmssMediaStackPollTimer = null;
+            }
+
+            if (delay > 0) {
+                pmssMediaStackPollTimer = window.setTimeout(pmssMediaStackStatusRefresh, delay);
+            }
+        }
+
+        function pmssMediaStackApply(payload) {
+            var panel = $('#pmss-media-stack-status');
+            var button = $('#pmss-media-stack-start');
+
+            if (panel.length > 0 && payload && payload.html) {
+                panel.html(payload.html);
+            }
+
+            if (button.length > 0 && payload) {
+                if (payload.canStart) {
+                    button.removeAttr('disabled');
+                } else {
+                    button.attr('disabled', 'disabled');
+                }
+            }
+
+            pmssMediaStackPollSchedule(payload && payload.poll ? 4000 : 0);
+        }
+
+        function pmssMediaStackStatusRefresh() {
+            if ($('#pmss-media-stack-status').length === 0) {
+                pmssMediaStackPollSchedule(0);
+                return;
+            }
+
+            $.ajax({
+                url: 'mediaStack.php?action=status',
+                dataType: 'json',
+                cache: false,
+                success: function(payload) {
+                    pmssMediaStackApply(payload);
+                }
+            });
+        }
+
+        function pmssMediaStackStart(button) {
+            pmssSetActionLoading(button, true);
+            pmssShowActionNotice('Starting media stack install...', false);
+
+            $.ajax({
+                url: 'mediaStack.php?action=start',
+                type: 'POST',
+                dataType: 'json',
+                cache: false,
+                success: function(payload) {
+                    pmssSetActionLoading(button, false);
+                    pmssMediaStackApply(payload);
+                    if (payload && payload.message) {
+                        pmssShowActionNotice(payload.message, false);
+                    }
+                },
+                error: function(xhr) {
+                    pmssSetActionLoading(button, false);
+                    if (xhr && xhr.responseText) {
+                        pmssMediaStackStatusRefresh();
+                    }
+                    pmssShowActionNotice('Media stack install could not be started from the panel.', true);
                 }
             });
         }
@@ -270,6 +378,16 @@ if ((file_exists('/usr/bin/qbittorrent-nox') || file_exists('/usr/local/bin/qbit
 }
 ?>
 
+<?php
+if (file_exists('mediaStack.php') && function_exists('pmssMediaStackPanelHtmlBuild')) {
+?>
+                        <h6>Media Stack</h6>
+                        <div id="pmss-media-stack-status"><?php echo pmssMediaStackPanelHtmlBuild($mediaStackStatus); ?></div>
+                        <input type="button" id="pmss-media-stack-start" name="mediaStackStart" value="Install Media Stack" onClick="pmssMediaStackStart(this);"<?php if (empty($mediaStackStatus['canStart'])) echo ' disabled="disabled"'; ?> />
+<?php
+}
+?>
+
                         <h6>rTorrent</h6>
                         <input type="button" name="rtorrentRestart" value="Restart rTorrent" onClick="pmssRunAction(this, 'rtorrentRestart.php', 'rTorrent restart request sent, please allow up to 2 minutes for restart to happen.', false, 'Sending rTorrent restart request...');" />
 <?php
@@ -362,6 +480,7 @@ echo $announcementItemsHtml;
     </div>
 
     <script type="text/javascript">
+        pmssMediaStackStatusRefresh();
         setTimeout(function(){ location = ''; }, 180000);
     </script>
 </body>
@@ -376,6 +495,26 @@ echo $announcementItemsHtml;
 function pmssWelcomePageStateBuild() {
     $quotaInfo = pmssWelcomeQuotaInfoRead();
     $delugeState = pmssWelcomeDelugeStateBuild('../.config/deluge/auth');
+    $mediaStackStatus = array(
+        'state' => 'blocked',
+        'message' => 'Media stack panel helper is unavailable on this host.',
+        'details' => array(),
+        'tail' => '',
+        'urls' => array(),
+        'canStart' => false,
+        'poll' => false,
+    );
+
+    if (function_exists('pmssMediaStackPanelStatusRead')
+        && function_exists('pmssMediaStackPanelCurrentUserRead')
+        && function_exists('pmssMediaStackPanelCurrentHostnameRead')) {
+        $home = dirname(__DIR__);
+        $mediaStackStatus = pmssMediaStackPanelStatusRead(
+            $home,
+            pmssMediaStackPanelCurrentUserRead($home),
+            pmssMediaStackPanelCurrentHostnameRead()
+        );
+    }
 
     return array(
         'quotaInfo' => $quotaInfo,
@@ -386,6 +525,7 @@ function pmssWelcomePageStateBuild() {
         'delugePasswordHelpersAvailable' => $delugeState['helpersAvailable'],
         'delugePasswordNotice' => $delugeState['passwordNotice'],
         'delugePassword' => $delugeState['password'],
+        'mediaStackStatus' => $mediaStackStatus,
     );
 }
 
