@@ -7,8 +7,50 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
+require_once __DIR__.'/../update/distro.php';
 require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/passwords.php';
+
+/**
+ * Pick the Deluge core template path for the active Debian release.
+ *
+ * Debian 12+ ships libtorrent 2.0, which removed the legacy cache_*
+ * settings. Older releases keep the cache directives enabled.
+ *
+ * @param array{name?:string,version?:int,codename?:string}|null $distro
+ */
+function pmssDelugeCoreTemplatePath(?array $distro = null): string
+{
+    $configDir = pmssResolvePathFromEnv('PMSS_SEEDBOX_CONFIG_DIR', '/etc/seedbox/config');
+    $version = (int) (($distro['version'] ?? 0));
+
+    return $version >= 12
+        ? $configDir.'/template.deluge.core.nocache.conf'
+        : $configDir.'/template.deluge.core.conf';
+}
+
+/**
+ * Render Deluge core.conf from the PMSS template and runtime values.
+ *
+ * @param array{name:string,memory:int|float} $user
+ * @param array{name?:string,version?:int,codename?:string}|null $distro
+ */
+function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $uploadThrottle, ?array $distro = null): string
+{
+    $username = (string) $user['name'];
+    $templatePath = pmssDelugeCoreTemplatePath($distro ?? pmssDetectDistro());
+    $template = file_get_contents($templatePath);
+
+    if (!is_string($template) || $template === '') {
+        return '';
+    }
+
+    return str_replace(
+        ['##USERNAME##', '##CACHE', '##DAEMONPORT', '##UPLOAD_THROTTLE##'],
+        [$username, (int) ($user['memory'] * 1024 / 16), $delugePort, $uploadThrottle],
+        $template
+    );
+}
 
 function userConfigureDeluge(array $user, array $configuration): void
 {
@@ -38,12 +80,7 @@ function userConfigureDeluge(array $user, array $configuration): void
     $throttle = pmssReadTorrentThrottle($username);
     $uploadThrottle = ($throttle !== null && $throttle > 0) ? (string) $throttle : '-1.0';
 
-    $coreTemplate = file_get_contents('/etc/seedbox/config/template.deluge.core.conf');
-    $coreConfig   = str_replace(
-        ['##USERNAME##', '##CACHE', '##DAEMONPORT', '##UPLOAD_THROTTLE##'],
-        [$username, (int) ($user['memory'] * 1024 / 16), $delugePort, $uploadThrottle],
-        $coreTemplate
-    );
+    $coreConfig = pmssDelugeRenderCoreConfig($user, $delugePort, $uploadThrottle);
     file_put_contents("$configDir/core.conf", $coreConfig);
 
     $hostlistTemplate = file_get_contents('/etc/seedbox/config/template.deluge.hostlist.conf');
