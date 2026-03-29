@@ -11,30 +11,12 @@ require_once __DIR__.'/userFileWrite.php';
 function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
 {
     $messages = array(
-        'suspended' => array(
-            'headline' => 'Your account is suspended.',
-            'detail' => 'Check your invoices or contact support before retrying.',
-        ),
-        'quota' => array(
-            'headline' => 'Your disk quota is full.',
-            'detail' => 'Connect with SFTP and delete files to free space, then retry.',
-        ),
-        'inode' => array(
-            'headline' => 'Server-wide storage pressure is blocking web access.',
-            'detail' => 'No action is needed from your side; our team is already on it.',
-        ),
-        'config' => array(
-            'headline' => 'A web configuration error was detected.',
-            'detail' => 'Please contact support so we can correct the service configuration.',
-        ),
-        'php' => array(
-            'headline' => 'Your PHP backend is not responding.',
-            'detail' => 'An automatic restart is in progress; retry in 1-2 minutes.',
-        ),
-        'restarting' => array(
-            'headline' => 'Your web service is restarting.',
-            'detail' => 'This usually settles within 1-2 minutes; please retry shortly.',
-        ),
+        'suspended' => array('headline' => 'Your account is suspended.', 'detail' => 'Check your invoices or contact support before retrying.'),
+        'quota' => array('headline' => 'Your disk quota is full.', 'detail' => 'Connect with SFTP and delete files to free space, then retry.'),
+        'inode' => array('headline' => 'Server-wide storage pressure is blocking web access.', 'detail' => 'No action is needed from your side; our team is already on it.'),
+        'config' => array('headline' => 'A web configuration error was detected.', 'detail' => 'Please contact support so we can correct the service configuration.'),
+        'php' => array('headline' => 'Your PHP backend is not responding.', 'detail' => 'An automatic restart is in progress; retry in 1-2 minutes.'),
+        'restarting' => array('headline' => 'Your web service is restarting.', 'detail' => 'This usually settles within 1-2 minutes; please retry shortly.'),
     );
     $message = $messages[$reasonKey] ?? $messages['restarting'];
     $headline = htmlspecialchars($message['headline'], ENT_QUOTES, 'UTF-8');

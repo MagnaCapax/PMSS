@@ -30,10 +30,7 @@ function pmssAgentDiagnosticsUsage(): string
 /** Collect always-on storage and service sections. */
 function pmssAgentDiagnosticsCollectBaseSections(): array
 {
-    $storage = [
-        'df' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -h')),
-        'df_inodes' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -i')),
-    ];
+    $storage = ['df' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -h')), 'df_inodes' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -i'))];
     foreach ([
         'mdstat' => ['PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', '/proc/mdstat'],
         'fstab' => ['PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', '/etc/fstab'],
@@ -76,9 +73,7 @@ function pmssAgentDiagnosticsCollectUserSections(string $user): array
 {
     $sections = [
         'user_settings' => pmssAgentDiagnosticsPhpJson('scripts/userSetting.php', ['view', $user], 'userSetting.php view'),
-        'user_processes' => pmssAgentDiagnosticsOutputLines(
-            pmssAgentDiagnosticsCapture('pgrep -u '.escapeshellarg($user).' -a 2>/dev/null')
-        ),
+        'user_processes' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('pgrep -u '.escapeshellarg($user).' -a 2>/dev/null')),
     ];
 
     foreach ([
