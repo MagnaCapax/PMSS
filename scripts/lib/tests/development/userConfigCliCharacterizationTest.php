@@ -62,6 +62,28 @@ class userConfigCliCharacterizationTest extends TestCase
         $this->assertSame(['', '', '', '', '', '', '', '', '0'], $positionals);
     }
 
+    public function testPersistedPresenceKeepsExplicitZeroTrafficCap(): void
+    {
+        $presence = \pmssUserConfigCliPersistedPositionalPresence([
+            'userConfig.php',
+            'alice',
+            '512',
+            '100',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '0',
+        ]);
+
+        $this->assertTrue($presence['trafficCapMbit']);
+        $this->assertFalse($presence['CPUWeight']);
+    }
+
     public function testCgroupResourceArgsUseSharedFlagMapOnce(): void
     {
         $args = \pmssUserConfigCliBuildCgroupResourceArgs([

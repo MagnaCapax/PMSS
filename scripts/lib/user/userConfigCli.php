@@ -85,7 +85,8 @@ function pmssUserConfigCliPersistedPositionalPresence(array $args): array
     $presence = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
         if (!empty($spec['persist'])) {
-            $presence[$key] = array_key_exists($spec['userConfigIndex'], $args);
+            $presence[$key] = array_key_exists($spec['userConfigIndex'], $args)
+                && $args[$spec['userConfigIndex']] !== '';
         }
     }
     return $presence;
