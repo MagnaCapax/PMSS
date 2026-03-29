@@ -149,9 +149,11 @@ Once this is working you can reuse the same pattern for other images.
 
 If you want the most common PMSS-ready presets without retyping the full
 `docker run` lines, the default skeleton now includes `~/bin/linuxserverInstall.sh`.
-It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, and `prowlarr`,
-creates the expected home-directory mounts, attaches the containers to a shared
-`pmss-media` Docker network, and keeps `--restart unless-stopped` enabled.
+It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, `prowlarr`,
+`mariadb`, and `phpmyadmin`, creates the expected home-directory mounts,
+attaches the containers to a shared `pmss-media` Docker network, and keeps
+`--restart unless-stopped` enabled. The database presets bind to
+`127.0.0.1` by default so they stay local to the host.
 
 ## 4. Common seedbox recipes
 
@@ -609,18 +611,12 @@ as MariaDB or PostgreSQL; see their docs for the recommended configuration.
 **MariaDB** – MySQL-compatible database:
 
 ```bash
-mkdir -p ~/docker/mariadb/config
-
-docker run -d \
-  --name mariadb \
-  -e PUID=0 -e PGID=0 \
-  -e TZ=Etc/UTC \
-  -e MYSQL_ROOT_PASSWORD=change_me \
-  -p 3306:3306 \
-  -v ~/docker/mariadb/config:/config \
-  --restart unless-stopped \
-  lscr.io/linuxserver/mariadb:latest
+linuxserverInstall.sh mariadb
 ```
+
+PMSS writes separate MariaDB service credentials to
+`~/docker/mariadb/pmss-credentials.env` on first install and binds the service
+to `127.0.0.1:3306` by default.
 
 **Postgres** – PostgreSQL database:
 
@@ -641,20 +637,11 @@ docker run -d \
 **phpMyAdmin** – Web UI for MySQL/MariaDB:
 
 ```bash
-mkdir -p ~/docker/phpmyadmin/config
-
-docker run -d \
-  --name phpmyadmin \
-  -e PUID=0 -e PGID=0 \
-  -e TZ=Etc/UTC \
-  -p 8082:80 \
-  -v ~/docker/phpmyadmin/config:/config \
-  --restart unless-stopped \
-  lscr.io/linuxserver/phpmyadmin:latest
+linuxserverInstall.sh phpmyadmin
 ```
 
-Configure phpMyAdmin to talk to your MariaDB container using the host and port
-you chose above.
+The helper binds phpMyAdmin to `127.0.0.1:8082` and points it at the shared
+`mariadb` service name on the per-user Docker network.
 
 #### 4.7.5 Dashboards, proxies, and utilities
 

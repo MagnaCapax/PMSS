@@ -127,6 +127,43 @@ BASH;
         $this->assertStringContainsString('-p 18989:8989', $result['output']);
     }
 
+    public function testDryRunMariadbUsesLocalOnlyBindAndGeneratedCredentials(): void
+    {
+        $result = $this->runHelper(['mariadb', '--dry-run']);
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertTrue(is_dir($this->homeDir.'/docker/mariadb/config'));
+        $this->assertStringContainsString('-p 127.0.0.1:3306:3306', $result['output']);
+        $this->assertStringContainsString('generated-at-install', $result['output']);
+        $this->assertStringContainsString('MYSQL_USER=db_', $result['output']);
+        $this->assertTrue(!is_file($this->homeDir.'/docker/mariadb/pmss-credentials.env'), 'dry-run must not persist credentials');
+    }
+
+    public function testRunMariadbWritesCredentialFileAndUsesEnvFile(): void
+    {
+        $result = $this->runHelper(['mariadb']);
+        $credentialFile = $this->homeDir.'/docker/mariadb/pmss-credentials.env';
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertTrue(is_file($credentialFile));
+        $contents = (string) file_get_contents($credentialFile);
+        $this->assertStringContainsString('MYSQL_ROOT_PASSWORD=', $contents);
+        $this->assertStringContainsString('MYSQL_USER=db_', $contents);
+        $this->assertStringContainsString('--env-file '.$credentialFile, $result['dockerLog']);
+        $this->assertStringContainsString('-p 127.0.0.1:3306:3306', $result['dockerLog']);
+    }
+
+    public function testDryRunPhpMyAdminUsesLocalOnlyBindAndMariadbHost(): void
+    {
+        $result = $this->runHelper(['phpmyadmin', '--dry-run']);
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertTrue(is_dir($this->homeDir.'/docker/phpmyadmin/config'));
+        $this->assertStringContainsString('-p 127.0.0.1:8082:80', $result['output']);
+        $this->assertStringContainsString('PMA_HOST=mariadb', $result['output']);
+        $this->assertStringContainsString('PMA_PORT=3306', $result['output']);
+    }
+
     public function testRunCreatesNetworkAndContainerWhenMissing(): void
     {
         $result = $this->runHelper(['prowlarr']);
@@ -155,7 +192,7 @@ BASH;
         $result = $this->runHelper(['bazarr', '--dry-run']);
 
         $this->assertTrue($result['rc'] !== 0, 'unknown app should fail');
-        $this->assertStringContainsString('Supported apps: jellyfin qbittorrent radarr sonarr prowlarr', $result['output']);
+        $this->assertStringContainsString('Supported apps: jellyfin qbittorrent radarr sonarr prowlarr mariadb phpmyadmin', $result['output']);
     }
 
     public function testSkeletonCopiesInstallerScript(): void

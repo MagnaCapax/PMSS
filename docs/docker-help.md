@@ -31,15 +31,20 @@ docker-install-wireguard.sh 51820
 ```
 
 For the common LinuxServer.io media stack, PMSS also ships `linuxserverInstall.sh`
-in `~/bin`. It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, and
-`prowlarr`, keeps their mounts under `~/`, joins them to a shared `pmss-media`
-network, and starts them with `--restart unless-stopped` so the existing
-rootless Docker watchdog can bring them back with the daemon:
+in `~/bin`. It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`,
+`prowlarr`, `mariadb`, and `phpmyadmin`, keeps their mounts under `~/`, joins
+them to a shared `pmss-media` network, and starts them with
+`--restart unless-stopped` so the existing rootless Docker watchdog can bring
+them back with the daemon. MariaDB and phpMyAdmin bind to `127.0.0.1` by
+default, and the MariaDB helper writes separate service credentials to
+`~/docker/mariadb/pmss-credentials.env` on first install:
 
 ```
 linuxserverInstall.sh qbittorrent
 linuxserverInstall.sh radarr
 linuxserverInstall.sh sonarr 18989
+linuxserverInstall.sh mariadb
+linuxserverInstall.sh phpmyadmin 18082
 ```
 
 ## Storage drivers on PMSS
