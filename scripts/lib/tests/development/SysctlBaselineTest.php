@@ -5,18 +5,64 @@ require_once dirname(__DIR__, 2).'/update/systemPrep.php';
 
 class SysctlBaselineTest extends TestCase
 {
+    /** @var array<string, string|false> */
+    private $env = [];
+
+    protected function setUp(): void
+    {
+        $this->env = [];
+        foreach ([
+            'PMSS_TOTAL_MEM_MIB',
+            'PMSS_SYSCTL_HAS_SWAP',
+            'PMSS_SYSCTL_SWAP_IS_FAST',
+            'PMSS_SYSCTL_NIC_SPEED_MBPS',
+            'PMSS_SYSCTL_IS_VM',
+            'PMSS_SYSCTL_HAS_CONNTRACK',
+            'PMSS_SYSCTL_OVERRIDES_PATH',
+            'PMSS_CONFIG_DIR',
+            'PMSS_SYSCTL_PROC_SYS_PATH',
+        ] as $key) {
+            $this->env[$key] = getenv($key);
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->env as $key => $value) {
+            if ($value === false || $value === '') {
+                putenv($key);
+                continue;
+            }
+
+            putenv($key.'='.$value);
+        }
+    }
+
     public function testWritesBaselineWithKptrRestrict(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-', 0700);
         $target = $dir.'/sysctl.conf';
+        $configDir = $dir.'/config';
+        putenv('PMSS_CONFIG_DIR='.$configDir);
+        putenv('PMSS_TOTAL_MEM_MIB=262144');
+        putenv('PMSS_SYSCTL_HAS_SWAP=1');
+        putenv('PMSS_SYSCTL_SWAP_IS_FAST=1');
+        putenv('PMSS_SYSCTL_NIC_SPEED_MBPS=10000');
+        putenv('PMSS_SYSCTL_IS_VM=0');
+        putenv('PMSS_SYSCTL_HAS_CONNTRACK=1');
         $messages = [];
         $this->runBaseline($target, $messages, false);
 
         $this->assertTrue(file_exists($target), 'expected sysctl file to be written');
         $content = (string)file_get_contents($target);
         $this->assertStringContainsString('# Pulsed Media Config', $content);
+        $this->assertStringContainsString('vm.swappiness = 100', $content);
+        $this->assertStringContainsString('vm.vfs_cache_pressure = 2', $content);
+        $this->assertStringContainsString('vm.min_free_kbytes = 2621440', $content);
+        $this->assertStringContainsString('net.core.rmem_max = 67108864', $content);
         $this->assertStringContainsString('net.core.default_qdisc = fq', $content);
         $this->assertStringContainsString('net.ipv4.tcp_congestion_control = bbr', $content);
+        $this->assertStringContainsString('net.netfilter.nf_conntrack_max = 524288', $content);
         $this->assertStringContainsString('kernel.kptr_restrict = 1', $content);
         $this->assertStringContainsString('kernel.yama.ptrace_scope = 1', $content);
         $this->assertStringContainsString('fs.protected_regular = 2', $content);
@@ -30,6 +76,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-bbr-', 0700);
         $target = $dir.'/sysctl.conf';
         $modulesLoad = $dir.'/modules-load.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
         $messages = [];
         $this->runBaseline($target, $messages, false, $modulesLoad);
 
@@ -44,6 +91,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-skip-', 0700);
         $target = $dir.'/sysctl.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -64,6 +112,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-dir-', 0700);
         $targetDir = $dir.'/nested';
         $target = $targetDir.'/sysctl.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
 
         $messages = [];
         $this->runBaseline($target, $messages, false);
@@ -78,6 +127,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-reload-', 0700);
         $target = $dir.'/sysctl.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
         $messages = [];
         $this->runBaseline($target, $messages, false);
 
@@ -90,6 +140,7 @@ class SysctlBaselineTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-sysctl-update-', 0700);
         $target = $dir.'/sysctl.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
         file_put_contents($target, "kernel.kptr_restrict = 0\n");
 
         $messages = [];
@@ -107,6 +158,7 @@ class SysctlBaselineTest extends TestCase
         $dir = $this->pmssMakeTempDir('pmss-sysctl-fail-', 0700);
         $blocked = $dir.'/blocked';
         $target = $blocked.'/sysctl.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
         $messages = [];
 
         file_put_contents($blocked, "not a directory\n");
@@ -117,6 +169,99 @@ class SysctlBaselineTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to write legacy sysctl defaults'), 'expected write failure warning');
         $this->assertFalse($this->pmssMessagesContain($messages, 'Refreshed legacy sysctl defaults'), 'did not expect success log');
         $this->assertFalse($this->pmssMessagesContain($messages, 'sysctl reload disabled'), 'did not expect reload log after failed write');
+
+        $this->cleanup($dir);
+    }
+
+    public function testVmProfileUsesConservativeMemorySettings(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-vm-', 0700);
+        $target = $dir.'/sysctl.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        putenv('PMSS_SYSCTL_IS_VM=1');
+        putenv('PMSS_SYSCTL_HAS_SWAP=1');
+        putenv('PMSS_SYSCTL_SWAP_IS_FAST=1');
+
+        $messages = [];
+        $this->runBaseline($target, $messages, false);
+
+        $content = (string) file_get_contents($target);
+        $this->assertStringContainsString('vm.swappiness = 10', $content);
+        $this->assertStringContainsString('vm.vfs_cache_pressure = 50', $content);
+        $this->assertStringContainsString('vm.min_free_kbytes = 131072', $content);
+        $this->assertStringContainsString('vm.dirty_ratio = 20', $content);
+
+        $this->cleanup($dir);
+    }
+
+    public function testNoSwapProfileFallsBackToBalancedDefaults(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-noswap-', 0700);
+        $target = $dir.'/sysctl.conf';
+        putenv('PMSS_CONFIG_DIR='.$dir.'/config');
+        putenv('PMSS_SYSCTL_HAS_SWAP=0');
+        putenv('PMSS_SYSCTL_SWAP_IS_FAST=0');
+
+        $messages = [];
+        $this->runBaseline($target, $messages, false);
+
+        $content = (string) file_get_contents($target);
+        $this->assertStringContainsString('vm.swappiness = 60', $content);
+        $this->assertStringContainsString('vm.vfs_cache_pressure = 50', $content);
+        $this->assertStringContainsString('vm.dirty_background_ratio = 5', $content);
+
+        $this->cleanup($dir);
+    }
+
+    public function testRespectsOperatorOwnedOverrideKeys(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-overrides-', 0700);
+        $target = $dir.'/sysctl.conf';
+        $configDir = $dir.'/config';
+        $overridePath = $dir.'/90-pmss-overrides.conf';
+        putenv('PMSS_CONFIG_DIR='.$configDir);
+        putenv('PMSS_SYSCTL_OVERRIDES_PATH='.$overridePath);
+        file_put_contents($overridePath, "vm.swappiness = 70\nnet.core.somaxconn = 9000\n");
+
+        $messages = [];
+        $this->runBaseline($target, $messages, false);
+
+        $content = (string) file_get_contents($target);
+        $this->pmssAssertStringNotContainsString('vm.swappiness =', $content, 'expected override key to be omitted');
+        $this->pmssAssertStringNotContainsString('net.core.somaxconn =', $content, 'expected override key to be omitted');
+
+        $summary = json_decode((string) file_get_contents($configDir.'/hardware.json'), true);
+        $this->assertTrue(is_array($summary), 'expected hardware summary json');
+        $this->assertEquals(
+            ['vm.swappiness', 'net.core.somaxconn'],
+            $summary['sysctl']['overrides_respected'],
+            'expected override keys to be reported'
+        );
+
+        $this->cleanup($dir);
+    }
+
+    public function testWritesHardwareSummaryJson(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sysctl-summary-', 0700);
+        $target = $dir.'/sysctl.conf';
+        $configDir = $dir.'/config';
+        putenv('PMSS_CONFIG_DIR='.$configDir);
+        putenv('PMSS_TOTAL_MEM_MIB=65536');
+        putenv('PMSS_SYSCTL_HAS_SWAP=1');
+        putenv('PMSS_SYSCTL_SWAP_IS_FAST=0');
+        putenv('PMSS_SYSCTL_NIC_SPEED_MBPS=1000');
+
+        $messages = [];
+        $this->runBaseline($target, $messages, false);
+
+        $summaryPath = $configDir.'/hardware.json';
+        $this->assertTrue(file_exists($summaryPath), 'expected hardware summary to be written');
+        $summary = json_decode((string) file_get_contents($summaryPath), true);
+        $this->assertTrue(is_array($summary), 'expected hardware summary json');
+        $this->assertEquals(64, $summary['sysctl']['detection']['ram_gb'], 'expected RAM detection in summary');
+        $this->assertFalse($summary['sysctl']['detection']['swap_is_fast'], 'expected slow swap summary');
+        $this->assertEquals('10', $summary['sysctl']['applied']['vm.swappiness'], 'expected applied swappiness in summary');
 
         $this->cleanup($dir);
     }

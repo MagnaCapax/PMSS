@@ -15,6 +15,7 @@ require_once __DIR__.'/managedPath.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/runtime/processes.php';
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/systemPrep/sysctlTuning.php';
 
 /** Read a non-negative integer override from the environment. */
 function pmssSystemPrepReadDigitEnv(string $key): ?int
@@ -155,7 +156,7 @@ function pmssEnsureCgroupsConfigured(?callable $logger = null): void
 require_once __DIR__.'/systemPrep/systemdSlicesEnsure.php';
 
 /**
- * Recreate the legacy BFQ/sysctl configuration shipped with PMSS.
+ * Recreate the PMSS-owned hardware-aware sysctl baseline.
  */
 function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targetOverride = null, bool $reload = true, ?string $modulesLoadOverride = null): void
 {
@@ -163,22 +164,17 @@ function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targe
     $target          = $targetOverride ?? '/etc/sysctl.d/99-pmss.conf';
     $modulesLoadPath = $modulesLoadOverride ?? '/etc/modules-load.d/pmss-bbr.conf';
     $sysctlWriteOk   = false;
+    $overridePath    = pmssResolvePathFromEnv('PMSS_SYSCTL_OVERRIDES_PATH', '/etc/sysctl.d/90-pmss-overrides.conf');
     // Persist TCP BBR module loading across reboots.
     $modulesContent = "# PMSS: enable TCP BBR\ntcp_bbr\n";
 
     // /sys block tuning is handled by the boot-time tuning service; sysctl only covers /proc/sys.
-    // Network and Security Hardening
-    $content = <<<'SYSCTL'
-# Pulsed Media Config
-
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
-net.ipv4.ip_forward = 1
-fs.protected_regular = 2
-fs.protected_fifos = 2
-kernel.yama.ptrace_scope = 1
-kernel.kptr_restrict = 1
-SYSCTL;
+    $profile = pmssSysctlProfileDetect();
+    $overrideKeys = pmssSysctlOverridesParse($overridePath);
+    $groupedSettings = pmssSysctlSettingsFilterOverrides(pmssSysctlSettingsBuild($profile), $overrideKeys);
+    $content = pmssSysctlConfigRender($groupedSettings);
+    $existingSettings = pmssSysctlFileParse($target);
+    $changes = pmssSysctlChangesDescribe($existingSettings, $groupedSettings);
 
     // Check if file needs updating
     $existing = @file_get_contents($target);
@@ -194,6 +190,8 @@ SYSCTL;
             $sysctlWriteOk = true;
         }
     }
+
+    pmssSysctlSummaryWrite($logger, $profile, $groupedSettings, $overrideKeys, $changes);
 
     $modulesExisting = @file_get_contents($modulesLoadPath);
     $modulesUpToDate = $modulesExisting !== false && trim($modulesExisting) === trim($modulesContent);
