@@ -194,7 +194,15 @@ function pmssSysctlSettingsBuild(array $profile): array
     $ramGb = max(1, (int) ($profile['ram_gb'] ?? 1));
     $tenGigabit = (int) ($profile['nic_speed_gbps'] ?? 1) >= 10;
 
-    if ($isVm) {
+    if (!$hasSwap) {
+        $memorySettings = [
+            'vm.swappiness' => '60',
+            'vm.vfs_cache_pressure' => '50',
+            'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
+            'vm.dirty_ratio' => '20',
+            'vm.dirty_background_ratio' => '5',
+        ];
+    } elseif ($isVm) {
         $memorySettings = [
             'vm.swappiness' => '10',
             'vm.vfs_cache_pressure' => '50',
@@ -213,14 +221,6 @@ function pmssSysctlSettingsBuild(array $profile): array
     } elseif ($hasSwap) {
         $memorySettings = [
             'vm.swappiness' => '10',
-            'vm.vfs_cache_pressure' => '50',
-            'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
-            'vm.dirty_ratio' => '20',
-            'vm.dirty_background_ratio' => '5',
-        ];
-    } else {
-        $memorySettings = [
-            'vm.swappiness' => '60',
             'vm.vfs_cache_pressure' => '50',
             'vm.min_free_kbytes' => (string) min(2097152, max(131072, $ramGb * 5120)),
             'vm.dirty_ratio' => '20',
