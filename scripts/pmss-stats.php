@@ -7,7 +7,13 @@
  * @author  PMSS Team
  */
 
-require_once __DIR__.'/lib/pmssStats.php';
+$pmssStatsLib = __DIR__.'/lib/pmssStats.php';
+if (!is_file($pmssStatsLib)) {
+    fwrite(STDERR, "Error: pmss stats library missing; aborting.\n");
+    exit(1);
+}
+
+require_once $pmssStatsLib;
 
 pmssRequireCli();
 exit(pmssStatsMain($argv ?? ($_SERVER['argv'] ?? [])));

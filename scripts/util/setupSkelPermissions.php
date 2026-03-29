@@ -7,4 +7,10 @@
  * @author PMSS Team
  */
 
-require __DIR__.'/setupPermissions.php';
+$setupPermissions = __DIR__.'/setupPermissions.php';
+if (!is_file($setupPermissions)) {
+    fwrite(STDERR, "Error: setupPermissions.php missing; aborting wrapper.\n");
+    exit(1);
+}
+
+require $setupPermissions;
