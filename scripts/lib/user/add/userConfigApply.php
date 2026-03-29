@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../passwords.php';
+require_once __DIR__.'/../userConfigCli.php';
 
 /**
  * Build the canonical userConfig command for addUser provisioning.
@@ -19,23 +20,17 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
         (string) $user['memory'],
         (string) $user['quota'],
     ];
-    $optionalArgs = [
-        4 => isset($user['trafficLimit']) ? (string) $user['trafficLimit'] : '',
-        5 => isset($user['CPUWeight']) ? (string) $user['CPUWeight'] : '',
-        6 => isset($user['IOWeight']) ? (string) $user['IOWeight'] : '',
-        7 => isset($user['IOReadBW']) ? (string) $user['IOReadBW'] : '',
-        8 => isset($user['IOWriteBW']) ? (string) $user['IOWriteBW'] : '',
-        9 => isset($user['IOReadIOPS']) ? (string) $user['IOReadIOPS'] : '',
-        10 => isset($user['IOWriteIOPS']) ? (string) $user['IOWriteIOPS'] : '',
-        11 => isset($user['cpuQuotaPercent']) ? (string) $user['cpuQuotaPercent'] : '',
-        12 => isset($user['trafficCapMbit']) ? (string) $user['trafficCapMbit'] : '',
-    ];
+    $optionalArgs = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        $optionalArgs[$spec['userConfigIndex']] = isset($user[$key]) ? (string) $user[$key] : '';
+    }
     $lastOptionalIndex = 3;
     foreach ($optionalArgs as $index => $value) {
         if ($value !== '') {
             $lastOptionalIndex = $index;
         }
     }
+    ksort($optionalArgs);
     for ($index = 4; $index <= $lastOptionalIndex; $index++) {
         $command[] = $optionalArgs[$index];
     }

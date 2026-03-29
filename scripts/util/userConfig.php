@@ -16,6 +16,7 @@ foreach (['traffic', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
     require_once __DIR__.'/../lib/user/'.$module.'.php';
 }
 require_once __DIR__.'/../lib/cli/optionParser.php';
+require_once __DIR__.'/../lib/user/userConfigCli.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
@@ -83,15 +84,14 @@ $user = [
     'name'      => $args[1],
     'memory'    => (int) $args[2],
     'quota'     => (int) $args[3],
-    'CPUWeight' => isset($args[5]) ? (int) $args[5] : 0,
-    'IOWeight'  => isset($args[6]) ? (int) $args[6] : 0,
-    'IOReadBW'    => isset($args[7]) ? $args[7] : null,
-    'IOWriteBW'   => isset($args[8]) ? $args[8] : null,
-    'IOReadIOPS'  => isset($args[9]) ? $args[9] : null,
-    'IOWriteIOPS' => isset($args[10]) ? $args[10] : null,
-    'cpuQuotaPercent' => isset($args[11]) ? $args[11] : 0,
-    'trafficCapMbit' => isset($args[12]) ? (int) $args[12] : 0,
 ];
+foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+    $value = array_key_exists($spec['userConfigIndex'], $args) ? $args[$spec['userConfigIndex']] : $spec['default'];
+    if ($spec['parse'] === 'int' && $value !== null) {
+        $value = (int) $value;
+    }
+    $user[$key] = $value;
+}
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
 
 $passwdEntry = pmssPasswdEntryLookup($user['name']);
@@ -115,19 +115,11 @@ if ($accountHome !== $expectedHome || !file_exists($expectedHome)) {
     die("User does not exist\n");
 }
 
-$presenceIndices = [
-    'CPUWeight'       => 5,
-    'IOWeight'        => 6,
-    'IOReadBW'        => 7,
-    'IOWriteBW'       => 8,
-    'IOReadIOPS'      => 9,
-    'IOWriteIOPS'     => 10,
-    'cpuQuotaPercent' => 11,
-    'trafficCapMbit'  => 12,
-];
 $presence = [];
-foreach ($presenceIndices as $key => $index) {
-    $presence[$key] = array_key_exists($index, $args);
+foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+    if (!empty($spec['persist'])) {
+        $presence[$key] = array_key_exists($spec['userConfigIndex'], $args);
+    }
 }
 
 $store = new UserConfigStore();
@@ -298,16 +290,11 @@ if (!empty($user['IOWeight']) && $user['IOWeight'] > 0) {
 }
 
 // Optional I/O throttles
-$ioArgs = [
-    'IOReadBW'    => '--io-read-bw=',
-    'IOWriteBW'   => '--io-write-bw=',
-    'IOReadIOPS'  => '--io-read-iops=',
-    'IOWriteIOPS' => '--io-write-iops=',
-];
-foreach ($ioArgs as $key => $flag) {
-    if (!empty($user[$key])) {
-        $args[] = $flag.$user[$key];
+foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+    if (empty($spec['cgroupFlag']) || empty($user[$key])) {
+        continue;
     }
+    $args[] = $spec['cgroupFlag'].$user[$key];
 }
 if (isset($user['cpuQuotaPercent']) && $user['cpuQuotaPercent'] !== '') {
     $quotaVal = $user['cpuQuotaPercent'];

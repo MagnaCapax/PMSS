@@ -48,6 +48,7 @@ class userConfigCommandContractsTest extends TestCase
         $source = $this->loadUserConfigSubsystemSource();
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $source);
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/user/userConfigCli.php';", $source);
         $this->assertStringContainsString(
             "pmssParseCliTokens(\$argv ?? (\$_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled'])",
             $source
@@ -55,6 +56,7 @@ class userConfigCommandContractsTest extends TestCase
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'upload-throttle-kib')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'welcome-message')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'docker-enabled')", $source);
+        $this->assertStringContainsString("foreach (pmssUserConfigCliResourceSpecs() as \$key => \$spec)", $source);
         $this->assertTrue(
             strpos($source, "strpos(\$arg, '--upload-throttle-kib=')") === false,
             'userConfig.php should not keep a manual --upload-throttle-kib scan'
@@ -78,5 +80,14 @@ class userConfigCommandContractsTest extends TestCase
         $this->assertStringContainsString("runStep('Installing systemd-container tools', 'apt-get install -y systemd-container');", $source);
         $this->assertStringContainsString("'Configuring rootless Docker'", $source);
         $this->assertStringContainsString("'machinectl shell %1\$s@ /usr/bin/dockerd-rootless-setuptool.sh install'", $source);
+    }
+
+    public function testUserConfigUsesSharedResourceSpecForPositionals(): void
+    {
+        $source = $this->loadUserConfigSubsystemSource();
+
+        $this->assertStringContainsString("\$value = array_key_exists(\$spec['userConfigIndex'], \$args) ? \$args[\$spec['userConfigIndex']] : \$spec['default'];", $source);
+        $this->assertStringContainsString("if (!empty(\$spec['persist'])) {", $source);
+        $this->assertStringContainsString("if (empty(\$spec['cgroupFlag']) || empty(\$user[\$key])) {", $source);
     }
 }

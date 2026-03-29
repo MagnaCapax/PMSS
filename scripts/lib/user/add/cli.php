@@ -11,28 +11,34 @@
  */
 
 require_once __DIR__.'/../../cli/optionParser.php';
+require_once __DIR__.'/../userConfigCli.php';
 
 /**
  * Return the canonical addUser CLI help text.
  */
 function pmssAddUserCliUsage(): string
 {
+    $resourceLines = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $spec) {
+        $resourceLines[] = '  '.$spec['usage'];
+    }
+
     return implode("\n", [
         'Usage:',
         '  addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [TRAFFIC_CAP_MBIT] [UPLOAD_THROTTLE_KIB]',
         '  addUser.php --user=USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=DISK_QUOTA_GiB [RESOURCE_OPTIONS]',
         '',
         'Resource options:',
-        '  --traffic-limit-gb=GIB',
-        '  --traffic-cap-mbit=MBIT',
+        $resourceLines[0],
+        $resourceLines[1],
         '  --upload-throttle-kib=KIB',
-        '  --cpu-weight=WEIGHT',
-        '  --io-weight=WEIGHT',
-        '  --io-read-bw=/dev/DEVICE:RATE',
-        '  --io-write-bw=/dev/DEVICE:RATE',
-        '  --io-read-iops=/dev/DEVICE:IOPS',
-        '  --io-write-iops=/dev/DEVICE:IOPS',
-        '  --cpu-quota-percent=PERCENT|infinity',
+        $resourceLines[2],
+        $resourceLines[3],
+        $resourceLines[4],
+        $resourceLines[5],
+        $resourceLines[6],
+        $resourceLines[7],
+        $resourceLines[8],
         '  --docker-enabled=true|false',
         '',
         'Other options:',
@@ -64,23 +70,18 @@ function pmssAddUserCliValue(array $parsed, string $option, array $args, int $le
  */
 function pmssAddUserParseCli(array $argv): array
 {
-    $parsed = pmssParseCliTokens($argv, [
+    $longOptions = [
         'user',
         'password',
         'ram-mib',
         'disk-quota-gib',
-        'traffic-limit-gb',
-        'traffic-cap-mbit',
         'upload-throttle-kib',
-        'cpu-weight',
-        'io-weight',
-        'io-read-bw',
-        'io-write-bw',
-        'io-read-iops',
-        'io-write-iops',
-        'cpu-quota-percent',
         'docker-enabled',
-    ]);
+    ];
+    foreach (pmssUserConfigCliResourceSpecs() as $spec) {
+        $longOptions[] = $spec['addUserOption'];
+    }
+    $parsed = pmssParseCliTokens($argv, $longOptions);
     if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
         return ['help' => true, 'usage' => pmssAddUserCliUsage()];
     }
@@ -97,23 +98,15 @@ function pmssAddUserParseCli(array $argv): array
         throw new InvalidArgumentException(pmssAddUserCliUsage());
     }
 
-    $optionalMap = [
-        'trafficLimit' => ['traffic-limit-gb', 5],
-        'trafficCapMbit' => ['traffic-cap-mbit', 6],
-        'torrentThrottle' => ['upload-throttle-kib', 7],
-        'CPUWeight' => ['cpu-weight', 8],
-        'IOWeight' => ['io-weight', 9],
-        'IOReadBW' => ['io-read-bw', 10],
-        'IOWriteBW' => ['io-write-bw', 11],
-        'IOReadIOPS' => ['io-read-iops', 12],
-        'IOWriteIOPS' => ['io-write-iops', 13],
-        'cpuQuotaPercent' => ['cpu-quota-percent', 14],
-    ];
-    foreach ($optionalMap as $key => $mapping) {
-        $value = pmssAddUserCliValue($parsed, $mapping[0], $args, $mapping[1], null);
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        $value = pmssAddUserCliValue($parsed, $spec['addUserOption'], $args, $spec['addUserLegacyIndex'], null);
         if ($value !== null && $value !== '') {
             $user[$key] = $value;
         }
+    }
+    $torrentThrottle = pmssAddUserCliValue($parsed, 'upload-throttle-kib', $args, 7, null);
+    if ($torrentThrottle !== null && $torrentThrottle !== '') {
+        $user['torrentThrottle'] = $torrentThrottle;
     }
 
     $dockerEnabled = pmssCliOption($parsed, 'docker-enabled', null, null);
