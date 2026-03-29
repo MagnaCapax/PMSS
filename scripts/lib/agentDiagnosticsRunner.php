@@ -109,7 +109,8 @@ function pmssAgentDiagnosticsOutputLines(array $result): array
 /** Return trimmed command stdout or a fallback when nothing useful was emitted. */
 function pmssAgentDiagnosticsCommandText(string $command, string $fallback = ''): string
 {
-    $text = trim((string) pmssAgentDiagnosticsCapture($command)['stdout']);
+    $result = pmssAgentDiagnosticsCapture($command);
+    $text = trim((string) $result['stdout']);
     return $text !== '' ? $text : $fallback;
 }
 

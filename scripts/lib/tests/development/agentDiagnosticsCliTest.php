@@ -68,6 +68,7 @@ final class agentDiagnosticsCliTest extends TestCase
         ]);
 
         $this->assertStringContainsString('PMSS Agent Diagnostics', $output);
+        $this->assertStringContainsString('user: -', $output);
         $this->assertStringContainsString('== services ==', $output);
     }
 
@@ -120,4 +121,3 @@ final class agentDiagnosticsCliTest extends TestCase
         @chmod($path, 0755);
     }
 }
-

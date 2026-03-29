@@ -7,14 +7,8 @@
 
 require_once __DIR__.'/userFileWrite.php';
 
-/** Build the absolute per-user 502 page path under the chosen web root. */
-function pmssLighttpdWatchdogErrorPagePath(string $username, string $webRoot = '/var/www'): string
-{
-    return rtrim($webRoot, '/').'/error-502-'.$username.'.html';
-}
-
-/** Return structured per-user 502 page messaging for a watchdog diagnosis. */
-function pmssLighttpdWatchdogReasonMessage(string $reasonKey): array
+/** Render a static browser/plain-text 502 page for a specific diagnosis. */
+function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
 {
     $messages = array(
         'suspended' => array(
@@ -42,14 +36,7 @@ function pmssLighttpdWatchdogReasonMessage(string $reasonKey): array
             'detail' => 'This usually settles within 1-2 minutes; please retry shortly.',
         ),
     );
-
-    return $messages[$reasonKey] ?? $messages['restarting'];
-}
-
-/** Render a static browser/plain-text 502 page for a specific diagnosis. */
-function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
-{
-    $message = pmssLighttpdWatchdogReasonMessage($reasonKey);
+    $message = $messages[$reasonKey] ?? $messages['restarting'];
     $headline = htmlspecialchars($message['headline'], ENT_QUOTES, 'UTF-8');
     $detail = htmlspecialchars($message['detail'], ENT_QUOTES, 'UTF-8');
 
@@ -107,7 +94,7 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
 function pmssLighttpdWatchdogWriteErrorPage(string $username, string $reasonKey, string $webRoot = '/var/www'): bool
 {
     return pmssReplaceUserFileWithMetadata(
-        pmssLighttpdWatchdogErrorPagePath($username, $webRoot),
+        rtrim($webRoot, '/').'/error-502-'.$username.'.html',
         pmssLighttpdWatchdogRenderErrorPage($reasonKey),
         0644
     );
@@ -116,7 +103,7 @@ function pmssLighttpdWatchdogWriteErrorPage(string $username, string $reasonKey,
 /** Remove a per-user 502 page when the tenant web stack recovers. */
 function pmssLighttpdWatchdogDeleteErrorPage(string $username, string $webRoot = '/var/www'): bool
 {
-    $path = pmssLighttpdWatchdogErrorPagePath($username, $webRoot);
+    $path = rtrim($webRoot, '/').'/error-502-'.$username.'.html';
     if (!file_exists($path)) {
         return true;
     }

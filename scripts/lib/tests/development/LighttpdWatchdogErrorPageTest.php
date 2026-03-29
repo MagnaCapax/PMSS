@@ -71,6 +71,13 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $this->assertStringContainsString('<a href="/">Return to the main page.</a>', $contents);
     }
 
+    public function testRenderErrorPageFallsBackToRestartingMessageForUnknownReason(): void
+    {
+        $contents = pmssLighttpdWatchdogRenderErrorPage('unknown');
+        $this->assertStringContainsString('Your web service is restarting.', $contents);
+        $this->assertStringContainsString('This usually settles within 1-2 minutes; please retry shortly.', $contents);
+    }
+
     public function testWriteErrorPageCreatesExpectedPerUserPath(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');

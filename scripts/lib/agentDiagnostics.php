@@ -30,22 +30,37 @@ function pmssAgentDiagnosticsUsage(): string
 /** Collect always-on storage and service sections. */
 function pmssAgentDiagnosticsCollectBaseSections(): array
 {
+    $storage = [
+        'df' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -h')),
+        'df_inodes' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -i')),
+    ];
+    foreach ([
+        'mdstat' => ['PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', '/proc/mdstat'],
+        'fstab' => ['PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', '/etc/fstab'],
+    ] as $key => $fileSpec) {
+        $storage[$key] = pmssAgentDiagnosticsReadFile($fileSpec[0], $fileSpec[1]);
+    }
+
+    $services = [];
+    foreach ([
+        'nginx' => ['systemctl is-active nginx 2>/dev/null', 'unknown'],
+        'proftpd' => ['systemctl is-active proftpd 2>/dev/null', 'unknown'],
+        'cron' => ['systemctl is-active cron 2>/dev/null', 'unknown'],
+        'ssh' => ['systemctl is-active ssh 2>/dev/null', 'unknown'],
+    ] as $key => $commandSpec) {
+        $services[$key] = pmssAgentDiagnosticsCommandText($commandSpec[0], $commandSpec[1]);
+    }
+    foreach ([
+        'rtorrent_count' => 'pgrep -cx rtorrent 2>/dev/null',
+        'lighttpd_count' => 'pgrep -cx lighttpd 2>/dev/null',
+    ] as $key => $command) {
+        $services[$key] = (int) pmssAgentDiagnosticsCommandText($command);
+    }
+
     return [
         'motd' => ['raw' => pmssAgentDiagnosticsReadFile('PMSS_AGENT_DIAGNOSTICS_MOTD_PATH', '/etc/motd')],
-        'storage' => [
-            'df' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -h')),
-            'df_inodes' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -i')),
-            'mdstat' => pmssAgentDiagnosticsReadFile('PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', '/proc/mdstat'),
-            'fstab' => pmssAgentDiagnosticsReadFile('PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', '/etc/fstab'),
-        ],
-        'services' => [
-            'nginx' => pmssAgentDiagnosticsCommandText('systemctl is-active nginx 2>/dev/null', 'unknown'),
-            'proftpd' => pmssAgentDiagnosticsCommandText('systemctl is-active proftpd 2>/dev/null', 'unknown'),
-            'cron' => pmssAgentDiagnosticsCommandText('systemctl is-active cron 2>/dev/null', 'unknown'),
-            'ssh' => pmssAgentDiagnosticsCommandText('systemctl is-active ssh 2>/dev/null', 'unknown'),
-            'rtorrent_count' => (int) pmssAgentDiagnosticsCommandText('pgrep -cx rtorrent 2>/dev/null'),
-            'lighttpd_count' => (int) pmssAgentDiagnosticsCommandText('pgrep -cx lighttpd 2>/dev/null'),
-        ],
+        'storage' => $storage,
+        'services' => $services,
         'system_test' => pmssAgentDiagnosticsPhpJson('scripts/util/systemTest.php', ['--json'], 'systemTest.php --json'),
         'users' => [
             'list' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsPhpScript('scripts/listUsers.php')),
@@ -59,15 +74,22 @@ function pmssAgentDiagnosticsCollectBaseSections(): array
 /** Collect optional per-user diagnostics after shared validation. */
 function pmssAgentDiagnosticsCollectUserSections(string $user): array
 {
-    return [
+    $sections = [
         'user_settings' => pmssAgentDiagnosticsPhpJson('scripts/userSetting.php', ['view', $user], 'userSetting.php view'),
-        'user_identity' => ['raw' => pmssAgentDiagnosticsCommandText('id '.escapeshellarg($user))],
-        'user_quota' => ['raw' => pmssAgentDiagnosticsCommandText('quota -u '.escapeshellarg($user).' 2>/dev/null')],
-        'user_disk' => ['raw' => pmssAgentDiagnosticsCommandText('du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null')],
         'user_processes' => pmssAgentDiagnosticsOutputLines(
             pmssAgentDiagnosticsCapture('pgrep -u '.escapeshellarg($user).' -a 2>/dev/null')
         ),
     ];
+
+    foreach ([
+        'user_identity' => 'id '.escapeshellarg($user),
+        'user_quota' => 'quota -u '.escapeshellarg($user).' 2>/dev/null',
+        'user_disk' => 'du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null',
+    ] as $key => $command) {
+        $sections[$key] = ['raw' => pmssAgentDiagnosticsCommandText($command)];
+    }
+
+    return $sections;
 }
 
 /** Assemble the full diagnostics payload. */
@@ -90,10 +112,10 @@ function pmssAgentDiagnosticsCollect(string $user = ''): array
 function pmssAgentDiagnosticsRenderText(array $payload): string
 {
     $output = "PMSS Agent Diagnostics\n";
-    $output .= 'timestamp: '.($payload['timestamp'] ?? '')."\n";
-    $output .= 'hostname: '.($payload['hostname'] ?? '')."\n";
-    $output .= 'version: '.($payload['version'] ?? '')."\n";
-    $output .= 'user: '.(($payload['user'] === null) ? '-' : $payload['user'])."\n";
+    foreach (['timestamp', 'hostname', 'version'] as $field) {
+        $output .= $field.': '.($payload[$field] ?? '')."\n";
+    }
+    $output .= 'user: '.(($payload['user'] ?? null) === null ? '-' : $payload['user'])."\n";
     foreach (($payload['sections'] ?? []) as $name => $section) {
         $output .= "\n== {$name} ==\n";
         if (is_string($section)) {
