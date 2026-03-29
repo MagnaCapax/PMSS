@@ -11,6 +11,7 @@
 
 require_once __DIR__.'/user/log.php';
 require_once __DIR__.'/user/userFilesystem.php';
+require_once __DIR__.'/user/userConfigStore.php';
 
 if (!defined('PMSS_USER_LOG_TEXT')) {
     define('PMSS_USER_LOG_TEXT', '/var/log/pmss/users.log');
@@ -579,6 +580,33 @@ function pmssUserLifecycleRequireUserRoots(array $argv, string $scriptName, stri
 }
 
 /**
+ * Mirror the best-effort suspended flag into the durable user config store.
+ */
+function pmssUserLifecycleSetSuspendedState(string $username, bool $suspended, ?callable $stateWriter = null): bool
+{
+    $writer = $stateWriter ?? static function (string $writerUsername, bool $writerSuspended): bool {
+        static $store = null;
+        if ($store === null) {
+            $store = new UserConfigStore();
+        }
+
+        return $store->setSuspended($writerUsername, $writerSuspended);
+    };
+
+    return (bool) $writer($username, $suspended);
+}
+
+/**
+ * Mirror the canonical `www-disabled` marker into the durable config store.
+ */
+function pmssUserLifecycleSyncSuspendedState(string $username, string $disabledRoot, ?callable $stateWriter = null): bool
+{
+    $suspended = is_dir($disabledRoot);
+    pmssUserLifecycleSetSuspendedState($username, $suspended, $stateWriter);
+    return $suspended;
+}
+
+/**
  * Find the newest suspended web backup that still contains user content.
  */
 function pmssUserLifecycleFindSuspendedBackup(string $homeDir): ?string
@@ -640,6 +668,22 @@ function pmssUserLifecycleRefreshNginxConfig(string $action, string $username, b
     }
 
     return (int) $runner($action, $username, $initStep, $initCommand, $dryRun);
+}
+
+/**
+ * Refresh the canonical per-user nginx config and restart nginx.
+ */
+function pmssUserLifecycleRefreshManagedNginxConfig(string $action, string $username, bool $dryRun, ?callable $stepRunner = null): int
+{
+    return pmssUserLifecycleRefreshNginxConfig(
+        $action,
+        $username,
+        $dryRun,
+        'refresh_nginx_config',
+        'php /scripts/util/createNginxConfig.php --user '.escapeshellarg($username),
+        array(),
+        $stepRunner
+    );
 }
 
 /**

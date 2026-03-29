@@ -14,7 +14,6 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
-require_once __DIR__.'/lib/user/userConfigStore.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Unsuspending
 // a user when /home is unavailable would fail or act on stale paths.
@@ -36,7 +35,7 @@ if (!is_dir($disabledRoot)) {
         }
     }
     if (!$restoredFromBackup) {
-        (new UserConfigStore())->setSuspended($username, false);
+        pmssUserLifecycleSetSuspendedState($username, false);
         if (!is_dir($activeRoot)) {
             die("User is not suspended and no recoverable web root was found\n");
         }
@@ -75,15 +74,8 @@ if (is_dir($disabledRoot) && !@rename($disabledRoot, $activeRoot)) {
     echo "Warning: failed to restore {$disabledRoot}\n";
 }
 // Best-effort: mirror the state in the user config store (marker is canonical).
-(new UserConfigStore())->setSuspended($username, is_dir($disabledRoot));
-
-pmssUserLifecycleRefreshNginxConfig(
-    'unsuspend',
-    $username,
-    false,
-    'refresh_nginx_config',
-    'php /scripts/util/createNginxConfig.php --user '.escapeshellarg($username)
-);
+pmssUserLifecycleSyncSuspendedState($username, $disabledRoot);
+pmssUserLifecycleRefreshManagedNginxConfig('unsuspend', $username, false);
 
 pmssUserLifecycleContextLog('unsuspend', 'start_rtorrent', $username, array(
     'status'   => 'INFO',

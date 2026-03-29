@@ -82,4 +82,65 @@ class userLifecycleLoggingTest extends TestCase
             $this->assertFalse($calls[0]['dryRun']);
         }
     }
+
+    public function testRefreshManagedNginxConfigUsesCanonicalSingleUserCommand(): void
+    {
+        $calls = array();
+        $result = \pmssUserLifecycleRefreshManagedNginxConfig(
+            'unsuspend',
+            'alice',
+            true,
+            static function (string $action, string $username, string $step, string $command, bool $dryRun) use (&$calls): int {
+                $calls[] = array('action' => $action, 'username' => $username, 'step' => $step, 'command' => $command, 'dryRun' => $dryRun);
+                return 0;
+            }
+        );
+
+        $this->assertSame(0, $result);
+        $this->assertSame(array('refresh_nginx_config', 'restart_nginx_systemctl'), array_column($calls, 'step'));
+        $this->assertSame('php /scripts/util/createNginxConfig.php --user \'alice\'', $calls[0]['command']);
+        $this->assertSame('alice', $calls[0]['username']);
+        $this->assertTrue($calls[0]['dryRun']);
+    }
+
+    public function testSyncSuspendedStateMirrorsDisabledRootMarker(): void
+    {
+        $base = sys_get_temp_dir().'/pmss-user-lifecycle-sync-'.bin2hex(random_bytes(4));
+        $disabledRoot = $base.'/www-disabled';
+        $calls = array();
+
+        @mkdir($disabledRoot, 0755, true);
+
+        try {
+            $suspended = \pmssUserLifecycleSyncSuspendedState(
+                'alice',
+                $disabledRoot,
+                static function (string $username, bool $state) use (&$calls): bool {
+                    $calls[] = array('username' => $username, 'state' => $state);
+                    return true;
+                }
+            );
+            $active = \pmssUserLifecycleSyncSuspendedState(
+                'alice',
+                $base.'/missing-marker',
+                static function (string $username, bool $state) use (&$calls): bool {
+                    $calls[] = array('username' => $username, 'state' => $state);
+                    return true;
+                }
+            );
+
+            $this->assertTrue($suspended);
+            $this->assertFalse($active);
+            $this->assertSame(
+                array(
+                    array('username' => 'alice', 'state' => true),
+                    array('username' => 'alice', 'state' => false),
+                ),
+                $calls
+            );
+        } finally {
+            @rmdir($disabledRoot);
+            @rmdir($base);
+        }
+    }
 }

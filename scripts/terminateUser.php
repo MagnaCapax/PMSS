@@ -134,7 +134,8 @@ if ($continue == 'N') {
 }
 
 echo "Terminating user {$username}\n";
-pmssUserLifecycleStep('terminate', $username, 'kill_processes_initial', 'killall -9 -u '.escapeshellarg($username), $dryRun);
+$killUserCommand = 'killall -9 -u '.escapeshellarg($username);
+pmssUserLifecycleStep('terminate', $username, 'kill_processes_initial', $killUserCommand, $dryRun);
 
 echo "\nRunning processes by user:\n";
 pmssUserLifecycleStep('terminate', $username,
@@ -145,7 +146,7 @@ pmssUserLifecycleStep('terminate', $username,
 
 sleep(3);   // Allow time for rTorrent to die
 
-pmssUserLifecycleStep('terminate', $username, 'kill_processes_retry', 'killall -9 -u '.escapeshellarg($username), $dryRun);  // Sometimes things just don't dieee!
+pmssUserLifecycleStep('terminate', $username, 'kill_processes_retry', $killUserCommand, $dryRun);  // Sometimes things just don't dieee!
 
 // Clean up reserved rTorrent ports before removing the home directory
 $portFile = "/home/{$username}/.rtorrent.rc";
@@ -198,39 +199,24 @@ echo "\nDeleting user, user data and HTTP password:\n";
 
 // Clear any per-user crontab before removing the account to avoid leaving stale
 // cron entries behind (Debian keeps them under /var/spool/cron/crontabs/).
-pmssUserLifecycleStep('terminate', $username,
-    'crontab_remove',
-    'crontab -r -u '.escapeshellarg($username).' || true',
-    $dryRun
-);
 $crontabSpoolPaths = array(
     "/var/spool/cron/crontabs/{$username}",
     "/var/spool/cron/{$username}",
 );
-pmssUserLifecycleStep('terminate', $username,
-    'crontab_spool_remove',
-    'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true',
-    $dryRun
-);
-
-pmssUserLifecycleStep('terminate', $username,
-    'userdel_initial',
-    'userdel '.escapeshellarg($username),
-    $dryRun
-);
+$userdelCommand = 'userdel '.escapeshellarg($username);
+$groupdelCommand = 'groupdel '.escapeshellarg($username);
 $trafficFiles = array_values(pmssTrafficDataPaths($username));
 $trafficArgs = array_map('escapeshellarg', $trafficFiles);
 $clearImmutableCmd = 'if command -v chattr >/dev/null 2>&1; then chattr -i '.implode(' ', $trafficArgs).' 2>/dev/null || true; fi';
-pmssUserLifecycleStep('terminate', $username,
-    'clear_immutable_traffic',
-    $clearImmutableCmd,
-    $dryRun
-);
-pmssUserLifecycleStep('terminate', $username,
-    'remove_home_initial',
-    'cd /home && rm -rf -- '.escapeshellarg($username),
-    $dryRun
-);
+foreach (array(
+    array('crontab_remove', 'crontab -r -u '.escapeshellarg($username).' || true'),
+    array('crontab_spool_remove', 'rm -f -- '.escapeshellarg($crontabSpoolPaths[0]).' '.escapeshellarg($crontabSpoolPaths[1]).' || true'),
+    array('userdel_initial', $userdelCommand),
+    array('clear_immutable_traffic', $clearImmutableCmd),
+    array('remove_home_initial', 'cd /home && rm -rf -- '.escapeshellarg($username)),
+) as $stepSpec) {
+    pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
+}
 //passthru("htpasswd -D /etc/lighttpd/.htpasswd {$username}");
 pmssUserLifecycleRefreshNginxConfig(
     'terminate',
@@ -243,32 +229,15 @@ pmssUserLifecycleRefreshNginxConfig(
         'initStep' => 'restart_nginx_init',
     )
 );   // Reconfig nginx
-pmssUserLifecycleStep('terminate', $username,
-    'userdel_groupdel_retry',
-    'userdel '.escapeshellarg($username),
-    $dryRun
-);
-pmssUserLifecycleStep('terminate', $username,
-    'groupdel_retry',
-    'groupdel '.escapeshellarg($username),
-    $dryRun
-); // If during first attempt still some process running.
-                                        // Make sure by attempting again FURTHER group needs to be deleted as well
-pmssUserLifecycleStep('terminate', $username,
-    'remove_screen_socket',
-    'rm -rf -- '.escapeshellarg("/var/run/screen/S-{$username}"),
-    $dryRun
-);
-pmssUserLifecycleStep('terminate', $username,
-    'remove_home_and_nginx_user',
-    'rm -rf -- '.escapeshellarg("/home/{$username}").' -- '.escapeshellarg("/etc/nginx/users/{$username}"),
-    $dryRun
-);
-pmssUserLifecycleStep('terminate', $username,
-    'release_lighttpd_port',
-    '/scripts/util/portManager.php release '.escapeshellarg($username).' lighttpd',
-    $dryRun
-);
+foreach (array(
+    array('userdel_groupdel_retry', $userdelCommand),
+    array('groupdel_retry', $groupdelCommand),
+    array('remove_screen_socket', 'rm -rf -- '.escapeshellarg("/var/run/screen/S-{$username}")),
+    array('remove_home_and_nginx_user', 'rm -rf -- '.escapeshellarg("/home/{$username}").' -- '.escapeshellarg("/etc/nginx/users/{$username}")),
+    array('release_lighttpd_port', '/scripts/util/portManager.php release '.escapeshellarg($username).' lighttpd'),
+) as $stepSpec) {
+    pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
+}
 @unlink("/etc/nginx/users/{$username}");
 
 $db = new users();
@@ -284,24 +253,15 @@ if (pmssUserAccountLookup($username) !== null) {
 }
 
 // If attemps 1 and 2 failed ...
-pmssUserLifecycleStep('terminate', $username, 'kill_processes_final', 'killall -9 -u '.escapeshellarg($username), $dryRun);
-pmssUserLifecycleStep('terminate', $username,
-    'userdel_groupdel_final',
-    'userdel '.escapeshellarg($username),
-    $dryRun
-);
-pmssUserLifecycleStep('terminate', $username,
-    'groupdel_final',
-    'groupdel '.escapeshellarg($username),
-    $dryRun
-);
-
-// Remove stale per-user lock files left behind by lifecycle helpers.
-pmssUserLifecycleStep('terminate', $username,
-    'cleanup_lock_files',
-    'rm -f -- /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock',
-    $dryRun
-);
+// If attempts 1 and 2 failed, keep the final cleanup order explicit.
+foreach (array(
+    array('kill_processes_final', $killUserCommand),
+    array('userdel_groupdel_final', $userdelCommand),
+    array('groupdel_final', $groupdelCommand),
+    array('cleanup_lock_files', 'rm -f -- /run/lock/pmss-*-'.$username.'.lock /tmp/pmss-*-'.$username.'.lock'),
+) as $stepSpec) {
+    pmssUserLifecycleStep('terminate', $username, $stepSpec[0], $stepSpec[1], $dryRun);
+}
 
 // We don't need setup network here because ... well that chain is not going to get any additional data anymore
 
