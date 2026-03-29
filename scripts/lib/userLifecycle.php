@@ -160,10 +160,7 @@ function pmssRequireCliUsername(string $rawUsername, string $action, string $err
     }
 
     $normalized = pmssNormalizeUsername($rawUsername);
-    pmssUserLifecycleContextLog($action, 'validate', $normalized, array(
-        'status'  => 'ERR',
-        'message' => $logMessage,
-    ));
+    pmssUserLifecycleContextLogStatusMessage($action, 'validate', $normalized, 'ERR', $logMessage);
 
     die(sprintf($errorFormat, $normalized));
 }
@@ -463,6 +460,25 @@ function pmssUserBaseContext(string $action, string $phase, string $username, ar
 function pmssUserLifecycleContextLog(string $action, string $phase, string $username, array $extra = array()): void
 {
     pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));
+}
+
+/**
+ * Write a structured user lifecycle event with shared status/message fields.
+ */
+function pmssUserLifecycleContextLogStatusMessage(string $action, string $phase, string $username, string $status, string $message, array $extra = array()): void
+{
+    pmssUserLifecycleContextLog(
+        $action,
+        $phase,
+        $username,
+        array_merge(
+            array(
+                'status' => $status,
+                'message' => $message,
+            ),
+            $extra
+        )
+    );
 }
 
 /**

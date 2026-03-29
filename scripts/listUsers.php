@@ -55,20 +55,14 @@ foreach ($usernames as $name) {
     }
     $normalized = pmssNormalizeUsername($name);
     if ($normalized !== $name) {
-        pmssUserLifecycleContextLog('list', 'case_mismatch', $name, array(
-            'status'  => 'ERR',
-            'message' => 'Uppercase username detected; aborting listUsers',
-        ));
+        pmssUserLifecycleContextLogStatusMessage('list', 'case_mismatch', $name, 'ERR', 'Uppercase username detected; aborting listUsers');
         fwrite(STDERR, "Error: uppercase username detected in listUsers: {$name}\n");
         exit(1);
     }
     if (!pmssValidateUsername($name)) {
         // Record and skip unexpected entries so downstream consumers see only
         // valid usernames while operators can investigate anomalies.
-        pmssUserLifecycleContextLog('list', 'filter_invalid', $name, array(
-            'status'  => 'ERR',
-            'message' => 'Skipping invalid username from listHomeUsers',
-        ));
+        pmssUserLifecycleContextLogStatusMessage('list', 'filter_invalid', $name, 'ERR', 'Skipping invalid username from listHomeUsers');
         continue;
     }
     echo $name . "\n";

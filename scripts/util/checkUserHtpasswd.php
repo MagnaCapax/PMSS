@@ -32,11 +32,11 @@ function pmssCheckUserHtpasswdUsernameIsValid(string $username): bool
 /**
  * Write a structured log entry when the optional user logger is available.
  *
- * @param array<string, mixed> $fields
+ * @param array<string, mixed> $extra
  */
-function pmssCheckUserHtpasswdLog(string $step, string $username, array $fields): void
+function pmssCheckUserHtpasswdLogStatusMessage(string $step, string $username, string $status, string $message, array $extra = array()): void
 {
-    pmssUserLifecycleContextLog('htpasswd', $step, $username, $fields);
+    pmssUserLifecycleContextLogStatusMessage('htpasswd', $step, $username, $status, $message, $extra);
 }
 
 /**
@@ -82,13 +82,11 @@ function pmssCheckUserHtpasswdMain(array $argv): int
 
     foreach ($users as $thisUser) {
         if (!pmssCheckUserHtpasswdUsernameIsValid($thisUser)) {
-            pmssCheckUserHtpasswdLog(
+            pmssCheckUserHtpasswdLogStatusMessage(
                 'validate',
                 trim((string) $thisUser),
-                [
-                    'status'  => 'ERR',
-                    'message' => 'Skipping htpasswd sync for invalid username',
-                ]
+                'ERR',
+                'Skipping htpasswd sync for invalid username'
             );
             continue;
         }
@@ -96,13 +94,13 @@ function pmssCheckUserHtpasswdMain(array $argv): int
         $userHtpasswd = "/home/{$thisUser}/.lighttpd/.htpasswd";
         $hasExistingEntry = pmssCheckUserHtpasswdHasUserEntry($userHtpasswd, $thisUser);
         if ($hasExistingEntry === null) {
-            pmssCheckUserHtpasswdLog(
+            pmssCheckUserHtpasswdLogStatusMessage(
                 'read',
                 $thisUser,
+                'ERR',
+                'Unable to read per-user htpasswd; skipping synchronization',
                 [
-                    'status'  => 'ERR',
-                    'message' => 'Unable to read per-user htpasswd; skipping synchronization',
-                    'path'    => $userHtpasswd,
+                    'path' => $userHtpasswd,
                 ]
             );
             continue;
@@ -117,13 +115,13 @@ function pmssCheckUserHtpasswdMain(array $argv): int
             }
 
             if (!pmssAppendUserFile($userHtpasswd, $thisPassword."\n", $thisUser, 0640)) {
-                pmssCheckUserHtpasswdLog(
+                pmssCheckUserHtpasswdLogStatusMessage(
                     'write',
                     $thisUser,
+                    'ERR',
+                    'Unable to append legacy credential to per-user htpasswd',
                     [
-                        'status'  => 'ERR',
-                        'message' => 'Unable to append legacy credential to per-user htpasswd',
-                        'path'    => $userHtpasswd,
+                        'path' => $userHtpasswd,
                     ]
                 );
                 continue;

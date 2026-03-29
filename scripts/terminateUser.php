@@ -65,28 +65,19 @@ $username = pmssRequireCliUsername(
 // spawning a separate process.
 $knownUsers = users::listHomeUsers();
 if (!in_array($username, $knownUsers, true)) {
-    pmssUserLifecycleContextLog('terminate', 'validate', $username, array(
-        'status'  => 'ERR',
-        'message' => 'Username not present in managed user list',
-    ));
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in managed user list');
     die("\t**** USER NOT FOUND IN MANAGED LIST ****\n\n");
 }
 
 if (!is_dir("/home/{$username}")) {
-    pmssUserLifecycleContextLog('terminate', 'validate', $username, array(
-        'status'  => 'ERR',
-        'message' => 'Home directory missing',
-    ));
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Home directory missing');
     die("\t**** USER HOME NOT FOUND ****\n\n");
 }
 
 // Ensure a passwd entry exists before continuing so we do not silently act on
 // stray directories or stale state.
 if (pmssUserAccountLookup($username) === null) {
-    pmssUserLifecycleContextLog('terminate', 'validate', $username, array(
-        'status'  => 'ERR',
-        'message' => 'Username not present in /etc/passwd',
-    ));
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'validate', $username, 'ERR', 'Username not present in /etc/passwd');
     die("Refusing to terminate {$username}: no passwd entry found\n");
 }
 
@@ -96,12 +87,17 @@ if (pmssUserAccountLookup($username) === null) {
 $expectedHome = "/home/{$username}";
 $realHome = realpath($expectedHome);
 if ($realHome === false || strpos($realHome, $expectedHome) !== 0) {
-    pmssUserLifecycleContextLog('terminate', 'invariant_home_prefix', $username, array(
-        'status'        => 'ERR',
-        'message'       => 'Refusing to operate on unexpected home path',
-        'expected_home' => $expectedHome,
-        'real_home'     => $realHome,
-    ));
+    pmssUserLifecycleContextLogStatusMessage(
+        'terminate',
+        'invariant_home_prefix',
+        $username,
+        'ERR',
+        'Refusing to operate on unexpected home path',
+        array(
+            'expected_home' => $expectedHome,
+            'real_home' => $realHome,
+        )
+    );
     die("Refusing to operate on '{$realHome}' for user {$username}\n");
 }
 
@@ -116,20 +112,14 @@ while (!in_array($continue, array('Y', 'N'))) {
     echo "Do you want to continue (Y/N)? ";
     $input = fgets(STDIN);
     if ($input === false) {
-        pmssUserLifecycleContextLog('terminate', 'confirm', $username, array(
-            'status'  => 'ERR',
-            'message' => 'Unable to read confirmation input (EOF). Re-run with --confirm for non-interactive use.',
-        ));
+        pmssUserLifecycleContextLogStatusMessage('terminate', 'confirm', $username, 'ERR', 'Unable to read confirmation input (EOF). Re-run with --confirm for non-interactive use.');
         fwrite(STDERR, "Error: confirmation input unavailable (EOF). Re-run with --confirm.\n");
         exit(1);
     }
     $continue = strtoupper(trim($input));
 }
 if ($continue == 'N') {
-    pmssUserLifecycleContextLog('terminate', 'abort', $username, array(
-        'status'  => 'SKIP',
-        'message' => 'Operator declined confirmation',
-    ));
+    pmssUserLifecycleContextLogStatusMessage('terminate', 'abort', $username, 'SKIP', 'Operator declined confirmation');
     die("\n");
 }
 

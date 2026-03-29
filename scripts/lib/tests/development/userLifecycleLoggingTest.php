@@ -62,6 +62,16 @@ class userLifecycleLoggingTest extends TestCase
         $this->assertStringContainsString('pmssUserWriteLogs(pmssUserBaseContext($action, $phase, $username, $extra));', $source);
     }
 
+    public function testContextLogStatusMessageHelperBuildsSharedPayload(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
+
+        $this->assertStringContainsString('function pmssUserLifecycleContextLogStatusMessage(', $source);
+        $this->assertStringContainsString("'status' => $status", $source);
+        $this->assertStringContainsString("'message' => $message", $source);
+        $this->assertStringContainsString('pmssUserLifecycleContextLog(', $source);
+    }
+
     public function testRefreshNginxConfigKeepsFallbackOrder(): void
     {
         $cases = array(

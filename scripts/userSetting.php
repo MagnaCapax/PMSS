@@ -32,18 +32,7 @@ USAGE;
  */
 function pmssUserSettingLog(string $user, string $phase, string $status, string $message, array $extra = array()): void
 {
-    pmssUserLifecycleContextLog(
-        'settings',
-        $phase,
-        $user,
-        array_merge(
-            array(
-                'status'  => $status,
-                'message' => $message,
-            ),
-            $extra
-        )
-    );
+    pmssUserLifecycleContextLogStatusMessage('settings', $phase, $user, $status, $message, $extra);
 }
 
 $action = $argv[1] ?? '';

@@ -25,10 +25,7 @@ pmssRequireHomeMounted('suspend.php');
 // Canonical suspended detection: only the presence of www-disabled matters.
 if (is_dir($disabledRoot)) {
     pmssUserLifecycleSetSuspendedState($username, true);
-    pmssUserLifecycleContextLog('suspend', 'already_suspended', $username, array(
-        'status'  => 'SKIP',
-        'message' => 'User already suspended',
-    ));
+    pmssUserLifecycleContextLogStatusMessage('suspend', 'already_suspended', $username, 'SKIP', 'User already suspended');
     die("User already suspended\n");
 }
 
@@ -75,12 +72,17 @@ if (!is_dir($activeRoot)) {
 pmssUserLifecycleSyncSuspendedState($username, $disabledRoot);
 pmssUserLifecycleRefreshManagedNginxConfig('suspend', $username, false);
 
-pmssUserLifecycleContextLog('suspend', 'end', $username, array(
-    'status'          => $landingMessage === '' ? 'OK' : 'WARN',
-    'home_dir'        => $homeDir,
-    'landing_created' => $landingCreated,
-    'message'         => $landingMessage === '' ? 'User suspended' : $landingMessage,
-));
+pmssUserLifecycleContextLogStatusMessage(
+    'suspend',
+    'end',
+    $username,
+    $landingMessage === '' ? 'OK' : 'WARN',
+    $landingMessage === '' ? 'User suspended' : $landingMessage,
+    array(
+        'home_dir' => $homeDir,
+        'landing_created' => $landingCreated,
+    )
+);
 
 /**
  * Generate the suspended landing page content.
