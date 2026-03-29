@@ -49,7 +49,7 @@ Guardrails always apply: MemoryHigh ≥ 250 MiB; MemoryMax ≤ 95% of RAM.
 
 Current state for the cgroup policy extension TODOs:
 
-- **Per-device IO controls**: Implemented for policy defaults and explicit CLI paths.
+- **Per-device IO controls**: Implemented.
   - Global policy supports `mounts` entries (`ioWeight`, `readBw`, `writeBw`, `readIops`, `writeIops`) that are translated into `IODeviceWeight` and IO throttle directives.
   - `userConfigCgroup.php --apply --defaults` expands policy `mounts` entries to per-device IO properties when mount device resolution succeeds.
   - Per-user CLI supports `--device` + `--io-profile` and explicit IO bandwidth/IOPS flags.

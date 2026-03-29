@@ -15,7 +15,7 @@ return [
     'memoryHighMiB'    => 500,    // soft throttle at 500 MiB (min enforced as 250)
     'memoryMaxMiB'     => 750,    // hard cap ~+50% over High (still capped at 95% of system RAM)
 
-    // Optional per-user file descriptor caps (via user@.service LimitNOFILE).
+    // Optional per-user file descriptor caps for the systemd user manager.
     // This path is implemented: when both values are valid integers, PMSS
     // installs /etc/systemd/system/user@.service.d/20-pmss-limits.conf.
     // 'limitNoFileSoft' => 8192,
