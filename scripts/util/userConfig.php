@@ -48,8 +48,6 @@ function pmssUserConfigParseDockerEnabledOption($rawOption): ?bool
 /**
  * Main entry point for user configuration changes.
  */
-
-
 $usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled']);
 $args = array_merge([''], $parsed['arguments']);

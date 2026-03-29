@@ -22,7 +22,6 @@ function pmssAddUserCliUsage(): string
     foreach (pmssUserConfigCliResourceSpecs() as $spec) {
         $resourceLines[] = '  '.$spec['usage'];
     }
-
     return implode("\n", [
         'Usage:',
         '  addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [TRAFFIC_CAP_MBIT] [UPLOAD_THROTTLE_KIB]',
@@ -108,7 +107,6 @@ function pmssAddUserParseCli(array $argv): array
     if ($torrentThrottle !== null && $torrentThrottle !== '') {
         $user['torrentThrottle'] = $torrentThrottle;
     }
-
     $dockerEnabled = pmssCliOption($parsed, 'docker-enabled', null, null);
     if ($dockerEnabled === true || $dockerEnabled === '') {
         throw new InvalidArgumentException('--docker-enabled requires true or false');

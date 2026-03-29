@@ -8,7 +8,6 @@
 
 require_once __DIR__.'/../passwords.php';
 require_once __DIR__.'/../userConfigCli.php';
-
 /**
  * Build the canonical userConfig command for addUser provisioning.
  */
@@ -40,7 +39,6 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
     if (isset($user['dockerEnabled']) && $user['dockerEnabled'] !== '') {
         $command[] = '--docker-enabled='.(string) $user['dockerEnabled'];
     }
-
     return implode(' ', array_map('escapeshellarg', $command));
 }
 
