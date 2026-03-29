@@ -56,6 +56,10 @@ if (!function_exists('pmssInfoResolveDockerEnabled')) {
     }
 }
 
+if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
+    require_once '/scripts/lib/webCgroupMemoryStatus.php';
+}
+
 if (!function_exists('pmssInfoSetDockerEnabled')) {
     /**
      * Persist dockerEnabled in the canonical per-user config store.
@@ -116,6 +120,9 @@ $pmssDockerToggleNotice = array(
 );
 
 $pmssDockerEnabledPolicy = pmssInfoResolveDockerEnabled($pmssStatsUsername);
+$pmssMemoryPressure = function_exists('pmssWebCgroupMemoryStatusRead')
+    ? pmssWebCgroupMemoryStatusRead()
+    : array('available' => false, 'status' => 'UNAVAILABLE');
 
 $requestMethod = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '';
 if ($requestMethod === 'POST' && isset($_POST['docker_toggle_state'])) {
@@ -228,6 +235,19 @@ if ($requestMethod === 'POST' && isset($_POST['docker_toggle_state'])) {
 .status.inactive { background: #c62828; color: #fff; }
 .status.stopped  { background: #c62828; color: #fff; }
 .status.error    { background: #d32f2f; color: #fff; }
+.status.low { background: #2e7d32; color: #fff; }
+.status.medium { background: #ef6c00; color: #fff; }
+.status.high { background: #c62828; color: #fff; }
+.status.throttled { background: #8e0000; color: #fff; }
+.status.unavailable { background: #546e7a; color: #fff; }
+.memory-pressure-note {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #111;
+    color: #e0e0e0;
+    font-size: 0.9em;
+}
 
 pre {
     margin: 12px 0 0;
@@ -528,6 +548,42 @@ if ($meminfo && preg_match_all('/(\w+):\s+(\d+)/', $meminfo, $m)) {
     </pre>
   </div>
 
+</div>
+
+<div class="stats-block">
+    <h6>Memory pressure</h6>
+<?php if (!$pmssMemoryPressure['available']): ?>
+    <pre>Memory pressure data is unavailable for this account.</pre>
+<?php else: ?>
+    <div class="info-line">
+        <span class="label">Memory usage:</span>
+        <span class="value"><?php echo htmlspecialchars($pmssMemoryPressure['usage_text']); ?></span>
+    </div>
+    <div class="info-line">
+        <span class="label">Memory pressure:</span>
+        <span class="value"><span class="status <?php echo strtolower($pmssMemoryPressure['status']); ?>"><?php echo htmlspecialchars($pmssMemoryPressure['status']); ?></span></span>
+    </div>
+    <div class="info-line">
+        <span class="label">Throttle events:</span>
+        <span class="value"><?php echo number_format((int) $pmssMemoryPressure['throttle_events']); ?></span>
+    </div>
+    <div class="info-line">
+        <span class="label">Pressure avg10:</span>
+        <span class="value"><?php
+        echo 'some '.($pmssMemoryPressure['pressure_some_avg10'] !== null ? number_format((float) $pmssMemoryPressure['pressure_some_avg10'], 2, '.', '') : 'n/a')
+            .' / full '.($pmssMemoryPressure['pressure_full_avg10'] !== null ? number_format((float) $pmssMemoryPressure['pressure_full_avg10'], 2, '.', '') : 'n/a');
+        ?></span>
+    </div>
+    <?php if ($pmssMemoryPressure['memory_high'] !== null): ?>
+    <div class="info-line">
+        <span class="label">Throttle threshold:</span>
+        <span class="value"><?php echo htmlspecialchars(pmssWebCgroupMemoryStatusFormatBytes($pmssMemoryPressure['memory_high'])); ?></span>
+    </div>
+    <?php endif; ?>
+    <?php if ($pmssMemoryPressure['message'] !== ''): ?>
+    <div class="memory-pressure-note"><?php echo htmlspecialchars($pmssMemoryPressure['message']); ?></div>
+    <?php endif; ?>
+<?php endif; ?>
 </div>
 
 <!-- Disk Quota -->

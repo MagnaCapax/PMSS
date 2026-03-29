@@ -17,6 +17,9 @@
 if (file_exists('/scripts/lib/welcomeAnnouncements.php')) {
     require_once '/scripts/lib/welcomeAnnouncements.php';
 }
+if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
+    require_once '/scripts/lib/webCgroupMemoryStatus.php';
+}
 
 $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
@@ -770,9 +773,26 @@ EOF;
         $warning = '';
     }
 
+    $pressureIndicator = '';
+    if (function_exists('pmssWebCgroupMemoryStatusRead')) {
+        $pressureStatus = pmssWebCgroupMemoryStatusRead();
+        if (!empty($pressureStatus['available'])) {
+            $pressureParts = array(
+                '<br /><b>Memory pressure:</b> <span style="color: '.$pressureStatus['status_color'].';">&#9679; '.htmlspecialchars($pressureStatus['status'], ENT_QUOTES, 'UTF-8').'</span>',
+                '<br />Throttle events: '.number_format((int) $pressureStatus['throttle_events']),
+            );
+            if ($pressureStatus['message'] !== '') {
+                $pressureParts[] = '<br /><b style="color: '.$pressureStatus['status_color'].';">'.htmlspecialchars($pressureStatus['message'], ENT_QUOTES, 'UTF-8').'</b>';
+            }
+
+            $pressureIndicator = implode('', $pressureParts).'<br />';
+        }
+    }
+
     return <<<EOF
 <h6>RAM Info</h6>
 {$gauge}
+{$pressureIndicator}
 {$warning}
 <hr />
 EOF;
