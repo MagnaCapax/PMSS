@@ -25,6 +25,9 @@ if (!networkIptablesOwnerMatchAvailable()) exit(0);
 $localnets = networkLoadLocalnets();
 $lastLocalNet = $localnets ? end($localnets) : '';
 
+// Loopback never leaves the host, so exclude it from egress accounting.
+echo "/sbin/iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT\n";
+
 foreach ($users as $thisUser) {
     $thisUid = pmssResourceLogLookupManagedUid($thisUser);
     if ($thisUid === null) continue;	// User does not exist anymore
