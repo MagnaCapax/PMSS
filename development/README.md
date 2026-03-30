@@ -27,7 +27,13 @@ These wrappers exist because assistants do not reliably auto-discover PMSS guard
   - Supports `--dry-run` to write the assembled prompt but skip invocation.
 
 - `development/codex.sh`
-  - Compatibility shim for `development/agentic.sh --agent=codex`.
+  - Compatibility shim for manual Codex sessions.
+  - Forces interactive `codex` so operator-started runs do not fall into the
+    headless `codex exec` path used by the generic agentic wrappers.
+
+- `development/codex-headless.sh`
+  - Compatibility shim for the headless Codex agentic path.
+  - Preserves the `codex exec` flow used for non-interactive or closed-loop runs.
 
 - `development/codex-refactor.sh`
   - Compatibility shim for `development/agentic-refactor.sh --agent=codex`.
