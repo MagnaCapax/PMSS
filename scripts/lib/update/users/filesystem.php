@@ -107,6 +107,7 @@ PHP;
         'install-ai-tools.sh',
         'bin/docker-install-wireguard.sh',
         'bin/linuxserverInstall.sh',
+        'bin/support',
         '.scriptsInc.php',
         '.lighttpd/php.ini',
         'radarr-sonarr.txt',

@@ -486,6 +486,11 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Behavior: Read-only probe of system readiness (binary versions, config presence);
     intended post-provision.
 
+- scripts/util/supportCommand.php <message>
+  - Behavior: Saves a read-only support snapshot under `/home/<user>/.support/requests/` and submits the same snapshot to the configured support inbox.
+  - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, and optional `/home/<user>/.billingId`.
+  - Delivery: Prefers a local `sendmail` binary when present, otherwise attempts direct MX SMTP delivery to the configured support inbox.
+
 - scripts/util/performanceBaselineCollect.sh [--output <file>]
   - Behavior: Collects a lightweight JSON baseline (timestamp/kernel, selected sysctl keys, TCP retransmit counter, optional vmstat/iostat samples) for before/after tuning comparisons.
 

@@ -1,0 +1,169 @@
+<?php
+/**
+ * Support command mail delivery helpers.
+ *
+ * Delivery prefers a local sendmail-compatible binary when available and falls
+ * back to direct MX delivery so the command stays functional on hosts where
+ * PMSS has purged exim4.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
+
+require_once __DIR__.'/diagnostics.php';
+
+/**
+ * Build the outbound message envelope for a support request.
+ *
+ * @return array<string,string>
+ */
+function pmssSupportMailEnvelopeBuild(array $diagnostics, array $config, string $snapshotPath): array
+{
+    $subject = sprintf(
+        '[PMSS Support] billing=%d user=%s host=%s',
+        (int) ($diagnostics['billingId'] ?? 0),
+        (string) ($diagnostics['username'] ?? 'unknown-user'),
+        (string) ($diagnostics['hostname'] ?? 'unknown-host')
+    );
+    $senderHost = preg_replace('/[^A-Za-z0-9.-]/', '-', (string) ($diagnostics['hostname'] ?? 'pmss.local'));
+    $from = 'support-command@'.trim((string) $senderHost, '-.');
+    $headers = [
+        'From: '.$from,
+        'To: '.$config['targetEmail'],
+        'Subject: '.$subject,
+        'X-PMSS-Username: '.(string) ($diagnostics['username'] ?? ''),
+        'X-PMSS-Billing-Id: '.(string) ((int) ($diagnostics['billingId'] ?? 0)),
+        'X-PMSS-Hostname: '.(string) ($diagnostics['hostname'] ?? ''),
+        'Content-Type: text/plain; charset=UTF-8',
+    ];
+
+    return [
+        'from' => $from,
+        'to' => (string) $config['targetEmail'],
+        'data' => implode("\r\n", $headers)."\r\n\r\n"
+            .'Snapshot: '.$snapshotPath."\r\n\r\n"
+            .str_replace("\n", "\r\n", (string) ($diagnostics['body'] ?? ''))."\r\n",
+    ];
+}
+
+/**
+ * Resolve the SMTP relay host for the configured support inbox.
+ */
+function pmssSupportRelayHostRead(array $config): string
+{
+    $relayHost = trim((string) ($config['relayHost'] ?? ''));
+    if ($relayHost !== '') {
+        return $relayHost;
+    }
+
+    $parts = explode('@', (string) $config['targetEmail']);
+    $domain = strtolower((string) end($parts));
+    $hosts = [];
+    if ($domain !== '' && function_exists('getmxrr') && @getmxrr($domain, $hosts) && !empty($hosts[0])) {
+        return (string) $hosts[0];
+    }
+    return $domain;
+}
+
+/**
+ * Deliver the support mail through the best available transport.
+ */
+function pmssSupportMailSend(array $config, array $envelope, ?callable $transport = null): void
+{
+    if ($transport !== null) {
+        $transport($config, $envelope);
+        return;
+    }
+
+    $sendmail = pmssCommandPath('sendmail');
+    if ($sendmail !== '') {
+        pmssSupportMailSendViaSendmail($sendmail, $envelope);
+        return;
+    }
+
+    pmssSupportMailSendViaSmtp(pmssSupportRelayHostRead($config), (int) $config['smtpPort'], (int) $config['connectTimeout'], $envelope);
+}
+
+/**
+ * Deliver the support message via a local sendmail-compatible binary.
+ */
+function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): void
+{
+    $spec = [0 => ['pipe', 'w'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $process = @proc_open(escapeshellarg($sendmailPath).' -t -i', $spec, $pipes);
+    if (!is_resource($process)) {
+        throw new RuntimeException('Unable to start sendmail transport.');
+    }
+
+    fwrite($pipes[0], (string) $envelope['data']);
+    fclose($pipes[0]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $rc = proc_close($process);
+    if ($rc !== 0) {
+        throw new RuntimeException('Support mail delivery failed: '.trim((string) $stderr));
+    }
+}
+
+/**
+ * Deliver the support message directly to the recipient MX via SMTP.
+ */
+function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array $envelope): void
+{
+    if ($host === '') {
+        throw new RuntimeException('Support relay host is not configured.');
+    }
+
+    $errno = 0;
+    $errstr = '';
+    $stream = @stream_socket_client('tcp://'.$host.':'.$port, $errno, $errstr, $timeout);
+    if (!is_resource($stream)) {
+        throw new RuntimeException('Support SMTP connection failed: '.$errstr);
+    }
+
+    stream_set_timeout($stream, $timeout);
+    pmssSupportSmtpExpect($stream, [220]);
+    $ehloHost = preg_replace('/[^A-Za-z0-9.-]/', '-', (string) (gethostname() ?: 'localhost'));
+    pmssSupportSmtpCommand($stream, 'EHLO '.$ehloHost, [250]);
+    pmssSupportSmtpCommand($stream, 'MAIL FROM:<'.$envelope['from'].'>', [250]);
+    pmssSupportSmtpCommand($stream, 'RCPT TO:<'.$envelope['to'].'>', [250, 251]);
+    pmssSupportSmtpCommand($stream, 'DATA', [354]);
+    fwrite($stream, str_replace("\n.", "\n..", (string) $envelope['data'])."\r\n.\r\n");
+    pmssSupportSmtpExpect($stream, [250]);
+    pmssSupportSmtpCommand($stream, 'QUIT', [221]);
+    fclose($stream);
+}
+
+/**
+ * Send one SMTP command and assert the expected response class.
+ *
+ * @param array<int,int> $expectedCodes
+ */
+function pmssSupportSmtpCommand($stream, string $command, array $expectedCodes): void
+{
+    fwrite($stream, $command."\r\n");
+    pmssSupportSmtpExpect($stream, $expectedCodes);
+}
+
+/**
+ * Read one SMTP response, including multiline replies, and validate it.
+ *
+ * @param array<int,int> $expectedCodes
+ */
+function pmssSupportSmtpExpect($stream, array $expectedCodes): void
+{
+    $line = '';
+    do {
+        $chunk = fgets($stream);
+        if (!is_string($chunk)) {
+            throw new RuntimeException('Support SMTP server closed the connection unexpectedly.');
+        }
+        $line = rtrim($chunk, "\r\n");
+    } while (strlen($line) >= 4 && $line[3] === '-');
+
+    $code = (int) substr($line, 0, 3);
+    if (!in_array($code, $expectedCodes, true)) {
+        throw new RuntimeException('Support SMTP error: '.$line);
+    }
+}

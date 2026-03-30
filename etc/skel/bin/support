@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keep the user-facing support command tiny and stable.
+if ! command -v php >/dev/null 2>&1; then
+  echo "Support command requires PHP CLI." >&2
+  exit 1
+fi
+
+exec php /scripts/util/supportCommand.php "$@"
