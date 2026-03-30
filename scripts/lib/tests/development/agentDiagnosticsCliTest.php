@@ -86,6 +86,22 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame('checkUsers.php --json failed', $payload['sections']['users']['consistency']['error']);
     }
 
+    public function testJsonSectionReportsMissingScriptWithoutShellingPhpCliError(): void
+    {
+        $scriptRoot = $this->makeScriptRoot();
+        unlink($scriptRoot.'/scripts/util/checkUsers.php');
+        $binDir = $this->makeCommandStubs();
+        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json'], [
+            'PMSS_TEST_MODE' => '1',
+            'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
+            'PATH' => $binDir.':'.(string) getenv('PATH'),
+        ]);
+        $payload = json_decode($output, true);
+
+        $this->assertSame('checkUsers.php --json failed', $payload['sections']['users']['consistency']['error']);
+        $this->assertStringContainsString('Diagnostics script missing or unreadable: scripts/util/checkUsers.php', $payload['sections']['users']['consistency']['stderr']);
+    }
+
     private function makeScriptRoot(bool $brokenCheckUsers = false): string
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');

@@ -66,6 +66,14 @@ function pmssAgentDiagnosticsCapture(string $command): array
 function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = []): array
 {
     $scriptPath = pmssAgentDiagnosticsScriptPath($relativePath);
+    if (!is_file($scriptPath) || !is_readable($scriptPath)) {
+        return [
+            'rc' => 1,
+            'stdout' => '',
+            'stderr' => 'Diagnostics script missing or unreadable: '.$relativePath,
+        ];
+    }
+
     $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
     foreach ($arguments as $argument) {
         $command .= ' '.escapeshellarg((string) $argument);
