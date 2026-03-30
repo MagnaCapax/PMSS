@@ -220,10 +220,9 @@ if (!function_exists('pmssUserTrafficCliBootstrap')) {
             return false;
         }
         require_once $optionParser;
-        foreach ([dirname(__DIR__).'/userLifecycle.php', __DIR__.'/log.php'] as $dependency) {
-            if (is_file($dependency)) {
-                require_once $dependency;
-            }
+        $userLogDependency = __DIR__.'/log.php';
+        if (!function_exists('pmssUserLog') && is_file($userLogDependency)) {
+            require_once $userLogDependency;
         }
 
         return true;

@@ -57,6 +57,7 @@ class UpdateLibraryDependencyTest extends TestCase
     public function testUserLifecycleBootstrapsUserLoggerForLeanCallers(): void
     {
         foreach ([
+            ['scripts/lib/user/log.php', ['function pmssUserLogAllowed(): bool', 'function pmssUserLogFile(string $user): string', 'function pmssUserLog(string $user, string $message): void'], ["if (!function_exists('pmssUserLogAllowed')) {", "if (!function_exists('pmssUserLogFile')) {", "if (!function_exists('pmssUserLog')) {"], 'user/log.php should define its logger functions directly once it is required'],
             ['scripts/lib/userLifecycle.php', ["require_once __DIR__.'/user/log.php';", 'function pmssUserWatchdogEnsureServices('], ["if (!function_exists('pmssUserLogAllowed')) {"], 'userLifecycle.php should rely on user/log.php for pmssUserLogAllowed()'],
             ['scripts/cron/checkRtorrent.php', ["require_once __DIR__.'/../lib/user/log.php';", "pmssUserLog(\$user, 'checkRtorrent: '.\$message);"], ["function_exists('pmssUserLog')"], 'checkRtorrent.php should log through the required user logger directly'],
             ['scripts/cron/checkDelugeInstances.php', ["require_once __DIR__.'/../lib/userLifecycle.php';", "pmssUserWatchdogRunService(", "'deluge stopped due to suspension'"], ['pmssUserLogPath', "\$canUserLog = function_exists('pmssUserLog');"], 'Deluge watchdog should use userLifecycle.php as its user logger bootstrap'],
