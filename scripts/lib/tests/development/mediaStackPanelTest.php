@@ -6,10 +6,16 @@ require_once dirname(__DIR__, 2).'/user/mediaStackPanel.php';
 
 class MediaStackPanelTest extends TestCase
 {
+    private function mediaHomeCreate(string $prefix): string
+    {
+        $home = $this->pmssMakeTempDir($prefix);
+        @file_put_contents($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
+        return $home;
+    }
+
     public function testStatusIsReadyForFreshHome(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-media-ready-');
-        @file_put_contents($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
+        $home = $this->mediaHomeCreate('pmss-media-ready-');
 
         $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
 
@@ -19,9 +25,8 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusBlocksWhenBinAlreadyPopulated(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-media-blocked-bin-');
+        $home = $this->mediaHomeCreate('pmss-media-blocked-bin-');
         @mkdir($home.'/.bin', 0755, true);
-        @file_put_contents($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
         @file_put_contents($home.'/.bin/existing', '1');
 
         $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
@@ -32,9 +37,8 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusShowsInstalledUrlsWhenJellyfinConfigExists(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-media-installed-');
+        $home = $this->mediaHomeCreate('pmss-media-installed-');
         @mkdir($home.'/.config/jellyfin/config', 0755, true);
-        @file_put_contents($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
         @file_put_contents($home.'/.config/jellyfin/config/network.xml', '<NetworkConfiguration />');
 
         $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
@@ -45,8 +49,7 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusShowsRunningWhenPidExists(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-media-running-');
-        @file_put_contents($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
+        $home = $this->mediaHomeCreate('pmss-media-running-');
         @file_put_contents($home.'/.install-media-stack-web.pid', (string) getmypid());
 
         $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');
@@ -57,8 +60,7 @@ class MediaStackPanelTest extends TestCase
 
     public function testStatusShowsFailedLogWhenPreviousRunStopped(): void
     {
-        $home = $this->pmssMakeTempDir('pmss-media-failed-');
-        @file_put_contents($home.'/install-media-stack.sh', "#!/bin/bash\nexit 0\n");
+        $home = $this->mediaHomeCreate('pmss-media-failed-');
         @file_put_contents($home.'/.install-media-stack.log', "[ERR ] Download failed\nPartial output\n");
 
         $status = \pmssMediaStackPanelStatusRead($home, 'alice', 'seedbox.example');

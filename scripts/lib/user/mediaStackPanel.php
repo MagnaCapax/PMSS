@@ -63,6 +63,19 @@ function pmssMediaStackPanelInstalled(string $home): bool
 }
 
 /**
+ * Return true when a directory exists and contains non-dot entries.
+ */
+function pmssMediaStackPanelDirectoryPopulated(string $path): bool
+{
+    if (!is_dir($path)) {
+        return false;
+    }
+
+    $entries = @scandir($path);
+    return $entries !== false && count(array_diff($entries, array('.', '..'))) > 0;
+}
+
+/**
  * Gate web installs to the first run so the wrapper never hangs on prompts.
  *
  * @return array{ok:bool,message:string}
@@ -78,15 +91,11 @@ function pmssMediaStackPanelStartGateRead(string $home): array
         return array('ok' => false, 'message' => 'PHP shell execution is unavailable on this host.');
     }
 
-    $binPath = rtrim($home, '/').'/.bin';
-    if (is_dir($binPath) && (($entries = @scandir($binPath)) !== false) && count(array_diff($entries, array('.', '..'))) > 0) {
+    if (pmssMediaStackPanelDirectoryPopulated(rtrim($home, '/').'/.bin')) {
         return array('ok' => false, 'message' => 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.');
     }
 
-    $jellyfinConfigPath = rtrim($home, '/').'/.config/jellyfin';
-    if (is_dir($jellyfinConfigPath)
-        && (($entries = @scandir($jellyfinConfigPath)) !== false)
-        && count(array_diff($entries, array('.', '..'))) > 0) {
+    if (pmssMediaStackPanelDirectoryPopulated(rtrim($home, '/').'/.config/jellyfin')) {
         return array('ok' => false, 'message' => 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.');
     }
 
@@ -194,62 +203,51 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
     $logTail = pmssMediaStackPanelLogTailRead($home);
     $gate = pmssMediaStackPanelStartGateRead($home);
     $urls = ($installed || $logTail !== '') ? pmssMediaStackPanelUrlsBuild($username, $hostname) : array();
+    $status = array('tail' => $logTail, 'urls' => $urls, 'canStart' => false, 'poll' => false);
 
     if ($running) {
-        return array(
+        return array_merge($status, array(
             'state' => 'running',
             'message' => 'Media stack install is running. This can take several minutes.',
             'details' => array('The page refreshes status automatically while the installer runs.'),
-            'tail' => $logTail,
-            'urls' => $urls,
-            'canStart' => false,
             'poll' => true,
-        );
+        ));
     }
 
     if ($installed) {
-        return array(
+        return array_merge($status, array(
             'state' => 'installed',
             'message' => 'Media stack is installed for this account.',
             'details' => array(
                 'No password is pre-generated. Create the Jellyfin admin account in the first-run wizard.',
                 'If you need a rerun or cleanup, use SSH because the installer becomes interactive once files already exist.',
             ),
-            'tail' => $logTail,
-            'urls' => $urls,
-            'canStart' => false,
-            'poll' => false,
-        );
+        ));
     }
 
     if ($logTail !== '') {
-        return array(
+        return array_merge($status, array(
             'state' => 'failed',
             'message' => 'A previous web install stopped before completion.',
             'details' => array(
                 $gate['ok'] ? 'You can retry from the panel.' : $gate['message'],
                 'Use SSH for deeper troubleshooting because the full installer log can be longer than the panel view.',
             ),
-            'tail' => $logTail,
-            'urls' => $urls,
             'canStart' => $gate['ok'],
-            'poll' => false,
-        );
+        ));
     }
 
     if (!$gate['ok']) {
-        return array(
+        return array_merge($status, array(
             'state' => 'blocked',
             'message' => $gate['message'],
             'details' => array('This panel wrapper intentionally supports the first install only so it never stalls on interactive confirmation prompts.'),
             'tail' => '',
             'urls' => array(),
-            'canStart' => false,
-            'poll' => false,
-        );
+        ));
     }
 
-    return array(
+    return array_merge($status, array(
         'state' => 'ready',
         'message' => 'Install Jellyfin plus the bundled media helpers without SSH.',
         'details' => array(
@@ -259,8 +257,7 @@ function pmssMediaStackPanelStatusRead(string $home, string $username, string $h
         'tail' => '',
         'urls' => array(),
         'canStart' => true,
-        'poll' => false,
-    );
+    ));
 }
 
 /**

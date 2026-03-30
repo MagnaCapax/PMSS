@@ -6,6 +6,11 @@ require_once dirname(__DIR__, 2).'/lighttpd/watchdogErrorPage.php';
 
 class LighttpdWatchdogErrorPageTest extends TestCase
 {
+    private function watchdogErrorPagePath(string $webRoot, string $username = 'alice'): string
+    {
+        return $webRoot.'/error-502-'.$username.'.html';
+    }
+
     public function testQuotaOutputShowsExhaustionWhenBlockColumnHasMarker(): void
     {
         $output = "Disk quotas for user demo (uid 1000):\nFilesystem blocks quota limit grace files quota limit grace\n/dev/sda1 10G* 9G 10G 0 0 0\n";
@@ -82,13 +87,13 @@ class LighttpdWatchdogErrorPageTest extends TestCase
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
         $this->assertTrue(pmssLighttpdWatchdogWriteErrorPage('alice', 'php', $webRoot));
-        $this->assertTrue(file_exists($webRoot.'/error-502-alice.html'));
+        $this->assertTrue(file_exists($this->watchdogErrorPagePath($webRoot)));
     }
 
     public function testDeleteErrorPageRemovesExistingFile(): void
     {
         $webRoot = $this->pmssMakeTempDir('pmss-502-root-');
-        $path = $webRoot.'/error-502-alice.html';
+        $path = $this->watchdogErrorPagePath($webRoot);
         file_put_contents($path, 'demo');
         $this->assertTrue(pmssLighttpdWatchdogDeleteErrorPage('alice', $webRoot));
         $this->assertFalse(file_exists($path));

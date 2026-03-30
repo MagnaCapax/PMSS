@@ -39,18 +39,6 @@ function rtorrentScgiFormatRequest(string $xmlData): string
  */
 function rtorrentScgiFormatXmlrpcValue($value): string
 {
-    if (is_int($value)) {
-        return '<value><int>' . $value . '</int></value>';
-    }
-
-    if (is_bool($value)) {
-        return '<value><boolean>' . ($value ? '1' : '0') . '</boolean></value>';
-    }
-
-    if (is_float($value)) {
-        return '<value><double>' . $value . '</double></value>';
-    }
-
     if (is_array($value)) {
         $items = '';
         foreach ($value as $item) {
@@ -60,7 +48,20 @@ function rtorrentScgiFormatXmlrpcValue($value): string
         return '<value><array><data>' . $items . '</data></array></value>';
     }
 
-    return '<value><string>' . htmlspecialchars((string) $value, ENT_XML1, 'UTF-8') . '</string></value>';
+    if (is_int($value)) {
+        $type = 'int';
+        $body = (string) $value;
+    } elseif (is_bool($value)) {
+        $type = 'boolean';
+        $body = $value ? '1' : '0';
+    } elseif (is_float($value)) {
+        $type = 'double';
+        $body = (string) $value;
+    } else {
+        return '<value><string>' . htmlspecialchars((string) $value, ENT_XML1, 'UTF-8') . '</string></value>';
+    }
+
+    return '<value><' . $type . '>' . $body . '</' . $type . '></value>';
 }
 
 /**
@@ -196,38 +197,36 @@ function rtorrentScgiDecodeXmlrpcValue(\SimpleXMLElement $valueNode)
     $child = $children[0];
     $name = $child->getName();
 
-    if ($name === 'int' || $name === 'i4' || $name === 'i8') {
-        return (int) ((string) $child);
-    }
+    switch ($name) {
+        case 'int':
+        case 'i4':
+        case 'i8':
+            return (int) ((string) $child);
 
-    if ($name === 'double') {
-        return (float) ((string) $child);
-    }
+        case 'double':
+            return (float) ((string) $child);
 
-    if ($name === 'boolean') {
-        return ((string) $child) === '1';
-    }
+        case 'boolean':
+            return ((string) $child) === '1';
 
-    if ($name === 'string') {
-        return (string) $child;
-    }
+        case 'string':
+            return (string) $child;
 
-    if ($name === 'array') {
-        $values = [];
-        foreach ($child->data->value as $item) {
-            $values[] = rtorrentScgiDecodeXmlrpcValue($item);
-        }
+        case 'array':
+            $values = [];
+            foreach ($child->data->value as $item) {
+                $values[] = rtorrentScgiDecodeXmlrpcValue($item);
+            }
 
-        return $values;
-    }
+            return $values;
 
-    if ($name === 'struct') {
-        $values = [];
-        foreach ($child->member as $member) {
-            $values[(string) $member->name] = rtorrentScgiDecodeXmlrpcValue($member->value);
-        }
+        case 'struct':
+            $values = [];
+            foreach ($child->member as $member) {
+                $values[(string) $member->name] = rtorrentScgiDecodeXmlrpcValue($member->value);
+            }
 
-        return $values;
+            return $values;
     }
 
     return (string) $child;
