@@ -16,6 +16,12 @@ $htmlHead = '';
 $frames   = array();
 $useLocalFrames = false;
 
+/** Detect frames that must open outside the iframe tab container. */
+function pmssFrameOpensInNewWindow(array $frame): bool
+{
+    return isset($frame['target']) && $frame['target'] === '_blank';
+}
+
 // Remote frames can be disabled explicitly for debugging or fully offline
 // deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1.
 if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
@@ -90,6 +96,7 @@ EOF;
             'url'      => 'https://wiki.pulsedmedia.com',
             'linkText' => 'wiki',
             'title'    => 'Pulsed Media Wiki',
+            'target'   => '_blank',
         ),
     );
 }
@@ -177,8 +184,11 @@ if (file_exists('../.customFrames')) {
 $frames = array_merge($frames, $frameData);
 
 $styleList = array('iframe');
-foreach($frames AS $thisId => $thisFrame)
-    $styleList[] = '#' . $thisId;
+foreach($frames AS $thisId => $thisFrame) {
+    if (!pmssFrameOpensInNewWindow($thisFrame)) {
+        $styleList[] = '#' . $thisId;
+    }
+}
 $styleList = implode(', ', $styleList);
 echo $styleList . '{';
 ?>
@@ -193,18 +203,33 @@ echo $styleList . '{';
 <div id="tabs">
         <ul>
 <?php
-foreach($frames AS $thisId => $thisFrame)
+foreach($frames AS $thisId => $thisFrame) {
+    if (pmssFrameOpensInNewWindow($thisFrame)) {
+        echo "\t\t" . '<li><a href="' . $thisFrame['url'] . '" title="' . $thisFrame['title'] . '" target="_blank" rel="noopener noreferrer"><span>' .
+            $thisFrame['linkText'] . '</span></a></li>' . "\n";
+        continue;
+    }
+
     echo "\t\t" . '<li><a href="#' . $thisId . '" title="' . $thisFrame['title'] . '" onClick="loadFrame(\'' . $thisId . '\', \'' . $thisFrame['url'] . '\'); setTimeout(\'setHeights();\', 500); "><span>' .
         $thisFrame['linkText'] . '</span></a></li>' . "\n";
+}
 ?>
         </ul>
     <div id="content">            
 <?php
-foreach($frames AS $thisId => $thisFrame)
-    if ($thisId != 'welcome') echo "\t" . '<div id="' . $thisId . '" class="tabs-container"></div>' . "\n";
-	else  echo "\n\t" . '<div id="' . $thisId . '" class="tabs-container">
+foreach($frames AS $thisId => $thisFrame) {
+    if (pmssFrameOpensInNewWindow($thisFrame)) {
+        continue;
+    }
+
+    if ($thisId != 'welcome') {
+        echo "\t" . '<div id="' . $thisId . '" class="tabs-container"></div>' . "\n";
+    } else {
+        echo "\n\t" . '<div id="' . $thisId . '" class="tabs-container">
         <iframe id="' . $thisId . 'Frame" width=100% height=100% src="' . $thisFrame['url'] . '" frameborder="0"></iframe>
      </div>' . "\n";
+    }
+}
     
 ?>
     </div>
@@ -229,8 +254,13 @@ function setHeights() {
         windowHeight = $(window).height();
         $('#content').height( windowHeight + offsetHeight );
         <?php
-        foreach($frames AS $thisId => $thisFrame)
+        foreach($frames AS $thisId => $thisFrame) {
+            if (pmssFrameOpensInNewWindow($thisFrame)) {
+                continue;
+            }
+
                 echo "$('#{$thisId}').height( windowHeight + offsetHeight );\n";
+        }
         ?>
 };
 
