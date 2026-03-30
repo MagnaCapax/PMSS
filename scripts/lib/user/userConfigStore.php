@@ -47,6 +47,35 @@ if (!function_exists('pmssUserDockerMinRamMiB')) {
     }
 }
 
+if (!function_exists('pmssUserConfigNormaliseToggleValue')) {
+    /** Convert stored feature-toggle values to a stable boolean. */
+    function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $default = true): bool
+    {
+        if (!array_key_exists($key, $payload)) {
+            return $default;
+        }
+        $value = $payload[$key];
+
+        return is_string($value)
+            ? !in_array(strtolower(trim($value)), ['false', '0', 'no', 'off', ''], true)
+            : (bool) $value;
+    }
+}
+
+if (!function_exists('pmssUserConfigResolvePayload')) {
+    /** Load one validated user's persisted payload for policy checks. */
+    function pmssUserConfigResolvePayload(string $username, ?UserConfigStore &$store = null): ?array
+    {
+        $username = pmssNormalizeUsername($username);
+        if (!UserValidator::isValidUsername($username)) {
+            return null;
+        }
+        $store = $store ?: new UserConfigStore();
+        $payload = $store->get($username);
+        return is_array($payload) ? $payload : [];
+    }
+}
+
 class UserConfigStore
 {
     /** @var string */
@@ -248,29 +277,15 @@ class UserConfigStore
             $payload['billingId'] = 0;
         }
 
-        if (!array_key_exists('suspended', $payload)) {
-            $payload['suspended'] = false;
-        } else {
-            $payload['suspended'] = (bool)$payload['suspended'];
-        }
+        $payload['suspended'] = array_key_exists('suspended', $payload) && (bool)$payload['suspended'];
 
-        $payload['dockerEnabled'] = array_key_exists('dockerEnabled', $payload)
-            ? (!is_string($payload['dockerEnabled'])
-                ? (bool) $payload['dockerEnabled']
-                : !in_array(strtolower(trim($payload['dockerEnabled'])), ['false', '0', 'no', 'off', ''], true))
-            : true;
-
-        $payload['lighttpdEnabled'] = array_key_exists('lighttpdEnabled', $payload)
-            ? (!is_string($payload['lighttpdEnabled'])
-                ? (bool) $payload['lighttpdEnabled']
-                : !in_array(strtolower(trim($payload['lighttpdEnabled'])), ['false', '0', 'no', 'off', ''], true))
-            : true;
+        $payload['dockerEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled');
+        $payload['lighttpdEnabled'] = pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');
 
         // Safety gate: keep rootless Docker disabled for low-memory accounts.
-        if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) && (int)$payload['ramMiB'] > 0) {
-            if ((int)$payload['ramMiB'] < pmssUserDockerMinRamMiB()) {
-                $payload['dockerEnabled'] = false;
-            }
+        if (isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) && (int)$payload['ramMiB'] > 0
+            && (int)$payload['ramMiB'] < pmssUserDockerMinRamMiB()) {
+            $payload['dockerEnabled'] = false;
         }
 
         // Invariant: always write trafficLimit as 0.
@@ -351,23 +366,16 @@ if (!function_exists('pmssUserDockerEnabled')) {
     function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null): bool
     {
         $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
+        $payload = pmssUserConfigResolvePayload($username, $store);
+        if ($payload === null) {
             return false;
         }
 
-        if ($store === null) {
-            $store = new UserConfigStore();
-        }
-
-        $payload = $store->get($username);
-        $payload = is_array($payload) ? $payload : [];
-        $configuredRamMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB'])
-            ? (int) $payload['ramMiB']
-            : 0;
-
-        if (array_key_exists('dockerEnabled', $payload) && !(bool) $payload['dockerEnabled']) {
+        if (!pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled')) {
             return false;
         }
+
+        $configuredRamMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
 
         $runtimeRamMiB = $store->resolveRamMiB($username);
         $effectiveRamMiB = $configuredRamMiB;
@@ -379,7 +387,7 @@ if (!function_exists('pmssUserDockerEnabled')) {
             return false;
         }
 
-        return !array_key_exists('dockerEnabled', $payload) || (bool) $payload['dockerEnabled'];
+        return true;
     }
 }
 
@@ -389,20 +397,11 @@ if (!function_exists('pmssUserLighttpdEnabled')) {
      */
     function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = null): bool
     {
-        $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
+        $payload = pmssUserConfigResolvePayload($username, $store);
+        if ($payload === null) {
             return false;
         }
 
-        if ($store === null) {
-            $store = new UserConfigStore();
-        }
-
-        $payload = $store->get($username);
-        if (!is_array($payload)) {
-            return true;
-        }
-
-        return !array_key_exists('lighttpdEnabled', $payload) || (bool) $payload['lighttpdEnabled'];
+        return pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');
     }
 }
