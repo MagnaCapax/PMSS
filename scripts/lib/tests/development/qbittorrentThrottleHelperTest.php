@@ -16,7 +16,11 @@ class QbittorrentThrottleHelperTest extends TestCase
     public function testHelperKeepsCanonicalConfigPath(): void
     {
         $this->assertStringContainsString(
-            "sprintf('/home/%s/.config/qBittorrent/qBittorrent.conf', \$username)",
+            "function pmssQbittorrentConfigPath(string \$username): string",
+            $this->source
+        );
+        $this->assertStringContainsString(
+            "getenv('PMSS_HOME_DIR') ?: '/home'",
             $this->source
         );
     }

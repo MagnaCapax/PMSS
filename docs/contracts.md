@@ -225,7 +225,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
-- pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
+- pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, refresh the PMSS-managed qBittorrent safety defaults, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; deletes `~/www/phpXplorer`.
 - pmssUserUpdateThemes(array $ctx): void → ensures named themes exist under `rutorrent/plugins/theme/themes/` (copied from skel), fixes ownership.
 - pmssUserUpgradeRutorrent(array $ctx): void → if user’s ruTorrent index.html SHA != skeleton (and no existing backup), backups to `oldRutorrent-3`, copies fresh from skel, restores config/share, updates config via `updateRutorrentConfig()`, fixes ownership and perms.
@@ -470,7 +470,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/userConfig.php <user> <ramMiB> <quotaGiB>
   - Behavior: Applies quota settings and rTorrent/ruTorrent configs; seeds dotfiles; safe to re-run.
-  - qBittorrent bootstrap: seeds `~/.config/qBittorrent/qBittorrent.conf` from `/etc/seedbox/config/template.qbittorrent.conf`, pinning shared-host defaults such as POSIX disk I/O, 128 MiB disk cache, 4 async I/O threads, and moderate connection/upload caps for new accounts.
+  - qBittorrent bootstrap: seeds `~/.config/qBittorrent/qBittorrent.conf` from `/etc/seedbox/config/template.qbittorrent.conf`, pinning shared-host defaults such as POSIX disk I/O, 128 MiB disk cache, 4 async I/O threads, and moderate connection/upload caps for new accounts; later maintenance refreshes that PMSS-managed subset without replacing user-owned settings.
   - Optional flags: `--upload-throttle-kib=<KiB>` updates torrent upload throttle; `--welcome-message=<HTML>` sets/clears per-user welcome banner override (empty value clears).
   - Welcome-only mode: `scripts/util/userConfig.php <user> --welcome-message=<HTML>` updates only the welcome banner field and exits without running service/quota orchestration.
   - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user. Storage Box product payloads also default `dockerEnabled=false` unless explicitly overridden.

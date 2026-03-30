@@ -64,7 +64,7 @@ $home = $homeRoot.'/'.$user;
 
 file_put_contents($home.'/.rtorrent.rc', "dummy\n");
 file_put_contents($home.'/.lighttpd/php.ini', "display_errors = On\n");
-file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\CSRFProtection=true\nWebUI\\ClickjackingProtection=true\nWebUI\\HostHeaderValidation=true\n");
+file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[BitTorrent]\nSession\\DiskCacheSize=16384\nSession\\MaxConnections=9999\n\n[Preferences]\nWebUI\\CSRFProtection=true\nWebUI\\ClickjackingProtection=true\nWebUI\\HostHeaderValidation=true\nDownloads\\DiskWriteCacheSize=16384\nBittorrent\\MaxConnecs=9999\n");
 file_put_contents($home.'/www/filemanager.php', "before\n        ob_flush();\nafter\n");
 file_put_contents($home.'/www/rutorrent/php/settings.php', '((integer)($tm["minutes"]/$interval))*$interval+$interval,');
 file_put_contents($home.'/www/rutorrent/plugins/rss/action.php', "before\nob_flush();\nafter\n");
@@ -113,6 +113,10 @@ PHP
         $this->assertStringContainsString('WebUI\\CSRFProtection=false', $result['qbittorrent']);
         $this->assertStringContainsString('WebUI\\ClickjackingProtection=false', $result['qbittorrent']);
         $this->assertStringContainsString('WebUI\\HostHeaderValidation=false', $result['qbittorrent']);
+        $this->assertStringContainsString('Session\\DiskCacheSize=128', $result['qbittorrent']);
+        $this->assertStringContainsString('Session\\MaxConnections=300', $result['qbittorrent']);
+        $this->assertStringContainsString('Downloads\\DiskWriteCacheSize=128', $result['qbittorrent']);
+        $this->assertStringContainsString('Bittorrent\\MaxConnecs=300', $result['qbittorrent']);
 
         $this->assertPhaseOrder(
             $result['descriptions'],

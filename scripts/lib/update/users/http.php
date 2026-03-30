@@ -25,25 +25,11 @@ function pmssUserConfigureHttp(array $ctx): void
 
     runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
 
-    // Keep qBittorrent WebUI reverse-proxy compatibility settings disabled.
+    // Refresh the PMSS-managed qBittorrent safety defaults on every pass.
+    // This includes reverse-proxy compatibility keys such as HostHeaderValidation.
     $qbittorrentConfig = "{$home}/.config/qBittorrent/qBittorrent.conf";
-    if (is_file($qbittorrentConfig) && is_string($config = file_get_contents($qbittorrentConfig))) {
-        $originalConfig = $config;
-        foreach (['HostHeaderValidation', 'CSRFProtection', 'ClickjackingProtection'] as $setting) {
-            $updated = preg_replace('/^WebUI\\\\'.preg_quote($setting, '/').'=.*$/m', 'WebUI\\'.$setting.'=false', $config, 1, $count);
-            if ($count < 1 || $updated === null || $updated === $config) {
-                continue;
-            }
-
-            $config = $updated;
-            if ($userLog) {
-                $userLog('Updated qBittorrent WebUI '.$setting.' to false');
-            }
-        }
-
-        if ($config !== $originalConfig) {
-            file_put_contents($qbittorrentConfig, $config);
-        }
+    if (function_exists('pmssQbittorrentApplyManagedConfig') && pmssQbittorrentApplyManagedConfig($user, $qbittorrentConfig) && $userLog) {
+        $userLog('Refreshed PMSS-managed qBittorrent settings');
     }
 
     $phpIniPath = "{$home}/.lighttpd/php.ini";
