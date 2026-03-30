@@ -47,25 +47,6 @@ function pmssSupportMailEnvelopeBuild(array $diagnostics, array $config, string 
 }
 
 /**
- * Resolve the SMTP relay host for the configured support inbox.
- */
-function pmssSupportRelayHostRead(array $config): string
-{
-    $relayHost = trim((string) ($config['relayHost'] ?? ''));
-    if ($relayHost !== '') {
-        return $relayHost;
-    }
-
-    $parts = explode('@', (string) $config['targetEmail']);
-    $domain = strtolower((string) end($parts));
-    $hosts = [];
-    if ($domain !== '' && function_exists('getmxrr') && @getmxrr($domain, $hosts) && !empty($hosts[0])) {
-        return (string) $hosts[0];
-    }
-    return $domain;
-}
-
-/**
  * Deliver the support mail through the best available transport.
  */
 function pmssSupportMailSend(array $config, array $envelope, ?callable $transport = null): void
@@ -81,7 +62,17 @@ function pmssSupportMailSend(array $config, array $envelope, ?callable $transpor
         return;
     }
 
-    pmssSupportMailSendViaSmtp(pmssSupportRelayHostRead($config), (int) $config['smtpPort'], (int) $config['connectTimeout'], $envelope);
+    $relayHost = trim((string) ($config['relayHost'] ?? ''));
+    if ($relayHost === '') {
+        $parts = explode('@', (string) $config['targetEmail']);
+        $relayHost = strtolower((string) end($parts));
+        $hosts = [];
+        if ($relayHost !== '' && function_exists('getmxrr') && @getmxrr($relayHost, $hosts) && !empty($hosts[0])) {
+            $relayHost = (string) $hosts[0];
+        }
+    }
+
+    pmssSupportMailSendViaSmtp($relayHost, (int) $config['smtpPort'], (int) $config['connectTimeout'], $envelope);
 }
 
 /**
@@ -125,25 +116,21 @@ function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array
     stream_set_timeout($stream, $timeout);
     pmssSupportSmtpExpect($stream, [220]);
     $ehloHost = preg_replace('/[^A-Za-z0-9.-]/', '-', (string) (gethostname() ?: 'localhost'));
-    pmssSupportSmtpCommand($stream, 'EHLO '.$ehloHost, [250]);
-    pmssSupportSmtpCommand($stream, 'MAIL FROM:<'.$envelope['from'].'>', [250]);
-    pmssSupportSmtpCommand($stream, 'RCPT TO:<'.$envelope['to'].'>', [250, 251]);
-    pmssSupportSmtpCommand($stream, 'DATA', [354]);
+    foreach ([
+        ['EHLO '.$ehloHost, [250]],
+        ['MAIL FROM:<'.$envelope['from'].'>', [250]],
+        ['RCPT TO:<'.$envelope['to'].'>', [250, 251]],
+        ['DATA', [354]],
+    ] as $commandSpec) {
+        fwrite($stream, $commandSpec[0]."\r\n");
+        pmssSupportSmtpExpect($stream, $commandSpec[1]);
+    }
+
     fwrite($stream, str_replace("\n.", "\n..", (string) $envelope['data'])."\r\n.\r\n");
     pmssSupportSmtpExpect($stream, [250]);
-    pmssSupportSmtpCommand($stream, 'QUIT', [221]);
+    fwrite($stream, "QUIT\r\n");
+    pmssSupportSmtpExpect($stream, [221]);
     fclose($stream);
-}
-
-/**
- * Send one SMTP command and assert the expected response class.
- *
- * @param array<int,int> $expectedCodes
- */
-function pmssSupportSmtpCommand($stream, string $command, array $expectedCodes): void
-{
-    fwrite($stream, $command."\r\n");
-    pmssSupportSmtpExpect($stream, $expectedCodes);
 }
 
 /**

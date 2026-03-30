@@ -489,6 +489,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/supportCommand.php <message>
   - Behavior: Saves a read-only support snapshot under `/home/<user>/.support/requests/` and submits the same snapshot to the configured support inbox.
   - Inputs: Reads `/etc/seedbox/config/support.php`, `/etc/seedbox/config/version`, and optional `/home/<user>/.billingId`.
+  - Flags and overrides: `-h`/`--help` prints usage and exits successfully; `PMSS_SUPPORT_CONFIG_PATH` overrides the support config file path before the `PMSS_CONFIG_DIR` default is consulted.
   - Delivery: Prefers a local `sendmail` binary when present, otherwise attempts direct MX SMTP delivery to the configured support inbox.
 
 - scripts/util/performanceBaselineCollect.sh [--output <file>]

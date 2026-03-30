@@ -21,7 +21,7 @@ class SupportCommandTest extends TestCase
         $this->configDir = sys_get_temp_dir().'/pmss-support-config-'.$suffix;
         $this->skelDir = sys_get_temp_dir().'/pmss-support-skel-'.$suffix;
         $this->user = 'user'.bin2hex(random_bytes(2));
-        $this->envBackup = $this->pmssCaptureEnv(['HOME', 'USER', 'PMSS_CONFIG_DIR', 'PMSS_VERSION_FILE', 'PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
+        $this->envBackup = $this->pmssCaptureEnv(['HOME', 'USER', 'PMSS_CONFIG_DIR', 'PMSS_SUPPORT_CONFIG_PATH', 'PMSS_VERSION_FILE', 'PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
         $this->pmssEnsureDir($this->configDir);
@@ -77,6 +77,24 @@ class SupportCommandTest extends TestCase
         symlink($target, $this->homeRoot.'/'.$this->user.'/.billingId');
 
         $this->assertEquals(0, \pmssSupportBillingIdRead($this->homeRoot.'/'.$this->user));
+    }
+
+    public function testConfigReadHonorsExplicitConfigPathOverride(): void
+    {
+        $customPath = $this->configDir.'/support-custom.php';
+        file_put_contents($customPath, "<?php\nreturn ".var_export([
+            'targetEmail' => 'override@example.com',
+            'snapshotDirectory' => '.support/requests',
+            'smtpPort' => 26,
+            'connectTimeout' => 6,
+            'relayHost' => 'mx-override.example.com',
+        ], true).";\n");
+        putenv('PMSS_SUPPORT_CONFIG_PATH='.$customPath);
+
+        $config = \pmssSupportConfigRead();
+
+        $this->assertSame('override@example.com', $config['targetEmail']);
+        $this->assertSame(26, $config['smtpPort']);
     }
 
     public function testDiagnosticsBuildUsesRunnerOutputs(): void

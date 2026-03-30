@@ -12,21 +12,13 @@
 require_once dirname(__DIR__).'/runtime.php';
 
 /**
- * Return the absolute path to the support command config file.
- */
-function pmssSupportConfigPath(): string
-{
-    return pmssResolvePathFromEnv('PMSS_SUPPORT_CONFIG_PATH', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/support.php');
-}
-
-/**
  * Load and validate support command settings.
  *
  * @return array<string,mixed>
  */
 function pmssSupportConfigRead(): array
 {
-    $path = pmssSupportConfigPath();
+    $path = pmssResolvePathFromEnv('PMSS_SUPPORT_CONFIG_PATH', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/support.php');
     if (!is_file($path) || is_link($path)) {
         throw new RuntimeException('Support command config is missing.');
     }
@@ -58,13 +50,11 @@ function pmssSupportConfigRead(): array
         throw new RuntimeException('Support SMTP timeout is invalid.');
     }
 
-    $relayHost = trim((string) ($config['relayHost'] ?? ''));
-
     return [
         'targetEmail' => $targetEmail,
         'snapshotDirectory' => $snapshotDirectory,
         'smtpPort' => $smtpPort,
         'connectTimeout' => $connectTimeout,
-        'relayHost' => $relayHost,
+        'relayHost' => trim((string) ($config['relayHost'] ?? '')),
     ];
 }

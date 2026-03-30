@@ -24,8 +24,5 @@ function pmssSupportRequestSubmit(string $message, ?callable $runner = null, ?ca
     $envelope = pmssSupportMailEnvelopeBuild($diagnostics, $config, $snapshotPath);
     pmssSupportMailSend($config, $envelope, $transport);
 
-    return [
-        'snapshotPath' => $snapshotPath,
-        'diagnostics' => $diagnostics,
-    ];
+    return compact('snapshotPath', 'diagnostics');
 }

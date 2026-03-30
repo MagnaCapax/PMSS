@@ -13,24 +13,17 @@
 
 require_once __DIR__.'/../lib/support/request.php';
 
-/**
- * Print command usage help.
- */
-function pmssSupportUsagePrint(): void
-{
-    fwrite(STDERR, "Usage: support <message>\n");
-}
-
 $args = $argv ?? $_SERVER['argv'] ?? [];
 array_shift($args);
+$usage = "Usage: support <message>\n";
 
 if ($args === ['--help'] || $args === ['-h']) {
-    pmssSupportUsagePrint();
+    fwrite(STDERR, $usage);
     exit(0);
 }
 
 if (count($args) < 1) {
-    pmssSupportUsagePrint();
+    fwrite(STDERR, $usage);
     exit(1);
 }
 
