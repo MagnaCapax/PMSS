@@ -17,6 +17,17 @@ require_once __DIR__.'/config.php';
  */
 function pmssSupportCurrentUsernameRead(): string
 {
+    $user = getenv('USER');
+    $user = is_string($user) ? trim($user) : '';
+    if ($user !== '') {
+        $home = getenv('HOME');
+        $home = is_string($home) ? rtrim($home, '/') : '';
+        $expectedHome = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$user;
+        if ($home !== '' && $home === $expectedHome) {
+            return $user;
+        }
+    }
+
     if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
         $entry = @posix_getpwuid(posix_geteuid());
         if (is_array($entry) && !empty($entry['name'])) {
@@ -24,8 +35,7 @@ function pmssSupportCurrentUsernameRead(): string
         }
     }
 
-    $user = getenv('USER');
-    return is_string($user) ? trim($user) : '';
+    return $user;
 }
 
 /**
@@ -33,9 +43,14 @@ function pmssSupportCurrentUsernameRead(): string
  */
 function pmssSupportCurrentHomeRead(string $username): string
 {
+    $expectedHome = '';
+    if ($username !== '') {
+        $expectedHome = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$username;
+    }
+
     $home = getenv('HOME');
     $home = is_string($home) ? rtrim($home, '/') : '';
-    if ($home !== '') {
+    if ($home !== '' && ($expectedHome === '' || $home === $expectedHome)) {
         return $home;
     }
 
@@ -46,7 +61,7 @@ function pmssSupportCurrentHomeRead(string $username): string
         }
     }
 
-    return $username !== '' ? '/home/'.$username : '';
+    return $expectedHome;
 }
 
 /**
@@ -178,7 +193,9 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
     }
 
     $path = sprintf('%s/request-%s-%d.txt', $snapshotDir, gmdate('Ymd-His'), getmypid());
+    $previousUmask = umask(0077);
     $handle = @fopen($path, 'x');
+    umask($previousUmask);
     if ($handle === false) {
         throw new RuntimeException('Unable to create support snapshot file.');
     }
@@ -197,5 +214,6 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
     }
 
     @chmod($path, 0600);
+    clearstatcache(true, $path);
     return $path;
 }
