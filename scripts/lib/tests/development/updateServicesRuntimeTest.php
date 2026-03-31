@@ -8,6 +8,17 @@ require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesRuntimeTest extends TestCase
 {
+    public function testSshdLegacyParserNormalizationKeepsLegacyFallbackContract(): void
+    {
+        $normalized = \pmssSshdLegacyParserTemplateNormalize("Port 22\nCiphers +aes128-ctr\nHostKeyAlgorithms ssh-ed25519");
+
+        $this->assertStringContainsString("Port 22\n", $normalized);
+        $this->assertSame(1, substr_count($normalized, "\nCiphers aes128-gcm@openssh.com"));
+        $this->assertSame(1, substr_count($normalized, "\nKexAlgorithms curve25519-sha256@libssh.org"));
+        $this->assertSame(1, substr_count($normalized, "\nMACs hmac-sha2-512-etm@openssh.com"));
+        $this->assertStringContainsString('# HostKeyAlgorithms ssh-ed25519', $normalized);
+    }
+
     public function testApplyRuntimeTemplatesLogsCommandsInStableOrderDuringDryRun(): void
     {
         $this->pmssResetRuntimeProfile();

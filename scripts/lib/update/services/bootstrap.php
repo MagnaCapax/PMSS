@@ -68,6 +68,45 @@ function pmssConfigureQuotaMount(?callable $logger = null): void
 }
 
 /**
+ * Normalize sshd template content for older parsers that reject modern
+ * list-append syntax or renamed key directives.
+ */
+function pmssSshdLegacyParserTemplateNormalize(string $config): string
+{
+    if (!is_array($lines = preg_split("/\r?\n/", $config))) {
+        return $config;
+    }
+    $legacyDirectives = [
+        'Ciphers' => 'Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,aes192-cbc,aes256-cbc',
+        'KexAlgorithms' => 'KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1',
+        'MACs' => 'MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,hmac-sha1,hmac-sha1-96,hmac-md5,hmac-md5-96,hmac-ripemd160,hmac-ripemd160@openssh.com',
+    ];
+    $present = array_fill_keys(array_keys($legacyDirectives), false);
+    $updatedLines = [];
+    foreach ($lines as $line) {
+        foreach ($legacyDirectives as $directive => $replacement) {
+            if (preg_match('/^\s*'.preg_quote($directive, '/').'\s+/i', $line) === 1) {
+                $updatedLines[] = $replacement;
+                $present[$directive] = true;
+                continue 2;
+            }
+        }
+        if (preg_match('/^\s*(Host[kK]eyAlgorithms|PubkeyAcceptedKeyTypes)\s+/', $line) === 1) {
+            $updatedLines[] = '# '.$line;
+            continue;
+        }
+        $updatedLines[] = $line;
+    }
+    foreach ($present as $directive => $seen) {
+        if (!$seen) {
+            $updatedLines[] = $legacyDirectives[$directive];
+        }
+    }
+    $updated = implode("\n", $updatedLines);
+    return ($updated !== '' && substr($updated, -1) !== "\n") ? $updated."\n" : $updated;
+}
+
+/**
  * Rewrite sshd directives to parser-safe explicit lists when legacy daemons
  * reject +append syntax or newer option names.
  */
@@ -78,61 +117,7 @@ function pmssNormalizeSshdTemplateForLegacyParsers(): void
         logMessage('[WARN] Cannot read sshd_config for legacy-parser normalization');
         return;
     }
-
-    $lines = preg_split("/\r?\n/", $config);
-    if (!is_array($lines)) {
-        logMessage('[WARN] Cannot parse sshd_config lines for legacy-parser normalization');
-        return;
-    }
-
-    $legacyCiphers = 'Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,aes192-cbc,aes256-cbc';
-    $legacyKex = 'KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1';
-    $legacyMacs = 'MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,hmac-sha1,hmac-sha1-96,hmac-md5,hmac-md5-96,hmac-ripemd160,hmac-ripemd160@openssh.com';
-
-    $updatedLines = [];
-    $hasCiphers = false;
-    $hasKex = false;
-    $hasMacs = false;
-
-    foreach ($lines as $line) {
-        if (preg_match('/^\s*Ciphers\s+/i', $line)) {
-            $updatedLines[] = $legacyCiphers;
-            $hasCiphers = true;
-            continue;
-        }
-        if (preg_match('/^\s*KexAlgorithms\s+/i', $line)) {
-            $updatedLines[] = $legacyKex;
-            $hasKex = true;
-            continue;
-        }
-        if (preg_match('/^\s*MACs\s+/i', $line)) {
-            $updatedLines[] = $legacyMacs;
-            $hasMacs = true;
-            continue;
-        }
-        if (preg_match('/^\s*Host[kK]eyAlgorithms\s+/', $line)
-            || preg_match('/^\s*PubkeyAcceptedKeyTypes\s+/', $line)) {
-            $updatedLines[] = '# '.$line;
-            continue;
-        }
-        $updatedLines[] = $line;
-    }
-
-    if (!$hasCiphers) {
-        $updatedLines[] = $legacyCiphers;
-    }
-    if (!$hasKex) {
-        $updatedLines[] = $legacyKex;
-    }
-    if (!$hasMacs) {
-        $updatedLines[] = $legacyMacs;
-    }
-
-    $updated = implode("\n", $updatedLines);
-    if ($updated !== '' && substr($updated, -1) !== "\n") {
-        $updated .= "\n";
-    }
-
+    $updated = pmssSshdLegacyParserTemplateNormalize($config);
     if ($updated === $config) {
         logMessage('[INFO] sshd legacy-parser normalization made no changes');
         return;
