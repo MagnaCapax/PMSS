@@ -432,6 +432,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/util/configureLighttpd.php [<user>]
   - Behavior: Renders per-user lighttpd vhost/fastcgi config from templates. With a username, targets only that user; otherwise (no args) refreshes all.
+  - PMSS-managed proxy fragments: always refreshes the qBittorrent and rclone proxies; when `/home/<user>/.invidiousPort` contains a valid port, also publishes `/public-<user>/invidious/` and `/user-<user>/apps/invidious/` through the user's lighttpd.
   - Side-effects: Writes files under `/home/<user>/.lighttpd/` and lighttpd config directories.
 
 - scripts/cron/checkLighttpdInstances.php [<user>]

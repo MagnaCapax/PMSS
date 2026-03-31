@@ -438,6 +438,48 @@ function pmssQbittorrentLighttpdProxyFragment(string $user, int $port): string
 LIGHTTPD;
 }
 
+function pmssInvidiousLighttpdProxyFragment(string $user, int $port): string
+{
+    return <<<LIGHTTPD
+# PMSS-managed: Invidious reverse proxy.
+
+\$HTTP["url"] =~ "^/public-{$user}/invidious($|/)" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$port}
+  ) ) ),
+  proxy.forwarded = ( "for" => 1,
+                      "host" => 1,
+                      "by" => 1
+  ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/public-{$user}/invidious/"  => "/",
+         "/public-{$user}/invidious" => ""
+       )
+  )
+}
+
+\$HTTP["url"] =~ "^/user-{$user}/apps/invidious($|/)" {
+  proxy.server = ( "" => ( (
+    "host" => "127.0.0.1",
+    "port" => {$port}
+  ) ) ),
+  proxy.forwarded = ( "for" => 1,
+                      "host" => 1,
+                      "by" => 1
+  ),
+  proxy.header = (
+      "map-urlpath" => (
+         "/user-{$user}/apps/invidious/"  => "/",
+         "/user-{$user}/apps/invidious" => ""
+       )
+  )
+}
+
+LIGHTTPD;
+}
+
 function pmssUserConfigLighttpdConfigureUser(
     string $thisUser,
     string $portsDirectory,
@@ -492,6 +534,18 @@ function pmssUserConfigLighttpdConfigureUser(
         if (!pmssWriteUserFile($proxyConfPath, $proxyFragment, $thisUser, 0640)) {
             fwrite(STDERR, "[user:{$thisUser}] Failed to write {$proxyName} lighttpd fragment\n");
         }
+    }
+
+    // Optional Invidious proxy wiring: publish both public and private URLs
+    // only when the user or installer pins a local port explicitly.
+    $invidiousPort = (int) trim((string) @file_get_contents($homeDir.'/.invidiousPort'));
+    $invidiousConfPath = $customDir.'/pmss-invidious.conf';
+    if ($invidiousPort >= 1024 && $invidiousPort <= 65535) {
+        if (!pmssWriteUserFile($invidiousConfPath, pmssInvidiousLighttpdProxyFragment($thisUser, $invidiousPort), $thisUser, 0640)) {
+            fwrite(STDERR, "[user:{$thisUser}] Failed to write invidious lighttpd fragment\n");
+        }
+    } elseif (is_file($invidiousConfPath) || is_link($invidiousConfPath)) {
+        @unlink($invidiousConfPath);
     }
 
     // Deluge: generate a per-user proxy fragment under ~/.lighttpd/custom.d/
