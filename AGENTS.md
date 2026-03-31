@@ -62,7 +62,7 @@ instead of restating details.
 - One Flow, No Special Cases: keep a single, explicit update path. Any exception requires an ADR and a removal plan.
 - Pit of Success Defaults: make safe paths the default; risky paths demand explicit, noisy opt‑in.
 - Never Break Old Users: preserve backward compatibility; ship shims/migrations and time‑boxed deprecations; break only to remediate credible security issues.
-- Contract Preservation over Refactor: For existing automation-facing commands/APIs, input -> output behavior is a compatibility contract. Refactors/optimizations must preserve stdout shape, parse format, and exit-code semantics by default.
+- Contract Preservation over Refactor: For existing automation-facing commands/APIs, input -> output behavior of the default invocation is a compatibility contract. Refactors/optimizations must preserve stdout shape, parse format, and exit-code semantics unless a new explicit version/flag/path is introduced.
 - Machine Channel Purity: If output is machine-consumed, stdout must contain payload only. Human diagnostics/warnings/errors belong in stderr or logs, not in payload channels.
 - Versioned Change Only: If a contract must change, add a new explicit version/flag/path and keep legacy behavior as default until migration is completed.
 - Visible Footprint: reviewers consider footprint alongside correctness. `scripts/testing/test-all.sh` prints a LOC snapshot to keep drift obvious.

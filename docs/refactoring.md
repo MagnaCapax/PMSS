@@ -44,3 +44,9 @@ minimal loop before merge:
 
 Non-negotiable guardrail: machine-consumed stdout is payload-only. Any
 diagnostics go to stderr/logs.
+
+Reject the refactor if any of these are true:
+- Default invocation output format changed.
+- Default invocation exit-code meaning changed.
+- Machine payload channel (stdout) now includes diagnostics/noise.
+- No compatibility test proves legacy default behavior still works.
