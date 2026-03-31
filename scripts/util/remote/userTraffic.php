@@ -1,7 +1,21 @@
 #!/usr/bin/env php
 <?php
 /**
- * Utility script: user Traffic.
+ * Utility script: user traffic callback payload for Hallinta automation.
+ *
+ * Output contract (STDOUT only, no banners/warnings):
+ * - Exactly one PHP serialized array: array<string,array{normal:int,local:int,ingress:int}>
+ * - Outer key: PMSS username
+ * - Empty result set serializes as a:0:{}
+ *
+ * Consumer contract:
+ * - Hallinta callback path expects unserialize()-compatible payload
+ * - Any extra STDOUT bytes can break callback parsing
+ *
+ * Compatibility requirement:
+ * - Keep PMSS_SKIP_HOME_MOUNT_CHECK=1 for this read-only callback producer so
+ *   historical/non-standard hosts still return payload instead of mount-gate
+ *   diagnostics.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
