@@ -13,7 +13,7 @@ require_once __DIR__.'/../../runtime.php';
 /**
  * Ensure the given mount point in /etc/fstab contains the quota options.
  */
-function pmssEnsureQuotaOptions(string $mountPoint, array $requiredOptions = null, ?callable $logger = null, ?string $fstabPath = null): void
+function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = null, ?callable $logger = null, ?string $fstabPath = null): void
 {
     // #TODO Add hermetic tests that verify fstab line parsing and option
     //       insertion behavior for common edge cases.
