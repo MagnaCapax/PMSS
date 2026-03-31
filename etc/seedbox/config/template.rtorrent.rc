@@ -13,8 +13,6 @@ protocol.pex.set = yes
 #disable UDP on custom config if you do not want them -- UDP trackers are likely to cause issues
 trackers.use_udp.set = yes
 
-try_import = .rtorrent.rc.custom
-
 ## Following user should not change in any case - basic config & performance options etc.
 
 pieces.memory.max.set = ##memoryMax
@@ -55,3 +53,4 @@ throttle.max_uploads.global.set = ##uploadSlots
 protocol.encryption.set = allow_incoming,try_outgoing,enable_retry
 encoding.add = utf8
 method.insert = system.startup_time, value|const, (system.time)
+try_import = .rtorrent.rc.custom

@@ -43,6 +43,22 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     }
 
     /**
+     * User custom overrides must load after PMSS defaults in the template.
+     */
+    public function testPmssRtorrentTemplateEndsWithCustomImport(): void
+    {
+        $templateContent = trim($this->pmssReadRepoFile('etc/seedbox/config/template.rtorrent.rc'));
+        $lines = preg_split('/\r\n|\r|\n/', $templateContent);
+        $lastLine = is_array($lines) ? end($lines) : false;
+
+        $this->assertEquals(
+            'try_import = .rtorrent.rc.custom',
+            $lastLine,
+            'Template should end with custom import so user overrides win over PMSS defaults'
+        );
+    }
+
+    /**
      * The skeleton should not ship rTorrent 0.9.8-incompatible legacy directives.
      */
     public function testSkeletonRtorrentConfigAvoidsRemovedAndDeprecatedLegacyOptions(): void
