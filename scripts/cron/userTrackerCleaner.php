@@ -22,6 +22,7 @@ include '/scripts/lib/devristo/Bee.php';
 include '/scripts/lib/devristo/File.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/lighttpd/userFileWrite.php';
 if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) {
     require_once $pmssUserLogPath;
 }
@@ -83,7 +84,7 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
     $ensureDirCmd = 'su -s /bin/bash -c '.escapeshellarg('mkdir -p ~/.logs').' '.escapeshellarg($username);
     pmssUserLifecycleStep('trackerCleaner', $username, 'ensure_user_logs_dir', $ensureDirCmd, false);
 
-    if (!is_dir($userLogsDir) || !pmssTrackerCleanerPathIsSafe($userLogsDir, $userHome.'/')) {
+    if (!is_dir($userLogsDir) || !pmssPathWithinRootIsSafe($userLogsDir, $userHome, true)) {
         pmssTrackerCleanerLog("WARN: User log directory is unsafe or missing for {$username} ({$userLogsDir}); skipping per-user verbose log.");
         @unlink($tmpLogPath);
         return;
@@ -99,27 +100,12 @@ function pmssTrackerCleanerWriteUserVerboseLog(string $username, string $payload
         .' '.escapeshellarg($username);
     pmssUserLifecycleStep('trackerCleaner', $username, 'append_user_verbose_log', $appendCmd, false);
 
-    if (file_exists($userLogFile) && !is_link($userLogFile) && pmssTrackerCleanerPathIsSafe($userLogFile, $userHome.'/')) {
+    if (file_exists($userLogFile) && !is_link($userLogFile) && pmssPathWithinRootIsSafe($userLogFile, $userHome)) {
         @chown($userLogFile, $username);
         @chgrp($userLogFile, $username);
     }
 
     @unlink($tmpLogPath);
-}
-
-function pmssTrackerCleanerPathIsSafe(string $path, string $expectedPrefix): bool
-{
-    if ($path === '' || $expectedPrefix === '') {
-        return false;
-    }
-    if (is_link($path)) {
-        return false;
-    }
-    $real = realpath($path);
-    if ($real === false) {
-        return false;
-    }
-    return strpos($real, $expectedPrefix) === 0;
 }
 
 $lockPath = '/run/lock/pmss-userTrackerCleaner.lock';
@@ -229,7 +215,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
 	    } // Disabled the cleaner
 	    $expectedSessionDir = "/home/{$thisUser}/session";
 	    $expectedSessionPrefix = $expectedSessionDir.'/';
-	    if (!pmssTrackerCleanerPathIsSafe($expectedSessionDir, $expectedSessionDir)) {
+	    if (!pmssPathWithinRootIsSafe($expectedSessionDir, $expectedSessionDir, true)) {
 	        pmssTrackerCleanerLog("SKIP: refusing to operate; session path unsafe for user {$thisUser} ({$expectedSessionDir}).");
 	        $userVerboseLog .= pmssTrackerCleanerTimestamp()." user_skip reason=session_path_unsafe session={$expectedSessionDir}\n";
 	        pmssTrackerCleanerWriteUserVerboseLog($thisUser, $userVerboseLog);
@@ -282,7 +268,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
       if ($thisTorrent === '' || !is_file($thisTorrent) || is_link($thisTorrent)) {
           continue;
       }
-      if (!pmssTrackerCleanerPathIsSafe($thisTorrent, $expectedSessionPrefix)) {
+      if (!pmssPathWithinRootIsSafe($thisTorrent, $expectedSessionDir)) {
           continue;
       }
       try {
@@ -413,7 +399,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
                   break;
               }
           }
-          if (!pmssTrackerCleanerPathIsSafe($thisUserTorrentBackupDirectory, $expectedBackupsDir.'/')) {
+          if (!pmssPathWithinRootIsSafe($thisUserTorrentBackupDirectory, $expectedBackupsDir, true)) {
               pmssTrackerCleanerLog("ERR: Backup path unsafe for user {$thisUser} ({$thisUserTorrentBackupDirectory}).");
               $userVerboseLog .= pmssTrackerCleanerTimestamp()
                   ." torrent_skip reason=backup_path_unsafe backup_dir={$thisUserTorrentBackupDirectory}\n";
@@ -441,7 +427,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
               && $backupSize === $sourceSize
               && is_file($backupTarget)
               && !is_link($backupTarget)
-              && pmssTrackerCleanerPathIsSafe($backupTarget, $expectedBackupsDir.'/');
+              && pmssPathWithinRootIsSafe($backupTarget, $expectedBackupsDir);
           $userVerboseLog .= pmssTrackerCleanerTimestamp()
               ." torrent_backup rc={$backupRc} src={$thisTorrent} dst={$backupTarget}\n";
           if (!$backupOk) {
@@ -504,7 +490,7 @@ foreach($users AS $thisUser) {    // Loop users checking their instances
           pmssTrackerCleanerLog("SKIP: refusing to write log; path is symlink for user {$thisUser} ({$userLogPath}).");
       } else {
           file_put_contents($userLogPath, $log, FILE_APPEND);
-          if (file_exists($userLogPath) && !is_link($userLogPath) && pmssTrackerCleanerPathIsSafe($userLogPath, "/home/{$thisUser}/")) {
+          if (file_exists($userLogPath) && !is_link($userLogPath) && pmssPathWithinRootIsSafe($userLogPath, "/home/{$thisUser}")) {
               @chown($userLogPath, $thisUser);
               @chgrp($userLogPath, $thisUser);
           }

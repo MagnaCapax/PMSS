@@ -11,6 +11,35 @@ function pmssUserFilePathIsSafe(string $path): bool
 }
 
 /**
+ * Confirm a safe path resolves inside an already-existing directory root.
+ */
+function pmssPathWithinRootIsSafe(string $path, string $rootPath, bool $directoryTarget = false): bool
+{
+    $rootPath = rtrim($rootPath, '/');
+    if ($rootPath === '') {
+        $rootPath = '/';
+    }
+
+    if ($rootPath !== '/' && !pmssPathTargetIsSafe($rootPath, true)) {
+        return false;
+    }
+    if (!pmssPathTargetIsSafe($path, $directoryTarget)) {
+        return false;
+    }
+
+    $resolvedRoot = @realpath($rootPath);
+    $resolvedPath = @realpath($path);
+    if ($resolvedRoot === false || $resolvedPath === false) {
+        return false;
+    }
+    if ($resolvedRoot === '/') {
+        return $resolvedPath !== '' && $resolvedPath[0] === '/';
+    }
+
+    return $resolvedPath === $resolvedRoot || strpos($resolvedPath, $resolvedRoot.'/') === 0;
+}
+
+/**
  * Validate a filesystem target and reject symlinked path segments.
  */
 function pmssPathTargetIsSafe(string $path, bool $directoryTarget, bool $requireParentDirectory = false): bool

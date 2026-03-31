@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/config.php';
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /**
  * Accept only simple local account names from process environment.
@@ -49,35 +50,6 @@ function pmssSupportExpectedHomeBuild(string $username): string
 }
 
 /**
- * Reject symlinked or non-directory path segments before writing below them.
- */
-function pmssSupportDirectoryPathIsSafe(string $path): bool
-{
-    $path = rtrim($path, '/');
-    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
-        return false;
-    }
-
-    $segments = explode('/', ltrim($path, '/'));
-    $current = '';
-    foreach ($segments as $segment) {
-        if ($segment === '') {
-            continue;
-        }
-
-        $current .= '/'.$segment;
-        if (is_link($current)) {
-            return false;
-        }
-        if (file_exists($current) && !is_dir($current)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/**
  * Determine the current username from process state.
  */
 function pmssSupportCurrentUsernameRead(): string
@@ -113,14 +85,14 @@ function pmssSupportCurrentHomeRead(string $username): string
 
     $home = getenv('HOME');
     $home = is_string($home) ? rtrim($home, '/') : '';
-    if ($expectedHome !== '' && $home !== '' && $home === $expectedHome && pmssSupportDirectoryPathIsSafe($home)) {
+    if ($expectedHome !== '' && $home !== '' && $home === $expectedHome && pmssPathTargetIsSafe($home, true)) {
         return $home;
     }
 
     if ($username !== '' && function_exists('posix_getpwnam')) {
         $entry = @posix_getpwnam($username);
         $dir = is_array($entry) && !empty($entry['dir']) ? rtrim((string) $entry['dir'], '/') : '';
-        if ($dir !== '' && pmssSupportDirectoryPathIsSafe($dir)) {
+        if ($dir !== '' && pmssPathTargetIsSafe($dir, true)) {
             return $dir;
         }
     }
@@ -244,18 +216,18 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
 function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
 {
     $home = rtrim((string) ($diagnostics['home'] ?? ''), '/');
-    if ($home === '' || $home[0] !== '/' || !is_dir($home) || !pmssSupportDirectoryPathIsSafe($home)) {
+    if ($home === '' || $home[0] !== '/' || !is_dir($home) || !pmssPathTargetIsSafe($home, true)) {
         throw new RuntimeException('Unable to determine support snapshot home directory.');
     }
 
     $snapshotDir = $home.'/'.trim((string) $config['snapshotDirectory'], '/');
-    if (!pmssSupportDirectoryPathIsSafe($snapshotDir)) {
+    if (!pmssPathTargetIsSafe($snapshotDir, true)) {
         throw new RuntimeException('Support snapshot directory is unsafe.');
     }
     if (!is_dir($snapshotDir) && !@mkdir($snapshotDir, 0700, true) && !is_dir($snapshotDir)) {
         throw new RuntimeException('Unable to create support snapshot directory.');
     }
-    if (!is_dir($snapshotDir) || !pmssSupportDirectoryPathIsSafe($snapshotDir)) {
+    if (!is_dir($snapshotDir) || !pmssPathTargetIsSafe($snapshotDir, true)) {
         throw new RuntimeException('Support snapshot directory is unsafe.');
     }
 
