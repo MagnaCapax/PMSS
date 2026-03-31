@@ -13,29 +13,95 @@
 require_once __DIR__.'/config.php';
 
 /**
+ * Accept only simple local account names from process environment.
+ */
+function pmssSupportUsernameIsSafe(string $username): bool
+{
+    $username = trim($username);
+    if ($username === '' || strpos($username, "\0") !== false) {
+        return false;
+    }
+    if (strpos($username, '/') !== false || strpos($username, '\\') !== false || strpos($username, '..') !== false) {
+        return false;
+    }
+    if (preg_match('/[[:space:][:cntrl:]]/', $username) === 1) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Build the expected home directory for a safe username.
+ */
+function pmssSupportExpectedHomeBuild(string $username): string
+{
+    if (!pmssSupportUsernameIsSafe($username)) {
+        return '';
+    }
+
+    $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
+    if ($homeRoot === '' || $homeRoot[0] !== '/' || strpos($homeRoot, "\0") !== false) {
+        return '';
+    }
+
+    return $homeRoot.'/'.$username;
+}
+
+/**
+ * Reject symlinked or non-directory path segments before writing below them.
+ */
+function pmssSupportDirectoryPathIsSafe(string $path): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
+        return false;
+    }
+
+    $segments = explode('/', ltrim($path, '/'));
+    $current = '';
+    foreach ($segments as $segment) {
+        if ($segment === '') {
+            continue;
+        }
+
+        $current .= '/'.$segment;
+        if (is_link($current)) {
+            return false;
+        }
+        if (file_exists($current) && !is_dir($current)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Determine the current username from process state.
  */
 function pmssSupportCurrentUsernameRead(): string
 {
     $user = getenv('USER');
     $user = is_string($user) ? trim($user) : '';
-    if ($user !== '') {
+    if (pmssSupportUsernameIsSafe($user)) {
         $home = getenv('HOME');
         $home = is_string($home) ? rtrim($home, '/') : '';
-        $expectedHome = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$user;
-        if ($home !== '' && $home === $expectedHome) {
+        $expectedHome = pmssSupportExpectedHomeBuild($user);
+        if ($expectedHome !== '' && $home !== '' && $home === $expectedHome) {
             return $user;
         }
     }
 
     if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
         $entry = @posix_getpwuid(posix_geteuid());
-        if (is_array($entry) && !empty($entry['name'])) {
-            return (string) $entry['name'];
+        $name = is_array($entry) && !empty($entry['name']) ? (string) $entry['name'] : '';
+        if (pmssSupportUsernameIsSafe($name)) {
+            return $name;
         }
     }
 
-    return $user;
+    return '';
 }
 
 /**
@@ -43,21 +109,19 @@ function pmssSupportCurrentUsernameRead(): string
  */
 function pmssSupportCurrentHomeRead(string $username): string
 {
-    $expectedHome = '';
-    if ($username !== '') {
-        $expectedHome = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/').'/'.$username;
-    }
+    $expectedHome = pmssSupportExpectedHomeBuild($username);
 
     $home = getenv('HOME');
     $home = is_string($home) ? rtrim($home, '/') : '';
-    if ($home !== '' && ($expectedHome === '' || $home === $expectedHome)) {
+    if ($expectedHome !== '' && $home !== '' && $home === $expectedHome && pmssSupportDirectoryPathIsSafe($home)) {
         return $home;
     }
 
     if ($username !== '' && function_exists('posix_getpwnam')) {
         $entry = @posix_getpwnam($username);
-        if (is_array($entry) && !empty($entry['dir'])) {
-            return rtrim((string) $entry['dir'], '/');
+        $dir = is_array($entry) && !empty($entry['dir']) ? rtrim((string) $entry['dir'], '/') : '';
+        if ($dir !== '' && pmssSupportDirectoryPathIsSafe($dir)) {
+            return $dir;
         }
     }
 
@@ -180,16 +244,19 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
 function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
 {
     $home = rtrim((string) ($diagnostics['home'] ?? ''), '/');
-    if ($home === '') {
+    if ($home === '' || $home[0] !== '/' || !is_dir($home) || !pmssSupportDirectoryPathIsSafe($home)) {
         throw new RuntimeException('Unable to determine support snapshot home directory.');
     }
 
     $snapshotDir = $home.'/'.trim((string) $config['snapshotDirectory'], '/');
-    if (is_link($snapshotDir)) {
+    if (!pmssSupportDirectoryPathIsSafe($snapshotDir)) {
         throw new RuntimeException('Support snapshot directory is unsafe.');
     }
     if (!is_dir($snapshotDir) && !@mkdir($snapshotDir, 0700, true) && !is_dir($snapshotDir)) {
         throw new RuntimeException('Unable to create support snapshot directory.');
+    }
+    if (!is_dir($snapshotDir) || !pmssSupportDirectoryPathIsSafe($snapshotDir)) {
+        throw new RuntimeException('Support snapshot directory is unsafe.');
     }
 
     $path = sprintf('%s/request-%s-%d.txt', $snapshotDir, gmdate('Ymd-His'), getmypid());

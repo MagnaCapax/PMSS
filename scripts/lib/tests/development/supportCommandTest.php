@@ -97,6 +97,19 @@ class SupportCommandTest extends TestCase
         $this->assertSame(26, $config['smtpPort']);
     }
 
+    public function testCurrentHomeReadRejectsUnsafeUsername(): void
+    {
+        $this->assertSame('', \pmssSupportCurrentHomeRead('../escape'));
+    }
+
+    public function testCurrentUsernameReadRejectsUnsafeEnvironmentUsername(): void
+    {
+        putenv('USER=../escape');
+        putenv('HOME=/home/../escape');
+
+        $this->assertTrue(\pmssSupportCurrentUsernameRead() !== '../escape');
+    }
+
     public function testDiagnosticsBuildUsesRunnerOutputs(): void
     {
         $outputs = [];
@@ -122,6 +135,27 @@ class SupportCommandTest extends TestCase
         $this->assertTrue(is_file($path));
         $this->assertEquals(0600, fileperms($path) & 0777);
         $this->assertStringContainsString('Please investigate', (string) file_get_contents($path));
+    }
+
+    public function testSnapshotWriteRejectsSymlinkedSupportPathAncestor(): void
+    {
+        $target = $this->homeRoot.'/'.$this->user.'/support-target';
+        mkdir($target, 0700, true);
+        symlink($target, $this->homeRoot.'/'.$this->user.'/.support');
+
+        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', function (array $command): array {
+            return ['rc' => 0, 'output' => implode(' ', $command)];
+        });
+        $config = \pmssSupportConfigRead();
+
+        $caught = false;
+        try {
+            \pmssSupportSnapshotWrite($diagnostics, $config);
+        } catch (\RuntimeException $exception) {
+            $caught = true;
+        }
+
+        $this->assertTrue($caught, 'symlinked support snapshot parents must be rejected');
     }
 
     public function testRequestSubmitWritesSnapshotAndUsesTransport(): void
