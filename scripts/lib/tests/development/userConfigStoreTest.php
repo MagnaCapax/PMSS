@@ -601,6 +601,49 @@ class UserConfigStoreTest extends TestCase
         }
     }
 
+    public function testGetAndLoadAllShareTheSameNormalizationAcrossStorageBackends(): void
+    {
+        $this->setUpTempDir();
+        try {
+            @mkdir(dirname($this->legacyUsersJsonPath()), 0755, true);
+            file_put_contents(
+                $this->legacyUsersJsonPath(),
+                json_encode([
+                    'users' => [
+                        'alice' => [
+                            'ramMiB' => '256',
+                            'rtorrentPort' => 4000,
+                            'quota' => 10,
+                            'quotaBurst' => 12,
+                            'trafficLimit' => 999,
+                        ],
+                        'legacyx' => 'invalid',
+                    ],
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            );
+
+            $store = new \UserConfigStore($this->configDirPath());
+            $this->assertTrue($store->set('bob', [
+                'ramMiB' => 512,
+                'rtorrentPort' => 5000,
+                'quota' => 20,
+                'quotaBurst' => 25,
+                'trafficLimit' => 77,
+            ]));
+
+            $all = $store->loadAll();
+
+            $this->assertEquals(['alice', 'bob'], array_keys($all));
+            $this->assertEquals($all['alice'], $store->get('alice'));
+            $this->assertEquals($all['bob'], $store->get('bob'));
+            $this->assertEquals(256, $all['alice']['ramMiB']);
+            $this->assertEquals(0, $all['alice']['trafficLimit']);
+            $this->assertEquals(null, $store->get('legacyx'));
+        } finally {
+            $this->pmssCleanupTempDirProperty('tempDir');
+        }
+    }
+
     public function testLoadAllSkipsInvalidCanonicalPayloads(): void
     {
         $this->setUpTempDir();

@@ -98,11 +98,7 @@ class UserConfigStore
         }
 
         $payload = $this->readJsonFile($this->userConfigPath($username));
-        if (!is_array($payload) && isset(($legacy = $this->loadLegacyAggregateMap())[$username]) && is_array($legacy[$username])) {
-            $payload = $legacy[$username];
-        }
-
-        return is_array($payload) ? $this->normalise($payload) : null;
+        return is_array($payload) ? $this->normalise($payload) : ($this->loadLegacyUsers()[$username] ?? null);
     }
 
     public function set(string $username, array $payload): bool
@@ -133,20 +129,7 @@ class UserConfigStore
 
     public function loadAll(): array
     {
-        $legacy = $this->loadLegacyAggregateMap();
-        $users = [];
-        foreach ($legacy as $name => $payload) {
-            if (!UserValidator::isValidUsername($name) || !is_array($payload)) {
-                continue;
-            }
-            $users[$name] = $this->normalise($payload);
-        }
-
-        // Overlay canonical per-user files on top of any legacy entries so mixed
-        // installs (partially migrated) continue to see a complete user list.
-        foreach ($this->loadFromUserDir() as $name => $payload) {
-            $users[$name] = $payload;
-        }
+        $users = array_replace($this->loadLegacyUsers(), $this->loadCanonicalUsers());
 
         ksort($users, SORT_STRING);
         return $users;
@@ -231,7 +214,7 @@ class UserConfigStore
         return $this->userDir.'/'.$username.'.json';
     }
 
-    private function loadFromUserDir(): array
+    private function loadCanonicalUsers(): array
     {
         if (!is_dir($this->userDir)) {
             return [];
@@ -242,17 +225,9 @@ class UserConfigStore
 
         $users = [];
         foreach ($files as $file) {
-            $name = basename($file, '.json');
-            if (!UserValidator::isValidUsername($name)) {
-                continue;
-            }
-            $payload = $this->readJsonFile($file);
-            if (!is_array($payload)) {
-                continue;
-            }
-            $users[$name] = $this->normalise($payload);
+            $users[basename($file, '.json')] = $this->readJsonFile($file);
         }
-        return $users;
+        return $this->normaliseUserMap($users);
     }
 
     private function normalise(array $payload): array
@@ -306,6 +281,24 @@ class UserConfigStore
         return is_array($data)
             ? (isset($data['users']) && is_array($data['users']) ? $data['users'] : $data)
             : [];
+    }
+
+    private function loadLegacyUsers(): array
+    {
+        return $this->normaliseUserMap($this->loadLegacyAggregateMap());
+    }
+
+    private function normaliseUserMap(array $users): array
+    {
+        $normalised = [];
+        foreach ($users as $name => $payload) {
+            $name = (string) $name;
+            if (!UserValidator::isValidUsername($name) || !is_array($payload)) {
+                continue;
+            }
+            $normalised[$name] = $this->normalise($payload);
+        }
+        return $normalised;
     }
 
     private function writeJsonFileAtomic(string $path, array $payload, int $mode, string $owner, string $group): bool
