@@ -9,6 +9,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__.'/runtime.php';
+
 /** Resolve the repository root used for internal script calls. */
 function pmssAgentDiagnosticsScriptRoot(): string
 {
@@ -39,27 +41,7 @@ function pmssAgentDiagnosticsReadFile(string $envKey, string $defaultPath): stri
 /** Execute a shell command and capture stdout, stderr, and rc. */
 function pmssAgentDiagnosticsCapture(string $command): array
 {
-    $descriptor = [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ];
-    $process = @proc_open('/bin/bash -c '.escapeshellarg($command), $descriptor, $pipes);
-    if (!is_resource($process)) {
-        return ['rc' => 1, 'stdout' => '', 'stderr' => 'Failed to launch command'];
-    }
-
-    fclose($pipes[0]);
-    $stdout = stream_get_contents($pipes[1]);
-    $stderr = stream_get_contents($pipes[2]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-
-    return [
-        'rc' => (int) proc_close($process),
-        'stdout' => is_string($stdout) ? $stdout : '',
-        'stderr' => is_string($stderr) ? $stderr : '',
-    ];
+    return pmssCommandCapture($command, 0, false, 'Failed to launch command');
 }
 
 /** Execute a repository PHP script relative to the diagnostics script root. */

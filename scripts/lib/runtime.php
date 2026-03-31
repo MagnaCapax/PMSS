@@ -191,6 +191,116 @@ if (!function_exists('pmssStandardStreamsAreTty')) {
     }
 }
 
+if (!function_exists('pmssCommandCapture')) {
+    /**
+     * Execute a shell command and capture stdout/stderr without streaming.
+     *
+     * @return array{rc:int,stdout:string,stderr:string}
+     */
+    function pmssCommandCapture(string $cmd, int $timeoutSec = 0, bool $loginShell = false, string $launchError = 'proc_open failed', int $launchRc = 1): array
+    {
+        $closePipe = static function (&$pipe): void {
+            if (is_resource($pipe)) {
+                fclose($pipe);
+            }
+        };
+        $closeProcess = static function ($process): void {
+            if (function_exists('proc_terminate')) {
+                @proc_terminate($process);
+            }
+            @proc_close($process);
+        };
+        $abortProcess = static function ($process, array $pipes, string $stderr) use ($closePipe, $closeProcess, $launchRc): array {
+            foreach ([0, 1, 2] as $index) {
+                if (array_key_exists($index, $pipes)) {
+                    $closePipe($pipes[$index]);
+                }
+            }
+            $closeProcess($process);
+            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $stderr];
+        };
+
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $bash = '/bin/bash '.($loginShell ? '-lc ' : '-c ').escapeshellarg($cmd);
+        $process = @proc_open($bash, $descriptor, $pipes);
+        if (!is_resource($process)) {
+            return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $launchError];
+        }
+        if (
+            !isset($pipes[0], $pipes[1], $pipes[2])
+            || !is_resource($pipes[0])
+            || !is_resource($pipes[1])
+            || !is_resource($pipes[2])
+        ) {
+            return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
+        }
+        fclose($pipes[0]);
+        if (!@stream_set_blocking($pipes[1], false) || !@stream_set_blocking($pipes[2], false)) {
+            return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
+        }
+
+        $stdout = '';
+        $stderr = '';
+        $startedAt = microtime(true);
+        $timedOut = false;
+
+        while (!feof($pipes[1]) || !feof($pipes[2])) {
+            $read = [];
+            if (!feof($pipes[1])) {
+                $read[] = $pipes[1];
+            }
+            if (!feof($pipes[2])) {
+                $read[] = $pipes[2];
+            }
+            if (empty($read)) {
+                break;
+            }
+            $write = $except = [];
+            $ready = stream_select($read, $write, $except, 0, 200000);
+            if ($ready === false) {
+                $stderr .= ($stderr !== '' ? "\n" : '').'stream_select failed';
+                break;
+            }
+            foreach ($read as $stream) {
+                $chunk = fread($stream, 8192);
+                if ($chunk === false || $chunk === '') {
+                    continue;
+                }
+                if ($stream === $pipes[1]) {
+                    $stdout .= $chunk;
+                } else {
+                    $stderr .= $chunk;
+                }
+            }
+            if ($timeoutSec > 0 && (microtime(true) - $startedAt) > $timeoutSec) {
+                $timedOut = true;
+                break;
+            }
+        }
+
+        $closePipe($pipes[1]);
+        $closePipe($pipes[2]);
+
+        if ($timedOut) {
+            $closeProcess($process);
+            return ['rc' => 124, 'stdout' => $stdout, 'stderr' => $stderr];
+        }
+
+        $rc = proc_close($process);
+        if ($rc === -1 && function_exists('proc_get_status')) {
+            $status = @proc_get_status($process);
+            if (is_array($status) && isset($status['exitcode']) && is_int($status['exitcode']) && $status['exitcode'] >= 0) {
+                $rc = $status['exitcode'];
+            }
+        }
+        return ['rc' => (int) $rc, 'stdout' => $stdout, 'stderr' => $stderr];
+    }
+}
+
 if (!function_exists('pmssOutputIndicatesForkFailure')) {
     /**
      * Detect common fork-related failure strings in captured command output.

@@ -21,18 +21,15 @@ require_once __DIR__.'/../user/userConfigStore.php';
     function pmssRunAndLog(string $user, string $label, string $command, bool $asUser = false): int
     {
         $inner = $asUser ? sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($command)) : $command;
-        $cmd   = ['/bin/bash', '-lc', $inner];
-        $desc  = [0 => ['pipe','r'], 1 => ['pipe','w'], 2 => ['pipe','w']];
         pmssUserLog($user, "[CMD] {$label}: {$command}");
-        $proc = @proc_open($cmd, $desc, $pipes);
-        if (!is_resource($proc)) {
+        $result = pmssCommandCapture($inner, 0, true, 'Failed to start process', 127);
+        if ((int) $result['rc'] === 127 && $result['stdout'] === '' && $result['stderr'] === 'Failed to start process') {
             pmssUserLog($user, "[ERR] Failed to start process for: {$label}");
             return 127;
         }
-        fclose($pipes[0]);
-        $stdout = rtrim((string) stream_get_contents($pipes[1])); fclose($pipes[1]);
-        $stderr = rtrim((string) stream_get_contents($pipes[2])); fclose($pipes[2]);
-        $rc = proc_close($proc);
+        $stdout = rtrim((string) $result['stdout']);
+        $stderr = rtrim((string) $result['stderr']);
+        $rc = (int) $result['rc'];
         if ($stdout !== '') pmssUserLog($user, $stdout);
         if ($stderr !== '') pmssUserLog($user, $stderr);
         pmssUserLog($user, sprintf('[RC] %s -> %d', $label, (int)$rc));

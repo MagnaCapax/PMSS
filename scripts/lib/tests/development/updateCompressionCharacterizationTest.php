@@ -310,7 +310,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'storageHealth.php should stop requiring the removed exec.php module'
         );
         $this->assertStringContainsString('function '.$symbol.'(', $commonSrc);
-        $this->assertStringContainsString("return ['rc' => 124, 'stdout' => \$stdout, 'stderr' => \$stderr];", $commonSrc);
+        $this->assertStringContainsString('return pmssCommandCapture($cmd, $timeoutSec);', $commonSrc);
     }
 
     public function testResourceSnapshotCronOwnsSnapshotLoop(): void
