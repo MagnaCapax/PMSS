@@ -58,8 +58,7 @@ function pmssUserEnsurePlugins(array $ctx): void
  */
 function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
 {
-    // Keep these compatibility shims local to the maintenance boundary so the
-    // frozen ruTorrent tenant patches do not leak extra exported helpers.
+    // Keep these compatibility shims in one literal patch table.
     foreach ([
         [
             'path' => $ctx['home'].'/www/rutorrent/php/settings.php',
@@ -77,15 +76,7 @@ function pmssUserMaintainRutorrentPhpCompatibility(array $ctx): void
             'patched' => 'return (int) $field;',
         ],
     ] as $patch) {
-        pmssUserPatchWritableFile($patch['path'], static function (string $content) use ($patch): string {
-            if (strpos($content, $patch['patched']) !== false) {
-                return $content;
-            }
-
-            $updated = str_replace($patch['legacy'], $patch['patched'], $content, $replacements);
-
-            return $replacements > 0 ? $updated : $content;
-        });
+        pmssUserPatchWritableStrings($patch['path'], [$patch]);
     }
 }
 
