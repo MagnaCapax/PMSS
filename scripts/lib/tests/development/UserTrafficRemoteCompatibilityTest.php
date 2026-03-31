@@ -5,17 +5,25 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UserTrafficRemoteCompatibilityTest extends TestCase
 {
-    public function testRemoteUserTrafficBypassesHomeMountGateForLegacyCallbacks(): void
+    public function testRemoteUserTrafficUsesContractSafeUserEnumerationPath(): void
     {
         $path = 'scripts/util/remote/userTraffic.php';
         $this->pmssAssertRepoFileContainsAllStrings(
             $path,
             [
-                "PMSS_SKIP_HOME_MOUNT_CHECK=1",
-                "pmssListManagedUsers('/scripts/listUsers.php')",
+                'users::listHomeUsers()',
+                'pmssValidateUsername($userName)',
                 'serialize($userTrafficData)',
             ],
-            'Remote userTraffic callback must stay mount-gate compatible for legacy Hallinta consumers'
+            'Remote userTraffic callback must keep contract-safe user discovery and serialized payload output'
+        );
+        $this->pmssAssertRepoFileNotContainsStrings(
+            $path,
+            [
+                "pmssListManagedUsers('/scripts/listUsers.php')",
+                "PMSS_SKIP_HOME_MOUNT_CHECK=1",
+            ],
+            'Remote userTraffic callback must not rely on listUsers mount-gate bypass path'
         );
     }
 
@@ -29,6 +37,7 @@ class UserTrafficRemoteCompatibilityTest extends TestCase
                 'array<string,array{normal:int,local:int,ingress:int}>',
                 'Hallinta callback path expects unserialize()-compatible payload',
                 'Any extra STDOUT bytes can break callback parsing',
+                'Do not call /scripts/listUsers.php from this callback producer.',
             ],
             'Remote userTraffic script must keep callback payload format documented in-source'
         );

@@ -12,26 +12,25 @@
  * - Hallinta callback path expects unserialize()-compatible payload
  * - Any extra STDOUT bytes can break callback parsing
  *
- * Compatibility requirement:
- * - Keep PMSS_SKIP_HOME_MOUNT_CHECK=1 for this read-only callback producer so
- *   historical/non-standard hosts still return payload instead of mount-gate
- *   diagnostics.
+ * Implementation rule:
+ * - Do not call /scripts/listUsers.php from this callback producer.
+ *   listUsers has operational safety gates and human diagnostics that are
+ *   valid for operations but can contaminate machine callback payloads.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2).'/lib/users.php';
 require_once dirname(__DIR__, 2).'/lib/userLifecycle.php';
 require_once dirname(__DIR__, 2).'/lib/user/traffic.php';
 
-// Legacy Hallinta callback integration expects a clean serialized payload.
-// This read-only telemetry command must keep working on historical installs
-// where /home is not a separate mount.
-putenv('PMSS_SKIP_HOME_MOUNT_CHECK=1');
-
 $userTrafficData = [];
-foreach (pmssListManagedUsers('/scripts/listUsers.php') as $userName) {
+foreach (users::listHomeUsers() as $userName) {
+    if (!pmssValidateUsername($userName)) {
+        continue;
+    }
     $userTrafficData[$userName] = pmssReadUserTrafficStates($userName);
 }
 
