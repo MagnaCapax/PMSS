@@ -22,6 +22,10 @@ function pmssSupportStreamWriteAll($stream, string $payload, string $context): v
     $offset = 0;
     $length = strlen($payload);
 
+    if ($length > 0 && !is_resource($stream)) {
+        throw new RuntimeException('Unable to write '.$context.'.');
+    }
+
     while ($offset < $length) {
         $written = @fwrite($stream, substr($payload, $offset));
         if (!is_int($written) || $written < 1) {
