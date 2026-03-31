@@ -13,6 +13,27 @@
 require_once __DIR__.'/diagnostics.php';
 
 /**
+ * Write an entire payload to a writable stream or fail loudly.
+ *
+ * @param resource $stream
+ */
+function pmssSupportStreamWriteAll($stream, string $payload, string $context): void
+{
+    $offset = 0;
+    $length = strlen($payload);
+
+    while ($offset < $length) {
+        $written = @fwrite($stream, substr($payload, $offset));
+        if (!is_int($written) || $written < 1) {
+            $meta = is_resource($stream) ? stream_get_meta_data($stream) : [];
+            $suffix = (!empty($meta['timed_out']) ? ' timed out' : '');
+            throw new RuntimeException('Unable to write '.$context.$suffix.'.');
+        }
+        $offset += $written;
+    }
+}
+
+/**
  * Build the outbound message envelope for a support request.
  *
  * @return array<string,string>
@@ -85,10 +106,25 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
     if (!is_resource($process)) {
         throw new RuntimeException('Unable to start sendmail transport.');
     }
+    if (!isset($pipes[0], $pipes[1], $pipes[2])
+        || !is_resource($pipes[0])
+        || !is_resource($pipes[1])
+        || !is_resource($pipes[2])) {
+        foreach ($pipes as $pipe) {
+            if (is_resource($pipe)) {
+                fclose($pipe);
+            }
+        }
+        proc_close($process);
+        throw new RuntimeException('Sendmail transport did not provide usable pipes.');
+    }
 
-    fwrite($pipes[0], (string) $envelope['data']);
+    pmssSupportStreamWriteAll($pipes[0], (string) $envelope['data'], 'support mail message to sendmail');
     fclose($pipes[0]);
     $stderr = stream_get_contents($pipes[2]);
+    if (!is_string($stderr)) {
+        $stderr = '';
+    }
     fclose($pipes[1]);
     fclose($pipes[2]);
     $rc = proc_close($process);
@@ -122,13 +158,13 @@ function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array
         ['RCPT TO:<'.$envelope['to'].'>', [250, 251]],
         ['DATA', [354]],
     ] as $commandSpec) {
-        fwrite($stream, $commandSpec[0]."\r\n");
+        pmssSupportStreamWriteAll($stream, $commandSpec[0]."\r\n", 'support SMTP command');
         pmssSupportSmtpExpect($stream, $commandSpec[1]);
     }
 
-    fwrite($stream, str_replace("\n.", "\n..", (string) $envelope['data'])."\r\n.\r\n");
+    pmssSupportStreamWriteAll($stream, str_replace("\n.", "\n..", (string) $envelope['data'])."\r\n.\r\n", 'support SMTP message body');
     pmssSupportSmtpExpect($stream, [250]);
-    fwrite($stream, "QUIT\r\n");
+    pmssSupportStreamWriteAll($stream, "QUIT\r\n", 'support SMTP quit command');
     pmssSupportSmtpExpect($stream, [221]);
     fclose($stream);
 }
@@ -144,6 +180,10 @@ function pmssSupportSmtpExpect($stream, array $expectedCodes): void
     do {
         $chunk = fgets($stream);
         if (!is_string($chunk)) {
+            $meta = is_resource($stream) ? stream_get_meta_data($stream) : [];
+            if (!empty($meta['timed_out'])) {
+                throw new RuntimeException('Support SMTP server timed out.');
+            }
             throw new RuntimeException('Support SMTP server closed the connection unexpectedly.');
         }
         $line = rtrim($chunk, "\r\n");
