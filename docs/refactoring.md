@@ -25,3 +25,22 @@ following points in mind whenever you touch large files:
 These rules complement the “Linux kernel style” note already present in the
 repository documentation and should be referenced before undertaking larger
 clean-ups.
+
+## Minimal Contract Rules (Joukahainen)
+
+For any optimization/refactor touching existing CLI/API output, follow this
+minimal loop before merge:
+
+1. **Name the consumer**: State who parses the output (human, cron, WHMCS,
+   callback, etc.).
+2. **Freeze baseline behavior**: Capture current input -> output + exit-code
+   behavior before changes.
+3. **Refactor behind the contract**: Internal code may change, but default
+   output contract must remain byte- and parser-compatible.
+4. **Prove compatibility**: Add/extend tests that assert legacy contract
+   behavior on the default path.
+5. **Version if change is required**: Introduce an explicit new flag/path and
+   keep legacy behavior as default until migration is complete.
+
+Non-negotiable guardrail: machine-consumed stdout is payload-only. Any
+diagnostics go to stderr/logs.
