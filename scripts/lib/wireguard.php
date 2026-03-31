@@ -315,17 +315,17 @@ function wgDeriveClientIp(string $key, array $usedIps): string
 }
 
 /**
- * Render auto-managed peer sections from collected public keys.
+ * Attach deterministic client IPs to collected peer entries.
+ *
+ * @param array<int,array{user:string,key:string}> $entries
+ *
+ * @return array<int,array{user:string,key:string,ip:string}>
  */
-function wgBuildPeersConfig(): string
+function wgAssignClientIps(array $entries): array
 {
-    $entries = wgCollectUserPublicKeys();
-    if (empty($entries)) {
-        return "# No WireGuard peers configured; place public key(s) in ~/.wireguard-public-key on each user account.\n";
-    }
-
-    $used = [];
+    $used     = [];
     $assigned = [];
+
     foreach ($entries as $entry) {
         $ip = wgDeriveClientIp($entry['key'], $used);
         if ($ip === '') {
@@ -339,6 +339,21 @@ function wgBuildPeersConfig(): string
             'ip'   => $ip,
         ];
     }
+
+    return $assigned;
+}
+
+/**
+ * Render auto-managed peer sections from collected public keys.
+ */
+function wgBuildPeersConfig(): string
+{
+    $entries = wgCollectUserPublicKeys();
+    if (empty($entries)) {
+        return "# No WireGuard peers configured; place public key(s) in ~/.wireguard-public-key on each user account.\n";
+    }
+
+    $assigned = wgAssignClientIps($entries);
     if (empty($assigned)) {
         return "# No valid WireGuard peers configured; all provided keys were invalid.\n";
     }
@@ -381,6 +396,76 @@ function wireguardBuildConfig(string $privKey, int $port): string
     $peers  = wgBuildPeersConfig();
 
     return $base."\n\n".$peers;
+}
+
+/**
+ * Replace the placeholder client address in a user guide with the assigned IP.
+ */
+function wgApplyAssignedIpToGuide(string $content, string $ip): string
+{
+    $updated = preg_replace(
+        '/^Address = 10\.90\.90\.(?:X|[0-9]{1,3})\/32$/m',
+        'Address = '.$ip.'/32',
+        $content,
+        1
+    );
+    if ($updated === null) {
+        return $content;
+    }
+
+    $content = $updated;
+    $updated = preg_replace(
+        '/AllowedIPs = 10\.90\.90\.(?:X|[0-9]{1,3})\/32/',
+        'AllowedIPs = '.$ip.'/32',
+        $content,
+        1
+    );
+
+    return $updated === null ? $content : $updated;
+}
+
+/**
+ * Update each per-user guide to show the assigned client IP for the first valid key.
+ *
+ * @param array<int,array{user:string,key:string,ip:string}> $assigned
+ */
+function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): void
+{
+    if (empty($assigned)) {
+        return;
+    }
+
+    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
+    $seenUsers = [];
+
+    foreach ($assigned as $entry) {
+        if (isset($seenUsers[$entry['user']])) {
+            continue;
+        }
+        $seenUsers[$entry['user']] = true;
+
+        $target     = $homeBase.'/'.$entry['user'].'/wireguard.txt';
+        $targetExists = is_file($target);
+        $guide      = $targetExists ? @file_get_contents($target) : false;
+        if ($guide === false || $guide === '') {
+            if ($fallbackGuide === '') {
+                continue;
+            }
+            $guide = $fallbackGuide;
+        }
+
+        $updated = wgApplyAssignedIpToGuide($guide, $entry['ip']);
+        if ($targetExists && $updated === $guide) {
+            continue;
+        }
+        if (@file_put_contents($target, $updated) === false) {
+            wgLog('Failed to update WireGuard guide for user '.$entry['user']);
+            continue;
+        }
+        @chown($target, $entry['user']);
+        @chgrp($target, $entry['user']);
+        @chmod($target, 0600);
+    }
 }
 
 /**

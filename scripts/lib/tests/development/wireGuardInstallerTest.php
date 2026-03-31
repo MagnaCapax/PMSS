@@ -235,6 +235,84 @@ class WireGuardInstallerTest extends TestCase
         }
     }
 
+    public function testApplyAssignedIpToGuideReplacesPlaceholderAddress(): void
+    {
+        $guide = "[Interface]\nAddress = 10.90.90.X/32\n"
+            ."[Peer]\nAllowedIPs = 10.90.90.X/32\n";
+
+        $updated = \wgApplyAssignedIpToGuide($guide, '10.90.90.42');
+
+        $this->assertStringContainsString("Address = 10.90.90.42/32\n", $updated);
+        $this->assertStringContainsString("AllowedIPs = 10.90.90.42/32\n", $updated);
+        $this->assertTrue(strpos($updated, '10.90.90.X/32') === false, 'placeholder should be removed from the guide');
+    }
+
+    public function testApplyAssignedIpToGuideRefreshesExistingAddress(): void
+    {
+        $guide = "[Interface]\nAddress = 10.90.90.9/32\n"
+            ."[Peer]\nAllowedIPs = 10.90.90.9/32\n";
+
+        $updated = \wgApplyAssignedIpToGuide($guide, '10.90.90.77');
+
+        $this->assertStringContainsString("Address = 10.90.90.77/32\n", $updated);
+        $this->assertStringContainsString("AllowedIPs = 10.90.90.77/32\n", $updated);
+        $this->assertTrue(strpos($updated, '10.90.90.9/32') === false, 'stale assigned IP should be replaced');
+    }
+
+    public function testApplyAssignedIpToGuideLeavesUnrelatedContentUntouched(): void
+    {
+        $guide = "WireGuard server ready\nDNS = 1.1.1.1\n";
+
+        $updated = \wgApplyAssignedIpToGuide($guide, '10.90.90.88');
+
+        $this->assertEquals($guide, $updated);
+    }
+
+    public function testSyncUserGuideAddressesUpdatesExistingGuide(): void
+    {
+        $homeBase = $this->createTempDir();
+        @mkdir($homeBase.'/alice', 0755, true);
+
+        $guide = "[Interface]\nAddress = 10.90.90.X/32\n"
+            ."[Peer]\nAllowedIPs = 10.90.90.X/32\n";
+        file_put_contents($homeBase.'/alice/wireguard.txt', $guide);
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE' => $homeBase,
+        ], function () use ($guide): void {
+            \wgSyncUserGuideAddresses([
+                ['user' => 'alice', 'key' => 'unused', 'ip' => '10.90.90.42'],
+            ], $guide);
+        });
+
+        $updated = (string) file_get_contents($homeBase.'/alice/wireguard.txt');
+        $this->assertStringContainsString("Address = 10.90.90.42/32\n", $updated);
+        $this->assertStringContainsString("AllowedIPs = 10.90.90.42/32\n", $updated);
+    }
+
+    public function testSyncUserGuideAddressesCreatesGuideFromFallback(): void
+    {
+        $homeBase = $this->createTempDir();
+        @mkdir($homeBase.'/alice', 0755, true);
+
+        $guide = "[Interface]\nAddress = 10.90.90.X/32\n"
+            ."[Peer]\nAllowedIPs = 10.90.90.X/32\n";
+
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE' => $homeBase,
+        ], function () use ($guide): void {
+            \wgSyncUserGuideAddresses([
+                ['user' => 'alice', 'key' => 'unused', 'ip' => '10.90.90.55'],
+            ], $guide);
+        });
+
+        $file = $homeBase.'/alice/wireguard.txt';
+        $this->assertTrue(file_exists($file), 'wireguard.txt should be created from the fallback guide');
+        $updated = (string) file_get_contents($file);
+        $this->assertStringContainsString("Address = 10.90.90.55/32\n", $updated);
+        $this->assertStringContainsString("AllowedIPs = 10.90.90.55/32\n", $updated);
+    }
+
     public function testConfigureKeepsReadmeFlowInline(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/wireguard.php');

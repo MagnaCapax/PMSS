@@ -39,6 +39,10 @@ $listenPort = 51820;
 $configPath = $configDir.'/wg0.conf';
 $current    = is_file($configPath) ? (string) file_get_contents($configPath) : '';
 
+$guideTemplate = is_file($configDir.'/README') ? (string) file_get_contents($configDir.'/README') : '';
+$assignedPeers = wgAssignClientIps(wgCollectUserPublicKeys());
+wgSyncUserGuideAddresses($assignedPeers, $guideTemplate);
+
 $newConfig = wireguardBuildConfig($privKey, $listenPort);
 
 if ($newConfig === $current) {
