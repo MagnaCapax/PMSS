@@ -31,6 +31,7 @@ class UpdateServicesRuntimeTest extends TestCase
             '/usr/bin/systemctl daemon-reexec',
             'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config',
             'chmod 644 /etc/ssh/sshd_config',
+            'sshd -t',
             '/usr/bin/systemctl restart sshd',
         ], $commands);
     }
