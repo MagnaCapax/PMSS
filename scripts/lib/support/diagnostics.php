@@ -14,31 +14,23 @@ require_once __DIR__.'/config.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /**
- * Accept only simple local account names from process environment.
- */
-function pmssSupportUsernameIsSafe(string $username): bool
-{
-    $username = trim($username);
-    if ($username === '' || strpos($username, "\0") !== false) {
-        return false;
-    }
-    if (strpos($username, '/') !== false || strpos($username, '\\') !== false || strpos($username, '..') !== false) {
-        return false;
-    }
-    if (preg_match('/[[:space:][:cntrl:]]/', $username) === 1) {
-        return false;
-    }
-
-    return true;
-}
-
-/**
  * Resolve the current caller identity from trusted process state.
  *
  * @return array<string,string>
  */
 function pmssSupportIdentityRead(): array
 {
+    $isSafeUsername = static function (string $username): bool {
+        $username = trim($username);
+        if ($username === '' || strpos($username, "\0") !== false) {
+            return false;
+        }
+        if (strpos($username, '/') !== false || strpos($username, '\\') !== false || strpos($username, '..') !== false) {
+            return false;
+        }
+        return preg_match('/[[:space:][:cntrl:]]/', $username) !== 1;
+    };
+
     $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
     $homeRoot = ($homeRoot !== '' && $homeRoot[0] === '/' && strpos($homeRoot, "\0") === false) ? $homeRoot : '';
     $envUser = getenv('USER');
@@ -47,7 +39,7 @@ function pmssSupportIdentityRead(): array
     $envHome = is_string($envHome) ? rtrim($envHome, '/') : '';
     $username = '';
 
-    if ($homeRoot !== '' && pmssSupportUsernameIsSafe($envUser)) {
+    if ($homeRoot !== '' && $isSafeUsername($envUser)) {
         $expectedHome = $homeRoot.'/'.$envUser;
         if ($expectedHome !== '' && $envHome !== '' && $envHome === $expectedHome) {
             $username = $envUser;
@@ -57,7 +49,7 @@ function pmssSupportIdentityRead(): array
     if ($username === '' && function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
         $entry = @posix_getpwuid(posix_geteuid());
         $name = is_array($entry) && !empty($entry['name']) ? (string) $entry['name'] : '';
-        if (pmssSupportUsernameIsSafe($name)) {
+        if ($isSafeUsername($name)) {
             $username = $name;
         }
     }
@@ -107,11 +99,11 @@ function pmssSupportBillingIdRead(string $home): int
 }
 
 /**
- * Execute a fixed read-only command and return a printable result block.
+ * Build the read-only diagnostics snapshot body.
  *
- * @param array<int,string> $command
+ * @return array<string,mixed>
  */
-function pmssSupportCommandOutputRead(array $command, ?callable $runner = null): string
+function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null): array
 {
     $runner = $runner ?: function (array $argv): array {
         $parts = [];
@@ -124,19 +116,6 @@ function pmssSupportCommandOutputRead(array $command, ?callable $runner = null):
         return ['rc' => $rc, 'output' => implode("\n", $output)];
     };
 
-    $result = $runner($command);
-    $rc = (int) ($result['rc'] ?? 1);
-    $output = trim((string) ($result['output'] ?? ''));
-    return ($output === '' ? '[no output]' : $output)."\n[exit status: {$rc}]";
-}
-
-/**
- * Build the read-only diagnostics snapshot body.
- *
- * @return array<string,mixed>
- */
-function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null): array
-{
     $message = pmssSupportMessageNormalize($message);
     $identity = pmssSupportIdentityRead();
     $username = (string) $identity['username'];
@@ -156,7 +135,10 @@ function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null):
 
     $sections = [];
     foreach ($commands as $label => $command) {
-        $sections[] = sprintf("## %s\n%s", $label, pmssSupportCommandOutputRead($command, $runner));
+        $result = $runner($command);
+        $rc = (int) ($result['rc'] ?? 1);
+        $output = trim((string) ($result['output'] ?? ''));
+        $sections[] = sprintf("## %s\n%s", $label, ($output === '' ? '[no output]' : $output)."\n[exit status: {$rc}]");
     }
 
     $body = implode("\n\n", [

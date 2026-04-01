@@ -107,30 +107,6 @@ function pmssSshdLegacyParserTemplateNormalize(string $config): string
 }
 
 /**
- * Rewrite sshd directives to parser-safe explicit lists when legacy daemons
- * reject +append syntax or newer option names.
- */
-function pmssNormalizeSshdTemplateForLegacyParsers(): void
-{
-    $sshdConfig = '/etc/ssh/sshd_config';
-    if (!is_string($config = @file_get_contents($sshdConfig))) {
-        logMessage('[WARN] Cannot read sshd_config for legacy-parser normalization');
-        return;
-    }
-    $updated = pmssSshdLegacyParserTemplateNormalize($config);
-    if ($updated === $config) {
-        logMessage('[INFO] sshd legacy-parser normalization made no changes');
-        return;
-    }
-
-    logMessage('[WARN] Applying sshd legacy-parser compatibility fallback');
-    pmssBackupCriticalConfig('sshd', $sshdConfig);
-    if (!pmssWriteManagedPathFile($sshdConfig, $updated, 'sshd config legacy parser fallback', 'logMessage', 'root', 'root')) {
-        logMessage('[ERR] Failed to write sshd legacy-parser fallback configuration');
-    }
-}
-
-/**
  * Refresh rc.local, systemd, and sshd configuration templates.
  */
 function pmssApplyRuntimeTemplates(): void
@@ -153,7 +129,21 @@ function pmssApplyRuntimeTemplates(): void
 
     $validateRc = runStep('Validating sshd configuration syntax', 'sshd -t');
     if ($validateRc !== 0) {
-        pmssNormalizeSshdTemplateForLegacyParsers();
+        $sshdConfig = '/etc/ssh/sshd_config';
+        if (!is_string($config = @file_get_contents($sshdConfig))) {
+            logMessage('[WARN] Cannot read sshd_config for legacy-parser normalization');
+        } else {
+            $updated = pmssSshdLegacyParserTemplateNormalize($config);
+            if ($updated === $config) {
+                logMessage('[INFO] sshd legacy-parser normalization made no changes');
+            } else {
+                logMessage('[WARN] Applying sshd legacy-parser compatibility fallback');
+                pmssBackupCriticalConfig('sshd', $sshdConfig);
+                if (!pmssWriteManagedPathFile($sshdConfig, $updated, 'sshd config legacy parser fallback', 'logMessage', 'root', 'root')) {
+                    logMessage('[ERR] Failed to write sshd legacy-parser fallback configuration');
+                }
+            }
+        }
         $validateRc = runStep('Re-validating sshd syntax after legacy-parser fallback', 'sshd -t');
         if ($validateRc !== 0) {
             logMessage('[ERR] sshd validation failed after legacy-parser fallback; skipping sshd restart');

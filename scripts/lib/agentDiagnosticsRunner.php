@@ -11,20 +11,12 @@ declare(strict_types=1);
 
 require_once __DIR__.'/runtime.php';
 
-/** Resolve the repository root used for internal script calls. */
-function pmssAgentDiagnosticsScriptRoot(): string
-{
-    $override = getenv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT');
-    if (is_string($override) && $override !== '') {
-        return rtrim($override, '/');
-    }
-    return dirname(__DIR__, 2);
-}
-
 /** Resolve an internal PMSS script path through the diagnostics script root. */
 function pmssAgentDiagnosticsScriptPath(string $relativePath): string
 {
-    return pmssAgentDiagnosticsScriptRoot().'/'.ltrim($relativePath, '/');
+    $scriptRoot = getenv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT');
+    $scriptRoot = is_string($scriptRoot) && $scriptRoot !== '' ? rtrim($scriptRoot, '/') : dirname(__DIR__, 2);
+    return $scriptRoot.'/'.ltrim($relativePath, '/');
 }
 
 /** Read an optional diagnostics input file, honoring a test override path. */
@@ -63,29 +55,6 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
     return pmssAgentDiagnosticsCapture($command);
 }
 
-/** Decode JSON output from a command result or return an error payload. */
-function pmssAgentDiagnosticsDecodeJson(array $result, string $label): array
-{
-    if ((int) $result['rc'] !== 0) {
-        return [
-            'error' => $label.' failed',
-            'rc' => (int) $result['rc'],
-            'stderr' => trim((string) $result['stderr']),
-        ];
-    }
-
-    $decoded = json_decode((string) $result['stdout'], true);
-    if (!is_array($decoded)) {
-        return [
-            'error' => $label.' returned invalid JSON',
-            'rc' => (int) $result['rc'],
-            'stdout' => trim((string) $result['stdout']),
-        ];
-    }
-
-    return $decoded;
-}
-
 /** Split command stdout into trimmed non-empty lines. */
 function pmssAgentDiagnosticsOutputLines(array $result): array
 {
@@ -107,5 +76,23 @@ function pmssAgentDiagnosticsCommandText(string $command, string $fallback = '')
 /** Execute a repository PHP script and decode its JSON payload. */
 function pmssAgentDiagnosticsPhpJson(string $relativePath, array $arguments, string $label): array
 {
-    return pmssAgentDiagnosticsDecodeJson(pmssAgentDiagnosticsPhpScript($relativePath, $arguments), $label);
+    $result = pmssAgentDiagnosticsPhpScript($relativePath, $arguments);
+    if ((int) $result['rc'] !== 0) {
+        return [
+            'error' => $label.' failed',
+            'rc' => (int) $result['rc'],
+            'stderr' => trim((string) $result['stderr']),
+        ];
+    }
+
+    $decoded = json_decode((string) $result['stdout'], true);
+    if (!is_array($decoded)) {
+        return [
+            'error' => $label.' returned invalid JSON',
+            'rc' => (int) $result['rc'],
+            'stdout' => trim((string) $result['stdout']),
+        ];
+    }
+
+    return $decoded;
 }
