@@ -2,8 +2,8 @@
 
 PMSS installs and manages a single server endpoint at `/etc/wireguard/wg0.conf`.
 During provisioning the installer generates server keys, enables `wg-quick@wg0`
-and writes connection instructions to both `/etc/wireguard/README` and each
-user's `~/wireguard.txt`.
+and writes connection instructions to `/etc/wireguard/README` plus a ready-to-
+import single-device profile to each user's `~/wireguard.txt`.
 
 This document describes the **host-level** WireGuard service managed by PMSS.
 Some accounts also use the optional linuxserver.io WireGuard container via
@@ -13,15 +13,14 @@ your user account and is separate from the system `wg0` service covered here.
 
 Typical workflow:
 
-1. Read `~/wireguard.txt` to obtain your server endpoint, public key, and
-   configuration template.
-2. Generate a client key pair (`wg genkey | tee private.key | wg pubkey > public.key`).
-3. On the seedbox, store your public key in `~/.wireguard-public-key` (one key
-   per line). The updater periodically rebuilds `/etc/wireguard/wg0.conf` from
-   these files, adding a `[Peer]` entry for every valid key.
-4. Apply the client template on your device and set the private key. The server
-   assigns each key a unique `/32` address inside `10.90.90.0/24`; peers are not
-   treated as a trusted LAN, and routing between tenants is controlled centrally.
+1. Download `~/wireguard.txt` via SFTP or view it over SSH.
+2. Import the file directly into the WireGuard app on one device.
+3. Treat `~/wireguard.txt` as a secret: it contains a server-generated client
+   private key and is stored with mode `0600` on the seedbox.
+4. For extra devices or for client-only key generation, add additional public
+   keys to `~/.wireguard-public-key`. The updater periodically rebuilds
+   `/etc/wireguard/wg0.conf` from these files, adding a `[Peer]` entry for every
+   valid key.
 
 A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded and
 `wg-quick@wg0` remains active. Logs are written to `/var/log/pmss/checkWireguard.log`
@@ -40,10 +39,25 @@ This section is intended to be copy-pasteable for end users.
    - Linux: install the `wireguard-tools` package or use your distro's WireGuard app.
    - Windows/macOS/mobile: install the official "WireGuard" app from the vendor store.
 
-2. **Log in to your seedbox via SSH**
+2. **Import the pre-generated profile**
+
+   - Download `~/wireguard.txt` from your seedbox account.
+   - Import it directly into the WireGuard app.
+   - The file already includes the private key, endpoint, and a per-device `/32`
+     address, so no editing is required for the first device.
+
+3. **Protect the imported file**
+
+   - Anyone who can read `~/wireguard.txt` can use that client identity.
+   - If the file is copied to an unsafe location, rotate the corresponding line
+     in `~/.wireguard-public-key` and let the updater refresh the peer set.
+
+4. **Use the manual flow for additional devices (optional)**
+
+   - Log in to your seedbox via SSH.
    - Use the username and password (or SSH key) provided for your account.
 
-3. **Generate a client key pair on your own device**
+5. **Generate a client key pair on your own device**
 
    On Linux/macOS (in a local terminal, *not* on the seedbox):
 
@@ -55,7 +69,7 @@ This section is intended to be copy-pasteable for end users.
    - `private.key` must never be shared.
    - `public.key` will be stored on the seedbox account.
 
-4. **Register your public key on the seedbox**
+6. **Register your public key on the seedbox**
 
    On the seedbox (SSH session, as your user):
 
@@ -68,29 +82,13 @@ This section is intended to be copy-pasteable for end users.
    - Within a few minutes the server will detect the new key and refresh its
      WireGuard configuration.
 
-5. **Fetch your base configuration from the seedbox**
+7. **Keep the generated profile as your first-device baseline**
 
-   - On the seedbox, view your `~/wireguard.txt` file:
+   - PMSS only auto-generates the first client profile in `~/wireguard.txt`.
+   - Additional devices remain an advanced/manual workflow; keep the generated
+     profile intact so you can still import it directly when needed.
 
-     ```bash
-     cat ~/wireguard.txt
-     ```
-
-   - Copy the entire contents to your clipboard or download the file via SFTP.
-
-6. **Create a tunnel in your WireGuard client**
-
-   - In the WireGuard app, create a new tunnel and paste the contents of
-     `wireguard.txt` into the configuration editor.
-   - In the `[Interface]` section, replace the placeholder:
-
-     ```ini
-     PrivateKey = <client private key>
-     ```
-
-     with the contents of your local `private.key` file from step 3.
-
-7. **Treat the VPN as untrusted and lock down services**
+8. **Treat the VPN as untrusted and lock down services**
 
    - Keep the WireGuard interface marked as a *Public/Untrusted* network in your
      OS. All tenants share the `10.90.90.0/24` overlay; the server drops direct
@@ -101,7 +99,7 @@ This section is intended to be copy-pasteable for end users.
    - The server enforces NAT and forwarding centrally, so only ports you expose
      on your device become reachable by other peers.
 
-8. **Rotate keys when devices are lost or compromised**
+9. **Rotate keys when devices are lost or compromised**
 
    - Generate a new key pair, update the corresponding line in
      `~/.wireguard-public-key`, and update your client config with the new
@@ -119,5 +117,7 @@ This section is intended to be copy-pasteable for end users.
   (synthetic tenant roster).
 - Additional overrides include `PMSS_WG_CONFIG_DIR` for staging config output
   inside `/tmp`, `PMSS_WG_HOME_BASE` for per-user file fan-out, and
-  `PMSS_WG_PRIVATE_KEY` / `PMSS_WG_PUBLIC_KEY` for deterministic key material.
-  Use these to exercise new code paths without touching the real filesystem.
+  `PMSS_WG_PRIVATE_KEY` / `PMSS_WG_PUBLIC_KEY` for deterministic server key
+  material plus `PMSS_WG_CLIENT_PRIVATE_KEY` / `PMSS_WG_CLIENT_PUBLIC_KEY` for
+  deterministic bootstrap client profiles. Use these to exercise new code paths
+  without touching the real filesystem.

@@ -1,6 +1,10 @@
 WireGuard server ready
 ======================
 
+PMSS also writes a ready-to-import one-device profile to `~/wireguard.txt`.
+The manual key workflow below remains useful for extra devices or for users who
+prefer generating their private key on the client side.
+
 Server host: %HOSTNAME% (%ENDPOINT%)
 Public key:  %PUBLIC_KEY%
 Listen port: %LISTEN_PORT%

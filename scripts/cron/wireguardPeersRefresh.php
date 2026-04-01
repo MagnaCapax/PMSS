@@ -39,7 +39,16 @@ $listenPort = 51820;
 $configPath = $configDir.'/wg0.conf';
 $current    = is_file($configPath) ? (string) file_get_contents($configPath) : '';
 
-$guideTemplate = is_file($configDir.'/README') ? (string) file_get_contents($configDir.'/README') : '';
+$hostname = trim((string) @file_get_contents('/etc/hostname'));
+[$endpoint, $endpointSource] = wgResolveEndpoint($hostname);
+if ($endpoint === '') {
+    wgLog('wireguardPeersRefresh: unable to determine public endpoint; falling back to hostname '.$hostname);
+    $endpoint = $hostname;
+}
+
+$guideTemplate = wgBuildClientGuide($pubKey, $endpoint, $listenPort);
+wgBootstrapUserGuides($guideTemplate);
+wgDistributeToUsers($guideTemplate);
 $assignedPeers = wgAssignClientIps(wgCollectUserPublicKeys());
 wgSyncUserGuideAddresses($assignedPeers, $guideTemplate);
 

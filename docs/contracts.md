@@ -389,9 +389,9 @@ Class `rtorrentConfig`
 
 ## WireGuard Provisioning – `scripts/lib/update/apps/wireguard.php`
 
-Functions documented inline above. Entrypoint (guarded by `PMSS_WIREGUARD_NO_ENTRYPOINT`) creates config dir, ensures keys, renders config and README, distributes to user homes, and enables `wg-quick@wg0` unless disabled.
+Functions documented inline above. Entrypoint (guarded by `PMSS_WIREGUARD_NO_ENTRYPOINT`) creates config dir, ensures keys, renders config and README, bootstraps one-device client profiles in `~/wireguard.txt` when users have no registered public key yet, seeds placeholder client configs for the remaining users, and enables `wg-quick@wg0` unless disabled.
 
-Environment overrides: `PMSS_WG_CONFIG_DIR`, `PMSS_WG_HOME_BASE`, `PMSS_WG_USER_LIST`, `PMSS_WG_PRIVATE_KEY`, `PMSS_WG_PUBLIC_KEY`, `PMSS_WG_EXTERNAL_IP`, `PMSS_WG_INTERFACE_IP`, `PMSS_WG_DNS_IP`, `PMSS_WG_SKIP_SERVICE`.
+Environment overrides: `PMSS_WG_CONFIG_DIR`, `PMSS_WG_HOME_BASE`, `PMSS_WG_USER_LIST`, `PMSS_WG_PRIVATE_KEY`, `PMSS_WG_PUBLIC_KEY`, `PMSS_WG_CLIENT_PRIVATE_KEY`, `PMSS_WG_CLIENT_PUBLIC_KEY`, `PMSS_WG_EXTERNAL_IP`, `PMSS_WG_INTERFACE_IP`, `PMSS_WG_DNS_IP`, `PMSS_WG_SKIP_SERVICE`.
 
 ---
 

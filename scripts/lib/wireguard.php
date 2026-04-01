@@ -225,6 +225,100 @@ function wgRenderTemplate(string $path, array $placeholders): ?string
 }
 
 /**
+ * Resolve the per-user public-key registry path.
+ */
+function wgUserPublicKeyPath(string $user): string
+{
+    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
+    return $homeBase.'/'.$user.'/.wireguard-public-key';
+}
+
+/**
+ * Resolve the per-user client configuration path.
+ */
+function wgUserGuidePath(string $user): string
+{
+    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
+    return $homeBase.'/'.$user.'/wireguard.txt';
+}
+
+/**
+ * Detect whether a guide still expects the user to provide a private key.
+ */
+function wgGuideHasPrivateKeyPlaceholder(string $content): bool
+{
+    return preg_match('/^PrivateKey = <client private key>$/m', $content) === 1;
+}
+
+/**
+ * Replace the placeholder client private key in a user guide.
+ */
+function wgApplyPrivateKeyToGuide(string $content, string $privateKey): string
+{
+    $updated = preg_replace(
+        '/^PrivateKey = <client private key>$/m',
+        'PrivateKey = '.$privateKey,
+        $content,
+        1
+    );
+
+    return $updated === null ? $content : $updated;
+}
+
+/**
+ * Build a ready-to-import client configuration template.
+ */
+function wgBuildClientGuide(string $publicKey, string $endpoint, int $listenPort): string
+{
+    return "[Interface]\n"
+        ."PrivateKey = <client private key>\n"
+        ."Address = 10.90.90.X/32\n"
+        ."MTU = 1420\n"
+        ."DNS = 1.1.1.1\n\n"
+        ."[Peer]\n"
+        ."PublicKey = {$publicKey}\n"
+        ."Endpoint = {$endpoint}:{$listenPort}\n"
+        ."AllowedIPs = 0.0.0.0/0, ::/0\n"
+        ."PersistentKeepalive = 25\n";
+}
+
+/**
+ * Generate a client keypair for the ready-to-import bootstrap profile.
+ *
+ * Environment overrides are available for hermetic tests.
+ *
+ * @return array{0:string,1:string}
+ */
+function wgGenerateClientKeypair(): array
+{
+    $privateOverride = getenv('PMSS_WG_CLIENT_PRIVATE_KEY');
+    if ($privateOverride !== false) {
+        $privateKey = trim($privateOverride);
+    } else {
+        $privateResult = pmssCommandCapture('wg genkey');
+        $privateKey = $privateResult['rc'] === 0 ? trim($privateResult['stdout']) : '';
+    }
+    if ($privateKey === '') {
+        wgLog('Failed to generate WireGuard client private key');
+        return ['', ''];
+    }
+
+    $publicOverride = getenv('PMSS_WG_CLIENT_PUBLIC_KEY');
+    if ($publicOverride !== false) {
+        $publicKey = trim($publicOverride);
+    } else {
+        $publicResult = pmssCommandCapture('printf %s '.escapeshellarg($privateKey).' | wg pubkey');
+        $publicKey = $publicResult['rc'] === 0 ? trim($publicResult['stdout']) : '';
+    }
+    if (!wgValidatePublicKey($publicKey)) {
+        wgLog('Failed to derive WireGuard client public key');
+        return ['', ''];
+    }
+
+    return [$privateKey, $publicKey];
+}
+
+/**
  * Validate that the supplied string is a plausible WireGuard public key.
  *
  * Keys are expected to be base64-encoded 32-byte values.
@@ -243,40 +337,56 @@ function wgValidatePublicKey(string $key): bool
 }
 
 /**
+ * Read the valid WireGuard public keys registered for a single user.
+ *
+ * @return array<int,string>
+ */
+function wgReadUserPublicKeys(string $user): array
+{
+    $path = wgUserPublicKeyPath($user);
+    if (!is_file($path)) {
+        return [];
+    }
+
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        wgLog('Failed to read '.$path.' for user '.$user);
+        return [];
+    }
+
+    $result = [];
+    foreach ($lines as $index => $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || $line[0] === ';') {
+            continue;
+        }
+        if (!wgValidatePublicKey($line)) {
+            wgLog(sprintf('Ignoring invalid WireGuard public key for user %s at %s line %d', $user, $path, $index + 1));
+            continue;
+        }
+        $result[] = $line;
+    }
+
+    return $result;
+}
+
+/**
  * Collect valid WireGuard public keys from ~/.wireguard-public-key for each user.
  *
  * @return array<int,array{user:string,key:string}>
  */
 function wgCollectUserPublicKeys(): array
 {
-    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
-    $result   = [];
+    $result = [];
 
     foreach (wgListHomeUsers() as $user) {
         if ($user === '') {
             continue;
         }
-        $path = $homeBase.'/'.$user.'/.wireguard-public-key';
-        if (!is_file($path)) {
-            continue;
-        }
-        $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($lines === false) {
-            wgLog('Failed to read '.$path.' for user '.$user);
-            continue;
-        }
-        foreach ($lines as $index => $line) {
-            $line = trim($line);
-            if ($line === '' || $line[0] === '#' || $line[0] === ';') {
-                continue;
-            }
-            if (!wgValidatePublicKey($line)) {
-                wgLog(sprintf('Ignoring invalid WireGuard public key for user %s at %s line %d', $user, $path, $index + 1));
-                continue;
-            }
+        foreach (wgReadUserPublicKeys($user) as $key) {
             $result[] = [
                 'user' => $user,
-                'key'  => $line,
+                'key'  => $key,
             ];
         }
     }
@@ -425,6 +535,76 @@ function wgApplyAssignedIpToGuide(string $content, string $ip): string
 }
 
 /**
+ * Ensure a default single-device client profile exists for users without keys.
+ */
+function wgBootstrapUserGuide(string $user, string $clientGuide): void
+{
+    $publicKeyPath = wgUserPublicKeyPath($user);
+    $guidePath     = wgUserGuidePath($user);
+    $guideExists   = is_file($guidePath);
+    $guide         = $guideExists ? @file_get_contents($guidePath) : false;
+    $publicKeyText = is_file($publicKeyPath) ? @file_get_contents($publicKeyPath) : false;
+
+    if (!empty(wgReadUserPublicKeys($user))) {
+        return;
+    }
+    if ($guide !== false && $guide !== '' && !wgGuideHasPrivateKeyPlaceholder($guide)) {
+        return;
+    }
+
+    [$privateKey, $publicKey] = wgGenerateClientKeypair();
+    if ($privateKey === '' || $publicKey === '') {
+        return;
+    }
+
+    $updatedGuide = wgApplyPrivateKeyToGuide($clientGuide, $privateKey);
+    $originalGuide = $guideExists && $guide !== false ? $guide : null;
+    $updatedKeyText = $publicKey.PHP_EOL;
+    if ($publicKeyText !== false && trim($publicKeyText) !== '') {
+        $updatedKeyText = rtrim($publicKeyText, "\r\n").PHP_EOL.$publicKey.PHP_EOL;
+    }
+
+    if (@file_put_contents($guidePath, $updatedGuide) === false) {
+        wgLog('Failed to write WireGuard guide for user '.$user);
+        return;
+    }
+
+    if (@file_put_contents($publicKeyPath, $updatedKeyText) === false) {
+        wgLog('Failed to write WireGuard public key for user '.$user);
+        if ($originalGuide === null) {
+            @unlink($guidePath);
+        } else {
+            @file_put_contents($guidePath, $originalGuide);
+        }
+        return;
+    }
+
+    @chown($publicKeyPath, $user);
+    @chgrp($publicKeyPath, $user);
+    @chmod($publicKeyPath, 0600);
+    @chown($guidePath, $user);
+    @chgrp($guidePath, $user);
+    @chmod($guidePath, 0600);
+}
+
+/**
+ * Bootstrap missing per-user client profiles during provision or refresh.
+ */
+function wgBootstrapUserGuides(string $clientGuide): void
+{
+    if ($clientGuide === '') {
+        return;
+    }
+
+    foreach (wgListHomeUsers() as $user) {
+        if ($user === '') {
+            continue;
+        }
+        wgBootstrapUserGuide($user, $clientGuide);
+    }
+}
+
+/**
  * Update each per-user guide to show the assigned client IP for the first valid key.
  *
  * @param array<int,array{user:string,key:string,ip:string}> $assigned
@@ -435,7 +615,6 @@ function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): 
         return;
     }
 
-    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
     $seenUsers = [];
 
     foreach ($assigned as $entry) {
@@ -444,9 +623,9 @@ function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): 
         }
         $seenUsers[$entry['user']] = true;
 
-        $target     = $homeBase.'/'.$entry['user'].'/wireguard.txt';
+        $target       = wgUserGuidePath($entry['user']);
         $targetExists = is_file($target);
-        $guide      = $targetExists ? @file_get_contents($target) : false;
+        $guide        = $targetExists ? @file_get_contents($target) : false;
         if ($guide === false || $guide === '') {
             if ($fallbackGuide === '') {
                 continue;
@@ -482,16 +661,22 @@ function wireguardWriteConfig(string $privKey, int $port): void
 }
 
 /**
- * Copy connection instructions to every tenant home directory.
+ * Seed per-user client configurations without clobbering ready profiles.
  */
 function wgDistributeToUsers(string $content): void
 {
     if ($content === '') {
         return;
     }
-    $homeBase = pmssResolvePathFromEnv('PMSS_WG_HOME_BASE', '/home');
+
     foreach (wgListHomeUsers() as $user) {
-        $target = $homeBase.'/'.$user.'/wireguard.txt';
+        $target = wgUserGuidePath($user);
+        if (is_file($target)) {
+            $existing = @file_get_contents($target);
+            if ($existing !== false && $existing !== '' && !wgGuideHasPrivateKeyPlaceholder($existing)) {
+                continue;
+            }
+        }
         @file_put_contents($target, $content);
         @chown($target, $user);
         @chgrp($target, $user);
@@ -526,7 +711,6 @@ function pmssWireguardConfigure(?callable $logger = null): void
     }
 
     $listenPort = 51820;
-    wireguardWriteConfig($privKey, $listenPort);
 
     $hostname = trim((string) @file_get_contents('/etc/hostname'));
     [$endpoint, $endpointSource] = wgResolveEndpoint($hostname);
@@ -552,7 +736,13 @@ function pmssWireguardConfigure(?callable $logger = null): void
         file_put_contents($configDir.'/README', $guide);
     }
 
-    wgDistributeToUsers($guide);
+    $clientGuide = wgBuildClientGuide($pubKey, $endpoint, $listenPort);
+    wgBootstrapUserGuides($clientGuide);
+    wgDistributeToUsers($clientGuide);
+
+    $assignedPeers = wgAssignClientIps(wgCollectUserPublicKeys());
+    wgSyncUserGuideAddresses($assignedPeers, $clientGuide);
+    wireguardWriteConfig($privKey, $listenPort);
 
     if (getenv('PMSS_WG_SKIP_SERVICE') === '1') {
         wgLog('Service enable skipped via PMSS_WG_SKIP_SERVICE');

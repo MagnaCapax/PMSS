@@ -822,8 +822,9 @@ The platform-wide WireGuard service is documented in
 [`docs/wireguard.md`](./wireguard.md). Key properties:
 
 - Managed at the host level under `/etc/wireguard/wg0.conf`.
-- Provisioning generates server keys, enables `wg-quick@wg0`, and writes
-  connection instructions to `/etc/wireguard/README` and `~/wireguard.txt`.
+- Provisioning generates server keys, enables `wg-quick@wg0`, writes
+  connection instructions to `/etc/wireguard/README`, and seeds a ready-to-
+  import single-device profile in `~/wireguard.txt`.
 - You add client public keys to `~/.wireguard-public-key`; the updater rebuilds
   the server config to include each `[Peer]`.
 - A cron watchdog (`checkWireguard.php`, see [`docs/cron.md`](./cron.md))
