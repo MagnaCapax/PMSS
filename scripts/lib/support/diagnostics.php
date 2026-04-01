@@ -14,6 +14,31 @@ require_once __DIR__.'/config.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 /**
+ * Write an entire payload to a writable stream or fail loudly.
+ *
+ * @param resource $stream
+ */
+function pmssSupportStreamWriteAll($stream, string $payload, string $context): void
+{
+    $offset = 0;
+    $length = strlen($payload);
+
+    if ($length > 0 && !is_resource($stream)) {
+        throw new RuntimeException('Unable to write '.$context.'.');
+    }
+
+    while ($offset < $length) {
+        $written = @fwrite($stream, substr($payload, $offset));
+        if (!is_int($written) || $written < 1) {
+            $meta = is_resource($stream) ? stream_get_meta_data($stream) : [];
+            $suffix = (!empty($meta['timed_out']) ? ' timed out' : '');
+            throw new RuntimeException('Unable to write '.$context.$suffix.'.');
+        }
+        $offset += $written;
+    }
+}
+
+/**
  * Resolve the current caller identity from trusted process state.
  *
  * @return array<string,string>
@@ -196,12 +221,18 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
         throw new RuntimeException('Unable to create support snapshot file.');
     }
 
+    $deletePath = true;
     try {
-        if (@fwrite($handle, (string) ($diagnostics['body'] ?? '')) === false) {
-            throw new RuntimeException('Unable to write support snapshot file.');
+        pmssSupportStreamWriteAll($handle, (string) ($diagnostics['body'] ?? ''), 'support snapshot file');
+        if (@fflush($handle) !== true) {
+            throw new RuntimeException('Unable to flush support snapshot file.');
         }
+        $deletePath = false;
     } finally {
         @fclose($handle);
+        if ($deletePath) {
+            @unlink($path);
+        }
     }
 
     if (!is_file($path) || is_link($path) || (function_exists('posix_geteuid') && @fileowner($path) !== posix_geteuid())) {

@@ -13,31 +13,6 @@
 require_once __DIR__.'/diagnostics.php';
 
 /**
- * Write an entire payload to a writable stream or fail loudly.
- *
- * @param resource $stream
- */
-function pmssSupportStreamWriteAll($stream, string $payload, string $context): void
-{
-    $offset = 0;
-    $length = strlen($payload);
-
-    if ($length > 0 && !is_resource($stream)) {
-        throw new RuntimeException('Unable to write '.$context.'.');
-    }
-
-    while ($offset < $length) {
-        $written = @fwrite($stream, substr($payload, $offset));
-        if (!is_int($written) || $written < 1) {
-            $meta = is_resource($stream) ? stream_get_meta_data($stream) : [];
-            $suffix = (!empty($meta['timed_out']) ? ' timed out' : '');
-            throw new RuntimeException('Unable to write '.$context.$suffix.'.');
-        }
-        $offset += $written;
-    }
-}
-
-/**
  * Build the outbound message envelope for a support request.
  *
  * @return array<string,string>

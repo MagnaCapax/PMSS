@@ -168,6 +168,17 @@ class SupportCommandTest extends TestCase
         $this->assertStringContainsString('Please investigate', (string) file_get_contents($path));
     }
 
+    public function testSnapshotWriteUsesSharedFullWriteGuard(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/lib/support/diagnostics.php');
+
+        $this->assertStringContainsString(
+            "pmssSupportStreamWriteAll(\$handle, (string) (\$diagnostics['body'] ?? ''), 'support snapshot file');",
+            $source
+        );
+        $this->assertStringContainsString("@fflush(\$handle) !== true", $source);
+    }
+
     public function testSnapshotWriteRejectsSymlinkedSupportPathAncestor(): void
     {
         $target = $this->homeRoot.'/'.$this->user.'/support-target';
