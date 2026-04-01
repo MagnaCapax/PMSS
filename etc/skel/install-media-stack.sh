@@ -262,6 +262,60 @@ extract_tgz(){
   echo "Installation files downloaded and extracted"
 }
 
+managed_install_path_reset() {
+  local path="$1"
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log_info "[dry-run] would refresh managed install path $path"
+    return 0
+  fi
+  if [[ -L "$path" || -e "$path" ]]; then
+    rm -rf "$path"
+  fi
+}
+
+lighttpd_custom_has_legacy_media_stack_rules() {
+  local custom_file="$1"
+  [[ -f "$custom_file" ]] || return 1
+  grep -Fq '# Keep ARR base paths canonical so missing-slash requests' "$custom_file" &&
+    grep -Fq '"^/sabnzbd(\$|/)"' "$custom_file" &&
+    grep -Fq '"^/radarr(\$|/)"' "$custom_file" &&
+    grep -Fq '"^/prowlarr(\$|/)"' "$custom_file" &&
+    grep -Fq '"^/sonarr(\$|/)"' "$custom_file" &&
+    grep -Fq '"^/jellyfin(\$|/)"' "$custom_file"
+}
+
+prepare_lighttpd_media_stack_paths() {
+  local lighttpd_dir="$HOME/.lighttpd"
+  local custom_file="$lighttpd_dir/custom"
+  local custom_dir="$lighttpd_dir/custom.d"
+  local managed_fragment="$custom_dir/media-stack.conf"
+  local migrated_fragment="$custom_dir/custom-migrated.conf"
+  local backup_stamp=""
+
+  mkdir -p "$lighttpd_dir" "$custom_dir"
+
+  if [[ -s "$custom_file" && ! -f "$managed_fragment" ]]; then
+    backup_stamp=$(date +%Y%m%d)
+    if ! cp "$custom_file" "$lighttpd_dir/backup.custom.${backup_stamp}" 2>/dev/null; then
+      log_warn "Failed to backup existing lighttpd custom config"
+    fi
+
+    if lighttpd_custom_has_legacy_media_stack_rules "$custom_file"; then
+      : > "$custom_file"
+      log_info "Migrated legacy PMSS lighttpd rules to ~/.lighttpd/custom.d/media-stack.conf"
+    elif [[ ! -e "$migrated_fragment" ]]; then
+      mv "$custom_file" "$migrated_fragment"
+      : > "$custom_file"
+      chmod 640 "$migrated_fragment" 2>/dev/null || true
+      log_info "Preserved ~/.lighttpd/custom at ~/.lighttpd/custom.d/custom-migrated.conf"
+    else
+      log_warn "Leaving ~/.lighttpd/custom unchanged; ~/.lighttpd/custom.d/custom-migrated.conf already exists"
+    fi
+  elif [[ ! -e "$custom_file" ]]; then
+    : > "$custom_file"
+  fi
+}
+
 # Helper to append to .bashrc.custom only if marker not present
 append_to_bashrc_custom_if_missing() {
   local content="$1"
@@ -377,27 +431,18 @@ case "$ARCH" in
 	;;
 esac
 
-# Safety check for existing .bin
+# Preserve unrelated ~/.bin contents on reruns; only managed media-stack paths are refreshed.
 if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin" 2>/dev/null)" ]; then
-    if [[ $DRY_RUN -eq 1 ]]; then
-      log_warn "$HOME/.bin exists and would be removed (dry-run)."
-    else
-      printf "WARNING: %s exists and will be removed. Continue? (y/N): " "$HOME/.bin"
-      read -r confirm
-      [[ $confirm == [yY] ]] || exit 1
-      rm -rf "$HOME/.bin"
-    fi
-elif [ -d "$HOME/.bin" ]; then
-  # Directory exists but is empty
-  [[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.bin"
+  log_info "Keeping existing ~/.bin contents outside PMSS-managed app paths."
+  log_info "Managed media-stack binaries will be refreshed in place."
 fi
 
-# Safety check for existing Jellyfin config (can cause DB migration hang on rerun)
+# Safety check for existing Jellyfin config/data (can cause DB migration hang on rerun)
 if [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev/null)" ]; then
     if [[ $DRY_RUN -eq 1 ]]; then
-      log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run)."
+      log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run); Jellyfin users, metadata, and watch state would be lost."
     else
-      printf "WARNING: %s exists and will be removed. Continue? (y/N): " "$HOME/.config/jellyfin"
+      printf "WARNING: %s exists and will be removed. Jellyfin users, metadata, and watch state will be lost. Continue? (y/N): " "$HOME/.config/jellyfin"
       read -r confirm
       [[ $confirm == [yY] ]] || exit 1
       rm -rf "$HOME/.config/jellyfin"
@@ -595,6 +640,7 @@ installdir="$HOME/.bin/cloudplow"
 datadir="$HOME/.config/cloudplow"
 mkdir -p "$datadir"
 if [[ $DRY_RUN -eq 0 ]]; then
+  managed_install_path_reset "$installdir"
   python3 -m venv "$installdir"
   cd "$installdir"
   git clone https://github.com/l3uddz/cloudplow.git >/dev/null 2>&1
@@ -619,6 +665,7 @@ datadir="$HOME/.config/sabnzbd"
 mkdir -p "$datadir"
 pkill -9 -f -u "$USERNAME" "${app}" >/dev/null 2>&1 || true
 if [[ $DRY_RUN -eq 0 ]]; then
+  managed_install_path_reset "$installdir"
   python3 -m venv "$installdir"
   cd "$installdir"
   echo "Downloading...${app^^} (${SABNZBD_VERSION})"
@@ -670,6 +717,9 @@ installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="$RADARR_BRANCH"
 mkdir -p "$datadir"
+if [[ $DRY_RUN -eq 0 ]]; then
+  managed_install_path_reset "$installdir/Radarr"
+fi
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 GLIBC_VER=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}')
 if [[ -n "$OVR_RADARR_URL" ]]; then
@@ -728,6 +778,9 @@ installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="$PROWLARR_BRANCH" # Stable
 mkdir -p "$datadir"
+if [[ $DRY_RUN -eq 0 ]]; then
+  managed_install_path_reset "$installdir/Prowlarr"
+fi
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 if [[ -n "$OVR_PROWLARR_URL" ]]; then
   DLURL="$OVR_PROWLARR_URL"
@@ -774,6 +827,9 @@ installdir="$HOME/.bin"
 datadir="$HOME/.config/${app}"
 branch="$SONARR_BRANCH"
 mkdir -p "$datadir"
+if [[ $DRY_RUN -eq 0 ]]; then
+  managed_install_path_reset "$installdir/Sonarr"
+fi
 pkill -9 -f -u "$USERNAME" "${app^}" >/dev/null 2>&1 || true
 if [[ -n "$OVR_SONARR_URL" ]]; then
   DLURL="$OVR_SONARR_URL"
@@ -818,6 +874,9 @@ app="aspnetcore"
 log_step "Installing ${app^^}..."
 echo "Downloading...${app^^}"
 installdir="$HOME/.bin/dotnet"
+if [[ $DRY_RUN -eq 0 ]]; then
+  managed_install_path_reset "$installdir"
+fi
 mkdir -p "$installdir"
 cd "$installdir"
 if ! fetch "$ASPDOTNET_URL" "aspnetcore.tar.gz"; then log_err "Failed to download ASP.NET runtime"; exit 1; fi
@@ -859,6 +918,9 @@ datadir="$JELLYFIN_DATA_DIR"
 configdir="$JELLYFIN_CONFIG_DIR"
 logdir="$JELLYFIN_LOG_DIR"
 mkdir -p "$datadir" "$logdir" "$configdir"
+if [[ $DRY_RUN -eq 0 ]]; then
+  managed_install_path_reset "$installdir/${app}"
+fi
 cd "$installdir"
 echo "Downloading...${app^^}"
 if ! fetch "${JELLYFIN_URL}" "${app}.tar.gz"; then log_err "Failed to download Jellyfin"; exit 1; fi
@@ -995,14 +1057,9 @@ alias sabnzbd='\''tmux new-session -d -s "sabnzbd" "source $HOME/.bin/sabnzbd/bi
 
 # Lighttpd config (use $HOSTNAME)
 if [[ $DRY_RUN -eq 0 ]]; then
-  mkdir -p "$HOME/.lighttpd"
-  if [[ -f "$HOME/.lighttpd/custom" ]]; then
-    backup_stamp=$(date +%Y%m%d)
-    if ! cp "$HOME/.lighttpd/custom" "$HOME/.lighttpd/backup.custom.${backup_stamp}" 2>/dev/null; then
-      log_warn "Failed to backup existing lighttpd custom config"
-    fi
-  fi
-  cat <<EOF >"$HOME/.lighttpd/custom"
+  prepare_lighttpd_media_stack_paths
+  cat <<EOF >"$HOME/.lighttpd/custom.d/media-stack.conf"
+# PMSS-managed media stack proxy fragment.
 # Keep ARR base paths canonical so missing-slash requests
 # redirect to proxy-managed app roots.
 url.redirect += (
@@ -1086,9 +1143,9 @@ url.redirect += (
   ) )
 }
 EOF
-  chmod 600 "$HOME/.lighttpd/custom" 2>/dev/null || true
+  chmod 640 "$HOME/.lighttpd/custom.d/media-stack.conf" 2>/dev/null || true
 else
-  log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom"
+  log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom.d/media-stack.conf"
 fi
 
 

@@ -19,7 +19,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 
 ## Web Panel Wrapper
 - The welcome page can launch the installer without SSH for the first run.
-- The wrapper intentionally stops at first-install scope: once `~/.bin` or Jellyfin data already exist, reruns must happen over SSH because the script asks for confirmation before removing those paths.
+- The wrapper intentionally stops at first-install scope: once `~/.bin` or Jellyfin data already exist, reruns should happen over SSH so operators can review existing state and any Jellyfin data-loss prompt before proceeding.
 - The wrapper does not pre-generate Jellyfin credentials; the admin account is created in Jellyfin’s first-run wizard after the install completes.
 
 ## Compatibility Matrix
@@ -134,7 +134,8 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Sources `~/.bashrc` with `set +u` so `~/.bashrc.custom` takes effect (and to avoid aborts when nounset is active in a user’s shell configs).
 
 8) Reverse proxy
-- Writes per‑user Lighttpd proxy mappings to `~/.lighttpd/custom` with URL rewriting from `/app` to `/public-<user>/<app>`.
+- Writes the PMSS-managed media-stack proxy fragment to `~/.lighttpd/custom.d/media-stack.conf` with URL rewriting from `/app` to `/public-<user>/<app>`.
+- On first rerun after older installer versions, legacy PMSS-managed `~/.lighttpd/custom` content is migrated out of the user-controlled include so custom rules are preserved.
 
 9) Launch
 - Starts each app under a tmux session (skipped in `--dry-run`).
@@ -150,7 +151,9 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Newer Radarr releases ship sqlite binaries that require `GLIBC_2.33+`. On Debian 10/11, this causes loader failures. The script detects GLIBC and pins x64 Radarr to `v5.10.4.9218` linux‑core on older systems. Use `--radarr-version=` or `--radarr-pin=` to override.
 
 ## Operations & Safety
-- The script prompts before removing an existing `~/.bin`. In dry‑run, removal is only logged.
+- The script preserves unrelated `~/.bin` contents on reruns and refreshes only PMSS-managed media-stack paths in place.
+- The script still prompts before removing existing Jellyfin state because stale config can hang reruns and the deletion is destructive.
+- Media-stack ports are still chosen locally from `10000-65000`; they are not yet registered with `scripts/util/portManager.php`.
 - All app binds are `127.0.0.1`. Exposure to the Internet is not supported without proper SSL/reverse proxy hardening.
 - Conflicts with global `/opt` installs may occur; this is a per‑user stack by design.
 

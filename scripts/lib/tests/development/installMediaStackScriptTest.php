@@ -126,9 +126,31 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('127.0.0.1:', $this->script);
     }
 
-    public function testLighttpdCustomConfigExists(): void
+    public function testLighttpdMediaStackFragmentPathExists(): void
     {
-        $this->assertStringContainsString('/.lighttpd/custom', $this->script);
+        $this->assertStringContainsString('/.lighttpd/custom.d/media-stack.conf', $this->script);
+        $this->assertStringContainsString('prepare_lighttpd_media_stack_paths', $this->script);
+    }
+
+    public function testLegacyLighttpdCustomMigrationPreservesUserRules(): void
+    {
+        $this->assertStringContainsString('custom-migrated.conf', $this->script);
+        $this->assertStringContainsString('lighttpd_custom_has_legacy_media_stack_rules', $this->script);
+    }
+
+    public function testManagedBinPathsRefreshInPlace(): void
+    {
+        $this->assertStringContainsString('Keeping existing ~/.bin contents outside PMSS-managed app paths.', $this->script);
+        $this->assertStringContainsString('managed_install_path_reset', $this->script);
+        $this->assertTrue(
+            strpos($this->script, 'rm -rf "$HOME/.bin"') === false,
+            'Installer must not delete the entire ~/.bin directory on reruns'
+        );
+    }
+
+    public function testJellyfinPromptExplainsDataLoss(): void
+    {
+        $this->assertStringContainsString('Jellyfin users, metadata, and watch state will be lost.', $this->script);
     }
 
     public function testLighttpdArrPathsRedirectToTrailingSlash(): void
