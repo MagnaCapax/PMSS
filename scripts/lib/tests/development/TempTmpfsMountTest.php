@@ -172,4 +172,26 @@ class TempTmpfsMountTest extends TestCase
         $this->pmssRemoveTree($dir);
     }
 
+    public function testUnreadableMountsWarns(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-tmpfs-mounts-unreadable-', 0700);
+        $fstab = $dir.'/fstab';
+        $mounts = $dir.'/mounts';
+
+        file_put_contents($fstab, "tmpfs /tmp tmpfs defaults 0 0\n");
+        file_put_contents($mounts, "tmpfs /tmp tmpfs rw 0 0\n");
+        chmod($mounts, 0000);
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        putenv('PMSS_HARDEN_TMP_TMPFS=1');
+        putenv('PMSS_DRY_RUN=1');
+        \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
+
+        $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
+        chmod($mounts, 0600);
+        $this->pmssRemoveTree($dir);
+    }
+
 }
