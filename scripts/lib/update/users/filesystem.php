@@ -96,6 +96,7 @@ PHP;
         '.bashrc',
         'install-media-stack.sh',
         'install-ai-tools.sh',
+        'bin/docker-install-lsio',
         'bin/docker-install-wireguard.sh',
         'bin/linuxserverInstall.sh',
         'bin/support',

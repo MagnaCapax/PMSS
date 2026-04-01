@@ -1,0 +1,22 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Stable tenant wrapper for the shared LSIO installer entrypoint.
+ */
+
+$target = getenv('PMSS_DOCKER_INSTALL_LSIO_SCRIPT');
+$target = is_string($target) && $target !== '' ? $target : '/scripts/util/dockerInstallLsio.php';
+
+if (!is_file($target)) {
+    fwrite(STDERR, "docker-install-lsio requires {$target}\n");
+    exit(1);
+}
+
+require_once $target;
+
+if (!function_exists('pmssDockerInstallLsioMain')) {
+    fwrite(STDERR, "docker-install-lsio could not load its installer entrypoint\n");
+    exit(1);
+}
+
+exit(pmssDockerInstallLsioMain($_SERVER['argv'] ?? []));

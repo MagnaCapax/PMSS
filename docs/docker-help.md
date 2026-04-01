@@ -30,7 +30,7 @@ linuxserver.io Wireguard container. Invoke it with an optional port:
 docker-install-wireguard.sh 51820
 ```
 
-For the common LinuxServer.io media stack, PMSS also ships `linuxserverInstall.sh`
+For the common LinuxServer.io media stack, PMSS also ships `docker-install-lsio`
 in `~/bin`. It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`,
 `prowlarr`, `mariadb`, and `phpmyadmin`, keeps their mounts under `~/`, joins
 them to a shared `pmss-media` network, and starts them with
@@ -40,12 +40,16 @@ default, and the MariaDB helper writes separate service credentials to
 `~/docker/mariadb/pmss-credentials.env` on first install:
 
 ```
-linuxserverInstall.sh qbittorrent
-linuxserverInstall.sh radarr
-linuxserverInstall.sh sonarr 18989
-linuxserverInstall.sh mariadb
-linuxserverInstall.sh phpmyadmin 18082
+docker-install-lsio qbittorrent
+docker-install-lsio radarr
+docker-install-lsio sonarr 18989
+docker-install-lsio mariadb
+docker-install-lsio phpmyadmin 18082
 ```
+
+The legacy `linuxserverInstall.sh` name remains as a compatibility wrapper for
+existing users, but new examples and support guidance should prefer
+`docker-install-lsio`.
 
 ## Storage drivers on PMSS
 

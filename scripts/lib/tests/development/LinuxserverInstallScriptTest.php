@@ -1,6 +1,6 @@
 <?php
 /**
- * Hermetic coverage for the LinuxServer.io one-click helper.
+ * Hermetic coverage for the LinuxServer.io installer wrappers.
  */
 
 namespace PMSS\Tests;
@@ -13,6 +13,11 @@ class LinuxserverInstallScriptTest extends TestCase
     private $homeDir;
     private $fakeBinDir;
     private $dockerLog;
+    private $phpBin;
+    private $bashBin;
+    private $installerPath;
+    private $legacyInstallerPath;
+    private $utilPath;
 
     protected function setUp(): void
     {
@@ -20,6 +25,11 @@ class LinuxserverInstallScriptTest extends TestCase
         $this->homeDir = $this->tempDir.'/home';
         $this->fakeBinDir = $this->tempDir.'/bin';
         $this->dockerLog = $this->tempDir.'/docker.log';
+        $this->phpBin = trim((string) shell_exec('command -v php 2>/dev/null'));
+        $this->bashBin = trim((string) shell_exec('command -v bash 2>/dev/null'));
+        $this->installerPath = __DIR__.'/../../../../etc/skel/bin/docker-install-lsio';
+        $this->legacyInstallerPath = __DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh';
+        $this->utilPath = __DIR__.'/../../../../scripts/util/dockerInstallLsio.php';
 
         @mkdir($this->homeDir, 0700, true);
         @mkdir($this->fakeBinDir, 0700, true);
@@ -54,22 +64,34 @@ BASH;
         $this->cleanup($this->tempDir);
     }
 
-    private function runHelper(array $args, array $env = []): array
+    /**
+     * @param array<string,string> $env
+     * @return array{rc:int,output:string,dockerLog:string}
+     */
+    private function runHelper(array $args, array $env = [], string $entry = 'current'): array
     {
+        $pathValue = array_key_exists('PATH', $env)
+            ? $env['PATH']
+            : $this->fakeBinDir.':'.(getenv('PATH') !== false ? getenv('PATH') : '/usr/bin:/bin');
+        unset($env['PATH']);
+
         $envPairs = [
             'HOME='.$this->homeDir,
-            'PATH='.$this->fakeBinDir.':'.(getenv('PATH') !== false ? getenv('PATH') : '/usr/bin:/bin'),
+            'PATH='.$pathValue,
             'PMSS_TEST_DOCKER_LOG='.$this->dockerLog,
+            'PMSS_DOCKER_INSTALL_LSIO_SCRIPT='.$this->utilPath,
         ];
         foreach ($env as $key => $value) {
             $envPairs[] = $key.'='.$value;
         }
 
+        $entryScript = $entry === 'legacy' ? $this->legacyInstallerPath : $this->installerPath;
+        $runner = $entry === 'legacy' ? $this->bashBin : $this->phpBin;
         $command = 'env';
         foreach ($envPairs as $pair) {
             $command .= ' '.escapeshellarg($pair);
         }
-        $command .= ' bash '.escapeshellarg(__DIR__.'/../../../../etc/skel/bin/linuxserverInstall.sh');
+        $command .= ' '.escapeshellarg($runner).' '.escapeshellarg($entryScript);
         foreach ($args as $arg) {
             $command .= ' '.escapeshellarg($arg);
         }
@@ -79,22 +101,20 @@ BASH;
         $rc = 0;
         exec($command, $output, $rc);
 
-        $dockerLog = is_file($this->dockerLog) ? (string) file_get_contents($this->dockerLog) : '';
-
         return [
             'rc' => $rc,
             'output' => implode("\n", $output),
-            'dockerLog' => $dockerLog,
+            'dockerLog' => is_file($this->dockerLog) ? (string) file_get_contents($this->dockerLog) : '',
         ];
     }
 
-    public function testDryRunJellyfinCreatesConfigAndMediaDirs(): void
+    public function testDryRunJellyfinDoesNotCreateConfigOrMediaDirs(): void
     {
         $result = $this->runHelper(['jellyfin', '--dry-run']);
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertTrue(is_dir($this->homeDir.'/docker/jellyfin/config'));
-        $this->assertTrue(is_dir($this->homeDir.'/media'));
+        $this->assertTrue(!is_dir($this->homeDir.'/docker/jellyfin/config'), 'dry-run must not create config dirs');
+        $this->assertTrue(!is_dir($this->homeDir.'/media'), 'dry-run must not create data dirs');
         $this->assertStringContainsString('--network pmss-media', $result['output']);
         $this->assertStringContainsString($this->homeDir.'/media:/data', $result['output']);
     }
@@ -104,7 +124,7 @@ BASH;
         $result = $this->runHelper(['qbittorrent', '--dry-run']);
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertTrue(is_dir($this->homeDir.'/downloads'));
+        $this->assertTrue(!is_dir($this->homeDir.'/downloads'), 'dry-run must not create downloads dir');
         $this->assertStringContainsString('WEBUI_PORT=8080', $result['output']);
         $this->assertStringContainsString($this->homeDir.'/downloads:/downloads', $result['output']);
     }
@@ -114,7 +134,7 @@ BASH;
         $result = $this->runHelper(['radarr', '--dry-run']);
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertTrue(is_dir($this->homeDir.'/movies'));
+        $this->assertTrue(!is_dir($this->homeDir.'/movies'), 'dry-run must not create movie dirs');
         $this->assertStringContainsString($this->homeDir.'/movies:/movies', $result['output']);
         $this->assertStringContainsString($this->homeDir.'/downloads:/downloads', $result['output']);
     }
@@ -132,10 +152,10 @@ BASH;
         $result = $this->runHelper(['mariadb', '--dry-run']);
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertTrue(is_dir($this->homeDir.'/docker/mariadb/config'));
+        $this->assertTrue(!is_dir($this->homeDir.'/docker/mariadb/config'), 'dry-run must not create config dirs');
         $this->assertStringContainsString('-p 127.0.0.1:3306:3306', $result['output']);
         $this->assertStringContainsString('generated-at-install', $result['output']);
-        $this->assertStringContainsString('MYSQL_USER=db_', $result['output']);
+        $this->assertStringContainsString('MYSQL_USER=db_home', $result['output']);
         $this->assertTrue(!is_file($this->homeDir.'/docker/mariadb/pmss-credentials.env'), 'dry-run must not persist credentials');
     }
 
@@ -148,7 +168,7 @@ BASH;
         $this->assertTrue(is_file($credentialFile));
         $contents = (string) file_get_contents($credentialFile);
         $this->assertStringContainsString('MYSQL_ROOT_PASSWORD=', $contents);
-        $this->assertStringContainsString('MYSQL_USER=db_', $contents);
+        $this->assertStringContainsString('MYSQL_USER=db_home', $contents);
         $this->assertStringContainsString('--env-file '.$credentialFile, $result['dockerLog']);
         $this->assertStringContainsString('-p 127.0.0.1:3306:3306', $result['dockerLog']);
     }
@@ -158,10 +178,23 @@ BASH;
         $result = $this->runHelper(['phpmyadmin', '--dry-run']);
 
         $this->assertEquals(0, $result['rc']);
-        $this->assertTrue(is_dir($this->homeDir.'/docker/phpmyadmin/config'));
+        $this->assertTrue(!is_dir($this->homeDir.'/docker/phpmyadmin/config'), 'dry-run must not create config dirs');
         $this->assertStringContainsString('-p 127.0.0.1:8082:80', $result['output']);
         $this->assertStringContainsString('PMA_HOST=mariadb', $result['output']);
         $this->assertStringContainsString('PMA_PORT=3306', $result['output']);
+    }
+
+    public function testRunWithoutDockerDoesNotCreateDirectories(): void
+    {
+        $emptyPath = $this->tempDir.'/empty-bin';
+        @mkdir($emptyPath, 0700, true);
+
+        $result = $this->runHelper(['jellyfin'], ['PATH' => $emptyPath]);
+
+        $this->assertTrue($result['rc'] !== 0, 'docker-less run should fail');
+        $this->assertStringContainsString('docker command not found in PATH', $result['output']);
+        $this->assertTrue(!is_dir($this->homeDir.'/docker/jellyfin/config'), 'failed runs must not create config dirs before docker checks');
+        $this->assertTrue(!is_dir($this->homeDir.'/media'), 'failed runs must not create media dirs before docker checks');
     }
 
     public function testRunCreatesNetworkAndContainerWhenMissing(): void
@@ -187,6 +220,15 @@ BASH;
         $this->assertTrue(strpos($result['dockerLog'], 'run -d --name jellyfin') === false, 'must not run docker when container exists');
     }
 
+    public function testLegacyWrapperDelegatesToPhpInstaller(): void
+    {
+        $result = $this->runHelper(['prowlarr', '--dry-run'], [], 'legacy');
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertStringContainsString('docker run -d --name prowlarr', $result['output']);
+        $this->assertStringContainsString('--network pmss-media', $result['output']);
+    }
+
     public function testUnknownAppShowsUsage(): void
     {
         $result = $this->runHelper(['bazarr', '--dry-run']);
@@ -199,6 +241,7 @@ BASH;
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/update/users/filesystem.php');
 
+        $this->assertStringContainsString("'bin/docker-install-lsio'", $source);
         $this->assertStringContainsString("'bin/linuxserverInstall.sh'", $source);
     }
 }

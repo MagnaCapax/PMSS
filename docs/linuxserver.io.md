@@ -148,12 +148,13 @@ This section walks through a simple Jellyfin media server deployment.
 Once this is working you can reuse the same pattern for other images.
 
 If you want the most common PMSS-ready presets without retyping the full
-`docker run` lines, the default skeleton now includes `~/bin/linuxserverInstall.sh`.
+`docker run` lines, the default skeleton now includes `~/bin/docker-install-lsio`.
 It supports `jellyfin`, `qbittorrent`, `radarr`, `sonarr`, `prowlarr`,
 `mariadb`, and `phpmyadmin`, creates the expected home-directory mounts,
 attaches the containers to a shared `pmss-media` Docker network, and keeps
 `--restart unless-stopped` enabled. The database presets bind to
-`127.0.0.1` by default so they stay local to the host.
+`127.0.0.1` by default so they stay local to the host. The legacy
+`~/bin/linuxserverInstall.sh` wrapper remains available for compatibility.
 
 ## 4. Common seedbox recipes
 
@@ -611,7 +612,7 @@ as MariaDB or PostgreSQL; see their docs for the recommended configuration.
 **MariaDB** – MySQL-compatible database:
 
 ```bash
-linuxserverInstall.sh mariadb
+docker-install-lsio mariadb
 ```
 
 PMSS writes separate MariaDB service credentials to
@@ -637,7 +638,7 @@ docker run -d \
 **phpMyAdmin** – Web UI for MySQL/MariaDB:
 
 ```bash
-linuxserverInstall.sh phpmyadmin
+docker-install-lsio phpmyadmin
 ```
 
 The helper binds phpMyAdmin to `127.0.0.1:8082` and points it at the shared
