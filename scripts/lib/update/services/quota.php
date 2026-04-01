@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/../fstab.php';
 require_once __DIR__.'/../managedPath.php';
 require_once __DIR__.'/../../runtime.php';
 
@@ -22,49 +23,27 @@ function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = nu
         return;
     }
     $fstab = $fstabPath ?? '/etc/fstab';
-    if (!is_readable($fstab)) {
-        $log('[WARN] '.$fstab.' not readable; skipping quota configuration.');
-        return;
-    }
-
-    $lines = file($fstab, FILE_IGNORE_NEW_LINES);
-    if ($lines === false) {
-        $log('[WARN] Unable to read '.$fstab.'; skipping quota configuration.');
+    $lines = pmssFstabLinesRead($fstab, $log, 'quota configuration.');
+    if ($lines === null) {
         return;
     }
 
     $requiredOptions = $requiredOptions ?? ['usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1'];
-    $found = false;
-    $changed = false;
-
-    foreach ($lines as $idx => $line) {
-        $columns = pmssConfigLineColumns($line, 4);
-        if ($columns === [] || $columns[1] !== $mountPoint) {
-            continue;
-        }
-
-        $found = true;
-        $plan = pmssConfigOptionsUpdatePlan($columns[3], $requiredOptions, [], true);
-        $missingOptions = $plan['added'];
-        if ($missingOptions === []) {
-            $log('[SKIP] Quota options already present for '.$mountPoint);
-            break;
-        }
-        $columns[3] = implode(',', $plan['options']);
-        $lines[$idx] = implode("\t", $columns);
-        $changed = true;
-        $log('[WARN] Updated quota options for '.$mountPoint.' (added '.implode(', ', $missingOptions).')');
-        break;
-    }
-
-    if (!$found) {
+    $entry = pmssFstabMountEntryRead($lines, $mountPoint);
+    if ($entry === null) {
         $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping quota updates.');
         return;
     }
 
-    if ($changed) {
-        pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
+    $plan = pmssFstabMountOptionsPlan($entry['columns'], $requiredOptions, [], true);
+    if ($plan['added'] === []) {
+        $log('[SKIP] Quota options already present for '.$mountPoint);
+        return;
     }
+
+    $lines[$entry['index']] = implode("\t", $plan['columns']);
+    $log('[WARN] Updated quota options for '.$mountPoint.' (added '.implode(', ', $plan['added']).')');
+    pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
 }
 
 /**

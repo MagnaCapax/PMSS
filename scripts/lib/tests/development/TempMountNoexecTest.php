@@ -108,7 +108,7 @@ class TempMountNoexecTest extends TestCase
         putenv('PMSS_DRY_RUN=1');
         \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
 
-        $options = $this->fstabOptionsForMount($fstab, '/tmp');
+        $options = $this->pmssFstabOptionsForMount($fstab, '/tmp');
         $this->assertTrue(in_array('noexec', $options, true), 'expected noexec option');
         $this->assertTrue(in_array('nosuid', $options, true), 'expected nosuid option');
         $this->assertTrue(in_array('nodev', $options, true), 'expected nodev option');
@@ -178,26 +178,6 @@ class TempMountNoexecTest extends TestCase
 
         $this->assertTrue($this->pmssMessagesContain($messages, 'not readable'), 'expected not readable log');
         chmod($fstab, 0600);
-    }
-
-    private function fstabOptionsForMount(string $fstab, string $mountPoint): array
-    {
-        $lines = file($fstab, FILE_IGNORE_NEW_LINES) ?: [];
-        foreach ($lines as $line) {
-            $trim = trim($line);
-            if ($trim === '' || $trim[0] === '#') {
-                continue;
-            }
-            $columns = preg_split('/\s+/', $trim);
-            if (count($columns) < 4) {
-                continue;
-            }
-            if ($columns[1] !== $mountPoint) {
-                continue;
-            }
-            return array_values(array_filter(explode(',', $columns[3]), 'strlen'));
-        }
-        return [];
     }
 
 }

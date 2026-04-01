@@ -172,6 +172,18 @@ abstract class TestCase
         throw new \AssertionError($message !== '' ? $message : 'Test failed');
     }
 
+    /** Return parsed mount options for one fstab mount point. */
+    protected function pmssFstabOptionsForMount(string $fstab, string $mountPoint): array
+    {
+        $lines = file($fstab, FILE_IGNORE_NEW_LINES) ?: [];
+        foreach ($lines as $line) {
+            $columns = preg_split('/\s+/', trim($line));
+            if (!is_array($columns) || count($columns) < 4 || $columns[1] !== $mountPoint) continue;
+            return array_values(array_filter(explode(',', $columns[3]), 'strlen'));
+        }
+        return [];
+    }
+
     protected function isSandbox(): bool
     {
         if (getenv('PMSS_SANDBOX') === '1') return true;

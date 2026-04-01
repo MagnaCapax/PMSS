@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/logging.php';
+require_once __DIR__.'/fstab.php';
 require_once __DIR__.'/managedPath.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/runtime/processes.php';
@@ -369,46 +370,24 @@ function pmssEnsureBootDefaults(
 
     // /proc hidepid baseline.
     $fstabChanged = false;
-    if (is_readable($fstabPath) && ($lines = file($fstabPath, FILE_IGNORE_NEW_LINES)) !== false) {
-        // Locate existing /proc entry when present.
-        $found = false;
-        foreach ($lines as $idx => $line) {
-            $columns = pmssConfigLineColumns($line, 4);
-            if ($columns === [] || $columns[1] !== '/proc' || $columns[2] !== 'proc') {
-                continue;
-            }
-            $found = true;
-            // Normalize hidepid option to enforce the legacy value.
-            $options = $columns[3] === '' || $columns[3] === '-' ? 'defaults' : $columns[3];
-            $parts = array_values(array_filter(explode(',', $options), 'strlen'));
-            $new = [];
-            $hidepid = false;
-            foreach ($parts as $opt) {
-                if (strpos($opt, 'hidepid=') === 0) {
-                    if (!$hidepid) {
-                        $new[] = 'hidepid=2';
-                        $hidepid = true;
-                    }
-                    continue;
-                }
-                $new[] = $opt;
-            }
-            if (!$hidepid) {
-                $new[] = 'hidepid=2';
-            }
-            $updated = implode(',', $new);
-            if ($updated !== $columns[3]) {
-                $columns[3] = $updated;
-                $lines[$idx] = implode("\t", $columns);
-                $fstabChanged = true;
-                $log('Updated /proc mount options in '.$fstabPath);
-            }
-            break;
-        }
-        if (!$found) {
+    $lines = pmssFstabLinesRead($fstabPath, $log, '/proc hidepid enforcement');
+    if ($lines !== null) {
+        $entry = pmssFstabMountEntryRead($lines, '/proc', 'proc');
+        if ($entry === null) {
             $lines[] = "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0";
             $fstabChanged = true;
             $log('Added /proc mount with hidepid=2 to '.$fstabPath);
+        } else {
+            $columns = $entry['columns'];
+            $options = $columns[3] === '' || $columns[3] === '-'
+                ? ['defaults']
+                : array_values(array_filter(explode(',', $columns[3]), 'strlen'));
+            $columns[3] = implode(',', pmssFstabOptionsReplacePrefixedValue($options, 'hidepid=', 'hidepid=2'));
+            if ($columns[3] !== $entry['columns'][3]) {
+                $lines[$entry['index']] = implode("\t", $columns);
+                $fstabChanged = true;
+                $log('Updated /proc mount options in '.$fstabPath);
+            }
         }
         // Write fstab only when content changed, with a backup.
         if ($fstabChanged) {
@@ -418,8 +397,6 @@ function pmssEnsureBootDefaults(
             $command = pmssBuildCommand('mount', ['-o', 'remount,hidepid=2', '/proc']);
             runStep('Remounting /proc with hidepid=2', $command);
         }
-    } else {
-        $log('[WARN] '.$fstabPath.' not readable; skipping /proc hidepid enforcement');
     }
 
     // Grub cmdline baseline.
