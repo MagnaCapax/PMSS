@@ -225,12 +225,109 @@ if (!function_exists('pmssUserTrafficCliBootstrap')) {
     }
 }
 
+if (!function_exists('pmssUserGiBSettingCli')) {
+    /** @param array<string,mixed> $spec */
+    function pmssUserGiBSettingCli(array $argv, array $spec): int
+    {
+        if (!pmssUserTrafficCliBootstrap()) return 1;
+        $usage = isset($spec['usage']) && is_string($spec['usage']) ? $spec['usage'] : '';
+        $parsed = pmssParseCliTokens($argv);
+        if (pmssCliOption($parsed, 'help', 'h')) { echo $usage."\n"; return 0; }
+
+        $userName = (string) pmssCliOption($parsed, 'user', 'u', $parsed['arguments'][0] ?? '');
+        $show = (pmssCliOption($parsed, 'show') === true);
+        $unset = (pmssCliOption($parsed, 'unset') === true);
+        $valueRaw = pmssCliOption($parsed, (string) $spec['valueOption'], (string) $spec['valueShortOption'], $parsed['arguments'][1] ?? null);
+
+        $exitCode = null;
+        $resolvedUser = pmssTrafficLimitResolveCliUserHome($userName, $usage, $exitCode);
+        if ($resolvedUser === null) return $exitCode ?? 1;
+
+        $userName = $resolvedUser['user'];
+        $homeDir = $resolvedUser['home'];
+        if ($show && $unset) {
+            fwrite(STDERR, "Error: --show and --unset are mutually exclusive.\n");
+            return 2;
+        }
+
+        $targetModes = call_user_func($spec['targetModesResolver'], $userName, $homeDir);
+
+        if ($show) {
+            echo sprintf("%s for %s: %d GiB\n", $spec['subjectLabel'], $userName, pmssTrafficLimitReadGiBFile((string) array_key_first($targetModes)));
+            return 0;
+        }
+
+        if ($unset) $valueRaw = '0';
+
+        $error = null;
+        $value = pmssTrafficLimitParseGiB($valueRaw, $error);
+        if ($value === null) {
+            fwrite(STDERR, sprintf("Error: invalid %s value (expected integer GiB): %s\n", $spec['invalidOptionLabel'], $error ?: 'invalid'));
+            return 2;
+        }
+
+        $prepareTargetModes = $spec['prepareTargetModes'] ?? null;
+        if ($prepareTargetModes !== null && !call_user_func($prepareTargetModes, $targetModes)) {
+            fwrite(STDERR, (string) ($spec['prepareError'] ?? 'Error: failed to prepare persisted targets')."\n");
+            return 4;
+        }
+
+        $removingValue = ($value === 0);
+        foreach ($targetModes as $target => $mode) {
+            if ($removingValue) {
+                if (!file_exists($target)) continue;
+                if (!pmssTrafficLimitRemoveGiBFile($target)) {
+                    fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$target}\n");
+                    return 4;
+                }
+                continue;
+            }
+
+            if (!pmssTrafficLimitWriteGiBFile($target, $value)) {
+                fwrite(STDERR, "Error: failed to write {$target}\n");
+                return 4;
+            }
+            if (!pmssTrafficLimitConvergeFileMode($target, (int) $mode)) {
+                fwrite(STDERR, "Error: failed to secure {$target}\n");
+                return 4;
+            }
+        }
+
+        if (function_exists('pmssUserLog')) {
+            pmssUserLog($userName, $removingValue ? (string) $spec['unsetLogMessage'] : sprintf((string) $spec['setLogTemplate'], $value));
+        }
+
+        echo sprintf("%s for %s set %s %d GiB\n", $spec['subjectLabel'], $userName, $spec['setPreposition'], $value);
+        return 0;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitCliTargetModes')) {
+    /** @return array<string,int> */
+    function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array
+    {
+        $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
+
+        return [
+            $runtimeDir.'/'.$userName => 0600,
+            $homeDir.'/.trafficLimit' => 0664,
+        ];
+    }
+}
+
+if (!function_exists('pmssTrafficLimitCliPrepareTargetModes')) {
+    /** @param array<string,int> $targetModes */
+    function pmssTrafficLimitCliPrepareTargetModes(array $targetModes): bool
+    {
+        $runtimePath = array_key_first($targetModes);
+        return is_string($runtimePath) && $runtimePath !== ''
+            && pmssTrafficLimitEnsureStorageDir(dirname($runtimePath));
+    }
+}
+
 if (!function_exists('pmssUserTrafficLimitCli')) {
     function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int
     {
-        if (!pmssUserTrafficCliBootstrap()) {
-            return 1;
-        }
         if (!is_string($usage) || $usage === '') {
             $usage = rtrim(<<<'TEXT'
 Usage:
@@ -245,71 +342,19 @@ Notes:
 TEXT
             );
         }
-        $parsed = pmssParseCliTokens($argv);
-        if (pmssCliOption($parsed, 'help', 'h')) {
-            echo $usage."\n";
-            return 0;
-        }
-        $userName = (string) pmssCliOption($parsed, 'user', 'u', $parsed['arguments'][0] ?? '');
-        $show = (pmssCliOption($parsed, 'show') === true);
-        $unset = (pmssCliOption($parsed, 'unset') === true);
-        $limitRaw = pmssCliOption($parsed, 'limit', 'l', $parsed['arguments'][1] ?? null);
-        $exitCode = null;
-        $resolvedUser = pmssTrafficLimitResolveCliUserHome($userName, $usage, $exitCode);
-        if ($resolvedUser === null) return $exitCode ?? 1;
-        $userName = $resolvedUser['user'];
-        $homeDir = $resolvedUser['home'];
-        if ($show && $unset) {
-            fwrite(STDERR, "Error: --show and --unset are mutually exclusive.\n");
-            return 2;
-        }
-        $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
-        $runtimePath = $runtimeDir.'/'.$userName;
-        $targetModes = [$runtimePath => 0600, $homeDir.'/.trafficLimit' => 0664];
-        if ($show) {
-            $limit = pmssTrafficLimitReadGiBFile($runtimePath);
-            echo "Traffic limit for {$userName}: {$limit} GiB\n";
-            return 0;
-        }
-        if ($unset) $limitRaw = '0';
-        $err = null;
-        $trafficLimit = pmssTrafficLimitParseGiB($limitRaw, $err);
-        if ($trafficLimit === null) {
-            fwrite(STDERR, "Error: invalid --limit value (expected integer GiB): ".($err ?: 'invalid')."\n");
-            return 2;
-        }
-        if (!pmssTrafficLimitEnsureStorageDir($runtimeDir)) {
-            fwrite(STDERR, "Error: failed to prepare {$runtimeDir}\n");
-            return 4;
-        }
-        $removingLimit = ($trafficLimit === 0);
-        foreach ($targetModes as $target => $mode) {
-            if ($removingLimit) {
-                if (!file_exists($target)) continue;
-                if (!pmssTrafficLimitRemoveGiBFile($target)) {
-                    fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$target}\n");
-                    return 4;
-                }
-                continue;
-            }
-
-            if (!pmssTrafficLimitWriteGiBFile($target, $trafficLimit)) {
-                fwrite(STDERR, "Error: failed to write {$target}\n");
-                return 4;
-            }
-            if (!pmssTrafficLimitConvergeFileMode($target, $mode)) {
-                fwrite(STDERR, "Error: failed to secure {$target}\n");
-                return 4;
-            }
-        }
-        if ($removingLimit) {
-            if (function_exists('pmssUserLog')) pmssUserLog($userName, 'traffic limit unset (GiB quota removed)');
-            echo "Traffic limit for {$userName} set at 0 GiB\n";
-            return 0;
-        }
-        if (function_exists('pmssUserLog')) pmssUserLog($userName, sprintf('traffic limit set to %d GiB (monthly quota)', $trafficLimit));
-        echo "Traffic limit for {$userName} set at {$trafficLimit} GiB\n";
-        return 0;
+        return pmssUserGiBSettingCli($argv, [
+            'usage'              => $usage,
+            'valueOption'        => 'limit',
+            'valueShortOption'   => 'l',
+            'subjectLabel'       => 'Traffic limit',
+            'setPreposition'     => 'at',
+            'invalidOptionLabel' => '--limit',
+            'setLogTemplate'     => 'traffic limit set to %d GiB (monthly quota)',
+            'unsetLogMessage'    => 'traffic limit unset (GiB quota removed)',
+            'targetModesResolver' => 'pmssTrafficLimitCliTargetModes',
+            'prepareTargetModes' => 'pmssTrafficLimitCliPrepareTargetModes',
+            'prepareError' => 'Error: failed to prepare /etc/seedbox/runtime/trafficLimits',
+        ]);
     }
 }
 

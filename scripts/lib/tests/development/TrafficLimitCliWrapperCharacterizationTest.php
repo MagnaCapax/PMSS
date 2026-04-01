@@ -31,12 +31,17 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings(
             'scripts/lib/user/trafficLimit.php',
             [
+                'function pmssUserGiBSettingCli(array $argv, array $spec): int',
+                'function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array',
                 'function pmssUserTrafficCliBootstrap(): bool',
                 'function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int',
-                '$targetModes = [',
-                'Traffic limit for {$userName}: {$limit} GiB',
+                "'targetModesResolver' => 'pmssTrafficLimitCliTargetModes'",
                 'traffic limit set to %d GiB (monthly quota)',
             ]
+        );
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'scripts/lib/user/bonusTraffic.php',
+            ['pmssParseCliTokens($argv)', 'pmssTrafficLimitWriteGiBFile($bonusFile']
         );
     }
 }
