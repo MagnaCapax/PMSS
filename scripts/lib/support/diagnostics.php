@@ -33,71 +33,49 @@ function pmssSupportUsernameIsSafe(string $username): bool
 }
 
 /**
- * Build the expected home directory for a safe username.
+ * Resolve the current caller identity from trusted process state.
+ *
+ * @return array<string,string>
  */
-function pmssSupportExpectedHomeBuild(string $username): string
+function pmssSupportIdentityRead(): array
 {
-    if (!pmssSupportUsernameIsSafe($username)) {
-        return '';
-    }
-
     $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
-    if ($homeRoot === '' || $homeRoot[0] !== '/' || strpos($homeRoot, "\0") !== false) {
-        return '';
-    }
+    $homeRoot = ($homeRoot !== '' && $homeRoot[0] === '/' && strpos($homeRoot, "\0") === false) ? $homeRoot : '';
+    $envUser = getenv('USER');
+    $envUser = is_string($envUser) ? trim($envUser) : '';
+    $envHome = getenv('HOME');
+    $envHome = is_string($envHome) ? rtrim($envHome, '/') : '';
+    $username = '';
 
-    return $homeRoot.'/'.$username;
-}
-
-/**
- * Determine the current username from process state.
- */
-function pmssSupportCurrentUsernameRead(): string
-{
-    $user = getenv('USER');
-    $user = is_string($user) ? trim($user) : '';
-    if (pmssSupportUsernameIsSafe($user)) {
-        $home = getenv('HOME');
-        $home = is_string($home) ? rtrim($home, '/') : '';
-        $expectedHome = pmssSupportExpectedHomeBuild($user);
-        if ($expectedHome !== '' && $home !== '' && $home === $expectedHome) {
-            return $user;
+    if ($homeRoot !== '' && pmssSupportUsernameIsSafe($envUser)) {
+        $expectedHome = $homeRoot.'/'.$envUser;
+        if ($expectedHome !== '' && $envHome !== '' && $envHome === $expectedHome) {
+            $username = $envUser;
         }
     }
 
-    if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+    if ($username === '' && function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
         $entry = @posix_getpwuid(posix_geteuid());
         $name = is_array($entry) && !empty($entry['name']) ? (string) $entry['name'] : '';
         if (pmssSupportUsernameIsSafe($name)) {
-            return $name;
+            $username = $name;
         }
     }
 
-    return '';
-}
-
-/**
- * Resolve the current home directory without trusting arbitrary input.
- */
-function pmssSupportCurrentHomeRead(string $username): string
-{
-    $expectedHome = pmssSupportExpectedHomeBuild($username);
-
-    $home = getenv('HOME');
-    $home = is_string($home) ? rtrim($home, '/') : '';
-    if ($expectedHome !== '' && $home !== '' && $home === $expectedHome && pmssPathTargetIsSafe($home, true)) {
-        return $home;
+    $expectedHome = ($username !== '' && $homeRoot !== '') ? $homeRoot.'/'.$username : '';
+    if ($expectedHome !== '' && $envHome !== '' && $envHome === $expectedHome && pmssPathTargetIsSafe($envHome, true)) {
+        return ['username' => $username, 'home' => $envHome];
     }
 
     if ($username !== '' && function_exists('posix_getpwnam')) {
         $entry = @posix_getpwnam($username);
         $dir = is_array($entry) && !empty($entry['dir']) ? rtrim((string) $entry['dir'], '/') : '';
         if ($dir !== '' && pmssPathTargetIsSafe($dir, true)) {
-            return $dir;
+            return ['username' => $username, 'home' => $dir];
         }
     }
 
-    return $expectedHome;
+    return ['username' => $username, 'home' => $expectedHome];
 }
 
 /**
@@ -164,8 +142,9 @@ function pmssSupportCommandOutputRead(array $command, ?callable $runner = null):
 function pmssSupportDiagnosticsBuild(string $message, ?callable $runner = null): array
 {
     $message = pmssSupportMessageNormalize($message);
-    $username = pmssSupportCurrentUsernameRead();
-    $home = pmssSupportCurrentHomeRead($username);
+    $identity = pmssSupportIdentityRead();
+    $username = (string) $identity['username'];
+    $home = (string) $identity['home'];
     $hostname = (string) (gethostname() ?: 'unknown-host');
     $billingId = pmssSupportBillingIdRead($home);
     $versionPath = pmssResolvePathFromEnv('PMSS_VERSION_FILE', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/version');

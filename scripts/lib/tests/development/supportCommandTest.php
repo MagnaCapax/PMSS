@@ -97,17 +97,15 @@ class SupportCommandTest extends TestCase
         $this->assertSame(26, $config['smtpPort']);
     }
 
-    public function testCurrentHomeReadRejectsUnsafeUsername(): void
-    {
-        $this->assertSame('', \pmssSupportCurrentHomeRead('../escape'));
-    }
-
-    public function testCurrentUsernameReadRejectsUnsafeEnvironmentUsername(): void
+    public function testIdentityReadRejectsUnsafeEnvironmentUsername(): void
     {
         putenv('USER=../escape');
         putenv('HOME=/home/../escape');
 
-        $this->assertTrue(\pmssSupportCurrentUsernameRead() !== '../escape');
+        $identity = \pmssSupportIdentityRead();
+
+        $this->assertTrue($identity['username'] !== '../escape');
+        $this->assertTrue($identity['home'] !== '/home/../escape');
     }
 
     public function testDiagnosticsBuildUsesRunnerOutputs(): void
@@ -120,7 +118,14 @@ class SupportCommandTest extends TestCase
 
         $this->assertEquals($this->user, $diagnostics['username']);
         $this->assertStringContainsString('Need help', $diagnostics['body']);
-        $this->assertTrue(count($outputs) >= 4, 'expected fixed diagnostics commands');
+        $this->assertSame([
+            ['uptime'],
+            ['df', '-P', '-h', $this->homeRoot.'/'.$this->user],
+            ['pgrep', '-a', '-u', $this->user, '-x', 'rtorrent'],
+            ['pgrep', '-a', '-u', $this->user, '-x', 'deluged'],
+            ['pgrep', '-a', '-u', $this->user, '-x', 'deluge-web'],
+            ['pgrep', '-a', '-u', $this->user, '-x', 'qbittorrent-nox'],
+        ], $outputs);
     }
 
     public function testSnapshotWriteCreatesPrivateFile(): void
