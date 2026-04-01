@@ -72,6 +72,9 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
     if (!is_array($lines)) {
         return $template;
     }
+    if ($lines !== [] && end($lines) === '') {
+        array_pop($lines);
+    }
 
     $legacyMappings = [
         [
