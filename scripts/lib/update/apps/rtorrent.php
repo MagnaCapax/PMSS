@@ -52,6 +52,113 @@ function pmssRtorrentResolveTargetVersions(array $distroInfo, string $legacyDebi
     ];
 }
 
+/**
+ * Normalize legacy rTorrent template directives to the modern syntax.
+ *
+ * Existing hosts can still carry historical `template.rtorrent.rc` copies from
+ * long-lived installs. Rewriting the known legacy keys keeps operator intent
+ * intact while removing aliases that newer rTorrent versions reject.
+ */
+function pmssRtorrentNormalizeLegacyTemplate(string $template): string
+{
+    $lineSeparator = "\n";
+    if (strpos($template, "\r\n") !== false) {
+        $lineSeparator = "\r\n";
+    } elseif (strpos($template, "\r") !== false) {
+        $lineSeparator = "\r";
+    }
+
+    $lines = preg_split('/\r\n|\r|\n/', $template);
+    if (!is_array($lines)) {
+        return $template;
+    }
+
+    $legacyMappings = [
+        [
+            'pattern' => '/^\s*tracker_numwant\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'trackers.numwant.set = ',
+        ],
+        [
+            'pattern' => '/^\s*use_udp_trackers\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'trackers.use_udp.set = ',
+        ],
+        [
+            'pattern' => '/^\s*port_range\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'network.port_range.set = ',
+        ],
+        [
+            'pattern' => '/^\s*check_hash\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'pieces.hash.on_completion.set = ',
+        ],
+    ];
+    $legacyRemovalPatterns = [
+        '/^\s*umask\s*=\s*.+?\s*$/',
+        '/^\s*hash_interval\s*=\s*.+?\s*$/',
+        '/^\s*hash_max_tries\s*=\s*.+?\s*$/',
+    ];
+
+    $managedLines = [];
+    foreach ($legacyMappings as $mapping) {
+        $managedLines[$mapping['replacementPrefix']] = true;
+    }
+
+    $normalizedLines = [];
+    $seenManagedLines = [];
+    foreach ($lines as $line) {
+        $wasHandled = false;
+
+        foreach ($legacyRemovalPatterns as $pattern) {
+            if (preg_match($pattern, $line) === 1) {
+                $wasHandled = true;
+                break;
+            }
+        }
+        if ($wasHandled) {
+            continue;
+        }
+
+        foreach ($legacyMappings as $mapping) {
+            $matches = [];
+            if (preg_match($mapping['pattern'], $line, $matches) === 1) {
+                $replacement = $mapping['replacementPrefix'].$matches[1];
+                if (!isset($seenManagedLines[$replacement])) {
+                    $normalizedLines[] = $replacement;
+                    $seenManagedLines[$replacement] = true;
+                }
+                $wasHandled = true;
+                break;
+            }
+        }
+        if ($wasHandled) {
+            continue;
+        }
+
+        $trimmed = trim($line);
+        foreach (array_keys($managedLines) as $managedPrefix) {
+            if (strpos($trimmed, $managedPrefix) === 0) {
+                if (isset($seenManagedLines[$trimmed])) {
+                    $wasHandled = true;
+                } else {
+                    $seenManagedLines[$trimmed] = true;
+                }
+                break;
+            }
+        }
+        if ($wasHandled) {
+            continue;
+        }
+
+        $normalizedLines[] = $line;
+    }
+
+    $normalized = implode($lineSeparator, $normalizedLines);
+    if ($template !== '' && preg_match('/(?:\r\n|\r|\n)\z/', $template) === 1) {
+        $normalized .= $lineSeparator;
+    }
+
+    return $normalized;
+}
+
 if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
     return;
 }
@@ -193,15 +300,10 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
         if (!is_string($localRtorrentRcTemplate) || $localRtorrentRcTemplate === '') {
             echo "**** Skipping template update (failed to read template)\n";
         } else {
-            $localRtorrentRcTemplate = str_replace(
-                array(
-                    "umask = 0002\n",
-                    "hash_interval = 300\n",
-                    "hash_max_tries = 2\n",
-					"use_udp_trackers = yes\n",
-                ), '', $localRtorrentRcTemplate);
-                
-            file_put_contents('/etc/seedbox/config/template.rtorrent.rc', $localRtorrentRcTemplate);
+            file_put_contents(
+                '/etc/seedbox/config/template.rtorrent.rc',
+                pmssRtorrentNormalizeLegacyTemplate($localRtorrentRcTemplate)
+            );
         }
     }
     
