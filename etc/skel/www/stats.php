@@ -100,12 +100,10 @@ if (!function_exists('pmssInfoSetDockerEnabled')) {
         }
 
         $payload['dockerEnabled'] = (bool) $enabled;
-        if (!$store->set($username, $payload)) {
+        if (!$store->persist($username, $payload)) {
             $result['error'] = 'Unable to persist Docker policy. Contact support if this account should be allowed to manage Docker state.';
             return $result;
         }
-
-        $store->writeUserCache($username, $payload);
         $result['ok'] = true;
         return $result;
     }
