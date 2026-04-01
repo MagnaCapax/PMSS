@@ -167,6 +167,27 @@ function pmssDockerInstallLsioWriteCredentialFile(string $credentialFile, string
 }
 
 /**
+ * Validate an optional CLI host port override.
+ */
+function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?string
+{
+    if ($value === null || $value === '') {
+        return $defaultPort;
+    }
+
+    if (!ctype_digit($value)) {
+        return null;
+    }
+
+    $port = (int) $value;
+    if ($port < 1 || $port > 65535) {
+        return null;
+    }
+
+    return (string) $port;
+}
+
+/**
  * Build the app-specific install specification.
  *
  * @return array<string,mixed>|null
@@ -327,7 +348,12 @@ function pmssDockerInstallLsioMain(array $argv): int
         return 1;
     }
 
-    $hostPort = isset($positionals[1]) && $positionals[1] !== '' ? (string) $positionals[1] : (string) $spec['defaultPort'];
+    $hostPort = pmssDockerInstallLsioHostPort(isset($positionals[1]) ? (string) $positionals[1] : null, (string) $spec['defaultPort']);
+    if ($hostPort === null) {
+        fwrite(STDERR, "Invalid host port; expected an integer between 1 and 65535.\n");
+        return 1;
+    }
+
     $dockerRun = pmssDockerInstallLsioDockerRunCommand($app, $hostPort, pmssDockerInstallLsioTimezone(), $spec);
 
     if ($dryRun) {

@@ -184,6 +184,24 @@ BASH;
         $this->assertStringContainsString('PMA_PORT=3306', $result['output']);
     }
 
+    public function testDryRunRejectsNonNumericHostPortOverride(): void
+    {
+        $result = $this->runHelper(['jellyfin', 'abc', '--dry-run']);
+
+        $this->assertTrue($result['rc'] !== 0, 'non-numeric host port should fail');
+        $this->assertStringContainsString('Invalid host port; expected an integer between 1 and 65535.', $result['output']);
+        $this->assertSame('', $result['dockerLog']);
+    }
+
+    public function testDryRunRejectsOutOfRangeHostPortOverride(): void
+    {
+        $result = $this->runHelper(['jellyfin', '70000', '--dry-run']);
+
+        $this->assertTrue($result['rc'] !== 0, 'out-of-range host port should fail');
+        $this->assertStringContainsString('Invalid host port; expected an integer between 1 and 65535.', $result['output']);
+        $this->assertSame('', $result['dockerLog']);
+    }
+
     public function testRunWithoutDockerDoesNotCreateDirectories(): void
     {
         $emptyPath = $this->tempDir.'/empty-bin';
