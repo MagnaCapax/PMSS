@@ -76,6 +76,9 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         finalizeProvision('FAIL', 'user_config_failed', 1);
         exit(1);
     }
+    if (function_exists('pmssAddUserFailureRollbackMarkUserConfigApplied')) {
+        pmssAddUserFailureRollbackMarkUserConfigApplied();
+    }
 
     // Record per-user service ports assigned during configuration.
     $portFiles = [

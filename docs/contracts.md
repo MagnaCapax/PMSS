@@ -517,6 +517,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
   - Guardrails: Rejects reserved system/service usernames to avoid future account collisions.
   - Recovery gate: When `/etc/passwd` already contains the username, addUser may self-heal only if the latest `###ADDUSER_JSON` summary for that user is a recent internal `FAIL` and both per-user `rtorrent` and `lighttpd` are inactive; the stale account is cleaned before retry. All other existing-user cases still abort.
+  - Recovery gate: When the current run fails after `useradd` but before `userConfig.php` completes, addUser reuses the stale-account cleanup path on shutdown so `/etc/passwd`, `/home/<user>`, ports, lock files, and the per-user config store do not linger half-created.
   - Fail-fast: Aborts on existing user, orphaned home directory, failed cleanup of stale failed-provision state, failed `useradd`, failed `changePw.php`, or failed `userConfig.php` to avoid unsafe overwrites.
   - Logs: `/var/log/pmss/addUser.log`, shared user logs (`/var/log/pmss/users.log`,
     `/var/log/pmss/users.jsonl`), and per-user logs under `/var/log/pmss/users/<user>.log`.

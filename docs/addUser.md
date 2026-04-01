@@ -61,6 +61,8 @@ Operational notes:
 - A per-user lock file prevents concurrent addUser runs for the same username.
 - Provisioning fails fast if the user already exists, the home directory is missing after `useradd`,
   or critical steps (password + userConfig) fail.
+- If provisioning fails after `useradd` but before `userConfig.php` finishes, addUser removes the
+  partially created account, home directory, ports, and per-user config store entry before exiting.
 - Step outcomes are logged in `/var/log/pmss/addUser.log`, `/var/log/pmss/users.log`,
   `/var/log/pmss/users.jsonl`, and per-user logs under `/var/log/pmss/users/<user>.log`.
 

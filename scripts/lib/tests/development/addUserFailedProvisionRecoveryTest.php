@@ -4,6 +4,7 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/add/provisioningRuntime.php';
 require_once dirname(__DIR__, 2).'/user/add/orphanCleanup.php';
+require_once dirname(__DIR__, 2).'/user/add/failureRollback.php';
 
 final class AddUserFailedProvisionRecoveryTest extends TestCase
 {
@@ -83,10 +84,48 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         $this->assertStringContainsString('/etc/seedbox/runtime/trafficLimits/alice', $joined);
     }
 
+    public function testFailureRollbackRunsOnlyForEarlyFailAfterUserCreation(): void
+    {
+        $summary = array('status' => 'FAIL', 'exit_code' => 1);
+
+        $this->assertTrue(pmssAddUserFailureRollbackShouldRun(
+            array('systemUserCreated' => true, 'userConfigApplied' => false, 'cleanupAttempted' => false),
+            $summary
+        ));
+        $this->assertFalse(pmssAddUserFailureRollbackShouldRun(
+            array('systemUserCreated' => false, 'userConfigApplied' => false, 'cleanupAttempted' => false),
+            $summary
+        ));
+        $this->assertFalse(pmssAddUserFailureRollbackShouldRun(
+            array('systemUserCreated' => true, 'userConfigApplied' => true, 'cleanupAttempted' => false),
+            $summary
+        ));
+        $this->assertFalse(pmssAddUserFailureRollbackShouldRun(
+            array('systemUserCreated' => true, 'userConfigApplied' => false, 'cleanupAttempted' => true),
+            $summary
+        ));
+    }
+
     public function testAddUserWrapperUsesPreflightHelper(): void
     {
         $src = $this->pmssReadRepoFile('scripts/addUser.php');
         $this->assertStringContainsString("require_once 'lib/user/add/preflight.php';", $src);
         $this->assertStringContainsString('pmssAddUserEnsurePreflightState($userDb, $user, $homePath);', $src);
+    }
+
+    public function testAddUserWrapperInitializesFailureRollback(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/addUser.php');
+        $this->assertStringContainsString("require_once 'lib/user/add/failureRollback.php';", $src);
+        $this->assertStringContainsString("pmssAddUserFailureRollbackInit(\$userDb, \$user['name'], \$homePath);", $src);
+    }
+
+    public function testProvisioningPhasesMarkRollbackBoundaries(): void
+    {
+        $systemUserCreate = $this->pmssReadRepoFile('scripts/lib/user/add/systemUserCreate.php');
+        $userConfigApply = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
+
+        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkSystemUserCreated();', $systemUserCreate);
+        $this->assertStringContainsString('pmssAddUserFailureRollbackMarkUserConfigApplied();', $userConfigApply);
     }
 }

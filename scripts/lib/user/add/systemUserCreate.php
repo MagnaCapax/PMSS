@@ -26,6 +26,9 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
         finalizeProvision('FAIL', 'useradd_failed', 1);
         exit(1);
     }
+    if (function_exists('pmssAddUserFailureRollbackMarkSystemUserCreated')) {
+        pmssAddUserFailureRollbackMarkSystemUserCreated();
+    }
 
     $pwEntry = null;
     if (function_exists('posix_getpwnam')) {
@@ -73,4 +76,3 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
         );
     }
 }
-

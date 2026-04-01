@@ -34,6 +34,7 @@ require_once 'lib/homeMount.php';
 require_once 'lib/update.php';
 require_once 'lib/update/users.php';
 require_once 'lib/user/add/provisioningRuntime.php';
+require_once 'lib/user/add/failureRollback.php';
 require_once 'lib/user/add/systemUserCreate.php';
 require_once 'lib/user/add/userConfigApply.php';
 require_once 'lib/user/add/artifactVerification.php';
@@ -110,6 +111,7 @@ if ($lockBusy) {
 }
 $homePath = "/home/{$user['name']}";
 pmssAddUserEnsurePreflightState($userDb, $user, $homePath);
+pmssAddUserFailureRollbackInit($userDb, $user['name'], $homePath);
 
 // Get our server hostname, and do some cleanup just to be safe
 $hostname = trim( file_get_contents('/etc/hostname') );

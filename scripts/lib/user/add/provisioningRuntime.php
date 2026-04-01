@@ -21,6 +21,25 @@ function pmssAddUserProvisioningLogPath(): string
 }
 
 /**
+ * Store the latest structured addUser summary for process-local helpers.
+ */
+function pmssAddUserProvisionSummarySet(array $summary): void
+{
+    $GLOBALS['PMSS_ADDUSER_PROVISION_SUMMARY'] = $summary;
+}
+
+/**
+ * Read the latest structured addUser summary stored in this process.
+ *
+ * @return array<string,mixed>|null
+ */
+function pmssAddUserProvisionSummaryGet(): ?array
+{
+    $summary = $GLOBALS['PMSS_ADDUSER_PROVISION_SUMMARY'] ?? null;
+    return is_array($summary) ? $summary : null;
+}
+
+/**
  * Initialise runtime knobs used by addUser provisioning runs.
  *
  * - Removes time limits in CLI runs (best-effort).
@@ -177,6 +196,7 @@ function finalizeProvision(string $status, string $message, int $exitCode, array
         ),
         $extraSummary
     );
+    pmssAddUserProvisionSummarySet($jsonSummary);
     $jsonEncoded = json_encode($jsonSummary, JSON_UNESCAPED_SLASHES);
     if ($jsonEncoded !== false) {
         logProvisionMessage('###ADDUSER_JSON:'.$jsonEncoded);
