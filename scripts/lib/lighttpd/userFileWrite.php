@@ -57,6 +57,11 @@ function pmssPathTargetIsSafe(string $path, bool $directoryTarget, bool $require
             continue;
         }
 
+        // Reject dot segments so callers cannot escape intended roots via traversal.
+        if ($segment === '.' || $segment === '..') {
+            return false;
+        }
+
         $current .= '/'.$segment;
         if (is_link($current)) {
             return false;

@@ -63,6 +63,18 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->assertFalse(file_exists('relative.htpasswd'));
     }
 
+    public function testAppendUserFileRejectsTraversalSegment(): void
+    {
+        $managedDir = $this->tempDir.'/user/.lighttpd';
+        $outsideDir = $this->tempDir.'/user/outside';
+        @mkdir($managedDir, 0755, true);
+        @mkdir($outsideDir, 0755, true);
+
+        $path = $managedDir.'/../outside/.htpasswd';
+        $this->assertFalse(\pmssAppendUserFile($path, "user:hash\n", $this->pmssCurrentOwner(), 0640));
+        $this->assertFalse(file_exists($outsideDir.'/.htpasswd'));
+    }
+
     public function testWriteUserFileRejectsSymlinkedParentDirectory(): void
     {
         $realDir = $this->tempDir.'/real';
@@ -77,6 +89,31 @@ class LighttpdUserFileWriteTest extends TestCase
     {
         $this->assertFalse(\pmssWriteUserFile('relative.htpasswd', "user:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertFalse(file_exists('relative.htpasswd'));
+    }
+
+    public function testWriteUserFileRejectsTraversalSegment(): void
+    {
+        $managedDir = $this->tempDir.'/user/.lighttpd';
+        $outsideDir = $this->tempDir.'/user/outside';
+        @mkdir($managedDir, 0755, true);
+        @mkdir($outsideDir, 0755, true);
+
+        $path = $managedDir.'/../outside/.htpasswd';
+        $this->assertFalse(\pmssWriteUserFile($path, "user:hash\n", $this->pmssCurrentOwner(), 0640));
+        $this->assertFalse(file_exists($outsideDir.'/.htpasswd'));
+    }
+
+    public function testJsonFileReadAssocRejectsTraversalWhenSafePathRequired(): void
+    {
+        $managedDir = $this->tempDir.'/user/.lighttpd';
+        $outsideDir = $this->tempDir.'/user/outside';
+        @mkdir($managedDir, 0755, true);
+        @mkdir($outsideDir, 0755, true);
+
+        $outsidePath = $outsideDir.'/state.json';
+        file_put_contents($outsidePath, json_encode(['ok' => true]));
+
+        $this->assertEquals(null, \pmssJsonFileReadAssoc($managedDir.'/../outside/state.json', true));
     }
 
     public function testReplaceUserFileCleansTempFileWhenPrepareTempThrows(): void
