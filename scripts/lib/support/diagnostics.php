@@ -102,12 +102,8 @@ function pmssSupportMessageNormalize(string $message): string
 function pmssSupportBillingIdRead(string $home): int
 {
     $path = rtrim($home, '/').'/.billingId';
-    if (!is_file($path) || is_link($path)) {
-        return 0;
-    }
-
-    $billingId = (int) trim((string) @file_get_contents($path));
-    return $billingId > 0 ? $billingId : 0;
+    $value = (int) pmssReadRegularFileTrimmed($path);
+    return $value > 0 ? $value : 0;
 }
 
 /**

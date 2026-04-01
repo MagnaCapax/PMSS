@@ -6,6 +6,7 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../lighttpd/userConfigApply.php';
 
 /**
@@ -35,8 +36,8 @@ function pmssTorrentPortCurrentUserContext(): ?array
  */
 function pmssTorrentPortExpectedRead(string $path): ?int
 {
-    $raw = trim((string) @file_get_contents($path));
-    if (preg_match('/^[0-9]+$/', $raw) !== 1) {
+    $raw = pmssReadRegularFileTrimmed($path);
+    if ($raw === null || preg_match('/^[0-9]+$/', $raw) !== 1) {
         return null;
     }
 

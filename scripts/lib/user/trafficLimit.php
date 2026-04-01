@@ -81,12 +81,8 @@ if (!function_exists('pmssTrafficLimitReadGiBFile')) {
      */
     function pmssTrafficLimitReadGiBFile(string $path): int
     {
-        if (!is_file($path) || is_link($path)) {
-            return 0;
-        }
-
-        $raw = trim((string) @file_get_contents($path));
-        if ($raw === '') {
+        $raw = pmssReadRegularFileTrimmed($path);
+        if ($raw === null || $raw === '') {
             return 0;
         }
 

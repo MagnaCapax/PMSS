@@ -33,11 +33,8 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
         $defaultCapMbit = 100;
     }
     $readPositiveInt = function (string $path): ?int {
-        if (!is_file($path) || is_link($path)) {
-            return null;
-        }
-        $raw = trim((string) @file_get_contents($path));
-        if ($raw === '' || !is_numeric($raw)) {
+        $raw = pmssReadRegularFileTrimmed($path);
+        if ($raw === null || $raw === '' || !is_numeric($raw)) {
             return null;
         }
         $value = (int) $raw;

@@ -114,6 +114,13 @@ if (!function_exists('pmssLogDir')) {
 if (!function_exists('pmssDirEnsureExists')) {
     function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path); }
 }
+if (!function_exists('pmssReadRegularFileTrimmed')) {
+    // Read a regular non-symlink file and return its trimmed contents.
+    function pmssReadRegularFileTrimmed(string $path): ?string
+    {
+        return (!is_file($path) || is_link($path) || !is_string($contents = @file_get_contents($path))) ? null : trim($contents);
+    }
+}
 
 if (!function_exists('pmssLockFileAcquire')) {
     function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)

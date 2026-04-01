@@ -131,8 +131,8 @@ function pmssReadTorrentThrottle(string $username): ?int
         }
     }
 
-    $raw = trim((string) @file_get_contents($path));
-    if ($raw === '' || !is_numeric($raw)) {
+    $raw = pmssReadRegularFileTrimmed($path);
+    if ($raw === null || $raw === '' || !is_numeric($raw)) {
         return null;
     }
 

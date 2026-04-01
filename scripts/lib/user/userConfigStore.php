@@ -343,8 +343,8 @@ class UserConfigStore
         if ($owner !== 0) {
             return 0;
         }
-        $raw = trim((string)@file_get_contents($path));
-        if ($raw === '' || !ctype_digit($raw)) {
+        $raw = pmssReadRegularFileTrimmed($path);
+        if ($raw === null || $raw === '' || !ctype_digit($raw)) {
             return 0;
         }
         $id = (int)$raw;
