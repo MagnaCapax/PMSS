@@ -97,6 +97,32 @@ class SupportCommandTest extends TestCase
         $this->assertSame(26, $config['smtpPort']);
     }
 
+    public function testConfigReadRejectsUnreadableOverridePath(): void
+    {
+        $customPath = $this->configDir.'/support-unreadable.php';
+        file_put_contents($customPath, "<?php\nreturn ".var_export([
+            'targetEmail' => 'override@example.com',
+            'snapshotDirectory' => '.support/requests',
+            'smtpPort' => 26,
+            'connectTimeout' => 6,
+            'relayHost' => 'mx-override.example.com',
+        ], true).";\n");
+        chmod($customPath, 0000);
+        putenv('PMSS_SUPPORT_CONFIG_PATH='.$customPath);
+
+        $caught = false;
+        try {
+            \pmssSupportConfigRead();
+        } catch (\RuntimeException $exception) {
+            $caught = true;
+            $this->assertSame('Support command config is missing or unreadable.', $exception->getMessage());
+        } finally {
+            chmod($customPath, 0600);
+        }
+
+        $this->assertTrue($caught, 'unreadable support config overrides must be rejected');
+    }
+
     public function testIdentityReadRejectsUnsafeEnvironmentUsername(): void
     {
         putenv('USER=../escape');

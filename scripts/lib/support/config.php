@@ -19,8 +19,8 @@ require_once dirname(__DIR__).'/runtime.php';
 function pmssSupportConfigRead(): array
 {
     $path = pmssResolvePathFromEnv('PMSS_SUPPORT_CONFIG_PATH', pmssResolvePathFromEnv('PMSS_CONFIG_DIR', '/etc/seedbox/config').'/support.php');
-    if (!is_file($path) || is_link($path)) {
-        throw new RuntimeException('Support command config is missing.');
+    if (!is_file($path) || is_link($path) || !is_readable($path)) {
+        throw new RuntimeException('Support command config is missing or unreadable.');
     }
 
     $config = require $path;
