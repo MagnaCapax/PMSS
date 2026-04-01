@@ -56,6 +56,10 @@ if (!function_exists('pmssInfoResolveDockerEnabled')) {
     }
 }
 
+if (file_exists('/scripts/lib/webDockerInactiveNote.php')) {
+    require_once '/scripts/lib/webDockerInactiveNote.php';
+}
+
 if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
     require_once '/scripts/lib/webCgroupMemoryStatus.php';
 }
@@ -456,6 +460,9 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
         }
     }
     $apps['Docker'] = $dockerStatus;
+    $pmssDockerInactiveNote = function_exists('pmssWebDockerInactiveNote')
+        ? pmssWebDockerInactiveNote($dockerStatus, $pmssDockerEnabledPolicy)
+        : '';
     ?>
 
     <div class="status-grid">
@@ -479,7 +486,7 @@ echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
         <div></div>
         <?php foreach ($apps as $name => $status): ?>
             <div><?php echo $name; ?></div>
-            <div><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php if ($name === 'Docker' && $status === 'inactive'): ?><span class="docker-note"> (Debian 11: User bus restricted. Requires `systemd.unified_cgroup_hierarchy=0` in GRUB. Contact support.)</span><?php endif; ?></div>
+            <div><span class="status <?php echo $status; ?>"><?php echo ucfirst($status); ?></span><?php if ($name === 'Docker' && $pmssDockerInactiveNote !== ''): ?><span class="docker-note"><?php echo htmlspecialchars($pmssDockerInactiveNote, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?></div>
         <?php endforeach; ?>
     </div>
 
