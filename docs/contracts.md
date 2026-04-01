@@ -516,8 +516,8 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Resource passthrough: Supports optional `--traffic-limit-gb`, `--traffic-cap-mbit`, `--upload-throttle-kib`, `--cpu-weight`, `--io-weight`, `--io-read-bw`, `--io-write-bw`, `--io-read-iops`, `--io-write-iops`, and `--cpu-quota-percent` flags while preserving the legacy positional form.
   - Guardrails: Per-user lock file prevents concurrent addUser runs for the same username.
   - Guardrails: Rejects reserved system/service usernames to avoid future account collisions.
-  - Fail-fast: Aborts on existing user, orphaned home directory, failed `useradd`,
-    failed `changePw.php`, or failed `userConfig.php` to avoid partial provisioning.
+  - Recovery gate: When `/etc/passwd` already contains the username, addUser may self-heal only if the latest `###ADDUSER_JSON` summary for that user is a recent internal `FAIL` and both per-user `rtorrent` and `lighttpd` are inactive; the stale account is cleaned before retry. All other existing-user cases still abort.
+  - Fail-fast: Aborts on existing user, orphaned home directory, failed cleanup of stale failed-provision state, failed `useradd`, failed `changePw.php`, or failed `userConfig.php` to avoid unsafe overwrites.
   - Logs: `/var/log/pmss/addUser.log`, shared user logs (`/var/log/pmss/users.log`,
     `/var/log/pmss/users.jsonl`), and per-user logs under `/var/log/pmss/users/<user>.log`.
     Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep plus

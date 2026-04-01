@@ -38,6 +38,7 @@ require_once 'lib/user/add/systemUserCreate.php';
 require_once 'lib/user/add/userConfigApply.php';
 require_once 'lib/user/add/artifactVerification.php';
 require_once 'lib/user/add/postProvision.php';
+require_once 'lib/user/add/preflight.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Creating
 // a user when /home is unavailable would write to the wrong location or fail
@@ -107,23 +108,8 @@ if ($lockBusy) {
     finalizeProvision('ERROR', 'lock_busy', 1);
     exit(1);
 }
-// Preflight: reject existing accounts or orphaned home directories.
 $homePath = "/home/{$user['name']}";
-$userExists = pmssUserAccountLookup($user['name']) !== null;
-if (!$userExists) {
-    $passwd = @file_get_contents('/etc/passwd');
-    $userExists = $passwd !== false && preg_match('/^'.preg_quote($user['name'], '/').':/m', $passwd) === 1;
-}
-if ($userExists) {
-    logProvisionMessage('FATAL: User already exists; refusing to overwrite');
-    finalizeProvision('ERROR', 'user_exists', 1);
-    exit(1);
-}
-if (is_dir($homePath)) {
-    logProvisionMessage('FATAL: Home directory exists without passwd entry; refusing to clobber');
-    finalizeProvision('ERROR', 'orphaned_home', 1);
-    exit(1);
-}
+pmssAddUserEnsurePreflightState($userDb, $user, $homePath);
 
 // Get our server hostname, and do some cleanup just to be safe
 $hostname = trim( file_get_contents('/etc/hostname') );

@@ -1,0 +1,140 @@
+<?php
+/**
+ * addUser: conservative recovery for recent failed provisioning attempts.
+ *
+ * @license GPL-3.0-only
+ * @author PMSS Team
+ */
+
+require_once __DIR__.'/../../userLifecycle.php';
+
+/**
+ * Return the most recent structured addUser summary for one username.
+ *
+ * @return array<string,mixed>|null
+ */
+function pmssAddUserLatestProvisionSummary(string $userName): ?array
+{
+    $logPath = function_exists('pmssAddUserProvisioningLogPath')
+        ? pmssAddUserProvisioningLogPath()
+        : ((string) getenv('PMSS_ADDUSER_LOG_PATH') ?: '/var/log/pmss/addUser.log');
+    if (!is_file($logPath) || is_link($logPath)) {
+        return null;
+    }
+
+    $summary = null;
+    $handle = @fopen($logPath, 'r');
+    if (!is_resource($handle)) {
+        return null;
+    }
+
+    try {
+        while (($line = fgets($handle)) !== false) {
+            $markerPos = strpos($line, '###ADDUSER_JSON:');
+            if ($markerPos === false) {
+                continue;
+            }
+            $payload = json_decode(substr($line, $markerPos + 16), true);
+            if (!is_array($payload) || ($payload['event'] ?? '') !== 'adduser_summary' || ($payload['user'] ?? '') !== $userName) {
+                continue;
+            }
+            $payload['timestamp'] = strtotime(substr($line, 0, 19)) ?: 0;
+            $summary = $payload;
+        }
+    } finally {
+        fclose($handle);
+    }
+
+    return $summary;
+}
+
+/**
+ * Keep orphan recovery limited to fresh internal failures, never guard errors.
+ */
+function pmssAddUserProvisionSummaryRecoverable(?array $summary, ?int $now = null): bool
+{
+    if (!is_array($summary) || ($summary['status'] ?? '') !== 'FAIL') {
+        return false;
+    }
+
+    $timestamp = (int) ($summary['timestamp'] ?? 0);
+    if ($timestamp <= 0) {
+        return false;
+    }
+
+    $now = $now ?? time();
+    $window = (int) (getenv('PMSS_ADDUSER_RECOVERY_WINDOW_SECONDS') ?: 3600);
+    if ($window < 60) {
+        $window = 60;
+    }
+    if ($window > 86400) {
+        $window = 86400;
+    }
+
+    return ($now - $timestamp) <= $window;
+}
+
+/**
+ * Return whether per-user services are still running.
+ *
+ * @return array<string,bool>
+ */
+function pmssAddUserProvisionServiceState(string $userName): array
+{
+    return array(
+        'rtorrent' => pmssUserWatchdogProcessRunning($userName, 'rtorrent'),
+        'lighttpd' => pmssUserWatchdogProcessRunning($userName, 'lighttpd'),
+    );
+}
+
+/**
+ * Self-heal only when the latest run failed internally and no services are live.
+ */
+function pmssAddUserFailedProvisionCanRecover(string $userName, ?array $summary = null, ?array $serviceState = null, ?int $now = null): bool
+{
+    $summary = $summary ?? pmssAddUserLatestProvisionSummary($userName);
+    if (!pmssAddUserProvisionSummaryRecoverable($summary, $now)) {
+        return false;
+    }
+
+    $serviceState = $serviceState ?? pmssAddUserProvisionServiceState($userName);
+    return empty($serviceState['rtorrent']) && empty($serviceState['lighttpd']);
+}
+
+/**
+ * Build the explicit cleanup steps used before a failed provisioning retry.
+ *
+ * @return array<int,array<int,string>>
+ */
+function pmssAddUserFailedProvisionCleanupCommands(string $userName, string $homePath): array
+{
+    return array(
+        array('Kill lingering user processes', 'killall -9 -u '.escapeshellarg($userName).' || true'),
+        array('Release lighttpd port', '/scripts/util/portManager.php release '.escapeshellarg($userName).' lighttpd'),
+        array('Remove nginx user config', 'rm -f -- '.escapeshellarg('/etc/nginx/users/'.$userName)),
+        array('Remove runtime traffic limit', 'rm -f -- '.escapeshellarg('/etc/seedbox/runtime/trafficLimits/'.$userName)),
+        array('Delete user account and home', 'userdel -r '.escapeshellarg($userName).' || true'),
+        array('Delete leftover home directory', 'rm -rf -- '.escapeshellarg($homePath)),
+        array('Delete user group', 'groupdel '.escapeshellarg($userName).' || true'),
+        array('Remove screen socket', 'rm -rf -- '.escapeshellarg('/var/run/screen/S-'.$userName)),
+        array('Cleanup addUser lock files', 'rm -f -- '.escapeshellarg('/run/lock/pmss-addUser-'.$userName.'.lock').' '.escapeshellarg('/tmp/pmss-addUser-'.$userName.'.lock')),
+    );
+}
+
+/**
+ * Remove stale resources from a known failed provisioning run.
+ */
+function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, string $homePath): bool
+{
+    foreach (pmssAddUserFailedProvisionCleanupCommands($userName, $homePath) as $step) {
+        runProvisionStep($step[0], $step[1]);
+    }
+
+    if (pmssUserAccountLookup($userName) !== null || is_dir($homePath)) {
+        return false;
+    }
+
+    $userDb->removeUser($userName);
+    logProvisionMessage('Removed stale user database entry');
+    return true;
+}

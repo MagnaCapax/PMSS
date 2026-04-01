@@ -13,6 +13,14 @@
 require_once __DIR__.'/../../runtime.php';
 
 /**
+ * Resolve the addUser provisioning log path with a hermetic test override.
+ */
+function pmssAddUserProvisioningLogPath(): string
+{
+    return pmssResolvePathFromEnv('PMSS_ADDUSER_LOG_PATH', '/var/log/pmss/addUser.log');
+}
+
+/**
  * Initialise runtime knobs used by addUser provisioning runs.
  *
  * - Removes time limits in CLI runs (best-effort).
@@ -56,7 +64,7 @@ function logProvisionMessage(string $message): void
 {
     global $user;
     $prefix = date('Y-m-d H:i:s') . " ({$user['name']}): ";
-    @file_put_contents('/var/log/pmss/addUser.log', $prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+    @file_put_contents(pmssAddUserProvisioningLogPath(), $prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
     echo $message.PHP_EOL;
     if (function_exists('pmssUserLog')) {
         pmssUserLog($user['name'], $message);
