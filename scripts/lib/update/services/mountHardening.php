@@ -100,14 +100,10 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
         $log('[WARN] Added /tmp tmpfs entry to '.$fstabPath.' (size='.$size.')');
     } else {
         if ($entry['columns'][2] !== 'tmpfs') { $log('[WARN] /tmp is configured as non-tmpfs in '.$fstabPath.'; skipping tmpfs hardening'); return; }
-        $plan = pmssFstabMountOptionsPlan($entry['columns'], $required, $conflicts);
-        $options = pmssFstabOptionsReplacePrefixedValue($plan['options'], 'size=', 'size='.$size, false);
-        $updatedColumns = $entry['columns'];
-        $updatedColumns[3] = implode(',', $options);
-        if ($updatedColumns[3] === $entry['columns'][3]) {
+        $plan = pmssFstabMountOptionsEnsure($lines, '/tmp', $required, $conflicts, false, 'tmpfs', ['size=' => 'size='.$size], false);
+        if (!$plan['changed']) {
             $log('[SKIP] /tmp tmpfs entry already up to date in '.$fstabPath);
         } else {
-            $lines[$entry['index']] = implode("\t", $updatedColumns);
             $changed = true;
             $msg = '[WARN] Updated /tmp tmpfs options in '.$fstabPath;
             if ($plan['added'] !== []) $msg .= ' (added '.implode(', ', $plan['added']).')';

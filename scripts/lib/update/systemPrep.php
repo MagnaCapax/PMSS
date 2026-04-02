@@ -372,22 +372,14 @@ function pmssEnsureBootDefaults(
     $fstabChanged = false;
     $lines = pmssFstabLinesRead($fstabPath, $log, '/proc hidepid enforcement');
     if ($lines !== null) {
-        $entry = pmssFstabMountEntryRead($lines, '/proc', 'proc');
-        if ($entry === null) {
+        $plan = pmssFstabMountOptionsEnsure($lines, '/proc', [], [], false, 'proc', ['hidepid=' => 'hidepid=2']);
+        if ($plan === null) {
             $lines[] = "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0";
             $fstabChanged = true;
             $log('Added /proc mount with hidepid=2 to '.$fstabPath);
-        } else {
-            $columns = $entry['columns'];
-            $options = $columns[3] === '' || $columns[3] === '-'
-                ? ['defaults']
-                : array_values(array_filter(explode(',', $columns[3]), 'strlen'));
-            $columns[3] = implode(',', pmssFstabOptionsReplacePrefixedValue($options, 'hidepid=', 'hidepid=2'));
-            if ($columns[3] !== $entry['columns'][3]) {
-                $lines[$entry['index']] = implode("\t", $columns);
-                $fstabChanged = true;
-                $log('Updated /proc mount options in '.$fstabPath);
-            }
+        } elseif ($plan['changed']) {
+            $fstabChanged = true;
+            $log('Updated /proc mount options in '.$fstabPath);
         }
         // Write fstab only when content changed, with a backup.
         if ($fstabChanged) {

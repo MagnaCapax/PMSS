@@ -89,6 +89,14 @@ class BootDefaultsEnsureTest extends TestCase
                 \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
                 return (string) file_get_contents($fstab);
             }],
+            ['label' => 'tmpfs-update', 'expect' => "tmpfs\t/tmp\ttmpfs\tdefaults,size=2G,noexec,nosuid,nodev\t0\t0\n", 'log' => 'Updated /tmp tmpfs options', 'runner' => function (string $dir, callable $logger): string {
+                $fstab = $dir.'/fstab'; $mounts = $dir.'/mounts';
+                file_put_contents($fstab, "tmpfs /tmp tmpfs defaults,exec,size=1G,suid,dev 0 0\n");
+                file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,size=1G,suid,dev 0 0\n");
+                putenv('PMSS_HARDEN_TMP_TMPFS=1'); putenv('PMSS_DRY_RUN=1');
+                \pmssConfigureTempTmpfsMount($logger, $fstab, $mounts);
+                return (string) file_get_contents($fstab);
+            }],
             ['label' => 'boot-defaults', 'expect' => "proc\t/proc\tproc\tdefaults,hidepid=2\t0\t0\n", 'log' => 'Updated /proc mount options', 'runner' => function (string $dir, callable $logger): string {
                 $fstab = $dir.'/fstab'; $grub = $dir.'/grub'; file_put_contents($fstab, "proc /proc proc defaults,hidepid=1 0 0\n"); file_put_contents($grub, "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet systemd.unified_cgroup_hierarchy=0\"\n");
                 \pmssEnsureBootDefaults($logger, $fstab, $grub, 'systemd.unified_cgroup_hierarchy=0');
