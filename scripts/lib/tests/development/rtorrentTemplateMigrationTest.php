@@ -47,6 +47,32 @@ class RtorrentTemplateMigrationTest extends TestCase
     }
 
     /**
+     * Upgrade removed scheduler aliases to the modern names used by 0.15.x.
+     */
+    public function testRewritesLegacySchedulerAliases(): void
+    {
+        $input = "schedule = watch_directory,15,1,\"load_start=~/watch/*.torrent\"\nschedule_remove = watch_directory\n";
+
+        $this->assertEquals(
+            "schedule2 = watch_directory,15,1,\"load_start=~/watch/*.torrent\"\nschedule_remove2 = watch_directory\n",
+            \pmssRtorrentNormalizeLegacyTemplate($input)
+        );
+    }
+
+    /**
+     * Rewrite legacy load/execute aliases without touching the dotted variants.
+     */
+    public function testRewritesLegacyLoadAndExecuteAliasesOnly(): void
+    {
+        $input = "load_start = ~/watch/example.torrent\nload_start_verbose = ~/watch/verbose.torrent\nexecute = sh,-c,echo ok\nexecute.nothrow = chmod,770,~/.rtorrent.socket\n";
+
+        $this->assertEquals(
+            "load.start = ~/watch/example.torrent\nload.start_verbose = ~/watch/verbose.torrent\nexecute2 = sh,-c,echo ok\nexecute.nothrow = chmod,770,~/.rtorrent.socket\n",
+            \pmssRtorrentNormalizeLegacyTemplate($input)
+        );
+    }
+
+    /**
      * Drop directives that have no modern replacement in current PMSS configs.
      */
     public function testRemovesObsoleteLegacyDirectives(): void

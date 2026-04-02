@@ -93,6 +93,26 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
             'pattern' => '/^\s*check_hash\s*=\s*(.+?)\s*$/',
             'replacementPrefix' => 'pieces.hash.on_completion.set = ',
         ],
+        [
+            'pattern' => '/^\s*schedule\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'schedule2 = ',
+        ],
+        [
+            'pattern' => '/^\s*schedule_remove\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'schedule_remove2 = ',
+        ],
+        [
+            'pattern' => '/^\s*load_start\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'load.start = ',
+        ],
+        [
+            'pattern' => '/^\s*load_start_verbose\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'load.start_verbose = ',
+        ],
+        [
+            'pattern' => '/^\s*execute\s*=\s*(.+?)\s*$/',
+            'replacementPrefix' => 'execute2 = ',
+        ],
     ];
     $legacyRemovalPatterns = [
         '/^\s*umask\s*=\s*.+?\s*$/',
