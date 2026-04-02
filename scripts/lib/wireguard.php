@@ -10,11 +10,25 @@ require_once __DIR__.'/users.php';
 require_once __DIR__.'/networkInfo.php';
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/log.php';
+require_once __DIR__.'/lighttpd/userFileWrite.php';
 require_once __DIR__.'/update/runtime/commands.php';
 
 function wgLog(string $message): void
 {
     logmsg('[wireguard] '.$message);
+}
+
+/**
+ * Atomically persist a WireGuard-managed file with the expected mode.
+ */
+function wgWriteManagedFile(string $path, string $contents, int $mode, string $context): bool
+{
+    if (!pmssAtomicWriteFile($path, $contents, $mode)) {
+        wgLog('Failed to write '.$context.' at '.$path);
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -204,10 +218,14 @@ function wgEnsureKeys(string $dir): array
         return ['', ''];
     }
 
-    file_put_contents($privFile, $priv.PHP_EOL);
-    file_put_contents($pubFile, $pub.PHP_EOL);
-    chmod($privFile, 0600);
-    chmod($pubFile, 0640);
+    if (!wgWriteManagedFile($privFile, $priv.PHP_EOL, 0600, 'WireGuard server private key')) {
+        return ['', ''];
+    }
+    if (!wgWriteManagedFile($pubFile, $pub.PHP_EOL, 0640, 'WireGuard server public key')) {
+        @unlink($privFile);
+        return ['', ''];
+    }
+
     return [$priv, $pub];
 }
 
@@ -650,14 +668,18 @@ function wgSyncUserGuideAddresses(array $assigned, string $fallbackGuide = ''): 
 /**
  * Lay down the WireGuard base configuration from the repo template.
  */
-function wireguardWriteConfig(string $privKey, int $port): void
+function wireguardWriteConfig(string $privKey, int $port): bool
 {
     $configPath = wgConfigDir().'/wg0.conf';
     $contents   = wireguardBuildConfig($privKey, $port);
 
-    file_put_contents($configPath, $contents);
-    chmod($configPath, 0640);
+    if (!wgWriteManagedFile($configPath, $contents, 0640, 'WireGuard configuration')) {
+        return false;
+    }
+
     wgLog('WireGuard configuration refreshed at '.$configPath);
+
+    return true;
 }
 
 /**
@@ -742,7 +764,10 @@ function pmssWireguardConfigure(?callable $logger = null): void
 
     $assignedPeers = wgAssignClientIps(wgCollectUserPublicKeys());
     wgSyncUserGuideAddresses($assignedPeers, $clientGuide);
-    wireguardWriteConfig($privKey, $listenPort);
+    if (!wireguardWriteConfig($privKey, $listenPort)) {
+        wgLog('Skipping wg-quick@wg0 enable because configuration refresh failed');
+        return;
+    }
 
     if (getenv('PMSS_WG_SKIP_SERVICE') === '1') {
         wgLog('Service enable skipped via PMSS_WG_SKIP_SERVICE');

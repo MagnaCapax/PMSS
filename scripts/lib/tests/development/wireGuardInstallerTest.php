@@ -169,6 +169,19 @@ class WireGuardInstallerTest extends TestCase
         });
     }
 
+    public function testWriteConfigReturnsFalseWhenConfigPathCannotBeWritten(): void
+    {
+        $homeBase = $this->createTempDir();
+
+        $this->pmssWithEnv([
+            'PMSS_WG_CONFIG_DIR' => $this->createTempDir().'/missing/config',
+            'PMSS_WG_HOME_BASE'  => $homeBase,
+            'PMSS_WG_USER_LIST'  => 'dummy',
+        ], function (): void {
+            $this->assertFalse(\wireguardWriteConfig('dummy', 12345));
+        });
+    }
+
     public function testEnsureKeysReusesExisting(): void
     {
         $dir = $this->createTempDir();
@@ -210,6 +223,22 @@ class WireGuardInstallerTest extends TestCase
             $this->assertEquals('', $pub);
             $this->assertTrue(!file_exists($dir.'/server_private.key'));
             $this->assertTrue(!file_exists($dir.'/server_public.key'));
+        });
+    }
+
+    public function testEnsureKeysReturnsEmptyWhenPersistFails(): void
+    {
+        $dir = $this->createTempDir().'/missing';
+
+        $this->pmssWithEnv([
+            'PMSS_WG_PRIVATE_KEY' => 'env-priv',
+            'PMSS_WG_PUBLIC_KEY'  => 'env-pub',
+        ], function () use ($dir): void {
+            [$priv, $pub] = \wgEnsureKeys($dir);
+            $this->assertEquals('', $priv);
+            $this->assertEquals('', $pub);
+            $this->assertFalse(file_exists($dir.'/server_private.key'));
+            $this->assertFalse(file_exists($dir.'/server_public.key'));
         });
     }
 

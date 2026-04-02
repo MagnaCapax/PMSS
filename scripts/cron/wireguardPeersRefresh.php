@@ -59,8 +59,11 @@ if ($newConfig === $current) {
     exit(0);
 }
 
-file_put_contents($configPath, $newConfig);
-chmod($configPath, 0640);
+if (!wgWriteManagedFile($configPath, $newConfig, 0640, 'WireGuard refresh configuration')) {
+    wgLog('wireguardPeersRefresh: failed to update wg0.conf; skipping service action');
+    exit(0);
+}
+
 wgLog('wireguardPeersRefresh: updated wg0.conf with current peer set');
 
 // Apply config only when systemd is available.
