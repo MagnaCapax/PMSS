@@ -235,4 +235,26 @@ class UserTrafficStateHelpersTest extends TestCase
 
         $this->assertEquals(0, \pmssTrafficLimitReadGiBFile($path));
     }
+
+    public function testTrafficLimitStateReadCombinesBaseLimitAndBonus(): void
+    {
+        $limitPath = $this->tempDir.'/traffic-limit';
+        $bonusPath = $this->tempDir.'/bonus-traffic';
+        file_put_contents($limitPath, "5\n");
+        file_put_contents($bonusPath, "2GiB\n");
+
+        $state = \pmssTrafficLimitStateRead($limitPath, $bonusPath);
+
+        $this->assertEquals(['limitGiB' => 5, 'bonusGiB' => 2, 'effectiveLimitGiB' => 7], $state);
+    }
+
+    public function testTrafficLimitStateReadKeepsBonusButDisablesEffectiveLimitWithoutBaseLimit(): void
+    {
+        $bonusPath = $this->tempDir.'/bonus-only';
+        file_put_contents($bonusPath, "9\n");
+
+        $state = \pmssTrafficLimitStateRead($this->tempDir.'/missing-limit', $bonusPath);
+
+        $this->assertEquals(['limitGiB' => 0, 'bonusGiB' => 9, 'effectiveLimitGiB' => 0], $state);
+    }
 }

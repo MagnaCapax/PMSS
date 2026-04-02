@@ -14,6 +14,7 @@ require_once __DIR__.'/rtorrent/scgi.php';
 require_once __DIR__.'/traffic/storage.php';
 require_once __DIR__.'/update.php';
 require_once __DIR__.'/user/userConfigStore.php';
+require_once __DIR__.'/user/trafficLimit.php';
 require_once __DIR__.'/cli/optionParser.php';
 
 /**
@@ -88,20 +89,6 @@ function pmssStatsDetectCgroupDir(): string
     }
 
     return '';
-}
-
-/**
- * Read a small integer from disk.
- */
-function pmssStatsReadIntegerFile(string $path): ?int
-{
-    $raw = @file_get_contents($path);
-    $raw = is_string($raw) ? trim($raw) : '';
-    if ($raw === '' || !preg_match('/^-?\d+$/', $raw)) {
-        return null;
-    }
-
-    return (int) $raw;
 }
 
 /**
@@ -383,8 +370,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $traffic = pmssTrafficReadSerializedArrayFile($home.'/.trafficData') ?: [];
     $trafficIngress = pmssTrafficReadSerializedArrayFile($home.'/.trafficDataIngress') ?: [];
     $resource = pmssTrafficReadSerializedArrayFile($home.'/.resourceData') ?: [];
-    $bonusTrafficGiB = max(0, (int) (pmssStatsReadIntegerFile($home.'/.bonusTraffic') ?? 0));
-    $trafficLimitGiB = (int) (pmssStatsReadIntegerFile($home.'/.trafficLimit') ?? 0);
+    $trafficLimitState = pmssTrafficLimitStateRead($home.'/.trafficLimit', $home.'/.bonusTraffic');
     $cgroup = pmssStatsReadCgroupStats($context['cgroup_dir']);
     $uptimeSeconds = null;
     $uptimeRaw = @file_get_contents('/proc/uptime');
@@ -421,7 +407,9 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
         $memoryPercent = ($memoryCurrentBytes / $memoryLimitBytes) * 100.0;
     }
 
-    $trafficLimitMiB = $trafficLimitGiB > 0 ? ($trafficLimitGiB + $bonusTrafficGiB) * 1024.0 : null;
+    $trafficLimitMiB = $trafficLimitState['effectiveLimitGiB'] > 0
+        ? $trafficLimitState['effectiveLimitGiB'] * 1024.0
+        : null;
     $trafficUsedMiB = isset($traffic['raw']['month']) && is_numeric($traffic['raw']['month'])
         ? (float) $traffic['raw']['month']
         : null;
@@ -454,7 +442,7 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
                 ? (float) $trafficIngress['raw']['month']
                 : null,
             'limit_mib' => $trafficLimitMiB,
-            'bonus_gib' => $bonusTrafficGiB,
+            'bonus_gib' => $trafficLimitState['bonusGiB'],
             'percent' => $trafficPercent,
         ],
         'resource' => $resource,

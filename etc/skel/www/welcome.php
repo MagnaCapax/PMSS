@@ -23,11 +23,15 @@ if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
 if (file_exists('/scripts/lib/user/mediaStackPanel.php')) {
     require_once '/scripts/lib/user/mediaStackPanel.php';
 }
+if (file_exists('/scripts/lib/user/trafficLimit.php')) {
+    require_once '/scripts/lib/user/trafficLimit.php';
+}
 
 $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
 $bonusQuota = $pageState['bonusQuota'];
-$bonusTraffic = $pageState['bonusTraffic'];
+$trafficLimitState = $pageState['trafficLimitState'];
+$bonusTraffic = $trafficLimitState['bonusGiB'];
 $vendor = $pageState['vendor'];
 $contextualWelcomeMessage = $pageState['contextualWelcomeMessage'];
 $delugePasswordHelpersAvailable = $pageState['delugePasswordHelpersAvailable'];
@@ -416,7 +420,7 @@ if (file_exists('openvpn-config.tgz')) {
                         echo quotaCreateSection($quotaInfo, $bonusQuota);
 
                         if (@file_exists('../.trafficLimit')) {
-	                            $trafficLimit = (int)trim(@file_get_contents('../.trafficLimit'));
+	                            $trafficLimit = (int) $trafficLimitState['limitGiB'];
 	                            if (@file_exists('../.trafficData')) {
 	                                $trafficData = @unserialize(trim(@file_get_contents('../.trafficData')));
 	                                $trafficIngress = null;
@@ -429,7 +433,7 @@ if (file_exists('openvpn-config.tgz')) {
 	                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic);
 	                            } else {
 	                                if ($trafficLimit > 0) {
-	                                    $effectiveLimit = $trafficLimit + max(0, (int) $bonusTraffic);
+	                                    $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
 	                                    $trafficLimitText = number_format($effectiveLimit) . ' GiB';
 	                                    if ($bonusTraffic > 0) {
 	                                        $trafficLimitText .= ' (Bonus traffic: ' . number_format($bonusTraffic) . ' GiB)';
@@ -516,10 +520,14 @@ function pmssWelcomePageStateBuild() {
         );
     }
 
+    $trafficLimitState = function_exists('pmssTrafficLimitStateRead')
+        ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
+        : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
+
     return array(
         'quotaInfo' => $quotaInfo,
-        'bonusQuota' => pmssWelcomeIntegerFileRead('../.bonusQuota'),
-        'bonusTraffic' => pmssWelcomeIntegerFileRead('../.bonusTraffic', true),
+        'bonusQuota' => (int) @file_get_contents('../.bonusQuota'),
+        'trafficLimitState' => $trafficLimitState,
         'vendor' => pmssWelcomeVendorRead(),
         'contextualWelcomeMessage' => pmssWelcomeContextualMessageBuild($quotaInfo),
         'delugePasswordHelpersAvailable' => $delugeState['helpersAvailable'],
@@ -539,19 +547,6 @@ function pmssWelcomeQuotaInfoRead() {
     $quotaInfo = @unserialize($quotaInfo);
 
     return is_array($quotaInfo) ? $quotaInfo : array();
-}
-
-function pmssWelcomeIntegerFileRead($path, $clampNegativeToZero = false) {
-    if (!file_exists($path)) {
-        return 0;
-    }
-
-    $value = (int) @file_get_contents($path);
-    if ($clampNegativeToZero && $value < 0) {
-        return 0;
-    }
-
-    return $value;
 }
 
 function pmssWelcomeVendorRead() {

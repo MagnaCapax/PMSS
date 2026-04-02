@@ -92,6 +92,17 @@ if (!function_exists('pmssTrafficLimitReadGiBFile')) {
     }
 }
 
+if (!function_exists('pmssTrafficLimitStateRead')) {
+    /** @return array{limitGiB:int,bonusGiB:int,effectiveLimitGiB:int} */
+    function pmssTrafficLimitStateRead(string $limitPath, string $bonusPath = ''): array
+    {
+        $limitGiB = pmssTrafficLimitReadGiBFile($limitPath);
+        $bonusGiB = ($bonusPath !== '') ? pmssTrafficLimitReadGiBFile($bonusPath) : 0;
+
+        return ['limitGiB' => $limitGiB, 'bonusGiB' => $bonusGiB, 'effectiveLimitGiB' => ($limitGiB > 0) ? ($limitGiB + $bonusGiB) : 0];
+    }
+}
+
 if (!function_exists('pmssTrafficLimitWriteGiBFile')) {
     /**
      * Persist a GiB quota file via the shared atomic file writer.

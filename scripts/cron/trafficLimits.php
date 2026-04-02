@@ -89,16 +89,13 @@ foreach($users AS $thisUser) {
         echo date('Y-m-d H:i:s') . ": Skipping {$thisUser}, invalid traffic data file\n";
         continue;
     }
-    $trafficLimitRaw = trim((string) @file_get_contents($userTrafficLimitFile));
-    if ($trafficLimitRaw === '' || !is_numeric($trafficLimitRaw) || (float) $trafficLimitRaw <= 0) {
+    $trafficLimitState = pmssTrafficLimitStateRead($userTrafficLimitFile, "/home/{$thisUser}/.bonusTraffic");
+    if ($trafficLimitState['effectiveLimitGiB'] <= 0) {
         continue;
     }
-    $trafficLimit = (float) $trafficLimitRaw;
-    $bonusTrafficFile = "/home/{$thisUser}/.bonusTraffic";
-    $bonusTraffic = pmssTrafficLimitReadGiBFile($bonusTrafficFile);
+    $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
 //    var_dump($data);
     $trafficUsageGiB = ($data['raw']['month'] / 1024);   // Set to GiB
-    $trafficLimit += $bonusTraffic;
     $trafficCapMbit = $defaultTrafficCapMbit;
     $userConfig = $userConfigStore->get($thisUser);
     if (is_array($userConfig) && isset($userConfig['trafficCapMbit']) && is_numeric($userConfig['trafficCapMbit'])) {

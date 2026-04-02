@@ -64,6 +64,10 @@ if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
     require_once '/scripts/lib/webCgroupMemoryStatus.php';
 }
 
+if (file_exists('/scripts/lib/user/trafficLimit.php')) {
+    require_once '/scripts/lib/user/trafficLimit.php';
+}
+
 if (!function_exists('pmssInfoSetDockerEnabled')) {
     /**
      * Persist dockerEnabled in the canonical per-user config store.
@@ -637,13 +641,9 @@ if (file_exists('../.trafficDataIngress')) {
         $trafficIngressData = null;
     }
 }
-$bonusTraffic = 0;
-if (file_exists('../.bonusTraffic')) {
-    $bonusTraffic = (int) trim((string) @file_get_contents('../.bonusTraffic'));
-    if ($bonusTraffic < 0) {
-        $bonusTraffic = 0;
-    }
-}
+$trafficLimitState = function_exists('pmssTrafficLimitStateRead')
+    ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
+    : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
 $trafficRatioDisplay = null;
 $trafficRatioClass = '';
 $trafficRatioGoodMin = 2.0;
@@ -687,12 +687,12 @@ Week: <?php echo $trafficData['display']['week']; ?>, Day: <?php echo $trafficDa
 Past 30 days upload traffic: <?php echo $trafficData['display']['month']; ?>
 <?php if (file_exists('../.trafficLimit')): ?>
 <?php
-$limit = (int)trim(file_get_contents('../.trafficLimit'));
+$limit = (int) $trafficLimitState['limitGiB'];
 if ($limit > 0) {
-    $effectiveLimit = $limit + max(0, $bonusTraffic);
+    $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
     echo "Traffic limit: " . number_format($effectiveLimit) . " GiB\n";
-    if ($bonusTraffic > 0) {
-        echo "Bonus traffic: " . number_format($bonusTraffic) . " GiB\n";
+    if ($trafficLimitState['bonusGiB'] > 0) {
+        echo "Bonus traffic: " . number_format($trafficLimitState['bonusGiB']) . " GiB\n";
     }
 }
 ?>
