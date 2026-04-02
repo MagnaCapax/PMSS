@@ -13,6 +13,46 @@
 require_once __DIR__.'/diagnostics.php';
 
 /**
+ * Normalize a hostname/token used in SMTP commands and envelope headers.
+ */
+function pmssSupportMailHostTokenNormalize(string $value, string $fallback): string
+{
+    $normalized = preg_replace('/[^A-Za-z0-9.-]/', '-', $value);
+    $normalized = trim(is_string($normalized) ? $normalized : '', '-.');
+
+    return $normalized === '' ? $fallback : $normalized;
+}
+
+/**
+ * Validate and normalize the transport-facing mail envelope.
+ *
+ * @return array<string,string>
+ */
+function pmssSupportMailEnvelopeNormalize(array $envelope): array
+{
+    $from = trim((string) ($envelope['from'] ?? ''));
+    if ($from === '' || preg_match('/[\r\n\x00]/', $from) === 1) {
+        throw new RuntimeException('Support mail envelope sender is invalid.');
+    }
+
+    $to = trim((string) ($envelope['to'] ?? ''));
+    if ($to === '' || preg_match('/[\r\n\x00]/', $to) === 1) {
+        throw new RuntimeException('Support mail envelope recipient is invalid.');
+    }
+
+    $data = (string) ($envelope['data'] ?? '');
+    if ($data === '') {
+        throw new RuntimeException('Support mail envelope payload is empty.');
+    }
+
+    return [
+        'from' => $from,
+        'to' => $to,
+        'data' => $data,
+    ];
+}
+
+/**
  * Build the outbound message envelope for a support request.
  *
  * @return array<string,string>
@@ -25,8 +65,8 @@ function pmssSupportMailEnvelopeBuild(array $diagnostics, array $config, string 
         (string) ($diagnostics['username'] ?? 'unknown-user'),
         (string) ($diagnostics['hostname'] ?? 'unknown-host')
     );
-    $senderHost = preg_replace('/[^A-Za-z0-9.-]/', '-', (string) ($diagnostics['hostname'] ?? 'pmss.local'));
-    $from = 'support-command@'.trim((string) $senderHost, '-.');
+    $senderHost = pmssSupportMailHostTokenNormalize((string) ($diagnostics['hostname'] ?? 'pmss.local'), 'pmss.local');
+    $from = 'support-command@'.$senderHost;
     $headers = [
         'From: '.$from,
         'To: '.$config['targetEmail'],
@@ -51,6 +91,8 @@ function pmssSupportMailEnvelopeBuild(array $diagnostics, array $config, string 
  */
 function pmssSupportMailSend(array $config, array $envelope, ?callable $transport = null): void
 {
+    $envelope = pmssSupportMailEnvelopeNormalize($envelope);
+
     if ($transport !== null) {
         $transport($config, $envelope);
         return;
@@ -80,6 +122,7 @@ function pmssSupportMailSend(array $config, array $envelope, ?callable $transpor
  */
 function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): void
 {
+    $envelope = pmssSupportMailEnvelopeNormalize($envelope);
     $spec = [0 => ['pipe', 'w'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
     $process = @proc_open(escapeshellarg($sendmailPath).' -t -i', $spec, $pipes);
     if (!is_resource($process)) {
@@ -98,15 +141,34 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
         throw new RuntimeException('Sendmail transport did not provide usable pipes.');
     }
 
-    pmssSupportStreamWriteAll($pipes[0], (string) $envelope['data'], 'support mail message to sendmail');
-    fclose($pipes[0]);
-    $stderr = stream_get_contents($pipes[2]);
-    if (!is_string($stderr)) {
-        $stderr = '';
+    $stderr = '';
+    try {
+        pmssSupportStreamWriteAll($pipes[0], (string) $envelope['data'], 'support mail message to sendmail');
+        fclose($pipes[0]);
+        unset($pipes[0]);
+
+        $stderr = stream_get_contents($pipes[2]);
+        if (!is_string($stderr)) {
+            $stderr = '';
+        }
+
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        unset($pipes[1], $pipes[2]);
+
+        $rc = proc_close($process);
+        $process = null;
+    } finally {
+        foreach ($pipes as $pipe) {
+            if (is_resource($pipe)) {
+                fclose($pipe);
+            }
+        }
+        if (is_resource($process)) {
+            proc_close($process);
+        }
     }
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    $rc = proc_close($process);
+
     if ($rc !== 0) {
         throw new RuntimeException('Support mail delivery failed: '.trim((string) $stderr));
     }
@@ -117,6 +179,7 @@ function pmssSupportMailSendViaSendmail(string $sendmailPath, array $envelope): 
  */
 function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array $envelope): void
 {
+    $envelope = pmssSupportMailEnvelopeNormalize($envelope);
     if ($host === '') {
         throw new RuntimeException('Support relay host is not configured.');
     }
@@ -128,24 +191,27 @@ function pmssSupportMailSendViaSmtp(string $host, int $port, int $timeout, array
         throw new RuntimeException('Support SMTP connection failed: '.$errstr);
     }
 
-    stream_set_timeout($stream, $timeout);
-    pmssSupportSmtpExpect($stream, [220]);
-    $ehloHost = preg_replace('/[^A-Za-z0-9.-]/', '-', (string) (gethostname() ?: 'localhost'));
-    foreach ([
-        ['EHLO '.$ehloHost, [250]],
-        ['MAIL FROM:<'.$envelope['from'].'>', [250]],
-        ['RCPT TO:<'.$envelope['to'].'>', [250, 251]],
-        ['DATA', [354]],
-    ] as $commandSpec) {
-        pmssSupportStreamWriteAll($stream, $commandSpec[0]."\r\n", 'support SMTP command');
-        pmssSupportSmtpExpect($stream, $commandSpec[1]);
-    }
+    try {
+        stream_set_timeout($stream, $timeout);
+        pmssSupportSmtpExpect($stream, [220]);
+        $ehloHost = pmssSupportMailHostTokenNormalize((string) (gethostname() ?: 'localhost'), 'localhost');
+        foreach ([
+            ['EHLO '.$ehloHost, [250]],
+            ['MAIL FROM:<'.$envelope['from'].'>', [250]],
+            ['RCPT TO:<'.$envelope['to'].'>', [250, 251]],
+            ['DATA', [354]],
+        ] as $commandSpec) {
+            pmssSupportStreamWriteAll($stream, $commandSpec[0]."\r\n", 'support SMTP command');
+            pmssSupportSmtpExpect($stream, $commandSpec[1]);
+        }
 
-    pmssSupportStreamWriteAll($stream, str_replace("\n.", "\n..", (string) $envelope['data'])."\r\n.\r\n", 'support SMTP message body');
-    pmssSupportSmtpExpect($stream, [250]);
-    pmssSupportStreamWriteAll($stream, "QUIT\r\n", 'support SMTP quit command');
-    pmssSupportSmtpExpect($stream, [221]);
-    fclose($stream);
+        pmssSupportStreamWriteAll($stream, str_replace("\n.", "\n..", (string) $envelope['data'])."\r\n.\r\n", 'support SMTP message body');
+        pmssSupportSmtpExpect($stream, [250]);
+        pmssSupportStreamWriteAll($stream, "QUIT\r\n", 'support SMTP quit command');
+        pmssSupportSmtpExpect($stream, [221]);
+    } finally {
+        fclose($stream);
+    }
 }
 
 /**
