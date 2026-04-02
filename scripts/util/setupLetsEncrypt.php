@@ -12,6 +12,7 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/distro.php';
 
 // Basic input validation: the automation expects an e-mail for certificate
@@ -22,7 +23,7 @@ if (strpos($email, '@') == false) die('You need valid e-mail address');
 
 // Gather the fqdn and Debian codename; the latter determines whether we need
 // the virtualenv install path still required on Debian 10 (buster).
-$domain = trim((string) file_get_contents('/etc/hostname'));
+$domain = pmssHostnameRead();
 $distroInfo = pmssDetectDistro();
 $codename = $distroInfo['codename'] !== '' ? $distroInfo['codename'] : 'bullseye';
 

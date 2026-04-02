@@ -499,7 +499,7 @@ function pmssUserConfigLighttpdConfigureUser(
 
     $portFile = "{$portsDirectory}/lighttpd-{$thisUser}";
     $serverPort = file_exists($portFile)
-        ? (int) file_get_contents($portFile)
+        ? pmssReadRegularFileInt($portFile)
         : (int) trim((string) shell_exec('/scripts/util/portManager.php assign '.escapeshellarg($thisUser).' lighttpd'));
 
     // Prepare directories and defaults.
@@ -516,7 +516,7 @@ function pmssUserConfigLighttpdConfigureUser(
     ];
     $proxyPorts = [];
     foreach ($proxyPortFiles as $proxyName => $proxyPortFile) {
-        $proxyPort = (int) trim((string) @file_get_contents($proxyPortFile));
+        $proxyPort = pmssReadRegularFileInt($proxyPortFile);
         if ($proxyPort < 1024 || $proxyPort > 65500) {
             file_put_contents($proxyPortFile, $proxyPort = (int) round(rand(1500, 65500)));
         }
@@ -538,7 +538,7 @@ function pmssUserConfigLighttpdConfigureUser(
 
     // Optional Invidious proxy wiring: publish both public and private URLs
     // only when the user or installer pins a local port explicitly.
-    $invidiousPort = (int) trim((string) @file_get_contents($homeDir.'/.invidiousPort'));
+    $invidiousPort = pmssReadRegularFileInt($homeDir.'/.invidiousPort');
     $invidiousConfPath = $customDir.'/pmss-invidious.conf';
     if ($invidiousPort >= 1024 && $invidiousPort <= 65535) {
         if (!pmssWriteUserFile($invidiousConfPath, pmssInvidiousLighttpdProxyFragment($thisUser, $invidiousPort), $thisUser, 0640)) {
@@ -585,7 +585,7 @@ function pmssUserConfigLighttpdConfigureUser(
     }
     if ($delugeWebPort === null) {
         // Fallback (legacy hosts): derive deluge-web port from .delugePort.
-        $delugePort = (int) trim((string) @file_get_contents($homeDir.'/.delugePort'));
+        $delugePort = pmssReadRegularFileInt($homeDir.'/.delugePort');
         if ($delugePort >= 1024 && $delugePort <= 65535) {
             foreach ([$delugePort + 1, $delugePort] as $candidate) {
                 if ($candidate < 1024 || $candidate > 65535) {

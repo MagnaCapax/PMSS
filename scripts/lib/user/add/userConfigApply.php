@@ -80,7 +80,7 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         'deluge' => $homePath.'/.delugePort',
     ];
     foreach ($portFiles as $label => $path) {
-        $port = is_file($path) ? (int) trim((string) @file_get_contents($path)) : 0;
+        $port = pmssReadRegularFileInt($path);
         if ($port <= 0) {
             continue;
         }

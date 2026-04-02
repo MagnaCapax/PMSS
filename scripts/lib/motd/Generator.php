@@ -10,6 +10,7 @@
 
 require_once __DIR__.'/../update/distro.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../runtime.php';
 
 class Motd
 {
@@ -180,7 +181,7 @@ class Motd
 
     private static function sysBasics(): array
     {
-        $host = trim((string) @file_get_contents('/etc/hostname'));
+        $host = pmssHostnameRead();
         $ip   = gethostbyname($host);
         $cpu  = trim((string) shell_exec("lscpu | grep 'Model name:' | sed 's/Model name:\\s*//'"));
         $ram  = trim((string) shell_exec("free -h | awk '/^Mem:/ { print \$2 }'"));
@@ -201,7 +202,7 @@ class Motd
             }
         }
 
-        $updateDate = is_file('/var/run/pmss/updated') ? trim((string) @file_get_contents('/var/run/pmss/updated')) : 'not set';
+        $updateDate = pmssReadRegularFileTrimmed('/var/run/pmss/updated') ?? 'not set';
         return [$pmssVersion,$updateDate];
     }
 

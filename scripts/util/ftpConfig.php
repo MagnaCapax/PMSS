@@ -14,10 +14,10 @@ foreach (['../lib/update.php', '../lib/update/runtime/commands.php', '../lib/upd
 logMessage('Making ProFTPD configuration');
 
 $configTemplate = @file_get_contents('/etc/seedbox/config/template.proftpd');
-$hostnameRaw    = @file_get_contents('/etc/hostname');
+$hostname = preg_replace('/[^a-z0-9.-]/', '', strtolower(pmssHostnameRead('localhost')));
 
-if ($configTemplate === false || $hostnameRaw === false) {
-    logMessage('No data, hostname or config template is empty!');
+if ($configTemplate === false) {
+    logMessage('No data or config template is empty!');
     exit(1);
 }
 
@@ -27,7 +27,6 @@ if (!is_dir($proftpdDir)) {
     exit(0);
 }
 
-$hostname = preg_replace('/[^a-z0-9.-]/', '', strtolower(trim($hostnameRaw)));
 $hostname = $hostname === '' ? 'localhost' : $hostname;
 $detected = \pmssDetectDistro();
 $distroVersion = (int) ($detected['version'] ?? 0);

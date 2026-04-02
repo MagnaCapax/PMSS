@@ -128,6 +128,7 @@ if (!function_exists('pmssReadRegularFileDigits')) {
         return (($raw = pmssReadRegularFileTrimmed($path)) !== null && $raw !== '' && ctype_digit($raw)) ? $raw : null;
     }
 }
+if (!function_exists('pmssReadRegularFileInt')) { function pmssReadRegularFileInt(string $path, int $default = 0): int { return (($raw = pmssReadRegularFileTrimmed($path)) === null || $raw === '') ? $default : (int) $raw; } }
 if (!function_exists('pmssHostnameRead')) {
     function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
 }

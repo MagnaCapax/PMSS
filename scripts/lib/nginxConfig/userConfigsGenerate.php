@@ -114,14 +114,11 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         return;
     }
 
-    $serverPort = 0;
-    if (is_readable($portFile)) {
-        $serverPort = (int) trim((string) file_get_contents($portFile));
-    }
+    $serverPort = pmssReadRegularFileInt($portFile);
     $needsLighttpdRefresh = ($serverPort < 1024 || $serverPort > 65535) || !is_file($homeDir.'/.lighttpd.conf');
     if ($needsLighttpdRefresh) {
         passthru('/scripts/util/userConfigLighttpd.php '.escapeshellarg($thisUser));
-        $serverPort = (int) trim((string) @file_get_contents($portFile));
+        $serverPort = pmssReadRegularFileInt($portFile);
     }
     if ($serverPort < 1024 || $serverPort > 65535) {
         pmssCreateNginxConfigLogSkippedUser($thisUser, 'lighttpd port missing or invalid after refresh attempt ('.$portFile.')');
