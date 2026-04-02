@@ -30,22 +30,16 @@ function pmssAddUserEnsurePreflightState(users $userDb, array $user, string $hom
     if ($userExists && pmssAddUserFailedProvisionCanRecover($user['name'])) {
         logProvisionMessage('Detected recent failed provisioning attempt with inactive services; cleaning stale account before retry');
         if (!pmssAddUserCleanupFailedProvision($userDb, $user['name'], $homePath)) {
-            logProvisionMessage('FATAL: Failed provisioning cleanup left stale resources; refusing to continue');
-            finalizeProvision('ERROR', 'failed_provision_cleanup_failed', 1);
-            exit(1);
+            pmssAddUserFatalExit('ERROR', 'Failed provisioning cleanup left stale resources; refusing to continue', 'failed_provision_cleanup_failed');
         }
         $userExists = pmssAddUserAccountExists($user['name']);
     }
 
     if ($userExists) {
-        logProvisionMessage('FATAL: User already exists; refusing to overwrite');
-        finalizeProvision('ERROR', 'user_exists', 1);
-        exit(1);
+        pmssAddUserFatalExit('ERROR', 'User already exists; refusing to overwrite', 'user_exists');
     }
 
     if (is_dir($homePath)) {
-        logProvisionMessage('FATAL: Home directory exists without passwd entry; refusing to clobber');
-        finalizeProvision('ERROR', 'orphaned_home', 1);
-        exit(1);
+        pmssAddUserFatalExit('ERROR', 'Home directory exists without passwd entry; refusing to clobber', 'orphaned_home');
     }
 }

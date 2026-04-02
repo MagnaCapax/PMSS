@@ -25,43 +25,23 @@ function pmssAddUserRequiredArtifactPaths(string $userName, string $homePath): a
 }
 
 /**
- * Return the first missing required provisioning artifact, if any.
- *
- * @return array<string, string>|null
- */
-function pmssAddUserMissingArtifact(string $userName, string $homePath): ?array
-{
-    foreach (pmssAddUserRequiredArtifactPaths($userName, $homePath) as $label => $path) {
-        if (!is_file($path)) {
-            return array(
-                'label' => $label,
-                'path' => $path,
-            );
-        }
-    }
-
-    return null;
-}
-
-/**
  * Abort provisioning if any required artifact is still missing.
  */
 function pmssAddUserVerifyArtifactsOrFail(string $userName, string $homePath): void
 {
-    $missing = pmssAddUserMissingArtifact($userName, $homePath);
-    if ($missing === null) {
-        return;
-    }
+    foreach (pmssAddUserRequiredArtifactPaths($userName, $homePath) as $label => $path) {
+        if (is_file($path)) {
+            continue;
+        }
 
-    logProvisionMessage('FATAL: Missing required provisioning artifact: '.$missing['path']);
-    finalizeProvision(
-        'FAIL',
-        'missing_artifact',
-        1,
-        array(
-            'artifact' => $missing['label'],
-            'path' => $missing['path'],
-        )
-    );
-    exit(1);
+        pmssAddUserFatalExit(
+            'FAIL',
+            'Missing required provisioning artifact: '.$path,
+            'missing_artifact',
+            array(
+                'artifact' => $label,
+                'path' => $path,
+            )
+        );
+    }
 }

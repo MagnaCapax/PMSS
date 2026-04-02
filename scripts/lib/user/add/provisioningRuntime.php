@@ -102,6 +102,34 @@ function logProvisionMessage(string $message): void
 }
 
 /**
+ * Emit a fatal addUser summary and exit with the legacy non-zero status.
+ */
+function pmssAddUserFatalExit(string $status, string $detail, string $message, array $extraSummary = array()): void
+{
+    logProvisionMessage('FATAL: '.$detail);
+    finalizeProvision($status, $message, 1, $extraSummary);
+    exit(1);
+}
+
+/**
+ * Run a provisioning step that must succeed or abort the addUser flow.
+ */
+function pmssAddUserRunRequiredProvisionStep(
+    string $description,
+    string $command,
+    string $failureDetail,
+    string $failureCode,
+    ?string $logCommand = null
+): void
+{
+    if (runProvisionStep($description, $command, $logCommand) === 0) {
+        return;
+    }
+
+    pmssAddUserFatalExit('FAIL', $failureDetail, $failureCode);
+}
+
+/**
  * Run a shell command and log whether it succeeded without aborting.
  * The 'continue on failure' behavior is intentional to allow as many
  * provisioning steps as possible to complete.

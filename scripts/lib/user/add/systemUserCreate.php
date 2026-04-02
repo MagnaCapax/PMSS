@@ -17,15 +17,12 @@
  */
 function pmssAddUserSystemUserCreate(array $user, string $homePath): void
 {
-    $rc = runProvisionStep(
+    pmssAddUserRunRequiredProvisionStep(
         'Create system user',
-        sprintf('useradd --skel /etc/skel -m %s', escapeshellarg($user['name']))
+        sprintf('useradd --skel /etc/skel -m %s', escapeshellarg($user['name'])),
+        'Create system user failed; aborting provisioning',
+        'useradd_failed'
     );
-    if ($rc !== 0) {
-        logProvisionMessage('FATAL: Create system user failed; aborting provisioning');
-        finalizeProvision('FAIL', 'useradd_failed', 1);
-        exit(1);
-    }
     if (function_exists('pmssAddUserFailureRollbackMarkSystemUserCreated')) {
         pmssAddUserFailureRollbackMarkSystemUserCreated();
     }
@@ -35,30 +32,23 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
         $pwEntry = @posix_getpwnam($user['name']);
     }
     if (!is_dir($homePath)) {
-        logProvisionMessage('FATAL: Home directory missing after useradd; aborting provisioning');
-        finalizeProvision('FAIL', 'home_missing', 1);
-        exit(1);
+        pmssAddUserFatalExit('FAIL', 'Home directory missing after useradd; aborting provisioning', 'home_missing');
     }
     if (is_array($pwEntry) && isset($pwEntry['uid'])) {
         $homeOwner = @fileowner($homePath);
         if ($homeOwner !== false && (int) $homeOwner !== (int) $pwEntry['uid']) {
-            logProvisionMessage('FATAL: Home directory owner mismatch after useradd; aborting provisioning');
-            finalizeProvision('FAIL', 'home_owner_mismatch', 1);
-            exit(1);
+            pmssAddUserFatalExit('FAIL', 'Home directory owner mismatch after useradd; aborting provisioning', 'home_owner_mismatch');
         }
     }
 
     $safeChangePw = sprintf('/scripts/changePw.php %s [redacted]', escapeshellarg($user['name']));
-    $rc = runProvisionStep(
+    pmssAddUserRunRequiredProvisionStep(
         'Set initial password',
         sprintf('/scripts/changePw.php %s %s', escapeshellarg($user['name']), escapeshellarg($user['password'])),
+        'Initial password update failed; aborting provisioning',
+        'password_failed',
         $safeChangePw
     );
-    if ($rc !== 0) {
-        logProvisionMessage('FATAL: Initial password update failed; aborting provisioning');
-        finalizeProvision('FAIL', 'password_failed', 1);
-        exit(1);
-    }
 
     runProvisionStep(
         'Unlock user account',

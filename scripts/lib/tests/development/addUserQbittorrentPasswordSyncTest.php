@@ -16,12 +16,14 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
 
-        $configPos = strpos($source, "runProvisionStep('Apply user configuration', \$userConfigCmd)");
+        $configPos = strpos($source, 'pmssAddUserRunRequiredProvisionStep(');
+        $configStepPos = strpos($source, "'Apply user configuration'");
         $syncPos = strpos($source, 'pmssUpdateQbittorrentPassword($user[\'name\'], $user[\'password\'])');
 
-        $this->assertTrue($configPos !== false, 'addUser provisioning must still apply the user config');
+        $this->assertTrue($configPos !== false, 'addUser provisioning must still use the required user config step helper');
+        $this->assertTrue($configStepPos !== false, 'addUser provisioning must still apply the user config');
         $this->assertTrue($syncPos !== false, 'addUser provisioning must sync qBittorrent password hashes');
-        $this->assertTrue($configPos < $syncPos, 'qBittorrent password sync must happen after userConfig creates qBittorrent.conf');
+        $this->assertTrue($configStepPos < $syncPos, 'qBittorrent password sync must happen after userConfig creates qBittorrent.conf');
     }
 
     public function testQbittorrentPasswordSyncStillRunsBeforeServiceStartup(): void
