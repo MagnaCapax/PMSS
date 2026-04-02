@@ -121,6 +121,13 @@ if (!function_exists('pmssReadRegularFileTrimmed')) {
         return (!is_file($path) || is_link($path) || !is_string($contents = @file_get_contents($path))) ? null : trim($contents);
     }
 }
+if (!function_exists('pmssReadRegularFileDigits')) {
+    // Read a regular non-symlink file that must contain digits only.
+    function pmssReadRegularFileDigits(string $path): ?string
+    {
+        return (($raw = pmssReadRegularFileTrimmed($path)) !== null && $raw !== '' && ctype_digit($raw)) ? $raw : null;
+    }
+}
 if (!function_exists('pmssHostnameRead')) {
     function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
 }

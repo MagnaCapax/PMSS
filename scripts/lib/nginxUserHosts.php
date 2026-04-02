@@ -9,6 +9,7 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/userTransfer.php';
 
 /**
@@ -34,15 +35,11 @@ function pmssNginxUserHostIsValidFqdn(string $hostname): bool
  */
 function pmssNginxUserBillingIdFromFile(string $path): ?string
 {
-    $raw = @file_get_contents($path);
-    if ($raw === false) {
+    $raw = pmssReadRegularFileDigits($path);
+    if ($raw === null) {
         return null;
     }
-    $raw = trim($raw);
-    if ($raw === '' || !ctype_digit($raw)) {
-        return null;
-    }
-    if ((int)$raw <= 0) {
+    if ((int) $raw <= 0) {
         return null;
     }
     return $raw;

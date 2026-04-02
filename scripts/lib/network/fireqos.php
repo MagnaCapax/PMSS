@@ -32,14 +32,6 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
     if ($defaultCapMbit <= 0) {
         $defaultCapMbit = 100;
     }
-    $readPositiveInt = function (string $path): ?int {
-        $raw = pmssReadRegularFileTrimmed($path);
-        if ($raw === null || $raw === '' || !is_numeric($raw)) {
-            return null;
-        }
-        $value = (int) $raw;
-        return $value > 0 ? $value : null;
-    };
 
     foreach ($users as $username) {
         if (!pmssValidateUsername($username)) {
@@ -53,15 +45,15 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
 
         $limit = '';
         $slidingPath = $limitStateDir."/{$username}.throttle_mbit";
-        $stored = $readPositiveInt($slidingPath);
-        if ($stored !== null) {
+        $stored = (int) (pmssReadRegularFileDigits($slidingPath) ?? '0');
+        if ($stored > 0) {
             $limit = ' ceil '.$stored.'Mbit';
         }
         if ($limit === '' && is_file($limitStateDir."/{$username}.enabled")) {
             $capMbit = $defaultCapMbit;
             $throttlePath = $homeDir."/{$username}/.throttle";
-            $stored = $readPositiveInt($throttlePath);
-            if ($stored !== null) {
+            $stored = (int) (pmssReadRegularFileDigits($throttlePath) ?? '0');
+            if ($stored > 0) {
                 $capMbit = $stored;
             }
             $limit = ' ceil '.$capMbit.'Mbit';

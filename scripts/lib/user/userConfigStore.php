@@ -343,11 +343,11 @@ class UserConfigStore
         if ($owner !== 0) {
             return 0;
         }
-        $raw = pmssReadRegularFileTrimmed($path);
-        if ($raw === null || $raw === '' || !ctype_digit($raw)) {
+        $raw = pmssReadRegularFileDigits($path);
+        if ($raw === null) {
             return 0;
         }
-        $id = (int)$raw;
+        $id = (int) $raw;
         return $id > 0 ? $id : 0;
     }
 }

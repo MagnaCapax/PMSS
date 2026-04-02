@@ -119,7 +119,7 @@ function pmssSupportMessageNormalize(string $message): string
 function pmssSupportBillingIdRead(string $home): int
 {
     $path = rtrim($home, '/').'/.billingId';
-    $value = (int) pmssReadRegularFileTrimmed($path);
+    $value = (int) (pmssReadRegularFileDigits($path) ?? '0');
     return $value > 0 ? $value : 0;
 }
 

@@ -36,8 +36,8 @@ function pmssTorrentPortCurrentUserContext(): ?array
  */
 function pmssTorrentPortExpectedRead(string $path): ?int
 {
-    $raw = pmssReadRegularFileTrimmed($path);
-    if ($raw === null || preg_match('/^[0-9]+$/', $raw) !== 1) {
+    $raw = pmssReadRegularFileDigits($path);
+    if ($raw === null) {
         return null;
     }
 
