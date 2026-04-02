@@ -75,19 +75,6 @@ function pmssAddUserProvisionSummaryRecoverable(?array $summary, ?int $now = nul
 }
 
 /**
- * Return whether per-user services are still running.
- *
- * @return array<string,bool>
- */
-function pmssAddUserProvisionServiceState(string $userName): array
-{
-    return array(
-        'rtorrent' => pmssUserWatchdogProcessRunning($userName, 'rtorrent'),
-        'lighttpd' => pmssUserWatchdogProcessRunning($userName, 'lighttpd'),
-    );
-}
-
-/**
  * Self-heal only when the latest run failed internally and no services are live.
  */
 function pmssAddUserFailedProvisionCanRecover(string $userName, ?array $summary = null, ?array $serviceState = null, ?int $now = null): bool
@@ -97,18 +84,22 @@ function pmssAddUserFailedProvisionCanRecover(string $userName, ?array $summary 
         return false;
     }
 
-    $serviceState = $serviceState ?? pmssAddUserProvisionServiceState($userName);
+    if ($serviceState === null) {
+        $serviceState = array(
+            'rtorrent' => pmssUserWatchdogProcessRunning($userName, 'rtorrent'),
+            'lighttpd' => pmssUserWatchdogProcessRunning($userName, 'lighttpd'),
+        );
+    }
+
     return empty($serviceState['rtorrent']) && empty($serviceState['lighttpd']);
 }
 
 /**
- * Build the explicit cleanup steps used before a failed provisioning retry.
- *
- * @return array<int,array<int,string>>
+ * Remove stale resources from a known failed provisioning run.
  */
-function pmssAddUserFailedProvisionCleanupCommands(string $userName, string $homePath): array
+function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, string $homePath): bool
 {
-    return array(
+    $cleanupSteps = array(
         array('Kill lingering user processes', 'killall -9 -u '.escapeshellarg($userName).' || true'),
         array('Release lighttpd port', '/scripts/util/portManager.php release '.escapeshellarg($userName).' lighttpd'),
         array('Remove nginx user config', 'rm -f -- '.escapeshellarg('/etc/nginx/users/'.$userName)),
@@ -119,14 +110,8 @@ function pmssAddUserFailedProvisionCleanupCommands(string $userName, string $hom
         array('Remove screen socket', 'rm -rf -- '.escapeshellarg('/var/run/screen/S-'.$userName)),
         array('Cleanup addUser lock files', 'rm -f -- '.escapeshellarg('/run/lock/pmss-addUser-'.$userName.'.lock').' '.escapeshellarg('/tmp/pmss-addUser-'.$userName.'.lock')),
     );
-}
 
-/**
- * Remove stale resources from a known failed provisioning run.
- */
-function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, string $homePath): bool
-{
-    foreach (pmssAddUserFailedProvisionCleanupCommands($userName, $homePath) as $step) {
+    foreach ($cleanupSteps as $step) {
         runProvisionStep($step[0], $step[1]);
     }
 

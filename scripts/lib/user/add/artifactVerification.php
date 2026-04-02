@@ -7,29 +7,20 @@
  */
 
 /**
- * Return the canonical artifact paths that must exist after provisioning.
- *
- * These files back the minimum viable PMSS user experience: nginx routing,
- * rtorrent config, per-user lighttpd config, and a seeded quota snapshot.
- *
- * @return array<string, string>
- */
-function pmssAddUserRequiredArtifactPaths(string $userName, string $homePath): array
-{
-    return array(
-        'nginx_config' => pmssAddUserExpectedNginxConfigPath($userName),
-        'rtorrent_config' => $homePath.'/.rtorrent.rc',
-        'lighttpd_config' => $homePath.'/.lighttpd.conf',
-        'quota_snapshot' => $homePath.'/.quota',
-    );
-}
-
-/**
  * Abort provisioning if any required artifact is still missing.
  */
 function pmssAddUserVerifyArtifactsOrFail(string $userName, string $homePath): void
 {
-    foreach (pmssAddUserRequiredArtifactPaths($userName, $homePath) as $label => $path) {
+    // Keep the required artifacts adjacent to the fatal guard so the success
+    // contract stays readable without chasing a one-call helper.
+    $requiredArtifacts = array(
+        'nginx_config' => '/etc/nginx/users/'.$userName,
+        'rtorrent_config' => $homePath.'/.rtorrent.rc',
+        'lighttpd_config' => $homePath.'/.lighttpd.conf',
+        'quota_snapshot' => $homePath.'/.quota',
+    );
+
+    foreach ($requiredArtifacts as $label => $path) {
         if (is_file($path)) {
             continue;
         }

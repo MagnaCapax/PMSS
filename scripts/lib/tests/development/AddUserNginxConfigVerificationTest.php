@@ -2,17 +2,19 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once __DIR__.'/../../user/add/userConfigApply.php';
-require_once __DIR__.'/../../user/add/artifactVerification.php';
 
 /**
  * Covers addUser nginx config verification helpers.
  */
 class AddUserNginxConfigVerificationTest extends TestCase
 {
-    public function testExpectedNginxConfigPathMatchesCanonicalLocation(): void
+    public function testCanonicalNginxConfigPathStaysInProvisioningGuards(): void
     {
-        $this->assertEquals('/etc/nginx/users/alice', \pmssAddUserExpectedNginxConfigPath('alice'));
+        $userConfigApply = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
+        $artifactVerification = $this->pmssReadRepoFile('scripts/lib/user/add/artifactVerification.php');
+
+        $this->assertStringContainsString("'/etc/nginx/users/'.\$user['name']", $userConfigApply);
+        $this->assertStringContainsString("'/etc/nginx/users/'.\$userName", $artifactVerification);
     }
 
     public function testProvisioningFailsLoudlyWhenConfigIsMissing(): void
@@ -23,16 +25,16 @@ class AddUserNginxConfigVerificationTest extends TestCase
         $this->assertStringContainsString("finalizeProvision('FAIL', 'nginx_config_missing', 1);", $source);
     }
 
-    public function testRequiredArtifactPathsCoverProvisioningOutputs(): void
+    public function testRequiredArtifactsStayAlongsideSuccessGuard(): void
     {
-        $expected = [
-            'nginx_config' => '/etc/nginx/users/alice',
-            'rtorrent_config' => '/home/alice/.rtorrent.rc',
-            'lighttpd_config' => '/home/alice/.lighttpd.conf',
-            'quota_snapshot' => '/home/alice/.quota',
-        ];
+        $source = $this->pmssReadRepoFile('scripts/lib/user/add/artifactVerification.php');
 
-        $this->assertEquals($expected, \pmssAddUserRequiredArtifactPaths('alice', '/home/alice'));
+        $this->assertStringContainsAllStrings(array(
+            "'nginx_config' => '/etc/nginx/users/'.\$userName",
+            "'rtorrent_config' => \$homePath.'/.rtorrent.rc'",
+            "'lighttpd_config' => \$homePath.'/.lighttpd.conf'",
+            "'quota_snapshot' => \$homePath.'/.quota'",
+        ), $source);
     }
 
     public function testAddUserVerifiesArtifactsBeforeReportingSuccess(): void

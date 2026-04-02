@@ -30,14 +30,6 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
 }
 
 /**
- * Return the canonical nginx user config path for a provisioned account.
- */
-function pmssAddUserExpectedNginxConfigPath(string $userName): string
-{
-    return '/etc/nginx/users/'.$userName;
-}
-
-/**
  * Apply the per-user PMSS configuration (quota, rtorrent, vhosts).
  *
  * Note: this helper intentionally exits on fatal provisioning errors to keep
@@ -105,7 +97,7 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         'Regenerate nginx config',
         sprintf('/scripts/util/createNginxConfig.php --user %s', escapeshellarg($user['name']))
     );
-    if (!is_file(pmssAddUserExpectedNginxConfigPath($user['name']))) {
+    if (!is_file('/etc/nginx/users/'.$user['name'])) {
         logProvisionMessage('FATAL: nginx config missing after regeneration; aborting provisioning');
         finalizeProvision('FAIL', 'nginx_config_missing', 1);
         exit(1);

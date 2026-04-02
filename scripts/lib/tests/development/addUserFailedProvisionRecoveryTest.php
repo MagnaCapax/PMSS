@@ -64,10 +64,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
 
     public function testCleanupCommandsKeepExpectedRecoverySteps(): void
     {
-        $commands = pmssAddUserFailedProvisionCleanupCommands('alice', '/home/alice');
-        $joined = implode("\n", array_map(static function (array $step): string {
-            return $step[0].' => '.$step[1];
-        }, $commands));
+        $source = $this->pmssReadRepoFile('scripts/lib/user/add/orphanCleanup.php');
 
         $this->assertOrderedStrings(
             array(
@@ -77,11 +74,11 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
                 'Delete user group',
                 'Cleanup addUser lock files',
             ),
-            $joined
+            $source
         );
-        $this->assertStringContainsString('/scripts/util/portManager.php release', $joined);
-        $this->assertStringContainsString('userdel -r', $joined);
-        $this->assertStringContainsString('/etc/seedbox/runtime/trafficLimits/alice', $joined);
+        $this->assertStringContainsString('/scripts/util/portManager.php release', $source);
+        $this->assertStringContainsString('userdel -r', $source);
+        $this->assertStringContainsString("'/etc/seedbox/runtime/trafficLimits/'.\$userName", $source);
     }
 
     public function testFailureRollbackRunsOnlyForEarlyFailAfterUserCreation(): void
