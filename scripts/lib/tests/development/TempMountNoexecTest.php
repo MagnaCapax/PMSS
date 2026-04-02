@@ -180,4 +180,24 @@ class TempMountNoexecTest extends TestCase
         chmod($fstab, 0600);
     }
 
+    public function testDryRunProfilesRemountCommandsInStableOrder(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-noexec-profile-', 0700);
+        $fstab = $dir.'/fstab';
+        $mounts = $dir.'/mounts';
+
+        file_put_contents($fstab, "tmpfs /tmp tmpfs defaults 0 0\nshm /dev/shm tmpfs defaults 0 0\n");
+        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\nshm /dev/shm tmpfs rw,exec,suid,dev 0 0\n");
+
+        $this->pmssResetRuntimeProfile();
+        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
+        putenv('PMSS_DRY_RUN=1');
+        \pmssConfigureTempMountNoexec(null, $fstab, $mounts);
+
+        $this->assertEquals([
+            "mount '-o' 'remount,noexec,nosuid,nodev' '/tmp'",
+            "mount '-o' 'remount,noexec,nosuid,nodev' '/dev/shm'",
+        ], $this->pmssProfileCommands());
+    }
+
 }

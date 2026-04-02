@@ -39,14 +39,23 @@ function pmssFstabMountEntryRead(array $lines, string $mountPoint, ?string $fsTy
  */
 function pmssFstabMountOptionsPlan(array $columns, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false): array
 {
-    $plan = pmssConfigOptionsUpdatePlan($columns[3], $requiredOptions, $removeOptions, $dropDefaultsOnly); $updatedColumns = $columns;
-    $updatedColumns[3] = implode(',', $plan['options']);
-    return [
-        'columns' => $updatedColumns,
-        'options' => $plan['options'],
-        'added' => $plan['added'],
-        'removed' => $plan['removed'],
-    ];
+    $plan = pmssConfigOptionsUpdatePlan($columns[3], $requiredOptions, $removeOptions, $dropDefaultsOnly);
+    $columns[3] = implode(',', $plan['options']);
+    return ['columns' => $columns, 'options' => $plan['options'], 'added' => $plan['added'], 'removed' => $plan['removed']];
+}
+/**
+ * Apply an option plan to the first matching fstab entry.
+ *
+ * @return ?array{columns:array<int,string>,options:array<int,string>,added:array<int,string>,removed:array<int,string>,changed:bool,index:int}
+ */
+function pmssFstabMountOptionsEnsure(array &$lines, string $mountPoint, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false, ?string $fsType = null): ?array
+{
+    if (($entry = pmssFstabMountEntryRead($lines, $mountPoint, $fsType)) === null) return null;
+    $plan = pmssFstabMountOptionsPlan($entry['columns'], $requiredOptions, $removeOptions, $dropDefaultsOnly);
+    $plan['changed'] = $plan['columns'][3] !== $entry['columns'][3];
+    $plan['index'] = $entry['index'];
+    if ($plan['changed']) $lines[$entry['index']] = implode("\t", $plan['columns']);
+    return $plan;
 }
 /**
  * Replace a prefixed option with one canonical value.
@@ -61,8 +70,8 @@ function pmssFstabOptionsReplacePrefixedValue(array $options, string $prefix, st
     foreach ($options as $option) {
         if (strpos($option, $prefix) !== 0) { $updated[] = $option; continue; }
         if (!$replaced) { $updated[] = $replacement; $replaced = true; continue; }
-        if (!$collapseDuplicates) { $updated[] = $option; }
+        if (!$collapseDuplicates) $updated[] = $option;
     }
-    if (!$replaced) { $updated[] = $replacement; }
+    if (!$replaced) $updated[] = $replacement;
     return $updated;
 }

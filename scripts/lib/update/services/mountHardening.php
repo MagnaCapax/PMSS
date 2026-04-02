@@ -15,10 +15,7 @@ require_once __DIR__.'/../../runtime.php';
 function pmssMountHardeningFlagEnabled(string $envKey, string $notSetMessage, string $disabledMessage, callable $logger): bool
 {
     $flag = getenv($envKey);
-    if ($flag === false) {
-        $logger($notSetMessage);
-        return false;
-    }
+    if ($flag === false) { $logger($notSetMessage); return false; }
     if (!pmssEnvValueIsFalsey($flag)) return true;
     $logger($disabledMessage);
     return false;
@@ -28,9 +25,7 @@ function pmssMountHardeningFlagEnabled(string $envKey, string $notSetMessage, st
 function pmssMountHardeningReadMounts(string $mountsPath): array
 {
     $mounts = [];
-    if (!is_readable($mountsPath)) return $mounts;
-    $lines = @file($mountsPath, FILE_IGNORE_NEW_LINES);
-    if ($lines === false) return $mounts;
+    if (!is_readable($mountsPath) || ($lines = @file($mountsPath, FILE_IGNORE_NEW_LINES)) === false) return $mounts;
     foreach ($lines as $line) {
         $columns = pmssConfigLineColumns($line, 4, []);
         if ($columns === []) continue;
@@ -55,9 +50,7 @@ function pmssMountHardeningWriteFstabIfChanged(string $fstabPath, ?array $lines,
 function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
 {
     $log = $logger ?: 'logMessage';
-    if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_NOEXEC', '[SKIP] /tmp and /dev/shm noexec hardening disabled (PMSS_HARDEN_TMP_NOEXEC not set)', '[SKIP] /tmp and /dev/shm noexec hardening disabled via PMSS_HARDEN_TMP_NOEXEC', $log)) {
-        return;
-    }
+    if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_NOEXEC', '[SKIP] /tmp and /dev/shm noexec hardening disabled (PMSS_HARDEN_TMP_NOEXEC not set)', '[SKIP] /tmp and /dev/shm noexec hardening disabled via PMSS_HARDEN_TMP_NOEXEC', $log)) return;
 
     $fstabPath = $fstabPath ?? '/etc/fstab';
     $mountsPath = $mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
@@ -67,80 +60,56 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
     $lines = pmssFstabLinesRead($fstabPath, $log, 'fstab hardening');
     $fstabChanged = false;
     foreach (['/tmp', '/dev/shm'] as $mountPoint) {
-        if ($lines !== null) {
-            $entry = pmssFstabMountEntryRead($lines, $mountPoint);
-            if ($entry === null) {
+        if (is_array($lines)) {
+            $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $required, $conflicts);
+            if ($plan === null) {
                 $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstabPath.'; skipping fstab hardening');
+            } elseif (!$plan['changed']) {
+                $log('[SKIP] '.$mountPoint.' already hardened in '.$fstabPath);
             } else {
-                $plan = pmssFstabMountOptionsPlan($entry['columns'], $required, $conflicts);
-                if ($plan['added'] === [] && $plan['removed'] === []) {
-                    $log('[SKIP] '.$mountPoint.' already hardened in '.$fstabPath);
-                } else {
-                    $lines[$entry['index']] = implode("\t", $plan['columns']);
-                    $fstabChanged = true;
-                    $msg = '[WARN] Updated '.$mountPoint.' mount options in '.$fstabPath;
-                    if ($plan['added'] !== []) {
-                        $msg .= ' (added '.implode(', ', $plan['added']).')';
-                    }
-                    if ($plan['removed'] !== []) {
-                        $msg .= ' (removed '.implode(', ', $plan['removed']).')';
-                    }
-                    $log($msg);
-                }
+                $fstabChanged = true;
+                $msg = '[WARN] Updated '.$mountPoint.' mount options in '.$fstabPath;
+                if ($plan['added'] !== []) $msg .= ' (added '.implode(', ', $plan['added']).')';
+                if ($plan['removed'] !== []) $msg .= ' (removed '.implode(', ', $plan['removed']).')';
+                $log($msg);
             }
         }
-        if (!isset($mounts[$mountPoint])) {
-            $log('[WARN] '.$mountPoint.' not mounted; skipping remount');
-            continue;
-        }
-        $missing = array_diff($required, $mounts[$mountPoint]['options']);
-        if ($missing === []) {
-            $log('[SKIP] '.$mountPoint.' already mounted with noexec,nosuid,nodev');
-            continue;
-        }
-        $command = pmssBuildCommand('mount', ['-o', 'remount,noexec,nosuid,nodev', $mountPoint]);
-        runStep('Remounting '.$mountPoint.' with noexec hardening', $command);
+        if (!isset($mounts[$mountPoint])) { $log('[WARN] '.$mountPoint.' not mounted; skipping remount'); continue; }
+        if (array_diff($required, $mounts[$mountPoint]['options']) === []) { $log('[SKIP] '.$mountPoint.' already mounted with noexec,nosuid,nodev'); continue; }
+        runStep('Remounting '.$mountPoint.' with noexec hardening', pmssBuildCommand('mount', ['-o', 'remount,'.implode(',', $required), $mountPoint]));
     }
     pmssMountHardeningWriteFstabIfChanged($fstabPath, $lines, $fstabChanged, $log);
 }
 
-/**
- * Ensure /tmp is mounted as tmpfs with hardened options when enabled.
- */
+/** Ensure /tmp is mounted as tmpfs with hardened options when enabled. */
 function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPath = null, ?string $mountsPath = null): void
 {
     $log = $logger ?: 'logMessage';
-    if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_TMPFS', '[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)', '[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS', $log)) {
-        return;
-    }
+    if (!pmssMountHardeningFlagEnabled('PMSS_HARDEN_TMP_TMPFS', '[SKIP] /tmp tmpfs hardening disabled (PMSS_HARDEN_TMP_TMPFS not set)', '[SKIP] /tmp tmpfs hardening disabled via PMSS_HARDEN_TMP_TMPFS', $log)) return;
 
     $size = trim((string) getenv('PMSS_TMPFS_TMP_SIZE'));
     $size === '' && $size = '2G';
-    if (!preg_match('/^[0-9]+[KMGTP]?$/i', $size)) {
-        $log('[WARN] Invalid PMSS_TMPFS_TMP_SIZE value; defaulting to 2G');
-        $size = '2G';
-    }
+    if (!preg_match('/^[0-9]+[KMGTP]?$/i', $size)) { $log('[WARN] Invalid PMSS_TMPFS_TMP_SIZE value; defaulting to 2G'); $size = '2G'; }
 
     $fstabPath = $fstabPath ?? '/etc/fstab';
     $mountsPath = $mountsPath ?? pmssResolvePathFromEnv('PMSS_PROC_MOUNTS_PATH', '/proc/mounts');
     $required = ['noexec', 'nosuid', 'nodev'];
     $conflicts = ['exec', 'suid', 'dev'];
-
     $mounts = pmssMountHardeningLoadMounts($mountsPath, '/proc/mounts checks', $log);
     $tmpMount = $mounts['/tmp'] ?? ['type' => null, 'options' => []];
-
     $lines = pmssFstabLinesRead($fstabPath, $log, '/tmp tmpfs configuration');
     if ($lines === null) return;
 
     $changed = false;
     $added = false;
     $entry = pmssFstabMountEntryRead($lines, '/tmp');
-    if ($entry !== null) {
-        if ($entry['columns'][2] !== 'tmpfs') {
-            $log('[WARN] /tmp is configured as non-tmpfs in '.$fstabPath.'; skipping tmpfs hardening');
-            return;
-        }
-
+    if ($entry === null) {
+        $lines[] = 'tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size='.$size.' 0 0';
+        $changed = true;
+        $added = true;
+        $log('[WARN] Added /tmp tmpfs entry to '.$fstabPath.' (size='.$size.')');
+    } else {
+        if ($entry['columns'][2] !== 'tmpfs') { $log('[WARN] /tmp is configured as non-tmpfs in '.$fstabPath.'; skipping tmpfs hardening'); return; }
         $plan = pmssFstabMountOptionsPlan($entry['columns'], $required, $conflicts);
         $options = pmssFstabOptionsReplacePrefixedValue($plan['options'], 'size=', 'size='.$size, false);
         $updatedColumns = $entry['columns'];
@@ -151,38 +120,17 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
             $lines[$entry['index']] = implode("\t", $updatedColumns);
             $changed = true;
             $msg = '[WARN] Updated /tmp tmpfs options in '.$fstabPath;
-            if ($plan['removed'] !== []) {
-                $msg .= ' (removed '.implode(', ', $plan['removed']).')';
-            }
+            if ($plan['added'] !== []) $msg .= ' (added '.implode(', ', $plan['added']).')';
+            if ($plan['removed'] !== []) $msg .= ' (removed '.implode(', ', $plan['removed']).')';
             $log($msg);
         }
-    } else {
-        $lines[] = 'tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size='.$size.' 0 0';
-        $changed = true;
-        $added = true;
-        $log('[WARN] Added /tmp tmpfs entry to '.$fstabPath.' (size='.$size.')');
     }
 
     pmssMountHardeningWriteFstabIfChanged($fstabPath, $lines, $changed, $log);
-
-    if (!is_dir('/tmp') || is_link('/tmp')) {
-        $log('[WARN] /tmp is not a directory; skipping tmpfs mount');
-        return;
-    }
+    if (!is_dir('/tmp') || is_link('/tmp')) { $log('[WARN] /tmp is not a directory; skipping tmpfs mount'); return; }
 
     $needsMount = $added || ($tmpMount['type'] !== 'tmpfs');
-    $missingHardening = array_diff($required, $tmpMount['options']);
-    if (!$needsMount && empty($missingHardening)) {
-        $log('[SKIP] /tmp already mounted as tmpfs with hardened options');
-        return;
-    }
-
-    if ($tmpMount['type'] === 'tmpfs') {
-        $command = pmssBuildCommand('mount', ['-o', 'remount,noexec,nosuid,nodev,size='.$size, '/tmp']);
-        runStep('Remounting /tmp tmpfs with hardened options', $command);
-        return;
-    }
-
-    $command = pmssBuildCommand('mount', ['/tmp']);
-    runStep('Mounting /tmp tmpfs from fstab', $command);
+    if (!$needsMount && array_diff($required, $tmpMount['options']) === []) { $log('[SKIP] /tmp already mounted as tmpfs with hardened options'); return; }
+    if ($tmpMount['type'] === 'tmpfs') { runStep('Remounting /tmp tmpfs with hardened options', pmssBuildCommand('mount', ['-o', 'remount,'.implode(',', array_merge($required, ['size='.$size])), '/tmp'])); return; }
+    runStep('Mounting /tmp tmpfs from fstab', pmssBuildCommand('mount', ['/tmp']));
 }

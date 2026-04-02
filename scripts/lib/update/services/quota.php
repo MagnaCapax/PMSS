@@ -29,19 +29,17 @@ function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = nu
     }
 
     $requiredOptions = $requiredOptions ?? ['usrjquota=aquota.user', 'grpjquota=aquota.group', 'jqfmt=vfsv1'];
-    $entry = pmssFstabMountEntryRead($lines, $mountPoint);
-    if ($entry === null) {
+    $plan = pmssFstabMountOptionsEnsure($lines, $mountPoint, $requiredOptions, [], true);
+    if ($plan === null) {
         $log('[WARN] Mount point '.$mountPoint.' not found in '.$fstab.'; skipping quota updates.');
         return;
     }
 
-    $plan = pmssFstabMountOptionsPlan($entry['columns'], $requiredOptions, [], true);
-    if ($plan['added'] === []) {
+    if (!$plan['changed']) {
         $log('[SKIP] Quota options already present for '.$mountPoint);
         return;
     }
 
-    $lines[$entry['index']] = implode("\t", $plan['columns']);
     $log('[WARN] Updated quota options for '.$mountPoint.' (added '.implode(', ', $plan['added']).')');
     pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
 }
