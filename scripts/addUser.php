@@ -152,16 +152,6 @@ if (!empty($user['trafficLimit']) && $user['trafficLimit'] > 0) {
     logProvisionMessage('Traffic limit set: '.$user['trafficLimit']);
 }
 
-// Retracker config
-/*$retrackerConfigPath = $userHomedirPath . "/www/rutorrent/share/users/{$user['name']}/settings";
-if (mkdir($retrackerConfigPath, 0777, true)) {
-    mkdir("/home/{$user['name']}/www/rutorrent/share/users/{$user['name']}/torrents", 0777, true);
-    file_put_contents($retrackerConfigPath . '/retrackers.dat', 'O:11:"rRetrackers":4:{s:4:"hash";s:14:"retrackers.dat";s:4:"list";a:1:{i:0;a:1:{i:0;s:33:"http://149.5.241.17:6969/announce";}}s:14:"dontAddPrivate";s:1:"1";s:10:"addToBegin";s:1:"1";}');
-    passthru("chown {$user['name']}:{$user['name']} {$retrackerConfigPath}");
-    passthru("chown {$user['name']}:{$user['name']} {$retrackerConfigPath}/retrackers.dat");
-    passthru("chown {$user['name']}:{$user['name']} /home/{$user['name']}/www/rutorrent/share/users/{$user['name']}");
-    passthru("chown {$user['name']}:{$user['name']} /home/{$user['name']}/www/rutorrent/share/users/{$user['name']}/torrents");
-}*/
 pmssAddUserPostProvision($user, $homePath);
 pmssAddUserVerifyArtifactsOrFail($user['name'], $homePath);
 

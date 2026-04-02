@@ -5,8 +5,5 @@ deb-src http://archive.debian.org/debian/ jessie main non-free
 deb http://archive.debian.org/debian-security/ jessie/updates main non-free
 deb-src http://archive.debian.org/debian-security/ jessie/updates main non-free
 
-# Sabnzbd repo for Jessie matches Ubuntu precise releases.
-deb http://ppa.launchpad.net/jcfp/ppa/ubuntu precise main
-
 # Backports provide ffmpeg and other multimedia packages.
 deb http://archive.debian.org/debian/ jessie-backports main

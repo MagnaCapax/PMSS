@@ -248,7 +248,7 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
     
     
     echo "**** get new packages\n";
-    // #TODO Switch to HTTPS and add checksum/GPG verification. (GH #132)
+    // Source tarballs stay pinned to HTTPS URLs with SHA256 verification.
     $rtorrentTarball = "rtorrent-{$rtorrentVersionTarget}.tar.gz";
     $libtorrentTarball = "libtorrent-{$rtorrentVersionTargetLib}.tar.gz";
     $rtorrentSha = isset($checksums[$rtorrentTarball]) ? $checksums[$rtorrentTarball] : '';

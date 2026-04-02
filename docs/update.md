@@ -132,7 +132,6 @@ whether trust is scoped or global.
 | Docker | `/etc/apt/sources.list.d/docker.sources` (written by `pmssEnsureDockerRepository()` in `scripts/lib/update/repositories.php`) | `/etc/apt/keyrings/docker.gpg` (override root: `PMSS_APT_KEYRING_DIR`) | Yes (`Signed-By` field in deb822 source) | Scoped to Docker source entry | Matches ADR 0008 guidance for key scoping without migrating base Debian templates. |
 | MediaArea | `etc/seedbox/config/template.sources.buster`, `etc/seedbox/config/template.sources.bullseye`, `etc/seedbox/config/template.sources.bookworm`, `etc/seedbox/config/template.sources.trixie` | `/etc/apt/trusted.gpg.d/mediaarea.asc` (override: `PMSS_APT_MEDIAAREA_KEY_PATH`) | No | Global (`trusted.gpg.d`) | Repository handling is intentionally frozen; audit only in this phase. |
 | Sonarr (legacy key support) | No active PMSS-managed source template; legacy host entries may still exist outside templates | `/etc/apt/keyrings/sonarr.gpg` (overrides: `PMSS_APT_KEYRING_DIR`, `PMSS_APT_SONARR_KEY_PATH`) | `pmssEnsureSonarrKey()` rewrites legacy Sonarr/NzbDrone `deb` lines with `signed-by=` | Scoped after rewrite; legacy global key removed when migration succeeds | App install still uses GitHub release tarballs; this path only keeps mixed/legacy hosts compatible during apt refresh. |
-| Jessie PPA (`jcfp/ppa`) | `etc/seedbox/config/template.sources.jessie` | No dedicated PMSS keyring path in current code | No | Global when key is present in apt trusted keyrings | Legacy Jessie-only line; treat as Phase B cleanup/scoping candidate. |
 
 Base Debian repos remain in `sources.list` templates per ADR 0008, so this
 table only tracks external/non-Debian sources.
@@ -155,7 +154,7 @@ table only tracks external/non-Debian sources.
 | `python.php` | Provisions FlexGet + gdrivefs virtualenv and CLI symlink. | Executes pip installs (PyPI) for FlexGet stack; assumes Python 3/venv available. |
 | `radarr.php` | Fetches newest Radarr build and deploys to `/opt/Radarr`. | Calls GitHub Releases API (`https://api.github.com/repos/Radarr/Radarr`); downloads tarball via curl. |
 | `rclone.php` | Pins or updates rclone binary and man page. | Downloads from `https://downloads.rclone.org/`; optional latest check hits `https://rclone.org/downloads/`; honours `PMSS_RCLONE_FETCH_LATEST`. |
-| `rtorrent.php` | Rebuilds rTorrent/libtorrent (plus xmlrpc-c), refreshes templates, restarts daemons. | Fetches tarballs from `http://pulsedmedia.com/remote/pkg/`, checks out xmlrpc-c via SourceForge SVN; needs build toolchain. |
+| `rtorrent.php` | Rebuilds rTorrent/libtorrent (plus xmlrpc-c), refreshes templates, restarts daemons. | Fetches pinned tarballs from `https://pulsedmedia.com/remote/pkg/` with SHA256 verification, checks out xmlrpc-c via SourceForge SVN; needs build toolchain. |
 | `sonarr.php` | Installs latest Sonarr under `/opt/Sonarr` and records version metadata. | Uses GitHub Releases API (`https://api.github.com/repos/Sonarr/Sonarr`); removes legacy apt repo artifacts. |
 | `syncthing.php` | Ensures syncthing binary matches the pinned amd64 release. | Fetches the pinned upstream tarball from GitHub over HTTPS, verifies SHA256, and installs `syncthing` into `/usr/bin`. |
 | `vnstat.php` | Installs/configures vnStat for the detected uplink. | Uses Debian APT; depends on `scripts/lib/networkInfo.php` for interface info. |

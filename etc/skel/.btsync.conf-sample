@@ -68,6 +68,6 @@
   ]
 */
 
-/* Advanced preferences can be added to config file. Info is available at http://sync-help.bittorrent.com */
+/* Advanced preferences can be added to config file. See the current Resilio Sync documentation for supported keys. */
 
 }
