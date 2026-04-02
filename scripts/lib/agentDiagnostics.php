@@ -27,37 +27,18 @@ function pmssAgentDiagnosticsUsage(): string
         ."  -h, --help      Show this help text.\n";
 }
 
-/** Collect always-on storage and service sections. */
-function pmssAgentDiagnosticsCollectBaseSections(): array
+/** Assemble the full diagnostics payload. */
+function pmssAgentDiagnosticsCollect(string $user = ''): array
 {
-    $storage = ['df' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -h')), 'df_inodes' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('df -i'))];
-    foreach ([
-        'mdstat' => ['PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', '/proc/mdstat'],
-        'fstab' => ['PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', '/etc/fstab'],
-    ] as $key => $fileSpec) {
-        $storage[$key] = pmssAgentDiagnosticsReadFile($fileSpec[0], $fileSpec[1]);
-    }
-
-    $services = [];
-    foreach ([
-        'nginx' => ['systemctl is-active nginx 2>/dev/null', 'unknown'],
-        'proftpd' => ['systemctl is-active proftpd 2>/dev/null', 'unknown'],
-        'cron' => ['systemctl is-active cron 2>/dev/null', 'unknown'],
-        'ssh' => ['systemctl is-active ssh 2>/dev/null', 'unknown'],
-    ] as $key => $commandSpec) {
-        $services[$key] = pmssAgentDiagnosticsCommandText($commandSpec[0], $commandSpec[1]);
-    }
-    foreach ([
-        'rtorrent_count' => 'pgrep -cx rtorrent 2>/dev/null',
-        'lighttpd_count' => 'pgrep -cx lighttpd 2>/dev/null',
-    ] as $key => $command) {
-        $services[$key] = (int) pmssAgentDiagnosticsCommandText($command);
-    }
-
-    return [
+    $sections = [
         'motd' => ['raw' => pmssAgentDiagnosticsReadFile('PMSS_AGENT_DIAGNOSTICS_MOTD_PATH', '/etc/motd')],
-        'storage' => $storage,
-        'services' => $services,
+        'storage' => [
+            'df' => pmssAgentDiagnosticsOutputLines(pmssCommandCapture('df -h', 0, false, 'Failed to launch command')),
+            'df_inodes' => pmssAgentDiagnosticsOutputLines(pmssCommandCapture('df -i', 0, false, 'Failed to launch command')),
+            'mdstat' => pmssAgentDiagnosticsReadFile('PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH', '/proc/mdstat'),
+            'fstab' => pmssAgentDiagnosticsReadFile('PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH', '/etc/fstab'),
+        ],
+        'services' => [],
         'system_test' => pmssAgentDiagnosticsPhpJson('scripts/util/systemTest.php', ['--json'], 'systemTest.php --json'),
         'users' => [
             'list' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsPhpScript('scripts/listUsers.php')),
@@ -66,33 +47,30 @@ function pmssAgentDiagnosticsCollectBaseSections(): array
         'resources' => pmssAgentDiagnosticsPhpJson('scripts/util/userResourcesList.php', ['--full', '--json'], 'userResourcesList.php --full --json'),
         'traffic' => pmssAgentDiagnosticsPhpJson('scripts/showTraffic.php', ['--json'], 'showTraffic.php --json'),
     ];
-}
-
-/** Collect optional per-user diagnostics after shared validation. */
-function pmssAgentDiagnosticsCollectUserSections(string $user): array
-{
-    $sections = [
-        'user_settings' => pmssAgentDiagnosticsPhpJson('scripts/userSetting.php', ['view', $user], 'userSetting.php view'),
-        'user_processes' => pmssAgentDiagnosticsOutputLines(pmssAgentDiagnosticsCapture('pgrep -u '.escapeshellarg($user).' -a 2>/dev/null')),
-    ];
-
     foreach ([
-        'user_identity' => 'id '.escapeshellarg($user),
-        'user_quota' => 'quota -u '.escapeshellarg($user).' 2>/dev/null',
-        'user_disk' => 'du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null',
-    ] as $key => $command) {
-        $sections[$key] = ['raw' => pmssAgentDiagnosticsCommandText($command)];
+        'nginx' => ['systemctl is-active nginx 2>/dev/null', 'unknown'],
+        'proftpd' => ['systemctl is-active proftpd 2>/dev/null', 'unknown'],
+        'cron' => ['systemctl is-active cron 2>/dev/null', 'unknown'],
+        'ssh' => ['systemctl is-active ssh 2>/dev/null', 'unknown'],
+    ] as $key => $commandSpec) {
+        $sections['services'][$key] = pmssAgentDiagnosticsCommandText($commandSpec[0], $commandSpec[1]);
     }
-
-    return $sections;
-}
-
-/** Assemble the full diagnostics payload. */
-function pmssAgentDiagnosticsCollect(string $user = ''): array
-{
-    $sections = pmssAgentDiagnosticsCollectBaseSections();
+    foreach ([
+        'rtorrent_count' => 'pgrep -cx rtorrent 2>/dev/null',
+        'lighttpd_count' => 'pgrep -cx lighttpd 2>/dev/null',
+    ] as $key => $command) {
+        $sections['services'][$key] = (int) pmssAgentDiagnosticsCommandText($command);
+    }
     if ($user !== '') {
-        $sections = array_merge($sections, pmssAgentDiagnosticsCollectUserSections($user));
+        $sections['user_settings'] = pmssAgentDiagnosticsPhpJson('scripts/userSetting.php', ['view', $user], 'userSetting.php view');
+        $sections['user_processes'] = pmssAgentDiagnosticsOutputLines(pmssCommandCapture('pgrep -u '.escapeshellarg($user).' -a 2>/dev/null', 0, false, 'Failed to launch command'));
+        foreach ([
+            'user_identity' => 'id '.escapeshellarg($user),
+            'user_quota' => 'quota -u '.escapeshellarg($user).' 2>/dev/null',
+            'user_disk' => 'du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null',
+        ] as $key => $command) {
+            $sections[$key] = ['raw' => pmssAgentDiagnosticsCommandText($command)];
+        }
     }
     return [
         'timestamp' => date('c'),

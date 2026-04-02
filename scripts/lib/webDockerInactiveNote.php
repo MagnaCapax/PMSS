@@ -10,37 +10,6 @@
  */
 
 /**
- * Resolve the Debian version label shown in Docker inactive guidance.
- *
- * Prefer os-release, then fall back to /etc/debian_version. Unknown values keep
- * the generic Debian label so the note stays accurate instead of guessing.
- */
-function pmssWebDockerInactiveDebianLabel(
-    string $osReleasePath = '/etc/os-release',
-    string $debianVersionPath = '/etc/debian_version'
-): string {
-    $label = 'Debian';
-    $osRelease = @parse_ini_file($osReleasePath);
-    if (is_array($osRelease)) {
-        $versionId = trim((string) ($osRelease['VERSION_ID'] ?? ''));
-        if ($versionId !== '') {
-            if (preg_match('/^([0-9]+)/', $versionId, $matches) === 1) {
-                return 'Debian '.$matches[1];
-            }
-
-            return 'Debian '.$versionId;
-        }
-    }
-
-    $debianVersion = trim((string) @file_get_contents($debianVersionPath));
-    if (preg_match('/^([0-9]+)/', $debianVersion, $matches) === 1) {
-        return 'Debian '.$matches[1];
-    }
-
-    return $label;
-}
-
-/**
  * Build the Docker inactive note shown beside the Docker app status.
  *
  * The note is only shown for the inactive state. When the cgroup boot option is
@@ -63,9 +32,25 @@ function pmssWebDockerInactiveNote(
 
     $cmdline = (string) @file_get_contents($cmdlinePath);
     if (strpos($cmdline, 'unified_cgroup_hierarchy=0') === false) {
+        $debianLabel = 'Debian';
+        $osRelease = @parse_ini_file($osReleasePath);
+        if (is_array($osRelease)) {
+            $versionId = trim((string) ($osRelease['VERSION_ID'] ?? ''));
+            if ($versionId !== '') {
+                $debianLabel = preg_match('/^([0-9]+)/', $versionId, $matches) === 1
+                    ? 'Debian '.$matches[1]
+                    : 'Debian '.$versionId;
+            }
+        }
+        if ($debianLabel === 'Debian') {
+            $debianVersion = trim((string) @file_get_contents($debianVersionPath));
+            if (preg_match('/^([0-9]+)/', $debianVersion, $matches) === 1) {
+                $debianLabel = 'Debian '.$matches[1];
+            }
+        }
         return sprintf(
             ' (%s: User bus restricted. Requires `systemd.unified_cgroup_hierarchy=0` in GRUB. Contact support.)',
-            pmssWebDockerInactiveDebianLabel($osReleasePath, $debianVersionPath)
+            $debianLabel
         );
     }
 

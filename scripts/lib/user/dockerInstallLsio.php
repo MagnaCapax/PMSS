@@ -12,24 +12,15 @@
 require_once __DIR__.'/../runtime.php';
 
 /**
- * Return the supported LSIO app identifiers in help-text order.
- *
- * @return array<int,string>
- */
-function pmssDockerInstallLsioSupportedApps(): array
-{
-    return ['jellyfin', 'qbittorrent', 'radarr', 'sonarr', 'prowlarr', 'mariadb', 'phpmyadmin'];
-}
-
-/**
  * Build the command usage text for the current entrypoint name.
  */
 function pmssDockerInstallLsioUsage(string $scriptName): string
 {
+    $supportedApps = ['jellyfin', 'qbittorrent', 'radarr', 'sonarr', 'prowlarr', 'mariadb', 'phpmyadmin'];
     return sprintf(
         "Usage: %s APP [HOST_PORT] [--dry-run]\n\nSupported apps: %s\n",
         $scriptName,
-        implode(' ', pmssDockerInstallLsioSupportedApps())
+        implode(' ', $supportedApps)
     );
 }
 
@@ -67,21 +58,15 @@ function pmssDockerInstallLsioTimezone(): string
 }
 
 /**
- * Quote a shell word for display while keeping simple arguments readable.
- */
-function pmssDockerInstallLsioDisplayWord(string $value): string
-{
-    return preg_match('/^[A-Za-z0-9_@:.,+\/=-]+$/', $value) === 1 ? $value : escapeshellarg($value);
-}
-
-/**
  * Render a command array as a shell-like string for dry-run output.
  *
  * @param array<int,string> $command
  */
 function pmssDockerInstallLsioDisplayCommand(array $command): string
 {
-    return implode(' ', array_map('pmssDockerInstallLsioDisplayWord', $command));
+    return implode(' ', array_map(static function (string $value): string {
+        return preg_match('/^[A-Za-z0-9_@:.,+\/=-]+$/', $value) === 1 ? $value : escapeshellarg($value);
+    }, $command));
 }
 
 /**

@@ -1,8 +1,8 @@
 <?php
 /**
- * Command and file helpers for agent diagnostics collection.
+ * Script path, command text, and JSON helpers for diagnostics collection.
  *
- * Keeps shelling and JSON decoding in one place so the collector can stay
+ * Keeps the shared decoding paths in one place so the collector can stay
  * focused on section assembly.
  *
  * @license GPL-3.0-only
@@ -30,12 +30,6 @@ function pmssAgentDiagnosticsReadFile(string $envKey, string $defaultPath): stri
     return is_string($contents) ? $contents : '';
 }
 
-/** Execute a shell command and capture stdout, stderr, and rc. */
-function pmssAgentDiagnosticsCapture(string $command): array
-{
-    return pmssCommandCapture($command, 0, false, 'Failed to launch command');
-}
-
 /** Execute a repository PHP script relative to the diagnostics script root. */
 function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = []): array
 {
@@ -52,7 +46,7 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
     foreach ($arguments as $argument) {
         $command .= ' '.escapeshellarg((string) $argument);
     }
-    return pmssAgentDiagnosticsCapture($command);
+    return pmssCommandCapture($command, 0, false, 'Failed to launch command');
 }
 
 /** Split command stdout into trimmed non-empty lines. */
@@ -68,7 +62,7 @@ function pmssAgentDiagnosticsOutputLines(array $result): array
 /** Return trimmed command stdout or a fallback when nothing useful was emitted. */
 function pmssAgentDiagnosticsCommandText(string $command, string $fallback = ''): string
 {
-    $result = pmssAgentDiagnosticsCapture($command);
+    $result = pmssCommandCapture($command, 0, false, 'Failed to launch command');
     $text = trim((string) $result['stdout']);
     return $text !== '' ? $text : $fallback;
 }
