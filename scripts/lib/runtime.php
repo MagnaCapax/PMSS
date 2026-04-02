@@ -121,6 +121,9 @@ if (!function_exists('pmssReadRegularFileTrimmed')) {
         return (!is_file($path) || is_link($path) || !is_string($contents = @file_get_contents($path))) ? null : trim($contents);
     }
 }
+if (!function_exists('pmssHostnameRead')) {
+    function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
+}
 
 if (!function_exists('pmssLockFileAcquire')) {
     function pmssLockFileAcquire(string $path, bool $nonBlocking = false, string $mode = 'c', bool $createParentDir = false, bool $closeOnBusy = true, ?bool &$busy = null)

@@ -712,7 +712,7 @@ function pmssWireguardConfigure(?callable $logger = null): void
 
     $listenPort = 51820;
 
-    $hostname = trim((string) @file_get_contents('/etc/hostname'));
+    $hostname = pmssHostnameRead();
     [$endpoint, $endpointSource] = wgResolveEndpoint($hostname);
     if ($endpoint === '') {
         $log('[wireguard] Unable to determine public endpoint; falling back to hostname '.$hostname);

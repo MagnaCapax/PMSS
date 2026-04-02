@@ -114,11 +114,6 @@ $homePath = "/home/{$user['name']}";
 pmssAddUserEnsurePreflightState($userDb, $user, $homePath);
 pmssAddUserFailureRollbackInit($userDb, $user['name'], $homePath);
 
-// Get our server hostname, and do some cleanup just to be safe
-$hostname = trim( file_get_contents('/etc/hostname') );
-$hostname = str_replace(array("\n", "\r", "\t"), array('','',''), $hostname);
-
-
 pmssAddUserSystemUserCreate($user, $homePath);
 pmssAddUserUserConfigApply($userDb, $user, $homePath);
 pmssUpdateUserEnvironment($user['name']);

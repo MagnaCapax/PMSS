@@ -34,7 +34,7 @@ function pmssApplyHostnameConfig(?callable $logger = null): void
             : pmssBuildCommand('hostname', [$hostname])
     );
 
-    if (is_string($existing = @file_get_contents('/etc/hostname')) && trim($existing) === $hostname) {
+    if (pmssHostnameRead() === $hostname) {
         $log('[SKIP] /etc/hostname already set to '.$hostname);
         return;
     }

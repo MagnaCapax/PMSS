@@ -39,7 +39,7 @@ $listenPort = 51820;
 $configPath = $configDir.'/wg0.conf';
 $current    = is_file($configPath) ? (string) file_get_contents($configPath) : '';
 
-$hostname = trim((string) @file_get_contents('/etc/hostname'));
+$hostname = pmssHostnameRead();
 [$endpoint, $endpointSource] = wgResolveEndpoint($hostname);
 if ($endpoint === '') {
     wgLog('wireguardPeersRefresh: unable to determine public endpoint; falling back to hostname '.$hostname);

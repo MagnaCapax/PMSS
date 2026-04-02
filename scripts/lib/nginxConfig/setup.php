@@ -10,6 +10,7 @@
 
 require_once __DIR__.'/templates.php';
 require_once __DIR__.'/../configBackups.php';
+require_once __DIR__.'/../runtime.php';
 
 /**
  * Ensure the default nginx site defines default_server on its listen directives.
@@ -69,7 +70,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
 
     // Configure site default
     //passthru("cp /etc/seedbox/config/template.nginx-site-default /etc/nginx/sites-available/default");
-    $serverHostname = trim((string)@file_get_contents('/etc/hostname'));
+    $serverHostname = pmssHostnameRead();
     // /etc/hostname should be a single token; trim defensively to avoid whitespace surprises.
     $serverHostnameParts = preg_split('/\\s+/', $serverHostname);
     $serverHostname = is_array($serverHostnameParts) && isset($serverHostnameParts[0]) ? (string)$serverHostnameParts[0] : $serverHostname;
@@ -145,8 +146,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
     }
 
     if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
-        $hostname = trim( file_get_contents("/etc/hostname") );
-        $hostname = str_replace(array("\n", "\r"), '', $hostname);
+        $hostname = $serverHostname;
         // Generate a self-signed cert if Let's Encrypt not present yet (ignore errors on systems without openssl)
         @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
     }

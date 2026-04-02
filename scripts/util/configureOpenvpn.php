@@ -20,8 +20,7 @@ require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 requireRoot();
 
-$hostname = trim((string) @file_get_contents('/etc/hostname'));
-$hostname = $hostname === '' ? 'localhost' : $hostname;
+$hostname = pmssHostnameRead('localhost');
 $fqdn = strpos($hostname, '.pulsedmedia.com') !== false ? $hostname : $hostname.'.pulsedmedia.com';
 $slug = str_replace('.', '-', $fqdn);
 
