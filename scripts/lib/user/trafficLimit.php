@@ -167,6 +167,28 @@ if (!function_exists('pmssTrafficLimitConvergeFileMode')) {
     }
 }
 
+if (!function_exists('pmssTrafficLimitPersistTargetModes')) {
+    /** @param array<string,int> $targetModes */
+    function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool
+    {
+        $error = null;
+        if ($value < 0) { $error = 'invalid GiB value'; return false; }
+
+        foreach ($targetModes as $target => $mode) {
+            if ($value === 0) {
+                if (!file_exists($target) || pmssTrafficLimitRemoveGiBFile($target)) continue;
+                $error = 'refusing to remove non-file/symlink: '.$target;
+                return false;
+            }
+
+            if (!pmssTrafficLimitWriteGiBFile($target, $value)) { $error = 'failed to write '.$target; return false; }
+            if (!pmssTrafficLimitConvergeFileMode($target, (int) $mode)) { $error = 'failed to secure '.$target; return false; }
+        }
+
+        return true;
+    }
+}
+
 if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
     /**
      * @param mixed $rawUserName
@@ -273,24 +295,10 @@ if (!function_exists('pmssUserGiBSettingCli')) {
         }
 
         $removingValue = ($value === 0);
-        foreach ($targetModes as $target => $mode) {
-            if ($removingValue) {
-                if (!file_exists($target)) continue;
-                if (!pmssTrafficLimitRemoveGiBFile($target)) {
-                    fwrite(STDERR, "Error: refusing to remove non-file/symlink: {$target}\n");
-                    return 4;
-                }
-                continue;
-            }
-
-            if (!pmssTrafficLimitWriteGiBFile($target, $value)) {
-                fwrite(STDERR, "Error: failed to write {$target}\n");
-                return 4;
-            }
-            if (!pmssTrafficLimitConvergeFileMode($target, (int) $mode)) {
-                fwrite(STDERR, "Error: failed to secure {$target}\n");
-                return 4;
-            }
+        $persistError = null;
+        if (!pmssTrafficLimitPersistTargetModes($targetModes, $value, $persistError)) {
+            fwrite(STDERR, 'Error: '.($persistError ?: 'failed to persist targets')."\n");
+            return 4;
         }
 
         if (function_exists('pmssUserLog')) {
@@ -306,12 +314,7 @@ if (!function_exists('pmssTrafficLimitCliTargetModes')) {
     /** @return array<string,int> */
     function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array
     {
-        $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
-
-        return [
-            $runtimeDir.'/'.$userName => 0600,
-            $homeDir.'/.trafficLimit' => 0664,
-        ];
+        return ['/etc/seedbox/runtime/trafficLimits/'.$userName => 0600, $homeDir.'/.trafficLimit' => 0664];
     }
 }
 

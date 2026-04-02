@@ -60,4 +60,15 @@ class AddUserProvisioningGuardTest extends TestCase
         $this->assertTrue($lighttpdPos !== false, 'addUser.php must still start lighttpd');
         $this->assertTrue($patchPos < $lighttpdPos, 'addUser.php must converge user environment before services start');
     }
+
+    public function testAddUserDelegatesTrafficLimitPersistenceToSharedHelpers(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/addUser.php');
+
+        $this->assertTrue(strpos($src, "require_once 'lib/user/trafficLimit.php';") !== false);
+        $this->assertTrue(strpos($src, 'pmssTrafficLimitCliTargetModes($user[\'name\'], $homePath)') !== false);
+        $this->assertTrue(strpos($src, 'pmssTrafficLimitPersistTargetModes($targetModes, (int) $user[\'trafficLimit\'], $persistError)') !== false);
+        $this->assertTrue(strpos($src, '@file_put_contents($runtimeDir') === false, 'addUser.php must not reimplement runtime traffic limit writes');
+        $this->assertTrue(strpos($src, '@file_put_contents("/home/{$user[\'name\']}/.trafficLimit"') === false, 'addUser.php must not reimplement home traffic limit writes');
+    }
 }

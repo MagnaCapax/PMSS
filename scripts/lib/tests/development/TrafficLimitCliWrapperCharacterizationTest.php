@@ -33,6 +33,7 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
             [
                 'function pmssUserGiBSettingCli(array $argv, array $spec): int',
                 'function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array',
+                'function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool',
                 'function pmssUserTrafficCliBootstrap(): bool',
                 'function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int',
                 "'targetModesResolver' => 'pmssTrafficLimitCliTargetModes'",

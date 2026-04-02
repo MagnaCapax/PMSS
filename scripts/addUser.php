@@ -33,6 +33,7 @@ require_once 'lib/user/log.php';
 require_once 'lib/homeMount.php';
 require_once 'lib/update.php';
 require_once 'lib/update/users.php';
+require_once 'lib/user/trafficLimit.php';
 require_once 'lib/user/add/provisioningRuntime.php';
 require_once 'lib/user/add/failureRollback.php';
 require_once 'lib/user/add/systemUserCreate.php';
@@ -137,19 +138,13 @@ foreach ([
     ['Refresh network rules', '/scripts/util/setupNetwork.php'],
 ] as $step) runProvisionStep($step[0], $step[1]);
 if (!empty($user['trafficLimit']) && $user['trafficLimit'] > 0) {
-    $runtimeDir = '/etc/seedbox/runtime/trafficLimits';
-    require_once 'lib/user/directories.php';
-    if (function_exists('pmssEnsureDir')) {
-        pmssEnsureDir($runtimeDir, 0700, 'root', 'root');
-    } elseif (!is_dir($runtimeDir)) {
-        @mkdir($runtimeDir, 0755, true);
-        @chmod($runtimeDir, 0700);
-    }
-    @file_put_contents($runtimeDir."/{$user['name']}", (string) $user['trafficLimit'], LOCK_EX);
-    @chmod($runtimeDir."/{$user['name']}", 0600);
-    @file_put_contents("/home/{$user['name']}/.trafficLimit", (string) $user['trafficLimit'], LOCK_EX);
-    @chmod("/home/{$user['name']}/.trafficLimit", 0664);
-    logProvisionMessage('Traffic limit set: '.$user['trafficLimit']);
+    $targetModes = pmssTrafficLimitCliTargetModes($user['name'], $homePath);
+    $persistError = null;
+    $persisted = pmssTrafficLimitCliPrepareTargetModes($targetModes)
+        && pmssTrafficLimitPersistTargetModes($targetModes, (int) $user['trafficLimit'], $persistError);
+    logProvisionMessage($persisted
+        ? 'Traffic limit set: '.$user['trafficLimit']
+        : 'Traffic limit persistence failed: '.($persistError ?: 'unable to prepare runtime targets'));
 }
 
 pmssAddUserPostProvision($user, $homePath);

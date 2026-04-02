@@ -121,4 +121,54 @@ class TrafficLimitSafetyHelperTest extends TestCase
 
         $this->assertTrue(\pmssTrafficLimitConvergeFileMode($linkPath, 0600) === false);
     }
+
+    public function testPersistTargetModesWritesAllTargetsWithRequestedModes(): void
+    {
+        $runtimeDir = $this->tempDir.'/runtime/trafficLimits';
+        $homeDir = $this->tempDir.'/home/alice';
+        mkdir($runtimeDir, 0700, true);
+        mkdir($homeDir, 0755, true);
+
+        $targets = [
+            $runtimeDir.'/alice' => 0600,
+            $homeDir.'/.trafficLimit' => 0664,
+        ];
+        $error = null;
+
+        $this->assertTrue(\pmssTrafficLimitPersistTargetModes($targets, 42, $error));
+        $this->assertSame(null, $error);
+        $this->assertSame('42', trim((string) file_get_contents($runtimeDir.'/alice')));
+        $this->assertSame('42', trim((string) file_get_contents($homeDir.'/.trafficLimit')));
+        $this->assertEquals(0600, fileperms($runtimeDir.'/alice') & 0777);
+        $this->assertEquals(0664, fileperms($homeDir.'/.trafficLimit') & 0777);
+    }
+
+    public function testPersistTargetModesRemovesExistingFilesForZeroValue(): void
+    {
+        $runtimePath = $this->tempDir.'/runtime/trafficLimits/alice';
+        $homePath = $this->tempDir.'/home/alice/.trafficLimit';
+        mkdir(dirname($runtimePath), 0700, true);
+        mkdir(dirname($homePath), 0755, true);
+        file_put_contents($runtimePath, '5');
+        file_put_contents($homePath, '5');
+
+        $error = 'stale';
+        $this->assertTrue(\pmssTrafficLimitPersistTargetModes([$runtimePath => 0600, $homePath => 0664], 0, $error));
+        $this->assertSame(null, $error);
+        $this->assertFalse(file_exists($runtimePath));
+        $this->assertFalse(file_exists($homePath));
+    }
+
+    public function testPersistTargetModesRejectsUnsafeRemovalTargets(): void
+    {
+        $realPath = $this->tempDir.'/real';
+        $linkPath = $this->tempDir.'/link';
+        file_put_contents($realPath, '12');
+        symlink($realPath, $linkPath);
+
+        $error = null;
+        $this->assertFalse(\pmssTrafficLimitPersistTargetModes([$linkPath => 0600], 0, $error));
+        $this->assertSame('refusing to remove non-file/symlink: '.$linkPath, $error);
+        $this->assertTrue(file_exists($realPath));
+    }
 }

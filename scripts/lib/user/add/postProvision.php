@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__.'/../../traffic/storage.php';
+require_once __DIR__.'/../../user/trafficLimit.php';
 
 /**
  * Run post-provision steps that should not block account creation.
@@ -65,7 +66,6 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     // Ensure .trafficLimit exists even when no limit is configured at creation time.
     if (empty($user['trafficLimit'])) {
         $trafficLimitPath = pmssTrafficLimitPath($user['name'], dirname($homePath));
-        @file_put_contents($trafficLimitPath, '0');
-        @chmod($trafficLimitPath, 0664);
+        pmssTrafficLimitWriteGiBFile($trafficLimitPath, 0) && pmssTrafficLimitConvergeFileMode($trafficLimitPath, 0664);
     }
 }
