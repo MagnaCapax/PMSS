@@ -32,8 +32,7 @@ class ConfigSyntaxValidationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-config-validation-'.getmypid();
-        @mkdir($this->tempDir, 0700, true);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-config-validation', 0700);
 
         // Locate binaries - check common paths
         $this->lighttpdBinary = $this->findBinary('lighttpd', array(
@@ -47,13 +46,6 @@ class ConfigSyntaxValidationTest extends TestCase
             '/usr/local/sbin/nginx',
             '/usr/bin/nginx',
         ));
-    }
-
-    protected function tearDown(): void
-    {
-        if ($this->tempDir && is_dir($this->tempDir)) {
-            $this->cleanup($this->tempDir);
-        }
     }
 
     private function findBinary(string $name, array $paths): ?string

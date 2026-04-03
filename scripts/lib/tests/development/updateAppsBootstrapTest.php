@@ -12,40 +12,7 @@ class UpdateAppsBootstrapTest extends TestCase
 
     public function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-update-app-bootstrap-'.uniqid('', true);
-        $this->assertTrue(@mkdir($this->tempDir, 0700, true), 'Unable to create temp dir');
-    }
-
-    public function tearDown(): void
-    {
-        if (!is_string($this->tempDir) || $this->tempDir === '' || !is_dir($this->tempDir)) {
-            return;
-        }
-
-        $paths = [$this->tempDir];
-        while ($paths !== []) {
-            $path = array_pop($paths);
-            if (is_dir($path)) {
-                $entries = scandir($path);
-                if ($entries === false) {
-                    continue;
-                }
-
-                $children = array_values(array_diff($entries, ['.', '..']));
-                if ($children === []) {
-                    @rmdir($path);
-                    continue;
-                }
-
-                $paths[] = $path;
-                foreach ($children as $child) {
-                    $paths[] = $path.'/'.$child;
-                }
-                continue;
-            }
-
-            @unlink($path);
-        }
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-app-bootstrap', 0700);
     }
 
     private function appBootstrapOutput(string $installerFile): string

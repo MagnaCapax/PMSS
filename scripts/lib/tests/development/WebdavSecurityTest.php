@@ -54,15 +54,7 @@ class WebdavSecurityTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-webdav-test-'.getmypid();
-        @mkdir($this->tempDir, 0700, true);
-    }
-
-    protected function tearDown(): void
-    {
-        if ($this->tempDir && is_dir($this->tempDir)) {
-            $this->cleanup($this->tempDir);
-        }
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-webdav-test', 0700);
     }
 
     // Helper assertion methods not in base TestCase

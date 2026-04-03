@@ -27,15 +27,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-deluge-proxy-test-'.getmypid();
-        @mkdir($this->tempDir, 0700, true);
-    }
-
-    protected function tearDown(): void
-    {
-        if ($this->tempDir && is_dir($this->tempDir)) {
-            $this->cleanup($this->tempDir);
-        }
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-proxy-test', 0700);
     }
 
     private function assertStringNotContainsString(string $needle, string $haystack, string $msg = ''): void

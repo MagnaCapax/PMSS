@@ -21,7 +21,7 @@ class LinuxserverInstallScriptTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-linuxserver-install-'.bin2hex(random_bytes(4));
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-linuxserver-install', 0700);
         $this->homeDir = $this->tempDir.'/home';
         $this->fakeBinDir = $this->tempDir.'/bin';
         $this->dockerLog = $this->tempDir.'/docker.log';
@@ -58,12 +58,6 @@ BASH;
         file_put_contents($this->fakeBinDir.'/docker', $dockerStub);
         @chmod($this->fakeBinDir.'/docker', 0755);
     }
-
-    protected function tearDown(): void
-    {
-        $this->cleanup($this->tempDir);
-    }
-
     /**
      * @param array<string,string> $env
      * @return array{rc:int,output:string,dockerLog:string}

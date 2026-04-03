@@ -19,7 +19,7 @@ class UpdateRuntimeProcessesTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-update-runtime-processes-'.bin2hex(random_bytes(4));
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-update-runtime-processes');
         @mkdir($this->tempDir.'/bin', 0755, true);
         @file_put_contents($this->tempDir.'/state', "stopped\n");
         @file_put_contents($this->tempDir.'/commands.log', '');

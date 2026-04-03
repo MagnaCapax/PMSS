@@ -9,15 +9,13 @@ class DelugeServicePasswordTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir().'/pmss-deluge-passwords-'.bin2hex(random_bytes(6));
-        @mkdir($this->tempDir, 0755, true);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-passwords');
     }
 
     protected function tearDown(): void
     {
         putenv('PMSS_HOME_DIR');
         putenv('PMSS_DELUGE_AUTH_TEMPLATE_PATH');
-        @shell_exec('rm -rf '.escapeshellarg($this->tempDir));
     }
 
     public function testGenerateServicePasswordLengthAndCharset(): void
