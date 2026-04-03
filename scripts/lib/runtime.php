@@ -209,6 +209,29 @@ if (!function_exists('pmssStandardStreamsAreTty')) {
     }
 }
 
+if (!function_exists('pmssCommandPipesReady')) {
+    /** Validate that proc_open exposed all requested pipes as stream resources. */
+    function pmssCommandPipesReady(array $pipes): bool
+    {
+        return isset($pipes[0], $pipes[1], $pipes[2])
+            && is_resource($pipes[0])
+            && is_resource($pipes[1])
+            && is_resource($pipes[2]);
+    }
+}
+
+if (!function_exists('pmssCommandOutputPipesSetNonBlocking')) {
+    /** Put proc_open stdout/stderr pipes into non-blocking mode when available. */
+    function pmssCommandOutputPipesSetNonBlocking(array $pipes): bool
+    {
+        return isset($pipes[1], $pipes[2])
+            && is_resource($pipes[1])
+            && is_resource($pipes[2])
+            && @stream_set_blocking($pipes[1], false)
+            && @stream_set_blocking($pipes[2], false);
+    }
+}
+
 if (!function_exists('pmssCommandCapture')) {
     /**
      * Execute a shell command and capture stdout/stderr without streaming.
@@ -248,16 +271,11 @@ if (!function_exists('pmssCommandCapture')) {
         if (!is_resource($process)) {
             return ['rc' => $launchRc, 'stdout' => '', 'stderr' => $launchError];
         }
-        if (
-            !isset($pipes[0], $pipes[1], $pipes[2])
-            || !is_resource($pipes[0])
-            || !is_resource($pipes[1])
-            || !is_resource($pipes[2])
-        ) {
+        if (!pmssCommandPipesReady($pipes)) {
             return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
         }
         fclose($pipes[0]);
-        if (!@stream_set_blocking($pipes[1], false) || !@stream_set_blocking($pipes[2], false)) {
+        if (!pmssCommandOutputPipesSetNonBlocking($pipes)) {
             return $abortProcess($process, $pipes, 'proc_open pipes unavailable');
         }
 
@@ -590,6 +608,25 @@ if (!function_exists('runCommand')) {
     function runCommand(string $cmd, bool $verbose = false, ?callable $logger = null, bool $inheritTty = false): int
     {
         $log = $logger ?? 'logMessage';
+        $abortPipeCapture = static function ($process, array $pipes, string $message) use ($log): int {
+            foreach ([0, 1, 2] as $index) {
+                if (isset($pipes[$index]) && is_resource($pipes[$index])) {
+                    fclose($pipes[$index]);
+                }
+            }
+            if (is_resource($process)) {
+                if (function_exists('proc_terminate')) {
+                    @proc_terminate($process);
+                }
+                @proc_close($process);
+            }
+
+            $log('[WARN] '.$message);
+            fwrite(STDERR, '[PIPE] '.$message.PHP_EOL);
+            $GLOBALS['PMSS_LAST_COMMAND_OUTPUT'] = ['stdout' => '', 'stderr' => $message];
+
+            return 1;
+        };
         $isInteractive = pmssStreamIsTty(STDOUT);
         $timeoutEnv = getenv('PMSS_COMMAND_TIMEOUT');
         $timeoutSec = PMSS_COMMAND_TIMEOUT_DEFAULT;
@@ -810,9 +847,14 @@ if (!function_exists('runCommand')) {
             return $exitCode;
         }
 
+        if (!pmssCommandPipesReady($pipes)) {
+            return $abortPipeCapture($process, $pipes, 'proc_open pipes unavailable for command capture: '.$cmd);
+        }
+
         fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
+        if (!pmssCommandOutputPipesSetNonBlocking($pipes)) {
+            return $abortPipeCapture($process, $pipes, 'unable to configure proc_open pipes for command capture: '.$cmd);
+        }
 
         $stdout = '';
         $stderr = '';

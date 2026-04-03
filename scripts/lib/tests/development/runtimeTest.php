@@ -86,6 +86,58 @@ class RuntimeTest extends TestCase
         $this->assertEquals(1200, constant('PMSS_COMMAND_TIMEOUT_DEFAULT'));
     }
 
+    public function testPmssCommandPipesReadyRejectsMissingDescriptors(): void
+    {
+        $this->assertFalse(\pmssCommandPipesReady([]));
+    }
+
+    public function testPmssCommandPipesReadyRejectsClosedDescriptor(): void
+    {
+        $pipes = [
+            fopen('php://temp', 'w+'),
+            fopen('php://temp', 'w+'),
+            fopen('php://temp', 'w+'),
+        ];
+        fclose($pipes[1]);
+
+        try {
+            $this->assertFalse(\pmssCommandPipesReady($pipes));
+        } finally {
+            foreach ($pipes as $pipe) {
+                if (is_resource($pipe)) {
+                    fclose($pipe);
+                }
+            }
+        }
+    }
+
+    public function testPmssCommandOutputPipesSetNonBlockingRejectsMissingDescriptors(): void
+    {
+        $this->assertFalse(\pmssCommandOutputPipesSetNonBlocking([]));
+    }
+
+    public function testPmssCommandOutputPipesSetNonBlockingMarksStreamsNonBlocking(): void
+    {
+        $pipes = [
+            fopen('php://temp', 'w+'),
+            fopen('php://temp', 'w+'),
+            fopen('php://temp', 'w+'),
+        ];
+
+        try {
+            $this->assertTrue(\pmssCommandPipesReady($pipes));
+            $this->assertTrue(\pmssCommandOutputPipesSetNonBlocking($pipes));
+            $this->assertFalse((bool) stream_get_meta_data($pipes[1])['blocked']);
+            $this->assertFalse((bool) stream_get_meta_data($pipes[2])['blocked']);
+        } finally {
+            foreach ($pipes as $pipe) {
+                if (is_resource($pipe)) {
+                    fclose($pipe);
+                }
+            }
+        }
+    }
+
     public function testRunCommandEchoSuccessCapturesStdout(): void
     {
         $captured = [];
