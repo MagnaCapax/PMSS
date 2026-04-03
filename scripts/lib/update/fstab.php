@@ -33,22 +33,6 @@ function pmssFstabMountEntryRead(array $lines, string $mountPoint, ?string $fsTy
     return null;
 }
 /**
- * Build an updated option plan for one fstab mount entry.
- *
- * @param array<string,string> $replacePrefixedOptions
- * @return array{columns:array<int,string>,options:array<int,string>,added:array<int,string>,removed:array<int,string>}
- */
-function pmssFstabMountOptionsPlan(array $columns, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false, array $replacePrefixedOptions = [], bool $collapseDuplicates = true): array
-{
-    $plan = pmssConfigOptionsUpdatePlan($columns[3], $requiredOptions, $removeOptions, $dropDefaultsOnly);
-    foreach ($replacePrefixedOptions as $prefix => $replacement) {
-        $plan['options'] = pmssFstabOptionsReplacePrefixedValue($plan['options'], $prefix, $replacement, $collapseDuplicates);
-    }
-    $columns[3] = implode(',', $plan['options']);
-    return ['columns' => $columns, 'options' => $plan['options'], 'added' => $plan['added'], 'removed' => $plan['removed']];
-}
-
-/**
  * Apply an option plan to the first matching fstab entry.
  *
  * @param array<string,string> $replacePrefixedOptions
@@ -57,7 +41,12 @@ function pmssFstabMountOptionsPlan(array $columns, array $requiredOptions = [], 
 function pmssFstabMountOptionsEnsure(array &$lines, string $mountPoint, array $requiredOptions = [], array $removeOptions = [], bool $dropDefaultsOnly = false, ?string $fsType = null, array $replacePrefixedOptions = [], bool $collapseDuplicates = true): ?array
 {
     if (($entry = pmssFstabMountEntryRead($lines, $mountPoint, $fsType)) === null) return null;
-    $plan = pmssFstabMountOptionsPlan($entry['columns'], $requiredOptions, $removeOptions, $dropDefaultsOnly, $replacePrefixedOptions, $collapseDuplicates);
+    $plan = pmssConfigOptionsUpdatePlan($entry['columns'][3], $requiredOptions, $removeOptions, $dropDefaultsOnly);
+    foreach ($replacePrefixedOptions as $prefix => $replacement) {
+        $plan['options'] = pmssFstabOptionsReplacePrefixedValue($plan['options'], $prefix, $replacement, $collapseDuplicates);
+    }
+    $plan['columns'] = $entry['columns'];
+    $plan['columns'][3] = implode(',', $plan['options']);
     $plan['changed'] = $plan['columns'][3] !== $entry['columns'][3];
     $plan['index'] = $entry['index'];
     if ($plan['changed']) $lines[$entry['index']] = implode("\t", $plan['columns']);

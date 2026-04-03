@@ -11,21 +11,10 @@ declare(strict_types=1);
 
 require_once __DIR__.'/runtime.php';
 
-/** Resolve an internal PMSS script path through the diagnostics script root. */
-function pmssAgentDiagnosticsScriptPath(string $relativePath): string
-{
-    $scriptRoot = getenv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT');
-    $scriptRoot = is_string($scriptRoot) && $scriptRoot !== '' ? rtrim($scriptRoot, '/') : dirname(__DIR__, 2);
-    return $scriptRoot.'/'.ltrim($relativePath, '/');
-}
-
 /** Read an optional diagnostics input file, honoring a test override path. */
 function pmssAgentDiagnosticsReadFile(string $envKey, string $defaultPath): string
 {
-    $path = getenv($envKey);
-    if (!is_string($path) || $path === '') {
-        $path = $defaultPath;
-    }
+    $path = pmssResolvePathFromEnv($envKey, $defaultPath);
     $contents = @file_get_contents($path);
     return is_string($contents) ? $contents : '';
 }
@@ -33,7 +22,7 @@ function pmssAgentDiagnosticsReadFile(string $envKey, string $defaultPath): stri
 /** Execute a repository PHP script relative to the diagnostics script root. */
 function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = []): array
 {
-    $scriptPath = pmssAgentDiagnosticsScriptPath($relativePath);
+    $scriptPath = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2)).'/'.ltrim($relativePath, '/');
     if (!is_file($scriptPath) || !is_readable($scriptPath)) {
         return [
             'rc' => 1,

@@ -30,26 +30,19 @@ function pmssSupportMailHostTokenNormalize(string $value, string $fallback): str
  */
 function pmssSupportMailEnvelopeNormalize(array $envelope): array
 {
-    $from = trim((string) ($envelope['from'] ?? ''));
-    if ($from === '' || preg_match('/[\r\n\x00]/', $from) === 1) {
-        throw new RuntimeException('Support mail envelope sender is invalid.');
+    $normalized = [];
+    foreach (['from' => 'sender', 'to' => 'recipient'] as $key => $label) {
+        $normalized[$key] = trim((string) ($envelope[$key] ?? ''));
+        if ($normalized[$key] === '' || preg_match('/[\r\n\x00]/', $normalized[$key]) === 1) {
+            throw new RuntimeException('Support mail envelope '.$label.' is invalid.');
+        }
     }
-
-    $to = trim((string) ($envelope['to'] ?? ''));
-    if ($to === '' || preg_match('/[\r\n\x00]/', $to) === 1) {
-        throw new RuntimeException('Support mail envelope recipient is invalid.');
-    }
-
     $data = (string) ($envelope['data'] ?? '');
     if ($data === '') {
         throw new RuntimeException('Support mail envelope payload is empty.');
     }
-
-    return [
-        'from' => $from,
-        'to' => $to,
-        'data' => $data,
-    ];
+    $normalized['data'] = $data;
+    return $normalized;
 }
 
 /**

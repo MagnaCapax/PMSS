@@ -57,10 +57,7 @@ function pmssWebDockerInactiveNote(
     if ($dockerEnabledPolicy === false) {
         return ' (Docker is available but currently disabled. Use the controls below to enable it.)';
     }
-
-    if ($dockerEnabledPolicy === true) {
-        return ' (Docker is available but not currently running. Use the controls below to start it again.)';
-    }
-
-    return ' (Docker is available but not currently running. Use the Docker controls below to enable it.)';
+    return $dockerEnabledPolicy === true
+        ? ' (Docker is available but not currently running. Use the controls below to start it again.)'
+        : ' (Docker is available but not currently running. Use the Docker controls below to enable it.)';
 }

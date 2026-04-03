@@ -116,7 +116,7 @@ function pmssAgentDiagnosticsMain(array $argv): int
     $user = trim((string) pmssCliOption($parsed, 'user', 'u', ''));
     if ($user !== '') {
         $selection = pmssManagedUsersSelectFromCommand(
-            pmssAgentDiagnosticsScriptPath('scripts/listUsers.php'),
+            pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2)).'/scripts/listUsers.php',
             $user,
             ['strictInput' => true]
         );
