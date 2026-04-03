@@ -37,6 +37,14 @@ final class agentDiagnosticsCliTest extends TestCase
         ]);
         $payload = json_decode($output, true);
 
+        $this->assertSame(
+            ['motd', 'storage', 'services', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_identity', 'user_quota', 'user_disk'],
+            array_keys($payload['sections'])
+        );
+        $this->assertSame(
+            ['nginx', 'proftpd', 'cron', 'ssh', 'rtorrent_count', 'lighttpd_count'],
+            array_keys($payload['sections']['services'])
+        );
         $this->assertSame('git/main@2026-03-28', $payload['version']);
         $this->assertSame('alice', $payload['user']);
         $this->assertSame("hello host\n", $payload['sections']['motd']['raw']);
