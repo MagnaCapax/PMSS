@@ -39,26 +39,29 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
         $zeroRaw = ['month'=>0.0,'week'=>0.0,'day'=>0.0,'hour'=>0.0,'15min'=>0.0];
         $zeroDisplay = ['month'=>'0MiB','week'=>'0MiB','day'=>'0MiB','hour'=>'0MiB','15min'=>'0MiB'];
         $zeroTraffic = ['raw'=>$zeroRaw,'display'=>$zeroDisplay,'daily'=>[]];
+        $serializedTraffic = serialize($zeroTraffic);
         $trafficPaths = pmssTrafficDataPaths($user['name'], dirname($homePath));
         $runtimeStatsPath = pmssTrafficStatsPath($user['name'], '/var/run/pmss/trafficStats');
         $runtimeStatsDir = dirname($runtimeStatsPath);
-        @mkdir($runtimeStatsDir, 0755, true);
+        $seedFailed = false;
+        if (!pmssEnsureSafeDir($runtimeStatsDir, 0755)) {
+            $seedFailed = true;
+            logProvisionMessage('Failed to prepare runtime traffic directory');
+        }
         // Home files
         foreach (['normal', 'local'] as $pathKey) {
             $trafficPath = $trafficPaths[$pathKey];
-            pmssTrafficSetImmutable($trafficPath, false);
-            @file_put_contents($trafficPath, serialize($zeroTraffic));
-            @chown($trafficPath, 'root');
-            @chgrp($trafficPath, $user['name']);
-            @chmod($trafficPath, 0640);
-            pmssTrafficSetImmutable($trafficPath, true);
+            if (!pmssTrafficWriteFile($trafficPath, $serializedTraffic, $user['name'], 0640, true)) {
+                $seedFailed = true;
+                logProvisionMessage('Failed to seed traffic file: '.$pathKey);
+            }
         }
         // Runtime cache
-        @file_put_contents($runtimeStatsPath, serialize($zeroTraffic));
-        @chown($runtimeStatsPath, 'root');
-        @chgrp($runtimeStatsPath, 'root');
-        @chmod($runtimeStatsPath, 0600);
-        logProvisionMessage('Seeded traffic files with zero values');
+        if (!pmssTrafficWriteFile($runtimeStatsPath, $serializedTraffic, 'root', 0600, false)) {
+            $seedFailed = true;
+            logProvisionMessage('Failed to seed runtime traffic cache');
+        }
+        !$seedFailed && logProvisionMessage('Seeded traffic files with zero values');
     } catch (\Throwable $e) {
         logProvisionMessage('Seeding traffic files failed: '.$e->getMessage());
     }
