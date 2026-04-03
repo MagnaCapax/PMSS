@@ -43,6 +43,22 @@ class rtorrentConfigSyntaxCompatibilityTest extends TestCase
     }
 
     /**
+     * The shipped custom override should keep tracker_debug opt-in only.
+     */
+    public function testSkeletonRtorrentCustomConfigKeepsTrackerDebugDisabledByDefault(): void
+    {
+        $content = $this->pmssReadRepoFile('etc/skel/.rtorrent.rc.custom');
+
+        $this->assertStringContainsString('#log.add_output = "tracker_debug", "rtorrent.log"', $content);
+        $this->assertTrue(
+            preg_match('/^\s*log\.add_output\s*=\s*"tracker_debug"/m', $content) !== 1,
+            'Skeleton custom config should not enable tracker_debug logging by default'
+        );
+        $this->assertStringContainsString('log.add_output = "storage_critical", "rtorrent.log"', $content);
+        $this->assertStringContainsString('log.add_output = "socket_critical", "rtorrent.log"', $content);
+    }
+
+    /**
      * User custom overrides must load after PMSS defaults in the template.
      */
     public function testPmssRtorrentTemplateEndsWithCustomImport(): void
