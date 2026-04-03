@@ -14,6 +14,7 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
+require_once __DIR__.'/lib/user/passwords.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Unsuspending
 // a user when /home is unavailable would fail or act on stale paths.
@@ -58,6 +59,25 @@ pmssUserLifecycleStep(
     'usermod --expiredate '.escapeshellarg($farFuture).' '.escapeshellarg($username),
     false
 );
+
+if (pmssUserHtpasswdSyncFromShadow($username)) {
+    pmssUserLifecycleContextLogStatusMessage(
+        'unsuspend',
+        'sync_htpasswd_shadow',
+        $username,
+        'OK',
+        'Resynced per-user htpasswd from unlocked shadow hash'
+    );
+} else {
+    pmssUserLifecycleContextLogStatusMessage(
+        'unsuspend',
+        'sync_htpasswd_shadow',
+        $username,
+        'WARN',
+        'Unable to resync per-user htpasswd from unlocked shadow hash'
+    );
+    echo "Warning: unable to resync per-user htpasswd from unlocked shadow hash\n";
+}
 
 // Preserve any unexpected www/ content created during suspension (or by legacy
 // scripts) before restoring the original web root.

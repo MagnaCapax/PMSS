@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__.'/../lighttpd/userFileWrite.php';
+
 /**
  * Password synchronization helpers for torrent clients.
  *
@@ -119,6 +121,139 @@ function pmssEnsureDelugeServicePassword(string $username): string
 
     $newPassword = pmssDelugeServicePasswordGenerate();
     return pmssDelugeAuthWriteLocalclientPassword($authPath, $newPassword) ? $newPassword : $currentPassword;
+}
+
+/**
+ * Read the active shadow hash for a managed user.
+ *
+ * Returns an empty string when the entry is missing, locked, or unreadable.
+ */
+function pmssUserShadowPasswordHashRead(string $username, string $shadowPath = '/etc/shadow'): string
+{
+    $username = trim($username);
+    if (
+        $username === ''
+        || strpos($username, ':') !== false
+        || preg_match('/[\r\n\0\/]/', $username) === 1
+        || !is_file($shadowPath)
+        || is_link($shadowPath)
+    ) {
+        return '';
+    }
+
+    $lines = @file($shadowPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!is_array($lines)) {
+        return '';
+    }
+
+    $prefix = $username.':';
+    foreach ($lines as $line) {
+        if (!is_string($line) || strpos($line, $prefix) !== 0) {
+            continue;
+        }
+
+        $parts = explode(':', $line);
+        $passwordHash = isset($parts[1]) ? trim((string) $parts[1]) : '';
+        if (
+            $passwordHash === ''
+            || $passwordHash === '*'
+            || $passwordHash === '!'
+            || strpos($passwordHash, '!') === 0
+            || strpos($passwordHash, ':') !== false
+            || preg_match('/[\r\n\0]/', $passwordHash) === 1
+        ) {
+            return '';
+        }
+
+        return $passwordHash;
+    }
+
+    return '';
+}
+
+/**
+ * Write a crypt()-compatible htpasswd entry for a managed user.
+ *
+ * Existing entries for the same user are replaced atomically so repeated syncs
+ * converge on one credential line without duplicating the account.
+ */
+function pmssUserHtpasswdHashWrite(string $htpasswdPath, string $username, string $passwordHash, string $owner): bool
+{
+    $username = trim($username);
+    if (
+        !pmssUserFilePathIsSafe($htpasswdPath)
+        || $username === ''
+        || $passwordHash === ''
+        || $owner === ''
+        || strpos($username, ':') !== false
+        || strpos($passwordHash, ':') !== false
+        || preg_match('/[\r\n\0]/', $username) === 1
+        || preg_match('/[\r\n\0]/', $passwordHash) === 1
+    ) {
+        return false;
+    }
+
+    $lines = array();
+    if (is_file($htpasswdPath)) {
+        if (is_link($htpasswdPath)) {
+            return false;
+        }
+
+        $lines = @file($htpasswdPath, FILE_IGNORE_NEW_LINES);
+        if (!is_array($lines)) {
+            return false;
+        }
+    }
+
+    $entry = $username.':'.$passwordHash;
+    $updatedLines = array();
+    $replaced = false;
+    foreach ($lines as $line) {
+        if (!is_string($line)) {
+            continue;
+        }
+
+        if (strpos($line, $username.':') === 0) {
+            if (!$replaced) {
+                $updatedLines[] = $entry;
+                $replaced = true;
+            }
+            continue;
+        }
+
+        $updatedLines[] = $line;
+    }
+
+    if (!$replaced) {
+        $updatedLines[] = $entry;
+    }
+
+    return pmssWriteUserFile($htpasswdPath, implode("\n", $updatedLines)."\n", $owner, 0640);
+}
+
+/**
+ * Mirror the active shadow hash into the per-user htpasswd file.
+ *
+ * Lighttpd's htpasswd backend accepts crypt()-compatible hashes, so matching
+ * the unlocked shadow entry restores one canonical credential after unsuspend.
+ */
+function pmssUserHtpasswdSyncFromShadow(string $username, string $shadowPath = '/etc/shadow', ?string $htpasswdPath = null): bool
+{
+    $homeRoot = getenv('PMSS_HOME_DIR');
+    if (!is_string($homeRoot) || trim($homeRoot) === '') {
+        $homeRoot = '/home';
+    }
+
+    $passwordHash = pmssUserShadowPasswordHashRead($username, $shadowPath);
+    if ($passwordHash === '') {
+        return false;
+    }
+
+    if ($htpasswdPath === null || trim($htpasswdPath) === '') {
+        $htpasswdPath = rtrim($homeRoot, '/').'/'.$username.'/.lighttpd/.htpasswd';
+    }
+
+    return pmssUserHtpasswdHashWrite($htpasswdPath, $username, $passwordHash, $username);
 }
 
 /**
