@@ -36,13 +36,7 @@ function pmssNginxUserHostIsValidFqdn(string $hostname): bool
 function pmssNginxUserBillingIdFromFile(string $path): ?string
 {
     $raw = pmssReadRegularFileDigits($path);
-    if ($raw === null) {
-        return null;
-    }
-    if ((int) $raw <= 0) {
-        return null;
-    }
-    return $raw;
+    return ($raw !== null && (int) $raw > 0) ? $raw : null;
 }
 
 /**
@@ -50,6 +44,5 @@ function pmssNginxUserBillingIdFromFile(string $path): ?string
  */
 function pmssNginxUserHashHostname(string $username, string $billingId, string $hostname): string
 {
-    $seed = $username.'.'.$billingId.'.'.$hostname;
-    return hash('sha256', $seed).'.'.$hostname;
+    return hash('sha256', $username.'.'.$billingId.'.'.$hostname).'.'.$hostname;
 }

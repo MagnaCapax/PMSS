@@ -53,15 +53,21 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
     $needsDelugeWebPort = is_string($userTemplate) && strpos($userTemplate, '##delugeWebPort') !== false;
 
     // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
-    if (!is_dir('/etc/nginx')) {
-        @mkdir('/etc/nginx', 0755, true);
+    foreach (['/etc/nginx', '/etc/nginx/sites-available', '/etc/nginx/sites-enabled'] as $path) {
+        if (!is_dir($path)) {
+            @mkdir($path, 0755, true);
+        }
     }
-    if (!is_dir('/etc/nginx/sites-available')) {
-        @mkdir('/etc/nginx/sites-available', 0755, true);
-    }
-    if (!is_dir('/etc/nginx/sites-enabled')) {
-        @mkdir('/etc/nginx/sites-enabled', 0755, true);
-    }
+
+    $cleanupConfigs = static function (string $pattern): void {
+        $existingConfigs = glob($pattern);
+        if ($existingConfigs === false) {
+            return;
+        }
+        foreach ($existingConfigs as $oldConfig) {
+            @unlink($oldConfig);
+        }
+    };
 
     pmssBackupCriticalConfig('nginx', '/etc/nginx/nginx.conf');
     @copy('/etc/seedbox/config/template.nginx-conf', '/etc/nginx/nginx.conf');
@@ -69,7 +75,6 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
     @copy('/etc/seedbox/config/template.nginx-proxy_params', '/etc/nginx/proxy_params');
 
     // Configure site default
-    //passthru("cp /etc/seedbox/config/template.nginx-site-default /etc/nginx/sites-available/default");
     $serverHostname = pmssHostnameRead();
     // /etc/hostname should be a single token; trim defensively to avoid whitespace surprises.
     $serverHostnameParts = preg_split('/\\s+/', $serverHostname);
@@ -80,24 +85,24 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
     $nginxConfigSiteDefault = @file_get_contents('/etc/seedbox/config/template.nginx-site-default');
     $nginxConfigSiteDefaultSsl = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl');
     $nginxConfigSiteDefaultSslLetsEncrypt = @file_get_contents('/etc/seedbox/config/template.nginx-site-default-ssl-lets-encrypt');
-
-
     // Do we have let's encrypt cert done?
     $certificatePath = "/etc/letsencrypt/live/{$serverHostname}";
-    if (file_exists("{$certificatePath}/fullchain.pem") &&
-        file_exists("{$certificatePath}/privkey.pem")   &&
-        file_exists('/etc/letsencrypt/options-ssl-nginx.conf') &&
-        file_exists('/etc/letsencrypt/ssl-dhparams.pem') &&
-
-        is_readable("{$certificatePath}/fullchain.pem") &&
-        is_readable("{$certificatePath}/privkey.pem")   &&
-        is_readable('/etc/letsencrypt/options-ssl-nginx.conf') &&
-        is_readable('/etc/letsencrypt/ssl-dhparams.pem') ) {
-
+    $certificateFiles = [
+        "{$certificatePath}/fullchain.pem",
+        "{$certificatePath}/privkey.pem",
+        '/etc/letsencrypt/options-ssl-nginx.conf',
+        '/etc/letsencrypt/ssl-dhparams.pem',
+    ];
+    $hasLetsEncryptCert = true;
+    foreach ($certificateFiles as $path) {
+        if (!file_exists($path) || !is_readable($path)) {
+            $hasLetsEncryptCert = false;
+            break;
+        }
+    }
+    if ($hasLetsEncryptCert) {
         // Insert server hostname on Let's Encrypt template AND put it on the default SSL config
         $nginxConfigSiteDefaultSsl = str_replace('||SERVER_HOSTNAME||', $serverHostname, $nginxConfigSiteDefaultSslLetsEncrypt);
-
-
     }
 
     $nginxSslBlock = '';
@@ -137,11 +142,8 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
             @file_put_contents($enabledDefault, $nginxConfigSiteDefault);
         }
     }
-
-
-
     // Create SSL config if required!
-    if (!file_exists("/etc/nginx/ssl")) {
+    if (!is_dir('/etc/nginx/ssl')) {
         @mkdir("/etc/nginx/ssl", 0755, true);
     }
 
@@ -151,29 +153,18 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
     }
 
-    if (!file_exists("/etc/nginx/users")) {
-        mkdir("/etc/nginx/users", 0751);
+    if (!is_dir('/etc/nginx/users')) {
+        @mkdir('/etc/nginx/users', 0751, true);
     } elseif (!$singleUser) {
-        $existingConfigs = glob('/etc/nginx/users/*');
-        if ($existingConfigs !== false) {
-            foreach ($existingConfigs as $oldConfig) {
-                @unlink($oldConfig);
-            }
-        }
+        $cleanupConfigs('/etc/nginx/users/*');
     }
 
     if ($subdomainEnabled && !is_dir($subdomainConfigDir)) {
         @mkdir($subdomainConfigDir, 0755, true);
     }
     if ($subdomainEnabled) {
-        $managedPattern = $subdomainConfigDir.'/pmss-user-*.conf';
         if (!$singleUser) {
-            $existingSubdomains = glob($managedPattern);
-            if ($existingSubdomains !== false) {
-                foreach ($existingSubdomains as $oldConfig) {
-                    @unlink($oldConfig);
-                }
-            }
+            $cleanupConfigs($subdomainConfigDir.'/pmss-user-*.conf');
         } elseif ($requestedUser !== '') {
             @unlink($subdomainConfigDir.'/pmss-user-'.$requestedUser.'.conf');
             @unlink($subdomainConfigDir.'/pmss-user-'.$requestedUser.'-hash.conf');

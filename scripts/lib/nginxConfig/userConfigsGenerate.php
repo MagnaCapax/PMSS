@@ -63,6 +63,24 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
     $subdomainBase = (string)($ctx['subdomainBase'] ?? '');
     $subdomainConfigDir = (string)($ctx['subdomainConfigDir'] ?? '/etc/nginx/conf.d');
     $nginxSslBlock = (string)($ctx['nginxSslBlock'] ?? '');
+    $hashHost = null;
+
+    $renderSubdomainConfig = static function (string $template, string $host, string $user, string $sslBlock, ?int $serverPort = null): string {
+        $placeholders = ['##host##', '##user##', '##ssl_block##'];
+        $replacements = [$host, $user, $sslBlock];
+        if ($serverPort !== null) {
+            array_splice($placeholders, 2, 0, ['##port##']);
+            array_splice($replacements, 2, 0, [(string) $serverPort]);
+        }
+        return str_replace($placeholders, $replacements, $template);
+    };
+
+    if ($subdomainEnabled) {
+        $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
+        $hashHost = $billingId !== null
+            ? pmssNginxUserHashHostname($thisUser, $billingId, $subdomainBase)
+            : null;
+    }
 
     // When a user is suspended, nginx should serve a static suspended page
     // instead of proxying to their per-user lighttpd instance.
@@ -77,23 +95,13 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
         }
         if ($subdomainEnabled) {
             $publicHost = $thisUser.'.'.$subdomainBase;
-            $publicConfig = str_replace(
-                array('##host##', '##user##', '##ssl_block##'),
-                array($publicHost, $thisUser, $nginxSslBlock),
-                (string)$ctx['publicSuspendedTemplate']
-            );
+            $publicConfig = $renderSubdomainConfig((string) $ctx['publicSuspendedTemplate'], $publicHost, $thisUser, $nginxSslBlock);
             if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig, $thisUser, 'public suspended subdomain config')) {
                 return;
             }
 
-            $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
-            if ($billingId !== null) {
-                $hashHost = pmssNginxUserHashHostname($thisUser, $billingId, $subdomainBase);
-                $hashConfig = str_replace(
-                    array('##host##', '##user##', '##ssl_block##'),
-                    array($hashHost, $thisUser, $nginxSslBlock),
-                    (string)$ctx['privateSuspendedTemplate']
-                );
+            if ($hashHost !== null) {
+                $hashConfig = $renderSubdomainConfig((string) $ctx['privateSuspendedTemplate'], $hashHost, $thisUser, $nginxSslBlock);
                 if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig, $thisUser, 'private suspended subdomain config')) {
                     return;
                 }
@@ -127,23 +135,13 @@ function pmssCreateNginxConfigGenerateUser(string $thisUser, array $ctx, bool $s
 
     if ($subdomainEnabled) {
         $publicHost = $thisUser.'.'.$subdomainBase;
-        $publicConfig = str_replace(
-            array('##host##', '##user##', '##port##', '##ssl_block##'),
-            array($publicHost, $thisUser, (string)$serverPort, $nginxSslBlock),
-            (string)$ctx['publicSubdomainTemplate']
-        );
+        $publicConfig = $renderSubdomainConfig((string) $ctx['publicSubdomainTemplate'], $publicHost, $thisUser, $nginxSslBlock, $serverPort);
         if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'.conf', $publicConfig, $thisUser, 'public subdomain config')) {
             return;
         }
 
-        $billingId = pmssNginxUserBillingIdFromFile($homeDir.'/.billingId');
-        if ($billingId !== null) {
-            $hashHost = pmssNginxUserHashHostname($thisUser, $billingId, $subdomainBase);
-            $hashConfig = str_replace(
-                array('##host##', '##user##', '##port##', '##ssl_block##'),
-                array($hashHost, $thisUser, (string)$serverPort, $nginxSslBlock),
-                (string)$ctx['privateSubdomainTemplate']
-            );
+        if ($hashHost !== null) {
+            $hashConfig = $renderSubdomainConfig((string) $ctx['privateSubdomainTemplate'], $hashHost, $thisUser, $nginxSslBlock, $serverPort);
             if (!pmssCreateNginxConfigWriteFile($subdomainConfigDir.'/pmss-user-'.$thisUser.'-hash.conf', $hashConfig, $thisUser, 'private subdomain config')) {
                 return;
             }

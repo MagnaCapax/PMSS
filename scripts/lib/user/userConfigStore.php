@@ -275,17 +275,16 @@ class UserConfigStore
         return pmssJsonFileReadAssoc($path);
     }
 
-    private function loadLegacyAggregateMap(): array
-    {
-        $data = $this->readJsonFile($this->legacyAggregatePath);
-        return is_array($data)
-            ? (isset($data['users']) && is_array($data['users']) ? $data['users'] : $data)
-            : [];
-    }
-
     private function loadLegacyUsers(): array
     {
-        return $this->normaliseUserMap($this->loadLegacyAggregateMap());
+        $data = $this->readJsonFile($this->legacyAggregatePath);
+        if (!is_array($data)) {
+            return [];
+        }
+
+        return $this->normaliseUserMap(
+            isset($data['users']) && is_array($data['users']) ? $data['users'] : $data
+        );
     }
 
     private function normaliseUserMap(array $users): array
@@ -336,19 +335,12 @@ class UserConfigStore
             return 0;
         }
         $path = "/home/{$username}/.billingId";
-        if (!is_file($path) || is_link($path)) {
+        if (!is_file($path) || is_link($path) || @fileowner($path) !== 0) {
             return 0;
         }
-        $owner = @fileowner($path);
-        if ($owner !== 0) {
-            return 0;
-        }
+
         $raw = pmssReadRegularFileDigits($path);
-        if ($raw === null) {
-            return 0;
-        }
-        $id = (int) $raw;
-        return $id > 0 ? $id : 0;
+        return ($raw !== null && (int) $raw > 0) ? (int) $raw : 0;
     }
 }
 

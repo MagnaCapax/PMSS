@@ -52,9 +52,8 @@ function pmssDockerInstallLsioRandomSecret(): string
  */
 function pmssDockerInstallLsioTimezone(): string
 {
-    $timezone = @file_get_contents('/etc/timezone');
-    $timezone = is_string($timezone) ? trim($timezone) : '';
-    return $timezone !== '' ? $timezone : 'UTC';
+    $timezone = pmssReadRegularFileTrimmed('/etc/timezone');
+    return $timezone !== null && $timezone !== '' ? $timezone : 'UTC';
 }
 
 /**
@@ -165,11 +164,7 @@ function pmssDockerInstallLsioHostPort(?string $value, string $defaultPort): ?st
     }
 
     $port = (int) $value;
-    if ($port < 1 || $port > 65535) {
-        return null;
-    }
-
-    return (string) $port;
+    return ($port >= 1 && $port <= 65535) ? (string) $port : null;
 }
 
 /**
