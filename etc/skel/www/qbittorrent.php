@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../.scriptsInc.php';
 require_once '/scripts/lib/user/torrentPort.php';
 /**
 * PMSS: User Frontend: qBittorrent start/disable/restart file
@@ -9,26 +10,12 @@ require_once '/scripts/lib/user/torrentPort.php';
 * # https://github.com/MagnaCapax/PMSS/issues/10
 **/
 
-if (!isset($_REQUEST['action'])) die();
-$action = $_REQUEST['action'];
-
-switch($action) {
-  case 'start':
-    touch('../.qbittorrentEnable');
-    startQbittorrent();
-    break;
-
-  case 'disable':
-    unlink('../.qbittorrentEnable');
-    shell_exec('killall -u $(whoami) -9 qbittorrent-nox;');
-    break;
-
-  case 'restart':
-    shell_exec('killall -u $(whoami) qbittorrent-nox; sleep 3; killall -u $(whoami) -9 qbittorrent-nox');
-    startQbittorrent();
-    break;
-
-}
+pmssFrontendToggleAction(
+    '../.qbittorrentEnable',
+    'startQbittorrent',
+    'killall -u $(whoami) -9 qbittorrent-nox;',
+    'killall -u $(whoami) qbittorrent-nox; sleep 3; killall -u $(whoami) -9 qbittorrent-nox'
+);
 
 function startQbittorrent() {    // this actually calls the function to start rTorrent :)
     if (function_exists('pmssQbittorrentPortEnsureCurrentUser')) {

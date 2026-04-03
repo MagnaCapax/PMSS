@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../.scriptsInc.php';
 /**
 * PMSS: Frontend: rclone start/disable/restart file
 *
@@ -7,26 +8,11 @@
 * #TODO Make this dynamic and single file with definitions for all apps, deluge, qbittorrent, jellyfin, *ARR etc. https://github.com/MagnaCapax/PMSS/issues/10
 **/
 
-if (!isset($_REQUEST['action'])) die();
-$action = $_REQUEST['action'];
-
-switch($action) {
-  case 'start':
-    touch('../.rcloneEnable');
-    startRclone();
-    break;
-
-  case 'disable':
-    unlink('../.rcloneEnable');
-    shell_exec('killall -u $(whoami) -9 rclone;');
-    break;
-
-  case 'restart':
-    shell_exec('killall -u $(whoami) -9 rclone;');
-    startRclone();
-    break;
-
-}
+pmssFrontendToggleAction(
+    '../.rcloneEnable',
+    'startRclone',
+    'killall -u $(whoami) -9 rclone;'
+);
 
 function startRclone() {
     $port = (int) trim(  file_get_contents('../.rclonePort') );
