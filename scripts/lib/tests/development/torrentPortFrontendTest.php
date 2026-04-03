@@ -19,7 +19,7 @@ class TorrentPortFrontendTest extends TestCase
         $this->homeRoot = sys_get_temp_dir().'/pmss-torrent-frontends-home-'.$suffix;
         $this->skelDir = sys_get_temp_dir().'/pmss-torrent-frontends-skel-'.$suffix;
         $this->user = 'user'.bin2hex(random_bytes(2));
-        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
+        $this->envBackup = $this->pmssCaptureEnv(['HOME', 'PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
         $this->pmssEnsureDir($this->skelDir.'/www');
@@ -187,6 +187,29 @@ class TorrentPortFrontendTest extends TestCase
         file_put_contents($home.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nLocale=en\n");
 
         $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $home) === false);
+    }
+
+    public function testCurrentUserContextRejectsSymlinkedHomePath(): void
+    {
+        $realHome = $this->pmssUserHomePath($this->homeRoot, $this->user);
+        $linkedHome = $this->homeRoot.'/linked-home';
+        symlink($realHome, $linkedHome);
+        putenv('HOME='.$linkedHome);
+
+        $this->assertSame(null, \pmssTorrentPortCurrentUserContext());
+    }
+
+    public function testQbittorrentPortEnsureRejectsSymlinkedHomeAncestor(): void
+    {
+        $realHome = $this->pmssUserHomePath($this->homeRoot, $this->user);
+        $linkedHome = $this->homeRoot.'/linked-home-qbit';
+        @mkdir($realHome.'/.config/qBittorrent', 0755, true);
+        file_put_contents($realHome.'/.qbittorrentPort', "45678\n");
+        file_put_contents($realHome.'/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=12345\n");
+        symlink($realHome, $linkedHome);
+
+        $this->assertTrue(\pmssQbittorrentPortEnsure($this->user, $linkedHome) === false);
+        $this->assertSame("[Preferences]\nWebUI\\Port=12345\n", (string) file_get_contents($realHome.'/.config/qBittorrent/qBittorrent.conf'));
     }
 
     public function testTorrentPortExpectedReadAcceptsValidRange(): void

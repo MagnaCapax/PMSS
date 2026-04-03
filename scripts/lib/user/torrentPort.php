@@ -17,11 +17,15 @@ require_once __DIR__.'/../lighttpd/userConfigApply.php';
 function pmssTorrentPortCurrentUserContext(): ?array
 {
     $home = getenv('HOME');
-    if (!is_string($home) || $home === '') {
+    $home = is_string($home) ? rtrim($home, '/') : '';
+    if ($home === '' || $home[0] !== '/' || !is_dir($home) || !pmssPathTargetIsSafe($home, true)) {
         return null;
     }
 
     $user = basename($home);
+    if ($user === '' || $user === '.' || $user === '..' || preg_match('/[[:space:][:cntrl:]\/\\\\]/', $user) === 1) {
+        return null;
+    }
     if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')
         && is_array($info = @posix_getpwuid(@posix_geteuid()))
         && is_string($info['name'] ?? null) && $info['name'] !== '') {
@@ -58,6 +62,9 @@ function pmssDelugePortEnsureCurrentUser(): bool
  */
 function pmssDelugePortEnsure(string $user, string $home): bool
 {
+    if (!pmssPathTargetIsSafe($home, true)) {
+        return false;
+    }
     $expectedPort = pmssTorrentPortExpectedRead($home.'/.delugePort');
     $parsed = pmssDelugeReadWebConf($home.'/.config/deluge/web.conf');
     $port = is_array($parsed) ? ($parsed['config']['port'] ?? null) : null;
@@ -87,8 +94,14 @@ function pmssQbittorrentPortEnsureCurrentUser(): bool
  */
 function pmssQbittorrentPortEnsure(string $user, string $home): bool
 {
+    if (!pmssPathTargetIsSafe($home, true)) {
+        return false;
+    }
     $expectedPort = pmssTorrentPortExpectedRead($home.'/.qbittorrentPort');
     $configPath = $home.'/.config/qBittorrent/qBittorrent.conf';
+    if (!pmssUserFilePathIsSafe($configPath)) {
+        return false;
+    }
     $config = @file_get_contents($configPath);
     $parsed = is_string($config) ? @parse_ini_string($config, true, INI_SCANNER_RAW) : false;
     $key = 'WebUI\\Port';
