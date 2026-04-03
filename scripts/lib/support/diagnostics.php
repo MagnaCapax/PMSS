@@ -212,6 +212,12 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
     if (!is_dir($snapshotDir) || !pmssPathTargetIsSafe($snapshotDir, true)) {
         throw new RuntimeException('Support snapshot directory is unsafe.');
     }
+    @chmod($snapshotDir, 0700);
+    clearstatcache(true, $snapshotDir);
+    $snapshotDirMode = @fileperms($snapshotDir);
+    if (is_int($snapshotDirMode) && (($snapshotDirMode & 0777) !== 0700)) {
+        throw new RuntimeException('Support snapshot directory permission check failed.');
+    }
 
     $path = sprintf('%s/request-%s-%d.txt', $snapshotDir, gmdate('Ymd-His'), getmypid());
     $previousUmask = umask(0077);
@@ -242,5 +248,11 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
 
     @chmod($path, 0600);
     clearstatcache(true, $path);
+    $snapshotFileMode = @fileperms($path);
+    if (is_int($snapshotFileMode) && (($snapshotFileMode & 0777) !== 0600)) {
+        @unlink($path);
+        throw new RuntimeException('Support snapshot file permission check failed.');
+    }
+
     return $path;
 }

@@ -168,6 +168,24 @@ class SupportCommandTest extends TestCase
         $this->assertStringContainsString('Please investigate', (string) file_get_contents($path));
     }
 
+    public function testSnapshotWriteTightensExistingDirectoryPermissions(): void
+    {
+        $snapshotDir = $this->homeRoot.'/'.$this->user.'/.support/requests';
+        mkdir($snapshotDir, 0755, true);
+        chmod($snapshotDir, 0755);
+
+        $diagnostics = \pmssSupportDiagnosticsBuild('Please investigate', function (array $command): array {
+            return ['rc' => 0, 'output' => implode(' ', $command)];
+        });
+        $config = \pmssSupportConfigRead();
+
+        $path = \pmssSupportSnapshotWrite($diagnostics, $config);
+
+        clearstatcache(true, $snapshotDir);
+        $this->assertTrue(is_file($path));
+        $this->assertEquals(0700, fileperms($snapshotDir) & 0777);
+    }
+
     public function testSnapshotWriteUsesSharedFullWriteGuard(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/support/diagnostics.php');
@@ -177,6 +195,8 @@ class SupportCommandTest extends TestCase
             $source
         );
         $this->assertStringContainsString("@fflush(\$handle) !== true", $source);
+        $this->assertStringContainsString("@chmod(\$snapshotDir, 0700);", $source);
+        $this->assertStringContainsString("@chmod(\$path, 0600);", $source);
     }
 
     public function testSnapshotWriteRejectsSymlinkedSupportPathAncestor(): void
