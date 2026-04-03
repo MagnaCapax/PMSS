@@ -76,7 +76,7 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->assertStringContainsString("Downloads\\DiskWriteCacheSize=128\n", $updated);
     }
 
-    public function testApplyManagedConfigLeavesMissingManagedKeysUntouched(): void
+    public function testApplyManagedConfigRestoresMissingManagedKeysWithinExistingSections(): void
     {
         $configPath = $this->writeConfig(
             "[BitTorrent]\nSession\\DiskIOType=MemoryMappedFiles\n\n[Preferences]\nLocale=en\n"
@@ -86,8 +86,22 @@ class QbittorrentManagedConfigTest extends TestCase
 
         $updated = (string) file_get_contents($configPath);
         $this->assertStringContainsString("Session\\DiskIOType=Posix\n", $updated);
-        $this->pmssAssertStringNotContainsString("Session\\AsyncIOThreadsCount=4\n", $updated);
-        $this->pmssAssertStringNotContainsString("Downloads\\PreAllocation=false\n", $updated);
+        $this->assertStringContainsString("Session\\AsyncIOThreadsCount=4\n", $updated);
+        $this->assertStringContainsString("Downloads\\PreAllocation=false\n", $updated);
+    }
+
+    public function testApplyManagedConfigCreatesMissingManagedSections(): void
+    {
+        $configPath = $this->writeConfig("[Application]\nMemoryWorkingSetLimit=2048\n");
+
+        $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
+
+        $updated = (string) file_get_contents($configPath);
+        $this->assertStringContainsString("[BitTorrent]\n", $updated);
+        $this->assertStringContainsString("Session\\DiskCacheSize=128\n", $updated);
+        $this->assertStringContainsString("[Preferences]\n", $updated);
+        $this->assertStringContainsString("Bittorrent\\MaxConnecs=300\n", $updated);
+        $this->assertStringContainsString("WebUI\\HostHeaderValidation=false\n", $updated);
     }
 
     public function testApplyManagedConfigRejectsSymlinkTarget(): void

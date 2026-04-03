@@ -49,7 +49,7 @@ function pmssQbittorrentManagedConfigEntries(): array
 }
 
 /**
- * Replace one managed qBittorrent key when it already exists in its section.
+ * Replace or restore one managed qBittorrent key inside the target section.
  */
 function pmssQbittorrentConfigUpsert(string $config, string $section, string $key, string $value): ?string
 {
@@ -82,22 +82,51 @@ function pmssQbittorrentConfigUpsert(string $config, string $section, string $ke
         }
     }
 
-    if ($sectionStart === null) {
-        return $config;
+    if ($sectionStart !== null) {
+        for ($index = $sectionStart + 1; $index < $sectionEnd; $index++) {
+            if (strpos($lines[$index], $key.'=') !== 0) {
+                continue;
+            }
+
+            $lines[$index] = $managedLine;
+            $found = true;
+            break;
+        }
     }
 
-    for ($index = $sectionStart + 1; $index < $sectionEnd; $index++) {
-        if (strpos($lines[$index], $key.'=') !== 0) {
-            continue;
+    if ($found) {
+        $updated = implode("\n", $lines);
+        if ($updated !== '' && $hadTrailingNewline) {
+            $updated .= "\n";
         }
 
-        $lines[$index] = $managedLine;
-        $found = true;
-        break;
+        return str_replace("\n", $lineEnding, $updated);
     }
 
-    if (!$found) {
-        return $config;
+    if ($sectionStart === null) {
+        if (!empty($lines) && end($lines) !== '') {
+            $lines[] = '';
+        }
+        $lines[] = $sectionHeader;
+        $lines[] = $managedLine;
+    } else {
+        for ($index = $sectionStart + 1; $index < $sectionEnd; $index++) {
+            if ($lines[$index] === $managedLine) {
+                $updated = implode("\n", $lines);
+                if ($updated !== '' && $hadTrailingNewline) {
+                    $updated .= "\n";
+                }
+
+                return str_replace("\n", $lineEnding, $updated);
+            }
+        }
+
+        while ($sectionEnd > ($sectionStart + 1) && $lines[$sectionEnd - 1] === '') {
+            $sectionEnd--;
+        }
+
+        // Insert before the next section header so user-owned settings keep their section.
+        array_splice($lines, $sectionEnd, 0, [$managedLine]);
     }
 
     $updated = implode("\n", $lines);

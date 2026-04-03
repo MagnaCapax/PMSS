@@ -65,7 +65,7 @@ class UserUpdateHttpTest extends TestCase
         }
     }
 
-    public function testConfigureHttpKeepsQbittorrentConfigWhenKeysMissing(): void
+    public function testConfigureHttpRestoresQbittorrentManagedKeysWhenMissing(): void
     {
         $home = sys_get_temp_dir().'/pmss-http-qbittorrent-missing-'.bin2hex(random_bytes(4));
         @mkdir($home.'/.config/qBittorrent', 0755, true);
@@ -85,7 +85,12 @@ class UserUpdateHttpTest extends TestCase
             \pmssUserConfigureHttp($ctx);
 
             $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
-            $this->assertEquals($config, ($updated === false) ? '' : $updated);
+            $updatedConfig = ($updated === false) ? '' : $updated;
+            $this->assertStringContainsString('WebUI\\Port=12345', $updatedConfig);
+            $this->assertStringContainsString('WebUI\\Address=*', $updatedConfig);
+            $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
+            $this->assertStringContainsString('Downloads\\PreAllocation=false', $updatedConfig);
+            $this->assertStringContainsString('Session\\DiskCacheSize=128', $updatedConfig);
         } finally {
             $this->cleanup($home);
         }
