@@ -73,9 +73,4 @@ class WireGuardPeersStatusTest extends TestCase
             ]
         );
     }
-
-    private function createTempDir(): string
-    {
-        return $this->pmssMakeNamedTempDir('pmss-wireguard-status-', 0700);
-    }
 }

@@ -151,10 +151,7 @@ class DistroDetectionTest extends TestCase
     {
         $template = "deb https://mirror.invalid bookworm main\n";
         $this->withConfigTemplates(['bookworm' => $template], function () use ($template): void {
-            $tmpDir = sys_get_temp_dir().'/pmss-apt-'.bin2hex(random_bytes(4));
-            if (!is_dir($tmpDir)) {
-                mkdir($tmpDir, 0775, true);
-            }
+            $tmpDir = $this->pmssMakeTempDir('pmss-apt-', 0775);
             $sources = $tmpDir.'/sources.list';
             file_put_contents($sources, "deb https://old.invalid stable main\n");
 
@@ -179,14 +176,8 @@ class DistroDetectionTest extends TestCase
                     return strpos($line, 'Applied Debian Bookworm repository config') !== false;
                 }));
             } finally {
-                if (file_exists($sources)) {
-                    unlink($sources);
-                }
-                $backup = $sources.'.pmss-backup';
-                if (file_exists($backup)) {
-                    unlink($backup);
-                }
-                @rmdir($tmpDir);
+                @unlink($sources);
+                @unlink($sources.'.pmss-backup');
             }
         });
     }
@@ -196,9 +187,8 @@ class DistroDetectionTest extends TestCase
      */
     public function testSafeWriteSourcesLogsParentDirectoryFailure(): void
     {
-        $tmpDir = sys_get_temp_dir().'/pmss-apt-parent-'.bin2hex(random_bytes(4));
+        $tmpDir = $this->pmssMakeTempDir('pmss-apt-parent-');
         $blocker = $tmpDir.'/blocked';
-        @mkdir($tmpDir, 0755, true);
         file_put_contents($blocker, 'not-a-directory');
 
         $logs = [];
@@ -217,7 +207,6 @@ class DistroDetectionTest extends TestCase
             $this->assertTrue(!file_exists($blocker.'/sources.list.pmss-backup'));
         } finally {
             @unlink($blocker);
-            @rmdir($tmpDir);
         }
     }
 
@@ -238,8 +227,7 @@ class DistroDetectionTest extends TestCase
 
     public function testLoadRepoTemplateLogsMissingAndEmptyTemplates(): void
     {
-        $configDir = sys_get_temp_dir().'/pmss-config-'.bin2hex(random_bytes(4));
-        @mkdir($configDir, 0755, true);
+        $configDir = $this->pmssMakeTempDir('pmss-config-');
 
         try {
             $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($configDir): void {
@@ -262,7 +250,6 @@ class DistroDetectionTest extends TestCase
             });
         } finally {
             @unlink($configDir.'/template.sources.bookworm');
-            @rmdir($configDir);
         }
     }
 
@@ -284,11 +271,7 @@ class DistroDetectionTest extends TestCase
      */
     private function withOsRelease(array $fields, callable $callback, bool $maskLsbRelease = false): void
     {
-        $file = tempnam(sys_get_temp_dir(), 'pmss-osr-');
-        if ($file === false) {
-            throw new \RuntimeException('Unable to allocate os-release fixture');
-        }
-        file_put_contents($file, $this->renderOsRelease($fields));
+        $file = $this->pmssWriteTempFile('osr', $this->renderOsRelease($fields));
         \pmssResetOsReleaseCache();
 
         $env = ['PMSS_OS_RELEASE_PATH' => $file];
@@ -299,7 +282,6 @@ class DistroDetectionTest extends TestCase
         try {
             $this->pmssWithEnv($env, $callback);
         } finally {
-            @unlink($file);
             \pmssResetOsReleaseCache();
         }
     }
@@ -309,8 +291,7 @@ class DistroDetectionTest extends TestCase
      */
     private function withConfigTemplates(array $templates, callable $callback): void
     {
-        $dir = sys_get_temp_dir().'/pmss-config-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0775, true);
+        $dir = $this->pmssMakeTempDir('pmss-config-', 0775);
         foreach ($templates as $codename => $content) {
             file_put_contents($dir."/template.sources.$codename", $content);
         }
@@ -322,7 +303,6 @@ class DistroDetectionTest extends TestCase
             foreach ((glob($dir.'/template.sources.*') ?: []) as $item) {
                 @unlink($item);
             }
-            @rmdir($dir);
         }
     }
 

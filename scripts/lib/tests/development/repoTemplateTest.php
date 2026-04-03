@@ -11,14 +11,13 @@ class RepoTemplateTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tmpSources = tempnam(sys_get_temp_dir(), 'pmss-sources-');
+        $this->tmpSources = $this->pmssMakeTempFile('pmss-sources-');
         putenv('PMSS_APT_SOURCES_PATH='.$this->tmpSources);
     }
 
     protected function tearDown(): void
     {
         putenv('PMSS_APT_SOURCES_PATH');
-        @unlink($this->tmpSources);
     }
 
     public function testRefreshRepositoriesSkipsWhenVersionUnknown(): void

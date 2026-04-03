@@ -12,12 +12,7 @@ class RepositoryPrerequisitesTest extends TestCase
         $previousDryRun = getenv('PMSS_DRY_RUN');
         $previousKeyPath = getenv('PMSS_APT_MEDIAAREA_KEY_PATH');
 
-        $tempKey = tempnam(sys_get_temp_dir(), 'pmss-mediaarea-key-');
-        if ($tempKey === false) {
-            $tempKey = sys_get_temp_dir().'/pmss-mediaarea-key-'.bin2hex(random_bytes(4));
-            touch($tempKey);
-        }
-        file_put_contents($tempKey, 'placeholder');
+        $tempKey = $this->pmssWriteTempFile('mediaarea-key', 'placeholder');
 
         $before = $this->listBootstrapDirs();
         putenv('PMSS_APT_MEDIAAREA_KEY_PATH='.$tempKey);
@@ -34,7 +29,6 @@ class RepositoryPrerequisitesTest extends TestCase
             } else {
                 putenv('PMSS_DRY_RUN='.$previousDryRun);
             }
-            @unlink($tempKey);
         }
         $after = $this->listBootstrapDirs();
         $this->assertEquals($before, $after, 'MediaArea bootstrap should skip when key already present');
@@ -115,7 +109,7 @@ class RepositoryPrerequisitesTest extends TestCase
 
     private function withTempSonarrPaths(callable $callback): void
     {
-        $root = sys_get_temp_dir().'/pmss-sonarr-'.bin2hex(random_bytes(6));
+        $root = $this->pmssMakeTempDir('pmss-sonarr-', 0700);
         $keyDir = $root.'/keyrings';
         $legacyDir = $root.'/trusted';
         $sourcesDir = $root.'/sources.list.d';
@@ -176,21 +170,6 @@ class RepositoryPrerequisitesTest extends TestCase
             } else {
                 putenv('PMSS_APT_SOURCES_PATH='.$previousSourcesPath);
             }
-
-            foreach (glob($sourcesDir.'/*') ?: [] as $file) {
-                @unlink($file);
-            }
-            foreach (glob($keyDir.'/*') ?: [] as $file) {
-                @unlink($file);
-            }
-            foreach (glob($legacyDir.'/*') ?: [] as $file) {
-                @unlink($file);
-            }
-            @unlink($sourcesPath);
-            @rmdir($sourcesDir);
-            @rmdir($keyDir);
-            @rmdir($legacyDir);
-            @rmdir($root);
         }
     }
 

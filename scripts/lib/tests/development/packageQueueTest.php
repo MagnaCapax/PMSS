@@ -23,12 +23,7 @@ class PackageQueueTest extends TestCase
 
     private function writeBaseline(array $rows): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-baseline-');
-        if (!is_string($path) || $path === '') {
-            $this->fail('Expected temporary baseline path');
-        }
-        file_put_contents($path, implode("\n", $rows)."\n");
-        return $path;
+        return $this->pmssWriteTempFile('baseline', implode("\n", $rows)."\n");
     }
 
     public function testQueuePackagesAddsEntries(): void

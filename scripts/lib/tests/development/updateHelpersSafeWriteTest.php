@@ -9,7 +9,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
 {
     public function testSafeWriteSourcesOverwritesExisting(): void
     {
-        $target = $this->makeTempSources('old');
+        $target = $this->pmssWriteTempFile('sources', 'old');
         putenv('PMSS_APT_SOURCES_PATH='.$target);
 
         $result = \pmssSafeWriteSources('new', 'UnitTest', null);
@@ -22,15 +22,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
 
     public function testSafeWriteSourcesReturnsFalseWhenTargetIsDirectory(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-dir-'.bin2hex(random_bytes(4));
-        if (file_exists($dir)) {
-            if (is_dir($dir)) {
-                @rmdir($dir);
-            } else {
-                @unlink($dir);
-            }
-        }
-        @mkdir($dir, 0755, true);
+        $dir = $this->pmssMakeTempDir('pmss-dir-');
         $this->assertTrue(is_dir($dir));
         putenv('PMSS_APT_SOURCES_PATH='.$dir);
 
@@ -43,11 +35,9 @@ class UpdateHelpersSafeWriteTest extends TestCase
 
     public function testSafeWriteSourcesCreatesParentDirectoriesWhenMissing(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-missing-'.bin2hex(random_bytes(4));
+        $dir = $this->pmssMakeTempDir('pmss-missing-');
         $target = $dir.'/sources.list';
-        if (file_exists($dir)) {
-            @unlink($dir);
-        }
+        $this->cleanup($dir);
         putenv('PMSS_APT_SOURCES_PATH='.$target);
 
         $result = \pmssSafeWriteSources('deb test main', 'DirCreate', null);
@@ -59,7 +49,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
 
     public function testSafeWriteSourcesBackupUpdatedOnSecondWrite(): void
     {
-        $target = $this->makeTempSources('first');
+        $target = $this->pmssWriteTempFile('sources', 'first');
         putenv('PMSS_APT_SOURCES_PATH='.$target);
 
         \pmssSafeWriteSources('second', 'UnitTest', null);
@@ -73,7 +63,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
 
     public function testAptWriteValidUntilOverrideCreatesParentDirectories(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-apt-override-'.bin2hex(random_bytes(4));
+        $dir = $this->pmssMakeTempDir('pmss-apt-override-');
         $target = $dir.'/apt.conf.d/90ignore-release-date';
         $logs = [];
         $logger = function (string $message) use (&$logs): void {
@@ -85,17 +75,12 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->assertTrue($result);
         $this->assertEquals("Acquire::Check-Valid-Until \"false\";\n", file_get_contents($target));
         $this->assertEquals([], $logs);
-
-        @unlink($target);
-        @rmdir(dirname($target));
-        @rmdir($dir);
     }
 
     public function testAptWriteValidUntilOverrideLogsParentDirectoryFailure(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-apt-override-blocked-'.bin2hex(random_bytes(4));
+        $dir = $this->pmssMakeTempDir('pmss-apt-override-blocked-');
         $blocker = $dir.'/blocked';
-        @mkdir($dir, 0755, true);
         file_put_contents($blocker, 'not-a-directory');
         $target = $blocker.'/90ignore-release-date';
         $logs = [];
@@ -110,9 +95,6 @@ class UpdateHelpersSafeWriteTest extends TestCase
             return strpos($line, 'Unable to create apt.conf.d directory for Release timestamp override: '.$blocker) !== false;
         }));
         $this->assertTrue(!file_exists($target));
-
-        @unlink($blocker);
-        @rmdir($dir);
     }
 
     public function testAptRunCleanReturnsTrueOnSuccess(): void
@@ -147,16 +129,6 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
             return strpos($line, 'apt-get clean failed with rc 100 (simulated apt failure)') !== false;
         }));
-    }
-
-    private function makeTempSources(string $content): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'pmss-sources-');
-        if ($path === false) {
-            $path = sys_get_temp_dir().'/pmss-sources-'.bin2hex(random_bytes(6));
-        }
-        file_put_contents($path, $content);
-        return $path;
     }
 
     private function clearEnv(string $name): void

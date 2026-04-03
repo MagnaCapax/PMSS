@@ -11,13 +11,8 @@ class UserUpdatePermissionsTest extends TestCase
 {
     public function testRefreshPermissionsBuildsExpectedCommand(): void
     {
-        $home = sys_get_temp_dir().'/pmss-perm-cmd-'.bin2hex(random_bytes(4));
-        mkdir($home, 0755, true);
-        $jsonLog = tempnam(sys_get_temp_dir(), 'pmss-user-perm-json-');
-        if ($jsonLog === false) {
-            $jsonLog = sys_get_temp_dir().'/pmss-user-perm-json-'.bin2hex(random_bytes(4));
-            file_put_contents($jsonLog, '');
-        }
+        $home = $this->pmssMakeTempDir('pmss-perm-cmd-');
+        $jsonLog = $this->pmssMakeTempFile('pmss-user-perm-json-');
 
         $ctx = [
             'user'     => 'dummy',
@@ -71,8 +66,6 @@ class UserUpdatePermissionsTest extends TestCase
             }
             $GLOBALS['PMSS_JSON_LOG_PATH'] = $previousJsonLogPath;
             unset($GLOBALS['PMSS_TEST_RUNUSERSTEP_LAST']);
-            @unlink($jsonLog);
-            $this->cleanup($home);
         }
     }
 
