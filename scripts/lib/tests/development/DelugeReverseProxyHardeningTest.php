@@ -448,7 +448,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
     public function testDelugeReadWebConfHandlesEscapedQuotes(): void
     {
         $good = "{\"file\":2,\"format\":1,\"note\":\"a\\\"b\\\"c\"}{\"base\":\"/user-testuser/deluge/\",\"port\":8112}";
-        $parsed = \pmssDelugeReadWebConf($this->writeTemp('web-escaped.conf', $good));
+        $this->pmssWriteRelativeFile($this->tempDir, 'web-escaped.conf', $good);
+        $parsed = \pmssDelugeReadWebConf($this->tempDir.'/web-escaped.conf');
         $this->assertTrue(is_array($parsed));
         $this->assertEquals('a"b"c', $parsed['meta']['note'] ?? null);
     }
@@ -482,13 +483,6 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->assertTrue(is_array($parsed2));
         $this->assertEquals('/user-testuser/deluge/', $parsed2['config']['base'] ?? null);
         $this->assertEquals(0640, @fileperms($path) & 0777);
-    }
-
-    private function writeTemp(string $name, string $content): string
-    {
-        $path = $this->tempDir.'/'.$name;
-        file_put_contents($path, $content);
-        return $path;
     }
 
     // =========================================================================

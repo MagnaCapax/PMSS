@@ -23,11 +23,11 @@ class DistroRepoSelectionTest extends TestCase
      */
     public function testDetectDistroTrustsCodenameForVersion(): void
     {
-        $osRelease = $this->writeOsRelease([
+        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=debian',
             'VERSION_ID="10"',
             'VERSION_CODENAME=bullseye',
-        ]);
+        ])."\n");
         putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
         \pmssResetOsReleaseCache();
 
@@ -44,11 +44,11 @@ class DistroRepoSelectionTest extends TestCase
      */
     public function testDetectDistroFallsBackToVersionDigits(): void
     {
-        $osRelease = $this->writeOsRelease([
+        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=debian',
             'VERSION_ID="42"',
             'VERSION_CODENAME=hyperion',
-        ]);
+        ])."\n");
         putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
         \pmssResetOsReleaseCache();
 
@@ -120,14 +120,5 @@ class DistroRepoSelectionTest extends TestCase
         }), 'Expected EOL post-hook to log test-mode skip');
 
         $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
-    }
-
-    /**
-     * Helper to write a temporary os-release fixture.
-     */
-    private function writeOsRelease(array $lines): string
-    {
-        $file = $this->pmssWriteTempFile('os-release', implode("\n", $lines)."\n");
-        return $file;
     }
 }

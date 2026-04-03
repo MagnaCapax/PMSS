@@ -64,7 +64,7 @@ class PmssStatsCliTest extends TestCase
             'home' => $this->home,
             'config_dir' => $this->configDir,
             'cgroup_dir' => $this->cgroupDir,
-            'version_file' => $this->pmssWriteVersionFile('2.8.14'),
+            'version_file' => $this->pmssWriteTempFile('stats-version', "2.8.14\n"),
             'socket_path' => $this->home.'/.rtorrent.socket',
         ], $this->rtorrentCallerStub());
 
@@ -86,7 +86,7 @@ class PmssStatsCliTest extends TestCase
             'home' => $this->home,
             'config_dir' => $this->configDir,
             'cgroup_dir' => $this->cgroupDir,
-            'version_file' => $this->pmssWriteVersionFile('2.8.14'),
+            'version_file' => $this->pmssWriteTempFile('stats-version', "2.8.14\n"),
         ], $this->rtorrentCallerStub());
 
         $rendered = \pmssStatsRenderText($stats, ['full' => false, 'mini' => false, 'no_header' => false]);
@@ -131,7 +131,7 @@ class PmssStatsCliTest extends TestCase
 
     public function testMainEmitsJsonWhenRequested(): void
     {
-        $versionFile = $this->pmssWriteVersionFile('3.0.0');
+        $versionFile = $this->pmssWriteTempFile('stats-version', "3.0.0\n");
         $this->setEnv('PMSS_STATS_USER', 'alice');
         $this->setEnv('PMSS_STATS_HOME', $this->home);
         $this->setEnv('PMSS_STATS_CONFIG_DIR', $this->configDir);
@@ -146,14 +146,6 @@ class PmssStatsCliTest extends TestCase
         $this->assertStringContainsString('"pmss_version": "3.0.0"', $json);
         $this->assertStringContainsString('"product": "M10G S"', $json);
     }
-
-    private function pmssWriteVersionFile(string $version): string
-    {
-        $path = $this->pmssMakeTempFile('pmss-stats-version-');
-        file_put_contents($path, $version."\n");
-        return $path;
-    }
-
     /**
      * Build a deterministic rTorrent caller stub for hermetic stats tests.
      *

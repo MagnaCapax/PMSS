@@ -9,11 +9,11 @@ class DistroRepoSelectionEdgeTest extends TestCase
 {
     public function testDetectDistroLowercasesId(): void
     {
-        $osRelease = $this->writeOsRelease([
+        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=Debian',
             'VERSION_ID="11"',
             'VERSION_CODENAME=BULLSEYE',
-        ]);
+        ])."\n");
         putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
         \pmssResetOsReleaseCache();
 
@@ -27,11 +27,11 @@ class DistroRepoSelectionEdgeTest extends TestCase
 
     public function testDetectDistroNormalisesUppercaseCodename(): void
     {
-        $osRelease = $this->writeOsRelease([
+        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=debian',
             'VERSION_ID=12',
             'VERSION_CODENAME=BOOKWORM',
-        ]);
+        ])."\n");
         putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
         \pmssResetOsReleaseCache();
 
@@ -44,11 +44,11 @@ class DistroRepoSelectionEdgeTest extends TestCase
 
     public function testDetectDistroUnknownCodenameKeepsVersion(): void
     {
-        $osRelease = $this->writeOsRelease([
+        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=debian',
             'VERSION_ID="77"',
             'VERSION_CODENAME=aurora',
-        ]);
+        ])."\n");
         putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
         \pmssResetOsReleaseCache();
 
@@ -61,11 +61,11 @@ class DistroRepoSelectionEdgeTest extends TestCase
 
     public function testDetectDistroWhitespaceInCodename(): void
     {
-        $osRelease = $this->writeOsRelease([
+        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=debian',
             'VERSION_ID=13',
             'VERSION_CODENAME="  trixie  "',
-        ]);
+        ])."\n");
         putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
         \pmssResetOsReleaseCache();
 
@@ -78,16 +78,16 @@ class DistroRepoSelectionEdgeTest extends TestCase
 
     public function testDetectDistroResetCacheSwitchesFiles(): void
     {
-        $first = $this->writeOsRelease([
+        $first = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=debian',
             'VERSION_ID=11',
             'VERSION_CODENAME=bullseye',
-        ]);
-        $second = $this->writeOsRelease([
+        ])."\n");
+        $second = $this->pmssWriteTempFile('os-release', implode("\n", [
             'ID=debian',
             'VERSION_ID=12',
             'VERSION_CODENAME=bookworm',
-        ]);
+        ])."\n");
 
         putenv('PMSS_OS_RELEASE_PATH='.$first);
         \pmssResetOsReleaseCache();
@@ -100,10 +100,5 @@ class DistroRepoSelectionEdgeTest extends TestCase
         $this->assertEquals(12, $secondInfo['version']);
 
         $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
-    }
-
-    private function writeOsRelease(array $lines): string
-    {
-        return $this->pmssWriteTempFile('os-release', implode("\n", $lines)."\n");
     }
 }

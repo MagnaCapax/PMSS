@@ -65,12 +65,8 @@ trait FilesystemCleanupTrait
     /** Create a temporary file with deterministic PMSS-style naming. */
     protected function pmssWriteTempFile(string $prefix, string $content, string $namespace = 'pmss'): string
     {
-        $path = tempnam(sys_get_temp_dir(), $namespace.'-'.$prefix.'-');
-        if ($path === false) {
-            $path = sys_get_temp_dir().'/'.$namespace.'-'.$prefix.'-'.bin2hex(random_bytes(6));
-        }
-
-        file_put_contents($path, $content);
+        $path = $this->pmssMakeTempPath($namespace.'-'.$prefix.'-');
+        $this->pmssWriteFile($path, $content);
         return $path;
     }
 

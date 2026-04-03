@@ -6,15 +6,11 @@ require_once dirname(__DIR__, 3).'/motd/Generator.php';
 
 class MotdHealthWarningsTest extends TestCase
 {
-    private function writeTemp(string $dir, string $name, string $content): string
-    {
-        $p = $dir.'/'.$name; @file_put_contents($p, $content); return $p;
-    }
-
     public function testMotdShowsStorageWarningsFromHealthLog(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-health-', 0700);
-        $tpl = $this->writeTemp($dir, 'template.motd', "Host: %HOSTNAME%\n");
+        $this->pmssWriteRelativeFile($dir, 'template.motd', "Host: %HOSTNAME%\n", 0700);
+        $tpl = $dir.'/template.motd';
         $out = $dir.'/motd.txt';
         $log = $this->pmssMakeJsonLogPath('pmss-motd-health-log-', 'health.jsonl');
 
@@ -40,7 +36,8 @@ class MotdHealthWarningsTest extends TestCase
     public function testMotdHandlesMalformedHealthLogGracefully(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-health-bad-', 0700);
-        $tpl = $this->writeTemp($dir, 'template.motd', "Hello %HOSTNAME%\n");
+        $this->pmssWriteRelativeFile($dir, 'template.motd', "Hello %HOSTNAME%\n", 0700);
+        $tpl = $dir.'/template.motd';
         $out = $dir.'/motd.txt';
         $log = $dir.'/health.jsonl';
         file_put_contents($log, "{this is not json}\n{\"kind\":\"nvme\",\"metrics\":{}}\nBROKEN\n");
@@ -54,7 +51,8 @@ class MotdHealthWarningsTest extends TestCase
     public function testMotdWithoutHealthLogHasNoStorageWarn(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-motd-nohealth-', 0700);
-        $tpl = $this->writeTemp($dir, 'template.motd', "Hello %HOSTNAME%\n");
+        $this->pmssWriteRelativeFile($dir, 'template.motd', "Hello %HOSTNAME%\n", 0700);
+        $tpl = $dir.'/template.motd';
         $out = $dir.'/motd.txt';
         putenv('PMSS_MOTD_TEMPLATE_PATH='.$tpl);
         putenv('PMSS_MOTD_OUTPUT_PATH='.$out);

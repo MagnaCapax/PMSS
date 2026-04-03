@@ -8,13 +8,6 @@ require_once dirname(__DIR__, 3).'/lib/nginxUserHosts.php';
  */
 class NginxUserHostsTest extends TestCase
 {
-    private function writeTempFile(string $contents): string
-    {
-        $path = sys_get_temp_dir().'/pmss-nginx-hosts-'.uniqid('', true);
-        file_put_contents($path, $contents);
-        return $path;
-    }
-
     public function testHostIsValidFqdnAcceptsExpectedNames(): void
     {
         $valid = [
@@ -63,9 +56,8 @@ class NginxUserHostsTest extends TestCase
         ];
 
         foreach ($valid as $raw => $expected) {
-            $path = $this->writeTempFile($raw);
+            $path = $this->pmssWriteTempFile('nginx-hosts', $raw);
             $this->assertEquals($expected, \pmssNginxUserBillingIdFromFile($path));
-            @unlink($path);
         }
     }
 
@@ -80,9 +72,8 @@ class NginxUserHostsTest extends TestCase
         ];
 
         foreach ($invalid as $raw) {
-            $path = $this->writeTempFile($raw);
+            $path = $this->pmssWriteTempFile('nginx-hosts', $raw);
             $this->assertEquals(null, \pmssNginxUserBillingIdFromFile($path));
-            @unlink($path);
         }
     }
 
