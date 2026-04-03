@@ -7,8 +7,8 @@ class UserUpdateThemesTest extends TestCase
 {
     public function testUpdateThemesUsesSkelOverrideForMissingTheme(): void
     {
-        $home = sys_get_temp_dir().'/pmss-user-theme-home-'.bin2hex(random_bytes(4));
-        $skel = sys_get_temp_dir().'/pmss-user-theme-skel-'.bin2hex(random_bytes(4));
+        $home = $this->pmssMakeTempDir('pmss-user-theme-home-');
+        $skel = $this->pmssMakeTempDir('pmss-user-theme-skel-');
         @mkdir($home.'/www/rutorrent/plugins/theme/themes', 0755, true);
         @mkdir($skel.'/www/rutorrent/plugins/theme/themes', 0755, true);
 
@@ -35,8 +35,6 @@ class UserUpdateThemesTest extends TestCase
         } finally {
             $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
-            $this->cleanup($home);
-            $this->cleanup($skel);
         }
 
         $expected = sprintf(

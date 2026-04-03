@@ -8,8 +8,7 @@ class MotdTest extends TestCase
 {
     public function testGenerateMotdWritesToOutputWithTemplate(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-motd-'.bin2hex(random_bytes(4));
-        @mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-motd-', 0700);
         $template = $dir.'/template.motd';
         $output   = $dir.'/motd.txt';
         $runtime  = $dir.'/run';
@@ -31,8 +30,7 @@ class MotdTest extends TestCase
 
     public function testGenerateMotdHonorsColorOptOutEnv(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-motd-'.bin2hex(random_bytes(4));
-        @mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-motd-', 0700);
         $template = $dir.'/template.motd';
         $output   = $dir.'/motd.txt';
         $runtime  = $dir.'/run';

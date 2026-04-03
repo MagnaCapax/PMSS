@@ -11,8 +11,7 @@ class UpdateHelpersTest extends TestCase
 
     public function testLoadRepoTemplateWithoutCustomLoggerStillUsesLogMessageFallback(): void
     {
-        $configDir = sys_get_temp_dir().'/pmss-update-logger-'.bin2hex(random_bytes(4));
-        @mkdir($configDir, 0700, true);
+        $configDir = $this->pmssMakeTempDir('pmss-update-logger-', 0700);
 
         $script = 'function logMessage(string $message, array $context = array()): void { echo $message; } '
             .'putenv('.var_export('PMSS_CONFIG_DIR='.$configDir, true).'); '
@@ -20,8 +19,6 @@ class UpdateHelpersTest extends TestCase
             .'pmssLoadRepoTemplate("this-code-name-does-not-exist");';
 
         $output = trim($this->pmssRunInlinePhp($script, ['PMSS_TEST_MODE' => '1']));
-
-        @rmdir($configDir);
 
         $this->assertStringContainsString('Repository template missing:', $output);
     }

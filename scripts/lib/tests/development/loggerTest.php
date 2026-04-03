@@ -9,8 +9,7 @@ class LoggerTest extends TestCase
 {
     public function testLoggerWritesToCustomDir(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-logs-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-logs-', 0700);
         $logger = new \Logger(__FILE__, $dir);
         $logger->msg('hello custom');
         $base = basename(__FILE__, '.php');
@@ -45,8 +44,7 @@ class LoggerTest extends TestCase
 
     public function testLoggerSupportsCustomBaseName(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-logs-custom-'.bin2hex(random_bytes(4));
-        mkdir($dir, 0700, true);
+        $dir = $this->pmssMakeTempDir('pmss-logs-custom-', 0700);
         $logger = new \Logger(__FILE__, $dir, $dir, 'pmss-update');
         $logger->msg('custom base');
 

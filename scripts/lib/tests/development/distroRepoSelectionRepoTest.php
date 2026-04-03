@@ -10,7 +10,7 @@ class DistroRepoSelectionRepoTest extends TestCase
 {
     public function testUpdateAptSourcesCreatesParentDirectory(): void
     {
-        $dir = sys_get_temp_dir().'/pmss-apt-'.bin2hex(random_bytes(4));
+        $dir = $this->pmssMakeTempPath('pmss-apt-dir-');
         $target = $dir.'/sources.list';
         if (file_exists($dir)) {
             @unlink($dir);
@@ -53,7 +53,7 @@ class DistroRepoSelectionRepoTest extends TestCase
 
     public function testUpdateAptSourcesWithoutExistingFileSkipsBackup(): void
     {
-        $target = sys_get_temp_dir().'/pmss-apt-'.bin2hex(random_bytes(4));
+        $target = $this->pmssMakeTempPath('pmss-apt-target-');
         putenv('PMSS_APT_SOURCES_PATH='.$target);
 
         $template = "deb http://mirror.example bookworm main\n";

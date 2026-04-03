@@ -11,8 +11,7 @@ class UserUpdatePluginsTest extends TestCase
 {
     public function testEnsurePluginsReportsMissingSource(): void
     {
-        $home = sys_get_temp_dir().'/pmss-plugins-home-'.bin2hex(random_bytes(4));
-        @mkdir($home, 0755, true);
+        $home = $this->pmssMakeTempDir('pmss-plugins-home-');
 
         $previousDryRun = getenv('PMSS_DRY_RUN');
         $previousSkel   = getenv('PMSS_SKEL_DIR');
@@ -59,13 +58,12 @@ class UserUpdatePluginsTest extends TestCase
             } else {
                 putenv('PMSS_DRY_RUN='.$previousDryRun);
             }
-            $this->cleanup($home);
         }
     }
 
     public function testEnsurePluginsOwnsRetrackerCleanupAndDirectoryBootstrap(): void
     {
-        $home = sys_get_temp_dir().'/pmss-plugins-retracker-'.bin2hex(random_bytes(4));
+        $home = $this->pmssMakeTempDir('pmss-plugins-retracker-');
         $settingsDir = $home.'/www/rutorrent/share/users/dummy/settings';
         @mkdir($home.'/www/rutorrent/plugins/unpack', 0755, true);
         @mkdir($settingsDir, 0755, true);
@@ -76,25 +74,21 @@ class UserUpdatePluginsTest extends TestCase
 
         $GLOBALS['PMSS_PROFILE'] = [];
 
-        try {
-            \pmssUserEnsurePlugins([
-                'user'     => 'dummy',
-                'home'     => $home,
-                'user_esc' => escapeshellarg('dummy'),
-            ]);
+        \pmssUserEnsurePlugins([
+            'user'     => 'dummy',
+            'home'     => $home,
+            'user_esc' => escapeshellarg('dummy'),
+        ]);
 
-            $this->assertTrue(!file_exists($settingsDir.'/retrackers.dat'));
-            $this->assertEquals(
-                sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/users/dummy/torrents')),
-                $this->findCommand('Creating ruTorrent torrents directory')
-            );
-            $this->assertEquals(
-                sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/settings/rss')),
-                $this->findCommand('Creating ruTorrent RSS settings directory')
-            );
-        } finally {
-            $this->cleanup($home);
-        }
+        $this->assertTrue(!file_exists($settingsDir.'/retrackers.dat'));
+        $this->assertEquals(
+            sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/users/dummy/torrents')),
+            $this->findCommand('Creating ruTorrent torrents directory')
+        );
+        $this->assertEquals(
+            sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/settings/rss')),
+            $this->findCommand('Creating ruTorrent RSS settings directory')
+        );
     }
 
     private function findCommand(string $needle): ?string
