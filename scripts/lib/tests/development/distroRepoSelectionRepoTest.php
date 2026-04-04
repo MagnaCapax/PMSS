@@ -15,57 +15,51 @@ class DistroRepoSelectionRepoTest extends TestCase
         if (file_exists($dir)) {
             @unlink($dir);
         }
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($dir, $target): void {
+            $template = "deb http://mirror.example bullseye main\n";
+            $logs = [];
+            $logger = function (string $msg) use (&$logs): void {
+                $logs[] = $msg;
+            };
 
-        $template = "deb http://mirror.example bullseye main\n";
-        $logs = [];
-        $logger = function (string $msg) use (&$logs): void {
-            $logs[] = $msg;
-        };
+            \updateAptSources('debian', 11, '', [
+                'bullseye' => $template,
+                'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => '',
+            ], $logger);
 
-        \updateAptSources('debian', 11, '', [
-            'bullseye' => $template,
-            'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => '',
-        ], $logger);
-
-        $this->assertTrue(is_dir($dir));
-        $this->assertEquals($template, file_get_contents($target));
-
-        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
+            $this->assertTrue(is_dir($dir));
+            $this->assertEquals($template, file_get_contents($target));
+        });
     }
 
     public function testUpdateAptSourcesLeavesFileWhenTemplateEmpty(): void
     {
         $initial = "deb http://existing bullseye main\n";
         $target = $this->pmssWriteTempFile('sources', $initial);
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($initial, $target): void {
+            \updateAptSources('debian', 11, sha1($initial), [
+                'bullseye' => '',
+                'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => '',
+            ], function (): void {});
 
-        \updateAptSources('debian', 11, sha1($initial), [
-            'bullseye' => '',
-            'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => '',
-        ], function (): void {});
-
-        $this->assertEquals($initial, file_get_contents($target));
-        $this->assertTrue(!file_exists($target.'.pmss-backup'));
-
-        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
+            $this->assertEquals($initial, file_get_contents($target));
+            $this->assertTrue(!file_exists($target.'.pmss-backup'));
+        });
     }
 
     public function testUpdateAptSourcesWithoutExistingFileSkipsBackup(): void
     {
         $target = $this->pmssMakeTempPath('pmss-apt-target-');
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($target): void {
+            $template = "deb http://mirror.example bookworm main\n";
+            \updateAptSources('debian', 12, '', [
+                'bookworm' => $template,
+                'bullseye' => '', 'buster' => '', 'jessie' => '', 'trixie' => '',
+            ], function (): void {});
 
-        $template = "deb http://mirror.example bookworm main\n";
-        \updateAptSources('debian', 12, '', [
-            'bookworm' => $template,
-            'bullseye' => '', 'buster' => '', 'jessie' => '', 'trixie' => '',
-        ], function (): void {});
-
-        $this->assertEquals($template, file_get_contents($target));
-        $this->assertTrue(!file_exists($target.'.pmss-backup'));
-
-        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
+            $this->assertEquals($template, file_get_contents($target));
+            $this->assertTrue(!file_exists($target.'.pmss-backup'));
+        });
     }
 
     public function testPmssVersionFromCodenameCoversStretch(): void

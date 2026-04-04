@@ -645,6 +645,48 @@ abstract class TestCase
         $this->pmssWithEnv(['PATH' => $path], $callback);
     }
 
+    /**
+     * Stage a temporary os-release fixture for the duration of a callback.
+     *
+     * @param array<string, string> $fields
+     */
+    protected function pmssWithOsRelease(array $fields, callable $callback, bool $maskLsbRelease = false): void
+    {
+        $file = $this->pmssWriteTempFile('osr', $this->pmssRenderOsRelease($fields));
+        \pmssResetOsReleaseCache();
+
+        $env = ['PMSS_OS_RELEASE_PATH' => $file];
+        if ($maskLsbRelease) {
+            $env['PATH'] = sys_get_temp_dir();
+        }
+
+        try {
+            $this->pmssWithEnv($env, $callback);
+        } finally {
+            \pmssResetOsReleaseCache();
+        }
+    }
+
+    /**
+     * Render an os-release fixture body from key/value pairs.
+     *
+     * @param array<string, string> $fields
+     */
+    protected function pmssRenderOsRelease(array $fields): string
+    {
+        $lines = [];
+        foreach ($fields as $key => $value) {
+            if ($value === '') {
+                $lines[] = $key.'=';
+                continue;
+            }
+
+            $lines[] = $key.'="'.str_replace('"', '\"', $value).'"';
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
     /** Run a shell command with optional environment overrides and return combined output. */
     protected function pmssRunShellCommand(string $command, array $environment = [], string $stderrRedirect = '2>&1'): string
     {

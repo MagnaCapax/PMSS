@@ -9,96 +9,80 @@ class DistroRepoSelectionEdgeTest extends TestCase
 {
     public function testDetectDistroLowercasesId(): void
     {
-        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=Debian',
-            'VERSION_ID="11"',
-            'VERSION_CODENAME=BULLSEYE',
-        ])."\n");
-        putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
-        \pmssResetOsReleaseCache();
-
-        $info = \pmssDetectDistro();
-        $this->assertEquals('debian', $info['name']);
-        $this->assertEquals(11, $info['version']);
-        $this->assertEquals('bullseye', $info['codename']);
-
-        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+        $this->pmssWithOsRelease([
+            'ID' => 'Debian',
+            'VERSION_ID' => '11',
+            'VERSION_CODENAME' => 'BULLSEYE',
+        ], function (): void {
+            $info = \pmssDetectDistro();
+            $this->assertEquals('debian', $info['name']);
+            $this->assertEquals(11, $info['version']);
+            $this->assertEquals('bullseye', $info['codename']);
+        });
     }
 
     public function testDetectDistroNormalisesUppercaseCodename(): void
     {
-        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=debian',
-            'VERSION_ID=12',
-            'VERSION_CODENAME=BOOKWORM',
-        ])."\n");
-        putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
-        \pmssResetOsReleaseCache();
-
-        $info = \pmssDetectDistro();
-        $this->assertEquals('bookworm', $info['codename']);
-        $this->assertEquals(12, $info['version']);
-
-        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+        $this->pmssWithOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '12',
+            'VERSION_CODENAME' => 'BOOKWORM',
+        ], function (): void {
+            $info = \pmssDetectDistro();
+            $this->assertEquals('bookworm', $info['codename']);
+            $this->assertEquals(12, $info['version']);
+        });
     }
 
     public function testDetectDistroUnknownCodenameKeepsVersion(): void
     {
-        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=debian',
-            'VERSION_ID="77"',
-            'VERSION_CODENAME=aurora',
-        ])."\n");
-        putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
-        \pmssResetOsReleaseCache();
-
-        $info = \pmssDetectDistro();
-        $this->assertEquals(77, $info['version']);
-        $this->assertEquals('aurora', $info['codename']);
-
-        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+        $this->pmssWithOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '77',
+            'VERSION_CODENAME' => 'aurora',
+        ], function (): void {
+            $info = \pmssDetectDistro();
+            $this->assertEquals(77, $info['version']);
+            $this->assertEquals('aurora', $info['codename']);
+        });
     }
 
     public function testDetectDistroWhitespaceInCodename(): void
     {
-        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=debian',
-            'VERSION_ID=13',
-            'VERSION_CODENAME="  trixie  "',
-        ])."\n");
-        putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
-        \pmssResetOsReleaseCache();
-
-        $info = \pmssDetectDistro();
-        $this->assertEquals('trixie', $info['codename']);
-        $this->assertEquals(13, $info['version']);
-
-        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+        $this->pmssWithOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '13',
+            'VERSION_CODENAME' => '  trixie  ',
+        ], function (): void {
+            $info = \pmssDetectDistro();
+            $this->assertEquals('trixie', $info['codename']);
+            $this->assertEquals(13, $info['version']);
+        });
     }
 
     public function testDetectDistroResetCacheSwitchesFiles(): void
     {
-        $first = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=debian',
-            'VERSION_ID=11',
-            'VERSION_CODENAME=bullseye',
-        ])."\n");
-        $second = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=debian',
-            'VERSION_ID=12',
-            'VERSION_CODENAME=bookworm',
-        ])."\n");
+        $first = $this->pmssWriteTempFile('os-release', $this->pmssRenderOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '11',
+            'VERSION_CODENAME' => 'bullseye',
+        ]));
+        $second = $this->pmssWriteTempFile('os-release', $this->pmssRenderOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '12',
+            'VERSION_CODENAME' => 'bookworm',
+        ]));
 
-        putenv('PMSS_OS_RELEASE_PATH='.$first);
-        \pmssResetOsReleaseCache();
-        $firstInfo = \pmssDetectDistro();
-        $this->assertEquals(11, $firstInfo['version']);
+        $this->pmssWithEnv(['PMSS_OS_RELEASE_PATH' => $first], function () use ($second): void {
+            \pmssResetOsReleaseCache();
+            $firstInfo = \pmssDetectDistro();
+            $this->assertEquals(11, $firstInfo['version']);
 
-        putenv('PMSS_OS_RELEASE_PATH='.$second);
-        \pmssResetOsReleaseCache();
-        $secondInfo = \pmssDetectDistro();
-        $this->assertEquals(12, $secondInfo['version']);
-
-        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+            $this->pmssWithEnv(['PMSS_OS_RELEASE_PATH' => $second], function (): void {
+                \pmssResetOsReleaseCache();
+                $secondInfo = \pmssDetectDistro();
+                $this->assertEquals(12, $secondInfo['version']);
+            });
+        });
     }
 }

@@ -46,7 +46,7 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectPrefersCodenameWhenVersionMismatches(): void
     {
-        $this->withOsRelease([
+        $this->pmssWithOsRelease([
             'ID'                => 'debian',
             'VERSION_ID'        => '11',
             'VERSION_CODENAME'  => 'bookworm',
@@ -62,7 +62,7 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectFallsBackToVersionId(): void
     {
-        $this->withOsRelease([
+        $this->pmssWithOsRelease([
             'ID'         => 'debian',
             'VERSION_ID' => '11',
         ], function (): void {
@@ -77,7 +77,7 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectNormalisesCodenameCase(): void
     {
-        $this->withOsRelease([
+        $this->pmssWithOsRelease([
             'ID'                => 'debian',
             'VERSION_CODENAME'  => 'Bullseye',
             'VERSION_ID'        => '',
@@ -90,7 +90,7 @@ class DistroDetectionTest extends TestCase
 
     public function testOsReleaseHelpersNormalizeCodenameAndMajorVersion(): void
     {
-        $this->withOsRelease([
+        $this->pmssWithOsRelease([
             'ID'                => 'debian',
             'VERSION_ID'        => '12 (testing snapshot)',
             'VERSION_CODENAME'  => ' Bookworm ',
@@ -105,7 +105,7 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectHandlesMissingVersionSignals(): void
     {
-        $this->withOsRelease([
+        $this->pmssWithOsRelease([
             'ID' => 'debian',
         ], function (): void {
             $detected = \pmssDetectDistro();
@@ -118,7 +118,7 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectParsesMessyVersionId(): void
     {
-        $this->withOsRelease([
+        $this->pmssWithOsRelease([
             'ID'         => 'debian',
             'VERSION_ID' => '12 (testing snapshot)',
         ], function (): void {
@@ -267,26 +267,6 @@ class DistroDetectionTest extends TestCase
     }
 
     /**
-     * Helper to stage an os-release fixture for the duration of the callback.
-     */
-    private function withOsRelease(array $fields, callable $callback, bool $maskLsbRelease = false): void
-    {
-        $file = $this->pmssWriteTempFile('osr', $this->renderOsRelease($fields));
-        \pmssResetOsReleaseCache();
-
-        $env = ['PMSS_OS_RELEASE_PATH' => $file];
-        if ($maskLsbRelease) {
-            $env['PATH'] = sys_get_temp_dir();
-        }
-
-        try {
-            $this->pmssWithEnv($env, $callback);
-        } finally {
-            \pmssResetOsReleaseCache();
-        }
-    }
-
-    /**
      * Helper to stage template directory overrides.
      */
     private function withConfigTemplates(array $templates, callable $callback): void
@@ -306,19 +286,4 @@ class DistroDetectionTest extends TestCase
         }
     }
 
-    /**
-     * Render key/value pairs into an os-release style document.
-     */
-    private function renderOsRelease(array $fields): string
-    {
-        $lines = [];
-        foreach ($fields as $key => $value) {
-            if ($value === '') {
-                $lines[] = $key.'=';
-            } else {
-                $lines[] = $key.'="'.str_replace('"', '\"', $value).'"';
-            }
-        }
-        return implode("\n", $lines)."\n";
-    }
 }

@@ -23,20 +23,16 @@ class DistroRepoSelectionTest extends TestCase
      */
     public function testDetectDistroTrustsCodenameForVersion(): void
     {
-        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=debian',
-            'VERSION_ID="10"',
-            'VERSION_CODENAME=bullseye',
-        ])."\n");
-        putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
-        \pmssResetOsReleaseCache();
-
-        $info = \pmssDetectDistro();
-        $this->assertEquals('debian', $info['name']);
-        $this->assertEquals('bullseye', $info['codename']);
-        $this->assertEquals(11, $info['version']);
-
-        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+        $this->pmssWithOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '10',
+            'VERSION_CODENAME' => 'bullseye',
+        ], function (): void {
+            $info = \pmssDetectDistro();
+            $this->assertEquals('debian', $info['name']);
+            $this->assertEquals('bullseye', $info['codename']);
+            $this->assertEquals(11, $info['version']);
+        });
     }
 
     /**
@@ -44,19 +40,15 @@ class DistroRepoSelectionTest extends TestCase
      */
     public function testDetectDistroFallsBackToVersionDigits(): void
     {
-        $osRelease = $this->pmssWriteTempFile('os-release', implode("\n", [
-            'ID=debian',
-            'VERSION_ID="42"',
-            'VERSION_CODENAME=hyperion',
-        ])."\n");
-        putenv('PMSS_OS_RELEASE_PATH='.$osRelease);
-        \pmssResetOsReleaseCache();
-
-        $info = \pmssDetectDistro();
-        $this->assertEquals(42, $info['version']);
-        $this->assertEquals('hyperion', $info['codename']);
-
-        $this->pmssRestoreEnv('PMSS_OS_RELEASE_PATH', false);
+        $this->pmssWithOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '42',
+            'VERSION_CODENAME' => 'hyperion',
+        ], function (): void {
+            $info = \pmssDetectDistro();
+            $this->assertEquals(42, $info['version']);
+            $this->assertEquals('hyperion', $info['codename']);
+        });
     }
 
     /**
@@ -66,59 +58,57 @@ class DistroRepoSelectionTest extends TestCase
     {
         $initial = "deb http://mirror.invalid buster main\n";
         $target = $this->pmssWriteTempFile('sources', $initial);
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($initial, $target): void {
+            $template = "deb http://mirror.example bullseye main contrib non-free\n";
+            $currentHash = sha1($initial);
+            $logs = [];
+            $logger = function (string $msg) use (&$logs): void {
+                $logs[] = $msg;
+            };
 
-        $template = "deb http://mirror.example bullseye main contrib non-free\n";
-        $currentHash = sha1($initial);
-        $logs = [];
-        $logger = function (string $msg) use (&$logs): void {
-            $logs[] = $msg;
-        };
+            \updateAptSources('debian', 11, $currentHash, [
+                'bullseye' => $template,
+                'buster'   => '',
+                'jessie'   => '',
+                'bookworm' => '',
+                'trixie'   => '',
+            ], $logger);
 
-        \updateAptSources('debian', 11, $currentHash, [
-            'bullseye' => $template,
-            'buster'   => '',
-            'jessie'   => '',
-            'bookworm' => '',
-            'trixie'   => '',
-        ], $logger);
+            $written = file_get_contents($target);
+            $this->assertEquals($template, $written);
+            $this->assertTrue((bool)array_filter($logs, static function ($m) {
+                return strpos($m, 'Applied Debian Bullseye') !== false;
+            }));
 
-        $written = file_get_contents($target);
-        $this->assertEquals($template, $written);
-        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'Applied Debian Bullseye') !== false; }));
-
-        $backup = $target.'.pmss-backup';
-        $this->assertEquals($initial, file_get_contents($backup));
-
-        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
+            $backup = $target.'.pmss-backup';
+            $this->assertEquals($initial, file_get_contents($backup));
+        });
     }
 
     public function testUpdateAptSourcesEolSuiteLogsTestModeSkip(): void
     {
         $initial = "deb http://mirror.invalid bullseye main\n";
         $target = $this->pmssWriteTempFile('sources', $initial);
-        putenv('PMSS_APT_SOURCES_PATH='.$target);
+        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($initial, $target): void {
+            $template = "deb http://mirror.example buster main\n";
+            $currentHash = sha1($initial);
+            $logs = [];
+            $logger = function (string $msg) use (&$logs): void {
+                $logs[] = $msg;
+            };
 
-        $template = "deb http://mirror.example buster main\n";
-        $currentHash = sha1($initial);
-        $logs = [];
-        $logger = function (string $msg) use (&$logs): void {
-            $logs[] = $msg;
-        };
+            \updateAptSources('debian', 10, $currentHash, [
+                'buster'   => $template,
+                'bullseye' => '',
+                'jessie'   => '',
+                'bookworm' => '',
+                'trixie'   => '',
+            ], $logger);
 
-        \updateAptSources('debian', 10, $currentHash, [
-            'buster'   => $template,
-            'bullseye' => '',
-            'jessie'   => '',
-            'bookworm' => '',
-            'trixie'   => '',
-        ], $logger);
-
-        $this->assertEquals($template, file_get_contents($target));
-        $this->assertTrue((bool)array_filter($logs, static function ($m) {
-            return strpos($m, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)') !== false;
-        }), 'Expected EOL post-hook to log test-mode skip');
-
-        $this->pmssRestoreEnv('PMSS_APT_SOURCES_PATH', false);
+            $this->assertEquals($template, file_get_contents($target));
+            $this->assertTrue((bool)array_filter($logs, static function ($m) {
+                return strpos($m, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)') !== false;
+            }), 'Expected EOL post-hook to log test-mode skip');
+        });
     }
 }
