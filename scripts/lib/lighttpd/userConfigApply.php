@@ -358,126 +358,118 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
     return pmssWriteUserFile($path, $metaJson.$configJson, $owner, $mode);
 }
 
-// Reverse proxy fragments stay with the lighttpd apply flow because the
-// runtime caller is the per-user config writer.
+function pmssLighttpdProxyHeaderMappings(array $pathMap): string
+{
+    $mappings = [];
+    $total = count($pathMap);
+    $index = 0;
+    foreach ($pathMap as $source => $target) {
+        $index++;
+        $padding = substr($source, -1) === '/' ? '  ' : ' ';
+        $suffix = $index < $total ? ',' : '';
+        $mappings[] = '         "'.$source.'"'.$padding.'=> "'.$target.'"'.$suffix;
+    }
+
+    return implode("\n", $mappings);
+}
+
+function pmssLighttpdProxyRuleFragment(
+    string $pattern,
+    int $port,
+    array $pathMap = [],
+    bool $disableAuth = false,
+    bool $forwardForwardedHeaders = false
+): string
+{
+    $hasHeader = count($pathMap) > 0;
+    $fragment = '\\$HTTP["url"] =~ "'.$pattern."\" {\n";
+    if ($disableAuth) {
+        $fragment .= "  auth.require = ()\n";
+    }
+
+    $fragment .= "  proxy.server = ( \"\" => ( (\n"
+        ."    \"host\" => \"127.0.0.1\",\n"
+        ."    \"port\" => {$port}\n"
+        ."  ) ) )";
+    if ($forwardForwardedHeaders || $hasHeader) {
+        $fragment .= ',';
+    }
+    $fragment .= "\n";
+    if ($forwardForwardedHeaders) {
+        $fragment .= "  proxy.forwarded = ( \"for\" => 1,\n"
+            ."                      \"host\" => 1,\n"
+            ."                      \"by\" => 1\n"
+            ."  )";
+        if ($hasHeader) {
+            $fragment .= ',';
+        }
+        $fragment .= "\n";
+    }
+    if ($hasHeader) {
+        $fragment .= "  proxy.header = (\n"
+            ."      \"map-urlpath\" => (\n"
+            .pmssLighttpdProxyHeaderMappings($pathMap)."\n"
+            ."       )\n"
+            ."  )\n";
+    }
+
+    return $fragment.'}';
+}
+
+// Reverse proxy fragments stay with the lighttpd apply flow because the runtime caller is the per-user config writer.
 function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 {
-    return <<<LIGHTTPD
-# PMSS-managed: Deluge reverse proxy.
-# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.
-
-\$HTTP["url"] =~ "^/user-{$user}/deluge($|/)" {
-  auth.require = ()
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => {$webPort}
-  ) ) ),
-  proxy.header = (
-      "map-urlpath" => (
-         "/user-{$user}/deluge/"  => "/",
-         "/user-{$user}/deluge" => ""
-       )
-  )
-}
-
-\$HTTP["url"] =~ "^/deluge-{$user}($|/)" {
-  auth.require = ()
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => {$webPort}
-  ) ) ),
-  proxy.header = (
-      "map-urlpath" => (
-         "/deluge-{$user}/"  => "/user-{$user}/deluge/",
-         "/deluge-{$user}" => "/user-{$user}/deluge"
-       )
-  )
-}
-
-LIGHTTPD;
+    return "# PMSS-managed: Deluge reverse proxy.\n"
+        ."# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n"
+        .pmssLighttpdProxyRuleFragment(
+            '^/user-'.$user.'/deluge($|/)',
+            $webPort,
+            ['/user-'.$user.'/deluge/' => '/', '/user-'.$user.'/deluge' => ''],
+            true
+        )."\n\n"
+        .pmssLighttpdProxyRuleFragment(
+            '^/deluge-'.$user.'($|/)',
+            $webPort,
+            ['/deluge-'.$user.'/' => '/user-'.$user.'/deluge/', '/deluge-'.$user => '/user-'.$user.'/deluge'],
+            true
+        )."\n\n";
 }
 
 function pmssRcloneLighttpdProxyFragment(string $user, int $port): string
 {
-    return <<<LIGHTTPD
-# PMSS-managed: rclone reverse proxy.
-
-\$HTTP["url"] =~ "^/user-{$user}/rclone/" {
-  auth.require = ()
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => {$port}
-  ) ) )
-}
-
-LIGHTTPD;
+    return "# PMSS-managed: rclone reverse proxy.\n\n"
+        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/rclone/', $port, [], true)."\n\n";
 }
 
 function pmssQbittorrentLighttpdProxyFragment(string $user, int $port): string
 {
-    return <<<LIGHTTPD
-# PMSS-managed: qBittorrent reverse proxy.
-
-\$HTTP["url"] =~ "^/user-{$user}/qbittorrent/" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => {$port}
-  ) ) ),
-  proxy.forwarded = ( "for" => 1,
-                      "host" => 1,
-                      "by" => 1
-  ),
-  proxy.header = (
-      "map-urlpath" => (
-         "/user-{$user}/qbittorrent/"  => "/",
-         "/user-{$user}/qbittorrent" => ""
-       )
-  )
-}
-
-LIGHTTPD;
+    return "# PMSS-managed: qBittorrent reverse proxy.\n\n"
+        .pmssLighttpdProxyRuleFragment(
+            '^/user-'.$user.'/qbittorrent/',
+            $port,
+            ['/user-'.$user.'/qbittorrent/' => '/', '/user-'.$user.'/qbittorrent' => ''],
+            false,
+            true
+        )."\n\n";
 }
 
 function pmssInvidiousLighttpdProxyFragment(string $user, int $port): string
 {
-    return <<<LIGHTTPD
-# PMSS-managed: Invidious reverse proxy.
-
-\$HTTP["url"] =~ "^/public-{$user}/invidious($|/)" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => {$port}
-  ) ) ),
-  proxy.forwarded = ( "for" => 1,
-                      "host" => 1,
-                      "by" => 1
-  ),
-  proxy.header = (
-      "map-urlpath" => (
-         "/public-{$user}/invidious/"  => "/",
-         "/public-{$user}/invidious" => ""
-       )
-  )
-}
-
-\$HTTP["url"] =~ "^/user-{$user}/apps/invidious($|/)" {
-  proxy.server = ( "" => ( (
-    "host" => "127.0.0.1",
-    "port" => {$port}
-  ) ) ),
-  proxy.forwarded = ( "for" => 1,
-                      "host" => 1,
-                      "by" => 1
-  ),
-  proxy.header = (
-      "map-urlpath" => (
-         "/user-{$user}/apps/invidious/"  => "/",
-         "/user-{$user}/apps/invidious" => ""
-       )
-  )
-}
-
-LIGHTTPD;
+    return "# PMSS-managed: Invidious reverse proxy.\n\n"
+        .pmssLighttpdProxyRuleFragment(
+            '^/public-'.$user.'/invidious($|/)',
+            $port,
+            ['/public-'.$user.'/invidious/' => '/', '/public-'.$user.'/invidious' => ''],
+            false,
+            true
+        )."\n\n"
+        .pmssLighttpdProxyRuleFragment(
+            '^/user-'.$user.'/apps/invidious($|/)',
+            $port,
+            ['/user-'.$user.'/apps/invidious/' => '/', '/user-'.$user.'/apps/invidious' => ''],
+            false,
+            true
+        )."\n\n";
 }
 
 function pmssUserConfigLighttpdConfigureUser(
@@ -486,7 +478,8 @@ function pmssUserConfigLighttpdConfigureUser(
     $template,
     bool $deflateEnabled,
     array $policyDefaults
-): void {
+): void
+{
     if (!pmssValidateUsername($thisUser)) {
         fwrite(STDERR, "Skipping invalid username: ".substr($thisUser, 0, 20)."\n");
         return;
