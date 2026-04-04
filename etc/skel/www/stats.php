@@ -67,6 +67,9 @@ if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
 if (file_exists('/scripts/lib/user/trafficLimit.php')) {
     require_once '/scripts/lib/user/trafficLimit.php';
 }
+if (file_exists('/scripts/lib/traffic/storage.php')) {
+    require_once '/scripts/lib/traffic/storage.php';
+}
 
 if (!function_exists('pmssInfoSetDockerEnabled')) {
     /**
@@ -623,27 +626,26 @@ $trafficDataError = null;
 $trafficIngressData = null;
 $trafficIngressTime = null;
 $trafficIngressError = null;
-
-if (file_exists('../.trafficData')) {
+if (is_file('../.trafficData') && !is_link('../.trafficData')) {
     $trafficTime = @filemtime('../.trafficData');
-    $trafficData = @unserialize(@file_get_contents('../.trafficData'));
-    if (!is_array($trafficData)) {
+    $trafficData = function_exists('pmssTrafficReadSerializedArrayFile')
+        ? pmssTrafficReadSerializedArrayFile('../.trafficData')
+        : null;
+    if ($trafficData === null) {
         $trafficDataError = 'Invalid traffic data format.';
-        $trafficData = null;
     }
 }
 
-if (file_exists('../.trafficDataIngress')) {
+if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress')) {
     $trafficIngressTime = @filemtime('../.trafficDataIngress');
-    $trafficIngressData = @unserialize(@file_get_contents('../.trafficDataIngress'));
-    if (!is_array($trafficIngressData)) {
+    $trafficIngressData = function_exists('pmssTrafficReadSerializedArrayFile')
+        ? pmssTrafficReadSerializedArrayFile('../.trafficDataIngress')
+        : null;
+    if ($trafficIngressData === null) {
         $trafficIngressError = 'Invalid inbound traffic data format.';
-        $trafficIngressData = null;
     }
 }
-$trafficLimitState = function_exists('pmssTrafficLimitStateRead')
-    ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
-    : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
+$trafficLimitState = function_exists('pmssTrafficLimitStateRead') ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic') : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
 $trafficRatioDisplay = null;
 $trafficRatioClass = '';
 $trafficRatioGoodMin = 2.0;
@@ -802,13 +804,13 @@ if (!function_exists('pmssFormatCpuHours')) {
 $resourceData = null;
 $resourceTime = null;
 $resourceDataError = null;
-
-if (file_exists('../.resourceData')) {
+if (is_file('../.resourceData') && !is_link('../.resourceData')) {
     $resourceTime = @filemtime('../.resourceData');
-    $resourceData = @unserialize(@file_get_contents('../.resourceData'));
-    if (!is_array($resourceData)) {
+    $resourceData = function_exists('pmssTrafficReadSerializedArrayFile')
+        ? pmssTrafficReadSerializedArrayFile('../.resourceData')
+        : null;
+    if ($resourceData === null) {
         $resourceDataError = 'Invalid resource data format.';
-        $resourceData = null;
     }
 }
 

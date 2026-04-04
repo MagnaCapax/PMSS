@@ -26,6 +26,9 @@ if (file_exists('/scripts/lib/user/mediaStackPanel.php')) {
 if (file_exists('/scripts/lib/user/trafficLimit.php')) {
     require_once '/scripts/lib/user/trafficLimit.php';
 }
+if (file_exists('/scripts/lib/traffic/storage.php')) {
+    require_once '/scripts/lib/traffic/storage.php';
+}
 
 $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
@@ -420,30 +423,30 @@ if (file_exists('openvpn-config.tgz')) {
                         echo quotaCreateSection($quotaInfo, $bonusQuota);
 
                         if (@file_exists('../.trafficLimit')) {
-	                            $trafficLimit = (int) $trafficLimitState['limitGiB'];
-	                            if (@file_exists('../.trafficData')) {
-	                                $trafficData = @unserialize(trim(@file_get_contents('../.trafficData')));
-	                                $trafficIngress = null;
-	                                if (@file_exists('../.trafficDataIngress')) {
-                                    $trafficIngress = @unserialize(trim(@file_get_contents('../.trafficDataIngress')));
-                                    if (!is_array($trafficIngress)) {
-                                        $trafficIngress = null;
+                            $trafficLimit = (int) $trafficLimitState['limitGiB'];
+                            $trafficData = null;
+                            if (is_file('../.trafficData') && !is_link('../.trafficData') && function_exists('pmssTrafficReadSerializedArrayFile')) {
+                                $trafficData = pmssTrafficReadSerializedArrayFile('../.trafficData');
+                            }
+                            if (is_array($trafficData)) {
+                                $trafficIngress = null;
+                                if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress') && function_exists('pmssTrafficReadSerializedArrayFile')) {
+                                    $trafficIngress = pmssTrafficReadSerializedArrayFile('../.trafficDataIngress');
+                                }
+                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic);
+                            } else {
+                                if ($trafficLimit > 0) {
+                                    $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
+                                    $trafficLimitText = number_format($effectiveLimit) . ' GiB';
+                                    if ($bonusTraffic > 0) {
+                                        $trafficLimitText .= ' (Bonus traffic: ' . number_format($bonusTraffic) . ' GiB)';
                                     }
-	                                }
-	                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic);
-	                            } else {
-	                                if ($trafficLimit > 0) {
-	                                    $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
-	                                    $trafficLimitText = number_format($effectiveLimit) . ' GiB';
-	                                    if ($bonusTraffic > 0) {
-	                                        $trafficLimitText .= ' (Bonus traffic: ' . number_format($bonusTraffic) . ' GiB)';
-	                                    }
-	                                } else {
-	                                    $trafficLimitText = 'Unlimited';
-	                                }
-	                                echo "Traffic limit: {$trafficLimitText}<br />";
-	                            }
-	                        }
+                                } else {
+                                    $trafficLimitText = 'Unlimited';
+                                }
+                                echo "Traffic limit: {$trafficLimitText}<br />";
+                            }
+                        }
 
                         echo memoryCreateSection();
 
@@ -723,18 +726,10 @@ function readUserMemoryCurrentBytes() {
 }
 
 function readUserResourceData() {
-    $resourcePath = '../.resourceData';
-    if (!is_file($resourcePath) || is_link($resourcePath)) {
+    if (!function_exists('pmssTrafficReadSerializedArrayFile')) {
         return null;
     }
-
-    $raw = @file_get_contents($resourcePath);
-    if (!is_string($raw) || trim($raw) === '') {
-        return null;
-    }
-
-    $resourceData = @unserialize($raw);
-    return is_array($resourceData) ? $resourceData : null;
+    return pmssTrafficReadSerializedArrayFile('../.resourceData');
 }
 
 function readUserMemoryBreakdownBytes() {

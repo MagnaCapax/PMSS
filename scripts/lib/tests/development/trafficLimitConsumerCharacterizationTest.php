@@ -27,4 +27,21 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $this->pmssAssertStringNotContainsString('function '.'pmssStats'.'ReadIntegerFile(', $source);
         $this->assertStringContainsString("require_once __DIR__.'/user/trafficLimit.php';", $source);
     }
+
+    public function testSerializedStateConsumersUseSharedArrayReader(): void
+    {
+        foreach (['scripts/lib/pmssStats.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
+            $this->pmssAssertRepoFileContainsString($path, 'pmssTrafficReadSerializedArrayFile(');
+        }
+    }
+
+    public function testLegacyWebConsumersNoLongerInlineUnserializeFileReads(): void
+    {
+        $statsSource = $this->pmssReadRepoFile('etc/skel/www/stats.php');
+        $welcomeSource = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+
+        $this->pmssAssertStringNotContainsString('@unserialize(@file_get_contents(', $statsSource);
+        $this->pmssAssertStringNotContainsString('@unserialize(trim(@file_get_contents(', $welcomeSource);
+        $this->pmssAssertStringNotContainsString('function readUserResourceData() {'.PHP_EOL.'    $resourcePath = \'../.resourceData\';', $welcomeSource);
+    }
 }
