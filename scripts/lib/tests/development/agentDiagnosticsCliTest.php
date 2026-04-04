@@ -52,6 +52,9 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame(['alice', 'bob'], $payload['sections']['users']['list']);
         $this->assertSame(4, $payload['sections']['services']['rtorrent_count']);
         $this->assertSame(['pid1 rtorrent'], $payload['sections']['user_processes']);
+        $this->assertSame(['raw' => 'uid=1001(alice) gid=1001(alice) groups=1001(alice)'], $payload['sections']['user_identity']);
+        $this->assertSame(['raw' => 'Disk quotas for user alice'], $payload['sections']['user_quota']);
+        $this->assertSame(['raw' => '12G /home/alice'], $payload['sections']['user_disk']);
         $this->assertSame('Alice Setting', $payload['sections']['user_settings']['label']);
     }
 
@@ -137,6 +140,35 @@ final class agentDiagnosticsCliTest extends TestCase
             $this->assertSame(4, $sections['services']['rtorrent_count']);
             $this->assertSame(['alice', 'bob'], $sections['users']['list']);
         });
+    }
+
+    public function testSpecCollectWrapsRawCommandOutputWithoutDedicatedFormat(): void
+    {
+        $section = \pmssAgentDiagnosticsSpecCollect([
+            'type' => 'command',
+            'command' => "printf 'uid=1001(alice)\\n'",
+            'wrap' => 'raw',
+        ]);
+
+        $this->assertSame(['raw' => 'uid=1001(alice)'], $section);
+    }
+
+    public function testSpecLabelDerivesStablePhpErrorLabels(): void
+    {
+        $this->assertSame(
+            'checkUsers.php --json',
+            \pmssAgentDiagnosticsSpecLabel([
+                'path' => 'scripts/util/checkUsers.php',
+                'args' => ['--json'],
+            ])
+        );
+        $this->assertSame(
+            'userSetting.php view alice',
+            \pmssAgentDiagnosticsSpecLabel([
+                'path' => 'scripts/userSetting.php',
+                'args' => ['view', 'alice'],
+            ])
+        );
     }
 
     private function makeScriptRoot(bool $brokenCheckUsers = false): string

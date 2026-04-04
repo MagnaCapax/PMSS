@@ -1,10 +1,6 @@
 <?php
-/**
- * PMSS diagnostic snapshot collector and CLI renderer.
- *
- * Aggregates existing PMSS probes into one read-only report so operators can
- * gather a quick server and optional user snapshot from a single entry point.
- *
+/** PMSS diagnostic snapshot collector and CLI renderer.
+ * Aggregates existing PMSS probes into one read-only report.
  * @license GPL-3.0-only
  */
 declare(strict_types=1);
@@ -17,9 +13,7 @@ require_once __DIR__.'/userLifecycle.php';
 function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = []): array
 {
     $scriptPath = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2)).'/'.ltrim($relativePath, '/');
-    if (!is_file($scriptPath) || !is_readable($scriptPath)) {
-        return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$relativePath];
-    }
+    if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$relativePath];
     $command = escapeshellarg(PHP_BINARY).' '.escapeshellarg($scriptPath);
     foreach ($arguments as $argument) {
         $command .= ' '.escapeshellarg((string) $argument);
@@ -46,24 +40,37 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
             'rtorrent_count' => ['type' => 'command', 'command' => 'pgrep -cx rtorrent 2>/dev/null', 'format' => 'int'],
             'lighttpd_count' => ['type' => 'command', 'command' => 'pgrep -cx lighttpd 2>/dev/null', 'format' => 'int'],
         ],
-        'system_test' => ['type' => 'php', 'path' => 'scripts/util/systemTest.php', 'args' => ['--json'], 'format' => 'json', 'label' => 'systemTest.php --json'],
+        'system_test' => ['type' => 'php', 'path' => 'scripts/util/systemTest.php', 'args' => ['--json'], 'format' => 'json'],
         'users' => [
             'list' => ['type' => 'php', 'path' => 'scripts/listUsers.php', 'format' => 'lines'],
-            'consistency' => ['type' => 'php', 'path' => 'scripts/util/checkUsers.php', 'args' => ['--json'], 'format' => 'json', 'label' => 'checkUsers.php --json'],
+            'consistency' => ['type' => 'php', 'path' => 'scripts/util/checkUsers.php', 'args' => ['--json'], 'format' => 'json'],
         ],
-        'resources' => ['type' => 'php', 'path' => 'scripts/util/userResourcesList.php', 'args' => ['--full', '--json'], 'format' => 'json', 'label' => 'userResourcesList.php --full --json'],
-        'traffic' => ['type' => 'php', 'path' => 'scripts/showTraffic.php', 'args' => ['--json'], 'format' => 'json', 'label' => 'showTraffic.php --json'],
+        'resources' => ['type' => 'php', 'path' => 'scripts/util/userResourcesList.php', 'args' => ['--full', '--json'], 'format' => 'json'],
+        'traffic' => ['type' => 'php', 'path' => 'scripts/showTraffic.php', 'args' => ['--json'], 'format' => 'json'],
     ];
     if ($user !== '') {
         $userArg = escapeshellarg($user);
-        $sections['user_settings'] = ['type' => 'php', 'path' => 'scripts/userSetting.php', 'args' => ['view', $user], 'format' => 'json', 'label' => 'userSetting.php view'];
+        $sections['user_settings'] = ['type' => 'php', 'path' => 'scripts/userSetting.php', 'args' => ['view', $user], 'format' => 'json'];
         $sections['user_processes'] = ['type' => 'command', 'command' => 'pgrep -u '.$userArg.' -a 2>/dev/null', 'format' => 'lines'];
-        $sections['user_identity'] = ['type' => 'command', 'command' => 'id '.$userArg, 'format' => 'wrap_raw'];
-        $sections['user_quota'] = ['type' => 'command', 'command' => 'quota -u '.$userArg.' 2>/dev/null', 'format' => 'wrap_raw'];
-        $sections['user_disk'] = ['type' => 'command', 'command' => 'du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null', 'format' => 'wrap_raw'];
+        foreach ([
+            'user_identity' => 'id '.$userArg,
+            'user_quota' => 'quota -u '.$userArg.' 2>/dev/null',
+            'user_disk' => 'du -sBG '.escapeshellarg('/home/'.$user).' 2>/dev/null',
+        ] as $name => $command) {
+            $sections[$name] = ['type' => 'command', 'command' => $command, 'wrap' => 'raw'];
+        }
     }
 
     return $sections;
+}
+
+/** Build the stable human label used in JSON error payloads. */
+function pmssAgentDiagnosticsSpecLabel(array $spec): string
+{
+    $path = trim((string) ($spec['path'] ?? ''));
+    if ($path === '') return trim((string) ($spec['command'] ?? 'diagnostics command'));
+    $args = array_values(array_filter(array_map('strval', (array) ($spec['args'] ?? [])), 'strlen'));
+    return $args === [] ? basename($path) : basename($path).' '.implode(' ', $args);
 }
 
 /** Collect one diagnostics spec node through a single recursive path. */
@@ -94,20 +101,18 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
     }
     if ($format === 'json') {
         if ((int) ($result['rc'] ?? 1) !== 0) {
-            return ['error' => (string) $spec['label'].' failed', 'rc' => (int) $result['rc'], 'stderr' => trim((string) ($result['stderr'] ?? ''))];
+            return ['error' => pmssAgentDiagnosticsSpecLabel($spec).' failed', 'rc' => (int) $result['rc'], 'stderr' => trim((string) ($result['stderr'] ?? ''))];
         }
         $decoded = json_decode((string) ($result['stdout'] ?? ''), true);
         return is_array($decoded)
             ? $decoded
-            : ['error' => (string) $spec['label'].' returned invalid JSON', 'rc' => (int) $result['rc'], 'stdout' => $stdout];
+            : ['error' => pmssAgentDiagnosticsSpecLabel($spec).' returned invalid JSON', 'rc' => (int) $result['rc'], 'stdout' => $stdout];
     }
     if ($format === 'int') {
         return (int) ($stdout !== '' ? $stdout : (string) ($spec['fallback'] ?? '0'));
     }
-    if ($format === 'wrap_raw') {
-        return ['raw' => $stdout];
-    }
-    return $stdout !== '' ? $stdout : (string) ($spec['fallback'] ?? '');
+    $value = $stdout !== '' ? $stdout : (string) ($spec['fallback'] ?? '');
+    return isset($spec['wrap']) ? [(string) $spec['wrap'] => $value] : $value;
 }
 
 /** Return CLI usage text for the diagnostics wrapper. */
@@ -158,14 +163,9 @@ function pmssAgentDiagnosticsRenderText(array $payload): string
 function pmssAgentDiagnosticsMain(array $argv): int
 {
     $parsed = pmssParseCliTokens($argv, ['user']);
-    if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
-        echo pmssAgentDiagnosticsUsage();
-        return 0;
-    }
+    if (pmssCliOption($parsed, 'help', 'h', false) !== false) { echo pmssAgentDiagnosticsUsage(); return 0; }
 
-    if (getenv('PMSS_TEST_MODE') !== '1') {
-        requireRoot();
-    }
+    if (getenv('PMSS_TEST_MODE') !== '1') requireRoot();
 
     $user = trim((string) pmssCliOption($parsed, 'user', 'u', ''));
     if ($user !== '') {
@@ -174,18 +174,14 @@ function pmssAgentDiagnosticsMain(array $argv): int
             $user,
             ['strictInput' => true]
         );
-        if ((int) $selection['exitCode'] !== 0) {
-            return (int) $selection['exitCode'];
-        }
+        if ((int) $selection['exitCode'] !== 0) return (int) $selection['exitCode'];
         $user = (string) $selection['username'];
     }
 
     $payload = pmssAgentDiagnosticsCollect($user);
     if (pmssCliOption($parsed, 'json', 'j', false) !== false) {
         $flags = JSON_UNESCAPED_SLASHES;
-        if (pmssCliOption($parsed, 'pretty', 'p', false) !== false) {
-            $flags |= JSON_PRETTY_PRINT;
-        }
+        if (pmssCliOption($parsed, 'pretty', 'p', false) !== false) $flags |= JSON_PRETTY_PRINT;
         echo json_encode($payload, $flags).PHP_EOL;
         return 0;
     }
