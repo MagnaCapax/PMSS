@@ -32,7 +32,7 @@ class SetupLetsEncryptTest extends TestCase
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/userTransfer/cliParse.php';", $source);
         $this->assertStringContainsString('pmssUserTransferHostnameIsValid($domain)', $source);
-        $this->assertStringContainsString("strpos($domain, '.') === false", $source);
+        $this->assertStringContainsString("strpos(\$domain, '.') === false", $source);
     }
 
     public function testShellEscapesDomainAndEmailBeforeCertbotInvocation(): void
@@ -41,6 +41,6 @@ class SetupLetsEncryptTest extends TestCase
 
         $this->assertStringContainsString('$domainArg = escapeshellarg($domain);', $source);
         $this->assertStringContainsString('$emailArg = escapeshellarg($email);', $source);
-        $this->assertStringContainsString("shell_exec('/usr/bin/certbot certonly -d '.$domainArg.' -n --nginx --agree-tos --email '.$emailArg)", $source);
+        $this->assertStringContainsString("shell_exec('/usr/bin/certbot certonly -d '.\$domainArg.' -n --nginx --agree-tos --email '.\$emailArg)", $source);
     }
 }
