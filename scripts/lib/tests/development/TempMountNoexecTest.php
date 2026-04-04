@@ -180,6 +180,28 @@ class TempMountNoexecTest extends TestCase
         chmod($fstab, 0600);
     }
 
+    public function testSymlinkedFstabWarnsAndSkips(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-noexec-symlinked-', 0700);
+        $fstabTarget = $dir.'/fstab-target';
+        $fstab = $dir.'/fstab';
+        $mounts = $dir.'/mounts';
+
+        file_put_contents($fstabTarget, "tmpfs /tmp tmpfs defaults 0 0\n");
+        $this->pmssCreateSymlinkOrSkip($fstabTarget, $fstab);
+        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,nosuid,nodev 0 0\n");
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
+        putenv('PMSS_DRY_RUN=1');
+        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+
+        $this->assertEquals("tmpfs /tmp tmpfs defaults 0 0\n", (string) file_get_contents($fstabTarget));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'not a regular file'), 'expected regular-file guard log');
+    }
+
     public function testDryRunProfilesRemountCommandsInStableOrder(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-noexec-profile-', 0700);
