@@ -53,7 +53,7 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
     <!-- Stylesheets -->
     <link href="https://static.pulsedmedia.com/wc/css/screen.css" rel="stylesheet" type="text/css" media="screen" />
     <!-- Javascript -->
-    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <style type="text/css">
         #pmss-action-notice {
             display: none;
