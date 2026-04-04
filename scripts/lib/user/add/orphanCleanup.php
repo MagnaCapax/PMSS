@@ -9,6 +9,22 @@
 require_once __DIR__.'/../../userLifecycle.php';
 
 /**
+ * Keep failed-provision cleanup scoped to one validated /home target.
+ */
+function pmssAddUserCleanupFailedProvisionTargetValid(string $userName, string $homePath): bool
+{
+    if (!pmssValidateUsername($userName)) {
+        return false;
+    }
+
+    if ($homePath === '' || strpos($homePath, "\0") !== false) {
+        return false;
+    }
+
+    return $homePath === '/home/'.$userName;
+}
+
+/**
  * Return the most recent structured addUser summary for one username.
  *
  * @return array<string,mixed>|null
@@ -99,6 +115,11 @@ function pmssAddUserFailedProvisionCanRecover(string $userName, ?array $summary 
  */
 function pmssAddUserCleanupFailedProvision(users $userDb, string $userName, string $homePath): bool
 {
+    if (!pmssAddUserCleanupFailedProvisionTargetValid($userName, $homePath)) {
+        logProvisionMessage('Refusing failed provisioning cleanup due to invalid target scope');
+        return false;
+    }
+
     $cleanupSteps = array(
         array('Kill lingering user processes', 'killall -9 -u '.escapeshellarg($userName).' || true'),
         array('Release lighttpd port', '/scripts/util/portManager.php release '.escapeshellarg($userName).' lighttpd'),

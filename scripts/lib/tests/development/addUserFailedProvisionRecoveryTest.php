@@ -62,6 +62,23 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         );
     }
 
+    public function testCleanupTargetValidationRejectsUnsafePaths(): void
+    {
+        $this->assertTrue(pmssAddUserCleanupFailedProvisionTargetValid('alice', '/home/alice'));
+
+        foreach (array(
+            array('Alice', '/home/Alice'),
+            array('alice', '/home/bob'),
+            array('alice', '/home'),
+            array('alice', '/'),
+            array('alice', '/home/alice/../bob'),
+            array('alice-', '/home/alice-'),
+            array('alice', "\0/home/alice"),
+        ) as $case) {
+            $this->assertFalse(pmssAddUserCleanupFailedProvisionTargetValid($case[0], $case[1]));
+        }
+    }
+
     public function testCleanupCommandsKeepExpectedRecoverySteps(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/add/orphanCleanup.php');
@@ -79,6 +96,7 @@ final class AddUserFailedProvisionRecoveryTest extends TestCase
         $this->assertStringContainsString('/scripts/util/portManager.php release', $source);
         $this->assertStringContainsString('userdel -r', $source);
         $this->assertStringContainsString("'/etc/seedbox/runtime/trafficLimits/'.\$userName", $source);
+        $this->assertStringContainsString('pmssAddUserCleanupFailedProvisionTargetValid($userName, $homePath)', $source);
     }
 
     public function testFailureRollbackRunsOnlyForEarlyFailAfterUserCreation(): void
