@@ -2,6 +2,7 @@
 namespace PMSS\Tests\Development;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/agentDiagnostics.php';
 
 use PMSS\Tests\TestCase;
 
@@ -108,6 +109,34 @@ final class agentDiagnosticsCliTest extends TestCase
 
         $this->assertSame('checkUsers.php --json failed', $payload['sections']['users']['consistency']['error']);
         $this->assertStringContainsString('Diagnostics script missing or unreadable: scripts/util/checkUsers.php', $payload['sections']['users']['consistency']['stderr']);
+    }
+
+    public function testSpecCollectRecursesMixedNestedSectionsInStableOrder(): void
+    {
+        $scriptRoot = $this->makeScriptRoot();
+        $motdPath = $this->pmssMakeTempFile('pmss-agent-motd-');
+        file_put_contents($motdPath, "hello host\n");
+
+        $this->pmssWithEnv([
+            'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
+            'PMSS_AGENT_DIAGNOSTICS_MOTD_PATH' => $motdPath,
+        ], function (): void {
+            $sections = \pmssAgentDiagnosticsSpecCollect([
+                'motd' => ['type' => 'file', 'env' => 'PMSS_AGENT_DIAGNOSTICS_MOTD_PATH', 'path' => '/etc/motd', 'wrap' => 'raw'],
+                'services' => [
+                    'rtorrent_count' => ['type' => 'command', 'command' => "printf '4\\n'", 'format' => 'int'],
+                ],
+                'users' => [
+                    'list' => ['type' => 'php', 'path' => 'scripts/listUsers.php', 'format' => 'lines'],
+                ],
+            ]);
+
+            $this->assertSame(['motd', 'services', 'users'], array_keys($sections));
+            $this->assertSame("hello host\n", $sections['motd']['raw']);
+            $this->assertSame(['rtorrent_count'], array_keys($sections['services']));
+            $this->assertSame(4, $sections['services']['rtorrent_count']);
+            $this->assertSame(['alice', 'bob'], $sections['users']['list']);
+        });
     }
 
     private function makeScriptRoot(bool $brokenCheckUsers = false): string

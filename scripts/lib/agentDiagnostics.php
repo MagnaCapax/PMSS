@@ -66,9 +66,16 @@ function pmssAgentDiagnosticsSectionSpecs(string $user = ''): array
     return $sections;
 }
 
-/** Execute one diagnostics probe from the stable spec map. */
-function pmssAgentDiagnosticsProbeCollect(array $spec)
+/** Collect one diagnostics spec node through a single recursive path. */
+function pmssAgentDiagnosticsSpecCollect(array $spec)
 {
+    if (!isset($spec['type'])) {
+        $sections = [];
+        foreach ($spec as $name => $childSpec) {
+            $sections[$name] = pmssAgentDiagnosticsSpecCollect($childSpec);
+        }
+        return $sections;
+    }
     if ((string) ($spec['type'] ?? '') === 'file') {
         $value = @file_get_contents(pmssResolvePathFromEnv((string) $spec['env'], (string) $spec['path']));
         $value = is_string($value) ? $value : '';
@@ -103,16 +110,6 @@ function pmssAgentDiagnosticsProbeCollect(array $spec)
     return $stdout !== '' ? $stdout : (string) ($spec['fallback'] ?? '');
 }
 
-/** Collect nested diagnostics sections from the stable ordered section spec. */
-function pmssAgentDiagnosticsSectionsCollect(array $specs): array
-{
-    $sections = [];
-    foreach ($specs as $name => $spec) {
-        $sections[$name] = isset($spec['type']) ? pmssAgentDiagnosticsProbeCollect($spec) : pmssAgentDiagnosticsSectionsCollect($spec);
-    }
-    return $sections;
-}
-
 /** Return CLI usage text for the diagnostics wrapper. */
 function pmssAgentDiagnosticsUsage(): string
 {
@@ -129,13 +126,12 @@ function pmssAgentDiagnosticsUsage(): string
 /** Assemble the full diagnostics payload. */
 function pmssAgentDiagnosticsCollect(string $user = ''): array
 {
-    $sections = pmssAgentDiagnosticsSectionsCollect(pmssAgentDiagnosticsSectionSpecs($user));
     return [
         'timestamp' => date('c'),
         'hostname' => gethostname() ?: '',
         'version' => trim((string) @file_get_contents(pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_VERSION_PATH', '/etc/seedbox/config/version'))),
         'user' => $user !== '' ? $user : null,
-        'sections' => $sections,
+        'sections' => pmssAgentDiagnosticsSpecCollect(pmssAgentDiagnosticsSectionSpecs($user)),
     ];
 }
 
