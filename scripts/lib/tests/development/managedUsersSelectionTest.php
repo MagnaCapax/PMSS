@@ -15,8 +15,7 @@ class ManagedUsersSelectionTest extends TestCase
 
     private function writeListUsersScript(string $body): void
     {
-        file_put_contents($this->listUsersScript, "#!/usr/bin/env php\n<?php\n".$body);
-        chmod($this->listUsersScript, 0755);
+        $this->pmssWriteExecutablePhpFile($this->listUsersScript, $body);
     }
 
     public function testManagedUsersSelectFromCommandReturnsSanitizedUsersWhenNoUsernameRequested(): void

@@ -175,34 +175,25 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $root = $this->pmssMakeNamedTempDir('pmss-agent-root-');
         mkdir($root.'/scripts/util', 0777, true);
-        $this->writeScript($root.'/scripts/listUsers.php', "echo \"alice\\nbob\\n\";");
-        $this->writeScript($root.'/scripts/showTraffic.php', "echo json_encode([['user' => 'alice', 'monthMiB' => 1024]]), PHP_EOL;");
-        $this->writeScript($root.'/scripts/userSetting.php', "echo json_encode(['label' => 'Alice Setting']), PHP_EOL;");
-        $this->writeScript($root.'/scripts/util/systemTest.php', "echo json_encode(['summary' => ['ok' => 3]]), PHP_EOL;");
+        $this->pmssWriteExecutablePhpFile($root.'/scripts/listUsers.php', "echo \"alice\\nbob\\n\";");
+        $this->pmssWriteExecutablePhpFile($root.'/scripts/showTraffic.php', "echo json_encode([['user' => 'alice', 'monthMiB' => 1024]]), PHP_EOL;");
+        $this->pmssWriteExecutablePhpFile($root.'/scripts/userSetting.php', "echo json_encode(['label' => 'Alice Setting']), PHP_EOL;");
+        $this->pmssWriteExecutablePhpFile($root.'/scripts/util/systemTest.php', "echo json_encode(['summary' => ['ok' => 3]]), PHP_EOL;");
         $checkUsersBody = $brokenCheckUsers ? "fwrite(STDERR, 'boom'); exit(3);" : "echo json_encode(['consistent' => ['alice']]), PHP_EOL;";
-        $this->writeScript($root.'/scripts/util/checkUsers.php', $checkUsersBody);
-        $this->writeScript($root.'/scripts/util/userResourcesList.php', "echo json_encode([['user' => 'alice', 'uid' => 1001]]), PHP_EOL;");
+        $this->pmssWriteExecutablePhpFile($root.'/scripts/util/checkUsers.php', $checkUsersBody);
+        $this->pmssWriteExecutablePhpFile($root.'/scripts/util/userResourcesList.php', "echo json_encode([['user' => 'alice', 'uid' => 1001]]), PHP_EOL;");
         return $root;
     }
 
     private function makeCommandStubs(): string
     {
         $binDir = $this->pmssMakeNamedTempDir('pmss-agent-bin-');
-        file_put_contents($binDir.'/df', "#!/bin/sh\nprintf 'Filesystem Size Used Avail Use%% Mounted on\\n/dev/md0 100G 10G 90G 10%% /home\\n'\n");
-        file_put_contents($binDir.'/systemctl', "#!/bin/sh\nprintf 'active\\n'\n");
-        file_put_contents($binDir.'/pgrep', "#!/bin/sh\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n");
-        file_put_contents($binDir.'/id', "#!/bin/sh\nprintf 'uid=1001(alice) gid=1001(alice) groups=1001(alice)\\n'\n");
-        file_put_contents($binDir.'/quota', "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n");
-        file_put_contents($binDir.'/du', "#!/bin/sh\nprintf '12G /home/alice\\n'\n");
-        foreach (['df', 'systemctl', 'pgrep', 'id', 'quota', 'du'] as $binary) {
-            @chmod($binDir.'/'.$binary, 0755);
-        }
+        $this->pmssWriteExecutableFile($binDir.'/df', "#!/bin/sh\nprintf 'Filesystem Size Used Avail Use%% Mounted on\\n/dev/md0 100G 10G 90G 10%% /home\\n'\n");
+        $this->pmssWriteExecutableFile($binDir.'/systemctl', "#!/bin/sh\nprintf 'active\\n'\n");
+        $this->pmssWriteExecutableFile($binDir.'/pgrep', "#!/bin/sh\nif [ \"$1\" = '-cx' ]; then\n  if [ \"$2\" = 'rtorrent' ]; then printf '4\\n'; else printf '2\\n'; fi\n  exit 0\nfi\nprintf 'pid1 rtorrent\\n'\n");
+        $this->pmssWriteExecutableFile($binDir.'/id', "#!/bin/sh\nprintf 'uid=1001(alice) gid=1001(alice) groups=1001(alice)\\n'\n");
+        $this->pmssWriteExecutableFile($binDir.'/quota', "#!/bin/sh\nprintf 'Disk quotas for user alice\\n'\n");
+        $this->pmssWriteExecutableFile($binDir.'/du', "#!/bin/sh\nprintf '12G /home/alice\\n'\n");
         return $binDir;
-    }
-
-    private function writeScript(string $path, string $body): void
-    {
-        file_put_contents($path, "#!/usr/bin/env php\n<?php\n{$body}\n");
-        @chmod($path, 0755);
     }
 }

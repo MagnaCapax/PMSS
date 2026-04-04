@@ -56,10 +56,37 @@ trait FilesystemCleanupTrait
         @file_put_contents($path, $content);
     }
 
+    /** Write fixture content and mark the target executable for stubbed commands. */
+    protected function pmssWriteExecutableFile(
+        string $path,
+        string $content,
+        int $dirMode = 0755,
+        int $fileMode = 0755
+    ): void {
+        $this->pmssWriteFile($path, $content, $dirMode);
+        @chmod($path, $fileMode);
+    }
+
+    /** Write an executable PHP fixture with the standard test shebang/header. */
+    protected function pmssWriteExecutablePhpFile(
+        string $path,
+        string $body,
+        int $dirMode = 0755,
+        int $fileMode = 0755
+    ): void {
+        $this->pmssWriteExecutableFile($path, "#!/usr/bin/env php\n<?php\n".$body."\n", $dirMode, $fileMode);
+    }
+
     /** Write fixture content beneath a base directory so tests can share relative-path setup. */
     protected function pmssWriteRelativeFile(string $baseDir, string $relativePath, string $content, int $dirMode = 0755): void
     {
         $this->pmssWriteFile(rtrim($baseDir, '/').'/'.ltrim($relativePath, '/'), $content, $dirMode);
+    }
+
+    /** Read fixture content, treating absent files as empty strings for assertions. */
+    protected function pmssReadFileOrEmpty(string $path): string
+    {
+        return is_file($path) ? (string) file_get_contents($path) : '';
     }
 
     /** Create a temporary file with deterministic PMSS-style naming. */

@@ -55,8 +55,7 @@ case "${1:-} ${2:-}" in
 esac
 exit 0
 BASH;
-        file_put_contents($this->fakeBinDir.'/docker', $dockerStub);
-        @chmod($this->fakeBinDir.'/docker', 0755);
+        $this->pmssWriteExecutableFile($this->fakeBinDir.'/docker', $dockerStub, 0700);
     }
     /**
      * @param array<string,string> $env
@@ -98,7 +97,7 @@ BASH;
         return [
             'rc' => $rc,
             'output' => implode("\n", $output),
-            'dockerLog' => is_file($this->dockerLog) ? (string) file_get_contents($this->dockerLog) : '',
+            'dockerLog' => $this->pmssReadFileOrEmpty($this->dockerLog),
         ];
     }
 

@@ -14,7 +14,7 @@ class RemoteBinaryHelperTest extends TestCase
         $dpkgCapture = $root.'/dpkg.capture';
         @mkdir($binDir, 0755, true);
 
-        $this->writeScript($binDir.'/wget', <<<'SH'
+        $this->pmssWriteExecutableFile($binDir.'/wget', <<<'SH'
 #!/bin/sh
 out=''
 while [ "$#" -gt 0 ]; do
@@ -32,7 +32,7 @@ printf '%s' "${PMSS_TEST_WGET_BODY}" > "$out"
 printf 'wget %s\n' "$out" >> "${PMSS_TEST_COMMAND_LOG}"
 SH
         );
-        $this->writeScript($binDir.'/install', <<<'SH'
+        $this->pmssWriteExecutableFile($binDir.'/install', <<<'SH'
 #!/bin/sh
 src="$3"
 dest="$4"
@@ -41,7 +41,7 @@ chmod 0755 "$dest" 2>/dev/null || true
 printf 'install %s %s\n' "$src" "$dest" >> "${PMSS_TEST_COMMAND_LOG}"
 SH
         );
-        $this->writeScript($binDir.'/dpkg', <<<'SH'
+        $this->pmssWriteExecutableFile($binDir.'/dpkg', <<<'SH'
 #!/bin/sh
 pkg="$2"
 printf 'dpkg %s\n' "$pkg" >> "${PMSS_TEST_COMMAND_LOG}"
@@ -61,18 +61,6 @@ SH
 
         $this->pmssRemoveTree($root);
     }
-
-    private function writeScript(string $path, string $body): void
-    {
-        @file_put_contents($path, $body);
-        @chmod($path, 0755);
-    }
-
-    private function readLog(string $path): string
-    {
-        return is_file($path) ? (string) file_get_contents($path) : '';
-    }
-
     public function testFetchPinnedRemoteFileReturnsTempPathForMatchingChecksum(): void
     {
         $body = 'payload';
@@ -83,7 +71,7 @@ SH
 
             $this->assertTrue(is_string($path) && $path !== '', 'Expected matching download to return a temp path');
             $this->assertEquals($body, (string) file_get_contents($path));
-            $this->assertStringContainsString('wget ', $this->readLog($commandLog));
+            $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
             @unlink($path);
         });
     }
@@ -97,7 +85,7 @@ SH
             $path = \pmssFetchPinnedRemoteFile('demo archive', 'http://example.invalid/archive', $expectedSha256);
 
             $this->assertTrue($path === null, 'Expected HTTP download to be rejected');
-            $this->assertEquals('', $this->readLog($commandLog));
+            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
         });
     }
 
@@ -126,7 +114,7 @@ SH
             \pmssInstallPinnedRemoteBinary('demo binary', 'https://example.invalid/binary', $expectedSha256, $destination, true);
 
             $this->assertEquals($body, (string) file_get_contents($destination));
-            $this->assertEquals('', $this->readLog($commandLog));
+            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
         });
     }
 
@@ -142,8 +130,8 @@ SH
 
             $this->assertTrue($result, 'Expected matching package install to succeed');
             $this->assertEquals($body, (string) file_get_contents($dpkgCapture));
-            $this->assertStringContainsString('wget ', $this->readLog($commandLog));
-            $this->assertStringContainsString('dpkg ', $this->readLog($commandLog));
+            $this->assertStringContainsString('wget ', $this->pmssReadFileOrEmpty($commandLog));
+            $this->assertStringContainsString('dpkg ', $this->pmssReadFileOrEmpty($commandLog));
             $this->assertEquals([], array_values(array_diff($after, $before)), 'Successful package install should clean temp files');
         });
     }
@@ -162,7 +150,7 @@ SH
             $after = glob(sys_get_temp_dir().'/pmss-remote-deb-*') ?: [];
 
             $this->assertTrue($result, 'Expected dry-run package install to report success');
-            $this->assertEquals('', $this->readLog($commandLog));
+            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
             $this->assertTrue(!is_file($dpkgCapture), 'Dry-run should not invoke dpkg');
             $this->assertEquals([], array_values(array_diff($after, $before)), 'Dry-run package install should clean temp files');
         });
