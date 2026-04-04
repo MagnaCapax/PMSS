@@ -64,8 +64,8 @@ if ($useLocalFrames) {
     $htmlHead = <<<EOF
 <title>PM Seedbox</title>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-        <script src="https://static.pulsedmedia.com/jquery.tabs.pack.js"></script>
-        <link rel="stylesheet" href="https://static.pulsedmedia.com/jquery.tabs.css" type="text/css" media="print, projection, screen">
+        <script src="pmssTabs.js"></script>
+        <link rel="stylesheet" href="jquery.tabs.css" type="text/css" media="print, projection, screen">
 EOF;
 
     $frames = array(

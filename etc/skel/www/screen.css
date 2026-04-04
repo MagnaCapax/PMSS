@@ -1,0 +1,154 @@
+/* Shared first-party layout for the welcome and info skeleton pages. */
+body {
+    margin: 0;
+    padding: 0;
+    background: #0f1720;
+    color: #e6edf3;
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.5;
+}
+
+/* Keep typography legible even when the legacy static host is unavailable. */
+a {
+    color: #4fc3f7;
+}
+
+a:hover,
+a:focus {
+    color: #7dd3fc;
+}
+
+#wrap {
+    min-height: 100vh;
+    padding: 24px 16px;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, #111827 0%, #0f1720 100%);
+}
+
+#full_page {
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+/* The legacy shell keeps the familiar framed card layout. */
+.full_top_nohd,
+.full_bottom {
+    height: 12px;
+    background: #111827;
+    border: 1px solid #223042;
+}
+
+.full_top_nohd {
+    border-bottom: 0;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.full_bottom {
+    border-top: 0;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.full_body {
+    padding: 24px;
+    background: #111827;
+    border-left: 1px solid #223042;
+    border-right: 1px solid #223042;
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+}
+
+/* Welcome uses two columns; info collapses to one naturally. */
+.portfoliobox {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.portfolioimg,
+.portfoliodesc,
+#stats {
+    flex: 1 1 360px;
+    min-width: 0;
+}
+
+h1 {
+    margin: 0 0 18px;
+    color: #ffffff;
+    font-size: 2rem;
+}
+
+h6 {
+    margin: 24px 0 10px;
+    color: #4fc3f7;
+    font-size: 1.05rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+p,
+ul,
+ol,
+table,
+pre {
+    margin-top: 0;
+}
+
+ul,
+ol {
+    padding-left: 20px;
+}
+
+hr {
+    border: 0;
+    border-top: 1px solid #2e3b4f;
+    margin: 20px 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+td,
+th {
+    padding: 8px 10px;
+    vertical-align: top;
+}
+
+pre {
+    padding: 12px;
+    border: 1px solid #2e3b4f;
+    background: #0b1220;
+    color: inherit;
+    overflow: auto;
+}
+
+/* Buttons stay recognisable without the retired remote stylesheet. */
+input[type="button"],
+input[type="submit"],
+button {
+    padding: 9px 14px;
+    border: 1px solid #4fc3f7;
+    border-radius: 6px;
+    background: #13293d;
+    color: #f8fafc;
+    cursor: pointer;
+}
+
+input[type="button"]:disabled,
+input[type="submit"]:disabled,
+button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+    #wrap {
+        padding: 16px 10px;
+    }
+
+    .full_body {
+        padding: 16px;
+    }
+}

@@ -51,7 +51,7 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title><?= $vendor['name']; ?> Seedbox</title>
     <!-- Stylesheets -->
-    <link href="https://static.pulsedmedia.com/wc/css/screen.css" rel="stylesheet" type="text/css" media="screen" />
+    <link href="screen.css" rel="stylesheet" type="text/css" media="screen" />
     <!-- Javascript -->
     <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <style type="text/css">

@@ -27,7 +27,7 @@ if (file_exists('/scripts/lib/storageHealth.php')) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Seedbox info</title>
-    <link href="https://static.pulsedmedia.com/wc/css/screen.css" rel="stylesheet" media="screen" />
+    <link href="screen.css" rel="stylesheet" media="screen" />
     <!-- Chart.js v4 (UMD build exposes global Chart) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
