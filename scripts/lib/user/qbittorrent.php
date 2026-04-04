@@ -205,7 +205,17 @@ function pmssQbittorrentApplyUploadThrottle(string $username, ?int $throttle = n
         $newConfig = preg_replace('/(\\[Preferences\\][^\\[]*)/s', '$1'.$replacement."\n", $config, 1);
     }
 
-    return $newConfig !== null
-        && $newConfig !== $config
-        && file_put_contents($configFile, $newConfig) !== false;
+    if ($newConfig === null || $newConfig === $config) {
+        return false;
+    }
+
+    $mode = fileperms($configFile);
+
+    return pmssReplaceUserFileWithMetadata(
+        $configFile,
+        $newConfig,
+        is_int($mode) ? ($mode & 0777) : 0600,
+        $username,
+        $username
+    );
 }

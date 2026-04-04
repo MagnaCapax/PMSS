@@ -114,6 +114,35 @@ class QbittorrentManagedConfigTest extends TestCase
         $this->assertFalse(pmssQbittorrentApplyManagedConfig('alice'));
     }
 
+    public function testApplyUploadThrottlePreservesFileMode(): void
+    {
+        $configPath = $this->writeConfig("[Preferences]\nConnection\\GlobalUPLimit=10\n");
+        chmod($configPath, 0640);
+
+        $this->assertTrue(pmssQbittorrentApplyUploadThrottle('alice', 512));
+
+        $updated = (string) file_get_contents($configPath);
+        $this->assertStringContainsString("Connection\\GlobalUPLimit=512\n", $updated);
+        $this->assertSame(0640, fileperms($configPath) & 0777);
+    }
+
+    public function testApplyUploadThrottleRejectsSymlinkedHomeRoot(): void
+    {
+        $realHomeRoot = $this->homeRoot.'/real-home';
+        $linkedHomeRoot = $this->homeRoot.'/linked-home';
+        @mkdir($realHomeRoot.'/alice/.config/qBittorrent', 0755, true);
+        $configPath = $realHomeRoot.'/alice/.config/qBittorrent/qBittorrent.conf';
+        file_put_contents($configPath, "[Preferences]\nConnection\\GlobalUPLimit=10\n");
+        symlink($realHomeRoot, $linkedHomeRoot);
+        putenv('PMSS_HOME_DIR='.$linkedHomeRoot);
+
+        $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice', 512));
+        $this->assertSame(
+            "[Preferences]\nConnection\\GlobalUPLimit=10\n",
+            (string) file_get_contents($configPath)
+        );
+    }
+
     private function writeConfig(string $contents): string
     {
         $configDir = $this->homeRoot.'/alice/.config/qBittorrent';
