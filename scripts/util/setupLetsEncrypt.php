@@ -14,16 +14,29 @@
 
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/update/distro.php';
+require_once __DIR__.'/../lib/userTransfer/cliParse.php';
 
 // Basic input validation: the automation expects an e-mail for certificate
 // registration so Let's Encrypt can deliver expiry notices.
 if (empty($argv[1])) die("You need to pass e-mail address to this script");
-$email = $argv[1];
-if (strpos($email, '@') == false) die('You need valid e-mail address');
+$email = trim((string) $argv[1]);
+if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n\0\s]/', $email) === 1) {
+    die('You need valid e-mail address');
+}
 
 // Gather the fqdn and Debian codename; the latter determines whether we need
 // the virtualenv install path still required on Debian 10 (buster).
-$domain = pmssHostnameRead();
+$domain = strtolower(trim(pmssHostnameRead()));
+if (
+    $domain === ''
+    || strpos($domain, '.') === false
+    || filter_var($domain, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
+    || !pmssUserTransferHostnameIsValid($domain)
+) {
+    die("Unable to determine valid hostname for Let's Encrypt");
+}
+$domainArg = escapeshellarg($domain);
+$emailArg = escapeshellarg($email);
 $distroInfo = pmssDetectDistro();
 $codename = $distroInfo['codename'] !== '' ? $distroInfo['codename'] : 'bullseye';
 
@@ -46,7 +59,7 @@ if (!file_exists('/opt/certbot') && $codename === 'buster') {
 // placeholder before requesting a certificate. The single-quoted string keeps
 // compatibility with older helper scripts that expect the static path.
 $legacyCertPath = '/etc/letsencrypt/live/{$domain}';
-if (!file_exists($legacyCertPath)) echo `/usr/bin/certbot certonly -d {$domain} -n --nginx --agree-tos --email {$email}`;
+if (!file_exists($legacyCertPath)) echo (string) shell_exec('/usr/bin/certbot certonly -d '.$domainArg.' -n --nginx --agree-tos --email '.$emailArg);
 
 // Older hosts may not ship the renewal cron stub; seed it so certbot handles
 // renewals twice a day with a jitter window.
