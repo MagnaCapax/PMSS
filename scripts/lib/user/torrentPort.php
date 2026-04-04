@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../lighttpd/userConfigApply.php';
+require_once __DIR__.'/qbittorrent.php';
 
 /**
  * Resolve the current user and home directory for frontend calls.
@@ -113,34 +114,13 @@ function pmssQbittorrentPortEnsure(string $user, string $home): bool
         return true;
     }
 
-    $updated = preg_replace('/^WebUI\\\\Port=.*$/m', 'WebUI\\\\Port='.$expectedPort, $config, 1, $count);
-    if (!is_string($updated) || $count !== 1) {
-        return false;
-    }
-
     @shell_exec(sprintf('killall -u %s -9 %s 2>/dev/null', escapeshellarg($user), escapeshellarg('qbittorrent-nox')));
-    $dir = dirname($configPath);
-    if (!is_dir($dir) || is_link($dir)) {
-        return false;
-    }
 
-    $mode = @fileperms($configPath);
-    $tmp = @tempnam($dir, basename($configPath).'.pmss-tmp-');
-    if ($tmp === false) {
-        return false;
-    }
-    if (@file_put_contents($tmp, $updated) === false) {
-        @unlink($tmp);
-        return false;
-    }
-
-    @chmod($tmp, is_int($mode) ? ($mode & 0777) : 0600);
-    @chown($tmp, $user);
-    @chgrp($tmp, $user);
-    if (!@rename($tmp, $configPath)) {
-        @unlink($tmp);
-        return false;
-    }
-
-    return true;
+    return pmssQbittorrentConfigMutate(
+        $user,
+        static function (string $liveConfig) use ($expectedPort): ?string {
+            return pmssQbittorrentConfigUpsert($liveConfig, 'Preferences', 'WebUI\\Port', (string) $expectedPort);
+        },
+        $configPath
+    );
 }

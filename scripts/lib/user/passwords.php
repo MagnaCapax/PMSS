@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/qbittorrent.php';
 
 /**
  * Password synchronization helpers for torrent clients.
@@ -256,19 +257,6 @@ function pmssUserHtpasswdSyncFromShadow(string $username, string $shadowPath = '
     return pmssUserHtpasswdHashWrite($htpasswdPath, $username, $passwordHash, $username);
 }
 
-/**
- * Generate qBittorrent PBKDF2 password hash.
- *
- * @param string $password Plaintext password
- * @return string Formatted hash string for qBittorrent.conf
- */
-function pmssGenerateQbittorrentPasswordHash(string $password): string
-{
-    $salt = random_bytes(16);
-    $hash = hash_pbkdf2('sha512', $password, $salt, 100000, 64, true);
-    return '@ByteArray(' . base64_encode($salt) . ':' . base64_encode($hash) . ')';
-}
-
 // Deluge password sync intentionally omitted: Deluge daemon auth stores passwords
 // in plaintext (all versions <= 2.1.1). Syncing the account password here would
 // expose it in a readable file under the user's home directory. Deluge service
@@ -283,24 +271,7 @@ function pmssGenerateQbittorrentPasswordHash(string $password): string
  */
 function pmssUpdateQbittorrentPassword(string $username, string $password): bool
 {
-    $configFile = "/home/{$username}/.config/qBittorrent/qBittorrent.conf";
-    if (!file_exists($configFile) || ($config = file_get_contents($configFile)) === false) {
-        return false;
-    }
-
-    $passwordHash = pmssGenerateQbittorrentPasswordHash($password);
-    $replacement = 'WebUI\\Password_PBKDF2=' . $passwordHash;
-
-    if (preg_match('/^WebUI\\\\Password_PBKDF2=.*/m', $config)) {
-        $newConfig = preg_replace('/^WebUI\\\\Password_PBKDF2=.*/m', $replacement, $config);
-    } else {
-        // If password line doesn't exist, add it under [Preferences]
-        $newConfig = preg_replace('/(\[Preferences\][^\[]*)/s', '$1' . $replacement . "\n", $config, 1);
-    }
-
-    return $newConfig !== null
-        && $newConfig !== $config
-        && file_put_contents($configFile, $newConfig) !== false;
+    return pmssQbittorrentApplyPassword($username, $password);
 }
 
 /**

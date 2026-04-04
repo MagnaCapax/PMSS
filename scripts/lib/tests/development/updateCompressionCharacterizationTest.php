@@ -171,17 +171,22 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("\$tokens[\$index] = \$matches[1].'K'.(\$matches[2] ?? '');", $src);
     }
 
-    public function testQbittorrentPortEnsureKeepsAtomicRewriteInline(): void
+    public function testQbittorrentPortEnsureUsesSharedConfigWriter(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/user/torrentPort.php');
         $symbol = 'pmssTorrentPort'.'FileWrite';
 
         $this->assertTrue(
             strpos($src, 'function '.$symbol.'(') === false,
-            'torrentPort.php should keep the qBittorrent atomic rewrite local to pmssQbittorrentPortEnsure()'
+            'torrentPort.php should not grow a second qBittorrent file-writer helper'
         );
-        $this->assertStringContainsString("@tempnam(\$dir, basename(\$configPath).'.pmss-tmp-')", $src);
-        $this->assertStringContainsString("@rename(\$tmp, \$configPath)", $src);
+        $this->assertStringContainsString("require_once __DIR__.'/qbittorrent.php';", $src);
+        $this->assertStringContainsString('pmssQbittorrentConfigMutate(', $src);
+        $this->pmssAssertStringNotContainsString(
+            '@tempnam($dir, basename($configPath).\'.pmss-tmp-\')',
+            $src,
+            'qBittorrent port repair should use the shared config writer instead of an inline temp-file path'
+        );
     }
 
     public function testUserConfigKeepsQbittorrentBootstrapInline(): void

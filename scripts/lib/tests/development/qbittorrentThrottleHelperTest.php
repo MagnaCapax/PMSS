@@ -33,12 +33,14 @@ class QbittorrentThrottleHelperTest extends TestCase
         );
     }
 
-    public function testHelperKeepsReplaceAndInsertBranches(): void
+    public function testHelperSharesOneConfigMutationPath(): void
     {
-        $this->assertStringContainsString("'/^Connection\\\\\\\\GlobalUPLimit=.*/m'", $this->source);
-        $this->assertStringContainsString("'/^Connection\\\\\\\\GlobalUPLimit=.*\\\\n?/m'", $this->source);
-        $this->assertStringContainsString("'/(\\\\[Preferences\\\\][^\\\\[]*)/s'", $this->source);
-        $this->assertStringContainsString('\'$1\'.$replacement', $this->source);
-        $this->assertStringContainsString('"\\n", $config, 1);', $this->source);
+        $this->assertStringContainsString('function pmssQbittorrentConfigMutate(', $this->source);
+        $this->assertStringContainsString('pmssQbittorrentConfigUpsert(', $this->source);
+        $this->assertStringContainsString("'/^Connection\\\\\\\\GlobalUPLimit=.*\\r?\\n?/m'", $this->source);
+        $this->assertTrue(
+            strpos($this->source, "'/(\\\\[Preferences\\\\][^\\\\[]*)/s'") === false,
+            'Upload throttle writes should reuse the shared qBittorrent section upsert path'
+        );
     }
 }

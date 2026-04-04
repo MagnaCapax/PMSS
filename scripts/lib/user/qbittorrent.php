@@ -138,9 +138,9 @@ function pmssQbittorrentConfigUpsert(string $config, string $section, string $ke
 }
 
 /**
- * Refresh the PMSS-managed subset of a user's qBittorrent config.
+ * Load, transform, and atomically rewrite a user's qBittorrent config.
  */
-function pmssQbittorrentApplyManagedConfig(string $username, ?string $configFile = null): bool
+function pmssQbittorrentConfigMutate(string $username, callable $mutator, ?string $configFile = null): bool
 {
     if ($configFile === null) {
         $configFile = pmssQbittorrentConfigPath($username);
@@ -149,25 +149,17 @@ function pmssQbittorrentApplyManagedConfig(string $username, ?string $configFile
         return false;
     }
 
-    $config = file_get_contents($configFile);
+    $config = @file_get_contents($configFile);
     if (!is_string($config)) {
         return false;
     }
 
-    $updatedConfig = $config;
-    foreach (pmssQbittorrentManagedConfigEntries() as $entry) {
-        $updated = pmssQbittorrentConfigUpsert($updatedConfig, $entry['section'], $entry['key'], $entry['value']);
-        if (!is_string($updated)) {
-            return false;
-        }
-        $updatedConfig = $updated;
-    }
-
-    if ($updatedConfig === $config) {
+    $updatedConfig = $mutator($config);
+    if (!is_string($updatedConfig) || $updatedConfig === $config) {
         return false;
     }
 
-    $mode = fileperms($configFile);
+    $mode = @fileperms($configFile);
 
     return pmssReplaceUserFileWithMetadata(
         $configFile,
@@ -179,43 +171,77 @@ function pmssQbittorrentApplyManagedConfig(string $username, ?string $configFile
 }
 
 /**
+ * Generate the qBittorrent PBKDF2 password hash format.
+ */
+function pmssQbittorrentPasswordHashGenerate(string $password): string
+{
+    $salt = random_bytes(16);
+    $hash = hash_pbkdf2('sha512', $password, $salt, 100000, 64, true);
+
+    return '@ByteArray(' . base64_encode($salt) . ':' . base64_encode($hash) . ')';
+}
+
+/**
+ * Refresh the PMSS-managed subset of a user's qBittorrent config.
+ */
+function pmssQbittorrentApplyManagedConfig(string $username, ?string $configFile = null): bool
+{
+    return pmssQbittorrentConfigMutate(
+        $username,
+        static function (string $config): ?string {
+            $updatedConfig = $config;
+            foreach (pmssQbittorrentManagedConfigEntries() as $entry) {
+                $updatedConfig = pmssQbittorrentConfigUpsert($updatedConfig, $entry['section'], $entry['key'], $entry['value']);
+                if (!is_string($updatedConfig)) {
+                    return null;
+                }
+            }
+
+            return $updatedConfig;
+        },
+        $configFile
+    );
+}
+
+/**
  * Apply the upload throttle setting to an existing qBittorrent config.
  */
 function pmssQbittorrentApplyUploadThrottle(string $username, ?int $throttle = null): bool
 {
-    $configFile = pmssQbittorrentConfigPath($username);
-    if (!is_file($configFile) || is_link($configFile) || ($config = file_get_contents($configFile)) === false) {
-        return false;
-    }
-
     $throttle = $throttle ?? pmssReadTorrentThrottle($username);
-    $hasThrottle = ($throttle !== null && $throttle > 0);
-    $replacement = 'Connection\\GlobalUPLimit='.(int) $throttle;
-
-    if (preg_match('/^Connection\\\\GlobalUPLimit=.*/m', $config)) {
-        $newConfig = preg_replace(
-            $hasThrottle ? '/^Connection\\\\GlobalUPLimit=.*/m' : '/^Connection\\\\GlobalUPLimit=.*\\n?/m',
-            $hasThrottle ? $replacement : '',
-            $config,
-            1
-        );
-    } elseif (!$hasThrottle) {
-        return false;
-    } else {
-        $newConfig = preg_replace('/(\\[Preferences\\][^\\[]*)/s', '$1'.$replacement."\n", $config, 1);
-    }
-
-    if ($newConfig === null || $newConfig === $config) {
-        return false;
-    }
-
-    $mode = fileperms($configFile);
-
-    return pmssReplaceUserFileWithMetadata(
-        $configFile,
-        $newConfig,
-        is_int($mode) ? ($mode & 0777) : 0600,
+    return pmssQbittorrentConfigMutate(
         $username,
-        $username
+        static function (string $config) use ($throttle): ?string {
+            if ($throttle !== null && $throttle > 0) {
+                return pmssQbittorrentConfigUpsert(
+                    $config,
+                    'Preferences',
+                    'Connection\\GlobalUPLimit',
+                    (string) (int) $throttle
+                );
+            }
+
+            $updated = preg_replace('/^Connection\\\\GlobalUPLimit=.*\r?\n?/m', '', $config, 1);
+            return is_string($updated) ? $updated : null;
+        }
+    );
+}
+
+/**
+ * Update the qBittorrent WebUI password hash inside the config file.
+ */
+function pmssQbittorrentApplyPassword(string $username, string $password, ?string $configFile = null): bool
+{
+    return pmssQbittorrentConfigMutate(
+        $username,
+        static function (string $config) use ($password): ?string {
+            return pmssQbittorrentConfigUpsert(
+                $config,
+                'Preferences',
+                'WebUI\\Password_PBKDF2',
+                pmssQbittorrentPasswordHashGenerate($password)
+            );
+        },
+        $configFile
     );
 }
