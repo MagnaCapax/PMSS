@@ -16,7 +16,7 @@ class FstabHelperCharacterizationTest extends TestCase
         $messages = [];
         $logger = $this->pmssMakeArrayLogger($messages);
 
-        $this->assertNull(\pmssFstabLinesRead($link, $logger, 'fstab characterization'));
+        $this->assertSame(null, \pmssFstabLinesRead($link, $logger, 'fstab characterization'));
         $this->assertTrue($this->pmssMessagesContain($messages, 'not a regular file'), 'expected regular-file guard log');
     }
 
@@ -31,8 +31,8 @@ class FstabHelperCharacterizationTest extends TestCase
         $entry = \pmssFstabMountEntryRead($lines, '/tmp', 'tmpfs');
 
         $this->assertSame(2, $entry['index']);
-        $this->assertSame(['tmpfs', '/tmp', 'tmpfs', 'defaults'], $entry['columns']);
-        $this->assertNull(\pmssFstabMountEntryRead($lines, '/tmp', 'xfs'));
+        $this->assertSame(['tmpfs', '/tmp', 'tmpfs', 'defaults', '0', '0'], $entry['columns']);
+        $this->assertSame(null, \pmssFstabMountEntryRead($lines, '/tmp', 'xfs'));
     }
 
     public function testMountOptionsEnsureCollapsesPrefixedDuplicatesByDefault(): void
