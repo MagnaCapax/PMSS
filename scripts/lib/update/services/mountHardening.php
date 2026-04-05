@@ -57,10 +57,7 @@ function pmssConfigureTempMountNoexec(?callable $logger = null, ?string $fstabPa
                 $log('[SKIP] '.$mountPoint.' already hardened in '.$fstabPath);
             } else {
                 $fstabChanged = true;
-                $msg = '[WARN] Updated '.$mountPoint.' mount options in '.$fstabPath;
-                if ($plan['added'] !== []) $msg .= ' (added '.implode(', ', $plan['added']).')';
-                if ($plan['removed'] !== []) $msg .= ' (removed '.implode(', ', $plan['removed']).')';
-                $log($msg);
+                $log('[WARN] Updated '.$mountPoint.' mount options in '.$fstabPath.pmssFstabPlanChangeSuffix($plan));
             }
         }
         if (!isset($mounts[$mountPoint])) { $log('[WARN] '.$mountPoint.' not mounted; skipping remount'); continue; }
@@ -105,10 +102,7 @@ function pmssConfigureTempTmpfsMount(?callable $logger = null, ?string $fstabPat
             $log('[SKIP] /tmp tmpfs entry already up to date in '.$fstabPath);
         } else {
             $changed = true;
-            $msg = '[WARN] Updated /tmp tmpfs options in '.$fstabPath;
-            if ($plan['added'] !== []) $msg .= ' (added '.implode(', ', $plan['added']).')';
-            if ($plan['removed'] !== []) $msg .= ' (removed '.implode(', ', $plan['removed']).')';
-            $log($msg);
+            $log('[WARN] Updated /tmp tmpfs options in '.$fstabPath.pmssFstabPlanChangeSuffix($plan));
         }
     }
 

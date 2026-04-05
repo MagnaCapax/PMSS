@@ -53,6 +53,13 @@ function pmssFstabMountOptionsEnsure(array &$lines, string $mountPoint, array $r
     if ($plan['changed']) $lines[$entry['index']] = implode("\t", $plan['columns']);
     return $plan;
 }
+
+/** Build the stable added/removed suffix used in fstab update logs. */
+function pmssFstabPlanChangeSuffix(array $plan): string
+{
+    return (($plan['added'] ?? []) !== [] ? ' (added '.implode(', ', $plan['added']).')' : '')
+        .(($plan['removed'] ?? []) !== [] ? ' (removed '.implode(', ', $plan['removed']).')' : '');
+}
 /**
  * Replace a prefixed option with one canonical value.
  *

@@ -16,8 +16,6 @@ require_once __DIR__.'/../../runtime.php';
  */
 function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = null, ?callable $logger = null, ?string $fstabPath = null): void
 {
-    // #TODO Add hermetic tests that verify fstab line parsing and option
-    //       insertion behavior for common edge cases.
     $log = $logger ?: 'logMessage';
     if ($mountPoint === '') {
         return;
@@ -40,7 +38,7 @@ function pmssEnsureQuotaOptions(string $mountPoint, ?array $requiredOptions = nu
         return;
     }
 
-    $log('[WARN] Updated quota options for '.$mountPoint.' (added '.implode(', ', $plan['added']).')');
+    $log('[WARN] Updated quota options for '.$mountPoint.pmssFstabPlanChangeSuffix($plan));
     pmssWriteManagedPathFileWithBackup($fstab, $lines, 'fstab', $log, true);
 }
 
