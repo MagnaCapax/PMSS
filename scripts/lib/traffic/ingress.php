@@ -24,23 +24,16 @@ function pmssTrafficIngressReadCounters(int $uid): ?array
  */
 function pmssTrafficIngressUpdateState(string $path, array $counters): array
 {
-    $previousState = pmssJsonFileReadAssoc($path, true) ?? [];
-    $currentIngress = (int) $counters['ingress'];
-    $previousIngress = isset($previousState['ingress']) ? (int) $previousState['ingress'] : null;
     $state = [
-        'ingress' => $currentIngress,
+        'ingress' => (int) $counters['ingress'],
         'egress' => (int) $counters['egress'],
         'ts' => time(),
     ];
-
-    if ($path !== '' && pmssUserFilePathIsSafe($path) && is_string($payload = json_encode($state))) {
-        pmssAtomicWriteFile($path, $payload, 0600);
-    }
+    $result = pmssCounterStateUpdate($path, $state, ['ingress']);
+    $previousIngress = isset($result['previous_state']['ingress']) ? (int) $result['previous_state']['ingress'] : null;
 
     return [
-        'delta' => ($previousIngress !== null && $currentIngress >= $previousIngress)
-            ? $currentIngress - $previousIngress
-            : $currentIngress,
+        'delta' => $result['delta']['ingress'],
         'previous_ingress' => $previousIngress,
     ];
 }

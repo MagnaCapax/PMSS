@@ -46,6 +46,35 @@ function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $m
     return pmssAppendUserFile($path, date('Y-m-d H:i:s').$message, 'root', $mode);
 }
 
+/** Persist counter state under lock and return deltas for the selected fields.
+ *
+ * @return array{delta: array<string, int>, previous_state: array<string, mixed>, state: array<string, int>}
+ */
+function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFields): array
+{
+    $handle = pmssPathTargetIsSafe($statePath, false) ? pmssLockFileAcquire($statePath, false, 'c+') : false;
+    $previousState = $handle !== false && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))
+        ? $decoded
+        : [];
+    $delta = [];
+    foreach ($deltaFields as $field) {
+        $currentValue = (int) $state[$field];
+        $delta[$field] = isset($previousState[$field]) && $currentValue >= (int) $previousState[$field]
+            ? $currentValue - (int) $previousState[$field]
+            : $currentValue;
+    }
+
+    if ($handle !== false && is_string($payload = json_encode($state))) {
+        @ftruncate($handle, 0);
+        @rewind($handle);
+        @fwrite($handle, $payload);
+        @fflush($handle);
+        @chmod($statePath, 0600);
+    }
+    if ($handle !== false) { pmssLockHandleRelease($handle); }
+    return ['delta' => $delta, 'previous_state' => $previousState, 'state' => $state];
+}
+
 /**
  * Check whether five minutes of usage exceed 90% of the configured link budget.
  */
@@ -116,47 +145,19 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
     return null;
 }
 
-/**
- * Update the state file for a user and compute per-interval deltas.
- *
- * Uses an exclusive lock to prevent concurrent writes from corrupting state.
+/** Update the resource state file and return the latest interval deltas.
  *
  * @return array{delta: array, state: array}
  */
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
-    $pathIsSafe = pmssPathTargetIsSafe($statePath, false);
-    $handle = $pathIsSafe ? pmssLockFileAcquire($statePath, false, 'c+') : false;
-    $locked = $handle !== false;
-    $previousState = $locked && is_array($decoded = json_decode((string) @stream_get_contents($handle), true))
-        ? $decoded
-        : [];
-
-    $state = $delta = [];
-    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
-        $currentValue = (int) $counters[$field];
-        $delta[$field] = isset($previousState[$field]) && $currentValue >= (int) $previousState[$field]
-            ? $currentValue - (int) $previousState[$field]
-            : $currentValue;
-        $state[$field] = $currentValue;
-    }
-    $state += ['memory' => (int) $counters['memory'], 'tasks' => (int) $counters['tasks'], 'ts' => time()];
+    $state = ['memory' => (int) $counters['memory'], 'tasks' => (int) $counters['tasks'], 'ts' => time()];
+    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) { $state[$field] = (int) $counters[$field]; }
     if (isset($counters['memory_anon']) && isset($counters['memory_file'])) {
         $state['memory_anon'] = (int) $counters['memory_anon'];
         $state['memory_file'] = (int) $counters['memory_file'];
     }
 
-    if ($locked && is_string($payload = json_encode($state))) {
-        @ftruncate($handle, 0);
-        @rewind($handle);
-        @fwrite($handle, $payload);
-        @fflush($handle);
-        @chmod($statePath, 0600);
-    }
-
-    if ($handle !== false) {
-        pmssLockHandleRelease($handle, $locked);
-    }
-
-    return ['delta' => $delta, 'state' => $state];
+    $result = pmssCounterStateUpdate($statePath, $state, ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec']);
+    return ['delta' => $result['delta'], 'state' => $state];
 }
