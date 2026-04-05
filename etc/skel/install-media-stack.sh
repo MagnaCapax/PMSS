@@ -18,6 +18,14 @@
 # DO NOT EXPOSE TO INTERNET WITHOUT PROPER FIREWALL/HTTPS/VPN.
 # MAY CONFLICT WITH GLOBAL /opt INSTALLS—USE AT OWN RISK.
 # RANDOM PORTS USED FOR SHARED ENV; APPS BIND TO LOCALHOST ONLY.
+# SECURITY MODEL
+# All apps are reverse-proxied under /public-$USER/<app> which has NO
+# proxy-level authentication. App-level auth is the USER's responsibility:
+#   - Jellyfin: first-run wizard forces admin account creation
+#   - Radarr/Sonarr/Prowlarr: enable Forms auth in Settings > General > Authentication
+#   - SABnzbd: first-run wizard sets credentials
+# Until users configure auth, Radarr/Sonarr/Prowlarr are accessible to anyone
+# who knows the URL. The installer prints a security warning at completion.
 #
 # #TODO: Integrate with /opt sonarr/radarr (e.g., symlink or detect)
 # #TODO: Systemd service generation instead of tmux
