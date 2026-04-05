@@ -26,29 +26,29 @@ class UpdateHelpersTest extends TestCase
     public function testLoadRepoTemplateMissingLogsAndReturnsEmpty(): void
     {
         $logs = [];
-        $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
+        $logger = $this->pmssMakeArrayLogger($logs);
         $data = \pmssLoadRepoTemplate('this-code-name-does-not-exist', $logger);
         $this->assertEquals('', $data);
-        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Repository template missing:') !== false; }));
+        $this->pmssAssertMessagesContain($logs, 'Repository template missing:');
     }
 
     public function testSafeWriteSourcesEmptyContentSkips(): void
     {
         $logs = [];
-        $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
+        $logger = $this->pmssMakeArrayLogger($logs);
         $ok = \pmssSafeWriteSources('', 'UnitTest', $logger);
         $this->assertTrue($ok === false);
-        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Empty repository content') !== false; }));
+        $this->pmssAssertMessagesContain($logs, 'Empty repository content');
     }
 
     public function testUpdateAptSourcesDebian9UnsupportedLogs(): void
     {
         $logs = [];
-        $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
+        $logger = $this->pmssMakeArrayLogger($logs);
         \updateAptSources('debian', 9, 'dead', [
             'jessie' => '', 'buster' => '', 'bullseye' => '', 'bookworm' => '', 'trixie' => ''
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Unsupported Debian version: 9') !== false; }));
+        $this->pmssAssertMessagesContain($logs, 'Unsupported Debian version: 9');
     }
 
     public function testUpdateAptSourcesAlreadyCorrectNoChange(): void
@@ -57,23 +57,23 @@ class UpdateHelpersTest extends TestCase
         $content = "deb https://example invalid\n";
         $hash = sha1($content);
         $logs = [];
-        $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
+        $logger = $this->pmssMakeArrayLogger($logs);
         \updateAptSources('debian', 12, $hash, [
             'bookworm' => $content,
             'bullseye' => '', 'buster' => '', 'jessie' => '', 'trixie' => '',
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'already correct') !== false; }));
+        $this->pmssAssertMessagesContain($logs, 'already correct');
         // Important: No destructive call path is taken here
     }
 
     public function testUpdateAptSourcesTemplateMissing(): void
     {
         $logs = [];
-        $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
+        $logger = $this->pmssMakeArrayLogger($logs);
         \updateAptSources('debian', 11, 'hash', [
             'bullseye' => '', 'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => ''
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Bullseye template missing') !== false; }));
+        $this->pmssAssertMessagesContain($logs, 'Bullseye template missing');
     }
 
     public function testUpdateAptSourcesDebian13AlreadyCorrect(): void
@@ -81,12 +81,12 @@ class UpdateHelpersTest extends TestCase
         $content = "deb https://example-trixie invalid\n";
         $hash = sha1($content);
         $logs = [];
-        $logger = function (string $m) use (&$logs): void { $logs[] = $m; };
+        $logger = $this->pmssMakeArrayLogger($logs);
         \updateAptSources('debian', 13, $hash, [
             'trixie' => $content,
             'bookworm' => '', 'bullseye' => '', 'buster' => '', 'jessie' => '',
         ], $logger);
-        $this->assertTrue((bool)array_filter($logs, static function ($l) { return strpos($l, 'Trixie') !== false; }));
+        $this->pmssAssertMessagesContain($logs, 'Trixie');
     }
 
     public function testGetOsReleaseDataIsArray(): void

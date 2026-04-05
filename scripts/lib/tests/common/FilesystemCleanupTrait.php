@@ -117,6 +117,15 @@ trait FilesystemCleanupTrait
         return false;
     }
 
+    /** Assert that a captured logger array contains the expected substring. */
+    protected function pmssAssertMessagesContain(array $messages, string $needle, string $message = ''): void
+    {
+        $this->assertTrue(
+            $this->pmssMessagesContain($messages, $needle),
+            $message !== '' ? $message : 'Expected log messages to contain '.var_export($needle, true)
+        );
+    }
+
     protected function cleanup(string $path): void
     {
         if (!file_exists($path) && !is_link($path)) {

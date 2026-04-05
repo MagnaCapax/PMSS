@@ -62,9 +62,7 @@ class DistroRepoSelectionTest extends TestCase
             $template = "deb http://mirror.example bullseye main contrib non-free\n";
             $currentHash = sha1($initial);
             $logs = [];
-            $logger = function (string $msg) use (&$logs): void {
-                $logs[] = $msg;
-            };
+            $logger = $this->pmssMakeArrayLogger($logs);
 
             \updateAptSources('debian', 11, $currentHash, [
                 'bullseye' => $template,
@@ -76,9 +74,7 @@ class DistroRepoSelectionTest extends TestCase
 
             $written = file_get_contents($target);
             $this->assertEquals($template, $written);
-            $this->assertTrue((bool)array_filter($logs, static function ($m) {
-                return strpos($m, 'Applied Debian Bullseye') !== false;
-            }));
+            $this->pmssAssertMessagesContain($logs, 'Applied Debian Bullseye');
 
             $backup = $target.'.pmss-backup';
             $this->assertEquals($initial, file_get_contents($backup));
@@ -93,9 +89,7 @@ class DistroRepoSelectionTest extends TestCase
             $template = "deb http://mirror.example buster main\n";
             $currentHash = sha1($initial);
             $logs = [];
-            $logger = function (string $msg) use (&$logs): void {
-                $logs[] = $msg;
-            };
+            $logger = $this->pmssMakeArrayLogger($logs);
 
             \updateAptSources('debian', 10, $currentHash, [
                 'buster'   => $template,
@@ -106,9 +100,7 @@ class DistroRepoSelectionTest extends TestCase
             ], $logger);
 
             $this->assertEquals($template, file_get_contents($target));
-            $this->assertTrue((bool)array_filter($logs, static function ($m) {
-                return strpos($m, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)') !== false;
-            }), 'Expected EOL post-hook to log test-mode skip');
+            $this->pmssAssertMessagesContain($logs, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)', 'Expected EOL post-hook to log test-mode skip');
         });
     }
 }

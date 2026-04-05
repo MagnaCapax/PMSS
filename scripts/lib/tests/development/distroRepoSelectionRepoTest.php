@@ -18,9 +18,7 @@ class DistroRepoSelectionRepoTest extends TestCase
         $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($dir, $target): void {
             $template = "deb http://mirror.example bullseye main\n";
             $logs = [];
-            $logger = function (string $msg) use (&$logs): void {
-                $logs[] = $msg;
-            };
+            $logger = $this->pmssMakeArrayLogger($logs);
 
             \updateAptSources('debian', 11, '', [
                 'bullseye' => $template,

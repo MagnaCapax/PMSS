@@ -133,15 +133,11 @@ class DistroDetectionTest extends TestCase
     public function testRefreshRepositoriesSkipsWhenVersionUnknown(): void
     {
         $logs = [];
-        $logger = function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($logs);
         $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($logger): void {
             \pmssRefreshRepositories('debian', 0, $logger);
         });
-        $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-            return strpos($line, 'reusing existing sources') !== false;
-        }), 'Expected reuse notice when version unresolved');
+        $this->pmssAssertMessagesContain($logs, 'reusing existing sources', 'Expected reuse notice when version unresolved');
     }
 
     /**
@@ -156,9 +152,7 @@ class DistroDetectionTest extends TestCase
             file_put_contents($sources, "deb https://old.invalid stable main\n");
 
             $logs = [];
-            $logger = function (string $message) use (&$logs): void {
-                $logs[] = $message;
-            };
+            $logger = $this->pmssMakeArrayLogger($logs);
 
             try {
                 $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $sources], function () use ($template, $logger): void {
@@ -172,9 +166,7 @@ class DistroDetectionTest extends TestCase
                 });
 
                 $this->assertEquals($template, file_get_contents($sources));
-                $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-                    return strpos($line, 'Applied Debian Bookworm repository config') !== false;
-                }));
+                $this->pmssAssertMessagesContain($logs, 'Applied Debian Bookworm repository config');
             } finally {
                 @unlink($sources);
                 @unlink($sources.'.pmss-backup');
@@ -192,17 +184,13 @@ class DistroDetectionTest extends TestCase
         file_put_contents($blocker, 'not-a-directory');
 
         $logs = [];
-        $logger = function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($logs);
 
         try {
             $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $blocker.'/sources.list'], function () use ($logger): void {
                 $this->assertTrue(!\pmssSafeWriteSources("deb https://mirror.invalid bookworm main\n", 'Bookworm', $logger));
             });
-            $this->assertTrue((bool) array_filter($logs, static function (string $line) use ($blocker): bool {
-                return strpos($line, '[ERROR] Unable to create parent directory for Bookworm sources.list: '.$blocker) !== false;
-            }));
+            $this->pmssAssertMessagesContain($logs, '[ERROR] Unable to create parent directory for Bookworm sources.list: '.$blocker);
             $this->assertTrue(!file_exists($blocker.'/sources.list'));
             $this->assertTrue(!file_exists($blocker.'/sources.list.pmss-backup'));
         } finally {
@@ -216,13 +204,9 @@ class DistroDetectionTest extends TestCase
     public function testUpdateAptSourcesLogsUnsupportedDistro(): void
     {
         $logs = [];
-        $logger = function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        };
+        $logger = $this->pmssMakeArrayLogger($logs);
         \pmssUpdateAptSources('alpine', 3, 'hash', [], $logger);
-        $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-            return strpos($line, 'Unsupported distro') !== false;
-        }));
+        $this->pmssAssertMessagesContain($logs, 'Unsupported distro');
     }
 
     public function testLoadRepoTemplateLogsMissingAndEmptyTemplates(): void
@@ -232,21 +216,15 @@ class DistroDetectionTest extends TestCase
         try {
             $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $configDir], function () use ($configDir): void {
                 $logs = [];
-                $logger = function (string $message) use (&$logs): void {
-                    $logs[] = $message;
-                };
+                $logger = $this->pmssMakeArrayLogger($logs);
 
                 $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
-                $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-                    return strpos($line, 'Repository template missing: ') !== false;
-                }));
+                $this->pmssAssertMessagesContain($logs, 'Repository template missing: ');
 
                 $logs = [];
                 file_put_contents($configDir.'/template.sources.bookworm', " \n\t ");
                 $this->assertEquals('', \pmssLoadRepoTemplate('bookworm', $logger));
-                $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-                    return strpos($line, 'Repository template empty: ') !== false;
-                }));
+                $this->pmssAssertMessagesContain($logs, 'Repository template empty: ');
             });
         } finally {
             @unlink($configDir.'/template.sources.bookworm');
