@@ -44,10 +44,9 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         $this->assertEquals('alice-bob', $processor->sanitizeUser('alice!@#-bob'));
     }
 
-    public function testFormatDataDisplay(): void
+    public function testSharedTrafficAmountFormatter(): void
     {
-        $processor = $this->makeProcessor();
-        $formatted = $processor->formatDataDisplay([
+        $formatted = array_map('pmssTrafficFormatAmount', [
             '15min' => 100,
             'hour'  => 2048,
             'day'   => 2048 * 2048,
@@ -57,10 +56,9 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         $this->assertTrue(strpos($formatted['day'], 'TiB') !== false);
     }
 
-    public function testFormatDataDisplayPreservesThresholdBoundaries(): void
+    public function testSharedTrafficAmountFormatterPreservesThresholdBoundaries(): void
     {
-        $processor = $this->makeProcessor();
-        $formatted = $processor->formatDataDisplay([
+        $formatted = array_map('pmssTrafficFormatAmount', [
             'exact_gib' => 1024,
             'over_gib' => 1025,
             'exact_tib' => 1024 * 1024,

@@ -7,6 +7,15 @@
  */
 
 require_once __DIR__.'/traffic/storage.php';
+
+/** Format a traffic amount stored in MiB using PMSS CLI conventions. */
+function pmssTrafficFormatAmount(float $valueMiB): string
+{
+    if ($valueMiB > (1024 * 1024)) return round(($valueMiB / 1024 / 1024), 2).'TiB';
+    if ($valueMiB > 1024) return round(($valueMiB / 1024), 2).'GiB';
+    return round($valueMiB, 2).'MiB';
+}
+
 /** Parse one iptables OUTPUT rule line into bytes, destination, and UID. */
 function pmssTrafficParseOutputRule(string $line): ?array
 {

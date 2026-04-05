@@ -7,18 +7,35 @@ class ShowTrafficFormatTest extends TestCase
 {
     public function testFormatTrafficAmountMiB(): void
     {
-        $this->assertEquals('500MiB', \formatTrafficAmount(500));
+        $this->assertEquals('500MiB', \pmssTrafficFormatAmount(500));
     }
 
     public function testFormatTrafficAmountGiB(): void
     {
-        $this->assertEquals('1.95GiB', \formatTrafficAmount(2000));
+        $this->assertEquals('1.95GiB', \pmssTrafficFormatAmount(2000));
     }
 
     public function testFormatTrafficAmountTiB(): void
     {
         $twoTiBInMiB = 2 * 1024 * 1024;
-        $this->assertEquals('2TiB', \formatTrafficAmount($twoTiBInMiB));
+        $this->assertEquals('2TiB', \pmssTrafficFormatAmount($twoTiBInMiB));
+    }
+
+    public function testTrafficAmountFormatterCharacterizationKeepsLegacyThresholds(): void
+    {
+        $this->assertEquals([
+            '0MiB',
+            '1024MiB',
+            '1GiB',
+            '1024GiB',
+            '1TiB',
+        ], [
+            \pmssTrafficFormatAmount(0),
+            \pmssTrafficFormatAmount(1024),
+            \pmssTrafficFormatAmount(1025),
+            \pmssTrafficFormatAmount(1024 * 1024),
+            \pmssTrafficFormatAmount((1024 * 1024) + 1),
+        ]);
     }
 
     public function testHelpIncludesJsonOption(): void
@@ -40,6 +57,7 @@ class ShowTrafficFormatTest extends TestCase
 
         $this->assertStringContainsString("pmssListManagedUsersResult(__DIR__.'/listUsers.php')", $source);
         $this->pmssAssertStringNotContainsString("exec(escapeshellarg(__DIR__.'/listUsers.php')", $source);
+        $this->assertStringContainsString("array_map('pmssTrafficFormatAmount', \$data['raw'])", $source);
     }
 
     public function testFormatRateDisplay(): void

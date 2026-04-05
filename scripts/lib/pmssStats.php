@@ -11,7 +11,7 @@
 
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/rtorrent/scgi.php';
-require_once __DIR__.'/traffic/storage.php';
+require_once __DIR__.'/traffic.php';
 require_once __DIR__.'/update.php';
 require_once __DIR__.'/user/userConfigStore.php';
 require_once __DIR__.'/user/trafficLimit.php';
@@ -181,20 +181,6 @@ function pmssStatsFormatBytes(float $bytes, int $precision = 1): string
     }
 
     return number_format($bytes, $index === 0 ? 0 : $precision, '.', '').' '.$units[$index];
-}
-
-/**
- * Format a traffic amount stored in MiB using PMSS CLI conventions.
- */
-function pmssStatsFormatTraffic(float $valueMiB): string
-{
-    if (($valueMiB / 1024 / 999) > 1) {
-        return round(($valueMiB / 1024 / 1024), 2).'TiB';
-    }
-    if (($valueMiB / 999) > 1) {
-        return round(($valueMiB / 1024), 2).'GiB';
-    }
-    return round($valueMiB, 2).'MiB';
 }
 
 /**
@@ -504,7 +490,7 @@ function pmssStatsRenderText(array $stats, array $options = []): string
         $lines[] = $title;
         $lines[] = 'Disk '.$diskValue.' · Mem '.$memoryValue;
         $lines[] = 'Up '.pmssStatsFormatRate((float) ($stats['rtorrent']['upload_rate'] ?? 0.0)).' · Down '.pmssStatsFormatRate((float) ($stats['rtorrent']['download_rate'] ?? 0.0)).' · Ratio '.$ratio;
-        $lines[] = 'Traffic '.(($stats['traffic']['upload_month_mib'] !== null) ? pmssStatsFormatTraffic((float) $stats['traffic']['upload_month_mib']) : 'n/a').' · Uptime '.($stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a');
+        $lines[] = 'Traffic '.(($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a').' · Uptime '.($stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a');
         return implode(PHP_EOL, $lines).PHP_EOL;
     }
 
@@ -552,14 +538,14 @@ function pmssStatsRenderText(array $stats, array $options = []): string
     if ($stats['traffic']['limit_mib'] !== null) {
         $lines[] = pmssStatsRenderLine(
             'Traffic',
-            (($stats['traffic']['upload_month_mib'] !== null) ? pmssStatsFormatTraffic((float) $stats['traffic']['upload_month_mib']) : 'n/a')
-                .' / '.pmssStatsFormatTraffic((float) $stats['traffic']['limit_mib']),
+            (($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a')
+                .' / '.pmssTrafficFormatAmount((float) $stats['traffic']['limit_mib']),
             pmssStatsRenderBar($stats['traffic']['percent'], 16).' '.($stats['traffic']['percent'] !== null ? sprintf('%d%%', round((float) $stats['traffic']['percent'])) : 'n/a')
         );
     } else {
         $lines[] = pmssStatsRenderLine(
             'Traffic',
-            (($stats['traffic']['upload_month_mib'] !== null) ? pmssStatsFormatTraffic((float) $stats['traffic']['upload_month_mib']) : 'n/a')
+            (($stats['traffic']['upload_month_mib'] !== null) ? pmssTrafficFormatAmount((float) $stats['traffic']['upload_month_mib']) : 'n/a')
         );
     }
     $lines[] = pmssStatsRenderLine('Uptime', $stats['uptime_seconds'] !== null ? pmssStatsFormatUptime((int) $stats['uptime_seconds']) : 'n/a', 'PMSS '.$stats['pmss_version']);

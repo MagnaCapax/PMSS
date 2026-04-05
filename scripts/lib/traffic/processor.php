@@ -147,25 +147,9 @@ class TrafficStatsProcessor
 
         $this->stats->saveUserTraffic($user, [
             'raw'     => $rawTotals,
-            'display' => $this->formatDataDisplay($rawTotals),
+            'display' => array_map('pmssTrafficFormatAmount', $rawTotals),
             'daily'   => $dailyTotals,
         ]);
         logMessage(date('c').": Traffic stats for {$user} saved, month data consumption: {$rawTotals['month']}");
     }
-
-    /** Format raw data totals into human readable units. */
-    public function formatDataDisplay(array $rawTotals): array
-    {
-        $formatted = [];
-        foreach ($rawTotals as $label => $value) {
-            $valueMiB = (float) $value;
-            $formatted[$label] = $valueMiB > 1024
-                ? ($valueMiB > (1024 * 1024)
-                    ? round($valueMiB / (1024 * 1024), 2).'TiB'
-                    : round($valueMiB / 1024, 2).'GiB')
-                : round($valueMiB, 2).'MiB';
-        }
-        return $formatted;
-    }
-
 }

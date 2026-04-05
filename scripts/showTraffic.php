@@ -8,7 +8,7 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/runtime.php';
-require_once __DIR__.'/lib/traffic/storage.php';
+require_once __DIR__.'/lib/traffic.php';
 
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     exit(pmssShowTrafficMain($argv));
@@ -140,7 +140,7 @@ TXT;
             $dataMonthTotalLocal += (float) $data['raw']['month'];
         }
 
-        $dataDisplay = array_map('formatTrafficAmount', $data['raw']);
+        $dataDisplay = array_map('pmssTrafficFormatAmount', $data['raw']);
 
         $trafficPaths = pmssTrafficDataPaths($baseUser);
         $ingressPath = $trafficPaths[$isLocalnet ? 'ingressLocal' : 'ingress'];
@@ -155,7 +155,7 @@ TXT;
             $inboundRatio = round($inboundMonth / (float) $data['raw']['month'], 2);
         }
 
-        $inboundDisplay = $inboundMonth !== null ? formatTrafficAmount($inboundMonth) : '-';
+        $inboundDisplay = $inboundMonth !== null ? pmssTrafficFormatAmount($inboundMonth) : '-';
         $ratioDisplay = $inboundRatio !== null ? sprintf('%.2f', $inboundRatio) : 'n/a';
 
         $dataRates = [
@@ -286,7 +286,7 @@ TXT;
 
     foreach ($rows as $row) {
         if ($extended) {
-            $limitDisplay = ($row['limitMiB'] !== null) ? formatTrafficAmount($row['limitMiB']) : '-';
+            $limitDisplay = ($row['limitMiB'] !== null) ? pmssTrafficFormatAmount($row['limitMiB']) : '-';
             $pctDisplayRaw = 'n/a';
             $statusLabel = '';
             if ($row['pctUsed'] !== null) {
@@ -370,12 +370,6 @@ TXT;
     }
 
     return 0;
-}
-
-function formatTrafficAmount($value): string {
-    if ( ($value / 1024 / 999) > 1 ) return round( ($value / 1024 / 1024), 2) . 'TiB';
-    if ( ($value / 999) > 1 )        return round( ($value / 1024), 2) . 'GiB';
-    return round($value, 2) . 'MiB';
 }
 
 /**
