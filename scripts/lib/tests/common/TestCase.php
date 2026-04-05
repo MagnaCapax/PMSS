@@ -35,6 +35,11 @@ abstract class TestCase
      */
     private $tempPaths = [];
 
+    /**
+     * @var array<string, string>
+     */
+    private $tempDirProperties = [];
+
     /** Provide a shared no-op setup hook for inheriting tests. */
     protected function setUp(): void
     {
@@ -498,7 +503,7 @@ abstract class TestCase
         );
     }
 
-    /** Assign a temporary directory to a test property, including private child properties. */
+    /** Assign a temporary directory to a test property and track it for automatic teardown cleanup. */
     protected function pmssAssignTempDirProperty(
         string $propertyName,
         string $prefix,
@@ -506,9 +511,13 @@ abstract class TestCase
         ?string $baseDir = null
     ): void {
         $path = $this->pmssTraitMakeNamedTempDir($prefix, $mode, $baseDir);
+        if (!in_array($path, $this->tempPaths, true)) {
+            $this->tempPaths[] = $path;
+        }
         $property = new \ReflectionProperty($this, $propertyName);
         $property->setAccessible(true);
         $property->setValue($this, $path);
+        $this->tempDirProperties[$propertyName] = $propertyName;
     }
 
     /** Remove a temporary directory stored on a test property, including private child properties. */
@@ -584,7 +593,14 @@ abstract class TestCase
             $this->pmssRemoveTree($path);
         }
 
+        foreach ($this->tempDirProperties as $propertyName) {
+            $property = new \ReflectionProperty($this, $propertyName);
+            $property->setAccessible(true);
+            $property->setValue($this, '');
+        }
+
         $this->tempPaths = [];
+        $this->tempDirProperties = [];
     }
 
     /** Restore a previous environment variable value captured with getenv(). */

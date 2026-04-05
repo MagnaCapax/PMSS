@@ -13,11 +13,6 @@ class LighttpdUserDirectoryPrepTest extends TestCase
         $this->pmssAssignTempDirProperty('base', 'pmss-lighttpd-dirprep-', 0700);
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('base');
-    }
-
     private function recursiveDelete(string $dir): void
     {
         $this->cleanup($dir);

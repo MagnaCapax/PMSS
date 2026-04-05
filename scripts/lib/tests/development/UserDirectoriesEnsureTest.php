@@ -22,11 +22,6 @@ class UserDirectoriesEnsureTest extends TestCase
         $this->user = (is_array($pw) && isset($pw['name']) && is_string($pw['name'])) ? $pw['name'] : get_current_user();
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     private function recursiveDelete(string $dir): void
     {
         $this->cleanup($dir);

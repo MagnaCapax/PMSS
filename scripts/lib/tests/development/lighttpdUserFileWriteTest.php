@@ -13,11 +13,6 @@ class LighttpdUserFileWriteTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-user-write-');
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     public function testAppendUserFileWritesNewFile(): void
     {
         $path = $this->tempDir.'/user/.lighttpd/.htpasswd';

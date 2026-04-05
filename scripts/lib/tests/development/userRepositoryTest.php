@@ -19,12 +19,6 @@ class UserRepositoryTest extends TestCase
         $this->setUpTempDir();
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-        parent::tearDown();
-    }
-
     private function setUpTempDir(): void
     {
         if ($this->tempDir !== null && $this->tempDir !== '') {

@@ -16,11 +16,6 @@ class NginxConfigWriteGuardTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-nginx-config-write-');
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     public function testWriteFileStoresContentWithManagedPermissions(): void
     {
         $path = $this->tempDir.'/conf.d/pmss-user-alice.conf';

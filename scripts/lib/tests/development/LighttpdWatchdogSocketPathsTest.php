@@ -16,11 +16,6 @@ class LighttpdWatchdogSocketPathsTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-watchdog-');
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     public function testBuildsOnlyStartupSocketPathsWhenConfigHasDemandSpawnedWorkers(): void
     {
         $configPath = $this->writeConfig("\"max-procs\" => 6\n\"min-procs\" => 1");

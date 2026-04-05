@@ -14,11 +14,6 @@ class TrafficLimitSafetyHelperTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-traffic-limit-safety-');
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     public function testEnsureStorageDirRejectsRelativePath(): void
     {
         $this->assertTrue(\pmssTrafficLimitEnsureStorageDir('relative/path') === false);

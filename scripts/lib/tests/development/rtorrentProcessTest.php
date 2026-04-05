@@ -19,11 +19,6 @@ class RtorrentProcessTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-rtorrent-process-');
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     /**
      * Test stale state: first detection records timestamp.
      */

@@ -17,11 +17,6 @@ class BootstrapWriteGuardTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-bootstrap-write-');
     }
 
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
-    }
-
     public function testManagedPathWriterStoresContentWithRootMetadata(): void
     {
         $path = $this->tempDir.'/etc/hostname';
