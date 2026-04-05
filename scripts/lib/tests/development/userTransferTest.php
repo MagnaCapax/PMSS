@@ -423,12 +423,12 @@ SNAP;
         file_put_contents($sessionDir.'/test.torrent.rtorrent', 'd9:directory'.strlen($path).':'.$path.'e');
         putenv('PMSS_LOG_DIR='.$logDir);
 
-        ob_start();
-        \pmssUserTransferRewriteRtorrentSessionPaths([
-            'localUser' => 'newuser',
-            'remoteUser' => 'olduser',
-        ], $home);
-        $output = (string) ob_get_clean();
+        list(, $output) = $this->pmssCaptureStdout(function () use ($home): void {
+            \pmssUserTransferRewriteRtorrentSessionPaths([
+                'localUser' => 'newuser',
+                'remoteUser' => 'olduser',
+            ], $home);
+        });
 
         $this->assertStringContainsString('[INFO] rTorrent session rewrite found no /home path references to update', $output);
     }

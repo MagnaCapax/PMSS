@@ -138,9 +138,7 @@ class PmssStatsCliTest extends TestCase
         $this->setEnv('PMSS_STATS_CGROUP_DIR', $this->cgroupDir);
         $this->setEnv('PMSS_STATS_VERSION_FILE', $versionFile);
 
-        ob_start();
-        $rc = \pmssStatsMain(['scripts/pmss-stats.php', '--json']);
-        $json = (string) ob_get_clean();
+        list($rc, $json) = $this->pmssCaptureStdout(function (): int { return \pmssStatsMain(['scripts/pmss-stats.php', '--json']); });
 
         $this->assertEquals(0, $rc);
         $this->assertStringContainsString('"pmss_version": "3.0.0"', $json);

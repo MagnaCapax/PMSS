@@ -25,9 +25,7 @@ class NginxConfigTestTest extends TestCase
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => $this->tempDir.'/nginx-test-success.sh',
             'PMSS_NGINX_RESTART_COMMAND' => null,
         ], function (): void {
-            ob_start();
-            $rc = \pmssCreateNginxConfigTestAndMaybeRestart(false);
-            $out = (string) ob_get_clean();
+            list($rc, $out) = $this->pmssCaptureStdout(function (): int { return \pmssCreateNginxConfigTestAndMaybeRestart(false); });
 
             $this->assertEquals(0, $rc);
             $this->assertStringContainsString('nginx configuration test passed', $out);
@@ -45,9 +43,7 @@ class NginxConfigTestTest extends TestCase
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => $this->tempDir.'/nginx-test-fail.sh',
             'PMSS_NGINX_RESTART_COMMAND' => null,
         ], function (): void {
-            ob_start();
-            $rc = \pmssCreateNginxConfigTestAndMaybeRestart(false);
-            $out = (string) ob_get_clean();
+            list($rc, $out) = $this->pmssCaptureStdout(function (): int { return \pmssCreateNginxConfigTestAndMaybeRestart(false); });
 
             $this->assertEquals(1, $rc);
             $this->assertStringContainsString('FAILED', $out);
@@ -67,9 +63,7 @@ class NginxConfigTestTest extends TestCase
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => $this->tempDir.'/nginx-test-fail.sh',
             'PMSS_NGINX_RESTART_COMMAND' => $this->tempDir.'/restart.sh',
         ], function () use ($restartLog): void {
-            ob_start();
-            $rc = \pmssCreateNginxConfigTestAndMaybeRestart(true);
-            $out = (string) ob_get_clean();
+            list($rc, $out) = $this->pmssCaptureStdout(function (): int { return \pmssCreateNginxConfigTestAndMaybeRestart(true); });
 
             $this->assertEquals(1, $rc);
             $this->assertStringContainsString('Restart aborted: refusing to restart nginx with broken configuration', $out);
@@ -89,9 +83,7 @@ class NginxConfigTestTest extends TestCase
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => $this->tempDir.'/nginx-test-success.sh',
             'PMSS_NGINX_RESTART_COMMAND' => $this->tempDir.'/restart.sh',
         ], function () use ($restartLog): void {
-            ob_start();
-            $rc = \pmssCreateNginxConfigTestAndMaybeRestart(true);
-            $out = (string) ob_get_clean();
+            list($rc, $out) = $this->pmssCaptureStdout(function (): int { return \pmssCreateNginxConfigTestAndMaybeRestart(true); });
 
             $this->assertEquals(0, $rc);
             $this->assertStringContainsString('Done! nginx restarted', $out);
@@ -110,9 +102,7 @@ class NginxConfigTestTest extends TestCase
             'PMSS_NGINX_CONFIG_TEST_COMMAND' => $this->tempDir.'/nginx-test-success.sh',
             'PMSS_NGINX_RESTART_COMMAND' => $this->tempDir.'/restart-fail.sh',
         ], function (): void {
-            ob_start();
-            $rc = \pmssCreateNginxConfigTestAndMaybeRestart(true);
-            $out = (string) ob_get_clean();
+            list($rc, $out) = $this->pmssCaptureStdout(function (): int { return \pmssCreateNginxConfigTestAndMaybeRestart(true); });
 
             $this->assertEquals(1, $rc);
             $this->assertStringContainsString('nginx restart', $out);

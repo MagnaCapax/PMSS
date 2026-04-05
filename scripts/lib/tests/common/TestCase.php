@@ -177,6 +177,22 @@ abstract class TestCase
         throw new \AssertionError($message !== '' ? $message : 'Test failed');
     }
 
+    /**
+     * Capture stdout emitted by a callback and return its result alongside the buffer.
+     *
+     * @return array{0:mixed,1:string}
+     */
+    protected function pmssCaptureStdout(callable $callback): array
+    {
+        ob_start();
+        try {
+            return [$callback(), (string) ob_get_clean()];
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            throw $e;
+        }
+    }
+
     /** Return parsed mount options for one fstab mount point. */
     protected function pmssFstabOptionsForMount(string $fstab, string $mountPoint): array
     {

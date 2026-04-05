@@ -206,9 +206,7 @@ class ResourceStatsProcessorTest extends TestCase
     {
         $processor = new SpyResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
 
-        ob_start();
-        $result = $processor->runCli(['/scripts/cron/resourceStats.php', 'ghost'], '/scripts/cron/resourceStats.php');
-        $output = (string) ob_get_clean();
+        list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/resourceStats.php', 'ghost'], '/scripts/cron/resourceStats.php'); });
 
         $this->assertEquals(0, $result);
         $this->assertStringContainsString("Invalid user specified: ghost\n", $output);
@@ -219,9 +217,7 @@ class ResourceStatsProcessorTest extends TestCase
     {
         $processor = new SpyResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
 
-        ob_start();
-        $result = $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php');
-        $output = (string) ob_get_clean();
+        list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'); });
 
         $this->assertEquals(0, $result);
         $this->assertStringContainsString("No users in this system!\n", $output);

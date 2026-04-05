@@ -136,13 +136,10 @@ class DistUpgradeHelpersTest extends TestCase
         file_put_contents($mdadmConfigPath, $mdadmConfig);
         file_put_contents($initramfsMdadmPath, $initramfsMdadm);
 
-        ob_start();
-        try {
+        list(, $output) = $this->pmssCaptureStdout(function () use ($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath): void {
             \pmssVerifyDistUpgradeBootReadiness($mdstatPath, $grubPath, $mdadmConfigPath, $initramfsMdadmPath);
-            return (string) ob_get_clean();
-        } catch (\Throwable $e) {
-            ob_end_clean();
-            throw $e;
-        }
+        });
+
+        return $output;
     }
 }

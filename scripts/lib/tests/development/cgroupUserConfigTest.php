@@ -86,9 +86,7 @@ class CgroupUserConfigTest extends TestCase
         $this->ensureManager();
         // Prepend dummy script name
         array_unshift($args, 'userConfigCgroup.php');
-        ob_start();
-        $rc = $this->mgr->run($args);
-        $out = ob_get_clean();
+        list($rc, $out) = $this->pmssCaptureStdout(function () use ($args) { return $this->mgr->run($args); });
         return ['rc' => $rc, 'out' => $out];
     }
 

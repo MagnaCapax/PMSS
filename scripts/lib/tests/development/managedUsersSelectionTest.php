@@ -53,9 +53,7 @@ class ManagedUsersSelectionTest extends TestCase
     {
         $this->writeListUsersScript("echo \"user1\\n\";");
 
-        ob_start();
-        $selection = \pmssManagedUsersSelectFromCommand($this->listUsersScript, 'User1', ['strictInput' => true]);
-        ob_end_clean();
+        list($selection) = $this->pmssCaptureStdout(function (): array { return \pmssManagedUsersSelectFromCommand($this->listUsersScript, 'User1', ['strictInput' => true]); });
 
         $this->assertEquals(1, $selection['exitCode']);
         $this->assertEquals('user1', $selection['username']);
@@ -66,9 +64,7 @@ class ManagedUsersSelectionTest extends TestCase
     {
         $this->writeListUsersScript("echo \"user1\\n\";");
 
-        ob_start();
-        $selection = \pmssManagedUsersSelectFromCommand($this->listUsersScript, 'user2');
-        ob_end_clean();
+        list($selection) = $this->pmssCaptureStdout(function (): array { return \pmssManagedUsersSelectFromCommand($this->listUsersScript, 'user2'); });
 
         $this->assertEquals(1, $selection['exitCode']);
         $this->assertEquals('user2', $selection['username']);
@@ -79,9 +75,7 @@ class ManagedUsersSelectionTest extends TestCase
     {
         $this->writeListUsersScript('');
 
-        ob_start();
-        $selection = \pmssManagedUsersSelectFromCommand($this->listUsersScript, '', ['emitEmptyMessage' => true]);
-        $output = ob_get_clean();
+        list($selection, $output) = $this->pmssCaptureStdout(function (): array { return \pmssManagedUsersSelectFromCommand($this->listUsersScript, '', ['emitEmptyMessage' => true]); });
 
         $this->assertEquals(0, $selection['exitCode']);
         $this->assertEquals([], $selection['users']);

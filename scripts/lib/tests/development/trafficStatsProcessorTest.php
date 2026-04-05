@@ -154,9 +154,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         $stub = new StubTrafficStatistics();
         $processor = new SpyTrafficStatsProcessor($stub, $this->makeTrafficPaths('pmss-traffic-', true));
 
-        ob_start();
-        $result = $processor->runCli(['/scripts/cron/trafficStats.php', 'ghost'], '/scripts/cron/trafficStats.php');
-        $output = (string) ob_get_clean();
+        list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php', 'ghost'], '/scripts/cron/trafficStats.php'); });
 
         $this->assertEquals(0, $result);
         $this->assertStringContainsString("Invalid user specified: ghost\n", $output);
@@ -168,9 +166,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
     {
         $processor = new SpyTrafficStatsProcessor(new StubTrafficStatistics(), $this->makeTrafficPaths('pmss-traffic-', true));
 
-        ob_start();
-        $result = $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php');
-        $output = (string) ob_get_clean();
+        list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'); });
 
         $this->assertEquals(0, $result);
         $this->assertStringContainsString("No users in this system!\n", $output);
