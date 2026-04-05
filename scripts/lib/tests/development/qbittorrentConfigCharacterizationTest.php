@@ -64,6 +64,7 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
     public function testPortRepairKeepsOtherLinesAndUsesSharedWriterSnapshot(): void
     {
         $home = $this->homeRoot.'/alice';
+        @mkdir($home, 0755, true);
         file_put_contents($home.'/.qbittorrentPort', "45678\n");
         $configPath = $this->writeConfig("[Preferences]\nWebUI\\Port=12345\nLocale=en\n");
 
