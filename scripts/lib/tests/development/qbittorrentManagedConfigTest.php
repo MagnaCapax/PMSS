@@ -35,7 +35,9 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testApplyManagedConfigRewritesDiskCacheAndConnectionCaps(): void
     {
-        $configPath = $this->writeConfig(
+        $configPath = $this->pmssWriteRelativeFile(
+            $this->homeRoot,
+            'alice/.config/qBittorrent/qBittorrent.conf',
             "[BitTorrent]\nSession\\DiskCacheSize=16384\nSession\\MaxConnections=9999\n\n[Preferences]\nDownloads\\DiskWriteCacheSize=16384\nBittorrent\\MaxConnecs=9999\n"
         );
 
@@ -50,7 +52,9 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testApplyManagedConfigRestoresWebUiSafetyFlags(): void
     {
-        $configPath = $this->writeConfig(
+        $configPath = $this->pmssWriteRelativeFile(
+            $this->homeRoot,
+            'alice/.config/qBittorrent/qBittorrent.conf',
             "[Preferences]\nWebUI\\CSRFProtection=true\nWebUI\\ClickjackingProtection=true\nWebUI\\HostHeaderValidation=true\n"
         );
 
@@ -64,7 +68,9 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testApplyManagedConfigPreservesUserOwnedSettings(): void
     {
-        $configPath = $this->writeConfig(
+        $configPath = $this->pmssWriteRelativeFile(
+            $this->homeRoot,
+            'alice/.config/qBittorrent/qBittorrent.conf',
             "[Preferences]\nGeneral\\Locale=fi\nWebUI\\Port=23456\nDownloads\\DiskWriteCacheSize=8192\n"
         );
 
@@ -78,7 +84,9 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testApplyManagedConfigRestoresMissingManagedKeysWithinExistingSections(): void
     {
-        $configPath = $this->writeConfig(
+        $configPath = $this->pmssWriteRelativeFile(
+            $this->homeRoot,
+            'alice/.config/qBittorrent/qBittorrent.conf',
             "[BitTorrent]\nSession\\DiskIOType=MemoryMappedFiles\n\n[Preferences]\nLocale=en\n"
         );
 
@@ -92,7 +100,11 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testApplyManagedConfigCreatesMissingManagedSections(): void
     {
-        $configPath = $this->writeConfig("[Application]\nMemoryWorkingSetLimit=2048\n");
+        $configPath = $this->pmssWriteRelativeFile(
+            $this->homeRoot,
+            'alice/.config/qBittorrent/qBittorrent.conf',
+            "[Application]\nMemoryWorkingSetLimit=2048\n"
+        );
 
         $this->assertTrue(pmssQbittorrentApplyManagedConfig('alice'));
 
@@ -116,7 +128,11 @@ class QbittorrentManagedConfigTest extends TestCase
 
     public function testApplyUploadThrottlePreservesFileMode(): void
     {
-        $configPath = $this->writeConfig("[Preferences]\nConnection\\GlobalUPLimit=10\n");
+        $configPath = $this->pmssWriteRelativeFile(
+            $this->homeRoot,
+            'alice/.config/qBittorrent/qBittorrent.conf',
+            "[Preferences]\nConnection\\GlobalUPLimit=10\n"
+        );
         chmod($configPath, 0640);
 
         $this->assertTrue(pmssQbittorrentApplyUploadThrottle('alice', 512));
@@ -130,9 +146,7 @@ class QbittorrentManagedConfigTest extends TestCase
     {
         $realHomeRoot = $this->homeRoot.'/real-home';
         $linkedHomeRoot = $this->homeRoot.'/linked-home';
-        @mkdir($realHomeRoot.'/alice/.config/qBittorrent', 0755, true);
-        $configPath = $realHomeRoot.'/alice/.config/qBittorrent/qBittorrent.conf';
-        file_put_contents($configPath, "[Preferences]\nConnection\\GlobalUPLimit=10\n");
+        $configPath = $this->pmssWriteRelativeFile($realHomeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nConnection\\GlobalUPLimit=10\n");
         symlink($realHomeRoot, $linkedHomeRoot);
         putenv('PMSS_HOME_DIR='.$linkedHomeRoot);
 
@@ -143,13 +157,4 @@ class QbittorrentManagedConfigTest extends TestCase
         );
     }
 
-    private function writeConfig(string $contents): string
-    {
-        $configDir = $this->homeRoot.'/alice/.config/qBittorrent';
-        @mkdir($configDir, 0755, true);
-        $configPath = $configDir.'/qBittorrent.conf';
-        file_put_contents($configPath, $contents);
-
-        return $configPath;
-    }
 }

@@ -12,15 +12,6 @@ class ConfigBackupsServiceGuardTest extends TestCase
         return [$this->pmssMakeTempDir('pmss-backups-src-'), $this->pmssMakeTempDir('pmss-backups-root-')];
     }
 
-    private function writeSourceFile(string $root, string $relativePath, string $content): string
-    {
-        $path = $root.'/'.ltrim($relativePath, '/');
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, $content);
-
-        return $path;
-    }
-
     public function testNormalizeServiceAcceptsSafeServiceNames(): void
     {
         $this->assertEquals('sshd', \pmssConfigBackupsNormalizeService('sshd'));
@@ -47,7 +38,7 @@ class ConfigBackupsServiceGuardTest extends TestCase
     {
         [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
         $messages = [];
-        $source = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         $backup = \pmssBackupCriticalConfig('../nginx', $source, array(
             'backupRoot' => $backupRoot,
@@ -69,7 +60,7 @@ class ConfigBackupsServiceGuardTest extends TestCase
     {
         [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
         $messages = [];
-        $source = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         \pmssPruneCriticalConfigBackups('nginx/child', $source, array(
             'backupRoot' => $backupRoot,
@@ -109,7 +100,7 @@ class ConfigBackupsServiceGuardTest extends TestCase
     {
         [$sourceRoot] = $this->makeBackupRoots();
         $messages = [];
-        $source = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
         \pmssPruneCriticalConfigBackups('nginx', $source, array(
             'backupRoot' => 'relative-backups',

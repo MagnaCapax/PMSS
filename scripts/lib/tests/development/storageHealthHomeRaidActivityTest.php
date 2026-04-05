@@ -20,13 +20,6 @@ class StorageHealthHomeRaidActivityTest extends TestCase
         $this->pmssCleanupTempDirProperty('tmpDir');
     }
 
-    private function writeFile(string $relativePath, string $content): string
-    {
-        $path = $this->tmpDir.'/'.$relativePath;
-        $this->pmssWriteFile($path, $content, 0700);
-        return $path;
-    }
-
     public function testParsesRaidActivitySummaryDetails(): void
     {
         $summary = \pmssStorageHealthRaidActivitySummaryParse(
@@ -41,7 +34,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testResolvesHomeArrayFromDirectMdMount(): void
     {
-        $mountsPath = $this->writeFile('mounts', "/dev/md0 /home ext4 rw 0 0\n");
+        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md0 /home ext4 rw 0 0\n", 0700);
 
         $homeArray = \pmssStorageHealthHomeArrayResolve($mountsPath);
         $this->assertEquals('md0', $homeArray);
@@ -50,10 +43,10 @@ class StorageHealthHomeRaidActivityTest extends TestCase
     public function testResolvesHomeArrayFromNamedMdDevice(): void
     {
         @mkdir($this->tmpDir.'/dev/md', 0700, true);
-        $this->writeFile('dev/md7', '');
+        $this->pmssWriteRelativeFile($this->tmpDir, 'dev/md7', '', 0700);
         symlink('../md7', $this->tmpDir.'/dev/md/home');
 
-        $mountsPath = $this->writeFile('mounts', $this->tmpDir.'/dev/md/home /home ext4 rw 0 0'."\n");
+        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', $this->tmpDir.'/dev/md/home /home ext4 rw 0 0'."\n", 0700);
 
         $homeArray = \pmssStorageHealthHomeArrayResolve($mountsPath);
         $this->assertEquals('md7', $homeArray);
@@ -61,7 +54,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityReturnsOnlyHomeArrayWork(): void
     {
-        $mountsPath = $this->writeFile('mounts', "/dev/md1 /home ext4 rw 0 0\n");
+        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             ['array' => 'md0', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
             ['array' => 'md1', 'resync' => '      [>....................]  recovery = 7.5% finish=60.0min speed=2000K/sec'],
@@ -77,7 +70,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityReturnsNullWhenHomeIsNotOnMd(): void
     {
-        $mountsPath = $this->writeFile('mounts', "/dev/vda1 /home ext4 rw 0 0\n");
+        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/vda1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             ['array' => 'md1', 'resync' => '      [>....................]  resync = 5.1% finish=90.0min speed=1000K/sec'],
         ];
@@ -88,7 +81,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityReturnsDegradedNoticeWithoutRebuild(): void
     {
-        $mountsPath = $this->writeFile('mounts', "/dev/md1 /home ext4 rw 0 0\n");
+        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             ['array' => 'md1', 'flags' => ['degraded'], 'severity' => 'fail'],
         ];
@@ -102,7 +95,7 @@ class StorageHealthHomeRaidActivityTest extends TestCase
 
     public function testHomeRaidActivityPrefersActiveRebuildOverDegradedNotice(): void
     {
-        $mountsPath = $this->writeFile('mounts', "/dev/md1 /home ext4 rw 0 0\n");
+        $mountsPath = $this->pmssWriteRelativeFile($this->tmpDir, 'mounts', "/dev/md1 /home ext4 rw 0 0\n", 0700);
         $raidEntries = [
             [
                 'array' => 'md1',

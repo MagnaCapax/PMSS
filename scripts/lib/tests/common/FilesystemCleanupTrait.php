@@ -50,10 +50,12 @@ trait FilesystemCleanupTrait
     }
 
     /** Write fixture content while creating parent directories when needed. */
-    protected function pmssWriteFile(string $path, string $content, int $dirMode = 0755): void
+    protected function pmssWriteFile(string $path, string $content, int $dirMode = 0755): string
     {
         $this->pmssEnsureDir(dirname($path), $dirMode);
         @file_put_contents($path, $content);
+
+        return $path;
     }
 
     /** Write fixture content and mark the target executable for stubbed commands. */
@@ -77,10 +79,10 @@ trait FilesystemCleanupTrait
         $this->pmssWriteExecutableFile($path, "#!/usr/bin/env php\n<?php\n".$body."\n", $dirMode, $fileMode);
     }
 
-    /** Write fixture content beneath a base directory so tests can share relative-path setup. */
-    protected function pmssWriteRelativeFile(string $baseDir, string $relativePath, string $content, int $dirMode = 0755): void
+    /** Write fixture content beneath a base directory and return the resolved path. */
+    protected function pmssWriteRelativeFile(string $baseDir, string $relativePath, string $content, int $dirMode = 0755): string
     {
-        $this->pmssWriteFile(rtrim($baseDir, '/').'/'.ltrim($relativePath, '/'), $content, $dirMode);
+        return $this->pmssWriteFile(rtrim($baseDir, '/').'/'.ltrim($relativePath, '/'), $content, $dirMode);
     }
 
     /** Read fixture content, treating absent files as empty strings for assertions. */

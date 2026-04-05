@@ -17,19 +17,10 @@ class ConfigBackupsCharacterizationTest extends TestCase
         return $roots;
     }
 
-    private function writeSourceFile(string $root, string $relativePath, string $content): string
-    {
-        $path = $root.'/'.ltrim($relativePath, '/');
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, $content);
-
-        return $path;
-    }
-
     public function testBackupFilenameFormatRemainsStable(): void
     {
         [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
-        $source = $this->writeSourceFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
 
         $backup = \pmssBackupCriticalConfig('sshd', $source, array(
             'backupRoot' => $backupRoot,
@@ -52,8 +43,8 @@ class ConfigBackupsCharacterizationTest extends TestCase
         $serviceDir = $backupRoot.'/nginx';
         @mkdir($serviceDir, 0700, true);
 
-        $targetSource = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
-        $otherSource = $this->writeSourceFile($sourceRoot, 'etc/nginx/proxy_params', "proxy_set_header Host \$host;\n");
+        $targetSource = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
+        $otherSource = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/proxy_params', "proxy_set_header Host \$host;\n");
 
         $targetKey = \pmssConfigBackupsPathKey($targetSource);
         $otherKey = \pmssConfigBackupsPathKey($otherSource);
@@ -78,7 +69,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
     public function testBackupRejectsSymlinkSourcePath(): void
     {
         [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
-        $source = $this->writeSourceFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/ssh/sshd_config', "Port 22\n");
         $sourceLink = $sourceRoot.'/etc/ssh/sshd_config.link';
         symlink($source, $sourceLink);
 
@@ -94,7 +85,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
     public function testBackupRejectsSymlinkedServiceDirectory(): void
     {
         [$sourceRoot, $backupRoot, $outsideRoot] = $this->makeBackupRoots(true);
-        $source = $this->writeSourceFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
         symlink($outsideRoot, $backupRoot.'/nginx');
 
         $backup = \pmssBackupCriticalConfig('nginx', $source, array(
@@ -109,7 +100,7 @@ class ConfigBackupsCharacterizationTest extends TestCase
     public function testPruneSkipsSymlinkedServiceDirectory(): void
     {
         [$sourceRoot, $backupRoot, $outsideRoot] = $this->makeBackupRoots(true);
-        $source = $this->writeSourceFile($sourceRoot, 'etc/proftpd/proftpd.conf', "ServerName pmss\n");
+        $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/proftpd/proftpd.conf', "ServerName pmss\n");
 
         $sourceKey = \pmssConfigBackupsPathKey($source);
         $backupPath = $outsideRoot.'/20260131100000__'.$sourceKey.'.bak';

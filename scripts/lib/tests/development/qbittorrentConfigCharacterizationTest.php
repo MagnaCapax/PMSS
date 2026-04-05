@@ -28,7 +28,7 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
 
     public function testPasswordSyncRewritesExistingPasswordLineInPlace(): void
     {
-        $configPath = $this->writeConfig("[Preferences]\nWebUI\\Password_PBKDF2=@ByteArray(old:hash)\nLocale=en\n");
+        $configPath = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Password_PBKDF2=@ByteArray(old:hash)\nLocale=en\n");
 
         $this->assertTrue(\pmssUpdateQbittorrentPassword('alice', 'secret'));
 
@@ -41,7 +41,7 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
 
     public function testPasswordSyncAddsPasswordLineInsidePreferencesSection(): void
     {
-        $configPath = $this->writeConfig("[Preferences]\nLocale=en\n\n[BitTorrent]\nSession\\DiskCacheSize=128\n");
+        $configPath = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nLocale=en\n\n[BitTorrent]\nSession\\DiskCacheSize=128\n");
 
         $this->assertTrue(\pmssUpdateQbittorrentPassword('alice', 'secret'));
 
@@ -55,7 +55,7 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
 
     public function testUploadThrottleRemovalKeepsRemainingPreferencesSnapshot(): void
     {
-        $configPath = $this->writeConfig("[Preferences]\nConnection\\GlobalUPLimit=512\nLocale=en\n");
+        $configPath = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nConnection\\GlobalUPLimit=512\nLocale=en\n");
 
         $this->assertTrue(\pmssQbittorrentApplyUploadThrottle('alice', 0));
         $this->assertSame("[Preferences]\nLocale=en\n", (string) file_get_contents($configPath));
@@ -65,8 +65,8 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
     {
         $home = $this->homeRoot.'/alice';
         @mkdir($home, 0755, true);
-        file_put_contents($home.'/.qbittorrentPort', "45678\n");
-        $configPath = $this->writeConfig("[Preferences]\nWebUI\\Port=12345\nLocale=en\n");
+        $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.qbittorrentPort', "45678\n");
+        $configPath = $this->pmssWriteRelativeFile($this->homeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nWebUI\\Port=12345\nLocale=en\n");
 
         $this->assertTrue(\pmssQbittorrentPortEnsure('alice', $home));
         $this->assertSame(
@@ -75,13 +75,4 @@ final class QbittorrentConfigCharacterizationTest extends TestCase
         );
     }
 
-    private function writeConfig(string $contents): string
-    {
-        $configDir = $this->homeRoot.'/alice/.config/qBittorrent';
-        @mkdir($configDir, 0755, true);
-        $configPath = $configDir.'/qBittorrent.conf';
-        file_put_contents($configPath, $contents);
-
-        return $configPath;
-    }
 }
