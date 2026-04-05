@@ -76,6 +76,27 @@ class ResourceStatsProcessor
         }
     }
 
+    /** Handle the CLI worker-or-spawn flow used by the resource stats cron job. */
+    public function runCli(array $argv, string $scriptPath): int
+    {
+        $this->ensureRuntime();
+        if (($user = $this->detectWorkerUser($argv)) !== null) {
+            if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; }
+            $this->processUser($user, $this->buildCompareTimes());
+            return 0;
+        }
+        $lockFile = $this->runtimeDir.'/resourceStats.lock';
+        $lockBusy = false;
+        $lockHandle = pmssLockFileAcquire($lockFile, true, 'c+', false, true, $lockBusy);
+        if ($lockHandle !== false) {
+            if ($lockBusy) return 0;
+            pmssLockHandleWritePid($lockHandle);
+        } else logMessage(date('c').": Unable to open lock file {$lockFile} for resourceStats");
+        if (empty($users = $this->discoverUsers())) { echo "No users in this system!\n"; return 0; }
+        $this->spawnWorkers($scriptPath, $users);
+        return 0;
+    }
+
     public function validateUser(string $user): bool
     {
         return is_readable($this->resourceDir.'/'.$user)

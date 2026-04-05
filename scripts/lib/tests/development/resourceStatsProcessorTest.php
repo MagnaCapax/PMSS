@@ -15,6 +15,24 @@ class StubResourceStatsProcessorStatistics extends \resourceStatistics
     }
 }
 
+class SpyResourceStatsProcessor extends \ResourceStatsProcessor
+{
+    /** @var array<int, string> */
+    public $usersToDiscover = [];
+    /** @var array<int, array<int, mixed>> */
+    public $spawnCalls = [];
+
+    public function discoverUsers(): array
+    {
+        return $this->usersToDiscover;
+    }
+
+    public function spawnWorkers(string $scriptPath, array $users): void
+    {
+        $this->spawnCalls[] = [$scriptPath, $users];
+    }
+}
+
 class ResourceStatsProcessorTest extends TestCase
 {
     /** @var array<string, string> */
@@ -162,6 +180,61 @@ class ResourceStatsProcessorTest extends TestCase
         $processor->processUser($user, $processor->buildCompareTimes());
 
         $this->assertTrue($this->readSavedResourceStats($user) === null);
+    }
+
+    public function testRunCliProcessesWorkerUser(): void
+    {
+        $stats = new StubResourceStatsProcessorStatistics();
+        $processor = new SpyResourceStatsProcessor($stats, $this->paths);
+        $user = 'alice';
+
+        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
+        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+
+        $now = time();
+        $stats->map[$user] = implode("\n", [
+            date('Y-m-d H:i:s', $now - 120).' 1024 2048 10 20 3600 1048576 4',
+            date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6',
+        ]);
+
+        $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php', $user], '/scripts/cron/resourceStats.php'));
+        $this->assertTrue($this->readSavedResourceStats($user) !== null);
+        $this->assertEquals([], $processor->spawnCalls);
+    }
+
+    public function testRunCliReportsInvalidWorkerUser(): void
+    {
+        $processor = new SpyResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
+
+        ob_start();
+        $result = $processor->runCli(['/scripts/cron/resourceStats.php', 'ghost'], '/scripts/cron/resourceStats.php');
+        $output = (string) ob_get_clean();
+
+        $this->assertEquals(0, $result);
+        $this->assertStringContainsString("Invalid user specified: ghost\n", $output);
+        $this->assertEquals([], $processor->spawnCalls);
+    }
+
+    public function testRunCliPrintsNoUsersMessageWithoutDiscoveredUsers(): void
+    {
+        $processor = new SpyResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
+
+        ob_start();
+        $result = $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php');
+        $output = (string) ob_get_clean();
+
+        $this->assertEquals(0, $result);
+        $this->assertStringContainsString("No users in this system!\n", $output);
+        $this->assertEquals([], $processor->spawnCalls);
+    }
+
+    public function testRunCliSpawnsWorkersForDiscoveredUsers(): void
+    {
+        $processor = new SpyResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths);
+        $processor->usersToDiscover = ['alice', 'bob'];
+
+        $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'));
+        $this->assertEquals([['/scripts/cron/resourceStats.php', ['alice', 'bob']]], $processor->spawnCalls);
     }
 
     public function testFormatMetricDisplayPreservesByteThresholdBoundaries(): void
