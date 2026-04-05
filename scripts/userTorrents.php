@@ -17,28 +17,25 @@ require_once __DIR__.'/lib/userLifecycle.php';
 function pmssUserTorrentsCountForUser(string $homeDir, string $username): array
 {
     $counts = ['rtorrent' => 0, 'deluge' => 0, 'qbittorrent' => 0, 'total' => 0];
-    if (!pmssUsernameIsValid($username)) {
-        return $counts;
-    }
-
+    if (!pmssUsernameIsValid($username)) return $counts;
     $home = $homeDir.'/'.$username;
-
     $clientPatterns = [
-        'rtorrent' => ['session'],
-        'deluge' => ['.config/deluge/state', '.delugeSession', '.sessionDeluge'],
-        'qbittorrent' => ['.local/share/data/qBittorrent/BT_backup', '.local/share/qBittorrent/BT_backup', '.config/qBittorrent/BT_backup'],
+        'rtorrent' => ['session/*.torrent'],
+        'deluge' => ['.config/deluge/state/*.torrent', '.delugeSession/*.torrent', '.sessionDeluge/*.torrent'],
+        'qbittorrent' => [
+            '.local/share/data/qBittorrent/BT_backup/*.torrent', '.local/share/data/qBittorrent/BT_backup/*.fastresume',
+            '.local/share/qBittorrent/BT_backup/*.torrent', '.local/share/qBittorrent/BT_backup/*.fastresume',
+            '.config/qBittorrent/BT_backup/*.torrent', '.config/qBittorrent/BT_backup/*.fastresume',
+        ],
     ];
 
     foreach ($clientPatterns as $client => $patterns) {
         $seen = [];
-        $suffixes = $client === 'qbittorrent' ? ['/*.torrent', '/*.fastresume'] : ['/*.torrent'];
         foreach ($patterns as $pattern) {
-            foreach ($suffixes as $suffix) {
-                foreach (glob($home.'/'.$pattern.$suffix) ?: [] as $path) {
-                    $name = pathinfo(basename($path), PATHINFO_FILENAME);
-                    if ($name !== '' && $name !== '.' && $name !== '..') {
-                        $seen[$name] = true;
-                    }
+            foreach (glob($home.'/'.$pattern) ?: [] as $path) {
+                $name = pathinfo(basename($path), PATHINFO_FILENAME);
+                if ($name !== '' && $name !== '.' && $name !== '..') {
+                    $seen[$name] = true;
                 }
             }
         }
