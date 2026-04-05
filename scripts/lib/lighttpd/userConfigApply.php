@@ -358,19 +358,12 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
     return pmssWriteUserFile($path, $metaJson.$configJson, $owner, $mode);
 }
 
-function pmssLighttpdProxyHeaderMappings(array $pathMap): string
+function pmssLighttpdProxyPathMap(string $sourceBase, string $targetBase): array
 {
-    $mappings = [];
-    $total = count($pathMap);
-    $index = 0;
-    foreach ($pathMap as $source => $target) {
-        $index++;
-        $padding = substr($source, -1) === '/' ? '  ' : ' ';
-        $suffix = $index < $total ? ',' : '';
-        $mappings[] = '         "'.$source.'"'.$padding.'=> "'.$target.'"'.$suffix;
-    }
+    $sourceBase = rtrim($sourceBase, '/');
+    $targetBase = rtrim($targetBase, '/');
 
-    return implode("\n", $mappings);
+    return [$sourceBase.'/' => $targetBase === '' ? '/' : $targetBase.'/', $sourceBase => $targetBase];
 }
 
 function pmssLighttpdProxyRuleFragment(
@@ -406,9 +399,14 @@ function pmssLighttpdProxyRuleFragment(
         $fragment .= "\n";
     }
     if ($hasHeader) {
+        $mappings = [];
+        $lastSource = array_key_last($pathMap);
+        foreach ($pathMap as $source => $target) {
+            $mappings[] = '         "'.$source.'"'.(substr($source, -1) === '/' ? '  ' : ' ').'=> "'.$target.'"'.($source === $lastSource ? '' : ',');
+        }
         $fragment .= "  proxy.header = (\n"
             ."      \"map-urlpath\" => (\n"
-            .pmssLighttpdProxyHeaderMappings($pathMap)."\n"
+            .implode("\n", $mappings)."\n"
             ."       )\n"
             ."  )\n";
     }
@@ -421,18 +419,8 @@ function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
 {
     return "# PMSS-managed: Deluge reverse proxy.\n"
         ."# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n"
-        .pmssLighttpdProxyRuleFragment(
-            '^/user-'.$user.'/deluge($|/)',
-            $webPort,
-            ['/user-'.$user.'/deluge/' => '/', '/user-'.$user.'/deluge' => ''],
-            true
-        )."\n\n"
-        .pmssLighttpdProxyRuleFragment(
-            '^/deluge-'.$user.'($|/)',
-            $webPort,
-            ['/deluge-'.$user.'/' => '/user-'.$user.'/deluge/', '/deluge-'.$user => '/user-'.$user.'/deluge'],
-            true
-        )."\n\n";
+        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/deluge($|/)', $webPort, pmssLighttpdProxyPathMap('/user-'.$user.'/deluge', ''), true)."\n\n"
+        .pmssLighttpdProxyRuleFragment('^/deluge-'.$user.'($|/)', $webPort, pmssLighttpdProxyPathMap('/deluge-'.$user, '/user-'.$user.'/deluge'), true)."\n\n";
 }
 
 function pmssRcloneLighttpdProxyFragment(string $user, int $port): string
@@ -444,32 +432,14 @@ function pmssRcloneLighttpdProxyFragment(string $user, int $port): string
 function pmssQbittorrentLighttpdProxyFragment(string $user, int $port): string
 {
     return "# PMSS-managed: qBittorrent reverse proxy.\n\n"
-        .pmssLighttpdProxyRuleFragment(
-            '^/user-'.$user.'/qbittorrent/',
-            $port,
-            ['/user-'.$user.'/qbittorrent/' => '/', '/user-'.$user.'/qbittorrent' => ''],
-            false,
-            true
-        )."\n\n";
+        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/qbittorrent/', $port, pmssLighttpdProxyPathMap('/user-'.$user.'/qbittorrent', ''), false, true)."\n\n";
 }
 
 function pmssInvidiousLighttpdProxyFragment(string $user, int $port): string
 {
     return "# PMSS-managed: Invidious reverse proxy.\n\n"
-        .pmssLighttpdProxyRuleFragment(
-            '^/public-'.$user.'/invidious($|/)',
-            $port,
-            ['/public-'.$user.'/invidious/' => '/', '/public-'.$user.'/invidious' => ''],
-            false,
-            true
-        )."\n\n"
-        .pmssLighttpdProxyRuleFragment(
-            '^/user-'.$user.'/apps/invidious($|/)',
-            $port,
-            ['/user-'.$user.'/apps/invidious/' => '/', '/user-'.$user.'/apps/invidious' => ''],
-            false,
-            true
-        )."\n\n";
+        .pmssLighttpdProxyRuleFragment('^/public-'.$user.'/invidious($|/)', $port, pmssLighttpdProxyPathMap('/public-'.$user.'/invidious', ''), false, true)."\n\n"
+        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/apps/invidious($|/)', $port, pmssLighttpdProxyPathMap('/user-'.$user.'/apps/invidious', ''), false, true)."\n\n";
 }
 
 function pmssUserConfigLighttpdConfigureUser(

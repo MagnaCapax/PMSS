@@ -6,38 +6,11 @@ require_once dirname(__DIR__, 3).'/util/userConfigLighttpd.php';
 
 class InvidiousLighttpdProxyTest extends TestCase
 {
-    public function testFragmentPublishesPublicTenantPath(): void
+    public function testFragmentMatchesCharacterization(): void
     {
         $fragment = \pmssInvidiousLighttpdProxyFragment('alice', 4100);
 
-        $this->assertStringContainsString('^/public-alice/invidious($|/)', $fragment);
-        $this->assertStringContainsString('"/public-alice/invidious/"  => "/"', $fragment);
-        $this->assertStringContainsString('"/public-alice/invidious" => ""', $fragment);
-    }
-
-    public function testFragmentPublishesPrivateAppsTenantPath(): void
-    {
-        $fragment = \pmssInvidiousLighttpdProxyFragment('alice', 4100);
-
-        $this->assertStringContainsString('^/user-alice/apps/invidious($|/)', $fragment);
-        $this->assertStringContainsString('"/user-alice/apps/invidious/"  => "/"', $fragment);
-        $this->assertStringContainsString('"/user-alice/apps/invidious" => ""', $fragment);
-    }
-
-    public function testFragmentTargetsLoopbackOnly(): void
-    {
-        $fragment = \pmssInvidiousLighttpdProxyFragment('alice', 4100);
-
-        $this->assertEquals(2, substr_count($fragment, '"host" => "127.0.0.1"'));
-        $this->assertTrue(strpos($fragment, '0.0.0.0') === false);
-    }
-
-    public function testFragmentPreservesForwardedHeadersInBothScopes(): void
-    {
-        $fragment = \pmssInvidiousLighttpdProxyFragment('alice', 4100);
-
-        $this->assertEquals(2, substr_count($fragment, 'proxy.forwarded = ( "for" => 1,'));
-        $this->assertEquals(2, substr_count($fragment, '"host" => 1,'));
+        $this->assertSame('a9f464c111549da0b12031161e050ca6ed1a554f4488133c78c3e296240911f9', hash('sha256', $fragment));
     }
 
     public function testUserConfigApplyWiresOptionalPortFileAndManagedFragment(): void
