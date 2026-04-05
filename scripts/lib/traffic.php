@@ -58,9 +58,9 @@ class trafficStatistics {
     /** Configure traffic storage paths and mode. */
     public function __construct(array $paths = [])
     {
-        $this->trafficDir = rtrim($paths['traffic_dir'] ?? getenv('PMSS_TRAFFIC_DIR') ?: '/var/log/pmss/traffic', '/');
-        $homeDir = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
-        $runtimeDir = rtrim($paths['runtime_dir'] ?? getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+        $this->trafficDir = pmssDirPathResolve($paths['traffic_dir'] ?? null, 'PMSS_TRAFFIC_DIR', '/var/log/pmss/traffic');
+        $homeDir = pmssDirPathResolve($paths['home_dir'] ?? null, 'PMSS_HOME_DIR', '/home');
+        $runtimeDir = pmssDirPathResolve($paths['runtime_dir'] ?? null, 'PMSS_RUNTIME_DIR', '/var/run/pmss');
         $this->storage = new \TrafficStorage([
             'home_dir' => $homeDir,
             'runtime_dir' => $runtimeDir,

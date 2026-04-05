@@ -7,30 +7,14 @@
  */
 
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../userLifecycle.php';
-
-if (!function_exists('pmssTrafficNormalizeDir')) {
-    /** Normalize a PMSS directory path while preserving root as `/`. */
-    function pmssTrafficNormalizeDir(string $path): string
-    {
-        $path = rtrim($path, '/');
-        return $path !== '' ? $path : '/';
-    }
-}
-
-if (!function_exists('pmssTrafficResolveDir')) {
-    /** Resolve and normalize a PMSS directory from an explicit path or env override. */
-    function pmssTrafficResolveDir(?string $path, string $envKey, string $fallback): string
-    {
-        return pmssTrafficNormalizeDir((string) ($path ?? (getenv($envKey) ?: $fallback)));
-    }
-}
 
 if (!function_exists('pmssTrafficDataPaths')) {
     /** @return array<string,string> Resolve the canonical per-user traffic data files. */
     function pmssTrafficDataPaths(string $username, ?string $homeDir = null): array
     {
-        $homeDir = pmssTrafficResolveDir($homeDir, 'PMSS_HOME_DIR', '/home');
+        $homeDir = pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home');
         $userHome = $homeDir.'/'.$username;
 
         return [
@@ -62,7 +46,7 @@ if (!function_exists('pmssTrafficLimitPath')) {
     /** Resolve the per-user persisted traffic limit path. */
     function pmssTrafficLimitPath(string $username, ?string $homeDir = null): string
     {
-        return pmssTrafficResolveDir($homeDir, 'PMSS_HOME_DIR', '/home').'/'.$username.'/.trafficLimit';
+        return pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home').'/'.$username.'/.trafficLimit';
     }
 }
 
@@ -71,10 +55,10 @@ if (!function_exists('pmssTrafficStatsPath')) {
     function pmssTrafficStatsPath(string $username, ?string $statsDir = null, ?string $runtimeDir = null): string
     {
         if ($statsDir === null) {
-            $statsDir = pmssTrafficResolveDir($runtimeDir, 'PMSS_RUNTIME_DIR', '/var/run/pmss').'/trafficStats';
+            $statsDir = pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/var/run/pmss').'/trafficStats';
         }
 
-        return pmssTrafficNormalizeDir($statsDir).'/'.$username;
+        return pmssDirPathNormalize($statsDir).'/'.$username;
     }
 }
 
@@ -171,9 +155,9 @@ class TrafficStorage
 
     public function __construct(array $paths = [])
     {
-        $this->homeDir = pmssTrafficResolveDir($paths['home_dir'] ?? null, 'PMSS_HOME_DIR', '/home');
-        $this->runtimeDir = pmssTrafficResolveDir($paths['runtime_dir'] ?? null, 'PMSS_RUNTIME_DIR', '/var/run/pmss');
-        $this->statsDir = pmssTrafficNormalizeDir((string) ($paths['stats_dir'] ?? ($this->runtimeDir.'/trafficStats')));
+        $this->homeDir = pmssDirPathResolve($paths['home_dir'] ?? null, 'PMSS_HOME_DIR', '/home');
+        $this->runtimeDir = pmssDirPathResolve($paths['runtime_dir'] ?? null, 'PMSS_RUNTIME_DIR', '/var/run/pmss');
+        $this->statsDir = pmssDirPathNormalize((string) ($paths['stats_dir'] ?? ($this->runtimeDir.'/trafficStats')));
         $this->trafficMode = ($paths['traffic_mode'] ?? 'egress') === 'ingress' ? 'ingress' : 'egress';
     }
 

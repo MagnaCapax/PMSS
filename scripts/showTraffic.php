@@ -83,7 +83,7 @@ TXT;
         require_once $trafficLimitLib;
     }
 
-    $runtimeDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/');
+    $runtimeDir = pmssRuntimeDir();
     $statsDir = $runtimeDir.'/trafficStats';
     $listUsersResult = pmssListManagedUsersResult(__DIR__.'/listUsers.php');
     if (($users = pmssListManagedUsersFromResult($listUsersResult)) === null) {

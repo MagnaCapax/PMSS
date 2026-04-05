@@ -66,7 +66,7 @@ TXT;
         exit(0);
     }
     $byClient = isset($options['by-client']);
-    $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
+    $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
 
     // Get & parse users list.
     $listUsersResult = pmssListManagedUsersResult(__DIR__.'/listUsers.php');

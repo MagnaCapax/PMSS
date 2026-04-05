@@ -20,7 +20,7 @@ class QbittorrentThrottleHelperTest extends TestCase
             $this->source
         );
         $this->assertStringContainsString(
-            "getenv('PMSS_HOME_DIR') ?: '/home'",
+            "pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home')",
             $this->source
         );
     }

@@ -87,7 +87,7 @@ TEXT;
 
     $userFilter = trim((string) ($options['user'] ?? ''));
 
-    $statsDir = rtrim(getenv('PMSS_RUNTIME_DIR') ?: '/var/run/pmss', '/').'/resourceStats';
+    $statsDir = pmssRuntimeDir().'/resourceStats';
 
     if ($userFilter !== '') {
         if (!pmssResourceLogIsValidUser($userFilter)) {

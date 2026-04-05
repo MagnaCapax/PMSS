@@ -14,9 +14,9 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
  */
 function pmssQbittorrentConfigPath(string $username): string
 {
-    $homeRoot = getenv('PMSS_HOME_DIR') ?: '/home';
+    $homeRoot = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
 
-    return rtrim($homeRoot, '/').'/'.$username.'/.config/qBittorrent/qBittorrent.conf';
+    return $homeRoot.'/'.$username.'/.config/qBittorrent/qBittorrent.conf';
 }
 
 /**

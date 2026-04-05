@@ -26,7 +26,7 @@ function pmssResourceSnapshotRun(): int
             return 0;
         }
         $stats = new resourceStatistics();
-        $homeDir = rtrim(getenv('PMSS_HOME_DIR') ?: '/home', '/');
+        $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
 
         foreach ($users as $user) {
             if (($uid = pmssResourceLogLookupManagedUid($user)) === null) {

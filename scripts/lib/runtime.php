@@ -27,6 +27,14 @@ if (!function_exists('pmssResolvePathFromEnv')) {
         return $value !== '' ? $value : rtrim($default, '/');
     }
 }
+if (!function_exists('pmssDirPathNormalize')) {
+    // Normalize directory paths while preserving `/` and intentional empty overrides.
+    function pmssDirPathNormalize(string $path): string { $trimmed = rtrim($path, '/'); return $trimmed !== '' ? $trimmed : ($path !== '' ? '/' : ''); }
+}
+if (!function_exists('pmssDirPathResolve')) {
+    // Resolve a directory path from an explicit override or env-backed default.
+    function pmssDirPathResolve(?string $override, string $envKey, string $default): string { return pmssDirPathNormalize((string) ($override !== null ? $override : pmssResolvePathFromEnv($envKey, $default))); }
+}
 if (!function_exists('pmssCommandBinaryNameIsSafe')) {
     // Accept only bare binary names before crossing the shell boundary.
     function pmssCommandBinaryNameIsSafe(string $binary): bool

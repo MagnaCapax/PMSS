@@ -101,7 +101,7 @@ function pmssReadUserTrafficStates(string $username): array
  */
 function pmssReadTorrentThrottle(string $username): ?int
 {
-    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
+    $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
     $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
     if (!is_file($path) || is_link($path)) {
         return null;
@@ -145,7 +145,7 @@ function pmssReadTorrentThrottle(string $username): ?int
  */
 function pmssWriteTorrentThrottle(string $username, int $value): bool
 {
-    $homeDir = getenv('PMSS_HOME_DIR') ?: '/home';
+    $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
     $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
     $homeDir = dirname($path);
     if (!is_dir($homeDir) || is_link($homeDir)) {

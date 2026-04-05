@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/runtime.php';
+
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
  */
@@ -16,7 +18,7 @@ class resourceStatistics
 
     public function __construct(array $paths = [])
     {
-        $this->resourceDir = rtrim($paths['resource_dir'] ?? getenv('PMSS_RESOURCE_DIR') ?: '/var/log/pmss/resources', '/');
+        $this->resourceDir = pmssDirPathResolve($paths['resource_dir'] ?? null, 'PMSS_RESOURCE_DIR', '/var/log/pmss/resources');
     }
 
     /**

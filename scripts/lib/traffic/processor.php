@@ -23,8 +23,8 @@ class TrafficStatsProcessor
     public function __construct(trafficStatistics $stats, array $paths = [])
     {
         $this->stats           = $stats;
-        $this->trafficDir      = rtrim($paths['traffic_dir'] ?? getenv('PMSS_TRAFFIC_DIR') ?: '/var/log/pmss/traffic', '/');
-        $this->homeDir         = rtrim($paths['home_dir'] ?? getenv('PMSS_HOME_DIR') ?: '/home', '/');
+        $this->trafficDir      = pmssDirPathResolve($paths['traffic_dir'] ?? null, 'PMSS_TRAFFIC_DIR', '/var/log/pmss/traffic');
+        $this->homeDir         = pmssDirPathResolve($paths['home_dir'] ?? null, 'PMSS_HOME_DIR', '/home');
         $this->passwdFile      = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
     }
 
