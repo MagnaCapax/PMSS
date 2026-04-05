@@ -268,6 +268,9 @@ abstract class TestCase
         return ['user' => $user, 'home' => $this->pmssUserHomePath($homeRoot, $user)];
     }
 
+    /** Create a fixture directory tree and assert it exists afterwards. */
+    protected function pmssEnsureFixtureDirectory(string $path, int $mode = 0755): void { $this->assertTrue(@mkdir($path, $mode, true) || is_dir($path), 'Expected fixture directory to exist: '.$path); }
+
     /** Write a PHP array fixture that can be loaded with include/require. */
     protected function pmssWritePhpArrayFixture(array $value, string $prefix = 'pmss-fixture-'): string
     {

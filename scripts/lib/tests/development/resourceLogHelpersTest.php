@@ -67,7 +67,7 @@ class ResourceLogHelpersTest extends TestCase
     {
         $root = $this->makeRoot();
         $target = $root.'/target';
-        $this->assertTrue(@mkdir($target, 0700, true) || is_dir($target));
+        $this->pmssEnsureFixtureDirectory($target, 0700);
 
         $symlinkedParent = $root.'/state';
         $this->pmssCreateSymlinkOrSkip($target, $symlinkedParent);
@@ -408,7 +408,7 @@ class ResourceLogHelpersTest extends TestCase
     {
         $root = $this->makeRoot();
         $targetDir = $root.'/target';
-        $this->assertTrue(@mkdir($targetDir, 0700, true) || is_dir($targetDir));
+        $this->pmssEnsureFixtureDirectory($targetDir, 0700);
 
         $stateDir = $root.'/state';
         $this->pmssCreateSymlinkOrSkip($targetDir, $stateDir);

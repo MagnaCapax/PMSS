@@ -163,9 +163,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     private function withTempSources(string $content, callable $callback): void
     {
         $dir = sys_get_temp_dir().'/pmss-sources-'.bin2hex(random_bytes(6));
-        if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
-            throw new \RuntimeException('Unable to create temp directory for test');
-        }
+        $this->pmssEnsureFixtureDirectory($dir, 0700);
 
         $path = $dir.'/sources.list';
         if (file_put_contents($path, $content) === false) {
@@ -190,9 +188,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     private function withTempConfigTemplates(array $templates, callable $callback): void
     {
         $dir = sys_get_temp_dir().'/pmss-config-'.bin2hex(random_bytes(6));
-        if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
-            throw new \RuntimeException('Unable to create temp config directory for test');
-        }
+        $this->pmssEnsureFixtureDirectory($dir, 0700);
 
         foreach ($templates as $codename => $content) {
             $path = $dir."/template.sources.$codename";

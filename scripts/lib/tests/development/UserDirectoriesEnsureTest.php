@@ -35,7 +35,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testCreatesNestedPathWithParentModeAndLeafMode(): void
     {
         $home = $this->tempDir.'/home';
-        $this->assertTrue(@mkdir($home, 0755, true) || is_dir($home));
+        $this->pmssEnsureFixtureDirectory($home);
 
         $ok = \pmssEnsureUserHomeDir($this->user, $home, 'www/recycle', 0771, null, 0755);
         $this->assertTrue($ok);
@@ -51,7 +51,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsTraversalRelativePath(): void
     {
         $home = $this->tempDir.'/home';
-        $this->assertTrue(@mkdir($home, 0755, true) || is_dir($home));
+        $this->pmssEnsureFixtureDirectory($home);
         $ok = \pmssEnsureUserHomeDir($this->user, $home, '../evil', 0755);
         $this->assertTrue($ok === false);
         $this->assertTrue(!is_dir($this->tempDir.'/evil'));
@@ -60,7 +60,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsAbsoluteRelativePath(): void
     {
         $home = $this->tempDir.'/home';
-        $this->assertTrue(@mkdir($home, 0755, true) || is_dir($home));
+        $this->pmssEnsureFixtureDirectory($home);
         $ok = \pmssEnsureUserHomeDir($this->user, $home, '/etc', 0755);
         $this->assertTrue($ok === false);
     }
@@ -68,7 +68,7 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsSymlinkedTarget(): void
     {
         $home = $this->tempDir.'/home';
-        $this->assertTrue(@mkdir($home, 0755, true) || is_dir($home));
+        $this->pmssEnsureFixtureDirectory($home);
         $target = $home.'/.tmp';
         @symlink($this->tempDir, $target);
 
@@ -80,10 +80,10 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testRejectsSymlinkedParentDirectory(): void
     {
         $home = $this->tempDir.'/home';
-        $this->assertTrue(@mkdir($home, 0755, true) || is_dir($home));
+        $this->pmssEnsureFixtureDirectory($home);
 
         $elsewhere = $this->tempDir.'/elsewhere';
-        $this->assertTrue(@mkdir($elsewhere, 0700, true) || is_dir($elsewhere));
+        $this->pmssEnsureFixtureDirectory($elsewhere, 0700);
 
         $symlinked = $home.'/.lighttpd';
         @symlink($elsewhere, $symlinked);
@@ -97,9 +97,9 @@ class UserDirectoriesEnsureTest extends TestCase
     public function testConvergesLeafModeWhenDirectoryExists(): void
     {
         $home = $this->tempDir.'/home';
-        $this->assertTrue(@mkdir($home, 0755, true) || is_dir($home));
+        $this->pmssEnsureFixtureDirectory($home);
         $dir = $home.'/.tmp';
-        $this->assertTrue(@mkdir($dir, 0700, true) || is_dir($dir));
+        $this->pmssEnsureFixtureDirectory($dir, 0700);
         @chmod($dir, 0700);
 
         $ok = \pmssEnsureUserHomeDir($this->user, $home, '.tmp', 0755);
