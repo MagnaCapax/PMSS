@@ -4,7 +4,7 @@
  * Nightly quota refresher.
  *
  * - Requires `quota` utilities and filesystem support for per-user quotas.
- * - Runs `quota -u <user>` for every tenant, storing the human-readable output
+ * - Runs `quota -u <user> -v -s` for every tenant, storing the human-readable output
  *   in `/home/<user>/.quota` for support tooling.
  * - Logs failures via `Logger`, then continues to the next user so one broken
  *   account does not halt the sweep.
@@ -111,7 +111,7 @@ foreach ($users as $thisUser) {
     // Note: `quota` returns exit code 1 when user is over quota, but still
     // produces valid output. We only treat it as failure if no output or
     // exit code > 1 (which indicates actual errors like invalid user).
-    $quotaCmd = 'quota -u '.escapeshellarg($thisUser).' -s 2>&1';
+    $quotaCmd = 'quota -u '.escapeshellarg($thisUser).' -v -s 2>&1';
     $outputLines = [];
     $ret = 0;
     exec($quotaCmd, $outputLines, $ret);

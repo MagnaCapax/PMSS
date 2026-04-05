@@ -32,7 +32,7 @@ class UpdateQuotasGuardTest extends TestCase
         $this->assertStringContainsString('/dev/null      0K      0K      0K', $src, 'updateQuotas.php fallback snapshot should provide numeric quota fields with unit suffixes');
 
         // The quota binary itself must be invoked once with a safely quoted username.
-        $this->assertStringContainsString("'quota -u '.escapeshellarg(\$thisUser).' -s 2>&1'", $src, 'updateQuotas.php must call quota with a single, quoted username');
+        $this->assertStringContainsString("'quota -u '.escapeshellarg(\$thisUser).' -v -s 2>&1'", $src, 'updateQuotas.php must call quota with verbose human-readable output for a single, quoted username');
         $this->assertStringContainsString('escapeshellarg($thisUser)', $src, 'updateQuotas.php must quote usernames in quota command');
     }
 }
