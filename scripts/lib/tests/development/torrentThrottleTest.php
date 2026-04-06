@@ -63,6 +63,14 @@ class TorrentThrottleTest extends TestCase
         $this->assertEquals(null, pmssReadTorrentThrottle($this->user));
     }
 
+    public function testReadRejectsInvalidUsernameBeforePathResolution(): void
+    {
+        @mkdir($this->homeRoot.'/alice/evil', 0755, true);
+        file_put_contents($this->homeRoot.'/alice/evil/.torrentThrottle', '77');
+
+        $this->assertEquals(null, pmssReadTorrentThrottle('alice/evil'));
+    }
+
     public function testWriteCreatesFileForPositive(): void
     {
         $result = pmssWriteTorrentThrottle($this->user, 55);
@@ -108,5 +116,13 @@ class TorrentThrottleTest extends TestCase
 
         $this->assertTrue(!pmssWriteTorrentThrottle($this->user, 10), 'Expected write to fail on directory');
         $this->assertTrue(is_dir($path), 'Throttle directory should remain untouched');
+    }
+
+    public function testWriteRejectsInvalidUsernameBeforePathResolution(): void
+    {
+        @mkdir($this->homeRoot.'/alice/evil', 0755, true);
+
+        $this->assertTrue(!pmssWriteTorrentThrottle('alice/evil', 10), 'Expected invalid username write to fail');
+        $this->assertTrue(!is_file($this->homeRoot.'/alice/evil/.torrentThrottle'), 'Traversal-like path should remain untouched');
     }
 }

@@ -92,6 +92,19 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
     }
 
+    public function testReadUserTrafficStatesRejectsInvalidUsernameBeforePathResolution(): void
+    {
+        @mkdir($this->tempDir.'/home/alice/evil', 0755, true);
+        file_put_contents(
+            $this->tempDir.'/home/alice/evil/.trafficData',
+            serialize(['raw' => ['month' => 4096]])
+        );
+
+        $this->pmssWithEnv(['PMSS_HOME_DIR' => $this->tempDir.'/home'], function (): void {
+            $this->assertEquals([], \pmssReadUserTrafficStates('alice/evil'));
+        });
+    }
+
     public function testTrafficLimitAndStatsPathsHonorExplicitBases(): void
     {
         $this->assertEquals(

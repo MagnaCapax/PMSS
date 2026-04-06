@@ -22,6 +22,10 @@ require_once __DIR__.'/../traffic/storage.php';
  */
 function userApplyTrafficLimit(array $user): void
 {
+    if (!isset($user['name']) || !is_string($user['name']) || !pmssUsernameIsValid($user['name'])) {
+        return;
+    }
+
     if (empty($user['trafficLimit']) || $user['trafficLimit'] <= 1) {
         return;
     }
@@ -39,6 +43,10 @@ function userApplyTrafficLimit(array $user): void
  */
 function userApplyDiskQuota(array $user): void
 {
+    if (!isset($user['name']) || !is_string($user['name']) || !pmssUsernameIsValid($user['name'])) {
+        return;
+    }
+
     $filesLimitPerGb = 500;
     $quota = $user['quota'] * 1024 * 1024;
     $filesLimit = max($user['quota'] * $filesLimitPerGb, 15000);
@@ -83,6 +91,10 @@ function pmssReadUserTrafficMonth(string $path): int
 /** @return array<string,int> */
 function pmssReadUserTrafficStates(string $username): array
 {
+    if (!pmssUsernameIsValid($username)) {
+        return [];
+    }
+
     $totals = [];
     foreach (array_intersect_key(pmssTrafficDataPaths($username), ['normal' => true, 'local' => true, 'ingress' => true]) as $name => $path) {
         $totals[$name] = pmssReadUserTrafficMonth($path);
@@ -101,6 +113,10 @@ function pmssReadUserTrafficStates(string $username): array
  */
 function pmssReadTorrentThrottle(string $username): ?int
 {
+    if (!pmssUsernameIsValid($username)) {
+        return null;
+    }
+
     $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
     $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
     if (!is_file($path) || is_link($path)) {
@@ -145,6 +161,10 @@ function pmssReadTorrentThrottle(string $username): ?int
  */
 function pmssWriteTorrentThrottle(string $username, int $value): bool
 {
+    if (!pmssUsernameIsValid($username)) {
+        return false;
+    }
+
     $homeDir = pmssDirPathResolve(null, 'PMSS_HOME_DIR', '/home');
     $path = rtrim($homeDir, '/').'/'.$username.'/.torrentThrottle';
     $homeDir = dirname($path);
