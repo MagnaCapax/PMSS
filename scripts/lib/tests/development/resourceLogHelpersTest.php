@@ -82,16 +82,13 @@ class ResourceLogHelpersTest extends TestCase
         $path = $root.'/resource.log';
         $this->assertTrue(\pmssAppendRootTimestampedLogEntry($path, ": 123\n"));
         $this->assertTrue((bool) preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}: 123\n$/', (string) file_get_contents($path)));
-        $resourceSource = (string) file_get_contents(dirname(__DIR__, 3).'/cron/resourceLog.php');
-        $trafficSource = $this->pmssReadRepoFile('scripts/cron/trafficLog.php');
-        $ingressSource = $this->pmssReadRepoFile('scripts/cron/trafficIngressLog.php');
-        $this->assertStringContainsString("pmssAppendRootTimestampedLogEntry(\$logDir.'/'.\$user", $resourceSource);
-        $this->assertTrue(strpos($resourceSource, "pmssAppendUserFile(\$logDir.'/'.\$user") === false);
-        $this->assertTrue(strpos($resourceSource, "@file_put_contents(\$logDir.'/'.\$user") === false);
-        $this->assertStringContainsString('pmssAppendRootTimestampedLogEntry(', $trafficSource);
-        $this->assertStringContainsString('pmssAppendRootTimestampedLogEntry(', $ingressSource);
-        $this->assertTrue(strpos($trafficSource, "file_put_contents(\$logdir . \$thisUser") === false);
-        $this->assertTrue(strpos($ingressSource, "@file_put_contents(\$logDir.'/'.\$user") === false);
+        $this->pmssAssertRepoFileContainsString('scripts/cron/resourceLog.php', "pmssAppendRootTimestampedLogEntry(\$logDir.'/'.\$user");
+        $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceLog.php', "pmssAppendUserFile(\$logDir.'/'.\$user");
+        $this->pmssAssertRepoFileNotContainsString('scripts/cron/resourceLog.php', "@file_put_contents(\$logDir.'/'.\$user");
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'pmssAppendRootTimestampedLogEntry(');
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficIngressLog.php', 'pmssAppendRootTimestampedLogEntry(');
+        $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', "file_put_contents(\$logdir . \$thisUser");
+        $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficIngressLog.php', "@file_put_contents(\$logDir.'/'.\$user");
     }
 
     public function testFiveMinuteLinkBudgetThresholdChecks(): void
@@ -148,18 +145,14 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testTrafficLogUsesSharedUsageParserInsteadOfTempFileGreps(): void
     {
-        $trafficSource = $this->pmssReadRepoFile('scripts/cron/trafficLog.php');
-        $trafficLibrarySource = $this->pmssReadRepoFile('scripts/lib/traffic.php');
-        $ingressSource = $this->pmssReadRepoFile('scripts/cron/trafficIngressLog.php');
-
-        $this->assertStringContainsString('$parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);', $trafficSource);
-        $this->assertStringContainsString('function pmssTrafficBudgetExceeded(', $trafficLibrarySource);
-        $this->assertStringContainsString('pmssTrafficBudgetExceeded(', $trafficSource);
-        $this->assertStringContainsString('pmssTrafficBudgetExceeded(', $ingressSource);
-        $this->assertTrue(strpos($trafficSource, '$thisUsageFile') === false);
-        $this->assertTrue(strpos($trafficSource, 'grep "0.0.0.0/0') === false);
-        $this->assertTrue(strpos($trafficSource, 'grep "Chain OUTPUT ("') === false);
-        $this->assertTrue(strpos($trafficSource, 'unlink($thisUsageFile)') === false);
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', '$parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/traffic.php', 'function pmssTrafficBudgetExceeded(');
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'pmssTrafficBudgetExceeded(');
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficIngressLog.php', 'pmssTrafficBudgetExceeded(');
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'scripts/cron/trafficLog.php',
+            ['$thisUsageFile', 'grep "0.0.0.0/0', 'grep "Chain OUTPUT ("', 'unlink($thisUsageFile)']
+        );
     }
 
     public function testUserValidationRejectsUppercase(): void
@@ -174,10 +167,9 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testTrafficIngressLoadsResourceHelpersDirectly(): void
     {
-        $ingressSrc = $this->pmssReadRepoFile('scripts/lib/traffic/ingress.php');
         $legacyPath = dirname(__DIR__, 3).'/resources/'.'user'.'Helpers.php';
 
-        $this->assertStringContainsString("require_once __DIR__.'/../resources/log.php';", $ingressSrc);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/traffic/ingress.php', "require_once __DIR__.'/../resources/log.php';");
         $this->assertTrue(!is_file($legacyPath), 'Expected the legacy resource helper shim to be removed');
     }
 
