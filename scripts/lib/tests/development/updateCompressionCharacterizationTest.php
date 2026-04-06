@@ -326,7 +326,9 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertTrue(!is_file($libraryPath), 'Expected one-call resources snapshot library file to be removed');
         $this->assertStringContainsString("require_once __DIR__.'/../lib/resources/log.php';", $cronSrc);
         $this->assertStringContainsString('const PMSS_RESOURCE_SNAPSHOT_LOG_DEFAULT', $cronSrc);
-        $this->assertStringContainsString('new ResourceStatsAccumulator([\'day\' => $threshold])', $cronSrc);
+        $this->assertStringContainsString('readSnapshotMetricsFromPath($dataPath)', $cronSrc);
+        $this->assertStringContainsString("collectWindowResultsFromData(\$dataLines, ['day' => \$threshold])", $cronSrc);
+        $this->pmssAssertStringNotContainsString('new ResourceStatsAccumulator([\'day\' => $threshold])', $cronSrc);
         $this->assertStringContainsString("pmssRunCliEntrypoint(__FILE__, 'pmssResourceSnapshotRun');", $cronSrc);
         $this->assertStringContainsString('function '.$symbol.'(): int', $cronSrc);
     }

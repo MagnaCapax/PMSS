@@ -8,7 +8,6 @@
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../resources.php';
 require_once __DIR__.'/accumulator.php';
-require_once __DIR__.'/../lighttpd/userFileWrite.php';
 
 class ResourceStatsProcessor
 {
@@ -114,7 +113,7 @@ class ResourceStatsProcessor
             return;
         }
 
-        if (($dataLines = trim($this->stats->getData($user, (int) ((35 * 24 * 60) / 5)))) === '') {
+        if (($dataLines = $this->stats->getData($user, (int) ((35 * 24 * 60) / 5))) === '') {
             logMessage($logPrefix."No data for user {$user}");
             return;
         }
@@ -124,22 +123,18 @@ class ResourceStatsProcessor
             return;
         }
 
-        $accumulator = new ResourceStatsAccumulator($compareTimes);
-        foreach ($resourceData as $line) {
-            $parsed = $this->stats->parseLine($line);
-            if ($parsed === false) {
+        $results = $this->stats->collectWindowResultsFromData(
+            $dataLines,
+            $compareTimes,
+            static function (string $line) use ($logPrefix, $user): void {
                 logMessage($logPrefix."Parsing line failed for {$user}, line: {$line}");
-                continue;
             }
-            $accumulator->addSample($parsed);
-        }
-
-        if (!$accumulator->hasSamples()) {
+        );
+        if ($results === null) {
             logMessage($logPrefix."No valid samples for {$user}");
             return;
         }
 
-        $results = $accumulator->results();
         $metricData = $results['raw'] + [
             'memory' => $results['memory'],
             'tasks' => $results['tasks'],
@@ -174,35 +169,8 @@ class ResourceStatsProcessor
         is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
 
         foreach ($targets as [$path, $group, $mode, $immutable]) {
-            $immutable && $this->setImmutable($path, false);
-            pmssWriteManagedFile($path, $serialized, 'root', $group, $mode);
-            $immutable && $this->setImmutable($path, true);
+            pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable);
         }
-    }
-
-    /**
-     * Toggle immutable bit when supported (best-effort).
-     */
-    private function setImmutable(string $path, bool $enable): void
-    {
-        if (!is_file($path)) {
-            return;
-        }
-        static $chattrPath = null;
-        if ($chattrPath === null) {
-            $chattrPath = '';
-            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-                if (is_executable($candidate)) {
-                    $chattrPath = $candidate;
-                    break;
-                }
-            }
-        }
-        if ($chattrPath === '') {
-            return;
-        }
-        $flag = $enable ? '+i' : '-i';
-        @exec($chattrPath.' '.$flag.' '.escapeshellarg($path).' 2>/dev/null');
     }
 
     private function formatMetricDisplay(string $metric, array $rawTotals): array

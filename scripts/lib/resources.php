@@ -7,6 +7,8 @@
  */
 
 require_once __DIR__.'/runtime.php';
+require_once __DIR__.'/resources/accumulator.php';
+require_once __DIR__.'/traffic/storage.php';
 
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
@@ -36,6 +38,60 @@ class resourceStatistics
     }
 
     /**
+     * Read the persisted day window payload used by resource snapshots.
+     *
+     * @param string $path Serialized resource payload path.
+     * @return array<string, float>|null
+     */
+    public function readSnapshotMetricsFromPath(string $path): ?array
+    {
+        $data = pmssTrafficReadSerializedArrayFile($path);
+        if ($data === null) return null;
+        $metrics = [];
+        foreach (['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'] as $key) {
+            $value = $data[$key]['raw']['day'] ?? null;
+            if ($value === null || !is_numeric($value)) {
+                return null;
+            }
+            $metrics[$key] = (float) $value;
+        }
+        $metrics['io_read_ops'] = (float) ($data['io_read_ops']['raw']['day'] ?? 0.0);
+        $metrics['io_write_ops'] = (float) ($data['io_write_ops']['raw']['day'] ?? 0.0);
+
+        return $metrics;
+    }
+
+    /**
+     * Accumulate parsed resource log lines across the requested windows.
+     *
+     * @param string $dataLines Newline-delimited resource log payload.
+     * @param array<string, int> $compareTimes Window thresholds keyed by label.
+     * @param callable|null $parseErrorLogger Optional parse-failure callback.
+     * @return array<string, mixed>|null
+     */
+    public function collectWindowResultsFromData(string $dataLines, array $compareTimes, ?callable $parseErrorLogger = null): ?array
+    {
+        if ($compareTimes === []) return null;
+        $resourceData = array_values(array_filter(explode("\n", trim($dataLines)), 'strlen'));
+        if (count($resourceData) < 2) return null;
+        $threshold = (int) min($compareTimes);
+        $accumulator = new ResourceStatsAccumulator($compareTimes);
+        foreach ($resourceData as $line) {
+            $parsed = $this->parseLine($line);
+            if ($parsed === false) {
+                $parseErrorLogger !== null && $parseErrorLogger($line);
+                continue;
+            }
+            if ($parsed['timestamp'] < $threshold) {
+                continue;
+            }
+            $accumulator->addSample($parsed);
+        }
+
+        return $accumulator->hasSamples() ? $accumulator->results() : null;
+    }
+
+    /**
      * Parse a single resource log line into structured numeric fields.
      *
      * @param string $thisLine Raw log line to parse.
@@ -48,10 +104,7 @@ class resourceStatistics
         }
 
         $timestamp = strtotime($tokens[0].' '.$tokens[1]);
-        if ($timestamp === false) {
-            return false;
-        }
-
+        if ($timestamp === false) return false;
         $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(
             ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'],
             0.0

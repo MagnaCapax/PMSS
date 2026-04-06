@@ -5,6 +5,16 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class ResourceSnapshotTest extends TestCase
 {
+    public function testSnapshotCronDelegatesToSharedResourceReaders(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/resourceSnapshot.php');
+
+        $this->assertStringContainsString('readSnapshotMetricsFromPath($dataPath)', $source);
+        $this->assertStringContainsString("collectWindowResultsFromData(\$dataLines, ['day' => \$threshold])", $source);
+        $this->pmssAssertStringNotContainsString('@unserialize($raw)', $source);
+        $this->pmssAssertStringNotContainsString('new ResourceStatsAccumulator(', $source);
+    }
+
     public function testRootCronSchedulesResourceJobs(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(

@@ -9,7 +9,6 @@
 
 require_once __DIR__.'/../lib/resources/log.php';
 require_once __DIR__.'/../lib/resources.php';
-require_once __DIR__.'/../lib/resources/accumulator.php';
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/userFilesystem.php';
 
@@ -34,36 +33,11 @@ function pmssResourceSnapshotRun(): int
             }
 
             $dataPath = $homeDir.'/'.$user.'/.resourceData';
-            $raw = is_file($dataPath) ? @file_get_contents($dataPath) : false;
-            $metrics = null;
-            if (is_string($raw) && trim($raw) !== '' && is_array($data = @unserialize($raw))) {
-                $metrics = [];
-                foreach (['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'] as $key) {
-                    $value = $data[$key]['raw']['day'] ?? null;
-                    if ($value === null) {
-                        $metrics = null;
-                        break;
-                    }
-                    $metrics[$key] = (float) $value;
-                }
-                if ($metrics !== null) {
-                    $metrics['io_read_ops'] = (float) ($data['io_read_ops']['raw']['day'] ?? 0.0);
-                    $metrics['io_write_ops'] = (float) ($data['io_write_ops']['raw']['day'] ?? 0.0);
-                }
-            }
+            $metrics = $stats->readSnapshotMetricsFromPath($dataPath);
 
-            if ($metrics === null && ($dataLines = trim($stats->getData($user, 350))) !== '') {
+            if ($metrics === null && ($dataLines = $stats->getData($user, 350)) !== '') {
                 $threshold = time() - (24 * 60 * 60);
-                $accumulator = new ResourceStatsAccumulator(['day' => $threshold]);
-                foreach (array_filter(explode("\n", $dataLines)) as $line) {
-                    $parsed = $stats->parseLine($line);
-                    if ($parsed === false || $parsed['timestamp'] < $threshold) {
-                        continue;
-                    }
-                    $accumulator->addSample($parsed);
-                }
-                if ($accumulator->hasSamples()) {
-                    $results = $accumulator->results();
+                if (($results = $stats->collectWindowResultsFromData($dataLines, ['day' => $threshold])) !== null) {
                     $metrics = [
                         'memory' => $results['memory']['day'],
                         'tasks' => $results['tasks']['day'],
