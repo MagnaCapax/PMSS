@@ -112,6 +112,28 @@ CONF;
 }
 
 /**
+     * Return the newest validated dpkg baseline major for automatic selection.
+     *
+     * Debian 13 stays experimental until its baseline is captured from a
+     * converged host and replay-validated. Keep automatic fallback on the latest
+     * validated baseline so provisional future manifests do not become active
+     * package authority just because the file exists.
+     *
+     * @param array<int, string> $baselines
+     */
+    function pmssLatestValidatedDpkgBaselineMajor(array $baselines): ?int
+    {
+        $validated = [];
+        foreach (array_keys($baselines) as $major) {
+            if ((int) $major <= 12) {
+                $validated[] = (int) $major;
+            }
+        }
+
+        return $validated ? max($validated) : null;
+}
+
+/**
      * Resolve the best dpkg selections baseline file for the detected distro version.
      *
      * This is pure selection logic (no command execution) so tests can validate
@@ -128,16 +150,24 @@ CONF;
             }
         }
         $latestBaseline = $baselines ? max(array_keys($baselines)) : null;
+        $latestValidatedBaseline = pmssLatestValidatedDpkgBaselineMajor($baselines);
 
         $candidates = [];
         $requestedPath = null;
+        $requestedBaselineValidated = true;
         if ($distroVersion !== null) {
             $requestedPath = $baselines[$distroVersion] ?? sprintf('%s/selections-debian%d.txt', $baseDir, $distroVersion);
-            $candidates[] = $requestedPath;
+            $requestedBaselineValidated = $distroVersion <= 12;
+            if ($requestedBaselineValidated) {
+                $candidates[] = $requestedPath;
+            }
         }
-        // Default to the newest baseline we have when the target release is newer than expected.
-        // #TODO #Debian13: capture and ship selections-debian13.txt (platform sign-off required).
-        if ($latestBaseline !== null) {
+        if ($latestValidatedBaseline !== null) {
+            $latestPath = $baselines[$latestValidatedBaseline];
+            if (!in_array($latestPath, $candidates, true)) {
+                $candidates[] = $latestPath;
+            }
+        } elseif ($latestBaseline !== null) {
             $latestPath = $baselines[$latestBaseline];
             if (!in_array($latestPath, $candidates, true)) {
                 $candidates[] = $latestPath;
@@ -158,8 +188,14 @@ CONF;
         }
 
         if ($distroVersion !== null && $requestedPath !== null && $selected !== $requestedPath) {
-            if ($latestBaseline !== null && $latestBaseline < $distroVersion && $selected === $baselines[$latestBaseline]) {
-                $log(sprintf('[WARN] Debian %d dpkg baseline missing; using Debian %d baseline (%s).', $distroVersion, $latestBaseline, basename($selected)));
+            if (!$requestedBaselineValidated && is_readable($requestedPath)) {
+                if ($latestValidatedBaseline !== null && isset($baselines[$latestValidatedBaseline]) && $selected === $baselines[$latestValidatedBaseline]) {
+                    $log(sprintf('[WARN] Debian %d dpkg baseline exists but is not validated for automatic use; using Debian %d baseline (%s).', $distroVersion, $latestValidatedBaseline, basename($selected)));
+                } else {
+                    $log(sprintf('[WARN] Debian %d dpkg baseline exists but is not validated for automatic use; using %s.', $distroVersion, basename($selected)));
+                }
+            } elseif ($latestValidatedBaseline !== null && $latestValidatedBaseline < $distroVersion && isset($baselines[$latestValidatedBaseline]) && $selected === $baselines[$latestValidatedBaseline]) {
+                $log(sprintf('[WARN] Debian %d dpkg baseline missing; using Debian %d baseline (%s).', $distroVersion, $latestValidatedBaseline, basename($selected)));
             } else {
                 $log(sprintf('[WARN] Debian %d dpkg baseline unavailable; using %s.', $distroVersion, basename($selected)));
             }
