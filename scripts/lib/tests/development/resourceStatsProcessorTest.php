@@ -69,13 +69,6 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue($processor->validateUser($user));
     }
 
-    public function testDetectWorkerUserSanitizesInput(): void
-    {
-        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
-        $user = $processor->detectWorkerUser(['/scripts/cron/resourceStats.php', 'a!li@ce-1']);
-        $this->assertEquals('alice-1', $user);
-    }
-
     public function testEnsureRuntimeCreatesRuntimeDirectories(): void
     {
         $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
@@ -117,7 +110,7 @@ class ResourceStatsProcessorTest extends TestCase
             date('Y-m-d H:i:s', $now - 3600).' 2048 4096 30 40 7200 2097152 6',
         ]);
 
-        $processor->processUser($user, $processor->buildCompareTimes());
+        $processor->processUser($user, \pmssStatsCompareTimesBuild());
 
         $saved = $this->readSavedResourceStats($user);
         $this->assertTrue(is_array($saved), 'Expected processed data to be persisted');
@@ -145,7 +138,7 @@ class ResourceStatsProcessorTest extends TestCase
             date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6 1048576 524288',
         ]);
 
-        $processor->processUser($user, $processor->buildCompareTimes());
+        $processor->processUser($user, \pmssStatsCompareTimesBuild());
 
         $saved = $this->readSavedResourceStats($user);
         $this->assertEquals(1048576.0, $saved['memory']['anon']);
@@ -162,7 +155,7 @@ class ResourceStatsProcessorTest extends TestCase
             date('Y-m-d H:i:s', time() - 60).' 2048 4096 1 1 3600 1024 1',
         ]);
 
-        $processor->processUser('ghost', $processor->buildCompareTimes());
+        $processor->processUser('ghost', \pmssStatsCompareTimesBuild());
 
         $this->assertTrue($this->readSavedResourceStats('ghost') === null);
     }
@@ -177,7 +170,7 @@ class ResourceStatsProcessorTest extends TestCase
         @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
         $stats->map[$user] = date('Y-m-d H:i:s', time() - 120).' 1024 2048 1 1 3600 1024 1';
 
-        $processor->processUser($user, $processor->buildCompareTimes());
+        $processor->processUser($user, \pmssStatsCompareTimesBuild());
 
         $this->assertTrue($this->readSavedResourceStats($user) === null);
     }
@@ -197,7 +190,7 @@ class ResourceStatsProcessorTest extends TestCase
             date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6',
         ]);
 
-        $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php', $user], '/scripts/cron/resourceStats.php'));
+        $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php', 'a!li@ce'], '/scripts/cron/resourceStats.php'));
         $this->assertTrue($this->readSavedResourceStats($user) !== null);
         $this->assertEquals([], $processor->spawnCalls);
     }

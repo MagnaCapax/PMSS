@@ -38,12 +38,6 @@ class SpyTrafficStatsProcessor extends \TrafficStatsProcessor
 
 class TrafficStatsProcessorTest extends TrafficTestCase
 {
-    public function testSanitizeUser(): void
-    {
-        $processor = $this->makeProcessor();
-        $this->assertEquals('alice-bob', $processor->sanitizeUser('alice!@#-bob'));
-    }
-
     public function testSharedTrafficAmountFormatter(): void
     {
         $formatted = array_map('pmssTrafficFormatAmount', [
@@ -87,7 +81,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         ];
         $stub->map[$user] = implode("\n", $lines);
 
-        $compare = $processor->buildCompareTimes();
+        $compare = \pmssStatsCompareTimesBuild();
         $processor->processUser($user, $compare);
 
         $this->assertTrue(isset($stub->saved[$user]));
@@ -123,7 +117,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         ];
         $stub->map[$user.'-localnet'] = implode("\n", $lines);
 
-        $compare = $processor->buildCompareTimes();
+        $compare = \pmssStatsCompareTimesBuild();
         $processor->processUser($user.'-localnet', $compare);
 
         $this->assertTrue(isset($stub->saved[$user.'-localnet']));
@@ -144,7 +138,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
             date('Y-m-d H:i:s', $now - 86400).': 1048576',
         ]);
 
-        $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php', $user], '/scripts/cron/trafficStats.php'));
+        $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php', 'a!li@ce'], '/scripts/cron/trafficStats.php'));
         $this->assertTrue(isset($stub->saved[$user]));
         $this->assertEquals([], $processor->spawnCalls);
     }

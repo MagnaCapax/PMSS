@@ -28,18 +28,6 @@ class TrafficStatsProcessor
         $this->passwdFile      = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
     }
 
-    /** Build comparison timestamps for each window. */
-    public function buildCompareTimes(): array
-    {
-        return pmssStatsCompareTimesBuild();
-    }
-
-    /** Detect whether we are running in worker mode for a specific user. */
-    public function detectWorkerUser(array $argv): ?string
-    {
-        return isset($argv[1]) ? pmssCliUserArgSanitize($argv[1]) : null;
-    }
-
     /** Discover users by scanning the traffic log directory. */
     public function discoverUsers(): array
     {
@@ -55,13 +43,14 @@ class TrafficStatsProcessor
     /** Handle the CLI worker-or-spawn flow used by traffic cron entrypoints. */
     public function runCli(array $argv, string $scriptPath): int
     {
-        if (($user = $this->detectWorkerUser($argv)) !== null) {
+        if (isset($argv[1])) {
+            $user = pmssCliUserArgSanitize($argv[1]);
             if (!$this->validateUser($user)) {
                 echo "Invalid user specified: {$user}\n";
                 return 0;
             }
 
-            $this->processUser($user, $this->buildCompareTimes());
+            $this->processUser($user, pmssStatsCompareTimesBuild());
             return 0;
         }
 
@@ -73,12 +62,6 @@ class TrafficStatsProcessor
 
         $this->spawnWorkers($scriptPath, $users);
         return 0;
-    }
-
-    /** Sanitize user input by stripping unexpected characters. */
-    public function sanitizeUser(string $input): string
-    {
-        return pmssCliUserArgSanitize($input);
     }
 
     /** Validate that a user has traffic data and a home directory. */

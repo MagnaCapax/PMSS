@@ -34,7 +34,7 @@ class TrafficStatsProcessorEdgeTest extends TrafficTestCase
             date('Y-m-d H:i:s', time() - 60).": 999999999999\n".
             "another bad line";
 
-        $processor->processUser('alice', $processor->buildCompareTimes());
+        $processor->processUser('alice', \pmssStatsCompareTimesBuild());
         $this->assertTrue(isset($stub->saved['alice']), 'Processor should persist zeroed totals');
         $this->assertEquals(0.0, $stub->saved['alice']['raw']['month']);
     }

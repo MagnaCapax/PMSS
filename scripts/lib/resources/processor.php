@@ -43,16 +43,6 @@ class ResourceStatsProcessor
         }
     }
 
-    public function buildCompareTimes(): array
-    {
-        return pmssStatsCompareTimesBuild();
-    }
-
-    public function detectWorkerUser(array $argv): ?string
-    {
-        return isset($argv[1]) ? pmssCliUserArgSanitize($argv[1]) : null;
-    }
-
     public function discoverUsers(): array
     {
         return pmssFileBasenamesDiscover($this->resourceDir.'/*');
@@ -67,9 +57,10 @@ class ResourceStatsProcessor
     public function runCli(array $argv, string $scriptPath): int
     {
         $this->ensureRuntime();
-        if (($user = $this->detectWorkerUser($argv)) !== null) {
+        if (isset($argv[1])) {
+            $user = pmssCliUserArgSanitize($argv[1]);
             if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; }
-            $this->processUser($user, $this->buildCompareTimes());
+            $this->processUser($user, pmssStatsCompareTimesBuild());
             return 0;
         }
         $lockFile = $this->runtimeDir.'/resourceStats.lock';
