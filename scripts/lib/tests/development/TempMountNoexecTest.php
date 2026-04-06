@@ -202,6 +202,32 @@ class TempMountNoexecTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'not a regular file'), 'expected regular-file guard log');
     }
 
+    public function testWriteFailureSkipsRemountsWhenFstabUpdateCannotPersist(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-noexec-write-fail-', 0700);
+        $fstab = $dir.'/fstab';
+        $mounts = $dir.'/mounts';
+
+        file_put_contents($fstab, "tmpfs /tmp tmpfs defaults 0 0\nshm /dev/shm tmpfs defaults 0 0\n");
+        file_put_contents($mounts, "tmpfs /tmp tmpfs rw,exec,suid,dev 0 0\nshm /dev/shm tmpfs rw,exec,suid,dev 0 0\n");
+        chmod($dir, 0500);
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $this->pmssResetRuntimeProfile();
+        putenv('PMSS_HARDEN_TMP_NOEXEC=1');
+        putenv('PMSS_DRY_RUN=1');
+        \pmssConfigureTempMountNoexec($logger, $fstab, $mounts);
+
+        $this->assertEquals([], $this->pmssProfileCommands());
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Failed writing updated '.$fstab), 'expected write failure log');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Skipping live mount hardening because '.$fstab.' could not be updated'), 'expected remount skip log');
+
+        chmod($dir, 0700);
+        $this->pmssRemoveTree($dir);
+    }
+
     public function testDryRunProfilesRemountCommandsInStableOrder(): void
     {
         $dir = $this->pmssMakeTempDir('pmss-noexec-profile-', 0700);
