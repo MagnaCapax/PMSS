@@ -47,7 +47,7 @@ codex_detect_distro_label() {
 		# shellcheck disable=SC1091
 		. /etc/os-release 2>/dev/null || true
 		printf '%s' "${VERSION_CODENAME:-${ID:-unknown}}"
-	) 2>/dev/null )"
+	) 2>/dev/null)"
 	if [[ -z "$label" ]]; then
 		label="unknown"
 	fi
@@ -141,6 +141,53 @@ codex_resolve_exec_cmd() {
 	fi
 
 	printf '%s\n' "$exec_cmd"
+}
+
+CODEX_PARSE_SHIFT=0
+CODEX_PARSE_VALUE=""
+
+# Parse a CLI option and expose its value via shared parse globals.
+codex_parse_option() {
+	local arg="$1" next_value="${2-}" option_name="$3" inline_allowed="${4:-0}"
+	CODEX_PARSE_SHIFT=0
+	CODEX_PARSE_VALUE=""
+
+	if [[ "$arg" == "$option_name" ]]; then
+		CODEX_PARSE_VALUE="$next_value"
+		CODEX_PARSE_SHIFT=2
+		return 0
+	fi
+
+	if [[ "$inline_allowed" == "1" && "$arg" == "$option_name="* ]]; then
+		CODEX_PARSE_VALUE="${arg#"$option_name"=}"
+		CODEX_PARSE_SHIFT=1
+		return 0
+	fi
+
+	return 1
+}
+
+# Parse a CLI option into the requested string variable.
+codex_parse_option_value() {
+	local target_name="$1"
+	local -n target_ref="$target_name"
+	codex_parse_option "$2" "${3-}" "$4" "${5:-0}" || return 1
+	target_ref="$CODEX_PARSE_VALUE"
+}
+
+# Parse a repeatable option and append its value to the target array.
+codex_parse_option_append() {
+	local target_name="$1"
+	local -n target_ref="$target_name"
+	codex_parse_option "$2" "${3-}" "$4" "${5:-0}" || return 1
+	target_ref+=("$CODEX_PARSE_VALUE")
+}
+
+# Append a `--name value` pair to the target array verbatim.
+codex_append_option_pair() {
+	local target_name="$1" option_name="$2" option_value="${3-}"
+	local -n target_ref="$target_name"
+	target_ref+=("$option_name" "$option_value")
 }
 
 # Normalize assistant CLI args (map yolo to Claude's danger flag).
@@ -323,7 +370,10 @@ codex_scan_frozen_paths() {
 		if echo "$f" | grep -qE "$pattern"; then
 			touched_files+=("$f")
 		fi
-	done < <(git -C "$repo_root" diff --name-only 2>/dev/null; git -C "$repo_root" diff --cached --name-only 2>/dev/null)
+	done < <(
+		git -C "$repo_root" diff --name-only 2>/dev/null
+		git -C "$repo_root" diff --cached --name-only 2>/dev/null
+	)
 
 	# Also check untracked files in frozen dirs
 	while IFS= read -r f; do
@@ -450,7 +500,7 @@ codex_scan_git_diff_for_dangers() {
 	local removal_re='(strlen[[:space:]]*[(]|preg_match[[:space:]]*[(]|pmss[A-Za-z]*Validate[A-Za-z]*[[:space:]]*[(]|pmss[A-Za-z]*IsValid[A-Za-z]*[[:space:]]*[(]|die[[:space:]]*[(]|throw[[:space:]]+new|[$]this->assert[A-Z])'
 	local relaxation_fail="${PMSS_CODEX_RELAXATION_FAIL:-0}"
 	local relax_result
-	relax_result=$( {
+	relax_result=$({
 		git -C "$repo_root" diff --no-color 2>/dev/null
 		git -C "$repo_root" diff --cached --no-color 2>/dev/null
 	} | awk -v re="$removal_re" '
@@ -526,7 +576,7 @@ codex_scan_commit_messages_for_pii() {
 			found=1
 		fi
 
-	done <<< "$messages"
+	done <<<"$messages"
 
 	if [[ "$found" -eq 1 ]]; then
 		echo "[commit-pii] WARNING: $ahead unpushed commit(s) contain PII" >&2

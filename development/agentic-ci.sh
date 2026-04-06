@@ -97,32 +97,28 @@ autocommit=0
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-	--agent)
-		agent=${2:-}
-		shift 2 || true
-		;;
-	--agent=*)
-		agent=${1#--agent=}
-		shift || true
+	--agent | --agent=*)
+		codex_parse_option_value agent "$1" "${2:-}" "--agent" 1
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--job)
-		job_name=${2:-}
-		shift 2 || true
+		codex_parse_option_value job_name "$1" "${2:-}" "--job"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--prompt)
-		custom_prompt=${2:-}
-		shift 2 || true
+		codex_parse_option_value custom_prompt "$1" "${2:-}" "--prompt"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--exec)
-		exec_cmd=${2:-}
-		shift 2 || true
+		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
-	--dry-run)
-		dry_run=1
-		shift || true
-		;;
-	--autocommit)
-		autocommit=1
+	--dry-run | --autocommit)
+		if [[ "$1" == "--dry-run" ]]; then
+			dry_run=1
+		else
+			autocommit=1
+		fi
 		shift || true
 		;;
 	-h | --help)

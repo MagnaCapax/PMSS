@@ -3,24 +3,14 @@ set -euo pipefail
 
 echo "[ci] starting CI prompt assembly…" >&1
 
-# ci.sh — one-command helper
-#
-# Defaults:
-#  - Downloads artifacts from the latest CI run to a temp workspace
-#  - Includes the 'build' job logs (if present)
-#  - Assembles a QC/QA-focused prompt honoring repository rails
-#  - If --exec is provided, pipes to your assistant CLI (e.g., Codex)
-#
-# Usage:
-#  development/ci.sh                 # build prompt; prints location
-#  development/ci.sh --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'
-#  development/ci.sh --job smoke     # include smoke logs instead of build
-#  development/ci.sh --prompt "..."   # custom prompt
-#  development/ci.sh --dry-run        # assemble prompt only; do not invoke assistant
+# ci.sh — assemble a CI-focused prompt and optionally invoke the assistant.
+# Usage: development/ci.sh [--job NAME] [--prompt TEXT] [--exec CMD] [--dry-run]
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
+# shellcheck disable=SC1091
+source "$HERE/lib/codex-common.sh"
 
 job=""
 exec_cmd=""
@@ -30,23 +20,23 @@ dry_run=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--job)
-		job=${2:-}
-		shift 2 || true
+		codex_parse_option_value job "$1" "${2:-}" "--job"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--exec)
-		exec_cmd=${2:-}
-		shift 2 || true
+		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--prompt)
-		custom_prompt=${2:-}
-		shift 2 || true
+		codex_parse_option_value custom_prompt "$1" "${2:-}" "--prompt"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--dry-run)
 		dry_run=1
 		shift || true
 		;;
 	-h | --help)
-		sed -n '1,80p' "$0"
+		sed -n '1,40p' "$0"
 		exit 0
 		;;
 	*)

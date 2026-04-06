@@ -95,12 +95,6 @@ Examples:
 EOF
 }
 
-# Usage:
-#   development/codex-run.sh run --prompt-file development/prompts/codex.txt
-#   development/codex-run.sh run --prompt-file development/prompts/codex.txt --dry-run
-#   development/codex-run.sh run --prompt-file development/prompts/codex.txt --exec 'codex --sandbox workspace-write --ask-for-approval untrusted'
-#   development/codex-run.sh run --prompt-file development/prompts/refactor.txt --autocommit
-
 cmd=${1:-}
 shift || true
 
@@ -128,35 +122,35 @@ declare -a extra_context=()
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--prompt-file)
-		prompt_file=${2:-}
-		shift 2 || true
+		codex_parse_option_value prompt_file "$1" "${2:-}" "--prompt-file"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--prompt)
-		custom_prompt=${2:-}
-		shift 2 || true
+		codex_parse_option_value custom_prompt "$1" "${2:-}" "--prompt"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--exec)
-		exec_cmd=${2:-}
-		shift 2 || true
+		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--outdir)
-		outdir=${2:-}
-		shift 2 || true
+		codex_parse_option_value outdir "$1" "${2:-}" "--outdir"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--event-log)
-		event_log=${2:-}
-		shift 2 || true
+		codex_parse_option_value event_log "$1" "${2:-}" "--event-log"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--context)
-		extra_context+=("${2:-}")
-		shift 2 || true
+		codex_parse_option_append extra_context "$1" "${2:-}" "--context"
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
-	--autocommit)
-		autocommit=1
-		shift || true
-		;;
-	--dry-run)
-		dry_run=1
+	--dry-run | --autocommit)
+		if [[ "$1" == "--dry-run" ]]; then
+			dry_run=1
+		else
+			autocommit=1
+		fi
 		shift || true
 		;;
 	-h | --help)
@@ -343,7 +337,7 @@ if [[ "$dry_run" == "1" ]]; then
 	exec_preview="$(codex_exec_preview "$exec_cmd" "$prompt_out")"
 	codex_color_line "33" "[codex-run] would invoke: $exec_preview"
 	echo "[codex-run] dry-run: not invoking assistant (--dry-run)" >&1
-	duration_ms=$(( $(codex_now_ms) - run_start_ms ))
+	duration_ms=$(($(codex_now_ms) - run_start_ms))
 	codex_emit_event_jsonl "$event_log" "runner_end" "info" "dry_run" "$run_id" "0" "$duration_ms" \
 		"dry-run completed without assistant invocation"
 	exit 0
@@ -356,11 +350,11 @@ set +e
 codex_invoke "$exec_cmd" "$prompt_out"
 invoke_rc=$?
 set -e
-invoke_duration_ms=$(( $(codex_now_ms) - invoke_start_ms ))
+invoke_duration_ms=$(($(codex_now_ms) - invoke_start_ms))
 codex_emit_event_jsonl "$event_log" "assistant_invoke_end" "info" "invoke" "$run_id" "$invoke_rc" "$invoke_duration_ms" \
 	"assistant invocation completed"
 if [[ "$invoke_rc" -ne 0 ]]; then
-	total_duration_ms=$(( $(codex_now_ms) - run_start_ms ))
+	total_duration_ms=$(($(codex_now_ms) - run_start_ms))
 	codex_emit_event_jsonl "$event_log" "runner_end" "error" "invoke" "$run_id" "$invoke_rc" "$total_duration_ms" \
 		"assistant invocation failed"
 	exit "$invoke_rc"
@@ -385,6 +379,6 @@ if ! codex_scan_commit_messages_for_pii "$ROOT"; then
 		"PII-like data detected in unpushed commit messages"
 fi
 
-total_duration_ms=$(( $(codex_now_ms) - run_start_ms ))
+total_duration_ms=$(($(codex_now_ms) - run_start_ms))
 codex_emit_event_jsonl "$event_log" "runner_end" "info" "post_checks" "$run_id" "0" "$total_duration_ms" \
 	"run completed"

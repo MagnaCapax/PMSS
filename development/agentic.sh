@@ -70,21 +70,13 @@ EOF
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-	--agent)
-		agent=${2:-}
-		shift 2 || true
+	--agent | --agent=*)
+		codex_parse_option_value agent "$1" "${2:-}" "--agent" 1
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
-	--agent=*)
-		agent=${1#--agent=}
-		shift || true
-		;;
-	--exec)
-		exec_cmd=${2:-}
-		shift 2 || true
-		;;
-	--exec=*)
-		exec_cmd=${1#--exec=}
-		shift || true
+	--exec | --exec=*)
+		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec" 1
+		shift "$CODEX_PARSE_SHIFT" || true
 		;;
 	--verbose)
 		verbose=1
@@ -96,19 +88,19 @@ while [[ $# -gt 0 ]]; do
 		shift || true
 		;;
 	--approval-mode)
-		exec_extra_args+=("$1" "${2:-}")
+		codex_append_option_pair exec_extra_args "$1" "${2:-}"
 		shift 2 || true
 		;;
 	--ask-for-approval | -a)
-		exec_extra_args+=("$1" "${2:-}")
+		codex_append_option_pair exec_extra_args "$1" "${2:-}"
 		shift 2 || true
 		;;
 	--allowed-tools)
-		exec_extra_args+=("$1" "${2:-}")
+		codex_append_option_pair exec_extra_args "$1" "${2:-}"
 		shift 2 || true
 		;;
 	--permission-mode)
-		exec_extra_args+=("$1" "${2:-}")
+		codex_append_option_pair exec_extra_args "$1" "${2:-}"
 		shift 2 || true
 		;;
 	--dangerously-skip-permissions)
