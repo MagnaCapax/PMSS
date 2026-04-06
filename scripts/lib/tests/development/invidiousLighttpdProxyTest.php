@@ -10,7 +10,7 @@ class InvidiousLighttpdProxyTest extends TestCase
     {
         $fragment = \pmssInvidiousLighttpdProxyFragment('alice', 4100);
 
-        $this->assertSame('a9f464c111549da0b12031161e050ca6ed1a554f4488133c78c3e296240911f9', hash('sha256', $fragment));
+        $this->assertSame('a6b6484bc3cc4767978a2a1eeb23869d17438625d3c2c93ccc9151fac24cb6dd', hash('sha256', $fragment));
     }
 
     public function testUserConfigApplyWiresOptionalPortFileAndManagedFragment(): void

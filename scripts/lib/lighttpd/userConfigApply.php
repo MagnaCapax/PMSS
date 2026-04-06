@@ -375,7 +375,7 @@ function pmssLighttpdProxyRuleFragment(
 ): string
 {
     $hasHeader = count($pathMap) > 0;
-    $fragment = '\\$HTTP["url"] =~ "'.$pattern."\" {\n";
+    $fragment = '$HTTP["url"] =~ "'.$pattern."\" {\n";
     if ($disableAuth) {
         $fragment .= "  auth.require = ()\n";
     }
