@@ -45,9 +45,7 @@ class UpdateHelpersTest extends TestCase
     {
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 9, 'dead', [
-            'jessie' => '', 'buster' => '', 'bullseye' => '', 'bookworm' => '', 'trixie' => ''
-        ], $logger);
+        \updateAptSources('debian', 9, 'dead', $this->pmssDebianRepoTemplates(), $logger);
         $this->pmssAssertMessagesContain($logs, 'Unsupported Debian version: 9');
     }
 
@@ -58,10 +56,9 @@ class UpdateHelpersTest extends TestCase
         $hash = sha1($content);
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 12, $hash, [
+        \updateAptSources('debian', 12, $hash, $this->pmssDebianRepoTemplates([
             'bookworm' => $content,
-            'bullseye' => '', 'buster' => '', 'jessie' => '', 'trixie' => '',
-        ], $logger);
+        ]), $logger);
         $this->pmssAssertMessagesContain($logs, 'already correct');
         // Important: No destructive call path is taken here
     }
@@ -70,9 +67,7 @@ class UpdateHelpersTest extends TestCase
     {
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 11, 'hash', [
-            'bullseye' => '', 'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => ''
-        ], $logger);
+        \updateAptSources('debian', 11, 'hash', $this->pmssDebianRepoTemplates(), $logger);
         $this->pmssAssertMessagesContain($logs, 'Bullseye template missing');
     }
 
@@ -82,10 +77,9 @@ class UpdateHelpersTest extends TestCase
         $hash = sha1($content);
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 13, $hash, [
+        \updateAptSources('debian', 13, $hash, $this->pmssDebianRepoTemplates([
             'trixie' => $content,
-            'bookworm' => '', 'bullseye' => '', 'buster' => '', 'jessie' => '',
-        ], $logger);
+        ]), $logger);
         $this->pmssAssertMessagesContain($logs, 'Trixie');
     }
 

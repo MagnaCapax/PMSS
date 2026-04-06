@@ -389,6 +389,55 @@ abstract class TestCase
         return (string) $path;
     }
 
+    /** Return a complete Debian repo-template map with caller overrides layered on top. */
+    protected function pmssDebianRepoTemplates(array $overrides = []): array
+    {
+        return array_merge([
+            'jessie' => '',
+            'buster' => '',
+            'bullseye' => '',
+            'bookworm' => '',
+            'trixie' => '',
+        ], $overrides);
+    }
+
+    /** Expose a caller-provided sources.list path through PMSS_APT_SOURCES_PATH. */
+    protected function pmssWithAptSourcesPath(string $path, callable $callback): void
+    {
+        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $path], function () use ($callback, $path): void {
+            $callback($path);
+        });
+    }
+
+    /** Stage a temporary sources.list fixture and expose it through PMSS_APT_SOURCES_PATH. */
+    protected function pmssWithTempAptSources(string $content, callable $callback): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-sources-', 0700);
+        $path = $this->pmssWriteFile($dir.'/sources.list', $content, 0700);
+        @chmod($path, 0600);
+
+        $this->pmssWithAptSourcesPath($path, $callback);
+    }
+
+    /** Stage template.sources.* fixtures under PMSS_CONFIG_DIR for repository update tests. */
+    protected function pmssWithRepoTemplates(array $templates, callable $callback, int $dirMode = 0700): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-config-', $dirMode);
+
+        foreach ($templates as $codename => $content) {
+            $path = $this->pmssWriteFile(
+                $dir.'/template.sources.'.$codename,
+                rtrim((string) $content, "\n")."\n",
+                $dirMode
+            );
+            @chmod($path, 0600);
+        }
+
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $dir], function () use ($callback, $dir): void {
+            $callback($dir);
+        });
+    }
+
     /**
      * Prepare a hermetic systemd user-slice fixture with templates, policy, and env overrides.
      *

@@ -146,31 +146,17 @@ class DistroDetectionTest extends TestCase
     public function testUpdateAptSourcesWritesTemplate(): void
     {
         $template = "deb https://mirror.invalid bookworm main\n";
-        $this->withConfigTemplates(['bookworm' => $template], function () use ($template): void {
-            $tmpDir = $this->pmssMakeTempDir('pmss-apt-', 0775);
-            $sources = $tmpDir.'/sources.list';
-            file_put_contents($sources, "deb https://old.invalid stable main\n");
-
+        $this->pmssWithRepoTemplates(['bookworm' => $template], function () use ($template): void {
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            try {
-                $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $sources], function () use ($template, $logger): void {
-                    \pmssUpdateAptSources('debian', 12, sha1('different'), [
-                        'bookworm' => $template,
-                        'bullseye' => '',
-                        'buster'   => '',
-                        'jessie'   => '',
-                        'trixie'   => '',
-                    ], $logger);
-                });
-
+            $this->pmssWithTempAptSources("deb https://old.invalid stable main\n", function (string $sources) use ($template, $logger, &$logs): void {
+                \pmssUpdateAptSources('debian', 12, sha1('different'), $this->pmssDebianRepoTemplates([
+                    'bookworm' => $template,
+                ]), $logger);
                 $this->assertEquals($template, file_get_contents($sources));
                 $this->pmssAssertMessagesContain($logs, 'Applied Debian Bookworm repository config');
-            } finally {
-                @unlink($sources);
-                @unlink($sources.'.pmss-backup');
-            }
+            });
         });
     }
 
@@ -187,7 +173,7 @@ class DistroDetectionTest extends TestCase
         $logger = $this->pmssMakeArrayLogger($logs);
 
         try {
-            $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $blocker.'/sources.list'], function () use ($logger): void {
+            $this->pmssWithAptSourcesPath($blocker.'/sources.list', function () use ($logger): void {
                 $this->assertTrue(!\pmssSafeWriteSources("deb https://mirror.invalid bookworm main\n", 'Bookworm', $logger));
             });
             $this->pmssAssertMessagesContain($logs, '[ERROR] Unable to create parent directory for Bookworm sources.list: '.$blocker);
@@ -242,26 +228,6 @@ class DistroDetectionTest extends TestCase
         $this->assertEquals('trixie', $specs[13]['repo']);
         $this->assertTrue($specs[13]['sources_template']);
         $this->assertTrue($specs[13]['eol'] === false);
-    }
-
-    /**
-     * Helper to stage template directory overrides.
-     */
-    private function withConfigTemplates(array $templates, callable $callback): void
-    {
-        $dir = $this->pmssMakeTempDir('pmss-config-', 0775);
-        foreach ($templates as $codename => $content) {
-            file_put_contents($dir."/template.sources.$codename", $content);
-        }
-        try {
-            $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $dir], function () use ($callback, $dir): void {
-                $callback($dir);
-            });
-        } finally {
-            foreach ((glob($dir.'/template.sources.*') ?: []) as $item) {
-                @unlink($item);
-            }
-        }
     }
 
 }

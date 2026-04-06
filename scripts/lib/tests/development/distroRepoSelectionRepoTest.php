@@ -15,15 +15,14 @@ class DistroRepoSelectionRepoTest extends TestCase
         if (file_exists($dir)) {
             @unlink($dir);
         }
-        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($dir, $target): void {
+        $this->pmssWithAptSourcesPath($target, function () use ($dir, $target): void {
             $template = "deb http://mirror.example bullseye main\n";
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            \updateAptSources('debian', 11, '', [
+            \updateAptSources('debian', 11, '', $this->pmssDebianRepoTemplates([
                 'bullseye' => $template,
-                'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => '',
-            ], $logger);
+            ]), $logger);
 
             $this->assertTrue(is_dir($dir));
             $this->assertEquals($template, file_get_contents($target));
@@ -33,12 +32,8 @@ class DistroRepoSelectionRepoTest extends TestCase
     public function testUpdateAptSourcesLeavesFileWhenTemplateEmpty(): void
     {
         $initial = "deb http://existing bullseye main\n";
-        $target = $this->pmssWriteTempFile('sources', $initial);
-        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($initial, $target): void {
-            \updateAptSources('debian', 11, sha1($initial), [
-                'bullseye' => '',
-                'buster' => '', 'jessie' => '', 'bookworm' => '', 'trixie' => '',
-            ], function (): void {});
+        $this->pmssWithTempAptSources($initial, function (string $target) use ($initial): void {
+            \updateAptSources('debian', 11, sha1($initial), $this->pmssDebianRepoTemplates(), function (): void {});
 
             $this->assertEquals($initial, file_get_contents($target));
             $this->assertTrue(!file_exists($target.'.pmss-backup'));
@@ -48,12 +43,11 @@ class DistroRepoSelectionRepoTest extends TestCase
     public function testUpdateAptSourcesWithoutExistingFileSkipsBackup(): void
     {
         $target = $this->pmssMakeTempPath('pmss-apt-target-');
-        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($target): void {
+        $this->pmssWithAptSourcesPath($target, function () use ($target): void {
             $template = "deb http://mirror.example bookworm main\n";
-            \updateAptSources('debian', 12, '', [
+            \updateAptSources('debian', 12, '', $this->pmssDebianRepoTemplates([
                 'bookworm' => $template,
-                'bullseye' => '', 'buster' => '', 'jessie' => '', 'trixie' => '',
-            ], function (): void {});
+            ]), function (): void {});
 
             $this->assertEquals($template, file_get_contents($target));
             $this->assertTrue(!file_exists($target.'.pmss-backup'));

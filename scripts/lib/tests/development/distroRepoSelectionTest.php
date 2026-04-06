@@ -57,20 +57,15 @@ class DistroRepoSelectionTest extends TestCase
     public function testUpdateAptSourcesWritesTemplateForBullseye(): void
     {
         $initial = "deb http://mirror.invalid buster main\n";
-        $target = $this->pmssWriteTempFile('sources', $initial);
-        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($initial, $target): void {
+        $this->pmssWithTempAptSources($initial, function (string $target) use ($initial): void {
             $template = "deb http://mirror.example bullseye main contrib non-free\n";
             $currentHash = sha1($initial);
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            \updateAptSources('debian', 11, $currentHash, [
+            \updateAptSources('debian', 11, $currentHash, $this->pmssDebianRepoTemplates([
                 'bullseye' => $template,
-                'buster'   => '',
-                'jessie'   => '',
-                'bookworm' => '',
-                'trixie'   => '',
-            ], $logger);
+            ]), $logger);
 
             $written = file_get_contents($target);
             $this->assertEquals($template, $written);
@@ -84,20 +79,15 @@ class DistroRepoSelectionTest extends TestCase
     public function testUpdateAptSourcesEolSuiteLogsTestModeSkip(): void
     {
         $initial = "deb http://mirror.invalid bullseye main\n";
-        $target = $this->pmssWriteTempFile('sources', $initial);
-        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $target], function () use ($initial, $target): void {
+        $this->pmssWithTempAptSources($initial, function (string $target) use ($initial): void {
             $template = "deb http://mirror.example buster main\n";
             $currentHash = sha1($initial);
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            \updateAptSources('debian', 10, $currentHash, [
-                'buster'   => $template,
-                'bullseye' => '',
-                'jessie'   => '',
-                'bookworm' => '',
-                'trixie'   => '',
-            ], $logger);
+            \updateAptSources('debian', 10, $currentHash, $this->pmssDebianRepoTemplates([
+                'buster' => $template,
+            ]), $logger);
 
             $this->assertEquals($template, file_get_contents($target));
             $this->pmssAssertMessagesContain($logs, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)', 'Expected EOL post-hook to log test-mode skip');
