@@ -121,8 +121,8 @@ TXT;
     }
 
     foreach ($users as $thisUser) {
-        $isLocalnet = substr($thisUser, -strlen('-localnet')) === '-localnet';
-        $baseUser = $isLocalnet ? substr($thisUser, 0, -strlen('-localnet')) : $thisUser;
+        $isLocalnet = pmssTrafficUserKeyIsLocalnet($thisUser);
+        $baseUser = pmssTrafficUserKeyBaseUser($thisUser);
         $baseUsers[$baseUser] = true;
         $statsPath = pmssTrafficStatsPath($thisUser, $statsDir);
         if (!is_file($statsPath)) {

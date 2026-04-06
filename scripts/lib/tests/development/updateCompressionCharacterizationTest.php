@@ -225,14 +225,14 @@ class UpdateCompressionCharacterizationTest extends TestCase
 
         $this->assertTrue(
             strpos($src, 'function '.$splitSymbol.'(') === false,
-            'showTraffic.php should keep localnet suffix detection inside pmssShowTrafficMain()'
+            'showTraffic.php should reuse shared traffic user-key helpers instead of adding a local splitter'
         );
         $this->assertTrue(
             strpos($src, 'function '.$barSymbol.'(') === false,
             'showTraffic.php should keep the extended output bar rendering inside pmssShowTrafficMain()'
         );
         $this->assertStringContainsString("pmssListManagedUsersResult(__DIR__.'/listUsers.php')", $src);
-        $this->assertStringContainsString("substr(\$thisUser, -strlen('-localnet')) === '-localnet'", $src);
+        $this->assertStringContainsString('pmssTrafficUserKeyBaseUser($thisUser)', $src);
         $this->assertStringContainsString("str_repeat('#', \$filled)", $src);
         $this->assertStringContainsString("str_repeat('-', 10 - \$filled)", $src);
     }

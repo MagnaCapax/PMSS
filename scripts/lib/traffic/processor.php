@@ -31,37 +31,25 @@ class TrafficStatsProcessor
     /** Build comparison timestamps for each window. */
     public function buildCompareTimes(): array
     {
-        $now = time();
-        return [
-            'month' => $now - (30 * 24 * 60 * 60),
-            'week'  => $now - (7 * 24 * 60 * 60),
-            'day'   => $now - (24 * 60 * 60),
-            'hour'  => $now - (60 * 60),
-            '15min' => $now - (15 * 60),
-        ];
+        return pmssStatsCompareTimesBuild();
     }
 
     /** Detect whether we are running in worker mode for a specific user. */
     public function detectWorkerUser(array $argv): ?string
     {
-        return isset($argv[1]) ? $this->sanitizeUser($argv[1]) : null;
+        return isset($argv[1]) ? pmssCliUserArgSanitize($argv[1]) : null;
     }
 
     /** Discover users by scanning the traffic log directory. */
     public function discoverUsers(): array
     {
-        $users = array_map('basename', array_filter(glob($this->trafficDir.'/*'), 'is_file'));
-        sort($users, SORT_NATURAL | SORT_FLAG_CASE);
-        return $users;
+        return pmssFileBasenamesDiscover($this->trafficDir.'/*');
     }
 
     /** Launch detached workers for each user to process in parallel. */
     public function spawnWorkers(string $scriptPath, array $users): void
     {
-        $script = escapeshellarg($scriptPath);
-        foreach ($users as $user) {
-            passthru("nohup {$script} ".escapeshellarg($user)." >> /var/log/pmss/trafficStats.log 2>&1 &");
-        }
+        pmssUserWorkersSpawnDetached($scriptPath, $users, '/var/log/pmss/trafficStats.log');
     }
 
     /** Handle the CLI worker-or-spawn flow used by traffic cron entrypoints. */
@@ -90,13 +78,13 @@ class TrafficStatsProcessor
     /** Sanitize user input by stripping unexpected characters. */
     public function sanitizeUser(string $input): string
     {
-        return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $input);
+        return pmssCliUserArgSanitize($input);
     }
 
     /** Validate that a user has traffic data and a home directory. */
     public function validateUser(string $username): bool
     {
-        $baseUser = (string) preg_replace('/-localnet$/', '', $username);
+        $baseUser = pmssTrafficUserKeyBaseUser($username);
         return is_readable($this->trafficDir.'/'.$username)
             && is_dir($this->homeDir.'/'.$baseUser)
             && is_string($passwd = @file_get_contents($this->passwdFile))

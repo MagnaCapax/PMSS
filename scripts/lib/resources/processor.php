@@ -45,34 +45,22 @@ class ResourceStatsProcessor
 
     public function buildCompareTimes(): array
     {
-        $now = time();
-        return [
-            'month' => $now - (30 * 24 * 60 * 60),
-            'week'  => $now - (7 * 24 * 60 * 60),
-            'day'   => $now - (24 * 60 * 60),
-            'hour'  => $now - (60 * 60),
-            '15min' => $now - (15 * 60),
-        ];
+        return pmssStatsCompareTimesBuild();
     }
 
     public function detectWorkerUser(array $argv): ?string
     {
-        return isset($argv[1]) ? preg_replace('/[^a-zA-Z0-9-_]/', '', $argv[1]) : null;
+        return isset($argv[1]) ? pmssCliUserArgSanitize($argv[1]) : null;
     }
 
     public function discoverUsers(): array
     {
-        $users = array_map('basename', array_filter(glob($this->resourceDir.'/*'), 'is_file'));
-        sort($users, SORT_NATURAL | SORT_FLAG_CASE);
-        return $users;
+        return pmssFileBasenamesDiscover($this->resourceDir.'/*');
     }
 
     public function spawnWorkers(string $scriptPath, array $users): void
     {
-        $script = escapeshellarg($scriptPath);
-        foreach ($users as $user) {
-            passthru("nohup {$script} ".escapeshellarg($user)." >> /var/log/pmss/resourceStats.log 2>&1 &");
-        }
+        pmssUserWorkersSpawnDetached($scriptPath, $users, '/var/log/pmss/resourceStats.log');
     }
 
     /** Handle the CLI worker-or-spawn flow used by the resource stats cron job. */

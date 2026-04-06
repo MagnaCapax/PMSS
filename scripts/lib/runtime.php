@@ -35,6 +35,22 @@ if (!function_exists('pmssDirPathResolve')) {
     // Resolve a directory path from an explicit override or env-backed default.
     function pmssDirPathResolve(?string $override, string $envKey, string $default): string { return pmssDirPathNormalize((string) ($override !== null ? $override : pmssResolvePathFromEnv($envKey, $default))); }
 }
+if (!function_exists('pmssStatsCompareTimesBuild')) {
+    // Build the standard month/week/day/hour/15min thresholds used by PMSS stats processors.
+    function pmssStatsCompareTimesBuild(?int $now = null): array { $now = $now ?? time(); return ['month' => $now - (30 * 24 * 60 * 60), 'week' => $now - (7 * 24 * 60 * 60), 'day' => $now - (24 * 60 * 60), 'hour' => $now - (60 * 60), '15min' => $now - (15 * 60)]; }
+}
+if (!function_exists('pmssCliUserArgSanitize')) {
+    // Strip unexpected characters from a CLI-supplied user key.
+    function pmssCliUserArgSanitize(string $value): string { return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $value); }
+}
+if (!function_exists('pmssFileBasenamesDiscover')) {
+    // Discover natural-sorted file basenames from a bounded glob pattern.
+    function pmssFileBasenamesDiscover(string $pattern): array { $items = array_map('basename', array_filter(glob($pattern) ?: [], 'is_file')); sort($items, SORT_NATURAL | SORT_FLAG_CASE); return $items; }
+}
+if (!function_exists('pmssUserWorkersSpawnDetached')) {
+    // Spawn per-user workers and redirect output to a shared PMSS log.
+    function pmssUserWorkersSpawnDetached(string $scriptPath, array $users, string $logPath): void { $script = escapeshellarg($scriptPath); foreach ($users as $user) passthru("nohup {$script} ".escapeshellarg($user)." >> ".escapeshellarg($logPath)." 2>&1 &"); }
+}
 if (!function_exists('pmssCommandBinaryNameIsSafe')) {
     // Accept only bare binary names before crossing the shell boundary.
     function pmssCommandBinaryNameIsSafe(string $binary): bool

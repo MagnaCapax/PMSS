@@ -26,19 +26,21 @@ if (!function_exists('pmssTrafficDataPaths')) {
     }
 }
 
+if (!function_exists('pmssTrafficUserKeyIsLocalnet')) {
+    // Detect whether a traffic user key targets the localnet bucket.
+    function pmssTrafficUserKeyIsLocalnet(string $user): bool { return substr_compare($user, '-localnet', -9) === 0; }
+}
+
+if (!function_exists('pmssTrafficUserKeyBaseUser')) {
+    // Resolve the canonical PMSS username behind a traffic user key.
+    function pmssTrafficUserKeyBaseUser(string $user): string { return pmssTrafficUserKeyIsLocalnet($user) ? substr($user, 0, -9) : $user; }
+}
+
 if (!function_exists('pmssTrafficUserKeyIsValid')) {
     /** Validate a traffic storage key, allowing the `-localnet` suffix. */
     function pmssTrafficUserKeyIsValid(string $user): bool
     {
-        if ($user === '') {
-            return false;
-        }
-
-        if (substr_compare($user, '-localnet', -9) === 0) {
-            return pmssUsernameIsValid(substr($user, 0, -9));
-        }
-
-        return pmssUsernameIsValid($user);
+        return $user !== '' && pmssUsernameIsValid(pmssTrafficUserKeyBaseUser($user));
     }
 }
 
@@ -176,8 +178,8 @@ class TrafficStorage
             return;
         }
 
-        $isLocalUser = substr_compare($user, '-localnet', -9) === 0;
-        $targetUser = $isLocalUser ? substr($user, 0, -9) : $user;
+        $isLocalUser = pmssTrafficUserKeyIsLocalnet($user);
+        $targetUser = pmssTrafficUserKeyBaseUser($user);
         $trafficPaths = pmssTrafficDataPaths($targetUser, $this->homeDir);
         $trafficKey = $this->trafficMode === 'ingress'
             ? ($isLocalUser ? 'ingressLocal' : 'ingress')
