@@ -119,9 +119,11 @@ class UserTrafficStateHelpersTest extends TestCase
 
     public function testTrafficStorageSaveRejectsSymlinkedRuntimeStatsFile(): void
     {
+        $messages = [];
         $storage = new \TrafficStorage([
             'home_dir' => $this->tempDir.'/home',
             'runtime_dir' => $this->tempDir.'/runtime',
+            'logger' => $this->pmssMakeArrayLogger($messages),
         ]);
         $storage->ensureRuntime();
 
@@ -134,10 +136,12 @@ class UserTrafficStateHelpersTest extends TestCase
 
         $this->assertEquals('keep-me', file_get_contents($target));
         $this->assertTrue(is_link($statsPath));
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$statsPath);
     }
 
     public function testTrafficStorageEnsureRuntimeRejectsSymlinkedRuntimeDir(): void
     {
+        $messages = [];
         $targetRuntime = $this->tempDir.'/runtime-target';
         @mkdir($targetRuntime, 0755, true);
         $runtimeLink = $this->tempDir.'/runtime-link';
@@ -146,23 +150,27 @@ class UserTrafficStateHelpersTest extends TestCase
         $storage = new \TrafficStorage([
             'home_dir' => $this->tempDir.'/home',
             'runtime_dir' => $runtimeLink,
+            'logger' => $this->pmssMakeArrayLogger($messages),
         ]);
 
         $storage->ensureRuntime();
 
         $this->assertTrue(is_link($runtimeLink));
         $this->assertTrue(!is_dir($targetRuntime.'/trafficStats'));
+        $this->pmssAssertMessagesContain($messages, '[WARN] Unable to prepare traffic runtime directory '.$runtimeLink);
     }
 
     public function testTrafficStorageSaveRejectsSymlinkedHomeTrafficFile(): void
     {
         $homeDir = $this->tempDir.'/home';
         $runtimeDir = $this->tempDir.'/runtime';
+        $messages = [];
         @mkdir($homeDir.'/alice', 0755, true);
 
         $storage = new \TrafficStorage([
             'home_dir' => $homeDir,
             'runtime_dir' => $runtimeDir,
+            'logger' => $this->pmssMakeArrayLogger($messages),
         ]);
         $storage->ensureRuntime();
 
@@ -175,6 +183,7 @@ class UserTrafficStateHelpersTest extends TestCase
 
         $this->assertEquals('keep-home', file_get_contents($target));
         $this->assertTrue(is_link($homeTrafficPath));
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$homeTrafficPath);
     }
 
     public function testTrafficStorageSaveRejectsInvalidUsername(): void

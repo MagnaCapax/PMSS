@@ -154,6 +154,7 @@ class TrafficStorage
     private $runtimeDir;
     private $statsDir;
     private $trafficMode;
+    private $logger;
 
     public function __construct(array $paths = [])
     {
@@ -161,13 +162,23 @@ class TrafficStorage
         $this->runtimeDir = pmssDirPathResolve($paths['runtime_dir'] ?? null, 'PMSS_RUNTIME_DIR', '/var/run/pmss');
         $this->statsDir = pmssDirPathNormalize((string) ($paths['stats_dir'] ?? ($this->runtimeDir.'/trafficStats')));
         $this->trafficMode = ($paths['traffic_mode'] ?? 'egress') === 'ingress' ? 'ingress' : 'egress';
+        $this->logger = $paths['logger'] ?? 'logMessage';
+    }
+
+    /** Emit a storage warning through the configured logger. */
+    private function log(string $message): void
+    {
+        $logger = $this->logger;
+        $logger($message);
     }
 
     /** Ensure runtime directories exist before writing. */
     public function ensureRuntime(): void
     {
         foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
-            pmssEnsureSafeDir($dir, $mode);
+            if (!pmssEnsureSafeDir($dir, $mode)) {
+                $this->log('[WARN] Unable to prepare traffic runtime directory '.$dir);
+            }
         }
     }
 
@@ -194,7 +205,9 @@ class TrafficStorage
         );
 
         foreach ($targets as [$path, $group, $mode, $immutable]) {
-            pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable);
+            if (!pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable)) {
+                $this->log('[WARN] Failed to write traffic state for '.$user.' at '.$path);
+            }
         }
     }
 }
