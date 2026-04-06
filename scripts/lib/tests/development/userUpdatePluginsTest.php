@@ -13,10 +13,9 @@ class UserUpdatePluginsTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-plugins-home-');
 
-        $previousDryRun = getenv('PMSS_DRY_RUN');
-        $previousSkel   = getenv('PMSS_SKEL_DIR');
+        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_SKEL_DIR']);
         putenv('PMSS_DRY_RUN=1');
-        putenv('PMSS_SKEL_DIR=' . sys_get_temp_dir().'/does-not-exist');
+        putenv('PMSS_SKEL_DIR='.sys_get_temp_dir().'/does-not-exist');
 
         $GLOBALS['PMSS_PROFILE'] = [];
         try {
@@ -34,30 +33,12 @@ class UserUpdatePluginsTest extends TestCase
                 escapeshellarg($expectedSource),
                 escapeshellarg($expectedDest)
             );
-            $cmd = null;
-            foreach (($GLOBALS['PMSS_PROFILE'] ?? []) as $entry) {
-                if (!is_array($entry)) {
-                    continue;
-                }
-                $description = (string) ($entry['description'] ?? '');
-                if (strpos($description, 'Installing unpack plugin') === false) {
-                    continue;
-                }
-	                $cmd = isset($entry['command']) ? (string) $entry['command'] : null;
-	                break;
-	            }
-	            $this->assertEquals($expectedCmd, (string) $cmd);
-	        } finally {
-	            if ($previousSkel === false) {
-	                putenv('PMSS_SKEL_DIR');
-            } else {
-                putenv('PMSS_SKEL_DIR='.$previousSkel);
-            }
-            if ($previousDryRun === false) {
-                putenv('PMSS_DRY_RUN');
-            } else {
-                putenv('PMSS_DRY_RUN='.$previousDryRun);
-            }
+            $this->assertEquals(
+                $expectedCmd,
+                (string) $this->pmssFindProfileCommand('Installing unpack plugin')
+            );
+        } finally {
+            $this->pmssRestoreEnvMap($previous);
         }
     }
 
@@ -83,28 +64,12 @@ class UserUpdatePluginsTest extends TestCase
         $this->assertTrue(!file_exists($settingsDir.'/retrackers.dat'));
         $this->assertEquals(
             sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/users/dummy/torrents')),
-            $this->findCommand('Creating ruTorrent torrents directory')
+            $this->pmssFindProfileCommand('Creating ruTorrent torrents directory')
         );
         $this->assertEquals(
             sprintf('mkdir -p %s', escapeshellarg($home.'/www/rutorrent/share/settings/rss')),
-            $this->findCommand('Creating ruTorrent RSS settings directory')
+            $this->pmssFindProfileCommand('Creating ruTorrent RSS settings directory')
         );
-    }
-
-    private function findCommand(string $needle): ?string
-    {
-        foreach (($GLOBALS['PMSS_PROFILE'] ?? []) as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-            $description = (string) ($entry['description'] ?? '');
-            if (strpos($description, $needle) === false) {
-                continue;
-            }
-            return isset($entry['command']) ? (string) $entry['command'] : null;
-        }
-
-        return null;
     }
 
 }

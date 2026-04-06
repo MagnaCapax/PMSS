@@ -44,7 +44,7 @@ class UserUpdatePermissionsTest extends TestCase
 
             $observedCommand = isset($GLOBALS['PMSS_TEST_RUNUSERSTEP_LAST']['command'])
                 ? (string) $GLOBALS['PMSS_TEST_RUNUSERSTEP_LAST']['command']
-                : $this->findStepCommand($jsonLog, 'Refreshing user permissions');
+                : $this->pmssFindJsonStepCommand($jsonLog, 'Refreshing user permissions');
 
             $this->assertEquals($expectedCommand, $observedCommand ?? '');
             $this->assertEquals('321', getenv('PMSS_COMMAND_TIMEOUT'));
@@ -123,29 +123,6 @@ class UserUpdatePermissionsTest extends TestCase
 
         $this->assertEquals(1, count($steps));
         $this->assertEquals('Refreshing user permissions', $firstStepDescription);
-    }
-
-    private function findStepCommand(string $jsonLog, string $needle): ?string
-    {
-        $lines = @file($jsonLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if (!is_array($lines)) {
-            return null;
-        }
-        foreach ($lines as $line) {
-            $decoded = json_decode($line, true);
-            if (!is_array($decoded) || ($decoded['event'] ?? '') !== 'step') {
-                continue;
-            }
-            $entry = $decoded['data'] ?? null;
-            if (!is_array($entry)) {
-                continue;
-            }
-            if (strpos((string) ($entry['description'] ?? ''), $needle) === false) {
-                continue;
-            }
-            return isset($entry['command']) ? (string) $entry['command'] : null;
-        }
-        return null;
     }
 }
 

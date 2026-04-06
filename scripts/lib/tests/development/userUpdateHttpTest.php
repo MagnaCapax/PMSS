@@ -166,12 +166,6 @@ class UserUpdateHttpTest extends TestCase
         $expected = sprintf('cp %s %s/', escapeshellarg($skel.'/.irssi/config'), escapeshellarg($home.'/.irssi'));
         $this->assertEquals($expected, $cmd ?? '');
     }
-
-    private function findStepCommand(string $jsonLog, string $needle): ?string
-    {
-        return $this->pmssFindJsonStepCommand($jsonLog, $needle);
-    }
-
 }
 
 }

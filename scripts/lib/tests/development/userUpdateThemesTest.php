@@ -44,9 +44,4 @@ class UserUpdateThemesTest extends TestCase
         );
         $this->assertEquals($expected, $cmd ?? '');
     }
-
-    private function findStepCommand(string $jsonLog, string $needle): ?string
-    {
-        return $this->pmssFindJsonStepCommand($jsonLog, $needle);
-    }
 }

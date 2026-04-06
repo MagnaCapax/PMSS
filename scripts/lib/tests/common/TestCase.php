@@ -64,6 +64,25 @@ abstract class TestCase
         }, $GLOBALS['PMSS_PROFILE'] ?? []);
     }
 
+    /** Return a dry-run profile command whose description contains a substring. */
+    protected function pmssFindProfileCommand(string $needle): ?string
+    {
+        foreach (($GLOBALS['PMSS_PROFILE'] ?? []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $description = (string) ($entry['description'] ?? '');
+            if (strpos($description, $needle) === false) {
+                continue;
+            }
+
+            return isset($entry['command']) ? (string) $entry['command'] : null;
+        }
+
+        return null;
+    }
+
     public function run(): array
     {
         $methods = array_filter(get_class_methods($this), static function ($method) {
