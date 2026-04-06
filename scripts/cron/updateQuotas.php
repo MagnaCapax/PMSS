@@ -78,11 +78,11 @@ $writeQuotaUserLogs = static function (
 
 foreach ($users as $thisUser) {
 #TODO Check that quota is working
-    // Invariant: verify the resolved home directory matches the expected
-    // /home/<username> prefix before touching any files.
+    // Invariant: verify the resolved home directory exactly matches the
+    // expected /home/<username> path before touching any files.
     $expectedHome = "/home/{$thisUser}";
     $realHome = realpath($expectedHome);
-    if ($realHome === false || strpos($realHome, $expectedHome) !== 0) {
+    if ($realHome === false || $realHome !== $expectedHome) {
         $logger->msg("Refusing quota refresh for {$thisUser}: unexpected home path '{$realHome}'");
         $writeQuotaUserLogs(
             $thisUser,
