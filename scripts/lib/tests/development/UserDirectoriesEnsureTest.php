@@ -22,11 +22,6 @@ class UserDirectoriesEnsureTest extends TestCase
         $this->user = (is_array($pw) && isset($pw['name']) && is_string($pw['name'])) ? $pw['name'] : get_current_user();
     }
 
-    private function recursiveDelete(string $dir): void
-    {
-        $this->cleanup($dir);
-    }
-
     public function testCreatesNestedPathWithParentModeAndLeafMode(): void
     {
         $home = $this->tempDir.'/home';

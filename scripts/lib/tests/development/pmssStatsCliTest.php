@@ -21,8 +21,7 @@ class PmssStatsCliTest extends TestCase
         $this->configDir = $this->pmssMakeTempDir('pmss-stats-config-');
         $this->cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');
 
-        @mkdir($this->configDir.'/users', 0755, true);
-        file_put_contents($this->configDir.'/users/alice.json', json_encode([
+        $this->pmssWriteRelativeFile($this->configDir, 'users/alice.json', json_encode([
             'ramMiB' => 8192,
             'quota' => 4096,
             'quotaBurst' => 5120,
@@ -30,31 +29,40 @@ class PmssStatsCliTest extends TestCase
             'product' => 'M10G S',
         ]));
 
-        file_put_contents($this->home.'/.quota', implode("\n", [
-            'Disk quotas for user alice (uid 1000):',
-            'Filesystem  blocks   quota   limit   grace',
-            '/dev/md0  1.2T  4.0T  4.0T',
-        ]));
-        file_put_contents($this->home.'/.trafficData', serialize([
-            'raw' => ['month' => 2150.0],
-            'display' => ['month' => '2.1GiB'],
-        ]));
-        file_put_contents($this->home.'/.trafficDataIngress', serialize([
-            'raw' => ['month' => 3680.0],
-            'display' => ['month' => '3.6GiB'],
-        ]));
-        file_put_contents($this->home.'/.resourceData', serialize([
-            'memory' => ['current' => 2147483648],
-        ]));
-        file_put_contents($this->home.'/.trafficLimit', "5\n");
-        file_put_contents($this->home.'/.bonusTraffic', "1\n");
+        foreach ([
+            '.quota' => implode("\n", [
+                'Disk quotas for user alice (uid 1000):',
+                'Filesystem  blocks   quota   limit   grace',
+                '/dev/md0  1.2T  4.0T  4.0T',
+            ]),
+            '.trafficData' => serialize([
+                'raw' => ['month' => 2150.0],
+                'display' => ['month' => '2.1GiB'],
+            ]),
+            '.trafficDataIngress' => serialize([
+                'raw' => ['month' => 3680.0],
+                'display' => ['month' => '3.6GiB'],
+            ]),
+            '.resourceData' => serialize([
+                'memory' => ['current' => 2147483648],
+            ]),
+            '.trafficLimit' => "5\n",
+            '.bonusTraffic' => "1\n",
+        ] as $relativePath => $content) {
+            $this->pmssWriteRelativeFile($this->home, $relativePath, $content);
+        }
 
-        file_put_contents($this->cgroupDir.'/memory.current', "2147483648\n");
-        file_put_contents($this->cgroupDir.'/memory.max', "8589934592\n");
-        file_put_contents($this->cgroupDir.'/pids.current', "12\n");
-        file_put_contents($this->cgroupDir.'/cpu.stat', "usage_usec 42000000\n");
-        file_put_contents($this->cgroupDir.'/io.stat', "8:0 rbytes=1024 wbytes=2048 rios=1 wios=2 dbytes=0 dios=0\n");
-        file_put_contents(dirname($this->cgroupDir).'/io.pressure', "some avg10=1.5 avg60=0.5 avg300=0.1 total=10\n");
+        foreach ([
+            'memory.current' => "2147483648\n",
+            'memory.max' => "8589934592\n",
+            'pids.current' => "12\n",
+            'cpu.stat' => "usage_usec 42000000\n",
+            'io.stat' => "8:0 rbytes=1024 wbytes=2048 rios=1 wios=2 dbytes=0 dios=0\n",
+        ] as $relativePath => $content) {
+            $this->pmssWriteRelativeFile($this->cgroupDir, $relativePath, $content);
+        }
+
+        $this->pmssWriteFile(dirname($this->cgroupDir).'/io.pressure', "some avg10=1.5 avg60=0.5 avg300=0.1 total=10\n");
     }
 
     public function testCollectBuildsCanonicalStatsPayload(): void

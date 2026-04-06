@@ -162,51 +162,26 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
 
     private function withTempSources(string $content, callable $callback): void
     {
-        $dir = sys_get_temp_dir().'/pmss-sources-'.bin2hex(random_bytes(6));
-        $this->pmssEnsureFixtureDirectory($dir, 0700);
-
-        $path = $dir.'/sources.list';
-        if (file_put_contents($path, $content) === false) {
-            throw new \RuntimeException('Unable to seed temp sources file');
-        }
+        $dir = $this->pmssMakeTempDir('pmss-sources-', 0700);
+        $path = $this->pmssWriteFile($dir.'/sources.list', $content, 0700);
         @chmod($path, 0600);
 
-        try {
-            $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $path], function () use ($callback, $path): void {
-                $callback($path);
-            });
-        } finally {
-            $backup = $path.'.pmss-backup';
-            if (file_exists($backup)) {
-                @unlink($backup);
-            }
-            @unlink($path);
-            @rmdir($dir);
-        }
+        $this->pmssWithEnv(['PMSS_APT_SOURCES_PATH' => $path], function () use ($callback, $path): void {
+            $callback($path);
+        });
     }
 
     private function withTempConfigTemplates(array $templates, callable $callback): void
     {
-        $dir = sys_get_temp_dir().'/pmss-config-'.bin2hex(random_bytes(6));
-        $this->pmssEnsureFixtureDirectory($dir, 0700);
+        $dir = $this->pmssMakeTempDir('pmss-config-', 0700);
 
         foreach ($templates as $codename => $content) {
-            $path = $dir."/template.sources.$codename";
-            if (file_put_contents($path, rtrim($content, "\n")."\n") === false) {
-                throw new \RuntimeException('Unable to seed template '.$codename);
-            }
+            $path = $this->pmssWriteFile($dir."/template.sources.$codename", rtrim($content, "\n")."\n", 0700);
             @chmod($path, 0600);
         }
 
-        try {
-            $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $dir], function () use ($callback, $dir): void {
-                $callback($dir);
-            });
-        } finally {
-            foreach ((glob($dir.'/template.sources.*') ?: []) as $file) {
-                @unlink($file);
-            }
-            @rmdir($dir);
-        }
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $dir], function () use ($callback, $dir): void {
+            $callback($dir);
+        });
     }
 }

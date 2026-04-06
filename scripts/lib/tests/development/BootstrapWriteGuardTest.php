@@ -20,32 +20,31 @@ class BootstrapWriteGuardTest extends TestCase
     public function testManagedPathWriterStoresContentWithRootMetadata(): void
     {
         $path = $this->tempDir.'/etc/hostname';
-        @mkdir(dirname($path), 0755, true);
+        $this->pmssEnsureFixtureDirectory(dirname($path));
 
         $this->assertTrue(\pmssWriteManagedPathFile($path, "pmss-host\n", 'hostname', 'logMessage', 'root', 'root'));
-        $this->assertEquals("pmss-host\n", (string) file_get_contents($path));
+        $this->assertEquals("pmss-host\n", $this->pmssReadFileOrEmpty($path));
         $this->assertEquals(0644, fileperms($path) & 0777);
     }
 
     public function testManagedPathWriterReplacesExistingRegularFile(): void
     {
         $path = $this->tempDir.'/etc/ssh/sshd_config';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, "old\n");
+        $this->pmssWriteFile($path, "old\n");
 
         $this->assertTrue(\pmssWriteManagedPathFile($path, "new\n", 'sshd config', 'logMessage', 'root', 'root'));
-        $this->assertEquals("new\n", (string) file_get_contents($path));
+        $this->assertEquals("new\n", $this->pmssReadFileOrEmpty($path));
     }
 
     public function testManagedPathWriterRejectsSymlinkTarget(): void
     {
         $realPath = $this->tempDir.'/real';
         $linkPath = $this->tempDir.'/link';
-        file_put_contents($realPath, "keep\n");
+        $this->pmssWriteFile($realPath, "keep\n");
         symlink($realPath, $linkPath);
 
         $this->assertFalse(\pmssWriteManagedPathFile($linkPath, "replace\n", 'sshd config', 'logMessage', 'root', 'root'));
-        $this->assertEquals("keep\n", (string) file_get_contents($realPath));
+        $this->assertEquals("keep\n", $this->pmssReadFileOrEmpty($realPath));
     }
 
     public function testManagedPathWriterRejectsRelativePath(): void
