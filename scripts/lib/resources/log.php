@@ -64,7 +64,7 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
             : $currentValue;
     }
 
-    if ($handle !== false && is_string($payload = json_encode($state))) {
+    if ($handle !== false && is_string($payload = pmssJsonEncodeSafe($state))) {
         @ftruncate($handle, 0);
         @rewind($handle);
         @fwrite($handle, $payload);
