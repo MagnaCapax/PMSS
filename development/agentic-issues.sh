@@ -119,8 +119,7 @@ if [[ "$dry_run" == "1" ]]; then
 	echo "(dry-run placeholder)" >"$ISSUES_FILE"
 
 	codex_args=(run --prompt-file "$HERE/prompts/issues.txt" --outdir "$OUTDIR" --context "$ISSUES_FILE" --dry-run)
-	[[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
-	[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
+	codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit" '' 0
 
 	bash "$HERE/codex-run.sh" "${codex_args[@]}"
 	exit 0
@@ -445,11 +444,7 @@ echo "[agentic-issues] issue context (post-sanitization): $issue_bytes bytes" >&
 
 # Launch the assistant.
 codex_args=(run --prompt-file "$HERE/prompts/issues.txt" --outdir "$OUTDIR" --context "$ISSUES_FILE")
-[[ -f "$ROOT/AGENTS.${agent}.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.md")
-[[ -f "$ROOT/AGENTS.${agent}.local.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.local.md")
-[[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
-[[ "$dry_run" == "1" ]] && codex_args+=(--dry-run)
-[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
+codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit"
 
 bash "$HERE/codex-run.sh" "${codex_args[@]}"
 

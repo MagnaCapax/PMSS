@@ -263,11 +263,7 @@ codex_args=(run --prompt-file "$HERE/prompts/refactor.txt" --outdir "$OUTDIR")
 [[ -s "$LOC_LOG" ]] && codex_args+=(--context "$LOC_LOG")
 [[ -s "$PHPLC_LOG" ]] && codex_args+=(--context "$PHPLC_LOG")
 [[ -s "$COOLING_CTX" ]] && codex_args+=(--context "$COOLING_CTX")
-[[ -f "$ROOT/AGENTS.${agent}.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.md")
-[[ -f "$ROOT/AGENTS.${agent}.local.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.local.md")
-[[ "$dry_run" == "1" ]] && codex_args+=(--dry-run)
-[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
-[[ -n "$custom_prompt" ]] && codex_args+=(--prompt "$custom_prompt")
+codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit" "$custom_prompt"
 
 bash "$HERE/codex-run.sh" "${codex_args[@]}"
 

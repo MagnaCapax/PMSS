@@ -108,8 +108,7 @@ if [[ "$dry_run" == "1" ]]; then
 	echo "(dry-run placeholder)" >"$QA_FILE"
 
 	codex_args=(run --prompt-file "$HERE/prompts/qa.txt" --outdir "$OUTDIR" --context "$QA_FILE" --dry-run)
-	[[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
-	[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
+	codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit" '' 0
 
 	bash "$HERE/codex-run.sh" "${codex_args[@]}"
 	exit 0
@@ -212,10 +211,7 @@ fi
 
 # Launch the assistant.
 codex_args=(run --prompt-file "$HERE/prompts/qa.txt" --outdir "$OUTDIR" --context "$QA_FILE")
-[[ -f "$ROOT/AGENTS.${agent}.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.md")
-[[ -f "$ROOT/AGENTS.${agent}.local.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.local.md")
-[[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
-[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
+codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit"
 
 bash "$HERE/codex-run.sh" "${codex_args[@]}"
 

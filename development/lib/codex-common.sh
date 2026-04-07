@@ -190,6 +190,21 @@ codex_append_option_pair() {
 	target_ref+=("$option_name" "$option_value")
 }
 
+# Append the shared codex-run options used by the agentic launcher wrappers.
+codex_append_runner_args() {
+	local target_name="$1" repo_root="$2" agent="$3" exec_cmd="$4" dry_run="$5" autocommit="$6"
+	local custom_prompt="${7-}" include_agent_contexts="${8:-1}"
+	local -n target_ref="$target_name"
+	if [[ "$include_agent_contexts" == "1" ]]; then
+		[[ -f "$repo_root/AGENTS.${agent}.md" ]] && target_ref+=(--context "$repo_root/AGENTS.${agent}.md")
+		[[ -f "$repo_root/AGENTS.${agent}.local.md" ]] && target_ref+=(--context "$repo_root/AGENTS.${agent}.local.md")
+	fi
+	[[ -n "$custom_prompt" ]] && target_ref+=(--prompt "$custom_prompt")
+	[[ -n "$exec_cmd" ]] && target_ref+=(--exec "$exec_cmd")
+	[[ "$dry_run" == "1" ]] && target_ref+=(--dry-run)
+	[[ "$autocommit" == "1" ]] && target_ref+=(--autocommit)
+}
+
 # Normalize assistant CLI args (map yolo to Claude's danger flag).
 codex_normalize_exec_extra_args() {
 	local agent="$1"

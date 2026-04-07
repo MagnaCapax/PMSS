@@ -169,11 +169,7 @@ if [[ "$dry_run" == "1" ]]; then
 	} >"$SUMMARY"
 
 	codex_args=(run --prompt-file "$HERE/prompts/ci.txt" --outdir "$OUTDIR" --context "$SUMMARY" --dry-run)
-	[[ -f "$ROOT/AGENTS.${agent}.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.md")
-	[[ -f "$ROOT/AGENTS.${agent}.local.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.local.md")
-	[[ -n "$custom_prompt" ]] && codex_args+=(--prompt "$custom_prompt")
-	[[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
-	[[ "$autocommit" == "1" ]] && codex_args+=(--autocommit)
+	codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit" "$custom_prompt"
 
 	bash "$HERE/codex-run.sh" "${codex_args[@]}"
 	exit 0
@@ -638,8 +634,6 @@ if [[ $any_logs -eq 0 ]]; then
 fi
 
 codex_args=(run --prompt-file "$HERE/prompts/ci.txt" --outdir "$OUTDIR" --context "$SUMMARY")
-[[ -f "$ROOT/AGENTS.${agent}.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.md")
-[[ -f "$ROOT/AGENTS.${agent}.local.md" ]] && codex_args+=(--context "$ROOT/AGENTS.${agent}.local.md")
 for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
 	[[ -s "$jl" ]] || continue
 	codex_args+=(--context "$jl")
@@ -647,16 +641,5 @@ done
 if [[ -n "$latest_art" ]]; then
 	codex_args+=(--context "$latest_art")
 fi
-if [[ -n "$custom_prompt" ]]; then
-	codex_args+=(--prompt "$custom_prompt")
-fi
-if [[ -n "$exec_cmd" ]]; then
-	codex_args+=(--exec "$exec_cmd")
-fi
-if [[ "$dry_run" == "1" ]]; then
-	codex_args+=(--dry-run)
-fi
-if [[ "$autocommit" == "1" ]]; then
-	codex_args+=(--autocommit)
-fi
+codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit" "$custom_prompt"
 bash "$HERE/codex-run.sh" "${codex_args[@]}"
