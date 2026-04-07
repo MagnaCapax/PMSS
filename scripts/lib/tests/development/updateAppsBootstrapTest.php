@@ -65,7 +65,7 @@ class UpdateAppsBootstrapTest extends TestCase
     public function testPythonVenvInstallersAvoidPackageQueueHelpers(): void
     {
         foreach (['python.php', 'pyload.php'] as $installer) {
-            $contents = $this->pmssReadRepoFile('scripts/lib/update/apps/'.$installer);
+            $contents = $this->pmssReadUpdateAppFile($installer);
 
             $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
             $this->assertTrue(
@@ -77,7 +77,7 @@ class UpdateAppsBootstrapTest extends TestCase
 
     public function testArrHelperKeepsSharedRuntimeBootstrapPath(): void
     {
-        $contents = $this->pmssReadRepoFile('scripts/lib/update/apps/arr.php');
+        $contents = $this->pmssReadUpdateAppFile('arr.php');
 
         $this->assertStringContainsString("dirname(__DIR__, 2).'/runtime.php'", $contents);
         $this->assertStringContainsString('%s updater: missing runtime helper', $contents);
@@ -87,7 +87,7 @@ class UpdateAppsBootstrapTest extends TestCase
     public function testStarrInstallersDelegateRuntimeBootstrapToArrHelper(): void
     {
         foreach (['radarr.php', 'sonarr.php'] as $installer) {
-            $contents = $this->pmssReadRepoFile('scripts/lib/update/apps/'.$installer);
+            $contents = $this->pmssReadUpdateAppFile($installer);
 
             $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);
             $this->assertTrue(

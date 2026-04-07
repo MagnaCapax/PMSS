@@ -914,6 +914,18 @@ abstract class TestCase
         return $contents;
     }
 
+    /** Read a file from scripts/lib/update through the shared repo helper. */
+    protected function pmssReadUpdateFile(string $relativePath): string
+    {
+        return $this->pmssReadRepoFile('scripts/lib/update/'.ltrim($relativePath, '/'));
+    }
+
+    /** Read an update app installer/helper source file. */
+    protected function pmssReadUpdateAppFile(string $relativePath): string
+    {
+        return $this->pmssReadUpdateFile('apps/'.ltrim($relativePath, '/'));
+    }
+
     /** Read a repository file and assert that it contains a substring. */
     protected function pmssAssertRepoFileContainsString(string $relativePath, string $needle, string $message = ''): void
     {

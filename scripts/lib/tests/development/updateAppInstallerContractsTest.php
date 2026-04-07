@@ -5,17 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateAppInstallerContractsTest extends TestCase
 {
-    private function readInstaller(string $name): string
-    {
-        $path = dirname(__DIR__, 2).'/update/apps/'.$name;
-        $contents = @file_get_contents($path);
-        $this->assertTrue(is_string($contents) && $contents !== '', 'Unable to read '.$path);
-        return $contents;
-    }
-
     public function testPyloadKeepsSharedVenvAndGuards(): void
     {
-        $contents = $this->readInstaller('pyload.php');
+        $contents = $this->pmssReadUpdateAppFile('pyload.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
         $this->assertStringContainsString('pmssDistroVersionFromEnv()', $contents);
@@ -27,7 +19,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testPyloadKeepsInstallAndLinkSteps(): void
     {
-        $contents = $this->readInstaller('pyload.php');
+        $contents = $this->pmssReadUpdateAppFile('pyload.php');
 
         $this->assertStringContainsString("['Installing pyLoad (pyload-ng)', 'pyload-ng']", $contents);
         $this->assertStringContainsString('/usr/local/bin/pyload', $contents);
@@ -36,7 +28,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testPythonInstallerKeepsSharedVenvAndWarnings(): void
     {
-        $contents = $this->readInstaller('python.php');
+        $contents = $this->pmssReadUpdateAppFile('python.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
         $this->assertStringContainsString('Skipping FlexGet install: python3 missing from PATH', $contents);
@@ -47,7 +39,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testPythonInstallerKeepsInstallSequence(): void
     {
-        $contents = $this->readInstaller('python.php');
+        $contents = $this->pmssReadUpdateAppFile('python.php');
 
         foreach (['Installing gdrivefs in FlexGet venv', 'Installing FlexGet dependencies', 'Installing FlexGet', 'Installing youtube-dl for FlexGet'] as $stepLabel) {
             $this->assertStringContainsString($stepLabel, $contents);
@@ -57,7 +49,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testIprangeKeepsPackageAndToolchainGuards(): void
     {
-        $contents = $this->readInstaller('iprange.php');
+        $contents = $this->pmssReadUpdateAppFile('iprange.php');
 
         $this->assertStringContainsString("empty(\$GLOBALS['PMSS_PACKAGES_READY'])", $contents);
         $this->assertStringContainsString('Skipping iprange build: package phase not complete', $contents);
@@ -70,7 +62,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testIprangeKeepsCompileStep(): void
     {
-        $contents = $this->readInstaller('iprange.php');
+        $contents = $this->pmssReadUpdateAppFile('iprange.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
         $this->assertStringContainsString("pmssFetchPinnedRemoteFile('iprange '.\$iprangeVersion.' source'", $contents);
@@ -83,7 +75,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testSyncthingInstallerKeepsVersionProbeAndPinnedDownload(): void
     {
-        $contents = $this->readInstaller('syncthing.php');
+        $contents = $this->pmssReadUpdateAppFile('syncthing.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
         $this->assertStringContainsString("syncthing version 2>/dev/null", $contents);
@@ -96,7 +88,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testFireholInstallerKeepsPinnedSourceBuild(): void
     {
-        $contents = $this->readInstaller('firehol.php');
+        $contents = $this->pmssReadUpdateAppFile('firehol.php');
 
         $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
         $this->assertStringContainsString('https://github.com/firehol/firehol/releases/download/v', $contents);
@@ -108,7 +100,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testRcloneInstallerKeepsLatestFetchAndRelocationGuards(): void
     {
-        $contents = $this->readInstaller('rclone.php');
+        $contents = $this->pmssReadUpdateAppFile('rclone.php');
 
         $this->assertStringContainsString("getenv('PMSS_RCLONE_FETCH_LATEST') === '1'", $contents);
         $this->assertStringContainsString('Warning: Unable to determine latest rclone version, falling back to pinned release.', $contents);
@@ -120,7 +112,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testVnstatInstallerKeepsSupportedConfigPathOnly(): void
     {
-        $contents = $this->readInstaller('vnstat.php');
+        $contents = $this->pmssReadUpdateAppFile('vnstat.php');
         $repairCommand = 'chown -R '.'vnstat:vnstat /var/lib/vnstat';
         $removedVersionVariable = '$debian'.'Major';
 
@@ -141,7 +133,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testWatchdogInstallerKeepsTemplateAndDeviceFallbackFlow(): void
     {
-        $contents = $this->readInstaller('watchdog.php');
+        $contents = $this->pmssReadUpdateAppFile('watchdog.php');
 
         $this->assertStringContainsString('template.watchdog.conf', $contents);
         $this->assertStringContainsString('template.watchdog.network-check.sh', $contents);
@@ -153,7 +145,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
     public function testPackagesBootstrapKeepsDuplicateQueueEntriesPruned(): void
     {
-        $contents = $this->readInstaller('packages.php');
+        $contents = $this->pmssReadUpdateAppFile('packages.php');
 
         foreach (['python3', 'python3-pip', 'python3-venv', 'python3-dev', 'python3-cheetah', 'zip', 'ethtool'] as $package) {
             $this->assertEquals(1, preg_match_all("/'".preg_quote($package, '/')."'/", $contents), $package.' should appear once in packages.php');
