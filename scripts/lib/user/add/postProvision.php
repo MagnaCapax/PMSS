@@ -34,11 +34,10 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     );
 
     // Seed traffic files with zero values so first login does not show errors before cron populates them.
-    // Format mirrors scripts/lib/traffic/storage.php consumers (serialized array with raw/display/daily keys).
+    // Consumers derive display strings from raw counters, so the seed payload stays minimal.
     try {
         $zeroRaw = ['month'=>0.0,'week'=>0.0,'day'=>0.0,'hour'=>0.0,'15min'=>0.0];
-        $zeroDisplay = ['month'=>'0MiB','week'=>'0MiB','day'=>'0MiB','hour'=>'0MiB','15min'=>'0MiB'];
-        $zeroTraffic = ['raw'=>$zeroRaw,'display'=>$zeroDisplay,'daily'=>[]];
+        $zeroTraffic = ['raw'=>$zeroRaw,'daily'=>[]];
         $serializedTraffic = serialize($zeroTraffic);
         $trafficPaths = pmssTrafficDataPaths($user['name'], dirname($homePath));
         $runtimeStatsPath = pmssTrafficStatsPath($user['name'], '/var/run/pmss/trafficStats');

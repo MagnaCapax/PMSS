@@ -86,6 +86,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
         $this->assertTrue(isset($stub->saved[$user]));
         $this->assertTrue(isset($stub->saved[$user]['raw']['day']));
+        $this->assertTrue(!isset($stub->saved[$user]['display']));
     }
 
     public function testValidateUserAcceptsLocalnetSuffix(): void
@@ -122,6 +123,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
         $this->assertTrue(isset($stub->saved[$user.'-localnet']));
         $this->assertTrue(isset($stub->saved[$user.'-localnet']['raw']['day']));
+        $this->assertTrue(!isset($stub->saved[$user.'-localnet']['display']));
     }
 
     public function testRunCliProcessesWorkerUser(): void

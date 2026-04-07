@@ -118,7 +118,6 @@ class TrafficStatsProcessor
 
         $this->stats->saveUserTraffic($user, [
             'raw'     => $rawTotals,
-            'display' => array_map('pmssTrafficFormatAmount', $rawTotals),
             'daily'   => $dailyTotals,
         ]);
         logMessage(date('c').": Traffic stats for {$user} saved, month data consumption: {$rawTotals['month']}");

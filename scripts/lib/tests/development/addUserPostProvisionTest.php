@@ -12,8 +12,10 @@ final class AddUserPostProvisionTest extends TestCase
         $this->assertStringContainsString('pmssEnsureSafeDir($runtimeStatsDir, 0755)', $source);
         $this->assertStringContainsString('pmssTrafficWriteFile($trafficPath, $serializedTraffic, $user[\'name\'], 0640, true)', $source);
         $this->assertStringContainsString('pmssTrafficWriteFile($runtimeStatsPath, $serializedTraffic, \'root\', 0600, false)', $source);
+        $this->assertStringContainsString("['raw'=>\$zeroRaw,'daily'=>[]]", $source);
         $this->pmssAssertStringNotContainsString('@file_put_contents($trafficPath', $source);
         $this->pmssAssertStringNotContainsString('@file_put_contents($runtimeStatsPath', $source);
+        $this->pmssAssertStringNotContainsString("'display'=>", $source);
     }
 
     public function testTrafficSeedingLogsPreparationFailuresWithoutAbortingAccountCreation(): void
