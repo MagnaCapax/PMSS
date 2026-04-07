@@ -3,6 +3,7 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/resources/processor.php';
+require_once dirname(__DIR__, 2).'/pmssStats.php';
 
 class StubResourceStatsProcessorStatistics extends \resourceStatistics
 {
@@ -95,7 +96,7 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue(!is_dir($targetRuntime.'/resourceStats'));
     }
 
-    public function testProcessUserPersistsMetricsAndDisplays(): void
+    public function testProcessUserPersistsMetricsWithoutDisplayCache(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = $this->makeProcessor($stats);
@@ -116,11 +117,60 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue(is_array($saved), 'Expected processed data to be persisted');
         $this->assertTrue(is_dir($this->paths['runtime_dir'].'/resourceStats'));
         $this->assertTrue(isset($saved['io_read']['raw']['month']));
-        $this->assertTrue(isset($saved['ram_hours']['display']['month']));
-        $this->assertStringContainsString('KiB', $saved['io_read']['display']['hour']);
-        $this->assertStringContainsString('MiB', $saved['memory']['display']['day']);
-        $this->assertStringContainsString('GB-hrs', $saved['ram_hours']['display']['day']);
-        $this->assertEquals('5', $saved['tasks']['display']['day']);
+        $this->assertTrue(!isset($saved['io_read']['display']));
+        $this->assertTrue(!isset($saved['memory']['display']));
+        $this->assertTrue(!isset($saved['ram_hours']['display']));
+        $this->assertTrue(!isset($saved['tasks']['display']));
+        $this->assertEquals(6.0, $saved['tasks']['current']);
+    }
+
+    public function testProcessUserSavedPayloadStillFeedsPmssStats(): void
+    {
+        $stats = new StubResourceStatsProcessorStatistics();
+        $processor = $this->makeProcessor($stats);
+
+        $user = 'alice';
+        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
+        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+
+        $now = time();
+        $stats->map[$user] = implode("\n", [
+            date('Y-m-d H:i:s', $now - 120).' 1048576 2097152 3600 7200 3600000000000 1073741824 4',
+            date('Y-m-d H:i:s', $now - 60).' 2097152 3145728 7200 10800 7200000000000 2147483648 6',
+        ]);
+
+        $processor->processUser($user, \pmssStatsCompareTimesBuild());
+
+        $configDir = $this->pmssMakeTempDir('pmss-stats-config-');
+        $cgroupDir = $this->pmssMakeTempDir('pmss-stats-cgroup-');
+        $this->pmssWriteRelativeFile($configDir, 'users/alice.json', json_encode([
+            'ramMiB' => 4096,
+            'product' => 'M10G S',
+        ]));
+        foreach ([
+            'memory.current' => "2147483648\n",
+            'memory.max' => "4294967296\n",
+            'pids.current' => "12\n",
+            'cpu.stat' => "usage_usec 42000000\n",
+            'io.stat' => "8:0 rbytes=1024 wbytes=2048 rios=1 wios=2 dbytes=0 dios=0\n",
+        ] as $relativePath => $content) {
+            $this->pmssWriteRelativeFile($cgroupDir, $relativePath, $content);
+        }
+        $this->pmssWriteFile(dirname($cgroupDir).'/io.pressure', "some avg10=1.5 avg60=0.5 avg300=0.1 total=10\n");
+
+        $payload = \pmssStatsCollect([
+            'user' => 'alice',
+            'home' => $this->paths['home_dir'].'/alice',
+            'config_dir' => $configDir,
+            'cgroup_dir' => $cgroupDir,
+            'version_file' => $this->pmssWriteTempFile('stats-version', "3.0.0\n"),
+        ], static function (): bool {
+            return false;
+        });
+
+        $this->assertEquals('alice', $payload['context']['user']);
+        $this->assertEquals(2147483648.0, $payload['memory']['current_bytes']);
+        $this->assertEquals('M10G S', $payload['product']);
     }
 
     public function testProcessUserPersistsMemoryBreakdownCurrentValues(): void
@@ -224,42 +274,6 @@ class ResourceStatsProcessorTest extends TestCase
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php'], '/scripts/cron/resourceStats.php'));
         $this->assertEquals([['/scripts/cron/resourceStats.php', ['alice', 'bob']]], $processor->spawnCalls);
-    }
-
-    public function testFormatMetricDisplayPreservesByteThresholdBoundaries(): void
-    {
-        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
-        $method = new \ReflectionMethod($processor, 'formatMetricDisplay');
-        $method->setAccessible(true);
-
-        $formatted = $method->invoke($processor, 'io_read', [
-            'exact_mib' => 1024 * 1024,
-            'over_mib' => (1024 * 1024) + 1,
-            'exact_gib' => 1024 * 1024 * 1024,
-            'over_gib' => (1024 * 1024 * 1024) + 1,
-        ]);
-
-        $this->assertEquals('1024KiB', $formatted['exact_mib']);
-        $this->assertEquals('1MiB', $formatted['over_mib']);
-        $this->assertEquals('1024MiB', $formatted['exact_gib']);
-        $this->assertEquals('1GiB', $formatted['over_gib']);
-    }
-
-    public function testFormatMetricDisplayPreservesCpuThresholdBoundaries(): void
-    {
-        $processor = $this->makeProcessor(new StubResourceStatsProcessorStatistics());
-        $method = new \ReflectionMethod($processor, 'formatMetricDisplay');
-        $method->setAccessible(true);
-
-        $formatted = $method->invoke($processor, 'cpu', [
-            'below_minute' => 59 * 1000000000,
-            'exact_minute' => 60 * 1000000000,
-            'exact_hour' => 3600 * 1000000000,
-        ]);
-
-        $this->assertEquals('59s', $formatted['below_minute']);
-        $this->assertEquals('1m', $formatted['exact_minute']);
-        $this->assertEquals('1h', $formatted['exact_hour']);
     }
 
     /**

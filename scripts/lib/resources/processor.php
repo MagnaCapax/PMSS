@@ -119,10 +119,7 @@ class ResourceStatsProcessor
             'tasks' => $results['tasks'],
         ];
         foreach (array_merge(ResourceStatsAccumulator::RAW_METRICS, ['memory', 'tasks']) as $metric) {
-            $data[$metric] = [
-                'raw' => $metricData[$metric],
-                'display' => $this->formatMetricDisplay($metric, $metricData[$metric]),
-            ];
+            $data[$metric] = ['raw' => $metricData[$metric]];
         }
         $data['memory']['current'] = $results['current_memory'];
         foreach (['anon' => 'current_memory_anon', 'file' => 'current_memory_file'] as $field => $resultKey) {
@@ -150,34 +147,5 @@ class ResourceStatsProcessor
         foreach ($targets as [$path, $group, $mode, $immutable]) {
             pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable);
         }
-    }
-
-    private function formatMetricDisplay(string $metric, array $rawTotals): array
-    {
-        $formatted = [];
-        $byteMetric = $metric === 'io_read' || $metric === 'io_write' || $metric === 'memory';
-        $byteDivisors = [1099511627776 => 'TiB', 1073741824 => 'GiB', 1048576 => 'MiB'];
-        foreach ($rawTotals as $label => $value) {
-            $number = (float) $value;
-            if ($metric === 'cpu') {
-                $seconds = $number / 1000000000;
-                $formatted[$label] = $seconds >= 3600
-                    ? round($seconds / 3600, 2).'h'
-                    : ($seconds >= 60 ? round($seconds / 60, 2).'m' : round($seconds, 2).'s');
-                continue;
-            }
-            if (!$byteMetric) {
-                $formatted[$label] = $metric === 'ram_hours' ? round($number, 2).'GB-hrs' : (string) round($number, 2);
-                continue;
-            }
-            foreach ($byteDivisors as $divisor => $suffix) {
-                if ($number > $divisor) {
-                    $formatted[$label] = round($number / $divisor, 2).$suffix;
-                    continue 2;
-                }
-            }
-            $formatted[$label] = round($number / 1024, 2).'KiB';
-        }
-        return $formatted;
     }
 }
