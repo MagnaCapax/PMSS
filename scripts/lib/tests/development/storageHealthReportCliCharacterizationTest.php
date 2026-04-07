@@ -134,8 +134,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice='.(string) $noticePath]);
 
         $this->assertTrue(is_file($noticePath), 'Expected user notice file to be created');
-        $notice = json_decode((string) file_get_contents($noticePath), true);
-        $this->assertTrue(is_array($notice), 'Expected user notice to contain JSON');
+        $notice = $this->pmssReadJsonArrayFile($noticePath, null, 'Expected user notice to contain JSON');
         $this->assertEquals('performance_limited', $notice['status'] ?? null, 'Expected performance-limited notice status');
         $this->assertEquals('md0', $notice['array'] ?? null, 'Expected notice to preserve the affected array');
         $this->assertEquals('RAID md0 recovery in progress', $notice['reason'] ?? null, 'Expected notice reason to match rebuild status');
@@ -161,8 +160,7 @@ final class StorageHealthReportCliCharacterizationTest extends TestCase
         $this->pmssRunRepoPhpScript('scripts/storageHealth.php', ['--json', (string) $jsonPath, '--user-notice', (string) $noticePath]);
 
         $this->assertTrue(is_file($noticePath), 'Expected separate-path user notice file to be created');
-        $notice = json_decode((string) file_get_contents($noticePath), true);
-        $this->assertTrue(is_array($notice), 'Expected separate-path user notice to contain JSON');
+        $notice = $this->pmssReadJsonArrayFile($noticePath, null, 'Expected separate-path user notice to contain JSON');
         $this->assertEquals('md1', $notice['array'] ?? null, 'Expected separate-path notice to keep the array name');
         $this->assertEquals('RAID md1 check in progress', $notice['reason'] ?? null, 'Expected separate-path notice reason to match the activity');
     }

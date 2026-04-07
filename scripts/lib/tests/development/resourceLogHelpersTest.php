@@ -34,12 +34,6 @@ class ResourceLogHelpersTest extends TestCase
         ];
     }
 
-    private function readState(string $path): array
-    {
-        $decoded = json_decode((string) file_get_contents($path), true);
-        return is_array($decoded) ? $decoded : [];
-    }
-
     public function testEnsureDirRejectsRelative(): void
     {
         $this->assertTrue(!\pmssEnsureSafeDir('relative/path', 0700));
@@ -312,7 +306,7 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertEquals(6, $result['delta']['io_read_ops']);
         $this->assertEquals(9, $result['delta']['io_write_ops']);
         $this->assertEquals(50, $result['delta']['cpu_nsec']);
-        $state = $this->readState($statePath);
+        $state = $this->pmssReadJsonArrayFile($statePath, []);
         $this->assertEquals(8, $state['io_read']);
         $this->assertEquals(12, $state['io_write']);
         $this->assertEquals(16, $state['io_read_ops']);
@@ -393,7 +387,7 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertEquals(9, $result['delta']['io_read']);
         $this->assertEquals(8, $result['delta']['io_write']);
         $this->assertEquals(7, $result['delta']['cpu_nsec']);
-        $this->assertEquals(['io_read' => 1], $this->readState($target));
+        $this->assertEquals(['io_read' => 1], $this->pmssReadJsonArrayFile($target, []));
     }
 
     public function testUpdateStateRejectsSymlinkedParentDirectory(): void

@@ -107,7 +107,7 @@ class WelcomeMessageTest extends TestCase
 
             $this->assertTrue(\pmssWelcomeProductMessageSet('m1000', '<p>new</p>', $messagesPath));
 
-            $stored = json_decode((string) file_get_contents($messagesPath), true);
+            $stored = $this->pmssReadJsonArrayFile($messagesPath, null, 'Expected welcome message store JSON');
             $this->assertEquals('test', $stored['meta']['updatedBy'] ?? '');
             $this->assertEquals('<p>old</p>', $stored['products']['free-tier'] ?? '');
             $this->assertEquals('<p>new</p>', $stored['products']['m1000'] ?? '');

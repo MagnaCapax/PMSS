@@ -230,8 +230,7 @@ class SysctlBaselineTest extends TestCase
         $this->pmssAssertStringNotContainsString('vm.swappiness =', $content, 'expected override key to be omitted');
         $this->pmssAssertStringNotContainsString('net.core.somaxconn =', $content, 'expected override key to be omitted');
 
-        $summary = json_decode((string) file_get_contents($configDir.'/hardware.json'), true);
-        $this->assertTrue(is_array($summary), 'expected hardware summary json');
+        $summary = $this->pmssReadJsonArrayFile($configDir.'/hardware.json', null, 'expected hardware summary json');
         $this->assertEquals(
             ['vm.swappiness', 'net.core.somaxconn'],
             $summary['sysctl']['overrides_respected'],
@@ -257,8 +256,7 @@ class SysctlBaselineTest extends TestCase
 
         $summaryPath = $configDir.'/hardware.json';
         $this->assertTrue(file_exists($summaryPath), 'expected hardware summary to be written');
-        $summary = json_decode((string) file_get_contents($summaryPath), true);
-        $this->assertTrue(is_array($summary), 'expected hardware summary json');
+        $summary = $this->pmssReadJsonArrayFile($summaryPath, null, 'expected hardware summary json');
         $this->assertEquals(64, $summary['sysctl']['detection']['ram_gb'], 'expected RAM detection in summary');
         $this->assertFalse($summary['sysctl']['detection']['swap_is_fast'], 'expected slow swap summary');
         $this->assertEquals('10', $summary['sysctl']['applied']['vm.swappiness'], 'expected applied swappiness in summary');

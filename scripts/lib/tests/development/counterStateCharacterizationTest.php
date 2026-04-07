@@ -12,12 +12,6 @@ class CounterStateCharacterizationTest extends TestCase
         return $this->pmssMakeTempDir('pmss-counter-state-', 0700);
     }
 
-    private function readState(string $path): array
-    {
-        $decoded = json_decode((string) file_get_contents($path), true);
-        return is_array($decoded) ? $decoded : [];
-    }
-
     public function testSharedStateCreatesMissingFileWithSelectedDeltaFields(): void
     {
         $path = $this->makeRoot().'/state.json';
@@ -27,7 +21,7 @@ class CounterStateCharacterizationTest extends TestCase
 
         $this->assertEquals(['ingress' => 123], $result['delta']);
         $this->assertEquals([], $result['previous_state']);
-        $this->assertEquals($state, $this->readState($path));
+        $this->assertEquals($state, $this->pmssReadJsonArrayFile($path, []));
         $this->assertEquals(0600, fileperms($path) & 0777);
     }
 
@@ -82,7 +76,7 @@ class CounterStateCharacterizationTest extends TestCase
 
         $this->assertEquals(['ingress' => 123], $result['delta']);
         $this->assertEquals([], $result['previous_state']);
-        $this->assertEquals(['ingress' => 5, 'egress' => 6], $this->readState($target));
+        $this->assertEquals(['ingress' => 5, 'egress' => 6], $this->pmssReadJsonArrayFile($target, []));
     }
 
     public function testIngressStateUsesSharedCounterWriterSnapshot(): void
@@ -93,7 +87,7 @@ class CounterStateCharacterizationTest extends TestCase
 
         $this->assertEquals(123, $result['delta']);
         $this->assertEquals(null, $result['previous_ingress']);
-        $this->assertEquals(['ingress' => 123, 'egress' => 456], array_intersect_key($this->readState($path), ['ingress' => true, 'egress' => true]));
+        $this->assertEquals(['ingress' => 123, 'egress' => 456], array_intersect_key($this->pmssReadJsonArrayFile($path, []), ['ingress' => true, 'egress' => true]));
         $this->assertStringContainsString('pmssCounterStateUpdate(', $this->pmssReadRepoFile('scripts/lib/traffic/ingress.php'));
         $this->assertStringContainsString('pmssCounterStateUpdate(', $this->pmssReadRepoFile('scripts/lib/resources/log.php'));
     }

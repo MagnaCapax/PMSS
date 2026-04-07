@@ -77,8 +77,7 @@ class RuntimeProfileTest extends TestCase
         ]);
         pmssProfileSummary();
         $this->assertTrue(file_exists($tmpProfile));
-        $payload = json_decode(file_get_contents($tmpProfile) ?: '', true);
-        $this->assertTrue(is_array($payload), 'Profile output should contain recorded entries');
+        $payload = $this->pmssReadJsonArrayFile($tmpProfile, null, 'Profile output should contain recorded entries');
         @unlink($tmpProfile);
     }
 

@@ -49,7 +49,7 @@ class TrafficIngressHelpersTest extends TestCase
         $result = \pmssTrafficIngressUpdateState($path, ['ingress' => 123, 'egress' => 456]);
         $this->assertEquals(123, $result['delta']);
         $this->assertEquals(null, $result['previous_ingress']);
-        $loaded = json_decode((string) file_get_contents($path), true);
+        $loaded = $this->pmssReadJsonArrayFile($path, []);
         $this->assertEquals(123, $loaded['ingress']);
         $this->assertEquals(456, $loaded['egress']);
         $this->assertEquals(0600, fileperms($path) & 0777);
@@ -102,7 +102,7 @@ class TrafficIngressHelpersTest extends TestCase
         $result = \pmssTrafficIngressUpdateState($path, ['ingress' => 123, 'egress' => 456]);
         $this->assertEquals(123, $result['delta']);
         $this->assertEquals(null, $result['previous_ingress']);
-        $loaded = json_decode((string) file_get_contents($target), true);
+        $loaded = $this->pmssReadJsonArrayFile($target, []);
         $this->assertEquals(['ingress' => 5, 'egress' => 6], $loaded);
     }
 }

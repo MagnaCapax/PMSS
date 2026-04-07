@@ -319,6 +319,21 @@ abstract class TestCase
         return $path;
     }
 
+    /** Read an array-shaped JSON fixture and optionally fall back on decode failures. */
+    protected function pmssReadJsonArrayFile(string $path, ?array $default = null, string $message = ''): array
+    {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        if ($default !== null) {
+            return $default;
+        }
+
+        $this->fail($message !== '' ? $message : 'Expected JSON array fixture: '.$path);
+    }
+
     /** Create a tracked JSON-lines fixture path under a fresh temporary directory. */
     protected function pmssMakeJsonLogPath(string $dirPrefix, string $filename = 'fixture.jsonl'): string
     {
