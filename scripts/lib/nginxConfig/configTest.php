@@ -40,6 +40,7 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
     $configTestRc = 0;
     exec(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_CONFIG_TEST_COMMAND', 'nginx -t 2>&1'), $configTestOutput, $configTestRc);
     $configTestResult = implode("\n", $configTestOutput);
+    $configTestPassed = ($configTestRc === 0);
 
     $isTty = pmssStreamIsTty(STDOUT);
     $cReset  = $isTty ? "\033[0m"  : '';
@@ -47,45 +48,39 @@ function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int
     $cGreen  = $isTty ? "\033[32m" : '';
     $cYellow = $isTty ? "\033[33m" : '';
 
-    if ($configTestRc === 0) {
-        $statusMsg = "{$cGreen}[OK]{$cReset} nginx configuration test passed";
-        echo $statusMsg."\n";
+    if ($configTestPassed) {
+        echo "{$cGreen}[OK]{$cReset} nginx configuration test passed\n";
         pmssCreateNginxConfigAppendLog('nginx -t passed (rc=0)');
     } else {
-        $criticalMsg = "{$cRed}[CRITICAL]{$cReset} nginx configuration test {$cRed}FAILED{$cReset} (rc={$configTestRc})";
-        echo $criticalMsg."\n";
+        echo "{$cRed}[CRITICAL]{$cReset} nginx configuration test {$cRed}FAILED{$cReset} (rc={$configTestRc})\n";
         echo "{$cRed}{$configTestResult}{$cReset}\n";
         pmssCreateNginxConfigAppendLog("CRITICAL: nginx -t failed (rc={$configTestRc}): {$configTestResult}");
-    }
 
-    if ($restartNginx) {
-        if ($configTestRc === 0) {
-            $restartRc = 0;
-            passthru(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', 'systemctl restart nginx || /etc/init.d/nginx restart'), $restartRc);
-            if ($restartRc !== 0) {
-                echo "{$cRed}[CRITICAL]{$cReset} nginx restart {$cRed}FAILED{$cReset} (rc={$restartRc})\n";
-                pmssCreateNginxConfigAppendLog("CRITICAL: nginx restart failed (rc={$restartRc})");
-                return 1;
-            }
-
-            echo "## Done! nginx restarted\n";
-            pmssCreateNginxConfigAppendLog('nginx restarted');
-        } else {
-            echo "{$cRed}## Restart aborted: refusing to restart nginx with broken configuration{$cReset}\n";
-            echo "## Fix the errors above, then manually restart:\n";
-            echo "   systemctl restart nginx\n";
+        if ($restartNginx) {
+            echo "{$cRed}## Restart aborted: refusing to restart nginx with broken configuration{$cReset}\n## Fix the errors above, then manually restart:\n   systemctl restart nginx\n";
             pmssCreateNginxConfigAppendLog('restart aborted due to config test failure');
-            return 1;
-        }
-    } else {
-        if ($configTestRc === 0) {
-            echo "## Done! You should restart nginx:\n";
-            echo "   systemctl restart nginx\n";
         } else {
             echo "{$cYellow}## Fix the configuration errors above before restarting nginx{$cReset}\n";
-            return 1;
         }
+
+        return 1;
     }
+
+    if (!$restartNginx) {
+        echo "## Done! You should restart nginx:\n   systemctl restart nginx\n";
+        return 0;
+    }
+
+    $restartRc = 0;
+    passthru(pmssCreateNginxConfigCommandFromEnv('PMSS_NGINX_RESTART_COMMAND', 'systemctl restart nginx || /etc/init.d/nginx restart'), $restartRc);
+    if ($restartRc !== 0) {
+        echo "{$cRed}[CRITICAL]{$cReset} nginx restart {$cRed}FAILED{$cReset} (rc={$restartRc})\n";
+        pmssCreateNginxConfigAppendLog("CRITICAL: nginx restart failed (rc={$restartRc})");
+        return 1;
+    }
+
+    echo "## Done! nginx restarted\n";
+    pmssCreateNginxConfigAppendLog('nginx restarted');
 
     return 0;
 }

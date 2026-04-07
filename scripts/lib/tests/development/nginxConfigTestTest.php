@@ -72,6 +72,30 @@ class NginxConfigTestTest extends TestCase
         });
     }
 
+    public function testBrokenConfigRestartOutputSequenceStaysStable(): void
+    {
+        $this->pmssWriteExecutableFile($this->tempDir.'/nginx-test-fail.sh', "#!/bin/sh\nprintf 'broken config\\n'\nexit 1\n");
+        $this->pmssWriteExecutableFile($this->tempDir.'/restart.sh', "#!/bin/sh\nexit 0\n");
+
+        $this->pmssWithEnv([
+            'PMSS_LOG_DIR' => $this->tempDir.'/logs',
+            'PMSS_NGINX_CONFIG_TEST_COMMAND' => $this->tempDir.'/nginx-test-fail.sh',
+            'PMSS_NGINX_RESTART_COMMAND' => $this->tempDir.'/restart.sh',
+        ], function (): void {
+            list($rc, $out) = $this->pmssCaptureStdout(function (): int { return \pmssCreateNginxConfigTestAndMaybeRestart(true); });
+
+            $this->assertEquals(1, $rc);
+            $this->assertEquals(
+                '[CRITICAL] nginx configuration test FAILED (rc=1)'.PHP_EOL
+                .'broken config'.PHP_EOL
+                .'## Restart aborted: refusing to restart nginx with broken configuration'.PHP_EOL
+                .'## Fix the errors above, then manually restart:'.PHP_EOL
+                .'   systemctl restart nginx'.PHP_EOL,
+                $out
+            );
+        });
+    }
+
     public function testRestartSuccessReturnsOk(): void
     {
         $this->pmssWriteExecutableFile($this->tempDir.'/nginx-test-success.sh', "#!/bin/sh\nprintf 'syntax ok\\n'\nexit 0\n");
