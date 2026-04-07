@@ -43,25 +43,14 @@ class TrafficStatsProcessor
     /** Handle the CLI worker-or-spawn flow used by traffic cron entrypoints. */
     public function runCli(array $argv, string $scriptPath): int
     {
-        if (isset($argv[1])) {
-            $user = pmssCliUserArgSanitize($argv[1]);
-            if (!$this->validateUser($user)) {
-                echo "Invalid user specified: {$user}\n";
-                return 0;
-            }
-
-            $this->processUser($user, pmssStatsCompareTimesBuild());
-            return 0;
-        }
-
-        $users = $this->discoverUsers();
-        if (empty($users)) {
-            echo "No users in this system!\n";
-            return 0;
-        }
-
-        $this->spawnWorkers($scriptPath, $users);
-        return 0;
+        return pmssStatsProcessorRunCli(
+            $argv,
+            $scriptPath,
+            [$this, 'validateUser'],
+            [$this, 'processUser'],
+            [$this, 'discoverUsers'],
+            [$this, 'spawnWorkers']
+        );
     }
 
     /** Validate that a user has traffic data and a home directory. */
@@ -70,27 +59,24 @@ class TrafficStatsProcessor
         $baseUser = pmssTrafficUserKeyBaseUser($username);
         return is_readable($this->trafficDir.'/'.$username)
             && is_dir($this->homeDir.'/'.$baseUser)
-            && is_string($passwd = @file_get_contents($this->passwdFile))
-            && preg_match('/^'.preg_quote($baseUser, '/').':/m', $passwd) === 1;
+            && pmssPasswdFileHasUser($this->passwdFile, $baseUser);
     }
 
     /** Process and persist traffic statistics for a single user. */
     public function processUser(string $user, array $compareTimes): void
     {
-        if (!$this->validateUser($user)) {
-            logMessage(date('c').": Invalid user {$user}");
+        $logPrefix = date('c').': ';
+        $loadedData = pmssStatsProcessorDataLinesLoad(
+            $user,
+            [$this, 'validateUser'],
+            [$this->stats, 'getData'],
+            $logPrefix,
+            true
+        );
+        if ($loadedData === null) {
             return;
         }
-
-        if (($dataLines = trim($this->stats->getData($user, (int) ((35 * 24 * 60) / 5)))) === '') {
-            logMessage(date('c').": No data for user {$user}");
-            return;
-        }
-
-        if (count($trafficData = array_filter(explode("\n", $dataLines))) < 2) {
-            logMessage(date('c').": Too little data for {$user}");
-            return;
-        }
+        $trafficData = $loadedData['records'];
 
         $rawTotals = array_fill_keys(array_keys($compareTimes), 0.0);
         $dailyTotals = [];
@@ -99,7 +85,7 @@ class TrafficStatsProcessor
         foreach ($trafficData as $line) {
             $parsed = $this->stats->parseLine($line);
             if ($parsed === false) {
-                logMessage(date('c').": Parsing line failed for {$user}, line: {$line}");
+                logMessage($logPrefix."Parsing line failed for {$user}, line: {$line}");
                 continue;
             }
 
@@ -120,6 +106,6 @@ class TrafficStatsProcessor
             'raw'     => $rawTotals,
             'daily'   => $dailyTotals,
         ]);
-        logMessage(date('c').": Traffic stats for {$user} saved, month data consumption: {$rawTotals['month']}");
+        logMessage($logPrefix."Traffic stats for {$user} saved, month data consumption: {$rawTotals['month']}");
     }
 }

@@ -57,29 +57,29 @@ class ResourceStatsProcessor
     public function runCli(array $argv, string $scriptPath): int
     {
         $this->ensureRuntime();
-        if (isset($argv[1])) {
-            $user = pmssCliUserArgSanitize($argv[1]);
-            if (!$this->validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; }
-            $this->processUser($user, pmssStatsCompareTimesBuild());
-            return 0;
-        }
-        $lockFile = $this->runtimeDir.'/resourceStats.lock';
-        $lockBusy = false;
-        $lockHandle = pmssLockFileAcquire($lockFile, true, 'c+', false, true, $lockBusy);
-        if ($lockHandle !== false) {
-            if ($lockBusy) return 0;
-            pmssLockHandleWritePid($lockHandle);
-        } else logMessage(date('c').": Unable to open lock file {$lockFile} for resourceStats");
-        if (empty($users = $this->discoverUsers())) { echo "No users in this system!\n"; return 0; }
-        $this->spawnWorkers($scriptPath, $users);
-        return 0;
+        $runtimeDir = $this->runtimeDir;
+        $lockHandle = null;
+        return pmssStatsProcessorRunCli(
+            $argv,
+            $scriptPath,
+            [$this, 'validateUser'],
+            [$this, 'processUser'],
+            [$this, 'discoverUsers'],
+            [$this, 'spawnWorkers'],
+            static function () use ($runtimeDir, &$lockHandle): bool {
+                $lockFile = $runtimeDir.'/resourceStats.lock';
+                $lockBusy = false;
+                $lockHandle = pmssLockFileAcquire($lockFile, true, 'c+', false, true, $lockBusy);
+                if ($lockHandle !== false) { if ($lockBusy) { return false; } pmssLockHandleWritePid($lockHandle); return true; }
+                logMessage(date('c').": Unable to open lock file {$lockFile} for resourceStats"); return true;
+            }
+        );
     }
 
     public function validateUser(string $user): bool
     {
         return is_readable($this->resourceDir.'/'.$user)
-            && ($passwd = @file_get_contents($this->passwdFile)) !== false
-            && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1
+            && pmssPasswdFileHasUser($this->passwdFile, $user)
             && is_dir($this->homeDir.'/'.$user);
     }
 
@@ -87,20 +87,16 @@ class ResourceStatsProcessor
     public function processUser(string $user, array $compareTimes): void
     {
         $logPrefix = date('c').': ';
-        if (!$this->validateUser($user)) {
-            logMessage($logPrefix."Invalid user {$user}");
+        $loadedData = pmssStatsProcessorDataLinesLoad(
+            $user,
+            [$this, 'validateUser'],
+            [$this->stats, 'getData'],
+            $logPrefix
+        );
+        if ($loadedData === null) {
             return;
         }
-
-        if (($dataLines = $this->stats->getData($user, (int) ((35 * 24 * 60) / 5))) === '') {
-            logMessage($logPrefix."No data for user {$user}");
-            return;
-        }
-
-        if (count($resourceData = array_filter(explode("\n", $dataLines))) < 2) {
-            logMessage($logPrefix."Too little data for {$user}");
-            return;
-        }
+        $dataLines = $loadedData['data_lines'];
 
         $results = $this->stats->collectWindowResultsFromData(
             $dataLines,

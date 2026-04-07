@@ -44,6 +44,7 @@ if (!function_exists('pmssCliUserArgSanitize')) {
     // Strip unexpected characters from a CLI-supplied user key.
     function pmssCliUserArgSanitize(string $value): string { return (string) preg_replace('/[^a-zA-Z0-9-_]/', '', $value); }
 }
+if (!function_exists('pmssPasswdFileHasUser')) { function pmssPasswdFileHasUser(string $passwdFile, string $user): bool { return is_string($passwd = @file_get_contents($passwdFile)) && preg_match('/^'.preg_quote($user, '/').':/m', $passwd) === 1; } }
 if (!function_exists('pmssFileBasenamesDiscover')) {
     // Discover natural-sorted file basenames from a bounded glob pattern.
     function pmssFileBasenamesDiscover(string $pattern): array { $items = array_map('basename', array_filter(glob($pattern) ?: [], 'is_file')); sort($items, SORT_NATURAL | SORT_FLAG_CASE); return $items; }
@@ -51,6 +52,13 @@ if (!function_exists('pmssFileBasenamesDiscover')) {
 if (!function_exists('pmssUserWorkersSpawnDetached')) {
     // Spawn per-user workers and redirect output to a shared PMSS log.
     function pmssUserWorkersSpawnDetached(string $scriptPath, array $users, string $logPath): void { $script = escapeshellarg($scriptPath); foreach ($users as $user) passthru("nohup {$script} ".escapeshellarg($user)." >> ".escapeshellarg($logPath)." 2>&1 &"); }
+}
+if (!function_exists('pmssStatsProcessorRunCli')) {
+    function pmssStatsProcessorRunCli(array $argv, string $scriptPath, callable $validateUser, callable $processUser, callable $discoverUsers, callable $spawnWorkers, ?callable $beforeSpawn = null): int { if (isset($argv[1])) { $user = pmssCliUserArgSanitize($argv[1]); if (!$validateUser($user)) { echo "Invalid user specified: {$user}\n"; return 0; } $processUser($user, pmssStatsCompareTimesBuild()); return 0; } if ($beforeSpawn !== null && !$beforeSpawn()) return 0; if (empty($users = $discoverUsers())) { echo "No users in this system!\n"; return 0; } $spawnWorkers($scriptPath, $users); return 0; }
+}
+if (!function_exists('pmssStatsProcessorDataLinesLoad')) {
+    /** @return array{data_lines:string,records:array<int,string>}|null */
+    function pmssStatsProcessorDataLinesLoad(string $user, callable $validateUser, callable $loadData, string $logPrefix, bool $trimData = false): ?array { if (!$validateUser($user)) { logMessage($logPrefix."Invalid user {$user}"); return null; } $dataLines = (string) $loadData($user, (int) ((35 * 24 * 60) / 5)); $trimData && $dataLines = trim($dataLines); if ($dataLines === '') { logMessage($logPrefix."No data for user {$user}"); return null; } if (count($records = array_filter(explode("\n", $dataLines))) < 2) { logMessage($logPrefix."Too little data for {$user}"); return null; } return ['data_lines' => $dataLines, 'records' => $records]; }
 }
 if (!function_exists('pmssCommandBinaryNameIsSafe')) {
     // Accept only bare binary names before crossing the shell boundary.
