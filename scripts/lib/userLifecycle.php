@@ -520,13 +520,9 @@ function pmssUserWriteLogs(array $payload): void
     }
 
     // JSON line for programmatic consumption
-    $line = json_encode($payload, JSON_UNESCAPED_SLASHES);
-    if ($line !== false) {
-        @file_put_contents(PMSS_USER_LOG_JSON, $line.PHP_EOL, FILE_APPEND | LOCK_EX);
-    }
+    pmssJsonLineAppend(PMSS_USER_LOG_JSON, $payload);
 
     // Text line for operators
-    $ts      = date('[Y-m-d H:i:s] ');
     $status  = pmssUserLifecycleFormatTextField($payload['status'] ?? 'INFO');
     $action  = pmssUserLifecycleFormatTextField($payload['action'] ?? 'unknown');
     $phase   = pmssUserLifecycleFormatTextField($payload['phase'] ?? 'unknown');
@@ -534,8 +530,8 @@ function pmssUserWriteLogs(array $payload): void
     $message = isset($payload['message']) ? ' msg='.pmssUserLifecycleFormatTextField($payload['message']) : '';
     $step    = isset($payload['step']) ? ' step='.pmssUserLifecycleFormatTextField($payload['step']) : '';
 
-    $text = $ts.'user='.$user.' action='.$action.' phase='.$phase.' status='.$status.$step.$message;
-    @file_put_contents(PMSS_USER_LOG_TEXT, $text.PHP_EOL, FILE_APPEND | LOCK_EX);
+    $text = 'user='.$user.' action='.$action.' phase='.$phase.' status='.$status.$step.$message;
+    pmssLogAppendTimestampedLine(PMSS_USER_LOG_TEXT, $text);
 }
 
 /**
@@ -726,11 +722,8 @@ function pmssUserFixLog(string $username, string $component, string $message): v
     }
 
     $logPath = "{$homeDir}/.pmss-fixes.log";
-    $ts = date('Y-m-d H:i:s');
-    $line = "{$ts} [{$component}] {$message}\n";
-
     // Write the log entry
-    if (@file_put_contents($logPath, $line, FILE_APPEND | LOCK_EX) === false) {
+    if (!pmssLogAppendTimestampedLine($logPath, $message, 'Y-m-d H:i:s', " [{$component}] ")) {
         return;
     }
 

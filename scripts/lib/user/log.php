@@ -4,11 +4,13 @@
  *
  * Appends timestamped lines to /var/log/pmss/users/<username>.log and mirrors
  * entries into the consolidated users.log/users.jsonl stream when available.
- * Keep this helper dependency-free so it can be used from cron scripts easily.
+ * Keep this helper lightweight so it can be used from cron scripts easily.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+
+require_once __DIR__.'/../log.php';
 
 function pmssUserLogAllowed(): bool
 {
@@ -63,8 +65,7 @@ function pmssUserLog(string $user, string $message): void
     }
 
     $path = pmssUserLogFile($user);
-    $ts   = date('[Y-m-d H:i:s] ');
-    @file_put_contents($path, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+    pmssLogAppendTimestampedLine($path, $message);
 
     // Mirror per-user events into the shared users.log/users.jsonl stream
     // when the lifecycle helpers are available. Kept optional so this

@@ -76,7 +76,7 @@ if (!function_exists('logMessage')) {
     {
         // Strip ANSI codes for file logging.
         $cleanMessage = preg_replace('/\x1b\[[0-9;]*m/', '', $message);
-        @file_put_contents(PMSS_LOG_FILE, date('[Y-m-d H:i:s] ').$cleanMessage.PHP_EOL, FILE_APPEND | LOCK_EX);
+        pmssLogAppendTimestampedLine(PMSS_LOG_FILE, $cleanMessage ?? '');
         // Stdout gets the colored message.
         echo $message.PHP_EOL;
         pmssLogJson([

@@ -29,9 +29,7 @@ class Logger {
     }
 
     public function msg(string $m): void {
-        $ts = date('[Y-m-d H:i:s] ');
-        @file_put_contents($this->log, $ts.$m.PHP_EOL, FILE_APPEND|LOCK_EX)
-        || @file_put_contents($this->fallback, $ts.$m.PHP_EOL, FILE_APPEND|LOCK_EX);
+        pmssLogAppendTimestampedLine($this->log, $m) || pmssLogAppendTimestampedLine($this->fallback, $m);
         if ($this->writeToStderr) {
             fwrite(STDERR, $m.PHP_EOL);
             return;

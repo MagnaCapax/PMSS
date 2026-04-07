@@ -22,8 +22,7 @@ $mirrorLegacy = pmssStreamIsTty(STDOUT, true);
 $logDockerMessage = static function (string $message) use ($logger, $mirrorLegacy): void {
     $logger->msg($message);
     if ($mirrorLegacy) {
-        $ts = date('[Y-m-d H:i:s] ');
-        @file_put_contents('/var/log/pmss/rootlessDocker.log', $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        pmssLogAppendTimestampedLine('/var/log/pmss/rootlessDocker.log', $message);
     }
 };
 

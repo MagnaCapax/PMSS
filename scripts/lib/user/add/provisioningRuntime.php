@@ -82,8 +82,7 @@ function pmssAddUserRuntimeInit(): void
 function logProvisionMessage(string $message): void
 {
     global $user;
-    $prefix = date('Y-m-d H:i:s') . " ({$user['name']}): ";
-    @file_put_contents(pmssAddUserProvisioningLogPath(), $prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+    pmssLogAppendTimestampedLine(pmssAddUserProvisioningLogPath(), $message, 'Y-m-d H:i:s', " ({$user['name']}): ");
     echo $message.PHP_EOL;
     if (function_exists('pmssUserLog')) {
         pmssUserLog($user['name'], $message);

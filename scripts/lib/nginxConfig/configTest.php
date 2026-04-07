@@ -31,7 +31,7 @@ function pmssCreateNginxConfigAppendLog(string $message): void
     $logDir = dirname($logFile);
     pmssDirEnsureExists($logDir, 0755);
 
-    @file_put_contents($logFile, date('[Y-m-d H:i:s] ').'[createNginxConfig] '.$message."\n", FILE_APPEND | LOCK_EX);
+    pmssLogAppendTimestampedLine($logFile, $message, '[Y-m-d H:i:s] ', '[createNginxConfig] ');
 }
 
 function pmssCreateNginxConfigTestAndMaybeRestart(bool $restartNginx): int

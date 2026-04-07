@@ -10,6 +10,7 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/log.php';
 const PMSS_LOG_DIR_DEFAULT = '/var/log/pmss';
 const PMSS_RUNTIME_DIR_DEFAULT = '/var/run/pmss';
 const PMSS_STATE_DIR_DEFAULT = '/var/lib/pmss';
@@ -202,8 +203,7 @@ if (!function_exists('logMessage')) {
     function logMessage(string $message, ?string $logFile = null): void
     {
         $target = $logFile ?? (defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : pmssLogDir().'/runtime.log');
-        $ts = date('[Y-m-d H:i:s] ');
-        @file_put_contents($target, $ts.$message.PHP_EOL, FILE_APPEND | LOCK_EX);
+        pmssLogAppendTimestampedLine($target, $message);
         echo $message.PHP_EOL;
     }
 }

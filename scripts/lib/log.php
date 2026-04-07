@@ -38,3 +38,13 @@ if (!function_exists('pmssJsonLineAppend')) {
             && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
     }
 }
+
+if (!function_exists('pmssLogAppendTimestampedLine')) {
+    /** Append one timestamped line to a log file. */
+    function pmssLogAppendTimestampedLine(string $path, string $message, string $timestampFormat = '[Y-m-d H:i:s] ', string $prefix = '', ?int $mode = null): bool
+    {
+        $written = @file_put_contents($path, date($timestampFormat).$prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
+        $written && $mode !== null && @chmod($path, $mode);
+        return $written;
+    }
+}
