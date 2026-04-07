@@ -152,6 +152,33 @@ class PmssStatsCliTest extends TestCase
         $this->assertStringContainsString('"pmss_version": "3.0.0"', $json);
         $this->assertStringContainsString('"product": "M10G S"', $json);
     }
+
+    public function testScriptReportsJsonEncodingFailuresOnStderrOnly(): void
+    {
+        $this->pmssWriteRelativeFile($this->home, '.resourceData', serialize([
+            'memory' => ['current' => INF],
+        ]));
+        $versionFile = $this->pmssWriteTempFile('stats-version', "3.0.0\n");
+        $stderrPath = $this->pmssMakeTempPath('pmss-stats-stderr-');
+
+        $result = $this->pmssRunRepoPhpScriptCommand(
+            'scripts/pmss-stats.php',
+            ['--json'],
+            [
+                'PMSS_STATS_USER' => 'alice',
+                'PMSS_STATS_HOME' => $this->home,
+                'PMSS_STATS_CONFIG_DIR' => $this->configDir,
+                'PMSS_STATS_CGROUP_DIR' => $this->cgroupDir,
+                'PMSS_STATS_VERSION_FILE' => $versionFile,
+            ],
+            '2>'.escapeshellarg($stderrPath)
+        );
+
+        $this->assertEquals(1, $result['rc']);
+        $this->assertEquals('', $result['output']);
+        $this->assertEquals("Failed to encode PMSS stats JSON.\n", (string) file_get_contents($stderrPath));
+    }
+
     /**
      * Build a deterministic rTorrent caller stub for hermetic stats tests.
      *
