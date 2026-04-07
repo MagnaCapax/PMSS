@@ -19,13 +19,7 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
  */
 function pmssStatusJsonEncode(array $payload, int $flags = 0): string
 {
-    $jsonFlags = $flags;
-    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-        $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
-    }
-
-    $json = json_encode($payload, $jsonFlags);
-    if ($json !== false) {
+    if (is_string($json = pmssJsonEncodeSafe($payload, $flags))) {
         return $json;
     }
 

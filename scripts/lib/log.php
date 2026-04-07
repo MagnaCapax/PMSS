@@ -30,11 +30,27 @@ if (!function_exists('logmsg')) {
     }
 }
 
+if (!function_exists('pmssJsonEncodeSafe')) {
+    /**
+     * Encode a payload as JSON while tolerating invalid UTF-8.
+     */
+    function pmssJsonEncodeSafe(array $payload, int $flags = 0): ?string
+    {
+        $jsonFlags = $flags;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        $encoded = json_encode($payload, $jsonFlags);
+        return is_string($encoded) ? $encoded : null;
+    }
+}
+
 if (!function_exists('pmssJsonLineAppend')) {
     /** Append one payload to a JSON Lines file. */
     function pmssJsonLineAppend(string $path, array $payload): bool
     {
-        return is_string($encoded = json_encode($payload, JSON_UNESCAPED_SLASHES))
+        return is_string($encoded = pmssJsonEncodeSafe($payload, JSON_UNESCAPED_SLASHES))
             && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
     }
 }

@@ -596,20 +596,6 @@ TEXT;
 }
 
 /**
- * Encode the stats payload without leaking encode failures into stdout.
- */
-function pmssStatsJsonEncode(array $payload): ?string
-{
-    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
-    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-        $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
-    }
-
-    $encoded = json_encode($payload, $flags);
-    return is_string($encoded) ? $encoded : null;
-}
-
-/**
  * CLI main for the per-account stats command.
  */
 function pmssStatsMain(array $argv): int
@@ -621,7 +607,7 @@ function pmssStatsMain(array $argv): int
 
     $stats = pmssStatsCollect();
     if ($options['json']) {
-        if (!is_string($encoded = pmssStatsJsonEncode($stats))) {
+        if (!is_string($encoded = pmssJsonEncodeSafe($stats, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
             fwrite(STDERR, "Failed to encode PMSS stats JSON.\n");
             return 1;
         }

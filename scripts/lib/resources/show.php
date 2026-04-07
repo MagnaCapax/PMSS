@@ -66,20 +66,6 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     return ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals];
 }
 
-/**
- * Encode the resource report JSON payload without polluting stdout on failure.
- */
-function pmssResourceReportJsonEncode(array $payload): ?string
-{
-    $flags = 0;
-    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-        $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
-    }
-
-    $encoded = json_encode($payload, $flags);
-    return is_string($encoded) ? $encoded : null;
-}
-
 function pmssShowResourcesMain(array $argv): int
 {
     $options = getopt('', ['json', 'show-missing', 'user:', 'help']);
@@ -142,7 +128,7 @@ TEXT;
             'totals' => $payloadFromSource($totals),
             'missing' => $missingStats,
         ];
-        if (!is_string($encoded = pmssResourceReportJsonEncode($payload))) {
+        if (!is_string($encoded = pmssJsonEncodeSafe($payload))) {
             fwrite(STDERR, "Failed to encode resource report JSON.\n");
             return 1;
         }
