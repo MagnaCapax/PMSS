@@ -11,7 +11,6 @@ class TorrentPortFrontendTest extends TestCase
     private $homeRoot;
     private $skelDir;
     private $user;
-    private $envBackup = [];
 
     protected function setUp(): void
     {
@@ -19,18 +18,19 @@ class TorrentPortFrontendTest extends TestCase
         $this->homeRoot = sys_get_temp_dir().'/pmss-torrent-frontends-home-'.$suffix;
         $this->skelDir = sys_get_temp_dir().'/pmss-torrent-frontends-skel-'.$suffix;
         $this->user = 'user'.bin2hex(random_bytes(2));
-        $this->envBackup = $this->pmssCaptureEnv(['HOME', 'PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
         $this->pmssEnsureDir($this->skelDir.'/www');
 
-        putenv('PMSS_HOME_DIR='.$this->homeRoot);
-        putenv('PMSS_SKEL_DIR='.$this->skelDir);
+        $this->pmssTrackEnvKeys(['HOME']);
+        $this->pmssTrackEnvOverrides([
+            'PMSS_HOME_DIR' => $this->homeRoot,
+            'PMSS_SKEL_DIR' => $this->skelDir,
+        ]);
     }
 
     protected function tearDown(): void
     {
-        $this->pmssRestoreEnvMap($this->envBackup);
         $this->cleanup($this->homeRoot);
         $this->cleanup($this->skelDir);
     }

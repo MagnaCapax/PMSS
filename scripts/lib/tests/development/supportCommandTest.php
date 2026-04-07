@@ -8,7 +8,6 @@ require_once dirname(__DIR__, 2).'/update/users.php';
 
 class SupportCommandTest extends TestCase
 {
-    private $envBackup = [];
     private $homeRoot;
     private $configDir;
     private $skelDir;
@@ -21,7 +20,6 @@ class SupportCommandTest extends TestCase
         $this->configDir = sys_get_temp_dir().'/pmss-support-config-'.$suffix;
         $this->skelDir = sys_get_temp_dir().'/pmss-support-skel-'.$suffix;
         $this->user = 'user'.bin2hex(random_bytes(2));
-        $this->envBackup = $this->pmssCaptureEnv(['HOME', 'USER', 'PMSS_CONFIG_DIR', 'PMSS_SUPPORT_CONFIG_PATH', 'PMSS_VERSION_FILE', 'PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
         $this->pmssEnsureDir($this->configDir);
@@ -35,17 +33,19 @@ class SupportCommandTest extends TestCase
         ], true).";\n");
         file_put_contents($this->configDir.'/version', "main@test\n");
 
-        putenv('HOME='.$this->homeRoot.'/'.$this->user);
-        putenv('USER='.$this->user);
-        putenv('PMSS_CONFIG_DIR='.$this->configDir);
-        putenv('PMSS_VERSION_FILE='.$this->configDir.'/version');
-        putenv('PMSS_HOME_DIR='.$this->homeRoot);
-        putenv('PMSS_SKEL_DIR='.$this->skelDir);
+        $this->pmssTrackEnvKeys(['PMSS_SUPPORT_CONFIG_PATH']);
+        $this->pmssTrackEnvOverrides([
+            'HOME' => $this->homeRoot.'/'.$this->user,
+            'USER' => $this->user,
+            'PMSS_CONFIG_DIR' => $this->configDir,
+            'PMSS_VERSION_FILE' => $this->configDir.'/version',
+            'PMSS_HOME_DIR' => $this->homeRoot,
+            'PMSS_SKEL_DIR' => $this->skelDir,
+        ]);
     }
 
     protected function tearDown(): void
     {
-        $this->pmssRestoreEnvMap($this->envBackup);
         $this->cleanup($this->homeRoot);
         $this->cleanup($this->configDir);
         $this->cleanup($this->skelDir);

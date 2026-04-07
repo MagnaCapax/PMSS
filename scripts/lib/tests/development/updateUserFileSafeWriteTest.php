@@ -10,7 +10,6 @@ class UpdateUserFileSafeWriteTest extends TestCase
     private $user;
     private $skelDirName;
     private $skelDirPath;
-    private $envBackup = [];
 
     protected function setUp(): void
     {
@@ -23,8 +22,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->homeRoot = sys_get_temp_dir().'/pmss-userfile-'.bin2hex(random_bytes(4));
         @mkdir($this->homeRoot, 0755, true);
 
-        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR']);
-        putenv('PMSS_HOME_DIR='.$this->homeRoot);
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $this->homeRoot]);
 
         $this->skelDirName = 'pmss-userfile-'.bin2hex(random_bytes(3));
         $this->skelDirPath = $skelBase.'/'.$this->skelDirName;
@@ -33,7 +31,6 @@ class UpdateUserFileSafeWriteTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->pmssRestoreEnvMap($this->envBackup);
         $this->cleanup($this->homeRoot);
         $this->cleanup($this->skelDirPath);
     }

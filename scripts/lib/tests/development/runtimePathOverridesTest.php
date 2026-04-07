@@ -8,74 +8,44 @@ class RuntimePathOverridesTest extends TestCase
 {
     public function testPmssLogDirDefaultsToVarLogPmss(): void
     {
-        $previous = $this->pmssCaptureEnv(['PMSS_LOG_DIR']);
-        putenv('PMSS_LOG_DIR');
-
-        try {
+        $this->pmssWithEnv(['PMSS_LOG_DIR' => null], function (): void {
             $this->assertEquals('/var/log/pmss', \pmssLogDir());
-        } finally {
-            $this->pmssRestoreEnvMap($previous);
-        }
+        });
     }
 
     public function testPmssLogDirUsesEnvOverride(): void
     {
-        $previous = $this->pmssCaptureEnv(['PMSS_LOG_DIR']);
-        putenv('PMSS_LOG_DIR=/tmp/pmss-log-override/');
-
-        try {
+        $this->pmssWithEnv(['PMSS_LOG_DIR' => '/tmp/pmss-log-override/'], function (): void {
             $this->assertEquals('/tmp/pmss-log-override', \pmssLogDir());
-        } finally {
-            $this->pmssRestoreEnvMap($previous);
-        }
+        });
     }
 
     public function testPmssRuntimeDirDefaultsToVarRunPmss(): void
     {
-        $previous = $this->pmssCaptureEnv(['PMSS_RUNTIME_DIR']);
-        putenv('PMSS_RUNTIME_DIR');
-
-        try {
+        $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => null], function (): void {
             $this->assertEquals('/var/run/pmss', \pmssRuntimeDir());
-        } finally {
-            $this->pmssRestoreEnvMap($previous);
-        }
+        });
     }
 
     public function testPmssRuntimeDirUsesEnvOverride(): void
     {
-        $previous = $this->pmssCaptureEnv(['PMSS_RUNTIME_DIR']);
-        putenv('PMSS_RUNTIME_DIR=/tmp/pmss-runtime-override/');
-
-        try {
+        $this->pmssWithEnv(['PMSS_RUNTIME_DIR' => '/tmp/pmss-runtime-override/'], function (): void {
             $this->assertEquals('/tmp/pmss-runtime-override', \pmssRuntimeDir());
-        } finally {
-            $this->pmssRestoreEnvMap($previous);
-        }
+        });
     }
 
     public function testPmssStateDirDefaultsToVarLibPmss(): void
     {
-        $previous = $this->pmssCaptureEnv(['PMSS_STATE_DIR']);
-        putenv('PMSS_STATE_DIR');
-
-        try {
+        $this->pmssWithEnv(['PMSS_STATE_DIR' => null], function (): void {
             $this->assertEquals('/var/lib/pmss', \pmssStateDir());
-        } finally {
-            $this->pmssRestoreEnvMap($previous);
-        }
+        });
     }
 
     public function testPmssStateDirUsesEnvOverride(): void
     {
-        $previous = $this->pmssCaptureEnv(['PMSS_STATE_DIR']);
-        putenv('PMSS_STATE_DIR=/tmp/pmss-state-override/');
-
-        try {
+        $this->pmssWithEnv(['PMSS_STATE_DIR' => '/tmp/pmss-state-override/'], function (): void {
             $this->assertEquals('/tmp/pmss-state-override', \pmssStateDir());
-        } finally {
-            $this->pmssRestoreEnvMap($previous);
-        }
+        });
     }
 
     public function testUpdateLoggingResolvesPmssLogFileFromLogDirOverride(): void

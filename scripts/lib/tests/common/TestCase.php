@@ -40,6 +40,11 @@ abstract class TestCase
      */
     private $tempDirProperties = [];
 
+    /**
+     * @var array<int, array{values:array<string, string|false>,unsetEmptyString:bool}>
+     */
+    private $trackedEnvOverrides = [];
+
     /** Provide a shared no-op setup hook for inheriting tests. */
     protected function setUp(): void
     {
@@ -111,6 +116,13 @@ abstract class TestCase
                 if ($setUpCompleted) {
                     $this->tearDown();
                 }
+            } catch (\Throwable $e) {
+                $status = false;
+                $message = $e->getMessage();
+            }
+
+            try {
+                $this->pmssCleanupTrackedEnvOverrides();
             } catch (\Throwable $e) {
                 $status = false;
                 $message = $e->getMessage();
@@ -752,6 +764,45 @@ abstract class TestCase
                 $this->pmssRestoreEnv($key, $value);
             }
         }
+    }
+
+    /**
+     * Apply environment overrides for the current test and restore them automatically afterwards.
+     *
+     * @param array<string, string|null> $values
+     */
+    protected function pmssTrackEnvOverrides(array $values, bool $unsetEmptyString = false): void
+    {
+        $this->trackedEnvOverrides[] = [
+            'values' => $this->pmssCaptureEnv(array_keys($values)),
+            'unsetEmptyString' => $unsetEmptyString,
+        ];
+
+        foreach ($values as $key => $value) {
+            $this->pmssRestoreEnv($key, $value);
+        }
+    }
+
+    /** Track environment keys for automatic restoration without changing their current values. */
+    protected function pmssTrackEnvKeys(array $keys, bool $unsetEmptyString = false): void
+    {
+        $this->trackedEnvOverrides[] = [
+            'values' => $this->pmssCaptureEnv($keys),
+            'unsetEmptyString' => $unsetEmptyString,
+        ];
+    }
+
+    /** Restore all environment overrides registered for the current test. */
+    private function pmssCleanupTrackedEnvOverrides(): void
+    {
+        foreach (array_reverse($this->trackedEnvOverrides) as $trackedOverride) {
+            $this->pmssRestoreEnvMap(
+                $trackedOverride['values'],
+                $trackedOverride['unsetEmptyString']
+            );
+        }
+
+        $this->trackedEnvOverrides = [];
     }
 
     /** Temporarily prepend a directory to PATH for a callback. */

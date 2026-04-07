@@ -8,22 +8,13 @@ require_once dirname(__DIR__, 2).'/user/torrentPort.php';
 
 final class QbittorrentConfigCharacterizationTest extends TestCase
 {
-    /** @var array<string, string|false> */
-    private $envBackup = [];
-
     /** @var string */
     private $homeRoot = '';
 
     protected function setUp(): void
     {
-        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR']);
         $this->homeRoot = $this->pmssMakeTempDir('pmss-qbt-characterization-');
-        putenv('PMSS_HOME_DIR='.$this->homeRoot);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssRestoreEnvMap($this->envBackup, true);
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $this->homeRoot], true);
     }
 
     public function testPasswordSyncRewritesExistingPasswordLineInPlace(): void

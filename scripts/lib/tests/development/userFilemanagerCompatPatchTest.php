@@ -10,25 +10,20 @@ class UserFilemanagerCompatPatchTest extends TestCase
     private $homeRoot;
     private $skelDir;
     private $user;
-    private $envBackup = [];
 
     protected function setUp(): void
     {
         $this->homeRoot = $this->pmssMakeTempDir('pmss-user-filemanager-home-');
         $this->skelDir = $this->pmssMakeTempDir('pmss-user-filemanager-skel-');
         $this->user = 'user'.bin2hex(random_bytes(2));
-        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR', 'PMSS_SKEL_DIR']);
 
         @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
         @mkdir($this->skelDir.'/www', 0755, true);
 
-        putenv('PMSS_HOME_DIR='.$this->homeRoot);
-        putenv('PMSS_SKEL_DIR='.$this->skelDir);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssRestoreEnvMap($this->envBackup);
+        $this->pmssTrackEnvOverrides([
+            'PMSS_HOME_DIR' => $this->homeRoot,
+            'PMSS_SKEL_DIR' => $this->skelDir,
+        ]);
     }
 
     public function testApplySkeletonFilesPatchesCopiedFilemanager(): void

@@ -6,23 +6,16 @@ require_once dirname(__DIR__, 2).'/user/qbittorrent.php';
 
 class QbittorrentManagedConfigTest extends TestCase
 {
-    /** @var array<string, string|false> */
-    private $envBackup = [];
-
     /** @var string */
     private $homeRoot = '';
 
     protected function setUp(): void
     {
-        $this->envBackup = $this->pmssCaptureEnv(['PMSS_HOME_DIR', 'PMSS_TEST_MODE']);
         $this->homeRoot = $this->pmssMakeTempDir('pmss-qbittorrent-managed-');
-        putenv('PMSS_HOME_DIR='.$this->homeRoot);
-        putenv('PMSS_TEST_MODE=1');
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssRestoreEnvMap($this->envBackup, true);
+        $this->pmssTrackEnvOverrides([
+            'PMSS_HOME_DIR' => $this->homeRoot,
+            'PMSS_TEST_MODE' => '1',
+        ], true);
     }
 
     public function testConfigPathHonoursManagedHomeOverride(): void
