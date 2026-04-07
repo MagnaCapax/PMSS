@@ -119,4 +119,24 @@ class ShowResourcesFormatTest extends TestCase
         $this->assertEquals(['ghost'], $payload['missing']);
     }
 
+    public function testJsonOutputReportsEncodingFailuresOnStderrOnly(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
+        $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload([
+            'memory' => ['current' => INF, 'raw' => ['month' => 512 * 1024 * 1024]],
+        ]));
+        $stderrPath = $this->pmssMakeTempPath('pmss-show-stderr-');
+
+        $result = $this->pmssRunRepoPhpScriptCommand(
+            'scripts/showResources.php',
+            ['--json', '--user=alice'],
+            ['PMSS_RUNTIME_DIR' => $runtimeDir],
+            '2>'.escapeshellarg($stderrPath)
+        );
+
+        $this->assertEquals(1, $result['rc']);
+        $this->assertEquals('', $result['output']);
+        $this->assertEquals("Failed to encode resource report JSON.\n", (string) file_get_contents($stderrPath));
+    }
+
 }
