@@ -133,15 +133,7 @@ exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit 
 
 if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	# Append extra assistant CLI args (shell-escaped) to the exec string.
-	normalized_exec_extra_args=()
-	while IFS= read -r line; do
-		[[ -n "$line" ]] || continue
-		normalized_exec_extra_args+=("$line")
-	done < <(codex_normalize_exec_extra_args "$agent" "${exec_extra_args[@]}")
-	for exec_extra_arg in "${normalized_exec_extra_args[@]}"; do
-		printf -v exec_extra_q '%q' "$exec_extra_arg"
-		exec_cmd+=" $exec_extra_q"
-	done
+	codex_append_exec_extra_args exec_cmd "$agent" "${exec_extra_args[@]}"
 fi
 
 if [[ -f "$ROOT/AGENTS.${agent}.md" ]]; then

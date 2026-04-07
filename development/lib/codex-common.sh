@@ -257,6 +257,25 @@ codex_normalize_exec_extra_args() {
 	printf '%s\n' "${normalized[@]}"
 }
 
+# Append normalized assistant CLI args to an exec command string.
+codex_append_exec_extra_args() {
+	local target_name="$1" agent="$2"
+	local -n target_ref="$target_name"
+	shift 2 || true
+
+	local exec_extra_arg exec_extra_q line
+	local -a normalized_exec_extra_args=()
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		normalized_exec_extra_args+=("$line")
+	done < <(codex_normalize_exec_extra_args "$agent" "$@")
+
+	for exec_extra_arg in "${normalized_exec_extra_args[@]}"; do
+		printf -v exec_extra_q '%q' "$exec_extra_arg"
+		target_ref+=" $exec_extra_q"
+	done
+}
+
 # Require that the given path is a non-empty file.
 codex_require_nonempty_file() {
 	local path="$1" message="${2:-}"

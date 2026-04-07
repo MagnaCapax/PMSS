@@ -186,15 +186,7 @@ if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	# Append extra assistant CLI args (shell-escaped) to the exec string.
 	# This keeps agent selection stable while allowing per-run tuning like:
 	#   ... -- --approval-mode yolo
-	normalized_exec_extra_args=()
-	while IFS= read -r line; do
-		[[ -n "$line" ]] || continue
-		normalized_exec_extra_args+=("$line")
-	done < <(codex_normalize_exec_extra_args "$agent" "${exec_extra_args[@]}")
-	for exec_extra_arg in "${normalized_exec_extra_args[@]}"; do
-		printf -v exec_extra_q '%q' "$exec_extra_arg"
-		exec_cmd+=" $exec_extra_q"
-	done
+	codex_append_exec_extra_args exec_cmd "$agent" "${exec_extra_args[@]}"
 fi
 
 # In dry-run mode, avoid running git/phploc/gh/etc. Only show what would run and

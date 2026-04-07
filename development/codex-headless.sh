@@ -4,4 +4,4 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 # Compatibility shim for the headless Codex agentic path.
-bash "$HERE/agentic.sh" --agent=codex "$@"
+exec bash "$HERE/agentic.sh" --agent=codex "$@"
