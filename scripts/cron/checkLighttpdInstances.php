@@ -8,6 +8,7 @@
  */
 require_once __DIR__.'/../lib/lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lib/lighttpd/watchdogErrorPage.php';
+require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 $argUserRaw = isset($argv[1]) ? trim((string)$argv[1]) : '';
@@ -47,15 +48,13 @@ foreach($users AS $thisUser) {
         // Probe every expected php-cgi socket so partial worker crashes become
         // visible instead of leaving the user with intermittent 502 responses.
         foreach ($socketPaths as $socketPath) {
-            $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, 5);
-            if (!$socket or $errno or $errstr) {
-                echo "Error when attempting to connect to socket {$socketPath}: {$errno}, {$errstr}\n";
+            $probeResult = pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);
+            if (!$probeResult['ok']) {
+                echo "Error when attempting to connect to socket {$socketPath}: {$probeResult['errno']}, {$probeResult['errstr']} (after {$probeResult['attempts']} attempts)\n";
                 echo "php-cgi, for user: {$thisUser}. Killing lighttpd instances.\n";
                 $socketError = true;
                 break;
             }
-
-            fclose($socket);
         }
     }
     $lighttpdRunningBeforeRestart = pmssUserWatchdogProcessRunning($thisUser, 'lighttpd');
