@@ -23,19 +23,20 @@ class OpenvpnHelpersTest extends TestCase
 
     public function testSystemTestUsesMatchingClientArtifactPaths(): void
     {
-        $contents = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
-
-        $this->assertStringContainsString('function pmssSystemStatusChecks(', $contents);
-        $this->assertStringContainsString("strpos(\$hostname, '.pulsedmedia.com') !== false", $contents);
-        $this->assertStringContainsString("str_replace('.', '-', \$fqdn)", $contents);
-        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.ovpn'", $contents);
-        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.crt'", $contents);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/systemStatus.php', [
+            'function pmssSystemStatusChecks(',
+            "strpos(\$hostname, '.pulsedmedia.com') !== false",
+            "str_replace('.', '-', \$fqdn)",
+            "'/home/openvpn-'.\$slug.'.ovpn'",
+            "'/home/openvpn-'.\$slug.'.crt'",
+        ]);
     }
 
     public function testSystemTestStillWarnsWhenHostnameIsUnknown(): void
     {
-        $contents = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
-
-        $this->assertStringContainsString("pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown')", $contents);
+        $this->pmssAssertRepoFileContainsString(
+            'scripts/lib/systemStatus.php',
+            "pmssStatus('OpenVPN client artifacts', 'WARN', 'hostname unknown')"
+        );
     }
 }

@@ -21,11 +21,4 @@ require_once __DIR__.'/../lib/systemStatus.php';
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
 $wantJson = pmssCliOption($parsed, 'json', null, false) !== false;
 $results = pmssComponentStatusChecks();
-$summary = pmssStatusSummary($results);
-
-if ($wantJson) {
-    echo pmssStatusJsonEncode(['generated_at' => date('c'), 'results' => $results], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL;
-    exit(0);
-}
-
-pmssRenderStatusText('PMSS Component Status', $results, $summary, false, 8, false);
+exit(pmssStatusEmit($results, 'PMSS Component Status', $wantJson, ['generated_at' => date('c'), 'results' => $results], null, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, false, 8, false));

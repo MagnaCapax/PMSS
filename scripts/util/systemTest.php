@@ -27,12 +27,5 @@ $prettyFlag = $prettyFlag !== false && $prettyFlag !== null;
 $format = ($jsonFlag === true || $format === 'json') ? 'json' : 'text';
 
 $checks = pmssSystemStatusChecks();
-
 $summary = pmssStatusSummary($checks);
-
-if ($format === 'json') {
-    echo pmssStatusJsonEncode(['checks' => $checks, 'summary' => $summary], $prettyFlag ? JSON_PRETTY_PRINT : 0).PHP_EOL;
-    exit(0);
-}
-
-pmssRenderStatusText('PMSS System Check', $checks, $summary, true, 9);
+exit(pmssStatusEmit($checks, 'PMSS System Check', $format === 'json', ['checks' => $checks, 'summary' => $summary], $summary, $prettyFlag ? JSON_PRETTY_PRINT : 0, true, 9));

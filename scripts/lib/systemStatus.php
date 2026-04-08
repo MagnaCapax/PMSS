@@ -69,6 +69,24 @@ function pmssRenderStatusText(
     echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", $summary['ok'], $summary['warn'], $summary['err']);
 }
 
+/** Emit either JSON or text output for a PMSS status report. */
+function pmssStatusEmit(
+    array $checks,
+    string $title,
+    bool $wantJson,
+    array $jsonPayload,
+    ?array $summary = null,
+    int $jsonFlags = 0,
+    bool $useColour = false,
+    int $labelWidth = 8,
+    bool $leadingNewline = true
+): int
+{
+    if ($wantJson) { echo pmssStatusJsonEncode($jsonPayload, $jsonFlags).PHP_EOL; return 0; }
+    pmssRenderStatusText($title, $checks, $summary ?? pmssStatusSummary($checks), $useColour, $labelWidth, $leadingNewline);
+    return 0;
+}
+
 /**
  * Collect the richer system-test probe used by scripts/util/systemTest.php.
  *

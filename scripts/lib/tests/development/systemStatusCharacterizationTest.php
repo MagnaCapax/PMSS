@@ -318,10 +318,11 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertStringContainsString('pmssComponentStatusChecks()', $componentSource);
         $this->assertStringContainsString('pmssSystemStatusChecks()', $systemSource);
         $this->assertStringContainsString('function pmssStatusJsonEncode(', $librarySource);
+        $this->assertStringContainsString('function pmssStatusEmit(', $librarySource);
         $this->assertStringContainsString('function pmssSystemStatusChecks(', $librarySource);
         $this->assertStringContainsString('function pmssComponentStatusChecks(array $dependencies = [])', $librarySource);
-        $this->assertStringContainsString('pmssStatusJsonEncode([', $componentSource);
-        $this->assertStringContainsString('pmssStatusJsonEncode([', $systemSource);
+        $this->assertStringContainsString('pmssStatusEmit(', $componentSource);
+        $this->assertStringContainsString('pmssStatusEmit(', $systemSource);
         $this->pmssAssertStringNotContainsString('json_decode($componentJson, true);', $systemSource);
     }
 }

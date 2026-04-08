@@ -5,24 +5,9 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 {
-    private function loadSetupPermissionsSource(): string
-    {
-        return (string) file_get_contents(__DIR__.'/../../../util/setupPermissions.php');
-    }
-
-    private function loadSystemTestSource(): string
-    {
-        return (string) file_get_contents(__DIR__.'/../../systemStatus.php');
-    }
-
-    private function loadStartRtorrentSource(): string
-    {
-        return (string) file_get_contents(__DIR__.'/../../../startRtorrent');
-    }
-
     public function testSeedboxParentTraversalStepRemainsInPermissionTargets(): void
     {
-        $src = $this->loadSetupPermissionsSource();
+        $src = $this->pmssReadRepoFile('scripts/util/setupPermissions.php');
 
         $this->assertStringContainsString("'/etc/seedbox' => [", $src);
         $this->assertStringContainsString("'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']", $src);
@@ -30,7 +15,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testSeedboxParentTraversalRunsBeforeConfigTreeNormalization(): void
     {
-        $src = $this->loadSetupPermissionsSource();
+        $src = $this->pmssReadRepoFile('scripts/util/setupPermissions.php');
 
         $parentPos = strpos($src, "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']");
         $configPos = strpos($src, '@chmod($configDir, 0775);');
@@ -42,14 +27,14 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testConfigDirectoryRootKeepsTraversePermission(): void
     {
-        $src = $this->loadSetupPermissionsSource();
+        $src = $this->pmssReadRepoFile('scripts/util/setupPermissions.php');
 
         $this->assertStringContainsString('@chmod($configDir, 0775);', $src);
     }
 
     public function testSystemTestChecksBothSeedboxTraversalDirectories(): void
     {
-        $src = $this->loadSystemTestSource();
+        $src = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
 
         $this->assertStringContainsString('function pmssSystemStatusChecks(', $src);
         $this->assertStringContainsString("foreach (['/etc/seedbox', '/etc/seedbox/config'] as \$dir)", $src);
@@ -58,7 +43,7 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testStartRtorrentKeepsLocalnetReadabilityPreflightAndHint(): void
     {
-        $src = $this->loadStartRtorrentSource();
+        $src = $this->pmssReadRepoFile('scripts/startRtorrent');
 
         $this->assertStringContainsString("escapeshellarg('test -r '.\$localnet)", $src);
         $this->assertStringContainsString('ls -ld /etc/seedbox /etc/seedbox/config {$localnet}', $src);
