@@ -236,7 +236,7 @@ class ResourceLogHelpersTest extends TestCase
         $root = $this->makeRoot();
         $path = $root.'/user.slice/user-1000.slice';
         @mkdir($path, 0755, true);
-        file_put_contents($path.'/memory.stat', "anon 123\nfile 456\n");
+        file_put_contents($path.'/memory.stat', "anon 123\nslab 999\nfile 456\n");
 
         $breakdown = \pmssResourceLogReadMemoryBreakdown(1000, $root);
 

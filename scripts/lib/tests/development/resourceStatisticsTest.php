@@ -94,8 +94,8 @@ class ResourceStatisticsTest extends TestCase
         $line = date('Y-m-d H:i:s').' 1024 2048 12 34 3000 4096 7 512 1024';
         $parsed = $stats->parseLine($line);
         $this->assertTrue($parsed !== false);
-        $this->assertEquals(512.0, $parsed['memory_anon']);
-        $this->assertEquals(1024.0, $parsed['memory_file']);
+        $this->assertEquals(512.0, $parsed[array_values(\pmssResourceMemoryBreakdownFieldMap())[0]]);
+        $this->assertEquals(1024.0, $parsed[array_values(\pmssResourceMemoryBreakdownFieldMap())[1]]);
     }
 
     public function testParseLineRejectsPartialMemoryBreakdownFields(): void

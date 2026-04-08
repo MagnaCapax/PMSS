@@ -129,7 +129,7 @@ class ResourceStatsProcessor
             $data[$metric] = ['raw' => $metricData[$metric]];
         }
         $data['memory']['current'] = $results['current_memory'];
-        foreach (['anon' => 'current_memory_anon', 'file' => 'current_memory_file'] as $field => $resultKey) {
+        foreach (pmssResourceMemoryBreakdownFieldMap('current_memory_') as $field => $resultKey) {
             if (isset($results[$resultKey]) && is_numeric($results[$resultKey])) {
                 $data['memory'][$field] = (float) $results[$resultKey];
             }

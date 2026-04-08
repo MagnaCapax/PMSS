@@ -9,6 +9,7 @@
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
+require_once __DIR__.'/../resources.php';
 
 /**
  * Resolve a username to its UID with a POSIX-first fallback.
@@ -118,6 +119,7 @@ function pmssResourceLogReadCounters(int $uid): ?array
 function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null): ?array
 {
     $root = rtrim($cgroupRoot ?? '/sys/fs/cgroup', '/');
+    $memoryFields = pmssResourceMemoryBreakdownFieldMap();
     $paths = [
         $root.'/user.slice/user-'.$uid.'.slice/memory.stat',
         $root.'/unified/user.slice/user-'.$uid.'.slice/memory.stat',
@@ -131,15 +133,13 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
         $breakdown = [];
         foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
             [$field, $value] = array_pad(preg_split('/\s+/', trim($line), 2), 2, null);
-            if (($field !== 'anon' && $field !== 'file') || !ctype_digit((string) $value)) {
+            if (!isset($memoryFields[$field]) || !ctype_digit((string) $value)) {
                 continue;
             }
-            $breakdown['memory_'.$field] = (int) $value;
+            $breakdown[$memoryFields[$field]] = (int) $value;
         }
 
-        if (isset($breakdown['memory_anon'], $breakdown['memory_file'])) {
-            return $breakdown;
-        }
+        if (count($breakdown) === count($memoryFields)) { return $breakdown; }
     }
 
     return null;
@@ -153,10 +153,7 @@ function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
     $state = ['memory' => (int) $counters['memory'], 'tasks' => (int) $counters['tasks'], 'ts' => time()];
     foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) { $state[$field] = (int) $counters[$field]; }
-    if (isset($counters['memory_anon']) && isset($counters['memory_file'])) {
-        $state['memory_anon'] = (int) $counters['memory_anon'];
-        $state['memory_file'] = (int) $counters['memory_file'];
-    }
+    foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { isset($counters[$field]) && $state[$field] = (int) $counters[$field]; }
 
     $result = pmssCounterStateUpdate($statePath, $state, ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec']);
     return ['delta' => $result['delta'], 'state' => $state];

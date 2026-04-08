@@ -10,6 +10,9 @@ require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/resources/accumulator.php';
 require_once __DIR__.'/traffic/storage.php';
 
+/** @return array<string, string> */
+function pmssResourceMemoryBreakdownFieldMap(string $prefix = 'memory_'): array { return ['anon' => $prefix.'anon', 'file' => $prefix.'file']; }
+
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
  */
@@ -119,11 +122,11 @@ class resourceStatistics
         }
 
         if ($tokenCount > 10) {
-            foreach ([9 => 'memory_anon', 10 => 'memory_file'] as $index => $field) {
-                if (!ctype_digit($tokens[$index] ?? '')) {
+            foreach (array_values(pmssResourceMemoryBreakdownFieldMap()) as $offset => $field) {
+                if (!ctype_digit($tokens[$offset + 9] ?? '')) {
                     return false;
                 }
-                $parsed[$field] = (float) $tokens[$index];
+                $parsed[$field] = (float) $tokens[$offset + 9];
             }
         }
 
