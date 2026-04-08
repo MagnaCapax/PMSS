@@ -145,10 +145,13 @@ if (!function_exists('pmssLogDir')) {
     }
 }
 
-// Share structured `logMessage()` with update helpers, but keep runtime-only
-// `logmsg()` on Logger fallback unless update bootstrap already enabled it.
-if (!function_exists('logMessage')) {
-    require_once __DIR__.'/update/logging.php';
+// Share structured `logMessage()` with update helpers via the standalone
+// logging bootstrap. `require_once` keeps the import idempotent. Only runtime-
+// first callers should disable legacy `logmsg()` forwarding afterwards; update
+// bootstraps set that state earlier and must keep it intact.
+$pmssLogmsgUsesLogMessageInitialized = array_key_exists('PMSS_LOGMSG_USES_LOGMESSAGE', $GLOBALS);
+require_once __DIR__.'/update/logging.php';
+if (!$pmssLogmsgUsesLogMessageInitialized) {
     $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = false;
 }
 
