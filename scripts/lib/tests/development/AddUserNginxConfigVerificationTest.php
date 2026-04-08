@@ -22,7 +22,7 @@ class AddUserNginxConfigVerificationTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
 
         $this->assertStringContainsString('nginx config missing after regeneration; aborting provisioning', $source);
-        $this->assertStringContainsString("finalizeProvision('FAIL', 'nginx_config_missing', 1);", $source);
+        $this->assertStringContainsString("pmssAddUserFatalExit('FAIL', 'nginx config missing after regeneration; aborting provisioning', 'nginx_config_missing');", $source);
     }
 
     public function testRequiredArtifactsStayAlongsideSuccessGuard(): void

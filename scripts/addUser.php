@@ -76,39 +76,26 @@ if ($usernameValidationError !== null) {
             )
         )
     );
-    if (function_exists('logProvisionMessage')) {
-        logProvisionMessage('FATAL: '.$errorMessage);
-    }
-    if (function_exists('finalizeProvision')) {
-        finalizeProvision(
-            'ERROR',
-            'invalid_username',
-            1,
-            array(
-                'reason' => $usernameValidationError['code'],
-                'detail' => $usernameValidationError['detail'],
-            )
-        );
-    } elseif (function_exists('logProvisionMessage')) {
-        logProvisionMessage('FATAL: Invalid username; aborting provisioning');
-    }
-    // Ensure automation receives a non-zero exit status for invalid input.
-    fwrite(STDERR, 'ERROR: '.$errorMessage . "\n");
-    exit(1);
+    pmssAddUserFatalExit(
+        'ERROR',
+        $errorMessage,
+        'invalid_username',
+        array(
+            'reason' => $usernameValidationError['code'],
+            'detail' => $usernameValidationError['detail'],
+        ),
+        'ERROR: '.$errorMessage
+    );
 }
 
 $lockPath = (is_dir('/run/lock') ? '/run/lock' : '/tmp').'/pmss-addUser-'.$user['name'].'.lock';
 $lockBusy = false;
 $lockHandle = pmssLockFileAcquire($lockPath, true, 'c', false, true, $lockBusy);
 if ($lockHandle === false) {
-    logProvisionMessage("FATAL: Unable to open lock file: {$lockPath}");
-    finalizeProvision('ERROR', 'lock_open_failed', 1);
-    exit(1);
+    pmssAddUserFatalExit('ERROR', "Unable to open lock file: {$lockPath}", 'lock_open_failed');
 }
 if ($lockBusy) {
-    logProvisionMessage('FATAL: Another addUser is already running for this user');
-    finalizeProvision('ERROR', 'lock_busy', 1);
-    exit(1);
+    pmssAddUserFatalExit('ERROR', 'Another addUser is already running for this user', 'lock_busy');
 }
 $homePath = "/home/{$user['name']}";
 pmssAddUserEnsurePreflightState($userDb, $user, $homePath);

@@ -98,9 +98,7 @@ function pmssAddUserUserConfigApply(users $userDb, array $user, string $homePath
         sprintf('/scripts/util/createNginxConfig.php --user %s', escapeshellarg($user['name']))
     );
     if (!is_file('/etc/nginx/users/'.$user['name'])) {
-        logProvisionMessage('FATAL: nginx config missing after regeneration; aborting provisioning');
-        finalizeProvision('FAIL', 'nginx_config_missing', 1);
-        exit(1);
+        pmssAddUserFatalExit('FAIL', 'nginx config missing after regeneration; aborting provisioning', 'nginx_config_missing');
     }
 
     // Sync qBittorrent password after configuration is complete.

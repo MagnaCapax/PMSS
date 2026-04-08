@@ -94,11 +94,22 @@ function logProvisionMessage(string $message): void
 
 /**
  * Emit a fatal addUser summary and exit with the legacy non-zero status.
+ *
+ * @param string|null $stderrMessage Optional stderr line for automation.
  */
-function pmssAddUserFatalExit(string $status, string $detail, string $message, array $extraSummary = array()): void
+function pmssAddUserFatalExit(
+    string $status,
+    string $detail,
+    string $message,
+    array $extraSummary = array(),
+    ?string $stderrMessage = null
+): void
 {
     logProvisionMessage('FATAL: '.$detail);
     finalizeProvision($status, $message, 1, $extraSummary);
+    if ($stderrMessage !== null) {
+        fwrite(STDERR, $stderrMessage.PHP_EOL);
+    }
     exit(1);
 }
 
