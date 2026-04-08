@@ -33,34 +33,9 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
         sprintf('chown root:%s %s', escapeshellarg($user['name']), escapeshellarg("/home/{$user['name']}/.quota"))
     );
 
-    // Seed traffic files with zero values so first login does not show errors before cron populates them.
-    // Consumers derive display strings from raw counters, so the seed payload stays minimal.
     try {
-        $zeroRaw = ['month'=>0.0,'week'=>0.0,'day'=>0.0,'hour'=>0.0,'15min'=>0.0];
-        $zeroTraffic = ['raw'=>$zeroRaw,'daily'=>[]];
-        $serializedTraffic = serialize($zeroTraffic);
-        $trafficPaths = pmssTrafficDataPaths($user['name'], dirname($homePath));
-        $runtimeStatsPath = pmssTrafficStatsPath($user['name'], '/var/run/pmss/trafficStats');
-        $runtimeStatsDir = dirname($runtimeStatsPath);
-        $seedFailed = false;
-        if (!pmssEnsureSafeDir($runtimeStatsDir, 0755)) {
-            $seedFailed = true;
-            logProvisionMessage('Failed to prepare runtime traffic directory');
-        }
-        // Home files
-        foreach (['normal', 'local'] as $pathKey) {
-            $trafficPath = $trafficPaths[$pathKey];
-            if (!pmssTrafficWriteFile($trafficPath, $serializedTraffic, $user['name'], 0640, true)) {
-                $seedFailed = true;
-                logProvisionMessage('Failed to seed traffic file: '.$pathKey);
-            }
-        }
-        // Runtime cache
-        if (!pmssTrafficWriteFile($runtimeStatsPath, $serializedTraffic, 'root', 0600, false)) {
-            $seedFailed = true;
-            logProvisionMessage('Failed to seed runtime traffic cache');
-        }
-        !$seedFailed && logProvisionMessage('Seeded traffic files with zero values');
+        pmssTrafficSeedInitialState($user['name'], dirname($homePath), null, 'logProvisionMessage')
+            && logProvisionMessage('Seeded traffic files with zero values');
     } catch (\Throwable $e) {
         logProvisionMessage('Seeding traffic files failed: '.$e->getMessage());
     }

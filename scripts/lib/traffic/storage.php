@@ -148,6 +148,21 @@ if (!function_exists('pmssTrafficWriteFile')) {
     }
 }
 
+if (!function_exists('pmssTrafficSeedInitialState')) {
+    /** Persist zeroed traffic state for new accounts via the canonical storage helper. */
+    function pmssTrafficSeedInitialState(string $username, ?string $homeDir = null, ?string $runtimeDir = null, ?callable $logger = null): bool
+    {
+        $failed = false;
+        $forwardLogger = $logger ?? 'logMessage';
+        $storage = new TrafficStorage(['home_dir' => $homeDir, 'runtime_dir' => $runtimeDir, 'logger' => static function (string $message) use (&$failed, $forwardLogger): void { $failed = true; $forwardLogger($message); }]);
+        $payload = ['raw' => array_fill_keys(array_keys(pmssStatsCompareTimesBuild(0)), 0.0), 'daily' => []];
+        $storage->ensureRuntime();
+        $storage->save($username, $payload);
+        $storage->save($username.'-localnet', $payload);
+        return !$failed;
+    }
+}
+
 class TrafficStorage
 {
     private $homeDir;

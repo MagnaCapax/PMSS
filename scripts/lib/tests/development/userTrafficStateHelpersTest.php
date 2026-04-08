@@ -92,6 +92,26 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
     }
 
+    public function testTrafficSeedInitialStateSeedsHomePayloadsAndReportsRuntimeWarnings(): void
+    {
+        $homeDir = $this->tempDir.'/home';
+        $runtimeDir = $this->tempDir.'/runtime';
+        $messages = [];
+        @mkdir($homeDir.'/alice', 0755, true);
+
+        $this->assertFalse(\pmssTrafficSeedInitialState('alice', $homeDir, $runtimeDir, $this->pmssMakeArrayLogger($messages)));
+
+        $expected = ['raw' => array_fill_keys(array_keys(\pmssStatsCompareTimesBuild(0)), 0.0), 'daily' => []];
+        foreach ([
+            $homeDir.'/alice/.trafficData',
+            $homeDir.'/alice/.trafficDataLocal',
+        ] as $path) {
+            $this->assertEquals($expected, \pmssTrafficReadSerializedArrayFile($path));
+        }
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$runtimeDir.'/trafficStats/alice');
+        $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice-localnet at '.$runtimeDir.'/trafficStats/alice-localnet');
+    }
+
     public function testReadUserTrafficStatesRejectsInvalidUsernameBeforePathResolution(): void
     {
         @mkdir($this->tempDir.'/home/alice/evil', 0755, true);
