@@ -144,6 +144,14 @@ if (!function_exists('pmssLogDir')) {
         return pmssResolvePathFromEnv('PMSS_LOG_DIR', PMSS_LOG_DIR_DEFAULT);
     }
 }
+
+// Share structured `logMessage()` with update helpers, but keep runtime-only
+// `logmsg()` on Logger fallback unless update bootstrap already enabled it.
+if (!function_exists('logMessage')) {
+    require_once __DIR__.'/update/logging.php';
+    $GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE'] = false;
+}
+
 if (!function_exists('pmssDirEnsureExists')) {
     function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path); }
 }
@@ -201,18 +209,6 @@ if (!function_exists('pmssStateDir')) {
     function pmssStateDir(): string
     {
         return pmssResolvePathFromEnv('PMSS_STATE_DIR', PMSS_STATE_DIR_DEFAULT);
-    }
-}
-
-if (!function_exists('logMessage')) {
-    /**
-     * Write a timestamped message to the preferred log file and stdout.
-     */
-    function logMessage(string $message, ?string $logFile = null): void
-    {
-        $target = $logFile ?? (defined('PMSS_LOG_FILE') ? PMSS_LOG_FILE : pmssLogDir().'/runtime.log');
-        pmssLogAppendTimestampedLine($target, $message);
-        echo $message.PHP_EOL;
     }
 }
 
