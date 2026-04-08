@@ -49,20 +49,8 @@ function pmssRenderStatusText(
         $status = strtoupper((string) ($result['status'] ?? ''));
         $label = str_pad('['.$status.']', $labelWidth);
         $detail = (string) ($result['detail'] ?? '');
-        $colour = '';
-        $reset = '';
-        if ($isTty) {
-            if ($status === 'OK') {
-                $colour = "\033[32m";
-            } elseif ($status === 'WARN') {
-                $colour = "\033[33m";
-            } elseif ($status === 'ERR') {
-                $colour = "\033[31m";
-            }
-            if ($colour !== '') {
-                $reset = "\033[0m";
-            }
-        }
+        $colour = $isTty ? (['OK' => "\033[32m", 'WARN' => "\033[33m", 'ERR' => "\033[31m"][$status] ?? '') : '';
+        $reset = $colour === '' ? '' : "\033[0m";
         echo $colour.$label.$reset.$result['name'].($detail !== '' ? ' - '.$detail : '').PHP_EOL;
     }
     echo str_repeat('-', 60)."\n";
@@ -97,6 +85,28 @@ function pmssStatusEmit(
     return 0;
 }
 
+/** @return array<string,array<int|string,mixed>> Shared probe catalog for system/component status reports. */
+function pmssStatusProbeSpecs(string $sourcesPath): array
+{
+    return [
+        'binaries' => [
+            'rtorrent' => ['infoCommand' => 'rtorrent -h 2>&1 | head -n 1', 'componentName' => 'bin.rtorrent'], 'nginx' => ['infoCommand' => 'nginx -v 2>&1', 'componentName' => 'bin.nginx'],
+            'lighttpd' => ['infoCommand' => 'lighttpd -v 2>&1 | head -n 1'], 'php' => ['infoCommand' => 'php -v 2>&1 | head -n 1', 'componentName' => 'bin.php'],
+            'proftpd' => ['infoCommand' => 'proftpd -v 2>&1 | head -n 1', 'componentName' => 'bin.proftpd'], 'openvpn' => ['infoCommand' => 'openvpn --version 2>&1 | head -n 1', 'componentName' => 'bin.openvpn'],
+            'tar' => ['infoCommand' => 'tar --version 2>&1 | head -n 1'], 'pigz' => ['infoCommand' => 'pigz --version 2>&1 | head -n 1'],
+            'gpg' => ['infoCommand' => 'gpg --version 2>&1 | head -n 1'], 'curl' => ['infoCommand' => 'curl --version 2>&1 | head -n 1', 'componentName' => 'bin.curl'],
+            'wget' => ['infoCommand' => 'wget --version 2>&1 | head -n 1'], 'rsync' => ['infoCommand' => 'rsync --version 2>&1 | head -n 1'],
+            'python3' => ['infoCommand' => 'python3 --version 2>&1 | head -n 1'], 'git' => ['infoCommand' => 'git --version 2>&1 | head -n 1'],
+            'flexget' => ['infoCommand' => 'flexget --version 2>&1 | head -n 1'], 'pyload' => ['infoCommand' => 'pyload --version 2>&1 | head -n 1'],
+        ],
+        'paths' => [
+            ['systemLabel' => 'Apt sources', 'path' => $sourcesPath], ['systemLabel' => 'ProFTPD configuration', 'componentName' => 'config.proftpd', 'path' => '/etc/proftpd/proftpd.conf'],
+            ['systemLabel' => 'OpenVPN directory', 'componentName' => 'config.openvpn', 'path' => '/etc/openvpn'], ['systemLabel' => 'VPN Easy-RSA', 'path' => '/etc/openvpn/easy-rsa'],
+            ['systemLabel' => 'Seedbox localnet', 'componentName' => 'config.seedbox.localnet', 'path' => '/etc/seedbox/localnet'], ['systemLabel' => 'Nginx directory', 'componentName' => 'config.nginx', 'path' => '/etc/nginx'],
+        ],
+    ];
+}
+
 /**
  * Collect the richer system-test probe used by scripts/util/systemTest.php.
  *
@@ -120,49 +130,27 @@ function pmssSystemStatusChecks(array $dependencies = []): array
 
     $checks = [];
     $codename = getDistroCodename();
+    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
+    $probeSpecs = pmssStatusProbeSpecs($sourcesPath);
     $checks[] = $codename === ''
         ? pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing')
         : pmssStatus('OS codename', 'OK', $codename);
 
-    foreach ([
-        'rtorrent' => 'rtorrent -h 2>&1 | head -n 1',
-        'nginx' => 'nginx -v 2>&1',
-        'lighttpd' => 'lighttpd -v 2>&1 | head -n 1',
-        'php' => 'php -v 2>&1 | head -n 1',
-        'proftpd' => 'proftpd -v 2>&1 | head -n 1',
-        'openvpn' => 'openvpn --version 2>&1 | head -n 1',
-        'tar' => 'tar --version 2>&1 | head -n 1',
-        'pigz' => 'pigz --version 2>&1 | head -n 1',
-        'gpg' => 'gpg --version 2>&1 | head -n 1',
-        'curl' => 'curl --version 2>&1 | head -n 1',
-        'wget' => 'wget --version 2>&1 | head -n 1',
-        'rsync' => 'rsync --version 2>&1 | head -n 1',
-        'python3' => 'python3 --version 2>&1 | head -n 1',
-        'git' => 'git --version 2>&1 | head -n 1',
-        'flexget' => 'flexget --version 2>&1 | head -n 1',
-        'pyload' => 'pyload --version 2>&1 | head -n 1',
-    ] as $binary => $infoCommand) {
+    foreach ($probeSpecs['binaries'] as $binary => $binarySpec) {
         $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
         if ($path === '') {
             $checks[] = pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
             continue;
         }
 
-        $detail = trim((string) $runCommand($infoCommand));
+        $detail = trim((string) $runCommand((string) $binarySpec['infoCommand']));
         $checks[] = pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
     }
 
-    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
-    foreach ([
-        'Apt sources' => $sourcesPath,
-        'ProFTPD configuration' => '/etc/proftpd/proftpd.conf',
-        'OpenVPN directory' => '/etc/openvpn',
-        'VPN Easy-RSA' => '/etc/openvpn/easy-rsa',
-        'Seedbox localnet' => '/etc/seedbox/localnet',
-        'Nginx directory' => '/etc/nginx',
-    ] as $label => $path) {
+    foreach ($probeSpecs['paths'] as $pathSpec) {
+        $path = (string) $pathSpec['path'];
         $exists = $pathExists($path);
-        $checks[] = pmssStatus($label, $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
+        $checks[] = pmssStatus((string) $pathSpec['systemLabel'], $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
     }
 
     $localnetConfig = '/etc/seedbox/config/localnet';
@@ -285,10 +273,11 @@ function pmssComponentStatusChecks(array $dependencies = []): array
     $readFile = $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; };
     $results = [];
     $codename = getDistroCodename();
+    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
+    $probeSpecs = pmssStatusProbeSpecs($sourcesPath);
     $results[] = $codename === ''
         ? pmssStatus('os.codename', 'WARN', 'VERSION_CODENAME missing')
         : pmssStatus('os.codename', 'OK', $codename);
-    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
     if (is_file($sourcesPath)) {
         $sources = $readFile($sourcesPath);
         $matches = $codename === '' || stripos($sources, $codename) !== false;
@@ -300,15 +289,21 @@ function pmssComponentStatusChecks(array $dependencies = []): array
     } else {
         $results[] = pmssStatus('apt.sources', 'WARN', 'missing sources.list');
     }
-    foreach (['rtorrent', 'nginx', 'php', 'proftpd', 'openvpn', 'curl'] as $binary) {
+    foreach ($probeSpecs['binaries'] as $binary => $binarySpec) {
+        if (!isset($binarySpec['componentName'])) {
+            continue;
+        }
         $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
-        $results[] = pmssStatus('bin.'.$binary, $path !== '' ? 'OK' : 'WARN', $path);
+        $results[] = pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
     }
 
-    $configPaths = ['config.proftpd' => '/etc/proftpd/proftpd.conf', 'config.openvpn' => '/etc/openvpn', 'config.seedbox.localnet' => '/etc/seedbox/localnet', 'config.nginx' => '/etc/nginx'];
-    foreach ($configPaths as $name => $path) {
+    foreach ($probeSpecs['paths'] as $pathSpec) {
+        if (!isset($pathSpec['componentName'])) {
+            continue;
+        }
+        $path = (string) $pathSpec['path'];
         $exists = $pathExists($path);
-        $results[] = pmssStatus($name, $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
+        $results[] = pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
     }
     return $results;
 }

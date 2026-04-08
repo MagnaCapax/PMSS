@@ -307,6 +307,31 @@ final class SystemStatusCharacterizationTest extends TestCase
         );
     }
 
+    public function testSystemStatusIncludesComponentProjectionVerbatim(): void
+    {
+        $dependencies = $this->buildSystemStatusDependencies();
+        $componentDependencies = [
+            'runCommand' => $dependencies['runCommand'],
+            'pathExists' => $dependencies['pathExists'],
+            'readFile' => $dependencies['readFile'],
+        ];
+
+        $systemChecks = pmssSystemStatusChecks($dependencies);
+        $componentChecks = pmssComponentStatusChecks($componentDependencies);
+        $expectedProjection = array_map(
+            static function (array $entry): array {
+                return [
+                    'name' => 'Component: '.$entry['name'],
+                    'status' => $entry['status'],
+                    'detail' => $entry['detail'],
+                ];
+            },
+            $componentChecks
+        );
+
+        $this->assertSame($expectedProjection, array_slice($systemChecks, -count($expectedProjection)));
+    }
+
     public function testSystemStatusWarnsWhenSymlinkTargetCannotBeRead(): void
     {
         $dependencies = $this->buildSystemStatusDependencies();
