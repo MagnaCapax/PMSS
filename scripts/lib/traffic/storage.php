@@ -26,6 +26,11 @@ if (!function_exists('pmssTrafficDataPaths')) {
     }
 }
 
+if (!function_exists('pmssTrafficDataPathKey')) {
+    /** Resolve the traffic file key for one mode/localnet combination. */
+    function pmssTrafficDataPathKey(bool $isLocalnet, string $trafficMode = 'egress'): string { return ['egress' => ['normal', 'local'], 'ingress' => ['ingress', 'ingressLocal']][$trafficMode === 'ingress' ? 'ingress' : 'egress'][$isLocalnet ? 1 : 0]; }
+}
+
 if (!function_exists('pmssTrafficUserKeyIsLocalnet')) {
     // Detect whether a traffic user key targets the localnet bucket.
     function pmssTrafficUserKeyIsLocalnet(string $user): bool { return substr_compare($user, '-localnet', -9) === 0; }
@@ -206,18 +211,11 @@ class TrafficStorage
 
         $isLocalUser = pmssTrafficUserKeyIsLocalnet($user);
         $targetUser = pmssTrafficUserKeyBaseUser($user);
-        $trafficPaths = pmssTrafficDataPaths($targetUser, $this->homeDir);
-        $trafficKey = $this->trafficMode === 'ingress'
-            ? ($isLocalUser ? 'ingressLocal' : 'ingress')
-            : ($isLocalUser ? 'local' : 'normal');
+        $homeTrafficPath = pmssTrafficDataPaths($targetUser, $this->homeDir)[pmssTrafficDataPathKey($isLocalUser, $this->trafficMode)];
 
         $serialized = serialize($data);
-        $homePath = $this->homeDir.'/'.$targetUser;
         $targets = [[pmssTrafficStatsPath($user, $this->statsDir), 'root', 0600, false]];
-        is_dir($homePath) && array_unshift(
-            $targets,
-            [$trafficPaths[$trafficKey], $targetUser, 0640, true]
-        );
+        is_dir($this->homeDir.'/'.$targetUser) && array_unshift($targets, [$homeTrafficPath, $targetUser, 0640, true]);
 
         foreach ($targets as [$path, $group, $mode, $immutable]) {
             if (!pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable)) {

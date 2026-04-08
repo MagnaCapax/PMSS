@@ -92,6 +92,23 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->assertEquals($this->tempDir.'/home/alice/.trafficDataIngressLocal', $paths['ingressLocal']);
     }
 
+    public function testTrafficDataPathKeyCharacterizationCoversModeAndBucketMatrix(): void
+    {
+        $this->assertEquals([
+            'normal',
+            'local',
+            'ingress',
+            'ingressLocal',
+            'normal',
+        ], [
+            \pmssTrafficDataPathKey(false, 'egress'),
+            \pmssTrafficDataPathKey(true, 'egress'),
+            \pmssTrafficDataPathKey(false, 'ingress'),
+            \pmssTrafficDataPathKey(true, 'ingress'),
+            \pmssTrafficDataPathKey(false, 'bogus'),
+        ]);
+    }
+
     public function testTrafficSeedInitialStateSeedsHomePayloadsAndReportsRuntimeWarnings(): void
     {
         $homeDir = $this->tempDir.'/home';

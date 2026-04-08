@@ -142,13 +142,10 @@ TXT;
 
         $dataDisplay = array_map('pmssTrafficFormatAmount', $data['raw']);
 
-        $trafficPaths = pmssTrafficDataPaths($baseUser);
-        $ingressPath = $trafficPaths[$isLocalnet ? 'ingressLocal' : 'ingress'];
+        $ingressPath = pmssTrafficDataPaths($baseUser)[pmssTrafficDataPathKey($isLocalnet, 'ingress')];
         $inboundMonth = null;
         $ingressData = pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser);
-        if ($ingressData !== null) {
-            $inboundMonth = (float) $ingressData['raw']['month'];
-        }
+        $ingressData !== null && $inboundMonth = (float) $ingressData['raw']['month'];
 
         $inboundRatio = null;
         if ($inboundMonth !== null && (float) $data['raw']['month'] > 0) {
