@@ -116,14 +116,55 @@ function pmssStatusCollectProbeChecks(array $probeSpecs, callable $binaryProbe, 
 {
     $checks = [];
     foreach ($probeSpecs['binaries'] as $binary => $binarySpec) {
-        $check = $binaryProbe((string) $binary, $binarySpec);
-        if ($check !== null) $checks[] = $check;
+        ($check = $binaryProbe((string) $binary, $binarySpec)) !== null && $checks[] = $check;
     }
     foreach ($probeSpecs['paths'] as $pathSpec) {
-        $check = $pathProbe($pathSpec);
-        if ($check !== null) $checks[] = $check;
+        ($check = $pathProbe($pathSpec)) !== null && $checks[] = $check;
     }
     return $checks;
+}
+
+function pmssStatusContextResolve(array $dependencies = []): array
+{
+    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
+    return [
+        'runCommand' => $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); },
+        'pathExists' => $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); },
+        'readFile' => $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; },
+        'isFile' => $dependencies['isFile'] ?? static function (string $path): bool { return is_file($path); },
+        'isDir' => $dependencies['isDir'] ?? static function (string $path): bool { return is_dir($path); },
+        'isExecutable' => $dependencies['isExecutable'] ?? static function (string $path): bool { return is_executable($path); },
+        'isLink' => $dependencies['isLink'] ?? static function (string $path): bool { return is_link($path); },
+        'readLink' => $dependencies['readLink'] ?? static function (string $path): string { $target = readlink($path); return $target === false ? '' : (string) $target; },
+        'filePerms' => $dependencies['filePerms'] ?? static function (string $path) { return @fileperms($path); },
+        'codename' => getDistroCodename(),
+        'sourcesPath' => $sourcesPath,
+        'probeSpecs' => pmssStatusProbeSpecs($sourcesPath),
+    ];
+}
+function pmssComponentStatusChecksFromContext(array $context): array
+{
+    $runCommand = $context['runCommand']; $pathExists = $context['pathExists']; $readFile = $context['readFile'];
+    $codename = (string) $context['codename']; $sourcesPath = (string) $context['sourcesPath'];
+    $results[] = $codename === '' ? pmssStatus('os.codename', 'WARN', 'VERSION_CODENAME missing') : pmssStatus('os.codename', 'OK', $codename);
+    $results[] = is_file($sourcesPath)
+        ? pmssStatus('apt.sources', ($matches = $codename === '' || stripos($readFile($sourcesPath), $codename) !== false) ? 'OK' : 'WARN', $matches ? 'contains '.$codename : 'codename mismatch')
+        : pmssStatus('apt.sources', 'WARN', 'missing sources.list');
+
+    return array_merge($results, pmssStatusCollectProbeChecks(
+        $context['probeSpecs'],
+        static function (string $binary, array $binarySpec) use ($runCommand): ?array {
+            if (!isset($binarySpec['componentName'])) return null;
+            $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+            return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
+        },
+        static function (array $pathSpec) use ($pathExists): ?array {
+            if (!isset($pathSpec['componentName'])) return null;
+            $path = (string) $pathSpec['path'];
+            $exists = $pathExists($path);
+            return pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
+        }
+    ));
 }
 
 /**
@@ -134,28 +175,18 @@ function pmssStatusCollectProbeChecks(array $probeSpecs, callable $binaryProbe, 
  */
 function pmssSystemStatusChecks(array $dependencies = []): array
 {
-    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); };
-    $pathExists = $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); };
-    $isFile = $dependencies['isFile'] ?? static function (string $path): bool { return is_file($path); };
-    $isDir = $dependencies['isDir'] ?? static function (string $path): bool { return is_dir($path); };
-    $isExecutable = $dependencies['isExecutable'] ?? static function (string $path): bool { return is_executable($path); };
-    $isLink = $dependencies['isLink'] ?? static function (string $path): bool { return is_link($path); };
-    $readLink = $dependencies['readLink'] ?? static function (string $path): string {
-        $target = readlink($path);
-        return $target === false ? '' : (string) $target;
-    };
-    $readFile = $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; };
-    $filePerms = $dependencies['filePerms'] ?? static function (string $path) { return @fileperms($path); };
-
+    $context = pmssStatusContextResolve($dependencies);
+    $runCommand = $context['runCommand']; $pathExists = $context['pathExists'];
+    $isFile = $context['isFile']; $isDir = $context['isDir']; $isExecutable = $context['isExecutable'];
+    $isLink = $context['isLink']; $readLink = $context['readLink']; $readFile = $context['readFile']; $filePerms = $context['filePerms'];
     $checks = [];
-    $codename = getDistroCodename();
-    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
-    $probeSpecs = pmssStatusProbeSpecs($sourcesPath);
+    $codename = (string) $context['codename'];
+    $sourcesPath = (string) $context['sourcesPath'];
     $checks[] = $codename === ''
         ? pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing')
         : pmssStatus('OS codename', 'OK', $codename);
     $checks = array_merge($checks, pmssStatusCollectProbeChecks(
-        $probeSpecs,
+        $context['probeSpecs'],
         static function (string $binary, array $binarySpec) use ($runCommand): array {
             $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
             if ($path === '') return pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
@@ -274,50 +305,14 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         $checks[] = pmssStatus($label, 'WARN', $isFile($link) ? sprintf('%s present but not a symlink', $link) : sprintf('%s missing', $link));
     }
 
-    foreach (pmssComponentStatusChecks(['runCommand' => $runCommand, 'pathExists' => $pathExists, 'readFile' => $readFile]) as $entry) {
-        $checks[] = pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
-    }
-
-    return $checks;
+    return array_merge($checks, array_map(
+        static function (array $entry): array {
+            return pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
+        },
+        pmssComponentStatusChecksFromContext($context)
+    ));
 }
 
 /** Collect the shared component-status checks used by both system probes. */
 function pmssComponentStatusChecks(array $dependencies = []): array
-{
-    $runCommand = $dependencies['runCommand'] ?? static function (string $command): string { return trim((string) @shell_exec($command)); };
-    $pathExists = $dependencies['pathExists'] ?? static function (string $path): bool { return is_dir($path) || is_file($path); };
-    $readFile = $dependencies['readFile'] ?? static function (string $path): string { $contents = @file_get_contents($path); return $contents === false ? '' : (string) $contents; };
-    $results = [];
-    $codename = getDistroCodename();
-    $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
-    $probeSpecs = pmssStatusProbeSpecs($sourcesPath);
-    $results[] = $codename === ''
-        ? pmssStatus('os.codename', 'WARN', 'VERSION_CODENAME missing')
-        : pmssStatus('os.codename', 'OK', $codename);
-    if (is_file($sourcesPath)) {
-        $sources = $readFile($sourcesPath);
-        $matches = $codename === '' || stripos($sources, $codename) !== false;
-        $results[] = pmssStatus(
-            'apt.sources',
-            $matches ? 'OK' : 'WARN',
-            $matches ? 'contains '.$codename : 'codename mismatch'
-        );
-    } else {
-        $results[] = pmssStatus('apt.sources', 'WARN', 'missing sources.list');
-    }
-
-    return array_merge($results, pmssStatusCollectProbeChecks(
-        $probeSpecs,
-        static function (string $binary, array $binarySpec) use ($runCommand): ?array {
-            if (!isset($binarySpec['componentName'])) return null;
-            $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
-            return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
-        },
-        static function (array $pathSpec) use ($pathExists): ?array {
-            if (!isset($pathSpec['componentName'])) return null;
-            $path = (string) $pathSpec['path'];
-            $exists = $pathExists($path);
-            return pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
-        }
-    ));
-}
+{ return pmssComponentStatusChecksFromContext(pmssStatusContextResolve($dependencies)); }

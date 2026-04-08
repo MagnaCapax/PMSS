@@ -421,6 +421,33 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertSame($expectedProjection, array_slice($systemChecks, -count($expectedProjection)));
     }
 
+    public function testComponentStatusCheckOrderStaysStableWithHermeticInputs(): void
+    {
+        $checks = pmssComponentStatusChecks([
+            'runCommand' => $this->buildSystemStatusDependencies()['runCommand'],
+            'pathExists' => $this->buildSystemStatusDependencies()['pathExists'],
+            'readFile' => $this->buildSystemStatusDependencies()['readFile'],
+        ]);
+
+        $this->assertSame(
+            [
+                'os.codename',
+                'apt.sources',
+                'bin.rtorrent',
+                'bin.nginx',
+                'bin.php',
+                'bin.proftpd',
+                'bin.openvpn',
+                'bin.curl',
+                'config.proftpd',
+                'config.openvpn',
+                'config.seedbox.localnet',
+                'config.nginx',
+            ],
+            array_column($checks, 'name')
+        );
+    }
+
     public function testSystemStatusWarnsWhenSymlinkTargetCannotBeRead(): void
     {
         $dependencies = $this->buildSystemStatusDependencies();
