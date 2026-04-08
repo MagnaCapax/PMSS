@@ -349,6 +349,53 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertEquals(6, $result['delta']['cpu_nsec']);
     }
 
+    public function testUpdateStateDefaultsMissingCountersWithoutWarnings(): void
+    {
+        $root = $this->makeRoot();
+        $statePath = $root.'/state.json';
+        $warnings = [];
+
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = [$severity, $message];
+            return true;
+        });
+
+        try {
+            $result = \pmssResourceLogUpdateState($statePath, ['memory' => 2048, 'tasks' => 3]);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertEquals([], $warnings);
+        $this->assertEquals(0, $result['delta']['io_read']);
+        $this->assertEquals(0, $result['delta']['io_write']);
+        $this->assertEquals(0, $result['delta']['cpu_nsec']);
+        $this->assertEquals(2048, $result['state']['memory']);
+        $this->assertEquals(3, $result['state']['tasks']);
+    }
+
+    public function testCounterStateUpdateDefaultsMissingDeltaFieldsWithoutWarnings(): void
+    {
+        $root = $this->makeRoot();
+        $statePath = $root.'/state.json';
+        $warnings = [];
+
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = [$severity, $message];
+            return true;
+        });
+
+        try {
+            $result = \pmssCounterStateUpdate($statePath, ['io_read' => 9], ['io_read', 'io_write']);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertEquals([], $warnings);
+        $this->assertEquals(9, $result['delta']['io_read']);
+        $this->assertEquals(0, $result['delta']['io_write']);
+    }
+
     public function testUpdateStateReturnsDeltaWhenFileMissing(): void
     {
         $root = $this->makeRoot();

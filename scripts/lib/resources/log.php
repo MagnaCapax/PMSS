@@ -44,6 +44,14 @@ function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $m
     return pmssAppendUserFile($path, date('Y-m-d H:i:s').$message, 'root', $mode);
 }
 
+/**
+ * Read one integer field without emitting undefined-index notices.
+ */
+function pmssResourceLogArrayIntField(array $values, string $field): int
+{
+    return array_key_exists($field, $values) ? (int) $values[$field] : 0;
+}
+
 /** Persist counter state under lock and return deltas for the selected fields.
  *
  * @return array{delta: array<string, int>, previous_state: array<string, mixed>, state: array<string, int>}
@@ -56,7 +64,7 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
         : [];
     $delta = [];
     foreach ($deltaFields as $field) {
-        $currentValue = (int) $state[$field];
+        $currentValue = pmssResourceLogArrayIntField($state, $field);
         $delta[$field] = isset($previousState[$field]) && $currentValue >= (int) $previousState[$field]
             ? $currentValue - (int) $previousState[$field]
             : $currentValue;
@@ -148,9 +156,9 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
  */
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
-    $state = ['memory' => (int) $counters['memory'], 'tasks' => (int) $counters['tasks'], 'ts' => time()];
-    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) { $state[$field] = (int) $counters[$field]; }
-    foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { isset($counters[$field]) && $state[$field] = (int) $counters[$field]; }
+    $state = ['memory' => pmssResourceLogArrayIntField($counters, 'memory'), 'tasks' => pmssResourceLogArrayIntField($counters, 'tasks'), 'ts' => time()];
+    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) { $state[$field] = pmssResourceLogArrayIntField($counters, $field); }
+    foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { array_key_exists($field, $counters) && $state[$field] = (int) $counters[$field]; }
 
     $result = pmssCounterStateUpdate($statePath, $state, ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec']);
     return ['delta' => $result['delta'], 'state' => $state];
