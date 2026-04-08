@@ -6,6 +6,14 @@ require_once dirname(__DIR__, 2).'/user/userConfigStore.php';
 
 class userConfigToggleCharacterizationTest extends TestCase
 {
+    /** @var string */
+    private $tempDir = '';
+
+    private function setUpTempDir(): void
+    {
+        $this->pmssAssignTempDirProperty('tempDir', 'user-config-toggle', 0755, sys_get_temp_dir().'/pmss-user-config-toggle-tests');
+    }
+
     public function testToggleNormalizerKeepsFalseTokensStable(): void
     {
         foreach (['false', '0', 'no', 'off', '', 0, false] as $value) {
@@ -30,5 +38,19 @@ class userConfigToggleCharacterizationTest extends TestCase
     {
         $this->assertFalse(\pmssUserDockerEnabled('../evil'));
         $this->assertFalse(\pmssUserLighttpdEnabled('../evil'));
+    }
+
+    public function testResolvePayloadKeepsMissingValidUserAsEmptyArray(): void
+    {
+        $this->setUpTempDir();
+        try {
+            $store = new \UserConfigStore($this->tempDir.'/seedbox/config');
+            $payload = \pmssUserConfigResolvePayload('alice', $store);
+
+            $this->assertEquals([], $payload);
+            $this->assertTrue($store instanceof \UserConfigStore);
+        } finally {
+            $this->pmssCleanupTempDirProperty('tempDir');
+        }
     }
 }

@@ -37,43 +37,38 @@ require_once __DIR__.'/UserValidator.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 
-if (!function_exists('pmssUserDockerMinRamMiB')) {
-    /**
-     * Minimum RAM required for rootless Docker.
-     */
-    function pmssUserDockerMinRamMiB(): int
-    {
-        return 245;
-    }
+/**
+ * Minimum RAM required for rootless Docker.
+ */
+function pmssUserDockerMinRamMiB(): int
+{
+    return 245;
 }
 
-if (!function_exists('pmssUserConfigNormaliseToggleValue')) {
-    /** Convert stored feature-toggle values to a stable boolean. */
-    function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $default = true): bool
-    {
-        if (!array_key_exists($key, $payload)) {
-            return $default;
-        }
-        $value = $payload[$key];
-
-        return is_string($value)
-            ? !in_array(strtolower(trim($value)), ['false', '0', 'no', 'off', ''], true)
-            : (bool) $value;
+/** Convert stored feature-toggle values to a stable boolean. */
+function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $default = true): bool
+{
+    if (!array_key_exists($key, $payload)) {
+        return $default;
     }
+    $value = $payload[$key];
+
+    return is_string($value)
+        ? !in_array(strtolower(trim($value)), ['false', '0', 'no', 'off', ''], true)
+        : (bool) $value;
 }
 
-if (!function_exists('pmssUserConfigResolvePayload')) {
-    /** Load one validated user's persisted payload for policy checks. */
-    function pmssUserConfigResolvePayload(string $username, ?UserConfigStore &$store = null): ?array
-    {
-        $username = pmssNormalizeUsername($username);
-        if (!UserValidator::isValidUsername($username)) {
-            return null;
-        }
-        $store = $store ?: new UserConfigStore();
-        $payload = $store->get($username);
-        return is_array($payload) ? $payload : [];
+/** Load one validated user's persisted payload for policy checks. */
+function pmssUserConfigResolvePayload(string $username, ?UserConfigStore &$store = null): ?array
+{
+    $username = pmssNormalizeUsername($username);
+    if (!UserValidator::isValidUsername($username)) {
+        return null;
     }
+
+    $store = $store ?: new UserConfigStore();
+    $payload = $store->get($username);
+    return is_array($payload) ? $payload : [];
 }
 
 class UserConfigStore
@@ -344,49 +339,45 @@ class UserConfigStore
     }
 }
 
-if (!function_exists('pmssUserDockerEnabled')) {
-    /**
-     * Check whether rootless Docker should run for a user.
-     */
-    function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null): bool
-    {
-        $username = pmssNormalizeUsername($username);
-        $payload = pmssUserConfigResolvePayload($username, $store);
-        if ($payload === null) {
-            return false;
-        }
-
-        if (!pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled')) {
-            return false;
-        }
-
-        $configuredRamMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
-
-        $runtimeRamMiB = $store->resolveRamMiB($username);
-        $effectiveRamMiB = $configuredRamMiB;
-        if ($runtimeRamMiB > 0 && ($effectiveRamMiB <= 0 || $runtimeRamMiB < $effectiveRamMiB)) {
-            $effectiveRamMiB = $runtimeRamMiB;
-        }
-
-        if ($effectiveRamMiB > 0 && $effectiveRamMiB < pmssUserDockerMinRamMiB()) {
-            return false;
-        }
-
-        return true;
+/**
+ * Check whether rootless Docker should run for a user.
+ */
+function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null): bool
+{
+    $username = pmssNormalizeUsername($username);
+    $payload = pmssUserConfigResolvePayload($username, $store);
+    if ($payload === null) {
+        return false;
     }
+
+    if (!pmssUserConfigNormaliseToggleValue($payload, 'dockerEnabled')) {
+        return false;
+    }
+
+    $configuredRamMiB = isset($payload['ramMiB']) && is_numeric($payload['ramMiB']) ? (int) $payload['ramMiB'] : 0;
+
+    $runtimeRamMiB = $store->resolveRamMiB($username);
+    $effectiveRamMiB = $configuredRamMiB;
+    if ($runtimeRamMiB > 0 && ($effectiveRamMiB <= 0 || $runtimeRamMiB < $effectiveRamMiB)) {
+        $effectiveRamMiB = $runtimeRamMiB;
+    }
+
+    if ($effectiveRamMiB > 0 && $effectiveRamMiB < pmssUserDockerMinRamMiB()) {
+        return false;
+    }
+
+    return true;
 }
 
-if (!function_exists('pmssUserLighttpdEnabled')) {
-    /**
-     * Check whether the per-user lighttpd/php-cgi web stack should run.
-     */
-    function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = null): bool
-    {
-        $payload = pmssUserConfigResolvePayload($username, $store);
-        if ($payload === null) {
-            return false;
-        }
-
-        return pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');
+/**
+ * Check whether the per-user lighttpd/php-cgi web stack should run.
+ */
+function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = null): bool
+{
+    $payload = pmssUserConfigResolvePayload($username, $store);
+    if ($payload === null) {
+        return false;
     }
+
+    return pmssUserConfigNormaliseToggleValue($payload, 'lighttpdEnabled');
 }

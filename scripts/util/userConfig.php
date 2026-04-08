@@ -226,7 +226,7 @@ runStep(
     pmssBuildCommand('php', $args)
 );
 
-if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user['name'], $store)) {
+if (!pmssUserDockerEnabled($user['name'], $store)) {
     pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.$user['name']);
 } else {
     runStep('Enabling linger for user', sprintf('loginctl enable-linger %s', escapeshellarg($user['name'])));

@@ -35,7 +35,7 @@ foreach ($users as $user) {
         $logDockerMessage("User {$user} is suspended");
         continue;
     }
-    if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user, $userConfigStore)) {
+    if (!pmssUserDockerEnabled($user, $userConfigStore)) {
         $logDockerMessage("User {$user}: Docker disabled by config; skipping");
         continue;
     }

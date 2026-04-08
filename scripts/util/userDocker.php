@@ -279,10 +279,8 @@ if ($action === 'stop' || $action === 'restart') {
 // START
 if ($action === 'start' || $action === 'restart') {
     $userConfigStore = new UserConfigStore();
-    if (function_exists('pmssUserDockerEnabled') && !pmssUserDockerEnabled($user, $userConfigStore)) {
-        $dockerRamFloorMiB = function_exists('pmssUserDockerMinRamMiB')
-            ? pmssUserDockerMinRamMiB()
-            : 245;
+    if (!pmssUserDockerEnabled($user, $userConfigStore)) {
+        $dockerRamFloorMiB = pmssUserDockerMinRamMiB();
         pmssUserLog($user, sprintf(
             'userDocker: start blocked; Docker disabled by config or RAM floor (%d MiB)',
             $dockerRamFloorMiB
