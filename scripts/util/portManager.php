@@ -48,7 +48,12 @@ function pmssPortManagerReadAssignedPort(string $portFile): ?int
 {
     $raw = @file_get_contents($portFile);
     if ($raw === false) return null;
-    $port = (int) trim((string) $raw);
+    $portText = trim((string) $raw);
+    if ($portText === '' || !ctype_digit($portText)) {
+        return null;
+    }
+
+    $port = (int) $portText;
     return $port >= 1 && $port <= 65535 ? $port : null;
 }
 
