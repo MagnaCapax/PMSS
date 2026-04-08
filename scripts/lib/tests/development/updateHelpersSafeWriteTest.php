@@ -65,12 +65,9 @@ class UpdateHelpersSafeWriteTest extends TestCase
     {
         $dir = $this->pmssMakeTempDir('pmss-apt-override-');
         $target = $dir.'/apt.conf.d/90ignore-release-date';
-        $logs = [];
-        $logger = function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        };
-
-        $result = \pmssAptWriteValidUntilOverride($logger, $target);
+        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($target): bool {
+            return \pmssAptWriteValidUntilOverride($logger, $target);
+        });
 
         $this->assertTrue($result);
         $this->assertEquals("Acquire::Check-Valid-Until \"false\";\n", file_get_contents($target));
@@ -83,12 +80,9 @@ class UpdateHelpersSafeWriteTest extends TestCase
         $blocker = $dir.'/blocked';
         file_put_contents($blocker, 'not-a-directory');
         $target = $blocker.'/90ignore-release-date';
-        $logs = [];
-        $logger = function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        };
-
-        $result = \pmssAptWriteValidUntilOverride($logger, $target);
+        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($target): bool {
+            return \pmssAptWriteValidUntilOverride($logger, $target);
+        });
 
         $this->assertTrue($result === false);
         $this->assertTrue((bool) array_filter($logs, static function (string $line) use ($blocker): bool {
@@ -99,15 +93,13 @@ class UpdateHelpersSafeWriteTest extends TestCase
 
     public function testAptRunCleanReturnsTrueOnSuccess(): void
     {
-        $logs = [];
-        $logger = function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        };
         $runner = static function (): array {
             return ['rc' => 0, 'output' => ''];
         };
 
-        $result = \pmssAptRunClean($logger, $runner);
+        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
+            return \pmssAptRunClean($logger, $runner);
+        });
 
         $this->assertTrue($result);
         $this->assertEquals([], $logs);
@@ -115,15 +107,13 @@ class UpdateHelpersSafeWriteTest extends TestCase
 
     public function testAptRunCleanLogsFailureOutput(): void
     {
-        $logs = [];
-        $logger = function (string $message) use (&$logs): void {
-            $logs[] = $message;
-        };
         $runner = static function (): array {
             return ['rc' => 100, 'output' => 'simulated apt failure'];
         };
 
-        $result = \pmssAptRunClean($logger, $runner);
+        [$result, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($runner): bool {
+            return \pmssAptRunClean($logger, $runner);
+        });
 
         $this->assertTrue($result === false);
         $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {

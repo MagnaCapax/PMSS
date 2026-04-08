@@ -37,16 +37,15 @@ class ConfigBackupsServiceGuardTest extends TestCase
     public function testBackupRejectsInvalidServiceWithoutCreatingDirectories(): void
     {
         [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
-        $messages = [];
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
-        $backup = \pmssBackupCriticalConfig('../nginx', $source, array(
-            'backupRoot' => $backupRoot,
-            'logger' => function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            },
-            'logSuccess' => false,
-        ));
+        [$backup, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($backupRoot, $source) {
+            return \pmssBackupCriticalConfig('../nginx', $source, array(
+                'backupRoot' => $backupRoot,
+                'logger' => $logger,
+                'logSuccess' => false,
+            ));
+        });
 
         $this->assertEquals(null, $backup);
         $this->assertEquals(['[WARN] Refusing config backup with invalid service name'], $messages);
@@ -59,15 +58,14 @@ class ConfigBackupsServiceGuardTest extends TestCase
     public function testPruneRejectsInvalidServiceWithoutTouchingFilesystem(): void
     {
         [$sourceRoot, $backupRoot] = $this->makeBackupRoots();
-        $messages = [];
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
-        \pmssPruneCriticalConfigBackups('nginx/child', $source, array(
-            'backupRoot' => $backupRoot,
-            'logger' => function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            },
-        ));
+        [, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($backupRoot, $source): void {
+            \pmssPruneCriticalConfigBackups('nginx/child', $source, array(
+                'backupRoot' => $backupRoot,
+                'logger' => $logger,
+            ));
+        });
 
         $this->assertEquals(['[WARN] Refusing config backup prune with invalid service name'], $messages);
         $this->assertTrue(glob($backupRoot.'/*') === []);
@@ -79,15 +77,14 @@ class ConfigBackupsServiceGuardTest extends TestCase
     public function testBackupRejectsRelativeSourcePath(): void
     {
         $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
-        $messages = [];
 
-        $backup = \pmssBackupCriticalConfig('nginx', 'etc/nginx/nginx.conf', array(
-            'backupRoot' => $backupRoot,
-            'logger' => function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            },
-            'logSuccess' => false,
-        ));
+        [$backup, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($backupRoot) {
+            return \pmssBackupCriticalConfig('nginx', 'etc/nginx/nginx.conf', array(
+                'backupRoot' => $backupRoot,
+                'logger' => $logger,
+                'logSuccess' => false,
+            ));
+        });
 
         $this->assertEquals(null, $backup);
         $this->assertEquals(['[WARN] Refusing config backup for non-absolute source path: etc/nginx/nginx.conf'], $messages);
@@ -99,15 +96,14 @@ class ConfigBackupsServiceGuardTest extends TestCase
     public function testPruneRejectsRelativeBackupRootWithoutTouchingFilesystem(): void
     {
         [$sourceRoot] = $this->makeBackupRoots();
-        $messages = [];
         $source = $this->pmssWriteRelativeFile($sourceRoot, 'etc/nginx/nginx.conf', "worker_processes auto;\n");
 
-        \pmssPruneCriticalConfigBackups('nginx', $source, array(
-            'backupRoot' => 'relative-backups',
-            'logger' => function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            },
-        ));
+        [, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($source): void {
+            \pmssPruneCriticalConfigBackups('nginx', $source, array(
+                'backupRoot' => 'relative-backups',
+                'logger' => $logger,
+            ));
+        });
 
         $this->assertEquals(['[WARN] Refusing config backup with non-absolute backup root: relative-backups'], $messages);
         $this->assertTrue(!file_exists('relative-backups'));

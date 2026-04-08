@@ -107,6 +107,13 @@ trait FilesystemCleanupTrait
         };
     }
 
+    /** Run a callback with an array-backed logger and return both result and logs. */
+    protected function pmssArrayLoggerCapture(callable $callback): array
+    {
+        $messages = [];
+        return [$callback($this->pmssMakeArrayLogger($messages)), $messages];
+    }
+
     /** Check whether a captured log message contains a given substring. */
     protected function pmssMessagesContain(array $messages, string $needle): bool
     {

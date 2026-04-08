@@ -295,10 +295,8 @@ class RtorrentProcessTest extends TestCase
         $sessionDir = $home.'/session';
         @mkdir($sessionDir, 0755, true);
         file_put_contents($sessionDir.'/resume.dat', 'state');
-        $messages = [];
-
-        $result = rtorrentProcessResetSessionDirectory($home, 'alice', function (string $message) use (&$messages): void {
-            $messages[] = $message;
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
+            return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
         });
 
         $this->assertTrue($result, 'Session reset should succeed for a normal directory');
@@ -322,10 +320,8 @@ class RtorrentProcessTest extends TestCase
 
     public function testResetSessionDirectoryRejectsUnexpectedPath(): void
     {
-        $messages = [];
-
-        $result = rtorrentProcessResetSessionDirectory($this->tempDir.'/alice', 'bob', function (string $message) use (&$messages): void {
-            $messages[] = $message;
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger): bool {
+            return rtorrentProcessResetSessionDirectory($this->tempDir.'/alice', 'bob', $logger);
         });
 
         $this->assertTrue(!$result, 'Unexpected home path should be rejected');
@@ -342,10 +338,8 @@ class RtorrentProcessTest extends TestCase
         @mkdir($home, 0755, true);
         @mkdir($this->tempDir.'/target', 0755, true);
         @symlink($this->tempDir.'/target', $home.'/session');
-        $messages = [];
-
-        $result = rtorrentProcessResetSessionDirectory($home, 'alice', function (string $message) use (&$messages): void {
-            $messages[] = $message;
+        [$result, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($home): bool {
+            return rtorrentProcessResetSessionDirectory($home, 'alice', $logger);
         });
 
         $this->assertTrue(!$result, 'Symlinked session directory should be rejected');

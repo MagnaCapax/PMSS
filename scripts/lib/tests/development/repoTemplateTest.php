@@ -17,10 +17,10 @@ class RepoTemplateTest extends TestCase
 
     public function testRefreshRepositoriesSkipsWhenVersionUnknown(): void
     {
-        $logs = [];
-        $plan = pmssRepositoryUpdatePlan('debian', 0, function (string $msg) use (&$logs): void {
-            $logs[] = $msg;
+        [$plan, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): array {
+            return pmssRepositoryUpdatePlan('debian', 0, $logger);
         });
+
         $this->assertEquals('reuse', $plan['mode']);
         $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'reusing existing sources') !== false; }));
     }

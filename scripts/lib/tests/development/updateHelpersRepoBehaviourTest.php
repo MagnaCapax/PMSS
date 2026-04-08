@@ -110,9 +110,10 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         $template = "deb http://mirror.example trixie main\n";
         $this->pmssWithRepoTemplates(['trixie' => $template], function () use ($template): void {
             $this->pmssWithTempAptSources('legacy', function (string $target) use ($template): void {
-                $logs = [];
-                $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use (&$logs): void {
-                    \pmssRefreshRepositories('debian', 13, $this->pmssMakeArrayLogger($logs));
+                [, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): void {
+                    $this->pmssWithEnv(['PMSS_DRY_RUN' => '1'], function () use ($logger): void {
+                        \pmssRefreshRepositories('debian', 13, $logger);
+                    });
                 });
                 $this->assertEquals($template, file_get_contents($target));
                 $this->pmssAssertMessagesContain($logs, 'Applied Debian Trixie repository config');
@@ -129,9 +130,10 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
 
     public function testRefreshRepositoriesSkipsWhenVersionUnknown(): void
     {
-        $logs = [];
-        $this->pmssWithTempAptSources('unchanged', function (string $target) use (&$logs): void {
-            $plan = \pmssRepositoryUpdatePlan('debian', 0, function (string $msg) use (&$logs): void { $logs[] = $msg; });
+        $this->pmssWithTempAptSources('unchanged', function (string $target): void {
+            [$plan, $logs] = $this->pmssArrayLoggerCapture(function (callable $logger): array {
+                return \pmssRepositoryUpdatePlan('debian', 0, $logger);
+            });
             $this->assertEquals('unchanged', file_get_contents($target));
             $this->assertEquals('reuse', $plan['mode']);
             $this->pmssAssertMessagesContain($logs, 'reusing existing sources');

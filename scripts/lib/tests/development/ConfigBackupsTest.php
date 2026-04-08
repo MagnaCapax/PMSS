@@ -158,13 +158,12 @@ class ConfigBackupsTest extends TestCase
         @mkdir(dirname($source), 0755, true);
         file_put_contents($source, "Port 22\n");
 
-        $messages = array();
-        \pmssPruneCriticalConfigBackups('sshd', $source, array(
-            'backupRoot' => $backupRoot,
-            'logger' => function (string $message) use (&$messages): void {
-                $messages[] = $message;
-            },
-        ));
+        [, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($backupRoot, $source): void {
+            \pmssPruneCriticalConfigBackups('sshd', $source, array(
+                'backupRoot' => $backupRoot,
+                'logger' => $logger,
+            ));
+        });
 
         $this->assertEquals(array(), $messages);
     }
