@@ -13,24 +13,33 @@ require_once __DIR__.'/traffic/storage.php';
 /** @return array<string, string> */
 function pmssResourceMemoryBreakdownFieldMap(string $prefix = 'memory_'): array { return ['anon' => $prefix.'anon', 'file' => $prefix.'file']; }
 
+/** Return the shared schema used by resource rows and totals. */
+function pmssResourceReportTemplate(): array
+{
+    $windows = array_fill_keys(['month', 'week', 'day', 'hour'], 0.0);
+    return array_fill_keys(ResourceStatsAccumulator::RAW_METRICS, $windows) + ['memory' => ['current' => 0.0, 'avg_month' => 0.0], 'tasks' => ['current' => 0.0]];
+}
+
+/** Read a stored payload metric window, defaulting missing ops windows to zero. */
+function pmssResourceStoredPayloadWindowValue(array $data, string $metric, string $window): ?float
+{
+    $value = $data[$metric]['raw'][$window] ?? (substr($metric, -4) === '_ops' ? 0.0 : null);
+    return ($value !== null && is_numeric($value)) ? (float) $value : null;
+}
+
 /** Normalize persisted resource stats into the row shape used by reports. */
 function pmssResourceStoredPayloadReportRow(array $data): ?array
 {
-    $windowZeros = array_fill_keys(['month', 'week', 'day', 'hour'], 0.0);
-    $row = [];
+    $row = pmssResourceReportTemplate();
     foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
-        $metricValues = $windowZeros;
-        foreach ($windowZeros as $label => $_zero) {
-            $value = $data[$metric]['raw'][$label] ?? null;
-            if ($value === null && substr($metric, -4) !== '_ops') return null;
-            $metricValues[$label] = (float) ($value ?? 0.0);
+        foreach (array_keys($row[$metric]) as $label) {
+            if (($row[$metric][$label] = pmssResourceStoredPayloadWindowValue($data, $metric, $label)) === null) return null;
         }
-        $row[$metric] = $metricValues;
     }
-    return $row + [
-        'memory' => ['current' => (float) ($data['memory']['current'] ?? 0.0), 'avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0)],
-        'tasks' => ['current' => (float) ($data['tasks']['current'] ?? 0.0)],
-    ];
+
+    $row['memory'] = ['current' => (float) ($data['memory']['current'] ?? 0.0), 'avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0)];
+    $row['tasks'] = ['current' => (float) ($data['tasks']['current'] ?? 0.0)];
+    return $row;
 }
 
 /** Build the persisted resource stats payload written by the cron processor. */
@@ -88,13 +97,8 @@ class resourceStatistics
         $data = pmssTrafficReadSerializedArrayFile($path);
         if ($data === null) return null;
         $metrics = [];
-        foreach (['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks', 'io_read_ops', 'io_write_ops'] as $key) {
-            $default = substr($key, -4) === '_ops' ? 0.0 : null;
-            $value = $data[$key]['raw']['day'] ?? $default;
-            if ($value === null || !is_numeric($value)) {
-                return null;
-            }
-            $metrics[$key] = (float) $value;
+        foreach (array_merge(ResourceStatsAccumulator::RAW_METRICS, ['memory', 'tasks']) as $key) {
+            if (($metrics[$key] = pmssResourceStoredPayloadWindowValue($data, $key, 'day')) === null) return null;
         }
 
         return $metrics;

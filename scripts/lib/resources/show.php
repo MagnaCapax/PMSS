@@ -17,12 +17,7 @@ require_once dirname(__DIR__).'/userLifecycle.php';
 function pmssResourceBuildReport(string $statsDir, array $users): array
 {
     $missingStats = $rows = [];
-    $metrics = ResourceStatsAccumulator::RAW_METRICS;
-    $windowZeros = array_fill_keys(['month', 'week', 'day', 'hour'], 0.0);
-    $totals = array_fill_keys($metrics, $windowZeros) + [
-        'memory' => ['current' => 0.0, 'avg_month' => 0.0],
-        'tasks' => ['current' => 0.0],
-    ];
+    $totals = pmssResourceReportTemplate();
 
     foreach ($users as $thisUser) {
         $data = pmssTrafficReadSerializedArrayFile("{$statsDir}/{$thisUser}");
@@ -31,14 +26,14 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             continue;
         }
 
-        foreach ($metrics as $metric) {
+        foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
             foreach ($row[$metric] as $label => $value) {
                 $totals[$metric][$label] += $value;
             }
         }
-        $totals['memory']['current'] += $row['memory']['current'];
-        $totals['memory']['avg_month'] += $row['memory']['avg_month'];
-        $totals['tasks']['current'] += $row['tasks']['current'];
+        foreach (['memory' => ['current', 'avg_month'], 'tasks' => ['current']] as $metric => $fields) {
+            foreach ($fields as $field) { $totals[$metric][$field] += $row[$metric][$field]; }
+        }
 
         $rows[$thisUser] = $row;
     }
