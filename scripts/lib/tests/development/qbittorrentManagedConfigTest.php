@@ -11,11 +11,8 @@ class QbittorrentManagedConfigTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->homeRoot = $this->pmssMakeTempDir('pmss-qbittorrent-managed-');
-        $this->pmssTrackEnvOverrides([
-            'PMSS_HOME_DIR' => $this->homeRoot,
-            'PMSS_TEST_MODE' => '1',
-        ], true);
+        $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-qbittorrent-managed-');
+        $this->pmssTrackEnvOverrides(['PMSS_TEST_MODE' => '1'], true);
     }
 
     public function testConfigPathHonoursManagedHomeOverride(): void
@@ -141,7 +138,7 @@ class QbittorrentManagedConfigTest extends TestCase
         $linkedHomeRoot = $this->homeRoot.'/linked-home';
         $configPath = $this->pmssWriteRelativeFile($realHomeRoot, 'alice/.config/qBittorrent/qBittorrent.conf', "[Preferences]\nConnection\\GlobalUPLimit=10\n");
         symlink($realHomeRoot, $linkedHomeRoot);
-        putenv('PMSS_HOME_DIR='.$linkedHomeRoot);
+        $this->pmssTrackHomeRoot($linkedHomeRoot);
 
         $this->assertFalse(pmssQbittorrentApplyUploadThrottle('alice', 512));
         $this->assertSame(

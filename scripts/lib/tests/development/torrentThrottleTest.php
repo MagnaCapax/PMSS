@@ -10,16 +10,9 @@ class TorrentThrottleTest extends TestCase
 
     public function setUp(): void
     {
-        $this->pmssAssignTempDirProperty('homeRoot', 'pmss-throttle-');
+        $this->homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-throttle-');
         $this->user = 'alice';
         @mkdir($this->homeRoot.'/'.$this->user, 0755, true);
-        putenv('PMSS_HOME_DIR='.$this->homeRoot);
-    }
-
-    public function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('homeRoot');
-        putenv('PMSS_HOME_DIR');
     }
 
     private function throttlePath(): string

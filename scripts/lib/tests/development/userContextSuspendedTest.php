@@ -11,18 +11,10 @@ require_once dirname(__DIR__, 2).'/update/users.php';
  */
 class UserContextSuspendedTest extends TestCase
 {
-    public function tearDown(): void
-    {
-        putenv('PMSS_HOME_DIR');
-    }
-
     public function testBuildUserContextSkipsSuspendedUsers(): void
     {
-        $base = sys_get_temp_dir().'/pmss-user-context-suspended-marker-'.uniqid('', true);
-        $homeRoot = $base.'/home';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-suspended-marker-');
         $user = 'testuser';
-
-        putenv('PMSS_HOME_DIR='.$homeRoot);
 
         $home = $homeRoot.'/'.$user;
         @mkdir($home.'/data', 0755, true);
@@ -34,21 +26,15 @@ class UserContextSuspendedTest extends TestCase
 
     public function testBuildUserContextReturnsNullWhenHomeMissing(): void
     {
-        $base = sys_get_temp_dir().'/pmss-user-context-missing-home-'.uniqid('', true);
-        $homeRoot = $base.'/home';
-
-        putenv('PMSS_HOME_DIR='.$homeRoot);
+        $this->pmssMakeTrackedHomeRoot('pmss-user-context-missing-home-');
 
         $this->assertEquals(null, \pmssBuildUserContext('missinguser'));
     }
 
     public function testBuildUserContextReturnsNullWhenRtorrentConfigMissing(): void
     {
-        $base = sys_get_temp_dir().'/pmss-user-context-missing-rtorrent-'.uniqid('', true);
-        $homeRoot = $base.'/home';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-missing-rtorrent-');
         $user = 'testuser';
-
-        putenv('PMSS_HOME_DIR='.$homeRoot);
 
         $home = $homeRoot.'/'.$user;
         @mkdir($home.'/data', 0755, true);
@@ -58,11 +44,8 @@ class UserContextSuspendedTest extends TestCase
 
     public function testBuildUserContextReturnsNullWhenDataDirMissing(): void
     {
-        $base = sys_get_temp_dir().'/pmss-user-context-missing-data-'.uniqid('', true);
-        $homeRoot = $base.'/home';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-missing-data-');
         $user = 'testuser';
-
-        putenv('PMSS_HOME_DIR='.$homeRoot);
 
         $home = $homeRoot.'/'.$user;
         @mkdir($home, 0755, true);
@@ -73,12 +56,9 @@ class UserContextSuspendedTest extends TestCase
 
     public function testBuildUserContextReturnsWhenMarkerMissing(): void
     {
-        $base = sys_get_temp_dir().'/pmss-user-context-active-'.uniqid('', true);
-        $homeRoot = $base.'/home';
+        $homeRoot = $this->pmssMakeTrackedHomeRoot('pmss-user-context-active-');
         $user = 'testuser';
         $sha = 'sha123';
-
-        putenv('PMSS_HOME_DIR='.$homeRoot);
 
         $home = $homeRoot.'/'.$user;
         @mkdir($home.'/data', 0755, true);

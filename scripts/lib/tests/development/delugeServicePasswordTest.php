@@ -12,12 +12,6 @@ class DelugeServicePasswordTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-passwords');
     }
 
-    protected function tearDown(): void
-    {
-        putenv('PMSS_HOME_DIR');
-        putenv('PMSS_DELUGE_AUTH_TEMPLATE_PATH');
-    }
-
     public function testGenerateServicePasswordLengthAndCharset(): void
     {
         $password = \pmssDelugeServicePasswordGenerate(32);
@@ -60,15 +54,14 @@ class DelugeServicePasswordTest extends TestCase
 
     public function testEnsureDelugeServicePasswordRotatesTemplateToken(): void
     {
-        $homeRoot = $this->tempDir.'/home';
+        $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
         $authPath = $homeRoot.'/alice/.config/deluge/auth';
         @mkdir(dirname($authPath), 0755, true);
         file_put_contents($authPath, "localclient:template-token:10\n");
 
         $templatePath = $this->tempDir.'/template.deluge.auth';
         file_put_contents($templatePath, "localclient:template-token:10\n");
-        putenv('PMSS_HOME_DIR='.$homeRoot);
-        putenv('PMSS_DELUGE_AUTH_TEMPLATE_PATH='.$templatePath);
+        $this->pmssTrackEnvOverrides(['PMSS_DELUGE_AUTH_TEMPLATE_PATH' => $templatePath], true);
 
         $generated = \pmssEnsureDelugeServicePassword('alice');
         $stored = \pmssDelugeAuthReadLocalclientPassword($authPath);

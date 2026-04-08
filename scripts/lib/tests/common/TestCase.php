@@ -277,6 +277,19 @@ abstract class TestCase
         return $path;
     }
 
+    /** Point PMSS_HOME_DIR at a fixture home root and restore it automatically after the test. */
+    protected function pmssTrackHomeRoot(string $homeRoot, bool $unsetEmptyString = true): string
+    {
+        $this->pmssTrackEnvOverrides(['PMSS_HOME_DIR' => $homeRoot], $unsetEmptyString);
+        return $homeRoot;
+    }
+
+    /** Create a fresh fixture home root and register it as PMSS_HOME_DIR for the current test. */
+    protected function pmssMakeTrackedHomeRoot(string $prefix, int $mode = 0755): string
+    {
+        return $this->pmssTrackHomeRoot($this->pmssMakeTempDir($prefix, $mode));
+    }
+
     /** Reserve and track a unique temporary filesystem path for hermetic tests. */
     protected function pmssMakeTempPath(string $prefix, string $suffix = ''): string
     {
