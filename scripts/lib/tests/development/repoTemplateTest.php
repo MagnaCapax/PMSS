@@ -9,6 +9,8 @@ class RepoTemplateTest extends TestCase
 {
     private $tmpSources;
 
+    private const TRIXIE_TEMPLATE = 'etc/seedbox/config/template.sources.trixie';
+
     protected function setUp(): void
     {
         $this->tmpSources = $this->pmssMakeTempFile('pmss-sources-');
@@ -22,29 +24,23 @@ class RepoTemplateTest extends TestCase
         });
 
         $this->assertEquals('reuse', $plan['mode']);
-        $this->assertTrue((bool)array_filter($logs, static function ($m) { return strpos($m, 'reusing existing sources') !== false; }));
+        $this->pmssAssertMessagesContain($logs, 'reusing existing sources');
     }
 
-    public function testShippedTrixieTemplateIncludesNonFreeFirmware(): void
+    public function testShippedTrixieTemplateRetainsExpectedSuitesAndComponents(): void
     {
-        $path = $this->pmssRepoPath('etc/seedbox/config/template.sources.trixie');
+        $path = $this->pmssRepoPath(self::TRIXIE_TEMPLATE);
         $this->assertTrue(is_file($path), 'Expected template.sources.trixie to exist');
 
-        $data = $this->pmssReadRepoFile('etc/seedbox/config/template.sources.trixie');
-        $this->assertTrue(strpos($data, 'non-free-firmware') !== false, 'Expected trixie repo template to include non-free-firmware');
-    }
-
-    public function testShippedTrixieTemplateIncludesSecurityUpdatesBackports(): void
-    {
-        $data = $this->pmssReadRepoFile('etc/seedbox/config/template.sources.trixie');
-        $this->assertTrue(strpos($data, 'trixie-security') !== false, 'Expected trixie template to include security pocket');
-        $this->assertTrue(strpos($data, 'trixie-updates') !== false, 'Expected trixie template to include updates pocket');
-        $this->assertTrue(strpos($data, 'trixie-backports') !== false, 'Expected trixie template to include backports pocket');
-    }
-
-    public function testShippedTrixieTemplateUsesSuiteName(): void
-    {
-        $data = $this->pmssReadRepoFile('etc/seedbox/config/template.sources.trixie');
-        $this->assertTrue(strpos($data, ' trixie ') !== false, 'Expected trixie template to reference the trixie suite');
+        $data = $this->pmssReadRepoFile(self::TRIXIE_TEMPLATE);
+        foreach ([
+            'non-free-firmware' => 'Expected trixie repo template to include non-free-firmware',
+            'trixie-security' => 'Expected trixie template to include security pocket',
+            'trixie-updates' => 'Expected trixie template to include updates pocket',
+            'trixie-backports' => 'Expected trixie template to include backports pocket',
+            ' trixie ' => 'Expected trixie template to reference the trixie suite',
+        ] as $needle => $message) {
+            $this->assertTrue(strpos($data, $needle) !== false, $message);
+        }
     }
 }

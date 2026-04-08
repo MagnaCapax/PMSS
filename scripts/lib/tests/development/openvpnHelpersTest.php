@@ -5,20 +5,14 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class OpenvpnHelpersTest extends TestCase
 {
-    public function testConfigureOpenvpnStillBuildsPmFqdnAndSlugInline(): void
+    public function testConfigureOpenvpnStillBuildsPmFqdnSlugAndHomeArtifactsInline(): void
     {
-        $contents = $this->pmssReadRepoFile('scripts/util/configureOpenvpn.php');
-
-        $this->assertStringContainsString("strpos(\$hostname, '.pulsedmedia.com') !== false", $contents);
-        $this->assertStringContainsString("str_replace('.', '-', \$fqdn)", $contents);
-    }
-
-    public function testConfigureOpenvpnClientArtifactsStayUnderHome(): void
-    {
-        $contents = $this->pmssReadRepoFile('scripts/util/configureOpenvpn.php');
-
-        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.ovpn'", $contents);
-        $this->assertStringContainsString("'/home/openvpn-'.\$slug.'.crt'", $contents);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/configureOpenvpn.php', [
+            "strpos(\$hostname, '.pulsedmedia.com') !== false",
+            "str_replace('.', '-', \$fqdn)",
+            "'/home/openvpn-'.\$slug.'.ovpn'",
+            "'/home/openvpn-'.\$slug.'.crt'",
+        ]);
     }
 
     public function testSystemTestUsesMatchingClientArtifactPaths(): void

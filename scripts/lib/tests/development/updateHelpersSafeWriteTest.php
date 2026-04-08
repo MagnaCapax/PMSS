@@ -85,9 +85,10 @@ class UpdateHelpersSafeWriteTest extends TestCase
         });
 
         $this->assertTrue($result === false);
-        $this->assertTrue((bool) array_filter($logs, static function (string $line) use ($blocker): bool {
-            return strpos($line, 'Unable to create apt.conf.d directory for Release timestamp override: '.$blocker) !== false;
-        }));
+        $this->pmssAssertMessagesContain(
+            $logs,
+            'Unable to create apt.conf.d directory for Release timestamp override: '.$blocker
+        );
         $this->assertTrue(!file_exists($target));
     }
 
@@ -116,9 +117,7 @@ class UpdateHelpersSafeWriteTest extends TestCase
         });
 
         $this->assertTrue($result === false);
-        $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-            return strpos($line, 'apt-get clean failed with rc 100 (simulated apt failure)') !== false;
-        }));
+        $this->pmssAssertMessagesContain($logs, 'apt-get clean failed with rc 100 (simulated apt failure)');
     }
 
     private function clearEnv(string $name): void

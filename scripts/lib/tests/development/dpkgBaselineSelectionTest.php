@@ -37,9 +37,11 @@ class DpkgBaselineSelectionTest extends TestCase
         $this->assertTrue(is_string($path) && $path !== '', 'Expected a dpkg baseline path');
 
         $this->assertStringContainsString('selections-debian'.$this->latestValidatedBaselineMajor().'.txt', $path);
-        $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-            return strpos($line, 'Debian 13 dpkg baseline exists but is not validated for automatic use') !== false;
-        }), 'Expected warning about Debian 13 baseline remaining experimental');
+        $this->pmssAssertMessagesContain(
+            $logs,
+            'Debian 13 dpkg baseline exists but is not validated for automatic use',
+            'Expected warning about Debian 13 baseline remaining experimental'
+        );
     }
 
     public function testWarnsWhenRequestedBaselineIsUnavailable(): void
@@ -57,9 +59,7 @@ class DpkgBaselineSelectionTest extends TestCase
         }
 
         $this->assertStringContainsString('selections-debian'.$this->latestValidatedBaselineMajor().'.txt', $path);
-        $this->assertTrue((bool) array_filter($logs, static function (string $line): bool {
-            return strpos($line, 'Debian 9 dpkg baseline') !== false;
-        }), 'Expected warning about unavailable Debian 9 baseline');
+        $this->pmssAssertMessagesContain($logs, 'Debian 9 dpkg baseline', 'Expected warning about unavailable Debian 9 baseline');
     }
 
     public function testSelectsLatestValidatedBaselineWhenVersionUnknown(): void
