@@ -64,26 +64,18 @@ autocommit=0
 select_only=0
 
 while [[ $# -gt 0 ]]; do
+	if codex_parse_agent_exec_option agent exec_cmd "$1" "${2:-}"; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
+	if codex_parse_runner_toggle_option dry_run autocommit "$1"; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
 	case "$1" in
 	--max-issues)
 		codex_parse_option_value max_issues "$1" "${2:-5}" "--max-issues"
 		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--agent | --agent=*)
-		codex_parse_option_value agent "$1" "${2:-}" "--agent" 1
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--exec)
-		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--dry-run | --autocommit)
-		if [[ "$1" == "--dry-run" ]]; then
-			dry_run=1
-		else
-			autocommit=1
-		fi
-		shift || true
 		;;
 	--select-only)
 		select_only=1

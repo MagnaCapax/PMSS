@@ -17,7 +17,6 @@ agent=""
 exec_cmd=""
 verbose=0
 declare -a passthrough=()
-declare -a extra_context=()
 declare -a exec_extra_args=()
 
 usage() {
@@ -69,47 +68,23 @@ EOF
 }
 
 while [[ $# -gt 0 ]]; do
+	if codex_parse_agent_exec_option agent exec_cmd "$1" "${2:-}" 1; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
+	if codex_parse_exec_extra_option exec_extra_args "$1" "${2:-}"; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
 	case "$1" in
-	--agent | --agent=*)
-		codex_parse_option_value agent "$1" "${2:-}" "--agent" 1
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--exec | --exec=*)
-		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec" 1
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
-	--verbose)
-		verbose=1
-		passthrough+=("$1")
-		shift || true
-		;;
-	--yolo | -y)
-		exec_extra_args+=("$1")
-		shift || true
-		;;
-	--approval-mode)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--ask-for-approval | -a)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--allowed-tools)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--permission-mode)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--dangerously-skip-permissions)
-		exec_extra_args+=("$1")
-		shift || true
-		;;
-	--)
-		shift || true
-		if [[ $# -gt 0 ]]; then
+		--verbose)
+			verbose=1
+			passthrough+=("$1")
+			shift || true
+			;;
+		--)
+			shift || true
+			if [[ $# -gt 0 ]]; then
 			exec_extra_args+=("$@")
 		fi
 		break
@@ -134,19 +109,11 @@ if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	codex_append_exec_extra_args exec_cmd "$agent" "${exec_extra_args[@]}"
 fi
 
-if [[ -f "$ROOT/AGENTS.${agent}.md" ]]; then
-	extra_context+=(--context "$ROOT/AGENTS.${agent}.md")
-fi
-if [[ -f "$ROOT/AGENTS.${agent}.local.md" ]]; then
-	extra_context+=(--context "$ROOT/AGENTS.${agent}.local.md")
-fi
-
 if [[ "$verbose" == "1" ]]; then
 	echo "[agentic] agent: $agent" >&1
 fi
 
 cmd=(bash "$HERE/codex-run.sh" run --prompt-file "$HERE/prompts/codex.txt")
-[[ -n "$exec_cmd" ]] && cmd+=(--exec "$exec_cmd")
-cmd+=("${extra_context[@]}")
+codex_append_runner_args cmd "$ROOT" "$agent" "$exec_cmd" 0 0 '' 1
 cmd+=("${passthrough[@]}")
 exec "${cmd[@]}"

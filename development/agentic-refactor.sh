@@ -90,11 +90,19 @@ autocommit=0
 cooling_files=""
 
 while [[ $# -gt 0 ]]; do
-	case "$1" in
-	--agent | --agent=*)
-		codex_parse_option_value agent "$1" "${2:-}" "--agent" 1
+	if codex_parse_agent_exec_option agent exec_cmd "$1" "${2:-}"; then
 		shift "$CODEX_PARSE_SHIFT" || true
-		;;
+		continue
+	fi
+	if codex_parse_runner_toggle_option dry_run autocommit "$1"; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
+	if codex_parse_exec_extra_option exec_extra_args "$1" "${2:-}"; then
+		shift "$CODEX_PARSE_SHIFT" || true
+		continue
+	fi
+	case "$1" in
 	--commits)
 		codex_parse_option_value commits "$1" "${2:-}" "--commits"
 		shift "$CODEX_PARSE_SHIFT" || true
@@ -103,49 +111,13 @@ while [[ $# -gt 0 ]]; do
 		codex_parse_option_value target "$1" "${2:-}" "--target"
 		shift "$CODEX_PARSE_SHIFT" || true
 		;;
-	--exec)
-		codex_parse_option_value exec_cmd "$1" "${2:-}" "--exec"
-		shift "$CODEX_PARSE_SHIFT" || true
-		;;
 	--prompt)
 		codex_parse_option_value custom_prompt "$1" "${2:-}" "--prompt"
 		shift "$CODEX_PARSE_SHIFT" || true
 		;;
-	--dry-run | --autocommit)
-		if [[ "$1" == "--dry-run" ]]; then
-			dry_run=1
-		else
-			autocommit=1
-		fi
-		shift || true
-		;;
 	--cooling-files)
 		cooling_files=${2:-}
 		shift 2 || true
-		;;
-	--yolo | -y)
-		exec_extra_args+=("$1")
-		shift || true
-		;;
-	--approval-mode)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--ask-for-approval | -a)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--allowed-tools)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--permission-mode)
-		codex_append_option_pair exec_extra_args "$1" "${2:-}"
-		shift 2 || true
-		;;
-	--dangerously-skip-permissions)
-		exec_extra_args+=("$1")
-		shift || true
 		;;
 	--)
 		shift || true

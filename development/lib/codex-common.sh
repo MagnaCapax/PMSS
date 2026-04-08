@@ -146,6 +146,39 @@ codex_resolve_exec_cmd() {
 CODEX_PARSE_SHIFT=0
 CODEX_PARSE_VALUE=""
 
+# Parse shared launcher options for agent selection and exec override.
+codex_parse_agent_exec_option() {
+	local agent_name="$1" exec_name="$2" arg="$3" next_value="${4-}" exec_inline_allowed="${5:-0}"
+	CODEX_PARSE_SHIFT=0
+	if codex_parse_option_value "$agent_name" "$arg" "$next_value" "--agent" 1; then
+		return 0
+	fi
+	if codex_parse_option_value "$exec_name" "$arg" "$next_value" "--exec" "$exec_inline_allowed"; then
+		return 0
+	fi
+	return 1
+}
+
+# Parse shared runner toggles used by agentic subcommands.
+codex_parse_runner_toggle_option() {
+	local dry_run_name="$1" autocommit_name="$2" arg="$3"
+	local -n dry_run_ref="$dry_run_name"
+	local -n autocommit_ref="$autocommit_name"
+	CODEX_PARSE_SHIFT=1
+	case "$arg" in
+	--dry-run)
+		dry_run_ref=1
+		return 0
+		;;
+	--autocommit)
+		autocommit_ref=1
+		return 0
+		;;
+	esac
+	CODEX_PARSE_SHIFT=0
+	return 1
+}
+
 # Parse a CLI option and expose its value via shared parse globals.
 codex_parse_option() {
 	local arg="$1" next_value="${2-}" option_name="$3" inline_allowed="${4:-0}"
@@ -188,6 +221,26 @@ codex_append_option_pair() {
 	local target_name="$1" option_name="$2" option_value="${3-}"
 	local -n target_ref="$target_name"
 	target_ref+=("$option_name" "$option_value")
+}
+
+# Parse assistant CLI passthrough flags collected before exec normalization.
+codex_parse_exec_extra_option() {
+	local target_name="$1" arg="$2" next_value="${3-}"
+	local -n target_ref="$target_name"
+	CODEX_PARSE_SHIFT=1
+	case "$arg" in
+	--yolo | -y | --dangerously-skip-permissions)
+		target_ref+=("$arg")
+		return 0
+		;;
+	--approval-mode | --ask-for-approval | -a | --allowed-tools | --permission-mode)
+		target_ref+=("$arg" "$next_value")
+		CODEX_PARSE_SHIFT=2
+		return 0
+		;;
+	esac
+	CODEX_PARSE_SHIFT=0
+	return 1
 }
 
 # Append the shared codex-run options used by the agentic launcher wrappers.
