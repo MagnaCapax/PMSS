@@ -40,8 +40,8 @@ class ResourceReportTest extends TestCase
         $this->assertEquals(24.0, $report['rows']['bob']['io_write']['hour']);
         $this->assertEquals(1011.0, $report['totals']['io_read']['month']);
         $this->assertEquals(48.0, $report['totals']['io_write_ops']['hour']);
-        $this->assertEquals(771.0, $report['totals']['memory_current']);
-        $this->assertEquals(80.0, $report['totals']['tasks_current']);
+        $this->assertEquals(771.0, $report['totals']['memory']['current']);
+        $this->assertEquals(80.0, $report['totals']['tasks']['current']);
     }
 
     public function testBuildReportMarksMissingWhenStatsFileMissing(): void
@@ -82,6 +82,9 @@ class ResourceReportTest extends TestCase
         $this->assertEquals([], $report['missing']);
         $this->assertEquals(0.0, $report['rows']['alice']['io_read_ops']['month']);
         $this->assertEquals(0.0, $report['rows']['alice']['io_write_ops']['hour']);
+        $this->assertEquals(5.0, $report['rows']['alice']['memory']['current']);
+        $this->assertEquals(6.0, $report['rows']['alice']['memory']['avg_month']);
+        $this->assertEquals(7.0, $report['rows']['alice']['tasks']['current']);
     }
 
     private function writeUserData(string $user, array $data): void

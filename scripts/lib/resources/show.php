@@ -21,7 +21,10 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $windows = ['month', 'week', 'day', 'hour'];
     $metrics = ResourceStatsAccumulator::RAW_METRICS;
     $windowZeros = array_fill_keys($windows, 0.0);
-    $totals = array_fill_keys($metrics, $windowZeros) + array_fill_keys(['memory_current', 'memory_avg_month', 'tasks_current'], 0.0);
+    $totals = array_fill_keys($metrics, $windowZeros) + [
+        'memory' => ['current' => 0.0, 'avg_month' => 0.0],
+        'tasks' => ['current' => 0.0],
+    ];
 
     foreach ($users as $thisUser) {
         $data = pmssTrafficReadSerializedArrayFile("{$statsDir}/{$thisUser}");
@@ -45,20 +48,19 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             $windowMetrics[$metric] = $metricValues;
         }
 
-        $summary = [
-            'memory_current' => (float) ($data['memory']['current'] ?? 0.0),
-            'memory_avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
-            'tasks_current' => (float) ($data['tasks']['current'] ?? 0.0),
-        ];
+        $summary = ['memory' => [
+            'current' => (float) ($data['memory']['current'] ?? 0.0),
+            'avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0),
+        ], 'tasks' => ['current' => (float) ($data['tasks']['current'] ?? 0.0)]];
 
         foreach ($windowMetrics as $metric => $values) {
             foreach ($values as $label => $value) {
                 $totals[$metric][$label] += $value;
             }
         }
-        foreach ($summary as $metric => $value) {
-            $totals[$metric] += $value;
-        }
+        $totals['memory']['current'] += $summary['memory']['current'];
+        $totals['memory']['avg_month'] += $summary['memory']['avg_month'];
+        $totals['tasks']['current'] += $summary['tasks']['current'];
 
         $rows[$thisUser] = $windowMetrics + $summary;
     }
@@ -84,9 +86,7 @@ TEXT;
         echo PHP_EOL;
         return 0;
     }
-
     $userFilter = trim((string) ($options['user'] ?? ''));
-
     $statsDir = pmssRuntimeDir().'/resourceStats';
 
     if ($userFilter !== '') {
@@ -111,16 +111,7 @@ TEXT;
     ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
     if (isset($options['json'])) {
-        $payloadFromSource = static function (array $source): array {
-            return ['memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']], 'tasks' => ['current' => $source['tasks_current']]]
-                + array_intersect_key($source, array_flip(ResourceStatsAccumulator::RAW_METRICS));
-        };
-
-        $payload = [
-            'users' => array_map($payloadFromSource, $rows),
-            'totals' => $payloadFromSource($totals),
-            'missing' => $missingStats,
-        ];
+        $payload = ['users' => $rows, 'totals' => $totals, 'missing' => $missingStats];
         if (!is_string($encoded = pmssJsonEncodeSafe($payload))) {
             fwrite(STDERR, "Failed to encode resource report JSON.\n");
             return 1;
@@ -150,8 +141,8 @@ TEXT;
             $formatBytes((float) $data['io_write']['month']),
             number_format((float) $data['cpu']['month'] / 1000000000 / 3600, 1).' hrs',
             number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs',
-            $formatBytes((float) $data['memory_current']),
-            (string) round($data['tasks_current']),
+            $formatBytes((float) $data['memory']['current']),
+            (string) round($data['tasks']['current']),
             number_format($hourOps / 3600, 2)
         );
     };

@@ -94,6 +94,21 @@ class ShowResourcesFormatTest extends TestCase
         $this->assertTrue(!isset($payload['users']['alice']['ignored_field']));
     }
 
+    public function testUserFilteredJsonOutputMatchesSnapshot(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
+        $this->writeResourceStats($runtimeDir, 'alice', [
+            'io_read' => $this->pmssBuildRawWindowMetric(1.0), 'io_write' => $this->pmssBuildRawWindowMetric(2.0), 'io_read_ops' => $this->pmssBuildRawWindowMetric(3.0),
+            'io_write_ops' => $this->pmssBuildRawWindowMetric(4.0), 'cpu' => $this->pmssBuildRawWindowMetric(5.0), 'memory' => ['current' => 6.0, 'raw' => ['month' => 7.0]],
+            'ram_hours' => $this->pmssBuildRawWindowMetric(8.0), 'tasks' => ['current' => 9.0],
+        ]);
+
+        $this->assertEquals(
+            '{"users":{"alice":{"io_read":{"month":1,"week":1,"day":1,"hour":1},"io_write":{"month":2,"week":2,"day":2,"hour":2},"io_read_ops":{"month":3,"week":3,"day":3,"hour":3},"io_write_ops":{"month":4,"week":4,"day":4,"hour":4},"cpu":{"month":5,"week":5,"day":5,"hour":5},"ram_hours":{"month":8,"week":8,"day":8,"hour":8},"memory":{"current":6,"avg_month":7},"tasks":{"current":9}}},"totals":{"io_read":{"month":1,"week":1,"day":1,"hour":1},"io_write":{"month":2,"week":2,"day":2,"hour":2},"io_read_ops":{"month":3,"week":3,"day":3,"hour":3},"io_write_ops":{"month":4,"week":4,"day":4,"hour":4},"cpu":{"month":5,"week":5,"day":5,"hour":5},"ram_hours":{"month":8,"week":8,"day":8,"hour":8},"memory":{"current":6,"avg_month":7},"tasks":{"current":9}},"missing":[]}'."\n",
+            $this->runScript(['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir])
+        );
+    }
+
     public function testUserFilteredJsonOutputMarksMissingWithoutRows(): void
     {
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
