@@ -11,7 +11,7 @@ class UserUpdateHttpTest extends TestCase
 {
     public function testConfigureHttpDisablesQbittorrentReverseProxyChecks(): void
     {
-        $home = sys_get_temp_dir().'/pmss-http-qbittorrent-'.bin2hex(random_bytes(4));
+        $home = $this->pmssMakeTempDir('pmss-http-qbittorrent-');
         mkdir($home.'/.config/qBittorrent', 0755, true);
 
         $config = "[Preferences]\n";
@@ -27,25 +27,21 @@ class UserUpdateHttpTest extends TestCase
             'user_esc' => escapeshellarg('dummy'),
         ];
 
-        try {
-            \pmssUserConfigureHttp($ctx);
+        \pmssUserConfigureHttp($ctx);
 
-            $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
-            $updatedConfig = ($updated === false) ? '' : $updated;
-            $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
-            $this->assertStringContainsString('WebUI\\ClickjackingProtection=false', $updatedConfig);
-            $this->assertStringContainsString('WebUI\\HostHeaderValidation=false', $updatedConfig);
-            $this->assertTrue(strpos($updatedConfig, 'WebUI\\CSRFProtection=true') === false);
-            $this->assertTrue(strpos($updatedConfig, 'WebUI\\ClickjackingProtection=true') === false);
-            $this->assertTrue(strpos($updatedConfig, 'WebUI\\HostHeaderValidation=true') === false);
-        } finally {
-            $this->cleanup($home);
-        }
+        $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
+        $updatedConfig = ($updated === false) ? '' : $updated;
+        $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
+        $this->assertStringContainsString('WebUI\\ClickjackingProtection=false', $updatedConfig);
+        $this->assertStringContainsString('WebUI\\HostHeaderValidation=false', $updatedConfig);
+        $this->assertTrue(strpos($updatedConfig, 'WebUI\\CSRFProtection=true') === false);
+        $this->assertTrue(strpos($updatedConfig, 'WebUI\\ClickjackingProtection=true') === false);
+        $this->assertTrue(strpos($updatedConfig, 'WebUI\\HostHeaderValidation=true') === false);
     }
 
     public function testConfigureHttpCreatesTempDirectory(): void
     {
-        $tempHome = sys_get_temp_dir().'/pmss-http-'.bin2hex(random_bytes(4));
+        $tempHome = $this->pmssMakeTempDir('pmss-http-');
         mkdir($tempHome.'/.lighttpd', 0755, true);
         file_put_contents($tempHome.'/.lighttpd/php.ini', "display_errors = On\n");
 
@@ -55,19 +51,15 @@ class UserUpdateHttpTest extends TestCase
             'user_esc' => escapeshellarg('dummy'),
         ];
 
-        try {
-            \pmssUserConfigureHttp($ctx);
+        \pmssUserConfigureHttp($ctx);
 
-            $ini = file_get_contents($tempHome.'/.lighttpd/php.ini');
-            $this->assertTrue(strpos($ini, 'error_log') !== false);
-        } finally {
-            $this->cleanup($tempHome);
-        }
+        $ini = file_get_contents($tempHome.'/.lighttpd/php.ini');
+        $this->assertTrue(strpos($ini, 'error_log') !== false);
     }
 
     public function testConfigureHttpRestoresQbittorrentManagedKeysWhenMissing(): void
     {
-        $home = sys_get_temp_dir().'/pmss-http-qbittorrent-missing-'.bin2hex(random_bytes(4));
+        $home = $this->pmssMakeTempDir('pmss-http-qbittorrent-missing-');
         @mkdir($home.'/.config/qBittorrent', 0755, true);
 
         $config = "[Preferences]\n";
@@ -81,25 +73,20 @@ class UserUpdateHttpTest extends TestCase
             'user_esc' => escapeshellarg('dummy'),
         ];
 
-        try {
-            \pmssUserConfigureHttp($ctx);
+        \pmssUserConfigureHttp($ctx);
 
-            $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
-            $updatedConfig = ($updated === false) ? '' : $updated;
-            $this->assertStringContainsString('WebUI\\Port=12345', $updatedConfig);
-            $this->assertStringContainsString('WebUI\\Address=*', $updatedConfig);
-            $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
-            $this->assertStringContainsString('Downloads\\PreAllocation=false', $updatedConfig);
-            $this->assertStringContainsString('Session\\DiskCacheSize=128', $updatedConfig);
-        } finally {
-            $this->cleanup($home);
-        }
+        $updated = file_get_contents($home.'/.config/qBittorrent/qBittorrent.conf');
+        $updatedConfig = ($updated === false) ? '' : $updated;
+        $this->assertStringContainsString('WebUI\\Port=12345', $updatedConfig);
+        $this->assertStringContainsString('WebUI\\Address=*', $updatedConfig);
+        $this->assertStringContainsString('WebUI\\CSRFProtection=false', $updatedConfig);
+        $this->assertStringContainsString('Downloads\\PreAllocation=false', $updatedConfig);
+        $this->assertStringContainsString('Session\\DiskCacheSize=128', $updatedConfig);
     }
 
     public function testConfigureHttpUsesDefaultSkelPathForIrssiCopy(): void
     {
-        $home = sys_get_temp_dir().'/pmss-http-skel-default-'.bin2hex(random_bytes(4));
-        mkdir($home, 0755, true);
+        $home = $this->pmssMakeTempDir('pmss-http-skel-default-');
         $ctx = [
             'user'     => 'dummy',
             'home'     => $home,
@@ -122,7 +109,6 @@ class UserUpdateHttpTest extends TestCase
         } finally {
             $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
-            $this->cleanup($home);
         }
 
         $expected = sprintf('cp /etc/skel/.irssi/config %s/', escapeshellarg($home.'/.irssi'));
@@ -131,9 +117,8 @@ class UserUpdateHttpTest extends TestCase
 
     public function testConfigureHttpUsesSkelOverrideForIrssiCopy(): void
     {
-        $home = sys_get_temp_dir().'/pmss-http-skel-override-home-'.bin2hex(random_bytes(4));
-        mkdir($home, 0755, true);
-        $skel = sys_get_temp_dir().'/pmss-http-skel-override-skel-'.bin2hex(random_bytes(4));
+        $home = $this->pmssMakeTempDir('pmss-http-skel-override-home-');
+        $skel = $this->pmssMakeTempDir('pmss-http-skel-override-skel-');
         @mkdir($skel.'/.irssi', 0755, true);
         @file_put_contents($skel.'/.irssi/config', 'test');
 
@@ -159,8 +144,6 @@ class UserUpdateHttpTest extends TestCase
         } finally {
             $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
-            $this->cleanup($home);
-            $this->cleanup($skel);
         }
 
         $expected = sprintf('cp %s %s/', escapeshellarg($skel.'/.irssi/config'), escapeshellarg($home.'/.irssi'));

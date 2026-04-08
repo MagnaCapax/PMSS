@@ -110,27 +110,21 @@ class UserConfigLighttpdLogicTest extends TestCase
 
     public function testShouldConfigureLighttpdSkipsSuspendedUsers(): void
     {
-        $base = sys_get_temp_dir().'/pmss-lighttpd-suspended-'.uniqid('', true);
-        $home = $base.'/user';
-        @mkdir($home.'/www-disabled', 0755, true);
+        $home = $this->pmssMakeUserHomeTree('pmss-lighttpd-suspended-', 'www-disabled', 'user');
 
         $this->assertFalse(\pmssShouldConfigureLighttpdForHome($home));
     }
 
     public function testShouldConfigureLighttpdSkipsMissingWebRoot(): void
     {
-        $base = sys_get_temp_dir().'/pmss-lighttpd-missing-www-'.uniqid('', true);
-        $home = $base.'/user';
-        @mkdir($home, 0755, true);
+        $home = $this->pmssMakeUserHomeTree('pmss-lighttpd-missing-www-', '', 'user');
 
         $this->assertFalse(\pmssShouldConfigureLighttpdForHome($home));
     }
 
     public function testShouldConfigureLighttpdRequiresRtorrentConfig(): void
     {
-        $base = sys_get_temp_dir().'/pmss-lighttpd-rtorrent-'.uniqid('', true);
-        $home = $base.'/user';
-        @mkdir($home.'/www', 0755, true);
+        $home = $this->pmssMakeUserHomeTree('pmss-lighttpd-rtorrent-', 'www', 'user');
 
         $this->assertFalse(\pmssShouldConfigureLighttpdForHome($home));
 
@@ -164,38 +158,25 @@ LIGHTTPD;
 
     public function testAtomicWriteFileRejectsSymlinkTarget(): void
     {
-        $root = sys_get_temp_dir().'/pmss-lighttpd-write-'.uniqid('', true);
+        $root = $this->pmssMakeTempDir('pmss-lighttpd-write-');
         $realPath = $root.'/real.conf';
         $linkPath = $root.'/link.conf';
-        @mkdir($root, 0755, true);
         file_put_contents($realPath, 'original');
         symlink($realPath, $linkPath);
 
-        try {
-            $this->assertFalse(\pmssAtomicWriteFile($linkPath, 'updated'));
-            $this->assertEquals('original', file_get_contents($realPath));
-        } finally {
-            @unlink($linkPath);
-            @unlink($realPath);
-            @rmdir($root);
-        }
+        $this->assertFalse(\pmssAtomicWriteFile($linkPath, 'updated'));
+        $this->assertEquals('original', file_get_contents($realPath));
     }
 
     public function testWriteUserFileWritesContentAndMode(): void
     {
-        $root = sys_get_temp_dir().'/pmss-lighttpd-write-'.uniqid('', true);
+        $root = $this->pmssMakeTempDir('pmss-lighttpd-write-');
         $path = $root.'/custom.conf';
         $owner = $this->pmssCurrentOwner();
-        @mkdir($root, 0755, true);
 
-        try {
-            $this->assertTrue(\pmssWriteUserFile($path, 'server.modules = ()', $owner, 0640));
-            $this->assertEquals('server.modules = ()', file_get_contents($path));
-            $this->assertEquals(0640, fileperms($path) & 0777);
-        } finally {
-            @unlink($path);
-            @rmdir($root);
-        }
+        $this->assertTrue(\pmssWriteUserFile($path, 'server.modules = ()', $owner, 0640));
+        $this->assertEquals('server.modules = ()', file_get_contents($path));
+        $this->assertEquals(0640, fileperms($path) & 0777);
     }
 
     public function testUserConfigEntryPointKeepsLighttpdApplyHelperWiring(): void

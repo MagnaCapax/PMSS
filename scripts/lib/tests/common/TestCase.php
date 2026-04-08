@@ -316,12 +316,17 @@ abstract class TestCase
         return $this->pmssMakeTempPath($prefix.$suffix.'-', '.php');
     }
 
-    /** Create a temporary home fixture and seed one relative directory tree. */
-    protected function pmssMakeUserHomeTree(string $prefix, string $relativeDir = ''): string
+    /** Create a temporary home fixture and optionally nest it beneath a relative path. */
+    protected function pmssMakeUserHomeTree(string $prefix, string $relativeDir = '', string $homeRelativePath = ''): string
     {
         $home = $this->pmssMakeTempDir($prefix);
+        if ($homeRelativePath !== '') {
+            $home .= '/'.trim($homeRelativePath, '/');
+            $this->pmssEnsureFixtureDirectory($home, 0755);
+        }
+
         if ($relativeDir !== '') {
-            @mkdir($home.'/'.ltrim($relativeDir, '/'), 0755, true);
+            $this->pmssEnsureFixtureDirectory($home.'/'.ltrim($relativeDir, '/'), 0755);
         }
 
         return $home;

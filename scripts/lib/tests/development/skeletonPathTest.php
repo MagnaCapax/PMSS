@@ -7,7 +7,7 @@ class SkeletonPathTest extends TestCase
 {
     public function testSkeletonBaseOverride(): void
     {
-        $temp = sys_get_temp_dir().'/pmss-skel-override-'.bin2hex(random_bytes(4));
+        $temp = $this->pmssMakeTempDir('pmss-skel-override-');
         $original = getenv('PMSS_SKEL_DIR');
         putenv('PMSS_SKEL_DIR='.$temp);
         try {
