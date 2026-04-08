@@ -178,11 +178,18 @@ abstract class TestCase
         }
     }
 
-    protected function pmssAssertStringNotContainsString(string $needle, string $haystack, string $message = ''): void
+    /** Assert that a string omits a forbidden substring. */
+    protected function assertStringNotContainsString(string $needle, string $haystack, string $message = ''): void
     {
         if (strpos($haystack, $needle) !== false) {
             throw new \AssertionError($message !== '' ? $message : sprintf('Expected string to not contain %s, but it did', var_export($needle, true)));
         }
+    }
+
+    /** Keep the PMSS-prefixed assertion available for existing tests. */
+    protected function pmssAssertStringNotContainsString(string $needle, string $haystack, string $message = ''): void
+    {
+        $this->assertStringNotContainsString($needle, $haystack, $message);
     }
 
     protected function assertStringContainsAllStrings(array $needles, string $haystack, string $messagePrefix = ''): void

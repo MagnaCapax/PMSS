@@ -57,15 +57,6 @@ class WebdavSecurityTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-webdav-test', 0700);
     }
 
-    // Helper assertion methods not in base TestCase
-    private function assertStringNotContainsString(string $needle, string $haystack, string $msg = ''): void
-    {
-        $this->assertTrue(
-            strpos($haystack, $needle) === false,
-            $msg !== '' ? $msg : "Expected string NOT to contain '$needle'"
-        );
-    }
-
     private function assertNotFalse($value, string $msg = ''): void
     {
         $this->assertTrue($value !== false, $msg !== '' ? $msg : 'Expected value to not be false');

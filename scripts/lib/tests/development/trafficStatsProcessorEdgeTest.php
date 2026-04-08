@@ -6,18 +6,7 @@ require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
 class StubTrafficStatisticsEdge extends \trafficStatistics
 {
-    public array $map = [];
-    public array $saved = [];
-
-    public function getData($user, $timePeriod = 5050)
-    {
-        return $this->map[$user] ?? '';
-    }
-
-    public function saveUserTraffic($user, $data)
-    {
-        $this->saved[$user] = $data;
-    }
+    use TrafficStatisticsStubTrait;
 }
 
 class TrafficStatsProcessorEdgeTest extends TrafficTestCase

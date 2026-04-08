@@ -6,20 +6,7 @@ require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
 final class TrafficDisplayPayloadCharacterizationStub extends \trafficStatistics
 {
-    /** @var array<string, string> */
-    public $map = [];
-    /** @var array<string, array<string, mixed>> */
-    public $saved = [];
-
-    public function getData($user, $timePeriod = 5050)
-    {
-        return $this->map[$user] ?? '';
-    }
-
-    public function saveUserTraffic($user, $data)
-    {
-        $this->saved[$user] = $data;
-    }
+    use TrafficStatisticsStubTrait;
 }
 
 final class TrafficDisplayPayloadCharacterizationTest extends TrafficTestCase

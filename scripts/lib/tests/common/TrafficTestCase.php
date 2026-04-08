@@ -4,6 +4,28 @@ namespace PMSS\Tests;
 require_once __DIR__.'/TestCase.php';
 
 /**
+ * Shared in-memory traffic statistics behaviour for processor tests.
+ */
+trait TrafficStatisticsStubTrait
+{
+    /** @var array<string, string> */
+    public $map = [];
+
+    /** @var array<string, mixed> */
+    public $saved = [];
+
+    public function getData($user, $timePeriod = 5050)
+    {
+        return $this->map[$user] ?? '';
+    }
+
+    public function saveUserTraffic($user, $data)
+    {
+        $this->saved[$user] = $data;
+    }
+}
+
+/**
  * Shared traffic-test fixtures for hermetic processor and statistics suites.
  */
 abstract class TrafficTestCase extends TestCase

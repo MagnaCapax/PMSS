@@ -53,14 +53,6 @@ class CgroupUserConfigTest extends TestCase
     /** @var Manager */
     private $mgr;
 
-    protected function assertStringNotContainsString(string $needle, string $haystack, string $message = ''): void
-    {
-        if (strpos($haystack, $needle) !== false) {
-            $msg = $message !== '' ? $message : sprintf('Expected string NOT to contain %s, but it did', var_export($needle, true));
-            throw new \AssertionError($msg);
-        }
-    }
-
     /**
      * Ensure the manager/system fixtures are initialised for the current test.
      *

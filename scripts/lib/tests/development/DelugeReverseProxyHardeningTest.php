@@ -30,14 +30,6 @@ class DelugeReverseProxyHardeningTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-proxy-test', 0700);
     }
 
-    private function assertStringNotContainsString(string $needle, string $haystack, string $msg = ''): void
-    {
-        $this->assertTrue(
-            strpos($haystack, $needle) === false,
-            $msg !== '' ? $msg : "Expected string NOT to contain '$needle'"
-        );
-    }
-
     // =========================================================================
     // SECTION 1: nginx legacy Deluge URL routing (slash redirect + proxy)
     // =========================================================================
