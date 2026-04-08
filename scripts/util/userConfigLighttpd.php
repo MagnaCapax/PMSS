@@ -85,4 +85,4 @@ function pmssUserConfigLighttpdMain(array $argv): int
     return 0;
 }
 
-pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int { return pmssUserConfigLighttpdMain($argv); });
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssUserConfigLighttpdMain');

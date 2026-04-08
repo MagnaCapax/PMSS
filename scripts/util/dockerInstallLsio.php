@@ -13,8 +13,4 @@
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/user/dockerInstallLsio.php';
 
-$argv = $_SERVER['argv'] ?? [];
-
-pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int {
-    return pmssDockerInstallLsioMain($argv);
-});
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssDockerInstallLsioMain');

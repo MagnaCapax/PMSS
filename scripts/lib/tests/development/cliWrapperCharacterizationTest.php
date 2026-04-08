@@ -40,15 +40,10 @@ final class CliWrapperCharacterizationTest extends TestCase
         );
     }
 
-    public function testPortManagerUsesSharedCliEntrypoint(): void
+    public function testArgvCliEntrypointsUseSharedRuntimeHelper(): void
     {
-        $this->pmssAssertRepoFileContainsAllStrings(
-            'scripts/util/portManager.php',
-            [
-                'function pmssPortManagerMain(array $argv): int',
-                'pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int {',
-                'return pmssPortManagerMain($argv);',
-            ]
-        );
+        foreach (['scripts/showResources.php', 'scripts/showTraffic.php', 'scripts/util/dockerInstallLsio.php', 'scripts/util/portManager.php', 'scripts/util/userConfigCgroup.php', 'scripts/util/userConfigLighttpd.php'] as $path) {
+            $this->pmssAssertRepoFileContainsAllStrings($path, ['pmssRunCliEntrypointWithArgv(__FILE__,']);
+        }
     }
 }

@@ -150,6 +150,4 @@ function pmssPortManagerMain(array $argv): int
     }
 }
 
-pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int {
-    return pmssPortManagerMain($argv);
-});
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssPortManagerMain');

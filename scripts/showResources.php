@@ -9,6 +9,4 @@
 
 require_once __DIR__.'/lib/resources/show.php';
 
-if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    exit(pmssShowResourcesMain($argv));
-}
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowResourcesMain');

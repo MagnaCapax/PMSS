@@ -1049,6 +1049,17 @@ if (!function_exists('pmssRunCliEntrypoint')) {
     }
 }
 
+if (!function_exists('pmssRunCliEntrypointWithArgv')) {
+    /** Run a direct CLI entrypoint and pass through the current argv vector. */
+    function pmssRunCliEntrypointWithArgv(string $scriptPath, callable $main): void
+    {
+        pmssRunCliEntrypoint($scriptPath, static function () use ($main): int {
+            $argv = $_SERVER['argv'] ?? ($GLOBALS['argv'] ?? []);
+            return (int) $main(is_array($argv) ? $argv : []);
+        });
+    }
+}
+
 if (!function_exists('pmssSnapshotLogOpen')) {
     /**
      * Open a root-only append log for snapshot-style cron jobs.

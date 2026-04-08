@@ -10,9 +10,7 @@ require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/runtime.php';
 require_once __DIR__.'/lib/traffic.php';
 
-if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    exit(pmssShowTrafficMain($argv));
-}
+pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');
 
 function pmssShowTrafficMain(array $argv): int
 {

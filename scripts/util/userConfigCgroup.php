@@ -14,4 +14,4 @@
 require_once __DIR__.'/../lib/cgroup/RealSystem.php';
 require_once __DIR__.'/../lib/cgroup/Manager.php';
 
-pmssRunCliEntrypoint(__FILE__, static function () use ($argv): int { return (new \PMSS\Cgroup\Manager(new \PMSS\Cgroup\RealSystem()))->run($argv); });
+pmssRunCliEntrypointWithArgv(__FILE__, static function (array $argv): int { return (new \PMSS\Cgroup\Manager(new \PMSS\Cgroup\RealSystem()))->run($argv); });
