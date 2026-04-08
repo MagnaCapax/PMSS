@@ -45,11 +45,7 @@ class ResourceStatsProcessor
     /** Ensure runtime directories exist before writing. */
     public function ensureRuntime(): void
     {
-        foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
-            if (!pmssEnsureSafeDir($dir, $mode)) {
-                $this->log(date('c').": Unable to prepare resource runtime directory {$dir}");
-            }
-        }
+        pmssManagedDirsEnsure([$this->runtimeDir => 0755, $this->statsDir => 0600], function (string $dir): void { $this->log(date('c').": Unable to prepare resource runtime directory {$dir}"); });
     }
 
     public function discoverUsers(): array
@@ -136,15 +132,6 @@ class ResourceStatsProcessor
 
         $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
         is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
-
-        $allWritesSucceeded = true;
-        foreach ($targets as [$path, $group, $mode, $immutable]) {
-            if (!pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable)) {
-                $allWritesSucceeded = false;
-                $this->log($logPrefix."Failed to write resource stats for {$user} at {$path}");
-            }
-        }
-
-        return $allWritesSucceeded;
+        return pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($logPrefix, $user): void { $this->log($logPrefix."Failed to write resource stats for {$user} at {$path}"); });
     }
 }

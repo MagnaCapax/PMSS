@@ -109,6 +109,49 @@ class UserTrafficStateHelpersTest extends TestCase
         ]);
     }
 
+    public function testManagedDirsEnsureContinuesAfterUnsafeDirectory(): void
+    {
+        $unsafeTarget = $this->tempDir.'/runtime-target';
+        @mkdir($unsafeTarget, 0755, true);
+        $unsafePath = $this->tempDir.'/runtime-link';
+        $safePath = $this->tempDir.'/runtime-safe';
+        $failures = [];
+        $this->pmssCreateSymlinkOrSkip($unsafeTarget, $unsafePath);
+
+        \pmssManagedDirsEnsure([
+            $unsafePath => 0755,
+            $safePath => 0600,
+        ], function (string $dir) use (&$failures): void {
+            $failures[] = $dir;
+        });
+
+        $this->assertEquals([$unsafePath], $failures);
+        $this->assertTrue(is_dir($safePath));
+    }
+
+    public function testManagedSerializedTargetsWriteKeepsHealthyTargetsAfterFailure(): void
+    {
+        $goodPath = $this->tempDir.'/traffic-data-good';
+        $badTarget = $this->tempDir.'/traffic-data-target';
+        $badPath = $this->tempDir.'/traffic-data-link-for-writer';
+        $payload = ['raw' => ['month' => 42.0], 'daily' => []];
+        $failures = [];
+        file_put_contents($badTarget, 'seed');
+        $this->pmssCreateSymlinkOrSkip($badTarget, $badPath);
+
+        $result = \pmssManagedSerializedTargetsWrite(serialize($payload), [
+            [$goodPath, 'root', 0600, false],
+            [$badPath, 'root', 0600, false],
+        ], function (string $path) use (&$failures): void {
+            $failures[] = $path;
+        });
+
+        $this->assertFalse($result);
+        $this->assertEquals([$badPath], $failures);
+        $this->assertEquals($payload, \pmssTrafficReadSerializedArrayFile($goodPath));
+        $this->assertEquals('seed', file_get_contents($badTarget));
+    }
+
     public function testTrafficSeedInitialStateSeedsHomePayloadsAndReportsRuntimeWarnings(): void
     {
         $homeDir = $this->tempDir.'/home';

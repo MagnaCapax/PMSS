@@ -153,6 +153,26 @@ if (!function_exists('pmssTrafficWriteFile')) {
     }
 }
 
+if (!function_exists('pmssManagedDirsEnsure')) {
+    /** Ensure each managed directory exists, reporting unsafe paths through the callback. */
+    function pmssManagedDirsEnsure(array $directories, callable $failureLogger): void { foreach ($directories as $dir => $mode) { pmssEnsureSafeDir((string) $dir, (int) $mode) || $failureLogger((string) $dir); } }
+}
+
+if (!function_exists('pmssManagedSerializedTargetsWrite')) {
+    /** Write one serialized payload to each managed target while preserving partial success. */
+    function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, callable $failureLogger): bool
+    {
+        $allWritesSucceeded = true;
+        foreach ($targets as list($path, $group, $mode, $immutable)) {
+            if (!pmssTrafficWriteFile((string) $path, $serialized, (string) $group, (int) $mode, (bool) $immutable)) {
+                $allWritesSucceeded = false;
+                $failureLogger((string) $path);
+            }
+        }
+        return $allWritesSucceeded;
+    }
+}
+
 if (!function_exists('pmssTrafficSeedInitialState')) {
     /** Persist zeroed traffic state for new accounts via the canonical storage helper. */
     function pmssTrafficSeedInitialState(string $username, ?string $homeDir = null, ?string $runtimeDir = null, ?callable $logger = null): bool
@@ -195,11 +215,7 @@ class TrafficStorage
     /** Ensure runtime directories exist before writing. */
     public function ensureRuntime(): void
     {
-        foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
-            if (!pmssEnsureSafeDir($dir, $mode)) {
-                $this->log('[WARN] Unable to prepare traffic runtime directory '.$dir);
-            }
-        }
+        pmssManagedDirsEnsure([$this->runtimeDir => 0755, $this->statsDir => 0600], function (string $dir): void { $this->log('[WARN] Unable to prepare traffic runtime directory '.$dir); });
     }
 
     /** Persist user traffic data to home directory and runtime cache. */
@@ -216,11 +232,6 @@ class TrafficStorage
         $serialized = serialize($data);
         $targets = [[pmssTrafficStatsPath($user, $this->statsDir), 'root', 0600, false]];
         is_dir($this->homeDir.'/'.$targetUser) && array_unshift($targets, [$homeTrafficPath, $targetUser, 0640, true]);
-
-        foreach ($targets as [$path, $group, $mode, $immutable]) {
-            if (!pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable)) {
-                $this->log('[WARN] Failed to write traffic state for '.$user.' at '.$path);
-            }
-        }
+        pmssManagedSerializedTargetsWrite($serialized, $targets, function (string $path) use ($user): void { $this->log('[WARN] Failed to write traffic state for '.$user.' at '.$path); });
     }
 }
