@@ -176,9 +176,7 @@ if ! [[ "$commits" =~ ^[0-9]+$ ]] || [[ "$commits" -le 0 ]]; then
 	exit 2
 fi
 
-if [[ -z "$agent" ]]; then
-	agent="$default_agent"
-fi
+agent="$(codex_default_agent "$agent" "$default_agent")"
 
 exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 
@@ -255,16 +253,13 @@ if [[ -n "$cooling_files" && -s "$cooling_files" ]]; then
 	echo "[agentic-refactor] cooling period: excluding $(wc -l <"$cooling_files" | tr -d ' ') file(s) from refactoring" >&1
 fi
 
-codex_args=(run --prompt-file "$HERE/prompts/refactor.txt" --outdir "$OUTDIR")
-[[ -n "$exec_cmd" ]] && codex_args+=(--exec "$exec_cmd")
-[[ -s "$COMMITS_SUMMARY" ]] && codex_args+=(--context "$COMMITS_SUMMARY")
-[[ -s "$COMMITS_FILES" ]] && codex_args+=(--context "$COMMITS_FILES")
-[[ -s "$CANDIDATES" ]] && codex_args+=(--context "$CANDIDATES")
-[[ -s "$LOC_LOG" ]] && codex_args+=(--context "$LOC_LOG")
-[[ -s "$PHPLC_LOG" ]] && codex_args+=(--context "$PHPLC_LOG")
-[[ -s "$COOLING_CTX" ]] && codex_args+=(--context "$COOLING_CTX")
-codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit" "$custom_prompt"
-
-bash "$HERE/codex-run.sh" "${codex_args[@]}"
+codex_context_args=()
+[[ -s "$COMMITS_SUMMARY" ]] && codex_context_args+=(--context "$COMMITS_SUMMARY")
+[[ -s "$COMMITS_FILES" ]] && codex_context_args+=(--context "$COMMITS_FILES")
+[[ -s "$CANDIDATES" ]] && codex_context_args+=(--context "$CANDIDATES")
+[[ -s "$LOC_LOG" ]] && codex_context_args+=(--context "$LOC_LOG")
+[[ -s "$PHPLC_LOG" ]] && codex_context_args+=(--context "$PHPLC_LOG")
+[[ -s "$COOLING_CTX" ]] && codex_context_args+=(--context "$COOLING_CTX")
+codex_run_prompt "$HERE" "$HERE/prompts/refactor.txt" "$OUTDIR" "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit" "$custom_prompt" 1 "${codex_context_args[@]}"
 
 echo "[agentic-refactor] done" >&1

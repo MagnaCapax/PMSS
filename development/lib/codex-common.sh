@@ -205,6 +205,23 @@ codex_append_runner_args() {
 	[[ "$autocommit" == "1" ]] && target_ref+=(--autocommit)
 }
 
+# Resolve the requested agent, falling back to the shared default.
+codex_default_agent() {
+	local agent="${1-}" default_agent="$2"
+	printf '%s\n' "${agent:-$default_agent}"
+}
+
+# Assemble and invoke a standard codex-run prompt command.
+codex_run_prompt() {
+	local here="$1" prompt_file="$2" outdir="$3" repo_root="$4" agent="$5" exec_cmd="$6" dry_run="$7" autocommit="$8"
+	local custom_prompt="${9-}" include_agent_contexts="${10:-1}"
+	shift 10
+	local -a codex_args=(run --prompt-file "$prompt_file" --outdir "$outdir")
+	[[ "$#" -gt 0 ]] && codex_args+=("$@")
+	codex_append_runner_args codex_args "$repo_root" "$agent" "$exec_cmd" "$dry_run" "$autocommit" "$custom_prompt" "$include_agent_contexts"
+	bash "$here/codex-run.sh" "${codex_args[@]}"
+}
+
 # Normalize assistant CLI args (map yolo to Claude's danger flag).
 codex_normalize_exec_extra_args() {
 	local agent="$1"

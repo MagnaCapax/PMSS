@@ -95,9 +95,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "$agent" ]]; then
-	agent="$default_agent"
-fi
+agent="$(codex_default_agent "$agent" "$default_agent")"
 
 exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 
@@ -107,10 +105,7 @@ if [[ "$dry_run" == "1" ]]; then
 	echo "[agentic-qa] dry-run: skipping GitHub API" >&1
 	echo "(dry-run placeholder)" >"$QA_FILE"
 
-	codex_args=(run --prompt-file "$HERE/prompts/qa.txt" --outdir "$OUTDIR" --context "$QA_FILE" --dry-run)
-	codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit" '' 0
-
-	bash "$HERE/codex-run.sh" "${codex_args[@]}"
+	codex_run_prompt "$HERE" "$HERE/prompts/qa.txt" "$OUTDIR" "$ROOT" "$agent" "$exec_cmd" 1 "$autocommit" '' 0 --context "$QA_FILE"
 	exit 0
 fi
 
@@ -210,9 +205,6 @@ if [[ "$qa_bytes" -gt "$QA_CONTEXT_WARN" ]]; then
 fi
 
 # Launch the assistant.
-codex_args=(run --prompt-file "$HERE/prompts/qa.txt" --outdir "$OUTDIR" --context "$QA_FILE")
-codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit"
-
-bash "$HERE/codex-run.sh" "${codex_args[@]}"
+codex_run_prompt "$HERE" "$HERE/prompts/qa.txt" "$OUTDIR" "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit" '' 1 --context "$QA_FILE"
 
 echo "[agentic-qa] done" >&1

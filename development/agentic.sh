@@ -125,9 +125,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "$agent" ]]; then
-	agent="$default_agent"
-fi
+agent="$(codex_default_agent "$agent" "$default_agent")"
 
 exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 

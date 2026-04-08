@@ -132,9 +132,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "$agent" ]]; then
-	agent="$default_agent"
-fi
+agent="$(codex_default_agent "$agent" "$default_agent")"
 
 exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
 
@@ -168,10 +166,7 @@ if [[ "$dry_run" == "1" ]]; then
 		[[ -n "$job_name" ]] && echo "Requested job: $job_name"
 	} >"$SUMMARY"
 
-	codex_args=(run --prompt-file "$HERE/prompts/ci.txt" --outdir "$OUTDIR" --context "$SUMMARY" --dry-run)
-	codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit" "$custom_prompt"
-
-	bash "$HERE/codex-run.sh" "${codex_args[@]}"
+	codex_run_prompt "$HERE" "$HERE/prompts/ci.txt" "$OUTDIR" "$ROOT" "$agent" "$exec_cmd" 1 "$autocommit" "$custom_prompt" 1 --context "$SUMMARY"
 	exit 0
 fi
 
@@ -633,13 +628,12 @@ if [[ $any_logs -eq 0 ]]; then
 	exit 1
 fi
 
-codex_args=(run --prompt-file "$HERE/prompts/ci.txt" --outdir "$OUTDIR" --context "$SUMMARY")
+codex_context_args=(--context "$SUMMARY")
 for jl in "$OUTDIR"/job-*.log "$JOBLOG" "$RUNLOG"; do
 	[[ -s "$jl" ]] || continue
-	codex_args+=(--context "$jl")
+	codex_context_args+=(--context "$jl")
 done
 if [[ -n "$latest_art" ]]; then
-	codex_args+=(--context "$latest_art")
+	codex_context_args+=(--context "$latest_art")
 fi
-codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit" "$custom_prompt"
-bash "$HERE/codex-run.sh" "${codex_args[@]}"
+codex_run_prompt "$HERE" "$HERE/prompts/ci.txt" "$OUTDIR" "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit" "$custom_prompt" 1 "${codex_context_args[@]}"

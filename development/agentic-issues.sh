@@ -100,9 +100,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "$agent" ]]; then
-	agent="$default_agent"
-fi
+agent="$(codex_default_agent "$agent" "$default_agent")"
 
 if [[ ! "$max_issues" =~ ^[0-9]+$ ]] || [[ "$max_issues" -lt 1 ]]; then
 	echo "[agentic-issues] ERROR: --max-issues must be a positive integer (got: $max_issues)" >&2
@@ -118,10 +116,7 @@ if [[ "$dry_run" == "1" ]]; then
 	echo "[agentic-issues] dry-run: would fetch $max_issues open issues" >&1
 	echo "(dry-run placeholder)" >"$ISSUES_FILE"
 
-	codex_args=(run --prompt-file "$HERE/prompts/issues.txt" --outdir "$OUTDIR" --context "$ISSUES_FILE" --dry-run)
-	codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" 0 "$autocommit" '' 0
-
-	bash "$HERE/codex-run.sh" "${codex_args[@]}"
+	codex_run_prompt "$HERE" "$HERE/prompts/issues.txt" "$OUTDIR" "$ROOT" "$agent" "$exec_cmd" 1 "$autocommit" '' 0 --context "$ISSUES_FILE"
 	exit 0
 fi
 
@@ -443,9 +438,6 @@ issue_bytes=$(wc -c <"$ISSUES_FILE" | tr -d ' ')
 echo "[agentic-issues] issue context (post-sanitization): $issue_bytes bytes" >&1
 
 # Launch the assistant.
-codex_args=(run --prompt-file "$HERE/prompts/issues.txt" --outdir "$OUTDIR" --context "$ISSUES_FILE")
-codex_append_runner_args codex_args "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit"
-
-bash "$HERE/codex-run.sh" "${codex_args[@]}"
+codex_run_prompt "$HERE" "$HERE/prompts/issues.txt" "$OUTDIR" "$ROOT" "$agent" "$exec_cmd" "$dry_run" "$autocommit" '' 1 --context "$ISSUES_FILE"
 
 echo "[agentic-issues] done" >&1
