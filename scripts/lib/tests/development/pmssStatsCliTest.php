@@ -174,9 +174,7 @@ class PmssStatsCliTest extends TestCase
             '2>'.escapeshellarg($stderrPath)
         );
 
-        $this->assertEquals(1, $result['rc']);
-        $this->assertEquals('', $result['output']);
-        $this->assertEquals("Failed to encode PMSS stats JSON.\n", (string) file_get_contents($stderrPath));
+        $this->pmssAssertCommandFailsToStderr($result, $stderrPath, "Failed to encode PMSS stats JSON.\n");
     }
 
     /**

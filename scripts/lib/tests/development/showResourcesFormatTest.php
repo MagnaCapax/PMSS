@@ -6,11 +6,6 @@ require_once dirname(__DIR__, 2).'/resources/show.php';
 
 class ShowResourcesFormatTest extends TestCase
 {
-    private function runScript(array $arguments, array $environment = []): string
-    {
-        return $this->pmssRunRepoPhpScript('scripts/showResources.php', $arguments, $environment);
-    }
-
     private function writeResourceStats(string $runtimeDir, string $user, array $payload): void
     {
         $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/'.$user, $payload);
@@ -27,7 +22,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testHelpIncludesCoreOptions(): void
     {
-        $out = $this->runScript(['--help']);
+        $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--help']);
 
         $this->assertTrue(strpos($out, '--json') !== false);
         $this->assertTrue(strpos($out, '--show-missing') !== false);
@@ -37,7 +32,7 @@ class ShowResourcesFormatTest extends TestCase
 
     public function testHelpOutputMatchesSnapshot(): void
     {
-        $out = $this->runScript(['--help']);
+        $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--help']);
 
         $this->assertEquals(
             "Usage: showResources.php [--json] [--show-missing] [--user=<username>]\n\n"
@@ -56,7 +51,7 @@ class ShowResourcesFormatTest extends TestCase
         $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload([
             'io_read' => ['raw' => ['month' => 2 * 1024 * 1024 * 1024 * 1024, 'week' => 1, 'day' => 1, 'hour' => 1]],
         ]));
-        $out = $this->runScript(['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $this->assertTrue(strpos($out, '2.00 TiB') !== false);
     }
@@ -83,7 +78,7 @@ class ShowResourcesFormatTest extends TestCase
             'io_write_ops' => $this->pmssBuildRawWindowMetric(4.0), 'cpu' => $this->pmssBuildRawWindowMetric(5.0), 'memory' => ['current' => 6.0, 'raw' => ['month' => 7.0]],
             'ram_hours' => $this->pmssBuildRawWindowMetric(8.0), 'tasks' => ['current' => 9.0], 'ignored_field' => ['month' => 999.0],
         ]);
-        $json = $this->runScript(['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $payload = json_decode($json, true);
         $this->assertTrue(is_array($payload));
@@ -105,7 +100,7 @@ class ShowResourcesFormatTest extends TestCase
 
         $this->assertEquals(
             '{"users":{"alice":{"io_read":{"month":1,"week":1,"day":1,"hour":1},"io_write":{"month":2,"week":2,"day":2,"hour":2},"io_read_ops":{"month":3,"week":3,"day":3,"hour":3},"io_write_ops":{"month":4,"week":4,"day":4,"hour":4},"cpu":{"month":5,"week":5,"day":5,"hour":5},"ram_hours":{"month":8,"week":8,"day":8,"hour":8},"memory":{"current":6,"avg_month":7},"tasks":{"current":9}}},"totals":{"io_read":{"month":1,"week":1,"day":1,"hour":1},"io_write":{"month":2,"week":2,"day":2,"hour":2},"io_read_ops":{"month":3,"week":3,"day":3,"hour":3},"io_write_ops":{"month":4,"week":4,"day":4,"hour":4},"cpu":{"month":5,"week":5,"day":5,"hour":5},"ram_hours":{"month":8,"week":8,"day":8,"hour":8},"memory":{"current":6,"avg_month":7},"tasks":{"current":9}},"missing":[]}'."\n",
-            $this->runScript(['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir])
+            $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir])
         );
     }
 
@@ -114,7 +109,7 @@ class ShowResourcesFormatTest extends TestCase
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         @mkdir($runtimeDir.'/resourceStats', 0755, true);
 
-        $json = $this->runScript(['--json', '--user=ghost'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+        $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=ghost'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
         $payload = json_decode($json, true);
         $this->assertTrue(is_array($payload));
@@ -138,9 +133,7 @@ class ShowResourcesFormatTest extends TestCase
             '2>'.escapeshellarg($stderrPath)
         );
 
-        $this->assertEquals(1, $result['rc']);
-        $this->assertEquals('', $result['output']);
-        $this->assertEquals("Failed to encode resource report JSON.\n", (string) file_get_contents($stderrPath));
+        $this->pmssAssertCommandFailsToStderr($result, $stderrPath, "Failed to encode resource report JSON.\n");
     }
 
 }

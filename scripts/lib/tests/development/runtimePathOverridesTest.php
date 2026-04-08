@@ -8,32 +8,32 @@ class RuntimePathOverridesTest extends TestCase
 {
     public function testPmssLogDirDefaultsToVarLogPmss(): void
     {
-        $this->assertEnvResolvedPath('PMSS_LOG_DIR', null, '/var/log/pmss', '\pmssLogDir');
+        $this->pmssAssertEnvResolvedPath('PMSS_LOG_DIR', null, '/var/log/pmss', '\pmssLogDir');
     }
 
     public function testPmssLogDirUsesEnvOverride(): void
     {
-        $this->assertEnvResolvedPath('PMSS_LOG_DIR', '/tmp/pmss-log-override/', '/tmp/pmss-log-override', '\pmssLogDir');
+        $this->pmssAssertEnvResolvedPath('PMSS_LOG_DIR', '/tmp/pmss-log-override/', '/tmp/pmss-log-override', '\pmssLogDir');
     }
 
     public function testPmssRuntimeDirDefaultsToVarRunPmss(): void
     {
-        $this->assertEnvResolvedPath('PMSS_RUNTIME_DIR', null, '/var/run/pmss', '\pmssRuntimeDir');
+        $this->pmssAssertEnvResolvedPath('PMSS_RUNTIME_DIR', null, '/var/run/pmss', '\pmssRuntimeDir');
     }
 
     public function testPmssRuntimeDirUsesEnvOverride(): void
     {
-        $this->assertEnvResolvedPath('PMSS_RUNTIME_DIR', '/tmp/pmss-runtime-override/', '/tmp/pmss-runtime-override', '\pmssRuntimeDir');
+        $this->pmssAssertEnvResolvedPath('PMSS_RUNTIME_DIR', '/tmp/pmss-runtime-override/', '/tmp/pmss-runtime-override', '\pmssRuntimeDir');
     }
 
     public function testPmssStateDirDefaultsToVarLibPmss(): void
     {
-        $this->assertEnvResolvedPath('PMSS_STATE_DIR', null, '/var/lib/pmss', '\pmssStateDir');
+        $this->pmssAssertEnvResolvedPath('PMSS_STATE_DIR', null, '/var/lib/pmss', '\pmssStateDir');
     }
 
     public function testPmssStateDirUsesEnvOverride(): void
     {
-        $this->assertEnvResolvedPath('PMSS_STATE_DIR', '/tmp/pmss-state-override/', '/tmp/pmss-state-override', '\pmssStateDir');
+        $this->pmssAssertEnvResolvedPath('PMSS_STATE_DIR', '/tmp/pmss-state-override/', '/tmp/pmss-state-override', '\pmssStateDir');
     }
 
     public function testUpdateLoggingResolvesPmssLogFileFromLogDirOverride(): void
@@ -44,13 +44,6 @@ class RuntimePathOverridesTest extends TestCase
         $output = trim($this->pmssRunInlinePhp($script, ['PMSS_LOG_DIR' => $logDir]));
 
         $this->assertEquals($logDir.'/update.log', $output);
-    }
-
-    private function assertEnvResolvedPath(string $envKey, ?string $envValue, string $expected, callable $resolver): void
-    {
-        $this->pmssWithEnv([$envKey => $envValue], function () use ($expected, $resolver): void {
-            $this->assertEquals($expected, $resolver());
-        });
     }
 
 }

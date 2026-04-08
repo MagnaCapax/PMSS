@@ -977,6 +977,20 @@ abstract class TestCase
         );
     }
 
+    protected function pmssAssertCommandFailsToStderr(array $result, string $stderrPath, string $expectedMessage): void
+    {
+        $this->assertEquals(1, $result['rc']);
+        $this->assertEquals('', $result['output']);
+        $this->assertEquals($expectedMessage, (string) @file_get_contents($stderrPath));
+    }
+
+    protected function pmssAssertEnvResolvedPath(string $envKey, ?string $envValue, string $expected, callable $resolver): void
+    {
+        $this->pmssWithEnv([$envKey => $envValue], function () use ($expected, $resolver): void {
+            $this->assertEquals($expected, $resolver());
+        });
+    }
+
     /** Execute `storageBenchmark.php --show-last` for the provided JSONL log. */
     protected function pmssRunStorageBenchmarkShowLast(string $logPath, array $arguments = []): string
     {
