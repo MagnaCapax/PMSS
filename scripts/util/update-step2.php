@@ -21,12 +21,12 @@
 // Cap PHP memory use so we fail fast with a PHP fatal instead of a host-wide OOM kill.
 @ini_set('memory_limit', '4096M');
 
-// Bootstrap the shared logger before loading update helpers so include-time
-// logs and standalone update-step2 runs share the same sink.
-require_once __DIR__.'/../lib/logger.php';
-if (!isset($GLOBALS['logmsg_default_logger'])) {
-    $GLOBALS['logmsg_default_logger'] = new Logger(__FILE__, '/var/log', '/tmp', 'pmss-update', true);
-}
+// Bootstrap the shared legacy logger defaults before loading update helpers so
+// include-time logs and standalone update-step2 runs share the same sink.
+require_once __DIR__.'/../lib/log.php';
+$GLOBALS['PMSS_LOGMSG_DEFAULTS'] = array_replace([
+    'script' => __FILE__, 'dir' => '/var/log', 'fallback_dir' => '/tmp', 'base_name' => 'pmss-update', 'write_to_stderr' => true,
+], isset($GLOBALS['PMSS_LOGMSG_DEFAULTS']) && is_array($GLOBALS['PMSS_LOGMSG_DEFAULTS']) ? $GLOBALS['PMSS_LOGMSG_DEFAULTS'] : []);
 
 // Module load order mirrors the runtime sequence. Keep shared runtime helpers
 // first, followed by environment detection, repository setup, system prep, web

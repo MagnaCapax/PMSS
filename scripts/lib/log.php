@@ -11,9 +11,7 @@
  */
 
 if (!function_exists('logmsg')) {
-    /**
-     * Historical logging function retained for backwards compatibility.
-     */
+    /** Historical logging function retained for backwards compatibility. */
     function logmsg(string $message): void
     {
         if (!empty($GLOBALS['PMSS_LOGMSG_USES_LOGMESSAGE']) && function_exists('logMessage')) {
@@ -21,12 +19,18 @@ if (!function_exists('logmsg')) {
             return;
         }
 
-        if (!isset($GLOBALS['logmsg_default_logger'])) {
-            require_once __DIR__.'/logger.php';
-            $GLOBALS['logmsg_default_logger'] = new Logger($_SERVER['SCRIPT_NAME'] ?? __FILE__);
-        }
+        $defaults = isset($GLOBALS['PMSS_LOGMSG_DEFAULTS']) && is_array($GLOBALS['PMSS_LOGMSG_DEFAULTS']) ? $GLOBALS['PMSS_LOGMSG_DEFAULTS'] : [];
+        $script = trim((string) ($defaults['script'] ?? '')); $script = $script !== '' ? $script : ($_SERVER['SCRIPT_NAME'] ?? __FILE__);
+        $baseName = trim((string) ($defaults['base_name'] ?? '')); $baseName = $baseName !== '' ? $baseName : basename($script, '.php');
+        $primary = rtrim(trim((string) ($defaults['dir'] ?? '')) !== '' ? (string) $defaults['dir'] : '/var/log/pmss', '/').'/'.$baseName.'.log';
+        $fallback = rtrim(trim((string) ($defaults['fallback_dir'] ?? '')) !== '' ? (string) $defaults['fallback_dir'] : '/tmp', '/').'/'.$baseName.'.log';
+        pmssLogAppendTimestampedLine($primary, $message) || pmssLogAppendTimestampedLine($fallback, $message);
 
-        $GLOBALS['logmsg_default_logger']->msg($message);
+        if (!empty($defaults['write_to_stderr'])) {
+            fwrite(STDERR, $message.PHP_EOL);
+            return;
+        }
+        echo $message.PHP_EOL;
     }
 }
 

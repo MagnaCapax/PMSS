@@ -86,4 +86,36 @@ final class RuntimeLoggingBootstrapTest extends TestCase
         $this->assertTrue($result['fallback_exists']);
         $this->assertStringContainsString('runtime wrapper line', (string) $result['fallback']);
     }
+
+    public function testLegacyLogmsgDefaultsCanRedirectToConfiguredFileAndStderr(): void
+    {
+        $logPath = $this->pmssMakeTempPath('pmss-logmsg-defaults-', '.log');
+        $stderrPath = $this->pmssMakeTempPath('pmss-logmsg-defaults-', '.stderr');
+        $logDir = dirname($logPath);
+        $logLibraryPath = dirname(__DIR__, 2).'/log.php';
+
+        $result = $this->pmssRunInlinePhpJson(
+            'require '.var_export($logLibraryPath, true).'; '
+            .'$GLOBALS["PMSS_LOGMSG_DEFAULTS"] = ['
+            .'"script" => "/scripts/util/update-step2.php", '
+            .'"dir" => '.var_export($logDir, true).', '
+            .'"fallback_dir" => '.var_export($logDir, true).', '
+            .'"base_name" => '.var_export(basename($logPath, '.log'), true).', '
+            .'"write_to_stderr" => true'
+            .']; '
+            .'ob_start(); logmsg("configured stderr line"); $stdout = ob_get_clean(); '
+            .'echo json_encode(['
+            .'"stdout" => $stdout, '
+            .'"file" => (string) @file_get_contents('.var_export($logPath, true).')'
+            .']);',
+            ['PMSS_TEST_MODE' => '1'],
+            '2>'.escapeshellarg($stderrPath)
+        );
+
+        $stderr = (string) @file_get_contents($stderrPath);
+
+        $this->assertSame('', $result['stdout']);
+        $this->assertStringContainsString('configured stderr line', $stderr);
+        $this->assertStringContainsString('configured stderr line', (string) $result['file']);
+    }
 }

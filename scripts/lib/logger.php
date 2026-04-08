@@ -6,29 +6,24 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/log.php';
+
 /** Simple logging helper shared across cron scripts. */
 class Logger {
-    /** @var string */
-    private $log;
-    /** @var string */
-    private $fallback;
-    /** @var bool */
-    private $writeToStderr;
+    /** @var string */ private $log;
+    /** @var string */ private $fallback;
+    /** @var bool */ private $writeToStderr;
 
-    public function __construct(
-        string $script,
-        string $dir = '/var/log/pmss',
-        string $fallbackDir = '/tmp',
-        ?string $baseName = null,
-        bool $writeToStderr = false
-    ) {
+    public function __construct(string $script, string $dir = '/var/log/pmss', string $fallbackDir = '/tmp', ?string $baseName = null, bool $writeToStderr = false)
+    {
         $base = $baseName !== null && $baseName !== '' ? $baseName : basename($script, '.php');
         $this->log = rtrim($dir, '/') . '/' . $base . '.log';
         $this->fallback = rtrim($fallbackDir, '/') . '/' . $base . '.log';
         $this->writeToStderr = $writeToStderr;
     }
 
-    public function msg(string $m): void {
+    public function msg(string $m): void
+    {
         pmssLogAppendTimestampedLine($this->log, $m) || pmssLogAppendTimestampedLine($this->fallback, $m);
         if ($this->writeToStderr) {
             fwrite(STDERR, $m.PHP_EOL);
@@ -37,10 +32,3 @@ class Logger {
         echo $m.PHP_EOL;
     }
 }
-
-/**
- * Load the shared `logmsg()` compatibility wrapper after the Logger class so
- * standalone scripts can either instantiate Logger directly or keep using the
- * historic helper name.
- */
-require_once __DIR__.'/log.php';
