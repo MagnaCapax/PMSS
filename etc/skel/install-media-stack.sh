@@ -19,7 +19,7 @@
 # MAY CONFLICT WITH GLOBAL /opt INSTALLS—USE AT OWN RISK.
 # RANDOM PORTS USED FOR SHARED ENV; APPS BIND TO LOCALHOST ONLY.
 # SECURITY MODEL
-# All apps are reverse-proxied under /public-$USER/<app> which has NO
+# All apps are reverse-proxied under /public-<user>/<app> which has NO
 # proxy-level authentication. App-level auth is the USER's responsibility:
 #   - Jellyfin: first-run wizard forces admin account creation
 #   - Radarr/Sonarr/Prowlarr: enable Forms auth in Settings > General > Authentication

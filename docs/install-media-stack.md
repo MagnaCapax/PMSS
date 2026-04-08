@@ -255,20 +255,20 @@ docker compose up -d
 
 All media stack applications bind to `127.0.0.1` only and are reverse-proxied through the user's lighttpd instance under `/public-<username>/<app>/`.
 
-The `/public-<username>/` path is intentionally unauthenticated at the proxy level. It exists for web hosting, file sharing, and public-facing services. App-level authentication is the user's responsibility.
+The `/public-<username>/` path is **intentionally unauthenticated** at the proxy level — it exists for web hosting, file sharing, and public-facing services. **App-level authentication is the user's responsibility.**
 
 | Application | Auth on Install | User Action Required |
 |-------------|----------------|---------------------|
-| Jellyfin | First-run wizard forces admin account creation | None — the wizard handles it |
-| Radarr | Disabled (`AuthenticationMethod: None`) | Enable Forms or Basic auth in Settings → General → Authentication |
-| Sonarr | Disabled (`AuthenticationMethod: None`) | Enable Forms or Basic auth in Settings → General → Authentication |
-| Prowlarr | Disabled (`AuthenticationMethod: None`) | Enable Forms or Basic auth in Settings → General → Authentication |
-| SABnzbd | Setup wizard on first access | Complete the wizard to set credentials |
+| Jellyfin | First-run wizard forces admin account creation | None — wizard handles it |
+| Radarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
+| Sonarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
+| Prowlarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
+| SABnzbd | Setup wizard on first access | Complete wizard to set credentials |
 
-Until users configure authentication, Radarr, Sonarr, and Prowlarr are accessible to anyone who knows the URL.
+**Until users configure authentication, Radarr/Sonarr/Prowlarr are accessible to anyone who knows the URL.**
 
 Additional security measures:
-- Randomized ports per user (not security, but an obscurity layer)
+- Randomized ports per user (not security, but obscurity layer)
 - HTTPS via lighttpd TLS termination
 - No root privileges during install
 - Downloaded archives verified with SHA256 checksums
