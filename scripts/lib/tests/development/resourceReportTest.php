@@ -87,6 +87,26 @@ class ResourceReportTest extends TestCase
         $this->assertEquals(7.0, $report['rows']['alice']['tasks']['current']);
     }
 
+    public function testStoredPayloadReportRowMatchesSnapshot(): void
+    {
+        $payload = $this->pmssBuildResourceStatsPayloadFromValues([
+            'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7), 'io_write' => $this->pmssBuildWindowValues(20, 19, 18, 17), 'io_read_ops' => $this->pmssBuildWindowValues(30, 29, 28, 27),
+            'io_write_ops' => $this->pmssBuildWindowValues(40, 39, 38, 37), 'cpu' => $this->pmssBuildWindowValues(50, 49, 48, 47), 'ram_hours' => $this->pmssBuildWindowValues(60, 59, 58, 57),
+            'memory_current' => 70, 'memory_avg_month' => 69, 'tasks_current' => 11,
+        ]);
+
+        $this->assertEquals([
+            'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
+            'io_write' => ['month' => 20.0, 'week' => 19.0, 'day' => 18.0, 'hour' => 17.0],
+            'io_read_ops' => ['month' => 30.0, 'week' => 29.0, 'day' => 28.0, 'hour' => 27.0],
+            'io_write_ops' => ['month' => 40.0, 'week' => 39.0, 'day' => 38.0, 'hour' => 37.0],
+            'cpu' => ['month' => 50.0, 'week' => 49.0, 'day' => 48.0, 'hour' => 47.0],
+            'ram_hours' => ['month' => 60.0, 'week' => 59.0, 'day' => 58.0, 'hour' => 57.0],
+            'memory' => ['current' => 70.0, 'avg_month' => 69.0],
+            'tasks' => ['current' => 11.0],
+        ], \pmssResourceStoredPayloadReportRow($payload));
+    }
+
     private function writeUserData(string $user, array $data): void
     {
         $this->pmssWriteSerializedFixture($this->statsDir.'/'.$user, $data);

@@ -13,6 +13,43 @@ require_once __DIR__.'/traffic/storage.php';
 /** @return array<string, string> */
 function pmssResourceMemoryBreakdownFieldMap(string $prefix = 'memory_'): array { return ['anon' => $prefix.'anon', 'file' => $prefix.'file']; }
 
+/** Normalize persisted resource stats into the row shape used by reports. */
+function pmssResourceStoredPayloadReportRow(array $data): ?array
+{
+    $windowZeros = array_fill_keys(['month', 'week', 'day', 'hour'], 0.0);
+    $row = [];
+    foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
+        $metricValues = $windowZeros;
+        foreach ($windowZeros as $label => $_zero) {
+            $value = $data[$metric]['raw'][$label] ?? null;
+            if ($value === null && substr($metric, -4) !== '_ops') return null;
+            $metricValues[$label] = (float) ($value ?? 0.0);
+        }
+        $row[$metric] = $metricValues;
+    }
+    return $row + [
+        'memory' => ['current' => (float) ($data['memory']['current'] ?? 0.0), 'avg_month' => (float) ($data['memory']['raw']['month'] ?? 0.0)],
+        'tasks' => ['current' => (float) ($data['tasks']['current'] ?? 0.0)],
+    ];
+}
+
+/** Build the persisted resource stats payload written by the cron processor. */
+function pmssResourceStoredPayloadBuild(array $results): array
+{
+    $payload = ['daily' => $results['daily']];
+    foreach ($results['raw'] + ['memory' => $results['memory'], 'tasks' => $results['tasks']] as $metric => $values) {
+        $payload[$metric] = ['raw' => $values];
+    }
+    $payload['memory']['current'] = $results['current_memory'];
+    foreach (pmssResourceMemoryBreakdownFieldMap('current_memory_') as $field => $resultKey) {
+        if (isset($results[$resultKey]) && is_numeric($results[$resultKey])) {
+            $payload['memory'][$field] = (float) $results[$resultKey];
+        }
+    }
+    $payload['tasks']['current'] = $results['current_tasks'];
+    return $payload;
+}
+
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
  */

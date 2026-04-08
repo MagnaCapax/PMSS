@@ -5,9 +5,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../resources.php';
-require_once __DIR__.'/accumulator.php';
 
 class ResourceStatsProcessor
 {
@@ -121,21 +119,7 @@ class ResourceStatsProcessor
             return;
         }
 
-        $metricData = $results['raw'] + [
-            'memory' => $results['memory'],
-            'tasks' => $results['tasks'],
-        ];
-        foreach (array_merge(ResourceStatsAccumulator::RAW_METRICS, ['memory', 'tasks']) as $metric) {
-            $data[$metric] = ['raw' => $metricData[$metric]];
-        }
-        $data['memory']['current'] = $results['current_memory'];
-        foreach (pmssResourceMemoryBreakdownFieldMap('current_memory_') as $field => $resultKey) {
-            if (isset($results[$resultKey]) && is_numeric($results[$resultKey])) {
-                $data['memory'][$field] = (float) $results[$resultKey];
-            }
-        }
-        $data['tasks']['current'] = $results['current_tasks'];
-        $data['daily'] = $results['daily'];
+        $data = pmssResourceStoredPayloadBuild($results);
 
         $this->ensureRuntime();
         if (!$this->save($user, $data, $logPrefix)) {
