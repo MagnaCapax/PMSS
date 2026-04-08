@@ -11,6 +11,7 @@ Active work items are tracked in GitHub issues to avoid duplication between this
 - #114: Config backups with TTL (sshd/nginx/proftpd)
 - #115: Test hooks and hermeticity (path overrides + patterns)
 - #116: Defensive directory creation (idempotent mkdir+perms in user maintenance)
+- #121: Cgroup policy extension backlog (remaining scheduler-aware IO auto-policy, burst allowances, and policy-level network shaping hints) — see `docs/cgroup.md`
 - #111: Debian 13 (trixie) validation roadmap (experimental → supported) — see `docs/dpkg-baseline.md`
 
 ## Code Quality Audits

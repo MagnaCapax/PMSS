@@ -31,4 +31,12 @@ class CgroupPolicyTrackingTest extends TestCase
             '| Scheduler-aware IO auto-policy | Partially pending |',
         ], $docs);
     }
+
+    public function testGlobalTodoIndexReferencesCgroupBacklog(): void
+    {
+        $docs = $this->pmssReadRepoFile('docs/TODO.md');
+
+        $this->assertStringContainsString('#121: Cgroup policy extension backlog', $docs);
+        $this->assertStringContainsString('docs/cgroup.md', $docs);
+    }
 }
