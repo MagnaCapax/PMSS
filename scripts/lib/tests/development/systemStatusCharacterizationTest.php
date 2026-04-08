@@ -270,6 +270,57 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals("Failed to encode status JSON.\n", (string) file_get_contents($stderrPath));
     }
 
+    public function testStatusEmitTextHandlesMalformedEntryFieldsWithoutFatal(): void
+    {
+        $stderrPath = $this->pmssMakeTempPath('pmss-status-stderr-');
+        $checks = [
+            'garbage',
+            ['status' => 'WARN', 'detail' => ['nested' => 'ignored']],
+            ['name' => ['nested' => 'ignored'], 'status' => 'ERR', 'detail' => 'broken'],
+        ];
+        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'$checks = '.var_export($checks, true).';'
+            .'exit(pmssStatusEmit($checks, "PMSS Status", false, [], null, 0, false, 8, false));';
+
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+            [],
+            '2>'.escapeshellarg($stderrPath)
+        );
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertStringContainsString('PMSS Status (', $result['output']);
+        $this->assertStringContainsString('Summary: 1 OK, 1 WARN, 1 ERR', $result['output']);
+        $this->assertEquals('', (string) file_get_contents($stderrPath));
+    }
+
+    public function testStatusEmitTextDefaultsMissingSummaryKeysToZero(): void
+    {
+        $stderrPath = $this->pmssMakeTempPath('pmss-status-stderr-');
+        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'exit(pmssStatusEmit('
+            .'[pmssStatus("bin.php", "OK", "ready")],'
+            .'"PMSS Status",'
+            .'false,'
+            .'[],'
+            .'["ok" => 1],'
+            .'0,'
+            .'false,'
+            .'8,'
+            .'false'
+            .'));';
+
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+            [],
+            '2>'.escapeshellarg($stderrPath)
+        );
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertStringContainsString('Summary: 1 OK, 0 WARN, 0 ERR', $result['output']);
+        $this->assertEquals('', (string) file_get_contents($stderrPath));
+    }
+
     public function testSystemStatusChecksStayStableWithHermeticInputs(): void
     {
         $checks = pmssSystemStatusChecks($this->buildSystemStatusDependencies());

@@ -15,6 +15,14 @@ function pmssStatus(string $name, string $status, string $detail = ''): array
 }
 
 /**
+ * Normalize status entry values before emitting human-readable text.
+ */
+function pmssStatusTextValue($value): string
+{
+    return is_scalar($value) || $value === null ? (string) $value : '';
+}
+
+/**
  * Encode a status payload as JSON without letting invalid UTF-8 break output.
  */
 function pmssStatusJsonEncode(array $payload, int $flags = 0): string
@@ -62,16 +70,22 @@ function pmssStatusEmit(
 
     $isTty = $useColour && pmssStreamIsTty(STDOUT, true);
     foreach ($checks as $result) {
-        $status = strtoupper((string) ($result['status'] ?? ''));
+        $status = strtoupper(pmssStatusTextValue($result['status'] ?? ''));
         $label = str_pad('['.$status.']', $labelWidth);
-        $detail = (string) ($result['detail'] ?? '');
+        $name = pmssStatusTextValue($result['name'] ?? '');
+        $detail = pmssStatusTextValue($result['detail'] ?? '');
         $colour = $isTty ? (['OK' => "\033[32m", 'WARN' => "\033[33m", 'ERR' => "\033[31m"][$status] ?? '') : '';
         $reset = $colour === '' ? '' : "\033[0m";
-        echo $colour.$label.$reset.$result['name'].($detail !== '' ? ' - '.$detail : '').PHP_EOL;
+        echo $colour.$label.$reset.$name.($detail !== '' ? ' - '.$detail : '').PHP_EOL;
     }
 
     echo str_repeat('-', 60)."\n";
-    echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", $summary['ok'], $summary['warn'], $summary['err']);
+    echo sprintf(
+        "Summary: %d OK, %d WARN, %d ERR\n",
+        (int) ($summary['ok'] ?? 0),
+        (int) ($summary['warn'] ?? 0),
+        (int) ($summary['err'] ?? 0)
+    );
     return 0;
 }
 
