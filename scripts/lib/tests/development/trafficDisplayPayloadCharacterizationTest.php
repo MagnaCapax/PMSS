@@ -19,10 +19,9 @@ final class TrafficDisplayPayloadCharacterizationTest extends TrafficTestCase
 
         $user = 'alice';
         $this->createTrafficUser($paths, $user);
-        $now = time();
-        $stats->map[$user] = implode("\n", [
-            date('Y-m-d H:i:s', $now - 120).': 1048576',
-            date('Y-m-d H:i:s', $now - 60).': 2097152',
+        $stats->map[$user] = $this->makeTrafficUsageLines([
+            120 => 1048576,
+            60 => 2097152,
         ]);
 
         $processor->processUser($user, \pmssStatsCompareTimesBuild());

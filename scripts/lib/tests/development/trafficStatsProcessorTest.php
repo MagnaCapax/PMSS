@@ -62,13 +62,10 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
         $user = 'alice';
         $this->createTrafficUser($paths, $user);
-
-        $now = time();
-        $lines = [
-            date('Y-m-d H:i:s', $now - 100).': 1048576',
-            date('Y-m-d H:i:s', $now - 86400).': 1048576',
-        ];
-        $stub->map[$user] = implode("\n", $lines);
+        $stub->map[$user] = $this->makeTrafficUsageLines([
+            100 => 1048576,
+            86400 => 1048576,
+        ]);
 
         $compare = \pmssStatsCompareTimesBuild();
         $processor->processUser($user, $compare);
@@ -99,13 +96,10 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         $user = 'alice';
         $this->createTrafficUser($paths, $user);
         file_put_contents($paths['traffic_dir'].'/'.$user.'-localnet', 'seed');
-
-        $now = time();
-        $lines = [
-            date('Y-m-d H:i:s', $now - 120).': 1048576',
-            date('Y-m-d H:i:s', $now - 3600).': 1048576',
-        ];
-        $stub->map[$user.'-localnet'] = implode("\n", $lines);
+        $stub->map[$user.'-localnet'] = $this->makeTrafficUsageLines([
+            120 => 1048576,
+            3600 => 1048576,
+        ]);
 
         $compare = \pmssStatsCompareTimesBuild();
         $processor->processUser($user.'-localnet', $compare);
@@ -123,10 +117,9 @@ class TrafficStatsProcessorTest extends TrafficTestCase
         $user = 'alice';
 
         $this->createTrafficUser($paths, $user);
-        $now = time();
-        $stub->map[$user] = implode("\n", [
-            date('Y-m-d H:i:s', $now - 100).': 1048576',
-            date('Y-m-d H:i:s', $now - 86400).': 1048576',
+        $stub->map[$user] = $this->makeTrafficUsageLines([
+            100 => 1048576,
+            86400 => 1048576,
         ]);
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php', 'a!li@ce'], '/scripts/cron/trafficStats.php'));

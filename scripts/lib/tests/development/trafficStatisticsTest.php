@@ -51,11 +51,7 @@ class TrafficStatisticsTest extends TrafficTestCase
         $this->createTrafficUser($paths, 'alice', false);
 
         $stats = new \trafficStatistics($paths);
-        $payload = [
-            'raw' => ['day' => 1.25],
-            'display' => ['day' => '1.25MiB'],
-            'daily' => ['2026/03/13' => 1.25],
-        ];
+        $payload = $this->makeTrafficPayload(['day' => 1.25], ['day' => '1.25MiB'], ['2026/03/13' => 1.25]);
         $stats->saveUserTraffic('alice', $payload);
 
         $homePath = $paths['home_dir'].'/alice/.trafficData';
@@ -73,11 +69,7 @@ class TrafficStatisticsTest extends TrafficTestCase
         $this->createTrafficUser($paths, 'alice', false);
 
         $stats = new \trafficStatistics($paths);
-        $payload = [
-            'raw' => ['day' => 7.5],
-            'display' => ['day' => '7.5MiB'],
-            'daily' => ['2026/03/13' => 7.5],
-        ];
+        $payload = $this->makeTrafficPayload(['day' => 7.5], ['day' => '7.5MiB'], ['2026/03/13' => 7.5]);
         $stats->saveUserTraffic('alice-localnet', $payload);
 
         $homePath = $paths['home_dir'].'/alice/.trafficDataIngressLocal';

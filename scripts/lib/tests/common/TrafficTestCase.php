@@ -59,4 +59,20 @@ abstract class TrafficTestCase extends TestCase
         }
         @mkdir($paths['home_dir'].'/'.$user, 0755, true);
     }
+    /** Build canonical persisted traffic payload arrays for save/read assertions. */
+    protected function makeTrafficPayload(array $raw, array $display = [], array $daily = []): array
+    {
+        return ['raw' => $raw, 'display' => $display, 'daily' => $daily];
+    }
+
+    /** Build traffic log fixtures from seconds-ago => byte-count samples. */
+    protected function makeTrafficUsageLines(array $samples, ?int $now = null): string
+    {
+        $now = $now ?? time();
+        $lines = [];
+        foreach ($samples as $secondsAgo => $bytes) {
+            $lines[] = date('Y-m-d H:i:s', $now - (int) $secondsAgo).': '.(string) $bytes;
+        }
+        return implode("\n", $lines);
+    }
 }
