@@ -23,6 +23,8 @@ class ResourceStatsProcessor
     private $statsDir;
     /** @var string */
     private $passwdFile;
+    /** @var callable */
+    private $logger;
 
     public function __construct(resourceStatistics $stats, array $paths = [])
     {
@@ -31,15 +33,24 @@ class ResourceStatsProcessor
         $this->runtimeDir = pmssDirPathResolve($paths['runtime_dir'] ?? null, 'PMSS_RUNTIME_DIR', '/var/run/pmss');
         $this->statsDir = pmssDirPathNormalize((string) ($paths['stats_dir'] ?? ($this->runtimeDir.'/resourceStats')));
         $this->passwdFile = $paths['passwd_file'] ?? getenv('PMSS_PASSWD_FILE') ?: '/etc/passwd';
-
         $this->stats = $stats;
+        $this->logger = $paths['logger'] ?? 'logMessage';
+    }
+
+    /** Emit processor diagnostics through the configured logger. */
+    private function log(string $message): void
+    {
+        $logger = $this->logger;
+        $logger($message);
     }
 
     /** Ensure runtime directories exist before writing. */
     public function ensureRuntime(): void
     {
         foreach ([$this->runtimeDir => 0755, $this->statsDir => 0600] as $dir => $mode) {
-            pmssEnsureSafeDir($dir, $mode);
+            if (!pmssEnsureSafeDir($dir, $mode)) {
+                $this->log(date('c').": Unable to prepare resource runtime directory {$dir}");
+            }
         }
     }
 
@@ -101,12 +112,12 @@ class ResourceStatsProcessor
         $results = $this->stats->collectWindowResultsFromData(
             $dataLines,
             $compareTimes,
-            static function (string $line) use ($logPrefix, $user): void {
-                logMessage($logPrefix."Parsing line failed for {$user}, line: {$line}");
+            function (string $line) use ($logPrefix, $user): void {
+                $this->log($logPrefix."Parsing line failed for {$user}, line: {$line}");
             }
         );
         if ($results === null) {
-            logMessage($logPrefix."No valid samples for {$user}");
+            $this->log($logPrefix."No valid samples for {$user}");
             return;
         }
 
@@ -127,12 +138,14 @@ class ResourceStatsProcessor
         $data['daily'] = $results['daily'];
 
         $this->ensureRuntime();
-        $this->save($user, $data);
-        logMessage($logPrefix."Resource stats for {$user} saved, month read bytes: {$results['raw']['io_read']['month']}");
+        if (!$this->save($user, $data, $logPrefix)) {
+            return;
+        }
+        $this->log($logPrefix."Resource stats for {$user} saved, month read bytes: {$results['raw']['io_read']['month']}");
     }
 
     /** Persist user resource data to home directory and runtime cache. */
-    private function save(string $user, array $data): void
+    private function save(string $user, array $data, string $logPrefix): bool
     {
         $serialized = serialize($data);
         $homePath = $this->homeDir.'/'.$user;
@@ -140,8 +153,14 @@ class ResourceStatsProcessor
         $targets = [[$this->statsDir.'/'.$user, 'root', 0600, false]];
         is_dir($homePath) && array_unshift($targets, [$homePath.'/.resourceData', $user, 0640, true]);
 
+        $allWritesSucceeded = true;
         foreach ($targets as [$path, $group, $mode, $immutable]) {
-            pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable);
+            if (!pmssTrafficWriteFile($path, $serialized, $group, $mode, $immutable)) {
+                $allWritesSucceeded = false;
+                $this->log($logPrefix."Failed to write resource stats for {$user} at {$path}");
+            }
         }
+
+        return $allWritesSucceeded;
     }
 }

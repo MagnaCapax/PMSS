@@ -96,6 +96,23 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue(!is_dir($targetRuntime.'/resourceStats'));
     }
 
+    public function testEnsureRuntimeLogsWarningWhenRuntimeDirIsUnsafe(): void
+    {
+        $messages = [];
+        $targetRuntime = dirname($this->paths['runtime_dir']).'/runtime-target';
+        @mkdir($targetRuntime, 0755, true);
+        @rmdir($this->paths['runtime_dir']);
+        $this->pmssCreateSymlinkOrSkip($targetRuntime, $this->paths['runtime_dir']);
+
+        $processor = new \ResourceStatsProcessor(new StubResourceStatsProcessorStatistics(), $this->paths + [
+            'logger' => $this->pmssMakeArrayLogger($messages),
+        ]);
+        $processor->ensureRuntime();
+
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to prepare resource runtime directory'));
+        $this->assertTrue(!is_dir($targetRuntime.'/resourceStats'));
+    }
+
     public function testProcessUserPersistsMetricsWithoutDisplayCache(): void
     {
         $stats = new StubResourceStatsProcessorStatistics();
@@ -122,6 +139,39 @@ class ResourceStatsProcessorTest extends TestCase
         $this->assertTrue(!isset($saved['ram_hours']['display']));
         $this->assertTrue(!isset($saved['tasks']['display']));
         $this->assertEquals(6.0, $saved['tasks']['current']);
+    }
+
+    public function testProcessUserLogsWriteFailureAndSkipsSuccessLogWhenRuntimeWriteFails(): void
+    {
+        $messages = [];
+        $stats = new StubResourceStatsProcessorStatistics();
+        $paths = $this->paths;
+        $targetRuntime = dirname($paths['runtime_dir']).'/runtime-target';
+        @mkdir($targetRuntime, 0755, true);
+        @rmdir($paths['runtime_dir']);
+        $this->pmssCreateSymlinkOrSkip($targetRuntime, $paths['runtime_dir']);
+
+        $processor = new \ResourceStatsProcessor($stats, $paths + [
+            'logger' => $this->pmssMakeArrayLogger($messages),
+        ]);
+
+        $user = 'alice';
+        file_put_contents($paths['resource_dir'].'/'.$user, 'seed');
+        @mkdir($paths['home_dir'].'/'.$user, 0755, true);
+
+        $now = time();
+        $stats->map[$user] = implode("\n", [
+            date('Y-m-d H:i:s', $now - 120).' 1024 2048 10 20 3600 1048576 4',
+            date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6',
+        ]);
+
+        $processor->processUser($user, \pmssStatsCompareTimesBuild());
+
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to prepare resource runtime directory'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Failed to write resource stats for '.$user.' at '.$paths['runtime_dir'].'/resourceStats/'.$user));
+        $this->assertFalse($this->pmssMessagesContain($messages, 'Resource stats for '.$user.' saved, month read bytes:'));
+        $this->assertTrue(is_file($paths['home_dir'].'/'.$user.'/.resourceData'));
+        $this->assertTrue(!is_file($targetRuntime.'/resourceStats/'.$user));
     }
 
     public function testProcessUserSavedPayloadStillFeedsPmssStats(): void
