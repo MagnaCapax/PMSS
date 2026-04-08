@@ -18,19 +18,19 @@ class UsernameValidationTest extends TestCase
     {
         $valid = ['abc', 'user123', 'abcdefg8'];
         foreach ($valid as $name) {
-            $this->assertTrue(\pmssValidateUsernameForCreate($name), 'Expected create-valid username: '.$name);
+            $this->assertTrue(\pmssUsernameIsValidForCreate($name), 'Expected create-valid username: '.$name);
         }
 
         $invalid = ['a', 'ab', '1user', 'user-name', 'User123', 'toolong89x'];
         foreach ($invalid as $name) {
-            $this->assertTrue(!\pmssValidateUsernameForCreate($name), 'Expected create-invalid username: '.$name);
+            $this->assertTrue(!\pmssUsernameIsValidForCreate($name), 'Expected create-invalid username: '.$name);
         }
     }
 
     public function testCreateUsernamesRejectReservedNames(): void
     {
         foreach (\pmssReservedUsernames() as $name) {
-            $this->assertTrue(!\pmssValidateUsernameForCreate($name), 'Expected reserved username to be rejected: '.$name);
+            $this->assertTrue(!\pmssUsernameIsValidForCreate($name), 'Expected reserved username to be rejected: '.$name);
         }
     }
 

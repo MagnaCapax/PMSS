@@ -165,12 +165,18 @@ function pmssRequireCliUsername(string $rawUsername, string $action, string $err
     die(sprintf($errorFormat, $normalized));
 }
 
-/**
- * Provisioning wrapper matching the legacy "Validate*" naming convention.
- */
-function pmssValidateUsernameForCreate(string $username): bool
+/** @param array<int,string> $rawUsers @return array<int,string> */
+function pmssManagedUsersNormalizeList(array $rawUsers): array
 {
-    return pmssUsernameIsValidForCreate($username);
+    $users = array();
+    foreach ($rawUsers as $rawUser) {
+        $trimmed = trim((string) $rawUser);
+        if (!pmssValidateUsername($trimmed)) {
+            continue;
+        }
+        $users[pmssNormalizeUsername($trimmed)] = true;
+    }
+    return array_keys($users);
 }
 
 /** @return array{exitCode:int,users:array<int,string>} */
@@ -179,14 +185,7 @@ function pmssListManagedUsersResult(string $command = '/scripts/listUsers.php'):
     $lines = array();
     $exitCode = 0;
     exec(escapeshellarg($command), $lines, $exitCode);
-    $users = array();
-    foreach ($lines as $rawUser) {
-        $trimmed = trim((string) $rawUser);
-        if (pmssValidateUsername($trimmed)) {
-            $users[pmssNormalizeUsername($trimmed)] = true;
-        }
-    }
-    return array('exitCode' => $exitCode, 'users' => array_keys($users));
+    return array('exitCode' => $exitCode, 'users' => pmssManagedUsersNormalizeList($lines));
 }
 function pmssListManagedUsersFromResult(array $listUsersResult): ?array
 {
@@ -289,15 +288,7 @@ function pmssUserWatchdogRunService(string $heading, string $enableMarker, array
 
 function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername = '', array $options = array()): array
 {
-    $normalizedUsers = array();
-    foreach ($managedUsers as $managedUser) {
-        $trimmed = trim((string) $managedUser);
-        if (!pmssValidateUsername($trimmed)) {
-            continue;
-        }
-        $normalizedUsers[pmssNormalizeUsername($trimmed)] = true;
-    }
-    $managedUsers = array_keys($normalizedUsers);
+    $managedUsers = pmssManagedUsersNormalizeList($managedUsers);
     $rawUsername = trim($rawUsername);
     if ($rawUsername === '') {
         if (!empty($options['emitEmptyMessage']) && $managedUsers === []) {
@@ -308,13 +299,15 @@ function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername
     }
 
     $strictInput = !empty($options['strictInput']);
-    $username = $strictInput ? pmssNormalizeUsername($rawUsername) : pmssUsernameNormalizeIfValid($rawUsername);
-    if ($username === null || ($strictInput && ($username !== $rawUsername || !pmssValidateUsername($username)))) {
-        $username = pmssNormalizeUsername($rawUsername);
+    $normalizedUsername = pmssNormalizeUsername($rawUsername);
+    $username = $strictInput
+        ? (($normalizedUsername === $rawUsername && pmssValidateUsername($normalizedUsername)) ? $normalizedUsername : null)
+        : pmssUsernameNormalizeIfValid($rawUsername);
+    if ($username === null) {
         $message = isset($options['invalidMessage']) ? (string) $options['invalidMessage'] : "Invalid username\n";
-        fwrite(STDERR, strpos($message, '%s') === false ? $message : sprintf($message, $username));
+        fwrite(STDERR, strpos($message, '%s') === false ? $message : sprintf($message, $normalizedUsername));
 
-        return array('exitCode' => 1, 'username' => $username, 'users' => array());
+        return array('exitCode' => 1, 'username' => $normalizedUsername, 'users' => array());
     }
 
     $found = (!empty($options['lookupMode']) && $options['lookupMode'] === 'account')
