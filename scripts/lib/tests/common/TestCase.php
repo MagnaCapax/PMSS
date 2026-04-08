@@ -653,6 +653,20 @@ abstract class TestCase
         $this->tempDirProperties[$propertyName] = $propertyName;
     }
 
+    /** Seed a temp-dir property plus an array-backed logger pair for fixture-heavy tests. */
+    protected function pmssAssignTempDirArrayLogger(
+        string $propertyName,
+        string $prefix,
+        array &$messages,
+        &$logger,
+        int $mode = 0755,
+        ?string $baseDir = null
+    ): void {
+        $this->pmssAssignTempDirProperty($propertyName, $prefix, $mode, $baseDir);
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+    }
+
     /** Remove a temporary directory stored on a test property, including private child properties. */
     protected function pmssCleanupTempDirProperty(string $propertyName): void
     {

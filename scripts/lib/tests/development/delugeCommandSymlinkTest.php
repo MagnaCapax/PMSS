@@ -19,14 +19,7 @@ class DelugeCommandSymlinkTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-command-link-', 0700);
-        $this->logs = [];
-        $this->logger = $this->pmssMakeArrayLogger($this->logs);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
+        $this->pmssAssignTempDirArrayLogger('tempDir', 'pmss-deluge-command-link-', $this->logs, $this->logger, 0700);
     }
 
     public function testCreatesSymlinkWhenLocalPathMissing(): void

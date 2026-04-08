@@ -19,14 +19,7 @@ class DelugeFindCallerCompatPatchTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-findcaller-', 0700);
-        $this->logs = [];
-        $this->logger = $this->pmssMakeArrayLogger($this->logs);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
+        $this->pmssAssignTempDirArrayLogger('tempDir', 'pmss-deluge-findcaller-', $this->logs, $this->logger, 0700);
     }
 
     public function testPatchAddsStacklevelToLegacySignature(): void

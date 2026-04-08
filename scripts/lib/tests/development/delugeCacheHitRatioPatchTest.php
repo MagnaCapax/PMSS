@@ -19,14 +19,7 @@ class DelugeCacheHitRatioPatchTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-cache-hit-ratio-', 0700);
-        $this->logs = [];
-        $this->logger = $this->pmssMakeArrayLogger($this->logs);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
+        $this->pmssAssignTempDirArrayLogger('tempDir', 'pmss-deluge-cache-hit-ratio-', $this->logs, $this->logger, 0700);
     }
 
     public function testPatchAddsKeyErrorGuardToLegacyBlock(): void
