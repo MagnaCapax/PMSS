@@ -24,13 +24,7 @@ if (!function_exists('logmsg')) {
         $baseName = trim((string) ($defaults['base_name'] ?? '')); $baseName = $baseName !== '' ? $baseName : basename($script, '.php');
         $primary = rtrim(trim((string) ($defaults['dir'] ?? '')) !== '' ? (string) $defaults['dir'] : '/var/log/pmss', '/').'/'.$baseName.'.log';
         $fallback = rtrim(trim((string) ($defaults['fallback_dir'] ?? '')) !== '' ? (string) $defaults['fallback_dir'] : '/tmp', '/').'/'.$baseName.'.log';
-        pmssLogAppendTimestampedLine($primary, $message) || pmssLogAppendTimestampedLine($fallback, $message);
-
-        if (!empty($defaults['write_to_stderr'])) {
-            fwrite(STDERR, $message.PHP_EOL);
-            return;
-        }
-        echo $message.PHP_EOL;
+        pmssLogWriteMessage($primary, $fallback, $message, !empty($defaults['write_to_stderr']));
     }
 }
 
@@ -66,5 +60,14 @@ if (!function_exists('pmssLogAppendTimestampedLine')) {
         $written = @file_put_contents($path, date($timestampFormat).$prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
         $written && $mode !== null && @chmod($path, $mode);
         return $written;
+    }
+}
+
+if (!function_exists('pmssLogWriteMessage')) {
+    /** Mirror one message into PMSS log files and the active console stream. */
+    function pmssLogWriteMessage(string $primary, string $fallback, string $message, bool $writeToStderr = false): void
+    {
+        pmssLogAppendTimestampedLine($primary, $message) || pmssLogAppendTimestampedLine($fallback, $message);
+        $writeToStderr ? fwrite(STDERR, $message.PHP_EOL) : print($message.PHP_EOL);
     }
 }

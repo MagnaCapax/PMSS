@@ -24,11 +24,6 @@ class Logger {
 
     public function msg(string $m): void
     {
-        pmssLogAppendTimestampedLine($this->log, $m) || pmssLogAppendTimestampedLine($this->fallback, $m);
-        if ($this->writeToStderr) {
-            fwrite(STDERR, $m.PHP_EOL);
-            return;
-        }
-        echo $m.PHP_EOL;
+        pmssLogWriteMessage($this->log, $this->fallback, $m, $this->writeToStderr);
     }
 }

@@ -6,7 +6,6 @@ require_once dirname(__DIR__, 2).'/traffic.php';
 
 class TrafficStatisticsIngressTest extends TrafficTestCase
 {
-
     public function testGetDataUsesCustomTrafficDir(): void
     {
         $paths = $this->makeTrafficPaths();
@@ -28,9 +27,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
 
     public function testSaveUserTrafficWritesIngressFile(): void
     {
-        $paths = $this->makeTrafficPaths();
+        $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
         $this->createTrafficUser($paths, 'alice', false);
-        $paths['traffic_mode'] = 'ingress';
         $stats = new \trafficStatistics($paths);
         $stats->saveUserTraffic('alice', ['raw' => ['month' => 1], 'display' => [], 'daily' => []]);
         $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficDataIngress'));
@@ -38,9 +36,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
 
     public function testSaveUserTrafficIngressLocalnetSuffixWritesLocalFile(): void
     {
-        $paths = $this->makeTrafficPaths();
+        $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
         $this->createTrafficUser($paths, 'alice', false);
-        $paths['traffic_mode'] = 'ingress';
         $stats = new \trafficStatistics($paths);
         $stats->saveUserTraffic('alice-localnet', ['raw' => ['month' => 1], 'display' => [], 'daily' => []]);
         $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficDataIngressLocal'));
@@ -48,9 +45,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
 
     public function testSaveUserTrafficInvalidModeFallsBackToEgress(): void
     {
-        $paths = $this->makeTrafficPaths();
+        $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'bogus']);
         $this->createTrafficUser($paths, 'alice', false);
-        $paths['traffic_mode'] = 'bogus';
         $stats = new \trafficStatistics($paths);
         $stats->saveUserTraffic('alice', ['raw' => ['month' => 1], 'display' => [], 'daily' => []]);
         $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficData'));

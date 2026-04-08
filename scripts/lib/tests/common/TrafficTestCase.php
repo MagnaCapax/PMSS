@@ -9,14 +9,14 @@ require_once __DIR__.'/TestCase.php';
 abstract class TrafficTestCase extends TestCase
 {
     /** Build an isolated traffic fixture tree for a test. */
-    protected function makeTrafficPaths(string $prefix = 'pmss-traffic-', bool $withPasswd = false): array
+    protected function makeTrafficPaths(string $prefix = 'pmss-traffic-', bool $withPasswd = false, array $overrides = []): array
     {
         $root = $this->pmssMakeTempDir($prefix);
-        $paths = [
+        $paths = array_replace([
             'traffic_dir' => $root.'/traffic',
             'home_dir'    => $root.'/home',
             'runtime_dir' => $root.'/run',
-        ];
+        ], $overrides);
 
         @mkdir($paths['traffic_dir'], 0755, true);
         @mkdir($paths['home_dir'], 0755, true);
@@ -36,11 +36,5 @@ abstract class TrafficTestCase extends TestCase
             file_put_contents($paths['traffic_dir'].'/'.$user, 'seed');
         }
         @mkdir($paths['home_dir'].'/'.$user, 0755, true);
-    }
-
-    /** Remove a traffic fixture tree once the test no longer needs it. */
-    protected function cleanupTrafficPaths(array $paths): void
-    {
-        $this->pmssRemoveTree(dirname($paths['traffic_dir']));
     }
 }

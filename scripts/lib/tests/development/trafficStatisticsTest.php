@@ -1,9 +1,10 @@
 <?php
 namespace PMSS\Tests;
 
+require_once __DIR__.'/../common/TrafficTestCase.php';
 require_once dirname(__DIR__, 2).'/traffic.php';
 
-class TrafficStatisticsTest extends TestCase
+class TrafficStatisticsTest extends TrafficTestCase
 {
     public function testParseLineValid(): void
     {
@@ -37,7 +38,7 @@ class TrafficStatisticsTest extends TestCase
 
     public function testGetDataClampsNonPositivePeriodsToOneLine(): void
     {
-        $paths = $this->makeTrafficPaths('egress');
+        $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'egress']);
         $this->pmssWriteFile($paths['traffic_dir'].'/alice', "first\nsecond\n");
 
         $stats = new \trafficStatistics($paths);
@@ -46,8 +47,8 @@ class TrafficStatisticsTest extends TestCase
 
     public function testSaveUserTrafficWritesHomeAndRuntimeFilesInEgressMode(): void
     {
-        $paths = $this->makeTrafficPaths('egress');
-        $this->pmssEnsureDir($paths['home_dir'].'/alice');
+        $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'egress']);
+        $this->createTrafficUser($paths, 'alice', false);
 
         $stats = new \trafficStatistics($paths);
         $payload = [
@@ -68,8 +69,8 @@ class TrafficStatisticsTest extends TestCase
 
     public function testSaveUserTrafficUsesIngressLocalnetFilename(): void
     {
-        $paths = $this->makeTrafficPaths('ingress');
-        $this->pmssEnsureDir($paths['home_dir'].'/alice');
+        $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'ingress']);
+        $this->createTrafficUser($paths, 'alice', false);
 
         $stats = new \trafficStatistics($paths);
         $payload = [
@@ -86,17 +87,5 @@ class TrafficStatisticsTest extends TestCase
         if (is_file($runtimePath)) {
             $this->assertEquals($payload, unserialize((string) file_get_contents($runtimePath)));
         }
-    }
-
-    private function makeTrafficPaths(string $mode): array
-    {
-        $root = $this->pmssMakeTempDir('pmss-traffic-statistics-');
-
-        return [
-            'traffic_dir' => $root.'/traffic',
-            'home_dir' => $root.'/home',
-            'runtime_dir' => $root.'/run',
-            'traffic_mode' => $mode,
-        ];
     }
 }
