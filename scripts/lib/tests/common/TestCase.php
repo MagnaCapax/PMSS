@@ -379,6 +379,15 @@ abstract class TestCase
         @file_put_contents($path, serialize($value));
     }
 
+    protected function pmssBuildWindowValues($month, $week = null, $day = null, $hour = null): array
+    {
+        $week = $week === null ? $month : $week;
+        $day = $day === null ? $week : $day;
+        return ['month' => $month, 'week' => $week, 'day' => $day, 'hour' => $hour === null ? $day : $hour];
+    }
+
+    protected function pmssBuildRawWindowMetric($month, $week = null, $day = null, $hour = null): array { return ['raw' => $this->pmssBuildWindowValues($month, $week, $day, $hour)]; }
+
     /** Build the serialized resource stats shape used by report-oriented tests. */
     protected function pmssBuildResourceStatsPayloadFromValues(array $values): array
     {

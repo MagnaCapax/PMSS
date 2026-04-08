@@ -112,15 +112,8 @@ TEXT;
 
     if (isset($options['json'])) {
         $payloadFromSource = static function (array $source): array {
-            $payload = [
-                'memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']],
-                'tasks' => ['current' => $source['tasks_current']],
-            ];
-            foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
-                $payload[$metric] = $source[$metric];
-            }
-
-            return $payload;
+            return ['memory' => ['current' => $source['memory_current'], 'avg_month' => $source['memory_avg_month']], 'tasks' => ['current' => $source['tasks_current']]]
+                + array_intersect_key($source, array_flip(ResourceStatsAccumulator::RAW_METRICS));
         };
 
         $payload = [

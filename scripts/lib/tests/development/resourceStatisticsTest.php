@@ -11,13 +11,8 @@ class ResourceStatisticsTest extends TestCase
         $root = $this->pmssMakeTempDir('pmss-resource-stats-');
         $path = $root.'/.resourceData';
         $this->pmssWriteSerializedFixture($path, [
-            'io_read' => ['raw' => ['day' => 11]],
-            'io_write' => ['raw' => ['day' => 22]],
-            'cpu' => ['raw' => ['day' => 33]],
-            'memory' => ['raw' => ['day' => 44]],
-            'ram_hours' => ['raw' => ['day' => 5.5]],
-            'tasks' => ['raw' => ['day' => 6]],
-            'io_read_ops' => ['raw' => ['day' => 77]],
+            'io_read' => $this->pmssBuildRawWindowMetric(0, 0, 11, 0), 'io_write' => $this->pmssBuildRawWindowMetric(0, 0, 22, 0), 'cpu' => $this->pmssBuildRawWindowMetric(0, 0, 33, 0),
+            'memory' => $this->pmssBuildRawWindowMetric(0, 0, 44, 0), 'ram_hours' => $this->pmssBuildRawWindowMetric(0, 0, 5.5, 0), 'tasks' => $this->pmssBuildRawWindowMetric(0, 0, 6, 0), 'io_read_ops' => $this->pmssBuildRawWindowMetric(0, 0, 77, 0),
         ]);
 
         $stats = new \resourceStatistics();

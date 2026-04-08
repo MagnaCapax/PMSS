@@ -51,15 +51,14 @@ class resourceStatistics
         $data = pmssTrafficReadSerializedArrayFile($path);
         if ($data === null) return null;
         $metrics = [];
-        foreach (['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks'] as $key) {
-            $value = $data[$key]['raw']['day'] ?? null;
+        foreach (['io_read', 'io_write', 'cpu', 'memory', 'ram_hours', 'tasks', 'io_read_ops', 'io_write_ops'] as $key) {
+            $default = substr($key, -4) === '_ops' ? 0.0 : null;
+            $value = $data[$key]['raw']['day'] ?? $default;
             if ($value === null || !is_numeric($value)) {
                 return null;
             }
             $metrics[$key] = (float) $value;
         }
-        $metrics['io_read_ops'] = (float) ($data['io_read_ops']['raw']['day'] ?? 0.0);
-        $metrics['io_write_ops'] = (float) ($data['io_write_ops']['raw']['day'] ?? 0.0);
 
         return $metrics;
     }

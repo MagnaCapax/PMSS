@@ -19,14 +19,9 @@ class ShowResourcesFormatTest extends TestCase
     private function sampleUsagePayload(array $overrides = []): array
     {
         return $overrides + [
-            'io_read' => ['raw' => ['month' => 10, 'week' => 10, 'day' => 10, 'hour' => 10]],
-            'io_write' => ['raw' => ['month' => 20, 'week' => 20, 'day' => 20, 'hour' => 20]],
-            'io_read_ops' => ['raw' => ['month' => 30, 'week' => 30, 'day' => 30, 'hour' => 3600]],
-            'io_write_ops' => ['raw' => ['month' => 40, 'week' => 40, 'day' => 40, 'hour' => 3600]],
-            'cpu' => ['raw' => ['month' => 3600 * 1000000000, 'week' => 1, 'day' => 1, 'hour' => 1]],
-            'memory' => ['current' => 1024 * 1024 * 1024, 'raw' => ['month' => 512 * 1024 * 1024]],
-            'ram_hours' => ['raw' => ['month' => 2.5, 'week' => 2.5, 'day' => 2.5, 'hour' => 2.5]],
-            'tasks' => ['current' => 3],
+            'io_read' => $this->pmssBuildRawWindowMetric(10), 'io_write' => $this->pmssBuildRawWindowMetric(20), 'io_read_ops' => $this->pmssBuildRawWindowMetric(30, 30, 30, 3600),
+            'io_write_ops' => $this->pmssBuildRawWindowMetric(40, 40, 40, 3600), 'cpu' => $this->pmssBuildRawWindowMetric(3600 * 1000000000, 1, 1, 1), 'memory' => ['current' => 1024 * 1024 * 1024, 'raw' => ['month' => 512 * 1024 * 1024]],
+            'ram_hours' => $this->pmssBuildRawWindowMetric(2.5), 'tasks' => ['current' => 3],
         ];
     }
 
@@ -84,15 +79,9 @@ class ShowResourcesFormatTest extends TestCase
     {
         $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
         $this->writeResourceStats($runtimeDir, 'alice', [
-            'io_read' => ['raw' => ['month' => 1.0, 'week' => 1.0, 'day' => 1.0, 'hour' => 1.0]],
-            'io_write' => ['raw' => ['month' => 2.0, 'week' => 2.0, 'day' => 2.0, 'hour' => 2.0]],
-            'io_read_ops' => ['raw' => ['month' => 3.0, 'week' => 3.0, 'day' => 3.0, 'hour' => 3.0]],
-            'io_write_ops' => ['raw' => ['month' => 4.0, 'week' => 4.0, 'day' => 4.0, 'hour' => 4.0]],
-            'cpu' => ['raw' => ['month' => 5.0, 'week' => 5.0, 'day' => 5.0, 'hour' => 5.0]],
-            'memory' => ['current' => 6.0, 'raw' => ['month' => 7.0]],
-            'ram_hours' => ['raw' => ['month' => 8.0, 'week' => 8.0, 'day' => 8.0, 'hour' => 8.0]],
-            'tasks' => ['current' => 9.0],
-            'ignored_field' => ['month' => 999.0],
+            'io_read' => $this->pmssBuildRawWindowMetric(1.0), 'io_write' => $this->pmssBuildRawWindowMetric(2.0), 'io_read_ops' => $this->pmssBuildRawWindowMetric(3.0),
+            'io_write_ops' => $this->pmssBuildRawWindowMetric(4.0), 'cpu' => $this->pmssBuildRawWindowMetric(5.0), 'memory' => ['current' => 6.0, 'raw' => ['month' => 7.0]],
+            'ram_hours' => $this->pmssBuildRawWindowMetric(8.0), 'tasks' => ['current' => 9.0], 'ignored_field' => ['month' => 999.0],
         ]);
         $json = $this->runScript(['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 

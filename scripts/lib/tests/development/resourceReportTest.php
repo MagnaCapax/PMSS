@@ -23,26 +23,14 @@ class ResourceReportTest extends TestCase
     public function testBuildReportAggregatesRowsAndTotals(): void
     {
         $this->writeUserStats('alice', [
-            'io_read' => ['month' => 1000, 'week' => 100, 'day' => 10, 'hour' => 1],
-            'io_write' => ['month' => 2000, 'week' => 200, 'day' => 20, 'hour' => 2],
-            'io_read_ops' => ['month' => 3000, 'week' => 300, 'day' => 30, 'hour' => 3],
-            'io_write_ops' => ['month' => 4000, 'week' => 400, 'day' => 40, 'hour' => 4],
-            'cpu' => ['month' => 5000, 'week' => 500, 'day' => 50, 'hour' => 5],
-            'ram_hours' => ['month' => 6000, 'week' => 600, 'day' => 60, 'hour' => 6],
-            'memory_current' => 700,
-            'memory_avg_month' => 70,
-            'tasks_current' => 7,
+            'io_read' => $this->pmssBuildWindowValues(1000, 100, 10, 1), 'io_write' => $this->pmssBuildWindowValues(2000, 200, 20, 2), 'io_read_ops' => $this->pmssBuildWindowValues(3000, 300, 30, 3),
+            'io_write_ops' => $this->pmssBuildWindowValues(4000, 400, 40, 4), 'cpu' => $this->pmssBuildWindowValues(5000, 500, 50, 5), 'ram_hours' => $this->pmssBuildWindowValues(6000, 600, 60, 6),
+            'memory_current' => 700, 'memory_avg_month' => 70, 'tasks_current' => 7,
         ]);
         $this->writeUserStats('bob', [
-            'io_read' => ['month' => 11, 'week' => 12, 'day' => 13, 'hour' => 14],
-            'io_write' => ['month' => 21, 'week' => 22, 'day' => 23, 'hour' => 24],
-            'io_read_ops' => ['month' => 31, 'week' => 32, 'day' => 33, 'hour' => 34],
-            'io_write_ops' => ['month' => 41, 'week' => 42, 'day' => 43, 'hour' => 44],
-            'cpu' => ['month' => 51, 'week' => 52, 'day' => 53, 'hour' => 54],
-            'ram_hours' => ['month' => 61, 'week' => 62, 'day' => 63, 'hour' => 64],
-            'memory_current' => 71,
-            'memory_avg_month' => 72,
-            'tasks_current' => 73,
+            'io_read' => $this->pmssBuildWindowValues(11, 12, 13, 14), 'io_write' => $this->pmssBuildWindowValues(21, 22, 23, 24), 'io_read_ops' => $this->pmssBuildWindowValues(31, 32, 33, 34),
+            'io_write_ops' => $this->pmssBuildWindowValues(41, 42, 43, 44), 'cpu' => $this->pmssBuildWindowValues(51, 52, 53, 54), 'ram_hours' => $this->pmssBuildWindowValues(61, 62, 63, 64),
+            'memory_current' => 71, 'memory_avg_month' => 72, 'tasks_current' => 73,
         ]);
 
         $report = \pmssResourceBuildReport($this->statsDir, ['alice', 'bob']);
@@ -66,15 +54,9 @@ class ResourceReportTest extends TestCase
     public function testBuildReportMarksMissingWhenRequiredMetricMissing(): void
     {
         $payload = $this->pmssBuildResourceStatsPayloadFromValues([
-            'io_read' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
-            'io_write' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
-            'io_read_ops' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
-            'io_write_ops' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
-            'cpu' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
-            'ram_hours' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
-            'memory_current' => 1,
-            'memory_avg_month' => 1,
-            'tasks_current' => 1,
+            'io_read' => $this->pmssBuildWindowValues(1), 'io_write' => $this->pmssBuildWindowValues(1), 'io_read_ops' => $this->pmssBuildWindowValues(1),
+            'io_write_ops' => $this->pmssBuildWindowValues(1), 'cpu' => $this->pmssBuildWindowValues(1), 'ram_hours' => $this->pmssBuildWindowValues(1),
+            'memory_current' => 1, 'memory_avg_month' => 1, 'tasks_current' => 1,
         ]);
         unset($payload['cpu']);
         $this->writeUserData('alice', $payload);
@@ -88,13 +70,8 @@ class ResourceReportTest extends TestCase
     public function testBuildReportDefaultsMissingOpsWindowsToZero(): void
     {
         $payload = $this->pmssBuildResourceStatsPayloadFromValues([
-            'io_read' => ['month' => 1, 'week' => 1, 'day' => 1, 'hour' => 1],
-            'io_write' => ['month' => 2, 'week' => 2, 'day' => 2, 'hour' => 2],
-            'cpu' => ['month' => 3, 'week' => 3, 'day' => 3, 'hour' => 3],
-            'ram_hours' => ['month' => 4, 'week' => 4, 'day' => 4, 'hour' => 4],
-            'memory_current' => 5,
-            'memory_avg_month' => 6,
-            'tasks_current' => 7,
+            'io_read' => $this->pmssBuildWindowValues(1), 'io_write' => $this->pmssBuildWindowValues(2), 'cpu' => $this->pmssBuildWindowValues(3), 'ram_hours' => $this->pmssBuildWindowValues(4),
+            'memory_current' => 5, 'memory_avg_month' => 6, 'tasks_current' => 7,
         ]);
         unset($payload['io_read_ops']);
         unset($payload['io_write_ops']);
