@@ -48,7 +48,26 @@ function pmssStatsResolveContext(array $overrides = []): array
 
     $cgroupDir = trim((string) ($overrides['cgroup_dir'] ?? getenv('PMSS_STATS_CGROUP_DIR') ?: ''));
     if ($cgroupDir === '') {
-        $cgroupDir = pmssStatsDetectCgroupDir();
+        $lines = @file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($lines)) {
+            $paths = [];
+            foreach ($lines as $line) {
+                $parts = explode(':', (string) $line, 3);
+                if (count($parts) !== 3 || trim($parts[2]) === '') {
+                    continue;
+                }
+                $paths[] = '/'.ltrim(trim($parts[2]), '/');
+            }
+
+            foreach ($paths as $path) {
+                foreach (['/sys/fs/cgroup'.$path, '/sys/fs/cgroup/unified'.$path] as $candidate) {
+                    if (is_dir($candidate)) {
+                        $cgroupDir = $candidate;
+                        break 2;
+                    }
+                }
+            }
+        }
     }
 
     return [
@@ -59,36 +78,6 @@ function pmssStatsResolveContext(array $overrides = []): array
         'version_file' => $versionFile,
         'cgroup_dir' => $cgroupDir,
     ];
-}
-
-/**
- * Detect the best readable cgroup directory for the current process.
- */
-function pmssStatsDetectCgroupDir(): string
-{
-    $lines = @file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
-        return '';
-    }
-
-    $paths = [];
-    foreach ($lines as $line) {
-        $parts = explode(':', (string) $line, 3);
-        if (count($parts) !== 3 || trim($parts[2]) === '') {
-            continue;
-        }
-        $paths[] = '/'.ltrim(trim($parts[2]), '/');
-    }
-
-    foreach ($paths as $path) {
-        foreach (['/sys/fs/cgroup'.$path, '/sys/fs/cgroup/unified'.$path] as $candidate) {
-            if (is_dir($candidate)) {
-                return $candidate;
-            }
-        }
-    }
-
-    return '';
 }
 
 /**
@@ -156,16 +145,6 @@ function pmssStatsReadQuotaSnapshot(string $home): array
     }
 
     return $result;
-}
-
-/**
- * Load canonical per-user PMSS configuration when available.
- */
-function pmssStatsLoadUserConfig(string $user, string $configDir): array
-{
-    $store = new UserConfigStore($configDir);
-    $payload = $store->get($user);
-    return is_array($payload) ? $payload : [];
 }
 
 /**
@@ -351,7 +330,9 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $context = pmssStatsResolveContext($overrides);
     $home = $context['home'];
 
-    $config = pmssStatsLoadUserConfig($context['user'], $context['config_dir']);
+    $store = new UserConfigStore($context['config_dir']);
+    $configPayload = $store->get($context['user']);
+    $config = is_array($configPayload) ? $configPayload : [];
     $quota = pmssStatsReadQuotaSnapshot($home);
     $traffic = pmssTrafficReadSerializedArrayFile($home.'/.trafficData') ?: [];
     $trafficIngress = pmssTrafficReadSerializedArrayFile($home.'/.trafficDataIngress') ?: [];

@@ -17,37 +17,6 @@ if (!defined('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS')) {
     define('PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS', 5);
 }
 
-/** Connect once to a php-cgi Unix socket and report the outcome. */
-function pmssLighttpdWatchdogSocketProbeOnce(string $socketPath, int $timeoutSeconds = PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_TIMEOUT_SECONDS, $probe = null): array
-{
-    if ($socketPath === '') {
-        return array('ok' => false, 'errno' => 0, 'errstr' => 'socket path missing');
-    }
-
-    if ($probe !== null) {
-        $result = $probe($socketPath, $timeoutSeconds);
-        if (!is_array($result)) {
-            return array('ok' => false, 'errno' => 0, 'errstr' => 'probe callback returned invalid result');
-        }
-
-        return array(
-            'ok' => !empty($result['ok']),
-            'errno' => isset($result['errno']) ? (int) $result['errno'] : 0,
-            'errstr' => isset($result['errstr']) ? (string) $result['errstr'] : '',
-        );
-    }
-
-    $errno = 0;
-    $errstr = '';
-    $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, $timeoutSeconds);
-    $ok = $socket !== false && $errno === 0 && $errstr === '';
-    if (is_resource($socket)) {
-        fclose($socket);
-    }
-
-    return array('ok' => $ok, 'errno' => (int) $errno, 'errstr' => (string) $errstr);
-}
-
 /** Retry a php-cgi Unix socket probe before treating the worker pool as dead. */
 function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $options = array()): array
 {
@@ -72,7 +41,28 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
 
     $result = array('ok' => false, 'errno' => 0, 'errstr' => '', 'attempts' => 0);
     for ($attempt = 1; $attempt <= $attemptCount; $attempt++) {
-        $result = pmssLighttpdWatchdogSocketProbeOnce($socketPath, $timeoutSeconds, $probe);
+        if ($probe !== null) {
+            $probeResult = $probe($socketPath, $timeoutSeconds);
+            $result = is_array($probeResult)
+                ? array(
+                    'ok' => !empty($probeResult['ok']),
+                    'errno' => isset($probeResult['errno']) ? (int) $probeResult['errno'] : 0,
+                    'errstr' => isset($probeResult['errstr']) ? (string) $probeResult['errstr'] : '',
+                )
+                : array('ok' => false, 'errno' => 0, 'errstr' => 'probe callback returned invalid result');
+        } else {
+            $errno = 0;
+            $errstr = '';
+            $socket = fsockopen('unix://'.$socketPath, 0, $errno, $errstr, $timeoutSeconds);
+            $result = array(
+                'ok' => $socket !== false && $errno === 0 && $errstr === '',
+                'errno' => (int) $errno,
+                'errstr' => (string) $errstr,
+            );
+            if (is_resource($socket)) {
+                fclose($socket);
+            }
+        }
         $result['attempts'] = $attempt;
         if ($result['ok']) {
             return $result;

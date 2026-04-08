@@ -32,31 +32,6 @@ function pmssStatusSummary(array $checks): array
     $warnings = count(array_filter($checks, static function ($check) { return ($check['status'] ?? '') === 'WARN'; }));
     return ['ok' => count($checks) - $warnings - $errors, 'warn' => $warnings, 'err' => $errors];
 }
-/** Render a standard PMSS status table with optional TTY colours. */
-function pmssRenderStatusText(
-    string $title,
-    array $checks,
-    array $summary,
-    bool $useColour = false,
-    int $labelWidth = 8,
-    bool $leadingNewline = true
-): void
-{
-    echo ($leadingNewline ? "\n" : '').$title.' ('.date('Y-m-d H:i:s').")\n";
-    echo str_repeat('-', 60)."\n";
-    $isTty = $useColour && pmssStreamIsTty(STDOUT, true);
-    foreach ($checks as $result) {
-        $status = strtoupper((string) ($result['status'] ?? ''));
-        $label = str_pad('['.$status.']', $labelWidth);
-        $detail = (string) ($result['detail'] ?? '');
-        $colour = $isTty ? (['OK' => "\033[32m", 'WARN' => "\033[33m", 'ERR' => "\033[31m"][$status] ?? '') : '';
-        $reset = $colour === '' ? '' : "\033[0m";
-        echo $colour.$label.$reset.$result['name'].($detail !== '' ? ' - '.$detail : '').PHP_EOL;
-    }
-    echo str_repeat('-', 60)."\n";
-    echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", $summary['ok'], $summary['warn'], $summary['err']);
-}
-
 /** Emit either JSON or text output for a PMSS status report. */
 function pmssStatusEmit(
     array $checks,
@@ -81,7 +56,22 @@ function pmssStatusEmit(
         return 0;
     }
 
-    pmssRenderStatusText($title, $checks, $summary ?? pmssStatusSummary($checks), $useColour, $labelWidth, $leadingNewline);
+    $summary = $summary ?? pmssStatusSummary($checks);
+    echo ($leadingNewline ? "\n" : '').$title.' ('.date('Y-m-d H:i:s').")\n";
+    echo str_repeat('-', 60)."\n";
+
+    $isTty = $useColour && pmssStreamIsTty(STDOUT, true);
+    foreach ($checks as $result) {
+        $status = strtoupper((string) ($result['status'] ?? ''));
+        $label = str_pad('['.$status.']', $labelWidth);
+        $detail = (string) ($result['detail'] ?? '');
+        $colour = $isTty ? (['OK' => "\033[32m", 'WARN' => "\033[33m", 'ERR' => "\033[31m"][$status] ?? '') : '';
+        $reset = $colour === '' ? '' : "\033[0m";
+        echo $colour.$label.$reset.$result['name'].($detail !== '' ? ' - '.$detail : '').PHP_EOL;
+    }
+
+    echo str_repeat('-', 60)."\n";
+    echo sprintf("Summary: %d OK, %d WARN, %d ERR\n", $summary['ok'], $summary['warn'], $summary['err']);
     return 0;
 }
 

@@ -12,17 +12,6 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../resources.php';
 
 /**
- * Resolve a username to its UID with a POSIX-first fallback.
- */
-function pmssResourceLogLookupUid(string $user): ?int
-{
-    if (($info = pmssUserAccountLookup($user)) !== null) {
-        return (int) $info['uid'];
-    }
-    return ctype_digit($out = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'))) ? (int) $out : null;
-}
-
-/**
  * Validate user entries from listUsers.php output.
  */
 function pmssResourceLogIsValidUser(string $user): bool
@@ -39,7 +28,15 @@ function pmssResourceLogIsValidUser(string $user): bool
  */
 function pmssResourceLogLookupManagedUid(string $user): ?int
 {
-    return pmssResourceLogIsValidUser($user) ? pmssResourceLogLookupUid($user) : null;
+    if (!pmssResourceLogIsValidUser($user)) {
+        return null;
+    }
+    if (($info = pmssUserAccountLookup($user)) !== null) {
+        return (int) $info['uid'];
+    }
+
+    $uid = trim((string) @shell_exec('id -u '.escapeshellarg($user).' 2>/dev/null'));
+    return ctype_digit($uid) ? (int) $uid : null;
 }
 
 function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $mode = 0644): bool
