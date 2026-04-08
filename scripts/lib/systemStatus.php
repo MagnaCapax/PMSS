@@ -82,7 +82,17 @@ function pmssStatusEmit(
     bool $leadingNewline = true
 ): int
 {
-    if ($wantJson) { echo pmssStatusJsonEncode($jsonPayload, $jsonFlags).PHP_EOL; return 0; }
+    if ($wantJson) {
+        $encoded = pmssJsonEncodeSafe($jsonPayload, $jsonFlags);
+        if (!is_string($encoded)) {
+            fwrite(STDERR, "Failed to encode status JSON.\n");
+            return 1;
+        }
+
+        echo $encoded.PHP_EOL;
+        return 0;
+    }
+
     pmssRenderStatusText($title, $checks, $summary ?? pmssStatusSummary($checks), $useColour, $labelWidth, $leadingNewline);
     return 0;
 }

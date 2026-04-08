@@ -208,6 +208,30 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals(JSON_ERROR_NONE, json_last_error());
     }
 
+    public function testStatusEmitReturnsErrorWhenJsonEncodingFails(): void
+    {
+        $stderrPath = $this->pmssMakeTempPath('pmss-status-stderr-');
+        $script = 'require_once '.var_export($this->pmssRepoPath('scripts/lib/systemStatus.php'), true).';'
+            .'exit(pmssStatusEmit('
+            .'[pmssStatus("bin.php", "OK", "ready")],'
+            .'"PMSS Status",'
+            .'true,'
+            .'["results" => [["name" => "bin.php", "status" => "OK", "detail" => INF]]],'
+            .'null,'
+            .'JSON_PRETTY_PRINT'
+            .'));';
+
+        $result = $this->pmssExecShellCommand(
+            escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($script),
+            [],
+            '2>'.escapeshellarg($stderrPath)
+        );
+
+        $this->assertEquals(1, $result['rc']);
+        $this->assertEquals('', $result['output']);
+        $this->assertEquals("Failed to encode status JSON.\n", (string) file_get_contents($stderrPath));
+    }
+
     public function testSystemStatusChecksStayStableWithHermeticInputs(): void
     {
         $checks = pmssSystemStatusChecks($this->buildSystemStatusDependencies());
