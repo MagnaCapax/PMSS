@@ -97,6 +97,21 @@ function pmssStatusProbeSpecs(string $sourcesPath): array
     ];
 }
 
+/** @return array<int, array<string, string>> Walk the shared status probe catalog once. */
+function pmssStatusCollectProbeChecks(array $probeSpecs, callable $binaryProbe, callable $pathProbe): array
+{
+    $checks = [];
+    foreach ($probeSpecs['binaries'] as $binary => $binarySpec) {
+        $check = $binaryProbe((string) $binary, $binarySpec);
+        if ($check !== null) $checks[] = $check;
+    }
+    foreach ($probeSpecs['paths'] as $pathSpec) {
+        $check = $pathProbe($pathSpec);
+        if ($check !== null) $checks[] = $check;
+    }
+    return $checks;
+}
+
 /**
  * Collect the richer system-test probe used by scripts/util/systemTest.php.
  *
@@ -125,23 +140,20 @@ function pmssSystemStatusChecks(array $dependencies = []): array
     $checks[] = $codename === ''
         ? pmssStatus('OS codename', 'WARN', 'VERSION_CODENAME missing')
         : pmssStatus('OS codename', 'OK', $codename);
-
-    foreach ($probeSpecs['binaries'] as $binary => $binarySpec) {
-        $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
-        if ($path === '') {
-            $checks[] = pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
-            continue;
+    $checks = array_merge($checks, pmssStatusCollectProbeChecks(
+        $probeSpecs,
+        static function (string $binary, array $binarySpec) use ($runCommand): array {
+            $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+            if ($path === '') return pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
+            $detail = trim((string) $runCommand((string) $binarySpec['infoCommand']));
+            return pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
+        },
+        static function (array $pathSpec) use ($pathExists): array {
+            $path = (string) $pathSpec['path'];
+            $exists = $pathExists($path);
+            return pmssStatus((string) $pathSpec['systemLabel'], $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
         }
-
-        $detail = trim((string) $runCommand((string) $binarySpec['infoCommand']));
-        $checks[] = pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
-    }
-
-    foreach ($probeSpecs['paths'] as $pathSpec) {
-        $path = (string) $pathSpec['path'];
-        $exists = $pathExists($path);
-        $checks[] = pmssStatus((string) $pathSpec['systemLabel'], $exists ? 'OK' : 'WARN', $exists ? $path : $path.' missing');
-    }
+    ));
 
     $localnetConfig = '/etc/seedbox/config/localnet';
     if ($isFile($localnetConfig)) {
@@ -279,21 +291,19 @@ function pmssComponentStatusChecks(array $dependencies = []): array
     } else {
         $results[] = pmssStatus('apt.sources', 'WARN', 'missing sources.list');
     }
-    foreach ($probeSpecs['binaries'] as $binary => $binarySpec) {
-        if (!isset($binarySpec['componentName'])) {
-            continue;
-        }
-        $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
-        $results[] = pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
-    }
 
-    foreach ($probeSpecs['paths'] as $pathSpec) {
-        if (!isset($pathSpec['componentName'])) {
-            continue;
+    return array_merge($results, pmssStatusCollectProbeChecks(
+        $probeSpecs,
+        static function (string $binary, array $binarySpec) use ($runCommand): ?array {
+            if (!isset($binarySpec['componentName'])) return null;
+            $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+            return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
+        },
+        static function (array $pathSpec) use ($pathExists): ?array {
+            if (!isset($pathSpec['componentName'])) return null;
+            $path = (string) $pathSpec['path'];
+            $exists = $pathExists($path);
+            return pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
         }
-        $path = (string) $pathSpec['path'];
-        $exists = $pathExists($path);
-        $results[] = pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
-    }
-    return $results;
+    ));
 }

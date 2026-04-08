@@ -183,6 +183,44 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertEquals('', $checks[3]['detail']);
     }
 
+    public function testSharedProbeCollectorPreservesCatalogOrderWhileFilteringNulls(): void
+    {
+        $checks = pmssStatusCollectProbeChecks(
+            [
+                'binaries' => [
+                    'alpha' => ['label' => 'first'],
+                    'beta' => ['skip' => true],
+                ],
+                'paths' => [
+                    ['path' => '/one', 'label' => 'third'],
+                    ['path' => '/two', 'skip' => true],
+                ],
+            ],
+            static function (string $binary, array $binarySpec): ?array {
+                if (isset($binarySpec['skip'])) {
+                    return null;
+                }
+
+                return pmssStatus('Binary: '.$binary, 'OK', (string) $binarySpec['label']);
+            },
+            static function (array $pathSpec): ?array {
+                if (isset($pathSpec['skip'])) {
+                    return null;
+                }
+
+                return pmssStatus('Path: '.$pathSpec['path'], 'WARN', (string) $pathSpec['label']);
+            }
+        );
+
+        $this->assertSame(
+            [
+                ['name' => 'Binary: alpha', 'status' => 'OK', 'detail' => 'first'],
+                ['name' => 'Path: /one', 'status' => 'WARN', 'detail' => 'third'],
+            ],
+            $checks
+        );
+    }
+
     public function testStatusSummaryCountsOkWarnAndErr(): void
     {
         $summary = pmssStatusSummary([
