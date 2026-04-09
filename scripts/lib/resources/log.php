@@ -16,11 +16,7 @@ require_once __DIR__.'/../resources.php';
  */
 function pmssResourceLogIsValidUser(string $user): bool
 {
-    return (function_exists('pmssNormalizeUsername') ? pmssNormalizeUsername($user) : strtolower($user)) === $user
-        && preg_match('/^[a-z0-9-]+$/', $user)
-        && ($user === 'www-data'
-        || !function_exists('pmssValidateUsername')
-        || pmssValidateUsername($user));
+    return pmssResourceUserIsValid($user);
 }
 
 /**

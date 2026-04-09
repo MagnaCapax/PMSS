@@ -30,6 +30,26 @@ class ResourceStatisticsTest extends TestCase
         ], $metrics);
     }
 
+    public function testGetDataRejectsTraversalUsernames(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-resource-getdata-');
+        file_put_contents($root.'/outside', "should-not-read\n");
+
+        $stats = new \resourceStatistics(['resource_dir' => $root]);
+
+        $this->assertSame('', $stats->getData('../outside', 1));
+    }
+
+    public function testGetDataAcceptsWwwData(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-resource-getdata-www-');
+        file_put_contents($root.'/www-data', "first\nsecond\n");
+
+        $stats = new \resourceStatistics(['resource_dir' => $root]);
+
+        $this->assertSame('second', $stats->getData('www-data', 1));
+    }
+
     public function testCollectWindowResultsFromDataKeepsSnapshotFallbackInDayWindow(): void
     {
         $stats = new \resourceStatistics();

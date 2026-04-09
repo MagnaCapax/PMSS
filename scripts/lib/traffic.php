@@ -89,6 +89,10 @@ class trafficStatistics {
      * @return string Raw log slice, possibly empty when no data is available.
      */
     public function getData($user, $timePeriod = 5050) {
+        if (!pmssTrafficUserKeyIsValid((string) $user)) {
+            return '';
+        }
+
         $lines = max(1, (int) $timePeriod);
         $path = escapeshellarg($this->trafficDir.'/'.$user);
         return trim(`tail -n{$lines} {$path} 2>/dev/null`);
@@ -110,9 +114,10 @@ class trafficStatistics {
         if (count($parts) !== 2) return false;    // Erroneous data, too many parts :
         $data = (float) trim($parts[1]) / 1024 / 1024;   // Transform from bytes to megabytes
         if ($data > 150000) return false;    // Pruning erroneous data, 7500Mb in max 6 minutes or so? Yeap.
+        if (($timestamp = strtotime(trim($parts[0]))) === false) return false;
         return [
             'data' => $data,
-            'timestamp' => strtotime(trim($parts[0])),
+            'timestamp' => $timestamp,
         ];
     }
     /**

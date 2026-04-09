@@ -31,6 +31,12 @@ class TrafficStatisticsTest extends TrafficTestCase
         }
     }
 
+    public function testParseLineRejectsInvalidTimestamp(): void
+    {
+        $ts = new \trafficStatistics();
+        $this->assertTrue($ts->parseLine('not-a-time: 1048576') === false);
+    }
+
     public function testGetDataClampsNonPositivePeriodsToOneLine(): void
     {
         $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'egress']);
@@ -38,6 +44,16 @@ class TrafficStatisticsTest extends TrafficTestCase
 
         $stats = new \trafficStatistics($paths);
         $this->assertEquals('second', $stats->getData('alice', 0));
+    }
+
+    public function testGetDataRejectsTraversalUserKeys(): void
+    {
+        $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'egress']);
+        $this->pmssWriteFile($paths['root'].'/outside', "should-not-read\n");
+
+        $stats = new \trafficStatistics($paths);
+
+        $this->assertSame('', $stats->getData('../outside', 1));
     }
 
     public function testSaveUserTrafficWritesHomeAndRuntimeFilesInEgressMode(): void

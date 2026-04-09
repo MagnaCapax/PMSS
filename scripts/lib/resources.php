@@ -13,6 +13,16 @@ require_once __DIR__.'/traffic/storage.php';
 /** @return array<string, string> */
 function pmssResourceMemoryBreakdownFieldMap(string $prefix = 'memory_'): array { return ['anon' => $prefix.'anon', 'file' => $prefix.'file']; }
 
+/** Keep resource log file lookups on validated usernames only. */
+function pmssResourceUserIsValid(string $user): bool
+{
+    return (function_exists('pmssNormalizeUsername') ? pmssNormalizeUsername($user) : strtolower(trim($user))) === $user
+        && preg_match('/^[a-z0-9-]+$/', $user) === 1
+        && ($user === 'www-data'
+        || !function_exists('pmssValidateUsername')
+        || pmssValidateUsername($user));
+}
+
 /** Return the shared schema used by resource rows and totals. */
 function pmssResourceReportTemplate(): array
 {
@@ -81,6 +91,10 @@ class resourceStatistics
      */
     public function getData($user, $timePeriod = 10080)
     {
+        if (!pmssResourceUserIsValid((string) $user)) {
+            return '';
+        }
+
         $lines = max(1, (int) $timePeriod);
         $path = escapeshellarg($this->resourceDir.'/'.$user);
         return trim(`tail -n{$lines} {$path} 2>/dev/null`);
