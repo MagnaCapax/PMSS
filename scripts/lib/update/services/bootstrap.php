@@ -106,6 +106,26 @@ function pmssSshdLegacyParserTemplateNormalize(string $config): string
     return ($updated !== '' && substr($updated, -1) !== "\n") ? $updated."\n" : $updated;
 }
 
+/** Normalize commented AuthorizedKeysFile directives into active directives. */
+function pmssSshdAuthorizedKeysDirectiveNormalize(string $config): string
+{
+    return str_replace('#AuthorizedKeysFile', 'AuthorizedKeysFile', $config);
+}
+
+/** Persist a mutated sshd_config payload through the guarded managed-path flow. */
+function pmssSshdConfigWriteUpdated(
+    string $sshdConfig,
+    string $config,
+    string $updated,
+    string $label,
+    bool $writeManagedBackupCopy = false,
+    string $backupCopyPath = '/etc/ssh/pmss.sshd_config'
+): bool {
+    pmssBackupCriticalConfig('sshd', $sshdConfig);
+    $writeManagedBackupCopy && pmssWriteManagedPathFile($backupCopyPath, $config, 'sshd backup config', 'logMessage', 'root', 'root');
+    return pmssWriteManagedPathFile($sshdConfig, $updated, $label, 'logMessage', 'root', 'root');
+}
+
 /**
  * Refresh rc.local, systemd, and sshd configuration templates.
  */
@@ -127,9 +147,16 @@ function pmssApplyRuntimeTemplates(): void
         ['Setting sshd_config permissions', 'chmod 644 /etc/ssh/sshd_config'],
     ] as $action) { runStep(...$action); }
 
+    $sshdConfig = '/etc/ssh/sshd_config';
+    if (!pmssEnvFlagEnabled('PMSS_DRY_RUN') && is_string($config = @file_get_contents($sshdConfig))) {
+        if (($updated = pmssSshdAuthorizedKeysDirectiveNormalize($config)) !== $config) {
+            logMessage('[INFO] Enabling sshd AuthorizedKeysFile directive from runtime template flow');
+            pmssSshdConfigWriteUpdated($sshdConfig, $config, $updated, 'sshd config', true);
+        }
+    }
+
     $validateRc = runStep('Validating sshd configuration syntax', 'sshd -t');
     if ($validateRc !== 0) {
-        $sshdConfig = '/etc/ssh/sshd_config';
         if (!is_string($config = @file_get_contents($sshdConfig))) {
             logMessage('[WARN] Cannot read sshd_config for legacy-parser normalization');
         } else {
@@ -138,8 +165,7 @@ function pmssApplyRuntimeTemplates(): void
                 logMessage('[INFO] sshd legacy-parser normalization made no changes');
             } else {
                 logMessage('[WARN] Applying sshd legacy-parser compatibility fallback');
-                pmssBackupCriticalConfig('sshd', $sshdConfig);
-                if (!pmssWriteManagedPathFile($sshdConfig, $updated, 'sshd config legacy parser fallback', 'logMessage', 'root', 'root')) {
+                if (!pmssSshdConfigWriteUpdated($sshdConfig, $config, $updated, 'sshd config legacy parser fallback')) {
                     logMessage('[ERR] Failed to write sshd legacy-parser fallback configuration');
                 }
             }
@@ -152,35 +178,4 @@ function pmssApplyRuntimeTemplates(): void
     }
 
     runStep('Restarting sshd to load updated configuration', '/usr/bin/systemctl restart sshd');
-}
-
-/**
- * Guarantee sshd honours per-user AuthorizedKeysFile entries.
- * #TODO(sshd-template): migrate this into the sshd_config template flow and
- * drop once userPermissions + template cover permissions and directives.
- */
-function pmssEnsureAuthorizedKeysDirective(): void
-{
-    // #TODO Add tests for directive insertion to ensure idempotence and
-    //       safe in-place updates of sshd_config.
-    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
-        logMessage('[SKIP] PMSS_DRY_RUN: skipping sshd AuthorizedKeysFile directive enforcement');
-        return;
-    }
-    $sshdConfig = '/etc/ssh/sshd_config';
-    if (!is_string($config = @file_get_contents($sshdConfig))) {
-        return;
-    }
-    logMessage('[START] Ensuring sshd AuthorizedKeysFile directive is enabled');
-    if ($config === ($updated = str_replace('#AuthorizedKeysFile', 'AuthorizedKeysFile', $config))) {
-        return;
-    }
-
-    echo "# Allowing SSH Key based authentication.\n";
-    pmssBackupCriticalConfig('sshd', $sshdConfig);
-    pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', $config, 'sshd backup config', 'logMessage', 'root', 'root');
-    if (!pmssWriteManagedPathFile($sshdConfig, $updated, 'sshd config', 'logMessage', 'root', 'root')) {
-        return;
-    }
-    runStep('Restarting sshd service after config update', '/etc/init.d/ssh restart');
 }

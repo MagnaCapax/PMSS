@@ -59,8 +59,8 @@ class BootstrapWriteGuardTest extends TestCase
         $this->pmssAssertRepoFileContainsAllStrings($path, [
             "'../managedPath.php'",
             "pmssWriteManagedPathFile('/etc/hostname', \$hostname.PHP_EOL, 'hostname', \$log, 'root', 'root')",
-            "pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', \$config, 'sshd backup config', 'logMessage', 'root', 'root')",
-            "pmssWriteManagedPathFile(\$sshdConfig, \$updated, 'sshd config', 'logMessage', 'root', 'root')",
+            'pmssSshdConfigWriteUpdated(',
+            'pmssSshdAuthorizedKeysDirectiveNormalize(',
         ]);
         $this->pmssAssertRepoFileNotContainsStrings($path, ["file_put_contents('/etc/hostname'", 'file_put_contents($sshdConfig, $updated)']);
     }

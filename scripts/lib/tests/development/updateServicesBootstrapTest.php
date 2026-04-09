@@ -6,15 +6,26 @@ require_once dirname(__DIR__, 2).'/update/services/bootstrap.php';
 
 class UpdateServicesBootstrapTest extends TestCase
 {
-    public function testAuthorizedKeysDirectiveUsesGuardedBackupWriter(): void
+    public function testAuthorizedKeysDirectiveWriterStoresBackupAndUpdatedConfig(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/update/services/bootstrap.php');
+        $tempDir = $this->pmssMakeTempDir('pmss-sshd-authkeys-');
+        $sshdConfig = $tempDir.'/sshd_config';
+        $backupPath = $tempDir.'/pmss.sshd_config';
+        $original = "#AuthorizedKeysFile .ssh/authorized_keys\nPasswordAuthentication yes\n";
+        $updated = \pmssSshdAuthorizedKeysDirectiveNormalize($original);
 
-        $this->assertStringContainsString(
-            "pmssWriteManagedPathFile('/etc/ssh/pmss.sshd_config', \$config, 'sshd backup config', 'logMessage', 'root', 'root');",
-            $src,
-            'Expected sshd backup copy to use the guarded root-owned writer'
-        );
+        $this->pmssWriteFile($sshdConfig, $original);
+
+        $this->assertTrue(\pmssSshdConfigWriteUpdated($sshdConfig, $original, $updated, 'sshd config', true, $backupPath));
+        $this->assertEquals($updated, $this->pmssReadFileOrEmpty($sshdConfig));
+        $this->assertEquals($original, $this->pmssReadFileOrEmpty($backupPath));
+    }
+
+    public function testAuthorizedKeysDirectiveNormalizeReturnsOriginalWhenAlreadyEnabled(): void
+    {
+        $config = "AuthorizedKeysFile .ssh/authorized_keys\nPasswordAuthentication yes\n";
+
+        $this->assertSame($config, \pmssSshdAuthorizedKeysDirectiveNormalize($config));
     }
 
     public function testHostnameSkipTruthyValueSkips(): void

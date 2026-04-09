@@ -246,7 +246,8 @@ Sub-handlers:
 
 - pmssApplyRuntimeTemplates(): void
   - Installs `rc.local`, systemd `system.conf`, and `sshd_config` from templates;
-    sets perms and ownership; reexecs systemd and restarts sshd; runs rc.local.
+    converges `AuthorizedKeysFile` if the template leaves it commented; sets
+    perms and ownership; reexecs systemd and restarts sshd; runs rc.local.
 
 - pmssApplyJournaldLimits(?callable $logger=null): void
   - Renders `/etc/systemd/journald.conf.d/pmss-limits.conf` from template;
@@ -257,8 +258,6 @@ Sub-handlers:
     `/etc/seedbox/config/logging.conf` exists and enables remote logging;
     uses imjournal for systemd compatibility; restarts rsyslog.
     Best-effort only (never fatal); disabled by default.
-
-- pmssEnsureAuthorizedKeysDirective(): void → ensures `AuthorizedKeysFile` is not commented in `sshd_config`, backs up previous config, restarts SSH via init.d.
 
 - pmssEnsureCgroupsConfigured(?callable $logger=null): void → appends cgroup mount to `/etc/fstab` if missing, installs `cgroup-bin`, mounts path, attempts to raise root slice PID limit.
 

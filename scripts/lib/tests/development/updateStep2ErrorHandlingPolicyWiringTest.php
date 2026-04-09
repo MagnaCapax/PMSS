@@ -22,10 +22,9 @@ class UpdateStep2ErrorHandlingPolicyWiringTest extends TestCase
         $this->assertStringContainsString("require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';", $src);
         $this->assertStringContainsString("pmssUpdateStep2RunClassifiedCallable('Applying runtime service templates'", $src);
         $this->assertStringContainsString("pmssUpdateStep2RunClassifiedCallable('Configuring web stack'", $src);
-        $this->assertStringContainsString("pmssUpdateStep2RunClassifiedCallable('Ensuring sshd AuthorizedKeysFile directive'", $src);
         $this->assertTrue(
-            substr_count($src, 'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED') >= 3,
-            'Expected at least three MUST_SUCCEED annotations in update-step2'
+            substr_count($src, 'PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED') >= 2,
+            'Expected at least two MUST_SUCCEED annotations in update-step2'
         );
     }
 }

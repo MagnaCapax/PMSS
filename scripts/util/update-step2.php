@@ -600,7 +600,6 @@ if (is_array($userMaintenanceSummary)) {
 }
 // Per-user maintenance now owns crontab restores, htpasswd sync, and lighttpd instance checks.
 
-pmssUpdateStep2RunClassifiedCallable('Ensuring sshd AuthorizedKeysFile directive', 'pmssEnsureAuthorizedKeysDirective', [], PMSS_UPDATE_STEP_CLASS_MUST_SUCCEED);
 // Ensure the standard download speed test file exists
 $testfilePath = '/var/www/testfile';
 if (!file_exists($testfilePath) || filesize($testfilePath) !== 104857600) {

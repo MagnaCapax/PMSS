@@ -112,8 +112,8 @@ Post-package orchestration uses explicit step classes:
 3. `skip_if_missing` — reserved for optional dependencies that may be absent;
    log and continue when missing.
 
-Current `must_succeed` annotations cover runtime template deployment, web stack
-configuration, and sshd AuthorizedKeysFile directive enforcement.
+Current `must_succeed` annotations cover runtime template deployment (including
+the sshd AuthorizedKeysFile convergence), and web stack configuration.
 
 `pmssRefreshRepositories()` ensures external repo prerequisites (currently the
 Docker deb822+keyring and Sonarr scoped keyring) exist before it runs `apt update`.
