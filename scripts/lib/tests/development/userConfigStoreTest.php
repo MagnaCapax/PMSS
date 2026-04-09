@@ -37,7 +37,7 @@ class UserConfigStoreTest extends TestCase
 
     private function setUpTempDir(): void
     {
-        $this->pmssAssignTempDirProperty('tempDir', 'store', 0755, sys_get_temp_dir().'/pmss-userconfigstore-tests');
+        $this->pmssEnsureTempDirProperty('tempDir', 'store', 0755, sys_get_temp_dir().'/pmss-userconfigstore-tests');
     }
 
     private function basePayload(array $overrides = []): array

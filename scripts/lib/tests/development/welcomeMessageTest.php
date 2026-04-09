@@ -11,15 +11,7 @@ class WelcomeMessageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->setUpTempDir();
-    }
-
-    private function setUpTempDir(): void
-    {
-        if ($this->tempDir !== '') {
-            return;
-        }
-        $this->pmssAssignTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
+        $this->pmssEnsureTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
     }
 
     private function makeUserHome(): string

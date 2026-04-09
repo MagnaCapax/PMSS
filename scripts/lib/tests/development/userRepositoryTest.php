@@ -16,15 +16,7 @@ class UserRepositoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->setUpTempDir();
-    }
-
-    private function setUpTempDir(): void
-    {
-        if ($this->tempDir !== null && $this->tempDir !== '') {
-            return;
-        }
-        $this->pmssAssignTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
+        $this->pmssEnsureTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
     }
 
     public function testPersistAndReload(): void
