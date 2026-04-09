@@ -42,6 +42,14 @@ class userPasswordShadowSyncTest extends TestCase
         $this->assertEquals('', \pmssUserShadowPasswordHashRead('alice', $shadowPath));
     }
 
+    public function testReadShadowPasswordHashReturnsEmptyForMalformedEntry(): void
+    {
+        $shadowPath = $this->tempDir.'/shadow';
+        file_put_contents($shadowPath, "alice\n");
+
+        $this->assertEquals('', \pmssUserShadowPasswordHashRead('alice', $shadowPath));
+    }
+
     public function testHtpasswdHashWriteReplacesDuplicateUserEntries(): void
     {
         $path = $this->tempDir.'/home/alice/.lighttpd/.htpasswd';

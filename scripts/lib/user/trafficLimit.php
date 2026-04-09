@@ -231,22 +231,7 @@ if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
             return null;
         }
 
-        $lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if (!is_array($lines)) {
-            return null;
-        }
-
-        $prefix = $userName.':';
-        foreach ($lines as $line) {
-            if (!is_string($line) || strpos($line, $prefix) !== 0) {
-                continue;
-            }
-
-            $parts = explode(':', $line);
-            if (count($parts) < 7) {
-                return null;
-            }
-
+        if (($parts = pmssColonRecordFieldsLookup('/etc/passwd', $userName, 7)) !== null) {
             return [
                 'name' => (string) $parts[0],
                 'uid' => (int) $parts[2],

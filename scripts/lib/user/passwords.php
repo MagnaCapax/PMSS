@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/qbittorrent.php';
 
@@ -132,44 +133,22 @@ function pmssEnsureDelugeServicePassword(string $username): string
 function pmssUserShadowPasswordHashRead(string $username, string $shadowPath = '/etc/shadow'): string
 {
     $username = trim($username);
+    if (($parts = pmssColonRecordFieldsLookup($shadowPath, $username, 2)) === null) {
+        return '';
+    }
+    $passwordHash = trim((string) $parts[1]);
     if (
-        $username === ''
-        || strpos($username, ':') !== false
-        || preg_match('/[\r\n\0\/]/', $username) === 1
-        || !is_file($shadowPath)
-        || is_link($shadowPath)
+        $passwordHash === ''
+        || $passwordHash === '*'
+        || $passwordHash === '!'
+        || strpos($passwordHash, '!') === 0
+        || strpos($passwordHash, ':') !== false
+        || preg_match('/[\r\n\0]/', $passwordHash) === 1
     ) {
         return '';
     }
 
-    $lines = @file($shadowPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines)) {
-        return '';
-    }
-
-    $prefix = $username.':';
-    foreach ($lines as $line) {
-        if (!is_string($line) || strpos($line, $prefix) !== 0) {
-            continue;
-        }
-
-        $parts = explode(':', $line);
-        $passwordHash = isset($parts[1]) ? trim((string) $parts[1]) : '';
-        if (
-            $passwordHash === ''
-            || $passwordHash === '*'
-            || $passwordHash === '!'
-            || strpos($passwordHash, '!') === 0
-            || strpos($passwordHash, ':') !== false
-            || preg_match('/[\r\n\0]/', $passwordHash) === 1
-        ) {
-            return '';
-        }
-
-        return $passwordHash;
-    }
-
-    return '';
+    return $passwordHash;
 }
 
 /**

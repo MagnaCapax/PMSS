@@ -107,6 +107,24 @@ class UsernameValidationTest extends TestCase
         $this->assertEquals(null, \pmssPasswdEntryLookup('alice', $link));
     }
 
+    public function testColonRecordFieldsLookupRequiresExactMatchAndMinimumFields(): void
+    {
+        $passwd = $this->pmssMakeTempDir('pmss-passwd-fields-').'/passwd';
+        file_put_contents($passwd, implode("\n", [
+            'alice2:x:1000:1000::/home/alice2:/bin/bash',
+            'alice:x:1001:1001::/home/alice:/bin/bash',
+            'broken:x',
+            '',
+        ]));
+
+        $this->assertEquals(
+            ['alice', 'x', '1001', '1001', '', '/home/alice', '/bin/bash'],
+            \pmssColonRecordFieldsLookup($passwd, 'alice', 7, false)
+        );
+        $this->assertEquals(null, \pmssColonRecordFieldsLookup($passwd, 'ali', 7, false));
+        $this->assertEquals(null, \pmssColonRecordFieldsLookup($passwd, 'broken', 7, false));
+    }
+
     public function testInvalidUsernamesFail(): void
     {
         $invalid = [

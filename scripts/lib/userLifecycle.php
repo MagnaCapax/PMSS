@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__.'/user/log.php';
+require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/user/userFilesystem.php';
 require_once __DIR__.'/user/userConfigStore.php';
 
@@ -332,35 +333,16 @@ function pmssManagedUsersSelectFromCommand(string $command = '/scripts/listUsers
 function pmssPasswdEntryLookup(string $username, string $passwdPath = '/etc/passwd'): ?array
 {
     $normalized = pmssUsernameNormalizeIfValid($username);
-    if ($normalized === null || !is_file($passwdPath) || is_link($passwdPath)) {
+    if ($normalized === null || ($parts = pmssColonRecordFieldsLookup($passwdPath, $normalized, 7, false)) === null) {
         return null;
     }
 
-    $lines = @file($passwdPath, FILE_IGNORE_NEW_LINES);
-    if (!is_array($lines)) {
-        return null;
-    }
-
-    $prefix = $normalized.':';
-    foreach ($lines as $line) {
-        if (!is_string($line) || strpos($line, $prefix) !== 0) {
-            continue;
-        }
-
-        $parts = explode(':', $line);
-        if (count($parts) < 7) {
-            return null;
-        }
-
-        return array(
-            'name' => (string) $parts[0],
-            'uid' => (int) $parts[2],
-            'gid' => (int) $parts[3],
-            'dir' => (string) $parts[5],
-        );
-    }
-
-    return null;
+    return array(
+        'name' => (string) $parts[0],
+        'uid' => (int) $parts[2],
+        'gid' => (int) $parts[3],
+        'dir' => (string) $parts[5],
+    );
 }
 
 /** @return array<string,mixed>|null */

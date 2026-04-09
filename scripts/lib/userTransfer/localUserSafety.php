@@ -28,22 +28,12 @@ function pmssUserTransferAssertSafeLocalHome(string $user): string
                 'dir' => (string) ($pw['dir'] ?? ''),
             ]
             : null;
-    } elseif (is_array($lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES))) {
-        $prefix = $user.':';
-        foreach ($lines as $line) {
-            if (strpos($line, $prefix) !== 0) {
-                continue;
-            }
-            $parts = explode(':', $line);
-            $pw = count($parts) < 7
-                ? null
-                : [
-                    'uid' => (int) $parts[2],
-                    'gid' => (int) $parts[3],
-                    'dir' => (string) $parts[5],
-                ];
-            break;
-        }
+    } elseif (($parts = pmssColonRecordFieldsLookup('/etc/passwd', $user, 7)) !== null) {
+        $pw = [
+            'uid' => (int) $parts[2],
+            'gid' => (int) $parts[3],
+            'dir' => (string) $parts[5],
+        ];
     }
 
     if ($pw === null) {

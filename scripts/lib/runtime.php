@@ -172,6 +172,44 @@ if (!function_exists('pmssReadRegularFileDigits')) {
         return (($raw = pmssReadRegularFileTrimmed($path)) !== null && $raw !== '' && ctype_digit($raw)) ? $raw : null;
     }
 }
+if (!function_exists('pmssColonRecordFieldsLookup')) {
+    // Resolve a single colon-delimited account row without repeating file scans.
+    function pmssColonRecordFieldsLookup(string $path, string $recordName, int $minFields = 2, bool $skipEmptyLines = true): ?array
+    {
+        if (
+            $recordName === ''
+            || $minFields < 1
+            || strpos($recordName, ':') !== false
+            || preg_match('/[\r\n\0\/]/', $recordName) === 1
+            || !is_file($path)
+            || is_link($path)
+        ) {
+            return null;
+        }
+
+        $flags = FILE_IGNORE_NEW_LINES;
+        if ($skipEmptyLines) {
+            $flags |= FILE_SKIP_EMPTY_LINES;
+        }
+
+        $lines = @file($path, $flags);
+        if (!is_array($lines)) {
+            return null;
+        }
+
+        $prefix = $recordName.':';
+        foreach ($lines as $line) {
+            if (!is_string($line) || strpos($line, $prefix) !== 0) {
+                continue;
+            }
+
+            $fields = explode(':', $line);
+            return count($fields) >= $minFields ? $fields : null;
+        }
+
+        return null;
+    }
+}
 if (!function_exists('pmssReadRegularFileInt')) { function pmssReadRegularFileInt(string $path, int $default = 0): int { return (($raw = pmssReadRegularFileTrimmed($path)) === null || $raw === '') ? $default : (int) $raw; } }
 if (!function_exists('pmssHostnameRead')) {
     function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
