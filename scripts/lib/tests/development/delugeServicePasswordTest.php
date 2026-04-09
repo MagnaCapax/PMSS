@@ -52,6 +52,34 @@ class DelugeServicePasswordTest extends TestCase
         $this->assertStringContainsString("localclient:new-secret:10\n", (string) file_get_contents($authPath));
     }
 
+    public function testWriteLocalclientPasswordRejectsSymlinkTarget(): void
+    {
+        $realPath = $this->tempDir.'/auth-real';
+        $linkPath = $this->tempDir.'/auth-link';
+        file_put_contents($realPath, "localclient:original:10\n");
+
+        if (!function_exists('symlink') || @symlink($realPath, $linkPath) === false) {
+            throw new SkipTest('symlink not supported in this environment');
+        }
+
+        $this->assertTrue(!\pmssDelugeAuthWriteLocalclientPassword($linkPath, 'new-secret'));
+        $this->assertEquals("localclient:original:10\n", (string) file_get_contents($realPath));
+    }
+
+    public function testWriteLocalclientPasswordRejectsPathUnderSymlinkedParent(): void
+    {
+        $realDir = $this->tempDir.'/real-dir';
+        $linkDir = $this->tempDir.'/link-dir';
+        @mkdir($realDir, 0755, true);
+
+        if (!function_exists('symlink') || @symlink($realDir, $linkDir) === false) {
+            throw new SkipTest('symlink not supported in this environment');
+        }
+
+        $this->assertTrue(!\pmssDelugeAuthWriteLocalclientPassword($linkDir.'/auth', 'new-secret'));
+        $this->assertTrue(!file_exists($realDir.'/auth'));
+    }
+
     public function testEnsureDelugeServicePasswordRotatesTemplateToken(): void
     {
         $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');

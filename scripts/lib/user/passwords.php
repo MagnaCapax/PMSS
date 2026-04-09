@@ -66,6 +66,9 @@ function pmssDelugeAuthWriteLocalclientPassword(string $authPath, string $passwo
     if ($password === '' || strpos($password, ':') !== false || preg_match('/[\r\n]/', $password) === 1) {
         return false;
     }
+    if (!pmssUserFilePathIsSafe($authPath)) {
+        return false;
+    }
 
     $lines = @file($authPath, FILE_IGNORE_NEW_LINES);
     if (!is_array($lines)) {
@@ -85,12 +88,10 @@ function pmssDelugeAuthWriteLocalclientPassword(string $authPath, string $passwo
         $lines[] = 'localclient:'.$password.':10';
     }
 
-    $written = @file_put_contents($authPath, implode("\n", $lines)."\n");
-    if ($written === false) {
+    if (!pmssAtomicWriteFile($authPath, implode("\n", $lines)."\n", 0600)) {
         return false;
     }
 
-    @chmod($authPath, 0600);
     return true;
 }
 
