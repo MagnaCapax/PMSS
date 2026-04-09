@@ -121,10 +121,16 @@ function pmssStatusProbeSpecs(string $sourcesPath): array
 function pmssStatusCollectProbeChecks(array $probeSpecs, callable $binaryProbe, callable $pathProbe): array
 {
     $checks = [];
-    foreach ($probeSpecs['binaries'] as $binary => $binarySpec) {
+    $binarySpecs = isset($probeSpecs['binaries']) && is_array($probeSpecs['binaries'])
+        ? $probeSpecs['binaries']
+        : [];
+    foreach ($binarySpecs as $binary => $binarySpec) {
         ($check = $binaryProbe((string) $binary, $binarySpec)) !== null && $checks[] = $check;
     }
-    foreach ($probeSpecs['paths'] as $pathSpec) {
+    $pathSpecs = isset($probeSpecs['paths']) && is_array($probeSpecs['paths'])
+        ? $probeSpecs['paths']
+        : [];
+    foreach ($pathSpecs as $pathSpec) {
         ($check = $pathProbe($pathSpec)) !== null && $checks[] = $check;
     }
     return $checks;
@@ -137,7 +143,14 @@ function pmssStatusBinaryProbeCheck(string $binary, array $binarySpec, callable 
     $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
     if ($componentView) return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
     if ($path === '') return pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
-    $detail = trim((string) $runCommand((string) $binarySpec['infoCommand']));
+    $infoCommand = isset($binarySpec['infoCommand']) && is_string($binarySpec['infoCommand'])
+        ? trim($binarySpec['infoCommand'])
+        : '';
+    if ($infoCommand === '') {
+        return pmssStatus('Binary: '.$binary, 'OK', 'present');
+    }
+
+    $detail = trim((string) $runCommand($infoCommand));
     return pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
 }
 

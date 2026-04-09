@@ -244,6 +244,43 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertTrue(pmssStatusBinaryProbeCheck('wget', ['infoCommand' => 'wget --version 2>&1 | head -n 1'], $runCommand, $isExecutable, true) === null);
     }
 
+    public function testSharedBinaryProbeRendererDefaultsMissingInfoCommandToPresentWithoutWarnings(): void
+    {
+        $commands = [];
+        $runCommand = static function (string $command) use (&$commands): string {
+            $commands[] = $command;
+
+            return $command === "command -v 'nginx'" ? '/usr/sbin/nginx' : '';
+        };
+        $warnings = [];
+
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = [$severity, $message];
+
+            return true;
+        });
+
+        try {
+            $result = pmssStatusBinaryProbeCheck(
+                'nginx',
+                ['componentName' => 'bin.nginx'],
+                $runCommand,
+                static function (string $path): bool {
+                    return $path === '/usr/sbin/nginx';
+                }
+            );
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertEquals([], $warnings);
+        $this->assertSame(
+            ['name' => 'Binary: nginx', 'status' => 'OK', 'detail' => 'present'],
+            $result
+        );
+        $this->assertSame(["command -v 'nginx'"], $commands);
+    }
+
     public function testSharedProbeCollectorPreservesCatalogOrderWhileFilteringNulls(): void
     {
         $checks = pmssStatusCollectProbeChecks(
@@ -280,6 +317,34 @@ final class SystemStatusCharacterizationTest extends TestCase
             ],
             $checks
         );
+    }
+
+    public function testSharedProbeCollectorTreatsMissingCatalogBucketsAsEmptyArrays(): void
+    {
+        $warnings = [];
+
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = [$severity, $message];
+
+            return true;
+        });
+
+        try {
+            $checks = pmssStatusCollectProbeChecks(
+                [],
+                static function (string $binary, array $binarySpec): ?array {
+                    return pmssStatus('Binary: '.$binary, 'OK', 'unexpected');
+                },
+                static function (array $pathSpec): ?array {
+                    return pmssStatus('Path: '.(string) ($pathSpec['path'] ?? ''), 'OK', 'unexpected');
+                }
+            );
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $warnings);
+        $this->assertSame([], $checks);
     }
 
     public function testStatusSummaryCountsOkWarnAndErr(): void
