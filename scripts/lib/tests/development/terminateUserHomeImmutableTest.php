@@ -1,8 +1,9 @@
 <?php
-
 declare(strict_types=1);
 
-use PHPUnit\Framework\TestCase;
+namespace PMSS\Tests;
+
+require_once __DIR__.'/../common/TestCase.php';
 
 final class terminateUserHomeImmutableTest extends TestCase
 {
