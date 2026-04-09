@@ -9,27 +9,14 @@ class RepositoryPrerequisitesTest extends TestCase
 {
     public function testMediaareaBootstrapSkipsWhenKeyPresent(): void
     {
-        $previousDryRun = getenv('PMSS_DRY_RUN');
-        $previousKeyPath = getenv('PMSS_APT_MEDIAAREA_KEY_PATH');
-
         $tempKey = $this->pmssWriteTempFile('mediaarea-key', 'placeholder');
 
         $before = $this->listBootstrapDirs();
-        putenv('PMSS_APT_MEDIAAREA_KEY_PATH='.$tempKey);
-        try {
+        $this->pmssWithTrackedEnv([
+            'PMSS_APT_MEDIAAREA_KEY_PATH' => $tempKey,
+        ], function (): void {
             \pmssEnsureMediaareaRepository();
-        } finally {
-            if ($previousKeyPath === false) {
-                putenv('PMSS_APT_MEDIAAREA_KEY_PATH');
-            } else {
-                putenv('PMSS_APT_MEDIAAREA_KEY_PATH='.$previousKeyPath);
-            }
-            if ($previousDryRun === false) {
-                putenv('PMSS_DRY_RUN');
-            } else {
-                putenv('PMSS_DRY_RUN='.$previousDryRun);
-            }
-        }
+        }, ['PMSS_DRY_RUN']);
         $after = $this->listBootstrapDirs();
         $this->assertEquals($before, $after, 'MediaArea bootstrap should skip when key already present');
     }
@@ -125,52 +112,20 @@ class RepositoryPrerequisitesTest extends TestCase
         }
         file_put_contents($sourcesPath, "deb http://deb.debian.org/debian bullseye main\n");
 
-        $previousKeyringDir = getenv('PMSS_APT_KEYRING_DIR');
-        $previousKeyPath = getenv('PMSS_APT_SONARR_KEY_PATH');
-        $previousLegacyKeyPath = getenv('PMSS_APT_SONARR_LEGACY_KEY_PATH');
-        $previousSourcesListDir = getenv('PMSS_APT_SOURCES_LIST_D_PATH');
-        $previousSourcesPath = getenv('PMSS_APT_SOURCES_PATH');
-
-        putenv('PMSS_APT_KEYRING_DIR='.$keyDir);
-        putenv('PMSS_APT_SONARR_KEY_PATH='.$keyPath);
-        putenv('PMSS_APT_SONARR_LEGACY_KEY_PATH='.$legacyKeyPath);
-        putenv('PMSS_APT_SOURCES_LIST_D_PATH='.$sourcesDir);
-        putenv('PMSS_APT_SOURCES_PATH='.$sourcesPath);
-
-        try {
+        $this->pmssWithTrackedEnv([
+            'PMSS_APT_KEYRING_DIR' => $keyDir,
+            'PMSS_APT_SONARR_KEY_PATH' => $keyPath,
+            'PMSS_APT_SONARR_LEGACY_KEY_PATH' => $legacyKeyPath,
+            'PMSS_APT_SOURCES_LIST_D_PATH' => $sourcesDir,
+            'PMSS_APT_SOURCES_PATH' => $sourcesPath,
+        ], function () use ($callback, $root, $keyPath, $legacyKeyPath, $listPath): void {
             $callback([
                 'root' => $root,
                 'key' => $keyPath,
                 'legacy_key' => $legacyKeyPath,
                 'list' => $listPath,
             ]);
-        } finally {
-            if ($previousKeyringDir === false) {
-                putenv('PMSS_APT_KEYRING_DIR');
-            } else {
-                putenv('PMSS_APT_KEYRING_DIR='.$previousKeyringDir);
-            }
-            if ($previousKeyPath === false) {
-                putenv('PMSS_APT_SONARR_KEY_PATH');
-            } else {
-                putenv('PMSS_APT_SONARR_KEY_PATH='.$previousKeyPath);
-            }
-            if ($previousLegacyKeyPath === false) {
-                putenv('PMSS_APT_SONARR_LEGACY_KEY_PATH');
-            } else {
-                putenv('PMSS_APT_SONARR_LEGACY_KEY_PATH='.$previousLegacyKeyPath);
-            }
-            if ($previousSourcesListDir === false) {
-                putenv('PMSS_APT_SOURCES_LIST_D_PATH');
-            } else {
-                putenv('PMSS_APT_SOURCES_LIST_D_PATH='.$previousSourcesListDir);
-            }
-            if ($previousSourcesPath === false) {
-                putenv('PMSS_APT_SOURCES_PATH');
-            } else {
-                putenv('PMSS_APT_SOURCES_PATH='.$previousSourcesPath);
-            }
-        }
+        });
     }
 
     // Legacy helper removed; MediaArea key tests now rely on a single temp file override.

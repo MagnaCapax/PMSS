@@ -49,9 +49,7 @@ cat "$pkg" > "${PMSS_TEST_DPKG_CAPTURE}"
 SH
         );
 
-        $originalPath = getenv('PATH');
-        $pathPrefix = ($originalPath === false || $originalPath === '') ? '' : ':'.$originalPath;
-        $env['PATH'] = $binDir.$pathPrefix;
+        $env = $this->pmssPathPrefixedEnvironment($binDir, $env);
         $env['PMSS_TEST_COMMAND_LOG'] = $commandLog;
         $env['PMSS_TEST_DPKG_CAPTURE'] = $dpkgCapture;
 

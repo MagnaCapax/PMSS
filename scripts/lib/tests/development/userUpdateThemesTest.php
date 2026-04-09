@@ -22,18 +22,18 @@ class UserUpdateThemesTest extends TestCase
         $jsonLog = $this->pmssMakeTempFile('pmss-user-theme-');
         @file_put_contents($jsonLog, '');
 
-        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_JSON_LOG', 'PMSS_SKEL_DIR']);
-        putenv('PMSS_DRY_RUN=1');
-        putenv('PMSS_JSON_LOG='.$jsonLog);
-        putenv('PMSS_SKEL_DIR='.$skel);
-        $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
-
         $cmd = null;
         try {
-            \pmssUserUpdateThemes($ctx);
-            $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Installing ruTorrent theme Agent34');
+            $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
+            $this->pmssWithTrackedEnv([
+                'PMSS_DRY_RUN' => '1',
+                'PMSS_JSON_LOG' => $jsonLog,
+                'PMSS_SKEL_DIR' => $skel,
+            ], function () use ($ctx, $jsonLog, &$cmd): void {
+                \pmssUserUpdateThemes($ctx);
+                $cmd = $this->pmssFindJsonStepCommand($jsonLog, 'Installing ruTorrent theme Agent34');
+            });
         } finally {
-            $this->pmssRestoreEnvMap($previous);
             $GLOBALS['PMSS_JSON_LOG_PATH'] = null;
         }
 

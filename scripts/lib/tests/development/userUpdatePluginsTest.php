@@ -13,12 +13,11 @@ class UserUpdatePluginsTest extends TestCase
     {
         $home = $this->pmssMakeTempDir('pmss-plugins-home-');
 
-        $previous = $this->pmssCaptureEnv(['PMSS_DRY_RUN', 'PMSS_SKEL_DIR']);
-        putenv('PMSS_DRY_RUN=1');
-        putenv('PMSS_SKEL_DIR='.sys_get_temp_dir().'/does-not-exist');
-
         $GLOBALS['PMSS_PROFILE'] = [];
-        try {
+        $this->pmssWithEnv([
+            'PMSS_DRY_RUN' => '1',
+            'PMSS_SKEL_DIR' => sys_get_temp_dir().'/does-not-exist',
+        ], function () use ($home): void {
             $ctx = [
                 'user'     => 'dummy',
                 'home'     => $home,
@@ -37,9 +36,7 @@ class UserUpdatePluginsTest extends TestCase
                 $expectedCmd,
                 (string) $this->pmssFindProfileCommand('Installing unpack plugin')
             );
-        } finally {
-            $this->pmssRestoreEnvMap($previous);
-        }
+        });
     }
 
     public function testEnsurePluginsOwnsRetrackerCleanupAndDirectoryBootstrap(): void

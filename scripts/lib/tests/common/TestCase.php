@@ -793,25 +793,37 @@ abstract class TestCase
     }
 
     /**
+     * Apply temporary environment overrides and restore the requested env keys afterwards.
+     *
+     * @param array<string, string|null> $values
+     * @param array<int, string> $trackedKeys
+     */
+    protected function pmssWithTrackedEnv(
+        array $values,
+        callable $callback,
+        array $trackedKeys = [],
+        bool $unsetEmptyString = false
+    ): void {
+        $previous = $this->pmssCaptureEnv(array_values(array_unique(array_merge(array_keys($values), $trackedKeys))));
+        foreach ($values as $key => $value) {
+            $this->pmssRestoreEnv($key, $value, $unsetEmptyString);
+        }
+
+        try {
+            $callback();
+        } finally {
+            $this->pmssRestoreEnvMap($previous, $unsetEmptyString);
+        }
+    }
+
+    /**
      * Apply temporary environment variable overrides for the duration of a callback.
      *
      * @param array<string, string|null> $values
      */
     protected function pmssWithEnv(array $values, callable $callback): void
     {
-        $previous = [];
-        foreach ($values as $key => $value) {
-            $previous[$key] = getenv($key);
-            $this->pmssRestoreEnv($key, $value);
-        }
-
-        try {
-            $callback();
-        } finally {
-            foreach ($previous as $key => $value) {
-                $this->pmssRestoreEnv($key, $value);
-            }
-        }
+        $this->pmssWithTrackedEnv($values, $callback);
     }
 
     /**
