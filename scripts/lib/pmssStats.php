@@ -18,6 +18,54 @@ require_once __DIR__.'/user/trafficLimit.php';
 require_once __DIR__.'/cli/optionParser.php';
 
 /**
+ * Normalise a stats username when it cleanly maps to a PMSS account.
+ */
+function pmssStatsContextUserNormalize(string $user): string
+{
+    $user = trim($user);
+    if ($user === '') {
+        return '';
+    }
+
+    if (function_exists('pmssUsernameNormalizeIfValid')) {
+        $normalized = pmssUsernameNormalizeIfValid($user);
+        return is_string($normalized) ? $normalized : $user;
+    }
+
+    if (function_exists('pmssNormalizeUsername')) {
+        $normalized = pmssNormalizeUsername($user);
+        if (function_exists('pmssUsernameIsValid') && pmssUsernameIsValid($normalized)) {
+            return $normalized;
+        }
+    }
+
+    return $user;
+}
+
+/**
+ * Choose the safe default home root for a stats context user.
+ */
+function pmssStatsContextDefaultHome(string $user): string
+{
+    return function_exists('pmssUsernameIsValid') && pmssUsernameIsValid($user)
+        ? '/home/'.$user
+        : '/home';
+}
+
+/**
+ * Resolve one stats path override while rejecting malformed or relative input.
+ */
+function pmssStatsContextPathResolve($candidate, string $default, bool $directoryPath = false): string
+{
+    $path = trim((string) $candidate);
+    if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1 || $path[0] !== '/') {
+        $path = $default;
+    }
+
+    return $directoryPath ? pmssDirPathNormalize($path) : $path;
+}
+
+/**
  * Resolve the effective user, home, and local PMSS paths for stats reads.
  *
  * @param array<string, string> $overrides
@@ -36,17 +84,34 @@ function pmssStatsResolveContext(array $overrides = []): array
     if ($user === '') {
         $user = trim((string) (getenv('USER') ?: get_current_user()));
     }
+    $user = pmssStatsContextUserNormalize($user);
 
-    $home = rtrim((string) ($overrides['home'] ?? getenv('PMSS_STATS_HOME') ?: getenv('HOME') ?: '/home/'.$user), '/');
-    if ($home === '') {
-        $home = '/home/'.$user;
-    }
+    $defaultHome = pmssStatsContextDefaultHome($user);
+    $home = pmssStatsContextPathResolve(
+        $overrides['home'] ?? getenv('PMSS_STATS_HOME') ?: getenv('HOME') ?: $defaultHome,
+        $defaultHome,
+        true
+    );
 
-    $configDir = rtrim((string) ($overrides['config_dir'] ?? getenv('PMSS_STATS_CONFIG_DIR') ?: '/etc/seedbox/config'), '/');
-    $socketPath = (string) ($overrides['socket_path'] ?? getenv('PMSS_STATS_SOCKET_PATH') ?: ($home.'/.rtorrent.socket'));
-    $versionFile = (string) ($overrides['version_file'] ?? getenv('PMSS_STATS_VERSION_FILE') ?: '/etc/seedbox/config/version');
+    $configDir = pmssStatsContextPathResolve(
+        $overrides['config_dir'] ?? getenv('PMSS_STATS_CONFIG_DIR') ?: '/etc/seedbox/config',
+        '/etc/seedbox/config',
+        true
+    );
+    $socketPath = pmssStatsContextPathResolve(
+        $overrides['socket_path'] ?? getenv('PMSS_STATS_SOCKET_PATH') ?: ($home.'/.rtorrent.socket'),
+        $home.'/.rtorrent.socket'
+    );
+    $versionFile = pmssStatsContextPathResolve(
+        $overrides['version_file'] ?? getenv('PMSS_STATS_VERSION_FILE') ?: '/etc/seedbox/config/version',
+        '/etc/seedbox/config/version'
+    );
 
-    $cgroupDir = trim((string) ($overrides['cgroup_dir'] ?? getenv('PMSS_STATS_CGROUP_DIR') ?: ''));
+    $cgroupDir = pmssStatsContextPathResolve(
+        $overrides['cgroup_dir'] ?? getenv('PMSS_STATS_CGROUP_DIR') ?: '',
+        '',
+        true
+    );
     if ($cgroupDir === '') {
         $lines = @file('/proc/self/cgroup', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         if (is_array($lines)) {
