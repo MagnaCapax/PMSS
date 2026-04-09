@@ -89,13 +89,7 @@ TEXT;
 
     if (isset($options['json'])) {
         $payload = ['users' => $rows, 'totals' => $totals, 'missing' => $missingStats];
-        if (!is_string($encoded = pmssJsonEncodeSafe($payload))) {
-            fwrite(STDERR, "Failed to encode resource report JSON.\n");
-            return 1;
-        }
-
-        echo $encoded."\n";
-        return 0;
+        return pmssJsonEmitPayload($payload, 'Failed to encode resource report JSON.');
     }
 
     $formatBytes = static function (float $bytes): string {

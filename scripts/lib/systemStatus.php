@@ -54,14 +54,7 @@ function pmssStatusEmit(
 ): int
 {
     if ($wantJson) {
-        $encoded = pmssJsonEncodeSafe($jsonPayload, $jsonFlags);
-        if (!is_string($encoded)) {
-            fwrite(STDERR, "Failed to encode status JSON.\n");
-            return 1;
-        }
-
-        echo $encoded.PHP_EOL;
-        return 0;
+        return pmssJsonEmitPayload($jsonPayload, 'Failed to encode status JSON.', $jsonFlags);
     }
 
     $summary = $summary ?? pmssStatusSummary($checks);

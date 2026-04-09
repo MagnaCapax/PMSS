@@ -53,6 +53,20 @@ if (!function_exists('pmssJsonLineAppend')) {
     }
 }
 
+if (!function_exists('pmssJsonEmitPayload')) {
+    /** Emit one JSON payload to stdout while keeping encode failures on stderr. */
+    function pmssJsonEmitPayload(array $payload, string $errorMessage, int $flags = 0): int
+    {
+        if (!is_string($encoded = pmssJsonEncodeSafe($payload, $flags))) {
+            fwrite(STDERR, rtrim($errorMessage, "\n").PHP_EOL);
+            return 1;
+        }
+
+        echo $encoded.PHP_EOL;
+        return 0;
+    }
+}
+
 if (!function_exists('pmssLogAppendTimestampedLine')) {
     /** Append one timestamped line to a log file. */
     function pmssLogAppendTimestampedLine(string $path, string $message, string $timestampFormat = '[Y-m-d H:i:s] ', string $prefix = '', ?int $mode = null): bool

@@ -588,13 +588,7 @@ function pmssStatsMain(array $argv): int
 
     $stats = pmssStatsCollect();
     if ($options['json']) {
-        if (!is_string($encoded = pmssJsonEncodeSafe($stats, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
-            fwrite(STDERR, "Failed to encode PMSS stats JSON.\n");
-            return 1;
-        }
-
-        echo $encoded.PHP_EOL;
-        return 0;
+        return pmssJsonEmitPayload($stats, 'Failed to encode PMSS stats JSON.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 
     echo pmssStatsRenderText($stats, $options);
