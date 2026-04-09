@@ -40,6 +40,23 @@ function pmssResourceLogArrayIntField(array $values, string $field): int
     return array_key_exists($field, $values) ? (int) $values[$field] : 0;
 }
 
+/**
+ * Read one previously persisted monotonic counter field when it stays numeric.
+ */
+function pmssResourceLogArrayNullableCounterField(array $values, string $field): ?int
+{
+    if (!array_key_exists($field, $values)) {
+        return null;
+    }
+
+    $value = $values[$field];
+    if (is_int($value)) {
+        return $value >= 0 ? $value : null;
+    }
+
+    return is_string($value) && ctype_digit($value) ? (int) $value : null;
+}
+
 /** Persist counter state under lock and return deltas for the selected fields.
  *
  * @return array{delta: array<string, int>, previous_state: array<string, mixed>, state: array<string, int>}
@@ -53,8 +70,9 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
     $delta = [];
     foreach ($deltaFields as $field) {
         $currentValue = pmssResourceLogArrayIntField($state, $field);
-        $delta[$field] = isset($previousState[$field]) && $currentValue >= (int) $previousState[$field]
-            ? $currentValue - (int) $previousState[$field]
+        $previousValue = pmssResourceLogArrayNullableCounterField($previousState, $field);
+        $delta[$field] = $previousValue !== null && $currentValue >= $previousValue
+            ? $currentValue - $previousValue
             : $currentValue;
     }
 

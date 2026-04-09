@@ -349,6 +349,37 @@ class ResourceLogHelpersTest extends TestCase
         $this->assertEquals(6, $result['delta']['cpu_nsec']);
     }
 
+    public function testUpdateStateIgnoresMalformedPreviousCounterFields(): void
+    {
+        $root = $this->makeRoot();
+        $statePath = $root.'/state.json';
+        file_put_contents($statePath, json_encode([
+            'io_read' => ['bad'],
+            'io_write' => true,
+            'cpu_nsec' => '12ns',
+            'memory' => 1,
+            'tasks' => 1,
+            'ts' => 1,
+        ]));
+        $warnings = [];
+
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = [$severity, $message];
+            return true;
+        });
+
+        try {
+            $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(10, 20, 30, 1024, 2));
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertEquals([], $warnings);
+        $this->assertEquals(10, $result['delta']['io_read']);
+        $this->assertEquals(20, $result['delta']['io_write']);
+        $this->assertEquals(30, $result['delta']['cpu_nsec']);
+    }
+
     public function testUpdateStateDefaultsMissingCountersWithoutWarnings(): void
     {
         $root = $this->makeRoot();
