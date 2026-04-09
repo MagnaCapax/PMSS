@@ -15,10 +15,9 @@ class SupportCommandTest extends TestCase
 
     protected function setUp(): void
     {
-        $suffix = bin2hex(random_bytes(4));
-        $this->homeRoot = sys_get_temp_dir().'/pmss-support-home-'.$suffix;
-        $this->configDir = sys_get_temp_dir().'/pmss-support-config-'.$suffix;
-        $this->skelDir = sys_get_temp_dir().'/pmss-support-skel-'.$suffix;
+        $this->pmssAssignTempDirProperty('homeRoot', 'pmss-support-home-');
+        $this->pmssAssignTempDirProperty('configDir', 'pmss-support-config-');
+        $this->pmssAssignTempDirProperty('skelDir', 'pmss-support-skel-');
         $this->user = 'user'.bin2hex(random_bytes(2));
 
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
@@ -42,13 +41,6 @@ class SupportCommandTest extends TestCase
             'PMSS_HOME_DIR' => $this->homeRoot,
             'PMSS_SKEL_DIR' => $this->skelDir,
         ]);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->cleanup($this->homeRoot);
-        $this->cleanup($this->configDir);
-        $this->cleanup($this->skelDir);
     }
 
     public function testMessageNormalizeRejectsEmptyInput(): void

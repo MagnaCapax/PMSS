@@ -14,9 +14,8 @@ class TorrentPortFrontendTest extends TestCase
 
     protected function setUp(): void
     {
-        $suffix = bin2hex(random_bytes(4));
-        $this->homeRoot = sys_get_temp_dir().'/pmss-torrent-frontends-home-'.$suffix;
-        $this->skelDir = sys_get_temp_dir().'/pmss-torrent-frontends-skel-'.$suffix;
+        $this->pmssAssignTempDirProperty('homeRoot', 'pmss-torrent-frontends-home-');
+        $this->pmssAssignTempDirProperty('skelDir', 'pmss-torrent-frontends-skel-');
         $this->user = 'user'.bin2hex(random_bytes(2));
 
         $this->pmssEnsureDir($this->homeRoot.'/'.$this->user);
@@ -27,12 +26,6 @@ class TorrentPortFrontendTest extends TestCase
             'PMSS_HOME_DIR' => $this->homeRoot,
             'PMSS_SKEL_DIR' => $this->skelDir,
         ]);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->cleanup($this->homeRoot);
-        $this->cleanup($this->skelDir);
     }
 
     public function testApplySkeletonFilesPatchesDelugeFrontendToUsePhpHelper(): void

@@ -4,8 +4,11 @@ set -euo pipefail
 # Verify tracked PHP files include a PHP open tag so plain-text files do not
 # slip through CI undetected.
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-mapfile -d '' PHP_FILES < <(git -C "$ROOT_DIR" ls-files -z '*.php')
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
+
+ROOT_DIR="$(pmss_testing_root_dir)"
+mapfile -d '' PHP_FILES < <(pmss_testing_list_tracked_php_files "$ROOT_DIR")
 
 echo "[open-tag-lint] scanning ${#PHP_FILES[@]} PHP files" >&2
 

@@ -10,8 +10,7 @@ class PolicyOverridePrecedenceTest extends TestCase
 
     private function createPolicyDir(string $suffix, string $body): string
     {
-        $cfgDir = sys_get_temp_dir().'/pmss-cg-'.bin2hex(random_bytes(4)).'-'.$suffix;
-        @mkdir($cfgDir, 0700, true);
+        $cfgDir = $this->pmssMakeNamedTempDir('pmss-cg-'.$suffix.'-', 0700);
         file_put_contents($cfgDir.'/cgroup.policy.php', $body);
         return $cfgDir;
     }

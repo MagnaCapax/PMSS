@@ -14,7 +14,10 @@ set -euo pipefail
 # Exclusions:
 # - tests/, vendor/, etc/skel/, scripts/lib/devristo/
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
+
+ROOT_DIR="$(pmss_testing_root_dir)"
 STRICT="${PMSS_LINT_SHARP_STRICT:-1}"
 PATTERN='rm[[:space:]]+-rf|chmod[[:space:]]+-R|chown[[:space:]]+-R|chgrp[[:space:]]+-R|\bmv[[:space:]]'
 PHP_WRAPPER_REGEX='(runStep|runUserStep|runSoft|runFatal|runCommand|pmssUserLifecycleStep|run)\s*\('
@@ -82,6 +85,9 @@ reportFatalMatches() {
 phpScan() {
   local file raw line text
   while IFS= read -r -d '' file; do
+    case "$file" in
+      */scripts/lib/tests/*) continue ;;
+    esac
     if phpAllowlistedFile "$file"; then
       continue
     fi
@@ -98,17 +104,15 @@ phpScan() {
       fi
       reportViolation "PHP" "$file" "${line}: ${text}"
     done < <(scanMatches "$file")
-  done < <(find "$ROOT_DIR" -type f -name "*.php" \
-           -not -path "*/.git/*" \
-           -not -path "*/vendor/*" \
-           -not -path "*/scripts/lib/tests/*" \
-           -not -path "*/scripts/lib/devristo/*" \
-           -not -path "*/etc/skel/*" -print0)
+  done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
 }
 
 shScan() {
   local file raw line text
   while IFS= read -r -d '' file; do
+    case "$file" in
+      */development/*|*/etc/skel/*|*/scripts/testing/sharp-edges-lint.sh) continue ;;
+    esac
     while IFS= read -r raw; do
       line="${raw%%:*}"
       text="${raw#*: }"
@@ -120,12 +124,7 @@ shScan() {
       fi
       reportViolation "Shell" "$file" "${line}: ${text}"
     done < <(scanMatches "$file")
-  done < <(find "$ROOT_DIR" -type f -name "*.sh" \
-           -not -path "*/.git/*" \
-           -not -path "*/vendor/*" \
-           -not -path "$ROOT_DIR/development/*" \
-           -not -path "*/etc/skel/*" \
-           -not -path "*/scripts/testing/sharp-edges-lint.sh" -print0)
+  done < <(pmss_testing_find_bash_files "$ROOT_DIR")
 }
 
 # Fatal patterns – always fail CI regardless of STRICT mode.

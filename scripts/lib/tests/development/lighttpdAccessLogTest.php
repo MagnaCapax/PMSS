@@ -10,12 +10,7 @@ class LighttpdAccessLogTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = $this->pmssMakeTempDir('pmss-lighttpd-access-log-');
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssRemoveTree($this->tempDir);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-lighttpd-access-log-');
     }
 
     public function testThresholdMatchesOneHundredMiB(): void

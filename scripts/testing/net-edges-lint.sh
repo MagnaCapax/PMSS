@@ -6,7 +6,10 @@ set -euo pipefail
 # Exclusions: vendor/, tests/, etc/skel/, scripts/lib/devristo/
 # For PHP: allow when used inside runStep(..., "curl ...") etc.
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
+
+ROOT_DIR="$(pmss_testing_root_dir)"
 STRICT="${PMSS_LINT_NET_STRICT:-0}"
 PATTERN='curl\b|wget\b|\bnc\b|telnet\b'
 VIOL=0
@@ -19,6 +22,9 @@ scanMatches() {
 phpScan() {
   local file raw
   while IFS= read -r -d '' file; do
+    case "$file" in
+      */scripts/lib/tests/*) continue ;;
+    esac
     while IFS= read -r raw; do
       # Permit when inside runStep command string
       if grep -Eq "runStep\s*\(.*(curl|wget|nc|telnet).*\)" <<<"$raw"; then
@@ -27,26 +33,20 @@ phpScan() {
       echo "PHP net edge: $file: ${raw}" >&2
       VIOL=$((VIOL+1))
     done < <(scanMatches "$file")
-  done < <(find "$ROOT_DIR" -type f -name "*.php" \
-           -not -path "*/.git/*" \
-           -not -path "*/vendor/*" \
-           -not -path "*/scripts/lib/tests/*" \
-           -not -path "*/scripts/lib/devristo/*" \
-           -not -path "*/etc/skel/*" -print0)
+  done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
 }
 
 shScan() {
   local file raw
   while IFS= read -r -d '' file; do
+    case "$file" in
+      */etc/skel/*|*/scripts/testing/net-edges-lint.sh) continue ;;
+    esac
     while IFS= read -r raw; do
       echo "Shell net edge: $file: ${raw}" >&2
       VIOL=$((VIOL+1))
     done < <(scanMatches "$file")
-  done < <(find "$ROOT_DIR" -type f -name "*.sh" \
-           -not -path "*/.git/*" \
-           -not -path "*/vendor/*" \
-           -not -path "*/etc/skel/*" \
-           -not -path "*/scripts/testing/net-edges-lint.sh" -print0)
+  done < <(pmss_testing_find_bash_files "$ROOT_DIR")
 }
 
 phpScan

@@ -7,8 +7,10 @@ set -euo pipefail
 # - PHP files with a php shebang must be executable.
 # - PHP files without a shebang must not be executable.
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT_DIR"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
+
+ROOT_DIR="$(pmss_testing_root_dir)"
 
 fail=0
 
@@ -25,11 +27,7 @@ while IFS= read -r -d '' file; do
       fail=1
     fi
   fi
-done < <(find "$ROOT_DIR" -type f -name "*.php" \
-  -not -path "*/.git/*" \
-  -not -path "*/vendor/*" \
-  -not -path "*/etc/skel/*" \
-  -not -path "*/scripts/lib/devristo/*" -print0)
+done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
 
 if [[ $fail -ne 0 ]]; then
   echo "exec-bit-lint: $fail issue(s) found" >&2

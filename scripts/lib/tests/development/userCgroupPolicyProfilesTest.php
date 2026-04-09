@@ -10,8 +10,7 @@ class UserCgroupPolicyProfilesTest extends TestCase
 
     private function createPolicyDir(array $policy): string
     {
-        $directory = sys_get_temp_dir().'/pmss-cgroup-policy-profiles-'.bin2hex(random_bytes(4));
-        @mkdir($directory, 0700, true);
+        $directory = $this->pmssMakeNamedTempDir('pmss-cgroup-policy-profiles-', 0700);
 
         $body = "<?php\nreturn ".var_export($policy, true).";\n";
         file_put_contents($directory.'/cgroup.policy.php', $body);

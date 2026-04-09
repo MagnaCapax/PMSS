@@ -10,20 +10,7 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir().'/pmss-dist-upgrade-helpers-'.mt_rand(1000, 999999);
-        @mkdir($this->tmpDir, 0755, true);
-    }
-
-    public function tearDown(): void
-    {
-        if (!is_dir($this->tmpDir)) {
-            return;
-        }
-
-        foreach ((array) glob($this->tmpDir.'/*') as $file) {
-            @unlink($file);
-        }
-        @rmdir($this->tmpDir);
+        $this->pmssAssignTempDirProperty('tmpDir', 'pmss-dist-upgrade-helpers-');
     }
 
     public function testResolveTargetVersionAcceptsNumbersAndCodenames(): void

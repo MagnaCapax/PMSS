@@ -4,9 +4,11 @@ set -euo pipefail
 # Lints for PHP short open tags "<?" that are not "<?php" or "<?="
 # Applies to all tracked *.php files (vendor excluded by git ls-files).
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 
-mapfile -d '' PHP_FILES < <(git -C "$ROOT_DIR" ls-files -z '*.php')
+ROOT_DIR="$(pmss_testing_root_dir)"
+mapfile -d '' PHP_FILES < <(pmss_testing_list_tracked_php_files "$ROOT_DIR")
 
 echo "[short-open-tag-lint] scanning ${#PHP_FILES[@]} PHP files" >&2
 

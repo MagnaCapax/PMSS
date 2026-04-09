@@ -14,12 +14,7 @@ class CreateNginxConfigPermissionHardeningTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->root = $this->pmssMakeTempDir('pmss-nginx-chmod-');
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssRemoveTree($this->root);
+        $this->pmssAssignTempDirProperty('root', 'pmss-nginx-chmod-');
     }
 
     public function testChmodGlobAppliesModeToMatchedFiles(): void
