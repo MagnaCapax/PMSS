@@ -6,16 +6,13 @@ require_once dirname(__DIR__, 2).'/user/passwords.php';
 
 class userPasswordShadowSyncTest extends TestCase
 {
+    /** @var string */
     private $tempDir = '';
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-user-password-shadow-sync-');
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pmssCleanupTempDirProperty('tempDir');
     }
 
     public function testReadShadowPasswordHashReturnsEntryForManagedUser(): void

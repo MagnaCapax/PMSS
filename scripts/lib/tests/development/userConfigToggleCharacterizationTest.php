@@ -9,6 +9,12 @@ class userConfigToggleCharacterizationTest extends TestCase
     /** @var string */
     private $tempDir = '';
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->pmssAssignTempDirProperty('tempDir', 'user-config-toggle', 0755, sys_get_temp_dir().'/pmss-user-config-toggle-tests');
+    }
+
     public function testToggleNormalizerKeepsFalseTokensStable(): void
     {
         foreach (['false', '0', 'no', 'off', '', 0, false] as $value) {
@@ -37,15 +43,10 @@ class userConfigToggleCharacterizationTest extends TestCase
 
     public function testResolvePayloadKeepsMissingValidUserAsEmptyArray(): void
     {
-        $this->pmssEnsureTempDirProperty('tempDir', 'user-config-toggle', 0755, sys_get_temp_dir().'/pmss-user-config-toggle-tests');
-        try {
-            $store = new \UserConfigStore($this->tempDir.'/seedbox/config');
-            $payload = \pmssUserConfigResolvePayload('alice', $store);
+        $store = new \UserConfigStore($this->tempDir.'/seedbox/config');
+        $payload = \pmssUserConfigResolvePayload('alice', $store);
 
-            $this->assertEquals([], $payload);
-            $this->assertTrue($store instanceof \UserConfigStore);
-        } finally {
-            $this->pmssCleanupTempDirProperty('tempDir');
-        }
+        $this->assertEquals([], $payload);
+        $this->assertTrue($store instanceof \UserConfigStore);
     }
 }

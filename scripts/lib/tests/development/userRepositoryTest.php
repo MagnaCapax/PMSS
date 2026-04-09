@@ -6,7 +6,7 @@ require_once dirname(__DIR__, 2).'/user/userRepository.php';
 class UserRepositoryTest extends TestCase
 {
     /** @var string */
-    private $tempDir;
+    private $tempDir = '';
 
     private function configDirPath(): string
     {
@@ -16,7 +16,7 @@ class UserRepositoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->pmssEnsureTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
+        $this->pmssAssignTempDirProperty('tempDir', 'repo', 0755, sys_get_temp_dir().'/pmss-userrepo-tests');
     }
 
     public function testPersistAndReload(): void

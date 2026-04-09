@@ -11,7 +11,7 @@ class WelcomeMessageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->pmssEnsureTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
+        $this->pmssAssignTempDirProperty('tempDir', 'pmss-welcome-message-', 0755);
     }
 
     private function makeUserHome(): string
@@ -140,9 +140,8 @@ class WelcomeMessageTest extends TestCase
             @file_put_contents($messagesPath, json_encode(['products' => ['m1000' => '<p>legacy</p>']], JSON_UNESCAPED_SLASHES));
 
             $this->assertTrue(\pmssWelcomeProductMessageSet('free-tier', '<p>hello</p>', $messagesPath));
-            $decoded = json_decode((string) @file_get_contents($messagesPath), true);
+            $decoded = $this->pmssReadJsonArrayFile($messagesPath, null, 'Message map must decode as array');
 
-            $this->assertTrue(is_array($decoded), 'Message map must decode as array');
             $this->assertEquals('<p>hello</p>', $decoded['products']['free-tier'] ?? null);
             $this->assertEquals('<p>legacy</p>', $decoded['products']['m1000'] ?? null);
     }
@@ -153,9 +152,8 @@ class WelcomeMessageTest extends TestCase
             @file_put_contents($messagesPath, json_encode(['free-tier' => '<p>old</p>'], JSON_UNESCAPED_SLASHES));
 
             $this->assertTrue(\pmssWelcomeProductMessageSet('free-tier', '', $messagesPath));
-            $decoded = json_decode((string) @file_get_contents($messagesPath), true);
+            $decoded = $this->pmssReadJsonArrayFile($messagesPath, null, 'Message map must decode as array');
 
-            $this->assertTrue(is_array($decoded), 'Message map must decode as array');
             $this->assertTrue(!isset($decoded['free-tier']), 'Entry must be removed when template is empty');
     }
 
@@ -181,9 +179,9 @@ class WelcomeMessageTest extends TestCase
                 \pmssWelcomeMessageForUser([], $home, 'alice', $nestedPath)
             );
 
-            $plainDecoded = json_decode((string) @file_get_contents($plainPath), true);
-            $nestedDecoded = json_decode((string) @file_get_contents($nestedPath), true);
-            $this->assertTrue(is_array($plainDecoded), 'Plain product map must remain a plain root map');
+            $plainDecoded = $this->pmssReadJsonArrayFile($plainPath, null, 'Plain product map must remain a plain root map');
+            $nestedDecoded = $this->pmssReadJsonArrayFile($nestedPath, null, 'Nested product map must decode as array');
+
             $this->assertTrue(!isset($plainDecoded['products']), 'Plain product map should not gain a nested products wrapper');
             $this->assertEquals('<p>{{product}}/{{username}}</p>', $plainDecoded['m1000'] ?? null);
             $this->assertEquals('<p>{{product}}/{{username}}</p>', $nestedDecoded['products']['m1000'] ?? null);
