@@ -222,7 +222,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeLighttpdProxyFragmentContainsCanonicalBase(): void
     {
-        $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
+        $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
         $this->assertStringContainsString('^/user-testuser/deluge($|/)', $fragment);
         $this->assertStringContainsString('"port" => 31111', $fragment);
@@ -231,7 +231,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeLighttpdProxyFragmentContainsLegacyMapping(): void
     {
-        $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
+        $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
         $this->assertStringContainsString('^/deluge-testuser($|/)', $fragment);
         $this->assertStringContainsString('"map-urlpath"', $fragment);
@@ -241,20 +241,20 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeLighttpdProxyFragmentDisablesBasicAuthForDelugePaths(): void
     {
-        $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
+        $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
         $this->assertEquals(2, substr_count($fragment, 'auth.require = ()'));
     }
 
     public function testDelugeLighttpdProxyFragmentHasDeprecationDate(): void
     {
-        $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
+        $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
         $this->assertStringContainsString('2028-01-28', $fragment);
     }
 
     public function testDelugeLighttpdProxyFragmentUsesAnchoredRegexesOnly(): void
     {
-        $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
+        $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
         // Regression guard: avoid permissive patterns (e.g., ".*") that could match other paths.
         $this->assertStringNotContainsString('.*', $fragment);
@@ -264,7 +264,7 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
     public function testDelugeLighttpdProxyFragmentIsLoopbackOnly(): void
     {
-        $fragment = \pmssDelugeLighttpdProxyFragment('testuser', 31111);
+        $fragment = \pmssLighttpdManagedProxyFragment('deluge', 'testuser', 31111);
 
         $this->assertStringContainsString('"host" => "127.0.0.1"', $fragment);
         $this->assertStringNotContainsString('"host" => "0.0.0.0"', $fragment);

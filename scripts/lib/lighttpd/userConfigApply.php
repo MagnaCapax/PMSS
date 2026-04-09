@@ -358,14 +358,6 @@ function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string
     return pmssWriteUserFile($path, $metaJson.$configJson, $owner, $mode);
 }
 
-function pmssLighttpdProxyPathMap(string $sourceBase, string $targetBase): array
-{
-    $sourceBase = rtrim($sourceBase, '/');
-    $targetBase = rtrim($targetBase, '/');
-
-    return [$sourceBase.'/' => $targetBase === '' ? '/' : $targetBase.'/', $sourceBase => $targetBase];
-}
-
 function pmssLighttpdProxyRuleFragment(
     string $pattern,
     int $port,
@@ -415,31 +407,36 @@ function pmssLighttpdProxyRuleFragment(
 }
 
 // Reverse proxy fragments stay with the lighttpd apply flow because the runtime caller is the per-user config writer.
-function pmssDelugeLighttpdProxyFragment(string $user, int $webPort): string
+function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $port): string
 {
-    return "# PMSS-managed: Deluge reverse proxy.\n"
-        ."# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n"
-        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/deluge($|/)', $webPort, pmssLighttpdProxyPathMap('/user-'.$user.'/deluge', ''), true)."\n\n"
-        .pmssLighttpdProxyRuleFragment('^/deluge-'.$user.'($|/)', $webPort, pmssLighttpdProxyPathMap('/deluge-'.$user, '/user-'.$user.'/deluge'), true)."\n\n";
-}
-
-function pmssRcloneLighttpdProxyFragment(string $user, int $port): string
-{
-    return "# PMSS-managed: rclone reverse proxy.\n\n"
-        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/rclone/', $port, [], true)."\n\n";
-}
-
-function pmssQbittorrentLighttpdProxyFragment(string $user, int $port): string
-{
-    return "# PMSS-managed: qBittorrent reverse proxy.\n\n"
-        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/qbittorrent/', $port, pmssLighttpdProxyPathMap('/user-'.$user.'/qbittorrent', ''), false, true)."\n\n";
-}
-
-function pmssInvidiousLighttpdProxyFragment(string $user, int $port): string
-{
-    return "# PMSS-managed: Invidious reverse proxy.\n\n"
-        .pmssLighttpdProxyRuleFragment('^/public-'.$user.'/invidious($|/)', $port, pmssLighttpdProxyPathMap('/public-'.$user.'/invidious', ''), false, true)."\n\n"
-        .pmssLighttpdProxyRuleFragment('^/user-'.$user.'/apps/invidious($|/)', $port, pmssLighttpdProxyPathMap('/user-'.$user.'/apps/invidious', ''), false, true)."\n\n";
+    $definitions = [
+        'deluge' => [
+            "# PMSS-managed: Deluge reverse proxy.\n"
+            ."# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n",
+            [
+                ['^/user-'.$user.'/deluge($|/)', ['/user-'.$user.'/deluge/' => '/', '/user-'.$user.'/deluge' => ''], true, false],
+                ['^/deluge-'.$user.'($|/)', ['/deluge-'.$user.'/' => '/user-'.$user.'/deluge/', '/deluge-'.$user => '/user-'.$user.'/deluge'], true, false],
+            ],
+        ],
+        'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false]]],
+        'qbittorrent' => [
+            "# PMSS-managed: qBittorrent reverse proxy.\n\n",
+            [['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/', '/user-'.$user.'/qbittorrent' => ''], false, true]],
+        ],
+        'invidious' => [
+            "# PMSS-managed: Invidious reverse proxy.\n\n",
+            [
+                ['^/public-'.$user.'/invidious($|/)', ['/public-'.$user.'/invidious/' => '/', '/public-'.$user.'/invidious' => ''], false, true],
+                ['^/user-'.$user.'/apps/invidious($|/)', ['/user-'.$user.'/apps/invidious/' => '/', '/user-'.$user.'/apps/invidious' => ''], false, true],
+            ],
+        ],
+    ];
+    if (!isset($definitions[$proxyName])) { return ''; }
+    $fragment = $definitions[$proxyName][0];
+    foreach ($definitions[$proxyName][1] as $rule) {
+        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3])."\n\n";
+    }
+    return $fragment;
 }
 
 function pmssUserConfigLighttpdConfigureUser(
@@ -490,11 +487,11 @@ function pmssUserConfigLighttpdConfigureUser(
 
     // PMSS-managed proxy fragments under ~/.lighttpd/custom.d/
     foreach ([
-        'rclone' => pmssRcloneLighttpdProxyFragment($thisUser, $rclonePort),
-        'qbittorrent' => pmssQbittorrentLighttpdProxyFragment($thisUser, $qbittorrentPort),
-    ] as $proxyName => $proxyFragment) {
+        'rclone' => $rclonePort,
+        'qbittorrent' => $qbittorrentPort,
+    ] as $proxyName => $proxyPort) {
         $proxyConfPath = "{$customDir}/pmss-{$proxyName}.conf";
-        if (!pmssWriteUserFile($proxyConfPath, $proxyFragment, $thisUser, 0640)) {
+        if (!pmssWriteUserFile($proxyConfPath, pmssLighttpdManagedProxyFragment($proxyName, $thisUser, $proxyPort), $thisUser, 0640)) {
             fwrite(STDERR, "[user:{$thisUser}] Failed to write {$proxyName} lighttpd fragment\n");
         }
     }
@@ -504,7 +501,7 @@ function pmssUserConfigLighttpdConfigureUser(
     $invidiousPort = pmssReadRegularFileInt($homeDir.'/.invidiousPort');
     $invidiousConfPath = $customDir.'/pmss-invidious.conf';
     if ($invidiousPort >= 1024 && $invidiousPort <= 65535) {
-        if (!pmssWriteUserFile($invidiousConfPath, pmssInvidiousLighttpdProxyFragment($thisUser, $invidiousPort), $thisUser, 0640)) {
+        if (!pmssWriteUserFile($invidiousConfPath, pmssLighttpdManagedProxyFragment('invidious', $thisUser, $invidiousPort), $thisUser, 0640)) {
             fwrite(STDERR, "[user:{$thisUser}] Failed to write invidious lighttpd fragment\n");
         }
     } elseif (is_file($invidiousConfPath) || is_link($invidiousConfPath)) {
@@ -569,7 +566,7 @@ function pmssUserConfigLighttpdConfigureUser(
     }
     if ($delugeWebPort !== null) {
         $delugeConfPath = $customDir.'/pmss-deluge.conf';
-        if (!pmssWriteUserFile($delugeConfPath, pmssDelugeLighttpdProxyFragment($thisUser, $delugeWebPort), $thisUser, 0640)) {
+        if (!pmssWriteUserFile($delugeConfPath, pmssLighttpdManagedProxyFragment('deluge', $thisUser, $delugeWebPort), $thisUser, 0640)) {
             fwrite(STDERR, "[user:{$thisUser}] Failed to write deluge lighttpd fragment\n");
         }
     }

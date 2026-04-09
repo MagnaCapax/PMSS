@@ -21,12 +21,20 @@ class LighttpdProxyFragmentsTest extends TestCase
     {
         $cases = [
             'rclone' => [
-                'actual' => \pmssRcloneLighttpdProxyFragment('demo', 4001),
+                'actual' => \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001),
                 'expectedHash' => '7c0160200a8bc640c0571ab0b6cea03ab31c36b15b8289a1881652a2e47ccf77',
             ],
             'qbittorrent' => [
-                'actual' => \pmssQbittorrentLighttpdProxyFragment('demo', 4002),
+                'actual' => \pmssLighttpdManagedProxyFragment('qbittorrent', 'demo', 4002),
                 'expectedHash' => '251a1a8531807254d4edbc0f097dca364066d59d89d48970eedb73564520c74c',
+            ],
+            'invidious' => [
+                'actual' => \pmssLighttpdManagedProxyFragment('invidious', 'demo', 4003),
+                'expectedHash' => '85c16c21a50a20ea8c85dee4fe5d5f1cf8d340f7fd6a44ba534fbacd00e2953c',
+            ],
+            'deluge' => [
+                'actual' => \pmssLighttpdManagedProxyFragment('deluge', 'demo', 4004),
+                'expectedHash' => 'e7ebd9fe53f2bc9ef696b520684d494d2a9d9f6be2ef0b2d0e5b08548f889f20',
             ],
         ];
 
@@ -38,10 +46,10 @@ class LighttpdProxyFragmentsTest extends TestCase
     public function testManagedProxyFragmentsUseValidLighttpdHttpVariableSyntax(): void
     {
         $cases = [
-            'rclone' => \pmssRcloneLighttpdProxyFragment('demo', 4001),
-            'qbittorrent' => \pmssQbittorrentLighttpdProxyFragment('demo', 4002),
-            'invidious' => \pmssInvidiousLighttpdProxyFragment('demo', 4003),
-            'deluge' => \pmssDelugeLighttpdProxyFragment('demo', 4004),
+            'rclone' => \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001),
+            'qbittorrent' => \pmssLighttpdManagedProxyFragment('qbittorrent', 'demo', 4002),
+            'invidious' => \pmssLighttpdManagedProxyFragment('invidious', 'demo', 4003),
+            'deluge' => \pmssLighttpdManagedProxyFragment('deluge', 'demo', 4004),
         ];
 
         foreach ($cases as $name => $fragment) {

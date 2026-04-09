@@ -224,11 +224,15 @@ LIGHTTPD;
             'pmssDelugeNormalizeEmptySessionsObject',
             'pmssDelugeReadWebConf',
             'pmssDelugeWriteWebConf',
-            'pmssDelugeLighttpdProxyFragment',
-            'pmssRcloneLighttpdProxyFragment',
-            'pmssQbittorrentLighttpdProxyFragment',
+            'pmssLighttpdManagedProxyFragment',
         ] as $functionName) {
             $this->assertStringContainsString('function '.$functionName.'(', $src);
         }
+
+        $this->assertSame(
+            0,
+            preg_match_all('/function\s+pmss[A-Za-z]+LighttpdProxyFragment\(/', $src),
+            'Legacy per-service proxy fragment wrappers should stay removed'
+        );
     }
 }
