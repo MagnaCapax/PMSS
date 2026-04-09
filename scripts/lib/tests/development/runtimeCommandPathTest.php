@@ -68,4 +68,9 @@ class RuntimeCommandPathTest extends TestCase
     {
         $this->assertEquals('', pmssCommandPath('   '));
     }
+
+    public function testCommandPathRejectsShellBuiltinsWithoutExecutablePaths(): void
+    {
+        $this->assertEquals('', pmssCommandPath('cd'));
+    }
 }

@@ -77,7 +77,12 @@ if (!function_exists('pmssCommandPath')) {
         }
 
         $resolved = @shell_exec('command -v '.escapeshellarg($binary).' 2>/dev/null');
-        return is_string($resolved) ? trim($resolved) : '';
+        if (!is_string($resolved)) {
+            return '';
+        }
+
+        $path = trim($resolved);
+        return $path !== '' && strpos($path, '/') === 0 && is_executable($path) ? $path : '';
     }
 }
 
