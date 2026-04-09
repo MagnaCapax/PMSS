@@ -20,7 +20,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $totals = pmssResourceReportTemplate();
 
     foreach ($users as $thisUser) {
-        if (!pmssResourceLogIsValidUser((string) $thisUser)) {
+        if (!pmssResourceUserIsValid((string) $thisUser)) {
             continue;
         }
 
@@ -30,13 +30,10 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             continue;
         }
 
-        foreach (ResourceStatsAccumulator::RAW_METRICS as $metric) {
-            foreach ($row[$metric] as $label => $value) {
+        foreach ($row as $metric => $fields) {
+            foreach ($fields as $label => $value) {
                 $totals[$metric][$label] += $value;
             }
-        }
-        foreach (['memory' => ['current', 'avg_month'], 'tasks' => ['current']] as $metric => $fields) {
-            foreach ($fields as $field) { $totals[$metric][$field] += $row[$metric][$field]; }
         }
 
         $rows[$thisUser] = $row;
@@ -67,7 +64,7 @@ TEXT;
     $statsDir = pmssRuntimeDir().'/resourceStats';
 
     if ($userFilter !== '') {
-        if (!pmssResourceLogIsValidUser($userFilter)) {
+        if (!pmssResourceUserIsValid($userFilter)) {
             fwrite(STDERR, "Invalid user specified: {$userFilter}\n");
             return 1;
         }
@@ -77,7 +74,7 @@ TEXT;
         if (($users = pmssListManagedUsersFromResult($listUsersResult)) === null) {
             return 1;
         }
-        $users = array_values(array_filter($users, 'pmssResourceLogIsValidUser'));
+        $users = array_values(array_filter($users, 'pmssResourceUserIsValid'));
         if (empty($users)) {
             die("No users in this system!\n");
         }

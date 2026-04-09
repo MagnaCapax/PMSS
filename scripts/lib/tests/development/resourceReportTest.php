@@ -87,6 +87,45 @@ class ResourceReportTest extends TestCase
         $this->assertEquals(7.0, $report['rows']['alice']['tasks']['current']);
     }
 
+    public function testBuildReportSnapshotSkipsInvalidUsersAndKeepsMissingSeparate(): void
+    {
+        $this->writeUserStats('alice', [
+            'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7),
+            'io_write' => $this->pmssBuildWindowValues(6, 5, 4, 3),
+            'io_read_ops' => $this->pmssBuildWindowValues(2, 2, 2, 2),
+            'io_write_ops' => $this->pmssBuildWindowValues(1, 1, 1, 1),
+            'cpu' => $this->pmssBuildWindowValues(11, 12, 13, 14),
+            'ram_hours' => $this->pmssBuildWindowValues(15, 16, 17, 18),
+            'memory_current' => 19,
+            'memory_avg_month' => 20,
+            'tasks_current' => 21,
+        ]);
+
+        $this->assertEquals([
+            'rows' => ['alice' => [
+                'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
+                'io_write' => ['month' => 6.0, 'week' => 5.0, 'day' => 4.0, 'hour' => 3.0],
+                'io_read_ops' => ['month' => 2.0, 'week' => 2.0, 'day' => 2.0, 'hour' => 2.0],
+                'io_write_ops' => ['month' => 1.0, 'week' => 1.0, 'day' => 1.0, 'hour' => 1.0],
+                'cpu' => ['month' => 11.0, 'week' => 12.0, 'day' => 13.0, 'hour' => 14.0],
+                'ram_hours' => ['month' => 15.0, 'week' => 16.0, 'day' => 17.0, 'hour' => 18.0],
+                'memory' => ['current' => 19.0, 'avg_month' => 20.0],
+                'tasks' => ['current' => 21.0],
+            ]],
+            'missing' => ['ghost'],
+            'totals' => [
+                'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
+                'io_write' => ['month' => 6.0, 'week' => 5.0, 'day' => 4.0, 'hour' => 3.0],
+                'io_read_ops' => ['month' => 2.0, 'week' => 2.0, 'day' => 2.0, 'hour' => 2.0],
+                'io_write_ops' => ['month' => 1.0, 'week' => 1.0, 'day' => 1.0, 'hour' => 1.0],
+                'cpu' => ['month' => 11.0, 'week' => 12.0, 'day' => 13.0, 'hour' => 14.0],
+                'ram_hours' => ['month' => 15.0, 'week' => 16.0, 'day' => 17.0, 'hour' => 18.0],
+                'memory' => ['current' => 19.0, 'avg_month' => 20.0],
+                'tasks' => ['current' => 21.0],
+            ],
+        ], \pmssResourceBuildReport($this->statsDir, ['alice', 'Alice', 'ghost']));
+    }
+
     public function testStoredPayloadReportRowMatchesSnapshot(): void
     {
         $payload = $this->pmssBuildResourceStatsPayloadFromValues([

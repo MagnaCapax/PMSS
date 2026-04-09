@@ -12,19 +12,11 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../resources.php';
 
 /**
- * Validate user entries from listUsers.php output.
- */
-function pmssResourceLogIsValidUser(string $user): bool
-{
-    return pmssResourceUserIsValid($user);
-}
-
-/**
  * Resolve a validated managed username to its UID.
  */
 function pmssResourceLogLookupManagedUid(string $user): ?int
 {
-    if (!pmssResourceLogIsValidUser($user)) {
+    if (!pmssResourceUserIsValid($user)) {
         return null;
     }
     if (($info = pmssUserAccountLookup($user)) !== null) {

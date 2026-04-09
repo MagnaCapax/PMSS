@@ -151,7 +151,7 @@ class ResourceLogHelpersTest extends TestCase
 
     public function testUserValidationRejectsUppercase(): void
     {
-        $this->assertTrue(!\pmssResourceLogIsValidUser('Alice'));
+        $this->assertTrue(!\pmssResourceUserIsValid('Alice'));
     }
 
     public function testManagedUidLookupRejectsInvalidUser(): void
