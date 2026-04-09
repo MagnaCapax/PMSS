@@ -41,10 +41,7 @@ class resourceReportSafetyTest extends TestCase
 
     public function testBuildReportRejectsSerializedObjectsWithoutWakeup(): void
     {
-        @file_put_contents(
-            $this->statsDir.'/alice',
-            serialize(new ResourceReportSafetyWakeupProbe($this->markerPath))
-        );
+        $this->pmssWriteSerializedFixture($this->statsDir.'/alice', new ResourceReportSafetyWakeupProbe($this->markerPath));
 
         $report = \pmssResourceBuildReport($this->statsDir, ['alice']);
 
@@ -55,20 +52,17 @@ class resourceReportSafetyTest extends TestCase
 
     public function testBuildReportSkipsInvalidUserTraversalKeys(): void
     {
-        @file_put_contents(
-            $this->runtimeDir.'/outside-stats',
-            serialize($this->pmssBuildResourceStatsPayloadFromValues([
-                'io_read' => $this->pmssBuildWindowValues(1),
-                'io_write' => $this->pmssBuildWindowValues(2),
-                'io_read_ops' => $this->pmssBuildWindowValues(3),
-                'io_write_ops' => $this->pmssBuildWindowValues(4),
-                'cpu' => $this->pmssBuildWindowValues(5),
-                'ram_hours' => $this->pmssBuildWindowValues(6),
-                'memory_current' => 7,
-                'memory_avg_month' => 8,
-                'tasks_current' => 9,
-            ]))
-        );
+        $this->pmssWriteSerializedFixture($this->runtimeDir.'/outside-stats', $this->pmssBuildResourceStatsPayloadFromValues([
+            'io_read' => $this->pmssBuildWindowValues(1),
+            'io_write' => $this->pmssBuildWindowValues(2),
+            'io_read_ops' => $this->pmssBuildWindowValues(3),
+            'io_write_ops' => $this->pmssBuildWindowValues(4),
+            'cpu' => $this->pmssBuildWindowValues(5),
+            'ram_hours' => $this->pmssBuildWindowValues(6),
+            'memory_current' => 7,
+            'memory_avg_month' => 8,
+            'tasks_current' => 9,
+        ]));
 
         $report = \pmssResourceBuildReport($this->statsDir, ['../outside-stats']);
 

@@ -403,18 +403,29 @@ abstract class TestCase
     /** Build the serialized resource stats shape used by report-oriented tests. */
     protected function pmssBuildResourceStatsPayloadFromValues(array $values): array
     {
+        $memoryRaw = $values['memory'] ?? ['month' => $values['memory_avg_month']];
+        $tasksRaw = $values['tasks'] ?? [];
         return [
             'io_read' => ['raw' => $values['io_read']],
             'io_write' => ['raw' => $values['io_write']],
             'io_read_ops' => ['raw' => $values['io_read_ops'] ?? []],
             'io_write_ops' => ['raw' => $values['io_write_ops'] ?? []],
             'cpu' => ['raw' => $values['cpu']],
-            'memory' => [
-                'current' => $values['memory_current'],
-                'raw' => ['month' => $values['memory_avg_month']],
-            ],
+            'memory' => ['current' => $values['memory_current'] ?? ($memoryRaw['month'] ?? 0.0), 'raw' => $memoryRaw],
             'ram_hours' => ['raw' => $values['ram_hours']],
-            'tasks' => ['current' => $values['tasks_current']],
+            'tasks' => ['current' => $values['tasks_current'] ?? ($tasksRaw['month'] ?? 0.0), 'raw' => $tasksRaw],
+        ];
+    }
+
+    /** Build the normalized resource report row shape used by report assertions. */
+    protected function pmssBuildResourceReportRowFromValues(array $values): array
+    {
+        return [
+            'io_read' => array_map('floatval', $values['io_read']), 'io_write' => array_map('floatval', $values['io_write']),
+            'io_read_ops' => array_map('floatval', $values['io_read_ops'] ?? $this->pmssBuildWindowValues(0.0)), 'io_write_ops' => array_map('floatval', $values['io_write_ops'] ?? $this->pmssBuildWindowValues(0.0)),
+            'cpu' => array_map('floatval', $values['cpu']), 'ram_hours' => array_map('floatval', $values['ram_hours']),
+            'memory' => ['current' => (float) $values['memory_current'], 'avg_month' => (float) $values['memory_avg_month']],
+            'tasks' => ['current' => (float) $values['tasks_current']],
         ];
     }
 

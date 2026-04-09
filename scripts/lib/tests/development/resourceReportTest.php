@@ -22,22 +22,27 @@ class ResourceReportTest extends TestCase
 
     public function testBuildReportAggregatesRowsAndTotals(): void
     {
-        $this->writeUserStats('alice', [
+        $aliceValues = [
             'io_read' => $this->pmssBuildWindowValues(1000, 100, 10, 1), 'io_write' => $this->pmssBuildWindowValues(2000, 200, 20, 2), 'io_read_ops' => $this->pmssBuildWindowValues(3000, 300, 30, 3),
             'io_write_ops' => $this->pmssBuildWindowValues(4000, 400, 40, 4), 'cpu' => $this->pmssBuildWindowValues(5000, 500, 50, 5), 'ram_hours' => $this->pmssBuildWindowValues(6000, 600, 60, 6),
             'memory_current' => 700, 'memory_avg_month' => 70, 'tasks_current' => 7,
-        ]);
-        $this->writeUserStats('bob', [
+        ];
+        $bobValues = [
             'io_read' => $this->pmssBuildWindowValues(11, 12, 13, 14), 'io_write' => $this->pmssBuildWindowValues(21, 22, 23, 24), 'io_read_ops' => $this->pmssBuildWindowValues(31, 32, 33, 34),
             'io_write_ops' => $this->pmssBuildWindowValues(41, 42, 43, 44), 'cpu' => $this->pmssBuildWindowValues(51, 52, 53, 54), 'ram_hours' => $this->pmssBuildWindowValues(61, 62, 63, 64),
             'memory_current' => 71, 'memory_avg_month' => 72, 'tasks_current' => 73,
-        ]);
+        ];
+        $this->writeUserStats('alice', $aliceValues);
+        $this->writeUserStats('bob', $bobValues);
+        $expectedRows = [
+            'alice' => $this->pmssBuildResourceReportRowFromValues($aliceValues),
+            'bob' => $this->pmssBuildResourceReportRowFromValues($bobValues),
+        ];
 
         $report = \pmssResourceBuildReport($this->statsDir, ['alice', 'bob']);
 
         $this->assertEquals([], $report['missing']);
-        $this->assertEquals(1000.0, $report['rows']['alice']['io_read']['month']);
-        $this->assertEquals(24.0, $report['rows']['bob']['io_write']['hour']);
+        $this->assertEquals($expectedRows, $report['rows']);
         $this->assertEquals(1011.0, $report['totals']['io_read']['month']);
         $this->assertEquals(48.0, $report['totals']['io_write_ops']['hour']);
         $this->assertEquals(771.0, $report['totals']['memory']['current']);
@@ -89,7 +94,7 @@ class ResourceReportTest extends TestCase
 
     public function testBuildReportSnapshotSkipsInvalidUsersAndKeepsMissingSeparate(): void
     {
-        $this->writeUserStats('alice', [
+        $values = [
             'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7),
             'io_write' => $this->pmssBuildWindowValues(6, 5, 4, 3),
             'io_read_ops' => $this->pmssBuildWindowValues(2, 2, 2, 2),
@@ -99,83 +104,43 @@ class ResourceReportTest extends TestCase
             'memory_current' => 19,
             'memory_avg_month' => 20,
             'tasks_current' => 21,
-        ]);
+        ];
+        $this->writeUserStats('alice', $values);
+        $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
 
         $this->assertEquals([
-            'rows' => ['alice' => [
-                'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
-                'io_write' => ['month' => 6.0, 'week' => 5.0, 'day' => 4.0, 'hour' => 3.0],
-                'io_read_ops' => ['month' => 2.0, 'week' => 2.0, 'day' => 2.0, 'hour' => 2.0],
-                'io_write_ops' => ['month' => 1.0, 'week' => 1.0, 'day' => 1.0, 'hour' => 1.0],
-                'cpu' => ['month' => 11.0, 'week' => 12.0, 'day' => 13.0, 'hour' => 14.0],
-                'ram_hours' => ['month' => 15.0, 'week' => 16.0, 'day' => 17.0, 'hour' => 18.0],
-                'memory' => ['current' => 19.0, 'avg_month' => 20.0],
-                'tasks' => ['current' => 21.0],
-            ]],
+            'rows' => ['alice' => $expectedRow],
             'missing' => ['ghost'],
-            'totals' => [
-                'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
-                'io_write' => ['month' => 6.0, 'week' => 5.0, 'day' => 4.0, 'hour' => 3.0],
-                'io_read_ops' => ['month' => 2.0, 'week' => 2.0, 'day' => 2.0, 'hour' => 2.0],
-                'io_write_ops' => ['month' => 1.0, 'week' => 1.0, 'day' => 1.0, 'hour' => 1.0],
-                'cpu' => ['month' => 11.0, 'week' => 12.0, 'day' => 13.0, 'hour' => 14.0],
-                'ram_hours' => ['month' => 15.0, 'week' => 16.0, 'day' => 17.0, 'hour' => 18.0],
-                'memory' => ['current' => 19.0, 'avg_month' => 20.0],
-                'tasks' => ['current' => 21.0],
-            ],
+            'totals' => $expectedRow,
         ], \pmssResourceBuildReport($this->statsDir, ['alice', 'Alice', 'ghost']));
     }
 
     public function testStoredPayloadReportRowMatchesSnapshot(): void
     {
-        $payload = $this->pmssBuildResourceStatsPayloadFromValues([
+        $values = [
             'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7), 'io_write' => $this->pmssBuildWindowValues(20, 19, 18, 17), 'io_read_ops' => $this->pmssBuildWindowValues(30, 29, 28, 27),
             'io_write_ops' => $this->pmssBuildWindowValues(40, 39, 38, 37), 'cpu' => $this->pmssBuildWindowValues(50, 49, 48, 47), 'ram_hours' => $this->pmssBuildWindowValues(60, 59, 58, 57),
             'memory_current' => 70, 'memory_avg_month' => 69, 'tasks_current' => 11,
-        ]);
+        ];
+        $payload = $this->pmssBuildResourceStatsPayloadFromValues($values);
 
-        $this->assertEquals([
-            'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
-            'io_write' => ['month' => 20.0, 'week' => 19.0, 'day' => 18.0, 'hour' => 17.0],
-            'io_read_ops' => ['month' => 30.0, 'week' => 29.0, 'day' => 28.0, 'hour' => 27.0],
-            'io_write_ops' => ['month' => 40.0, 'week' => 39.0, 'day' => 38.0, 'hour' => 37.0],
-            'cpu' => ['month' => 50.0, 'week' => 49.0, 'day' => 48.0, 'hour' => 47.0],
-            'ram_hours' => ['month' => 60.0, 'week' => 59.0, 'day' => 58.0, 'hour' => 57.0],
-            'memory' => ['current' => 70.0, 'avg_month' => 69.0],
-            'tasks' => ['current' => 11.0],
-        ], \pmssResourceStoredPayloadReportRow($payload));
+        $this->assertEquals($this->pmssBuildResourceReportRowFromValues($values), \pmssResourceStoredPayloadReportRow($payload));
     }
 
     public function testBuildReportSingleUserMatchesSnapshot(): void
     {
-        $this->writeUserStats('alice', [
+        $values = [
             'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7), 'io_write' => $this->pmssBuildWindowValues(20, 19, 18, 17), 'io_read_ops' => $this->pmssBuildWindowValues(30, 29, 28, 27),
             'io_write_ops' => $this->pmssBuildWindowValues(40, 39, 38, 37), 'cpu' => $this->pmssBuildWindowValues(50, 49, 48, 47), 'ram_hours' => $this->pmssBuildWindowValues(60, 59, 58, 57),
             'memory_current' => 70, 'memory_avg_month' => 69, 'tasks_current' => 11,
-        ]);
+        ];
+        $this->writeUserStats('alice', $values);
+        $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
 
         $this->assertEquals([
-            'rows' => ['alice' => [
-                'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
-                'io_write' => ['month' => 20.0, 'week' => 19.0, 'day' => 18.0, 'hour' => 17.0],
-                'io_read_ops' => ['month' => 30.0, 'week' => 29.0, 'day' => 28.0, 'hour' => 27.0],
-                'io_write_ops' => ['month' => 40.0, 'week' => 39.0, 'day' => 38.0, 'hour' => 37.0],
-                'cpu' => ['month' => 50.0, 'week' => 49.0, 'day' => 48.0, 'hour' => 47.0],
-                'ram_hours' => ['month' => 60.0, 'week' => 59.0, 'day' => 58.0, 'hour' => 57.0],
-                'memory' => ['current' => 70.0, 'avg_month' => 69.0],
-                'tasks' => ['current' => 11.0],
-            ]],
+            'rows' => ['alice' => $expectedRow],
             'missing' => [],
-            'totals' => [
-                'io_read' => ['month' => 10.0, 'week' => 9.0, 'day' => 8.0, 'hour' => 7.0],
-                'io_write' => ['month' => 20.0, 'week' => 19.0, 'day' => 18.0, 'hour' => 17.0],
-                'io_read_ops' => ['month' => 30.0, 'week' => 29.0, 'day' => 28.0, 'hour' => 27.0],
-                'io_write_ops' => ['month' => 40.0, 'week' => 39.0, 'day' => 38.0, 'hour' => 37.0],
-                'cpu' => ['month' => 50.0, 'week' => 49.0, 'day' => 48.0, 'hour' => 47.0],
-                'ram_hours' => ['month' => 60.0, 'week' => 59.0, 'day' => 58.0, 'hour' => 57.0],
-                'memory' => ['current' => 70.0, 'avg_month' => 69.0],
-                'tasks' => ['current' => 11.0],
-            ],
+            'totals' => $expectedRow,
         ], \pmssResourceBuildReport($this->statsDir, ['alice']));
     }
 

@@ -10,10 +10,15 @@ class ResourceStatisticsTest extends TestCase
     {
         $root = $this->pmssMakeTempDir('pmss-resource-stats-');
         $path = $root.'/.resourceData';
-        $this->pmssWriteSerializedFixture($path, [
-            'io_read' => $this->pmssBuildRawWindowMetric(0, 0, 11, 0), 'io_write' => $this->pmssBuildRawWindowMetric(0, 0, 22, 0), 'cpu' => $this->pmssBuildRawWindowMetric(0, 0, 33, 0),
-            'memory' => $this->pmssBuildRawWindowMetric(0, 0, 44, 0), 'ram_hours' => $this->pmssBuildRawWindowMetric(0, 0, 5.5, 0), 'tasks' => $this->pmssBuildRawWindowMetric(0, 0, 6, 0), 'io_read_ops' => $this->pmssBuildRawWindowMetric(0, 0, 77, 0),
-        ]);
+        $this->pmssWriteSerializedFixture($path, $this->pmssBuildResourceStatsPayloadFromValues([
+            'io_read' => $this->pmssBuildWindowValues(0, 0, 11, 0),
+            'io_write' => $this->pmssBuildWindowValues(0, 0, 22, 0),
+            'cpu' => $this->pmssBuildWindowValues(0, 0, 33, 0),
+            'memory' => $this->pmssBuildWindowValues(0, 0, 44, 0),
+            'ram_hours' => $this->pmssBuildWindowValues(0, 0, 5.5, 0),
+            'tasks' => $this->pmssBuildWindowValues(0, 0, 6, 0),
+            'io_read_ops' => $this->pmssBuildWindowValues(0, 0, 77, 0),
+        ]));
 
         $stats = new \resourceStatistics();
         $metrics = $stats->readSnapshotMetricsFromPath($path);
