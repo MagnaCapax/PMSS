@@ -215,7 +215,14 @@ if (!function_exists('pmssColonRecordFieldsLookup')) {
         return null;
     }
 }
-if (!function_exists('pmssReadRegularFileInt')) { function pmssReadRegularFileInt(string $path, int $default = 0): int { return (($raw = pmssReadRegularFileTrimmed($path)) === null || $raw === '') ? $default : (int) $raw; } }
+if (!function_exists('pmssReadRegularFileInt')) {
+    // Read a regular non-symlink file that must contain digits to become an int.
+    function pmssReadRegularFileInt(string $path, int $default = 0): int
+    {
+        $raw = pmssReadRegularFileDigits($path);
+        return $raw === null ? $default : (int) $raw;
+    }
+}
 if (!function_exists('pmssHostnameRead')) {
     function pmssHostnameRead(string $default = '', string $path = '/etc/hostname'): string { return is_string($hostname = @file_get_contents($path)) ? trim($hostname) : $default; }
 }

@@ -186,5 +186,46 @@ class RuntimeTest extends TestCase
         $this->assertTrue(strpos($out, 'apt-get') !== false);
     }
 
+    public function testReadRegularFileIntReturnsParsedDigits(): void
+    {
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
+        $path = $tempDir.'/port';
+        file_put_contents($path, "123\n");
+
+        try {
+            $this->assertEquals(123, \pmssReadRegularFileInt($path, 99));
+        } finally {
+            $this->pmssRemoveTree($tempDir);
+        }
+    }
+
+    public function testReadRegularFileIntFallsBackForNonDigitContent(): void
+    {
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
+        $path = $tempDir.'/port';
+        file_put_contents($path, "123oops\n");
+
+        try {
+            $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
+        } finally {
+            $this->pmssRemoveTree($tempDir);
+        }
+    }
+
+    public function testReadRegularFileIntFallsBackForSymlinkedFile(): void
+    {
+        $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');
+        $target = $tempDir.'/target';
+        $path = $tempDir.'/port';
+        file_put_contents($target, "123\n");
+        symlink($target, $path);
+
+        try {
+            $this->assertEquals(99, \pmssReadRegularFileInt($path, 99));
+        } finally {
+            $this->pmssRemoveTree($tempDir);
+        }
+    }
+
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
 }
