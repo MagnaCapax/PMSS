@@ -4,16 +4,11 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TrafficTestCase.php';
 require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
-final class TrafficDisplayPayloadCharacterizationStub extends \trafficStatistics
-{
-    use TrafficStatisticsStubTrait;
-}
-
 final class TrafficDisplayPayloadCharacterizationTest extends TrafficTestCase
 {
     public function testTrafficProcessorPersistsRawAndDailyOnly(): void
     {
-        $stats = new TrafficDisplayPayloadCharacterizationStub();
+        $stats = $this->makeTrafficStatisticsStub();
         [$paths, $processor] = $this->makeTrafficProcessorFixture($stats, '\TrafficStatsProcessor', 'pmss-traffic-characterization-');
 
         $user = 'alice';

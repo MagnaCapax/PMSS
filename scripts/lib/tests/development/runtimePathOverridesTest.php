@@ -6,34 +6,26 @@ require_once dirname(__DIR__, 3).'/update.php';
 
 class RuntimePathOverridesTest extends TestCase
 {
-    public function testPmssLogDirDefaultsToVarLogPmss(): void
+    public function testRuntimeHelpersDefaultToPmssDirectories(): void
     {
-        $this->pmssAssertEnvResolvedPath('PMSS_LOG_DIR', null, '/var/log/pmss', '\pmssLogDir');
+        foreach ([
+            ['PMSS_LOG_DIR', '/var/log/pmss', '\pmssLogDir'],
+            ['PMSS_RUNTIME_DIR', '/var/run/pmss', '\pmssRuntimeDir'],
+            ['PMSS_STATE_DIR', '/var/lib/pmss', '\pmssStateDir'],
+        ] as $case) {
+            $this->pmssAssertEnvResolvedPath($case[0], null, $case[1], $case[2]);
+        }
     }
 
-    public function testPmssLogDirUsesEnvOverride(): void
+    public function testRuntimeHelpersHonorEnvOverrides(): void
     {
-        $this->pmssAssertEnvResolvedPath('PMSS_LOG_DIR', '/tmp/pmss-log-override/', '/tmp/pmss-log-override', '\pmssLogDir');
-    }
-
-    public function testPmssRuntimeDirDefaultsToVarRunPmss(): void
-    {
-        $this->pmssAssertEnvResolvedPath('PMSS_RUNTIME_DIR', null, '/var/run/pmss', '\pmssRuntimeDir');
-    }
-
-    public function testPmssRuntimeDirUsesEnvOverride(): void
-    {
-        $this->pmssAssertEnvResolvedPath('PMSS_RUNTIME_DIR', '/tmp/pmss-runtime-override/', '/tmp/pmss-runtime-override', '\pmssRuntimeDir');
-    }
-
-    public function testPmssStateDirDefaultsToVarLibPmss(): void
-    {
-        $this->pmssAssertEnvResolvedPath('PMSS_STATE_DIR', null, '/var/lib/pmss', '\pmssStateDir');
-    }
-
-    public function testPmssStateDirUsesEnvOverride(): void
-    {
-        $this->pmssAssertEnvResolvedPath('PMSS_STATE_DIR', '/tmp/pmss-state-override/', '/tmp/pmss-state-override', '\pmssStateDir');
+        foreach ([
+            ['PMSS_LOG_DIR', '/tmp/pmss-log-override/', '/tmp/pmss-log-override', '\pmssLogDir'],
+            ['PMSS_RUNTIME_DIR', '/tmp/pmss-runtime-override/', '/tmp/pmss-runtime-override', '\pmssRuntimeDir'],
+            ['PMSS_STATE_DIR', '/tmp/pmss-state-override/', '/tmp/pmss-state-override', '\pmssStateDir'],
+        ] as $case) {
+            $this->pmssAssertEnvResolvedPath($case[0], $case[1], $case[2], $case[3]);
+        }
     }
 
     public function testUpdateLoggingResolvesPmssLogFileFromLogDirOverride(): void
@@ -45,5 +37,4 @@ class RuntimePathOverridesTest extends TestCase
 
         $this->assertEquals($logDir.'/update.log', $output);
     }
-
 }

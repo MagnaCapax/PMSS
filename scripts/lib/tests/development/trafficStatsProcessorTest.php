@@ -4,27 +4,6 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TrafficTestCase.php';
 require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
-class StubTrafficStatistics extends \trafficStatistics
-{
-    use TrafficStatisticsStubTrait;
-}
-
-class SpyTrafficStatsProcessor extends \TrafficStatsProcessor
-{
-    public array $usersToDiscover = [];
-    public array $spawnCalls = [];
-
-    public function discoverUsers(): array
-    {
-        return $this->usersToDiscover;
-    }
-
-    public function spawnWorkers(string $scriptPath, array $users): void
-    {
-        $this->spawnCalls[] = [$scriptPath, $users];
-    }
-}
-
 class TrafficStatsProcessorTest extends TrafficTestCase
 {
     public function testSharedTrafficAmountFormatter(): void
@@ -56,7 +35,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testProcessUserPersistsData(): void
     {
-        $stub = new StubTrafficStatistics();
+        $stub = $this->makeTrafficStatisticsStub();
         [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
 
         $user = 'alice';
@@ -76,7 +55,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testValidateUserAcceptsLocalnetSuffix(): void
     {
-        [$paths, $processor] = $this->makeTrafficProcessorFixture(new StubTrafficStatistics());
+        [$paths, $processor] = $this->makeTrafficProcessorFixture($this->makeTrafficStatisticsStub());
 
         $user = 'alice';
         $this->createTrafficUser($paths, $user);
@@ -87,7 +66,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testProcessUserPersistsLocalnetData(): void
     {
-        $stub = new StubTrafficStatistics();
+        $stub = $this->makeTrafficStatisticsStub();
         [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
 
         $user = 'alice';
@@ -108,8 +87,8 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliProcessesWorkerUser(): void
     {
-        $stub = new StubTrafficStatistics();
-        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub, SpyTrafficStatsProcessor::class);
+        $stub = $this->makeTrafficStatisticsStub();
+        [$paths, $processor] = $this->makeTrafficProcessorSpyFixture($stub);
         $user = 'alice';
 
         $this->createTrafficUser($paths, $user);
@@ -125,8 +104,8 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliReportsInvalidWorkerUser(): void
     {
-        $stub = new StubTrafficStatistics();
-        [, $processor] = $this->makeTrafficProcessorFixture($stub, SpyTrafficStatsProcessor::class);
+        $stub = $this->makeTrafficStatisticsStub();
+        [, $processor] = $this->makeTrafficProcessorSpyFixture($stub);
 
         list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php', 'ghost'], '/scripts/cron/trafficStats.php'); });
 
@@ -138,7 +117,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliPrintsNoUsersMessageWithoutDiscoveredUsers(): void
     {
-        [, $processor] = $this->makeTrafficProcessorFixture(new StubTrafficStatistics(), SpyTrafficStatsProcessor::class);
+        [, $processor] = $this->makeTrafficProcessorSpyFixture($this->makeTrafficStatisticsStub());
 
         list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'); });
 
@@ -149,7 +128,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliSpawnsWorkersForDiscoveredUsers(): void
     {
-        [, $processor] = $this->makeTrafficProcessorFixture(new StubTrafficStatistics(), SpyTrafficStatsProcessor::class);
+        [, $processor] = $this->makeTrafficProcessorSpyFixture($this->makeTrafficStatisticsStub());
         $processor->usersToDiscover = ['alice', 'bob'];
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'));

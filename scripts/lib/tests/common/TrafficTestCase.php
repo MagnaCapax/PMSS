@@ -67,6 +67,35 @@ abstract class TrafficTestCase extends TestCase
         return [$paths, new $processorClass($stats, $paths)];
     }
 
+    /** Build a stubbed statistics instance with in-memory input and saved payloads. */
+    protected function makeTrafficStatisticsStub(): \trafficStatistics
+    {
+        return new class extends \trafficStatistics {
+            use TrafficStatisticsStubTrait;
+        };
+    }
+
+    /** Build a processor spy fixture that records worker discovery and spawn requests. */
+    protected function makeTrafficProcessorSpyFixture(\trafficStatistics $stats, string $prefix = 'pmss-traffic-', bool $withPasswd = true): array
+    {
+        $paths = $this->makeTrafficPaths($prefix, $withPasswd);
+
+        return [$paths, new class($stats, $paths) extends \TrafficStatsProcessor {
+            public $usersToDiscover = [];
+            public $spawnCalls = [];
+
+            public function discoverUsers(): array
+            {
+                return $this->usersToDiscover;
+            }
+
+            public function spawnWorkers(string $scriptPath, array $users): void
+            {
+                $this->spawnCalls[] = [$scriptPath, $users];
+            }
+        }];
+    }
+
     /** Create the canonical localnet traffic marker and return its user key. */
     protected function markTrafficUserLocalnet(array $paths, string $user): string
     {

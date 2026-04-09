@@ -6,6 +6,14 @@ require_once dirname(__DIR__, 2).'/traffic.php';
 
 class TrafficStatisticsIngressTest extends TrafficTestCase
 {
+    private function assertSaveUserTrafficPersists(array $paths, string $user, string $trafficMode = 'egress'): void
+    {
+        $stats = new \trafficStatistics($paths);
+        $payload = $this->makeTrafficPayload(['month' => 1]);
+        $stats->saveUserTraffic($user, $payload);
+        $this->assertTrafficPayloadPersistence($paths, $user, $payload, $trafficMode);
+    }
+
     public function testGetDataUsesCustomTrafficDir(): void
     {
         $paths = $this->makeTrafficPaths();
@@ -20,20 +28,14 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
     {
         $paths = $this->makeTrafficPaths();
         $this->createTrafficUser($paths, 'alice', false);
-        $stats = new \trafficStatistics($paths);
-        $payload = $this->makeTrafficPayload(['month' => 1]);
-        $stats->saveUserTraffic('alice', $payload);
-        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload);
+        $this->assertSaveUserTrafficPersists($paths, 'alice');
     }
 
     public function testSaveUserTrafficWritesIngressFile(): void
     {
         $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
         $this->createTrafficUser($paths, 'alice', false);
-        $stats = new \trafficStatistics($paths);
-        $payload = $this->makeTrafficPayload(['month' => 1]);
-        $stats->saveUserTraffic('alice', $payload);
-        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload, 'ingress');
+        $this->assertSaveUserTrafficPersists($paths, 'alice', 'ingress');
     }
 
     public function testSaveUserTrafficIngressLocalnetSuffixWritesLocalFile(): void
@@ -41,10 +43,7 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
         $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
         $this->createTrafficUser($paths, 'alice', false);
         $user = $this->markTrafficUserLocalnet($paths, 'alice');
-        $stats = new \trafficStatistics($paths);
-        $payload = $this->makeTrafficPayload(['month' => 1]);
-        $stats->saveUserTraffic($user, $payload);
-        $this->assertTrafficPayloadPersistence($paths, $user, $payload, 'ingress');
+        $this->assertSaveUserTrafficPersists($paths, $user, 'ingress');
     }
 
     public function testSaveUserTrafficInvalidModeFallsBackToEgress(): void

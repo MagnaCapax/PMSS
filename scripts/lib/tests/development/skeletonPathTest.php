@@ -8,24 +8,16 @@ class SkeletonPathTest extends TestCase
     public function testSkeletonBaseOverride(): void
     {
         $temp = $this->pmssMakeTempDir('pmss-skel-override-');
-        $original = getenv('PMSS_SKEL_DIR');
-        putenv('PMSS_SKEL_DIR='.$temp);
-        try {
+        $this->pmssWithEnv(['PMSS_SKEL_DIR' => $temp], function () use ($temp): void {
             $this->assertEquals($temp, \pmssSkeletonBase());
             $this->assertEquals($temp.'/foo/bar', \pmssSkeletonBase().'/foo/bar');
-        } finally {
-            if ($original === false) {
-                putenv('PMSS_SKEL_DIR');
-            } else {
-                putenv('PMSS_SKEL_DIR='.$original);
-            }
-        }
+        });
     }
 
     public function testSkeletonBaseNormalizesTrailingSlash(): void
     {
-        putenv('PMSS_SKEL_DIR=/etc/skel/');
-        $this->assertEquals('/etc/skel', \pmssSkeletonBase());
-        putenv('PMSS_SKEL_DIR');
+        $this->pmssWithEnv(['PMSS_SKEL_DIR' => '/etc/skel/'], function (): void {
+            $this->assertEquals('/etc/skel', \pmssSkeletonBase());
+        });
     }
 }

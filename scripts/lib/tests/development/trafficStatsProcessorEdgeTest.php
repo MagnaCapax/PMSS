@@ -4,16 +4,11 @@ namespace PMSS\Tests;
 require_once __DIR__.'/../common/TrafficTestCase.php';
 require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
-class StubTrafficStatisticsEdge extends \trafficStatistics
-{
-    use TrafficStatisticsStubTrait;
-}
-
 class TrafficStatsProcessorEdgeTest extends TrafficTestCase
 {
     public function testProcessUserIgnoresErroneousLines(): void
     {
-        $stub = new StubTrafficStatisticsEdge();
+        $stub = $this->makeTrafficStatisticsStub();
         [$paths, $processor] = $this->makeTrafficProcessorFixture($stub, '\TrafficStatsProcessor', 'pmss-traffic-edge-');
         $this->createTrafficUser($paths, 'alice');
 
@@ -29,7 +24,7 @@ class TrafficStatsProcessorEdgeTest extends TrafficTestCase
 
     public function testValidateUserFalseWhenMissingPasswd(): void
     {
-        $stub = new StubTrafficStatisticsEdge();
+        $stub = $this->makeTrafficStatisticsStub();
         [$paths, $processor] = $this->makeTrafficProcessorFixture($stub, '\TrafficStatsProcessor', 'pmss-traffic-edge-');
         @unlink($paths['passwd_file']);
         $this->createTrafficUser($paths, 'ghost');
