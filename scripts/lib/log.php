@@ -45,10 +45,33 @@ if (!function_exists('pmssJsonEncodeSafe')) {
 }
 
 if (!function_exists('pmssJsonLineAppend')) {
+    /** Validate a log write target before appending data. */
+    function pmssLogWritePathIsSafe(string $path): bool
+    {
+        $path = trim($path);
+        if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1) {
+            return false;
+        }
+
+        if (is_link($path) || (file_exists($path) && !is_file($path))) {
+            return false;
+        }
+
+        $directory = dirname($path);
+        if ($directory === '' || !is_dir($directory) || is_link($directory)) {
+            return false;
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('pmssJsonLineAppend')) {
     /** Append one payload to a JSON Lines file. */
     function pmssJsonLineAppend(string $path, array $payload): bool
     {
-        return is_string($encoded = pmssJsonEncodeSafe($payload, JSON_UNESCAPED_SLASHES))
+        return pmssLogWritePathIsSafe($path)
+            && is_string($encoded = pmssJsonEncodeSafe($payload, JSON_UNESCAPED_SLASHES))
             && @file_put_contents($path, $encoded.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
     }
 }
@@ -71,7 +94,8 @@ if (!function_exists('pmssLogAppendTimestampedLine')) {
     /** Append one timestamped line to a log file. */
     function pmssLogAppendTimestampedLine(string $path, string $message, string $timestampFormat = '[Y-m-d H:i:s] ', string $prefix = '', ?int $mode = null): bool
     {
-        $written = @file_put_contents($path, date($timestampFormat).$prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
+        $written = pmssLogWritePathIsSafe($path)
+            && @file_put_contents($path, date($timestampFormat).$prefix.$message.PHP_EOL, FILE_APPEND | LOCK_EX) !== false;
         $written && $mode !== null && @chmod($path, $mode);
         return $written;
     }
