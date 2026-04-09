@@ -996,6 +996,19 @@ abstract class TestCase
         );
     }
 
+    /** @return array{result:array{rc:int, output:string, lines:array<int, string>},stderrPath:string} */
+    protected function pmssExecShellCommandWithTempStderr(string $command, array $environment = [], string $stderrPrefix = 'pmss-stderr-'): array
+    {
+        $stderrPath = $this->pmssMakeTempPath($stderrPrefix);
+        return ['result' => $this->pmssExecShellCommand($command, $environment, '2>'.escapeshellarg($stderrPath)), 'stderrPath' => $stderrPath];
+    }
+
+    /** @return array{result:array{rc:int, output:string, lines:array<int, string>},stderrPath:string} */
+    protected function pmssRunRepoPhpScriptCommandWithTempStderr(string $relativePath, array $arguments = [], array $environment = [], string $stderrPrefix = 'pmss-stderr-'): array
+    {
+        return $this->pmssExecShellCommandWithTempStderr($this->pmssBuildPhpCommand($this->pmssRepoPath($relativePath), $arguments), $environment, $stderrPrefix);
+    }
+
     protected function pmssAssertCommandFailsToStderr(array $result, string $stderrPath, string $expectedMessage): void
     {
         $this->assertEquals(1, $result['rc']);

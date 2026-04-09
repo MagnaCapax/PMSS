@@ -116,16 +116,13 @@ class ShowResourcesFormatTest extends TestCase
         $this->writeResourceStats($runtimeDir, 'alice', $this->sampleUsagePayload([
             'memory' => ['current' => INF, 'raw' => ['month' => 512 * 1024 * 1024]],
         ]));
-        $stderrPath = $this->pmssMakeTempPath('pmss-show-stderr-');
-
-        $result = $this->pmssRunRepoPhpScriptCommand(
+        $command = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
             'scripts/showResources.php',
             ['--json', '--user=alice'],
             ['PMSS_RUNTIME_DIR' => $runtimeDir],
-            '2>'.escapeshellarg($stderrPath)
+            'pmss-show-stderr-'
         );
-
-        $this->pmssAssertCommandFailsToStderr($result, $stderrPath, "Failed to encode resource report JSON.\n");
+        $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Failed to encode resource report JSON.\n");
     }
 
 }

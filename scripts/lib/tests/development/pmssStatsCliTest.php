@@ -160,9 +160,7 @@ class PmssStatsCliTest extends TestCase
             'memory' => ['current' => INF],
         ]));
         $versionFile = $this->pmssWriteTempFile('stats-version', "3.0.0\n");
-        $stderrPath = $this->pmssMakeTempPath('pmss-stats-stderr-');
-
-        $result = $this->pmssRunRepoPhpScriptCommand(
+        $command = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
             'scripts/pmss-stats.php',
             ['--json'],
             [
@@ -172,10 +170,9 @@ class PmssStatsCliTest extends TestCase
                 'PMSS_STATS_CGROUP_DIR' => $this->cgroupDir,
                 'PMSS_STATS_VERSION_FILE' => $versionFile,
             ],
-            '2>'.escapeshellarg($stderrPath)
+            'pmss-stats-stderr-'
         );
-
-        $this->pmssAssertCommandFailsToStderr($result, $stderrPath, "Failed to encode PMSS stats JSON.\n");
+        $this->pmssAssertCommandFailsToStderr($command['result'], $command['stderrPath'], "Failed to encode PMSS stats JSON.\n");
     }
 
     /**
