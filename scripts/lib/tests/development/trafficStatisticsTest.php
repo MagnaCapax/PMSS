@@ -23,17 +23,12 @@ class TrafficStatisticsTest extends TrafficTestCase
         $this->assertTrue($parsed === false);
     }
 
-    public function testParseLineRejectsMalformed(): void
+    public function testParseLineRejectsMalformedInputs(): void
     {
         $ts = new \trafficStatistics();
-        $this->assertTrue($ts->parseLine('bad data') === false);
-    }
-
-    public function testParseLineRejectsExtraColonParts(): void
-    {
-        $ts = new \trafficStatistics();
-        $line = date('Y-m-d H:i:s').': 1048576: 2097152';
-        $this->assertTrue($ts->parseLine($line) === false);
+        foreach (['bad data', date('Y-m-d H:i:s').': 1048576: 2097152'] as $line) {
+            $this->assertTrue($ts->parseLine($line) === false);
+        }
     }
 
     public function testGetDataClampsNonPositivePeriodsToOneLine(): void
@@ -53,31 +48,18 @@ class TrafficStatisticsTest extends TrafficTestCase
         $stats = new \trafficStatistics($paths);
         $payload = $this->makeTrafficPayload(['day' => 1.25], ['day' => '1.25MiB'], ['2026/03/13' => 1.25]);
         $stats->saveUserTraffic('alice', $payload);
-
-        $homePath = $paths['home_dir'].'/alice/.trafficData';
-        $runtimePath = $paths['runtime_dir'].'/trafficStats/alice';
-        $this->assertTrue(is_file($homePath));
-        $this->assertEquals($payload, unserialize((string) file_get_contents($homePath)));
-        if (is_file($runtimePath)) {
-            $this->assertEquals($payload, unserialize((string) file_get_contents($runtimePath)));
-        }
+        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload);
     }
 
     public function testSaveUserTrafficUsesIngressLocalnetFilename(): void
     {
         $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'ingress']);
         $this->createTrafficUser($paths, 'alice', false);
+        $user = $this->markTrafficUserLocalnet($paths, 'alice');
 
         $stats = new \trafficStatistics($paths);
         $payload = $this->makeTrafficPayload(['day' => 7.5], ['day' => '7.5MiB'], ['2026/03/13' => 7.5]);
-        $stats->saveUserTraffic('alice-localnet', $payload);
-
-        $homePath = $paths['home_dir'].'/alice/.trafficDataIngressLocal';
-        $runtimePath = $paths['runtime_dir'].'/trafficStats/alice-localnet';
-        $this->assertTrue(is_file($homePath));
-        $this->assertEquals($payload, unserialize((string) file_get_contents($homePath)));
-        if (is_file($runtimePath)) {
-            $this->assertEquals($payload, unserialize((string) file_get_contents($runtimePath)));
-        }
+        $stats->saveUserTraffic($user, $payload);
+        $this->assertTrafficPayloadPersistence($paths, $user, $payload, 'ingress');
     }
 }

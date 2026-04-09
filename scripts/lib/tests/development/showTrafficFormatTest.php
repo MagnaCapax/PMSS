@@ -5,20 +5,12 @@ require_once dirname(__DIR__, 3).'/showTraffic.php';
 
 class ShowTrafficFormatTest extends TestCase
 {
-    public function testFormatTrafficAmountMiB(): void
-    {
-        $this->assertEquals('500MiB', \pmssTrafficFormatAmount(500));
-    }
-
-    public function testFormatTrafficAmountGiB(): void
-    {
-        $this->assertEquals('1.95GiB', \pmssTrafficFormatAmount(2000));
-    }
-
-    public function testFormatTrafficAmountTiB(): void
+    public function testFormatTrafficAmountAcrossUnits(): void
     {
         $twoTiBInMiB = 2 * 1024 * 1024;
-        $this->assertEquals('2TiB', \pmssTrafficFormatAmount($twoTiBInMiB));
+        foreach ([[500, '500MiB'], [2000, '1.95GiB'], [$twoTiBInMiB, '2TiB']] as $case) {
+            $this->assertEquals($case[1], \pmssTrafficFormatAmount($case[0]));
+        }
     }
 
     public function testTrafficAmountFormatterCharacterizationKeepsLegacyThresholds(): void
@@ -43,12 +35,9 @@ class ShowTrafficFormatTest extends TestCase
         $out = $this->pmssRunRepoPhpScript('scripts/showTraffic.php', ['--help'], [], '');
 
         $this->assertTrue(is_string($out));
-        $this->assertTrue(strpos($out, '--json') !== false);
-        $this->assertTrue(strpos($out, '--show-missing') !== false);
-        $this->assertTrue(strpos($out, '--extended') !== false);
-        $this->assertTrue(strpos($out, '--sort') !== false);
-        $this->assertTrue(strpos($out, '--color') !== false);
-        $this->assertTrue(strpos($out, '--no-color') !== false);
+        foreach (['--json', '--show-missing', '--extended', '--sort', '--color', '--no-color'] as $option) {
+            $this->assertTrue(strpos($out, $option) !== false);
+        }
     }
 
     public function testShowTrafficUsesSharedManagedUsersParser(): void

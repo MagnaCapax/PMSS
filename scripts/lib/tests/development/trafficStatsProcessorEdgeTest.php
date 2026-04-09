@@ -14,8 +14,7 @@ class TrafficStatsProcessorEdgeTest extends TrafficTestCase
     public function testProcessUserIgnoresErroneousLines(): void
     {
         $stub = new StubTrafficStatisticsEdge();
-        $paths = $this->makeTrafficPaths('pmss-traffic-edge-', true);
-        $processor = new \TrafficStatsProcessor($stub, $paths);
+        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub, '\TrafficStatsProcessor', 'pmss-traffic-edge-');
         $this->createTrafficUser($paths, 'alice');
 
         // malformed lines mixed with valid-looking but enormous values
@@ -31,9 +30,8 @@ class TrafficStatsProcessorEdgeTest extends TrafficTestCase
     public function testValidateUserFalseWhenMissingPasswd(): void
     {
         $stub = new StubTrafficStatisticsEdge();
-        $paths = $this->makeTrafficPaths('pmss-traffic-edge-', true);
+        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub, '\TrafficStatsProcessor', 'pmss-traffic-edge-');
         @unlink($paths['passwd_file']);
-        $processor = new \TrafficStatsProcessor($stub, $paths);
         $this->createTrafficUser($paths, 'ghost');
         $this->assertTrue(!$processor->validateUser('ghost'));
     }

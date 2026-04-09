@@ -14,8 +14,7 @@ final class TrafficDisplayPayloadCharacterizationTest extends TrafficTestCase
     public function testTrafficProcessorPersistsRawAndDailyOnly(): void
     {
         $stats = new TrafficDisplayPayloadCharacterizationStub();
-        $paths = $this->makeTrafficPaths('pmss-traffic-characterization-', true);
-        $processor = new \TrafficStatsProcessor($stats, $paths);
+        [$paths, $processor] = $this->makeTrafficProcessorFixture($stats, '\TrafficStatsProcessor', 'pmss-traffic-characterization-');
 
         $user = 'alice';
         $this->createTrafficUser($paths, $user);

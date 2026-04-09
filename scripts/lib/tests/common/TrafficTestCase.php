@@ -59,6 +59,34 @@ abstract class TrafficTestCase extends TestCase
         }
         @mkdir($paths['home_dir'].'/'.$user, 0755, true);
     }
+
+    /** Build an isolated processor fixture with shared path wiring. */
+    protected function makeTrafficProcessorFixture(\trafficStatistics $stats, string $processorClass = '\\TrafficStatsProcessor', string $prefix = 'pmss-traffic-', bool $withPasswd = true): array
+    {
+        $paths = $this->makeTrafficPaths($prefix, $withPasswd);
+        return [$paths, new $processorClass($stats, $paths)];
+    }
+
+    /** Create the canonical localnet traffic marker and return its user key. */
+    protected function markTrafficUserLocalnet(array $paths, string $user): string
+    {
+        $localnetUser = $user.'-localnet';
+        $this->pmssWriteFile($paths['traffic_dir'].'/'.$localnetUser, 'seed');
+        return $localnetUser;
+    }
+
+    /** Assert that a traffic payload lands in the expected home and runtime files. */
+    protected function assertTrafficPayloadPersistence(array $paths, string $user, array $payload, string $trafficMode = 'egress'): void
+    {
+        $homePath = pmssTrafficDataPaths(pmssTrafficUserKeyBaseUser($user), $paths['home_dir'])[pmssTrafficDataPathKey(pmssTrafficUserKeyIsLocalnet($user), $trafficMode)];
+        $runtimePath = pmssTrafficStatsPath($user, null, $paths['runtime_dir']);
+        $this->assertTrue(is_file($homePath));
+        $this->assertEquals($payload, unserialize((string) file_get_contents($homePath)));
+        if (is_file($runtimePath)) {
+            $this->assertEquals($payload, unserialize((string) file_get_contents($runtimePath)));
+        }
+    }
+
     /** Build canonical persisted traffic payload arrays for save/read assertions. */
     protected function makeTrafficPayload(array $raw, array $display = [], array $daily = []): array
     {

@@ -21,8 +21,9 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
         $paths = $this->makeTrafficPaths();
         $this->createTrafficUser($paths, 'alice', false);
         $stats = new \trafficStatistics($paths);
-        $stats->saveUserTraffic('alice', $this->makeTrafficPayload(['month' => 1]));
-        $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficData'));
+        $payload = $this->makeTrafficPayload(['month' => 1]);
+        $stats->saveUserTraffic('alice', $payload);
+        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload);
     }
 
     public function testSaveUserTrafficWritesIngressFile(): void
@@ -30,17 +31,20 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
         $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
         $this->createTrafficUser($paths, 'alice', false);
         $stats = new \trafficStatistics($paths);
-        $stats->saveUserTraffic('alice', $this->makeTrafficPayload(['month' => 1]));
-        $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficDataIngress'));
+        $payload = $this->makeTrafficPayload(['month' => 1]);
+        $stats->saveUserTraffic('alice', $payload);
+        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload, 'ingress');
     }
 
     public function testSaveUserTrafficIngressLocalnetSuffixWritesLocalFile(): void
     {
         $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
         $this->createTrafficUser($paths, 'alice', false);
+        $user = $this->markTrafficUserLocalnet($paths, 'alice');
         $stats = new \trafficStatistics($paths);
-        $stats->saveUserTraffic('alice-localnet', $this->makeTrafficPayload(['month' => 1]));
-        $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficDataIngressLocal'));
+        $payload = $this->makeTrafficPayload(['month' => 1]);
+        $stats->saveUserTraffic($user, $payload);
+        $this->assertTrafficPayloadPersistence($paths, $user, $payload, 'ingress');
     }
 
     public function testSaveUserTrafficInvalidModeFallsBackToEgress(): void
@@ -48,8 +52,9 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
         $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'bogus']);
         $this->createTrafficUser($paths, 'alice', false);
         $stats = new \trafficStatistics($paths);
-        $stats->saveUserTraffic('alice', $this->makeTrafficPayload(['month' => 1]));
-        $this->assertTrue(is_file($paths['home_dir'].'/alice/.trafficData'));
+        $payload = $this->makeTrafficPayload(['month' => 1]);
+        $stats->saveUserTraffic('alice', $payload);
+        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload);
         $this->assertTrue(!is_file($paths['home_dir'].'/alice/.trafficDataIngress'));
     }
 }

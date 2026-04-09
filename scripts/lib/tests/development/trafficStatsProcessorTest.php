@@ -57,8 +57,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
     public function testProcessUserPersistsData(): void
     {
         $stub = new StubTrafficStatistics();
-        $paths = $this->makeTrafficPaths('pmss-traffic-', true);
-        $processor = new \TrafficStatsProcessor($stub, $paths);
+        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
 
         $user = 'alice';
         $this->createTrafficUser($paths, $user);
@@ -77,43 +76,40 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testValidateUserAcceptsLocalnetSuffix(): void
     {
-        $paths = $this->makeTrafficPaths('pmss-traffic-', true);
-        $processor = new \TrafficStatsProcessor(new StubTrafficStatistics(), $paths);
+        [$paths, $processor] = $this->makeTrafficProcessorFixture(new StubTrafficStatistics());
 
         $user = 'alice';
         $this->createTrafficUser($paths, $user);
-        file_put_contents($paths['traffic_dir'].'/'.$user.'-localnet', 'seed');
+        $localnetUser = $this->markTrafficUserLocalnet($paths, $user);
 
-        $this->assertTrue($processor->validateUser($user.'-localnet'));
+        $this->assertTrue($processor->validateUser($localnetUser));
     }
 
     public function testProcessUserPersistsLocalnetData(): void
     {
         $stub = new StubTrafficStatistics();
-        $paths = $this->makeTrafficPaths('pmss-traffic-', true);
-        $processor = new \TrafficStatsProcessor($stub, $paths);
+        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
 
         $user = 'alice';
         $this->createTrafficUser($paths, $user);
-        file_put_contents($paths['traffic_dir'].'/'.$user.'-localnet', 'seed');
-        $stub->map[$user.'-localnet'] = $this->makeTrafficUsageLines([
+        $localnetUser = $this->markTrafficUserLocalnet($paths, $user);
+        $stub->map[$localnetUser] = $this->makeTrafficUsageLines([
             120 => 1048576,
             3600 => 1048576,
         ]);
 
         $compare = \pmssStatsCompareTimesBuild();
-        $processor->processUser($user.'-localnet', $compare);
+        $processor->processUser($localnetUser, $compare);
 
-        $this->assertTrue(isset($stub->saved[$user.'-localnet']));
-        $this->assertTrue(isset($stub->saved[$user.'-localnet']['raw']['day']));
-        $this->assertTrue(!isset($stub->saved[$user.'-localnet']['display']));
+        $this->assertTrue(isset($stub->saved[$localnetUser]));
+        $this->assertTrue(isset($stub->saved[$localnetUser]['raw']['day']));
+        $this->assertTrue(!isset($stub->saved[$localnetUser]['display']));
     }
 
     public function testRunCliProcessesWorkerUser(): void
     {
         $stub = new StubTrafficStatistics();
-        $paths = $this->makeTrafficPaths('pmss-traffic-', true);
-        $processor = new SpyTrafficStatsProcessor($stub, $paths);
+        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub, SpyTrafficStatsProcessor::class);
         $user = 'alice';
 
         $this->createTrafficUser($paths, $user);
@@ -130,7 +126,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
     public function testRunCliReportsInvalidWorkerUser(): void
     {
         $stub = new StubTrafficStatistics();
-        $processor = new SpyTrafficStatsProcessor($stub, $this->makeTrafficPaths('pmss-traffic-', true));
+        [, $processor] = $this->makeTrafficProcessorFixture($stub, SpyTrafficStatsProcessor::class);
 
         list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php', 'ghost'], '/scripts/cron/trafficStats.php'); });
 
@@ -142,7 +138,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliPrintsNoUsersMessageWithoutDiscoveredUsers(): void
     {
-        $processor = new SpyTrafficStatsProcessor(new StubTrafficStatistics(), $this->makeTrafficPaths('pmss-traffic-', true));
+        [, $processor] = $this->makeTrafficProcessorFixture(new StubTrafficStatistics(), SpyTrafficStatsProcessor::class);
 
         list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'); });
 
@@ -153,15 +149,10 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliSpawnsWorkersForDiscoveredUsers(): void
     {
-        $processor = new SpyTrafficStatsProcessor(new StubTrafficStatistics(), $this->makeTrafficPaths('pmss-traffic-', true));
+        [, $processor] = $this->makeTrafficProcessorFixture(new StubTrafficStatistics(), SpyTrafficStatsProcessor::class);
         $processor->usersToDiscover = ['alice', 'bob'];
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'));
         $this->assertEquals([['/scripts/cron/trafficStats.php', ['alice', 'bob']]], $processor->spawnCalls);
-    }
-
-    private function makeProcessor(): \TrafficStatsProcessor
-    {
-        return new \TrafficStatsProcessor(new StubTrafficStatistics(), $this->makeTrafficPaths('pmss-traffic-', true));
     }
 }
