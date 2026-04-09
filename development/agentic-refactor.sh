@@ -89,15 +89,7 @@ autocommit=0
 cooling_files=""
 
 while [[ $# -gt 0 ]]; do
-	if codex_parse_agent_exec_option agent exec_cmd "$1" "${2:-}"; then
-		shift "$CODEX_PARSE_SHIFT" || true
-		continue
-	fi
-	if codex_parse_runner_toggle_option dry_run autocommit "$1"; then
-		shift "$CODEX_PARSE_SHIFT" || true
-		continue
-	fi
-	if codex_parse_exec_extra_option exec_extra_args "$1" "${2:-}"; then
+	if codex_parse_launcher_option agent exec_cmd dry_run autocommit "$1" "${2:-}" 0 exec_extra_args; then
 		shift "$CODEX_PARSE_SHIFT" || true
 		continue
 	fi

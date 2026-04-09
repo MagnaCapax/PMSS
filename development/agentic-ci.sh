@@ -94,11 +94,7 @@ dry_run=0
 autocommit=0
 
 while [[ $# -gt 0 ]]; do
-	if codex_parse_agent_exec_option agent exec_cmd "$1" "${2:-}"; then
-		shift "$CODEX_PARSE_SHIFT" || true
-		continue
-	fi
-	if codex_parse_runner_toggle_option dry_run autocommit "$1"; then
+	if codex_parse_launcher_option agent exec_cmd dry_run autocommit "$1" "${2:-}"; then
 		shift "$CODEX_PARSE_SHIFT" || true
 		continue
 	fi

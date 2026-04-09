@@ -179,6 +179,22 @@ codex_parse_runner_toggle_option() {
 	return 1
 }
 
+# Parse the shared launcher flags reused across agentic wrappers.
+codex_parse_launcher_option() {
+	local agent_name="$1" exec_name="$2" dry_run_name="${3-}" autocommit_name="${4-}"
+	local arg="$5" next_value="${6-}" exec_inline_allowed="${7:-0}" exec_extra_name="${8-}"
+	if codex_parse_agent_exec_option "$agent_name" "$exec_name" "$arg" "$next_value" "$exec_inline_allowed"; then
+		return 0
+	fi
+	if [[ -n "$dry_run_name" && -n "$autocommit_name" ]] && codex_parse_runner_toggle_option "$dry_run_name" "$autocommit_name" "$arg"; then
+		return 0
+	fi
+	if [[ -n "$exec_extra_name" ]] && codex_parse_exec_extra_option "$exec_extra_name" "$arg" "$next_value"; then
+		return 0
+	fi
+	return 1
+}
+
 # Parse a CLI option and expose its value via shared parse globals.
 codex_parse_option() {
 	local arg="$1" next_value="${2-}" option_name="$3" inline_allowed="${4:-0}"
