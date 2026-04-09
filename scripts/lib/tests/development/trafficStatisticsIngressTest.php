@@ -24,26 +24,18 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
         $this->assertStringContainsString('1048576', $data);
     }
 
-    public function testSaveUserTrafficWritesDefaultFile(): void
+    public function testSaveUserTrafficPersistsAcrossSupportedModes(): void
     {
-        $paths = $this->makeTrafficPaths();
-        $this->createTrafficUser($paths, 'alice', false);
-        $this->assertSaveUserTrafficPersists($paths, 'alice');
-    }
-
-    public function testSaveUserTrafficWritesIngressFile(): void
-    {
-        $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
-        $this->createTrafficUser($paths, 'alice', false);
-        $this->assertSaveUserTrafficPersists($paths, 'alice', 'ingress');
-    }
-
-    public function testSaveUserTrafficIngressLocalnetSuffixWritesLocalFile(): void
-    {
-        $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']);
-        $this->createTrafficUser($paths, 'alice', false);
-        $user = $this->markTrafficUserLocalnet($paths, 'alice');
-        $this->assertSaveUserTrafficPersists($paths, $user, 'ingress');
+        foreach ([
+            ['paths' => $this->makeTrafficPaths(), 'user' => 'alice', 'mode' => 'egress'],
+            ['paths' => $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']), 'user' => 'alice', 'mode' => 'ingress'],
+            ['paths' => $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'ingress']), 'user' => 'alice-localnet', 'mode' => 'ingress'],
+        ] as $case) {
+            $paths = $case['paths'];
+            $this->createTrafficUser($paths, 'alice', false);
+            $user = $case['user'] === 'alice-localnet' ? $this->markTrafficUserLocalnet($paths, 'alice') : $case['user'];
+            $this->assertSaveUserTrafficPersists($paths, $user, $case['mode']);
+        }
     }
 
     public function testSaveUserTrafficInvalidModeFallsBackToEgress(): void

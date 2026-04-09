@@ -5,16 +5,12 @@ require_once dirname(__DIR__, 3).'/showTraffic.php';
 
 class ShowTrafficFormatTest extends TestCase
 {
-    public function testFormatTrafficAmountAcrossUnits(): void
+    public function testFormatTrafficAmountCharacterizationAcrossUnits(): void
     {
         $twoTiBInMiB = 2 * 1024 * 1024;
         foreach ([[500, '500MiB'], [2000, '1.95GiB'], [$twoTiBInMiB, '2TiB']] as $case) {
             $this->assertEquals($case[1], \pmssTrafficFormatAmount($case[0]));
         }
-    }
-
-    public function testTrafficAmountFormatterCharacterizationKeepsLegacyThresholds(): void
-    {
         $this->assertEquals([
             '0MiB',
             '1024MiB',

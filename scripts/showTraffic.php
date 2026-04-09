@@ -162,19 +162,13 @@ TXT;
 
         $displayUser = $isLocalnet ? "{$baseUser} (L)" : $baseUser;
 
-        $limitGiB = null;
-        if (array_key_exists($baseUser, $limitCache)) {
-            $limitGiB = $limitCache[$baseUser];
-        } else {
+        if (!array_key_exists($baseUser, $limitCache)) {
             $limitPath = pmssTrafficLimitPath($baseUser);
             $parsedLimit = pmssTrafficLimitReadGiBFile($limitPath);
-            if ($parsedLimit > 0) {
-                $limitGiB = $parsedLimit;
-            }
-            $limitCache[$baseUser] = $limitGiB;
+            $limitCache[$baseUser] = $parsedLimit > 0 ? $parsedLimit : null;
         }
 
-        $limitMiB = ($limitGiB !== null) ? ($limitGiB * 1024) : null;
+        $limitMiB = ($limitCache[$baseUser] !== null) ? ($limitCache[$baseUser] * 1024) : null;
         $pctUsed = null;
         $overLimit = false;
         $nearLimit = false;
@@ -195,7 +189,6 @@ TXT;
         $rows[] = [
             'user' => $thisUser,
             'displayUser' => $displayUser,
-            'isLocalnet' => $isLocalnet,
             'monthMiB' => (float) $data['raw']['month'],
             'display' => [
                 'month' => $dataDisplay['month'] ?? null,
@@ -207,7 +200,6 @@ TXT;
             'inboundDisplay' => $inboundDisplay,
             'inboundRatio' => $inboundRatio,
             'ratioDisplay' => $ratioDisplay,
-            'limitGiB' => $limitGiB,
             'limitMiB' => $limitMiB,
             'pctUsed' => $pctUsed,
             'overLimit' => $overLimit,
@@ -240,7 +232,7 @@ TXT;
     }
 
     if ($asJson) {
-        $payload = [
+        return pmssJsonEmitPayload([
             'users' => array_map(static function (array $row): array {
                 return [
                 'user'    => $row['user'],
@@ -273,10 +265,7 @@ TXT;
                 'missingStats' => count($missingStats),
             ],
             'missingStatsUsers' => $missingStats,
-        ];
-        echo json_encode($payload);
-        echo "\n";
-        return 0;
+        ], 'Failed to encode traffic report JSON.');
     }
 
     foreach ($rows as $row) {

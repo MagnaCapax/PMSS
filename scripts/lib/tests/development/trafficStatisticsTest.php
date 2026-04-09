@@ -15,26 +15,17 @@ class TrafficStatisticsTest extends TrafficTestCase
         $this->assertEquals(1.0, $parsed['data']);
     }
 
-    public function testParseLineRejectsGiganticTransfer(): void
+    public function testParseLineRejectsInvalidSamples(): void
     {
         $ts = new \trafficStatistics();
-        $line = date('Y-m-d H:i:s').': '.(150000 * 1024 * 1024 + 1);
-        $parsed = $ts->parseLine($line);
-        $this->assertTrue($parsed === false);
-    }
-
-    public function testParseLineRejectsMalformedInputs(): void
-    {
-        $ts = new \trafficStatistics();
-        foreach (['bad data', date('Y-m-d H:i:s').': 1048576: 2097152'] as $line) {
+        foreach ([
+            date('Y-m-d H:i:s').': '.(150000 * 1024 * 1024 + 1),
+            'bad data',
+            date('Y-m-d H:i:s').': 1048576: 2097152',
+            'not-a-time: 1048576',
+        ] as $line) {
             $this->assertTrue($ts->parseLine($line) === false);
         }
-    }
-
-    public function testParseLineRejectsInvalidTimestamp(): void
-    {
-        $ts = new \trafficStatistics();
-        $this->assertTrue($ts->parseLine('not-a-time: 1048576') === false);
     }
 
     public function testGetDataClampsNonPositivePeriodsToOneLine(): void
@@ -56,26 +47,19 @@ class TrafficStatisticsTest extends TrafficTestCase
         $this->assertSame('', $stats->getData('../outside', 1));
     }
 
-    public function testSaveUserTrafficWritesHomeAndRuntimeFilesInEgressMode(): void
+    public function testSaveUserTrafficPersistsExpectedFilesAcrossModes(): void
     {
-        $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'egress']);
-        $this->createTrafficUser($paths, 'alice', false);
+        foreach ([
+            ['mode' => 'egress', 'user' => 'alice', 'payload' => $this->makeTrafficPayload(['day' => 1.25], ['day' => '1.25MiB'], ['2026/03/13' => 1.25])],
+            ['mode' => 'ingress', 'user' => 'alice-localnet', 'payload' => $this->makeTrafficPayload(['day' => 7.5], ['day' => '7.5MiB'], ['2026/03/13' => 7.5])],
+        ] as $case) {
+            $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => $case['mode']]);
+            $this->createTrafficUser($paths, 'alice', false);
+            $user = $case['mode'] === 'ingress' ? $this->markTrafficUserLocalnet($paths, 'alice') : $case['user'];
 
-        $stats = new \trafficStatistics($paths);
-        $payload = $this->makeTrafficPayload(['day' => 1.25], ['day' => '1.25MiB'], ['2026/03/13' => 1.25]);
-        $stats->saveUserTraffic('alice', $payload);
-        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload);
-    }
-
-    public function testSaveUserTrafficUsesIngressLocalnetFilename(): void
-    {
-        $paths = $this->makeTrafficPaths('pmss-traffic-statistics-', false, ['traffic_mode' => 'ingress']);
-        $this->createTrafficUser($paths, 'alice', false);
-        $user = $this->markTrafficUserLocalnet($paths, 'alice');
-
-        $stats = new \trafficStatistics($paths);
-        $payload = $this->makeTrafficPayload(['day' => 7.5], ['day' => '7.5MiB'], ['2026/03/13' => 7.5]);
-        $stats->saveUserTraffic($user, $payload);
-        $this->assertTrafficPayloadPersistence($paths, $user, $payload, 'ingress');
+            $stats = new \trafficStatistics($paths);
+            $stats->saveUserTraffic($user, $case['payload']);
+            $this->assertTrafficPayloadPersistence($paths, $user, $case['payload'], $case['mode']);
+        }
     }
 }

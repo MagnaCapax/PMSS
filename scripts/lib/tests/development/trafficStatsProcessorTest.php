@@ -6,83 +6,50 @@ require_once dirname(__DIR__, 2).'/traffic/processor.php';
 
 class TrafficStatsProcessorTest extends TrafficTestCase
 {
-    public function testSharedTrafficAmountFormatter(): void
+    public function testSharedTrafficFormatterCharacterization(): void
     {
         $formatted = array_map('pmssTrafficFormatAmount', [
             '15min' => 100,
-            'hour'  => 2048,
-            'day'   => 2048 * 2048,
-        ]);
-        $this->assertEquals('100MiB', $formatted['15min']);
-        $this->assertTrue(strpos($formatted['hour'], 'GiB') !== false);
-        $this->assertTrue(strpos($formatted['day'], 'TiB') !== false);
-    }
-
-    public function testSharedTrafficAmountFormatterPreservesThresholdBoundaries(): void
-    {
-        $formatted = array_map('pmssTrafficFormatAmount', [
+            'hour' => 2048,
+            'day' => 2048 * 2048,
             'exact_gib' => 1024,
             'over_gib' => 1025,
             'exact_tib' => 1024 * 1024,
             'over_tib' => (1024 * 1024) + 1,
         ]);
 
+        $this->assertEquals('100MiB', $formatted['15min']);
+        $this->assertTrue(strpos($formatted['hour'], 'GiB') !== false);
+        $this->assertTrue(strpos($formatted['day'], 'TiB') !== false);
         $this->assertEquals('1024MiB', $formatted['exact_gib']);
         $this->assertEquals('1GiB', $formatted['over_gib']);
         $this->assertEquals('1024GiB', $formatted['exact_tib']);
         $this->assertEquals('1TiB', $formatted['over_tib']);
     }
 
-    public function testProcessUserPersistsData(): void
+    public function testProcessorSavesBaseAndLocalnetPayloads(): void
     {
-        $stub = $this->makeTrafficStatisticsStub();
-        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
+        foreach ([
+            ['offsets' => [100 => 1048576, 86400 => 1048576], 'localnet' => false],
+            ['offsets' => [120 => 1048576, 3600 => 1048576], 'localnet' => true],
+        ] as $case) {
+            $stub = $this->makeTrafficStatisticsStub();
+            [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
 
-        $user = 'alice';
-        $this->createTrafficUser($paths, $user);
-        $stub->map[$user] = $this->makeTrafficUsageLines([
-            100 => 1048576,
-            86400 => 1048576,
-        ]);
+            $user = 'alice';
+            $this->createTrafficUser($paths, $user);
+            $user = $case['localnet'] ? $this->markTrafficUserLocalnet($paths, $user) : $user;
+            $stub->map[$user] = $this->makeTrafficUsageLines($case['offsets']);
 
-        $compare = \pmssStatsCompareTimesBuild();
-        $processor->processUser($user, $compare);
+            $processor->processUser($user, \pmssStatsCompareTimesBuild());
 
-        $this->assertTrue(isset($stub->saved[$user]));
-        $this->assertTrue(isset($stub->saved[$user]['raw']['day']));
-        $this->assertTrue(!isset($stub->saved[$user]['display']));
-    }
-
-    public function testValidateUserAcceptsLocalnetSuffix(): void
-    {
-        [$paths, $processor] = $this->makeTrafficProcessorFixture($this->makeTrafficStatisticsStub());
-
-        $user = 'alice';
-        $this->createTrafficUser($paths, $user);
-        $localnetUser = $this->markTrafficUserLocalnet($paths, $user);
-
-        $this->assertTrue($processor->validateUser($localnetUser));
-    }
-
-    public function testProcessUserPersistsLocalnetData(): void
-    {
-        $stub = $this->makeTrafficStatisticsStub();
-        [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
-
-        $user = 'alice';
-        $this->createTrafficUser($paths, $user);
-        $localnetUser = $this->markTrafficUserLocalnet($paths, $user);
-        $stub->map[$localnetUser] = $this->makeTrafficUsageLines([
-            120 => 1048576,
-            3600 => 1048576,
-        ]);
-
-        $compare = \pmssStatsCompareTimesBuild();
-        $processor->processUser($localnetUser, $compare);
-
-        $this->assertTrue(isset($stub->saved[$localnetUser]));
-        $this->assertTrue(isset($stub->saved[$localnetUser]['raw']['day']));
-        $this->assertTrue(!isset($stub->saved[$localnetUser]['display']));
+            $this->assertTrue(isset($stub->saved[$user]));
+            $this->assertTrue(isset($stub->saved[$user]['raw']['day']));
+            $this->assertTrue(!isset($stub->saved[$user]['display']));
+            if ($case['localnet']) {
+                $this->assertTrue($processor->validateUser($user));
+            }
+        }
     }
 
     public function testRunCliProcessesWorkerUser(): void
