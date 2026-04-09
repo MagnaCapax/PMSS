@@ -52,4 +52,27 @@ class resourceReportSafetyTest extends TestCase
         $this->assertEquals([], $report['rows']);
         $this->assertTrue(!file_exists($this->markerPath));
     }
+
+    public function testBuildReportSkipsInvalidUserTraversalKeys(): void
+    {
+        @file_put_contents(
+            $this->runtimeDir.'/outside-stats',
+            serialize($this->pmssBuildResourceStatsPayloadFromValues([
+                'io_read' => $this->pmssBuildWindowValues(1),
+                'io_write' => $this->pmssBuildWindowValues(2),
+                'io_read_ops' => $this->pmssBuildWindowValues(3),
+                'io_write_ops' => $this->pmssBuildWindowValues(4),
+                'cpu' => $this->pmssBuildWindowValues(5),
+                'ram_hours' => $this->pmssBuildWindowValues(6),
+                'memory_current' => 7,
+                'memory_avg_month' => 8,
+                'tasks_current' => 9,
+            ]))
+        );
+
+        $report = \pmssResourceBuildReport($this->statsDir, ['../outside-stats']);
+
+        $this->assertEquals([], $report['missing']);
+        $this->assertEquals([], $report['rows']);
+    }
 }

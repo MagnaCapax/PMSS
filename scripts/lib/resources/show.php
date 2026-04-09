@@ -20,6 +20,10 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
     $totals = pmssResourceReportTemplate();
 
     foreach ($users as $thisUser) {
+        if (!pmssResourceLogIsValidUser((string) $thisUser)) {
+            continue;
+        }
+
         $data = pmssTrafficReadSerializedArrayFile("{$statsDir}/{$thisUser}");
         if ($data === null || ($row = pmssResourceStoredPayloadReportRow($data)) === null) {
             $missingStats[] = $thisUser;
