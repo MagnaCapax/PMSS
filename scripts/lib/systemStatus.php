@@ -33,6 +33,19 @@ function pmssStatusJsonEncode(array $payload, int $flags = 0): string
 
     return '{"error":"status_json_encode_failed","code":'.(int) json_last_error().'}';
 }
+
+/**
+ * Resolve a binary probe path only when `command -v` yields an executable path.
+ */
+function pmssStatusBinaryPathResolve(string $binary, callable $runCommand, ?callable $isExecutable = null): string
+{
+    $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+    if ($path === '' || strpos($path, '/') !== 0) {
+        return '';
+    }
+
+    return $isExecutable !== null && !$isExecutable($path) ? '' : $path;
+}
 /** Count OK/WARN/ERR entries for summary banners and JSON payloads. */
 function pmssStatusSummary(array $checks): array
 {
@@ -137,7 +150,7 @@ function pmssStatusContextResolve(array $dependencies = []): array
 }
 function pmssComponentStatusChecksFromContext(array $context): array
 {
-    $runCommand = $context['runCommand']; $pathExists = $context['pathExists']; $readFile = $context['readFile'];
+    $runCommand = $context['runCommand']; $pathExists = $context['pathExists']; $readFile = $context['readFile']; $isExecutable = $context['isExecutable'];
     $codename = (string) $context['codename']; $sourcesPath = (string) $context['sourcesPath'];
     $results[] = $codename === '' ? pmssStatus('os.codename', 'WARN', 'VERSION_CODENAME missing') : pmssStatus('os.codename', 'OK', $codename);
     $results[] = is_file($sourcesPath)
@@ -146,9 +159,9 @@ function pmssComponentStatusChecksFromContext(array $context): array
 
     return array_merge($results, pmssStatusCollectProbeChecks(
         $context['probeSpecs'],
-        static function (string $binary, array $binarySpec) use ($runCommand): ?array {
+        static function (string $binary, array $binarySpec) use ($runCommand, $isExecutable): ?array {
             if (!isset($binarySpec['componentName'])) return null;
-            $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+            $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
             return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
         },
         static function (array $pathSpec) use ($pathExists): ?array {
@@ -180,8 +193,8 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         : pmssStatus('OS codename', 'OK', $codename);
     $checks = array_merge($checks, pmssStatusCollectProbeChecks(
         $context['probeSpecs'],
-        static function (string $binary, array $binarySpec) use ($runCommand): array {
-            $path = trim((string) $runCommand('command -v '.escapeshellarg($binary)));
+        static function (string $binary, array $binarySpec) use ($runCommand, $isExecutable): array {
+            $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
             if ($path === '') return pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
             $detail = trim((string) $runCommand((string) $binarySpec['infoCommand']));
             return pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');

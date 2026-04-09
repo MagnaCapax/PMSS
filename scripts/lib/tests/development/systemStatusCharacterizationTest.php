@@ -71,7 +71,13 @@ final class SystemStatusCharacterizationTest extends TestCase
                 return in_array($path, [$sourcesPath, '/etc/seedbox/config/localnet', '/home/openvpn-host-pulsedmedia-com.ovpn', '/home/openvpn-host-pulsedmedia-com.crt', '/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload'], true);
             },
             'isDir' => static function (string $path): bool { return in_array($path, ['/etc/seedbox', '/etc/seedbox/config'], true); },
-            'isExecutable' => static function (string $path): bool { return in_array($path, ['/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload'], true); },
+            'isExecutable' => static function (string $path): bool {
+                return in_array($path, [
+                    '/usr/bin/rtorrent', '/usr/sbin/nginx', '/usr/sbin/lighttpd', '/usr/bin/php', '/usr/sbin/proftpd', '/usr/sbin/openvpn',
+                    '/usr/bin/tar', '/usr/bin/pigz', '/usr/bin/gpg', '/usr/bin/curl', '/usr/bin/wget', '/usr/bin/rsync', '/usr/bin/python3',
+                    '/usr/bin/git', '/opt/flexget/bin/flexget', '/opt/pyload/bin/pyload',
+                ], true);
+            },
             'isLink' => static function (string $path): bool { return in_array($path, ['/usr/local/bin/flexget', '/usr/local/bin/pyload'], true); },
             'readLink' => static function (string $path): string {
                 return [
@@ -107,6 +113,9 @@ final class SystemStatusCharacterizationTest extends TestCase
             },
             'readFile' => static function (string $path): string {
                 return is_file($path) ? (string) file_get_contents($path) : '';
+            },
+            'isExecutable' => static function (string $path): bool {
+                return in_array($path, ['/usr/bin/rtorrent', '/usr/sbin/nginx', '/usr/bin/php', '/usr/sbin/openvpn', '/usr/bin/curl'], true);
             },
         ]);
 
@@ -176,11 +185,34 @@ final class SystemStatusCharacterizationTest extends TestCase
             'readFile' => static function (string $path): string {
                 return is_file($path) ? (string) file_get_contents($path) : '';
             },
+            'isExecutable' => static function (string $path): bool {
+                return in_array($path, ['/usr/bin/rtorrent', '/usr/bin/php', '/usr/sbin/proftpd', '/usr/sbin/openvpn', '/usr/bin/curl'], true);
+            },
         ]);
 
         $this->assertEquals('bin.nginx', $checks[3]['name']);
         $this->assertEquals('WARN', $checks[3]['status']);
         $this->assertEquals('', $checks[3]['detail']);
+    }
+
+    public function testBinaryPathResolveRejectsNonExecutableAndNonAbsoluteResults(): void
+    {
+        $runCommand = static function (string $command): string {
+            $map = [
+                "command -v 'nginx'" => 'nginx',
+                "command -v 'curl'" => '/usr/bin/curl',
+                "command -v 'wget'" => '/usr/bin/wget',
+            ];
+
+            return $map[$command] ?? '';
+        };
+        $isExecutable = static function (string $path): bool {
+            return $path === '/usr/bin/curl';
+        };
+
+        $this->assertSame('', pmssStatusBinaryPathResolve('nginx', $runCommand, $isExecutable));
+        $this->assertSame('/usr/bin/curl', pmssStatusBinaryPathResolve('curl', $runCommand, $isExecutable));
+        $this->assertSame('', pmssStatusBinaryPathResolve('wget', $runCommand, $isExecutable));
     }
 
     public function testSharedProbeCollectorPreservesCatalogOrderWhileFilteringNulls(): void
@@ -395,6 +427,7 @@ final class SystemStatusCharacterizationTest extends TestCase
             'runCommand' => $dependencies['runCommand'],
             'pathExists' => $dependencies['pathExists'],
             'readFile' => $dependencies['readFile'],
+            'isExecutable' => $dependencies['isExecutable'],
         ];
 
         $systemChecks = pmssSystemStatusChecks($dependencies);
@@ -415,10 +448,12 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testComponentStatusCheckOrderStaysStableWithHermeticInputs(): void
     {
+        $dependencies = $this->buildSystemStatusDependencies();
         $checks = pmssComponentStatusChecks([
-            'runCommand' => $this->buildSystemStatusDependencies()['runCommand'],
-            'pathExists' => $this->buildSystemStatusDependencies()['pathExists'],
-            'readFile' => $this->buildSystemStatusDependencies()['readFile'],
+            'runCommand' => $dependencies['runCommand'],
+            'pathExists' => $dependencies['pathExists'],
+            'readFile' => $dependencies['readFile'],
+            'isExecutable' => $dependencies['isExecutable'],
         ]);
 
         $this->assertSame(
