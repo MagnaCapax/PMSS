@@ -298,6 +298,29 @@ if (!function_exists('pmssUserTrafficCliBootstrap')) {
     }
 }
 
+if (!function_exists('pmssUserGiBSettingUsageText')) {
+    /** Build the shared CLI usage text for per-user GiB quota commands. */
+    function pmssUserGiBSettingUsageText(
+        string $scriptName,
+        string $valueOption,
+        string $unitNote,
+        string $removalNote
+    ): string {
+        return rtrim(<<<TEXT
+Usage:
+  ./{$scriptName} --user=<username> --{$valueOption}=<GiB>
+  ./{$scriptName} --user=<username> --show
+  ./{$scriptName} --user=<username> --unset
+  ./{$scriptName} <username> <GiB>
+
+Notes:
+  - {$unitNote}
+  - {$removalNote}
+TEXT
+        );
+    }
+}
+
 if (!function_exists('pmssUserGiBSettingCli')) {
     /** @param array<string,mixed> $spec */
     function pmssUserGiBSettingCli(array $argv, array $spec): int
@@ -383,17 +406,11 @@ if (!function_exists('pmssUserTrafficLimitCli')) {
     function pmssUserTrafficLimitCli(array $argv, ?string $usage = null): int
     {
         if (!is_string($usage) || $usage === '') {
-            $usage = rtrim(<<<'TEXT'
-Usage:
-  ./userTrafficLimit.php --user=<username> --limit=<GiB>
-  ./userTrafficLimit.php --user=<username> --show
-  ./userTrafficLimit.php --user=<username> --unset
-  ./userTrafficLimit.php <username> <GiB>
-
-Notes:
-  - Limit unit is GiB (monthly quota).
-  - Use 0 (or --unset) to remove a limit.
-TEXT
+            $usage = pmssUserGiBSettingUsageText(
+                'userTrafficLimit.php',
+                'limit',
+                'Limit unit is GiB (monthly quota).',
+                'Use 0 (or --unset) to remove a limit.'
             );
         }
         return pmssUserGiBSettingCli($argv, [

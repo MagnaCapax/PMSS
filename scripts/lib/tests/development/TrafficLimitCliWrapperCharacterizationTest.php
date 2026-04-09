@@ -16,13 +16,16 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
             [
                 "require_once __DIR__.'/../lib/runtime.php';",
                 "require_once __DIR__.'/../lib/user/trafficLimit.php';",
-                '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
-                "exit(pmssUserTrafficLimitCli(\$argv ?? (\$_SERVER['argv'] ?? []), \$usage));",
+                "exit(pmssUserTrafficLimitCli(\$argv ?? (\$_SERVER['argv'] ?? [])));",
             ]
         );
         $this->pmssAssertRepoFileNotContainsStrings(
             $path,
-            ['pmssParseCliTokens($argv', 'pmssTrafficLimitWriteGiBFile($target, $trafficLimit)']
+            [
+                'pmssParseCliTokens($argv',
+                'pmssTrafficLimitWriteGiBFile($target, $trafficLimit)',
+                '  ./userTrafficLimit.php --user=<username> --limit=<GiB>',
+            ]
         );
     }
 
@@ -32,6 +35,7 @@ final class TrafficLimitCliWrapperCharacterizationTest extends TestCase
             'scripts/lib/user/trafficLimit.php',
             [
                 'function pmssUserGiBSettingCli(array $argv, array $spec): int',
+                'function pmssUserGiBSettingUsageText(',
                 'function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array',
                 'function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool',
                 'function pmssUserTrafficCliBootstrap(): bool',

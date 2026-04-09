@@ -49,6 +49,27 @@ PHP;
         $this->assertEquals([], $result['logs']);
     }
 
+    public function testHelpModePrintsCanonicalUsageText(): void
+    {
+        $result = $this->runTrafficLimitCli(['userTrafficLimit.php', '--help'], [], null);
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertEquals(
+            "Usage:\n"
+            ."  ./userTrafficLimit.php --user=<username> --limit=<GiB>\n"
+            ."  ./userTrafficLimit.php --user=<username> --show\n"
+            ."  ./userTrafficLimit.php --user=<username> --unset\n"
+            ."  ./userTrafficLimit.php <username> <GiB>\n\n"
+            ."Notes:\n"
+            ."  - Limit unit is GiB (monthly quota).\n"
+            ."  - Use 0 (or --unset) to remove a limit.\n",
+            $result['stdout']
+        );
+        $this->assertEquals(null, $result['runtimeFile']);
+        $this->assertEquals(null, $result['homeFile']);
+        $this->assertEquals([], $result['logs']);
+    }
+
     public function testSetModeWritesBothTargetsAndLogsChange(): void
     {
         $result = $this->runTrafficLimitCli(['userTrafficLimit.php', '--user=alice', '--limit=20']);
@@ -82,7 +103,7 @@ PHP;
      * @param array<string,string> $existingFiles
      * @return array{rc:int,stdout:string,runtimeFile:?string,homeFile:?string,runtimeMode:?int,homeMode:?int,logs:array<int,array<int,string>>}
      */
-    private function runTrafficLimitCli(array $argv, array $existingFiles = []): array
+    private function runTrafficLimitCli(array $argv, array $existingFiles = [], ?string $usage = ''): array
     {
         $repoRoot = dirname(__DIR__, 4);
         $runtimeDir = $this->pmssMakeTempDir('pmss-traffic-runtime-').'/trafficLimits';
@@ -97,7 +118,8 @@ PHP;
             file_put_contents($homeDir.'/.trafficLimit', $existingFiles['home']);
         }
 
-        $usage = rtrim(<<<'TEXT'
+        if ($usage === '') {
+            $usage = rtrim(<<<'TEXT'
 Usage:
   ./userTrafficLimit.php --user=<username> --limit=<GiB>
   ./userTrafficLimit.php --user=<username> --show
@@ -108,7 +130,8 @@ Notes:
   - Limit unit is GiB (monthly quota).
   - Use 0 (or --unset) to remove a limit.
 TEXT
-        );
+            );
+        }
 
         $script = <<<'PHP'
 $runtimeDir = __RUNTIME_DIR__;
@@ -155,7 +178,7 @@ $GLOBALS['PMSS_TRAFFIC_LIMIT_TEST_HOME'] = $homeDir;
 require $repoRoot.'/scripts/lib/user/trafficLimit.php';
 
 ob_start();
-$rc = pmssUserTrafficLimitCli($argv, $usage);
+$rc = ($usage === null) ? pmssUserTrafficLimitCli($argv) : pmssUserTrafficLimitCli($argv, $usage);
 $stdout = ob_get_clean();
 $runtimeFile = $runtimeDir.'/alice';
 $homeFile = $homeDir.'/.trafficLimit';

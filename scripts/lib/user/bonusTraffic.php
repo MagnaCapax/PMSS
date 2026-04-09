@@ -15,17 +15,11 @@ require_once __DIR__.'/trafficLimit.php';
  */
 function pmssUserBonusTrafficCli(array $argv): int
 {
-    $usage = rtrim(<<<'TEXT'
-Usage:
-  ./userBonusTraffic.php --user=<username> --bonus=<GiB>
-  ./userBonusTraffic.php --user=<username> --show
-  ./userBonusTraffic.php --user=<username> --unset
-  ./userBonusTraffic.php <username> <GiB>
-
-Notes:
-  - Bonus unit is GiB (monthly quota add-on).
-  - Use 0 (or --unset) to remove the bonus.
-TEXT
+    $usage = pmssUserGiBSettingUsageText(
+        'userBonusTraffic.php',
+        'bonus',
+        'Bonus unit is GiB (monthly quota add-on).',
+        'Use 0 (or --unset) to remove the bonus.'
     );
     // Shared helper keeps the missing username contract: "Error: missing username.\n".$usage."\n"
 

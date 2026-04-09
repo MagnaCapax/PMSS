@@ -20,6 +20,26 @@ final class BonusTrafficTest extends TestCase
         $this->assertEquals([], $result['logs']);
     }
 
+    public function testHelpModePrintsCanonicalUsageText(): void
+    {
+        $result = $this->runBonusTrafficCli(['userBonusTraffic.php', '--help']);
+
+        $this->assertEquals(0, $result['rc']);
+        $this->assertEquals(
+            "Usage:\n"
+            ."  ./userBonusTraffic.php --user=<username> --bonus=<GiB>\n"
+            ."  ./userBonusTraffic.php --user=<username> --show\n"
+            ."  ./userBonusTraffic.php --user=<username> --unset\n"
+            ."  ./userBonusTraffic.php <username> <GiB>\n\n"
+            ."Notes:\n"
+            ."  - Bonus unit is GiB (monthly quota add-on).\n"
+            ."  - Use 0 (or --unset) to remove the bonus.\n",
+            $result['stdout']
+        );
+        $this->assertEquals(null, $result['file']);
+        $this->assertEquals([], $result['logs']);
+    }
+
     public function testSetModeWritesBonusAndLogsChange(): void
     {
         $result = $this->runBonusTrafficCli(['userBonusTraffic.php', '--user=alice', '--bonus=20']);
