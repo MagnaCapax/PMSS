@@ -17,6 +17,7 @@ foreach (['traffic', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
 }
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/user/userConfigCli.php';
+require_once __DIR__.'/../lib/user/userConfigFilesystem.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
@@ -134,19 +135,20 @@ userApplyTrafficLimit($user);
 
 // Compose a canonical rtorrent configuration and mirror it to companion apps.
 echo "Creating rTorrent config\n";
-$resources = [];
-$resourceFile = '/etc/seedbox/config/system.rtorrent.resources';
-if (file_exists($resourceFile)) {
-    $resources = unserialize((string) file_get_contents($resourceFile));
+try {
+    $resources = pmssUserConfigReadRtorrentResources('/etc/seedbox/config/system.rtorrent.resources');
+    $rtorrentConfig = new rtorrentConfig($resources);
+    $throttle = pmssReadTorrentThrottle($user['name']);
+    $configuration = $rtorrentConfig->createConfig([
+        'ram' => $user['memory'],
+        'dht' => pmssUserConfigReadRequiredFile('/etc/seedbox/config/user.rtorrent.defaults.dht', 'rTorrent DHT defaults'),
+        'pex' => pmssUserConfigReadRequiredFile('/etc/seedbox/config/user.rtorrent.defaults.pex', 'rTorrent PEX defaults'),
+        'uploadThrottle' => $throttle === null ? 0 : $throttle,
+    ]);
+} catch (RuntimeException $exception) {
+    fwrite(STDERR, 'Error: '.$exception->getMessage()."\n");
+    exit(1);
 }
-$rtorrentConfig = new rtorrentConfig($resources);
-$throttle = pmssReadTorrentThrottle($user['name']);
-$configuration = $rtorrentConfig->createConfig([
-    'ram' => $user['memory'],
-    'dht' => file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.dht'),
-    'pex' => file_get_contents('/etc/seedbox/config/user.rtorrent.defaults.pex'),
-    'uploadThrottle' => $throttle === null ? 0 : $throttle,
-]);
 $rtorrentConfig->writeConfig($user['name'], $configuration['configFile']);
 
 // Persist derived ports once rTorrent config is generated so they survive
@@ -173,6 +175,13 @@ if (!file_exists($qbittorrentConfigFile)) {
         mkdir($qbittorrentConfigDir, 0770, true);
     }
 
+    try {
+        $qbittorrentTemplate = pmssUserConfigReadRequiredFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template');
+    } catch (RuntimeException $exception) {
+        fwrite(STDERR, 'Error: '.$exception->getMessage()."\n");
+        exit(1);
+    }
+
     file_put_contents(
         $qbittorrentConfigFile,
         str_replace(
@@ -182,7 +191,7 @@ if (!file_exists($qbittorrentConfigFile)) {
                 $qbittorrentPort,
                 ($throttle !== null && $throttle > 0) ? 'Connection\\GlobalUPLimit='.(int) $throttle : '',
             ],
-            file_get_contents('/etc/seedbox/config/template.qbittorrent.conf')
+            $qbittorrentTemplate
         )
     );
     file_put_contents(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort);
