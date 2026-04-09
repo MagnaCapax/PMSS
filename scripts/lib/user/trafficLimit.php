@@ -201,6 +201,63 @@ if (!function_exists('pmssTrafficLimitPersistTargetModes')) {
 }
 
 if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
+    function pmssTrafficLimitCliUsernameNormalize(string $rawUserName): ?string
+    {
+        if (function_exists('pmssUsernameNormalizeIfValid')) {
+            return pmssUsernameNormalizeIfValid($rawUserName);
+        }
+
+        $normalized = function_exists('pmssNormalizeUsername')
+            ? pmssNormalizeUsername($rawUserName)
+            : strtolower(trim($rawUserName));
+
+        return preg_match('/^[a-z][a-z0-9]{0,7}$/D', $normalized) === 1
+            ? $normalized
+            : null;
+    }
+
+    /** @return array<string,mixed>|null */
+    function pmssTrafficLimitCliUserAccountLookup(string $userName): ?array
+    {
+        if (function_exists('pmssUserAccountLookup')) {
+            return pmssUserAccountLookup($userName);
+        }
+        if (function_exists('posix_getpwnam')) {
+            $account = @posix_getpwnam($userName);
+            return is_array($account) && isset($account['uid']) ? $account : null;
+        }
+
+        if (preg_match('/^[a-z][a-z0-9]{0,7}$/D', $userName) !== 1) {
+            return null;
+        }
+
+        $lines = @file('/etc/passwd', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!is_array($lines)) {
+            return null;
+        }
+
+        $prefix = $userName.':';
+        foreach ($lines as $line) {
+            if (!is_string($line) || strpos($line, $prefix) !== 0) {
+                continue;
+            }
+
+            $parts = explode(':', $line);
+            if (count($parts) < 7) {
+                return null;
+            }
+
+            return [
+                'name' => (string) $parts[0],
+                'uid' => (int) $parts[2],
+                'gid' => (int) $parts[3],
+                'dir' => (string) $parts[5],
+            ];
+        }
+
+        return null;
+    }
+
     /**
      * @param mixed $rawUserName
      * @return array{user:string,home:string}|null
@@ -209,9 +266,7 @@ if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
     {
         $exitCode = null;
         $fail = static function (int $rc, string $message) use (&$exitCode): ?array { fwrite(STDERR, $message); $exitCode = $rc; return null; };
-        $userName = function_exists('pmssUsernameNormalizeIfValid')
-            ? pmssUsernameNormalizeIfValid((string) $rawUserName)
-            : null;
+        $userName = pmssTrafficLimitCliUsernameNormalize((string) $rawUserName);
         $normalizedRawUserName = function_exists('pmssNormalizeUsername')
             ? pmssNormalizeUsername((string) $rawUserName)
             : strtolower(trim((string) $rawUserName));
@@ -224,7 +279,7 @@ if (!function_exists('pmssTrafficLimitResolveCliUserHome')) {
         if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
             return $fail(1, "Error: must run as root.\n");
         }
-        $account = function_exists('pmssUserAccountLookup') ? pmssUserAccountLookup($userName) : null;
+        $account = pmssTrafficLimitCliUserAccountLookup($userName);
         $homeDir = is_array($account) && isset($account['dir']) ? (string) $account['dir'] : "/home/{$userName}";
         if (!is_dir($homeDir) || is_link($homeDir)) {
             return $fail(3, "Error: no such user: {$userName}\n");

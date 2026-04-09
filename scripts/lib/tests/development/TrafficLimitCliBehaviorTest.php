@@ -7,6 +7,34 @@ require_once __DIR__.'/../common/TestCase.php';
 
 final class TrafficLimitCliBehaviorTest extends TestCase
 {
+    public function testCliFallbackHelpersWorkWithoutUserLifecycleBootstrap(): void
+    {
+        $script = <<<'PHP'
+require __REPO_FILE__;
+
+echo json_encode([
+    'normalizeBefore' => function_exists('pmssUsernameNormalizeIfValid'),
+    'lookupBefore' => function_exists('pmssUserAccountLookup'),
+    'normalizedUser' => pmssTrafficLimitCliUsernameNormalize(' User1 '),
+    'invalidUser' => pmssTrafficLimitCliUsernameNormalize('user-name'),
+    'lookupRootDir' => (string) (pmssTrafficLimitCliUserAccountLookup('root')['dir'] ?? ''),
+]);
+PHP;
+
+        $script = str_replace(
+            '__REPO_FILE__',
+            var_export(dirname(__DIR__, 4).'/scripts/lib/user/trafficLimit.php', true),
+            $script
+        );
+        $result = $this->pmssRunInlinePhpJson($script);
+
+        $this->assertFalse($result['normalizeBefore']);
+        $this->assertFalse($result['lookupBefore']);
+        $this->assertSame('user1', $result['normalizedUser']);
+        $this->assertSame(null, $result['invalidUser']);
+        $this->assertTrue($result['lookupRootDir'] !== '');
+    }
+
     public function testShowModeReadsRuntimeTargetFirst(): void
     {
         $result = $this->runTrafficLimitCli(
