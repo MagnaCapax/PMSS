@@ -6,14 +6,6 @@ require_once dirname(__DIR__, 2).'/traffic.php';
 
 class TrafficStatisticsIngressTest extends TrafficTestCase
 {
-    private function assertSaveUserTrafficPersists(array $paths, string $user, string $trafficMode = 'egress'): void
-    {
-        $stats = new \trafficStatistics($paths);
-        $payload = $this->makeTrafficPayload(['month' => 1]);
-        $stats->saveUserTraffic($user, $payload);
-        $this->assertTrafficPayloadPersistence($paths, $user, $payload, $trafficMode);
-    }
-
     public function testGetDataUsesCustomTrafficDir(): void
     {
         $paths = $this->makeTrafficPaths();
@@ -34,7 +26,7 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
             $paths = $case['paths'];
             $this->createTrafficUser($paths, 'alice', false);
             $user = $case['user'] === 'alice-localnet' ? $this->markTrafficUserLocalnet($paths, 'alice') : $case['user'];
-            $this->assertSaveUserTrafficPersists($paths, $user, $case['mode']);
+            $this->saveTrafficPayloadAndAssert($paths, $user, $this->makeTrafficPayload(['month' => 1]), $case['mode']);
         }
     }
 
@@ -42,10 +34,8 @@ class TrafficStatisticsIngressTest extends TrafficTestCase
     {
         $paths = $this->makeTrafficPaths('pmss-traffic-', false, ['traffic_mode' => 'bogus']);
         $this->createTrafficUser($paths, 'alice', false);
-        $stats = new \trafficStatistics($paths);
         $payload = $this->makeTrafficPayload(['month' => 1]);
-        $stats->saveUserTraffic('alice', $payload);
-        $this->assertTrafficPayloadPersistence($paths, 'alice', $payload);
+        $this->saveTrafficPayloadAndAssert($paths, 'alice', $payload);
         $this->assertTrue(!is_file($paths['home_dir'].'/alice/.trafficDataIngress'));
     }
 }

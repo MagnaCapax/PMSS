@@ -33,8 +33,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
             ['offsets' => [100 => 1048576, 86400 => 1048576], 'localnet' => false],
             ['offsets' => [120 => 1048576, 3600 => 1048576], 'localnet' => true],
         ] as $case) {
-            $stub = $this->makeTrafficStatisticsStub();
-            [$paths, $processor] = $this->makeTrafficProcessorFixture($stub);
+            [$stub, $paths, $processor] = $this->makeTrafficProcessorStubFixture();
 
             $user = 'alice';
             $this->createTrafficUser($paths, $user);
@@ -54,8 +53,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliProcessesWorkerUser(): void
     {
-        $stub = $this->makeTrafficStatisticsStub();
-        [$paths, $processor] = $this->makeTrafficProcessorSpyFixture($stub);
+        [$stub, $paths, $processor] = $this->makeTrafficProcessorStubFixture(true);
         $user = 'alice';
 
         $this->createTrafficUser($paths, $user);
@@ -71,8 +69,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliReportsInvalidWorkerUser(): void
     {
-        $stub = $this->makeTrafficStatisticsStub();
-        [, $processor] = $this->makeTrafficProcessorSpyFixture($stub);
+        [$stub, , $processor] = $this->makeTrafficProcessorStubFixture(true);
 
         list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php', 'ghost'], '/scripts/cron/trafficStats.php'); });
 
@@ -84,7 +81,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliPrintsNoUsersMessageWithoutDiscoveredUsers(): void
     {
-        [, $processor] = $this->makeTrafficProcessorSpyFixture($this->makeTrafficStatisticsStub());
+        [, , $processor] = $this->makeTrafficProcessorStubFixture(true);
 
         list($result, $output) = $this->pmssCaptureStdout(function () use ($processor): int { return $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'); });
 
@@ -95,7 +92,7 @@ class TrafficStatsProcessorTest extends TrafficTestCase
 
     public function testRunCliSpawnsWorkersForDiscoveredUsers(): void
     {
-        [, $processor] = $this->makeTrafficProcessorSpyFixture($this->makeTrafficStatisticsStub());
+        [, , $processor] = $this->makeTrafficProcessorStubFixture(true);
         $processor->usersToDiscover = ['alice', 'bob'];
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/trafficStats.php'], '/scripts/cron/trafficStats.php'));

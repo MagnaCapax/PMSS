@@ -216,13 +216,6 @@ codex_parse_option_append() {
 	target_ref+=("$CODEX_PARSE_VALUE")
 }
 
-# Append a `--name value` pair to the target array verbatim.
-codex_append_option_pair() {
-	local target_name="$1" option_name="$2" option_value="${3-}"
-	local -n target_ref="$target_name"
-	target_ref+=("$option_name" "$option_value")
-}
-
 # Parse assistant CLI passthrough flags collected before exec normalization.
 codex_parse_exec_extra_option() {
 	local target_name="$1" arg="$2" next_value="${3-}"

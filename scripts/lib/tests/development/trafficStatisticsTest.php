@@ -57,9 +57,7 @@ class TrafficStatisticsTest extends TrafficTestCase
             $this->createTrafficUser($paths, 'alice', false);
             $user = $case['mode'] === 'ingress' ? $this->markTrafficUserLocalnet($paths, 'alice') : $case['user'];
 
-            $stats = new \trafficStatistics($paths);
-            $stats->saveUserTraffic($user, $case['payload']);
-            $this->assertTrafficPayloadPersistence($paths, $user, $case['payload'], $case['mode']);
+            $this->saveTrafficPayloadAndAssert($paths, $user, $case['payload'], $case['mode']);
         }
     }
 }

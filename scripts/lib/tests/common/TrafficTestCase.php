@@ -35,6 +35,7 @@ abstract class TrafficTestCase extends TestCase
     {
         $root = $this->pmssMakeTempDir($prefix);
         $paths = array_replace([
+            'root' => $root,
             'traffic_dir' => $root.'/traffic',
             'home_dir'    => $root.'/home',
             'runtime_dir' => $root.'/run',
@@ -73,6 +74,16 @@ abstract class TrafficTestCase extends TestCase
         return new class extends \trafficStatistics {
             use TrafficStatisticsStubTrait;
         };
+    }
+
+    /** Build a processor fixture backed by a fresh in-memory statistics stub. */
+    protected function makeTrafficProcessorStubFixture(bool $spy = false, string $prefix = 'pmss-traffic-', bool $withPasswd = true): array
+    {
+        $stub = $this->makeTrafficStatisticsStub();
+        [$paths, $processor] = $spy
+            ? $this->makeTrafficProcessorSpyFixture($stub, $prefix, $withPasswd)
+            : $this->makeTrafficProcessorFixture($stub, '\\TrafficStatsProcessor', $prefix, $withPasswd);
+        return [$stub, $paths, $processor];
     }
 
     /** Build a processor spy fixture that records worker discovery and spawn requests. */
@@ -114,6 +125,13 @@ abstract class TrafficTestCase extends TestCase
         if (is_file($runtimePath)) {
             $this->assertEquals($payload, unserialize((string) file_get_contents($runtimePath)));
         }
+    }
+
+    /** Save a traffic payload through the shared helper and assert persistence. */
+    protected function saveTrafficPayloadAndAssert(array $paths, string $user, array $payload, string $trafficMode = 'egress'): void
+    {
+        (new \trafficStatistics($paths))->saveUserTraffic($user, $payload);
+        $this->assertTrafficPayloadPersistence($paths, $user, $payload, $trafficMode);
     }
 
     /** Build canonical persisted traffic payload arrays for save/read assertions. */
