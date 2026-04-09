@@ -24,10 +24,7 @@ class ShowResourcesFormatTest extends TestCase
     {
         $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--help']);
 
-        $this->assertTrue(strpos($out, '--json') !== false);
-        $this->assertTrue(strpos($out, '--show-missing') !== false);
-        $this->assertTrue(strpos($out, '--user') !== false);
-        $this->assertTrue(strpos($out, '--help') !== false);
+        $this->assertStringContainsAllStrings(['--json', '--show-missing', '--user', '--help'], $out);
     }
 
     public function testHelpOutputMatchesSnapshot(): void
@@ -53,7 +50,7 @@ class ShowResourcesFormatTest extends TestCase
         ]));
         $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
-        $this->assertTrue(strpos($out, '2.00 TiB') !== false);
+        $this->assertStringContainsString('2.00 TiB', $out);
     }
 
     public function testUserFilteredOutputFormatsCpuRamAndIops(): void
@@ -64,10 +61,7 @@ class ShowResourcesFormatTest extends TestCase
 
         $textOutput = $result['output'];
         $this->assertEquals(0, $result['rc']);
-        $this->assertTrue(strpos($textOutput, '1.0 hrs') !== false);
-        $this->assertTrue(strpos($textOutput, '2.50 GB-hrs') !== false);
-        $this->assertTrue(strpos($textOutput, '1.00 GiB') !== false);
-        $this->assertTrue(strpos($textOutput, '2.00') !== false);
+        $this->assertStringContainsAllStrings(['1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], $textOutput);
     }
 
     public function testUserFilteredJsonOutputKeepsExpectedPayloadShape(): void
@@ -80,8 +74,7 @@ class ShowResourcesFormatTest extends TestCase
         ]);
         $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
-        $payload = json_decode($json, true);
-        $this->assertTrue(is_array($payload));
+        $payload = $this->pmssDecodeJsonArray($json);
         $this->assertEquals(6.0, $payload['users']['alice']['memory']['current']);
         $this->assertEquals(8.0, $payload['users']['alice']['ram_hours']['month']);
         $this->assertEquals(9.0, $payload['totals']['tasks']['current']);
@@ -111,8 +104,7 @@ class ShowResourcesFormatTest extends TestCase
 
         $json = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--json', '--user=ghost'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
 
-        $payload = json_decode($json, true);
-        $this->assertTrue(is_array($payload));
+        $payload = $this->pmssDecodeJsonArray($json);
         $this->assertEquals([], $payload['users']);
         $this->assertEquals(0.0, $payload['totals']['memory']['current']);
         $this->assertEquals(['ghost'], $payload['missing']);

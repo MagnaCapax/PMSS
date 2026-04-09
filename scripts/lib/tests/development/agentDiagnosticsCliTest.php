@@ -36,7 +36,7 @@ final class agentDiagnosticsCliTest extends TestCase
             'PMSS_AGENT_DIAGNOSTICS_VERSION_PATH' => $versionPath,
             'PATH' => $binDir.':'.(string) getenv('PATH'),
         ]);
-        $payload = json_decode($output, true);
+        $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame(
             ['motd', 'storage', 'services', 'system_test', 'users', 'resources', 'traffic', 'user_settings', 'user_processes', 'user_identity', 'user_quota', 'user_disk'],
@@ -79,9 +79,7 @@ final class agentDiagnosticsCliTest extends TestCase
             'PATH' => $binDir.':'.(string) getenv('PATH'),
         ]);
 
-        $this->assertStringContainsString('PMSS Agent Diagnostics', $output);
-        $this->assertStringContainsString('user: -', $output);
-        $this->assertStringContainsString('== services ==', $output);
+        $this->assertStringContainsAllStrings(['PMSS Agent Diagnostics', 'user: -', '== services =='], $output);
     }
 
     public function testJsonSectionReportsScriptFailure(): void
@@ -93,7 +91,7 @@ final class agentDiagnosticsCliTest extends TestCase
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
             'PATH' => $binDir.':'.(string) getenv('PATH'),
         ]);
-        $payload = json_decode($output, true);
+        $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame('checkUsers.php --json failed', $payload['sections']['users']['consistency']['error']);
     }
@@ -108,7 +106,7 @@ final class agentDiagnosticsCliTest extends TestCase
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
             'PATH' => $binDir.':'.(string) getenv('PATH'),
         ]);
-        $payload = json_decode($output, true);
+        $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame('checkUsers.php --json failed', $payload['sections']['users']['consistency']['error']);
         $this->assertStringContainsString('Diagnostics script missing or unreadable: scripts/util/checkUsers.php', $payload['sections']['users']['consistency']['stderr']);

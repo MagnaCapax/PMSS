@@ -98,12 +98,14 @@ class PmssStatsCliTest extends TestCase
         ], $this->rtorrentCallerStub());
 
         $rendered = \pmssStatsRenderText($stats, ['full' => false, 'mini' => false, 'no_header' => false]);
-        $this->assertStringContainsString('Pulsed Media Seedbox · M10G S · alice', $rendered);
-        $this->assertStringContainsString('Disk', $rendered);
-        $this->assertStringContainsString('Memory', $rendered);
-        $this->assertStringContainsString('Torrents', $rendered);
-        $this->assertStringContainsString('Traffic', $rendered);
-        $this->assertStringContainsString('PMSS 2.8.14', $rendered);
+        $this->assertStringContainsAllStrings([
+            'Pulsed Media Seedbox · M10G S · alice',
+            'Disk',
+            'Memory',
+            'Torrents',
+            'Traffic',
+            'PMSS 2.8.14',
+        ], $rendered);
     }
 
     public function testRenderTextSupportsMiniMode(): void
@@ -132,25 +134,24 @@ class PmssStatsCliTest extends TestCase
         ], $this->rtorrentCallerStub());
 
         $rendered = \pmssStatsRenderText($stats, ['full' => true, 'mini' => false, 'no_header' => true]);
-        $this->assertStringContainsString('PIDs', $rendered);
-        $this->assertStringContainsString('I/O Read', $rendered);
-        $this->assertStringContainsString('I/O PSI', $rendered);
+        $this->assertStringContainsAllStrings(['PIDs', 'I/O Read', 'I/O PSI'], $rendered);
     }
 
     public function testMainEmitsJsonWhenRequested(): void
     {
         $versionFile = $this->pmssWriteTempFile('stats-version', "3.0.0\n");
-        $this->setEnv('PMSS_STATS_USER', 'alice');
-        $this->setEnv('PMSS_STATS_HOME', $this->home);
-        $this->setEnv('PMSS_STATS_CONFIG_DIR', $this->configDir);
-        $this->setEnv('PMSS_STATS_CGROUP_DIR', $this->cgroupDir);
-        $this->setEnv('PMSS_STATS_VERSION_FILE', $versionFile);
+        $this->pmssTrackEnvOverrides([
+            'PMSS_STATS_USER' => 'alice',
+            'PMSS_STATS_HOME' => $this->home,
+            'PMSS_STATS_CONFIG_DIR' => $this->configDir,
+            'PMSS_STATS_CGROUP_DIR' => $this->cgroupDir,
+            'PMSS_STATS_VERSION_FILE' => $versionFile,
+        ]);
 
         list($rc, $json) = $this->pmssCaptureStdout(function (): int { return \pmssStatsMain(['scripts/pmss-stats.php', '--json']); });
 
         $this->assertEquals(0, $rc);
-        $this->assertStringContainsString('"pmss_version": "3.0.0"', $json);
-        $this->assertStringContainsString('"product": "M10G S"', $json);
+        $this->assertStringContainsAllStrings(['"pmss_version": "3.0.0"', '"product": "M10G S"'], $json);
     }
 
     public function testScriptReportsJsonEncodingFailuresOnStderrOnly(): void
@@ -212,10 +213,5 @@ class PmssStatsCliTest extends TestCase
 
             return false;
         };
-    }
-
-    private function setEnv(string $key, string $value): void
-    {
-        putenv($key.'='.$value);
     }
 }

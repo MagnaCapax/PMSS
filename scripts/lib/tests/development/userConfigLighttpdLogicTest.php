@@ -90,17 +90,21 @@ class UserConfigLighttpdLogicTest extends TestCase
     {
         $template = "connection.kbytes-per-second = 204800\nserver.kbytes-per-second = 409600\n";
         $clamped = \pmssClampLighttpdBandwidthLimits($template);
-        $this->assertTrue(strpos($clamped, 'connection.kbytes-per-second = 0') !== false);
-        $this->assertTrue(strpos($clamped, 'server.kbytes-per-second = 0') !== false);
+        $this->assertStringContainsAllStrings([
+            'connection.kbytes-per-second = 0',
+            'server.kbytes-per-second = 0',
+        ], $clamped);
 
         $templateOk = "connection.kbytes-per-second = 1024\nserver.kbytes-per-second = 65535\n";
         $clampedOk = \pmssClampLighttpdBandwidthLimits($templateOk);
-        $this->assertTrue(strpos($clampedOk, 'connection.kbytes-per-second = 1024') !== false);
-        $this->assertTrue(strpos($clampedOk, 'server.kbytes-per-second = 65535') !== false);
+        $this->assertStringContainsAllStrings([
+            'connection.kbytes-per-second = 1024',
+            'server.kbytes-per-second = 65535',
+        ], $clampedOk);
 
         $templateComment = "server.kbytes-per-second = 2048 # keep\n";
         $clampedComment = \pmssClampLighttpdBandwidthLimits($templateComment);
-        $this->assertTrue(strpos($clampedComment, 'server.kbytes-per-second = 2048 # keep') !== false);
+        $this->assertStringContainsString('server.kbytes-per-second = 2048 # keep', $clampedComment);
     }
 
     public function testShouldConfigureLighttpdSkipsNonExistingHome(): void
@@ -150,10 +154,9 @@ $HTTP["url"] =~ "^/webdav-user($|/)" {
 LIGHTTPD;
 
         $stripped = \pmssStripLighttpdWebdavConfig($template);
-        $this->assertFalse(strpos($stripped, 'webdav.activate') !== false);
-        $this->assertFalse(strpos($stripped, 'PMSS_WEBDAV_BEGIN') !== false);
-        $this->assertTrue(strpos($stripped, 'mod_webdav') !== false);
-        $this->assertTrue(strpos($stripped, '#"mod_webdav",') !== false);
+        $this->pmssAssertStringNotContainsString('webdav.activate', $stripped);
+        $this->pmssAssertStringNotContainsString('PMSS_WEBDAV_BEGIN', $stripped);
+        $this->assertStringContainsAllStrings(['mod_webdav', '#"mod_webdav",'], $stripped);
     }
 
     public function testAtomicWriteFileRejectsSymlinkTarget(): void
@@ -183,12 +186,18 @@ LIGHTTPD;
     {
         $src = $this->pmssReadRepoFile('scripts/util/userConfigLighttpd.php');
 
-        $this->assertStringContainsString("require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';", $src);
-        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';") !== false);
-        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';") !== false);
-        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';") !== false);
-        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';") !== false);
-        $this->assertFalse(strpos($src, "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';") !== false);
+        $this->assertStringContainsAllStrings([
+            "require_once dirname(__DIR__).'/lib/lighttpd/userConfigApply.php';",
+        ], $src);
+        foreach ([
+            "require_once dirname(__DIR__).'/lib/lighttpd/delugeWebConf.php';",
+            "require_once dirname(__DIR__).'/lib/lighttpd/proxyFragments.php';",
+            "require_once dirname(__DIR__).'/lib/lighttpd/resourcePlan.php';",
+            "require_once dirname(__DIR__).'/lib/lighttpd/userDirectoriesPrepare.php';",
+            "require_once dirname(__DIR__).'/lib/lighttpd/configRender.php';",
+        ] as $forbidden) {
+            $this->pmssAssertStringNotContainsString($forbidden, $src);
+        }
     }
 
     public function testUserConfigApplyOwnsPhpIniMemoryLimitUpdate(): void

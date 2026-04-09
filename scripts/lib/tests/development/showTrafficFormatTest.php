@@ -35,9 +35,7 @@ class ShowTrafficFormatTest extends TestCase
         $out = $this->pmssRunRepoPhpScript('scripts/showTraffic.php', ['--help'], [], '');
 
         $this->assertTrue(is_string($out));
-        foreach (['--json', '--show-missing', '--extended', '--sort', '--color', '--no-color'] as $option) {
-            $this->assertTrue(strpos($out, $option) !== false);
-        }
+        $this->assertStringContainsAllStrings(['--json', '--show-missing', '--extended', '--sort', '--color', '--no-color'], $out);
     }
 
     public function testShowTrafficUsesSharedManagedUsersParser(): void

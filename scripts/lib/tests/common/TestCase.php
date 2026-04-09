@@ -935,9 +935,16 @@ abstract class TestCase
 
     protected function pmssRunInlinePhpJson(string $script, array $environment = [], string $stderrRedirect = '2>/dev/null'): array
     {
-        $output = $this->pmssRunInlinePhp($script, $environment, $stderrRedirect);
+        return $this->pmssDecodeJsonArray(
+            $this->pmssRunInlinePhp($script, $environment, $stderrRedirect)
+        );
+    }
+
+    /** Decode JSON output that is expected to produce an array payload. */
+    protected function pmssDecodeJsonArray(string $output, string $message = ''): array
+    {
         $decoded = json_decode($output, true);
-        $this->assertTrue(is_array($decoded), 'Expected JSON output, got: '.trim($output));
+        $this->assertTrue(is_array($decoded), $message !== '' ? $message : 'Expected JSON output, got: '.trim($output));
         return $decoded;
     }
 
