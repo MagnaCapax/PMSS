@@ -17,7 +17,6 @@ foreach (['traffic', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
 }
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/user/userConfigCli.php';
-require_once __DIR__.'/../lib/user/userConfigFilesystem.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
@@ -136,13 +135,13 @@ userApplyTrafficLimit($user);
 // Compose a canonical rtorrent configuration and mirror it to companion apps.
 echo "Creating rTorrent config\n";
 try {
-    $resources = pmssUserConfigReadRtorrentResources('/etc/seedbox/config/system.rtorrent.resources');
+    $resources = pmssReadOptionalSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources', 'rTorrent resource configuration');
     $rtorrentConfig = new rtorrentConfig($resources);
     $throttle = pmssReadTorrentThrottle($user['name']);
     $configuration = $rtorrentConfig->createConfig([
         'ram' => $user['memory'],
-        'dht' => pmssUserConfigReadRequiredFile('/etc/seedbox/config/user.rtorrent.defaults.dht', 'rTorrent DHT defaults'),
-        'pex' => pmssUserConfigReadRequiredFile('/etc/seedbox/config/user.rtorrent.defaults.pex', 'rTorrent PEX defaults'),
+        'dht' => pmssReadRequiredRegularFile('/etc/seedbox/config/user.rtorrent.defaults.dht', 'rTorrent DHT defaults'),
+        'pex' => pmssReadRequiredRegularFile('/etc/seedbox/config/user.rtorrent.defaults.pex', 'rTorrent PEX defaults'),
         'uploadThrottle' => $throttle === null ? 0 : $throttle,
     ]);
 } catch (RuntimeException $exception) {
@@ -176,7 +175,7 @@ if (!file_exists($qbittorrentConfigFile)) {
     }
 
     try {
-        $qbittorrentTemplate = pmssUserConfigReadRequiredFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template');
+        $qbittorrentTemplate = pmssReadRequiredRegularFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template');
     } catch (RuntimeException $exception) {
         fwrite(STDERR, 'Error: '.$exception->getMessage()."\n");
         exit(1);

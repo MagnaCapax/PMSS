@@ -334,9 +334,9 @@ function pmssStatsCollect(array $overrides = [], ?callable $rtorrentCaller = nul
     $configPayload = $store->get($context['user']);
     $config = is_array($configPayload) ? $configPayload : [];
     $quota = pmssStatsReadQuotaSnapshot($home);
-    $traffic = pmssTrafficReadSerializedArrayFile($home.'/.trafficData') ?: [];
-    $trafficIngress = pmssTrafficReadSerializedArrayFile($home.'/.trafficDataIngress') ?: [];
-    $resource = pmssTrafficReadSerializedArrayFile($home.'/.resourceData') ?: [];
+    $traffic = pmssReadSerializedArrayFile($home.'/.trafficData') ?: [];
+    $trafficIngress = pmssReadSerializedArrayFile($home.'/.trafficDataIngress') ?: [];
+    $resource = pmssReadSerializedArrayFile($home.'/.resourceData') ?: [];
     $trafficLimitState = pmssTrafficLimitStateRead($home.'/.trafficLimit', $home.'/.bonusTraffic');
     $cgroup = pmssStatsReadCgroupStats($context['cgroup_dir']);
     $uptimeSeconds = null;

@@ -80,7 +80,7 @@ function userApplyDiskQuota(array $user): void
  */
 function pmssReadUserTrafficMonth(string $path): int
 {
-    $data = pmssTrafficReadSerializedArrayFile($path);
+    $data = pmssReadSerializedArrayFile($path);
     if ($data === null || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
         return 0;
     }

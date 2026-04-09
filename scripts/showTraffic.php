@@ -128,7 +128,7 @@ TXT;
             continue;
         }
 
-        $data = pmssTrafficReadSerializedArrayFile($statsPath);
+        $data = pmssReadSerializedArrayFile($statsPath);
         if ($data === null || empty($data['raw']['month'])) {
             continue;
         }

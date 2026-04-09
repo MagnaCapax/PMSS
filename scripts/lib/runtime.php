@@ -163,11 +163,63 @@ if (!$pmssLogmsgUsesLogMessageInitialized) {
 if (!function_exists('pmssDirEnsureExists')) {
     function pmssDirEnsureExists(string $path, int $mode = 0755): bool { return is_dir($path) || @mkdir($path, $mode, true) || is_dir($path); }
 }
+if (!function_exists('pmssReadRegularFileContents')) {
+    // Read a regular non-symlink file and return its raw contents.
+    function pmssReadRegularFileContents(string $path): ?string
+    {
+        return (!is_file($path) || is_link($path) || !is_string($contents = @file_get_contents($path))) ? null : $contents;
+    }
+}
 if (!function_exists('pmssReadRegularFileTrimmed')) {
     // Read a regular non-symlink file and return its trimmed contents.
     function pmssReadRegularFileTrimmed(string $path): ?string
     {
-        return (!is_file($path) || is_link($path) || !is_string($contents = @file_get_contents($path))) ? null : trim($contents);
+        return (($contents = pmssReadRegularFileContents($path)) === null) ? null : trim($contents);
+    }
+}
+if (!function_exists('pmssReadSerializedArrayFile')) {
+    // Read a serialized array payload without allowing object wakeups.
+    function pmssReadSerializedArrayFile(string $path): ?array
+    {
+        $raw = pmssReadRegularFileContents($path);
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        $data = @unserialize($raw, ['allowed_classes' => false]);
+        return is_array($data) ? $data : null;
+    }
+}
+if (!function_exists('pmssReadOptionalSerializedArrayFile')) {
+    // Read an optional serialized array file; malformed payloads fail closed.
+    function pmssReadOptionalSerializedArrayFile(string $path, string $label = 'serialized array file'): array
+    {
+        if (!file_exists($path)) {
+            return [];
+        }
+
+        $payload = pmssReadSerializedArrayFile($path);
+        if ($payload === null) {
+            throw new RuntimeException('Invalid '.$label.': '.$path);
+        }
+
+        return $payload;
+    }
+}
+if (!function_exists('pmssReadRequiredRegularFile')) {
+    // Read one required regular file without following symlinks.
+    function pmssReadRequiredRegularFile(string $path, string $label = 'required file'): string
+    {
+        if (!is_file($path) || is_link($path)) {
+            throw new RuntimeException('Missing '.$label.': '.$path);
+        }
+
+        $contents = pmssReadRegularFileContents($path);
+        if ($contents === null) {
+            throw new RuntimeException('Unable to read '.$label.': '.$path);
+        }
+
+        return $contents;
     }
 }
 if (!function_exists('pmssReadRegularFileDigits')) {

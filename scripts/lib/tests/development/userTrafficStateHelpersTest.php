@@ -26,7 +26,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $expected = ['raw' => ['month' => 1536.4], 'extra' => ['week' => 12]];
         file_put_contents($path, serialize($expected));
 
-        $this->assertEquals($expected, \pmssTrafficReadSerializedArrayFile($path));
+        $this->assertEquals($expected, \pmssReadSerializedArrayFile($path));
     }
 
     public function testSharedTrafficPayloadReaderRejectsSymlinkedFile(): void
@@ -36,7 +36,7 @@ class UserTrafficStateHelpersTest extends TestCase
         $link = $this->tempDir.'/traffic-data-link-for-array-reader';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
-        $this->assertEquals(null, \pmssTrafficReadSerializedArrayFile($link));
+        $this->assertEquals(null, \pmssReadSerializedArrayFile($link));
     }
 
     public function testReadUserTrafficMonthRejectsSymlinkedFile(): void
@@ -148,7 +148,7 @@ class UserTrafficStateHelpersTest extends TestCase
 
         $this->assertFalse($result);
         $this->assertEquals([$badPath], $failures);
-        $this->assertEquals($payload, \pmssTrafficReadSerializedArrayFile($goodPath));
+        $this->assertEquals($payload, \pmssReadSerializedArrayFile($goodPath));
         $this->assertEquals('seed', file_get_contents($badTarget));
     }
 
@@ -166,7 +166,7 @@ class UserTrafficStateHelpersTest extends TestCase
             $homeDir.'/alice/.trafficData',
             $homeDir.'/alice/.trafficDataLocal',
         ] as $path) {
-            $this->assertEquals($expected, \pmssTrafficReadSerializedArrayFile($path));
+            $this->assertEquals($expected, \pmssReadSerializedArrayFile($path));
         }
         $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$runtimeDir.'/trafficStats/alice');
         $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice-localnet at '.$runtimeDir.'/trafficStats/alice-localnet');

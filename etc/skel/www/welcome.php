@@ -425,13 +425,13 @@ if (file_exists('openvpn-config.tgz')) {
                         if (@file_exists('../.trafficLimit')) {
                             $trafficLimit = (int) $trafficLimitState['limitGiB'];
                             $trafficData = null;
-                            if (is_file('../.trafficData') && !is_link('../.trafficData') && function_exists('pmssTrafficReadSerializedArrayFile')) {
-                                $trafficData = pmssTrafficReadSerializedArrayFile('../.trafficData');
+                            if (is_file('../.trafficData') && !is_link('../.trafficData') && function_exists('pmssReadSerializedArrayFile')) {
+                                $trafficData = pmssReadSerializedArrayFile('../.trafficData');
                             }
                             if (is_array($trafficData)) {
                                 $trafficIngress = null;
-                                if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress') && function_exists('pmssTrafficReadSerializedArrayFile')) {
-                                    $trafficIngress = pmssTrafficReadSerializedArrayFile('../.trafficDataIngress');
+                                if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress') && function_exists('pmssReadSerializedArrayFile')) {
+                                    $trafficIngress = pmssReadSerializedArrayFile('../.trafficDataIngress');
                                 }
                                 trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic);
                             } else {
@@ -726,10 +726,10 @@ function readUserMemoryCurrentBytes() {
 }
 
 function readUserResourceData() {
-    if (!function_exists('pmssTrafficReadSerializedArrayFile')) {
+    if (!function_exists('pmssReadSerializedArrayFile')) {
         return null;
     }
-    return pmssTrafficReadSerializedArrayFile('../.resourceData');
+    return pmssReadSerializedArrayFile('../.resourceData');
 }
 
 function readUserMemoryBreakdownBytes() {

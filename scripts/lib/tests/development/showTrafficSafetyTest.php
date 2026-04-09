@@ -43,7 +43,7 @@ class ShowTrafficSafetyTest extends TestCase
 
     public function testSharedTrafficPayloadReaderRejectsSerializedObjectsWithoutWakeup(): void
     {
-        $payload = \pmssTrafficReadSerializedArrayFile($this->statsPath);
+        $payload = \pmssReadSerializedArrayFile($this->statsPath);
 
         $this->assertEquals(null, $payload);
         $this->assertTrue(!file_exists($this->markerPath));

@@ -24,7 +24,7 @@ function pmssResourceBuildReport(string $statsDir, array $users): array
             continue;
         }
 
-        $data = pmssTrafficReadSerializedArrayFile("{$statsDir}/{$thisUser}");
+        $data = pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}");
         if ($data === null || ($row = pmssResourceStoredPayloadReportRow($data)) === null) {
             $missingStats[] = $thisUser;
             continue;

@@ -31,7 +31,7 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     public function testSerializedStateConsumersUseSharedArrayReader(): void
     {
         foreach (['scripts/lib/pmssStats.php', 'etc/skel/www/stats.php', 'etc/skel/www/welcome.php'] as $path) {
-            $this->pmssAssertRepoFileContainsString($path, 'pmssTrafficReadSerializedArrayFile(');
+            $this->pmssAssertRepoFileContainsString($path, 'pmssReadSerializedArrayFile(');
         }
     }
 

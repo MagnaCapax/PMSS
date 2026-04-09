@@ -681,8 +681,8 @@ $trafficIngressTime = null;
 $trafficIngressError = null;
 if (is_file('../.trafficData') && !is_link('../.trafficData')) {
     $trafficTime = @filemtime('../.trafficData');
-    $trafficData = function_exists('pmssTrafficReadSerializedArrayFile')
-        ? pmssTrafficReadSerializedArrayFile('../.trafficData')
+    $trafficData = function_exists('pmssReadSerializedArrayFile')
+        ? pmssReadSerializedArrayFile('../.trafficData')
         : null;
     if ($trafficData === null) {
         $trafficDataError = 'Invalid traffic data format.';
@@ -691,8 +691,8 @@ if (is_file('../.trafficData') && !is_link('../.trafficData')) {
 
 if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress')) {
     $trafficIngressTime = @filemtime('../.trafficDataIngress');
-    $trafficIngressData = function_exists('pmssTrafficReadSerializedArrayFile')
-        ? pmssTrafficReadSerializedArrayFile('../.trafficDataIngress')
+    $trafficIngressData = function_exists('pmssReadSerializedArrayFile')
+        ? pmssReadSerializedArrayFile('../.trafficDataIngress')
         : null;
     if ($trafficIngressData === null) {
         $trafficIngressError = 'Invalid inbound traffic data format.';
@@ -859,8 +859,8 @@ $resourceTime = null;
 $resourceDataError = null;
 if (is_file('../.resourceData') && !is_link('../.resourceData')) {
     $resourceTime = @filemtime('../.resourceData');
-    $resourceData = function_exists('pmssTrafficReadSerializedArrayFile')
-        ? pmssTrafficReadSerializedArrayFile('../.resourceData')
+    $resourceData = function_exists('pmssReadSerializedArrayFile')
+        ? pmssReadSerializedArrayFile('../.resourceData')
         : null;
     if ($resourceData === null) {
         $resourceDataError = 'Invalid resource data format.';

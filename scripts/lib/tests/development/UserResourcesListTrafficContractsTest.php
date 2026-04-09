@@ -34,12 +34,12 @@ class UserResourcesListTrafficContractsTest extends TestCase
         $trafficLimitsReader = 'pmssRead'.'TrafficData';
 
         $this->assertStringContainsString('pmssTrafficStatsPath($thisUser, $statsDir)', $showTraffic);
-        $this->assertStringContainsString('pmssTrafficReadSerializedArrayFile($statsPath)', $showTraffic);
+        $this->assertStringContainsString('pmssReadSerializedArrayFile($statsPath)', $showTraffic);
         $this->assertStringContainsString('pmssTrafficReadRootOwnedStatsPayload($ingressPath, $baseUser)', $showTraffic);
         $this->pmssAssertStringNotContainsString('function '.$showTrafficReader, $showTraffic);
         $this->pmssAssertStringNotContainsString('unserialize(', $showTraffic);
 
-        $this->assertStringContainsString('pmssTrafficReadSerializedArrayFile("{$statsDir}/{$thisUser}")', $showResources);
+        $this->assertStringContainsString('pmssReadSerializedArrayFile("{$statsDir}/{$thisUser}")', $showResources);
         $this->pmssAssertStringNotContainsString('unserialize(', $showResources);
 
         $this->assertStringContainsString('pmssTrafficReadRootOwnedStatsPayload($trafficDataFile, $thisUser)', $trafficLimits);

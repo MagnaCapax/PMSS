@@ -108,7 +108,7 @@ class resourceStatistics
      */
     public function readSnapshotMetricsFromPath(string $path): ?array
     {
-        $data = pmssTrafficReadSerializedArrayFile($path);
+        $data = pmssReadSerializedArrayFile($path);
         if ($data === null) return null;
         $metrics = [];
         foreach (array_merge(ResourceStatsAccumulator::RAW_METRICS, ['memory', 'tasks']) as $key) {

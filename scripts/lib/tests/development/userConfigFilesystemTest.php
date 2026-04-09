@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/user/userConfigFilesystem.php';
+require_once dirname(__DIR__, 2).'/runtime.php';
 
 class UserConfigFilesystemTest extends TestCase
 {
@@ -11,12 +11,12 @@ class UserConfigFilesystemTest extends TestCase
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/resources.serialized';
         file_put_contents($path, serialize(['ramBlock' => 256, 'uploadSlots' => 4]));
 
-        $this->assertEquals(['ramBlock' => 256, 'uploadSlots' => 4], \pmssUserConfigReadSerializedArrayFile($path));
+        $this->assertEquals(['ramBlock' => 256, 'uploadSlots' => 4], \pmssReadSerializedArrayFile($path));
     }
 
     public function testReadSerializedArrayFileReturnsNullForMissingPath(): void
     {
-        $this->assertSame(null, \pmssUserConfigReadSerializedArrayFile('/nonexistent/pmss-user-config-fs'));
+        $this->assertSame(null, \pmssReadSerializedArrayFile('/nonexistent/pmss-user-config-fs'));
     }
 
     public function testReadSerializedArrayFileReturnsNullForMalformedPayload(): void
@@ -24,7 +24,7 @@ class UserConfigFilesystemTest extends TestCase
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/bad.serialized';
         file_put_contents($path, 'not-a-serialized-array');
 
-        $this->assertSame(null, \pmssUserConfigReadSerializedArrayFile($path));
+        $this->assertSame(null, \pmssReadSerializedArrayFile($path));
     }
 
     public function testReadSerializedArrayFileReturnsNullForSerializedObject(): void
@@ -32,7 +32,7 @@ class UserConfigFilesystemTest extends TestCase
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/object.serialized';
         file_put_contents($path, serialize((object) ['ramBlock' => 256]));
 
-        $this->assertSame(null, \pmssUserConfigReadSerializedArrayFile($path));
+        $this->assertSame(null, \pmssReadSerializedArrayFile($path));
     }
 
     public function testReadSerializedArrayFileRejectsSymlinkPayloads(): void
@@ -43,12 +43,12 @@ class UserConfigFilesystemTest extends TestCase
         $link = $root.'/link.serialized';
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
-        $this->assertSame(null, \pmssUserConfigReadSerializedArrayFile($link));
+        $this->assertSame(null, \pmssReadSerializedArrayFile($link));
     }
 
     public function testReadRtorrentResourcesReturnsEmptyArrayWhenMissing(): void
     {
-        $this->assertSame([], \pmssUserConfigReadRtorrentResources('/nonexistent/pmss-rtorrent-resources'));
+        $this->assertSame([], \pmssReadOptionalSerializedArrayFile('/nonexistent/pmss-rtorrent-resources', 'rTorrent resource configuration'));
     }
 
     public function testReadRtorrentResourcesThrowsForInvalidPayload(): void
@@ -57,7 +57,7 @@ class UserConfigFilesystemTest extends TestCase
         file_put_contents($path, serialize('nope'));
 
         try {
-            \pmssUserConfigReadRtorrentResources($path);
+            \pmssReadOptionalSerializedArrayFile($path, 'rTorrent resource configuration');
             $this->fail('Expected invalid rTorrent resource payload to throw');
         } catch (\RuntimeException $exception) {
             $this->assertStringContainsString('Invalid rTorrent resource configuration:', $exception->getMessage());
@@ -69,13 +69,13 @@ class UserConfigFilesystemTest extends TestCase
         $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/defaults.conf';
         file_put_contents($path, "enabled = yes\n");
 
-        $this->assertSame("enabled = yes\n", \pmssUserConfigReadRequiredFile($path, 'demo defaults'));
+        $this->assertSame("enabled = yes\n", \pmssReadRequiredRegularFile($path, 'demo defaults'));
     }
 
     public function testReadRequiredFileThrowsWhenPathMissing(): void
     {
         try {
-            \pmssUserConfigReadRequiredFile('/nonexistent/pmss-required-file', 'demo defaults');
+            \pmssReadRequiredRegularFile('/nonexistent/pmss-required-file', 'demo defaults');
             $this->fail('Expected missing required file to throw');
         } catch (\RuntimeException $exception) {
             $this->assertStringContainsString('Missing demo defaults:', $exception->getMessage());
@@ -91,18 +91,25 @@ class UserConfigFilesystemTest extends TestCase
         $this->pmssCreateSymlinkOrSkip($target, $link);
 
         try {
-            \pmssUserConfigReadRequiredFile($link, 'demo defaults');
+            \pmssReadRequiredRegularFile($link, 'demo defaults');
             $this->fail('Expected symlinked required file to throw');
         } catch (\RuntimeException $exception) {
             $this->assertStringContainsString('Missing demo defaults:', $exception->getMessage());
         }
     }
 
-    public function testUserConfigUsesFilesystemSafetyHelpers(): void
+    public function testReadRegularFileContentsPreservesWhitespace(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "require_once __DIR__.'/../lib/user/userConfigFilesystem.php';");
-        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "pmssUserConfigReadRtorrentResources('/etc/seedbox/config/system.rtorrent.resources')");
-        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "pmssUserConfigReadRequiredFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template')");
+        $path = $this->pmssMakeTempDir('pmss-user-config-fs-', 0700).'/content.txt';
+        file_put_contents($path, "  enabled = yes\n");
+
+        $this->assertSame("  enabled = yes\n", \pmssReadRegularFileContents($path));
+    }
+
+    public function testUserConfigUsesSharedRuntimeFilesystemHelpers(): void
+    {
+        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "pmssReadOptionalSerializedArrayFile('/etc/seedbox/config/system.rtorrent.resources', 'rTorrent resource configuration')");
+        $this->pmssAssertRepoFileContainsString('scripts/util/userConfig.php', "pmssReadRequiredRegularFile('/etc/seedbox/config/template.qbittorrent.conf', 'qBittorrent template')");
         $this->pmssAssertRepoFileNotContainsString('scripts/util/userConfig.php', "unserialize((string) file_get_contents(\$resourceFile))");
     }
 }

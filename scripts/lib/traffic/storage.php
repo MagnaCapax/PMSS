@@ -69,26 +69,6 @@ if (!function_exists('pmssTrafficStatsPath')) {
     }
 }
 
-if (!function_exists('pmssTrafficReadSerializedArrayFile')) {
-    /**
-     * Read a serialized array payload without allowing object wakeups.
-     */
-    function pmssTrafficReadSerializedArrayFile(string $path): ?array
-    {
-        if (!is_file($path) || is_link($path)) {
-            return null;
-        }
-
-        $raw = @file_get_contents($path);
-        if (!is_string($raw) || $raw === '') {
-            return null;
-        }
-
-        $data = @unserialize($raw, ['allowed_classes' => false]);
-        return is_array($data) ? $data : null;
-    }
-}
-
 if (!function_exists('pmssTrafficReadRootOwnedStatsPayload')) {
     /**
      * Read a trusted traffic stats payload owned by root and grouped to the user.
@@ -105,7 +85,7 @@ if (!function_exists('pmssTrafficReadRootOwnedStatsPayload')) {
             return null;
         }
 
-        $data = pmssTrafficReadSerializedArrayFile($path);
+        $data = pmssReadSerializedArrayFile($path);
         if ($data === null || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
             return null;
         }
