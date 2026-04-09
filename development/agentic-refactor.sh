@@ -69,10 +69,9 @@ Examples:
 EOF
 }
 
-TMP="${TMPDIR:-/tmp}"
 ASSIST_DIR="$HERE/assistants"
 default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
-OUTDIR="$(mktemp -d "${TMP%/}/pmss-refactor-codex-XXXXXXXX")"
+OUTDIR="$(codex_make_temp_workspace pmss-refactor-codex)"
 COMMITS_SUMMARY="$OUTDIR/commits-summary.txt"
 COMMITS_FILES="$OUTDIR/commits-files.txt"
 CANDIDATES="$OUTDIR/candidate-files.txt"
@@ -148,9 +147,7 @@ if ! [[ "$commits" =~ ^[0-9]+$ ]] || [[ "$commits" -le 0 ]]; then
 	exit 2
 fi
 
-agent="$(codex_default_agent "$agent" "$default_agent")"
-
-exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
+codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	# Append extra assistant CLI args (shell-escaped) to the exec string.

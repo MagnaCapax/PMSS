@@ -72,11 +72,9 @@ Examples:
 EOF
 }
 
-# Create a throwaway workspace under the system temp dir (avoid repo clutter)
-TMP="${TMPDIR:-/tmp}"
 ASSIST_DIR="$HERE/assistants"
 default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
-OUTDIR="$(mktemp -d "${TMP%/}/pmss-codex-ci-XXXXXXXX")"
+OUTDIR="$(codex_make_temp_workspace pmss-codex-ci)"
 ARTDIR="$OUTDIR/artifacts"
 JOBLOG="$OUTDIR/job.log"
 RUNLOG="$OUTDIR/job-run.log"
@@ -124,9 +122,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-agent="$(codex_default_agent "$agent" "$default_agent")"
-
-exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
+codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 # Pre-flight: skip session entirely if CI is already green (saves tokens on no-op runs)
 if [[ "$autocommit" == "1" && "$dry_run" == "0" ]]; then

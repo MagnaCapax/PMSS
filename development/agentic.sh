@@ -100,9 +100,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-agent="$(codex_default_agent "$agent" "$default_agent")"
-
-exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
+codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 if [[ "${#exec_extra_args[@]}" -gt 0 ]]; then
 	# Append extra assistant CLI args (shell-escaped) to the exec string.

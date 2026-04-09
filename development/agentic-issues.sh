@@ -50,10 +50,9 @@ Environment:
 EOF
 }
 
-TMP="${TMPDIR:-/tmp}"
 ASSIST_DIR="$HERE/assistants"
 default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
-OUTDIR="$(mktemp -d "${TMP%/}/pmss-issues-codex-XXXXXXXX")"
+OUTDIR="$(codex_make_temp_workspace pmss-issues-codex)"
 ISSUES_FILE="$OUTDIR/issues-context.txt"
 
 max_issues=5
@@ -92,14 +91,12 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-agent="$(codex_default_agent "$agent" "$default_agent")"
-
 if [[ ! "$max_issues" =~ ^[0-9]+$ ]] || [[ "$max_issues" -lt 1 ]]; then
 	echo "[agentic-issues] ERROR: --max-issues must be a positive integer (got: $max_issues)" >&2
 	exit 2
 fi
 
-exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
+codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 echo "[agentic-issues] output directory: $OUTDIR" >&1
 

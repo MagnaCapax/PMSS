@@ -49,10 +49,9 @@ Environment:
 EOF
 }
 
-TMP="${TMPDIR:-/tmp}"
 ASSIST_DIR="$HERE/assistants"
 default_agent="${PMSS_AGENTIC_DEFAULT_AGENT:-codex}"
-OUTDIR="$(mktemp -d "${TMP%/}/pmss-qa-codex-XXXXXXXX")"
+OUTDIR="$(codex_make_temp_workspace pmss-qa-codex)"
 QA_FILE="$OUTDIR/qa-context.txt"
 
 # I6: Limit to 5 issues to avoid context exhaustion (each includes full diffs).
@@ -87,9 +86,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-agent="$(codex_default_agent "$agent" "$default_agent")"
-
-exec_cmd="$(codex_resolve_exec_cmd "$ASSIST_DIR" "$agent" "$exec_cmd")" || exit $?
+codex_prepare_agent_exec "$ASSIST_DIR" "$default_agent" agent exec_cmd || exit $?
 
 echo "[agentic-qa] output directory: $OUTDIR" >&1
 

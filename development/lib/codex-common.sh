@@ -264,6 +264,20 @@ codex_default_agent() {
 	printf '%s\n' "${agent:-$default_agent}"
 }
 
+# Resolve the effective agent and its exec command in one step for wrappers.
+codex_prepare_agent_exec() {
+	local assist_dir="$1" default_agent="$2" agent_name="$3" exec_name="$4"
+	local -n agent_ref="$agent_name"
+	local -n exec_ref="$exec_name"
+	agent_ref="$(codex_default_agent "$agent_ref" "$default_agent")"
+	exec_ref="$(codex_resolve_exec_cmd "$assist_dir" "$agent_ref" "$exec_ref")" || return $?
+}
+
+codex_make_temp_workspace() {
+	local prefix="$1"
+	mktemp -d "${TMPDIR:-/tmp}/${prefix}-XXXXXXXX"
+}
+
 # Assemble and invoke a standard codex-run prompt command.
 codex_run_prompt() {
 	local here="$1" prompt_file="$2" outdir="$3" repo_root="$4" agent="$5" exec_cmd="$6" dry_run="$7" autocommit="$8"
