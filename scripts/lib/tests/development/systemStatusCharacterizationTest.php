@@ -215,6 +215,35 @@ final class SystemStatusCharacterizationTest extends TestCase
         $this->assertSame('', pmssStatusBinaryPathResolve('wget', $runCommand, $isExecutable));
     }
 
+    public function testSharedBinaryProbeRendererKeepsSystemAndComponentViewsStable(): void
+    {
+        $runCommand = static function (string $command): string {
+            $map = [
+                "command -v 'nginx'" => '/usr/sbin/nginx',
+                'nginx -v 2>&1' => 'nginx version: nginx/1.22.0',
+            ];
+
+            return $map[$command] ?? '';
+        };
+        $isExecutable = static function (string $path): bool {
+            return $path === '/usr/sbin/nginx';
+        };
+        $binarySpec = [
+            'infoCommand' => 'nginx -v 2>&1',
+            'componentName' => 'bin.nginx',
+        ];
+
+        $this->assertSame(
+            ['name' => 'Binary: nginx', 'status' => 'OK', 'detail' => 'nginx version: nginx/1.22.0'],
+            pmssStatusBinaryProbeCheck('nginx', $binarySpec, $runCommand, $isExecutable)
+        );
+        $this->assertSame(
+            ['name' => 'bin.nginx', 'status' => 'OK', 'detail' => '/usr/sbin/nginx'],
+            pmssStatusBinaryProbeCheck('nginx', $binarySpec, $runCommand, $isExecutable, true)
+        );
+        $this->assertTrue(pmssStatusBinaryProbeCheck('wget', ['infoCommand' => 'wget --version 2>&1 | head -n 1'], $runCommand, $isExecutable, true) === null);
+    }
+
     public function testSharedProbeCollectorPreservesCatalogOrderWhileFilteringNulls(): void
     {
         $checks = pmssStatusCollectProbeChecks(

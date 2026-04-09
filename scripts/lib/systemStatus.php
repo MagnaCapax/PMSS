@@ -130,6 +130,17 @@ function pmssStatusCollectProbeChecks(array $probeSpecs, callable $binaryProbe, 
     return $checks;
 }
 
+/** Render a shared binary probe in either system or component view. */
+function pmssStatusBinaryProbeCheck(string $binary, array $binarySpec, callable $runCommand, callable $isExecutable, bool $componentView = false): ?array
+{
+    if ($componentView && !isset($binarySpec['componentName'])) return null;
+    $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
+    if ($componentView) return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
+    if ($path === '') return pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
+    $detail = trim((string) $runCommand((string) $binarySpec['infoCommand']));
+    return pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
+}
+
 function pmssStatusContextResolve(array $dependencies = []): array
 {
     $sourcesPath = pmssResolvePathFromEnv('PMSS_APT_SOURCES_PATH', '/etc/apt/sources.list');
@@ -148,8 +159,9 @@ function pmssStatusContextResolve(array $dependencies = []): array
         'probeSpecs' => pmssStatusProbeSpecs($sourcesPath),
     ];
 }
-function pmssComponentStatusChecksFromContext(array $context): array
+function pmssComponentStatusChecks(array $dependencies = []): array
 {
+    $context = isset($dependencies['probeSpecs']) ? $dependencies : pmssStatusContextResolve($dependencies);
     $runCommand = $context['runCommand']; $pathExists = $context['pathExists']; $readFile = $context['readFile']; $isExecutable = $context['isExecutable'];
     $codename = (string) $context['codename']; $sourcesPath = (string) $context['sourcesPath'];
     $results[] = $codename === '' ? pmssStatus('os.codename', 'WARN', 'VERSION_CODENAME missing') : pmssStatus('os.codename', 'OK', $codename);
@@ -160,15 +172,12 @@ function pmssComponentStatusChecksFromContext(array $context): array
     return array_merge($results, pmssStatusCollectProbeChecks(
         $context['probeSpecs'],
         static function (string $binary, array $binarySpec) use ($runCommand, $isExecutable): ?array {
-            if (!isset($binarySpec['componentName'])) return null;
-            $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
-            return pmssStatus((string) $binarySpec['componentName'], $path !== '' ? 'OK' : 'WARN', $path);
+            return pmssStatusBinaryProbeCheck($binary, $binarySpec, $runCommand, $isExecutable, true);
         },
         static function (array $pathSpec) use ($pathExists): ?array {
             if (!isset($pathSpec['componentName'])) return null;
             $path = (string) $pathSpec['path'];
-            $exists = $pathExists($path);
-            return pmssStatus((string) $pathSpec['componentName'], $exists ? 'OK' : 'WARN', $exists ? $path : 'missing');
+            return pmssStatus((string) $pathSpec['componentName'], ($exists = $pathExists($path)) ? 'OK' : 'WARN', $exists ? $path : 'missing');
         }
     ));
 }
@@ -193,11 +202,8 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         : pmssStatus('OS codename', 'OK', $codename);
     $checks = array_merge($checks, pmssStatusCollectProbeChecks(
         $context['probeSpecs'],
-        static function (string $binary, array $binarySpec) use ($runCommand, $isExecutable): array {
-            $path = pmssStatusBinaryPathResolve($binary, $runCommand, $isExecutable);
-            if ($path === '') return pmssStatus('Binary: '.$binary, 'WARN', 'Not found in PATH');
-            $detail = trim((string) $runCommand((string) $binarySpec['infoCommand']));
-            return pmssStatus('Binary: '.$binary, 'OK', $detail !== '' ? $detail : 'present');
+        static function (string $binary, array $binarySpec) use ($runCommand, $isExecutable): ?array {
+            return pmssStatusBinaryProbeCheck($binary, $binarySpec, $runCommand, $isExecutable);
         },
         static function (array $pathSpec) use ($pathExists): array {
             $path = (string) $pathSpec['path'];
@@ -315,10 +321,6 @@ function pmssSystemStatusChecks(array $dependencies = []): array
         static function (array $entry): array {
             return pmssStatus('Component: '.(string) $entry['name'], (string) $entry['status'], (string) ($entry['detail'] ?? ''));
         },
-        pmssComponentStatusChecksFromContext($context)
+        pmssComponentStatusChecks($context)
     ));
 }
-
-/** Collect the shared component-status checks used by both system probes. */
-function pmssComponentStatusChecks(array $dependencies = []): array
-{ return pmssComponentStatusChecksFromContext(pmssStatusContextResolve($dependencies)); }
