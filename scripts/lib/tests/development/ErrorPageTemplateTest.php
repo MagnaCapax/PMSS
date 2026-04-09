@@ -81,6 +81,22 @@ class ErrorPageTemplateTest extends TestCase
         $this->assertStringContainsString('server-wide storage pressure', $contents);
     }
 
+    public function testSuspendedErrorPageDoesNotReferenceABrokenImage(): void
+    {
+        $contents = $this->pmssReadRepoFile('var/www/error-suspended.html');
+        $this->assertStringNotContainsString('<img', $contents);
+        $this->assertStringContainsString('Account Suspended', $contents);
+        $this->assertStringContainsString('https://pulsedmedia.com/contact/', $contents);
+    }
+
+    public function testSuspendedErrorPageKeepsSupportCallToActionReadable(): void
+    {
+        $contents = $this->pmssReadRepoFile('var/www/error-suspended.html');
+        $this->assertStringContainsString('class="cta"', $contents);
+        $this->assertStringContainsString('.cta:visited', $contents);
+        $this->assertStringContainsString('color:#fff;', $contents);
+    }
+
     public function testUserNginxTemplateUsesPerUser502FallbackPage(): void
     {
         $contents = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');

@@ -1,33 +1,38 @@
-<div class="container">
-  <span class="error-message">Account Suspended</span>
-  <br />
-  <div class="content-container">
-    <div id="image-container">
-      <img alt="Account Suspended" />
-    </div>
-
-    <div class="error-description">
-      <p>
-        This account is currently suspended and access to its services is
-        temporarily disabled.
-      </p>
-      <p>
-        If you believe this is a mistake or need assistance restoring access,
-        please open a support ticket.
-      </p>
-      <p>
-        <a href="https://pulsedmedia.com/clients/supporttickets.php">
-          pulsedmedia.com/clients/supporttickets.php
-        </a>
-      </p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Account Suspended</title>
+  <link rel="stylesheet" href="/css/error-styles.css" />
+  <style>
+    body { background:#030711; color:#f5f5f5; font-family: "Inter", "Segoe UI", sans-serif; }
+    .container { max-width: 860px; margin: 6vh auto; padding: 0 2rem; }
+    .error-message { font-size: 2.8rem; display:block; font-weight: 600; margin-bottom: 1.25rem; text-transform: uppercase; letter-spacing: .08em; }
+    .content-container { display:flex; flex-wrap:wrap; align-items:center; gap:2rem; background:rgba(12,18,30,0.92); padding:2.5rem; border-radius:18px; box-shadow:0 30px 90px rgba(0,0,0,0.45); }
+    .error-description { flex:1; font-size:1.05rem; line-height:1.7; }
+    .error-description strong { color:#6bb1ff; }
+    .cta,
+    .cta:visited { margin-top:1.5rem; display:inline-block; padding:.75rem 1.5rem; border-radius:999px; background:#3478f6; color:#fff; text-decoration:none; font-weight:600; letter-spacing:.02em; }
+    .cta:hover,
+    .cta:focus { background:#2a63c8; color:#fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="error-message">Account Suspended</span>
+    <div class="content-container">
+      <div class="error-description">
+        <p>
+          This account is currently suspended and access to its services is
+          temporarily disabled.
+        </p>
+        <p>
+          If you believe this is a mistake or need assistance restoring access,
+          please contact support.
+        </p>
+        <a class="cta" href="https://pulsedmedia.com/contact/">Contact Support</a>
+      </div>
     </div>
   </div>
-</div>
-
-<script>
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.type = 'text/css';
-  link.href = '/css/error-styles.css';
-  document.head.appendChild(link);
-</script>
+</body>
+</html>
