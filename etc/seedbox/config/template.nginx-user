@@ -17,6 +17,14 @@ location /user-##username/ {
 
 location /public-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/;
+        # PMSS media-stack apps behind lighttpd use map-urlpath, which also
+        # reverse-maps Location headers back to bare /app paths. Restore the
+        # external /public-<user>/ prefix before clients follow redirects.
+        proxy_redirect ~^(https?://[^/]+)?/sabnzbd(/.*)?$ /public-##username/sabnzbd$2;
+        proxy_redirect ~^(https?://[^/]+)?/radarr(/.*)?$ /public-##username/radarr$2;
+        proxy_redirect ~^(https?://[^/]+)?/prowlarr(/.*)?$ /public-##username/prowlarr$2;
+        proxy_redirect ~^(https?://[^/]+)?/sonarr(/.*)?$ /public-##username/sonarr$2;
+        proxy_redirect ~^(https?://[^/]+)?/jellyfin(/.*)?$ /public-##username/jellyfin$2;
         proxy_set_header Upgrade $http_upgrade;
 #        proxy_set_header Connection $connection_upgrade;
         proxy_set_header Connection "upgrade";
