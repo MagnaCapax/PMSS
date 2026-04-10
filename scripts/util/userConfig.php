@@ -26,6 +26,11 @@ require_once __DIR__.'/../lib/userLifecycle.php';
  * Main entry point for user configuration changes.
  */
 $usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
+$usage .= "\n   or: ./userConfig.php USERNAME --welcome-message=HTML";
+$usage .= "\n\nOptions:";
+$usage .= "\n  --upload-throttle-kib=KIB          Per-user torrent upload limit";
+$usage .= "\n  --welcome-message=HTML             Per-user welcome page message (empty to clear)";
+$usage .= "\n  --docker-enabled=true|false        Rootless Docker policy";
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled']);
 $args = array_merge([''], $parsed['arguments']);
 $welcomeMessage = pmssCliOption($parsed, 'welcome-message');
@@ -36,8 +41,6 @@ try {
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage()."\n");
 }
-$usage .= ' [--upload-throttle-kib=KIB] [--welcome-message=HTML] [--docker-enabled=true|false]';
-$usage .= "\n   or: ./userConfig.php USERNAME --welcome-message=HTML";
 $fullConfigMode = !empty($args[1]) && !empty($args[2]) && !empty($args[3]);
 $welcomeOnlyMode = !empty($args[1]) && $welcomeMessage !== null && empty($args[2]) && empty($args[3]);
 if (!$fullConfigMode && !$welcomeOnlyMode) {
