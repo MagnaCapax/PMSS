@@ -31,10 +31,22 @@ function networkLoadLocalnets(): array
         }
 
         $default = ['185.148.0.0/22'];
-        file_put_contents($path, implode("\n", $default)."\n");
+        $directory = dirname($path);
+        $realDirectory = realpath($directory);
+        if (
+            $path !== ''
+            && $path[0] === '/'
+            && preg_match('/[\r\n\0]/', $path) !== 1
+            && $directory !== ''
+            && $realDirectory !== false
+            && pmssDirPathNormalize($realDirectory) === pmssDirPathNormalize($directory)
+            && @file_put_contents($path, implode("\n", $default)."\n") !== false
+        ) {
+            @chmod($path, 0644);
+        }
         return $default;
     }
 
-    $cfg = trim((string) file_get_contents($path));
+    $cfg = trim((string) pmssReadRegularFileContents($path));
     return $cfg === '' ? [] : preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY);
 }

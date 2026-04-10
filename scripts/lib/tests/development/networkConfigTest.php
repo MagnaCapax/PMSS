@@ -61,4 +61,36 @@ class NetworkConfigTest extends TestCase
             $this->assertEquals([], \networkLoadLocalnets());
         });
     }
+
+    public function testLoadLocalnetsRejectsSymlinkedConfigFile(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-localnets-symlink-');
+        $target = $root.'/target-localnet';
+        file_put_contents($target, "10.0.0.0/8\n");
+        $link = $root.'/localnet';
+        $this->pmssCreateSymlinkOrSkip($target, $link);
+
+        $this->pmssWithEnv(['PMSS_LOCALNET_FILE' => $link], function (): void {
+            $this->assertEquals([], \networkLoadLocalnets());
+        });
+    }
+
+    public function testLoadLocalnetsDoesNotPersistDefaultThroughSymlinkedParent(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-localnets-parent-');
+        $targetDir = $root.'/target';
+        @mkdir($targetDir, 0755, true);
+        $linkDir = $root.'/linked';
+        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
+        $path = $linkDir.'/localnet';
+
+        $this->pmssWithEnv([
+            'PMSS_LOCALNET_FILE' => $path,
+            'PMSS_HOSTNAME' => 'seedbox1.pulsedmedia.com',
+        ], function () use ($path, $targetDir): void {
+            $this->assertEquals(['185.148.0.0/22'], \networkLoadLocalnets());
+            $this->assertFalse(file_exists($path));
+            $this->assertFalse(file_exists($targetDir.'/localnet'));
+        });
+    }
 }
