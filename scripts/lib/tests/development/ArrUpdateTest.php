@@ -146,6 +146,67 @@ class ArrUpdateTest extends TestCase
         }
     }
 
+    public function testUpdateRejectsUnsafeExtractDirectoryBeforeFetchingMetadata(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-unsafe-extract-');
+        $output = '';
+
+        try {
+            $this->pmssWithEnv([], function () use ($baseDir, &$output): void {
+                ob_start();
+                \pmssArrUpdate([
+                    'app' => 'PmssArrUnsafeExtract',
+                    'install_path' => $baseDir.'/install',
+                    'releases_url' => $baseDir.'/missing-releases.json',
+                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
+                    'extract_dir' => '../PackageDir',
+                    'user_agent' => 'PMSS-Test',
+                ]);
+                $output = (string) ob_get_clean();
+            });
+
+            $this->assertStringContainsString('Invalid updater configuration: extract_dir', $output);
+            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
+    public function testUpdateDoesNotReportInstalledWhenInstallParentIsMissing(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-move-fail-');
+        $app = 'PmssArrMoveFail'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/missing-parent/install';
+        $extractDir = 'PackageDir';
+        $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'new']);
+        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $shimDir = $this->writeCurlShim($baseDir);
+        $output = '';
+
+        try {
+            $this->pmssWithEnv([
+                'PATH' => $shimDir.':'.(string) getenv('PATH'),
+            ], function () use ($app, $installPath, $metadataPath, $extractDir, &$output): void {
+                ob_start();
+                \pmssArrUpdate([
+                    'app' => $app,
+                    'install_path' => $installPath,
+                    'releases_url' => $metadataPath,
+                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
+                    'extract_dir' => $extractDir,
+                    'user_agent' => 'PMSS-Test',
+                ]);
+                $output = (string) ob_get_clean();
+            });
+
+            $this->assertFalse(is_dir($installPath), 'install path should stay absent when its parent directory is missing');
+            $this->assertStringContainsString('Install parent directory missing; refusing to replace application', $output);
+            $this->assertStringNotContainsString('Installed version 1.2.3', $output);
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
     private function createArchive(string $baseDir, string $extractDir, array $files, string $archiveName = 'bundle-1.2.3.tar.gz'): string
     {
         $archiveRoot = $baseDir.'/archive';

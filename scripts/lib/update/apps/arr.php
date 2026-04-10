@@ -43,9 +43,74 @@ function pmssArrAssetArchitectureTokens(): array
     return ['x64', 'amd64'];
 }
 
+/**
+ * Reject config values that could break shell/file boundaries.
+ */
+function pmssArrIsSafeConfigValue(string $value): bool
+{
+    return $value !== '' && preg_match('/[\r\n\0]/', $value) !== 1;
+}
+
+/**
+ * Only allow one extracted top-level directory from the downloaded archive.
+ */
+function pmssArrExtractDirectoryIsSafe(string $extractDir): bool
+{
+    return pmssArrIsSafeConfigValue($extractDir)
+        && $extractDir !== '.'
+        && $extractDir !== '..'
+        && basename($extractDir) === $extractDir;
+}
+
+/**
+ * Normalize required config and fail closed on unsafe runtime inputs.
+ */
+function pmssArrNormalizeConfig(array $config, callable $log): ?array
+{
+    foreach (['app', 'install_path', 'releases_url', 'asset_pattern', 'extract_dir'] as $key) {
+        if (!isset($config[$key]) || !is_string($config[$key]) || !pmssArrIsSafeConfigValue($config[$key])) {
+            $log('Invalid updater configuration: '.$key);
+            return null;
+        }
+    }
+
+    if ($config['install_path'][0] !== '/' || $config['install_path'] === '/') {
+        $log('Invalid updater configuration: install_path');
+        return null;
+    }
+    if (!pmssArrExtractDirectoryIsSafe($config['extract_dir'])) {
+        $log('Invalid updater configuration: extract_dir');
+        return null;
+    }
+    if (@preg_match($config['asset_pattern'], '') === false) {
+        $log('Invalid updater configuration: asset_pattern');
+        return null;
+    }
+
+    $config['user_agent'] = isset($config['user_agent'])
+        && is_string($config['user_agent'])
+        && pmssArrIsSafeConfigValue($config['user_agent'])
+        ? $config['user_agent']
+        : 'PMSS-ARR';
+
+    return $config;
+}
+
+/**
+ * Asset names must stay inside the temporary workspace.
+ */
+function pmssArrArchiveNameIsSafe(string $assetName): bool
+{
+    return pmssArrIsSafeConfigValue($assetName)
+        && basename($assetName) === $assetName
+        && preg_match('/[\\\/]/', $assetName) !== 1;
+}
+
 function pmssArrUpdate(array $config): void
 {
-    $app = $config['app'];
+    $app = isset($config['app']) && is_string($config['app']) && $config['app'] !== ''
+        ? $config['app']
+        : 'ARR';
     $runtimePath = dirname(__DIR__, 2).'/runtime.php';
     if (!@include_once $runtimePath) {
         if (defined('STDERR')) {
@@ -58,11 +123,16 @@ function pmssArrUpdate(array $config): void
         logMessage($app.': '.$message);
     };
 
+    $config = pmssArrNormalizeConfig($config, $log);
+    if ($config === null) {
+        return;
+    }
+
     $payload = @file_get_contents($config['releases_url'], false, stream_context_create([
         'http' => [
             'header'  => [
                 'Accept: application/vnd.github+json',
-                'User-Agent: '.($config['user_agent'] ?? 'PMSS-ARR'),
+                'User-Agent: '.$config['user_agent'],
             ],
             'timeout' => 15,
         ],
@@ -82,6 +152,9 @@ function pmssArrUpdate(array $config): void
         }
         foreach ($release['assets'] as $candidateAsset) {
             $name = (string) ($candidateAsset['name'] ?? '');
+            if (!pmssArrArchiveNameIsSafe($name)) {
+                continue;
+            }
             if (!preg_match($config['asset_pattern'], $name, $match)) {
                 continue;
             }
@@ -168,9 +241,15 @@ function pmssArrUpdate(array $config): void
         || !is_dir($extractPath)
     ) {
         $log('Extraction failed; keeping existing installation');
+    } elseif (!is_dir(dirname($installPath))) {
+        $log('Install parent directory missing; refusing to replace application');
+    } elseif (runCommand('rm -rf '.escapeshellarg($installPath)) !== 0) {
+        $log('Failed to remove existing installation; keeping existing installation');
+    } elseif (runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath))) !== 0
+        || !is_dir($installPath)
+    ) {
+        $log('Failed to activate extracted release');
     } else {
-        runCommand('rm -rf '.escapeshellarg($installPath));
-        runCommand(sprintf('mv %s %s', escapeshellarg($extractPath), escapeshellarg($installPath)));
         $installed = true;
     }
 
