@@ -79,7 +79,74 @@ class ArrUpdateTest extends TestCase
         }
     }
 
-    private function createArchive(string $baseDir, string $extractDir, array $files): string
+    public function testUpdatePrefersHostArchitectureAssetWhenMultipleBuildsMatch(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-arch-match-');
+        $app = 'PmssArrArch'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/install';
+        $extractDir = 'PackageDir';
+        $metadataPath = $this->writeMetadataForAssets($baseDir, [
+            ['bundle-1.2.3-arm.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'arm'], 'bundle-1.2.3-arm.tar.gz')],
+            ['bundle-1.2.3-arm64.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'arm64'], 'bundle-1.2.3-arm64.tar.gz')],
+            ['bundle-1.2.3-x64.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'x64'], 'bundle-1.2.3-x64.tar.gz')],
+        ]);
+        $shimDir = $this->writeCurlShim($baseDir, 'amd64');
+
+        try {
+            $this->pmssWithEnv([
+                'PATH' => $shimDir.':'.(string) getenv('PATH'),
+                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                \pmssArrUpdate([
+                    'app' => $app,
+                    'install_path' => $installPath,
+                    'releases_url' => $metadataPath,
+                    'asset_pattern' => '/bundle-([0-9.]+)-.*\.tar\.gz/',
+                    'extract_dir' => $extractDir,
+                    'user_agent' => 'PMSS-Test',
+                ]);
+            });
+
+            $this->assertEquals('x64', (string) @file_get_contents($installPath.'/marker.txt'));
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
+    public function testUpdateFallsBackToGenericAssetWhenArchSpecificBuildDoesNotMatch(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-arch-fallback-');
+        $app = 'PmssArrArchFallback'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/install';
+        $extractDir = 'PackageDir';
+        $metadataPath = $this->writeMetadataForAssets($baseDir, [
+            ['bundle-1.2.3-arm.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'arm'], 'bundle-1.2.3-arm.tar.gz')],
+            ['bundle-1.2.3.tar.gz', $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'generic'])],
+        ]);
+        $shimDir = $this->writeCurlShim($baseDir, 'amd64');
+
+        try {
+            $this->pmssWithEnv([
+                'PATH' => $shimDir.':'.(string) getenv('PATH'),
+                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                \pmssArrUpdate([
+                    'app' => $app,
+                    'install_path' => $installPath,
+                    'releases_url' => $metadataPath,
+                    'asset_pattern' => '/bundle-([0-9.]+)(?:-.*)?\.tar\.gz/',
+                    'extract_dir' => $extractDir,
+                    'user_agent' => 'PMSS-Test',
+                ]);
+            });
+
+            $this->assertEquals('generic', (string) @file_get_contents($installPath.'/marker.txt'));
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
+    private function createArchive(string $baseDir, string $extractDir, array $files, string $archiveName = 'bundle-1.2.3.tar.gz'): string
     {
         $archiveRoot = $baseDir.'/archive';
         $payloadDir = $archiveRoot.'/'.$extractDir;
@@ -88,7 +155,7 @@ class ArrUpdateTest extends TestCase
             @file_put_contents($payloadDir.'/'.$name, $contents);
         }
 
-        $archivePath = $baseDir.'/bundle-1.2.3.tar.gz';
+        $archivePath = $baseDir.'/'.$archiveName;
         $output = [];
         $rc = 0;
         exec(
@@ -121,7 +188,22 @@ class ArrUpdateTest extends TestCase
         return $metadataPath;
     }
 
-    private function writeCurlShim(string $baseDir): string
+    private function writeMetadataForAssets(string $baseDir, array $assets): string
+    {
+        $metadataPath = $baseDir.'/releases.json';
+        $payload = ['assets' => []];
+        foreach ($assets as $asset) {
+            $payload['assets'][] = [
+                'name' => $asset[0],
+                'browser_download_url' => 'file://'.$asset[1],
+            ];
+        }
+
+        @file_put_contents($metadataPath, json_encode([$payload]));
+        return $metadataPath;
+    }
+
+    private function writeCurlShim(string $baseDir, string $architecture = ''): string
     {
         $shimDir = $baseDir.'/bin';
         @mkdir($shimDir, 0755, true);
@@ -150,6 +232,13 @@ cp "${source_url#file://}" "$target"
 SH
         );
         @chmod($curl, 0755);
+
+        if ($architecture !== '') {
+            $dpkg = $shimDir.'/dpkg';
+            @file_put_contents($dpkg, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--print-architecture\" ]; then\n  printf '%s\\n' ".escapeshellarg($architecture)."\n  exit 0\nfi\nexit 1\n");
+            @chmod($dpkg, 0755);
+        }
+
         return $shimDir;
     }
 

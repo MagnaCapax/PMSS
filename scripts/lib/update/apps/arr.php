@@ -17,6 +17,32 @@
  *  - extract_dir: Directory name created inside the tarball after extraction
  *  - user_agent: HTTP user-agent value for GitHub API requests
  */
+function pmssArrAssetNameHasToken(string $assetName, array $tokens): bool
+{
+    $name = strtolower($assetName);
+    foreach ($tokens as $token) {
+        if (preg_match('/(?:^|[^a-z0-9])'.preg_quote(strtolower($token), '/').'(?=[^a-z0-9]|$)/', $name)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** Return the expected Starr asset tokens for the current host architecture. */
+function pmssArrAssetArchitectureTokens(): array
+{
+    $architecture = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
+    if ($architecture === 'arm64') {
+        return ['arm64', 'aarch64'];
+    }
+    if ($architecture === 'armhf') {
+        return ['armhf', 'armv7', 'arm'];
+    }
+
+    return ['x64', 'amd64'];
+}
+
 function pmssArrUpdate(array $config): void
 {
     $app = $config['app'];
@@ -47,6 +73,9 @@ function pmssArrUpdate(array $config): void
     if (!is_array($releases)) { $log('Invalid release metadata payload'); return; }
 
     $asset = null;
+    $genericAsset = null;
+    $targetArchitectureTokens = pmssArrAssetArchitectureTokens();
+    $knownArchitectureTokens = ['x64', 'amd64', 'arm64', 'aarch64', 'armhf', 'armv7', 'arm'];
     foreach ($releases as $release) {
         if (empty($release['assets']) || !is_array($release['assets'])) {
             continue;
@@ -60,9 +89,18 @@ function pmssArrUpdate(array $config): void
             if ($url === '') {
                 continue;
             }
-            $asset = [$match[1], $url, $name];
-            break 2;
+            $candidate = [$match[1], $url, $name];
+            if (pmssArrAssetNameHasToken($name, $targetArchitectureTokens)) {
+                $asset = $candidate;
+                break 2;
+            }
+            if ($genericAsset === null && !pmssArrAssetNameHasToken($name, $knownArchitectureTokens)) {
+                $genericAsset = $candidate;
+            }
         }
+    }
+    if ($asset === null) {
+        $asset = $genericAsset;
     }
     if ($asset === null) { $log('No suitable linux release asset found'); return; }
     [$latestVersion, $downloadUrl, $assetName] = $asset;
