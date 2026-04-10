@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 
 v2="$ROOT_DIR/etc/seedbox/config/template.cgroup.user-slice.v2.conf"
 v1="$ROOT_DIR/etc/seedbox/config/template.cgroup.user-slice.v1.conf"

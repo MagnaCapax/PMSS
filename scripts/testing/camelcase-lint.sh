@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 # camelCase filename lint for PMSS first-party PHP files
 # - Filenames must be camelCase starting lowercase: ^[a-z][a-zA-Z0-9]*\.php$
 # - Scope targets ops/update paths with stable lower-camel conventions.
 # - Explicit exceptions live in the allowlist below.
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 VIOLATIONS=0
 
 is_camel_file() {

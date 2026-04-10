@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 # phpstan runner for PMSS. Honors:
 # - PMSS_PHPSTAN_BIN: override path to phpstan (default: vendor/bin/phpstan or phpstan in PATH)
 # - PHPSTAN_DISABLE_PARALLEL=1 to disable parallelization in constrained envs
 # - ALLOW_TOOL_SKIP=1 to skip when phpstan is unavailable
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 
 PHAR_BIN="${PMSS_PHPSTAN_BIN:-}"
 if [[ -z "$PHAR_BIN" ]]; then
@@ -31,7 +31,7 @@ if [[ -f "$ROOT_DIR/phpstan.neon.dist" ]]; then
   ARGS+=("-c" "$ROOT_DIR/phpstan.neon.dist")
 fi
 
-cd "$ROOT_DIR"
+pmss_testing_cd_root_dir "$ROOT_DIR"
 
 has_target=0
 after_double_dash=0

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Be strict on unset vars and pipelines, but aggregate failures to report clearly.
 set -uo pipefail
-
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 FAIL=0
 
 # 1) README should not link directly to docs/adr/ (use adr-list or browse dir)

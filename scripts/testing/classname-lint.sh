@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 # classname-lint.sh — advisory class/file name consistency check
 # Rules:
 # - For tests: each *Test.php must declare a class whose name matches the filename (sans .php), case-insensitively.
 #   Integration tests are script-style and excluded.
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 VIOL=0
 
 check_tests() {

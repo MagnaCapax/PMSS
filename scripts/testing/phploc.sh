@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 # phploc runner (advisory). Gathers aggregate PHP metrics quickly.
 # Prefers vendor/bin/phploc, falls back to tools/phploc.phar, then 'phploc' in PATH.
 # Excludes third-party/frozen trees so metrics reflect first-party code.
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 
 PHPLC_BIN=()
 if [[ -x "$ROOT_DIR/vendor/bin/phploc" ]]; then

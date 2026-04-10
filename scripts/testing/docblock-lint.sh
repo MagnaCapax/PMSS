@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 # Docblock linter for classes and public methods (PMSS first-party code)
 # Enforces that:
 # - Every class has a preceding docblock (/** ... */) with a description line.
@@ -16,7 +15,8 @@ set -euo pipefail
 #    enforced first, then core shared helpers; broader tree coverage remains
 #    advisory/opt‑in for now.
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 VIOLATIONS=0
 
 scan_file() {

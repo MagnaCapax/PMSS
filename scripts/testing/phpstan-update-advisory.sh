@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=scripts/testing/testingPaths.sh
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 CONFIG_PATH="$ROOT_DIR/phpstan.update.neon.dist"
 
 if [[ ! -f "$CONFIG_PATH" ]]; then
@@ -27,4 +27,3 @@ fi
 
 echo "phpstan-update advisory: findings detected (non-blocking)"
 exit 0
-
