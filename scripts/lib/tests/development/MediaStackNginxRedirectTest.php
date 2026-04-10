@@ -20,6 +20,11 @@ class MediaStackNginxRedirectTest extends TestCase
         $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/sabnzbd(/.*)?$ /public-##username/sabnzbd$2;', $this->publicProxyBlock());
     }
 
+    public function testPublicProxyBlockRewritesLidarrRedirects(): void
+    {
+        $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/lidarr(/.*)?$ /public-##username/lidarr$2;', $this->publicProxyBlock());
+    }
+
     public function testPublicProxyBlockRewritesRadarrRedirects(): void
     {
         $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/radarr(/.*)?$ /public-##username/radarr$2;', $this->publicProxyBlock());
@@ -28,6 +33,11 @@ class MediaStackNginxRedirectTest extends TestCase
     public function testPublicProxyBlockRewritesProwlarrRedirects(): void
     {
         $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/prowlarr(/.*)?$ /public-##username/prowlarr$2;', $this->publicProxyBlock());
+    }
+
+    public function testPublicProxyBlockRewritesReadarrRedirects(): void
+    {
+        $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/readarr(/.*)?$ /public-##username/readarr$2;', $this->publicProxyBlock());
     }
 
     public function testPublicProxyBlockRewritesSonarrRedirects(): void

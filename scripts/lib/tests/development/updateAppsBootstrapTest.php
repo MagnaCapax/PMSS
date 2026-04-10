@@ -53,6 +53,30 @@ class UpdateAppsBootstrapTest extends TestCase
         $this->assertTrue(strpos($output, 'Fatal error') === false, 'Sonarr bootstrap should soft-return when runtime is missing');
     }
 
+    public function testProwlarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
+    {
+        $output = $this->appBootstrapOutput('prowlarr.php');
+
+        $this->assertStringContainsString('Prowlarr updater: missing runtime helper', $output);
+        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Prowlarr bootstrap should soft-return when runtime is missing');
+    }
+
+    public function testLidarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
+    {
+        $output = $this->appBootstrapOutput('lidarr.php');
+
+        $this->assertStringContainsString('Lidarr updater: missing runtime helper', $output);
+        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Lidarr bootstrap should soft-return when runtime is missing');
+    }
+
+    public function testReadarrWarnsAndReturnsWhenRuntimeHelperMissing(): void
+    {
+        $output = $this->appBootstrapOutput('readarr.php');
+
+        $this->assertStringContainsString('Readarr updater: missing runtime helper', $output);
+        $this->assertTrue(strpos($output, 'Fatal error') === false, 'Readarr bootstrap should soft-return when runtime is missing');
+    }
+
     public function testUpdateStep2SkipsHelperModulesInAppLoader(): void
     {
         $contents = $this->pmssReadRepoFile('scripts/util/update-step2.php');
@@ -86,7 +110,7 @@ class UpdateAppsBootstrapTest extends TestCase
 
     public function testStarrInstallersDelegateRuntimeBootstrapToArrHelper(): void
     {
-        foreach (['radarr.php', 'sonarr.php'] as $installer) {
+        foreach (['lidarr.php', 'prowlarr.php', 'radarr.php', 'readarr.php', 'sonarr.php'] as $installer) {
             $contents = $this->pmssReadUpdateAppFile($installer);
 
             $this->assertStringContainsString("require_once __DIR__.'/arr.php';", $contents);

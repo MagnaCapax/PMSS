@@ -1,8 +1,9 @@
-Radarr & Sonarr
+ARR applications
 ----------------
-The server keeps the latest Radarr and Sonarr builds in /opt/Radarr and
-/opt/Sonarr. Use the `arrinfo` shell alias (already in your profile) to see the
-HTTPS URLs proxied through nginx:
+The server keeps the latest Radarr, Sonarr, Prowlarr, Lidarr, and Readarr
+builds in /opt/Radarr, /opt/Sonarr, /opt/Prowlarr, /opt/Lidarr, and
+/opt/Readarr. Use the `arrinfo` shell alias (already in your profile) to see
+the HTTPS URLs proxied through nginx:
 
     arrinfo
 
