@@ -21,6 +21,7 @@ require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
+require_once __DIR__.'/../lib/welcomeMessage.php';
 
 /**
  * Main entry point for user configuration changes.
@@ -96,7 +97,11 @@ if ($welcomeOnlyMode) {
         }
     }
 
-    $payload = pmssUserConfigApplyWelcomeMessage($payload, $welcomeMessage);
+    if (!pmssWelcomeUserMessageSet($user['name'], $expectedHome, $welcomeMessage)) {
+        fwrite(STDERR, "Error: failed to persist welcome message for {$user['name']}\n");
+        exit(1);
+    }
+    $payload = pmssUserConfigClearWelcomeMessage($payload);
     if (!$store->persist($user['name'], $payload)) {
         fwrite(STDERR, "Error: failed to persist user config for {$user['name']}\n");
         exit(1);
@@ -118,7 +123,12 @@ if ($payload['billingId'] === 0) {
 if ($dockerEnabled !== null) {
     $payload['dockerEnabled'] = $dockerEnabled;
 }
-$payload = pmssUserConfigApplyWelcomeMessage($payload, $welcomeMessage);
+if ($welcomeMessage !== null) {
+    if (!pmssWelcomeUserMessageSet($user['name'], $expectedHome, $welcomeMessage)) {
+        fwrite(STDERR, "Warning: failed to persist welcome message for {$user['name']}\n");
+    }
+    $payload = pmssUserConfigClearWelcomeMessage($payload);
+}
 
 if (!$store->persist($user['name'], $payload)) {
     fwrite(STDERR, "Warning: failed to persist user config for {$user['name']}\n");

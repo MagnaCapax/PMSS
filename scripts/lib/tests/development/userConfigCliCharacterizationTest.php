@@ -108,12 +108,13 @@ class userConfigCliCharacterizationTest extends TestCase
         $this->assertSame(0, $payload['trafficLimit']);
     }
 
-    public function testApplyWelcomeMessageSetsAndClearsBanner(): void
+    public function testClearWelcomeMessageRemovesLegacyBannerKey(): void
     {
-        $withBanner = \pmssUserConfigApplyWelcomeMessage(['quota' => 100], '<b>Hello</b>');
-        $this->assertSame('<b>Hello</b>', $withBanner['welcomeMessage']);
+        $withoutBanner = \pmssUserConfigClearWelcomeMessage([
+            'quota' => 100,
+            'welcomeMessage' => '<b>Hello</b>',
+        ]);
 
-        $withoutBanner = \pmssUserConfigApplyWelcomeMessage($withBanner, '   ');
         $this->assertFalse(array_key_exists('welcomeMessage', $withoutBanner));
         $this->assertSame(100, $withoutBanner['quota']);
     }

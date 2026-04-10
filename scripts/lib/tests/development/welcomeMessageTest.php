@@ -26,8 +26,9 @@ class WelcomeMessageTest extends TestCase
             $home = $this->makeUserHome();
             @file_put_contents(
                 $home.'/.config/pmss-user.json',
-                json_encode(['welcomeMessage' => '<p>Hello {{username}} / {{quota}}</p>', 'product' => 'free'], JSON_UNESCAPED_SLASHES)
+                json_encode(['product' => 'free'], JSON_UNESCAPED_SLASHES)
             );
+            @file_put_contents($home.'/.config/welcome-message.html', '<p>Hello {{username}} / {{quota}}</p>');
             @file_put_contents($this->tempDir.'/welcomeMessages.json', json_encode(['free' => '<p>fallback</p>'], JSON_UNESCAPED_SLASHES));
 
             $message = \pmssWelcomeMessageForUser(['totalSpace' => 214748364800], $home, 'alice', $this->tempDir.'/welcomeMessages.json');
@@ -119,10 +120,39 @@ class WelcomeMessageTest extends TestCase
     public function testSubstitutionsAreEscaped(): void
     {
             $home = $this->makeUserHome();
-            @file_put_contents($home.'/.config/pmss-user.json', json_encode(['welcomeMessage' => 'user={{username}}'], JSON_UNESCAPED_SLASHES));
+            @file_put_contents($home.'/.config/pmss-user.json', json_encode([], JSON_UNESCAPED_SLASHES));
+            @file_put_contents($home.'/.config/welcome-message.html', 'user={{username}}');
 
             $message = \pmssWelcomeMessageForUser([], $home, '<script>alert(1)</script>', $this->tempDir.'/missing.json');
             $this->assertEquals('user=&lt;script&gt;alert(1)&lt;/script&gt;', $message);
+    }
+
+    public function testLegacyEmbeddedMessageRemainsReadableForBackCompat(): void
+    {
+            $home = $this->makeUserHome();
+            @file_put_contents(
+                $home.'/.config/pmss-user.json',
+                json_encode(['welcomeMessage' => '<p>legacy {{username}}</p>'], JSON_UNESCAPED_SLASHES)
+            );
+
+            $message = \pmssWelcomeMessageForUser([], $home, 'alice', $this->tempDir.'/missing.json');
+            $this->assertEquals('<p>legacy alice</p>', $message);
+    }
+
+    public function testManagedUserMessageFileReadWriteAndClearRoundTrip(): void
+    {
+            $home = $this->makeUserHome();
+
+            $this->assertTrue(\pmssWelcomeUserMessageSet('alice', $home, '<p>hello</p>'));
+            $this->assertEquals('<p>hello</p>', \pmssWelcomeUserMessageRead($home));
+
+            $path = \pmssWelcomeUserMessagePath($home);
+            $this->assertSame($home.'/.config/welcome-message.html', $path);
+            $this->assertTrue(is_file($path));
+
+            $this->assertTrue(\pmssWelcomeUserMessageSet('alice', $home, '   '));
+            $this->assertEquals('', \pmssWelcomeUserMessageRead($home));
+            $this->assertFalse(is_file($path));
     }
 
     public function testMissingConfigurationReturnsEmptyMessage(): void

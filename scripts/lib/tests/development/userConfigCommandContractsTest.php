@@ -123,7 +123,8 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("pmssUserConfigApplyWelcomeMessage(\$payload, \$welcomeMessage)", $source);
+        $this->assertStringContainsString("pmssWelcomeUserMessageSet(\$user['name'], \$expectedHome, \$welcomeMessage)", $source);
+        $this->assertStringContainsString("pmssUserConfigClearWelcomeMessage(\$payload)", $source);
         $this->assertStringContainsString("\$store->persist(\$user['name'], \$payload)", $source);
         $this->assertTrue(
             strpos($source, 'writeUserCache(') === false,

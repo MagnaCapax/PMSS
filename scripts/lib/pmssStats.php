@@ -53,6 +53,29 @@ function pmssStatsContextDefaultHome(string $user): string
 }
 
 /**
+ * Prefer explicit PMSS overrides before falling back to the shell HOME.
+ */
+function pmssStatsContextHomeCandidate(array $overrides, string $defaultHome): string
+{
+    if (array_key_exists('home', $overrides)) {
+        return (string) $overrides['home'];
+    }
+
+    $statsHome = getenv('PMSS_STATS_HOME');
+    if (is_string($statsHome) && trim($statsHome) !== '') {
+        return $statsHome;
+    }
+
+    $statsUser = array_key_exists('user', $overrides) ? $overrides['user'] : getenv('PMSS_STATS_USER');
+    if (is_string($statsUser) && trim($statsUser) !== '') {
+        return $defaultHome;
+    }
+
+    $shellHome = getenv('HOME');
+    return (is_string($shellHome) && trim($shellHome) !== '') ? $shellHome : $defaultHome;
+}
+
+/**
  * Resolve one stats path override while rejecting malformed or relative input.
  */
 function pmssStatsContextPathResolve($candidate, string $default, bool $directoryPath = false): string
@@ -88,7 +111,7 @@ function pmssStatsResolveContext(array $overrides = []): array
 
     $defaultHome = pmssStatsContextDefaultHome($user);
     $home = pmssStatsContextPathResolve(
-        $overrides['home'] ?? getenv('PMSS_STATS_HOME') ?: getenv('HOME') ?: $defaultHome,
+        pmssStatsContextHomeCandidate($overrides, $defaultHome),
         $defaultHome,
         true
     );

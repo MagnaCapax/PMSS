@@ -107,16 +107,10 @@ function pmssUserConfigCliApplyPersistedResources(array $payload, array $user, a
     return $payload;
 }
 
-/** @return array<string,mixed> Apply or clear the per-user welcome banner. */
-function pmssUserConfigApplyWelcomeMessage(array $payload, ?string $welcomeMessage): array
+/** @return array<string,mixed> Remove the legacy embedded welcome banner from config. */
+function pmssUserConfigClearWelcomeMessage(array $payload): array
 {
-    if ($welcomeMessage !== null) {
-        if (trim($welcomeMessage) === '') {
-            unset($payload['welcomeMessage']);
-        } else {
-            $payload['welcomeMessage'] = $welcomeMessage;
-        }
-    }
+    unset($payload['welcomeMessage']);
     return $payload;
 }
 

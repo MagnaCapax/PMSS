@@ -24,7 +24,7 @@ Parameters:
 - **CPU_QUOTA_PERCENT** (optional) – systemd CPUQuota percentage (e.g., 85 for 85%); omit to leave unchanged/inherit slice baseline
 - **TRAFFIC_CAP_MBIT** (optional) – traffic shaper ceiling in Mbit/s
 - **--upload-throttle-kib=KIB** (optional) – per-user torrent upload limit in KiB/s (0 removes the throttle file)
-- **--welcome-message=HTML** (optional) – per-user welcome page message override (empty value clears it)
+- **--welcome-message=HTML** (optional) – per-user welcome page message override stored in `~/.config/welcome-message.html` (empty value clears it)
 - **--docker-enabled=true|false** (optional) – explicit rootless Docker policy written to the per-user config store
 
 The script rewrites rTorrent and ruTorrent configs, applies disk quota changes and restarts the user's rTorrent process.

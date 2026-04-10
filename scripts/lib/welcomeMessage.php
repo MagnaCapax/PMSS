@@ -70,6 +70,66 @@ function pmssWelcomeProductMessageSet(
 }
 
 /**
+ * Resolve the per-user welcome-message override path.
+ */
+function pmssWelcomeUserMessagePath(string $userHome): string
+{
+    return rtrim($userHome, '/').'/.config/welcome-message.html';
+}
+
+/**
+ * Read a per-user welcome-message override from the managed file path.
+ */
+function pmssWelcomeUserMessageRead(string $userHome): string
+{
+    $path = pmssWelcomeUserMessagePath($userHome);
+    if (!function_exists('pmssUserFilePathIsSafe') || !pmssUserFilePathIsSafe($path) || !is_file($path) || is_link($path)) {
+        return '';
+    }
+
+    $content = @file_get_contents($path);
+    return (is_string($content) && trim($content) !== '') ? $content : '';
+}
+
+/**
+ * Persist or clear a per-user welcome-message override beside other local config.
+ */
+function pmssWelcomeUserMessageSet(string $username, string $userHome, string $template): bool
+{
+    $username = trim($username);
+    $userHome = rtrim($userHome, '/');
+    if ($username === '' || $userHome === '') {
+        return false;
+    }
+
+    $path = pmssWelcomeUserMessagePath($userHome);
+    if (trim($template) === '') {
+        return !is_link($path) && (!is_file($path) || @unlink($path));
+    }
+
+    $configDir = $userHome.'/.config';
+    if (!function_exists('pmssEnsureSafeDir') || !pmssEnsureSafeDir($configDir, 0755)) {
+        return false;
+    }
+    if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+        @chown($configDir, $username);
+        @chgrp($configDir, $username);
+    }
+
+    return function_exists('pmssReplaceUserFile')
+        && pmssReplaceUserFile(
+            $path,
+            $template,
+            static function (string $temporaryPath) use ($username): void {
+                @chmod($temporaryPath, 0640);
+                if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
+                    @chgrp($temporaryPath, $username);
+                }
+            }
+        );
+}
+
+/**
  * Resolve and render the contextual welcome message for a user.
  */
 function pmssWelcomeMessageForUser(
@@ -90,9 +150,12 @@ function pmssWelcomeMessageForUser(
         $productKey = trim((string) @file_get_contents($productFile));
     }
 
-    $template = is_string($userConfig['welcomeMessage'] ?? null) && trim($userConfig['welcomeMessage']) !== ''
-        ? $userConfig['welcomeMessage']
-        : '';
+    $template = pmssWelcomeUserMessageRead($userHome);
+    if ($template === '') {
+        $template = is_string($userConfig['welcomeMessage'] ?? null) && trim($userConfig['welcomeMessage']) !== ''
+            ? $userConfig['welcomeMessage']
+            : '';
+    }
     if ($template === '' && $productKey !== '') {
         $messageMap = pmssWelcomeProductMessageMap(pmssWelcomeReadJson($productMessagesPath));
         if (!is_string($template = $messageMap[$productKey] ?? null)) {
