@@ -2,9 +2,7 @@
 set -euo pipefail
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
-
-ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 
 # Syntax-only lint to catch parse errors under older PHP (e.g., 7.3 on Debian 10).
 # Do not run dev tests here — they may rely on newer PHP features.

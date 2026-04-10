@@ -5,9 +5,7 @@ set -euo pipefail
 # Applies to all tracked *.php files (vendor excluded by git ls-files).
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
-
-ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
 mapfile -d '' PHP_FILES < <(pmss_testing_list_tracked_php_files "$ROOT_DIR")
 
 echo "[short-open-tag-lint] scanning ${#PHP_FILES[@]} PHP files" >&2
