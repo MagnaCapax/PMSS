@@ -429,6 +429,33 @@ if (!function_exists('pmssUserTrafficLimitCli')) {
     }
 }
 
+if (!function_exists('pmssUserBonusTrafficCli')) {
+    /**
+     * Reuse the shared GiB-setting CLI for per-user bonus traffic.
+     */
+    function pmssUserBonusTrafficCli(array $argv): int
+    {
+        return pmssUserGiBSettingCli($argv, [
+            'usage'               => pmssUserGiBSettingUsageText(
+                'userBonusTraffic.php',
+                'bonus',
+                'Bonus unit is GiB (monthly quota add-on).',
+                'Use 0 (or --unset) to remove the bonus.'
+            ),
+            'valueOption'         => 'bonus',
+            'valueShortOption'    => 'b',
+            'subjectLabel'        => 'Bonus traffic',
+            'setPreposition'      => 'to',
+            'invalidOptionLabel'  => '--bonus',
+            'setLogTemplate'      => 'bonus traffic set to %d GiB (monthly add-on)',
+            'unsetLogMessage'     => 'bonus traffic unset (GiB add-on removed)',
+            'targetModesResolver' => static function (string $userName, string $homeDir): array {
+                return [$homeDir.'/.bonusTraffic' => 0664];
+            },
+        ]);
+    }
+}
+
 if (!function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
     /**
      * Compute progressive post-cap throttling in Mbit based on overage.

@@ -63,17 +63,22 @@ final class BonusTrafficTest extends TestCase
         $this->assertEquals([['alice', 'bonus traffic unset (GiB add-on removed)']], $result['logs']);
     }
 
-    public function testLibraryKeepsBonusFileOpsOnSharedTrafficHelpers(): void
+    public function testBonusTrafficCliLivesInSharedTrafficLimitLibrary(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/user/bonusTraffic.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/user/trafficLimit.php');
 
+        $this->assertStringContainsString('function pmssUserBonusTrafficCli(array $argv): int', $source);
         $this->assertStringContainsString('pmssUserGiBSettingCli($argv, [', $source);
         $this->assertStringContainsString("'valueOption'         => 'bonus'", $source);
         $this->assertStringContainsString("'targetModesResolver' => static function", $source);
         $this->pmssAssertStringNotContainsString('function '.'pmssBonusTraffic'.'ReadGiB(', $source);
         $this->pmssAssertStringNotContainsString('function '.'pmssBonusTraffic'.'WriteGiB(', $source);
         $this->pmssAssertStringNotContainsString('function '.'pmssBonusTraffic'.'Remove(', $source);
-        $this->pmssAssertStringNotContainsString('pmssParseCliTokens($argv)', $source);
+
+        $shimSource = $this->pmssReadRepoFile('scripts/lib/user/bonusTraffic.php');
+        $this->assertStringContainsString("require_once __DIR__.'/trafficLimit.php';", $shimSource);
+        $this->pmssAssertStringNotContainsString('function pmssUserBonusTrafficCli(array $argv): int', $shimSource);
+        $this->pmssAssertStringNotContainsString('pmssParseCliTokens($argv)', $shimSource);
     }
 
     /**

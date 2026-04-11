@@ -30,8 +30,9 @@ class BonusTrafficCliTextTest extends TestCase
         );
     }
 
-    public function testBonusLibraryBuildsUsageFromSharedHelper(): void
+    public function testBonusUsageBuilderLivesInSharedTrafficLimitLibrary(): void
     {
-        $this->pmssAssertRepoFileContainsString('scripts/lib/user/bonusTraffic.php', 'pmssUserGiBSettingUsageText(');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/trafficLimit.php', 'pmssUserGiBSettingUsageText(');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/bonusTraffic.php', "require_once __DIR__.'/trafficLimit.php';");
     }
 }
