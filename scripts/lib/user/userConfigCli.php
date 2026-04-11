@@ -10,6 +10,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/../cli/helpText.php';
+
 /** @return array<string,array<string,mixed>> Shared resource option specification. */
 function pmssUserConfigCliResourceSpecs(): array
 {
@@ -143,4 +145,102 @@ function pmssUserConfigCliBuildCgroupResourceArgs(array $user): array
         }
     }
     return $args;
+}
+
+/** @return array<string,array<string,string>> Human-facing descriptions for shared resource knobs. */
+function pmssUserConfigCliResourceHelpSpecs(): array
+{
+    return [
+        'trafficLimit' => [
+            'parameter' => 'TRAFFIC_LIMIT_GB',
+            'parameterDescription' => 'Monthly traffic quota in GiB.',
+            'optionDescription' => 'Monthly traffic quota in GiB.',
+        ],
+        'trafficCapMbit' => [
+            'parameter' => 'TRAFFIC_CAP_MBIT',
+            'parameterDescription' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.',
+            'optionDescription' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.',
+        ],
+        'CPUWeight' => [
+            'parameter' => 'CPUWEIGHT',
+            'parameterDescription' => 'systemd CPUWeight; systemd expects 1-10000.',
+            'optionDescription' => 'systemd CPUWeight; systemd expects 1-10000.',
+        ],
+        'IOWeight' => [
+            'parameter' => 'IOWEIGHT',
+            'parameterDescription' => 'systemd IOWeight; systemd expects 1-10000.',
+            'optionDescription' => 'systemd IOWeight; systemd expects 1-10000.',
+        ],
+        'IOReadBW' => [
+            'parameter' => 'IO_READ_BW',
+            'parameterDescription' => 'Read bandwidth cap in /dev/DEVICE:RATE form.',
+            'optionDescription' => 'Read bandwidth cap in /dev/DEVICE:RATE form.',
+        ],
+        'IOWriteBW' => [
+            'parameter' => 'IO_WRITE_BW',
+            'parameterDescription' => 'Write bandwidth cap in /dev/DEVICE:RATE form.',
+            'optionDescription' => 'Write bandwidth cap in /dev/DEVICE:RATE form.',
+        ],
+        'IOReadIOPS' => [
+            'parameter' => 'IO_READ_IOPS',
+            'parameterDescription' => 'Read IOPS cap in /dev/DEVICE:IOPS form.',
+            'optionDescription' => 'Read IOPS cap in /dev/DEVICE:IOPS form.',
+        ],
+        'IOWriteIOPS' => [
+            'parameter' => 'IO_WRITE_IOPS',
+            'parameterDescription' => 'Write IOPS cap in /dev/DEVICE:IOPS form.',
+            'optionDescription' => 'Write IOPS cap in /dev/DEVICE:IOPS form.',
+        ],
+        'cpuQuotaPercent' => [
+            'parameter' => 'CPU_QUOTA_PERCENT',
+            'parameterDescription' => 'CPU quota percent; use infinity to remove the limit.',
+            'optionDescription' => 'CPU quota percent; use infinity to remove the limit.',
+        ],
+    ];
+}
+
+/** Render the canonical userConfig.php help output. */
+function pmssUserConfigCliUsage(): string
+{
+    $useColor = pmssCliHelpSupportsColor();
+    $resourceHelp = pmssUserConfigCliResourceHelpSpecs();
+    $derivedDefault = pmssCliHelpDim(' (default: auto-derived from RAM when omitted)', $useColor);
+    $unchangedDefault = pmssCliHelpDim(' (default: leave current slice policy unchanged)', $useColor);
+    $lines = [
+        pmssCliHelpHeading('Usage', $useColor),
+        '  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]',
+        '  ./userConfig.php USERNAME --welcome-message=HTML',
+        '',
+        pmssCliHelpHeading('Positional Parameters', $useColor),
+        pmssCliHelpLine('USERNAME', 'Existing PMSS username; lowercase [a-z][a-z0-9]{2,7}.'),
+        pmssCliHelpLine('RAM_MiB', 'Account RAM target in MiB; forwarded as MemoryHigh with a 250 MiB floor.'),
+        pmssCliHelpLine('DISK_QUOTA_GiB', 'Disk quota in GiB.'),
+        pmssCliHelpLine($resourceHelp['trafficLimit']['parameter'], $resourceHelp['trafficLimit']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['CPUWeight']['parameter'], $resourceHelp['CPUWeight']['parameterDescription'].$derivedDefault),
+        pmssCliHelpLine($resourceHelp['IOWeight']['parameter'], $resourceHelp['IOWeight']['parameterDescription'].$derivedDefault),
+        pmssCliHelpLine($resourceHelp['IOReadBW']['parameter'], $resourceHelp['IOReadBW']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['IOWriteBW']['parameter'], $resourceHelp['IOWriteBW']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['IOReadIOPS']['parameter'], $resourceHelp['IOReadIOPS']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['IOWriteIOPS']['parameter'], $resourceHelp['IOWriteIOPS']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['cpuQuotaPercent']['parameter'], $resourceHelp['cpuQuotaPercent']['parameterDescription'].$unchangedDefault),
+        pmssCliHelpLine($resourceHelp['trafficCapMbit']['parameter'], $resourceHelp['trafficCapMbit']['parameterDescription']),
+        '',
+        pmssCliHelpHeading('Named Options', $useColor),
+        pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
+        pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
+        pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),
+        pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
+        '',
+        pmssCliHelpHeading('Examples', $useColor),
+        '  /scripts/util/userConfig.php alice 1024 200',
+        '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 --upload-throttle-kib=2048 --docker-enabled=true',
+        '  /scripts/util/userConfig.php alice --welcome-message=<p>Planned maintenance tonight.</p>',
+        '',
+        pmssCliHelpHeading('Notes', $useColor),
+        '  - RAM_MiB is applied through userConfigCgroup.php as MemoryHigh; PMSS clamps the effective floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.',
+        '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.',
+        '  - For targeted slice-only edits, use /scripts/util/userConfigCgroup.php directly.',
+    ];
+
+    return implode("\n", $lines);
 }

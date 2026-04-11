@@ -18,24 +18,53 @@ require_once __DIR__.'/../userConfigCli.php';
  */
 function pmssAddUserCliUsage(): string
 {
-    $resourceLines = array_map(static function (array $spec): string {
-        return '  '.$spec['usage'];
-    }, array_values(pmssUserConfigCliResourceSpecs()));
-    return implode("\n", array_merge([
-        'Usage:',
+    $useColor = pmssCliHelpSupportsColor();
+    $resourceSpecs = pmssUserConfigCliResourceSpecs();
+    $resourceHelp = pmssUserConfigCliResourceHelpSpecs();
+    $derivedDefault = pmssCliHelpDim(' (default: auto-derived from RAM when omitted)', $useColor);
+    $lines = [
+        pmssCliHelpHeading('Usage', $useColor),
         '  addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [TRAFFIC_CAP_MBIT] [UPLOAD_THROTTLE_KIB]',
         '  addUser.php --user=USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=DISK_QUOTA_GiB [RESOURCE_OPTIONS]',
         '',
-        'Resource options:',
-        $resourceLines[0],
-        $resourceLines[1],
-        '  --upload-throttle-kib=KIB',
-    ], array_slice($resourceLines, 2), [
-        '  --docker-enabled=true|false',
+        pmssCliHelpHeading('Positional Parameters', $useColor),
+        pmssCliHelpLine('USERNAME', 'New PMSS username; lowercase [a-z][a-z0-9]{2,7}.'),
+        pmssCliHelpLine('PASSWORD', 'Initial password; use rand to generate one automatically.'),
+        pmssCliHelpLine('RAM_MiB', 'Account RAM target in MiB; forwarded as MemoryHigh with a 250 MiB floor.'),
+        pmssCliHelpLine('DISK_QUOTA_GiB', 'Disk quota in GiB.'),
+        pmssCliHelpLine($resourceHelp['trafficLimit']['parameter'], $resourceHelp['trafficLimit']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['trafficCapMbit']['parameter'], $resourceHelp['trafficCapMbit']['parameterDescription']),
+        pmssCliHelpLine('UPLOAD_THROTTLE_KIB', 'Torrent upload throttle in KiB/s; 0 removes it.'),
         '',
-        'Other options:',
-        '  -h, --help',
-    ]));
+        pmssCliHelpHeading('Named Options', $useColor),
+        pmssCliHelpLine('--user=USERNAME', 'Same as the first positional username.'),
+        pmssCliHelpLine('--password=PASSWORD', 'Same as the second positional password.'),
+        pmssCliHelpLine('--ram-mib=RAM_MiB', 'Same as the RAM positional argument.'),
+        pmssCliHelpLine('--disk-quota-gib=DISK_QUOTA_GiB', 'Same as the disk quota positional argument.'),
+        pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['optionDescription']),
+        pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
+        pmssCliHelpLine($resourceSpecs['CPUWeight']['usage'], $resourceHelp['CPUWeight']['optionDescription'].$derivedDefault),
+        pmssCliHelpLine($resourceSpecs['IOWeight']['usage'], $resourceHelp['IOWeight']['optionDescription'].$derivedDefault),
+        pmssCliHelpLine($resourceSpecs['IOReadBW']['usage'], $resourceHelp['IOReadBW']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['IOWriteBW']['usage'], $resourceHelp['IOWriteBW']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['IOReadIOPS']['usage'], $resourceHelp['IOReadIOPS']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['IOWriteIOPS']['usage'], $resourceHelp['IOWriteIOPS']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['cpuQuotaPercent']['usage'], $resourceHelp['cpuQuotaPercent']['optionDescription']),
+        pmssCliHelpLine('--docker-enabled=true|false', 'Persist the initial rootless Docker policy.'),
+        pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
+        '',
+        pmssCliHelpHeading('Examples', $useColor),
+        '  /scripts/addUser.php alice rand 1024 200',
+        '  /scripts/addUser.php --user=alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --upload-throttle-kib=2048 --docker-enabled=true',
+        '',
+        pmssCliHelpHeading('Notes', $useColor),
+        '  - Named options override legacy positional values, so automation can skip intermediate optional slots safely.',
+        '  - RAM_MiB is applied through userConfig.php and then userConfigCgroup.php; PMSS clamps the effective MemoryHigh floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.',
+        '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.',
+    ];
+
+    return implode("\n", $lines);
 }
 
 /**

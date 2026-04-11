@@ -23,7 +23,7 @@ class addUserCliTest extends TestCase
         $cli = \pmssAddUserParseCli(['addUser.php', '--help']);
 
         $this->assertTrue($cli['help'] === true, 'help mode should be explicit');
-        $this->assertStringContainsString('Usage:', $cli['usage']);
+        $this->assertStringContainsAllStrings(['Usage', 'Positional Parameters', 'Named Options', 'Examples'], $cli['usage']);
     }
 
     public function testLegacyPositionalArgumentsRemainSupported(): void

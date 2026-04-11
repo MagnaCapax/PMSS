@@ -75,15 +75,16 @@ class userConfigCommandContractsTest extends TestCase
     {
         $usage = $this->pmssRunRepoPhpScript('scripts/util/userConfig.php');
 
-        $this->assertSame(
-            "Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]\n"
-            ."   or: ./userConfig.php USERNAME --welcome-message=HTML\n\n"
-            ."Options:\n"
-            ."  --upload-throttle-kib=KIB          Per-user torrent upload limit\n"
-            ."  --welcome-message=HTML             Per-user welcome page message (empty to clear)\n"
-            ."  --docker-enabled=true|false        Rootless Docker policy\n",
-            $usage
-        );
+        $this->assertStringContainsAllStrings([
+            'Usage',
+            './userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB',
+            './userConfig.php USERNAME --welcome-message=HTML',
+            'Positional Parameters',
+            'Named Options',
+            '--upload-throttle-kib=KIB',
+            '--docker-enabled=true|false',
+            'Examples',
+        ], $usage);
     }
 
     public function testRootlessDockerProvisioningContractRemainsStable(): void

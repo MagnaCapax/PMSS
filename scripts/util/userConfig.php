@@ -26,18 +26,18 @@ require_once __DIR__.'/../lib/welcomeMessage.php';
 /**
  * Main entry point for user configuration changes.
  */
-$usage = 'Usage: ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]';
-$usage .= "\n   or: ./userConfig.php USERNAME --welcome-message=HTML";
-$usage .= "\n\nOptions:";
-$usage .= "\n  --upload-throttle-kib=KIB          Per-user torrent upload limit";
-$usage .= "\n  --welcome-message=HTML             Per-user welcome page message (empty to clear)";
-$usage .= "\n  --docker-enabled=true|false        Rootless Docker policy";
+$usage = pmssUserConfigCliUsage();
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled']);
+$helpRequested = pmssCliOption($parsed, 'help', 'h', false) !== false;
 $args = array_merge([''], $parsed['arguments']);
+if ($helpRequested) {
+    echo $usage."\n";
+    exit(0);
+}
 $welcomeMessage = pmssCliOption($parsed, 'welcome-message');
 $welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null : (string) $welcomeMessage;
 try {
-    $uploadThrottleKib = pmssUserConfigCliParseUploadThrottleOption(pmssCliOption($parsed, 'upload-throttle-kib'));
+$uploadThrottleKib = pmssUserConfigCliParseUploadThrottleOption(pmssCliOption($parsed, 'upload-throttle-kib'));
     $dockerEnabled = pmssUserConfigParseDockerEnabledOption(pmssCliOption($parsed, 'docker-enabled'));
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage()."\n");

@@ -9,6 +9,7 @@
 namespace PMSS\Cgroup;
 
 require_once __DIR__ . '/SystemInterface.php';
+require_once __DIR__ . '/../cli/helpText.php';
 require_once __DIR__ . '/../systemdSliceProperties.php';
 require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 
@@ -26,8 +27,12 @@ class Manager
     {
         $args = $argv;
         array_shift($args); // remove script name
+        if (in_array('--help', $args, true) || in_array('-h', $args, true)) {
+            echo $this->usageText()."\n";
+            return 0;
+        }
         if (count($args) === 0) {
-            fwrite(STDERR, "Usage: /scripts/util/userConfigCgroup.php USERNAME [--status] [--config] [--apply] [--dry-run] [--cpu-weight N] [--io-weight N] [--tasks-max N] [--memory-high MiB] [--memory-max MiB] [--cpu-quota-percent N]\n");
+            fwrite(STDERR, $this->usageText()."\n");
             return 2;
         }
 
@@ -599,6 +604,57 @@ class Manager
         $props = ['CPUWeight','IOWeight','MemoryAccounting','CPUAccounting','IOAccounting','MemoryHigh','MemoryMax','TasksMax','CPUQuotaPerSecUSec','CPUQuotaPeriodUSec'];
         $out = $this->sys->execute(\pmssBuildSystemdShowCommand($slice, $props));
         echo $out !== null ? trim($out)."\n" : "(no data)\n";
+    }
+
+    private function usageText(): string
+    {
+        $useColor = \pmssCliHelpSupportsColor();
+        $derivedDefault = \pmssCliHelpDim(' (default: derive from MemoryHigh when omitted)', $useColor);
+        $lines = [
+            \pmssCliHelpHeading('Usage', $useColor),
+            '  /scripts/util/userConfigCgroup.php USERNAME [--status] [--config]',
+            '  /scripts/util/userConfigCgroup.php USERNAME --apply [--dry-run] [--defaults] [--respect-existing] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N|infinity] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:RATE] [--io-write-bw=/dev/DEV:RATE] [--io-read-iops=/dev/DEV:IOPS] [--io-write-iops=/dev/DEV:IOPS] [--wipe]',
+            '',
+            \pmssCliHelpHeading('Actions', $useColor),
+            \pmssCliHelpLine('--status', 'Show live slice counters from cgroupfs.'),
+            \pmssCliHelpLine('--config', 'Show the current systemd slice properties.'),
+            \pmssCliHelpLine('--apply', 'Apply the requested plan to the user slice.'),
+            \pmssCliHelpLine('--dry-run', 'Print the planned properties without changing the system.'),
+            \pmssCliHelpLine('--wipe', 'Reset the slice back to the PMSS baseline.'),
+            '',
+            \pmssCliHelpHeading('Resource Options', $useColor),
+            \pmssCliHelpLine('--memory-high=MiB', 'MemoryHigh target in MiB; effective minimum is 250 MiB.'),
+            \pmssCliHelpLine('--memory-max=MiB', 'MemoryMax target in MiB; capped to High + 2048 MiB.'),
+            \pmssCliHelpLine('--cpu-weight=N', 'systemd CPUWeight; systemd expects 1-10000.'.$derivedDefault),
+            \pmssCliHelpLine('--io-weight=N', 'systemd IOWeight; systemd expects 1-10000.'.$derivedDefault),
+            \pmssCliHelpLine('--tasks-max=N', 'Process limit for the user slice; use a positive integer.'),
+            \pmssCliHelpLine('--cpu-quota-percent=N|infinity', 'CPU quota percent; use 0 or infinity to remove the cap.'),
+            \pmssCliHelpLine('--device=/dev/DEV|/home', 'Device selector for IO profiles and shorthand resolution.'),
+            \pmssCliHelpLine('--io-profile=hdd|nvme|bulk', 'Apply a named IO profile to the selected device.'),
+            \pmssCliHelpLine('--io-read-bw=/dev/DEV:RATE', 'Explicit read bandwidth cap, e.g. /dev/sda:20M.'),
+            \pmssCliHelpLine('--io-write-bw=/dev/DEV:RATE', 'Explicit write bandwidth cap, e.g. /dev/sda:20M.'),
+            \pmssCliHelpLine('--io-read-iops=/dev/DEV:IOPS', 'Explicit read IOPS cap, e.g. /dev/sda:500.'),
+            \pmssCliHelpLine('--io-write-iops=/dev/DEV:IOPS', 'Explicit write IOPS cap, e.g. /dev/sda:500.'),
+            '',
+            \pmssCliHelpHeading('Profiles', $useColor),
+            \pmssCliHelpLine('--defaults', 'Load PMSS policy defaults before applying explicit overrides.'),
+            \pmssCliHelpLine('--respect-existing', 'Keep live properties when neither flags nor defaults set them.'),
+            \pmssCliHelpLine('--cpu-profile=<name>', 'Apply a named CPU profile from cgroup.policy.php.'),
+            \pmssCliHelpLine('--mem-profile=<name>', 'Apply a named memory profile from cgroup.policy.php.'),
+            \pmssCliHelpLine('--tasks-profile=<name>', 'Apply a named TasksMax profile from cgroup.policy.php.'),
+            \pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
+            '',
+            \pmssCliHelpHeading('Examples', $useColor),
+            '  /scripts/util/userConfigCgroup.php alice --status --config',
+            '  /scripts/util/userConfigCgroup.php alice --apply --dry-run --memory-high=1024 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=125',
+            '  /scripts/util/userConfigCgroup.php alice --apply --defaults --device=/home --io-profile=hdd',
+            '',
+            \pmssCliHelpHeading('Notes', $useColor),
+            '  - Help is available without needing a real user lookup; normal runs still require an existing passwd entry.',
+            '  - MemoryHigh below 250 MiB is raised to the PMSS floor before applying properties.',
+        ];
+
+        return implode("\n", $lines);
     }
 
     private function showStatus(string $slice, int $uid): void
