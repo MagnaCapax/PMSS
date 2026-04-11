@@ -2,6 +2,9 @@
 # Shared helpers for Codex-oriented CLI wrappers.
 # Keep lightweight and dependency-free so scripts can source this safely.
 
+# Initialize ROOT from a launcher path and optionally chdir.
+codex_init_root() { ROOT="$(cd "$1/.." && pwd)"; [[ "${2:-0}" == "1" ]] && cd "$ROOT"; }
+
 # Enable bash -x tracing when the given env var is set to 1.
 codex_enable_debug() {
 	local env_var="$1" prefix="$2"

@@ -3,9 +3,9 @@ set -euo pipefail
 set -o errtrace
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/.." && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
+codex_init_root "$HERE"
 
 # Optional debug: PMSS_REFACTOR_CODEX_DEBUG=1 enables bash -x tracing.
 codex_enable_debug PMSS_REFACTOR_CODEX_DEBUG "agentic-refactor"

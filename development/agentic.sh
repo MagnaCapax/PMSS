@@ -3,9 +3,9 @@ set -euo pipefail
 set -o errtrace
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/.." && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/lib/codex-common.sh"
+codex_init_root "$HERE"
 
 codex_enable_debug PMSS_AGENTIC_DEBUG "agentic"
 codex_set_error_trap "agentic"
