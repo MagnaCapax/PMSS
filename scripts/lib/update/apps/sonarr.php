@@ -15,11 +15,4 @@ require_once __DIR__.'/arr.php';
 @unlink('/etc/apt/sources.list.d/sonarr.list');
 @passthru('apt-key del 0xA236C58F409091A18ACA53CBEBFF6B99D9B78493 2>/dev/null');
 
-pmssArrUpdate([
-    'app'            => 'Sonarr',
-    'install_path'   => '/opt/Sonarr',
-    'releases_url'   => 'https://api.github.com/repos/Sonarr/Sonarr/releases',
-    'asset_pattern'  => '/Sonarr\.(?:main|develop)\.([0-9.]+).*linux.*tar\.gz/i',
-    'extract_dir'    => 'Sonarr',
-    'user_agent'     => 'PMSS-Sonarr',
-]);
+pmssArrUpdateApp('Sonarr');

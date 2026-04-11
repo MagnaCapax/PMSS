@@ -43,6 +43,38 @@ function pmssArrAssetArchitectureTokens(): array
     return ['x64', 'amd64'];
 }
 
+/** Build the canonical updater config for a supported Starr-family app. */
+function pmssArrAppConfig(string $app): ?array
+{
+    $branches = ['Lidarr' => 'develop|master', 'Prowlarr' => 'develop|master', 'Radarr' => 'develop|master', 'Readarr' => 'develop|master', 'Sonarr' => 'main|develop'];
+    if (!isset($branches[$app])) {
+        return null;
+    }
+
+    return [
+        'app' => $app,
+        'install_path' => '/opt/'.$app,
+        'releases_url' => 'https://api.github.com/repos/'.$app.'/'.$app.'/releases',
+        'asset_pattern' => sprintf('/%s\\.(?:%s)\\.([0-9.]+).*linux.*tar\\.gz/i', preg_quote($app, '/'), $branches[$app]),
+        'extract_dir' => $app,
+        'user_agent' => 'PMSS-'.$app,
+    ];
+}
+
+/** Run the updater for a supported Starr-family app preset. */
+function pmssArrUpdateApp(string $app): void
+{
+    $config = pmssArrAppConfig($app);
+    if ($config === null) {
+        if (defined('STDERR')) {
+            fwrite(STDERR, 'ARR updater: unknown app preset '.$app.', skipping.'.PHP_EOL);
+        }
+        return;
+    }
+
+    pmssArrUpdate($config);
+}
+
 /**
  * Reject config values that could break shell/file boundaries.
  */
