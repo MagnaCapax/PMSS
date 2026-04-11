@@ -126,7 +126,7 @@ foreach ([
 }
 
 define('PMSS_TEST_MODE', true);
-require_once dirname(__DIR__, 3).'/update.php';
+require_once __DIR__.'/../common/updateBootstrapShim.php';
 
 $testFiles = glob(__DIR__.'/*Test.php') ?: [];
 $repoRoot = dirname(__DIR__, 4);

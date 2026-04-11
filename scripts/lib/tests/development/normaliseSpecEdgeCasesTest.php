@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 // Cover additional edge cases for spec parsing in scripts/update.php
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/update.php';
+require_once __DIR__.'/../common/updateBootstrapShim.php';
 
 class NormaliseSpecEdgeCasesTest extends TestCase
 {

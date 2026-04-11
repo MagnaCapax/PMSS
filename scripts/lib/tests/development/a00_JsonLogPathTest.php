@@ -3,7 +3,7 @@ namespace PMSS\Tests;
 
 // Ensure the JSON log path reads from env on first call and logging writes a line
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 3).'/update.php';
+require_once __DIR__.'/../common/updateBootstrapShim.php';
 require_once dirname(__DIR__, 2).'/update.php';
 
 class A00_JsonLogPathTest extends TestCase

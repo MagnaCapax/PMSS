@@ -48,7 +48,7 @@ class UpdateBootstrapLockReleaseTest extends TestCase
     /** @return array{rc:int, output:string, lines:array<int, string>} */
     private function runBootstrapInline(string $script): array
     {
-        $libraryPath = dirname(__DIR__, 3).'/update.php';
+        $libraryPath = dirname(__DIR__).'/common/updateBootstrapShim.php';
         return $this->pmssExecShellCommand(
             escapeshellarg(PHP_BINARY).' -r '.escapeshellarg('require '.var_export($libraryPath, true).'; '.$script),
             ['PMSS_TEST_MODE' => '1'],
