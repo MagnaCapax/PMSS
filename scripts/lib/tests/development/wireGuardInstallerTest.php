@@ -338,6 +338,29 @@ class WireGuardInstallerTest extends TestCase
         $this->assertTrue(!file_exists($homeBase.'/alice/.wireguard-public-key'), 'manual guides should not be replaced automatically');
     }
 
+    public function testBootstrapUserGuideRepairsManagedGuideMissingPublicKeyFile(): void
+    {
+        $homeBase = $this->createTempDir();
+        @mkdir($homeBase.'/alice', 0755, true);
+
+        $guide = \wgApplyPrivateKeyToGuide(
+            \wgBuildClientGuide('server-pub', 'vpn.example.com', 51820),
+            'client-private'
+        );
+        file_put_contents($homeBase.'/alice/wireguard.txt', $guide);
+
+        $publicKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+        $this->pmssWithEnv([
+            'PMSS_WG_HOME_BASE'         => $homeBase,
+            'PMSS_WG_CLIENT_PUBLIC_KEY' => $publicKey,
+        ], function () use ($guide): void {
+            \wgBootstrapUserGuide('alice', $guide);
+        });
+
+        $this->assertEquals($guide, (string) file_get_contents($homeBase.'/alice/wireguard.txt'));
+        $this->assertEquals($publicKey."\n", (string) file_get_contents($homeBase.'/alice/.wireguard-public-key'));
+    }
+
     public function testApplyAssignedIpToGuideReplacesPlaceholderAddress(): void
     {
         $guide = "[Interface]\nAddress = 10.90.90.X/32\n"

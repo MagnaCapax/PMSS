@@ -22,6 +22,10 @@ Typical workflow:
    `/etc/wireguard/wg0.conf` from these files, adding a `[Peer]` entry for every
    valid key.
 
+If a PMSS-generated single-device `~/wireguard.txt` already exists but its
+matching `~/.wireguard-public-key` entry goes missing, the periodic refresh can
+re-register that first profile automatically from the managed guide.
+
 A cron watchdog (`checkWireguard.php`) ensures the kernel module stays loaded and
 `wg-quick@wg0` remains active. Logs are written to `/var/log/pmss/checkWireguard.log`
 when taking action (module load/restart); use `checkWireguard.php --debug` to

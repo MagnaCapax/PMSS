@@ -284,6 +284,34 @@ function wgApplyPrivateKeyToGuide(string $content, string $privateKey): string
 }
 
 /**
+ * Determine whether the guide still matches the PMSS-managed bootstrap profile.
+ */
+function wgGuideLooksManagedBootstrapProfile(string $content): bool
+{
+    return preg_match('/^MTU = 1420$/m', $content) === 1
+        && preg_match('/^DNS = 1\.1\.1\.1$/m', $content) === 1
+        && preg_match('/^AllowedIPs = 0\.0\.0\.0\/0, ::\/0$/m', $content) === 1
+        && preg_match('/^PersistentKeepalive = 25$/m', $content) === 1;
+}
+
+/**
+ * Read the client private key from a ready-to-import guide.
+ */
+function wgGuidePrivateKey(string $content): string
+{
+    if (preg_match('/^PrivateKey = ([^\r\n]+)$/m', $content, $matches) !== 1) {
+        return '';
+    }
+
+    $privateKey = trim($matches[1]);
+    if ($privateKey === '' || $privateKey === '<client private key>') {
+        return '';
+    }
+
+    return $privateKey;
+}
+
+/**
  * Build a ready-to-import client configuration template.
  */
 function wgBuildClientGuide(string $publicKey, string $endpoint, int $listenPort): string
@@ -321,6 +349,19 @@ function wgGenerateClientKeypair(): array
         return ['', ''];
     }
 
+    $publicKey = wgDerivePublicKey($privateKey);
+    if ($publicKey === '') {
+        return ['', ''];
+    }
+
+    return [$privateKey, $publicKey];
+}
+
+/**
+ * Derive a client public key from private key material.
+ */
+function wgDerivePublicKey(string $privateKey): string
+{
     $publicOverride = getenv('PMSS_WG_CLIENT_PUBLIC_KEY');
     if ($publicOverride !== false) {
         $publicKey = trim($publicOverride);
@@ -330,10 +371,10 @@ function wgGenerateClientKeypair(): array
     }
     if (!wgValidatePublicKey($publicKey)) {
         wgLog('Failed to derive WireGuard client public key');
-        return ['', ''];
+        return '';
     }
 
-    return [$privateKey, $publicKey];
+    return $publicKey;
 }
 
 /**
@@ -562,47 +603,67 @@ function wgBootstrapUserGuide(string $user, string $clientGuide): void
     $guideExists   = is_file($guidePath);
     $guide         = $guideExists ? @file_get_contents($guidePath) : false;
     $publicKeyText = is_file($publicKeyPath) ? @file_get_contents($publicKeyPath) : false;
+    $managedGuide  = $guide !== false && $guide !== '' && !wgGuideHasPrivateKeyPlaceholder($guide);
 
     if (!empty(wgReadUserPublicKeys($user))) {
         return;
     }
-    if ($guide !== false && $guide !== '' && !wgGuideHasPrivateKeyPlaceholder($guide)) {
+    if ($managedGuide && !wgGuideLooksManagedBootstrapProfile($guide)) {
         return;
     }
 
-    [$privateKey, $publicKey] = wgGenerateClientKeypair();
-    if ($privateKey === '' || $publicKey === '') {
-        return;
-    }
-
-    $updatedGuide = wgApplyPrivateKeyToGuide($clientGuide, $privateKey);
     $originalGuide = $guideExists && $guide !== false ? $guide : null;
+    if ($managedGuide) {
+        $privateKey = wgGuidePrivateKey($guide);
+        if ($privateKey === '') {
+            wgLog('Managed WireGuard guide for user '.$user.' is missing a client private key');
+            return;
+        }
+        $publicKey = wgDerivePublicKey($privateKey);
+        if ($publicKey === '') {
+            return;
+        }
+        $updatedGuide = $guide;
+    } else {
+        [$privateKey, $publicKey] = wgGenerateClientKeypair();
+        if ($privateKey === '' || $publicKey === '') {
+            return;
+        }
+        $updatedGuide = wgApplyPrivateKeyToGuide($clientGuide, $privateKey);
+    }
+
     $updatedKeyText = $publicKey.PHP_EOL;
     if ($publicKeyText !== false && trim($publicKeyText) !== '') {
         $updatedKeyText = rtrim($publicKeyText, "\r\n").PHP_EOL.$publicKey.PHP_EOL;
     }
 
-    if (@file_put_contents($guidePath, $updatedGuide) === false) {
+    if (!$managedGuide && @file_put_contents($guidePath, $updatedGuide) === false) {
         wgLog('Failed to write WireGuard guide for user '.$user);
         return;
     }
 
     if (@file_put_contents($publicKeyPath, $updatedKeyText) === false) {
         wgLog('Failed to write WireGuard public key for user '.$user);
-        if ($originalGuide === null) {
+        if (!$managedGuide && $originalGuide === null) {
             @unlink($guidePath);
-        } else {
+        } elseif (!$managedGuide) {
             @file_put_contents($guidePath, $originalGuide);
         }
         return;
     }
 
+    if ($managedGuide) {
+        wgLog('Recovered WireGuard public key registration for user '.$user.' from existing managed guide');
+    }
+
     @chown($publicKeyPath, $user);
     @chgrp($publicKeyPath, $user);
     @chmod($publicKeyPath, 0600);
-    @chown($guidePath, $user);
-    @chgrp($guidePath, $user);
-    @chmod($guidePath, 0600);
+    if ($guideExists || !$managedGuide) {
+        @chown($guidePath, $user);
+        @chgrp($guidePath, $user);
+        @chmod($guidePath, 0600);
+    }
 }
 
 /**
