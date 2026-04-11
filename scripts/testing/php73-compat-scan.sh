@@ -4,7 +4,7 @@ set -euo pipefail
 # This complements php -l under PHP 7.3 by catching patterns proactively.
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 
 pmss_testing_cd_root_dir "$ROOT_DIR"
 

@@ -8,7 +8,7 @@ set -euo pipefail
 # - PHP files without a shebang must not be executable.
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 
 fail=0
 

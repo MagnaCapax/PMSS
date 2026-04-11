@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 CONFIG_PATH="$ROOT_DIR/phpstan.update.neon.dist"
 
 if [[ ! -f "$CONFIG_PATH" ]]; then

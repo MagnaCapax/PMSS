@@ -7,7 +7,7 @@ set -euo pipefail
 # For PHP: allow when used inside runStep(..., "curl ...") etc.
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 STRICT="${PMSS_LINT_NET_STRICT:-0}"
 PATTERN='curl\b|wget\b|\bnc\b|telnet\b'
 VIOL=0

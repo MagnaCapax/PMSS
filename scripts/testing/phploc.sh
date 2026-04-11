@@ -5,7 +5,7 @@ set -euo pipefail
 # Excludes third-party/frozen trees so metrics reflect first-party code.
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 
 PHPLC_BIN=()
 if [[ -x "$ROOT_DIR/vendor/bin/phploc" ]]; then

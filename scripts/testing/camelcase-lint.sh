@@ -6,7 +6,7 @@ set -euo pipefail
 # - Explicit exceptions live in the allowlist below.
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 VIOLATIONS=0
 
 is_camel_file() {

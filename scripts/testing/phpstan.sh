@@ -6,7 +6,7 @@ set -euo pipefail
 # - ALLOW_TOOL_SKIP=1 to skip when phpstan is unavailable
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 
 PHAR_BIN="${PMSS_PHPSTAN_BIN:-}"
 if [[ -z "$PHAR_BIN" ]]; then

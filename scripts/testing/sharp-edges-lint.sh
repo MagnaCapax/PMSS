@@ -15,7 +15,7 @@ set -euo pipefail
 # - tests/, vendor/, etc/skel/, scripts/lib/devristo/
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 STRICT="${PMSS_LINT_SHARP_STRICT:-1}"
 PATTERN='rm[[:space:]]+-rf|chmod[[:space:]]+-R|chown[[:space:]]+-R|chgrp[[:space:]]+-R|\bmv[[:space:]]'
 PHP_WRAPPER_REGEX='(runStep|runUserStep|runSoft|runFatal|runCommand|pmssUserLifecycleStep|run)\s*\('

@@ -3,7 +3,7 @@ set -euo pipefail
 # quick-php73.sh — fast local PHP 7.3 compatibility smoke
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 pmss_testing_cd_root_dir "$ROOT_DIR"
 
 echo "[quick-php73] syntax-only lint (use PHP 7.3 if available)" >&2

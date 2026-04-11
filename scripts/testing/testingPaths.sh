@@ -7,3 +7,4 @@ pmss_testing_find_runtime_php_files() { find "$1" -type d \( -path "$1/vendor" -
 pmss_testing_find_first_party_php_files() { find "$1" -type f -name "*.php" -not -path "*/.git/*" -not -path "*/vendor/*" -not -path "*/etc/skel/*" -not -path "*/scripts/lib/devristo/*" -print0; }
 pmss_testing_find_bash_files() { find "$1" -type f -name "*.sh" -not -path "*/vendor/*" -not -path "*/etc/skel/www/*" -print0; }
 pmss_testing_list_tracked_php_files() { git -C "$1" ls-files -z '*.php'; }
+[[ -n "${ROOT_DIR:-}" ]] || ROOT_DIR="$(pmss_testing_root_dir)"

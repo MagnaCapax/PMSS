@@ -6,7 +6,7 @@ set -euo pipefail
 #   Integration tests are script-style and excluded.
 
 # shellcheck source=scripts/testing/testingPaths.sh
-source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"; ROOT_DIR="$(pmss_testing_root_dir)"
+source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 VIOL=0
 
 check_tests() {
