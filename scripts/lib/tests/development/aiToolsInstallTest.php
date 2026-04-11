@@ -40,6 +40,7 @@ class AiToolsInstallTest extends TestCase
         $contents = $this->pmssReadUpdateAppFile('aiToolsInstall.php');
         $this->assertStringContainsString("dirname(\$nodeBinary).'/npm'", $contents);
         $this->assertStringContainsString('npm not available', $contents);
+        $this->assertStringContainsString("putenv('PATH='.dirname(\$nodeBinary)", $contents);
         $this->assertTrue(
             strpos($contents, 'function pmssAiTools'.'InstallNpmCli(') === false,
             'NPM CLI installation should stay inline in the only installer'

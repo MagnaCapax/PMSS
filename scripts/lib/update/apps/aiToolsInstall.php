@@ -66,6 +66,11 @@ if ($nodeBinary !== '') {
         $npmBinary = pmssCommandPath('npm');
     }
 
+    // npm launches child entrypoints via `/usr/bin/env node`, so keep the
+    // selected Node.js directory on PATH even when npm itself runs by full path.
+    $pathValue = getenv('PATH');
+    putenv('PATH='.dirname($nodeBinary).($pathValue === false || $pathValue === '' ? '' : ':'.$pathValue));
+
     foreach ([
         ['Gemini CLI', '@google/gemini-cli', 'gemini'],
         ['Claude Code', '@anthropic-ai/claude-code', 'claude'],
