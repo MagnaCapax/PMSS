@@ -73,7 +73,7 @@ class IopsLimitHelpersTest extends TestCase
             'cpuQuotaPercent' => '125',
         ]);
 
-        $this->assertNotSame(null, $command);
+        $this->assertTrue($command !== null);
         $this->assertStringContainsAllStrings([
             "'/scripts/util/userConfigCgroup.php'",
             "'--wipe'",

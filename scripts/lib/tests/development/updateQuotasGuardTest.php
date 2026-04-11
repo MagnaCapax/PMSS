@@ -5,6 +5,15 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateQuotasGuardTest extends TestCase
 {
+    public function testRootCronGuardsUpdateQuotasAgainstOverlap(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'etc/seedbox/config/root.cron',
+            ['* * * * *', 'flock -xn /tmp/pmss-updateQuotas.lock', '/scripts/cron/updateQuotas.php'],
+            'root.cron should guard updateQuotas with flock: '
+        );
+    }
+
     public function testUpdateQuotasSkipsEmptyAndInvalidUsers(): void
     {
         $src = (string) file_get_contents(__DIR__.'/../../../cron/updateQuotas.php');
