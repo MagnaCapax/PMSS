@@ -55,6 +55,7 @@ existing users, but new examples and support guidance should prefer
 
 On PMSS, rootless Docker prefers overlay-style drivers so containers stay fast and space-efficient:
 
+- Cgroup v2 hosts: PMSS seeds `~/.config/docker/daemon.json` with `"exec-opts": ["native.cgroupdriver=cgroupfs"]` so first-start rootless Docker avoids the transient systemd scope permission failure seen on unified cgroup hosts.
 - Debian 10+: when no driver is configured yet and `fuse-overlayfs` is available, PMSS writes `~/.config/docker/daemon.json` with `"storage-driver": "fuse-overlayfs"`. This is the default and recommended mode for rootless Docker on PMSS.
 - Custom drivers: if `daemon.json` already contains `storage-driver` (for example `overlay2` or `vfs`), PMSS leaves it untouched and logs that it is reusing the existing configuration. `vfs` is supported but slow and space-heavy, and should generally be considered a last resort.
 
@@ -75,6 +76,8 @@ For operators, per-user Docker can be controlled via:
 ```
 
 This helper **defaults to starting `dockerd-rootless.sh` directly** (non-systemd rootless mode) once it has confirmed no rootless Docker process is running. Systemd user units are treated as advisory: their *presence on disk* is reported by `status` and, when available, used for a polite `stop`, but the helper does not query the user bus (to avoid hangs) or rely on systemd for `start`/`restart` until it has dedicated test coverage on the current distro mix. Actions are logged to `/var/log/pmss/users/<username>.log` (and mirrored into `/var/log/pmss/users.log`/`.jsonl` when available).
+
+On cgroup v2 hosts, `userDocker.php start` also backfills the same `daemon.json` override for older accounts that were provisioned before the skeleton shipped it.
 
 ## Troubleshooting
 

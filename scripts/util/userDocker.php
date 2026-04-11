@@ -51,6 +51,7 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 pmssRequireCli();
 
 require_once __DIR__.'/../lib/user/log.php';
+require_once __DIR__.'/../lib/user/directories.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 
 $args = $argv ?? ($_SERVER['argv'] ?? []);
@@ -129,6 +130,91 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
     exec($wrapper, $out, $rcLocal);
     $rc = $rcLocal;
     return implode("\n", $out);
+}
+
+/**
+ * Detect the current host cgroup mode for rootless Docker setup.
+ */
+function userDockerCgroupMode(): string
+{
+    if (($override = getenv('PMSS_CGROUP_MODE')) === 'v1' || $override === 'v2') {
+        return $override;
+    }
+
+    if (is_file('/sys/fs/cgroup/cgroup.controllers')) {
+        return 'v2';
+    }
+
+    return strpos((string) @file_get_contents('/proc/self/mountinfo'), ' - cgroup2 ') !== false
+        ? 'v2'
+        : 'v1';
+}
+
+/**
+ * Ensure cgroup v2 hosts have a daemon.json with the rootless cgroupfs driver.
+ */
+function userDockerEnsureCgroupfsDaemonConfig(string $user, string $home, int $uid, int $gid): void
+{
+    if (userDockerCgroupMode() !== 'v2') {
+        return;
+    }
+
+    if (!pmssEnsureUserHomeDir(
+        $user,
+        $home,
+        '.config/docker',
+        0700,
+        static function (string $message) use ($user): void {
+            pmssUserLog($user, $message);
+        },
+        0700
+    )) {
+        pmssUserLog($user, '[WARN] userDocker: failed to ensure ~/.config/docker for cgroup v2 rootless Docker');
+        return;
+    }
+
+    $configFile = $home.'/.config/docker/daemon.json';
+    $hasConfigFile = is_file($configFile);
+    $current = $hasConfigFile ? @file_get_contents($configFile) : false;
+    $data = [];
+    if ($current !== false && trim($current) !== '') {
+        $decoded = json_decode($current, true);
+        if (!is_array($decoded)) {
+            pmssUserLog($user, '[WARN] userDocker: existing daemon.json is invalid JSON; leaving it unchanged');
+            return;
+        }
+        $data = $decoded;
+    }
+
+    $execOpts = [];
+    if (isset($data['exec-opts']) && is_array($data['exec-opts'])) {
+        $execOpts = $data['exec-opts'];
+    }
+    if (in_array('native.cgroupdriver=cgroupfs', $execOpts, true)) {
+        return;
+    }
+
+    $execOpts[] = 'native.cgroupdriver=cgroupfs';
+    $data['exec-opts'] = array_values(array_unique($execOpts));
+    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        pmssUserLog($user, '[WARN] userDocker: failed to encode daemon.json for cgroup v2 rootless Docker');
+        return;
+    }
+    if (@file_put_contents($configFile, $json) === false) {
+        pmssUserLog($user, '[WARN] userDocker: failed to write ~/.config/docker/daemon.json for cgroup v2 rootless Docker');
+        return;
+    }
+
+    @chown($configFile, $uid);
+    @chgrp($configFile, $gid);
+    @chmod($configFile, 0600);
+    pmssUserLog(
+        $user,
+        $hasConfigFile
+            ? 'userDocker: updated ~/.config/docker/daemon.json for cgroup v2 rootless Docker'
+            : 'userDocker: wrote ~/.config/docker/daemon.json for cgroup v2 rootless Docker'
+    );
 }
 
 /**
@@ -314,6 +400,8 @@ if ($action === 'start' || $action === 'restart') {
     if ($socketPresent && $debug) {
         pmssUserLog($user, 'userDocker: docker socket present without running dockerd; attempting start');
     }
+
+    userDockerEnsureCgroupfsDaemonConfig($user, $home, $uid, (int) $info['gid']);
 
     // Start dockerd-rootless.sh in the same way the watchdog and manual
     // workflows do, ensuring PATH and XDG_RUNTIME_DIR are sane.
