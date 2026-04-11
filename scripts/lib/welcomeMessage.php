@@ -17,7 +17,7 @@ if (!function_exists('pmssReplaceUserFile') && is_file(__DIR__.'/lighttpd/userFi
  */
 function pmssWelcomeReadJson(string $path): array
 {
-    return pmssJsonFileReadAssoc($path) ?? [];
+    return pmssJsonFileReadAssoc($path, true) ?? [];
 }
 
 /**
@@ -103,6 +103,10 @@ function pmssWelcomeUserMessageSet(string $username, string $userHome, string $t
     }
 
     $path = pmssWelcomeUserMessagePath($userHome);
+    if (!function_exists('pmssPathTargetIsSafe') || !pmssPathTargetIsSafe($path, false)) {
+        return false;
+    }
+
     if (trim($template) === '') {
         return !is_link($path) && (!is_file($path) || @unlink($path));
     }
@@ -147,7 +151,9 @@ function pmssWelcomeMessageForUser(
         }
     }
     if ($productKey === '' && is_file($productFile = $userHome.'/.product') && !is_link($productFile)) {
-        $productKey = trim((string) @file_get_contents($productFile));
+        if (function_exists('pmssUserFilePathIsSafe') && pmssUserFilePathIsSafe($productFile)) {
+            $productKey = trim((string) @file_get_contents($productFile));
+        }
     }
 
     $template = pmssWelcomeUserMessageRead($userHome);

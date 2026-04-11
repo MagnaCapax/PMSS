@@ -155,6 +155,29 @@ class WelcomeMessageTest extends TestCase
             $this->assertFalse(is_file($path));
     }
 
+    public function testManagedUserMessageSetRejectsTraversalLikeHomePath(): void
+    {
+            $home = $this->makeUserHome();
+            $unsafeHome = $home.'/../escape';
+
+            $this->assertFalse(\pmssWelcomeUserMessageSet('alice', $unsafeHome, '<p>hello</p>'));
+            $this->assertFalse(\pmssWelcomeUserMessageSet('alice', $unsafeHome, '   '));
+            $this->assertFalse(is_file($this->tempDir.'/home/escape/.config/welcome-message.html'));
+    }
+
+    public function testProductMessageLookupRejectsSymlinkedJsonStore(): void
+    {
+            $home = $this->makeUserHome();
+            @file_put_contents($home.'/.config/pmss-user.json', json_encode(['product' => 'free'], JSON_UNESCAPED_SLASHES));
+
+            $messagesTarget = $this->tempDir.'/welcomeMessages-target.json';
+            $messagesLink = $this->tempDir.'/welcomeMessages-link.json';
+            @file_put_contents($messagesTarget, json_encode(['free' => '<p>fallback</p>'], JSON_UNESCAPED_SLASHES));
+            $this->pmssCreateSymlinkOrSkip($messagesTarget, $messagesLink);
+
+            $this->assertEquals('', \pmssWelcomeMessageForUser([], $home, 'alice', $messagesLink));
+    }
+
     public function testMissingConfigurationReturnsEmptyMessage(): void
     {
             $home = $this->makeUserHome();
