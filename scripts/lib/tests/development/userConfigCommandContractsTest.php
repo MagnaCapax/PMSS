@@ -49,14 +49,12 @@ class userConfigCommandContractsTest extends TestCase
 
         $this->assertStringContainsString("require_once __DIR__.'/../lib/cli/optionParser.php';", $source);
         $this->assertStringContainsString("require_once __DIR__.'/../lib/user/userConfigCli.php';", $source);
-        $this->assertStringContainsString(
-            "pmssParseCliTokens(\$argv ?? (\$_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled'])",
-            $source
-        );
+        $this->assertStringContainsString("pmssUserConfigCliResourceOptionNames('addUserOption')", $source);
+        $this->assertStringContainsString("array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], \$resourceOptions)", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'upload-throttle-kib')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'welcome-message')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'docker-enabled')", $source);
-        $this->assertStringContainsString("pmssUserConfigCliPositionalResources(\$args, 'userConfigIndex')", $source);
+        $this->assertStringContainsString("pmssUserConfigCliExplicitResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
         $this->assertTrue(
             strpos($source, "strpos(\$arg, '--upload-throttle-kib=')") === false,
             'userConfig.php should not keep a manual --upload-throttle-kib scan'
@@ -78,9 +76,11 @@ class userConfigCommandContractsTest extends TestCase
         $this->assertStringContainsAllStrings([
             'Usage',
             './userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB',
+            './userConfig.php USERNAME [RESOURCE_OPTIONS]',
             './userConfig.php USERNAME --welcome-message=HTML',
             'Positional Parameters',
             'Named Options',
+            '--cpu-weight=WEIGHT',
             '--upload-throttle-kib=KIB',
             '--docker-enabled=true|false',
             'Examples',
@@ -102,8 +102,9 @@ class userConfigCommandContractsTest extends TestCase
     {
         $source = $this->loadUserConfigSubsystemSource();
 
-        $this->assertStringContainsString("pmssUserConfigCliPositionalResources(\$args, 'userConfigIndex')", $source);
-        $this->assertStringContainsString("pmssUserConfigCliPersistedPositionalPresence(\$args)", $source);
+        $this->assertStringContainsString("pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
+        $this->assertStringContainsString("pmssUserConfigCliPersistedResourcePresence(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
+        $this->assertStringContainsString("pmssUserConfigCliPersistedStoredResources(\$existing)", $source);
         $this->assertStringContainsString("pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", $source);
         $this->assertStringContainsString("pmssUserConfigCliBuildCgroupResourceArgs(\$user)", $source);
         $this->assertTrue(

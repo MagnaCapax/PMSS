@@ -25,6 +25,7 @@ function pmssAddUserCliUsage(): string
     $lines = [
         pmssCliHelpHeading('Usage', $useColor),
         '  addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [TRAFFIC_CAP_MBIT] [UPLOAD_THROTTLE_KIB]',
+        '  addUser.php USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=DISK_QUOTA_GiB [RESOURCE_OPTIONS]',
         '  addUser.php --user=USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=DISK_QUOTA_GiB [RESOURCE_OPTIONS]',
         '',
         pmssCliHelpHeading('Positional Parameters', $useColor),
@@ -56,6 +57,7 @@ function pmssAddUserCliUsage(): string
         '',
         pmssCliHelpHeading('Examples', $useColor),
         '  /scripts/addUser.php alice rand 1024 200',
+        '  /scripts/addUser.php alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --io-weight=320',
         '  /scripts/addUser.php --user=alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --upload-throttle-kib=2048 --docker-enabled=true',
         '',
         pmssCliHelpHeading('Notes', $useColor),

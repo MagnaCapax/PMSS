@@ -35,6 +35,57 @@ function pmssUserConfigCliLegacyValue(array $parsed, string $option, array $args
     return ($value !== null && $value !== true) ? $value : (array_key_exists($legacyIndex, $args) ? $args[$legacyIndex] : $default);
 }
 
+/** @return array<int,string> List shared long-option names for resource flags. */
+function pmssUserConfigCliResourceOptionNames(string $optionKey): array
+{
+    return array_values(array_filter(array_map(static function (array $spec) use ($optionKey): string {
+        return isset($spec[$optionKey]) ? (string) $spec[$optionKey] : '';
+    }, pmssUserConfigCliResourceSpecs())));
+}
+
+/** Check whether a parsed long option carries an explicit scalar value. */
+function pmssUserConfigCliHasExplicitOptionValue(array $parsed, string $option): bool
+{
+    if (!array_key_exists($option, $parsed['options'])) {
+        return false;
+    }
+
+    $value = $parsed['options'][$option];
+    return $value !== null && $value !== true && $value !== '';
+}
+
+/** @return array<string,mixed> Parse resource values with named options overriding positional slots. */
+function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $optionKey, string $indexKey): array
+{
+    $values = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        $value = pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $spec[$indexKey], $spec['default']);
+        $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
+    }
+    return $values;
+}
+
+/** @return array<string,mixed> Parse only explicitly provided resource values. */
+function pmssUserConfigCliExplicitResources(array $parsed, array $args, string $optionKey, string $indexKey): array
+{
+    $values = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        $value = null;
+        if (pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])) {
+            $value = $parsed['options'][$spec[$optionKey]];
+        } elseif (array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '') {
+            $value = $args[$spec[$indexKey]];
+        }
+
+        if ($value === null) {
+            continue;
+        }
+
+        $values[$key] = ($spec['parse'] === 'int') ? (int) $value : $value;
+    }
+    return $values;
+}
+
 /** Parse the optional Docker toggle while keeping legacy CLI semantics. */
 function pmssUserConfigParseDockerEnabledOption($rawOption): ?bool
 {
@@ -93,6 +144,34 @@ function pmssUserConfigCliPersistedPositionalPresence(array $args): array
             && $args[$spec['userConfigIndex']] !== '';
     }
     return $presence;
+}
+
+/** @return array<string,bool> Track explicit persisted resources from named options or positionals. */
+function pmssUserConfigCliPersistedResourcePresence(array $parsed, array $args, string $optionKey, string $indexKey): array
+{
+    $presence = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        if (empty($spec['persist'])) {
+            continue;
+        }
+
+        $presence[$key] = pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])
+            || (array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '');
+    }
+    return $presence;
+}
+
+/** @return array<string,mixed> Copy persisted shared resources from stored payloads. */
+function pmssUserConfigCliPersistedStoredResources(array $payload): array
+{
+    $values = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        if (empty($spec['persist']) || !array_key_exists($key, $payload)) {
+            continue;
+        }
+        $values[$key] = $payload[$key];
+    }
+    return $values;
 }
 
 /** @return array<string,mixed> Copy explicit persisted resources into a payload. */
@@ -204,11 +283,13 @@ function pmssUserConfigCliUsage(): string
 {
     $useColor = pmssCliHelpSupportsColor();
     $resourceHelp = pmssUserConfigCliResourceHelpSpecs();
+    $resourceSpecs = pmssUserConfigCliResourceSpecs();
     $derivedDefault = pmssCliHelpDim(' (default: auto-derived from RAM when omitted)', $useColor);
     $unchangedDefault = pmssCliHelpDim(' (default: leave current slice policy unchanged)', $useColor);
     $lines = [
         pmssCliHelpHeading('Usage', $useColor),
         '  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]',
+        '  ./userConfig.php USERNAME [RESOURCE_OPTIONS]',
         '  ./userConfig.php USERNAME --welcome-message=HTML',
         '',
         pmssCliHelpHeading('Positional Parameters', $useColor),
@@ -226,6 +307,15 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpLine($resourceHelp['trafficCapMbit']['parameter'], $resourceHelp['trafficCapMbit']['parameterDescription']),
         '',
         pmssCliHelpHeading('Named Options', $useColor),
+        pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['CPUWeight']['usage'], $resourceHelp['CPUWeight']['optionDescription'].$derivedDefault),
+        pmssCliHelpLine($resourceSpecs['IOWeight']['usage'], $resourceHelp['IOWeight']['optionDescription'].$derivedDefault),
+        pmssCliHelpLine($resourceSpecs['IOReadBW']['usage'], $resourceHelp['IOReadBW']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['IOWriteBW']['usage'], $resourceHelp['IOWriteBW']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['IOReadIOPS']['usage'], $resourceHelp['IOReadIOPS']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['IOWriteIOPS']['usage'], $resourceHelp['IOWriteIOPS']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['cpuQuotaPercent']['usage'], $resourceHelp['cpuQuotaPercent']['optionDescription'].$unchangedDefault),
+        pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['optionDescription']),
         pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
         pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),
@@ -233,10 +323,12 @@ function pmssUserConfigCliUsage(): string
         '',
         pmssCliHelpHeading('Examples', $useColor),
         '  /scripts/util/userConfig.php alice 1024 200',
+        '  /scripts/util/userConfig.php alice --io-weight=300',
         '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 --upload-throttle-kib=2048 --docker-enabled=true',
         '  /scripts/util/userConfig.php alice --welcome-message=<p>Planned maintenance tonight.</p>',
         '',
         pmssCliHelpHeading('Notes', $useColor),
+        '  - Named resource options override legacy positional values, and USERNAME with named options reuses the stored RAM/quota baseline.',
         '  - RAM_MiB is applied through userConfigCgroup.php as MemoryHigh; PMSS clamps the effective floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.',
         '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.',
         '  - For targeted slice-only edits, use /scripts/util/userConfigCgroup.php directly.',

@@ -5,6 +5,7 @@ The `addUser.php` helper provisions a PMSS account and now exposes structured `-
 ```text
 Usage
   addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [TRAFFIC_CAP_MBIT] [UPLOAD_THROTTLE_KIB]
+  addUser.php USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=DISK_QUOTA_GiB [RESOURCE_OPTIONS]
   addUser.php --user=USERNAME --password=PASSWORD --ram-mib=RAM_MiB --disk-quota-gib=DISK_QUOTA_GiB [RESOURCE_OPTIONS]
 ```
 
@@ -40,6 +41,7 @@ Usage
 ## Notes
 
 - Named options override legacy positional values, so automation can skip intermediate optional slots safely.
+- The first positional `USERNAME` can be mixed with named options for the remaining values.
 - `RAM_MiB` is applied through `userConfig.php` and then `userConfigCgroup.php`; PMSS clamps the effective `MemoryHigh` floor to 250 MiB and derives `MemoryMax` at roughly 1.25x with at most 2048 MiB of headroom.
 - If `RAM_MiB` is below `245`, PMSS persists `dockerEnabled=false` for safety.
 
@@ -47,6 +49,7 @@ Usage
 
 ```bash
 /scripts/addUser.php alice rand 1024 200
+/scripts/addUser.php alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --io-weight=320
 /scripts/addUser.php --user=alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --upload-throttle-kib=2048 --docker-enabled=true
 ```
 

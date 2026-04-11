@@ -27,7 +27,11 @@ require_once __DIR__.'/../lib/welcomeMessage.php';
  * Main entry point for user configuration changes.
  */
 $usage = pmssUserConfigCliUsage();
-$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []), ['upload-throttle-kib', 'welcome-message', 'docker-enabled']);
+$resourceOptions = pmssUserConfigCliResourceOptionNames('addUserOption');
+$parsed = pmssParseCliTokens(
+    $argv ?? ($_SERVER['argv'] ?? []),
+    array_merge(['upload-throttle-kib', 'welcome-message', 'docker-enabled'], $resourceOptions)
+);
 $helpRequested = pmssCliOption($parsed, 'help', 'h', false) !== false;
 $args = array_merge([''], $parsed['arguments']);
 if ($helpRequested) {
@@ -37,22 +41,27 @@ if ($helpRequested) {
 $welcomeMessage = pmssCliOption($parsed, 'welcome-message');
 $welcomeMessage = ($welcomeMessage === true || $welcomeMessage === null) ? null : (string) $welcomeMessage;
 try {
-$uploadThrottleKib = pmssUserConfigCliParseUploadThrottleOption(pmssCliOption($parsed, 'upload-throttle-kib'));
+    $uploadThrottleKib = pmssUserConfigCliParseUploadThrottleOption(pmssCliOption($parsed, 'upload-throttle-kib'));
     $dockerEnabled = pmssUserConfigParseDockerEnabledOption(pmssCliOption($parsed, 'docker-enabled'));
 } catch (InvalidArgumentException $exception) {
     die($exception->getMessage()."\n");
 }
+$explicitResourceOverrides = pmssUserConfigCliExplicitResources($parsed, $args, 'addUserOption', 'userConfigIndex');
+$namedConfigChange = $uploadThrottleKib !== null
+    || $dockerEnabled !== null
+    || count($explicitResourceOverrides) > 0;
+$namedConfigMode = !empty($args[1])
+    && empty($args[2])
+    && empty($args[3])
+    && $namedConfigChange;
 $fullConfigMode = !empty($args[1]) && !empty($args[2]) && !empty($args[3]);
-$welcomeOnlyMode = !empty($args[1]) && $welcomeMessage !== null && empty($args[2]) && empty($args[3]);
-if (!$fullConfigMode && !$welcomeOnlyMode) {
+$welcomeOnlyMode = !empty($args[1])
+    && $welcomeMessage !== null
+    && empty($args[2])
+    && empty($args[3])
+    && !$namedConfigMode;
+if (!$fullConfigMode && !$welcomeOnlyMode && !$namedConfigMode) {
     die($usage."\n");
-}
-
-if ($welcomeOnlyMode && $uploadThrottleKib !== null) {
-    die("--upload-throttle-kib requires RAM and quota arguments\n");
-}
-if ($welcomeOnlyMode && $dockerEnabled !== null) {
-    die("--docker-enabled requires RAM and quota arguments\n");
 }
 
 // The $user array is populated from sanitized command-line arguments ($args)
@@ -62,7 +71,7 @@ $user = [
     'memory'    => (int) $args[2],
     'quota'     => (int) $args[3],
 ];
-$user = array_merge($user, pmssUserConfigCliPositionalResources($args, 'userConfigIndex'));
+$user = array_merge($user, pmssUserConfigCliResolvedResources($parsed, $args, 'addUserOption', 'userConfigIndex'));
 $user['name'] = pmssNormalizeUsername((string) $user['name']);
 
 $passwdEntry = pmssPasswdEntryLookup($user['name']);
@@ -81,8 +90,6 @@ $accountHome = rtrim((string) ($passwdEntry['dir'] ?? ($account['dir'] ?? '')), 
 if ($accountHome !== $expectedHome || !file_exists($expectedHome)) {
     die("User does not exist\n");
 }
-
-$presence = pmssUserConfigCliPersistedPositionalPresence($args);
 
 $store = new UserConfigStore();
 $existing = $store->get($user['name']) ?? [];
@@ -108,6 +115,22 @@ if ($welcomeOnlyMode) {
     }
     exit(0);
 }
+
+if ($namedConfigMode) {
+    foreach (['ramMiB', 'quota'] as $requiredBaselineKey) {
+        if (!isset($existing[$requiredBaselineKey]) || !is_numeric($existing[$requiredBaselineKey])) {
+            fwrite(STDERR, "Error: missing existing {$requiredBaselineKey}; rerun full userConfig.php first.\n");
+            exit(1);
+        }
+    }
+
+    $user['memory'] = (int) $existing['ramMiB'];
+    $user['quota'] = (int) $existing['quota'];
+    $user = array_merge($user, pmssUserConfigCliPersistedStoredResources($existing));
+    $user = array_merge($user, $explicitResourceOverrides);
+}
+
+$presence = pmssUserConfigCliPersistedResourcePresence($parsed, $args, 'addUserOption', 'userConfigIndex');
 
 $payload = $existing;
 $payload['ramMiB'] = $user['memory'];

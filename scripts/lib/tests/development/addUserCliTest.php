@@ -11,6 +11,7 @@ class addUserCliTest extends TestCase
     {
         $usage = \pmssAddUserCliUsage();
 
+        $this->assertStringContainsString('addUser.php USERNAME --password=PASSWORD', $usage);
         $this->assertStringContainsString('--cpu-weight=WEIGHT', $usage);
         $this->assertStringContainsString('--io-read-bw=/dev/DEVICE:RATE', $usage);
         $this->assertStringContainsString('--cpu-quota-percent=PERCENT|infinity', $usage);
@@ -102,6 +103,24 @@ class addUserCliTest extends TestCase
         $this->assertSame('1024', $cli['user']['memory']);
         $this->assertSame('250', $cli['user']['quota']);
         $this->assertSame('900', $cli['user']['trafficLimit']);
+    }
+
+    public function testFirstPositionalUsernameCanMixWithNamedOptions(): void
+    {
+        $cli = \pmssAddUserParseCli([
+            'addUser.php',
+            'alice',
+            '--password=secret',
+            '--ram-mib=1024',
+            '--disk-quota-gib=250',
+            '--io-weight=300',
+        ]);
+
+        $this->assertSame('alice', $cli['user']['name']);
+        $this->assertSame('secret', $cli['user']['password']);
+        $this->assertSame('1024', $cli['user']['memory']);
+        $this->assertSame('250', $cli['user']['quota']);
+        $this->assertSame('300', $cli['user']['IOWeight']);
     }
 
     public function testRejectsNegativeUploadThrottle(): void
