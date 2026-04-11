@@ -235,7 +235,7 @@ class UserConfigStore
         $intKeys = [
             'ramMiB', 'rtorrentPort', 'quota', 'quotaBurst', 'billingId', 'trafficLimit',
             'trafficCapMbit',
-            'CPUWeight', 'IOWeight', 'IOReadIOPS', 'IOWriteIOPS',
+            'CPUWeight', 'IOWeight', 'IOReadIOPS', 'IOWriteIOPS', 'ioLatencyMs',
         ];
         foreach ($intKeys as $key) {
             if (array_key_exists($key, $payload) && $payload[$key] !== null && $payload[$key] !== '' && is_numeric($payload[$key])) {

@@ -15,6 +15,7 @@ class addUserCliTest extends TestCase
         $this->assertStringContainsString('--cpu-weight=WEIGHT', $usage);
         $this->assertStringContainsString('--io-read-bw=/dev/DEVICE:RATE', $usage);
         $this->assertStringContainsString('--cpu-quota-percent=PERCENT|infinity', $usage);
+        $this->assertStringContainsString('--io-latency-ms=MS', $usage);
         $this->assertStringContainsString('--docker-enabled=true|false', $usage);
         $this->assertStringContainsString('--help', $usage);
     }
@@ -55,6 +56,7 @@ class addUserCliTest extends TestCase
             '--io-read-iops=/dev/sda:100',
             '--io-write-iops=/dev/sda:200',
             '--cpu-quota-percent=150',
+            '--io-latency-ms=50',
             '--traffic-cap-mbit=80',
             '--docker-enabled=false',
         ]);
@@ -66,6 +68,7 @@ class addUserCliTest extends TestCase
         $this->assertSame('/dev/sda:100', $cli['user']['IOReadIOPS']);
         $this->assertSame('/dev/sda:200', $cli['user']['IOWriteIOPS']);
         $this->assertSame('150', $cli['user']['cpuQuotaPercent']);
+        $this->assertSame('50', $cli['user']['ioLatencyMs']);
         $this->assertSame('80', $cli['user']['trafficCapMbit']);
         $this->assertSame('false', $cli['user']['dockerEnabled']);
     }

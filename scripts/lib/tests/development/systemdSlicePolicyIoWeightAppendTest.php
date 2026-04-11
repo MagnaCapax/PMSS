@@ -60,4 +60,22 @@ class SystemdSlicePolicyIoWeightAppendTest extends TestCase
         $this->assertTrue(strpos($out, 'IOReadBandwidthMax=') !== false, 'IOReadBandwidthMax not appended');
         $this->assertTrue(strpos($out, 'IOWriteBandwidthMax=') !== false, 'IOWriteBandwidthMax not appended');
     }
+
+    public function testIODeviceLatencyUsesHomeBackingDeviceOnV2(): void
+    {
+        $findmntPath = $this->pmssMakeExecutableStub(
+            'findmnt',
+            "#!/bin/sh\nif [ \"$3\" = \"/home\" ]; then\n  printf '%s\\n' '/dev/md0'\nfi\n",
+            'pmss-findmnt-latency-'
+        );
+        $out = $this->pmssSystemdSliceRender([
+            'v2Template' => $this->pmssSystemdSliceTasksTemplate(['%%USER_CGROUP_IO_DEVICE_LATENCY%%']),
+            'policy' => $this->pmssSystemdSlicePolicySource([
+                'ioLatencyMs' => 50,
+            ]),
+            'env' => $this->pmssPathPrefixedEnvironment($findmntPath),
+            'totalMemMiB' => 2048,
+        ]);
+        $this->assertStringContainsString('IODeviceLatencyTargetSec=/dev/md0 50ms', $out);
+    }
 }

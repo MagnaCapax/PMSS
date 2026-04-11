@@ -14,6 +14,7 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertSame(6, $specs['trafficCapMbit']['addUserLegacyIndex']);
         $this->assertSame(8, $specs['CPUWeight']['addUserLegacyIndex']);
         $this->assertSame(14, $specs['cpuQuotaPercent']['addUserLegacyIndex']);
+        $this->assertSame(15, $specs['ioLatencyMs']['addUserLegacyIndex']);
     }
 
     public function testResourceSpecKeepsUserConfigPositionalOrderingStable(): void
@@ -24,6 +25,7 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertSame(5, $specs['CPUWeight']['userConfigIndex']);
         $this->assertSame(10, $specs['IOWriteIOPS']['userConfigIndex']);
         $this->assertSame(12, $specs['trafficCapMbit']['userConfigIndex']);
+        $this->assertSame(13, $specs['ioLatencyMs']['userConfigIndex']);
     }
 
     public function testResourceSpecRetainsHumanUsageStrings(): void
@@ -33,6 +35,7 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertSame('--traffic-limit-gb=GIB', $specs['trafficLimit']['usage']);
         $this->assertSame('--io-read-bw=/dev/DEVICE:RATE', $specs['IOReadBW']['usage']);
         $this->assertSame('--cpu-quota-percent=PERCENT|infinity', $specs['cpuQuotaPercent']['usage']);
+        $this->assertSame('--io-latency-ms=MS', $specs['ioLatencyMs']['usage']);
     }
 
     public function testResourceSpecFlagsPersistOnlyStoredFields(): void
@@ -50,6 +53,7 @@ class userConfigCliSpecificationTest extends TestCase
 
         $this->assertSame('--cpu-weight=', $specs['CPUWeight']['cgroupFlag']);
         $this->assertSame('--io-write-bw=', $specs['IOWriteBW']['cgroupFlag']);
+        $this->assertSame('--io-latency-ms=', $specs['ioLatencyMs']['cgroupFlag']);
         $this->assertFalse(isset($specs['trafficLimit']['cgroupFlag']));
         $this->assertFalse(isset($specs['cpuQuotaPercent']['cgroupFlag']));
     }

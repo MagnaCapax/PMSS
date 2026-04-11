@@ -50,6 +50,7 @@ class userConfigCliCharacterizationTest extends TestCase
         $parsed = [
             'options' => [
                 'io-weight' => '300',
+                'io-latency-ms' => '50',
                 'traffic-cap-mbit' => '0',
             ],
             'arguments' => ['alice'],
@@ -61,6 +62,7 @@ class userConfigCliCharacterizationTest extends TestCase
         $this->assertSame([
             'trafficCapMbit' => 0,
             'IOWeight' => 300,
+            'ioLatencyMs' => 50,
         ], $resolved);
     }
 
@@ -125,6 +127,7 @@ class userConfigCliCharacterizationTest extends TestCase
         $parsed = [
             'options' => [
                 'cpu-weight' => '250',
+                'io-latency-ms' => '45',
                 'traffic-cap-mbit' => '0',
             ],
             'arguments' => ['alice'],
@@ -134,6 +137,7 @@ class userConfigCliCharacterizationTest extends TestCase
         $presence = \pmssUserConfigCliPersistedResourcePresence($parsed, $args, 'addUserOption', 'userConfigIndex');
 
         $this->assertTrue($presence['CPUWeight']);
+        $this->assertTrue($presence['ioLatencyMs']);
         $this->assertTrue($presence['trafficCapMbit']);
         $this->assertFalse($presence['IOWeight']);
     }
@@ -149,16 +153,19 @@ class userConfigCliCharacterizationTest extends TestCase
                 'CPUWeight' => 200,
                 'trafficLimit' => 900,
                 'trafficCapMbit' => 12,
+                'ioLatencyMs' => 45,
             ],
             [
                 'CPUWeight' => true,
                 'trafficCapMbit' => true,
                 'trafficLimit' => true,
+                'ioLatencyMs' => true,
             ]
         );
 
         $this->assertSame(200, $payload['CPUWeight']);
         $this->assertSame(12, $payload['trafficCapMbit']);
+        $this->assertSame(45, $payload['ioLatencyMs']);
         $this->assertSame(0, $payload['trafficLimit']);
     }
 
@@ -169,12 +176,14 @@ class userConfigCliCharacterizationTest extends TestCase
             'IOWeight' => 330,
             'trafficCapMbit' => 12,
             'trafficLimit' => 500,
+            'ioLatencyMs' => 50,
         ]);
 
         $this->assertSame([
             'trafficCapMbit' => 12,
             'CPUWeight' => 220,
             'IOWeight' => 330,
+            'ioLatencyMs' => 50,
         ], $values);
     }
 
@@ -196,6 +205,7 @@ class userConfigCliCharacterizationTest extends TestCase
             'CPUWeight' => 200,
             'IOWeight' => 300,
             'IOWriteBW' => '/dev/sda:7M',
+            'ioLatencyMs' => 50,
             'cpuQuotaPercent' => '150',
         ]);
 
@@ -203,6 +213,7 @@ class userConfigCliCharacterizationTest extends TestCase
             '--cpu-weight=200',
             '--io-weight=300',
             '--io-write-bw=/dev/sda:7M',
+            '--io-latency-ms=50',
         ], $args);
     }
 }

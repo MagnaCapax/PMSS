@@ -12,6 +12,7 @@ class SystemdSlicePlaceholdersCoverageTest extends TestCase
             'v2Template' => $this->pmssSystemdSliceTasksTemplate([
                 'CPUWeight=%%USER_CGROUP_CPU_WEIGHT%%',
                 'IOWeight=%%USER_CGROUP_IO_WEIGHT%%',
+                '%%USER_CGROUP_IO_DEVICE_LATENCY%%',
                 'MemoryHigh=%%USER_CGROUP_MEMORY_HIGH%%M',
                 'MemoryMax=%%USER_CGROUP_MEMORY_MAX%%M',
                 'CPUQuota=%%USER_CGROUP_CPU_QUOTA%%',

@@ -245,6 +245,43 @@ class CgroupUserConfigTest extends TestCase
         $this->assertStringContainsString("'IOReadBandwidthMax=/dev/sda 5M'", $res['out']);
     }
 
+    public function testIoLatencyDefaultsToHomeBackingDevice()
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+
+        $res = $this->runMgr(['testuser', '--io-latency-ms=50']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString('IODeviceLatencyTargetSec=/dev/md0 50ms', $res['out']);
+    }
+
+    public function testIoLatencyRequiresPositiveInteger()
+    {
+        $res = $this->runMgr(['testuser', '--io-latency-ms=0']);
+        $this->assertEquals(2, $res['rc']);
+    }
+
+    public function testDefaultsApplyPolicyLatencyToHomeDevice()
+    {
+        $policy = '<?php return ["ioLatencyMs"=>45];';
+        file_put_contents(sys_get_temp_dir().'/cgroup.policy.php', $policy);
+        $this->sys->findmnt['/home'] = '/dev/md0';
+
+        $res = $this->runMgr(['testuser', '--defaults']);
+
+        $this->assertStringContainsString('IODeviceLatencyTargetSec=/dev/md0 45ms', $res['out']);
+    }
+
+    public function testIoLatencySkippedOnCgroupV1()
+    {
+        $this->sys->cgroupMode = 'v1';
+        $res = $this->runMgr(['testuser', '--io-latency-ms=50']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString('IODeviceLatencyTargetSec requires cgroup v2', $res['out']);
+        $this->assertStringNotContainsString('IODeviceLatencyTargetSec=/dev/', $res['out']);
+    }
+
     // -- Profile Tests --
 
     public function testCpuProfileLow()

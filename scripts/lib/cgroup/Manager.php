@@ -61,7 +61,7 @@ class Manager
         $policyIoPairs = [];
 
         // Flag parsing
-        foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile','--cpu-quota-percent'] as $k) {
+        foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile','--cpu-quota-percent','--io-latency-ms'] as $k) {
             foreach ($flags as $f) {
                 if (strpos($f, $k.'=') === 0) {
                     $val = substr($f, strlen($k)+1);
@@ -129,9 +129,22 @@ class Manager
             return 2;
         }
 
+        if (isset($opt['io-latency-ms']) && $devResolved === '') {
+            $devResolved = $this->sys->resolveDevice('/home');
+        }
+
         // IO Profile
         if ($ioProfile !== '' && $devResolved !== '') {
             $this->applyIoProfile($ioProfile, $devResolved, $opt, $ioPairs);
+        }
+
+        if (isset($opt['io-latency-ms']) && (int)$opt['io-latency-ms'] > 0) {
+            if ($mode === 'v2' && $devResolved !== '') {
+                $ioPairs[] = 'IODeviceLatencyTargetSec='.$devResolved.' '.(int)$opt['io-latency-ms'].'ms';
+                $hasIoFlag = true;
+            } elseif ($mode !== 'v2') {
+                echo "[SKIP] IODeviceLatencyTargetSec requires cgroup v2\n";
+            }
         }
 
         // Policy mount defaults apply only when no explicit IO input is given.
@@ -274,10 +287,14 @@ class Manager
      */
     private function validateFlagOptions(array $opt): ?string
     {
-        foreach (['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max'] as $key) {
+        foreach (['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'io-latency-ms'] as $key) {
             if (isset($opt[$key]) && preg_match('/^-?[0-9]+$/', (string)$opt[$key]) !== 1) {
                 return 'Invalid --'.$key.' value: expected integer';
             }
+        }
+
+        if (isset($opt['io-latency-ms']) && (int)$opt['io-latency-ms'] <= 0) {
+            return 'Invalid --io-latency-ms value: expected positive integer';
         }
 
         if (!isset($opt['cpu-quota-percent'])) {
@@ -339,6 +356,9 @@ class Manager
             if (!isset($opt[$map[0]]) && isset($policy[$map[1]]) && is_numeric($policy[$map[1]])) {
                 $opt[$map[0]] = (string)$policy[$map[1]];
             }
+        }
+        if (!isset($opt['io-latency-ms']) && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs'])) {
+            $opt['io-latency-ms'] = (string)$policy['ioLatencyMs'];
         }
         if (!isset($opt['memory-high']) && isset($policy['memoryHighMiB']) && is_numeric($policy['memoryHighMiB'])) {
             $opt['memory-high'] = (string)$policy['memoryHighMiB'];
@@ -601,7 +621,7 @@ class Manager
     private function showConfig(string $slice): void
     {
         echo "\n[Config] $slice\n";
-        $props = ['CPUWeight','IOWeight','MemoryAccounting','CPUAccounting','IOAccounting','MemoryHigh','MemoryMax','TasksMax','CPUQuotaPerSecUSec','CPUQuotaPeriodUSec'];
+        $props = ['CPUWeight','IOWeight','IODeviceLatencyTargetSec','MemoryAccounting','CPUAccounting','IOAccounting','MemoryHigh','MemoryMax','TasksMax','CPUQuotaPerSecUSec','CPUQuotaPeriodUSec'];
         $out = $this->sys->execute(\pmssBuildSystemdShowCommand($slice, $props));
         echo $out !== null ? trim($out)."\n" : "(no data)\n";
     }
@@ -613,7 +633,7 @@ class Manager
         $lines = [
             \pmssCliHelpHeading('Usage', $useColor),
             '  /scripts/util/userConfigCgroup.php USERNAME [--status] [--config]',
-            '  /scripts/util/userConfigCgroup.php USERNAME --apply [--dry-run] [--defaults] [--respect-existing] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N|infinity] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:RATE] [--io-write-bw=/dev/DEV:RATE] [--io-read-iops=/dev/DEV:IOPS] [--io-write-iops=/dev/DEV:IOPS] [--wipe]',
+            '  /scripts/util/userConfigCgroup.php USERNAME --apply [--dry-run] [--defaults] [--respect-existing] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N|infinity] [--io-latency-ms=MS] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:RATE] [--io-write-bw=/dev/DEV:RATE] [--io-read-iops=/dev/DEV:IOPS] [--io-write-iops=/dev/DEV:IOPS] [--wipe]',
             '',
             \pmssCliHelpHeading('Actions', $useColor),
             \pmssCliHelpLine('--status', 'Show live slice counters from cgroupfs.'),
@@ -629,6 +649,7 @@ class Manager
             \pmssCliHelpLine('--io-weight=N', 'systemd IOWeight; systemd expects 1-10000.'.$derivedDefault),
             \pmssCliHelpLine('--tasks-max=N', 'Process limit for the user slice; use a positive integer.'),
             \pmssCliHelpLine('--cpu-quota-percent=N|infinity', 'CPU quota percent; use 0 or infinity to remove the cap.'),
+            \pmssCliHelpLine('--io-latency-ms=MS', 'IODeviceLatencyTargetSec target in milliseconds for the selected device or the /home backing device.'),
             \pmssCliHelpLine('--device=/dev/DEV|/home', 'Device selector for IO profiles and shorthand resolution.'),
             \pmssCliHelpLine('--io-profile=hdd|nvme|bulk', 'Apply a named IO profile to the selected device.'),
             \pmssCliHelpLine('--io-read-bw=/dev/DEV:RATE', 'Explicit read bandwidth cap, e.g. /dev/sda:20M.'),
@@ -646,7 +667,7 @@ class Manager
             '',
             \pmssCliHelpHeading('Examples', $useColor),
             '  /scripts/util/userConfigCgroup.php alice --status --config',
-            '  /scripts/util/userConfigCgroup.php alice --apply --dry-run --memory-high=1024 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=125',
+            '  /scripts/util/userConfigCgroup.php alice --apply --dry-run --memory-high=1024 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=125 --io-latency-ms=50',
             '  /scripts/util/userConfigCgroup.php alice --apply --defaults --device=/home --io-profile=hdd',
             '',
             \pmssCliHelpHeading('Notes', $useColor),
@@ -669,6 +690,7 @@ class Manager
                 'memory.high'     => $base.'/memory.high',
                 'memory.max'      => $base.'/memory.max',
                 'io.stat'         => $base.'/io.stat',
+                'io.latency'      => $base.'/io.latency',
                 'cpu.weight'      => $base.'/cpu.weight',
             ];
             foreach ($pairs as $label => $path) {

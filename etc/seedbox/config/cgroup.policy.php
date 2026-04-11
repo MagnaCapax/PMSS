@@ -7,6 +7,7 @@ return [
     // CPU/IO weights (1..10000). Lower = lower priority vs others. Default systemd is ~100.
     'cpuWeight'        => 100,
     'ioWeight'         => 100,
+    'ioLatencyMs'      => 50,
 
     // Process/thread cap under the user slice. When omitted, PMSS derives a
     // default from host capacity (CPU threads / RAM GiB) in systemPrep.php.

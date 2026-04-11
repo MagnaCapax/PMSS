@@ -25,6 +25,7 @@ function pmssUserConfigCliResourceSpecs(): array
         'IOReadIOPS' => ['addUserOption' => 'io-read-iops', 'addUserLegacyIndex' => 12, 'userConfigIndex' => 9, 'usage' => '--io-read-iops=/dev/DEVICE:IOPS', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-read-iops='],
         'IOWriteIOPS' => ['addUserOption' => 'io-write-iops', 'addUserLegacyIndex' => 13, 'userConfigIndex' => 10, 'usage' => '--io-write-iops=/dev/DEVICE:IOPS', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-iops='],
         'cpuQuotaPercent' => ['addUserOption' => 'cpu-quota-percent', 'addUserLegacyIndex' => 14, 'userConfigIndex' => 11, 'usage' => '--cpu-quota-percent=PERCENT|infinity', 'parse' => 'string', 'default' => 0, 'persist' => true],
+        'ioLatencyMs' => ['addUserOption' => 'io-latency-ms', 'addUserLegacyIndex' => 15, 'userConfigIndex' => 13, 'usage' => '--io-latency-ms=MS', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-latency-ms='],
     ];
 }
 
@@ -275,6 +276,11 @@ function pmssUserConfigCliResourceHelpSpecs(): array
             'parameterDescription' => 'CPU quota percent; use infinity to remove the limit.',
             'optionDescription' => 'CPU quota percent; use infinity to remove the limit.',
         ],
+        'ioLatencyMs' => [
+            'parameter' => 'IO_LATENCY_MS',
+            'parameterDescription' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
+            'optionDescription' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
+        ],
     ];
 }
 
@@ -288,7 +294,7 @@ function pmssUserConfigCliUsage(): string
     $unchangedDefault = pmssCliHelpDim(' (default: leave current slice policy unchanged)', $useColor);
     $lines = [
         pmssCliHelpHeading('Usage', $useColor),
-        '  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT]',
+        '  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT] [IO_LATENCY_MS]',
         '  ./userConfig.php USERNAME [RESOURCE_OPTIONS]',
         '  ./userConfig.php USERNAME --welcome-message=HTML',
         '',
@@ -305,6 +311,7 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpLine($resourceHelp['IOWriteIOPS']['parameter'], $resourceHelp['IOWriteIOPS']['parameterDescription']),
         pmssCliHelpLine($resourceHelp['cpuQuotaPercent']['parameter'], $resourceHelp['cpuQuotaPercent']['parameterDescription'].$unchangedDefault),
         pmssCliHelpLine($resourceHelp['trafficCapMbit']['parameter'], $resourceHelp['trafficCapMbit']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['ioLatencyMs']['parameter'], $resourceHelp['ioLatencyMs']['parameterDescription']),
         '',
         pmssCliHelpHeading('Named Options', $useColor),
         pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['optionDescription']),
@@ -316,6 +323,7 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpLine($resourceSpecs['IOWriteIOPS']['usage'], $resourceHelp['IOWriteIOPS']['optionDescription']),
         pmssCliHelpLine($resourceSpecs['cpuQuotaPercent']['usage'], $resourceHelp['cpuQuotaPercent']['optionDescription'].$unchangedDefault),
         pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['ioLatencyMs']['usage'], $resourceHelp['ioLatencyMs']['optionDescription']),
         pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
         pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),

@@ -134,7 +134,18 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
             '%%USER_CGROUP_IO_WEIGHT%%'   => (string)$ioWeight,
             '%%USER_CGROUP_TASKS_MAX%%'   => (string)$tasksMax,
             '%%USER_CGROUP_CPU_QUOTA%%'   => ($cpuQuotaVal === 'infinity') ? 'infinity' : $cpuQuotaVal.'%',
+            '%%USER_CGROUP_IO_DEVICE_LATENCY%%' => '',
         ];
+        if ($mode === 'v2' && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs']) && (int) $policy['ioLatencyMs'] > 0) {
+            $homeDevice = trim((string) @shell_exec('findmnt -no SOURCE /home 2>/dev/null'));
+            if ($homeDevice !== '') {
+                $repl['%%USER_CGROUP_IO_DEVICE_LATENCY%%'] = 'IODeviceLatencyTargetSec='.$homeDevice.' '.(int) $policy['ioLatencyMs'].'ms';
+            } else {
+                $log('[WARN] Unable to resolve /home backing device for IODeviceLatencyTargetSec');
+            }
+        } elseif ($mode !== 'v2' && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs']) && (int) $policy['ioLatencyMs'] > 0) {
+            $log('[SKIP] IODeviceLatencyTargetSec skipped on cgroup v1');
+        }
         $raw = strtr((string)@file_get_contents($tpl), $repl);
         // Append per-mount device throttles and weights from policy
         if (isset($policy['mounts']) && is_array($policy['mounts'])) {

@@ -15,6 +15,7 @@ final class UserCliHelpContractsTest extends TestCase
             'Named Options',
             'Examples',
             '--cpu-weight=WEIGHT',
+            '--io-latency-ms=MS',
             '1-10000',
             '250 MiB',
         ], $output);
@@ -36,6 +37,7 @@ final class UserCliHelpContractsTest extends TestCase
         $this->assertStringContainsAllStrings([
             'Usage',
             '--welcome-message=HTML',
+            '--io-latency-ms=MS',
             'MemoryHigh',
             'Examples',
             '250 MiB',
@@ -51,6 +53,7 @@ final class UserCliHelpContractsTest extends TestCase
             'Resource Options',
             '--defaults',
             '--io-profile=hdd|nvme|bulk',
+            '--io-latency-ms=MS',
             '1-10000',
             '250 MiB',
             'Examples',
@@ -79,6 +82,7 @@ final class UserCliHelpContractsTest extends TestCase
             [
                 'addUser.php USERNAME PASSWORD RAM_MiB DISK_QUOTA_GiB',
                 '--cpu-weight=WEIGHT',
+                '--io-latency-ms=MS',
                 '250 MiB',
                 '--docker-enabled=true|false',
                 '/scripts/addUser.php alice rand 1024 200',
@@ -89,6 +93,7 @@ final class UserCliHelpContractsTest extends TestCase
             [
                 './userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB',
                 '--welcome-message=HTML',
+                '--io-latency-ms=MS',
                 '1-10000',
                 '250 MiB',
                 '/scripts/util/userConfig.php alice 1024 200',
