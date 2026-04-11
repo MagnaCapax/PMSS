@@ -81,6 +81,38 @@ class LighttpdWatchdogErrorPageTest extends TestCase
         $contents = pmssLighttpdWatchdogRenderErrorPage('unknown');
         $this->assertStringContainsString('Your web service is restarting.', $contents);
         $this->assertStringContainsString('This usually settles within 1-2 minutes; please retry shortly.', $contents);
+        $this->assertStringContainsString('If the issue persists, please open a support ticket.', $contents);
+    }
+
+    public function testRenderErrorPageKeepsTicketGuidanceForQuotaReason(): void
+    {
+        $contents = pmssLighttpdWatchdogRenderErrorPage('quota');
+        $this->assertStringContainsString('If the issue persists, please open a support ticket.', $contents);
+    }
+
+    public function testRenderErrorPageUsesNoActionGuidanceForPhpReason(): void
+    {
+        $contents = pmssLighttpdWatchdogRenderErrorPage('php');
+        $this->assertStringContainsString('This usually resolves within 1-2 minutes. No action needed.', $contents);
+        $this->assertStringNotContainsString('If the issue persists, please open a support ticket.', $contents);
+    }
+
+    public function testRenderErrorPageUsesNoActionGuidanceForRestartingReason(): void
+    {
+        $contents = pmssLighttpdWatchdogRenderErrorPage('restarting');
+        $this->assertStringContainsString('This usually resolves within 1-2 minutes. No action needed.', $contents);
+    }
+
+    public function testRenderErrorPageUsesNoActionGuidanceForInodeReason(): void
+    {
+        $contents = pmssLighttpdWatchdogRenderErrorPage('inode');
+        $this->assertStringContainsString('This usually resolves within a few minutes. No action needed.', $contents);
+    }
+
+    public function testStaticFallback502PageQualifiesTicketGuidance(): void
+    {
+        $contents = (string) file_get_contents(dirname(__DIR__, 4).'/var/www/error-502.html');
+        $this->assertStringContainsString('If this continues for more than a few minutes, open a support ticket.', $contents);
     }
 
     public function testWriteErrorPageCreatesExpectedPerUserPath(): void

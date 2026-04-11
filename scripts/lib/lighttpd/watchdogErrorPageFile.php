@@ -18,9 +18,16 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
         'php' => array('headline' => 'Your PHP backend is not responding.', 'detail' => 'An automatic restart is in progress; retry in 1-2 minutes.'),
         'restarting' => array('headline' => 'Your web service is restarting.', 'detail' => 'This usually settles within 1-2 minutes; please retry shortly.'),
     );
+    $guidanceMessages = array(
+        'inode' => 'This usually resolves within a few minutes. No action needed.',
+        'php' => 'This usually resolves within 1-2 minutes. No action needed.',
+        'restarting' => 'This usually resolves within 1-2 minutes. No action needed.',
+    );
     $message = $messages[$reasonKey] ?? $messages['restarting'];
+    $guidance = $guidanceMessages[$reasonKey] ?? 'If the issue persists, please open a support ticket.';
     $headline = htmlspecialchars($message['headline'], ENT_QUOTES, 'UTF-8');
     $detail = htmlspecialchars($message['detail'], ENT_QUOTES, 'UTF-8');
+    $guidanceHtml = htmlspecialchars($guidance, ENT_QUOTES, 'UTF-8');
 
     return "502 - Bad Gateway\n\n"
         ."Your web interface could not be loaded.\n\n"
@@ -28,7 +35,7 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
         .'- '.$message['headline']."\n"
         .'- '.$message['detail']."\n\n"
         ."Please wait 1-2 minutes and try again.\n"
-        ."If the issue persists, please open a support ticket.\n\n"
+        .$guidance."\n\n"
         ."---\n"
         .'<!-- Visual page for browsers below -->' . "\n"
         ."<!DOCTYPE html>\n"
@@ -49,7 +56,8 @@ function pmssLighttpdWatchdogRenderErrorPage(string $reasonKey): string
         ."      <p>The sage is reconnecting the pathways.</p>\n"
         ."      <p><strong>Status:</strong> {$headline}</p>\n"
         ."      <p>{$detail}</p>\n"
-        ."      <p>Wait 1-2 minutes and retry. If this continues, open a support ticket.</p>\n"
+        ."      <p>Wait 1-2 minutes and retry.</p>\n"
+        ."      <p>{$guidanceHtml}</p>\n"
         ."      <p><a href=\"/\">Return to the main page.</a></p>\n"
         ."    </div>\n"
         ."  </div>\n"
