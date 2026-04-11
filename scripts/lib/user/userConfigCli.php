@@ -17,6 +17,7 @@ function pmssUserConfigCliResourceSpecs(): array
 {
     return [
         'trafficLimit' => ['addUserOption' => 'traffic-limit-gb', 'addUserLegacyIndex' => 5, 'userConfigIndex' => 4, 'usage' => '--traffic-limit-gb=GIB', 'parse' => 'int', 'default' => null, 'persist' => false],
+        'iopsLimit' => ['addUserOption' => 'iops-limit', 'usage' => '--iops-limit=OPS', 'parse' => 'int', 'default' => null, 'persist' => false],
         'trafficCapMbit' => ['addUserOption' => 'traffic-cap-mbit', 'addUserLegacyIndex' => 6, 'userConfigIndex' => 12, 'usage' => '--traffic-cap-mbit=MBIT', 'parse' => 'int', 'default' => 0, 'persist' => true],
         'CPUWeight' => ['addUserOption' => 'cpu-weight', 'addUserLegacyIndex' => 8, 'userConfigIndex' => 5, 'usage' => '--cpu-weight=WEIGHT', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--cpu-weight='],
         'IOWeight' => ['addUserOption' => 'io-weight', 'addUserLegacyIndex' => 9, 'userConfigIndex' => 6, 'usage' => '--io-weight=WEIGHT', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-weight='],
@@ -60,7 +61,8 @@ function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $
 {
     $values = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $value = pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $spec[$indexKey], $spec['default']);
+        $legacyIndex = isset($spec[$indexKey]) ? (int) $spec[$indexKey] : -1;
+        $value = pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $legacyIndex, $spec['default']);
         $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
     }
     return $values;
@@ -74,7 +76,7 @@ function pmssUserConfigCliExplicitResources(array $parsed, array $args, string $
         $value = null;
         if (pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])) {
             $value = $parsed['options'][$spec[$optionKey]];
-        } elseif (array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '') {
+        } elseif (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '') {
             $value = $args[$spec[$indexKey]];
         }
 
@@ -127,7 +129,7 @@ function pmssUserConfigCliPositionalResources(array $args, string $indexKey): ar
 {
     $values = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $value = array_key_exists($spec[$indexKey], $args) ? $args[$spec[$indexKey]] : $spec['default'];
+        $value = (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args)) ? $args[$spec[$indexKey]] : $spec['default'];
         $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
     }
     return $values;
@@ -141,7 +143,7 @@ function pmssUserConfigCliPersistedPositionalPresence(array $args): array
         if (empty($spec['persist'])) {
             continue;
         }
-        $presence[$key] = array_key_exists($spec['userConfigIndex'], $args)
+        $presence[$key] = isset($spec['userConfigIndex']) && array_key_exists($spec['userConfigIndex'], $args)
             && $args[$spec['userConfigIndex']] !== '';
     }
     return $presence;
@@ -157,7 +159,7 @@ function pmssUserConfigCliPersistedResourcePresence(array $parsed, array $args, 
         }
 
         $presence[$key] = pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])
-            || (array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '');
+            || (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '');
     }
     return $presence;
 }
@@ -202,6 +204,9 @@ function pmssUserConfigCliBuildUserConfigPositionals(array $user): array
     $optionalArgs = array_fill(4, 9, '');
     $lastOptionalIndex = 3;
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+        if (!isset($spec['userConfigIndex'])) {
+            continue;
+        }
         $index = $spec['userConfigIndex'];
         $optionalArgs[$index] = array_key_exists($key, $user) ? (string) $user[$key] : '';
         if ($optionalArgs[$index] !== '') {
@@ -235,6 +240,11 @@ function pmssUserConfigCliResourceHelpSpecs(): array
             'parameter' => 'TRAFFIC_LIMIT_GB',
             'parameterDescription' => 'Monthly traffic quota in GiB.',
             'optionDescription' => 'Monthly traffic quota in GiB.',
+        ],
+        'iopsLimit' => [
+            'parameter' => 'IOPS_LIMIT',
+            'parameterDescription' => 'Monthly combined read+write I/O operations budget.',
+            'optionDescription' => 'Monthly combined read+write I/O operations budget.',
         ],
         'trafficCapMbit' => [
             'parameter' => 'TRAFFIC_CAP_MBIT',
@@ -315,6 +325,7 @@ function pmssUserConfigCliUsage(): string
         '',
         pmssCliHelpHeading('Named Options', $useColor),
         pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['iopsLimit']['usage'], $resourceHelp['iopsLimit']['optionDescription']),
         pmssCliHelpLine($resourceSpecs['CPUWeight']['usage'], $resourceHelp['CPUWeight']['optionDescription'].$derivedDefault),
         pmssCliHelpLine($resourceSpecs['IOWeight']['usage'], $resourceHelp['IOWeight']['optionDescription'].$derivedDefault),
         pmssCliHelpLine($resourceSpecs['IOReadBW']['usage'], $resourceHelp['IOReadBW']['optionDescription']),

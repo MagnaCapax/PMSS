@@ -23,6 +23,9 @@ function pmssAddUserBuildUserConfigCommand(array $user): string
     if (isset($user['torrentThrottle']) && is_numeric($user['torrentThrottle'])) {
         $command[] = '--upload-throttle-kib='.(string) $user['torrentThrottle'];
     }
+    if (isset($user['iopsLimit']) && is_numeric($user['iopsLimit'])) {
+        $command[] = '--iops-limit='.(string) $user['iopsLimit'];
+    }
     if (isset($user['dockerEnabled']) && $user['dockerEnabled'] !== '') {
         $command[] = '--docker-enabled='.(string) $user['dockerEnabled'];
     }

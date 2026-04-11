@@ -43,6 +43,7 @@ function pmssAddUserCliUsage(): string
         pmssCliHelpLine('--ram-mib=RAM_MiB', 'Same as the RAM positional argument.'),
         pmssCliHelpLine('--disk-quota-gib=DISK_QUOTA_GiB', 'Same as the disk quota positional argument.'),
         pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['iopsLimit']['usage'], $resourceHelp['iopsLimit']['optionDescription']),
         pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['optionDescription']),
         pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         pmssCliHelpLine($resourceSpecs['CPUWeight']['usage'], $resourceHelp['CPUWeight']['optionDescription'].$derivedDefault),
@@ -96,7 +97,7 @@ function pmssAddUserParseCli(array $argv): array
     }
 
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $value = pmssUserConfigCliLegacyValue($parsed, $spec['addUserOption'], $args, $spec['addUserLegacyIndex'], null);
+        $value = pmssUserConfigCliLegacyValue($parsed, $spec['addUserOption'], $args, isset($spec['addUserLegacyIndex']) ? (int) $spec['addUserLegacyIndex'] : -1, null);
         if ($value !== null && $value !== '') {
             $user[$key] = $value;
         }

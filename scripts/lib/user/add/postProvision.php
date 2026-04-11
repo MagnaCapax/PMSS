@@ -8,6 +8,7 @@
 
 require_once __DIR__.'/../../traffic/storage.php';
 require_once __DIR__.'/../../user/trafficLimit.php';
+require_once __DIR__.'/../../user/iopsLimit.php';
 
 /**
  * Run post-provision steps that should not block account creation.
@@ -44,5 +45,9 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     if (empty($user['trafficLimit'])) {
         $trafficLimitPath = pmssTrafficLimitPath($user['name'], dirname($homePath));
         pmssTrafficLimitWriteGiBFile($trafficLimitPath, 0) && pmssTrafficLimitConvergeFileMode($trafficLimitPath, 0664);
+    }
+    if (empty($user['iopsLimit'])) {
+        $iopsLimitPath = pmssIopsLimitPath($user['name'], dirname($homePath));
+        pmssIopsLimitWriteOperationsFile($iopsLimitPath, 0) && pmssIopsLimitConvergeFileMode($iopsLimitPath, 0664);
     }
 }

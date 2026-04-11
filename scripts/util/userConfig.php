@@ -12,7 +12,7 @@
  * @author PMSS Team
  */
 
-foreach (['traffic', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
+foreach (['traffic', 'iopsLimit', 'deluge', 'qbittorrent', 'userConfigStore'] as $module) {
     require_once __DIR__.'/../lib/user/'.$module.'.php';
 }
 require_once __DIR__.'/../lib/cli/optionParser.php';
@@ -167,6 +167,15 @@ if ($uploadThrottleKib !== null) {
 // Write optional traffic caps before touching heavyweight services so limits
 // persist even if later steps bail out.
 userApplyTrafficLimit($user);
+if (array_key_exists('iopsLimit', $user) && $user['iopsLimit'] !== null) {
+    $targetModes = pmssIopsLimitTargetModes($user['name'], dirname($expectedHome));
+    $persistError = null;
+    if (!pmssIopsLimitPrepareTargetModes($targetModes)
+        || !pmssIopsLimitPersistTargetModes($targetModes, (int) $user['iopsLimit'], $persistError)
+    ) {
+        fwrite(STDERR, "Warning: failed to persist IOPS limit for {$user['name']}: ".($persistError ?: 'unable to prepare runtime targets')."\n");
+    }
+}
 
 // Compose a canonical rtorrent configuration and mirror it to companion apps.
 echo "Creating rTorrent config\n";

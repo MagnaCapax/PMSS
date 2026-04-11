@@ -72,6 +72,7 @@ append logs to `/var/log/pmss/<script>.log`. Highlights include:
 - `resourceStats.php` – Fold raw resource samples into per-user aggregates twice per hour.
 - `resourceSnapshot.php` – Append a daily root-only snapshot of resource usage for long-term review.
 - `trafficLimits.php` – Refresh per-user traffic throttling configuration (supports staged overage caps via `overageStages` and progressive post-cap reduction via `progressiveThrottleEnabled`, `progressiveThrottleFloorPercent`, and `progressiveThrottleGracePercent` in `/etc/seedbox/config/network`).
+- `iopsLimits.php` – Refresh per-user monthly IOPS throttling by comparing `resourceStats` month totals against `/etc/seedbox/runtime/iopsLimits/<user>` and temporarily capping `/home` read/write IOPS via `userConfigCgroup.php`.
 - `trafficLog.php` – Capture recent traffic counters for aggregation.
 - `trafficStats.php` – Fold raw logs into long-term statistics.
 - `systemdServicesGuard.php` – Enforce stop/disable/mask policy for system services.

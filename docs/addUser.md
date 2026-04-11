@@ -26,6 +26,7 @@ Usage
 - `--ram-mib=RAM_MiB` — same as the RAM positional argument.
 - `--disk-quota-gib=DISK_QUOTA_GiB` — same as the disk quota positional argument.
 - `--traffic-limit-gb=GIB` — monthly traffic quota in GiB.
+- `--iops-limit=OPS` — monthly combined read+write I/O operations budget.
 - `--traffic-cap-mbit=MBIT` — traffic shaper ceiling in Mbit/s; `0` disables shaping.
 - `--upload-throttle-kib=KIB` — persist torrent upload throttle in KiB/s; `0` removes it.
 - `--cpu-weight=WEIGHT` — systemd `CPUWeight`; systemd expects `1-10000` and PMSS auto-derives a value from RAM when omitted.

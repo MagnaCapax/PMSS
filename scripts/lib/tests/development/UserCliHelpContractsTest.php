@@ -37,6 +37,7 @@ final class UserCliHelpContractsTest extends TestCase
         $this->assertStringContainsAllStrings([
             'Usage',
             '--welcome-message=HTML',
+            '--iops-limit=OPS',
             '--io-latency-ms=MS',
             'MemoryHigh',
             'Examples',
@@ -93,6 +94,7 @@ final class UserCliHelpContractsTest extends TestCase
             [
                 './userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB',
                 '--welcome-message=HTML',
+                '--iops-limit=OPS',
                 '--io-latency-ms=MS',
                 '1-10000',
                 '250 MiB',

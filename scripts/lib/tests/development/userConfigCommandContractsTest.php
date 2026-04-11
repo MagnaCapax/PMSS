@@ -82,6 +82,7 @@ class userConfigCommandContractsTest extends TestCase
             'Named Options',
             '--cpu-weight=WEIGHT',
             '--upload-throttle-kib=KIB',
+            '--iops-limit=OPS',
             '--docker-enabled=true|false',
             'Examples',
         ], $usage);

@@ -28,6 +28,7 @@ Usage
 ## Named Options
 
 - `--traffic-limit-gb=GIB` — monthly traffic quota in GiB.
+- `--iops-limit=OPS` — monthly combined read+write I/O operations budget.
 - `--cpu-weight=WEIGHT` — systemd `CPUWeight`; systemd expects `1-10000` and PMSS auto-derives a value from RAM when omitted.
 - `--io-weight=WEIGHT` — systemd `IOWeight`; systemd expects `1-10000` and PMSS auto-derives a value from RAM when omitted.
 - `--io-read-bw=/dev/DEVICE:RATE` — read bandwidth cap in `/dev/DEVICE:RATE` form.
