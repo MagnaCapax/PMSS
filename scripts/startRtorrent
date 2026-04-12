@@ -176,6 +176,10 @@ if (file_exists($localnet)) {
         logmsg("[WARN] {$localnet} exists but is not readable by {$user}; rTorrent will likely fail with a localnet ip filter error.");
         logmsg("[HINT] Run '/scripts/util/setupPermissions.php' as root or check: ls -ld /etc/seedbox /etc/seedbox/config {$localnet}");
     }
+
+    if (is_file($localnet) && !is_link($localnet) && @filesize($localnet) === 0) {
+        logmsg("[WARN] {$localnet} is empty; rTorrent will likely fail with a localnet ip filter error.");
+    }
 }
 
 // Check if session directory exists - if not create it.

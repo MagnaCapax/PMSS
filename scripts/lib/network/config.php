@@ -19,7 +19,7 @@ function networkLoadConfig(): array
 function networkLoadLocalnets(): array
 {
     $path = pmssResolvePathFromEnv('PMSS_LOCALNET_FILE', '/etc/seedbox/config/localnet');
-    if (!file_exists($path)) {
+    $loadDefaultLocalnets = static function () use ($path): array {
         $hostname = getenv('PMSS_HOSTNAME');
         if (!is_string($hostname) || trim($hostname) === '') {
             $hostname = function_exists('gethostname') ? (string) @gethostname() : (string) php_uname('n');
@@ -45,8 +45,17 @@ function networkLoadLocalnets(): array
             @chmod($path, 0644);
         }
         return $default;
+    };
+
+    if (!file_exists($path)) {
+        return $loadDefaultLocalnets();
     }
 
-    $cfg = trim((string) pmssReadRegularFileContents($path));
-    return $cfg === '' ? [] : preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY);
+    $contents = pmssReadRegularFileContents($path);
+    if ($contents === null) {
+        return [];
+    }
+
+    $cfg = trim($contents);
+    return $cfg === '' ? $loadDefaultLocalnets() : preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY);
 }

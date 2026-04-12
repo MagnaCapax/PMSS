@@ -46,6 +46,8 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/startRtorrent');
 
         $this->assertStringContainsString("escapeshellarg('test -r '.\$localnet)", $src);
+        $this->assertStringContainsString("@filesize(\$localnet) === 0", $src);
+        $this->assertStringContainsString('is empty; rTorrent will likely fail with a localnet ip filter error.', $src);
         $this->assertStringContainsString('ls -ld /etc/seedbox /etc/seedbox/config {$localnet}', $src);
     }
 }

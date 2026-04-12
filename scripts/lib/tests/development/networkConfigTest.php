@@ -52,13 +52,31 @@ class NetworkConfigTest extends TestCase
         });
     }
 
-    public function testLoadLocalnetsReturnsEmptyWhenConfigFileIsBlank(): void
+    public function testLoadLocalnetsRepopulatesBlankPmConfigFileWithDefault(): void
     {
         $tmp = $this->pmssMakeTempPath('pmss-localnets-');
         file_put_contents($tmp, "\n");
 
-        $this->pmssWithEnv(['PMSS_LOCALNET_FILE' => $tmp], function (): void {
+        $this->pmssWithEnv([
+            'PMSS_LOCALNET_FILE' => $tmp,
+            'PMSS_HOSTNAME' => 'seedbox1.pulsedmedia.com',
+        ], function () use ($tmp): void {
+            $this->assertEquals(['185.148.0.0/22'], \networkLoadLocalnets());
+            $this->assertEquals("185.148.0.0/22\n", file_get_contents($tmp));
+        });
+    }
+
+    public function testLoadLocalnetsKeepsBlankNonPmConfigFileEmpty(): void
+    {
+        $tmp = $this->pmssMakeTempPath('pmss-localnets-');
+        file_put_contents($tmp, "\n");
+
+        $this->pmssWithEnv([
+            'PMSS_LOCALNET_FILE' => $tmp,
+            'PMSS_HOSTNAME' => 'seedbox1.example.com',
+        ], function () use ($tmp): void {
             $this->assertEquals([], \networkLoadLocalnets());
+            $this->assertEquals("\n", file_get_contents($tmp));
         });
     }
 
