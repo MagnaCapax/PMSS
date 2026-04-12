@@ -22,7 +22,7 @@ class LighttpdProxyFragmentsTest extends TestCase
         $cases = [
             'rclone' => [
                 'actual' => \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001),
-                'expectedHash' => '7c0160200a8bc640c0571ab0b6cea03ab31c36b15b8289a1881652a2e47ccf77',
+                'expectedHash' => 'd386c37104634b335218731ee05713a068944bc6a30e907ee4690dfc6a674c88',
             ],
             'qbittorrent' => [
                 'actual' => \pmssLighttpdManagedProxyFragment('qbittorrent', 'demo', 4002),
@@ -55,6 +55,32 @@ class LighttpdProxyFragmentsTest extends TestCase
         foreach ($cases as $name => $fragment) {
             $this->assertStringContainsString('$HTTP["url"] =~ ', $fragment, $name.' fragment must use lighttpd $HTTP matcher');
             $this->assertFalse(strpos($fragment, '\\$HTTP["url"]') !== false, $name.' fragment must not escape lighttpd $HTTP matcher');
+        }
+
+        $rcloneFragment = $cases['rclone'];
+        $this->assertStringContainsString('$REQUEST_HEADER["Content-Length"]', $rcloneFragment);
+        $this->assertFalse(strpos($rcloneFragment, '\\$REQUEST_HEADER["Content-Length"]') !== false, 'rclone fragment must not escape lighttpd $REQUEST_HEADER matcher');
+    }
+
+    public function testRcloneFragmentAddsZeroContentLengthOnlyForBodylessPosts(): void
+    {
+        $fragment = \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001);
+
+        $this->assertStringContainsString('$HTTP["request-method"] == "POST" {', $fragment);
+        $this->assertStringContainsString('$REQUEST_HEADER["Content-Length"] == "" {', $fragment);
+        $this->assertStringContainsString('setenv.set-request-header = ( "Content-Length" => "0" )', $fragment);
+    }
+
+    public function testOnlyRcloneFragmentTouchesContentLengthHeader(): void
+    {
+        $this->assertStringContainsString('Content-Length', \pmssLighttpdManagedProxyFragment('rclone', 'demo', 4001));
+
+        foreach (['qbittorrent', 'invidious', 'deluge'] as $proxyName) {
+            $this->assertStringNotContainsString(
+                'Content-Length',
+                \pmssLighttpdManagedProxyFragment($proxyName, 'demo', 4001),
+                $proxyName.' proxy should not rewrite request bodies'
+            );
         }
     }
 }

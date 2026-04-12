@@ -363,13 +363,22 @@ function pmssLighttpdProxyRuleFragment(
     int $port,
     array $pathMap = [],
     bool $disableAuth = false,
-    bool $forwardForwardedHeaders = false
+    bool $forwardForwardedHeaders = false,
+    bool $injectZeroContentLengthOnEmptyPost = false
 ): string
 {
     $hasHeader = count($pathMap) > 0;
     $fragment = '$HTTP["url"] =~ "'.$pattern."\" {\n";
     if ($disableAuth) {
         $fragment .= "  auth.require = ()\n";
+    }
+    if ($injectZeroContentLengthOnEmptyPost) {
+        // Lighttpd rejects empty POSTs without Content-Length before mod_proxy forwards them.
+        $fragment .= '  $HTTP["request-method"] == "POST" {'."\n"
+            .'    $REQUEST_HEADER["Content-Length"] == "" {'."\n"
+            .'      setenv.set-request-header = ( "Content-Length" => "0" )'."\n"
+            .'    }'."\n"
+            .'  }'."\n";
     }
 
     $fragment .= "  proxy.server = ( \"\" => ( (\n"
@@ -418,7 +427,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
                 ['^/deluge-'.$user.'($|/)', ['/deluge-'.$user.'/' => '/user-'.$user.'/deluge/', '/deluge-'.$user => '/user-'.$user.'/deluge'], true, false],
             ],
         ],
-        'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false]]],
+        'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
         'qbittorrent' => [
             "# PMSS-managed: qBittorrent reverse proxy.\n\n",
             [['^/user-'.$user.'/qbittorrent/', ['/user-'.$user.'/qbittorrent/' => '/', '/user-'.$user.'/qbittorrent' => ''], false, true]],
@@ -434,7 +443,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
     if (!isset($definitions[$proxyName])) { return ''; }
     $fragment = $definitions[$proxyName][0];
     foreach ($definitions[$proxyName][1] as $rule) {
-        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3])."\n\n";
+        $fragment .= pmssLighttpdProxyRuleFragment($rule[0], $port, $rule[1], $rule[2], $rule[3], $rule[4] ?? false)."\n\n";
     }
     return $fragment;
 }
