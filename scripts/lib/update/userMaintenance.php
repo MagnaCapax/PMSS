@@ -78,12 +78,12 @@ require_once __DIR__.'/../user/userConfigStore.php';
         foreach ($users as $user) {
             if (($userTrim = trim($user)) === '') {
                 $skippedUsers++;
-                logMessage('[WARN] Skipping empty username during update-step2');
+                logMessage("[WARN] Account '(empty)' skipped during environment refresh: empty username entry");
                 continue;
             }
             if (!pmssValidateUsername($userTrim)) {
                 $skippedUsers++;
-                logMessage(sprintf('[WARN] Skipping invalid username during update-step2: %s', $userTrim));
+                logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: invalid username", $userTrim));
                 continue;
             }
 
@@ -147,7 +147,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
                 $userDuration = microtime(true) - $userStart;
                 $reason = get_class($throwable).($throwable->getMessage() === '' ? '' : ': '.$throwable->getMessage());
 
-                logMessage(sprintf('[WARN] Skipping remaining maintenance for user %s: %s', $userTrim, $reason));
+                logMessage(sprintf("[WARN] Account '%s' skipped during environment refresh: %s", $userTrim, $reason));
                 pmssUserLog($userTrim, '[WARN] update-step2 user maintenance aborted: '.$reason);
 
                 $recordUserProfile($userTrim, 'ERR', 1, $userDuration, substr(preg_replace('/\s+/', ' ', $reason), 0, 300));

@@ -10,6 +10,9 @@ class UserMaintenancePartialCompletionGuardTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
 
         $this->assertStringContainsString('Processed %d of %d users', $src);
+        $this->assertStringContainsString("Account '(empty)' skipped during environment refresh: empty username entry", $src);
+        $this->assertStringContainsString("Account '%s' skipped during environment refresh: invalid username", $src);
+        $this->assertStringContainsString("Account '%s' skipped during environment refresh: %s", $src);
         $this->assertStringContainsString("'event'     => 'user_maintenance_summary'", $src);
         $this->assertStringContainsString("'processed' => ", $src);
         $this->assertStringContainsString("'skipped'   => ", $src);
