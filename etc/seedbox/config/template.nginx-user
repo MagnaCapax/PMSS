@@ -20,6 +20,15 @@ location /public-##username/ {
         # PMSS media-stack apps behind lighttpd use map-urlpath, which also
         # reverse-maps Location headers back to bare /app paths. Restore the
         # external /public-<user>/ prefix before clients follow redirects.
+        # The same reverse mapping touches Set-Cookie Path values, so keep
+        # cookie scope aligned with the external /public-<user>/<app> paths.
+        proxy_cookie_path /sabnzbd /public-##username/sabnzbd;
+        proxy_cookie_path /lidarr /public-##username/lidarr;
+        proxy_cookie_path /radarr /public-##username/radarr;
+        proxy_cookie_path /prowlarr /public-##username/prowlarr;
+        proxy_cookie_path /readarr /public-##username/readarr;
+        proxy_cookie_path /sonarr /public-##username/sonarr;
+        proxy_cookie_path /jellyfin /public-##username/jellyfin;
         proxy_redirect ~^(https?://[^/]+)?/sabnzbd(/.*)?$ /public-##username/sabnzbd$2;
         proxy_redirect ~^(https?://[^/]+)?/lidarr(/.*)?$ /public-##username/lidarr$2;
         proxy_redirect ~^(https?://[^/]+)?/radarr(/.*)?$ /public-##username/radarr$2;
