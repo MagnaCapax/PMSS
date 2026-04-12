@@ -85,6 +85,25 @@ class MediaStackNginxRedirectTest extends TestCase
         $this->assertStringContainsString('proxy_cookie_path /jellyfin /public-##username/jellyfin;', $this->publicProxyBlock());
     }
 
+    public function testPublicProxyBlockRewritesGenericRedirects(): void
+    {
+        $this->assertStringContainsString('proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;', $this->publicProxyBlock());
+    }
+
+    public function testPublicProxyBlockKeepsGenericRedirectAfterAppSpecificRules(): void
+    {
+        $block = $this->publicProxyBlock();
+        $jellyfinRule = 'proxy_redirect ~^(https?://[^/]+)?/jellyfin(/.*)?$ /public-##username/jellyfin$2;';
+        $genericRule = 'proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;';
+
+        $this->assertTrue(strpos($block, $jellyfinRule) !== false, 'Expected jellyfin redirect rule in public block');
+        $this->assertTrue(strpos($block, $genericRule) !== false, 'Expected generic redirect rule in public block');
+        $this->assertTrue(
+            strpos($block, $jellyfinRule) < strpos($block, $genericRule),
+            'Generic redirect rule must stay after app-specific proxy_redirect rules'
+        );
+    }
+
     public function testProxyParamsForwardOriginalScheme(): void
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-proxy_params');

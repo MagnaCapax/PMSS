@@ -36,6 +36,9 @@ location /public-##username/ {
         proxy_redirect ~^(https?://[^/]+)?/readarr(/.*)?$ /public-##username/readarr$2;
         proxy_redirect ~^(https?://[^/]+)?/sonarr(/.*)?$ /public-##username/sonarr$2;
         proxy_redirect ~^(https?://[^/]+)?/jellyfin(/.*)?$ /public-##username/jellyfin$2;
+        # Restore the external public prefix for generic lighttpd redirects
+        # such as directory trailing-slash 301 responses.
+        proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;
         proxy_set_header Upgrade $http_upgrade;
 #        proxy_set_header Connection $connection_upgrade;
         proxy_set_header Connection "upgrade";
