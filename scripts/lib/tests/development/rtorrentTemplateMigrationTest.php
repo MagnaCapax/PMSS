@@ -54,7 +54,22 @@ class RtorrentTemplateMigrationTest extends TestCase
         $input = "schedule = watch_directory,15,1,\"load_start=~/watch/*.torrent\"\nschedule_remove = watch_directory\n";
 
         $this->assertEquals(
-            "schedule2 = watch_directory,15,1,\"load_start=~/watch/*.torrent\"\nschedule_remove2 = watch_directory\n",
+            "schedule2 = watch_directory,15,1,\"load.start=~/watch/*.torrent\"\nschedule_remove2 = watch_directory\n",
+            \pmssRtorrentNormalizeLegacyTemplate($input)
+        );
+    }
+
+    /**
+     * Existing schedule2 lines can still hide removed aliases inside payloads.
+     */
+    public function testNormalizesLegacyInlineAliasesInsideModernSchedulerLines(): void
+    {
+        $input = "schedule2 = rss,0,1800,\"execute=sh,-c,echo ok\"\n"
+            ."schedule2 = watch_directory,15,1,\"load_start_verbose=~/watch/*.torrent\"\n";
+
+        $this->assertEquals(
+            "schedule2 = rss,0,1800,\"execute2=sh,-c,echo ok\"\n"
+            ."schedule2 = watch_directory,15,1,\"load.start_verbose=~/watch/*.torrent\"\n",
             \pmssRtorrentNormalizeLegacyTemplate($input)
         );
     }

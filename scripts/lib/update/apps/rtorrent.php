@@ -120,6 +120,20 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
         '/^\s*hash_max_tries\s*=\s*.+?\s*$/',
     ];
 
+    $inlineLegacyMappings = [
+        '/(?<![A-Za-z0-9_.])load_start_verbose(?==)/' => 'load.start_verbose',
+        '/(?<![A-Za-z0-9_.])load_start(?==)/' => 'load.start',
+        '/(?<![A-Za-z0-9_.])execute(?==)/' => 'execute2',
+    ];
+
+    $normalizeInlineAliases = static function (string $line) use ($inlineLegacyMappings): string {
+        return (string) preg_replace(
+            array_keys($inlineLegacyMappings),
+            array_values($inlineLegacyMappings),
+            $line
+        );
+    };
+
     $managedLines = [];
     foreach ($legacyMappings as $mapping) {
         $managedLines[$mapping['replacementPrefix']] = true;
@@ -143,7 +157,7 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
         foreach ($legacyMappings as $mapping) {
             $matches = [];
             if (preg_match($mapping['pattern'], $line, $matches) === 1) {
-                $replacement = $mapping['replacementPrefix'].$matches[1];
+                $replacement = $normalizeInlineAliases($mapping['replacementPrefix'].$matches[1]);
                 if (!isset($seenManagedLines[$replacement])) {
                     $normalizedLines[] = $replacement;
                     $seenManagedLines[$replacement] = true;
@@ -156,6 +170,7 @@ function pmssRtorrentNormalizeLegacyTemplate(string $template): string
             continue;
         }
 
+        $line = $normalizeInlineAliases($line);
         $trimmed = trim($line);
         foreach (array_keys($managedLines) as $managedPrefix) {
             if (strpos($trimmed, $managedPrefix) === 0) {
