@@ -11,30 +11,22 @@
 
 require_once __DIR__.'/../network/iptables.php';
 
-if (!function_exists('iptablesRun')) {
-    function iptablesRun(string $rule): void
-    {
-        networkRunIptables($rule);
-    }
+function iptablesRun(string $rule): void
+{
+    networkRunIptables($rule);
 }
 
-if (!function_exists('iptablesParseMonitoring')) {
-    function iptablesParseMonitoring(string $raw): array
-    {
-        return networkParseMonitoringCommands($raw);
-    }
+function iptablesParseMonitoring(string $raw): array
+{
+    return networkParseMonitoringCommands($raw);
 }
 
-if (!function_exists('iptablesApplyAtomically')) {
-    function iptablesApplyAtomically(array $filterCommands, array $natCommands): bool
-    {
-        return networkApplyIptablesAtomically($filterCommands, $natCommands);
-    }
+function iptablesApplyAtomically(array $filterCommands, array $natCommands): bool
+{
+    return networkApplyIptablesAtomically($filterCommands, $natCommands);
 }
 
-if (!function_exists('iptablesApplyFallback')) {
-    function iptablesApplyFallback(array $filterCommands, array $natCommands, array $replacements): void
-    {
-        networkApplyIptablesFallback($filterCommands, $natCommands, $replacements);
-    }
+function iptablesApplyFallback(array $filterCommands, array $natCommands, array $replacements): void
+{
+    networkApplyIptablesFallback($filterCommands, $natCommands, $replacements);
 }
