@@ -1070,6 +1070,8 @@ if [[ $DRY_RUN -eq 0 ]]; then
 # PMSS-managed media stack proxy fragment.
 # Keep ARR base paths canonical so missing-slash requests
 # redirect to proxy-managed app roots.
+# App-specific Location and Set-Cookie Path rewriting belongs here via
+# map-urlpath so nginx stays a minimal per-user front door.
 url.redirect += (
   "^/radarr$" => "/public-${USERNAME}/radarr/",
   "^/sonarr$" => "/public-${USERNAME}/sonarr/",

@@ -160,6 +160,17 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('"^/prowlarr$" => "/public-${USERNAME}/prowlarr/"', $this->script);
     }
 
+    public function testLighttpdMediaStackFragmentOwnsAppResponsePathMapping(): void
+    {
+        $this->assertStringContainsString('Location and Set-Cookie Path rewriting belongs here via', $this->script);
+        $this->assertStringContainsString('map-urlpath so nginx stays a minimal per-user front door.', $this->script);
+        $this->assertStringContainsString('"/sabnzbd" => "/public-${USERNAME}/sabnzbd"', $this->script);
+        $this->assertStringContainsString('"/radarr" => "/public-${USERNAME}/radarr"', $this->script);
+        $this->assertStringContainsString('"/prowlarr" => "/public-${USERNAME}/prowlarr"', $this->script);
+        $this->assertStringContainsString('"/sonarr" => "/public-${USERNAME}/sonarr"', $this->script);
+        $this->assertStringContainsString('"/jellyfin" => "/public-${USERNAME}/jellyfin"', $this->script);
+    }
+
     public function testDryRunLoggingPresent(): void
     {
         $this->assertStringContainsString('[dry-run]', $this->script);
