@@ -292,6 +292,88 @@ lighttpd_custom_has_legacy_media_stack_rules() {
     grep -Fq '"^/jellyfin(\$|/)"' "$custom_file"
 }
 
+lighttpd_custom_strip_managed_media_stack_routes() {
+  local custom_fragment="$1"
+  local temp_fragment=""
+  [[ -f "$custom_fragment" ]] || return 0
+
+  temp_fragment="${custom_fragment}.pmss.$$"
+
+  if ! awk '
+    function line_is_managed_route_start(line) {
+      if (line !~ /^[[:space:]]*\$HTTP\["url"\] =~ /) {
+        return 0
+      }
+
+      if (index(line, "\"^/sabnzbd(\\$|/)\"") > 0) {
+        return 1
+      }
+      if (index(line, "\"^/radarr(\\$|/)\"") > 0) {
+        return 1
+      }
+      if (index(line, "\"^/prowlarr(\\$|/)\"") > 0) {
+        return 1
+      }
+      if (index(line, "\"^/sonarr(\\$|/)\"") > 0) {
+        return 1
+      }
+      if (index(line, "\"^/jellyfin(\\$|/)\"") > 0) {
+        return 1
+      }
+
+      return 0
+    }
+
+    function brace_delta(line, open_count, close_count) {
+      open_count = gsub(/\{/, "{", line)
+      close_count = gsub(/\}/, "}", line)
+      return open_count - close_count
+    }
+
+    {
+      if (skip_block == 1) {
+        block_depth += brace_delta($0)
+        if (block_depth <= 0) {
+          skip_block = 0
+          block_depth = 0
+        }
+        next
+      }
+
+      if (line_is_managed_route_start($0)) {
+        skip_block = 1
+        block_depth = brace_delta($0)
+        if (block_depth <= 0) {
+          skip_block = 0
+          block_depth = 0
+        }
+        next
+      }
+
+      print
+    }
+  ' "$custom_fragment" >"$temp_fragment"; then
+    rm -f "$temp_fragment"
+    log_warn "Failed to sanitize overlapping PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
+    return 1
+  fi
+
+  if cmp -s "$custom_fragment" "$temp_fragment"; then
+    rm -f "$temp_fragment"
+    return 0
+  fi
+
+  if mv "$temp_fragment" "$custom_fragment"; then
+    chmod 640 "$custom_fragment" 2>/dev/null || true
+    log_info "Removed PMSS-managed media stack proxy routes from ~/.lighttpd/custom.d/custom-migrated.conf"
+    return 0
+  fi
+
+  rm -f "$temp_fragment"
+  log_warn "Failed to update sanitized PMSS lighttpd routes in ~/.lighttpd/custom.d/custom-migrated.conf"
+  return 1
+}
+
 prepare_lighttpd_media_stack_paths() {
   local lighttpd_dir="$HOME/.lighttpd"
   local custom_file="$lighttpd_dir/custom"
@@ -314,6 +396,7 @@ prepare_lighttpd_media_stack_paths() {
     elif [[ ! -e "$migrated_fragment" ]]; then
       mv "$custom_file" "$migrated_fragment"
       : > "$custom_file"
+      lighttpd_custom_strip_managed_media_stack_routes "$migrated_fragment" || true
       chmod 640 "$migrated_fragment" 2>/dev/null || true
       log_info "Preserved ~/.lighttpd/custom at ~/.lighttpd/custom.d/custom-migrated.conf"
     else

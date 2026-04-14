@@ -138,6 +138,12 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('lighttpd_custom_has_legacy_media_stack_rules', $this->script);
     }
 
+    public function testLegacyLighttpdCustomMigrationPrunesManagedProxyRoutes(): void
+    {
+        $this->assertStringContainsString('lighttpd_custom_strip_managed_media_stack_routes', $this->script);
+        $this->assertStringContainsString('Removed PMSS-managed media stack proxy routes', $this->script);
+    }
+
     public function testManagedBinPathsRefreshInPlace(): void
     {
         $this->assertStringContainsString('Keeping existing ~/.bin contents outside PMSS-managed app paths.', $this->script);
