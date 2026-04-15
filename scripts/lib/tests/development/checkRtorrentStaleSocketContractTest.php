@@ -33,4 +33,18 @@ class checkRtorrentStaleSocketContractTest extends TestCase
             'SCGI recovery should reuse the shared cleanup and restart helpers after re-checking process liveness'
         );
     }
+
+    public function testStaleScgiPathRefreshesGraceWhileRtorrentIsAlive(): void
+    {
+        $path = 'scripts/cron/checkRtorrent.php';
+        $this->pmssAssertRepoFileContainsString(
+            $path,
+            'SCGI unresponsive but rtorrent still alive (pids='
+        );
+        $this->pmssAssertRepoFileMatches(
+            $path,
+            '/\$state = rtorrentProcessCheckStaleState\(\$unresponsiveState, \$effectiveGrace\);.*?if \(\$state\[\'action\'\] === \'wait\'\) \{.*?continue;\s*\}.*?\$rtorrentPids = rtorrentProcessPgrepExact\(\$user, \'rtorrent\'\);.*?if \(!empty\(\$rtorrentPids\)\) \{.*?file_put_contents\(\$unresponsiveState, \(string\) time\(\), LOCK_EX\);.*?continue;\s*\}.*?pmssCheckRtorrentCleanupStaleSocket\(\$user, \$socketPath, \$unresponsiveState, \$debug\);.*?rtorrentProcessRestart\(\$user, \[\], \$executorAllPids, \$logCallback, \$debug\);/s',
+            'Stale SCGI recovery should extend grace for live rtorrent processes and reserve restart for missing ones'
+        );
+    }
 }

@@ -471,13 +471,25 @@ foreach ($users as $user) {
             continue;
         }
 
-        // Stale - restart.
+        // Stale - confirm the process is still gone before restarting.
+        $rtorrentPids = rtorrentProcessPgrepExact($user, 'rtorrent');
+        if (!empty($rtorrentPids)) {
+            @file_put_contents($unresponsiveState, (string) time(), LOCK_EX);
+            pmssCheckRtorrentLogBoth(
+                $user,
+                'SCGI unresponsive but rtorrent still alive (pids='.implode(',', $rtorrentPids).'); extending grace',
+                $debug
+            );
+            continue;
+        }
+
+        pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $unresponsiveState, $debug);
         pmssCheckRtorrentLogBoth(
             $user,
             "SCGI unresponsive for {$state['age']}s; restarting rtorrent",
             $debug
         );
-        rtorrentProcessRestart($user, $rtorrentPids, $executorAllPids, $logCallback, $debug);
+        rtorrentProcessRestart($user, [], $executorAllPids, $logCallback, $debug);
         rtorrentProcessClearStaleState($unresponsiveState);
         continue;
     }
