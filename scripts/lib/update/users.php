@@ -9,6 +9,7 @@
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../user/directories.php';
+require_once __DIR__.'/../user/delugeManagedConfig.php';
 require_once __DIR__.'/../user/qbittorrent.php';
 require_once __DIR__.'/users/context.php';
 require_once __DIR__.'/users/http.php';

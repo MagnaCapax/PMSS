@@ -32,6 +32,11 @@ function pmssUserConfigureHttp(array $ctx): void
         $userLog('Refreshed PMSS-managed qBittorrent settings');
     }
 
+    $delugeConfig = "{$home}/.config/deluge/core.conf";
+    if (function_exists('pmssDelugeApplyManagedConfig') && pmssDelugeApplyManagedConfig($user, $delugeConfig) && $userLog) {
+        $userLog('Refreshed PMSS-managed Deluge settings');
+    }
+
     $phpIniPath = "{$home}/.lighttpd/php.ini";
     if (($phpIni = @parse_ini_file($phpIniPath)) !== false && !isset($phpIni['error_log'])) {
         $phpIni['error_log'] = "{$home}/.lighttpd/error.log";

@@ -225,7 +225,7 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 
 Sub-handlers:
 - pmssBuildUserContext(string $user, string $rutorrentIndexSha=''): ?array → validates `/home/<user>` with `.rtorrent.rc`, `data`, and no `www-disabled`; returns context.
-- pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, refresh the PMSS-managed qBittorrent safety defaults, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
+- pmssUserConfigureHttp(array $ctx): void → configure lighttpd per-user, refresh the PMSS-managed qBittorrent safety defaults and Deluge fleet safety limits, ensure php.ini `error_log`, create `.tmp` and `.irssi` (from skel), and `www/recycle` with perms/ownership.
 - pmssUserApplySkeletonFiles(array $ctx): void → copies fixed list of skel files and quota plugin files into user tree using `updateUserFile()`; deletes `~/www/phpXplorer`.
 - pmssUserUpdateThemes(array $ctx): void → ensures named themes exist under `rutorrent/plugins/theme/themes/` (copied from skel), fixes ownership.
 - pmssUserUpgradeRutorrent(array $ctx): void → if user’s ruTorrent index.html SHA != skeleton (and no existing backup), backups to `oldRutorrent-3`, copies fresh from skel, restores config/share, updates config via `updateRutorrentConfig()`, fixes ownership and perms.

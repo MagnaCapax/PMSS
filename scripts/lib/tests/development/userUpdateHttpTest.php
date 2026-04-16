@@ -84,6 +84,45 @@ class UserUpdateHttpTest extends TestCase
         $this->assertStringContainsString('Session\\DiskCacheSize=128', $updatedConfig);
     }
 
+    public function testConfigureHttpRefreshesDelugeManagedKeys(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-http-deluge-');
+        @mkdir($home.'/.config/deluge', 0755, true);
+        file_put_contents($home.'/.config/deluge/core.conf', <<<'JSON'
+{
+    "file": 1,
+    "format": 1
+}{
+    "download_location": "/home/dummy/data",
+    "enabled_plugins": [
+        "Label"
+    ],
+    "max_active_downloading": 20,
+    "max_active_limit": 999,
+    "max_connections_global": 999,
+    "max_upload_slots_global": 50
+}
+JSON
+        );
+
+        $ctx = [
+            'user'     => 'dummy',
+            'home'     => $home,
+            'user_esc' => escapeshellarg('dummy'),
+        ];
+
+        \pmssUserConfigureHttp($ctx);
+
+        $updated = (string) file_get_contents($home.'/.config/deluge/core.conf');
+        $this->assertStringContainsString('"download_location": "/home/dummy/data"', $updated);
+        $this->assertStringContainsString('"enabled_plugins": [', $updated);
+        $this->assertStringContainsString('"Label"', $updated);
+        $this->assertStringContainsString('"max_active_downloading": 5', $updated);
+        $this->assertStringContainsString('"max_active_limit": 500', $updated);
+        $this->assertStringContainsString('"max_connections_global": 300', $updated);
+        $this->assertStringContainsString('"max_upload_slots_global": 15', $updated);
+    }
+
     public function testConfigureHttpUsesDefaultSkelPathForIrssiCopy(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-skel-default-');
