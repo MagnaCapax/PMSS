@@ -48,7 +48,16 @@ $cmd = sprintf(
     escapeshellarg($pwPayload),
     escapeshellarg($username)
 );
-shell_exec($cmd);
+$passwdOutput = [];
+$passwdReturnCode = 0;
+exec($cmd.' 2>&1', $passwdOutput, $passwdReturnCode);
+if ($passwdReturnCode !== 0) {
+    fwrite(STDERR, "passwd failed for {$username}; aborting credential sync\n");
+    if ($passwdOutput !== []) {
+        fwrite(STDERR, implode("\n", $passwdOutput)."\n");
+    }
+    exit(1);
+}
 
 $homeDir = '/home/'.$username;
 $htpasswdFile = $homeDir.'/.lighttpd/.htpasswd';
