@@ -34,7 +34,7 @@ class LighttpdProxyFragmentsTest extends TestCase
             ],
             'deluge' => [
                 'actual' => \pmssLighttpdManagedProxyFragment('deluge', 'demo', 4004),
-                'expectedHash' => 'e7ebd9fe53f2bc9ef696b520684d494d2a9d9f6be2ef0b2d0e5b08548f889f20',
+                'expectedHash' => '05b1bc3c5636a341f92e229a4b87118f0917a23a22a53006330c483f0cb9b514',
             ],
         ];
 

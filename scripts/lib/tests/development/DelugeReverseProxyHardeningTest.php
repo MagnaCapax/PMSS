@@ -235,8 +235,8 @@ class DelugeReverseProxyHardeningTest extends TestCase
 
         $this->assertStringContainsString('^/deluge-testuser($|/)', $fragment);
         $this->assertStringContainsString('"map-urlpath"', $fragment);
-        $this->assertStringContainsString('"/deluge-testuser/"  => "/user-testuser/deluge/"', $fragment);
-        $this->assertStringContainsString('"/deluge-testuser" => "/user-testuser/deluge"', $fragment);
+        $this->assertStringContainsString('"/deluge-testuser/"  => "/"', $fragment);
+        $this->assertStringContainsString('"/deluge-testuser" => ""', $fragment);
     }
 
     public function testDelugeLighttpdProxyFragmentDisablesBasicAuthForDelugePaths(): void

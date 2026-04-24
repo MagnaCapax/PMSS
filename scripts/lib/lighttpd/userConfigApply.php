@@ -424,7 +424,7 @@ function pmssLighttpdManagedProxyFragment(string $proxyName, string $user, int $
             ."# Legacy path /deluge-{$user}/ kept for compatibility until at least 2028-01-28.\n\n",
             [
                 ['^/user-'.$user.'/deluge($|/)', ['/user-'.$user.'/deluge/' => '/', '/user-'.$user.'/deluge' => ''], true, false],
-                ['^/deluge-'.$user.'($|/)', ['/deluge-'.$user.'/' => '/user-'.$user.'/deluge/', '/deluge-'.$user => '/user-'.$user.'/deluge'], true, false],
+                ['^/deluge-'.$user.'($|/)', ['/deluge-'.$user.'/' => '/', '/deluge-'.$user => ''], true, false],
             ],
         ],
         'rclone' => ["# PMSS-managed: rclone reverse proxy.\n\n", [['^/user-'.$user.'/rclone/', [], true, false, true]]],
