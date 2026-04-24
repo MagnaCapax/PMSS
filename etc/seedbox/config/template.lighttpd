@@ -126,7 +126,8 @@ fastcgi.server += ( ".php" =>
                 "min-procs"             => 1,
                 "bin-environment" => (
                     "PHP_FCGI_CHILDREN" => "6",
-                    "PHP_FCGI_MAX_REQUESTS" => "5000"
+                    "PHP_FCGI_MAX_REQUESTS" => "5000",
+                    "PMSS_DISABLE_REMOTE_FRAMES" => "1"
                 ),
                 "bin-copy-environment" => (
                         "PATH", "SHELL", "USER"
