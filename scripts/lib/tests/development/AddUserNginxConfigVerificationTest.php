@@ -33,6 +33,7 @@ class AddUserNginxConfigVerificationTest extends TestCase
             "'nginx_config' => '/etc/nginx/users/'.\$userName",
             "'rtorrent_config' => \$homePath.'/.rtorrent.rc'",
             "'lighttpd_config' => \$homePath.'/.lighttpd.conf'",
+            "'lighttpd_htpasswd' => \$homePath.'/.lighttpd/.htpasswd'",
             "'quota_snapshot' => \$homePath.'/.quota'",
         ), $source);
     }

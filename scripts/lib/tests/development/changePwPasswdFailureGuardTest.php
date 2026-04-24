@@ -22,11 +22,38 @@ class changePwPasswdFailureGuardTest extends TestCase
                 'exec($cmd.\' 2>&1\', $passwdOutput, $passwdReturnCode);',
                 'if ($passwdReturnCode !== 0) {',
                 'exit(1);',
-                '$htpasswdCommand = file_exists($htpasswdFile) ? \'htpasswd -b -m\' : \'htpasswd -c -b -m\';',
+                '$htpasswdCommand = is_file($htpasswdFile) ? \'htpasswd -b -m\' : \'htpasswd -c -b -m\';',
             ],
             $source,
             'changePw missing guard substring: ',
             'changePw guard order changed near: '
+        );
+    }
+
+    public function testHtpasswdCommandUsesExitCodeAwareExecCall(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/changePw.php');
+
+        $this->assertStringContainsString('$htpasswdOutput = [];', $source);
+        $this->assertStringContainsString('$htpasswdReturnCode = 0;', $source);
+        $this->assertStringContainsString('if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {', $source);
+    }
+
+    public function testHtpasswdFailureExitsBeforeOwnershipUpdate(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/changePw.php');
+
+        $this->assertOrderedStrings(
+            [
+                '$htpasswdOutput = [];',
+                '$htpasswdReturnCode = 0;',
+                'if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {',
+                'htpasswd update failed for {$username}; aborting credential sync',
+                '$chownOutput = [];',
+            ],
+            $source,
+            'changePw htpasswd guard missing substring: ',
+            'changePw htpasswd guard order changed near: '
         );
     }
 }

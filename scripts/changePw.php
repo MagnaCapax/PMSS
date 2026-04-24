@@ -61,21 +61,46 @@ if ($passwdReturnCode !== 0) {
 
 $homeDir = '/home/'.$username;
 $htpasswdFile = $homeDir.'/.lighttpd/.htpasswd';
+$htpasswdDir = dirname($htpasswdFile);
 
-$htpasswdCommand = file_exists($htpasswdFile) ? 'htpasswd -b -m' : 'htpasswd -c -b -m';
+if (!is_dir($htpasswdDir)) {
+    fwrite(STDERR, "lighttpd credential directory missing for {$username}; aborting credential sync\n");
+    exit(1);
+}
 
-shell_exec(sprintf(
-    '%s %s %s %s',
+$htpasswdCommand = is_file($htpasswdFile) ? 'htpasswd -b -m' : 'htpasswd -c -b -m';
+
+$htpasswdOutput = [];
+$htpasswdReturnCode = 0;
+exec(sprintf(
+    '%s %s %s %s 2>&1',
     $htpasswdCommand,
     escapeshellarg($htpasswdFile),
     escapeshellarg($username),
     escapeshellarg($password)
-));     // Create http password
-passthru(sprintf(
-    'chown %s %s',
+), $htpasswdOutput, $htpasswdReturnCode);
+if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {
+    fwrite(STDERR, "htpasswd update failed for {$username}; aborting credential sync\n");
+    if ($htpasswdOutput !== []) {
+        fwrite(STDERR, implode("\n", $htpasswdOutput)."\n");
+    }
+    exit(1);
+}
+
+$chownOutput = [];
+$chownReturnCode = 0;
+exec(sprintf(
+    'chown %s %s 2>&1',
     escapeshellarg($username.':'.$username),
     escapeshellarg($htpasswdFile)
-));
+), $chownOutput, $chownReturnCode);
+if ($chownReturnCode !== 0) {
+    fwrite(STDERR, "htpasswd ownership update failed for {$username}; aborting credential sync\n");
+    if ($chownOutput !== []) {
+        fwrite(STDERR, implode("\n", $chownOutput)."\n");
+    }
+    exit(1);
+}
 
 // Sync password to qBittorrent if installed.
 // Deluge is intentionally excluded: its auth file stores passwords in plaintext,
