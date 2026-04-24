@@ -1088,12 +1088,11 @@ function gaugeColor($percent) {
 function quotaCreateSection($quotaInfo, $bonusQuota = 0) {
     if (count($quotaInfo) == 0) return '';
 
-    $freeSpace  = $quotaInfo['freeSpace'];
     $hardLimit  = $quotaInfo['hardLimit'];
     $totalSpace = $quotaInfo['totalSpace'];
     $usedBytes  = $quotaInfo['usedBytes'];
 
-    if ($freeSpace == 0 || $hardLimit == 0 || $totalSpace == 0 || $usedBytes == 0) {
+    if ($hardLimit == 0 || $totalSpace == 0) {
         return '<b>Warning:</b> Quota info is missing. If this persists for more than an hour, contact support.';
     }
 
