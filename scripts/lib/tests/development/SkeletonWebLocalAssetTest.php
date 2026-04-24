@@ -28,12 +28,12 @@ class SkeletonWebLocalAssetTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/index.php', 'static.pulsedmedia.com/jquery.tabs.css', 'index.php should not depend on the remote tabs stylesheet host.');
     }
 
-    public function testLighttpdTemplateDisablesRemoteFramesByDefault(): void
+    public function testLighttpdTemplateDisablesRemoteFrames(): void
     {
         $this->pmssAssertRepoFileContainsString(
             'etc/seedbox/config/template.lighttpd',
             '"PMSS_DISABLE_REMOTE_FRAMES" => "1"',
-            'lighttpd php-cgi should default to local master GUI frames.'
+            'lighttpd template must set PMSS_DISABLE_REMOTE_FRAMES to prevent remote self-updater from reverting deployed GUI files.'
         );
     }
 
