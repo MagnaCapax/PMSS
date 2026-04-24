@@ -6,6 +6,12 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class LighttpdWatchdogSocketProbeTest extends TestCase
 {
+    public function testDefaultRetryPolicyConstantsAreExpanded(): void
+    {
+        $this->assertSame(4, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_ATTEMPTS);
+        $this->assertSame(2, \PMSS_LIGHTTPD_WATCHDOG_SOCKET_PROBE_RETRY_DELAY_SECONDS);
+    }
+
     public function testProbeSucceedsOnFirstAttemptWithoutSleeping(): void
     {
         $probeCalls = 0;
@@ -49,7 +55,7 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         $this->assertTrue($result['ok']);
         $this->assertEquals(2, $result['attempts']);
         $this->assertEquals(2, $probeCalls);
-        $this->assertEquals(array(1), $sleepCalls);
+        $this->assertEquals(array(2), $sleepCalls);
     }
 
     public function testProbeReturnsLastFailureWhenAllAttemptsFail(): void
@@ -69,11 +75,11 @@ class LighttpdWatchdogSocketProbeTest extends TestCase
         ));
 
         $this->assertFalse($result['ok']);
-        $this->assertEquals(2, $result['attempts']);
-        $this->assertEquals(2, $probeCalls);
-        $this->assertEquals(113, $result['errno']);
-        $this->assertEquals('Connection refused 2', $result['errstr']);
-        $this->assertEquals(array(1), $sleepCalls);
+        $this->assertEquals(4, $result['attempts']);
+        $this->assertEquals(4, $probeCalls);
+        $this->assertEquals(115, $result['errno']);
+        $this->assertEquals('Connection refused 4', $result['errstr']);
+        $this->assertEquals(array(2, 2, 2), $sleepCalls);
     }
 
     public function testProbeCoercesAttemptCountBelowOneToSingleAttempt(): void
