@@ -15,7 +15,7 @@ Must Follow:
 - PHP 7.3 compatibility for all PHP runtime code.
 - Updater topology: install.sh → scripts/update.php (bootstrap/minimal) → scripts/util/update-step2.php (orchestration/profiling).
 - Distro detection: use scripts/lib/update/distro.php::pmssDetectDistro(); trust VERSION_CODENAME; allowed env overrides: PMSS_OS_RELEASE_PATH, PMSS_APT_SOURCES_PATH.
-- Treat bundled vendor/third-party trees (e.g., ruTorrent upstream, _lib/) as read-only unless explicitly approved. First-party skel files are editable. Do not modify scripts/lib/update/dpkg/selections*.txt.
+- Treat bundled vendor/third-party trees (e.g., ruTorrent upstream, _lib/) as read-only unless explicitly approved. First-party skel files are editable. scripts/lib/update/dpkg/selections*.txt entries MAY be modified to flip a package's state-flag (install/hold/deinstall) when an open issue documents a fleet-wide regression that requires it; adding or removing package entries still requires explicit operator approval.
 - Language/deps: Bash-first; PHP for complex flows; do not introduce Python; avoid new dependencies without explicit approval.
 - Doctrine: Deletion‑First; Minimal Edits; One Flow; Pit of Success; No Aliases; Context‑First naming (domain→action); Single‑Method Consistency; Separation of Concerns; Idempotence; Fail‑Soft where safe.
 - Observability: route shelling through runStep(); prefer structured logs; use PMSS_JSON_LOG and PMSS_PROFILE_OUTPUT when applicable.
