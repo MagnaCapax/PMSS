@@ -478,6 +478,17 @@ if (!$dpkgBaselineOk) {
     }
 }
 
+// Re-apply libssl3 + openssl hold after dpkg baseline phase.
+// Belt-2: selections-debian12 hold entries are belt-1. This call handles
+// hosts already at broken versions and ensures convergence to exactly 3.0.17.
+// Uses simulate-guarded downgrade logic with a dpkg-direct fallback path when
+// apt predicts openssh removals. Refs #436.
+pmssRunProfiledCallable(
+    'Holding libssl3/openssl for PECL ssh2 compat (dpkg-direct guard)',
+    'pmssHoldLibssl3ForPeclSsh2Compat',
+    [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
+);
+
 // Package convergence: dpkg selections are now the authoritative source of
 // package state. The legacy per-app queue module remains in-tree for
 // compatibility tooling, but update-step2 no longer executes it.

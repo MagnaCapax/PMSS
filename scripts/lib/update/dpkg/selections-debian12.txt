@@ -910,7 +910,9 @@ libssh-gcrypt-4:amd64	install
 libssh2-1:amd64	install
 libssl-dev:amd64	install
 libssl1.1:amd64	install
-libssl3:amd64	install
+# held to preserve PECL/ssh2 1.10.0 compat per #436.
+# Do not flip back without addressing the libssh2/PECL upgrade on the upstream client tooling first.
+libssl3:amd64	hold
 libstdc++-12-dev:amd64	install
 libstdc++6:amd64	install
 libsubid4:amd64	install
@@ -1167,7 +1169,9 @@ opensc-pkcs11:amd64	install
 openssh-client	install
 openssh-server	install
 openssh-sftp-server	install
-openssl	install
+# held to preserve PECL/ssh2 1.10.0 compat per #436.
+# Do not flip back without addressing the libssh2/PECL upgrade on the upstream client tooling first.
+openssl	hold
 openvpn	install
 os-prober	install
 p7zip	install

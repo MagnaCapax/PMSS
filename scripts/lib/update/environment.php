@@ -352,6 +352,164 @@ CONF;
 }
 
 /**
+     * Converge libssl3 + openssl to 3.0.17-1~deb12u2 for PECL/ssh2 compatibility.
+     *
+     * Why this exists:
+     * - Debian 12.13 ships libssl3 3.0.18/3.0.19 paths that break ssh2_exec()
+     *   for legacy PECL/ssh2 + libssh2 1.10.0 callers.
+     * - The dpkg baseline replay can overwrite ad-hoc host holds during updates.
+     *
+     * Safety invariants:
+     * - Debian 12 only (Debian 13 uses libssl3t64 and is out of scope).
+     * - Never downgrade with apt without simulate-first cascade detection.
+     * - If simulate shows openssh removals, use dpkg-direct path only:
+     *   apt-mark unhold -> apt-get download -> dpkg -i -> apt-mark hold.
+     * - If dpkg-direct cannot proceed, abort update-step2 with non-zero.
+     *
+     * Idempotent behavior:
+     * - If already at 3.0.17-1~deb12u2 and both packages are held, no-op.
+     *
+     * Refs #436.
+     */
+    function pmssHoldLibssl3ForPeclSsh2Compat(?int $distroVersion = null): void
+    {
+        $targetVersion = '3.0.17-1~deb12u2';
+
+        if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+            logMessage('[DRY-RUN] pmssHoldLibssl3ForPeclSsh2Compat: skipping all mutations');
+            return;
+        }
+
+        $effectiveVersion = pmssDistroVersionFromEnv($distroVersion);
+        if ($effectiveVersion !== 12) {
+            logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: not Debian 12 (detected: '.$effectiveVersion.')');
+            return;
+        }
+
+        $rawVer = trim((string) @shell_exec("dpkg-query -W -f='${Version}' libssl3 2>/dev/null"));
+        if ($rawVer === '') {
+            logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: libssl3 is not installed');
+            return;
+        }
+
+        $compareVersions = static function (string $left, string $operator, string $right): bool {
+            $rc = 1;
+            @exec(
+                'dpkg --compare-versions '
+                .escapeshellarg($left).' '
+                .escapeshellarg($operator).' '
+                .escapeshellarg($right),
+                $unused,
+                $rc
+            );
+
+            return $rc === 0;
+        };
+
+        $heldList   = (string) @shell_exec('apt-mark showhold 2>/dev/null');
+        $libsslHeld = preg_match('/(^|\R)libssl3($|\R)/', $heldList) === 1;
+        $opensslHeld = preg_match('/(^|\R)openssl($|\R)/', $heldList) === 1;
+
+        $needsDowngrade = $compareVersions($rawVer, 'gt', $targetVersion);
+        $needsUpgrade   = $compareVersions($rawVer, 'lt', $targetVersion);
+        $atTarget       = $compareVersions($rawVer, 'eq', $targetVersion);
+        if ($atTarget && $libsslHeld && $opensslHeld) {
+            logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: already at '.$targetVersion.' with libssl3+openssl held');
+            return;
+        }
+
+        $downgraded = false;
+        if ($needsUpgrade) {
+            $upgradeCmd = aptCmd('install -y libssl3='.$targetVersion.' openssl='.$targetVersion);
+            $upgradeRc  = runStep('Upgrading libssl3/openssl to '.$targetVersion.' (convergence from older version)', $upgradeCmd);
+            if ($upgradeRc !== 0) {
+                logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: upgrade to '.$targetVersion.' failed');
+                throw new RuntimeException('Unable to upgrade libssl3/openssl to '.$targetVersion);
+            }
+        } elseif ($needsDowngrade) {
+            // Guard downgrade safety: if apt predicts openssh removals, switch to dpkg-direct path.
+            $simulateCmd = 'apt-get install --simulate --allow-downgrades '
+                .'libssl3='.$targetVersion.' openssl='.$targetVersion.' 2>&1';
+            $simulateOut = (string) @shell_exec($simulateCmd);
+            $opensshCascade = preg_match('/Remv:\s+.*openssh|Remv\s+openssh/i', $simulateOut) === 1;
+
+            if ($opensshCascade) {
+                logMessage('[WARN] pmssHoldLibssl3ForPeclSsh2Compat: apt simulate shows openssh removals; using dpkg-direct downgrade path');
+                runStep('Unholding libssl3/openssl for dpkg-direct downgrade', 'apt-mark unhold libssl3 openssl 2>/dev/null || true');
+
+                $tmpDir = sys_get_temp_dir().'/pmss-libssl-'.substr(md5(uniqid('', true)), 0, 8);
+                if (!@mkdir($tmpDir, 0700, true)) {
+                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: cannot create temporary directory for dpkg-direct downgrade');
+                    throw new RuntimeException('Unable to create temporary directory for dpkg-direct downgrade');
+                }
+
+                $downloadRc = runStep(
+                    'Downloading libssl3/openssl '.$targetVersion.' deb packages',
+                    'cd '.escapeshellarg($tmpDir)
+                    .' && apt-get download libssl3='.$targetVersion.' openssl='.$targetVersion.' 2>&1'
+                );
+                if ($downloadRc !== 0) {
+                    @runStep('Cleaning dpkg-direct download cache', 'rm -rf '.escapeshellarg($tmpDir));
+                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: apt-get download failed; refusing unsafe fallback');
+                    throw new RuntimeException('dpkg-direct downgrade blocked: download failed for libssl3/openssl '.$targetVersion);
+                }
+
+                $debs = glob($tmpDir.'/*.deb') ?: [];
+                sort($debs);
+                if (count($debs) < 2) {
+                    @runStep('Cleaning dpkg-direct download cache', 'rm -rf '.escapeshellarg($tmpDir));
+                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: missing downloaded .deb files; refusing unsafe fallback');
+                    throw new RuntimeException('dpkg-direct downgrade blocked: expected .deb files were not downloaded');
+                }
+
+                $installRc = runStep(
+                    'Installing libssl3/openssl via dpkg-direct (openssh-safe path)',
+                    'dpkg -i '.implode(' ', array_map('escapeshellarg', $debs))
+                );
+                runStep('Cleaning dpkg-direct download cache', 'rm -rf '.escapeshellarg($tmpDir));
+                if ($installRc !== 0) {
+                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: dpkg-direct install failed; refusing unsafe fallback');
+                    throw new RuntimeException('dpkg-direct downgrade blocked: dpkg -i failed');
+                }
+            } else {
+                $downgradeCmd = aptCmd('install -y --allow-downgrades libssl3='.$targetVersion.' openssl='.$targetVersion);
+                $downgradeRc  = runStep('Downgrading libssl3/openssl to '.$targetVersion.' (simulate-verified safe)', $downgradeCmd);
+                if ($downgradeRc !== 0) {
+                    logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: guarded apt downgrade to '.$targetVersion.' failed');
+                    throw new RuntimeException('Unable to downgrade libssl3/openssl to '.$targetVersion);
+                }
+            }
+
+            $downgraded = true;
+        }
+
+        $postVer = trim((string) @shell_exec("dpkg-query -W -f='${Version}' libssl3 2>/dev/null"));
+        if ($postVer === '') {
+            logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: unable to read libssl3 version after convergence');
+            throw new RuntimeException('Unable to read libssl3 version after convergence');
+        }
+        if (!$compareVersions($postVer, 'eq', $targetVersion)) {
+            logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: libssl3 remains at '.$postVer.' after convergence attempt');
+            throw new RuntimeException('libssl3 convergence failed: expected '.$targetVersion.', got '.$postVer);
+        }
+
+        $holdRc = runStep('Holding libssl3 + openssl at '.$targetVersion, 'apt-mark hold libssl3 openssl');
+        if ($holdRc !== 0) {
+            logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: apt-mark hold failed');
+            throw new RuntimeException('Unable to hold libssl3/openssl after convergence');
+        }
+
+        if ($downgraded) {
+            $sshListening = trim((string) @shell_exec("ss -tln 2>/dev/null | grep -q ':22 ' && echo yes || echo no")) === 'yes';
+            if ($sshListening) {
+                runStep('Restarting sshd after libssl3 downgrade', '/usr/bin/systemctl restart ssh');
+            } else {
+                logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: SSH port 22 not listening; skipping restart');
+            }
+        }
+    }
+
+/**
      * Move the legacy localnet file into the configuration directory.
      */
     function pmssMigrateLegacyLocalnet(): void
