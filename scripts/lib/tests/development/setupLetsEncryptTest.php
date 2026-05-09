@@ -43,4 +43,12 @@ class SetupLetsEncryptTest extends TestCase
         $this->assertStringContainsString('$emailArg = escapeshellarg($email);', $source);
         $this->assertStringContainsString("shell_exec('/usr/bin/certbot certonly -d '.\$domainArg.' -n --nginx --agree-tos --email '.\$emailArg)", $source);
     }
+
+    public function testInterpolatesLiveCertificatePathBeforeCertbotCheck(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/util/setupLetsEncrypt.php');
+
+        $this->assertStringContainsString("\$legacyCertPath = \"/etc/letsencrypt/live/{\$domain}\";", $source);
+        $this->assertStringNotContainsString("\$legacyCertPath = '/etc/letsencrypt/live/{\$domain}';", $source);
+    }
 }

@@ -98,9 +98,21 @@ TEXT;
 
         return number_format($bytes / 1024, 2).' KiB';
     };
-    $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-8s\n";
-    $printUsageRow = static function (string $label, array $data) use ($formatBytes, $rowFormat): void {
+    $formatIoOperations = static function (float $operations): string {
+        foreach ([1000000000.0 => 'B ops', 1000000.0 => 'M ops', 1000.0 => 'K ops'] as $divisor => $unit) {
+            if ($operations >= $divisor) {
+                $value = $operations / $divisor;
+                $decimals = $value >= 100 ? 0 : ($value >= 10 ? 1 : 2);
+                return number_format($value, $decimals).' '.$unit;
+            }
+        }
+
+        return number_format($operations, 0).' ops';
+    };
+    $rowFormat = "%-14s %-12s %-12s %-11s %-14s %-9s %-6s %-10s %-8s\n";
+    $printUsageRow = static function (string $label, array $data) use ($formatBytes, $formatIoOperations, $rowFormat): void {
         $hourOps = (float) (($data['io_read_ops']['hour'] ?? 0) + ($data['io_write_ops']['hour'] ?? 0));
+        $monthOps = (float) (($data['io_read_ops']['month'] ?? 0) + ($data['io_write_ops']['month'] ?? 0));
         $ramHours = (float) $data['ram_hours']['month'];
         printf(
             $rowFormat,
@@ -111,15 +123,16 @@ TEXT;
             number_format($ramHours, $ramHours >= 100 ? 0 : ($ramHours >= 10 ? 1 : 2)).' GB-hrs',
             $formatBytes((float) $data['memory']['current']),
             (string) round($data['tasks']['current']),
+            $formatIoOperations($monthOps),
             number_format($hourOps / 3600, 2)
         );
     };
 
-    printf($rowFormat, 'Username', 'IO Read/mo', 'IO Write/mo', 'CPU hrs/mo', 'RAM GB-hrs/mo', 'Mem Now', 'Procs', 'IOPS/s');
+    printf($rowFormat, 'Username', 'IO Read/mo', 'IO Write/mo', 'CPU hrs/mo', 'RAM GB-hrs/mo', 'Mem Now', 'Procs', 'IO Ops/mo', 'IOPS/s');
     foreach ($rows as $username => $row) {
         $printUsageRow($username, $row);
     }
-    printf($rowFormat, '---', '---', '---', '---', '---', '---', '---', '---');
+    printf($rowFormat, '---', '---', '---', '---', '---', '---', '---', '---', '---');
     $printUsageRow('Total', $totals);
 
     if (!empty($missingStats)) {

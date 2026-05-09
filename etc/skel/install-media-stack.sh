@@ -739,7 +739,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
   cd "$installdir"
   # shellcheck disable=SC1091
   source "${installdir}/bin/activate"
-  python -m pip install -U pip >/dev/null 2>&1
+  python3 -m pip install -U pip >/dev/null 2>&1
   python3 -m pip install -r "${installdir}/cloudplow/requirements.txt" >/dev/null 2>&1
   deactivate
   echo "${app^^} Installed"
@@ -769,7 +769,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
   extract_tgz "${app}.tar.gz" "${app}" 1
   # shellcheck disable=SC1091
   source "${installdir}/bin/activate"
-  python -m pip install -U pip >/dev/null 2>&1
+  python3 -m pip install -U pip >/dev/null 2>&1
   python3 -m pip install -r "${installdir}/${app}/requirements.txt" >/dev/null 2>&1
   deactivate
   echo "${app^^} Installed"

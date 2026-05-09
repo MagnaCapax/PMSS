@@ -39,7 +39,8 @@ return [
     'mem' => ['streaming' => 1536],
     'tasks' => ['service' => 12000],
   ],
-  // Remaining TODOs: burst allowances + policy-level net shaping hints.
+  // Remaining TODOs: scheduler-aware IO auto-policy, burst allowances +
+  // policy-level net shaping hints.
 ];
 ```
 

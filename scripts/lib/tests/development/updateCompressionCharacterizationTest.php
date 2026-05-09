@@ -356,6 +356,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
             'filesystem.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()'
         );
         $this->assertStringContainsString("require_once __DIR__.'/users/filesystem.php';", $src);
+        $this->assertStringContainsString("\$guardedRequireLine = preg_replace('/^<\\?php\\s*/', '', \$requireLine, 1, \$count);", $filesystemSrc);
+        $this->assertStringContainsString("str_replace(\"require_once '/scripts/lib/user/torrentPort.php';\\n\", \$guardedRequireLine, \$updated, \$replaced)", $filesystemSrc);
         $this->assertStringContainsString("preg_replace('/^<\\?php\\s*/', \$requireLine, \$updated, 1, \$count)", $filesystemSrc);
         $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $filesystemSrc);
         $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $filesystemSrc);

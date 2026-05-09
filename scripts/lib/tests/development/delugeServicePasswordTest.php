@@ -12,6 +12,26 @@ class DelugeServicePasswordTest extends TestCase
         $this->pmssAssignTempDirProperty('tempDir', 'pmss-deluge-passwords');
     }
 
+    private function pmssWriteDelugeWebConf(string $path, string $salt, string $password): void
+    {
+        @mkdir(dirname($path), 0755, true);
+        file_put_contents(
+            $path,
+            json_encode(['file' => 2, 'format' => 1], JSON_UNESCAPED_SLASHES)
+            .json_encode(
+                [
+                    'base' => '/user-alice/deluge/',
+                    'first_login' => false,
+                    'port' => 8112,
+                    'pwd_salt' => $salt,
+                    'pwd_sha1' => sha1($salt.$password),
+                    'sessions' => (object) [],
+                ],
+                JSON_UNESCAPED_SLASHES
+            )
+        );
+    }
+
     public function testGenerateServicePasswordLengthAndCharset(): void
     {
         $password = \pmssDelugeServicePasswordGenerate(32);
@@ -84,8 +104,10 @@ class DelugeServicePasswordTest extends TestCase
     {
         $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
         $authPath = $homeRoot.'/alice/.config/deluge/auth';
+        $webConfPath = $homeRoot.'/alice/.config/deluge/web.conf';
         @mkdir(dirname($authPath), 0755, true);
         file_put_contents($authPath, "localclient:template-token:10\n");
+        $this->pmssWriteDelugeWebConf($webConfPath, '9ae84a41deedf34c4ce55ce163df27fd8e8dc3b8', 'template-token');
 
         $templatePath = $this->tempDir.'/template.deluge.auth';
         file_put_contents($templatePath, "localclient:template-token:10\n");
@@ -97,5 +119,58 @@ class DelugeServicePasswordTest extends TestCase
         $this->assertTrue($generated !== '', 'Expected generated password');
         $this->assertTrue($generated !== 'template-token', 'Expected template token to be rotated');
         $this->assertEquals($generated, $stored);
+
+        $parsed = \pmssDelugeReadWebConf($webConfPath);
+        $this->assertTrue(is_array($parsed));
+        $this->assertSame($parsed['config']['pwd_sha1'], sha1($parsed['config']['pwd_salt'].$generated));
+    }
+
+    public function testEnsureDelugeServicePasswordSynchronizesWebUiHashToExistingAuth(): void
+    {
+        $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
+        $authPath = $homeRoot.'/alice/.config/deluge/auth';
+        $webConfPath = $homeRoot.'/alice/.config/deluge/web.conf';
+        @mkdir(dirname($authPath), 0755, true);
+        file_put_contents($authPath, "localclient:existing-secret:10\n");
+        $this->pmssWriteDelugeWebConf($webConfPath, '1111111111111111111111111111111111111111', 'stale-secret');
+
+        $ensured = \pmssEnsureDelugeServicePassword('alice');
+        $parsed = \pmssDelugeReadWebConf($webConfPath);
+
+        $this->assertSame('existing-secret', $ensured);
+        $this->assertTrue(is_array($parsed));
+        $this->assertSame('existing-secret', \pmssDelugeAuthReadLocalclientPassword($authPath));
+        $this->assertSame(sha1($parsed['config']['pwd_salt'].$ensured), $parsed['config']['pwd_sha1']);
+    }
+
+    public function testRotateDelugeServicePasswordUpdatesAuthAndWebUiTogether(): void
+    {
+        $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
+        $authPath = $homeRoot.'/alice/.config/deluge/auth';
+        $webConfPath = $homeRoot.'/alice/.config/deluge/web.conf';
+        @mkdir(dirname($authPath), 0755, true);
+        file_put_contents($authPath, "localclient:old-secret:10\n");
+        $this->pmssWriteDelugeWebConf($webConfPath, '2222222222222222222222222222222222222222', 'old-secret');
+
+        $rotated = \pmssDelugeServicePasswordRotate('alice');
+        $parsed = \pmssDelugeReadWebConf($webConfPath);
+
+        $this->assertTrue($rotated !== '' && $rotated !== 'old-secret', 'Expected a new Deluge service password');
+        $this->assertTrue(is_array($parsed));
+        $this->assertSame($rotated, \pmssDelugeAuthReadLocalclientPassword($authPath));
+        $this->assertSame(sha1($parsed['config']['pwd_salt'].$rotated), $parsed['config']['pwd_sha1']);
+    }
+
+    public function testRotateDelugeServicePasswordFailsSoftWhenWebConfMissing(): void
+    {
+        $homeRoot = $this->pmssTrackHomeRoot($this->tempDir.'/home');
+        $authPath = $homeRoot.'/alice/.config/deluge/auth';
+        @mkdir(dirname($authPath), 0755, true);
+        file_put_contents($authPath, "localclient:old-secret:10\n");
+
+        $rotated = \pmssDelugeServicePasswordRotate('alice');
+
+        $this->assertSame('', $rotated);
+        $this->assertSame('old-secret', \pmssDelugeAuthReadLocalclientPassword($authPath));
     }
 }

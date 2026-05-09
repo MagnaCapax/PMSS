@@ -123,9 +123,11 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
     {
         return implode("\n", array(
             '<?php',
+            "if (!function_exists('pmssLogAppendTimestampedLine')) {",
             "function pmssLogAppendTimestampedLine(string \$path, string \$message, string \$timestampFormat = '[Y-m-d H:i:s] ', string \$prefix = '', ?int \$mode = null): bool",
             '{',
             "    return file_put_contents(\$path, date('Y-m-d H:i:s').' '.\$prefix.\$message.PHP_EOL, FILE_APPEND) !== false;",
+            '}',
             '}',
             'function pmssUserBaseContext(string $action, string $phase, string $username, array $extra = array()): array',
             '{',

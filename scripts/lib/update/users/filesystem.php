@@ -79,14 +79,25 @@ function pmssUserApplySkeletonFiles(array $ctx): void
 PHP;
     $patchPhpCommand = static function (string $path, string $requireLine, string $legacyCommand, string $patchedCommand): void {
         pmssUserPatchWritableFile($path, static function (string $updated) use ($requireLine, $legacyCommand, $patchedCommand): ?string {
-            if (strpos($updated, $requireLine) === false) {
-                $updated = preg_replace('/^<\?php\s*/', $requireLine, $updated, 1, $count);
-                if (!is_string($updated) || $count !== 1) {
-                    return null;
+            $guardedRequireLine = preg_replace('/^<\?php\s*/', '', $requireLine, 1, $count);
+            if (!is_string($guardedRequireLine) || $count !== 1) {
+                return null;
+            }
+
+            if (strpos($updated, $guardedRequireLine) === false) {
+                $updated = str_replace("require_once '/scripts/lib/user/torrentPort.php';\n", $guardedRequireLine, $updated, $replaced);
+                if ($replaced === 0) {
+                    $updated = preg_replace('/^<\?php\s*/', $requireLine, $updated, 1, $count);
+                    if (!is_string($updated) || $count !== 1) {
+                        return null;
+                    }
                 }
             }
 
-            return strpos($updated, $patchedCommand) !== false ? $updated : str_replace($legacyCommand, $patchedCommand, $updated);
+            if (strpos($updated, $patchedCommand) === false) {
+                $updated = str_replace($legacyCommand, $patchedCommand, $updated);
+            }
+            return $updated;
         });
     };
 
@@ -149,8 +160,8 @@ PHP;
 
     // Keep tenant torrent frontend copies off the legacy Python port helpers
     // until the frozen /etc/skel/www sources can be updated directly.
-    $patchPhpCommand($ctx['home'].'/www/deluge.php', "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';\n", "shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');", "if (function_exists('pmssDelugePortEnsureCurrentUser')) {\n        pmssDelugePortEnsureCurrentUser();\n    }\n    shell_exec('nohup deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');");
-    $patchPhpCommand($ctx['home'].'/www/qbittorrent.php', "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';\n", "passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');", "if (function_exists('pmssQbittorrentPortEnsureCurrentUser')) {\n        pmssQbittorrentPortEnsureCurrentUser();\n    }\n    passthru('zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');");
+    $patchPhpCommand($ctx['home'].'/www/deluge.php', "<?php\nif (is_readable('/scripts/lib/user/torrentPort.php')) {\n    require_once '/scripts/lib/user/torrentPort.php';\n}\n", "shell_exec('nohup python3 /home/\$(whoami)/.delugePort.py; deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');", "if (function_exists('pmssDelugePortEnsureCurrentUser')) {\n        pmssDelugePortEnsureCurrentUser();\n    }\n    shell_exec('nohup deluged -l /home/\$(whoami)/.delugeLog -L info >> /dev/null 2>&1 & nohup deluge-web -l /home/\$(whoami)/.delugeWebLog -L info >> /dev/null 2>&1 &');");
+    $patchPhpCommand($ctx['home'].'/www/qbittorrent.php', "<?php\nif (is_readable('/scripts/lib/user/torrentPort.php')) {\n    require_once '/scripts/lib/user/torrentPort.php';\n}\n", "passthru('python3 /home/\$(whoami)/.qbittorrentPort.py; zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');", "if (function_exists('pmssQbittorrentPortEnsureCurrentUser')) {\n        pmssQbittorrentPortEnsureCurrentUser();\n    }\n    passthru('zsh -c \"qbittorrent-nox -d\" >> /dev/null 2>&1 &');");
 
     $skelBase = pmssSkeletonBase();
     foreach (glob($skelBase.'/www/rutorrent/plugins/hddquota/*') ?: [] as $file) {

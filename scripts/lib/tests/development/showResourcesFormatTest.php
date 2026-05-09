@@ -64,7 +64,20 @@ class ShowResourcesFormatTest extends TestCase
 
         $textOutput = $result['output'];
         $this->assertEquals(0, $result['rc']);
-        $this->assertStringContainsAllStrings(['1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], $textOutput);
+        $this->assertStringContainsAllStrings(['IO Ops/mo', '70 ops', '1.0 hrs', '2.50 GB-hrs', '1.00 GiB', '2.00'], $textOutput);
+    }
+
+    public function testUserFilteredOutputFormatsMonthlyIoOpsWithSuffixes(): void
+    {
+        $runtimeDir = $this->pmssMakeTempDir('pmss-show-runtime-');
+        $this->pmssWriteSerializedFixture($runtimeDir.'/resourceStats/alice', $this->pmssBuildResourceStatsPayloadFromValues($this->sampleUsageValues([
+            'io_read_ops' => $this->pmssBuildWindowValues(2500000, 30, 30, 3600),
+            'io_write_ops' => $this->pmssBuildWindowValues(3500000, 40, 40, 3600),
+        ])));
+
+        $out = $this->pmssRunRepoPhpScript('scripts/showResources.php', ['--user=alice'], ['PMSS_RUNTIME_DIR' => $runtimeDir]);
+
+        $this->assertStringContainsString('6.00 M ops', $out);
     }
 
     public function testUserFilteredJsonOutputKeepsExpectedPayloadShape(): void

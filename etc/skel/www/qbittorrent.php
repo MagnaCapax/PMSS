@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__.'/../.scriptsInc.php';
-require_once '/scripts/lib/user/torrentPort.php';
+if (is_readable('/scripts/lib/user/torrentPort.php')) {
+    require_once '/scripts/lib/user/torrentPort.php';
+}
 /**
 * PMSS: User Frontend: qBittorrent start/disable/restart file
 *

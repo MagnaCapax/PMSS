@@ -30,6 +30,11 @@ class CgroupPolicyTrackingTest extends TestCase
             '| Network shaping hints in policy | Pending |',
             '| Scheduler-aware IO auto-policy | Partially pending |',
         ], $docs);
+
+        $this->assertStringContainsString(
+            'Remaining TODOs: scheduler-aware IO auto-policy, burst allowances +',
+            $docs
+        );
     }
 
     public function testGlobalTodoIndexReferencesCgroupBacklog(): void

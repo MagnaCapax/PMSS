@@ -317,7 +317,7 @@ $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
 if ((file_exists('/usr/bin/deluged') || file_exists('/usr/local/bin/deluged')) && file_exists('deluge.php')) {
 ?>
                         <h6>Deluge</h6>
-                        <p>Deluge password: <b><?php echo htmlspecialchars($delugePassword === '' ? 'Unavailable' : $delugePassword, ENT_QUOTES, 'UTF-8'); ?></b> (separate from your account password)</p>
+                        <p>Deluge Web UI password: <b><?php echo htmlspecialchars($delugePassword === '' ? 'Unavailable' : $delugePassword, ENT_QUOTES, 'UTF-8'); ?></b> (also used for the daemon connection; separate from your account password)</p>
 <?php
     if ($delugePasswordHelpersAvailable) {
 ?>
@@ -501,7 +501,8 @@ echo $announcementItemsHtml;
  */
 function pmssWelcomePageStateBuild() {
     $quotaInfo = pmssWelcomeQuotaInfoRead();
-    $delugeState = pmssWelcomeDelugeStateBuild('../.config/deluge/auth');
+    $home = dirname(__DIR__);
+    $delugeState = pmssWelcomeDelugeStateBuild(basename($home), $home.'/.config/deluge/auth');
     $mediaStackStatus = array(
         'state' => 'blocked',
         'message' => 'Media stack panel helper is unavailable on this host.',
@@ -515,7 +516,6 @@ function pmssWelcomePageStateBuild() {
     if (function_exists('pmssMediaStackPanelStatusRead')
         && function_exists('pmssMediaStackPanelCurrentUserRead')
         && function_exists('pmssMediaStackPanelCurrentHostnameRead')) {
-        $home = dirname(__DIR__);
         $mediaStackStatus = pmssMediaStackPanelStatusRead(
             $home,
             pmssMediaStackPanelCurrentUserRead($home),
@@ -611,20 +611,19 @@ function pmssWelcomeHomeRaidNoticeHtmlRead() {
     return pmssStorageHealthHomeRaidNoticeHtmlBuild($activity);
 }
 
-function pmssWelcomeDelugeStateBuild($delugeAuthPath) {
+function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
     if (file_exists('/scripts/lib/user/passwords.php')) {
         require_once '/scripts/lib/user/passwords.php';
     }
 
     $helpersAvailable = function_exists('pmssDelugeAuthReadLocalclientPassword')
-        && function_exists('pmssDelugeAuthWriteLocalclientPassword')
-        && function_exists('pmssDelugeServicePasswordGenerate');
+        && function_exists('pmssDelugeServicePasswordRotate');
     $passwordNotice = '';
     $password = '';
 
     if ($helpersAvailable && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
-        $newDelugePassword = pmssDelugeServicePasswordGenerate();
-        $passwordUpdated = pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword);
+        $newDelugePassword = pmssDelugeServicePasswordRotate((string) $username);
+        $passwordUpdated = $newDelugePassword !== '';
         $passwordNotice = $passwordUpdated
             ? 'Deluge password rotated. Re-login in Deluge Web UI with the new password below.'
             : 'Deluge password rotation failed. Please try again.';

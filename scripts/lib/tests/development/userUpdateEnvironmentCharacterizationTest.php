@@ -116,10 +116,10 @@ PHP
         $this->assertTrue($result['irssi_exists']);
         $this->assertTrue($result['recycle_exists']);
         $this->assertStringContainsString('@ob_flush();', $result['filemanager']);
-        $this->assertStringContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['deluge']);
+        $this->assertStringContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['deluge']);
         $this->assertStringContainsString('pmssDelugePortEnsureCurrentUser', $result['deluge']);
         $this->assertTrue(strpos($result['deluge'], '.delugePort.py') === false);
-        $this->assertStringContainsString("require_once '/scripts/lib/user/torrentPort.php';", $result['qbittorrent_frontend']);
+        $this->assertStringContainsString("if (is_readable('/scripts/lib/user/torrentPort.php')) {", $result['qbittorrent_frontend']);
         $this->assertStringContainsString('pmssQbittorrentPortEnsureCurrentUser', $result['qbittorrent_frontend']);
         $this->assertTrue(strpos($result['qbittorrent_frontend'], '.qbittorrentPort.py') === false);
         $this->assertStringContainsString('((integer)($tm["minutes"]/((', str_replace('(int)$interval', '((int)$interval)', $result['settings']));

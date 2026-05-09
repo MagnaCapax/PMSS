@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../runtime.php';
+require_once __DIR__.'/../lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/qbittorrent.php';
 
@@ -37,6 +38,19 @@ function pmssDelugeAuthPath(string $username): string
     }
 
     return rtrim($homeRoot, '/').'/'.$username.'/.config/deluge/auth';
+}
+
+/**
+ * Resolve the Deluge Web UI config path for a user.
+ */
+function pmssDelugeWebConfPath(string $username): string
+{
+    $homeRoot = getenv('PMSS_HOME_DIR');
+    if (!is_string($homeRoot) || trim($homeRoot) === '') {
+        $homeRoot = '/home';
+    }
+
+    return rtrim($homeRoot, '/').'/'.$username.'/.config/deluge/web.conf';
 }
 
 /**
@@ -110,6 +124,70 @@ function pmssDelugeTemplateLocalclientPassword(): string
 }
 
 /**
+ * Write the Web UI hash that corresponds to a Deluge service password.
+ */
+function pmssDelugeWebPasswordWrite(string $webConfPath, string $password, string $owner): bool
+{
+    if ($password === '' || !pmssUserFilePathIsSafe($webConfPath) || !is_file($webConfPath) || is_link($webConfPath)) {
+        return false;
+    }
+
+    $parsed = pmssDelugeReadWebConf($webConfPath);
+    if (!is_array($parsed) || !is_array($parsed['meta'] ?? null) || !is_array($parsed['config'] ?? null)) {
+        return false;
+    }
+
+    $config = $parsed['config'];
+    $salt = $config['pwd_salt'] ?? '';
+    if (!is_string($salt) || strlen($salt) !== 40 || !ctype_xdigit($salt)) {
+        $salt = bin2hex(random_bytes(20));
+    }
+
+    $hash = sha1($salt.$password);
+    if (($config['pwd_salt'] ?? '') === $salt && ($config['pwd_sha1'] ?? '') === $hash) {
+        return true;
+    }
+
+    $config['pwd_salt'] = $salt;
+    $config['pwd_sha1'] = $hash;
+    pmssDelugeNormalizeEmptySessionsObject($config);
+
+    return pmssDelugeWriteWebConf($webConfPath, $parsed['meta'], $config, $owner);
+}
+
+/**
+ * Apply one Deluge service password to both daemon auth and web.conf.
+ */
+function pmssDelugeServicePasswordApply(string $username, string $password): bool
+{
+    if ($password === '') {
+        return false;
+    }
+
+    $authPath = pmssDelugeAuthPath($username);
+    $webConfPath = pmssDelugeWebConfPath($username);
+    if (!pmssUserFilePathIsSafe($authPath) || !pmssUserFilePathIsSafe($webConfPath)) {
+        return false;
+    }
+
+    $originalWebConfig = pmssDelugeReadWebConf($webConfPath);
+    if (!is_array($originalWebConfig) || !is_array($originalWebConfig['meta'] ?? null) || !is_array($originalWebConfig['config'] ?? null)) {
+        return false;
+    }
+
+    if (!pmssDelugeWebPasswordWrite($webConfPath, $password, $username)) {
+        return false;
+    }
+
+    if (pmssDelugeAuthWriteLocalclientPassword($authPath, $password)) {
+        return true;
+    }
+
+    pmssDelugeWriteWebConf($webConfPath, $originalWebConfig['meta'], $originalWebConfig['config'], $username);
+    return false;
+}
+
+/**
  * Ensure Deluge uses a per-user service credential (not the shared template token).
  */
 function pmssEnsureDelugeServicePassword(string $username): string
@@ -119,11 +197,35 @@ function pmssEnsureDelugeServicePassword(string $username): string
     $templatePassword = pmssDelugeTemplateLocalclientPassword();
 
     if ($currentPassword !== '' && $currentPassword !== $templatePassword) {
+        if (!pmssDelugeWebPasswordWrite(pmssDelugeWebConfPath($username), $currentPassword, $username) && function_exists('pmssLogStatus')) {
+            pmssLogStatus('WARN', 'Deluge Web UI password hash sync failed', 1);
+        }
         return $currentPassword;
     }
 
     $newPassword = pmssDelugeServicePasswordGenerate();
-    return pmssDelugeAuthWriteLocalclientPassword($authPath, $newPassword) ? $newPassword : $currentPassword;
+    if (!pmssDelugeServicePasswordApply($username, $newPassword) && function_exists('pmssLogStatus')) {
+        pmssLogStatus('WARN', 'Deluge service credential sync failed', 1);
+        return $currentPassword;
+    }
+
+    return $newPassword;
+}
+
+/**
+ * Rotate the Deluge service credential and keep daemon/web auth in sync.
+ */
+function pmssDelugeServicePasswordRotate(string $username): string
+{
+    $newPassword = pmssDelugeServicePasswordGenerate();
+    if (!pmssDelugeServicePasswordApply($username, $newPassword)) {
+        if (function_exists('pmssLogStatus')) {
+            pmssLogStatus('WARN', 'Deluge service credential rotation failed', 1);
+        }
+        return '';
+    }
+
+    return $newPassword;
 }
 
 /**
@@ -237,10 +339,11 @@ function pmssUserHtpasswdSyncFromShadow(string $username, string $shadowPath = '
     return pmssUserHtpasswdHashWrite($htpasswdPath, $username, $passwordHash, $username);
 }
 
-// Deluge password sync intentionally omitted: Deluge daemon auth stores passwords
-// in plaintext (all versions <= 2.1.1). Syncing the account password here would
-// expose it in a readable file under the user's home directory. Deluge service
-// credentials are handled separately via pmssEnsureDelugeServicePassword().
+// Deluge account-password sync intentionally omitted: Deluge daemon auth stores
+// service passwords in plaintext (all versions <= 2.1.1). Reusing the account
+// password here would expose it in a readable file under the user's home
+// directory. Deluge service credentials are managed separately and mirrored
+// into web.conf via pmssEnsureDelugeServicePassword()/pmssDelugeServicePasswordRotate().
 
 /**
  * Update qBittorrent config with new password hash.

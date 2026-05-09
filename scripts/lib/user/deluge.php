@@ -30,6 +30,33 @@ function pmssDelugeCoreTemplatePath(?array $distro = null): string
 }
 
 /**
+ * Resolve an auxiliary Deluge template under the configured seedbox config dir.
+ */
+function pmssDelugeTemplatePath(string $templateName): string
+{
+    return pmssResolvePathFromEnv('PMSS_SEEDBOX_CONFIG_DIR', '/etc/seedbox/config').'/'.$templateName;
+}
+
+/**
+ * Read a required Deluge template and emit a structured warning on failure.
+ */
+function pmssDelugeTemplateRead(string $templatePath, string $label): string
+{
+    $template = @file_get_contents($templatePath);
+    if (is_string($template) && $template !== '') {
+        return $template;
+    }
+
+    pmssLogStatus('WARN', sprintf(
+        'Skipping Deluge %s template because it is %s: %s',
+        $label,
+        file_exists($templatePath) ? 'empty' : 'missing',
+        $templatePath
+    ), 1);
+    return '';
+}
+
+/**
  * Render Deluge core.conf from the PMSS template and runtime values.
  *
  * @param array{name:string,memory:int|float} $user
@@ -39,9 +66,8 @@ function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $upload
 {
     $username = (string) $user['name'];
     $templatePath = pmssDelugeCoreTemplatePath($distro ?? pmssDetectDistro());
-    $template = file_get_contents($templatePath);
-
-    if (!is_string($template) || $template === '') {
+    $template = pmssDelugeTemplateRead($templatePath, 'core');
+    if ($template === '') {
         return '';
     }
 
@@ -55,7 +81,7 @@ function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $upload
 function userConfigureDeluge(array $user, array $configuration): void
 {
     $username = $user['name'];
-    $home = "/home/{$username}";
+    $home = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home')."/{$username}";
     $configDir     = "$home/.config/deluge";
     $unfinishedDir = "$home/dataUnfinished";
     $sessionDir    = "$home/.sessionDeluge";
@@ -75,22 +101,26 @@ function userConfigureDeluge(array $user, array $configuration): void
     }
 
     $scgiPort    = $configuration['config']['scgiPort'] ?? 5000;
-    $existingPort = file_exists("$home/.delugePort") ? (int) file_get_contents("$home/.delugePort") : 0;
+    $existingPort = file_exists("$home/.delugePort") ? (int) @file_get_contents("$home/.delugePort") : 0;
     $delugePort   = ($existingPort >= 1024 && $existingPort <= 65000) ? $existingPort : $scgiPort;
     $throttle = pmssReadTorrentThrottle($username);
     $uploadThrottle = ($throttle !== null && $throttle > 0) ? (string) $throttle : '-1.0';
 
     $coreConfig = pmssDelugeRenderCoreConfig($user, $delugePort, $uploadThrottle);
-    file_put_contents("$configDir/core.conf", $coreConfig);
+    $hostlistTemplate = pmssDelugeTemplateRead(pmssDelugeTemplatePath('template.deluge.hostlist.conf'), 'hostlist');
+    $webTemplate = pmssDelugeTemplateRead(pmssDelugeTemplatePath('template.deluge.web.conf'), 'web');
+    if ($coreConfig === '' || $hostlistTemplate === '' || $webTemplate === '') {
+        pmssLogStatus('WARN', 'Skipping Deluge configuration update because one or more templates are unavailable', 1);
+        return;
+    }
 
-    $hostlistTemplate = file_get_contents('/etc/seedbox/config/template.deluge.hostlist.conf');
+    file_put_contents("$configDir/core.conf", $coreConfig);
     $hostlistConfig   = str_replace('##DAEMONPORT', $delugePort, $hostlistTemplate);
     file_put_contents("$configDir/hostlist.conf", $hostlistConfig);
     if (!file_exists("$configDir/hostlist.conf.1.2")) {
         @symlink("$configDir/hostlist.conf", "$configDir/hostlist.conf.1.2");
     }
 
-    $webTemplate = file_get_contents('/etc/seedbox/config/template.deluge.web.conf');
     $webConfPath = "$configDir/web.conf";
     $existingWebConfig = @file_get_contents($webConfPath);
     $webConfig   = str_replace(['##WEBPORT', '##USER'], [$delugePort + 1, $username], $webTemplate);
@@ -99,18 +129,28 @@ function userConfigureDeluge(array $user, array $configuration): void
     file_put_contents("$home/.delugePort", $delugePort);
 
     if (!file_exists("$configDir/auth")) {
-        runStep('Provisioning Deluge auth template', sprintf('cp %s %s',
-            escapeshellarg('/etc/seedbox/config/template.deluge.auth'),
-            escapeshellarg("$configDir/auth")
-        ));
+        $authTemplate = pmssDelugeTemplatePath('template.deluge.auth');
+        if (!is_file($authTemplate)) {
+            pmssLogStatus('WARN', 'Skipping Deluge auth template copy because the template is missing: '.$authTemplate, 1);
+        } else {
+            runStep('Provisioning Deluge auth template', sprintf('cp %s %s',
+                escapeshellarg($authTemplate),
+                escapeshellarg("$configDir/auth")
+            ));
+        }
     }
     pmssEnsureDelugeServicePassword($username);
 
     if (!file_exists("$configDir/web.conf")) {
-        runStep('Provisioning Deluge web template', sprintf('cp %s %s',
-            escapeshellarg('/etc/seedbox/config/template.deluge.web.conf'),
-            escapeshellarg("$configDir/web.conf")
-        ));
+        $webTemplatePath = pmssDelugeTemplatePath('template.deluge.web.conf');
+        if (!is_file($webTemplatePath)) {
+            pmssLogStatus('WARN', 'Skipping Deluge web template copy because the template is missing: '.$webTemplatePath, 1);
+        } else {
+            runStep('Provisioning Deluge web template', sprintf('cp %s %s',
+                escapeshellarg($webTemplatePath),
+                escapeshellarg("$configDir/web.conf")
+            ));
+        }
     }
     runStep('Fixing Deluge ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg("$home/.config/")));
 

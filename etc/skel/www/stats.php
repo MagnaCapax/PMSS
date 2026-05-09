@@ -853,6 +853,22 @@ if (!function_exists('pmssFormatCpuHours')) {
     }
 }
 
+if (!function_exists('pmssFormatIoOperationsShort')) {
+    function pmssFormatIoOperationsShort($operations)
+    {
+        $operations = max(0.0, (float)$operations);
+        foreach (array(1000000000.0 => 'billion', 1000000.0 => 'million', 1000.0 => 'thousand') as $divisor => $unit) {
+            if ($operations >= $divisor) {
+                $value = $operations / $divisor;
+                $decimals = $value >= 100 ? 0 : ($value >= 10 ? 1 : 2);
+                return number_format($value, $decimals).' '.$unit.' IO operations';
+            }
+        }
+
+        return number_format($operations, 0).' IO operations';
+    }
+}
+
 // === Resource Usage ===
 $resourceData = null;
 $resourceTime = null;
@@ -883,6 +899,13 @@ if ($resourceData === null) {
     $cpuRaw = isset($resourceData['cpu']['raw']) && is_array($resourceData['cpu']['raw'])
         ? $resourceData['cpu']['raw']
         : [];
+    $ioReadOpsRaw = isset($resourceData['io_read_ops']['raw']) && is_array($resourceData['io_read_ops']['raw'])
+        ? $resourceData['io_read_ops']['raw']
+        : [];
+    $ioWriteOpsRaw = isset($resourceData['io_write_ops']['raw']) && is_array($resourceData['io_write_ops']['raw'])
+        ? $resourceData['io_write_ops']['raw']
+        : [];
+    $ioOperationsMonth = (float)($ioReadOpsRaw['month'] ?? 0.0) + (float)($ioWriteOpsRaw['month'] ?? 0.0);
     if (isset($cpuRaw['month'])) {
         $cpuDisplay['month'] = pmssFormatCpuHours($cpuRaw['month']);
     }
@@ -917,7 +940,7 @@ if ($resourceData === null) {
     $ioDailyLabels = [];
     $ioDailyRead = [];
     $ioDailyWrite = [];
-    $iopsDailyAverage = [];
+    $ioDailyOperations = [];
     $cpuDailyHours = [];
     if (isset($resourceData['daily']) && is_array($resourceData['daily'])) {
         foreach ($resourceData['daily'] as $day => $totals) {
@@ -929,7 +952,7 @@ if ($resourceData === null) {
             $cpuNanoseconds = isset($totals['cpu']) ? (float)$totals['cpu'] : 0.0;
             $ioDailyRead[] = round($readBytes / 1024 / 1024, 2);
             $ioDailyWrite[] = round($writeBytes / 1024 / 1024, 2);
-            $iopsDailyAverage[] = round(($readOps + $writeOps) / 86400, 2);
+            $ioDailyOperations[] = round($readOps + $writeOps, 2);
             $cpuDailyHours[] = round(($cpuNanoseconds / 1000000000) / 3600, 4);
         }
     }
@@ -940,6 +963,7 @@ if ($resourceData === null) {
 Resource usage at <?php echo date('Y-m-d H:i:s', (int)$resourceTime); ?>:
 I/O Read (month/week/day/hour): <?php echo $ioReadDisplay['month'] ?? 'n/a'; ?> / <?php echo $ioReadDisplay['week'] ?? 'n/a'; ?> / <?php echo $ioReadDisplay['day'] ?? 'n/a'; ?> / <?php echo $ioReadDisplay['hour'] ?? 'n/a'; ?>
 I/O Write (month/week/day/hour): <?php echo $ioWriteDisplay['month'] ?? 'n/a'; ?> / <?php echo $ioWriteDisplay['week'] ?? 'n/a'; ?> / <?php echo $ioWriteDisplay['day'] ?? 'n/a'; ?> / <?php echo $ioWriteDisplay['hour'] ?? 'n/a'; ?>
+Past 30 days total I/O operations: <?php echo pmssFormatIoOperationsShort($ioOperationsMonth); ?>
         </pre>
 
         <?php if (count($ioDailyLabels) >= 2): ?>
@@ -998,8 +1022,8 @@ I/O Write (month/week/day/hour): <?php echo $ioWriteDisplay['month'] ?? 'n/a'; ?
                     data: {
                         labels: <?php echo json_encode($ioDailyLabels); ?>,
                         datasets: [{
-                            label: 'Daily Average IOPS (ops/s)',
-                            data: <?php echo json_encode($iopsDailyAverage); ?>,
+                            label: 'Daily I/O Operations',
+                            data: <?php echo json_encode($ioDailyOperations); ?>,
                             fill: true,
                             backgroundColor: 'rgba(255, 193, 7, 0.2)',
                             borderColor: 'rgb(255, 193, 7)',

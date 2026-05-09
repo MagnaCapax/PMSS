@@ -35,7 +35,8 @@ class TorrentPortFrontendTest extends TestCase
         \pmssUserApplySkeletonFiles($this->context());
 
         $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/deluge.php'));
-        $this->assertTrue(strpos($content, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
+        $this->assertTrue(strpos($content, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
+        $this->assertTrue(strpos($content, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
         $this->assertTrue(strpos($content, 'pmssDelugePortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($content, '.delugePort.py') === false);
     }
@@ -47,7 +48,8 @@ class TorrentPortFrontendTest extends TestCase
         \pmssUserApplySkeletonFiles($this->context());
 
         $content = (string) file_get_contents($this->pmssUserHomePath($this->homeRoot, $this->user, 'www/qbittorrent.php'));
-        $this->assertTrue(strpos($content, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
+        $this->assertTrue(strpos($content, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
+        $this->assertTrue(strpos($content, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
         $this->assertTrue(strpos($content, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($content, '.qbittorrentPort.py') === false);
     }
@@ -68,7 +70,8 @@ class TorrentPortFrontendTest extends TestCase
 
         $this->assertTrue(strpos($src, "require_once __DIR__.'/../.scriptsInc.php';") !== false);
         $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
-        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
+        $this->assertTrue(strpos($src, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
+        $this->assertTrue(strpos($src, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
         $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($src, '.delugePort.py') === false);
     }
@@ -79,7 +82,8 @@ class TorrentPortFrontendTest extends TestCase
 
         $this->assertTrue(strpos($src, "require_once __DIR__.'/../.scriptsInc.php';") !== false);
         $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
-        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") !== false);
+        $this->assertTrue(strpos($src, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
+        $this->assertTrue(strpos($src, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
         $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($src, '.qbittorrentPort.py') === false);
     }

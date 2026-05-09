@@ -55,10 +55,9 @@ if (!file_exists('/opt/certbot') && $codename === 'buster') {
     echo `apt-get -y install certbot python3-certbot-nginx; `;
 } #TODO: This also belongs in an app installer.
 
-// Legacy behaviour: look for the literal '/etc/letsencrypt/live/{$domain}'
-// placeholder before requesting a certificate. The single-quoted string keeps
-// compatibility with older helper scripts that expect the static path.
-$legacyCertPath = '/etc/letsencrypt/live/{$domain}';
+// Only request a certificate when the live directory for this hostname is
+// absent; otherwise every update run would invoke certbot needlessly.
+$legacyCertPath = "/etc/letsencrypt/live/{$domain}";
 if (!file_exists($legacyCertPath)) echo (string) shell_exec('/usr/bin/certbot certonly -d '.$domainArg.' -n --nginx --agree-tos --email '.$emailArg);
 
 // Older hosts may not ship the renewal cron stub; seed it so certbot handles

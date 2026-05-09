@@ -352,6 +352,49 @@ function rtorrentProcessResetSessionDirectory(string $home, string $user, callab
 }
 
 /**
+ * Find legacy custom-config directives that PMSS templates already migrated away from.
+ *
+ * Customer overrides are imported verbatim via `try_import`, so startup failures can
+ * be harder to triage when the file still carries historic aliases that PMSS no longer
+ * ships in its managed template. Return the matched directive names in a stable order
+ * so callers can emit actionable diagnostics before quarantining the file.
+ *
+ * @param string $content Raw `.rtorrent.rc.custom` contents.
+ *
+ * @return string[] Legacy directive labels found in the config.
+ */
+function rtorrentCustomConfigFindLegacyDirectives(string $content): array
+{
+    if ($content === '') {
+        return [];
+    }
+
+    $patterns = [
+        'tracker_numwant' => '/^\s*tracker_numwant\s*=/m',
+        'use_udp_trackers' => '/^\s*use_udp_trackers\s*=/m',
+        'port_range' => '/^\s*port_range\s*=/m',
+        'check_hash' => '/^\s*check_hash\s*=/m',
+        'schedule' => '/^\s*schedule\s*=/m',
+        'schedule_remove' => '/^\s*schedule_remove\s*=/m',
+        'load_start' => '/^\s*load_start\s*=/m',
+        'load_start_verbose' => '/^\s*load_start_verbose\s*=/m',
+        'execute' => '/^\s*execute\s*=/m',
+        'umask' => '/^\s*umask\s*=/m',
+        'hash_interval' => '/^\s*hash_interval\s*=/m',
+        'hash_max_tries' => '/^\s*hash_max_tries\s*=/m',
+    ];
+
+    $matches = [];
+    foreach ($patterns as $label => $pattern) {
+        if (preg_match($pattern, $content) === 1) {
+            $matches[] = $label;
+        }
+    }
+
+    return $matches;
+}
+
+/**
  * Quarantine a user's custom rTorrent config file.
  *
  * When /home/<user>/.rtorrent.rc.custom exists but is invalid, rTorrent can
@@ -385,6 +428,18 @@ function rtorrentCustomConfigQuarantine(string $home, string $user, callable $lo
         if ($owner !== false && $uid !== null && (int) $owner !== 0 && (int) $owner !== $uid) {
             $logFn("Refusing to quarantine {$src}: unexpected owner uid={$owner}", true);
             return null;
+        }
+    }
+
+    $content = @file_get_contents($src);
+    if (is_string($content)) {
+        $legacyDirectives = rtorrentCustomConfigFindLegacyDirectives($content);
+        if ($legacyDirectives !== []) {
+            $logFn(
+                'Custom rTorrent config still uses legacy PMSS-migrated directives: '
+                .implode(', ', $legacyDirectives),
+                true
+            );
         }
     }
 

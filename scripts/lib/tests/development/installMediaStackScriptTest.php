@@ -89,6 +89,18 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('$HOME/.bin/cloudplow', $this->script);
     }
 
+    public function testVenvPipBootstrapUsesPython3(): void
+    {
+        $this->assertTrue(
+            substr_count($this->script, 'python3 -m pip install -U pip >/dev/null 2>&1') === 2,
+            'Cloudplow and SABnzbd venv bootstrap should use python3 explicitly'
+        );
+        $this->assertTrue(
+            strpos($this->script, 'python -m pip install -U pip >/dev/null 2>&1') === false,
+            'Media stack venv bootstrap must not rely on bare python'
+        );
+    }
+
     public function testSabnzbdUsesConfigDir(): void
     {
         $this->assertStringContainsString('$HOME/.config/sabnzbd', $this->script);
