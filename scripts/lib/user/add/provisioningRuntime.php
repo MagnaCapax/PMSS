@@ -10,14 +10,32 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../../runtime.php';
+/**
+ * Provisioning fatal-path tests load this helper in isolation, so defer the
+ * heavier runtime bootstrap until a caller needs runtime-specific functions.
+ */
+function pmssAddUserRuntimeBootstrap(): void
+{
+    require_once __DIR__.'/../../runtime.php';
+}
+
+/**
+ * Resolve one env-backed path without forcing the full runtime bootstrap.
+ */
+function pmssAddUserResolvePathFromEnv(string $envKey, string $default): string
+{
+    $value = getenv($envKey);
+    $value = ($value === false || $value === '') ? $default : $value;
+    $value = rtrim($value, '/');
+    return $value !== '' ? $value : rtrim($default, '/');
+}
 
 /**
  * Resolve the addUser provisioning log path with a hermetic test override.
  */
 function pmssAddUserProvisioningLogPath(): string
 {
-    return pmssResolvePathFromEnv('PMSS_ADDUSER_LOG_PATH', '/var/log/pmss/addUser.log');
+    return pmssAddUserResolvePathFromEnv('PMSS_ADDUSER_LOG_PATH', '/var/log/pmss/addUser.log');
 }
 
 /**
@@ -39,6 +57,8 @@ function pmssAddUserProvisionSummaryGet(): ?array
  */
 function pmssAddUserRuntimeInit(): void
 {
+    pmssAddUserRuntimeBootstrap();
+
     if (function_exists('set_time_limit')) {
         @set_time_limit(0);
     }
@@ -145,6 +165,8 @@ function pmssAddUserRunRequiredProvisionStep(
 function runProvisionStep(string $description, string $command, ?string $logCommand = null): int
 {
     global $user, $provisionStats;
+
+    pmssAddUserRuntimeBootstrap();
 
     $logCommand = $logCommand ?? $command;
     $logger = 'logProvisionMessage';
