@@ -1,11 +1,5 @@
 # FireQOS policy template – seeded by setupNetwork.php/update-step2.
 #
-# Placeholders:
-#   ##INTERFACE   -> uplink interface name (e.g., eth0)
-#   ##SPEEDMbit   -> interface speed in Mbit for shaping limits
-#   ##LOCALNETWORK -> newline-delimited CIDRs exempted from shaping
-#   ##USERMATCHES -> generated `match` statements per user class
-
 DEVICE=##INTERFACE
 INTERFACE_SPEED=##SPEEDMbit
 #Uncomment following if you have issues matching users

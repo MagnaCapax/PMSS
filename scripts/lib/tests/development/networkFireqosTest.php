@@ -129,47 +129,34 @@ class NetworkFireqosTest extends TestCase
         });
     }
 
-    public function testBuildFireqosConfigUsesSlidingThrottleWhenPresent(): void
+    public function testBuildFireqosConfigWithRepositoryTemplateKeepsLocalClassInsideInterfaceBlock(): void
     {
         $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
         $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
+        $templatePath = $this->pmssMakeTempPath('pmss-fireqos-template-', '.conf');
         @mkdir($homeDir.'/root', 0755, true);
         @file_put_contents($stateDir.'/root.enabled', '1');
         @file_put_contents($homeDir.'/root/.throttle', '25');
-        @file_put_contents($stateDir.'/root.throttle_mbit', '333');
+        @file_put_contents($templatePath, $this->pmssReadRepoFile('etc/seedbox/config/template.fireqos'));
 
         $this->pmssWithEnv([
             'PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir,
             'PMSS_HOME_DIR' => $homeDir,
+            'PMSS_FIREQOS_TEMPLATE' => $templatePath,
         ], function (): void {
             $config = \networkBuildFireqosConfig(
                 ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]],
                 ['root'],
-                []
+                ['10.0.0.0/8']
             );
-            $this->assertTrue(strpos($config, 'class root ceil 333Mbit') !== false);
-        });
-    }
-
-    public function testBuildFireqosConfigFallsBackWhenSlidingThrottleInvalid(): void
-    {
-        $stateDir = $this->pmssMakeTempDir('pmss-fireqos-state-', 0700);
-        $homeDir = $this->pmssMakeTempDir('pmss-fireqos-home-', 0700);
-        @mkdir($homeDir.'/root', 0755, true);
-        @file_put_contents($stateDir.'/root.enabled', '1');
-        @file_put_contents($homeDir.'/root/.throttle', '25');
-        @file_put_contents($stateDir.'/root.throttle_mbit', 'nope');
-
-        $this->pmssWithEnv([
-            'PMSS_TRAFFIC_LIMIT_STATE_DIR' => $stateDir,
-            'PMSS_HOME_DIR' => $homeDir,
-        ], function (): void {
-            $config = \networkBuildFireqosConfig(
-                ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]],
-                ['root'],
-                []
-            );
+            $interfacePos = strpos($config, 'interface $DEVICE outbound output rate $INTERFACE_SPEED');
+            $localPos = strpos($config, 'class local commit 10%');
+            $this->assertTrue($interfacePos !== false);
+            $this->assertTrue($localPos !== false);
+            $this->assertTrue($localPos > $interfacePos);
+            $this->assertEquals(1, substr_count($config, 'class local commit 10%'));
             $this->assertTrue(strpos($config, 'class root ceil 25Mbit') !== false);
+            $this->assertTrue(strpos($config, 'match dst 10.0.0.0/8') !== false);
         });
     }
 

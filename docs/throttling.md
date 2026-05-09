@@ -14,7 +14,6 @@ How PMSS limits per-user network egress when a customer exceeds their monthly tr
                                                                             ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ trafficLimits.php (cron) — reads .trafficData vs trafficLimits/<u>                     │
-│   if usage ≥ 75% of limit:    sliding throttle  → /var/run/pmss/trafficLimits/<u>.throttle_mbit
 │   if usage > limit:           hard cap          → .enabled marker + /home/<u>/.throttle (Mbit)
 │   if under limit + cooldown:  remove .enabled, restore default cap
 └────────────────────────────┬───────────────────────────────────────────────────────────┘
@@ -22,7 +21,7 @@ How PMSS limits per-user network egress when a customer exceeds their monthly tr
                              ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ fireqos.php::networkBuildFireqosConfig                                                 │
-│   per user: read .throttle_mbit (sliding) > .enabled+.throttle (hard) > defaultCap     │
+│   per user: read .enabled + .throttle (hard) > defaultCap                              │
 │   render: class <user> ceil <N>Mbit                                                    │
 │             match rawmark <fireqosMark>                                                │
 │   write to /etc/seedbox/config/fireqos.conf                                            │
@@ -51,7 +50,6 @@ End result: any packet from a UID over the limit hits a kernel HTB class with a 
 | `/etc/seedbox/runtime/trafficLimits/<user>` | root | plain int | `userTrafficLimit.php` | Monthly traffic cap in **GiB** (0 = unlimited) |
 | `/home/<user>/.bonusTraffic` | root | plain int | `userBonusTraffic.php` | Extra GiB granted on top of base limit |
 | `/var/run/pmss/trafficLimits/<user>.enabled` | root | empty marker | `trafficLimits.php` | Hard-cap state active; mtime drives cooldown |
-| `/var/run/pmss/trafficLimits/<user>.throttle_mbit` | root | plain int | `trafficLimits.php` | Sliding throttle ceiling in **Mbit/s** |
 | `/home/<user>/.throttle` | user | plain int | `setRateLimit()` | Hard-cap ceiling in **Mbit/s** when limit is enforced |
 
 ### System (per host)
@@ -64,20 +62,6 @@ End result: any packet from a UID over the limit hits a kernel HTB class with a 
 | `/var/log/pmss/fireqos.log` | root | text log | `fireqos start` | Parser/installer messages — check this first when throttle isn't applying |
 
 ## Throttle Algorithm
-
-### Sliding throttle (75% of limit and above)
-
-Triggers when `usage ≥ slidingThrottleStart` (default 75%) and the hard-cap `.enabled` marker is NOT present. Computes a continuously-decreasing ceiling:
-
-```
-range = 100 - 75 = 25
-capPct = min(75, ((usagePct - 75) / 25) * 75)
-hardCapMbit = trafficCapMbit (config default, e.g. 100)
-usableBw = networkSpeed - hardCapMbit
-effectiveCeil = networkSpeed - usableBw * (capPct / 100)
-```
-
-Writes the integer Mbit ceiling to `<user>.throttle_mbit`. fireqos picks this up on next render.
 
 ### Hard cap (over 100% of limit)
 
@@ -116,7 +100,7 @@ class <username> ceil <N>Mbit
 
 `fireqosMark` is sequential (1, 2, 3, ...) per the order users are walked. iptables mangle OUTPUT chain marks packets to each user's UID with the corresponding `fireqosMark`. The `match rawmark` line in fireqos directs marked packets into the per-user HTB class.
 
-When neither `.throttle_mbit` nor `.enabled+.throttle` is present, the user's class is rendered without a `ceil` clause — they get the parent class's full bandwidth allocation.
+When `.enabled` is not present, the user's class is rendered without a `ceil` clause — they get the parent class's full bandwidth allocation.
 
 ## Verification Commands
 
@@ -138,7 +122,6 @@ fireqos start /etc/seedbox/config/fireqos.conf
 # 4. Per-user state inspection
 cat /etc/seedbox/runtime/trafficLimits/<user>      # GiB monthly cap
 cat /home/<user>/.throttle                          # Mbit hard cap (when over)
-cat /var/run/pmss/trafficLimits/<user>.throttle_mbit  # Mbit sliding ceil (when 75-100%)
 ls -la /var/run/pmss/trafficLimits/<user>.enabled   # presence + mtime = throttled state + cooldown
 
 # 5. Iptables MARK plumbing (mangle table OUTPUT chain)
@@ -185,14 +168,6 @@ Cause: `setupNetwork.php` not run since user added; mangle OUTPUT chain doesn't 
 
 Fix: re-run `/scripts/util/setupNetwork.php` to regenerate iptables rules.
 
-### .throttle_mbit set but fireqos has stale config
-
-Symptom: `<user>.throttle_mbit` written; `tc class show` reflects an older value.
-
-Cause: fireqos config rendering happens via `setupNetwork.php` (not on every cron cycle). The throttle markers are read at render time; stale config = stale throttle.
-
-Fix: re-run setupNetwork.php to regenerate fireqos.conf and call `fireqos start`.
-
 ## Source Map
 
 | File | Role |
@@ -200,7 +175,7 @@ Fix: re-run setupNetwork.php to regenerate fireqos.conf and call `fireqos start`
 | `scripts/cron/trafficLog.php` | Per-cycle per-user iptables OWNER UID egress sample |
 | `scripts/cron/trafficIngressLog.php` | Per-cycle per-user systemd IPIngressBytes sample |
 | `scripts/cron/trafficStats.php` | Aggregate samples → window totals → write `.trafficData` |
-| `scripts/cron/trafficLimits.php` | Throttle decision: sliding/hard cap/cooldown |
+| `scripts/cron/trafficLimits.php` | Throttle decision: hard cap/cooldown |
 | `scripts/lib/user/trafficLimit.php` | Tiered overage stages + progressive throttle helpers |
 | `scripts/lib/network/fireqos.php` | Render fireqos.conf + apply via `fireqos start` |
 | `scripts/util/userTrafficLimit.php` | Operator/admin tool: set per-user GiB cap |

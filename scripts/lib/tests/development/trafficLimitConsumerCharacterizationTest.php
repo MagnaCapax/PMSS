@@ -44,4 +44,19 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $this->pmssAssertStringNotContainsString('@unserialize(trim(@file_get_contents(', $welcomeSource);
         $this->pmssAssertStringNotContainsString('function readUserResourceData() {'.PHP_EOL.'    $resourcePath = \'../.resourceData\';', $welcomeSource);
     }
+
+    public function testTrafficLimitCronWritesReadableThrottleFile(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/trafficLimits.php');
+
+        $this->assertStringContainsString('@chmod("/home/{$user}/.throttle", 0644);', $source);
+    }
+
+    public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void
+    {
+        $this->pmssAssertStringNotContainsString('slidingThrottleStart', $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
+        $this->pmssAssertStringNotContainsString('throttle_mbit', $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
+        $this->pmssAssertStringNotContainsString('throttle_mbit', $this->pmssReadRepoFile('scripts/lib/network/fireqos.php'));
+        $this->pmssAssertStringNotContainsString('slidingThrottleStart', $this->pmssReadRepoFile('scripts/lib/update/networking.php'));
+    }
 }

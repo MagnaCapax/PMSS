@@ -75,6 +75,7 @@ $tempArtifactsBefore = pmssTestListTempArtifacts();
 $suiteRoot = sys_get_temp_dir().'/pmss-tests-'.bin2hex(random_bytes(6));
 $versionDir = $suiteRoot.'/version';
 $testRoot    = $suiteRoot.'/root';
+$repoRoot = dirname(__DIR__, 4);
 $skelDir     = $testRoot.'/skel';
 $networkCfg  = $testRoot.'/network.php';
 $localnetCfg = $testRoot.'/localnet';
@@ -115,12 +116,17 @@ foreach ([
     @mkdir($dir, 0755, true);
 }
 
+$fireqosTemplateSeed = @file_get_contents($repoRoot.'/etc/seedbox/config/template.fireqos');
+if (!is_string($fireqosTemplateSeed) || $fireqosTemplateSeed === '') {
+    $fireqosTemplateSeed = "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n";
+}
+
 foreach ([
     $skelDir.'/.irssi/config' => 'test',
     $skelDir.'/.rtorrent.rc.custom' => 'test',
     $networkCfg => "<?php return ['interface' => 'eth0', 'speed' => 1000, 'throttle' => ['max' => 100]];",
     $localnetCfg => "185.148.0.0/22\n",
-    $fireqosTpl => "interface ##INTERFACE\nrate ##SPEED\n##LOCALNETWORK\n##USERMATCHES\n",
+    $fireqosTpl => $fireqosTemplateSeed,
 ] as $path => $contents) {
     @file_put_contents($path, $contents);
 }
@@ -129,7 +135,6 @@ define('PMSS_TEST_MODE', true);
 require_once __DIR__.'/../common/updateBootstrapShim.php';
 
 $testFiles = glob(__DIR__.'/*Test.php') ?: [];
-$repoRoot = dirname(__DIR__, 4);
 $listed = trim((string) @shell_exec('git -C '.escapeshellarg($repoRoot).' ls-files -- '.escapeshellarg(':(glob)scripts/lib/tests/development/*Test.php').' 2>/dev/null'));
 if ($listed !== '' && ($tracked = array_values(array_filter(array_map(static function (string $path) use ($repoRoot): string { return $repoRoot.'/'.$path; }, preg_split('/\r?\n/', $listed) ?: []), 'is_file'))) !== []) {
     $testFiles = $tracked;
