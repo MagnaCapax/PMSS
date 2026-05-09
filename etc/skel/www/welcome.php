@@ -41,6 +41,8 @@ $delugePasswordHelpersAvailable = $pageState['delugePasswordHelpersAvailable'];
 $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $mediaStackStatus = $pageState['mediaStackStatus'];
+$billingId = $pageState['billingId'];
+$trafficBandwidthState = $pageState['trafficBandwidthState'];
 $welcomeHeadingHtml = pmssWelcomeHeadingHtmlBuild($contextualWelcomeMessage);
 $announcementItemsHtml = pmssWelcomeAnnouncementItemsHtmlBuild();
 $homeRaidNoticeHtml = pmssWelcomeHomeRaidNoticeHtmlRead();
@@ -433,7 +435,7 @@ if (file_exists('openvpn-config.tgz')) {
                                 if (is_file('../.trafficDataIngress') && !is_link('../.trafficDataIngress') && function_exists('pmssReadSerializedArrayFile')) {
                                     $trafficIngress = pmssReadSerializedArrayFile('../.trafficDataIngress');
                                 }
-                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic);
+                                trafficCreateSection($trafficData, $trafficLimit, $trafficIngress, $bonusTraffic, $trafficBandwidthState, $billingId);
                             } else {
                                 if ($trafficLimit > 0) {
                                     $effectiveLimit = (int) $trafficLimitState['effectiveLimitGiB'];
@@ -445,20 +447,18 @@ if (file_exists('openvpn-config.tgz')) {
                                     $trafficLimitText = 'Unlimited';
                                 }
                                 echo "Traffic limit: {$trafficLimitText}<br />";
+                                echo pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId).'<br />';
                             }
                         }
 
                         echo memoryCreateSection();
 
-                        if (@file_exists('../.billingId')) {
-                            $billingId = (int)@file_get_contents('../.billingId');
-                            if ($billingId > 0) {
-                                echo <<<EOF
-                                <h6>Need more resources?</h6>
-                        <p>Need more disk space, traffic, or RAM?</p>
-                                <p>You can upgrade fast and easy — activation usually within few minutes! Just check out your <a href="https://pulsedmedia.com/clients/upgrade.php?type=configoptions&id={$billingId}" target="_blank">Upgrade Options!</a></p>
+                        if ($billingId > 0) {
+                            echo <<<EOF
+                            <h6>Need more resources?</h6>
+                    <p>Need more disk space, traffic, or RAM?</p>
+                            <p>You can upgrade fast and easy — activation usually within few minutes! Just check out your <a href="https://pulsedmedia.com/clients/upgrade.php?type=configoptions&id={$billingId}" target="_blank">Upgrade Options!</a></p>
 EOF;
-                            }
                         }
                         ?>
 
@@ -526,6 +526,8 @@ function pmssWelcomePageStateBuild() {
     $trafficLimitState = function_exists('pmssTrafficLimitStateRead')
         ? pmssTrafficLimitStateRead('../.trafficLimit', '../.bonusTraffic')
         : array('limitGiB' => 0, 'bonusGiB' => 0, 'effectiveLimitGiB' => 0);
+    $billingId = pmssWelcomeBillingIdRead('../.billingId');
+    $trafficBandwidthState = pmssWelcomeTrafficBandwidthStateBuild('../.throttle');
 
     return array(
         'quotaInfo' => $quotaInfo,
@@ -537,7 +539,116 @@ function pmssWelcomePageStateBuild() {
         'delugePasswordNotice' => $delugeState['passwordNotice'],
         'delugePassword' => $delugeState['password'],
         'mediaStackStatus' => $mediaStackStatus,
+        'billingId' => $billingId,
+        'trafficBandwidthState' => $trafficBandwidthState,
     );
+}
+
+/**
+ * Read billing profile ID for upgrade links.
+ */
+function pmssWelcomeBillingIdRead($path) {
+    if (!file_exists($path)) {
+        return 0;
+    }
+
+    $raw = @file_get_contents($path);
+    if (!is_string($raw)) {
+        return 0;
+    }
+
+    $billingId = (int) trim($raw);
+    return $billingId > 0 ? $billingId : 0;
+}
+
+/**
+ * Resolve baseline and currently effective per-account bandwidth caps.
+ *
+ * @return array{defaultCapMbit:int,effectiveCapMbit:int,isReduced:bool}
+ */
+function pmssWelcomeTrafficBandwidthStateBuild($throttlePath) {
+    $defaultCapMbit = pmssWelcomeTrafficDefaultCapMbitRead();
+    $effectiveCapMbit = $defaultCapMbit;
+
+    if (file_exists($throttlePath)) {
+        $rawThrottle = @file_get_contents($throttlePath);
+        if (is_string($rawThrottle)) {
+            $rawThrottle = trim($rawThrottle);
+            if ($rawThrottle !== '' && ctype_digit($rawThrottle)) {
+                $parsedCap = (int) $rawThrottle;
+                if ($parsedCap > 0) {
+                    $effectiveCapMbit = $parsedCap;
+                }
+            }
+        }
+    }
+
+    return array(
+        'defaultCapMbit' => $defaultCapMbit,
+        'effectiveCapMbit' => $effectiveCapMbit,
+        'isReduced' => $effectiveCapMbit < $defaultCapMbit,
+    );
+}
+
+/**
+ * Read the default post-limit cap with per-user override compatibility.
+ */
+function pmssWelcomeTrafficDefaultCapMbitRead() {
+    $defaultCapMbit = 100;
+    if (file_exists($path = '/etc/seedbox/config/network')) {
+        $networkConfig = @include $path;
+        if (is_array($networkConfig)
+            && isset($networkConfig['throttle'])
+            && is_array($networkConfig['throttle'])
+            && isset($networkConfig['throttle']['max'])
+            && is_numeric($networkConfig['throttle']['max'])) {
+            $defaultCapMbit = (int) $networkConfig['throttle']['max'];
+        }
+    }
+    if ($defaultCapMbit <= 0) {
+        $defaultCapMbit = 100;
+    }
+
+    $userConfigPath = '../.config/pmss-user.json';
+    if (file_exists($userConfigPath)) {
+        $userConfigRaw = @file_get_contents($userConfigPath);
+        if (is_string($userConfigRaw) && trim($userConfigRaw) !== '') {
+            $userConfig = json_decode($userConfigRaw, true);
+            if (is_array($userConfig)
+                && isset($userConfig['trafficCapMbit'])
+                && is_numeric($userConfig['trafficCapMbit'])) {
+                $userCapMbit = (int) $userConfig['trafficCapMbit'];
+                if ($userCapMbit > 0) {
+                    $defaultCapMbit = $userCapMbit;
+                }
+            }
+        }
+    }
+
+    return $defaultCapMbit;
+}
+
+/**
+ * Build tiny traffic-cap disclosure text shown near usage gauge.
+ */
+function pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId) {
+    $effectiveCapMbit = isset($trafficBandwidthState['effectiveCapMbit']) && is_numeric($trafficBandwidthState['effectiveCapMbit'])
+        ? (int) $trafficBandwidthState['effectiveCapMbit']
+        : 0;
+    $isReduced = isset($trafficBandwidthState['isReduced']) && $trafficBandwidthState['isReduced'] === true;
+    if (!$isReduced) {
+        return '<span style="font-size: 0.82em; color: #666;">Current effective: full plan port speed</span>';
+    }
+
+    $upgradeUrl = 'https://pulsedmedia.com/clients/upgrade.php?type=configoptions';
+    if ((int) $billingId > 0) {
+        $upgradeUrl .= '&id='.(int) $billingId;
+    }
+
+    $effectiveText = number_format(max(0, $effectiveCapMbit));
+
+    return '<span style="font-size: 0.82em; color: #7a1a1a;">Current effective: '.$effectiveText.' Mbps (reduced)</span>'
+        . '<br /><span style="font-size: 0.82em;"><a href="'.htmlspecialchars($upgradeUrl, ENT_QUOTES, 'UTF-8').'" target="_blank">Need more bandwidth? Upgrade your plan.</a></span>';
 }
 
 function pmssWelcomeQuotaInfoRead() {
@@ -927,8 +1038,9 @@ EOF;
 EOF;
 }
 
-	function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0) {
+	function trafficCreateSection($trafficData, $trafficLimit, $trafficIngress = null, $bonusTraffic = 0, $trafficBandwidthState = array(), $billingId = 0) {
 	    if (count($trafficData) == 0) return;
+	    $bandwidthNote = pmssWelcomeTrafficEffectiveHtmlBuild($trafficBandwidthState, $billingId);
 
 	    $trafficUsed = round($trafficData['raw']['month']);
 	    $ratioGoodMin = 2.0;
@@ -969,6 +1081,7 @@ EOF;
 	    <h6>Traffic Info</h6>
 	    Traffic used (30 days): {$trafficUsed}<br />
 	    Traffic limit: Unlimited{$inboundLine}{$ratioLine}<br />
+	    <div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
 	    This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
 	    <hr />
 	EOF;
@@ -989,17 +1102,18 @@ EOF;
         $warning = '';
     }
 
-    $titleText = "{$trafficUsed} / {$limitTotal} GiB";
-    $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
-    $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
+	    $titleText = "{$trafficUsed} / {$limitTotal} GiB";
+		    $bonusLine = ($bonusTraffic > 0) ? '<br />Bonus traffic: ' . number_format($bonusTraffic) . ' GiB' : '';
+		    $gauge = createGauge($titleText, $titleText . $bonusLine, $percent);
 
-    echo <<<EOF
-    <h6>Traffic Info</h6>
-    {$gauge}
-    {$warning}
-    {$inboundLine}{$ratioLine}
-    This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
-    <hr />
+		    echo <<<EOF
+	    <h6>Traffic Info</h6>
+	    {$gauge}
+	    {$warning}
+	    <div style="margin-top: 3px; line-height: 1.35;">{$bandwidthNote}</div>
+	    {$inboundLine}{$ratioLine}
+	    This is rolling past 30 days, <a href="https://blog.pulsedmedia.com/2016/06/traffic-limits-why-and-what-is-rolling-30-days-limit/" target="_blank">read more</a>.
+	    <hr />
 EOF;
 }
 
