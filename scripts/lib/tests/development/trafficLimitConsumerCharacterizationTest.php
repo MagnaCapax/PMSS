@@ -54,9 +54,12 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void
     {
-        $this->pmssAssertStringNotContainsString('slidingThrottleStart', $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
-        $this->pmssAssertStringNotContainsString('throttle_mbit', $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
-        $this->pmssAssertStringNotContainsString('throttle_mbit', $this->pmssReadRepoFile('scripts/lib/network/fireqos.php'));
-        $this->pmssAssertStringNotContainsString('slidingThrottleStart', $this->pmssReadRepoFile('scripts/lib/update/networking.php'));
+        $slidingKey = 'sliding'.'ThrottleStart';
+        $legacyFileKey = 'throttle'.'_mbit';
+
+        $this->pmssAssertStringNotContainsString($slidingKey, $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
+        $this->pmssAssertStringNotContainsString($legacyFileKey, $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
+        $this->pmssAssertStringNotContainsString($legacyFileKey, $this->pmssReadRepoFile('scripts/lib/network/fireqos.php'));
+        $this->pmssAssertStringNotContainsString($slidingKey, $this->pmssReadRepoFile('scripts/lib/update/networking.php'));
     }
 }
