@@ -22,6 +22,8 @@ echo "[agentic-issues] start: fetching open issues and invoking assistant" >&1
 #   development/agentic-issues.sh --autocommit
 #   development/agentic-issues.sh --dry-run
 #   development/agentic-issues.sh --select-only
+#   development/agentic-issues.sh --target-issue 123
+#   development/agentic-issues.sh --target-issue 123 --force
 
 usage() {
 	cat <<EOF
@@ -40,6 +42,8 @@ Options:
   --autocommit    Enable autocommit rules in the prompt (operator-approved)
   --dry-run       Skip GitHub API; only assemble prompt scaffolding
   --select-only   Print selected issue numbers and exit (no assistant launch)
+  --target-issue N  Process only issue N (open issue required)
+  --force         With --target-issue, bypass exclusion/cooldown checks
   -h, --help      Show this help
 
 Environment:
@@ -60,6 +64,8 @@ exec_cmd=""
 dry_run=0
 autocommit=0
 select_only=0
+target_issue=""
+force_target=0
 
 while [[ $# -gt 0 ]]; do
 	if codex_parse_launcher_option agent exec_cmd dry_run autocommit "$1" "${2:-}"; then
@@ -75,6 +81,14 @@ while [[ $# -gt 0 ]]; do
 		select_only=1
 		shift || true
 		;;
+	--target-issue)
+		codex_parse_option_value target_issue "$1" "${2:-}" "--target-issue"
+		shift "$CODEX_PARSE_SHIFT" || true
+		;;
+	--force)
+		force_target=1
+		shift || true
+		;;
 	-h | --help)
 		usage
 		exit 0
@@ -88,6 +102,14 @@ done
 
 if [[ ! "$max_issues" =~ ^[0-9]+$ ]] || [[ "$max_issues" -lt 1 ]]; then
 	echo "[agentic-issues] ERROR: --max-issues must be a positive integer (got: $max_issues)" >&2
+	exit 2
+fi
+if [[ -n "$target_issue" ]] && [[ ! "$target_issue" =~ ^[0-9]+$ ]]; then
+	echo "[agentic-issues] ERROR: --target-issue must be a positive integer (got: $target_issue)" >&2
+	exit 2
+fi
+if [[ "$force_target" == "1" && -z "$target_issue" ]]; then
+	echo "[agentic-issues] ERROR: --force requires --target-issue" >&2
 	exit 2
 fi
 
@@ -111,21 +133,23 @@ if [[ "$issue_count" -eq 0 ]]; then
 	exit 0
 fi
 
-# Fetch a larger candidate pool, then filter/prioritize down to max_issues.
-# Using --limit max_issues directly causes starvation when top N are strategic
-# meta-issues (e.g. process/architecture epics) that are repeatedly skipped.
-candidate_pool=$((max_issues * 8))
-if [[ "$candidate_pool" -lt 25 ]]; then
-	candidate_pool=25
-fi
-if [[ "$candidate_pool" -gt 100 ]]; then
-	candidate_pool=100
-fi
-echo "[agentic-issues] fetching candidate pool (limit ${candidate_pool}, target ${max_issues})..." >&1
-
 exclude_numbers_csv=$(printf '%s' "${PMSS_ISSUES_EXCLUDE_NUMBERS:-}" | tr ' ' ',' | tr -s ',')
 if [[ -n "$exclude_numbers_csv" ]]; then
 	exclude_numbers_csv=",${exclude_numbers_csv#,},"
+fi
+
+if [[ -n "$target_issue" ]]; then
+	echo "[agentic-issues] targeting issue #$target_issue" >&1
+	target_state=$(gh issue view "$target_issue" --json state --jq '.state' 2>/dev/null || true)
+	if [[ "$target_state" != "OPEN" ]]; then
+		echo "[agentic-issues] target issue #$target_issue not open or not found" >&1
+		issue_numbers=()
+	elif [[ "$force_target" != "1" && -n "$exclude_numbers_csv" && "$exclude_numbers_csv" == *",${target_issue},"* ]]; then
+		echo "[agentic-issues] SKIP #$target_issue (excluded via PMSS_ISSUES_EXCLUDE_NUMBERS)" >&1
+		issue_numbers=()
+	else
+		issue_numbers=("$target_issue")
+	fi
 fi
 
 issue_numbers_bug=()
@@ -139,6 +163,19 @@ has_label() {
 	local needle="${2:-}"
 	[[ ",${labels_csv}," == *",${needle},"* ]]
 }
+
+if [[ -z "$target_issue" ]]; then
+# Fetch a larger candidate pool, then filter/prioritize down to max_issues.
+# Using --limit max_issues directly causes starvation when top N are strategic
+# meta-issues (e.g. process/architecture epics) that are repeatedly skipped.
+candidate_pool=$((max_issues * 8))
+if [[ "$candidate_pool" -lt 25 ]]; then
+	candidate_pool=25
+fi
+if [[ "$candidate_pool" -gt 100 ]]; then
+	candidate_pool=100
+fi
+echo "[agentic-issues] fetching candidate pool (limit ${candidate_pool}, target ${max_issues})..." >&1
 
 while IFS=$'\t' read -r num title labels_csv; do
 	[[ -n "$num" ]] || continue
@@ -187,12 +224,18 @@ fi
 if [[ ${#issue_numbers[@]} -gt 1 ]] && command -v shuf >/dev/null 2>&1; then
 	mapfile -t issue_numbers < <(printf '%s\n' "${issue_numbers[@]}" | shuf)
 fi
+fi
 
 if [[ ${#issue_numbers[@]} -eq 0 ]]; then
-	echo "[agentic-issues] No tractable issues (all labeled complete-verify, wontfix, or needs-investigation). Skipping." >&1
+	if [[ -n "$target_issue" ]]; then
+		echo "[agentic-issues] No selectable target issue. Skipping." >&1
+	else
+		echo "[agentic-issues] No tractable issues (all labeled complete-verify, wontfix, or needs-investigation). Skipping." >&1
+	fi
 	exit 0
 fi
 
+if [[ -z "$target_issue" ]]; then
 echo "[agentic-issues] candidates: raw=${raw_candidate_count} filtered=${#issue_numbers[@]} (pre-gate)" >&1
 
 # --- Author Gate (security: public repo, only org issues auto-approved) ---
@@ -261,6 +304,7 @@ if [[ ${#approved_issues[@]} -eq 0 ]]; then
 fi
 
 issue_numbers=("${approved_issues[@]}")
+fi
 echo "[agentic-issues] selected ${#issue_numbers[@]} issue(s): ${issue_numbers[*]}" >&1
 
 if [[ "$select_only" == "1" ]]; then
