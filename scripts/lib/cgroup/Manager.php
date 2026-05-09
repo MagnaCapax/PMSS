@@ -57,16 +57,21 @@ class Manager
         $respectExisting = in_array('--respect-existing', $flags, true);
         $device = '';
         $ioProfile = '';
+        $ioCostQos = '';
+        $ioCostModel = '';
         $hasIoFlag = false;
         $policyIoPairs = [];
+        $ioCostWrites = [];
 
         // Flag parsing
-        foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile','--cpu-quota-percent','--io-latency-ms'] as $k) {
+        foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile','--cpu-quota-percent','--io-latency-ms','--io-cost-qos','--io-cost-model'] as $k) {
             foreach ($flags as $f) {
                 if (strpos($f, $k.'=') === 0) {
                     $val = substr($f, strlen($k)+1);
                     if ($k === '--device') { $device = $val; }
                     elseif ($k === '--io-profile') { $ioProfile = strtolower($val); }
+                    elseif ($k === '--io-cost-qos') { $ioCostQos = $val; }
+                    elseif ($k === '--io-cost-model') { $ioCostModel = $val; }
                     elseif ($k === '--cpu-profile') { $opt['cpu-profile'] = strtolower($val); }
                     elseif ($k === '--mem-profile') { $opt['mem-profile'] = strtolower($val); }
                     elseif ($k === '--tasks-profile') { $opt['tasks-profile'] = strtolower($val); }
@@ -75,7 +80,7 @@ class Manager
             }
         }
 
-        if (($invalidMessage = $this->validateFlagOptions($opt)) !== null) {
+        if (($invalidMessage = $this->validateFlagOptions($opt, $ioCostQos, $ioCostModel)) !== null) {
             fwrite(STDERR, $invalidMessage."\n");
             return 2;
         }
@@ -147,6 +152,18 @@ class Manager
             }
         }
 
+        if ($ioCostQos !== '' || $ioCostModel !== '') {
+            $ioCostPlan = $this->buildIoCostWrites($slice, $mode, $devResolved, $ioCostQos, $ioCostModel);
+            if (!empty($ioCostPlan['messages'])) {
+                foreach ($ioCostPlan['messages'] as $message) {
+                    echo $message."\n";
+                }
+            }
+            if (!empty($ioCostPlan['writes'])) {
+                $ioCostWrites = $ioCostPlan['writes'];
+            }
+        }
+
         // Policy mount defaults apply only when no explicit IO input is given.
         if (!empty($policyIoPairs) && !$hasIoFlag && $ioProfile === '' && $device === '') {
             $ioPairs = array_merge($ioPairs, $policyIoPairs);
@@ -154,7 +171,7 @@ class Manager
 
         // Default view if no actions
         if (!$wantStatus && !$wantConfig) {
-            $hasPlanInput = !empty($opt) || !empty($ioPairs) || $device !== '' || $ioProfile !== '' || $hasIoFlag || in_array('--wipe', $flags, true);
+            $hasPlanInput = !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $hasIoFlag || in_array('--wipe', $flags, true);
             if (!$hasPlanInput) {
                 $this->showConfig($slice);
                 $this->showStatus($slice, $uid);
@@ -181,9 +198,15 @@ class Manager
             echo "[Planned IO properties]\n";
             foreach ($ioPairs as $p) echo $p."\n";
         }
+        if (!empty($ioCostWrites)) {
+            echo "[Planned io.cost writes]\n";
+            foreach ($ioCostWrites as $write) {
+                echo $write['path'].' <= '.$write['value']."\n";
+            }
+        }
 
         $doWipe = in_array('--wipe', $flags, true);
-        $hasPlan = !empty($props) || !empty($ioPairs) || $doWipe || $hasIoFlag;
+        $hasPlan = !empty($props) || !empty($ioPairs) || !empty($ioCostWrites) || $doWipe || $hasIoFlag;
 
         if ($hasPlan) {
             if ($apply && !$dryRun) {
@@ -206,8 +229,14 @@ class Manager
                     $pairs = [];
                     foreach ($props as $k=>$v) { $pairs[] = $k.'='.$v; }
                     $allPairs = array_merge($pairs, $ioPairs);
-                    $cmd = \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs));
-                    \runStep('Applying cgroup properties', $cmd);
+                    if (!empty($allPairs)) {
+                        $cmd = \pmssBuildCommand('systemctl', array_merge(['set-property', $slice], $allPairs));
+                        \runStep('Applying cgroup properties', $cmd);
+                    }
+                    foreach ($ioCostWrites as $write) {
+                        $cmd = $this->buildIoCostWriteCommand($write['path'], $write['value']);
+                        \runStep('Applying io.cost setting', $cmd);
+                    }
                 }
             } else {
                 echo "(dry-run or no --apply; not changing system)\n";
@@ -285,7 +314,7 @@ class Manager
     /**
      * Reject malformed CLI values before they reach systemctl.
      */
-    private function validateFlagOptions(array $opt): ?string
+    private function validateFlagOptions(array $opt, string $ioCostQos, string $ioCostModel): ?string
     {
         foreach (['cpu-weight', 'io-weight', 'tasks-max', 'memory-high', 'memory-max', 'io-latency-ms'] as $key) {
             if (isset($opt[$key]) && preg_match('/^-?[0-9]+$/', (string)$opt[$key]) !== 1) {
@@ -295,6 +324,13 @@ class Manager
 
         if (isset($opt['io-latency-ms']) && (int)$opt['io-latency-ms'] <= 0) {
             return 'Invalid --io-latency-ms value: expected positive integer';
+        }
+
+        if (!$this->isValidIoCostSetting($ioCostQos)) {
+            return 'Invalid --io-cost-qos value: newline and NUL bytes are not allowed';
+        }
+        if (!$this->isValidIoCostSetting($ioCostModel)) {
+            return 'Invalid --io-cost-model value: newline and NUL bytes are not allowed';
         }
 
         if (!isset($opt['cpu-quota-percent'])) {
@@ -618,6 +654,120 @@ class Manager
         }
     }
 
+    /** Validate free-form io.cost setting strings before shell execution. */
+    private function isValidIoCostSetting(string $value): bool
+    {
+        return $value === ''
+            || (strpos($value, "\0") === false && strpos($value, "\n") === false && strpos($value, "\r") === false);
+    }
+
+    /**
+     * Build io.cost write operations for qos/model with scheduler safeguards.
+     *
+     * @return array<string,array<int,array<string,string>>|array<int,string>>
+     */
+    private function buildIoCostWrites(string $slice, string $mode, string $resolvedDevice, string $ioCostQos, string $ioCostModel): array
+    {
+        $messages = [];
+        $writes = [];
+
+        if ($mode !== 'v2') {
+            $messages[] = '[SKIP] io.cost requires cgroup v2';
+            return ['writes' => $writes, 'messages' => $messages];
+        }
+
+        if ($resolvedDevice === '') {
+            $resolvedDevice = trim((string) $this->sys->resolveDevice('/home'));
+        }
+        if ($resolvedDevice === '') {
+            $messages[] = '[WARN] io.cost skipped: unable to resolve /home backing device';
+            return ['writes' => $writes, 'messages' => $messages];
+        }
+
+        $majorMinor = $this->resolveIoCostMajorMinor($resolvedDevice);
+        if ($majorMinor === '') {
+            $messages[] = '[WARN] io.cost skipped: unable to resolve major:minor for '.$resolvedDevice;
+            return ['writes' => $writes, 'messages' => $messages];
+        }
+
+        $bfqProbe = trim((string) $this->sys->execute("grep -l '\\[bfq\\]' /sys/class/block/*/queue/scheduler 2>/dev/null | head -n 1"));
+        if ($bfqProbe !== '') {
+            $messages[] = '[SKIP] io.cost skipped: BFQ scheduler active ('.$bfqProbe.')';
+            return ['writes' => $writes, 'messages' => $messages];
+        }
+
+        foreach ([
+            ['io.cost.qos', $ioCostQos],
+            ['io.cost.model', $ioCostModel],
+        ] as $entry) {
+            $fileName = $entry[0];
+            $setting = trim((string) $entry[1]);
+            if ($setting === '') {
+                continue;
+            }
+            $normalized = $this->normalizeIoCostWriteValue($setting, $majorMinor);
+            if ($normalized === null) {
+                $messages[] = '[WARN] io.cost skipped: invalid '.$fileName.' setting';
+                continue;
+            }
+
+            $writes[] = ['path' => '/sys/fs/cgroup/'.$fileName, 'value' => $normalized];
+            $slicePath = '/sys/fs/cgroup/user.slice/'.$slice.'/'.$fileName;
+            if ($this->sys->readFile($slicePath) !== null) {
+                $writes[] = ['path' => $slicePath, 'value' => $normalized];
+            }
+        }
+
+        if (!empty($writes)) {
+            $messages[] = '[INFO] io.cost target '.$resolvedDevice.' ('.$majorMinor.')';
+        }
+
+        return ['writes' => $writes, 'messages' => $messages];
+    }
+
+    /** Resolve device major:minor in decimal form for io.cost lines. */
+    private function resolveIoCostMajorMinor(string $devicePath): string
+    {
+        $majorMinor = trim((string) $this->sys->execute('lsblk -dn -o MAJ:MIN '.escapeshellarg($devicePath).' 2>/dev/null'));
+        if (preg_match('/^[0-9]+:[0-9]+$/', $majorMinor) === 1) {
+            return $majorMinor;
+        }
+
+        if (strpos($devicePath, '/dev/') === 0) {
+            $blockName = basename($devicePath);
+            if ($blockName !== '') {
+                $devValue = trim((string) $this->sys->readFile('/sys/class/block/'.$blockName.'/dev'));
+                if (preg_match('/^[0-9]+:[0-9]+$/', $devValue) === 1) {
+                    return $devValue;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /** Prefix plain nested keys with the resolved major:minor device token. */
+    private function normalizeIoCostWriteValue(string $setting, string $majorMinor): ?string
+    {
+        if ($setting === '') {
+            return null;
+        }
+        if (preg_match('/^[0-9]+:[0-9]+\s+/', $setting) === 1) {
+            return $setting;
+        }
+        return $majorMinor.' '.$setting;
+    }
+
+    /** Build a shell-safe writer command for cgroup io.cost files. */
+    private function buildIoCostWriteCommand(string $path, string $value): string
+    {
+        $script = 'if [ -w '.escapeshellarg($path).' ]; then printf \'%s\\n\' '
+            .escapeshellarg($value)
+            .' > '.escapeshellarg($path)
+            .'; else echo '.escapeshellarg('[SKIP] io.cost path not writable: '.$path).'; fi';
+        return \pmssBuildCommand('sh', ['-c', $script]);
+    }
+
     private function showConfig(string $slice): void
     {
         echo "\n[Config] $slice\n";
@@ -633,7 +783,7 @@ class Manager
         $lines = [
             \pmssCliHelpHeading('Usage', $useColor),
             '  /scripts/util/userConfigCgroup.php USERNAME [--status] [--config]',
-            '  /scripts/util/userConfigCgroup.php USERNAME --apply [--dry-run] [--defaults] [--respect-existing] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N|infinity] [--io-latency-ms=MS] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:RATE] [--io-write-bw=/dev/DEV:RATE] [--io-read-iops=/dev/DEV:IOPS] [--io-write-iops=/dev/DEV:IOPS] [--wipe]',
+            '  /scripts/util/userConfigCgroup.php USERNAME --apply [--dry-run] [--defaults] [--respect-existing] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N|infinity] [--io-latency-ms=MS] [--io-cost-qos=SETTING] [--io-cost-model=SETTING] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:RATE] [--io-write-bw=/dev/DEV:RATE] [--io-read-iops=/dev/DEV:IOPS] [--io-write-iops=/dev/DEV:IOPS] [--wipe]',
             '',
             \pmssCliHelpHeading('Actions', $useColor),
             \pmssCliHelpLine('--status', 'Show live slice counters from cgroupfs.'),
@@ -650,6 +800,8 @@ class Manager
             \pmssCliHelpLine('--tasks-max=N', 'Process limit for the user slice; use a positive integer.'),
             \pmssCliHelpLine('--cpu-quota-percent=N|infinity', 'CPU quota percent; use 0 or infinity to remove the cap.'),
             \pmssCliHelpLine('--io-latency-ms=MS', 'IODeviceLatencyTargetSec target in milliseconds for the selected device or the /home backing device.'),
+            \pmssCliHelpLine('--io-cost-qos=SETTING', 'io.cost.qos nested keys; defaults to the /home backing device major:minor.'),
+            \pmssCliHelpLine('--io-cost-model=SETTING', 'io.cost.model nested keys; defaults to the /home backing device major:minor.'),
             \pmssCliHelpLine('--device=/dev/DEV|/home', 'Device selector for IO profiles and shorthand resolution.'),
             \pmssCliHelpLine('--io-profile=hdd|nvme|bulk', 'Apply a named IO profile to the selected device.'),
             \pmssCliHelpLine('--io-read-bw=/dev/DEV:RATE', 'Explicit read bandwidth cap, e.g. /dev/sda:20M.'),
@@ -667,12 +819,13 @@ class Manager
             '',
             \pmssCliHelpHeading('Examples', $useColor),
             '  /scripts/util/userConfigCgroup.php alice --status --config',
-            '  /scripts/util/userConfigCgroup.php alice --apply --dry-run --memory-high=1024 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=125 --io-latency-ms=50',
+            '  /scripts/util/userConfigCgroup.php alice --apply --dry-run --memory-high=1024 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=125 --io-latency-ms=50 --io-cost-qos="enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00"',
             '  /scripts/util/userConfigCgroup.php alice --apply --defaults --device=/home --io-profile=hdd',
             '',
             \pmssCliHelpHeading('Notes', $useColor),
             '  - Help is available without needing a real user lookup; normal runs still require an existing passwd entry.',
             '  - MemoryHigh below 250 MiB is raised to the PMSS floor before applying properties.',
+            '  - io.cost writes are skipped when BFQ is active on any block scheduler queue.',
         ];
 
         return implode("\n", $lines);
@@ -691,8 +844,17 @@ class Manager
                 'memory.max'      => $base.'/memory.max',
                 'io.stat'         => $base.'/io.stat',
                 'io.latency'      => $base.'/io.latency',
+                'io.cost.weight'  => $base.'/io.cost.weight',
+                'io.cost.qos'     => $base.'/io.cost.qos',
+                'io.cost.model'   => $base.'/io.cost.model',
                 'cpu.weight'      => $base.'/cpu.weight',
             ];
+            if ($this->sys->readFile($base.'/io.cost.qos') === null) {
+                $pairs['io.cost.qos'] = '/sys/fs/cgroup/io.cost.qos';
+            }
+            if ($this->sys->readFile($base.'/io.cost.model') === null) {
+                $pairs['io.cost.model'] = '/sys/fs/cgroup/io.cost.model';
+            }
             foreach ($pairs as $label => $path) {
                 $val = $this->sys->readFile($path);
                 if ($val === null) { echo "$label: (unavailable)\n"; } else { echo "$label: ".trim($val)."\n"; }

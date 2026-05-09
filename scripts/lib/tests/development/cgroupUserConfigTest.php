@@ -70,7 +70,16 @@ class CgroupUserConfigTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->ensureManager();
+        $this->sys = new MockSystem();
+        $this->mgr = new Manager($this->sys);
+        putenv('PMSS_CONFIG_DIR=' . sys_get_temp_dir());
+    }
+
+    protected function tearDown(): void
+    {
+        $this->sys = null;
+        $this->mgr = null;
+        @unlink(sys_get_temp_dir().'/cgroup.policy.php');
     }
 
     private function runMgr(array $args)
@@ -280,6 +289,46 @@ class CgroupUserConfigTest extends TestCase
         $this->assertEquals(0, $res['rc']);
         $this->assertStringContainsString('IODeviceLatencyTargetSec requires cgroup v2', $res['out']);
         $this->assertStringNotContainsString('IODeviceLatencyTargetSec=/dev/', $res['out']);
+    }
+
+    public function testIoCostQosDefaultsToHomeDeviceMajorMinor()
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+
+        $res = $this->runMgr(['testuser', '--io-cost-qos=enable=1 ctrl=user']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString('[Planned io.cost writes]', $res['out']);
+        $this->assertStringContainsString('/sys/fs/cgroup/io.cost.qos <= 9:0 enable=1 ctrl=user', $res['out']);
+    }
+
+    public function testIoCostSkippedWhenBfqSchedulerActive()
+    {
+        $this->sys->findmnt['/home'] = '/dev/md0';
+        $this->sys->commands['lsblk -dn -o MAJ:MIN'] = "9:0\n";
+        $this->sys->commands['grep -l'] = "/sys/class/block/sda/queue/scheduler\n";
+
+        $res = $this->runMgr(['testuser', '--io-cost-qos=enable=1 ctrl=user']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString('io.cost skipped: BFQ scheduler active', $res['out']);
+        $this->assertStringNotContainsString('[Planned io.cost writes]', $res['out']);
+    }
+
+    public function testIoCostSkippedOnCgroupV1()
+    {
+        $this->sys->cgroupMode = 'v1';
+        $res = $this->runMgr(['testuser', '--io-cost-qos=enable=1 ctrl=user']);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertStringContainsString('io.cost requires cgroup v2', $res['out']);
+    }
+
+    public function testIoCostRejectsControlCharacters()
+    {
+        $res = $this->runMgr(['testuser', "--io-cost-qos=enable=1\nctrl=user"]);
+        $this->assertEquals(2, $res['rc']);
     }
 
     // -- Profile Tests --

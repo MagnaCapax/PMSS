@@ -15,6 +15,8 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertSame(8, $specs['CPUWeight']['addUserLegacyIndex']);
         $this->assertSame(14, $specs['cpuQuotaPercent']['addUserLegacyIndex']);
         $this->assertSame(15, $specs['ioLatencyMs']['addUserLegacyIndex']);
+        $this->assertSame(16, $specs['ioCostQos']['addUserLegacyIndex']);
+        $this->assertSame(17, $specs['ioCostModel']['addUserLegacyIndex']);
     }
 
     public function testResourceSpecKeepsUserConfigPositionalOrderingStable(): void
@@ -26,6 +28,8 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertSame(10, $specs['IOWriteIOPS']['userConfigIndex']);
         $this->assertSame(12, $specs['trafficCapMbit']['userConfigIndex']);
         $this->assertSame(13, $specs['ioLatencyMs']['userConfigIndex']);
+        $this->assertSame(14, $specs['ioCostQos']['userConfigIndex']);
+        $this->assertSame(15, $specs['ioCostModel']['userConfigIndex']);
     }
 
     public function testResourceSpecRetainsHumanUsageStrings(): void
@@ -36,6 +40,8 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertSame('--io-read-bw=/dev/DEVICE:RATE', $specs['IOReadBW']['usage']);
         $this->assertSame('--cpu-quota-percent=PERCENT|infinity', $specs['cpuQuotaPercent']['usage']);
         $this->assertSame('--io-latency-ms=MS', $specs['ioLatencyMs']['usage']);
+        $this->assertSame('--io-cost-qos=SETTING', $specs['ioCostQos']['usage']);
+        $this->assertSame('--io-cost-model=SETTING', $specs['ioCostModel']['usage']);
     }
 
     public function testResourceSpecFlagsPersistOnlyStoredFields(): void
@@ -45,6 +51,8 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertFalse($specs['trafficLimit']['persist']);
         $this->assertTrue($specs['trafficCapMbit']['persist']);
         $this->assertTrue($specs['CPUWeight']['persist']);
+        $this->assertTrue($specs['ioCostQos']['persist']);
+        $this->assertTrue($specs['ioCostModel']['persist']);
     }
 
     public function testResourceSpecRetainsCgroupFlagMappings(): void
@@ -54,6 +62,8 @@ class userConfigCliSpecificationTest extends TestCase
         $this->assertSame('--cpu-weight=', $specs['CPUWeight']['cgroupFlag']);
         $this->assertSame('--io-write-bw=', $specs['IOWriteBW']['cgroupFlag']);
         $this->assertSame('--io-latency-ms=', $specs['ioLatencyMs']['cgroupFlag']);
+        $this->assertSame('--io-cost-qos=', $specs['ioCostQos']['cgroupFlag']);
+        $this->assertSame('--io-cost-model=', $specs['ioCostModel']['cgroupFlag']);
         $this->assertFalse(isset($specs['trafficLimit']['cgroupFlag']));
         $this->assertFalse(isset($specs['cpuQuotaPercent']['cgroupFlag']));
     }

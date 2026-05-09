@@ -95,6 +95,24 @@ class UserConfigStoreTest extends TestCase
         $this->assertEquals(15, $reloaded['trafficCapMbit']);
     }
 
+    public function testIoCostSettingsPersistAsStrings(): void
+    {
+        $store = new \UserConfigStore($this->configDirPath());
+        $payload = [
+            'ramMiB' => 512,
+            'rtorrentPort' => 5100,
+            'quota' => 100,
+            'quotaBurst' => 125,
+            'ioCostQos' => 'enable=1 ctrl=user rpct=95.00 rlat=75000',
+            'ioCostModel' => 'ctrl=user model=linear rbps=1000 rseqiops=100 rrandiops=100 wbps=1000 wseqiops=100 wrandiops=100',
+        ];
+        $this->assertTrue($store->set('iocost', $payload));
+        $reloaded = $store->get('iocost');
+        $this->assertTrue(is_array($reloaded));
+        $this->assertEquals($payload['ioCostQos'], $reloaded['ioCostQos']);
+        $this->assertEquals($payload['ioCostModel'], $reloaded['ioCostModel']);
+    }
+
     public function testLegacyRtorrentRamCreatesRamMiBButPreservesKey(): void
     {
         $store = new \UserConfigStore($this->configDirPath());

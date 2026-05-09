@@ -23,7 +23,8 @@
  *   provisioner stores an explicit override).
  * - lighttpdEnabled (bool) Per-user lighttpd/php-cgi watchdog enablement
  *   (default true unless the operator stores an explicit override).
- * - CPUWeight/IOWeight/IOReadBW/... pass-through for future resource controls.
+ * - CPUWeight/IOWeight/IOReadBW/... and ioCostQos/ioCostModel pass-through for
+ *   cgroup resource controls.
  *
  * #TODO(Q4/2027): Remove legacy /etc/seedbox/runtime/users.json fallback.
  *

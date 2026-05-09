@@ -4,7 +4,7 @@
 
 ```text
 Usage
-  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT] [IO_LATENCY_MS]
+  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT] [IO_LATENCY_MS] [IO_COST_QOS] [IO_COST_MODEL]
   ./userConfig.php USERNAME [RESOURCE_OPTIONS]
   ./userConfig.php USERNAME --welcome-message=HTML
 ```
@@ -24,6 +24,8 @@ Usage
 - `CPU_QUOTA_PERCENT` — optional CPU quota percentage; use `infinity` to remove the limit. If omitted, the current slice policy stays unchanged.
 - `TRAFFIC_CAP_MBIT` — optional traffic shaper ceiling in Mbit/s; `0` disables shaping.
 - `IO_LATENCY_MS` — optional `IODeviceLatencyTargetSec` target in milliseconds; defaults to the `/home` backing device.
+- `IO_COST_QOS` — optional io.cost QoS nested keys; defaults to the `/home` backing device major:minor.
+- `IO_COST_MODEL` — optional io.cost model nested keys; defaults to the `/home` backing device major:minor.
 
 ## Named Options
 
@@ -38,6 +40,8 @@ Usage
 - `--cpu-quota-percent=PERCENT|infinity` — CPU quota percentage; use `infinity` to remove the limit. If omitted, the current slice policy stays unchanged.
 - `--traffic-cap-mbit=MBIT` — traffic shaper ceiling in Mbit/s; `0` disables shaping.
 - `--io-latency-ms=MS` — `IODeviceLatencyTargetSec` target in milliseconds; defaults to the `/home` backing device.
+- `--io-cost-qos=SETTING` — io.cost QoS nested keys; defaults to the `/home` backing device major:minor.
+- `--io-cost-model=SETTING` — io.cost model nested keys; defaults to the `/home` backing device major:minor.
 - `--upload-throttle-kib=KIB` — persist torrent upload throttle in KiB/s; `0` removes it.
 - `--welcome-message=HTML` — set or clear `~/.config/welcome-message.html`.
 - `--docker-enabled=true|false` — persist the rootless Docker policy for this user.
@@ -48,7 +52,7 @@ Usage
 ```bash
 /scripts/util/userConfig.php alice 1024 200
 /scripts/util/userConfig.php alice --io-weight=300
-/scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 --upload-throttle-kib=2048 --docker-enabled=true
+/scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true
 /scripts/util/userConfig.php alice --welcome-message='<p>Planned maintenance tonight.</p>'
 ```
 

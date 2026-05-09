@@ -27,6 +27,8 @@ function pmssUserConfigCliResourceSpecs(): array
         'IOWriteIOPS' => ['addUserOption' => 'io-write-iops', 'addUserLegacyIndex' => 13, 'userConfigIndex' => 10, 'usage' => '--io-write-iops=/dev/DEVICE:IOPS', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-write-iops='],
         'cpuQuotaPercent' => ['addUserOption' => 'cpu-quota-percent', 'addUserLegacyIndex' => 14, 'userConfigIndex' => 11, 'usage' => '--cpu-quota-percent=PERCENT|infinity', 'parse' => 'string', 'default' => 0, 'persist' => true],
         'ioLatencyMs' => ['addUserOption' => 'io-latency-ms', 'addUserLegacyIndex' => 15, 'userConfigIndex' => 13, 'usage' => '--io-latency-ms=MS', 'parse' => 'int', 'default' => 0, 'persist' => true, 'cgroupFlag' => '--io-latency-ms='],
+        'ioCostQos' => ['addUserOption' => 'io-cost-qos', 'addUserLegacyIndex' => 16, 'userConfigIndex' => 14, 'usage' => '--io-cost-qos=SETTING', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-qos='],
+        'ioCostModel' => ['addUserOption' => 'io-cost-model', 'addUserLegacyIndex' => 17, 'userConfigIndex' => 15, 'usage' => '--io-cost-model=SETTING', 'parse' => 'string', 'default' => null, 'persist' => true, 'cgroupFlag' => '--io-cost-model='],
     ];
 }
 
@@ -291,6 +293,16 @@ function pmssUserConfigCliResourceHelpSpecs(): array
             'parameterDescription' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
             'optionDescription' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
         ],
+        'ioCostQos' => [
+            'parameter' => 'IO_COST_QOS',
+            'parameterDescription' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.',
+            'optionDescription' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.',
+        ],
+        'ioCostModel' => [
+            'parameter' => 'IO_COST_MODEL',
+            'parameterDescription' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.',
+            'optionDescription' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.',
+        ],
     ];
 }
 
@@ -304,7 +316,7 @@ function pmssUserConfigCliUsage(): string
     $unchangedDefault = pmssCliHelpDim(' (default: leave current slice policy unchanged)', $useColor);
     $lines = [
         pmssCliHelpHeading('Usage', $useColor),
-        '  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT] [IO_LATENCY_MS]',
+        '  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT] [IO_LATENCY_MS] [IO_COST_QOS] [IO_COST_MODEL]',
         '  ./userConfig.php USERNAME [RESOURCE_OPTIONS]',
         '  ./userConfig.php USERNAME --welcome-message=HTML',
         '',
@@ -322,6 +334,8 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpLine($resourceHelp['cpuQuotaPercent']['parameter'], $resourceHelp['cpuQuotaPercent']['parameterDescription'].$unchangedDefault),
         pmssCliHelpLine($resourceHelp['trafficCapMbit']['parameter'], $resourceHelp['trafficCapMbit']['parameterDescription']),
         pmssCliHelpLine($resourceHelp['ioLatencyMs']['parameter'], $resourceHelp['ioLatencyMs']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['ioCostQos']['parameter'], $resourceHelp['ioCostQos']['parameterDescription']),
+        pmssCliHelpLine($resourceHelp['ioCostModel']['parameter'], $resourceHelp['ioCostModel']['parameterDescription']),
         '',
         pmssCliHelpHeading('Named Options', $useColor),
         pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['optionDescription']),
@@ -335,6 +349,8 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpLine($resourceSpecs['cpuQuotaPercent']['usage'], $resourceHelp['cpuQuotaPercent']['optionDescription'].$unchangedDefault),
         pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['optionDescription']),
         pmssCliHelpLine($resourceSpecs['ioLatencyMs']['usage'], $resourceHelp['ioLatencyMs']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['ioCostQos']['usage'], $resourceHelp['ioCostQos']['optionDescription']),
+        pmssCliHelpLine($resourceSpecs['ioCostModel']['usage'], $resourceHelp['ioCostModel']['optionDescription']),
         pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
         pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
         pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),
@@ -343,7 +359,7 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpHeading('Examples', $useColor),
         '  /scripts/util/userConfig.php alice 1024 200',
         '  /scripts/util/userConfig.php alice --io-weight=300',
-        '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 --upload-throttle-kib=2048 --docker-enabled=true',
+        '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true',
         '  /scripts/util/userConfig.php alice --welcome-message=<p>Planned maintenance tonight.</p>',
         '',
         pmssCliHelpHeading('Notes', $useColor),

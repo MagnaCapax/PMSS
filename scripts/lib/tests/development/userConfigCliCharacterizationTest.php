@@ -154,18 +154,21 @@ class userConfigCliCharacterizationTest extends TestCase
                 'trafficLimit' => 900,
                 'trafficCapMbit' => 12,
                 'ioLatencyMs' => 45,
+                'ioCostQos' => 'enable=1 ctrl=user',
             ],
             [
                 'CPUWeight' => true,
                 'trafficCapMbit' => true,
                 'trafficLimit' => true,
                 'ioLatencyMs' => true,
+                'ioCostQos' => true,
             ]
         );
 
         $this->assertSame(200, $payload['CPUWeight']);
         $this->assertSame(12, $payload['trafficCapMbit']);
         $this->assertSame(45, $payload['ioLatencyMs']);
+        $this->assertSame('enable=1 ctrl=user', $payload['ioCostQos']);
         $this->assertSame(0, $payload['trafficLimit']);
     }
 
@@ -177,6 +180,8 @@ class userConfigCliCharacterizationTest extends TestCase
             'trafficCapMbit' => 12,
             'trafficLimit' => 500,
             'ioLatencyMs' => 50,
+            'ioCostQos' => 'enable=1 ctrl=user',
+            'ioCostModel' => 'ctrl=user model=linear',
         ]);
 
         $this->assertSame([
@@ -184,6 +189,8 @@ class userConfigCliCharacterizationTest extends TestCase
             'CPUWeight' => 220,
             'IOWeight' => 330,
             'ioLatencyMs' => 50,
+            'ioCostQos' => 'enable=1 ctrl=user',
+            'ioCostModel' => 'ctrl=user model=linear',
         ], $values);
     }
 
@@ -206,6 +213,8 @@ class userConfigCliCharacterizationTest extends TestCase
             'IOWeight' => 300,
             'IOWriteBW' => '/dev/sda:7M',
             'ioLatencyMs' => 50,
+            'ioCostQos' => 'enable=1 ctrl=user',
+            'ioCostModel' => 'ctrl=user model=linear',
             'cpuQuotaPercent' => '150',
         ]);
 
@@ -214,6 +223,8 @@ class userConfigCliCharacterizationTest extends TestCase
             '--io-weight=300',
             '--io-write-bw=/dev/sda:7M',
             '--io-latency-ms=50',
+            '--io-cost-qos=enable=1 ctrl=user',
+            '--io-cost-model=ctrl=user model=linear',
         ], $args);
     }
 }

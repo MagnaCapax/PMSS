@@ -17,6 +17,8 @@ class addUserCliTest extends TestCase
         $this->assertStringContainsString('--cpu-quota-percent=PERCENT|infinity', $usage);
         $this->assertStringContainsString('--iops-limit=OPS', $usage);
         $this->assertStringContainsString('--io-latency-ms=MS', $usage);
+        $this->assertStringContainsString('--io-cost-qos=SETTING', $usage);
+        $this->assertStringContainsString('--io-cost-model=SETTING', $usage);
         $this->assertStringContainsString('--docker-enabled=true|false', $usage);
         $this->assertStringContainsString('--help', $usage);
     }
@@ -59,6 +61,8 @@ class addUserCliTest extends TestCase
             '--cpu-quota-percent=150',
             '--iops-limit=123456',
             '--io-latency-ms=50',
+            '--io-cost-qos=enable=1 ctrl=user',
+            '--io-cost-model=ctrl=user model=linear',
             '--traffic-cap-mbit=80',
             '--docker-enabled=false',
         ]);
@@ -72,6 +76,8 @@ class addUserCliTest extends TestCase
         $this->assertSame('150', $cli['user']['cpuQuotaPercent']);
         $this->assertSame('123456', $cli['user']['iopsLimit']);
         $this->assertSame('50', $cli['user']['ioLatencyMs']);
+        $this->assertSame('enable=1 ctrl=user', $cli['user']['ioCostQos']);
+        $this->assertSame('ctrl=user model=linear', $cli['user']['ioCostModel']);
         $this->assertSame('80', $cli['user']['trafficCapMbit']);
         $this->assertSame('false', $cli['user']['dockerEnabled']);
     }

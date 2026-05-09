@@ -56,6 +56,12 @@ Current state for the cgroup policy extension TODOs:
   - Per-user CLI supports `--device` + `--io-profile` and explicit IO bandwidth/IOPS flags.
   - Remaining gap: richer scheduler-aware auto-detection policy remains TODO.
 
+- **Per-user io.cost exposure**: Implemented with scheduler guard.
+  - Per-user knobs `ioCostQos` / `ioCostModel` map to `--io-cost-qos=...` / `--io-cost-model=...` on `userConfigCgroup.php`.
+  - PMSS resolves `/home` to major:minor automatically and prefixes io.cost nested keys when the device token is omitted.
+  - io.cost writes are skipped when BFQ is active on any block scheduler queue (kernel-level incompatibility).
+  - PMSS writes io.cost to root cgroup files (`/sys/fs/cgroup/io.cost.qos`, `/sys/fs/cgroup/io.cost.model`) and mirrors to the user slice path when the kernel exposes those files there.
+
 - **NOFILE limits**: Implemented.
   - Policy keys `limitNoFileSoft` / `limitNoFileHard` are consumed during system prep.
   - PMSS writes `/etc/systemd/system/user@.service.d/20-pmss-limits.conf` with `LimitNOFILE=soft:hard` when both values are valid.
@@ -92,7 +98,7 @@ Inspect and apply limits per user:
 
 ```
 /scripts/util/userConfigCgroup.php USER [--status] [--config]
-/scripts/util/userConfigCgroup.php USER --apply [--dry-run] [--defaults] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:SIZED] [--io-write-bw=/dev/DEV:SIZED] [--io-read-iops=/dev/DEV:OPS] [--io-write-iops=/dev/DEV:OPS] [--wipe]
+/scripts/util/userConfigCgroup.php USER --apply [--dry-run] [--defaults] [--cpu-weight=N] [--io-weight=N] [--tasks-max=N] [--memory-high=MiB] [--memory-max=MiB] [--cpu-quota-percent=N] [--io-latency-ms=MS] [--io-cost-qos=SETTING] [--io-cost-model=SETTING] [--device=/dev/DEV|/home] [--io-profile=hdd|nvme|bulk] [--io-read-bw=/dev/DEV:SIZED] [--io-write-bw=/dev/DEV:SIZED] [--io-read-iops=/dev/DEV:OPS] [--io-write-iops=/dev/DEV:OPS] [--wipe]
 ```
 
 ### Examples (explicit)
@@ -101,6 +107,9 @@ Inspect and apply limits per user:
   - `--io-read-bw=/dev/sda:5M --io-write-bw=/dev/sda:10M`
 - IOPS limits:
   - `--io-read-iops=/dev/sda:100 --io-write-iops=/dev/sda:120`
+- io.cost QoS/model:
+  - `--io-cost-qos='enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00'`
+  - `--io-cost-model='ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025'`
 - CPU/IO weights:
   - `--cpu-weight=200 --io-weight=200`
 - Memory:
@@ -137,6 +146,8 @@ Inspect and apply limits per user:
 - User creation applies defaults automatically:
   - `php /scripts/util/userConfigCgroup.php USER --apply --defaults`
   - Policy `mounts` entries are applied as per-device IO limits/weights when their backing devices can be resolved.
+- Cron refresh reapplies explicit io.latency/io.cost user knobs:
+  - `/scripts/cron/cgroupPolicyRefresh.php` runs at boot and every 2 hours from `root.cron`.
 - User termination clears slice overrides:
   - `systemctl revert user-UID.slice` before deleting OS user data.
 
@@ -158,8 +169,11 @@ Inspect and apply limits per user:
   - `IOWriteBandwidthMax=/dev/DEV SIZE` (strict write bandwidth)
   - `IOReadIOPSMax=/dev/DEV OPS` (strict read IOPS)
   - `IOWriteIOPSMax=/dev/DEV OPS` (strict write IOPS)
+  - `IODeviceLatencyTargetSec=/dev/DEV MSms` (latency target; cgroup v2 only)
+  - `io.cost.qos` / `io.cost.model` (root-cgroup knobs; BFQ scheduler disables these)
 
 ## Notes
 
 - IOWeight effectiveness depends on device scheduler. It works well with BFQ (HDDs), but is less effective with NVMe (none/mq‑deadline). Prefer strict throttles when needed.
+- io.cost is skipped automatically when BFQ is active on any queue; PMSS logs a skip message rather than applying dead settings.
 - cgroup v1 systems (Debian 10) use BlockIOAccounting and analogous memory/task settings. PMSS retains a v1 template and selection by kernel detection.

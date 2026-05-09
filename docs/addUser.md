@@ -37,6 +37,8 @@ Usage
 - `--io-write-iops=/dev/DEVICE:IOPS` — write IOPS cap in `/dev/DEVICE:IOPS` form.
 - `--cpu-quota-percent=PERCENT|infinity` — CPU quota percentage; use `infinity` to remove the limit.
 - `--io-latency-ms=MS` — `IODeviceLatencyTargetSec` target in milliseconds; defaults to the `/home` backing device.
+- `--io-cost-qos=SETTING` — io.cost QoS nested keys; defaults to the `/home` backing device major:minor.
+- `--io-cost-model=SETTING` — io.cost model nested keys; defaults to the `/home` backing device major:minor.
 - `--docker-enabled=true|false` — persist the initial rootless Docker policy.
 - `-h`, `--help` — show the structured help output and exit successfully.
 
@@ -52,7 +54,7 @@ Usage
 ```bash
 /scripts/addUser.php alice rand 1024 200
 /scripts/addUser.php alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --io-weight=320
-/scripts/addUser.php --user=alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --io-latency-ms=50 --upload-throttle-kib=2048 --docker-enabled=true
+/scripts/addUser.php --user=alice --password=rand --ram-mib=1024 --disk-quota-gib=200 --traffic-limit-gb=500 --cpu-weight=320 --io-weight=320 --cpu-quota-percent=150 --io-latency-ms=50 --io-cost-qos='enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00' --upload-throttle-kib=2048 --docker-enabled=true
 ```
 
 On success the script creates the Unix user and home directory, assigns an HTTP service port, applies `userConfig.php`, converges the per-user environment, starts the user services, and emits both text and JSON summary markers for automation.
