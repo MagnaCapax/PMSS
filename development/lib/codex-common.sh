@@ -3,7 +3,7 @@
 # Keep lightweight and dependency-free so scripts can source this safely.
 
 # Initialize ROOT from a launcher path and optionally chdir.
-codex_init_root() { ROOT="$(cd "$1/.." && pwd)"; [[ "${2:-0}" == "1" ]] && cd "$ROOT"; }
+codex_init_root() { ROOT="$(cd "$1/.." && pwd)"; [[ "${2:-0}" == "1" ]] && cd "$ROOT"; return 0; }
 
 # Enable bash -x tracing when the given env var is set to 1.
 codex_enable_debug() {
