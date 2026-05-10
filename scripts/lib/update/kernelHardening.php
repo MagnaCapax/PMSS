@@ -11,10 +11,24 @@ require_once __DIR__.'/managedPath.php';
 /** Render the Dirty Frag mitigation blacklist body. */
 function pmssDirtyFragBlacklistBody(): string
 {
+    // Vendor-grade module set: V4bel writeup names esp4/esp6/rxrpc; AWS bulletin
+    // 2026-027 + Sysdig analysis identify ipcomp/ipcomp6 (additional xfrm code
+    // paths reaching the same skb_input vulnerable handler) and xfrm_user (the
+    // netlink interface that AUTOLOADS esp4/ipcomp via MODULE_ALIAS_XFRM_TYPE).
+    //
+    // POLICY: xfrm_user blacklist blocks future autoload. PMSS does NOT use
+    // IPsec / strongswan / legacy xfrm consumers today (verified empty
+    // `ip xfrm policy` fleet-wide). If a future PMSS feature requires xfrm_user,
+    // lift the xfrm_user line from this blacklist BEFORE adding that feature.
+    // WireGuard, Docker rootless, ixgbe, customer workloads are unaffected.
     return "# PMSS: block autoload of Dirty Frag attack-surface modules\n"
+        ."# Module set: V4bel PoC + AWS bulletin 2026-027 + Sysdig analysis\n"
         ."install esp4 /bin/false\n"
         ."install esp6 /bin/false\n"
-        ."install rxrpc /bin/false\n";
+        ."install rxrpc /bin/false\n"
+        ."install ipcomp /bin/false\n"
+        ."install ipcomp6 /bin/false\n"
+        ."install xfrm_user /bin/false\n";
 }
 
 /**
@@ -40,7 +54,7 @@ function pmssDirtyFragModulesLoaded(): ?array
         if (!is_array($columns) || count($columns) < 3 || $columns[0] === 'Module') {
             continue;
         }
-        if (!in_array($columns[0], ['esp4', 'esp6', 'rxrpc'], true)) {
+        if (!in_array($columns[0], ['esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'xfrm_user'], true)) {
             continue;
         }
         $loaded[$columns[0]] = ctype_digit($columns[2]) ? (int) $columns[2] : 0;
@@ -69,9 +83,13 @@ function pmssEnsureDirtyFragBlacklist(callable $log, ?callable $runner = null): 
         return;
     }
 
+    // xfrm_user is intentionally NOT in the rmmod set: it has use count > 0 on
+    // most live hosts (in-use by kernel network stack — netns refs, iproute2,
+    // etc.) and rmmod would fail. The blacklist alone protects post-reboot
+    // autoload, which is the relevant defensive surface for xfrm_user.
     $runner(
-        'Unloading Dirty Frag modules (esp4 esp6 rxrpc)',
-        'bash -lc '.escapeshellarg('modprobe -r esp4 esp6 rxrpc >/dev/null 2>&1 || true')
+        'Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6)',
+        'bash -lc '.escapeshellarg('modprobe -r esp4 esp6 rxrpc ipcomp ipcomp6 >/dev/null 2>&1 || true')
     );
 
     $loaded = pmssDirtyFragModulesLoaded();
