@@ -4,6 +4,7 @@ namespace PMSS\Tests;
 // Tests for functions in scripts/lib/update.php that are safe to exercise without root
 require_once __DIR__.'/../common/TestCase.php';
 require_once __DIR__.'/../common/updateBootstrapShim.php';
+require_once dirname(__DIR__, 2).'/motd/Generator.php';
 
 class UpdateHelpersTest extends TestCase
 {
@@ -45,7 +46,7 @@ class UpdateHelpersTest extends TestCase
     {
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 9, 'dead', $this->pmssDebianRepoTemplates(), $logger);
+        \pmssUpdateAptSources('debian', 9, 'dead', $this->pmssDebianRepoTemplates(), $logger);
         $this->pmssAssertMessagesContain($logs, 'Unsupported Debian version: 9');
     }
 
@@ -56,7 +57,7 @@ class UpdateHelpersTest extends TestCase
         $hash = sha1($content);
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 12, $hash, $this->pmssDebianRepoTemplates([
+        \pmssUpdateAptSources('debian', 12, $hash, $this->pmssDebianRepoTemplates([
             'bookworm' => $content,
         ]), $logger);
         $this->pmssAssertMessagesContain($logs, 'already correct');
@@ -67,7 +68,7 @@ class UpdateHelpersTest extends TestCase
     {
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 11, 'hash', $this->pmssDebianRepoTemplates(), $logger);
+        \pmssUpdateAptSources('debian', 11, 'hash', $this->pmssDebianRepoTemplates(), $logger);
         $this->pmssAssertMessagesContain($logs, 'Bullseye template missing');
     }
 
@@ -77,7 +78,7 @@ class UpdateHelpersTest extends TestCase
         $hash = sha1($content);
         $logs = [];
         $logger = $this->pmssMakeArrayLogger($logs);
-        \updateAptSources('debian', 13, $hash, $this->pmssDebianRepoTemplates([
+        \pmssUpdateAptSources('debian', 13, $hash, $this->pmssDebianRepoTemplates([
             'trixie' => $content,
         ]), $logger);
         $this->pmssAssertMessagesContain($logs, 'Trixie');
@@ -114,10 +115,10 @@ class UpdateHelpersTest extends TestCase
         $this->assertEquals('git/main:2024-01-01', \getPmssVersion($f));
     }
 
-    public function testGenerateMotdNoTemplateSafe(): void
+    public function testMotdGeneratorNoTemplateSafe(): void
     {
-        // When template missing, function returns early without changes
-        \generateMotd();
-        $this->assertTrue(true, 'generateMotd should be a no-op without template');
+        // When template missing, the canonical generator returns early without changes.
+        \Motd::motdGenerate();
+        $this->assertTrue(true, 'Motd::motdGenerate() should be a no-op without template');
     }
 }

@@ -20,7 +20,7 @@ class DistroRepoSelectionRepoTest extends TestCase
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            \updateAptSources('debian', 11, '', $this->pmssDebianRepoTemplates([
+            \pmssUpdateAptSources('debian', 11, '', $this->pmssDebianRepoTemplates([
                 'bullseye' => $template,
             ]), $logger);
 
@@ -33,7 +33,7 @@ class DistroRepoSelectionRepoTest extends TestCase
     {
         $initial = "deb http://existing bullseye main\n";
         $this->pmssWithTempAptSources($initial, function (string $target) use ($initial): void {
-            \updateAptSources('debian', 11, sha1($initial), $this->pmssDebianRepoTemplates(), function (): void {});
+            \pmssUpdateAptSources('debian', 11, sha1($initial), $this->pmssDebianRepoTemplates(), function (): void {});
 
             $this->assertEquals($initial, file_get_contents($target));
             $this->assertTrue(!file_exists($target.'.pmss-backup'));
@@ -45,7 +45,7 @@ class DistroRepoSelectionRepoTest extends TestCase
         $target = $this->pmssMakeTempPath('pmss-apt-target-');
         $this->pmssWithAptSourcesPath($target, function () use ($target): void {
             $template = "deb http://mirror.example bookworm main\n";
-            \updateAptSources('debian', 12, '', $this->pmssDebianRepoTemplates([
+            \pmssUpdateAptSources('debian', 12, '', $this->pmssDebianRepoTemplates([
                 'bookworm' => $template,
             ]), function (): void {});
 

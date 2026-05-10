@@ -40,7 +40,7 @@ PHP
         $this->assertEquals('', $result['output']);
     }
 
-    public function testUpdateUserEnvironmentRunsStablePhasesAndLingerHook(): void
+    public function testUpdateUserEnvironmentRunsStablePhasesWithoutLingerHook(): void
     {
         $repoRoot = dirname(__DIR__, 4);
         $script = $this->buildUserEnvironmentScript(
@@ -111,7 +111,7 @@ PHP
         $result = $this->pmssRunInlinePhpJson(str_replace('__REPO_ROOT__', var_export($repoRoot, true), $script), ['PMSS_TEST_MODE' => '1']);
 
         $this->assertStringContainsString('***** Updating user alice', $result['output']);
-        $this->assertEquals(['alice'], $result['linger']);
+        $this->assertEquals([], $result['linger']);
         $this->assertTrue($result['tmp_exists']);
         $this->assertTrue($result['irssi_exists']);
         $this->assertTrue($result['recycle_exists']);

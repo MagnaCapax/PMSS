@@ -2,6 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
+require_once dirname(__DIR__, 2).'/certbotSetup.php';
 
 class SetupLetsEncryptTest extends TestCase
 {
@@ -35,20 +36,152 @@ class SetupLetsEncryptTest extends TestCase
         $this->assertStringContainsString("strpos(\$domain, '.') === false", $source);
     }
 
-    public function testShellEscapesDomainAndEmailBeforeCertbotInvocation(): void
+    public function testCliDelegatesToSharedSetupLibraryWithoutShellExec(): void
     {
         $source = $this->pmssReadRepoFile('scripts/util/setupLetsEncrypt.php');
 
-        $this->assertStringContainsString('$domainArg = escapeshellarg($domain);', $source);
-        $this->assertStringContainsString('$emailArg = escapeshellarg($email);', $source);
-        $this->assertStringContainsString("shell_exec('/usr/bin/certbot certonly -d '.\$domainArg.' -n --nginx --agree-tos --email '.\$emailArg)", $source);
+        $this->assertStringContainsString("require_once __DIR__.'/../lib/certbotSetup.php';", $source);
+        $this->assertStringContainsString('pmssSetupLetsEncryptRun($domain, $email, $codename);', $source);
+        $this->assertStringNotContainsString('shell_exec(', $source);
     }
 
-    public function testInterpolatesLiveCertificatePathBeforeCertbotCheck(): void
+    public function testSharedSetupUsesCheckedCommandsAndPhpCronWrites(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/setupLetsEncrypt.php');
+        $source = $this->pmssReadRepoFile('scripts/lib/certbotSetup.php');
 
-        $this->assertStringContainsString("\$legacyCertPath = \"/etc/letsencrypt/live/{\$domain}\";", $source);
-        $this->assertStringNotContainsString("\$legacyCertPath = '/etc/letsencrypt/live/{\$domain}';", $source);
+        $this->assertStringContainsString('pmssCommandCapture($command)', $source);
+        $this->assertStringContainsString('@file_put_contents($cronPath, pmssSetupLetsEncryptRenewalCronContents()) === false', $source);
+        $this->assertStringNotContainsString('shell_exec(', $source);
+    }
+
+    public function testSharedSetupBuildsShellEscapedCertbotCommand(): void
+    {
+        $commands = [];
+        list($ignored, $stdout) = $this->pmssCaptureStdout(function () use (&$commands): void {
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
+                'cronPath' => $this->pmssMakeTempDir('pmss-certbot-cron-').'/certbot',
+                'createNginxConfigCommand' => 'create-nginx',
+                'nginxRestartCommand' => 'restart-nginx',
+                'fileExists' => static function (string $path): bool {
+                    return $path === '/etc/cron.d/certbot';
+                },
+                'commandRunner' => static function (string $command, string $description) use (&$commands): array {
+                    $commands[] = ['command' => $command, 'description' => $description];
+                    return ['rc' => 0, 'stdout' => $description."\n", 'stderr' => ''];
+                },
+            ]);
+        });
+
+        $this->assertStringContainsString('Install certbot packages', $stdout);
+        $this->assertStringContainsString('Request Let\'s Encrypt certificate', $stdout);
+        $this->assertStringContainsString(
+            "/usr/bin/certbot 'certonly' '-d' 'example.com' '-n' '--nginx' '--agree-tos' '--email' 'user@example.com'",
+            $commands[1]['command']
+        );
+    }
+
+    public function testSharedSetupSkipsCertRequestWhenLiveCertificateExists(): void
+    {
+        $commands = [];
+        $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-existing-').'/certbot';
+        file_put_contents($cronPath, "existing\n");
+
+        list($ignored, $stdout) = $this->pmssCaptureStdout(function () use (&$commands, $cronPath): void {
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
+                'cronPath' => $cronPath,
+                'createNginxConfigCommand' => 'create-nginx',
+                'nginxRestartCommand' => 'restart-nginx',
+                'fileExists' => static function (string $path) use ($cronPath): bool {
+                    return $path === '/etc/letsencrypt/live/example.com' || $path === $cronPath;
+                },
+                'commandRunner' => static function (string $command, string $description) use (&$commands): array {
+                    $commands[] = ['command' => $command, 'description' => $description];
+                    return ['rc' => 0, 'stdout' => $description."\n", 'stderr' => ''];
+                },
+            ]);
+        });
+
+        $this->assertStringContainsString('Install certbot packages', $stdout);
+        $this->assertStringNotContainsString('Request Let\'s Encrypt certificate', $stdout);
+        $this->assertEquals(
+            ['Install certbot packages', 'Rebuild nginx configuration', 'Restart nginx'],
+            array_column($commands, 'description')
+        );
+    }
+
+    public function testSharedSetupWritesRenewalCronWhenMissing(): void
+    {
+        $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-missing-').'/certbot';
+
+        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
+            'cronPath' => $cronPath,
+            'createNginxConfigCommand' => 'create-nginx',
+            'nginxRestartCommand' => 'restart-nginx',
+            'fileExists' => static function (string $path): bool {
+                return $path === '/etc/letsencrypt/live/example.com';
+            },
+            'commandRunner' => static function (string $command, string $description): array {
+                return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
+            },
+        ]);
+
+        $this->assertEquals(\pmssSetupLetsEncryptRenewalCronContents(), (string) file_get_contents($cronPath));
+        $this->assertEquals('644', substr(sprintf('%o', fileperms($cronPath)), -3));
+    }
+
+    public function testSharedSetupFailsLoudlyWhenNginxRestartFails(): void
+    {
+        $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-fail-').'/certbot';
+
+        try {
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
+                'cronPath' => $cronPath,
+                'createNginxConfigCommand' => 'create-nginx',
+                'nginxRestartCommand' => 'restart-nginx',
+                'fileExists' => static function (string $path): bool {
+                    return $path === '/etc/letsencrypt/live/example.com';
+                },
+                'commandRunner' => static function (string $command, string $description): array {
+                    if ($description === 'Restart nginx') {
+                        return ['rc' => 1, 'stdout' => '', 'stderr' => 'restart failed'];
+                    }
+                    return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
+                },
+            ]);
+            $this->fail('Expected nginx restart failure to throw');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Restart nginx failed (rc=1): restart failed', $exception->getMessage());
+        }
+    }
+
+    public function testSharedSetupBootstrapsMissingBusterCertbotBinary(): void
+    {
+        $commands = [];
+
+        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'buster', [
+            'cronPath' => $this->pmssMakeTempDir('pmss-certbot-cron-buster-').'/certbot',
+            'createNginxConfigCommand' => 'create-nginx',
+            'nginxRestartCommand' => 'restart-nginx',
+            'fileExists' => static function (string $path): bool {
+                return false;
+            },
+            'commandRunner' => static function (string $command, string $description) use (&$commands): array {
+                $commands[] = $description;
+                return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
+            },
+        ]);
+
+        $this->assertEquals(
+            [
+                'Create certbot virtualenv',
+                'Upgrade certbot pip',
+                'Install certbot virtualenv packages',
+                'Link certbot binary',
+                'Request Let\'s Encrypt certificate',
+                'Rebuild nginx configuration',
+                'Restart nginx',
+            ],
+            $commands
+        );
     }
 }

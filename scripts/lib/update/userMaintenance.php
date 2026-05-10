@@ -11,7 +11,6 @@ require_once __DIR__.'/systemPrep.php';
 require_once __DIR__.'/users.php';
 require_once __DIR__.'/../users.php';
 require_once __DIR__.'/../userLifecycle.php';
-require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/../user/userConfigStore.php';
 
@@ -130,6 +129,7 @@ require_once __DIR__.'/../user/userConfigStore.php';
                 }
 
                 pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);
+                pmssEnsureLingerAndDocker($userTrim);
 
                 foreach ($postChecks as $label => $helperPath) {
                     $rc = runUserStep($userTrim, $label, pmssBuildCommand($helperPath, [$userTrim]));

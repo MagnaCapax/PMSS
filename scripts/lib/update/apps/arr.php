@@ -135,7 +135,8 @@ function pmssArrArchiveNameIsSafe(string $assetName): bool
 {
     return pmssArrIsSafeConfigValue($assetName)
         && basename($assetName) === $assetName
-        && preg_match('/[\\\/]/', $assetName) !== 1;
+        && strpos($assetName, '/') === false
+        && strpos($assetName, '\\') === false;
 }
 
 function pmssArrUpdate(array $config): void

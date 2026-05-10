@@ -49,34 +49,63 @@ class Manager
         $mode  = $this->sys->getCgroupMode();
         echo "user=$user uid=$uid slice=$slice mode=$mode\n";
 
+        $flagSet = array_flip($flags);
         $opt = [];
-        $wantStatus = in_array('--status', $flags, true);
-        $wantConfig = in_array('--config', $flags, true);
-        $apply      = in_array('--apply', $flags, true);
-        $dryRun     = in_array('--dry-run', $flags, true);
-        $respectExisting = in_array('--respect-existing', $flags, true);
+        $wantStatus = isset($flagSet['--status']);
+        $wantConfig = isset($flagSet['--config']);
+        $apply      = isset($flagSet['--apply']);
+        $dryRun     = isset($flagSet['--dry-run']);
+        $respectExisting = isset($flagSet['--respect-existing']);
+        $defaultsRequested = isset($flagSet['--defaults']);
+        $doWipe = isset($flagSet['--wipe']);
         $device = '';
         $ioProfile = '';
         $ioCostQos = '';
         $ioCostModel = '';
         $hasIoFlag = false;
+        $ioPairs = [];
         $policyIoPairs = [];
         $ioCostWrites = [];
+        $ioMap = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
+        $optTargets = ['cpu-weight' => true, 'io-weight' => true, 'tasks-max' => true, 'memory-high' => true, 'memory-max' => true, 'cpu-quota-percent' => true, 'io-latency-ms' => true, 'cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
+        $ioSpecs = [];
+        $optLowercase = ['cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
+        $scalarTargets = ['device' => 'device', 'io-profile' => 'ioProfile', 'io-cost-qos' => 'ioCostQos', 'io-cost-model' => 'ioCostModel'];
 
-        // Flag parsing
-        foreach (['--cpu-weight','--io-weight','--tasks-max','--memory-high','--memory-max','--device','--io-profile','--cpu-profile','--mem-profile','--tasks-profile','--cpu-quota-percent','--io-latency-ms','--io-cost-qos','--io-cost-model'] as $k) {
-            foreach ($flags as $f) {
-                if (strpos($f, $k.'=') === 0) {
-                    $val = substr($f, strlen($k)+1);
-                    if ($k === '--device') { $device = $val; }
-                    elseif ($k === '--io-profile') { $ioProfile = strtolower($val); }
-                    elseif ($k === '--io-cost-qos') { $ioCostQos = $val; }
-                    elseif ($k === '--io-cost-model') { $ioCostModel = $val; }
-                    elseif ($k === '--cpu-profile') { $opt['cpu-profile'] = strtolower($val); }
-                    elseif ($k === '--mem-profile') { $opt['mem-profile'] = strtolower($val); }
-                    elseif ($k === '--tasks-profile') { $opt['tasks-profile'] = strtolower($val); }
-                    else { $opt[substr($k,2)] = $val; }
+        // Scan value flags once, then replay IO specs in canonical property order.
+        foreach ($flags as $flag) {
+            if (strpos($flag, '--') !== 0 || ($separator = strpos($flag, '=')) === false) {
+                continue;
+            }
+
+            $name = substr($flag, 2, $separator - 2);
+            $value = substr($flag, $separator + 1);
+
+            if (isset($ioMap[$name])) {
+                $ioSpecs[$name][] = $value;
+                $hasIoFlag = true;
+                continue;
+            }
+
+            if (isset($scalarTargets[$name])) {
+                $target = $scalarTargets[$name];
+                $$target = ($name === 'io-profile') ? strtolower($value) : $value;
+                continue;
+            }
+
+            if (isset($optTargets[$name])) {
+                $opt[$name] = isset($optLowercase[$name]) ? strtolower($value) : $value;
+            }
+        }
+
+        foreach ($ioMap as $flagName => $propertyName) {
+            foreach ($ioSpecs[$flagName] ?? [] as $spec) {
+                $parsedIoPair = $this->parseIoPropertyPair($propertyName, $spec);
+                if ($parsedIoPair === null) {
+                    fwrite(STDERR, 'Invalid --'.$flagName.' specification: '.$spec."\n");
+                    return 2;
                 }
+                $ioPairs[] = $parsedIoPair;
             }
         }
 
@@ -86,7 +115,7 @@ class Manager
         }
 
         // Defaults policy
-        if (in_array('--defaults', $flags, true)) {
+        if ($defaultsRequested) {
             $policyIoPairs = $this->applyDefaults($opt);
         }
 
@@ -103,29 +132,6 @@ class Manager
                 $devResolved = $device;
             } else {
                 $devResolved = $this->sys->resolveDevice($device);
-            }
-        }
-
-        // IO Throttles
-        $ioPairs = [];
-        $ioMap = [
-            'io-read-bw'   => 'IOReadBandwidthMax',
-            'io-write-bw'  => 'IOWriteBandwidthMax',
-            'io-read-iops' => 'IOReadIOPSMax',
-            'io-write-iops'=> 'IOWriteIOPSMax',
-        ];
-        foreach ($ioMap as $flag=>$prop) {
-            foreach ($flags as $f) {
-                if (strpos($f, '--'.$flag.'=') === 0) {
-                    $spec = substr($f, strlen('--'.$flag.'='));
-                    $parsedIoPair = $this->parseIoPropertyPair($prop, $spec);
-                    if ($parsedIoPair === null) {
-                        fwrite(STDERR, 'Invalid --'.$flag.' specification: '.$spec."\n");
-                        return 2;
-                    }
-                    $ioPairs[] = $parsedIoPair;
-                    $hasIoFlag = true;
-                }
             }
         }
 
@@ -171,7 +177,7 @@ class Manager
 
         // Default view if no actions
         if (!$wantStatus && !$wantConfig) {
-            $hasPlanInput = !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $hasIoFlag || in_array('--wipe', $flags, true);
+            $hasPlanInput = !empty($opt) || !empty($ioPairs) || !empty($ioCostWrites) || $device !== '' || $ioProfile !== '' || $hasIoFlag || $doWipe;
             if (!$hasPlanInput) {
                 $this->showConfig($slice);
                 $this->showStatus($slice, $uid);
@@ -181,7 +187,7 @@ class Manager
         $sysMem = $this->sys->getTotalMemoryMiB();
         $props = !empty($opt) ? $this->computeSetProps($opt, $sysMem) : [];
 
-        if (in_array('--defaults', $flags, true) && $respectExisting && !empty($props)) {
+        if ($defaultsRequested && $respectExisting && !empty($props)) {
             $current = $this->readCurrentProps($slice);
             foreach (array_keys($props) as $k) {
                 if (isset($current[$k]) && trim((string)$current[$k]) !== '') {
@@ -205,7 +211,6 @@ class Manager
             }
         }
 
-        $doWipe = in_array('--wipe', $flags, true);
         $hasPlan = !empty($props) || !empty($ioPairs) || !empty($ioCostWrites) || $doWipe || $hasIoFlag;
 
         if ($hasPlan) {
@@ -387,20 +392,11 @@ class Manager
     private function applyDefaults(array &$opt): array
     {
         $policy = $this->loadPolicy();
-        
-        foreach ([['cpu-weight','cpuWeight'],['io-weight','ioWeight'],['tasks-max','tasksMax'],['cpu-quota-percent','cpuQuotaPercent']] as $map) {
-            if (!isset($opt[$map[0]]) && isset($policy[$map[1]]) && is_numeric($policy[$map[1]])) {
-                $opt[$map[0]] = (string)$policy[$map[1]];
+
+        foreach (['cpu-weight' => 'cpuWeight', 'io-weight' => 'ioWeight', 'tasks-max' => 'tasksMax', 'cpu-quota-percent' => 'cpuQuotaPercent', 'io-latency-ms' => 'ioLatencyMs', 'memory-high' => 'memoryHighMiB', 'memory-max' => 'memoryMaxMiB'] as $optionKey => $policyKey) {
+            if (!isset($opt[$optionKey]) && isset($policy[$policyKey]) && is_numeric($policy[$policyKey])) {
+                $opt[$optionKey] = (string)$policy[$policyKey];
             }
-        }
-        if (!isset($opt['io-latency-ms']) && isset($policy['ioLatencyMs']) && is_numeric($policy['ioLatencyMs'])) {
-            $opt['io-latency-ms'] = (string)$policy['ioLatencyMs'];
-        }
-        if (!isset($opt['memory-high']) && isset($policy['memoryHighMiB']) && is_numeric($policy['memoryHighMiB'])) {
-            $opt['memory-high'] = (string)$policy['memoryHighMiB'];
-        }
-        if (!isset($opt['memory-max']) && isset($policy['memoryMaxMiB']) && is_numeric($policy['memoryMaxMiB'])) {
-            $opt['memory-max'] = (string)$policy['memoryMaxMiB'];
         }
 
         if (!isset($policy['mounts']) || !is_array($policy['mounts'])) {
@@ -420,39 +416,26 @@ class Manager
                 continue;
             }
 
-            if (isset($mountPolicy['ioWeight']) && is_numeric($mountPolicy['ioWeight'])) {
-                $ioWeight = (int)$mountPolicy['ioWeight'];
-                if ($ioWeight > 0) {
-                    $pairsByKey['IODeviceWeight|'.$devicePath] = 'IODeviceWeight='.$devicePath.' '.$ioWeight;
-                }
-            }
-
-            foreach ([
-                ['readBw', 'IOReadBandwidthMax'],
-                ['writeBw', 'IOWriteBandwidthMax'],
-            ] as $mapping) {
+            foreach ([['ioWeight', 'IODeviceWeight', true], ['readBw', 'IOReadBandwidthMax', false], ['writeBw', 'IOWriteBandwidthMax', false], ['readIops', 'IOReadIOPSMax', true], ['writeIops', 'IOWriteIOPSMax', true]] as $mapping) {
                 $policyKey = $mapping[0];
                 $propertyName = $mapping[1];
-                if (isset($mountPolicy[$policyKey]) && is_string($mountPolicy[$policyKey])) {
-                    $limitValue = trim($mountPolicy[$policyKey]);
-                    if ($limitValue !== '') {
-                        $pairsByKey[$propertyName.'|'.$devicePath] = $propertyName.'='.$devicePath.' '.$limitValue;
-                    }
+                $numeric = $mapping[2];
+                if (!isset($mountPolicy[$policyKey])) {
+                    continue;
                 }
-            }
 
-            foreach ([
-                ['readIops', 'IOReadIOPSMax'],
-                ['writeIops', 'IOWriteIOPSMax'],
-            ] as $mapping) {
-                $policyKey = $mapping[0];
-                $propertyName = $mapping[1];
-                if (isset($mountPolicy[$policyKey]) && is_numeric($mountPolicy[$policyKey])) {
-                    $limitValue = (int)$mountPolicy[$policyKey];
-                    if ($limitValue > 0) {
-                        $pairsByKey[$propertyName.'|'.$devicePath] = $propertyName.'='.$devicePath.' '.$limitValue;
+                if ($numeric) {
+                    if (!is_numeric($mountPolicy[$policyKey]) || ($value = (int)$mountPolicy[$policyKey]) <= 0) {
+                        continue;
+                    }
+                } else {
+                    $value = trim((string)$mountPolicy[$policyKey]);
+                    if ($value === '') {
+                        continue;
                     }
                 }
+
+                $pairsByKey[$propertyName.'|'.$devicePath] = $propertyName.'='.$devicePath.' '.$value;
             }
         }
 
@@ -592,27 +575,25 @@ class Manager
                     $hasValidOverride = true;
                 }
 
-                foreach (['readBw', 'writeBw'] as $bandwidthKey) {
-                    if (!isset($profileConfig[$bandwidthKey]) || !is_string($profileConfig[$bandwidthKey])) {
+                foreach ([['readBw', false], ['writeBw', false], ['readIops', true], ['writeIops', true]] as $mapping) {
+                    $limitKey = $mapping[0];
+                    $numeric = $mapping[1];
+                    if (!isset($profileConfig[$limitKey])) {
                         continue;
                     }
-                    $limitValue = trim($profileConfig[$bandwidthKey]);
-                    if ($limitValue === '') {
-                        continue;
-                    }
-                    $resolvedProfile['limits'][$bandwidthKey] = $limitValue;
-                    $hasValidOverride = true;
-                }
 
-                foreach (['readIops', 'writeIops'] as $iopsKey) {
-                    if (!isset($profileConfig[$iopsKey]) || !is_numeric($profileConfig[$iopsKey])) {
-                        continue;
+                    if ($numeric) {
+                        if (!is_numeric($profileConfig[$limitKey]) || ($limitValue = (int)$profileConfig[$limitKey]) <= 0) {
+                            continue;
+                        }
+                    } else {
+                        $limitValue = trim((string)$profileConfig[$limitKey]);
+                        if ($limitValue === '') {
+                            continue;
+                        }
                     }
-                    $limitValue = (int)$profileConfig[$iopsKey];
-                    if ($limitValue <= 0) {
-                        continue;
-                    }
-                    $resolvedProfile['limits'][$iopsKey] = $limitValue;
+
+                    $resolvedProfile['limits'][$limitKey] = $limitValue;
                     $hasValidOverride = true;
                 }
 

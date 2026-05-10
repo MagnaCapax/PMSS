@@ -180,8 +180,9 @@ Other Python-driven installers (e.g. Deluge’s Debian 10 bootstrap) still rely
 6. Run application installers under `scripts/lib/update/apps/*.php`.
 7. Configure the web stack, disable legacy daemons, and install supporting
    packages (e.g., mediainfo, Let’s Encrypt helpers).
-8. Update every user environment via `pmssUpdateUserEnvironment` and rescan
-   skeletons and logrotate policies (user crontabs are user-owned and not rewritten).
+8. Update every user environment via `pmssUpdateAllUsers()`, which also owns
+   linger/rootless-Docker wiring and the optional post-refresh checks
+   (user crontabs are user-owned and not rewritten).
 9. Reapply network templates, apply security hardening, summarise profiling, and
    log completion markers. Per-user traffic monitoring rules rely on the
    iptables owner match; when unavailable `setupNetwork.php` skips those rules

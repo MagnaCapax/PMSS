@@ -27,14 +27,14 @@ class MediaStackNginxRedirectTest extends TestCase
         }
     }
 
-    public function testPublicProxyBlockDoesNotCarryMediaStackCookiePathRules(): void
+    public function testPublicProxyBlockRewritesMediaStackCookiePaths(): void
     {
         $block = $this->publicProxyBlock();
 
         foreach (array('sabnzbd', 'lidarr', 'radarr', 'prowlarr', 'readarr', 'sonarr', 'jellyfin') as $app) {
-            $this->assertFalse(
+            $this->assertTrue(
                 strpos($block, 'proxy_cookie_path /'.$app.' /public-##username/'.$app.';') !== false,
-                'Nginx public block must stay app-agnostic for '.$app.' cookie paths'
+                'Nginx public block must restore cookie scope for '.$app
             );
         }
     }

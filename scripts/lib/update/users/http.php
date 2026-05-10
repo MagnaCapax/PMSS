@@ -21,19 +21,19 @@ function pmssUserConfigureHttp(array $ctx): void
     $user    = $ctx['user'];
     $home    = $ctx['home'];
     $userEsc = $ctx['user_esc'];
-    $userLog = function_exists('pmssUserLog') ? static function (string $message) use ($user): void { pmssUserLog($user, $message); } : null;
+    $userLog = static function (string $message) use ($user): void { pmssUserLog($user, $message); };
 
     runUserStep($user, 'Configuring lighttpd vhost', sprintf('/scripts/util/userConfigLighttpd.php %s', $userEsc));
 
     // Refresh the PMSS-managed qBittorrent safety defaults on every pass.
     // This includes reverse-proxy compatibility keys such as HostHeaderValidation.
     $qbittorrentConfig = "{$home}/.config/qBittorrent/qBittorrent.conf";
-    if (function_exists('pmssQbittorrentApplyManagedConfig') && pmssQbittorrentApplyManagedConfig($user, $qbittorrentConfig) && $userLog) {
+    if (pmssQbittorrentApplyManagedConfig($user, $qbittorrentConfig)) {
         $userLog('Refreshed PMSS-managed qBittorrent settings');
     }
 
     $delugeConfig = "{$home}/.config/deluge/core.conf";
-    if (function_exists('pmssDelugeApplyManagedConfig') && pmssDelugeApplyManagedConfig($user, $delugeConfig) && $userLog) {
+    if (pmssDelugeApplyManagedConfig($user, $delugeConfig)) {
         $userLog('Refreshed PMSS-managed Deluge settings');
     }
 

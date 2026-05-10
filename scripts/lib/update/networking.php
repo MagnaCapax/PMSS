@@ -14,6 +14,7 @@
  */
 
 require_once __DIR__.'/logging.php';
+require_once __DIR__.'/managedPath.php';
 
 /**
  * Seed the default network configuration file when missing.
@@ -21,7 +22,10 @@ require_once __DIR__.'/logging.php';
 function pmssEnsureNetworkTemplate(?callable $logger = null): void
 {
     $log  = $logger ?: 'logMessage';
-    $path = '/etc/seedbox/config/network';
+    $path = getenv('PMSS_NETWORK_CONFIG');
+    $path = is_string($path) && trim($path) !== ''
+        ? rtrim($path, '/')
+        : '/etc/seedbox/config/network';
     if (file_exists($path)) {
         return;
     }
@@ -54,6 +58,8 @@ return array(
 );
 PHP;
 
-    file_put_contents($path, $template);
+    if (!pmssWriteManagedPathFile($path, $template, 'network configuration', $log)) {
+        return;
+    }
     $log('Created default network configuration');
 }

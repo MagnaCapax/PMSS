@@ -212,10 +212,7 @@ class UserConfigStore
 
     private function loadCanonicalUsers(): array
     {
-        if (!is_dir($this->userDir)) {
-            return [];
-        }
-        if (empty($files = glob($this->userDir.'/*.json'))) {
+        if (!is_dir($this->userDir) || empty($files = glob($this->userDir.'/*.json'))) {
             return [];
         }
 
@@ -321,8 +318,7 @@ class UserConfigStore
             return 0;
         }
 
-        $mib = (int)floor($bytes / 1048576);
-        return max(0, $mib);
+        return max(0, (int) floor($bytes / 1048576));
     }
 
     private function readBillingId(string $username): int

@@ -9,6 +9,7 @@ final class TrafficDisplayPayloadCharacterizationTest extends TrafficTestCase
     public function testTrafficProcessorPersistsRawAndDailyOnly(): void
     {
         $stats = $this->makeTrafficStatisticsStub();
+        /** @var \trafficStatistics&object{map: array<string, string>, saved: array<string, mixed>} $stats */
         [$paths, $processor] = $this->makeTrafficProcessorFixture($stats, '\TrafficStatsProcessor', 'pmss-traffic-characterization-');
 
         $user = 'alice';

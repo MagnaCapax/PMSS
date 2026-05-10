@@ -205,6 +205,33 @@ CONF;
 }
 
 /**
+     * Persist the sanitized dpkg baseline to a temporary file.
+     *
+     * Callers must treat a null return as a hard stop. Falling back to the raw
+     * baseline would bypass the validation pass that produced the sanitized
+     * payload.
+     *
+     * @param array<int, string> $sanitised
+     */
+    function pmssWriteSanitisedDpkgSelectionsTempFile(array $sanitised): ?string
+    {
+        $tmpSelection = @tempnam(sys_get_temp_dir(), 'pmss-selections-');
+        if ($tmpSelection === false) {
+            logMessage('[ERROR] Unable to create temporary file for sanitized dpkg selections baseline');
+            return null;
+        }
+
+        $payload = implode(PHP_EOL, $sanitised).PHP_EOL;
+        if (@file_put_contents($tmpSelection, $payload, LOCK_EX) === false) {
+            @unlink($tmpSelection);
+            logMessage('[ERROR] Unable to write temporary file for sanitized dpkg selections baseline');
+            return null;
+        }
+
+        return $tmpSelection;
+}
+
+/**
      * Apply the baseline dpkg selection snapshot so required packages stay present.
      *
      * @return bool True when the baseline was parsed and applied successfully.
@@ -300,14 +327,12 @@ CONF;
             }
 
             if (!empty($sanitised)) {
-                $tmpSelection = tempnam(sys_get_temp_dir(), 'pmss-selections-');
-                if ($tmpSelection !== false && file_put_contents($tmpSelection, implode(PHP_EOL, $sanitised).PHP_EOL) !== false) {
-                    $selectionPath = $tmpSelection;
-                } elseif ($tmpSelection !== false) {
-                    @unlink($tmpSelection);
-                    $tmpSelection = null;
-                    $warnings     = true;
+                $tmpSelection = pmssWriteSanitisedDpkgSelectionsTempFile($sanitised);
+                if ($tmpSelection === null) {
+                    logMessage('[ERROR] Refusing to apply raw dpkg selections baseline after sanitized baseline staging failed');
+                    return false;
                 }
+                $selectionPath = $tmpSelection;
             }
 
             // Aggregate summary logs instead of per-package noise
@@ -386,7 +411,7 @@ CONF;
             return;
         }
 
-        $rawVer = trim((string) @shell_exec("dpkg-query -W -f='${Version}' libssl3 2>/dev/null"));
+        $rawVer = trim((string) @shell_exec("dpkg-query -W -f='\\${Version}' libssl3 2>/dev/null"));
         if ($rawVer === '') {
             logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: libssl3 is not installed');
             return;
@@ -483,7 +508,7 @@ CONF;
             $downgraded = true;
         }
 
-        $postVer = trim((string) @shell_exec("dpkg-query -W -f='${Version}' libssl3 2>/dev/null"));
+        $postVer = trim((string) @shell_exec("dpkg-query -W -f='\\${Version}' libssl3 2>/dev/null"));
         if ($postVer === '') {
             logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: unable to read libssl3 version after convergence');
             throw new RuntimeException('Unable to read libssl3 version after convergence');

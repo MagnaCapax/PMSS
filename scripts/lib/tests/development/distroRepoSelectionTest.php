@@ -63,7 +63,7 @@ class DistroRepoSelectionTest extends TestCase
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            \updateAptSources('debian', 11, $currentHash, $this->pmssDebianRepoTemplates([
+            \pmssUpdateAptSources('debian', 11, $currentHash, $this->pmssDebianRepoTemplates([
                 'bullseye' => $template,
             ]), $logger);
 
@@ -85,7 +85,7 @@ class DistroRepoSelectionTest extends TestCase
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            \updateAptSources('debian', 10, $currentHash, $this->pmssDebianRepoTemplates([
+            \pmssUpdateAptSources('debian', 10, $currentHash, $this->pmssDebianRepoTemplates([
                 'buster' => $template,
             ]), $logger);
 

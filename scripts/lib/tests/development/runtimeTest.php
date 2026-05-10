@@ -127,8 +127,8 @@ class RuntimeTest extends TestCase
         try {
             $this->assertTrue(\pmssCommandPipesReady($pipes));
             $this->assertTrue(\pmssCommandOutputPipesSetNonBlocking($pipes));
-            $this->assertFalse((bool) stream_get_meta_data($pipes[1])['blocked']);
-            $this->assertFalse((bool) stream_get_meta_data($pipes[2])['blocked']);
+            $this->assertFalse((bool) (stream_get_meta_data($pipes[1])['blocked'] ?? false));
+            $this->assertFalse((bool) (stream_get_meta_data($pipes[2])['blocked'] ?? false));
         } finally {
             foreach ($pipes as $pipe) {
                 if (is_resource($pipe)) {

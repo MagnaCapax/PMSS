@@ -10,6 +10,7 @@ require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/../user/delugeManagedConfig.php';
+require_once __DIR__.'/../user/log.php';
 require_once __DIR__.'/../user/qbittorrent.php';
 require_once __DIR__.'/users/context.php';
 require_once __DIR__.'/users/http.php';
@@ -45,10 +46,5 @@ function pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha = '')
         'pmssUserRefreshPermissions',
     ] as $handler) {
         $handler($ctx);
-    }
-
-    // Keep linger/systemd/rootless Docker wiring inside the main user flow.
-    if (function_exists('pmssEnsureLingerAndDocker')) {
-        pmssEnsureLingerAndDocker($user);
     }
 }

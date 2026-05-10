@@ -200,16 +200,3 @@ function getPmssVersion($versionFile = '/etc/seedbox/config/version') {
 
     return 'unknown';
 }
-
-// Backwards-compatible wrappers for legacy helper names.
-function updateAptSources(string $distroName, int $distroVersion, string $currentHash, array $repos, ?callable $logger = null): void
-{
-    pmssUpdateAptSources($distroName, $distroVersion, $currentHash, $repos, $logger);
-}
-
-/** Generate /etc/motd using the template and system details */
-function generateMotd(): void
-{
-    require_once __DIR__.'/motd/Generator.php';
-    \Motd::motdGenerate();
-}

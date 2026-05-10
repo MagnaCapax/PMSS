@@ -345,6 +345,25 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("pmssSkeletonBase().'/'.\$file", $src);
     }
 
+    public function testUpdateLibraryDropsLegacyFacadeWrappers(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/lib/update.php');
+        $aptFacade = 'function update'.'AptSources(';
+        $motdFacade = 'function generate'.'Motd(';
+
+        $this->pmssAssertStringNotContainsString(
+            $aptFacade,
+            $src,
+            'update.php should keep the canonical pmssUpdateAptSources() symbol only'
+        );
+        $this->pmssAssertStringNotContainsString(
+            $motdFacade,
+            $src,
+            'update.php should not keep a dead MOTD wrapper once callers use Motd::motdGenerate() directly'
+        );
+        $this->assertStringContainsString('function getPmssVersion(', $src);
+    }
+
     public function testSkeletonMaintenanceKeepsTorrentFrontendPatchLocal(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/users.php');
@@ -525,10 +544,16 @@ class UpdateCompressionCharacterizationTest extends TestCase
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/users.php');
 
+        $this->assertStringContainsString("require_once __DIR__.'/../user/log.php';", $src);
         $this->assertStringContainsString("'pmssUserConfigureHttp'", $src);
         $this->assertStringContainsString("'pmssUserApplySkeletonFiles'", $src);
         $this->assertStringContainsString("'pmssUserUpgradeRutorrent'", $src);
         $this->assertStringContainsString("'pmssUserRefreshPermissions'", $src);
+        $this->pmssAssertStringNotContainsString(
+            'pmssEnsureLingerAndDocker($user)',
+            $src,
+            'users.php should keep single-user refresh limited to environment handlers'
+        );
         $this->pmssAssertStringNotContainsString(
             'Missing handler',
             $src,
@@ -539,8 +564,13 @@ class UpdateCompressionCharacterizationTest extends TestCase
     public function testUserMaintenanceKeepsDirectPhaseSummaryAndSummaryLogging(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
+        $updatePos = strpos($src, 'pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);');
+        $lingerPos = strpos($src, 'pmssEnsureLingerAndDocker($userTrim);');
 
         $this->assertStringContainsString('Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)', $src);
+        $this->assertTrue($updatePos !== false, 'userMaintenance.php should update the user environment directly');
+        $this->assertTrue($lingerPos !== false, 'userMaintenance.php should keep linger wiring in the main per-user loop');
+        $this->assertTrue($lingerPos > $updatePos, 'linger wiring should run after environment convergence');
         $this->assertStringContainsString("pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);", $src);
         $this->assertStringContainsString('pmssLogJson([', $src);
         $this->pmssAssertStringNotContainsString(

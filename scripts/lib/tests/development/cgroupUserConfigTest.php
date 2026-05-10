@@ -48,9 +48,9 @@ class MockSystem implements SystemInterface
 
 class CgroupUserConfigTest extends TestCase
 {
-    /** @var MockSystem */
+    /** @var MockSystem|null */
     private $sys;
-    /** @var Manager */
+    /** @var Manager|null */
     private $mgr;
 
     /**
@@ -252,6 +252,40 @@ class CgroupUserConfigTest extends TestCase
 
         $this->assertEquals(0, $res['rc']);
         $this->assertStringContainsString("'IOReadBandwidthMax=/dev/sda 5M'", $res['out']);
+    }
+
+    public function testMixedFlagPlanSnapshotLocksParsingPrecedence(): void
+    {
+        $res = $this->runMgr([
+            'testuser',
+            '--apply',
+            '--dry-run',
+            '--memory-high=600',
+            '--memory-max=900',
+            '--cpu-weight=111',
+            '--cpu-weight=222',
+            '--device=/dev/sdb',
+            '--io-profile=bulk',
+            '--io-read-bw=/dev/sda:5M',
+            '--io-write-iops=/dev/sda:9',
+        ]);
+
+        $this->assertEquals(0, $res['rc']);
+        $this->assertSame(
+            "user=testuser uid=1000 slice=user-1000.slice mode=v2\n"
+            ."\n"
+            ."[Planned properties]\n"
+            ."MemoryHigh=600M\n"
+            ."MemoryMax=900M\n"
+            ."CPUWeight=222\n"
+            ."IOWeight=500\n"
+            ."TasksMax=8192\n"
+            ."[Planned IO properties]\n"
+            ."IOReadBandwidthMax=/dev/sda 5M\n"
+            ."IOWriteIOPSMax=/dev/sda 9\n"
+            ."(dry-run or no --apply; not changing system)\n",
+            $res['out']
+        );
     }
 
     public function testIoLatencyDefaultsToHomeBackingDevice()

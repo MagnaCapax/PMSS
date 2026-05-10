@@ -41,6 +41,11 @@ class UserConfigStoreTest extends TestCase
         return $this->tempDir.'/seedbox/runtime/users.json';
     }
 
+    private function newStore(): \UserConfigStore
+    {
+        return new \UserConfigStore($this->configDirPath());
+    }
+
     private function basePayload(array $overrides = []): array
     {
         return $overrides + [
@@ -51,9 +56,14 @@ class UserConfigStoreTest extends TestCase
         ];
     }
 
+    private function reloadBasePayload(string $username, array $overrides = []): array
+    {
+        return $this->persistAndReload($username, $this->basePayload($overrides));
+    }
+
     private function persistAndReload(string $username, array $payload): array
     {
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertTrue($store->set($username, $payload));
         $reloaded = $store->get($username);
         $this->assertTrue(is_array($reloaded));
@@ -62,16 +72,14 @@ class UserConfigStoreTest extends TestCase
 
     public function testSetAndGetRoundTripPreservesUnknownKeysAndForcesTrafficLimit(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
+        $store = $this->newStore();
+        $this->assertTrue($store->set('alice', $this->basePayload([
             'ramMiB'       => 512,
-            'rtorrentPort' => 5000,
             'quota'        => 100,
             'quotaBurst'   => 125,
             'trafficLimit' => 999,
             'customNote'   => 'keep-me',
-        ];
-        $this->assertTrue($store->set('alice', $payload));
+        ])));
 
         $reloaded = $store->get('alice');
         $this->assertTrue(is_array($reloaded));
@@ -81,50 +89,39 @@ class UserConfigStoreTest extends TestCase
 
     public function testTrafficCapMbitNormalisesToInt(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
+        $reloaded = $this->persistAndReload('captest', $this->basePayload([
             'ramMiB' => 256,
             'rtorrentPort' => 5100,
             'quota' => 50,
             'quotaBurst' => 62,
             'trafficCapMbit' => '15',
-        ];
-        $this->assertTrue($store->set('captest', $payload));
-        $reloaded = $store->get('captest');
-        $this->assertTrue(is_array($reloaded));
+        ]));
         $this->assertEquals(15, $reloaded['trafficCapMbit']);
     }
 
     public function testIoCostSettingsPersistAsStrings(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
+        $payload = $this->basePayload([
             'ramMiB' => 512,
             'rtorrentPort' => 5100,
             'quota' => 100,
             'quotaBurst' => 125,
             'ioCostQos' => 'enable=1 ctrl=user rpct=95.00 rlat=75000',
             'ioCostModel' => 'ctrl=user model=linear rbps=1000 rseqiops=100 rrandiops=100 wbps=1000 wseqiops=100 wrandiops=100',
-        ];
-        $this->assertTrue($store->set('iocost', $payload));
-        $reloaded = $store->get('iocost');
-        $this->assertTrue(is_array($reloaded));
+        ]);
+        $reloaded = $this->persistAndReload('iocost', $payload);
         $this->assertEquals($payload['ioCostQos'], $reloaded['ioCostQos']);
         $this->assertEquals($payload['ioCostModel'], $reloaded['ioCostModel']);
     }
 
     public function testLegacyRtorrentRamCreatesRamMiBButPreservesKey(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
+        $reloaded = $this->persistAndReload('bob', [
             'rtorrentRam'  => 256,
             'rtorrentPort' => 4100,
             'quota'        => 10,
             'quotaBurst'   => 12,
-        ];
-        $this->assertTrue($store->set('bob', $payload));
-        $reloaded = $store->get('bob');
-        $this->assertTrue(is_array($reloaded));
+        ]);
         $this->assertEquals(256, $reloaded['ramMiB']);
         $this->assertTrue(isset($reloaded['rtorrentRam']));
     }
@@ -138,94 +135,94 @@ class UserConfigStoreTest extends TestCase
 
     public function testDockerEnabledDefaultsTrue(): void
     {
-        $reloaded = $this->persistAndReload('docked', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('docked', [
             'ramMiB' => 512,
             'rtorrentPort' => 5002,
-        ]));
+        ]);
         $this->assertEquals(true, $reloaded['dockerEnabled']);
     }
 
     public function testLighttpdEnabledDefaultsTrue(): void
     {
-        $reloaded = $this->persistAndReload('lighton', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('lighton', [
             'ramMiB' => 512,
             'rtorrentPort' => 5012,
-        ]));
+        ]);
         $this->assertEquals(true, $reloaded['lighttpdEnabled']);
     }
 
     public function testDockerEnabledIgnoresProductMetadataWhenUnset(): void
     {
-        $reloaded = $this->persistAndReload('dockst', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('dockst', [
             'ramMiB' => 512,
             'rtorrentPort' => 5007,
             'productType' => 'storage-box',
-        ]));
+        ]);
         $this->assertEquals(true, $reloaded['dockerEnabled']);
     }
 
     public function testDockerEnabledExplicitValueStillWinsWhenProductMetadataExists(): void
     {
-        $reloaded = $this->persistAndReload('docksx', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('docksx', [
             'ramMiB' => 512,
             'rtorrentPort' => 5008,
             'product' => 'Storage Box 100',
             'dockerEnabled' => true,
-        ]));
+        ]);
         $this->assertEquals(true, $reloaded['dockerEnabled']);
     }
 
     public function testDockerEnabledNormalisesFalse(): void
     {
-        $reloaded = $this->persistAndReload('dockoff', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('dockoff', [
             'rtorrentPort' => 5003,
             'dockerEnabled' => 0,
-        ]));
+        ]);
         $this->assertEquals(false, $reloaded['dockerEnabled']);
     }
 
     public function testDockerEnabledNormalisesFalseString(): void
     {
-        $reloaded = $this->persistAndReload('dockstr', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('dockstr', [
             'rtorrentPort' => 5004,
             'dockerEnabled' => 'false',
-        ]));
+        ]);
         $this->assertEquals(false, $reloaded['dockerEnabled']);
     }
 
     public function testDockerEnabledNormalisesTrueString(): void
     {
-        $reloaded = $this->persistAndReload('dockon', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('dockon', [
             'ramMiB' => 512,
             'rtorrentPort' => 5005,
             'dockerEnabled' => 'true',
-        ]));
+        ]);
         $this->assertEquals(true, $reloaded['dockerEnabled']);
     }
 
     public function testLighttpdEnabledNormalisesFalseString(): void
     {
-        $reloaded = $this->persistAndReload('lightoff', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('lightoff', [
             'ramMiB' => 512,
             'rtorrentPort' => 5013,
             'lighttpdEnabled' => 'false',
-        ]));
+        ]);
         $this->assertEquals(false, $reloaded['lighttpdEnabled']);
     }
 
     public function testDockerEnabledForcedOffBelowRamFloor(): void
     {
-        $reloaded = $this->persistAndReload('docklow', $this->basePayload([
+        $reloaded = $this->reloadBasePayload('docklow', [
             'ramMiB' => 244,
             'rtorrentPort' => 5006,
             'dockerEnabled' => true,
-        ]));
+        ]);
         $this->assertEquals(false, $reloaded['dockerEnabled']);
     }
 
     public function testPmssUserDockerEnabledDefaultsTrueWhenMissing(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertEquals(true, \pmssUserDockerEnabled('alice', $store));
     }
 
@@ -273,13 +270,13 @@ class UserConfigStoreTest extends TestCase
 
     public function testPmssUserDockerEnabledRejectsInvalidUsername(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertEquals(false, \pmssUserDockerEnabled('../evil', $store));
     }
 
     public function testPmssUserLighttpdEnabledDefaultsTrueWhenMissing(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertEquals(true, \pmssUserLighttpdEnabled('alice', $store));
     }
 
@@ -299,13 +296,13 @@ class UserConfigStoreTest extends TestCase
 
     public function testPmssUserLighttpdEnabledRejectsInvalidUsername(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertEquals(false, \pmssUserLighttpdEnabled('../evil', $store));
     }
 
     public function testUsernameNormalizationStaysConsistentAcrossStoreOperations(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $payload = [
             'ramMiB' => 256,
             'rtorrentPort' => 5000,
@@ -322,20 +319,15 @@ class UserConfigStoreTest extends TestCase
 
     public function testInvalidUsernameRejected(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
-            'ramMiB'       => 128,
-            'rtorrentPort' => 5000,
-            'quota'        => 10,
-            'quotaBurst'   => 12,
-        ];
+        $store = $this->newStore();
+        $payload = $this->basePayload(['quota' => 10, 'quotaBurst' => 12]);
         $this->assertTrue($store->set('../evil', $payload) === false);
         $this->assertTrue($store->get('../evil') === null);
     }
 
     public function testInvalidPayloadRejected(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertTrue($store->set('dave', [
             'ramMiB'     => 128,
             'quota'      => 10,
@@ -348,7 +340,7 @@ class UserConfigStoreTest extends TestCase
         $usersDir = $this->configDirPath().'/users';
         @mkdir($usersDir, 0755, true);
         @file_put_contents($usersDir.'/alice.json', '{not-json');
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertTrue($store->get('alice') === null);
     }
 
@@ -364,19 +356,14 @@ class UserConfigStoreTest extends TestCase
             'quotaBurst' => 1,
         ]));
         @symlink($target, $usersDir.'/alice.json');
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertTrue($store->get('alice') === null, 'Symlinked user config must be ignored');
     }
 
     public function testRemoveDeletesFile(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
-            'ramMiB'       => 128,
-            'rtorrentPort' => 5000,
-            'quota'        => 10,
-            'quotaBurst'   => 12,
-        ];
+        $store = $this->newStore();
+        $payload = $this->basePayload(['quota' => 10, 'quotaBurst' => 12]);
         $this->assertTrue($store->set('erin', $payload));
         $userFile = $this->configDirPath().'/users/erin.json';
         $this->assertTrue(is_file($userFile));
@@ -386,13 +373,8 @@ class UserConfigStoreTest extends TestCase
 
     public function testLoadAllReturnsSortedByUsername(): void
     {
-        $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
-            'ramMiB'       => 128,
-            'rtorrentPort' => 5000,
-            'quota'        => 10,
-            'quotaBurst'   => 12,
-        ];
+        $store = $this->newStore();
+        $payload = $this->basePayload(['quota' => 10, 'quotaBurst' => 12]);
         $this->assertTrue($store->set('bob', $payload));
         $this->assertTrue($store->set('alice', $payload));
         $all = $store->loadAll();
@@ -413,7 +395,7 @@ class UserConfigStoreTest extends TestCase
             ],
         ]));
 
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $payload = $store->get('alice');
         $this->assertTrue(is_array($payload));
         $this->assertEquals(256, $payload['ramMiB']);
@@ -428,7 +410,7 @@ class UserConfigStoreTest extends TestCase
             json_encode(['users' => ['legacyx' => 'invalid']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
 
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertEquals(null, $store->get('legacyx'));
     }
 
@@ -451,7 +433,7 @@ class UserConfigStoreTest extends TestCase
             ],
         ]));
 
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertTrue($store->set('bob', [
             'ramMiB'       => 512,
             'rtorrentPort' => 5000,
@@ -484,7 +466,7 @@ class UserConfigStoreTest extends TestCase
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
 
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertTrue($store->set('bob', [
             'ramMiB' => 512,
             'rtorrentPort' => 5000,
@@ -518,7 +500,7 @@ class UserConfigStoreTest extends TestCase
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
 
-        $store = new \UserConfigStore($this->configDirPath());
+        $store = $this->newStore();
         $this->assertEquals(['bob'], array_keys($store->loadAll()));
     }
 }

@@ -17,9 +17,18 @@ location /user-##username/ {
 
 location /public-##username/ {
         proxy_pass http://127.0.0.1:##serverPort/;
-        # Keep nginx app-agnostic. Per-app response rewriting stays in the
-        # user's lighttpd custom.d fragments; nginx only restores the external
-        # public prefix for generic lighttpd redirects such as trailing slashes.
+        # lighttpd map-urlpath restores Location headers, but it does not
+        # rewrite Set-Cookie Path values for proxied responses. Keep login
+        # cookies scoped to the external /public-##username/<app> paths here.
+        proxy_cookie_path /sabnzbd /public-##username/sabnzbd;
+        proxy_cookie_path /lidarr /public-##username/lidarr;
+        proxy_cookie_path /radarr /public-##username/radarr;
+        proxy_cookie_path /prowlarr /public-##username/prowlarr;
+        proxy_cookie_path /readarr /public-##username/readarr;
+        proxy_cookie_path /sonarr /public-##username/sonarr;
+        proxy_cookie_path /jellyfin /public-##username/jellyfin;
+        # Keep redirect rewriting generic so nginx does not need per-app
+        # location rules for trailing-slash and similar lighttpd responses.
         proxy_redirect ~^(https?://[^/]+)?/(.+)$ /public-##username/$2;
         proxy_set_header Upgrade $http_upgrade;
 #        proxy_set_header Connection $connection_upgrade;

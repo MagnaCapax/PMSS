@@ -12,21 +12,21 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     public function testUpdateAptSourcesUnsupportedDistroLogsMessage(): void
     {
         $logs = [];
-        \updateAptSources('arch', 1, '', [], $this->pmssMakeArrayLogger($logs));
+        \pmssUpdateAptSources('arch', 1, '', [], $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'Unsupported distro: arch');
     }
 
     public function testUpdateAptSourcesUbuntuLogsMessage(): void
     {
         $logs = [];
-        \updateAptSources('ubuntu', 22, '', [], $this->pmssMakeArrayLogger($logs));
+        \pmssUpdateAptSources('ubuntu', 22, '', [], $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'Ubuntu is not supported yet');
     }
 
     public function testUpdateAptSourcesUnsupportedVersionLogs(): void
     {
         $logs = [];
-        \updateAptSources('debian', 19, '', $this->pmssDebianRepoTemplates(), $this->pmssMakeArrayLogger($logs));
+        \pmssUpdateAptSources('debian', 19, '', $this->pmssDebianRepoTemplates(), $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'Unsupported Debian version');
     }
 
@@ -34,7 +34,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     {
         $template = "deb http://mirror.example buster main\n";
         $this->pmssWithTempAptSources('initial', function (string $target) use ($template): void {
-            \updateAptSources('debian', 10, sha1('initial'), $this->pmssDebianRepoTemplates([
+            \pmssUpdateAptSources('debian', 10, sha1('initial'), $this->pmssDebianRepoTemplates([
                 'buster' => $template,
             ]), function (): void {});
             $this->assertEquals($template, file_get_contents($target));
@@ -46,10 +46,10 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         $this->pmssWithTempAptSources('alpha', function (string $target): void {
             $first = "deb http://mirror.example bullseye main\n";
             $second = "deb http://mirror.example bullseye contrib\n";
-            \updateAptSources('debian', 11, sha1('alpha'), $this->pmssDebianRepoTemplates([
+            \pmssUpdateAptSources('debian', 11, sha1('alpha'), $this->pmssDebianRepoTemplates([
                 'bullseye' => $first,
             ]), function (): void {});
-            \updateAptSources('debian', 11, sha1($first), $this->pmssDebianRepoTemplates([
+            \pmssUpdateAptSources('debian', 11, sha1($first), $this->pmssDebianRepoTemplates([
                 'bullseye' => $second,
             ]), function (): void {});
             $this->assertEquals($second, file_get_contents($target));
@@ -62,7 +62,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
         $template = "deb http://mirror.example bullseye main\n";
         $hash = sha1($template);
         $logs = [];
-        \updateAptSources('debian', 11, $hash, $this->pmssDebianRepoTemplates([
+        \pmssUpdateAptSources('debian', 11, $hash, $this->pmssDebianRepoTemplates([
             'bullseye' => $template,
         ]), $this->pmssMakeArrayLogger($logs));
         $this->pmssAssertMessagesContain($logs, 'already correct');
@@ -71,7 +71,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     public function testUpdateAptSourcesEmptyRepositoriesSkipsWrites(): void
     {
         $this->pmssWithTempAptSources('baseline', function (string $target): void {
-            \updateAptSources('debian', 11, sha1('baseline'), $this->pmssDebianRepoTemplates(), function (): void {});
+            \pmssUpdateAptSources('debian', 11, sha1('baseline'), $this->pmssDebianRepoTemplates(), function (): void {});
             $this->assertEquals('baseline', file_get_contents($target));
         });
     }
@@ -80,7 +80,7 @@ class UpdateHelpersRepoBehaviourTest extends TestCase
     {
         $template = "deb http://mirror.example trixie main\n";
         $logs = [];
-        \updateAptSources('debian', 13, '', $this->pmssDebianRepoTemplates([
+        \pmssUpdateAptSources('debian', 13, '', $this->pmssDebianRepoTemplates([
             'trixie' => $template,
         ]), $this->pmssMakeArrayLogger($logs));
         $this->assertTrue(count($logs) >= 1);

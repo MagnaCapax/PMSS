@@ -6,64 +6,75 @@ require_once dirname(__DIR__, 2).'/user/userConfigCli.php';
 
 class userConfigCliSpecificationTest extends TestCase
 {
-    public function testResourceSpecKeepsAddUserLegacyOrderingStable(): void
+    /** @param array<string,mixed> $expected */
+    private function assertSpecFieldValues(string $field, array $expected): void
     {
         $specs = \pmssUserConfigCliResourceSpecs();
+        foreach ($expected as $key => $value) {
+            $this->assertSame($value, $specs[$key][$field]);
+        }
+    }
 
-        $this->assertSame(5, $specs['trafficLimit']['addUserLegacyIndex']);
-        $this->assertSame(6, $specs['trafficCapMbit']['addUserLegacyIndex']);
-        $this->assertSame(8, $specs['CPUWeight']['addUserLegacyIndex']);
-        $this->assertSame(14, $specs['cpuQuotaPercent']['addUserLegacyIndex']);
-        $this->assertSame(15, $specs['ioLatencyMs']['addUserLegacyIndex']);
-        $this->assertSame(16, $specs['ioCostQos']['addUserLegacyIndex']);
-        $this->assertSame(17, $specs['ioCostModel']['addUserLegacyIndex']);
+    public function testResourceSpecKeepsAddUserLegacyOrderingStable(): void
+    {
+        $this->assertSpecFieldValues('addUserLegacyIndex', [
+            'trafficLimit' => 5,
+            'trafficCapMbit' => 6,
+            'CPUWeight' => 8,
+            'cpuQuotaPercent' => 14,
+            'ioLatencyMs' => 15,
+            'ioCostQos' => 16,
+            'ioCostModel' => 17,
+        ]);
     }
 
     public function testResourceSpecKeepsUserConfigPositionalOrderingStable(): void
     {
-        $specs = \pmssUserConfigCliResourceSpecs();
-
-        $this->assertSame(4, $specs['trafficLimit']['userConfigIndex']);
-        $this->assertSame(5, $specs['CPUWeight']['userConfigIndex']);
-        $this->assertSame(10, $specs['IOWriteIOPS']['userConfigIndex']);
-        $this->assertSame(12, $specs['trafficCapMbit']['userConfigIndex']);
-        $this->assertSame(13, $specs['ioLatencyMs']['userConfigIndex']);
-        $this->assertSame(14, $specs['ioCostQos']['userConfigIndex']);
-        $this->assertSame(15, $specs['ioCostModel']['userConfigIndex']);
+        $this->assertSpecFieldValues('userConfigIndex', [
+            'trafficLimit' => 4,
+            'CPUWeight' => 5,
+            'IOWriteIOPS' => 10,
+            'trafficCapMbit' => 12,
+            'ioLatencyMs' => 13,
+            'ioCostQos' => 14,
+            'ioCostModel' => 15,
+        ]);
     }
 
     public function testResourceSpecRetainsHumanUsageStrings(): void
     {
-        $specs = \pmssUserConfigCliResourceSpecs();
-
-        $this->assertSame('--traffic-limit-gb=GIB', $specs['trafficLimit']['usage']);
-        $this->assertSame('--io-read-bw=/dev/DEVICE:RATE', $specs['IOReadBW']['usage']);
-        $this->assertSame('--cpu-quota-percent=PERCENT|infinity', $specs['cpuQuotaPercent']['usage']);
-        $this->assertSame('--io-latency-ms=MS', $specs['ioLatencyMs']['usage']);
-        $this->assertSame('--io-cost-qos=SETTING', $specs['ioCostQos']['usage']);
-        $this->assertSame('--io-cost-model=SETTING', $specs['ioCostModel']['usage']);
+        $this->assertSpecFieldValues('usage', [
+            'trafficLimit' => '--traffic-limit-gb=GIB',
+            'IOReadBW' => '--io-read-bw=/dev/DEVICE:RATE',
+            'cpuQuotaPercent' => '--cpu-quota-percent=PERCENT|infinity',
+            'ioLatencyMs' => '--io-latency-ms=MS',
+            'ioCostQos' => '--io-cost-qos=SETTING',
+            'ioCostModel' => '--io-cost-model=SETTING',
+        ]);
     }
 
     public function testResourceSpecFlagsPersistOnlyStoredFields(): void
     {
-        $specs = \pmssUserConfigCliResourceSpecs();
-
-        $this->assertFalse($specs['trafficLimit']['persist']);
-        $this->assertTrue($specs['trafficCapMbit']['persist']);
-        $this->assertTrue($specs['CPUWeight']['persist']);
-        $this->assertTrue($specs['ioCostQos']['persist']);
-        $this->assertTrue($specs['ioCostModel']['persist']);
+        $this->assertSpecFieldValues('persist', [
+            'trafficLimit' => false,
+            'trafficCapMbit' => true,
+            'CPUWeight' => true,
+            'ioCostQos' => true,
+            'ioCostModel' => true,
+        ]);
     }
 
     public function testResourceSpecRetainsCgroupFlagMappings(): void
     {
         $specs = \pmssUserConfigCliResourceSpecs();
 
-        $this->assertSame('--cpu-weight=', $specs['CPUWeight']['cgroupFlag']);
-        $this->assertSame('--io-write-bw=', $specs['IOWriteBW']['cgroupFlag']);
-        $this->assertSame('--io-latency-ms=', $specs['ioLatencyMs']['cgroupFlag']);
-        $this->assertSame('--io-cost-qos=', $specs['ioCostQos']['cgroupFlag']);
-        $this->assertSame('--io-cost-model=', $specs['ioCostModel']['cgroupFlag']);
+        $this->assertSpecFieldValues('cgroupFlag', [
+            'CPUWeight' => '--cpu-weight=',
+            'IOWriteBW' => '--io-write-bw=',
+            'ioLatencyMs' => '--io-latency-ms=',
+            'ioCostQos' => '--io-cost-qos=',
+            'ioCostModel' => '--io-cost-model=',
+        ]);
         $this->assertFalse(isset($specs['trafficLimit']['cgroupFlag']));
         $this->assertFalse(isset($specs['cpuQuotaPercent']['cgroupFlag']));
     }

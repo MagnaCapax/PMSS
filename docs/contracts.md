@@ -212,12 +212,13 @@ Logs: `/var/log/pmss/update.php.log` (stdout mirror) and JSON `/var/log/pmss-upd
 - pmssUpdateAllUsers(string $rutorrentIndexSha): array
   - Enumerates users from `users::listHomeUsers()`, runs per-user maintenance, and returns summary keys: `total`, `processed`, `skipped`.
   - Emits end-of-loop summary log line `Processed N of M users` and JSON event `user_maintenance_summary`.
+  - Calls `pmssUpdateUserEnvironment()` first, then applies linger/rootless-Docker wiring and optional post-refresh checks for each valid user.
   - Catches per-user throwables (including permission-step timeouts), logs warning, skips that user, and continues remaining users.
 
 - pmssUpdateUserEnvironment(string $user, string $rutorrentIndexSha=''): void
   - Builds context (`pmssBuildUserContext`), returns early when invalid.
   - Runs handlers in order: HTTP, skeleton, ruTorrent themes, ruTorrent refresh,
-    plugin maintenance, permissions, then linger/systemd/rootless Docker wiring.
+    plugin maintenance, then permissions.
     Each handler consumes `['user','home','user_esc','rutorrent_index_sha']`.
 - pmssEnsureLingerAndDocker(string $user): void
   - Enables linger + rootless Docker wiring for the user.
@@ -345,7 +346,6 @@ System/app groups:
 - getDistroName(): string, getDistroVersion(): string, getDistroCodename(): string → wrappers around `getOsReleaseData()`.
 - pmssResetOsReleaseCache(): void → clears cached os-release data for current path.
 - getPmssVersion(string $versionFile='/etc/seedbox/config/version'): string → trimmed file contents or `'unknown'`.
-- generateMotd(): void → renders `/etc/seedbox/config/template.motd` tokens (hostname, IP, CPU/RAM/storage, PMSS version, apt last update, uptime, kernel, net speed, WireGuard/OpenVPN status) to `/etc/motd`.
 
 ---
 

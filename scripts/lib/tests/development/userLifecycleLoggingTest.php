@@ -67,8 +67,8 @@ class userLifecycleLoggingTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
 
         $this->assertStringContainsString('function pmssUserLifecycleContextLogStatusMessage(', $source);
-        $this->assertStringContainsString("'status' => $status", $source);
-        $this->assertStringContainsString("'message' => $message", $source);
+        $this->assertStringContainsString('\'status\' => $status', $source);
+        $this->assertStringContainsString('\'message\' => $message', $source);
         $this->assertStringContainsString('pmssUserLifecycleContextLog(', $source);
     }
 

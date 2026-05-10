@@ -33,9 +33,7 @@ function pmssUserRefreshPermissions(array $ctx): void
     }
 
     if ($rc === 124) {
-        if (function_exists('pmssUserLog')) {
-            pmssUserLog($user, sprintf('[WARN] userPermissions timed out after %ds', $timeoutSeconds));
-        }
+        pmssUserLog($user, sprintf('[WARN] userPermissions timed out after %ds', $timeoutSeconds));
         throw new \RuntimeException(sprintf('userPermissions timeout after %ds', $timeoutSeconds));
     }
 

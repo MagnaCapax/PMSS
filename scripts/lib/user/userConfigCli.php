@@ -58,37 +58,48 @@ function pmssUserConfigCliHasExplicitOptionValue(array $parsed, string $option):
     return $value !== null && $value !== true && $value !== '';
 }
 
-/** @return array<string,mixed> Parse resource values with named options overriding positional slots. */
-function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $optionKey, string $indexKey): array
+/** Cast a shared resource value according to its specification. */
+function pmssUserConfigCliTypedResourceValue(array $spec, $value)
+{
+    return ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
+}
+
+/** @return array<string,mixed> Build a resource map from the shared spec list. */
+function pmssUserConfigCliBuildResourceMap(callable $resolver, bool $skipNull = false): array
 {
     $values = [];
     foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $legacyIndex = isset($spec[$indexKey]) ? (int) $spec[$indexKey] : -1;
-        $value = pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $legacyIndex, $spec['default']);
-        $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
+        $value = $resolver($key, $spec);
+        if ($skipNull && $value === null) {
+            continue;
+        }
+        $values[$key] = pmssUserConfigCliTypedResourceValue($spec, $value);
     }
+
     return $values;
+}
+
+/** @return array<string,mixed> Parse resource values with named options overriding positional slots. */
+function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $optionKey, string $indexKey): array
+{
+    return pmssUserConfigCliBuildResourceMap(static function (string $key, array $spec) use ($parsed, $args, $optionKey, $indexKey) {
+        $legacyIndex = isset($spec[$indexKey]) ? (int) $spec[$indexKey] : -1;
+        return pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $legacyIndex, $spec['default']);
+    });
 }
 
 /** @return array<string,mixed> Parse only explicitly provided resource values. */
 function pmssUserConfigCliExplicitResources(array $parsed, array $args, string $optionKey, string $indexKey): array
 {
-    $values = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
+    return pmssUserConfigCliBuildResourceMap(static function (string $key, array $spec) use ($parsed, $args, $optionKey, $indexKey) {
         $value = null;
         if (pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])) {
             $value = $parsed['options'][$spec[$optionKey]];
         } elseif (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '') {
             $value = $args[$spec[$indexKey]];
         }
-
-        if ($value === null) {
-            continue;
-        }
-
-        $values[$key] = ($spec['parse'] === 'int') ? (int) $value : $value;
-    }
-    return $values;
+        return $value;
+    }, true);
 }
 
 /** Parse the optional Docker toggle while keeping legacy CLI semantics. */
@@ -129,12 +140,9 @@ function pmssUserConfigCliParseUploadThrottleOption($rawOption, string $negative
 /** @param array<int,mixed> $args @return array<string,mixed> Parse positional resources. */
 function pmssUserConfigCliPositionalResources(array $args, string $indexKey): array
 {
-    $values = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $value = (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args)) ? $args[$spec[$indexKey]] : $spec['default'];
-        $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
-    }
-    return $values;
+    return pmssUserConfigCliBuildResourceMap(static function (string $key, array $spec) use ($args, $indexKey) {
+        return (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args)) ? $args[$spec[$indexKey]] : $spec['default'];
+    });
 }
 
 /** @param array<int,mixed> $args @return array<string,bool> Track explicit persisted resources. */
@@ -240,68 +248,55 @@ function pmssUserConfigCliResourceHelpSpecs(): array
     return [
         'trafficLimit' => [
             'parameter' => 'TRAFFIC_LIMIT_GB',
-            'parameterDescription' => 'Monthly traffic quota in GiB.',
-            'optionDescription' => 'Monthly traffic quota in GiB.',
+            'description' => 'Monthly traffic quota in GiB.',
         ],
         'iopsLimit' => [
             'parameter' => 'IOPS_LIMIT',
-            'parameterDescription' => 'Monthly combined read+write I/O operations budget.',
-            'optionDescription' => 'Monthly combined read+write I/O operations budget.',
+            'description' => 'Monthly combined read+write I/O operations budget.',
         ],
         'trafficCapMbit' => [
             'parameter' => 'TRAFFIC_CAP_MBIT',
-            'parameterDescription' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.',
-            'optionDescription' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.',
+            'description' => 'Traffic shaper ceiling in Mbit/s; 0 disables shaping.',
         ],
         'CPUWeight' => [
             'parameter' => 'CPUWEIGHT',
-            'parameterDescription' => 'systemd CPUWeight; systemd expects 1-10000.',
-            'optionDescription' => 'systemd CPUWeight; systemd expects 1-10000.',
+            'description' => 'systemd CPUWeight; systemd expects 1-10000.',
         ],
         'IOWeight' => [
             'parameter' => 'IOWEIGHT',
-            'parameterDescription' => 'systemd IOWeight; systemd expects 1-10000.',
-            'optionDescription' => 'systemd IOWeight; systemd expects 1-10000.',
+            'description' => 'systemd IOWeight; systemd expects 1-10000.',
         ],
         'IOReadBW' => [
             'parameter' => 'IO_READ_BW',
-            'parameterDescription' => 'Read bandwidth cap in /dev/DEVICE:RATE form.',
-            'optionDescription' => 'Read bandwidth cap in /dev/DEVICE:RATE form.',
+            'description' => 'Read bandwidth cap in /dev/DEVICE:RATE form.',
         ],
         'IOWriteBW' => [
             'parameter' => 'IO_WRITE_BW',
-            'parameterDescription' => 'Write bandwidth cap in /dev/DEVICE:RATE form.',
-            'optionDescription' => 'Write bandwidth cap in /dev/DEVICE:RATE form.',
+            'description' => 'Write bandwidth cap in /dev/DEVICE:RATE form.',
         ],
         'IOReadIOPS' => [
             'parameter' => 'IO_READ_IOPS',
-            'parameterDescription' => 'Read IOPS cap in /dev/DEVICE:IOPS form.',
-            'optionDescription' => 'Read IOPS cap in /dev/DEVICE:IOPS form.',
+            'description' => 'Read IOPS cap in /dev/DEVICE:IOPS form.',
         ],
         'IOWriteIOPS' => [
             'parameter' => 'IO_WRITE_IOPS',
-            'parameterDescription' => 'Write IOPS cap in /dev/DEVICE:IOPS form.',
-            'optionDescription' => 'Write IOPS cap in /dev/DEVICE:IOPS form.',
+            'description' => 'Write IOPS cap in /dev/DEVICE:IOPS form.',
         ],
         'cpuQuotaPercent' => [
             'parameter' => 'CPU_QUOTA_PERCENT',
-            'parameterDescription' => 'CPU quota percent; use infinity to remove the limit.',
-            'optionDescription' => 'CPU quota percent; use infinity to remove the limit.',
+            'description' => 'CPU quota percent; use infinity to remove the limit.',
         ],
         'ioLatencyMs' => [
             'parameter' => 'IO_LATENCY_MS',
-            'parameterDescription' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
-            'optionDescription' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
+            'description' => 'IODeviceLatencyTargetSec target in milliseconds; defaults to the /home backing device.',
         ],
         'ioCostQos' => [
             'parameter' => 'IO_COST_QOS',
-            'parameterDescription' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.',
-            'optionDescription' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.',
+            'description' => 'io.cost.qos nested keys; defaults to the /home backing device major:minor.',
         ],
         'ioCostModel' => [
             'parameter' => 'IO_COST_MODEL',
-            'parameterDescription' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.',
-            'optionDescription' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.',
+            'description' => 'io.cost.model nested keys; defaults to the /home backing device major:minor.',
         ],
     ];
 }
@@ -314,6 +309,11 @@ function pmssUserConfigCliUsage(): string
     $resourceSpecs = pmssUserConfigCliResourceSpecs();
     $derivedDefault = pmssCliHelpDim(' (default: auto-derived from RAM when omitted)', $useColor);
     $unchangedDefault = pmssCliHelpDim(' (default: leave current slice policy unchanged)', $useColor);
+    $resourceDescriptionSuffixes = [
+        'CPUWeight' => $derivedDefault,
+        'IOWeight' => $derivedDefault,
+        'cpuQuotaPercent' => $unchangedDefault,
+    ];
     $lines = [
         pmssCliHelpHeading('Usage', $useColor),
         '  ./userConfig.php USERNAME RAM_MiB DISK_QUOTA_GiB [TRAFFIC_LIMIT_GB] [CPUWEIGHT] [IOWEIGHT] [IO_READ_BW] [IO_WRITE_BW] [IO_READ_IOPS] [IO_WRITE_IOPS] [CPU_QUOTA_PERCENT] [TRAFFIC_CAP_MBIT] [IO_LATENCY_MS] [IO_COST_QOS] [IO_COST_MODEL]',
@@ -324,50 +324,33 @@ function pmssUserConfigCliUsage(): string
         pmssCliHelpLine('USERNAME', 'Existing PMSS username; lowercase [a-z][a-z0-9]{2,7}.'),
         pmssCliHelpLine('RAM_MiB', 'Account RAM target in MiB; forwarded as MemoryHigh with a 250 MiB floor.'),
         pmssCliHelpLine('DISK_QUOTA_GiB', 'Disk quota in GiB.'),
-        pmssCliHelpLine($resourceHelp['trafficLimit']['parameter'], $resourceHelp['trafficLimit']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['CPUWeight']['parameter'], $resourceHelp['CPUWeight']['parameterDescription'].$derivedDefault),
-        pmssCliHelpLine($resourceHelp['IOWeight']['parameter'], $resourceHelp['IOWeight']['parameterDescription'].$derivedDefault),
-        pmssCliHelpLine($resourceHelp['IOReadBW']['parameter'], $resourceHelp['IOReadBW']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['IOWriteBW']['parameter'], $resourceHelp['IOWriteBW']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['IOReadIOPS']['parameter'], $resourceHelp['IOReadIOPS']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['IOWriteIOPS']['parameter'], $resourceHelp['IOWriteIOPS']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['cpuQuotaPercent']['parameter'], $resourceHelp['cpuQuotaPercent']['parameterDescription'].$unchangedDefault),
-        pmssCliHelpLine($resourceHelp['trafficCapMbit']['parameter'], $resourceHelp['trafficCapMbit']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['ioLatencyMs']['parameter'], $resourceHelp['ioLatencyMs']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['ioCostQos']['parameter'], $resourceHelp['ioCostQos']['parameterDescription']),
-        pmssCliHelpLine($resourceHelp['ioCostModel']['parameter'], $resourceHelp['ioCostModel']['parameterDescription']),
-        '',
-        pmssCliHelpHeading('Named Options', $useColor),
-        pmssCliHelpLine($resourceSpecs['trafficLimit']['usage'], $resourceHelp['trafficLimit']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['iopsLimit']['usage'], $resourceHelp['iopsLimit']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['CPUWeight']['usage'], $resourceHelp['CPUWeight']['optionDescription'].$derivedDefault),
-        pmssCliHelpLine($resourceSpecs['IOWeight']['usage'], $resourceHelp['IOWeight']['optionDescription'].$derivedDefault),
-        pmssCliHelpLine($resourceSpecs['IOReadBW']['usage'], $resourceHelp['IOReadBW']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['IOWriteBW']['usage'], $resourceHelp['IOWriteBW']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['IOReadIOPS']['usage'], $resourceHelp['IOReadIOPS']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['IOWriteIOPS']['usage'], $resourceHelp['IOWriteIOPS']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['cpuQuotaPercent']['usage'], $resourceHelp['cpuQuotaPercent']['optionDescription'].$unchangedDefault),
-        pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['ioLatencyMs']['usage'], $resourceHelp['ioLatencyMs']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['ioCostQos']['usage'], $resourceHelp['ioCostQos']['optionDescription']),
-        pmssCliHelpLine($resourceSpecs['ioCostModel']['usage'], $resourceHelp['ioCostModel']['optionDescription']),
-        pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
-        pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.'),
-        pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.'),
-        pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
-        '',
-        pmssCliHelpHeading('Examples', $useColor),
-        '  /scripts/util/userConfig.php alice 1024 200',
-        '  /scripts/util/userConfig.php alice --io-weight=300',
-        '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true',
-        '  /scripts/util/userConfig.php alice --welcome-message=<p>Planned maintenance tonight.</p>',
-        '',
-        pmssCliHelpHeading('Notes', $useColor),
-        '  - Named resource options override legacy positional values, and USERNAME with named options reuses the stored RAM/quota baseline.',
-        '  - RAM_MiB is applied through userConfigCgroup.php as MemoryHigh; PMSS clamps the effective floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.',
-        '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.',
-        '  - For targeted slice-only edits, use /scripts/util/userConfigCgroup.php directly.',
     ];
+
+    foreach (['trafficLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
+        $lines[] = pmssCliHelpLine($resourceHelp[$key]['parameter'], $resourceHelp[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
+    }
+
+    $lines[] = '';
+    $lines[] = pmssCliHelpHeading('Named Options', $useColor);
+    foreach (['trafficLimit', 'iopsLimit', 'CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'trafficCapMbit', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
+        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['usage'], $resourceHelp[$key]['description'].($resourceDescriptionSuffixes[$key] ?? ''));
+    }
+    $lines[] = pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.');
+    $lines[] = pmssCliHelpLine('--welcome-message=HTML', 'Set or clear ~/.config/welcome-message.html.');
+    $lines[] = pmssCliHelpLine('--docker-enabled=true|false', 'Persist the rootless Docker policy for this user.');
+    $lines[] = pmssCliHelpLine('-h, --help', 'Show this help and exit.');
+    $lines[] = '';
+    $lines[] = pmssCliHelpHeading('Examples', $useColor);
+    $lines[] = '  /scripts/util/userConfig.php alice 1024 200';
+    $lines[] = '  /scripts/util/userConfig.php alice --io-weight=300';
+    $lines[] = '  /scripts/util/userConfig.php alice 2048 500 750 300 300 /dev/sda:20M /dev/sda:20M /dev/sda:500 /dev/sda:500 125 150 50 "enable=1 ctrl=user rpct=95.00 rlat=75000 wpct=95.00 wlat=150000 min=50.00 max=150.00" "ctrl=user model=linear rbps=834913556 rseqiops=93622 rrandiops=102913 wbps=618985353 wseqiops=72325 wrandiops=71025" --upload-throttle-kib=2048 --docker-enabled=true';
+    $lines[] = '  /scripts/util/userConfig.php alice --welcome-message=<p>Planned maintenance tonight.</p>';
+    $lines[] = '';
+    $lines[] = pmssCliHelpHeading('Notes', $useColor);
+    $lines[] = '  - Named resource options override legacy positional values, and USERNAME with named options reuses the stored RAM/quota baseline.';
+    $lines[] = '  - RAM_MiB is applied through userConfigCgroup.php as MemoryHigh; PMSS clamps the effective floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.';
+    $lines[] = '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.';
+    $lines[] = '  - For targeted slice-only edits, use /scripts/util/userConfigCgroup.php directly.';
 
     return implode("\n", $lines);
 }

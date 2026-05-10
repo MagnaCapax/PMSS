@@ -369,6 +369,7 @@ abstract class TestCase
         }
 
         $this->fail($message !== '' ? $message : 'Expected JSON array fixture: '.$path);
+        return [];
     }
 
     /** Create a tracked JSON-lines fixture path under a fresh temporary directory. */

@@ -3,7 +3,7 @@
 /**
  * Generate MOTD using repository helper.
  *
- * Small standalone utility that invokes generateMotd() so operators and cron
+ * Small standalone utility that invokes `Motd::motdGenerate()` so operators and cron
  * can refresh /etc/motd without running the full updater. Follows the GNU
  * philosophy of small focused tools.
  *
