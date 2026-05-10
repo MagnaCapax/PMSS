@@ -513,6 +513,7 @@ pmssRunProfiledCallable('Configuring quota mounts', 'pmssConfigureQuotaMount', [
 runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
 pmssRunProfiledCallable('Applying boot defaults', 'pmssEnsureBootDefaults', ['logmsg']);
 pmssRunProfiledCallable('Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']);
+pmssRunProfiledCallable('Applying Copy Fail algif_aead blacklist', 'pmssEnsureAlgifAeadBlacklist', ['logmsg']);
 pmssRunProfiledCallable('Applying Dirty Frag kernel blacklist', 'pmssEnsureDirtyFragBlacklist', ['logmsg']);
 pmssRunProfiledCallable('Applying boot-time tuning', 'pmssEnsureBootTuning', ['logmsg']);
 pmssRunProfiledCallable('Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']);
