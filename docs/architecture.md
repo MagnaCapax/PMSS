@@ -27,6 +27,7 @@ Keep the canonical installer/update details under `docs/install.md` and
 
 ## Key Modules
 - **scripts/lib/update/environment.php** – dpkg/apt guards plus helper to apply release-specific package selections.
+- **scripts/lib/update/kernelHardening.php** – module blacklist hardening that writes PMSS-owned `modprobe.d` entries and attempts runtime eviction so already-loaded modules do not silently persist.
 - **scripts/lib/update/repositories.php** – Applies `/etc/seedbox/config/template.sources.<suite>` when version is known; otherwise logs and leaves sources untouched. Finishes with `apt update` via `runStep()`.
 - **scripts/lib/update/systemPrep.php** – Cgroups, systemd slices, base permissions, locale setup.
 - **scripts/lib/update/services/** – Runtime templates (rc.local, systemd, sshd), legacy service disablement, mediainfo installer, security tweaks.

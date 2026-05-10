@@ -41,6 +41,7 @@ require_once __DIR__.'/../lib/update/runtime/stepPolicy.php';
 require_once __DIR__.'/../lib/update/runtime/processes.php';
 require_once __DIR__.'/../lib/update/environment.php';
 require_once __DIR__.'/../lib/update/distro.php';
+require_once __DIR__.'/../lib/update/kernelHardening.php';
 require_once __DIR__.'/../lib/update/repositories.php';
 require_once __DIR__.'/../lib/update/systemPrep.php';
 require_once __DIR__.'/../lib/update/services/systemd.php';
@@ -512,6 +513,7 @@ pmssRunProfiledCallable('Configuring quota mounts', 'pmssConfigureQuotaMount', [
 runStep('Recalculating quota integrity', 'php /scripts/util/quotaFix.php');
 pmssRunProfiledCallable('Applying boot defaults', 'pmssEnsureBootDefaults', ['logmsg']);
 pmssRunProfiledCallable('Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']);
+pmssRunProfiledCallable('Applying Dirty Frag kernel blacklist', 'pmssEnsureDirtyFragBlacklist', ['logmsg']);
 pmssRunProfiledCallable('Applying boot-time tuning', 'pmssEnsureBootTuning', ['logmsg']);
 pmssRunProfiledCallable('Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']);
 runStep('Restricting world access to /home', 'chmod o-rw /home');
