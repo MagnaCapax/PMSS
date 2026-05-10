@@ -55,7 +55,7 @@ require_once __DIR__.'/../lib/motd/Generator.php';
 requireRoot();
 
 if (!defined('PMSS_UPDATE_LOCK_FILE')) {
-    define('PMSS_UPDATE_LOCK_FILE', '/var/run/pmss/update.lock');
+    define('PMSS_UPDATE_LOCK_FILE', '/var/lib/pmss/update.lock');
 }
 if (!defined('PMSS_UPDATE_LOCK_ENV')) {
     define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');

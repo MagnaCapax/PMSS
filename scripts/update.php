@@ -51,7 +51,7 @@ const JSON_LOG              = '/var/log/pmss-update.jsonl';
 const SELF_UPDATE_SKIP_FLAG = '--skip-self-update';
 const SCRIPTS_ONLY_FLAG     = '--scripts-only';
 const PMSS_CORRELATION_ENV  = 'PMSS_CORRELATION_ID';
-define('PMSS_UPDATE_LOCK_FILE', '/var/run/pmss/update.lock');
+define('PMSS_UPDATE_LOCK_FILE', '/var/lib/pmss/update.lock');
 define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');
 
 $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;

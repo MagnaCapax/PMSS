@@ -84,7 +84,7 @@ Signature: refer to file for full source; highlights below.
   - Orchestrator: ensure root → parse/normalize/parse spec → workdir fetch → stage →
     record version → cleanup → self-update handoff → dist-upgrade (optional) →
     run phase 2 or scripts-only path → log completion with duration.
-- Update lock: uses `PMSS_UPDATE_LOCK_FILE=/var/run/pmss/update.lock` with an
+- Update lock: uses `PMSS_UPDATE_LOCK_FILE=/var/lib/pmss/update.lock` with an
   exclusive flock; sets `PMSS_UPDATE_LOCK_ENV=1` when held so child re-exec
   skips re-acquiring. Emits JSON events `update_lock_wait`, `update_lock_acquired`,
   and `update_lock_released`. Events include `pmss_correlation_id` once initialized.

@@ -5,6 +5,18 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateBootstrapLockReleaseTest extends TestCase
 {
+    public function testBootstrapAndPhase2ShareTheStateDirectoryLockPath(): void
+    {
+        $bootstrapSource = (string) file_get_contents(__DIR__.'/../../../update.php');
+        $step2Source = (string) file_get_contents(__DIR__.'/../../../util/update-step2.php');
+        $expected = "define('PMSS_UPDATE_LOCK_FILE', '/var/lib/pmss/update.lock');";
+
+        $this->assertStringContainsString($expected, $bootstrapSource, 'update.php should move the global lock outside /var/run');
+        $this->assertStringContainsString($expected, $step2Source, 'update-step2.php should share the migrated lock path');
+        $this->assertStringNotContainsString('/var/run/pmss/update.lock', $bootstrapSource, 'update.php should not keep the legacy /var/run lock path');
+        $this->assertStringNotContainsString('/var/run/pmss/update.lock', $step2Source, 'update-step2.php should not keep the legacy /var/run lock path');
+    }
+
     public function testReleaseUpdateLockDoesNotDependOnRuntimeHelper(): void
     {
         $result = $this->runBootstrapInline(
