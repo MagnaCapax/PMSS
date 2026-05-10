@@ -181,9 +181,9 @@ is_codex_exec=0
 [[ "$exec_cmd" =~ ^codex[[:space:]]+exec([[:space:]]|$) ]] && is_codex_exec=1
 if [[ "$exec_bin" == "codex" && "${PMSS_CODEX_NO_SANDBOX:-0}" != "1" ]]; then
 	if [[ "$exec_cmd" == "codex" ]]; then
-		exec_cmd="codex --sandbox workspace-write --ask-for-approval untrusted"
+		exec_cmd="codex --sandbox workspace-write --add-dir .git --ask-for-approval untrusted"
 	elif [[ "$is_codex_exec" == "1" && "$exec_cmd" == "codex exec" ]]; then
-		exec_cmd="codex exec --sandbox workspace-write"
+		exec_cmd="codex exec --sandbox workspace-write --add-dir .git"
 	else
 		[[ "$exec_cmd" == *"--sandbox"* ]] || exec_cmd+=" --sandbox workspace-write"
 		if [[ "$is_codex_exec" == "0" ]]; then
@@ -278,8 +278,9 @@ COMMIT MESSAGE RULE (PUBLIC REPO — BINDING):
   Use generic descriptions: "user account", "target server", "the affected host".
   The push wrapper scans commit messages and BLOCKS push if violations found.
 
-PUSH after each commit (best-effort — sandbox may block network):
+PUSH after each commit (best-effort — sandbox may still block network):
   git push origin HEAD
+  Sandbox defaults can also block writes under .git in workspace-write mode; codex-run adds --add-dir .git to allow autocommit.
   If push fails (sandbox/network): continue. Wrapper pushes after session.
   If rejected (remote ahead): git pull --rebase origin main → re-verify → push.
   NEVER force push.
