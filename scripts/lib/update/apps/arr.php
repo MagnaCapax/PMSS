@@ -139,6 +139,58 @@ function pmssArrArchiveNameIsSafe(string $assetName): bool
         && strpos($assetName, '\\') === false;
 }
 
+/** Extract a semantic version from ARR metadata or CLI output. */
+function pmssArrVersionExtract(string $payload): ?string
+{
+    return preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $payload, $match) === 1
+        ? $match[1]
+        : null;
+}
+
+/** Build a bounded ARR version probe so daemonizing binaries cannot wedge updates. */
+function pmssArrVersionProbeCommand(string $binary, string $flag): string
+{
+    return 'timeout 10 '.escapeshellarg($binary).' '.escapeshellarg($flag).' 2>/dev/null';
+}
+
+/** Prefer cheap version files, then bounded binary probes, to detect installed ARR versions. */
+function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
+{
+    foreach ([$installPath.'/version.txt', $installPath.'/VERSION'] as $file) {
+        if (!is_file($file)) {
+            continue;
+        }
+
+        $versionPayload = @file_get_contents($file);
+        if (is_string($versionPayload) && $versionPayload !== '') {
+            $version = pmssArrVersionExtract($versionPayload);
+            if ($version !== null) {
+                return $version;
+            }
+        }
+    }
+
+    foreach ([$installPath.'/'.$app, $installPath.'/'.strtolower($app), $installPath.'/'.$app.'.exe'] as $binary) {
+        if (!is_executable($binary)) {
+            continue;
+        }
+
+        foreach (['--version', '-v'] as $flag) {
+            $output = @shell_exec(pmssArrVersionProbeCommand($binary, $flag));
+            if (!is_string($output) || $output === '') {
+                continue;
+            }
+
+            $version = pmssArrVersionExtract($output);
+            if ($version !== null) {
+                return $version;
+            }
+        }
+    }
+
+    return null;
+}
+
 function pmssArrUpdate(array $config): void
 {
     $app = isset($config['app']) && is_string($config['app']) && $config['app'] !== ''
@@ -213,37 +265,7 @@ function pmssArrUpdate(array $config): void
 
     $installPath = $config['install_path'];
 
-    $currentVersion = null;
-    foreach ([$installPath.'/version.txt', $installPath.'/VERSION'] as $file) {
-        if (!is_file($file)) {
-            continue;
-        }
-        $versionPayload = @file_get_contents($file);
-        if (is_string($versionPayload)
-            && $versionPayload !== ''
-            && preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $versionPayload, $match)
-        ) {
-            $currentVersion = $match[1];
-            break;
-        }
-    }
-    if ($currentVersion === null) {
-        foreach ([$installPath.'/'.$app, $installPath.'/'.strtolower($app), $installPath.'/'.$app.'.exe'] as $binary) {
-            if (!is_executable($binary)) {
-                continue;
-            }
-            foreach ([escapeshellarg($binary).' --version 2>/dev/null', escapeshellarg($binary).' -v 2>/dev/null'] as $command) {
-                $output = @shell_exec($command);
-                if (is_string($output)
-                    && $output !== ''
-                    && preg_match('/(\d+\.\d+\.\d+(?:\.\d+)?)/', $output, $match)
-                ) {
-                    $currentVersion = $match[1];
-                    break 2;
-                }
-            }
-        }
-    }
+    $currentVersion = pmssArrInstalledVersionRead($installPath, $app);
     if ($currentVersion === $latestVersion && is_dir($installPath)) {
         $log("Already at {$latestVersion}, skipping update");
         return;

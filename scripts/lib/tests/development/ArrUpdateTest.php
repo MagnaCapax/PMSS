@@ -207,6 +207,89 @@ class ArrUpdateTest extends TestCase
         }
     }
 
+    public function testUpdateUsesTimeoutWrappedBinaryProbeBeforeSkippingMatchingInstall(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-timeout-probe-');
+        $app = 'PmssArrProbe'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/install';
+        $extractDir = 'PackageDir';
+        $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
+        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $shimDir = $this->writeCurlShim($baseDir);
+        $timeoutLog = $baseDir.'/timeout.log';
+
+        @mkdir($installPath, 0755, true);
+        @file_put_contents($installPath.'/marker.txt', 'existing');
+        $this->writeVersionBinary($installPath.'/'.$app, '1.2.3');
+        $this->writeTimeoutShim($shimDir);
+
+        try {
+            $this->pmssWithEnv([
+                'PATH' => $shimDir.':'.(string) getenv('PATH'),
+                'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
+                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                \pmssArrUpdate([
+                    'app' => $app,
+                    'install_path' => $installPath,
+                    'releases_url' => $metadataPath,
+                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
+                    'extract_dir' => $extractDir,
+                    'user_agent' => 'PMSS-Test',
+                ]);
+            });
+
+            $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
+            $timeoutOutput = (string) @file_get_contents($timeoutLog);
+            $this->assertStringContainsString('10 '.($installPath.'/'.$app).' --version', $timeoutOutput);
+            $this->assertStringNotContainsString(' -v', $timeoutOutput, 'expected --version probe to satisfy the version check without a fallback probe');
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
+    public function testUpdateReinstallsWhenTimeoutWrappedVersionProbesReturnNoVersion(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-timeout-fallback-');
+        $app = 'PmssArrTimeout'.bin2hex(random_bytes(3));
+        $installPath = $baseDir.'/install';
+        $extractDir = 'PackageDir';
+        $archivePath = $this->createArchive($baseDir, $extractDir, ['marker.txt' => 'replacement']);
+        $metadataPath = $this->writeMetadata($baseDir, basename($archivePath), $archivePath);
+        $shimDir = $this->writeCurlShim($baseDir);
+        $timeoutLog = $baseDir.'/timeout.log';
+
+        @mkdir($installPath, 0755, true);
+        @file_put_contents($installPath.'/marker.txt', 'existing');
+        $this->writeVersionBinary($installPath.'/'.$app, '9.9.9');
+        $this->writeTimeoutShim($shimDir);
+
+        try {
+            $this->pmssWithEnv([
+                'PATH' => $shimDir.':'.(string) getenv('PATH'),
+                'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
+                'PMSS_ARR_TEST_TIMEOUT_MODE' => 'always-timeout',
+                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
+            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                \pmssArrUpdate([
+                    'app' => $app,
+                    'install_path' => $installPath,
+                    'releases_url' => $metadataPath,
+                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
+                    'extract_dir' => $extractDir,
+                    'user_agent' => 'PMSS-Test',
+                ]);
+            });
+
+            $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
+            $timeoutOutput = (string) @file_get_contents($timeoutLog);
+            $this->assertStringContainsString('10 '.($installPath.'/'.$app).' --version', $timeoutOutput);
+            $this->assertStringContainsString('10 '.($installPath.'/'.$app).' -v', $timeoutOutput);
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
     private function createArchive(string $baseDir, string $extractDir, array $files, string $archiveName = 'bundle-1.2.3.tar.gz'): string
     {
         $archiveRoot = $baseDir.'/archive';
@@ -301,6 +384,32 @@ SH
         }
 
         return $shimDir;
+    }
+
+    private function writeVersionBinary(string $path, string $version): void
+    {
+        @file_put_contents($path, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--version\" ] || [ \"\${1:-}\" = \"-v\" ]; then\n  printf '%s\\n' ".escapeshellarg($version)."\n  exit 0\nfi\nexit 1\n");
+        @chmod($path, 0755);
+    }
+
+    private function writeTimeoutShim(string $shimDir): void
+    {
+        $timeout = $shimDir.'/timeout';
+        @file_put_contents($timeout, <<<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "${PMSS_ARR_TEST_TIMEOUT_LOG:?}"
+if [ "${PMSS_ARR_TEST_TIMEOUT_MODE:-pass-through}" = "always-timeout" ]; then
+  exit 124
+fi
+if [ "$#" -lt 2 ]; then
+  exit 125
+fi
+shift
+exec "$@"
+SH
+        );
+        @chmod($timeout, 0755);
     }
 
     private function cleanupGlob(string $pattern): void
