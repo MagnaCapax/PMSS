@@ -347,6 +347,14 @@ fi
 invoke_start_ms="$(codex_now_ms)"
 codex_emit_event_jsonl "$event_log" "assistant_invoke_start" "info" "invoke" "$run_id" "" "" \
 	"exec=${exec_cmd%% *}"
+
+# Capture HEAD before invocation so we can detect "codex modified files but failed
+# to commit" sandbox-blocker pattern and fall back to a parent-shell commit.
+head_before_invoke=""
+if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	head_before_invoke="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+fi
+
 set +e
 codex_invoke "$exec_cmd" "$prompt_out"
 invoke_rc=$?
@@ -378,6 +386,62 @@ if ! codex_scan_commit_messages_for_pii "$ROOT"; then
 	echo "[codex-run] WARNING: unpushed commits contain PII — wrapper should block push" >&2
 	codex_emit_event_jsonl "$event_log" "commit_pii_warning" "warn" "scan_commit_messages" "$run_id" "0" "" \
 		"PII-like data detected in unpushed commit messages"
+fi
+
+# Sandbox commit fallback: codex's workspace-write sandbox can block .git/index.lock
+# creation despite --add-dir .git, leaving codex-implemented changes uncommitted.
+# Frozen paths and PII have been scanned/reverted/warned above; the parent shell
+# runs outside the sandbox and can commit. Risk profile is identical to what
+# codex would have committed directly.
+if [[ "$autocommit" == "1" ]] && command -v git >/dev/null 2>&1 \
+	&& git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	head_after_invoke="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+	dirty_status="$(git -C "$ROOT" status --porcelain 2>/dev/null || true)"
+	if [[ -n "$head_before_invoke" && "$head_after_invoke" == "$head_before_invoke" \
+		&& -n "$dirty_status" ]]; then
+		echo "[codex-run] codex implemented changes but did not commit (sandbox blocker); parent-shell fallback engaged" >&1
+		codex_emit_event_jsonl "$event_log" "fallback_commit_start" "warn" "fallback_commit" "$run_id" "" "" \
+			"codex produced uncommitted changes; parent-shell fallback engaged"
+
+		issue_ref=""
+		if [[ -f "$prompt_out" ]]; then
+			issue_ref="$(grep -oE 'Refs #[0-9]+' "$prompt_out" 2>/dev/null | sort -u | head -1)"
+		fi
+		[[ -z "${commit_prefix:-}" ]] && commit_prefix="fix:"
+
+		git -C "$ROOT" add -A 2>&1 | tail -3
+
+		commit_subject="${commit_prefix} codex sandbox commit fallback"
+		[[ -n "$issue_ref" ]] && commit_subject="${commit_subject} (${issue_ref})"
+		commit_body="Codex implemented changes but the workspace-write sandbox blocked .git/index.lock; parent shell committed.
+
+Mode: ${autocommit_mode:-general}
+Run ID: ${run_id}
+
+Co-Authored-By: Sampsa Pellervoinen <noreply@pulsedmedia.com>"
+
+		fallback_rc=0
+		git -C "$ROOT" \
+			-c user.name="Sampsa Pellervoinen" \
+			-c user.email="noreply@pulsedmedia.com" \
+			commit -m "${commit_subject}" -m "${commit_body}" 2>&1 | tail -5 || fallback_rc=$?
+
+		if [[ "$fallback_rc" -eq 0 ]]; then
+			echo "[codex-run] fallback commit OK: $(git -C "$ROOT" log -1 --oneline 2>/dev/null)" >&1
+			codex_emit_event_jsonl "$event_log" "fallback_commit_ok" "info" "fallback_commit" "$run_id" "0" "" \
+				"parent-shell commit recovered codex changes"
+			set +e
+			git -C "$ROOT" push origin HEAD 2>&1 | tail -3
+			push_rc=$?
+			set -e
+			codex_emit_event_jsonl "$event_log" "fallback_push_done" "info" "fallback_commit" "$run_id" "$push_rc" "" \
+				"parent-shell push completed (rc=$push_rc; non-zero is best-effort)"
+		else
+			echo "[codex-run] fallback commit FAILED rc=$fallback_rc — leaving working tree dirty" >&2
+			codex_emit_event_jsonl "$event_log" "fallback_commit_fail" "error" "fallback_commit" "$run_id" "$fallback_rc" "" \
+				"parent-shell commit failed; working tree left dirty"
+		fi
+	fi
 fi
 
 total_duration_ms=$(($(codex_now_ms) - run_start_ms))
