@@ -635,6 +635,16 @@ function pmssUserConfigLighttpdConfigureUser(
         } else {
             $phpIniContent = rtrim($phpIniContent, "\n")."\n".$memoryLine."\n";
         }
+        // Redirect PHP upload temp dir from shared /tmp to the per-user,
+        // quota-bound lighttpd upload dir. Without this, any user's aborted
+        // PHP uploads accumulate in /tmp on the shared root partition and
+        // can DoS all co-tenants.
+        $uploadTmpDirLine = 'upload_tmp_dir = /home/'.$thisUser.'/.lighttpd/upload';
+        if (preg_match('/^\s*;?\s*upload_tmp_dir\s*=.*$/m', $phpIniContent)) {
+            $phpIniContent = preg_replace('/^\s*;?\s*upload_tmp_dir\s*=.*$/m', $uploadTmpDirLine, $phpIniContent, 1);
+        } else {
+            $phpIniContent = rtrim($phpIniContent, "\n")."\n".$uploadTmpDirLine."\n";
+        }
         pmssAtomicWriteFile($phpIniPath, $phpIniContent);
     }
     @chmod($phpIniPath, 0751);

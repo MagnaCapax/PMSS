@@ -208,6 +208,14 @@ LIGHTTPD;
         $this->assertStringContainsString('pmssAtomicWriteFile($phpIniPath, $phpIniContent);', $src);
     }
 
+    public function testUserConfigApplyOwnsPhpIniUploadTmpDirUpdate(): void
+    {
+        $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
+
+        $this->assertStringContainsString("preg_match('/^\\s*;?\\s*upload_tmp_dir\\s*=.*$/m', \$phpIniContent)", $src);
+        $this->assertStringContainsString("'upload_tmp_dir = /home/'.\$thisUser.'/.lighttpd/upload'", $src);
+    }
+
     public function testUserConfigApplyOwnsMovedHelperFunctions(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
