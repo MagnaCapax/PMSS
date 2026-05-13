@@ -23,12 +23,14 @@ function pmssDirtyFragBlacklistBody(): string
     // WireGuard, Docker rootless, ixgbe, customer workloads are unaffected.
     return "# PMSS: block autoload of Dirty Frag attack-surface modules\n"
         ."# Module set: V4bel PoC + AWS bulletin 2026-027 + Sysdig analysis\n"
+        ."# espintcp added 2026-05-13 (Fragnesia / copyfail 3.0, Sam James / v12-security PoC)\n"
         ."install esp4 /bin/false\n"
         ."install esp6 /bin/false\n"
         ."install rxrpc /bin/false\n"
         ."install ipcomp /bin/false\n"
         ."install ipcomp6 /bin/false\n"
-        ."install xfrm_user /bin/false\n";
+        ."install xfrm_user /bin/false\n"
+        ."install espintcp /bin/false\n";
 }
 
 /**
@@ -54,7 +56,7 @@ function pmssDirtyFragModulesLoaded(): ?array
         if (!is_array($columns) || count($columns) < 3 || $columns[0] === 'Module') {
             continue;
         }
-        if (!in_array($columns[0], ['esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'xfrm_user'], true)) {
+        if (!in_array($columns[0], ['esp4', 'esp6', 'rxrpc', 'ipcomp', 'ipcomp6', 'xfrm_user', 'espintcp'], true)) {
             continue;
         }
         $loaded[$columns[0]] = ctype_digit($columns[2]) ? (int) $columns[2] : 0;
@@ -67,6 +69,11 @@ function pmssDirtyFragModulesLoaded(): ?array
 function pmssEnsureDirtyFragBlacklist(callable $log, ?callable $runner = null): void
 {
     $runner = $runner ?: 'runStep';
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        $log('[DRY-RUN] Dirty Frag blacklist: skipping all mutations');
+        return;
+    }
+
     $blacklistPath = pmssResolvePathFromEnv('PMSS_DIRTYFRAG_MODPROBE_PATH', '/etc/modprobe.d/dirtyfrag.conf');
     $flagPath = pmssResolvePathFromEnv('PMSS_DIRTYFRAG_FLAG_PATH', pmssRuntimeDir().'/dirtyfrag-modules-loaded');
     $blacklistBody = pmssDirtyFragBlacklistBody();
@@ -88,8 +95,8 @@ function pmssEnsureDirtyFragBlacklist(callable $log, ?callable $runner = null): 
     // etc.) and rmmod would fail. The blacklist alone protects post-reboot
     // autoload, which is the relevant defensive surface for xfrm_user.
     $runner(
-        'Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6)',
-        'bash -lc '.escapeshellarg('modprobe -r esp4 esp6 rxrpc ipcomp ipcomp6 >/dev/null 2>&1 || true')
+        'Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)',
+        'bash -lc '.escapeshellarg('modprobe -r esp4 esp6 rxrpc ipcomp ipcomp6 espintcp >/dev/null 2>&1 || true')
     );
 
     $loaded = pmssDirtyFragModulesLoaded();

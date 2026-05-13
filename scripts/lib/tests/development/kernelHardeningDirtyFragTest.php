@@ -25,7 +25,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Updated '.$dir.'/modprobe.d/dirtyfrag.conf'), 'expected blacklist update log');
-        $this->assertEquals('Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6)', $calls[0][0]);
+        $this->assertEquals('Unloading Dirty Frag modules (esp4 esp6 rxrpc ipcomp ipcomp6 espintcp)', $calls[0][0]);
         $this->assertTrue(!is_file($dir.'/runtime/dirtyfrag-modules-loaded'), 'expected runtime flag to stay absent');
     }
 
@@ -93,6 +93,29 @@ class KernelHardeningDirtyFragTest extends TestCase
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Unable to inspect Dirty Frag modules'), 'expected missing snapshot warning');
+    }
+
+    public function testSkipsAllMutationsInDryRun(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-dirtyfrag-dry-run-');
+        $logs = [];
+        $calls = [];
+        $env = $this->dirtyFragEnv($dir, null);
+        $env['PMSS_DRY_RUN'] = '1';
+
+        $this->pmssWithEnv($env, function () use (&$logs, &$calls): void {
+            \pmssEnsureDirtyFragBlacklist(
+                function (string $message) use (&$logs): void { $logs[] = $message; },
+                function (string $description, string $command) use (&$calls): int {
+                    $calls[] = [$description, $command];
+                    return 0;
+                }
+            );
+        });
+
+        $this->assertTrue($this->pmssMessagesContain($logs, 'Dirty Frag blacklist: skipping all mutations'), 'expected dry-run skip log');
+        $this->assertTrue(!is_file($dir.'/modprobe.d/dirtyfrag.conf'), 'expected dry-run to skip file creation');
+        $this->assertEquals([], $calls);
     }
 
     /**
