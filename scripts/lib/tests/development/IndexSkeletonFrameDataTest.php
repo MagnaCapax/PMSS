@@ -58,5 +58,14 @@ class IndexSkeletonFrameDataTest extends TestCase
         $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
 
         $this->assertStringContainsString("'www/index.php',", $source);
+        $this->assertOrderedStrings(
+            [
+                'pmssUserRefreshPanelIndexForFrameDataCompat($ctx);',
+                "'www/index.php',",
+            ],
+            $source,
+            'Missing panel index compatibility refresh wiring: ',
+            'Panel index compatibility refresh should run before normal skeleton sync: '
+        );
     }
 }

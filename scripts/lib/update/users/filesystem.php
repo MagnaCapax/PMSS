@@ -84,9 +84,58 @@ function pmssUserDeletePathIfPresent(string $path): void
     }
 }
 
+/**
+ * Detect legacy panel copies that fatal on PHP 8.2 because frameData is null.
+ */
+function pmssUserPanelIndexNeedsFrameDataCompatRefresh(string $content): bool
+{
+    return strpos($content, '$frameData = array();') === false
+        && strpos($content, '$frames = array_merge($frames, $frameData);') !== false;
+}
+
+/**
+ * Force-refresh only the known broken legacy panel index.php variant.
+ */
+function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
+{
+    $user = (string) ($ctx['user'] ?? '');
+    $home = rtrim((string) ($ctx['home'] ?? ''), '/');
+    if ($user === '' || $home === '') {
+        return;
+    }
+
+    $targetFile = $home.'/www/index.php';
+    if (!pmssUserPathWithinHomeRoot($targetFile) || !is_file($targetFile) || is_link($targetFile)) {
+        return;
+    }
+
+    $sourceFile = pmssSkeletonBase().'/www/index.php';
+    if (!is_file($sourceFile)) {
+        return;
+    }
+
+    $sourceContent = @file_get_contents($sourceFile);
+    $targetContent = @file_get_contents($targetFile);
+    if (!is_string($sourceContent) || !is_string($targetContent)) {
+        return;
+    }
+
+    if (!pmssUserPanelIndexNeedsFrameDataCompatRefresh($targetContent)
+        || strpos($sourceContent, '$frameData = array();') === false
+        || strpos($sourceContent, 'function pmssFrameOpensInNewWindow(array $frame): bool') === false) {
+        return;
+    }
+
+    if (copyToUserSpace($sourceFile, $targetFile, $user)) {
+        logMessage("[user:{$user}] Updated legacy panel index.php for frameData compatibility");
+    }
+}
+
 function pmssUserApplySkeletonFiles(array $ctx): void
 {
     $user = $ctx['user'];
+    pmssUserRefreshPanelIndexForFrameDataCompat($ctx);
+
     $legacyDownloadHeaderBlock = <<<'PHP'
     if (strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
         $fileName = preg_replace('/\./', '%2e', $fileName, substr_count($fileName, '.') - 1);
