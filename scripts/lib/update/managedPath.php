@@ -48,6 +48,62 @@ function pmssWriteManagedPathFile(
     return false;
 }
 
+/** Build the timestamped backup path, adding a suffix after collisions. */
+function pmssManagedPathBackupCandidate(string $path, string $timestamp, int $attempt): string
+{
+    return $path.'.pmss-backup-'.$timestamp.($attempt === 0 ? '' : '-'.$attempt);
+}
+
+/**
+ * Create a best-effort backup without following pre-existing target symlinks.
+ */
+function pmssCreateManagedPathBackup(string $path, string $label, callable $logger, string $timestamp): string
+{
+    for ($attempt = 0; $attempt < 10; $attempt++) {
+        $backup = pmssManagedPathBackupCandidate($path, $timestamp, $attempt);
+        if (file_exists($backup) || is_link($backup)) {
+            continue;
+        }
+        if (!pmssManagedPathIsSafe($backup, $label.' backup', $logger)) {
+            return '';
+        }
+
+        $source = @fopen($path, 'rb');
+        if (!is_resource($source)) {
+            $logger('[WARN] Unable to open '.$label.' for backup at '.$path);
+            return '';
+        }
+
+        $target = @fopen($backup, 'xb');
+        if (!is_resource($target)) {
+            @fclose($source);
+            if (file_exists($backup) || is_link($backup)) {
+                continue;
+            }
+            $logger('[WARN] Unable to create '.$label.' backup at '.$backup);
+            return '';
+        }
+
+        $copied = @stream_copy_to_stream($source, $target);
+        $targetClosed = @fclose($target);
+        @fclose($source);
+        if (is_int($copied) && $targetClosed) {
+            $sourceMode = @fileperms($path);
+            if (is_int($sourceMode)) {
+                @chmod($backup, $sourceMode & 0777);
+            }
+            return $backup;
+        }
+
+        @unlink($backup);
+        $logger('[WARN] Unable to create '.$label.' backup at '.$backup);
+        return '';
+    }
+
+    $logger('[WARN] Unable to create '.$label.' backup; timestamped backup paths already exist for '.$path);
+    return '';
+}
+
 /** Persist a managed file from line content while keeping a timestamped backup. */
 function pmssWriteManagedPathFileWithBackup(
     string $path, array $contentLines, string $label, callable $logger, bool $logSuccess = false,
@@ -57,8 +113,7 @@ function pmssWriteManagedPathFileWithBackup(
     if (!pmssManagedPathIsSafe($path, $label, $logger)) return false;
     $backup = '';
     if (file_exists($path)) {
-        $backup = $path.'.pmss-backup-'.date('YmdHis');
-        if (!@copy($path, $backup)) $logger('[WARN] Unable to create '.$label.' backup at '.$backup);
+        $backup = pmssCreateManagedPathBackup($path, $label, $logger, date('YmdHis'));
     }
     $contents = implode(PHP_EOL, $contentLines).PHP_EOL;
     $writeLogger = function (string $message) use ($logger, $path, $label): void {

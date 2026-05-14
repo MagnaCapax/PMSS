@@ -103,6 +103,61 @@ class ManagedPathTest extends TestCase
         $this->assertTrue($this->pmssMessagesContain($messages, 'Wrote updated '.$path.' (backup '));
     }
 
+    public function testManagedBackupSkipsPreExistingSymlinkCandidate(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-backup-symlink-');
+        $path = $root.'/managed.conf';
+        file_put_contents($path, "before\n");
+        $outside = $root.'/outside.conf';
+        file_put_contents($outside, "outside\n");
+        $timestamp = '20260102030405';
+        $blocked = \pmssManagedPathBackupCandidate($path, $timestamp, 0);
+        $this->pmssCreateSymlinkOrSkip($outside, $blocked);
+        $messages = [];
+
+        $backup = \pmssCreateManagedPathBackup($path, 'test target', $this->pmssMakeArrayLogger($messages), $timestamp);
+
+        $this->assertEquals(\pmssManagedPathBackupCandidate($path, $timestamp, 1), $backup);
+        $this->assertEquals("before\n", file_get_contents($backup));
+        $this->assertEquals("outside\n", file_get_contents($outside));
+        $this->assertEquals([], $messages);
+    }
+
+    public function testManagedBackupSkipsPreExistingRegularCandidate(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-backup-collision-');
+        $path = $root.'/managed.conf';
+        file_put_contents($path, "before\n");
+        $timestamp = '20260102030406';
+        $blocked = \pmssManagedPathBackupCandidate($path, $timestamp, 0);
+        file_put_contents($blocked, "occupied\n");
+        $messages = [];
+
+        $backup = \pmssCreateManagedPathBackup($path, 'test target', $this->pmssMakeArrayLogger($messages), $timestamp);
+
+        $this->assertEquals(\pmssManagedPathBackupCandidate($path, $timestamp, 1), $backup);
+        $this->assertEquals("occupied\n", file_get_contents($blocked));
+        $this->assertEquals("before\n", file_get_contents($backup));
+        $this->assertEquals([], $messages);
+    }
+
+    public function testManagedBackupLogsWhenAllTimestampCandidatesExist(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-backup-full-');
+        $path = $root.'/managed.conf';
+        file_put_contents($path, "before\n");
+        $timestamp = '20260102030407';
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            file_put_contents(\pmssManagedPathBackupCandidate($path, $timestamp, $attempt), "occupied\n");
+        }
+        $messages = [];
+
+        $backup = \pmssCreateManagedPathBackup($path, 'test target', $this->pmssMakeArrayLogger($messages), $timestamp);
+
+        $this->assertEquals('', $backup);
+        $this->assertTrue($this->pmssMessagesContain($messages, 'timestamped backup paths already exist for '.$path));
+    }
+
     public function testManagedWriteWithBackupRejectsSymlinkTarget(): void
     {
         $root = $this->pmssMakeTempDir('pmss-env-write-backup-link-');
