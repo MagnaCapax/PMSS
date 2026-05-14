@@ -119,7 +119,7 @@ function pmssDockerInstallLsioEnsureDirectories(array $paths): bool
             fwrite(STDERR, "Path already exists and is not a directory: {$path}\n");
             return false;
         }
-        if (!@mkdir($path, 0755, true) && !is_dir($path)) {
+        if (!pmssDirEnsureExists($path, 0755)) {
             fwrite(STDERR, "Failed to create directory: {$path}\n");
             return false;
         }

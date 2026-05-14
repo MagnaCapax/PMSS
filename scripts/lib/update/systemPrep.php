@@ -184,7 +184,7 @@ function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targe
         $sysctlWriteOk = true;
         $log('[SKIP] Legacy sysctl defaults already present and up to date');
     } else {
-        @mkdir(dirname($target), 0755, true);
+        pmssDirEnsureExists(dirname($target), 0755);
         if (@file_put_contents($target, $content.PHP_EOL) === false) {
             $log('[WARN] Unable to write legacy sysctl defaults at '.$target);
         } else {
@@ -199,7 +199,7 @@ function pmssEnsureLegacySysctlBaseline(?callable $logger = null, ?string $targe
     if ($modulesUpToDate) {
         $log('[SKIP] TCP BBR modules-load configuration already present and up to date');
     } else {
-        @mkdir(dirname($modulesLoadPath), 0755, true);
+        pmssDirEnsureExists(dirname($modulesLoadPath), 0755);
         if (@file_put_contents($modulesLoadPath, $modulesContent) === false) {
             $log('[WARN] Unable to write TCP BBR modules-load configuration at '.$modulesLoadPath);
         } else {

@@ -206,7 +206,7 @@ function pmssSupportSnapshotWrite(array $diagnostics, array $config): string
     if (!pmssPathTargetIsSafe($snapshotDir, true)) {
         throw new RuntimeException('Support snapshot directory is unsafe.');
     }
-    if (!is_dir($snapshotDir) && !@mkdir($snapshotDir, 0700, true) && !is_dir($snapshotDir)) {
+    if (!pmssDirEnsureExists($snapshotDir, 0700)) {
         throw new RuntimeException('Unable to create support snapshot directory.');
     }
     if (!is_dir($snapshotDir) || !pmssPathTargetIsSafe($snapshotDir, true)) {

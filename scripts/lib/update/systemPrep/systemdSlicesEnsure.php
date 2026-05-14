@@ -243,7 +243,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         // Ensure root (uid 0) slice is not limited: create user-0 specific
         // override setting infinity/large limits.
         $rootDir = dirname($dropDir).'/user-0.slice.d';
-        is_dir($rootDir) || @mkdir($rootDir, 0755, true);
+        pmssDirEnsureExists($rootDir, 0755);
         // Use a suffix that sorts after legacy 99-pmss.conf drop-ins so root
         // remains unlimited even when a stale vendor file exists.
         $rootDrop = $rootDir.'/99-zz-pmss-unlimited.conf';

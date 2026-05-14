@@ -54,9 +54,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
 
     // Ensure nginx directories exist to avoid noisy cp/mkdir errors on fresh hosts.
     foreach (['/etc/nginx', '/etc/nginx/sites-available', '/etc/nginx/sites-enabled'] as $path) {
-        if (!is_dir($path)) {
-            @mkdir($path, 0755, true);
-        }
+        pmssDirEnsureExists($path, 0755);
     }
 
     $cleanupConfigs = static function (string $pattern): void {
@@ -143,9 +141,7 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         }
     }
     // Create SSL config if required!
-    if (!is_dir('/etc/nginx/ssl')) {
-        @mkdir("/etc/nginx/ssl", 0755, true);
-    }
+    pmssDirEnsureExists('/etc/nginx/ssl', 0755);
 
     if (!file_exists("/etc/nginx/ssl/nginx.crt")) {
         $hostname = $serverHostname;
@@ -153,16 +149,12 @@ function pmssCreateNginxConfigSetup(string $requestedUser, bool $singleUser): ar
         @passthru('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj "/C=FI/ST=none/L=none/O=PulsedMedia/CN=' . $hostname . '" -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt');
     }
 
-    if (!is_dir('/etc/nginx/users')) {
-        @mkdir('/etc/nginx/users', 0751, true);
-    } elseif (!$singleUser) {
+    if (pmssDirEnsureExists('/etc/nginx/users', 0751) && !$singleUser) {
         $cleanupConfigs('/etc/nginx/users/*');
     }
 
-    if ($subdomainEnabled && !is_dir($subdomainConfigDir)) {
-        @mkdir($subdomainConfigDir, 0755, true);
-    }
     if ($subdomainEnabled) {
+        pmssDirEnsureExists($subdomainConfigDir, 0755);
         if (!$singleUser) {
             $cleanupConfigs($subdomainConfigDir.'/pmss-user-*.conf');
         } elseif ($requestedUser !== '') {

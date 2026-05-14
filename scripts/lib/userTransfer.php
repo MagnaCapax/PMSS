@@ -295,7 +295,7 @@ function pmssUserTransferMain(array $argv): int
             $token = sha1(microtime(true).'-'.mt_rand());
         }
         $scratch = '/root/pmss-userTransfer-'.$token;
-        if (!@mkdir($scratch, 0700, true) && !is_dir($scratch)) {
+        if (!pmssDirEnsureExists($scratch, 0700)) {
             throw new RuntimeException('Failed to create scratch directory: '.$scratch, 1);
         }
         @chmod($scratch, 0700);

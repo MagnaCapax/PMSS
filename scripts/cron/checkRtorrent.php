@@ -198,9 +198,7 @@ $users = $listUsersResult['users'];
 
 $changedConfig = [];
 $stateDir = '/run/pmss';
-if (!is_dir($stateDir)) {
-    @mkdir($stateDir, 0755, true);
-}
+pmssDirEnsureExists($stateDir, 0755);
 
 // Create logging callback for restart helper.
 $logCallback = function (string $msg, bool $force) use ($debug): void {

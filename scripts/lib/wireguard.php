@@ -778,9 +778,7 @@ function pmssWireguardConfigure(?callable $logger = null): void
     }
 
     $configDir = wgConfigDir();
-    if (!is_dir($configDir)) {
-        @mkdir($configDir, 0750, true);
-    }
+    pmssDirEnsureExists($configDir, 0750);
 
     if (!wgSupports()) {
         $log('[wireguard] wg binary not available on PATH; skipping configure');
