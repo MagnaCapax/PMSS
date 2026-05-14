@@ -185,7 +185,7 @@ if [[ "$exec_bin" == "codex" && "${PMSS_CODEX_NO_SANDBOX:-0}" != "1" ]]; then
 	elif [[ "$is_codex_exec" == "1" && "$exec_cmd" == "codex exec" ]]; then
 		exec_cmd="codex exec --sandbox workspace-write --add-dir .git"
 	else
-		[[ "$exec_cmd" == *"--sandbox"* ]] || exec_cmd+=" --sandbox workspace-write"
+		[[ "$exec_cmd" == *"--sandbox"* ]] || exec_cmd+=" --sandbox danger-full-access"
 		if [[ "$is_codex_exec" == "0" ]]; then
 			[[ "$exec_cmd" == *"--ask-for-approval"* ]] || exec_cmd+=" --ask-for-approval untrusted"
 		fi
@@ -405,7 +405,7 @@ if [[ "$autocommit" == "1" ]] && command -v git >/dev/null 2>&1 \
 
 		issue_ref=""
 		if [[ -f "$prompt_out" ]]; then
-			issue_ref="$(grep -oE 'Refs #[0-9]+' "$prompt_out" 2>/dev/null | sort -u | head -1)"
+			issue_ref="$(grep -oE 'Refs #[0-9]+' "$prompt_out" 2>/dev/null | sort -u | head -1 || true)"
 		fi
 		[[ -z "${commit_prefix:-}" ]] && commit_prefix="fix:"
 
