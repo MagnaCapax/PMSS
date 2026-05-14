@@ -45,6 +45,18 @@ trait FilesystemCleanupTrait
         $this->pmssAssignTempDirProperty($propertyName, $prefix, $mode, $baseDir);
     }
 
+    /** Create a fixture user home under a tracked PMSS_HOME_DIR root. */
+    protected function pmssMakeTrackedUserHomeTree(string $prefix, string $user, string $relativeDir = ''): string
+    {
+        $homeRoot = $this->pmssMakeTrackedHomeRoot($prefix);
+        $home = $this->pmssUserHomePath($homeRoot, $user);
+        if ($relativeDir !== '') {
+            $this->pmssEnsureFixtureDirectory($home.'/'.ltrim($relativeDir, '/'), 0755);
+        }
+
+        return $home;
+    }
+
     /** Remove a temporary directory stored on a test property and clear the slot. */
     protected function pmssCleanupTempDirProperty(string $propertyName): void
     {
