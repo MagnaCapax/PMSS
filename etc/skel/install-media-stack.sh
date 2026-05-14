@@ -281,6 +281,34 @@ managed_install_path_reset() {
   fi
 }
 
+servarr_config_xml_converge() {
+  local app="$1" datadir="$2" port="$3" default_port="$4"
+
+  if [[ $DRY_RUN -eq 0 ]]; then
+    touch "$datadir"/update_required
+  fi
+  echo "${app^^} Installed"
+  echo "Configuring ${app^^}"
+  if [[ $DRY_RUN -eq 0 ]]; then
+    if [ ! -f "$datadir/config.xml" ]; then
+      cat <<EOF >"$datadir/config.xml"
+<Config>
+  <UrlBase></UrlBase>
+  <Port>${default_port}</Port>
+  <BindAddress>127.0.0.1</BindAddress>
+</Config>
+EOF
+    fi
+    sed -i -E "s|<Port>[^<]*</Port>|<Port>${port}</Port>|g" "$datadir/config.xml"
+    sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
+    sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
+  else
+    log_info "[dry-run] would configure ${app^^} (port=${port}, url_base=/public-${USERNAME}/${app})"
+  fi
+  echo "${app^^} configured"
+  echo ""
+}
+
 lighttpd_custom_has_legacy_media_stack_rules() {
   local custom_file="$1"
   [[ -f "$custom_file" ]] || return 1
@@ -486,9 +514,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
 fi
 
 # CPU feature detection for compatibility warnings
-CPU_HAS_SSE42=0
 CPU_HAS_AVX=0
-if grep -q 'sse4_2' /proc/cpuinfo 2>/dev/null; then CPU_HAS_SSE42=1; fi
 if grep -q ' avx ' /proc/cpuinfo 2>/dev/null; then CPU_HAS_AVX=1; fi
 
 if [[ $CPU_HAS_AVX -eq 0 ]]; then
@@ -844,29 +870,7 @@ if ! verify_checksum "Radarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
   log_err "Radarr download failed integrity check — aborting"; exit 1
 fi
 extract_tgz "Radarr.tar.gz"
-if [[ $DRY_RUN -eq 0 ]]; then
-  touch "$datadir"/update_required
-fi
-echo "${app^^} Installed"
-echo "Configuring ${app^^}"
-if [[ $DRY_RUN -eq 0 ]]; then
-  if [ ! -f "$datadir/config.xml" ]; then
-    cat <<EOF >"$datadir/config.xml"
-<Config>
-  <UrlBase></UrlBase>
-  <Port>7878</Port>
-  <BindAddress>127.0.0.1</BindAddress>
-</Config>
-EOF
-  fi
-  sed -i -E "s|<Port>[^<]*</Port>|<Port>${RADARR_PORT}</Port>|g" "$datadir/config.xml"
-  sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
-  sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
-else
-  log_info "[dry-run] would configure ${app^^} (port=${RADARR_PORT}, url_base=/public-${USERNAME}/${app})"
-fi
-echo "${app^^} configured"
-echo ""
+servarr_config_xml_converge "$app" "$datadir" "$RADARR_PORT" "7878"
 
 # Install Prowlarr (branch master)
 app="prowlarr"
@@ -893,29 +897,7 @@ if ! verify_checksum "Prowlarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
   log_err "Prowlarr download failed integrity check — aborting"; exit 1
 fi
 extract_tgz "Prowlarr.tar.gz"
-if [[ $DRY_RUN -eq 0 ]]; then
-  touch "$datadir"/update_required
-fi
-echo "${app^^} Installed"
-echo "Configuring ${app^^}"
-if [[ $DRY_RUN -eq 0 ]]; then
-  if [ ! -f "$datadir/config.xml" ]; then
-    cat <<EOF >"$datadir/config.xml"
-<Config>
-  <UrlBase></UrlBase>
-  <Port>9696</Port>
-  <BindAddress>127.0.0.1</BindAddress>
-</Config>
-EOF
-  fi
-  sed -i -E "s|<Port>[^<]*</Port>|<Port>${PROWLARR_PORT}</Port>|g" "$datadir/config.xml"
-  sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
-  sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
-else
-  log_info "[dry-run] would configure ${app^^} (port=${PROWLARR_PORT}, url_base=/public-${USERNAME}/${app})"
-fi
-echo "${app^^} configured"
-echo ""
+servarr_config_xml_converge "$app" "$datadir" "$PROWLARR_PORT" "9696"
 
 # Install Sonarr (services.sonarr.tv download API; branch main)
 app="sonarr"
@@ -942,29 +924,7 @@ if ! verify_checksum "Sonarr.tar.gz" "$(basename "${DLURL%%\?*}")"; then
   log_err "Sonarr download failed integrity check — aborting"; exit 1
 fi
 extract_tgz "Sonarr.tar.gz"
-if [[ $DRY_RUN -eq 0 ]]; then
-  touch "$datadir"/update_required
-fi
-echo "${app^^} Installed"
-echo "Configuring ${app^^}"
-if [[ $DRY_RUN -eq 0 ]]; then
-  if [ ! -f "$datadir/config.xml" ]; then
-    cat <<EOF >"$datadir/config.xml"
-<Config>
-  <Port>8989</Port>
-  <UrlBase></UrlBase>
-  <BindAddress>127.0.0.1</BindAddress>
-</Config>
-EOF
-  fi
-  sed -i -E "s|<Port>[^<]*</Port>|<Port>${SONARR_PORT}</Port>|g" "$datadir/config.xml"
-  sed -i -E "s|<UrlBase>[^<]*</UrlBase>|<UrlBase>/public-${USERNAME}/${app}</UrlBase>|g" "$datadir/config.xml"
-  sed -i -E "s|<BindAddress>[^<]*</BindAddress>|<BindAddress>127.0.0.1</BindAddress>|g" "$datadir/config.xml"
-else
-  log_info "[dry-run] would configure ${app^^} (port=${SONARR_PORT}, url_base=/public-${USERNAME}/${app})"
-fi
-echo "${app^^} configured"
-echo ""
+servarr_config_xml_converge "$app" "$datadir" "$SONARR_PORT" "8989"
 
 # Install ASP.NET Core (.NET 8)
 app="aspnetcore"
@@ -1118,7 +1078,6 @@ echo "${app^^} configured"
 # Jellyfin smoke test: verify DLL loads without Illegal Instruction crash
 if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
   log_info "Running Jellyfin smoke test..."
-  JELLYFIN_SMOKE_OK=1
   # Start Jellyfin briefly to verify native libraries load on this CPU
   tmux new-session -d -s "jellyfin-smoke" \
     "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin-smoke.log\"" 2>/dev/null || true
@@ -1127,7 +1086,6 @@ if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
     log_ok "Jellyfin smoke test passed (DLL loads, native libs OK)"
     tmux kill-session -t "jellyfin-smoke" 2>/dev/null || true
   else
-    JELLYFIN_SMOKE_OK=0
     log_warn "Jellyfin exited during smoke test — may have crashed"
     if [[ -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" ]]; then
       if grep -qi "illegal instruction\|SIGILL\|signal 4" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
