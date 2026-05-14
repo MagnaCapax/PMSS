@@ -14,9 +14,16 @@ class UpdateLibraryDependencyTest extends TestCase
         }
     }
 
+    private function assertRepoFileDependencyCases(array $cases): void
+    {
+        foreach ($cases as $case) {
+            $this->assertRepoFileDependencyContract($case[0], $case[1], $case[2], $case[3]);
+        }
+    }
+
     public function testDirectLibraryConsumersKeepLeanIncludes(): void
     {
-        foreach ([
+        $this->assertRepoFileDependencyCases([
             ['scripts/util/configureOpenvpn.php', ["require_once __DIR__.'/../lib/update/runtime/commands.php';"], ["require_once __DIR__.'/../lib/update.php';", "require_once __DIR__.'/../lib/logger.php';"], 'configureOpenvpn.php should rely on runtime/commands.php as its logging/runtime bootstrap'],
             ['scripts/util/setupLetsEncrypt.php', ["require_once __DIR__.'/../lib/update/distro.php';"], ["require_once __DIR__.'/../lib/update.php';"], 'setupLetsEncrypt.php should not pull scripts/lib/update.php just for distro detection'],
             ['scripts/util/userConfig.php', ["require_once __DIR__.'/../lib/rtorrentConfig.php';", "require_once __DIR__.'/../lib/update/runtime/commands.php';"], ["require_once __DIR__.'/../lib/update.php';"], 'userConfig.php should rely on direct subsystem requires'],
@@ -30,38 +37,32 @@ class UpdateLibraryDependencyTest extends TestCase
             ['scripts/util/configureOpenvpn.php', ["pmssLogStatus('SKIP', 'OpenVPN already configured; skipping provisioning', 0);"], ["function_exists('pmssLogStatus')"], 'configureOpenvpn.php should rely on runtime/commands.php for pmssLogStatus()'],
             ['scripts/util/userConfig.php', ["pmssLogStatus('SKIP', 'Rootless Docker disabled by config for '.\$user['name']);", "pmssUserDockerEnabled(\$user['name'], \$store)"], ["function_exists('pmssLogStatus')", "function_exists('pmssUserDockerEnabled')"], 'userConfig.php should rely on runtime/commands.php and userConfigStore.php for Docker policy helpers'],
             ['scripts/lib/update/apps/packages/helpers.php', ['pmssLogJson(['], ["function_exists('pmssLogJson')"], 'packages/helpers.php should rely on runtime/commands.php for pmssLogJson()'],
-        ] as $case) {
-            $this->assertRepoFileDependencyContract($case[0], $case[1], $case[2], $case[3]);
-        }
+        ]);
     }
 
     public function testRuntimeBootstrapsKeepOnlyIntentionalFallbackGuards(): void
     {
-        foreach ([
+        $this->assertRepoFileDependencyCases([
             ['scripts/lib/log.php', ["if (!function_exists('logmsg')) {", 'function pmssJsonEncodeSafe(array $payload, int $flags = 0): ?string', 'function pmssJsonLineAppend(string $path, array $payload): bool', 'function pmssLogWriteMessage(string $primary, string $fallback, string $message, bool $writeToStderr = false): void'], ["if (!function_exists('pmssJsonEncodeSafe')) {", "if (!function_exists('pmssJsonLineAppend')) {", "if (!function_exists('pmssJsonEmitPayload')) {", "if (!function_exists('pmssLogAppendTimestampedLine')) {", "if (!function_exists('pmssLogWriteMessage')) {"], 'log.php should keep only the intentional update.php compatibility guard'],
             ['scripts/lib/update/runtime/commands.php', ["if (!function_exists('runUserStep')) {"], ["if (!function_exists('runStep')) {", "if (!function_exists('aptCmd')) {", "if (!function_exists('pmssBuildCommand')) {", "if (!function_exists('pmssLogStatus')) {"], 'runtime/commands.php should rely on require_once for '],
             ['scripts/lib/update/logging.php', ["if (!function_exists('pmssCorrelationId')) {"], ["if (!function_exists('pmssJsonLogPath')) {", "if (!function_exists('pmssLogJson')) {"], 'logging.php should rely on require_once for '],
             ['scripts/lib/runtime.php', ["require_once __DIR__.'/update/logging.php';"], ["if (!function_exists('logMessage')) {"], 'runtime.php should rely on require_once for logMessage bootstrap'],
             ['scripts/util/update-step2.php', ["runStep('Restoring root cron configuration (shutdown)', \$helper);", "\$jsonPath = pmssJsonLogPath();", "\$pmssCorrelationId = pmssCorrelationId();"], ["function_exists('runStep')", "function_exists('pmssJsonLogPath')", "function_exists('pmssCorrelationId')"], 'update-step2.php should rely on the shared bootstrap for '],
             ['scripts/lib/user/userConfigStore.php', ['function pmssUserDockerMinRamMiB(): int', 'function pmssUserConfigResolvePayload(string $username, ?UserConfigStore &$store = null): ?array', 'function pmssUserDockerEnabled(string $username, ?UserConfigStore $store = null): bool', 'function pmssUserLighttpdEnabled(string $username, ?UserConfigStore $store = null): bool'], ["if (!function_exists('pmssUserDockerMinRamMiB')) {", "if (!function_exists('pmssUserConfigNormaliseToggleValue')) {", "if (!function_exists('pmssUserConfigResolvePayload')) {", "if (!function_exists('pmssUserDockerEnabled')) {", "if (!function_exists('pmssUserLighttpdEnabled')) {"], 'userConfigStore.php should define its policy helpers directly once it is required'],
-        ] as $case) {
-            $this->assertRepoFileDependencyContract($case[0], $case[1], $case[2], $case[3]);
-        }
+        ]);
     }
 
     public function testSystemdServiceGuardUsesSharedProcessesLibraryViaServiceHelper(): void
     {
-        foreach ([
+        $this->assertRepoFileDependencyCases([
             ['scripts/lib/update/services/systemd.php', ["require_once __DIR__.'/../runtime/processes.php';"], ['function_exists(\'pmssSystemdUnitExists\')'], 'services/systemd.php should rely on runtime/processes.php for pmssSystemdUnitExists()'],
             ['scripts/cron/systemdServicesGuard.php', ["require_once __DIR__.'/../lib/update/services/systemd.php';"], ["require_once __DIR__.'/../lib/update/runtime/processes.php';"], 'systemdServicesGuard.php should rely on services/systemd.php to bootstrap runtime/processes.php'],
-        ] as $case) {
-            $this->assertRepoFileDependencyContract($case[0], $case[1], $case[2], $case[3]);
-        }
+        ]);
     }
 
     public function testUserLifecycleBootstrapsUserLoggerForLeanCallers(): void
     {
-        foreach ([
+        $this->assertRepoFileDependencyCases([
             ['scripts/lib/user/log.php', ['function pmssUserLogAllowed(): bool', 'function pmssUserLogFile(string $user): string', 'function pmssUserLog(string $user, string $message): void'], ["if (!function_exists('pmssUserLogAllowed')) {", "if (!function_exists('pmssUserLogFile')) {", "if (!function_exists('pmssUserLog')) {"], 'user/log.php should define its logger functions directly once it is required'],
             ['scripts/lib/userLifecycle.php', ["require_once __DIR__.'/user/log.php';", 'function pmssUserWatchdogEnsureServices('], ["if (!function_exists('pmssUserLogAllowed')) {"], 'userLifecycle.php should rely on user/log.php for pmssUserLogAllowed()'],
             ['scripts/cron/checkRtorrent.php', ["require_once __DIR__.'/../lib/user/log.php';", "pmssUserLog(\$user, 'checkRtorrent: '.\$message);"], ["function_exists('pmssUserLog')"], 'checkRtorrent.php should log through the required user logger directly'],
@@ -71,8 +72,6 @@ class UpdateLibraryDependencyTest extends TestCase
             ['scripts/cron/checkRcloneInstances.php', ["require_once __DIR__.'/../lib/userLifecycle.php';", "pmssUserWatchdogRunService(", "'rclone start requested'"], ['pmssUserLogPath', "\$canUserLog = function_exists('pmssUserLog');"], 'Rclone watchdog should use userLifecycle.php as its user logger bootstrap'],
             ['scripts/cron/updateQuotas.php', ["require_once '/scripts/lib/userLifecycle.php';", "if (\$mirrorUserLog) {"], ['pmssUserLogPath', "function_exists('pmssUserLog')"], 'updateQuotas.php should log through the required user logger directly'],
             ['scripts/util/checkUserHtpasswd.php', ["require_once __DIR__.'/../lib/userLifecycle.php';", "pmssUserLog(\$thisUser, 'htpasswd sync: appended legacy credential to per-user .htpasswd');"], ['pmssUserLogPath', "function_exists('pmssUserLog')"], 'checkUserHtpasswd.php should log through the required user logger directly'],
-        ] as $case) {
-            $this->assertRepoFileDependencyContract($case[0], $case[1], $case[2], $case[3]);
-        }
+        ]);
     }
 }

@@ -66,6 +66,28 @@ class ConfigSyntaxValidationTest extends TestCase
         return null;
     }
 
+    private function assertBalancedTokenCounts(string $value, string $open, string $close, string $label): void
+    {
+        $openCount = substr_count($value, $open);
+        $closeCount = substr_count($value, $close);
+
+        $this->assertEquals(
+            $openCount,
+            $closeCount,
+            "Unbalanced $label: $openCount open vs $closeCount close"
+        );
+    }
+
+    private function assertOutputOmitsSyntaxErrors(string $output, array $syntaxErrors, string $label): void
+    {
+        foreach ($syntaxErrors as $error) {
+            $this->assertTrue(
+                stripos($output, $error) === false,
+                "$label config has syntax error: $error\nOutput: $output"
+            );
+        }
+    }
+
     /**
      * Render lighttpd template with test values.
      */
@@ -183,12 +205,7 @@ NGINX;
             'unexpected end of file',       // Unbalanced braces
         );
 
-        foreach ($syntaxErrors as $error) {
-            $this->assertTrue(
-                stripos($outputStr, $error) === false,
-                "lighttpd config has syntax error: $error\nOutput: $outputStr"
-            );
-        }
+        $this->assertOutputOmitsSyntaxErrors($outputStr, $syntaxErrors, 'lighttpd');
     }
 
     /**
@@ -198,16 +215,7 @@ NGINX;
      */
     public function testLighttpdTemplateHasBalancedParentheses(): void
     {
-        $config = $this->renderLighttpdTemplate();
-
-        $openParens = substr_count($config, '(');
-        $closeParens = substr_count($config, ')');
-
-        $this->assertEquals(
-            $openParens,
-            $closeParens,
-            "Unbalanced parentheses: $openParens open vs $closeParens close"
-        );
+        $this->assertBalancedTokenCounts($this->renderLighttpdTemplate(), '(', ')', 'parentheses');
     }
 
     /**
@@ -215,16 +223,7 @@ NGINX;
      */
     public function testLighttpdTemplateHasBalancedBraces(): void
     {
-        $config = $this->renderLighttpdTemplate();
-
-        $openBraces = substr_count($config, '{');
-        $closeBraces = substr_count($config, '}');
-
-        $this->assertEquals(
-            $openBraces,
-            $closeBraces,
-            "Unbalanced braces: $openBraces open vs $closeBraces close"
-        );
+        $this->assertBalancedTokenCounts($this->renderLighttpdTemplate(), '{', '}', 'braces');
     }
 
     // =========================================================================
@@ -268,12 +267,7 @@ NGINX;
             'invalid number of arguments',  // Wrong argument count
         );
 
-        foreach ($syntaxErrors as $error) {
-            $this->assertTrue(
-                stripos($outputStr, $error) === false,
-                "nginx config has syntax error: $error\nOutput: $outputStr"
-            );
-        }
+        $this->assertOutputOmitsSyntaxErrors($outputStr, $syntaxErrors, 'nginx');
     }
 
     /**
@@ -284,14 +278,7 @@ NGINX;
         require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
         $templates = \pmssNginxUserSubdomainTemplates();
         foreach (array_values($templates) as $i => $block) {
-            $openBraces = substr_count($block, '{');
-            $closeBraces = substr_count($block, '}');
-
-            $this->assertEquals(
-                $openBraces,
-                $closeBraces,
-                "HEREDOC block $i has unbalanced braces: $openBraces open vs $closeBraces close"
-            );
+            $this->assertBalancedTokenCounts($block, '{', '}', "HEREDOC block $i braces");
         }
     }
 
