@@ -359,20 +359,19 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
         'torrent_stopped' => null,
     ];
 
-    $uploadRate = $caller($socketPath, 'get_up_rate', [], 2);
-    $downloadRate = $caller($socketPath, 'get_down_rate', [], 2);
-    $uploadTotal = $caller($socketPath, 'get_up_total', [], 2);
-    $downloadTotal = $caller($socketPath, 'get_down_total', [], 2);
-    if ($uploadRate === false || $downloadRate === false || $uploadTotal === false || $downloadTotal === false) {
+    $requiredValues = [];
+    foreach (['upload_rate' => 'get_up_rate', 'download_rate' => 'get_down_rate', 'upload_total' => 'get_up_total', 'download_total' => 'get_down_total'] as $key => $method) {
+        $requiredValues[$key] = $caller($socketPath, $method, [], 2);
+    }
+    if (in_array(false, $requiredValues, true)) {
         return $stats;
     }
 
     $stats['ok'] = true;
-    $stats['upload_rate'] = (float) $uploadRate;
-    $stats['download_rate'] = (float) $downloadRate;
-    $stats['upload_total'] = (float) $uploadTotal;
-    $stats['download_total'] = (float) $downloadTotal;
-    $stats['ratio'] = ((float) $downloadTotal > 0.0) ? ((float) $uploadTotal / (float) $downloadTotal) : null;
+    foreach ($requiredValues as $key => $value) {
+        $stats[$key] = (float) $value;
+    }
+    $stats['ratio'] = ($stats['download_total'] > 0.0) ? ($stats['upload_total'] / $stats['download_total']) : null;
 
     $countView = static function (string $view) use ($caller, $socketPath): ?int {
         $result = $caller($socketPath, 'd.multicall2', [$view, 'd.get_hash='], 2);
@@ -383,23 +382,17 @@ function pmssStatsReadRtorrentStats(callable $caller, string $socketPath): array
         return count($result);
     };
 
-    $total = $countView('main');
-    $active = $countView('started');
-    $seeding = $countView('seeding');
-    if ($total !== null) {
-        $stats['torrent_total'] = $total;
+    foreach (['torrent_total' => 'main', 'torrent_active' => 'started', 'torrent_seeding' => 'seeding'] as $key => $view) {
+        $count = $countView($view);
+        if ($count !== null) {
+            $stats[$key] = $count;
+        }
     }
-    if ($active !== null) {
-        $stats['torrent_active'] = $active;
+    if ($stats['torrent_active'] !== null && $stats['torrent_seeding'] !== null) {
+        $stats['torrent_downloading'] = max(0, $stats['torrent_active'] - $stats['torrent_seeding']);
     }
-    if ($seeding !== null) {
-        $stats['torrent_seeding'] = $seeding;
-    }
-    if ($active !== null && $seeding !== null) {
-        $stats['torrent_downloading'] = max(0, $active - $seeding);
-    }
-    if ($total !== null && $active !== null) {
-        $stats['torrent_stopped'] = max(0, $total - $active);
+    if ($stats['torrent_total'] !== null && $stats['torrent_active'] !== null) {
+        $stats['torrent_stopped'] = max(0, $stats['torrent_total'] - $stats['torrent_active']);
     }
 
     return $stats;

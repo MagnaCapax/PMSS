@@ -83,6 +83,8 @@ class PmssStatsCliTest extends TestCase
         $this->assertEquals(6144.0, $stats['traffic']['limit_mib']);
         $this->assertEquals(12, $stats['cgroup']['pids_current']);
         $this->assertEquals(6, $stats['rtorrent']['torrent_total']);
+        $this->assertEquals(4, $stats['rtorrent']['torrent_active']);
+        $this->assertEquals(2, $stats['rtorrent']['torrent_stopped']);
         $this->assertEquals(2, $stats['rtorrent']['torrent_downloading']);
         $this->assertEquals(2.0, $stats['rtorrent']['ratio']);
     }
