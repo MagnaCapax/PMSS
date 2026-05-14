@@ -13,7 +13,7 @@ const PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT = '/var/log/pmss/process-snapshot.log';
 
 function pmssProcessSnapshotRun(): int
 {
-    $logPath = (string) (getenv('PMSS_PROCESS_SNAPSHOT_LOG') ?: PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT);
+    $logPath = pmssResolvePathFromEnv('PMSS_PROCESS_SNAPSHOT_LOG', PMSS_PROCESS_SNAPSHOT_LOG_DEFAULT);
     $ts = date('Y-m-d\\TH:i:s');
 
     return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($ts): int {
