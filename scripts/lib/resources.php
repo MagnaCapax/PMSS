@@ -52,23 +52,6 @@ function pmssResourceStoredPayloadReportRow(array $data): ?array
     return $row;
 }
 
-/** Build the persisted resource stats payload written by the cron processor. */
-function pmssResourceStoredPayloadBuild(array $results): array
-{
-    $payload = ['daily' => $results['daily']];
-    foreach ($results['raw'] + ['memory' => $results['memory'], 'tasks' => $results['tasks']] as $metric => $values) {
-        $payload[$metric] = ['raw' => $values];
-    }
-    $payload['memory']['current'] = $results['current_memory'];
-    foreach (pmssResourceMemoryBreakdownFieldMap('current_memory_') as $field => $resultKey) {
-        if (isset($results[$resultKey]) && is_numeric($results[$resultKey])) {
-            $payload['memory'][$field] = (float) $results[$resultKey];
-        }
-    }
-    $payload['tasks']['current'] = $results['current_tasks'];
-    return $payload;
-}
-
 /**
  * Read and persist per-user resource statistics for PMSS hosts.
  */

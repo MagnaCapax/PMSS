@@ -52,7 +52,7 @@ function pmssLogWritePathIsSafe(string $path): bool
         return false;
     }
 
-    if (!pmssLogWritePathSegmentsAreSafe($path)
+    if (!pmssPathSegmentsAreSafe($path, true)
         || is_link($path)
         || (file_exists($path) && !is_file($path))) {
         return false;
@@ -64,12 +64,6 @@ function pmssLogWritePathIsSafe(string $path): bool
     }
 
     return true;
-}
-
-/** Reject traversal and symlinked ancestor components before writing logs. */
-function pmssLogWritePathSegmentsAreSafe(string $path): bool
-{
-    return pmssPathSegmentsAreSafe($path, true);
 }
 
 /** Append one payload to a JSON Lines file. */
