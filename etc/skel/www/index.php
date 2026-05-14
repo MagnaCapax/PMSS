@@ -22,6 +22,94 @@ function pmssFrameOpensInNewWindow(array $frame): bool
     return isset($frame['target']) && $frame['target'] === '_blank';
 }
 
+/** Parse a human-readable quota token into bytes. */
+function pmssLocalFrameQuotaSizeToBytes(string $value): ?int
+{
+    $value = trim(str_replace('*', '', $value));
+    if ($value === '') {
+        return null;
+    }
+
+    if (preg_match('/^(\d+(?:\.\d+)?)\s*([KMGTPE]?)(?:i?B)?$/i', $value, $matches) !== 1) {
+        return null;
+    }
+
+    $powerMap = array('' => 0, 'K' => 1, 'M' => 2, 'G' => 3, 'T' => 4, 'P' => 5, 'E' => 6);
+    $unit = strtoupper($matches[2]);
+    if (!array_key_exists($unit, $powerMap)) {
+        return null;
+    }
+
+    return (int) round((float) $matches[1] * pow(1024, $powerMap[$unit]));
+}
+
+/**
+ * Build the quota payload expected by welcome.php from the local snapshot.
+ *
+ * @return array<string,int|bool>
+ */
+function pmssLocalFrameQuotaInfoBuild(string $used, string $softLimit, string $hardLimit): array
+{
+    $usedBytes = pmssLocalFrameQuotaSizeToBytes($used);
+    $totalSpace = pmssLocalFrameQuotaSizeToBytes($softLimit);
+    $hardLimitBytes = pmssLocalFrameQuotaSizeToBytes($hardLimit);
+    if ($usedBytes === null || $totalSpace === null || $hardLimitBytes === null) {
+        return array();
+    }
+
+    return array(
+        'overQuota'  => $hardLimitBytes > 0 && $usedBytes > $hardLimitBytes,
+        'totalSpace' => $totalSpace,
+        'freeSpace'  => $totalSpace - $usedBytes,
+        'hardLimit'  => $hardLimitBytes,
+        'usedBytes'  => $usedBytes,
+    );
+}
+
+/**
+ * Read ~/.quota output as written by updateQuotas.php.
+ *
+ * @return array<string,int|bool>
+ */
+function pmssLocalFrameQuotaInfoRead(string $quotaPath = '../.quota'): array
+{
+    $raw = @file_get_contents($quotaPath);
+    if (!is_string($raw) || trim($raw) === '') {
+        return array();
+    }
+
+    $expectWrappedValues = false;
+    foreach (preg_split('/\r?\n/', trim($raw)) ?: array() as $line) {
+        $line = trim($line);
+        if ($line === '') {
+            continue;
+        }
+
+        if (preg_match('/^\/dev\/\S+\s+(\S+)\s+(\S+)\s+(\S+)/', $line, $matches) === 1) {
+            return pmssLocalFrameQuotaInfoBuild($matches[1], $matches[2], $matches[3]);
+        }
+
+        if ($expectWrappedValues && preg_match('/^(\S+)\s+(\S+)\s+(\S+)/', $line, $matches) === 1) {
+            return pmssLocalFrameQuotaInfoBuild($matches[1], $matches[2], $matches[3]);
+        }
+
+        $expectWrappedValues = preg_match('/^\/dev\/\S+$/', $line) === 1;
+    }
+
+    return array();
+}
+
+/** Build the welcome iframe URL with local quota data when available. */
+function pmssLocalFrameWelcomeUrlBuild(string $quotaPath = '../.quota'): string
+{
+    $quotaInfo = pmssLocalFrameQuotaInfoRead($quotaPath);
+    if (count($quotaInfo) == 0) {
+        return 'welcome.php';
+    }
+
+    return 'welcome.php?quota='.urlencode(serialize($quotaInfo));
+}
+
 // Remote frames can be disabled explicitly for debugging or fully offline
 // deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1.
 if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
@@ -70,7 +158,7 @@ EOF;
 
     $frames = array(
         'welcome' => array(
-            'url'      => 'welcome.php',
+            'url'      => pmssLocalFrameWelcomeUrlBuild(),
             'linkText' => 'welcome',
             'title'    => 'Welcome to your seedbox. Basic information',
         ),
