@@ -58,6 +58,21 @@ class CronInlineCharacterizationTest extends TestCase
         }
     }
 
+    public function testServiceWatchdogsQuoteSuShellBoundaries(): void
+    {
+        foreach ([
+            'scripts/cron/checkQbittorrentInstances.php',
+            'scripts/cron/checkRcloneInstances.php',
+            'scripts/cron/checkDelugeInstances.php',
+        ] as $path) {
+            $src = $this->pmssReadRepoFile($path);
+            $unsafeNeedle = 'su '.'{$thisUser}';
+            $this->assertStringNotContainsString($unsafeNeedle, $src);
+            $this->assertStringContainsString('escapeshellarg($thisUser)', $src);
+            $this->assertStringContainsString('escapeshellarg($innerCommand)', $src);
+        }
+    }
+
     public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void
     {
         $src = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');

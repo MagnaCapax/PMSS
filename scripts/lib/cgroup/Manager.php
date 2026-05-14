@@ -420,19 +420,9 @@ class Manager
                 $policyKey = $mapping[0];
                 $propertyName = $mapping[1];
                 $numeric = $mapping[2];
-                if (!isset($mountPolicy[$policyKey])) {
+                $value = $this->policyPositiveValue($mountPolicy, $policyKey, $numeric);
+                if ($value === null) {
                     continue;
-                }
-
-                if ($numeric) {
-                    if (!is_numeric($mountPolicy[$policyKey]) || ($value = (int)$mountPolicy[$policyKey]) <= 0) {
-                        continue;
-                    }
-                } else {
-                    $value = trim((string)$mountPolicy[$policyKey]);
-                    if ($value === '') {
-                        continue;
-                    }
                 }
 
                 $pairsByKey[$propertyName.'|'.$devicePath] = $propertyName.'='.$devicePath.' '.$value;
@@ -440,6 +430,23 @@ class Manager
         }
 
         return array_values($pairsByKey);
+    }
+
+    /**
+     * Read one positive policy value, preserving the existing skip-on-invalid contract.
+     */
+    private function policyPositiveValue(array $source, string $key, bool $numeric): ?string
+    {
+        if (!isset($source[$key])) {
+            return null;
+        }
+
+        if ($numeric) {
+            return is_numeric($source[$key]) && (int)$source[$key] > 0 ? (string)(int)$source[$key] : null;
+        }
+
+        $value = trim((string)$source[$key]);
+        return $value === '' ? null : $value;
     }
 
     /**
@@ -564,33 +571,20 @@ class Manager
                 foreach ([['ioWeight', 'io-weight'], ['cpuWeight', 'cpu-weight'], ['tasksMax', 'tasks-max']] as $mapping) {
                     $policyKey = $mapping[0];
                     $targetKey = $mapping[1];
-                    if (!isset($profileConfig[$policyKey]) || !is_numeric($profileConfig[$policyKey])) {
+                    $value = $this->policyPositiveValue($profileConfig, $policyKey, true);
+                    if ($value === null) {
                         continue;
                     }
-                    $numeric = (int)$profileConfig[$policyKey];
-                    if ($numeric <= 0) {
-                        continue;
-                    }
-                    $resolvedProfile['defaults'][$targetKey] = (string)$numeric;
+                    $resolvedProfile['defaults'][$targetKey] = $value;
                     $hasValidOverride = true;
                 }
 
                 foreach ([['readBw', false], ['writeBw', false], ['readIops', true], ['writeIops', true]] as $mapping) {
                     $limitKey = $mapping[0];
                     $numeric = $mapping[1];
-                    if (!isset($profileConfig[$limitKey])) {
+                    $limitValue = $this->policyPositiveValue($profileConfig, $limitKey, $numeric);
+                    if ($limitValue === null) {
                         continue;
-                    }
-
-                    if ($numeric) {
-                        if (!is_numeric($profileConfig[$limitKey]) || ($limitValue = (int)$profileConfig[$limitKey]) <= 0) {
-                            continue;
-                        }
-                    } else {
-                        $limitValue = trim((string)$profileConfig[$limitKey]);
-                        if ($limitValue === '') {
-                            continue;
-                        }
                     }
 
                     $resolvedProfile['limits'][$limitKey] = $limitValue;

@@ -17,6 +17,26 @@ class UpdateBootstrapLockReleaseTest extends TestCase
         $this->assertStringNotContainsString('/var/run/pmss/update.lock', $step2Source, 'update-step2.php should not keep the legacy /var/run lock path');
     }
 
+    public function testBootstrapLockAcquisitionIsBoundedAndNonBlocking(): void
+    {
+        $bootstrapSource = (string) file_get_contents(__DIR__.'/../../../update.php');
+
+        $this->assertStringContainsString('PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS', $bootstrapSource, 'update.php should bound lock wait time');
+        $this->assertStringContainsString('LOCK_EX | LOCK_NB', $bootstrapSource, 'update.php should not block indefinitely on flock');
+        $this->assertStringContainsString("logEvent('update_lock_busy_skip'", $bootstrapSource, 'update.php should report skipped busy locks');
+        $this->assertStringNotContainsString('flock($fh, LOCK_EX))', $bootstrapSource, 'update.php should not use a blocking exclusive flock');
+    }
+
+    public function testPhase2StandaloneLockAcquisitionIsBoundedAndNonBlocking(): void
+    {
+        $step2Source = (string) file_get_contents(__DIR__.'/../../../util/update-step2.php');
+
+        $this->assertStringContainsString('PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS', $step2Source, 'update-step2.php should bound standalone lock wait time');
+        $this->assertStringContainsString("pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, true, 'c', true", $step2Source, 'update-step2.php should request a non-blocking lock');
+        $this->assertStringContainsString("'event' => 'update_lock_busy_skip'", $step2Source, 'update-step2.php should report skipped busy locks');
+        $this->assertStringNotContainsString("pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, false, 'c', true)", $step2Source, 'update-step2.php should not use a blocking lock acquire');
+    }
+
     public function testReleaseUpdateLockDoesNotDependOnRuntimeHelper(): void
     {
         $result = $this->runBootstrapInline(

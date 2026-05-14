@@ -12,8 +12,14 @@
  */
 require_once __DIR__.'/../lib/userLifecycle.php';
 pmssUserWatchdogRunService('Deluge', 'delugeEnable', ['deluged', 'deluge-web'], 'deluge stopped due to suspension', [
-    ['processName' => 'deluged', 'command' => static function (string $thisUser): string { return "su {$thisUser} -c 'cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info'"; }, 'userLogMessage' => 'deluged start requested'],
-    ['processName' => 'deluge-web', 'command' => static function (string $thisUser): string { return "su {$thisUser} -c 'cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info'"; }, 'userLogMessage' => 'deluge-web start requested'],
+    ['processName' => 'deluged', 'command' => static function (string $thisUser): string {
+        $innerCommand = "cd ~; deluged -l /home/{$thisUser}/.delugeLog -L info";
+        return 'su '.escapeshellarg($thisUser).' -c '.escapeshellarg($innerCommand);
+    }, 'userLogMessage' => 'deluged start requested'],
+    ['processName' => 'deluge-web', 'command' => static function (string $thisUser): string {
+        $innerCommand = "cd ~; deluge-web -l /home/{$thisUser}/.delugeWebLog -L info";
+        return 'su '.escapeshellarg($thisUser).' -c '.escapeshellarg($innerCommand);
+    }, 'userLogMessage' => 'deluge-web start requested'],
 ], function (string $thisUser): array {
     $delugedRunning = pmssUserWatchdogRestartProcessesIf($thisUser, pmssUserWatchdogProcessRunning($thisUser, 'deluged'), ['deluged', 'deluge-web'], static function () use ($thisUser): bool { return function_exists('pmssDelugeApplyUploadThrottle') && pmssDelugeApplyUploadThrottle($thisUser); }, 'deluge restarted to apply upload throttle');
     return ['deluged' => $delugedRunning];

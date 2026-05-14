@@ -28,6 +28,15 @@ class SkeletonWebLocalAssetTest extends TestCase
         $this->pmssAssertRepoFileNotContainsString('etc/skel/www/index.php', 'static.pulsedmedia.com/jquery.tabs.css', 'index.php should not depend on the remote tabs stylesheet host.');
     }
 
+    public function testLocalTabsHelperAddsNavigationClass(): void
+    {
+        $this->pmssAssertRepoFileContainsString(
+            'etc/skel/www/pmssTabs.js',
+            "container.find('> ul').addClass('tabs-nav');",
+            'pmssTabs.js must add the tabs-nav class required by jquery.tabs.css.'
+        );
+    }
+
     public function testLighttpdTemplateDisablesRemoteFrames(): void
     {
         $this->pmssAssertRepoFileContainsString(

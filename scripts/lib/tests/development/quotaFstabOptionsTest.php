@@ -130,4 +130,95 @@ class QuotaFstabOptionsTest extends TestCase
         $this->assertStringContainsString('aquota.gro\\003', $messages[0]);
     }
 
+    public function testRemoveStaleQuotaCheckFilesLogsNoStaleEntries(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+
+        $this->assertEquals(0, $removed);
+        $this->assertTrue($this->pmssMessagesContain($messages, 'No stale files found'), 'expected no-stale log');
+    }
+
+    public function testRemoveStaleQuotaCheckFilesDeletesRegularFiles(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
+        $stale = $dir.'/aquota.user.new';
+        file_put_contents($stale, 'stale');
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+
+        $this->assertEquals(1, $removed);
+        $this->assertFalse(file_exists($stale), 'expected stale file removed');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Removed stale file'), 'expected removal log');
+    }
+
+    public function testRemoveStaleQuotaCheckFilesSkipsMatchedDirectories(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
+        $staleDir = $dir.'/aquota.user.new';
+        mkdir($staleDir, 0700);
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+
+        $this->assertEquals(0, $removed);
+        $this->assertTrue(is_dir($staleDir), 'expected matched directory to remain');
+        $this->assertTrue($this->pmssMessagesContain($messages, 'skipped unsafe stale quota path'), 'expected unsafe-path log');
+    }
+
+    public function testRemoveStaleQuotaCheckFilesRejectsRelativeMountPoint(): void
+    {
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $removed = \pmssRemoveStaleQuotaCheckFiles('relative/home', $logger);
+
+        $this->assertEquals(0, $removed);
+        $this->assertTrue($this->pmssMessagesContain($messages, 'refusing unsafe quota cleanup path'), 'expected unsafe mount log');
+    }
+
+    public function testRemoveStaleQuotaCheckFilesRejectsSymlinkMountPoint(): void
+    {
+        $target = $this->pmssMakeTempDir('pmss-quota-target-', 0700);
+        $link = $this->pmssMakeTempPath('pmss-quota-link-');
+        if (!@symlink($target, $link)) {
+            throw new SkipTest('filesystem does not support symlinks');
+        }
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $removed = \pmssRemoveStaleQuotaCheckFiles($link, $logger);
+
+        $this->assertEquals(0, $removed);
+        $this->assertTrue($this->pmssMessagesContain($messages, 'refusing quota cleanup outside stable mount point'), 'expected symlink mount log');
+    }
+
+    public function testRemoveStaleQuotaCheckFilesEscapesRemovedPath(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-quota-clean-', 0700);
+        $stale = $dir.'/aquota.gro'.chr(3).'new';
+        if (@file_put_contents($stale, 'stale') === false) {
+            throw new SkipTest('filesystem does not support control character filenames');
+        }
+
+        $messages = [];
+        $logger = $this->pmssMakeArrayLogger($messages);
+
+        $removed = \pmssRemoveStaleQuotaCheckFiles($dir, $logger);
+
+        $this->assertEquals(1, $removed);
+        $this->assertTrue(count($messages) === 1, 'expected one removal log');
+        $this->assertStringContainsString('aquota.gro\\003new', $messages[0]);
+    }
+
 }

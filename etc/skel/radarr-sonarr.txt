@@ -7,6 +7,10 @@ the HTTPS URLs proxied through nginx:
 
     arrinfo
 
-Login with your panel credentials unless you have changed them in the web UI.
-Restart your instances via the control panel if needed—system-wide services are
+Each Arr app has its own authentication, separate from your seedbox panel.
+On first visit, set up Forms authentication in that app's web UI. The username
+and password belong only to that app, so Radarr, Sonarr, and Prowlarr each need
+their own credentials.
+
+Restart your instances via the control panel if needed; system-wide services are
 managed by PMSS during updates.

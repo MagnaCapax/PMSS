@@ -84,26 +84,17 @@ class NetworkFireqosTest extends TestCase
     {
         $missingPath = $this->pmssMakeTempPath('pmss-fireqos-missing-', '.conf');
         $config = '';
-        $warnings = [];
 
-        $this->pmssWithEnv(['PMSS_FIREQOS_TEMPLATE' => $missingPath], function () use (&$config, &$warnings): void {
-            set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-                $warnings[] = [$severity, $message];
-                return true;
-            });
-
-            try {
+        $this->pmssWithEnv(['PMSS_FIREQOS_TEMPLATE' => $missingPath], function () use (&$config): void {
+            $this->pmssAssertNoPhpWarnings(function () use (&$config): void {
                 $config = \networkBuildFireqosConfig(
                     ['interface' => 'eth2', 'speed' => 1234, 'throttle' => ['max' => 100]],
                     [],
                     []
                 );
-            } finally {
-                restore_error_handler();
-            }
+            });
         });
 
-        $this->assertEquals([], $warnings);
         $this->assertTrue(strpos($config, 'interface eth2') !== false);
         $this->assertTrue(strpos($config, 'rate 1234') !== false);
     }

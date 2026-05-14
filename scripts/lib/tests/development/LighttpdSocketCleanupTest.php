@@ -10,7 +10,7 @@ class LighttpdSocketCleanupTest extends TestCase
         $script = $this->readStartScript();
         $dirsPos = strpos($script, 'foreach ($requiredDirs as $dir) {');
         $mkdirPos = strpos($script, "'mkdir -p '.escapeshellarg(\$dir)");
-        $launchPos = strpos($script, "/usr/sbin/lighttpd -f {\$configPath}");
+        $launchPos = strpos($script, "\$startCommand = '/usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);");
 
         $this->assertTrue($dirsPos !== false);
         $this->assertTrue($mkdirPos !== false && $mkdirPos > $dirsPos);
@@ -24,11 +24,25 @@ class LighttpdSocketCleanupTest extends TestCase
         $script = $this->readStartScript();
         $cleanupPos = strpos($script, "foreach (glob(rtrim(\$lighttpdDir, '/').'/php.socket*') ?: [] as \$socketPath) {");
         $unlinkPos = strpos($script, '@unlink($socketPath);');
-        $launchPos = strpos($script, "/usr/sbin/lighttpd -f {\$configPath}");
+        $launchPos = strpos($script, "\$startCommand = '/usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);");
 
         $this->assertTrue($cleanupPos !== false);
         $this->assertTrue($unlinkPos !== false && $unlinkPos > $cleanupPos);
         $this->assertTrue($launchPos !== false && $unlinkPos < $launchPos);
+    }
+
+    public function testStartScriptEntersUserHomeBeforeLaunchingLighttpd(): void
+    {
+        $script = $this->readStartScript();
+        $chdirPos = strpos($script, '@chdir($homeDir)');
+        $commandPos = strpos($script, "\$startCommand = '/usr/sbin/lighttpd -f '.escapeshellarg(\$configPath);");
+        $suPos = strpos($script, "passthru('su '.escapeshellarg(\$user).' -c '.escapeshellarg(\$startCommand));");
+
+        $this->assertTrue($chdirPos !== false);
+        $this->assertTrue($commandPos !== false && $commandPos > $chdirPos);
+        $this->assertTrue($suPos !== false && $suPos > $commandPos);
+        $this->assertTrue(strpos($script, 'cd {$homeDir}; su {$user}') === false);
+        $this->assertTrue(strpos($script, "ps aux | grep '.escapeshellarg(\$user)") !== false);
     }
 
     private function readStartScript(): string

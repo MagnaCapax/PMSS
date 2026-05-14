@@ -15,10 +15,29 @@ require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/../user/userConfigStore.php';
 
     /**
+     * Keep per-user maintenance helper entrypoints behind the username policy.
+     */
+    function pmssUserMaintenanceUsernameAllowed(string $user, string $context): bool
+    {
+        if (pmssValidateUsername($user)) {
+            return true;
+        }
+
+        $safeUser = preg_replace('/[\r\n\0]+/', '?', $user);
+        $safeUser = is_string($safeUser) && $safeUser !== '' ? $safeUser : '(empty)';
+        logMessage(sprintf('[WARN] %s refused invalid username: %s', $context, $safeUser));
+        return false;
+    }
+
+    /**
      * Run a shell command (optionally as the user) and log stdout/stderr + rc to the user's log file.
      */
     function pmssRunAndLog(string $user, string $label, string $command, bool $asUser = false): int
     {
+        if (!pmssUserMaintenanceUsernameAllowed($user, 'pmssRunAndLog')) {
+            return 127;
+        }
+
         $inner = $asUser ? sprintf('su %s -c %s', escapeshellarg($user), escapeshellarg($command)) : $command;
         pmssUserLog($user, "[CMD] {$label}: {$command}");
         $result = pmssCommandCapture($inner, 0, true, 'Failed to start process', 127);
@@ -182,6 +201,10 @@ require_once __DIR__.'/../user/userConfigStore.php';
      */
     function pmssEnsureLingerAndDocker(string $user): void
     {
+        if (!pmssUserMaintenanceUsernameAllowed($user, 'pmssEnsureLingerAndDocker')) {
+            return;
+        }
+
         if (is_dir("/home/{$user}/www-disabled")) {
             pmssUserLog($user, '[SKIP] User appears suspended; skipping linger/Docker wiring');
             return;
@@ -249,6 +272,10 @@ require_once __DIR__.'/../user/userConfigStore.php';
      */
     function pmssEnsureRootlessDockerInstalled(string $user): void
     {
+        if (!pmssUserMaintenanceUsernameAllowed($user, 'pmssEnsureRootlessDockerInstalled')) {
+            return;
+        }
+
         $uinfo = pmssUserAccountLookup($user);
         if ($uinfo === null || !isset($uinfo['dir'])) {
             pmssUserLog($user, '[WARN] Unable to resolve passwd entry; skipping rootless Docker install');
@@ -338,6 +365,10 @@ require_once __DIR__.'/../user/userConfigStore.php';
      */
     function pmssEnsureDockerDependencies(string $user): void
     {
+        if (!pmssUserMaintenanceUsernameAllowed($user, 'pmssEnsureDockerDependencies')) {
+            return;
+        }
+
         // 1. Check subuid/subgid
         $subuid = @file_get_contents('/etc/subuid');
         $subgid = @file_get_contents('/etc/subgid');

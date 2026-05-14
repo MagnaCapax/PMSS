@@ -54,6 +54,9 @@ foreach (glob(rtrim($lighttpdDir, '/').'/php.socket*') ?: [] as $socketPath) {
     @unlink($socketPath);
 }
 
-passthru("cd {$homeDir}; su {$user} -c '/usr/sbin/lighttpd -f {$configPath}'");	// This is for newer versions
+// lighttpd inherits cwd before opening logs; keep it out of root-only paths.
+if (!@chdir($homeDir)) die("Unable to enter user home\n");
+$startCommand = '/usr/sbin/lighttpd -f '.escapeshellarg($configPath);
+passthru('su '.escapeshellarg($user).' -c '.escapeshellarg($startCommand));
 
-passthru("ps aux|grep {$user}"); // Output running processes
+passthru('ps aux | grep '.escapeshellarg($user)); // Output running processes

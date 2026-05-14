@@ -9,6 +9,23 @@
  */
 
 /**
+ * Confirm that a user maintenance path resolves beneath the configured home root.
+ */
+function pmssUserPathWithinHomeRoot(string $path): bool
+{
+    $homeRoot = rtrim(pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home'), '/');
+    $realHomeRoot = realpath($homeRoot);
+    $realParent = realpath(dirname($path));
+    if ($homeRoot === '' || $homeRoot === '/' || $realHomeRoot === false || $realParent === false) {
+        return false;
+    }
+
+    $candidate = rtrim($realParent, '/').'/'.basename($path);
+    $prefix = rtrim($realHomeRoot, '/').'/';
+    return strpos($candidate, $prefix) === 0;
+}
+
+/**
  * Apply a text patch to a writable tenant file when it exists.
  *
  * @param string   $path    Writable file path in the tenant home.
@@ -16,7 +33,8 @@
  */
 function pmssUserPatchWritableFile(string $path, callable $patcher): void
 {
-    if (!is_file($path)
+    if (!pmssUserPathWithinHomeRoot($path)
+        || !is_file($path)
         || is_link($path)
         || !is_string($content = @file_get_contents($path))
         || $content === '') {
@@ -61,7 +79,7 @@ function pmssUserPatchWritableStrings(string $path, array $replacements): void
  */
 function pmssUserDeletePathIfPresent(string $path): void
 {
-    if ((is_file($path) || is_link($path)) && file_exists($path)) {
+    if (pmssUserPathWithinHomeRoot($path) && (is_file($path) || is_link($path)) && file_exists($path)) {
         @unlink($path);
     }
 }

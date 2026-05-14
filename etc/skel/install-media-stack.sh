@@ -785,6 +785,7 @@ port = 8080
 host = 127.0.0.1
 url_base = /sabnzbd
 host_whitelist = ${HOSTNAME}
+inet_exposure = 4
 EOF
   fi
   sed -i -E "s#(url_base = ).*#\1/public-${USERNAME}/${app}#" "$datadir/${app}.ini"
@@ -795,6 +796,11 @@ EOF
     sed -i '/^\[misc\]/a host = 127.0.0.1' "$datadir/${app}.ini"
   fi
   sed -i -E "s#^(host_whitelist = ).*#\1${HOSTNAME}#" "$datadir/${app}.ini"
+  # The public lighttpd proxy forwards real client IPs; allow the setup wizard so users can set SABnzbd auth.
+  sed -i -E "s#^inet_exposure = .*#inet_exposure = 4#" "$datadir/${app}.ini"
+  if ! grep -q '^inet_exposure = ' "$datadir/${app}.ini"; then
+    sed -i '/^\[misc\]/a inet_exposure = 4' "$datadir/${app}.ini"
+  fi
 else
   log_info "[dry-run] would configure ${app^^} (port=${SABNZBD_PORT}, url_base=/public-${USERNAME}/${app})"
 fi

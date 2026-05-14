@@ -86,4 +86,36 @@ class UserCgroupUtilTest extends TestCase
         $infinity = $mgr->computeSetProps(['memory-high'=>400,'cpu-quota-percent'=>0], 16000);
         $this->assertEquals('', $infinity['CPUQuota']);
     }
+
+    public function testIoPolicyProfileKeepsOnlyPositiveValues(): void
+    {
+        $cfgDir = $this->pmssMakeTempDir('pmss-cgroup-policy-');
+        $this->pmssWriteFile($cfgDir.'/cgroup.policy.php', '<?php return '.var_export([
+            'profiles' => [
+                'io' => [
+                    'archive' => [
+                        'cpuWeight' => 250,
+                        'readBw' => '9M',
+                        'writeBw' => '',
+                        'readIops' => 44,
+                        'writeIops' => 0,
+                    ],
+                ],
+            ],
+        ], true).";\n");
+
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $cfgDir], function (): void {
+            $mgr = $this->makeManager();
+            list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
+                return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--device=/dev/sdb', '--io-profile=archive']);
+            });
+
+            $this->assertEquals(0, $rc);
+            $this->assertStringContainsString('CPUWeight=250', $out);
+            $this->assertStringContainsString('IOReadBandwidthMax=/dev/sdb 9M', $out);
+            $this->assertStringContainsString('IOReadIOPSMax=/dev/sdb 44', $out);
+            $this->assertStringNotContainsString('IOWriteBandwidthMax=/dev/sdb', $out);
+            $this->assertStringNotContainsString('IOWriteIOPSMax=/dev/sdb', $out);
+        });
+    }
 }

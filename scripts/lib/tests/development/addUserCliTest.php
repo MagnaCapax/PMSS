@@ -25,7 +25,7 @@ class addUserCliTest extends TestCase
 
     public function testHelpFlagReturnsUsageWithoutUserPayload(): void
     {
-        $cli = \pmssAddUserParseCli(['addUser.php', '--help']);
+        $cli = $this->parseAddUserCli(['--help']);
 
         $this->assertTrue($cli['help'] === true, 'help mode should be explicit');
         $this->assertStringContainsAllStrings(['Usage', 'Positional Parameters', 'Named Options', 'Examples'], $cli['usage']);
@@ -33,7 +33,7 @@ class addUserCliTest extends TestCase
 
     public function testLegacyPositionalArgumentsRemainSupported(): void
     {
-        $cli = \pmssAddUserParseCli(['addUser.php', 'alice', 'rand', '512', '100', '500', '80', '16']);
+        $cli = $this->parseAddUserCli(['alice', 'rand', '512', '100', '500', '80', '16']);
 
         $this->assertSame('alice', $cli['user']['name']);
         $this->assertSame('', $cli['user']['password']);
@@ -46,8 +46,7 @@ class addUserCliTest extends TestCase
 
     public function testLongOptionsPopulateAdvancedResources(): void
     {
-        $cli = \pmssAddUserParseCli([
-            'addUser.php',
+        $cli = $this->parseAddUserCli([
             '--user=alice',
             '--password=secret',
             '--ram-mib=512',
@@ -84,25 +83,18 @@ class addUserCliTest extends TestCase
 
     public function testDockerEnabledRequiresExplicitValue(): void
     {
-        try {
-            \pmssAddUserParseCli([
-                'addUser.php',
-                '--user=alice',
-                '--password=secret',
-                '--ram-mib=512',
-                '--disk-quota-gib=100',
-                '--docker-enabled',
-            ]);
-            $this->fail('docker-enabled must require a value');
-        } catch (\InvalidArgumentException $exception) {
-            $this->assertSame('--docker-enabled requires true or false', $exception->getMessage());
-        }
+        $this->assertAddUserParseFails([
+            '--user=alice',
+            '--password=secret',
+            '--ram-mib=512',
+            '--disk-quota-gib=100',
+            '--docker-enabled',
+        ], '--docker-enabled requires true or false');
     }
 
     public function testLongOptionsOverrideLegacyPositionals(): void
     {
-        $cli = \pmssAddUserParseCli([
-            'addUser.php',
+        $cli = $this->parseAddUserCli([
             'alice',
             'secret',
             '512',
@@ -119,8 +111,7 @@ class addUserCliTest extends TestCase
 
     public function testFirstPositionalUsernameCanMixWithNamedOptions(): void
     {
-        $cli = \pmssAddUserParseCli([
-            'addUser.php',
+        $cli = $this->parseAddUserCli([
             'alice',
             '--password=secret',
             '--ram-mib=1024',
@@ -137,19 +128,13 @@ class addUserCliTest extends TestCase
 
     public function testRejectsNegativeUploadThrottle(): void
     {
-        try {
-            \pmssAddUserParseCli([
-                'addUser.php',
-                '--user=alice',
-                '--password=secret',
-                '--ram-mib=512',
-                '--disk-quota-gib=100',
-                '--upload-throttle-kib=-1',
-            ]);
-            $this->fail('Negative throttles must be rejected');
-        } catch (\InvalidArgumentException $exception) {
-            $this->assertSame('Invalid upload throttle value', $exception->getMessage());
-        }
+        $this->assertAddUserParseFails([
+            '--user=alice',
+            '--password=secret',
+            '--ram-mib=512',
+            '--disk-quota-gib=100',
+            '--upload-throttle-kib=-1',
+        ], 'Invalid upload throttle value');
     }
 
     public function testUserConfigCommandPadsSkippedOptionalSlots(): void
@@ -169,5 +154,22 @@ class addUserCliTest extends TestCase
         $this->assertStringContainsString("'--upload-throttle-kib=16'", $command);
         $this->assertStringContainsString("'--iops-limit=1234'", $command);
         $this->assertStringContainsString("'--docker-enabled=false'", $command);
+    }
+
+    private function parseAddUserCli(array $args): array
+    {
+        return \pmssAddUserParseCli(array_merge(['addUser.php'], $args));
+    }
+
+    private function assertAddUserParseFails(array $args, string $message): void
+    {
+        try {
+            $this->parseAddUserCli($args);
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame($message, $exception->getMessage());
+            return;
+        }
+
+        $this->fail('Expected addUser parser failure: '.$message);
     }
 }

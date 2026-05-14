@@ -44,7 +44,15 @@ function pmssFstabMountOptionsEnsure(array &$lines, string $mountPoint, array $r
     if (($entry = pmssFstabMountEntryRead($lines, $mountPoint, $fsType)) === null) return null;
     $plan = pmssConfigOptionsUpdatePlan($entry['columns'][3], $requiredOptions, $removeOptions, $dropDefaultsOnly);
     foreach ($replacePrefixedOptions as $prefix => $replacement) {
-        $plan['options'] = pmssFstabOptionsReplacePrefixedValue($plan['options'], $prefix, $replacement, $collapseDuplicates);
+        $updated = [];
+        $replaced = false;
+        foreach ($plan['options'] as $option) {
+            if (strpos($option, $prefix) !== 0) { $updated[] = $option; continue; }
+            if (!$replaced) { $updated[] = $replacement; $replaced = true; continue; }
+            if (!$collapseDuplicates) $updated[] = $option;
+        }
+        if (!$replaced) $updated[] = $replacement;
+        $plan['options'] = $updated;
     }
     $plan['columns'] = $entry['columns'];
     $plan['columns'][3] = implode(',', $plan['options']);
@@ -59,22 +67,4 @@ function pmssFstabPlanChangeSuffix(array $plan): string
 {
     return (($plan['added'] ?? []) !== [] ? ' (added '.implode(', ', $plan['added']).')' : '')
         .(($plan['removed'] ?? []) !== [] ? ' (removed '.implode(', ', $plan['removed']).')' : '');
-}
-/**
- * Replace a prefixed option with one canonical value.
- *
- * @param array<int,string> $options
- * @return array<int,string>
- */
-function pmssFstabOptionsReplacePrefixedValue(array $options, string $prefix, string $replacement, bool $collapseDuplicates = true): array
-{
-    $updated = [];
-    $replaced = false;
-    foreach ($options as $option) {
-        if (strpos($option, $prefix) !== 0) { $updated[] = $option; continue; }
-        if (!$replaced) { $updated[] = $replacement; $replaced = true; continue; }
-        if (!$collapseDuplicates) $updated[] = $option;
-    }
-    if (!$replaced) $updated[] = $replacement;
-    return $updated;
 }

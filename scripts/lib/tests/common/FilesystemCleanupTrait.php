@@ -128,6 +128,24 @@ trait FilesystemCleanupTrait
         return [$callback($this->pmssMakeArrayLogger($messages)), $messages];
     }
 
+    /** Assert that a callback runs without emitting PHP warnings/notices. */
+    protected function pmssAssertNoPhpWarnings(callable $callback): void
+    {
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = [$severity, $message];
+            return true;
+        });
+
+        try {
+            $callback();
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame([], $warnings);
+    }
+
     /** Check whether a captured log message contains a given substring. */
     protected function pmssMessagesContain(array $messages, string $needle): bool
     {

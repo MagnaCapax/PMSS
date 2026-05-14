@@ -33,10 +33,7 @@ final class UserCliHelpContractsTest extends TestCase
 
     public function testUserConfigHelpBypassesUserLookup(): void
     {
-        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/userConfig.php', ['ghostuser', '--help']);
-
-        $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsAllStrings([
+        $this->assertHelpCommandContains('scripts/util/userConfig.php', ['ghostuser', '--help'], [
             'Usage',
             '--welcome-message=HTML',
             '--iops-limit=OPS',
@@ -46,15 +43,12 @@ final class UserCliHelpContractsTest extends TestCase
             'MemoryHigh',
             'Examples',
             '250 MiB',
-        ], $result['output']);
+        ]);
     }
 
     public function testUserConfigCgroupHelpIncludesProfilesAndRanges(): void
     {
-        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/userConfigCgroup.php', ['--help']);
-
-        $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsAllStrings([
+        $this->assertHelpCommandContains('scripts/util/userConfigCgroup.php', ['--help'], [
             'Resource Options',
             '--defaults',
             '--io-profile=hdd|nvme|bulk',
@@ -64,21 +58,18 @@ final class UserCliHelpContractsTest extends TestCase
             '1-10000',
             '250 MiB',
             'Examples',
-        ], $result['output']);
+        ]);
     }
 
     public function testUserResourcesListHelpBypassesRootGuard(): void
     {
-        $result = $this->pmssRunRepoPhpScriptCommand('scripts/util/userResourcesList.php', ['--help']);
-
-        $this->assertSame(0, $result['rc']);
-        $this->assertStringContainsAllStrings([
+        $result = $this->assertHelpCommandContains('scripts/util/userResourcesList.php', ['--help'], [
             '--brief',
             '--full',
             '--json',
             '--jsonl',
             '--help works without root',
-        ], $result['output']);
+        ]);
         $this->pmssAssertStringNotContainsString('must be run as root', $result['output']);
     }
 
@@ -111,5 +102,15 @@ final class UserCliHelpContractsTest extends TestCase
                 '/scripts/util/userConfig.php alice 1024 200',
             ]
         );
+    }
+
+    private function assertHelpCommandContains(string $script, array $args, array $needles): array
+    {
+        $result = $this->pmssRunRepoPhpScriptCommand($script, $args);
+
+        $this->assertSame(0, $result['rc']);
+        $this->assertStringContainsAllStrings($needles, $result['output']);
+
+        return $result;
     }
 }

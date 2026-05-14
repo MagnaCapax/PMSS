@@ -12,6 +12,7 @@
 
         return this.each(function () {
             var container = $(this);
+            container.find('> ul').addClass('tabs-nav');
             var panes = container.find('> #content > .tabs-container');
             var tabLinks = container.find('> ul a[href^="#"]');
 

@@ -10,162 +10,136 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../userLifecycle.php';
 
-if (!function_exists('pmssTrafficDataPaths')) {
-    /** @return array<string,string> Resolve the canonical per-user traffic data files. */
-    function pmssTrafficDataPaths(string $username, ?string $homeDir = null): array
-    {
-        $homeDir = pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home');
-        $userHome = $homeDir.'/'.$username;
+/** @return array<string,string> Resolve the canonical per-user traffic data files. */
+function pmssTrafficDataPaths(string $username, ?string $homeDir = null): array
+{
+    $homeDir = pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home');
+    $userHome = $homeDir.'/'.$username;
 
-        return [
-            'normal' => $userHome.'/.trafficData',
-            'local' => $userHome.'/.trafficDataLocal',
-            'ingress' => $userHome.'/.trafficDataIngress',
-            'ingressLocal' => $userHome.'/.trafficDataIngressLocal',
-        ];
+    return [
+        'normal' => $userHome.'/.trafficData',
+        'local' => $userHome.'/.trafficDataLocal',
+        'ingress' => $userHome.'/.trafficDataIngress',
+        'ingressLocal' => $userHome.'/.trafficDataIngressLocal',
+    ];
+}
+
+/** Resolve the traffic file key for one mode/localnet combination. */
+function pmssTrafficDataPathKey(bool $isLocalnet, string $trafficMode = 'egress'): string { return ['egress' => ['normal', 'local'], 'ingress' => ['ingress', 'ingressLocal']][$trafficMode === 'ingress' ? 'ingress' : 'egress'][$isLocalnet ? 1 : 0]; }
+
+// Detect whether a traffic user key targets the localnet bucket.
+function pmssTrafficUserKeyIsLocalnet(string $user): bool { return substr_compare($user, '-localnet', -9) === 0; }
+
+// Resolve the canonical PMSS username behind a traffic user key.
+function pmssTrafficUserKeyBaseUser(string $user): string { return pmssTrafficUserKeyIsLocalnet($user) ? substr($user, 0, -9) : $user; }
+
+/** Validate a traffic storage key, allowing the `-localnet` suffix. */
+function pmssTrafficUserKeyIsValid(string $user): bool
+{
+    return $user !== '' && pmssUsernameIsValid(pmssTrafficUserKeyBaseUser($user));
+}
+
+/** Resolve the per-user persisted traffic limit path. */
+function pmssTrafficLimitPath(string $username, ?string $homeDir = null): string
+{
+    return pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home').'/'.$username.'/.trafficLimit';
+}
+
+/** Resolve the runtime traffic statistics cache path for a user key. */
+function pmssTrafficStatsPath(string $username, ?string $statsDir = null, ?string $runtimeDir = null): string
+{
+    if ($statsDir === null) {
+        $statsDir = pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/var/run/pmss').'/trafficStats';
     }
+
+    return pmssDirPathNormalize($statsDir).'/'.$username;
 }
 
-if (!function_exists('pmssTrafficDataPathKey')) {
-    /** Resolve the traffic file key for one mode/localnet combination. */
-    function pmssTrafficDataPathKey(bool $isLocalnet, string $trafficMode = 'egress'): string { return ['egress' => ['normal', 'local'], 'ingress' => ['ingress', 'ingressLocal']][$trafficMode === 'ingress' ? 'ingress' : 'egress'][$isLocalnet ? 1 : 0]; }
-}
-
-if (!function_exists('pmssTrafficUserKeyIsLocalnet')) {
-    // Detect whether a traffic user key targets the localnet bucket.
-    function pmssTrafficUserKeyIsLocalnet(string $user): bool { return substr_compare($user, '-localnet', -9) === 0; }
-}
-
-if (!function_exists('pmssTrafficUserKeyBaseUser')) {
-    // Resolve the canonical PMSS username behind a traffic user key.
-    function pmssTrafficUserKeyBaseUser(string $user): string { return pmssTrafficUserKeyIsLocalnet($user) ? substr($user, 0, -9) : $user; }
-}
-
-if (!function_exists('pmssTrafficUserKeyIsValid')) {
-    /** Validate a traffic storage key, allowing the `-localnet` suffix. */
-    function pmssTrafficUserKeyIsValid(string $user): bool
-    {
-        return $user !== '' && pmssUsernameIsValid(pmssTrafficUserKeyBaseUser($user));
+/**
+ * Read a trusted traffic stats payload owned by root and grouped to the user.
+ */
+function pmssTrafficReadRootOwnedStatsPayload(string $path, string $username): ?array
+{
+    $stats = @stat($path);
+    if ($stats === false || (int) $stats['uid'] !== 0 || (($stats['mode'] & 0777) & 0022) !== 0) {
+        return null;
     }
-}
 
-if (!function_exists('pmssTrafficLimitPath')) {
-    /** Resolve the per-user persisted traffic limit path. */
-    function pmssTrafficLimitPath(string $username, ?string $homeDir = null): string
-    {
-        return pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home').'/'.$username.'/.trafficLimit';
+    $group = @posix_getgrgid((int) $stats['gid']);
+    if ($group !== false && isset($group['name']) && $group['name'] !== $username && $group['name'] !== 'root') {
+        return null;
     }
-}
 
-if (!function_exists('pmssTrafficStatsPath')) {
-    /** Resolve the runtime traffic statistics cache path for a user key. */
-    function pmssTrafficStatsPath(string $username, ?string $statsDir = null, ?string $runtimeDir = null): string
-    {
-        if ($statsDir === null) {
-            $statsDir = pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/var/run/pmss').'/trafficStats';
-        }
-
-        return pmssDirPathNormalize($statsDir).'/'.$username;
+    $data = pmssReadSerializedArrayFile($path);
+    if ($data === null || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
+        return null;
     }
+
+    return $data;
 }
 
-if (!function_exists('pmssTrafficReadRootOwnedStatsPayload')) {
-    /**
-     * Read a trusted traffic stats payload owned by root and grouped to the user.
-     */
-    function pmssTrafficReadRootOwnedStatsPayload(string $path, string $username): ?array
-    {
-        $stats = @stat($path);
-        if ($stats === false || (int) $stats['uid'] !== 0 || (($stats['mode'] & 0777) & 0022) !== 0) {
-            return null;
-        }
-
-        $group = @posix_getgrgid((int) $stats['gid']);
-        if ($group !== false && isset($group['name']) && $group['name'] !== $username && $group['name'] !== 'root') {
-            return null;
-        }
-
-        $data = pmssReadSerializedArrayFile($path);
-        if ($data === null || !isset($data['raw']['month']) || !is_numeric($data['raw']['month'])) {
-            return null;
-        }
-
-        return $data;
+/** Best-effort immutable toggle for traffic data files. */
+function pmssTrafficSetImmutable(string $path, bool $enable): void
+{
+    if (!is_file($path) || is_link($path)) {
+        return;
     }
-}
 
-if (!function_exists('pmssTrafficSetImmutable')) {
-    /** Best-effort immutable toggle for traffic data files. */
-    function pmssTrafficSetImmutable(string $path, bool $enable): void
-    {
-        if (!is_file($path) || is_link($path)) {
-            return;
-        }
-
-        static $chattr = null;
-        if ($chattr === null) {
-            $chattr = '';
-            foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
-                if (is_executable($candidate)) {
-                    $chattr = $candidate;
-                    break;
-                }
+    static $chattr = null;
+    if ($chattr === null) {
+        $chattr = '';
+        foreach (['/usr/bin/chattr', '/bin/chattr'] as $candidate) {
+            if (is_executable($candidate)) {
+                $chattr = $candidate;
+                break;
             }
         }
+    }
 
-        $chattr === '' || @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
+    $chattr === '' || @exec($chattr.' '.($enable ? '+i' : '-i').' '.escapeshellarg($path).' 2>/dev/null');
+}
+
+/**
+ * Persist one traffic state file through the shared atomic writer.
+ */
+function pmssTrafficWriteFile(string $path, string $serialized, string $group, int $mode, bool $immutable): bool
+{
+    $immutable && pmssTrafficSetImmutable($path, false);
+
+    try {
+        return pmssWriteManagedFile($path, $serialized, 'root', $group, $mode);
+    } finally {
+        $immutable && pmssTrafficSetImmutable($path, true);
     }
 }
 
-if (!function_exists('pmssTrafficWriteFile')) {
-    /**
-     * Persist one traffic state file through the shared atomic writer.
-     */
-    function pmssTrafficWriteFile(string $path, string $serialized, string $group, int $mode, bool $immutable): bool
-    {
-        $immutable && pmssTrafficSetImmutable($path, false);
+/** Ensure each managed directory exists, reporting unsafe paths through the callback. */
+function pmssManagedDirsEnsure(array $directories, callable $failureLogger): void { foreach ($directories as $dir => $mode) { pmssEnsureSafeDir((string) $dir, (int) $mode) || $failureLogger((string) $dir); } }
 
-        try {
-            return pmssWriteManagedFile($path, $serialized, 'root', $group, $mode);
-        } finally {
-            $immutable && pmssTrafficSetImmutable($path, true);
+/** Write one serialized payload to each managed target while preserving partial success. */
+function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, callable $failureLogger): bool
+{
+    $allWritesSucceeded = true;
+    foreach ($targets as list($path, $group, $mode, $immutable)) {
+        if (!pmssTrafficWriteFile((string) $path, $serialized, (string) $group, (int) $mode, (bool) $immutable)) {
+            $allWritesSucceeded = false;
+            $failureLogger((string) $path);
         }
     }
+    return $allWritesSucceeded;
 }
 
-if (!function_exists('pmssManagedDirsEnsure')) {
-    /** Ensure each managed directory exists, reporting unsafe paths through the callback. */
-    function pmssManagedDirsEnsure(array $directories, callable $failureLogger): void { foreach ($directories as $dir => $mode) { pmssEnsureSafeDir((string) $dir, (int) $mode) || $failureLogger((string) $dir); } }
-}
-
-if (!function_exists('pmssManagedSerializedTargetsWrite')) {
-    /** Write one serialized payload to each managed target while preserving partial success. */
-    function pmssManagedSerializedTargetsWrite(string $serialized, array $targets, callable $failureLogger): bool
-    {
-        $allWritesSucceeded = true;
-        foreach ($targets as list($path, $group, $mode, $immutable)) {
-            if (!pmssTrafficWriteFile((string) $path, $serialized, (string) $group, (int) $mode, (bool) $immutable)) {
-                $allWritesSucceeded = false;
-                $failureLogger((string) $path);
-            }
-        }
-        return $allWritesSucceeded;
-    }
-}
-
-if (!function_exists('pmssTrafficSeedInitialState')) {
-    /** Persist zeroed traffic state for new accounts via the canonical storage helper. */
-    function pmssTrafficSeedInitialState(string $username, ?string $homeDir = null, ?string $runtimeDir = null, ?callable $logger = null): bool
-    {
-        $failed = false;
-        $forwardLogger = $logger ?? 'logMessage';
-        $storage = new TrafficStorage(['home_dir' => $homeDir, 'runtime_dir' => $runtimeDir, 'logger' => static function (string $message) use (&$failed, $forwardLogger): void { $failed = true; $forwardLogger($message); }]);
-        $payload = ['raw' => array_fill_keys(array_keys(pmssStatsCompareTimesBuild(0)), 0.0), 'daily' => []];
-        $storage->ensureRuntime();
-        $storage->save($username, $payload);
-        $storage->save($username.'-localnet', $payload);
-        return !$failed;
-    }
+/** Persist zeroed traffic state for new accounts via the canonical storage helper. */
+function pmssTrafficSeedInitialState(string $username, ?string $homeDir = null, ?string $runtimeDir = null, ?callable $logger = null): bool
+{
+    $failed = false;
+    $forwardLogger = $logger ?? 'logMessage';
+    $storage = new TrafficStorage(['home_dir' => $homeDir, 'runtime_dir' => $runtimeDir, 'logger' => static function (string $message) use (&$failed, $forwardLogger): void { $failed = true; $forwardLogger($message); }]);
+    $payload = ['raw' => array_fill_keys(array_keys(pmssStatsCompareTimesBuild(0)), 0.0), 'daily' => []];
+    $storage->ensureRuntime();
+    $storage->save($username, $payload);
+    $storage->save($username.'-localnet', $payload);
+    return !$failed;
 }
 
 class TrafficStorage

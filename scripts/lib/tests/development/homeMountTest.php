@@ -12,14 +12,12 @@ require_once __DIR__.'/../../homeMount.php';
  */
 class HomeMountTest extends TestCase
 {
-    private $originalOverride;
     private $originalSkip;
     private $originalMountsPath;
 
     protected function setUp(): void
     {
         // Preserve original env state.
-        $this->originalOverride = getenv('PMSS_HOME_MOUNTED_OVERRIDE');
         $this->originalSkip = getenv('PMSS_SKIP_HOME_MOUNT_CHECK');
         $this->originalMountsPath = getenv('PMSS_PROC_MOUNTS_PATH');
     }
@@ -27,11 +25,6 @@ class HomeMountTest extends TestCase
     protected function tearDown(): void
     {
         // Restore original env state.
-        if ($this->originalOverride === false) {
-            putenv('PMSS_HOME_MOUNTED_OVERRIDE');
-        } else {
-            putenv('PMSS_HOME_MOUNTED_OVERRIDE='.$this->originalOverride);
-        }
         if ($this->originalSkip === false) {
             putenv('PMSS_SKIP_HOME_MOUNT_CHECK');
         } else {
@@ -42,33 +35,6 @@ class HomeMountTest extends TestCase
         } else {
             putenv('PMSS_PROC_MOUNTS_PATH='.$this->originalMountsPath);
         }
-    }
-
-    public function testIsHomeMountedReturnsTrueWhenOverrideSet(): void
-    {
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=1');
-        $this->assertTrue(pmssIsHomeMounted());
-
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=true');
-        $this->assertTrue(pmssIsHomeMounted());
-    }
-
-    public function testIsHomeMountedReturnsFalseWhenOverrideSetToFalse(): void
-    {
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=0');
-        $this->assertTrue(!pmssIsHomeMounted());
-
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=false');
-        $this->assertTrue(!pmssIsHomeMounted());
-    }
-
-    public function testIsHomeMountedNormalizesOverrideCase(): void
-    {
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=TRUE');
-        $this->assertTrue(pmssIsHomeMounted());
-
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=FALSE');
-        $this->assertTrue(!pmssIsHomeMounted());
     }
 
     public function testIsHomeMountedParsesRealMountsFile(): void
@@ -82,7 +48,6 @@ tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
 MOUNTS;
         file_put_contents($tmpFile, $content);
 
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=');
         putenv('PMSS_PROC_MOUNTS_PATH='.$tmpFile);
 
         $this->assertTrue(pmssIsHomeMounted());
@@ -100,7 +65,6 @@ tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
 MOUNTS;
         file_put_contents($tmpFile, $content);
 
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=');
         putenv('PMSS_PROC_MOUNTS_PATH='.$tmpFile);
 
         $this->assertTrue(!pmssIsHomeMounted());
@@ -118,7 +82,6 @@ MOUNTS;
 MOUNTS;
         file_put_contents($tmpFile, $content);
 
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=');
         putenv('PMSS_PROC_MOUNTS_PATH='.$tmpFile);
 
         $this->assertTrue(!pmssIsHomeMounted());
@@ -128,7 +91,6 @@ MOUNTS;
 
     public function testIsHomeMountedReturnsFalseWhenMountsFileUnreadable(): void
     {
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=');
         putenv('PMSS_PROC_MOUNTS_PATH=/nonexistent/path/to/mounts');
 
         $this->assertTrue(!pmssIsHomeMounted());
@@ -138,7 +100,7 @@ MOUNTS;
     {
         // When skip is set, the function should return without exiting.
         putenv('PMSS_SKIP_HOME_MOUNT_CHECK=1');
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=0'); // Force "not mounted"
+        putenv('PMSS_PROC_MOUNTS_PATH=/nonexistent/path/to/mounts');
 
         // If this doesn't exit, the test passes.
         pmssRequireHomeMounted('test');
@@ -148,7 +110,7 @@ MOUNTS;
     public function testRequireHomeMountedSkipsWhenEnvSetToTrue(): void
     {
         putenv('PMSS_SKIP_HOME_MOUNT_CHECK=true');
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=0');
+        putenv('PMSS_PROC_MOUNTS_PATH=/nonexistent/path/to/mounts');
 
         pmssRequireHomeMounted('test');
         $this->assertTrue(true);
@@ -157,7 +119,7 @@ MOUNTS;
     public function testRequireHomeMountedSkipsWhenEnvSetToUppercaseTrue(): void
     {
         putenv('PMSS_SKIP_HOME_MOUNT_CHECK=TRUE');
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=0');
+        putenv('PMSS_PROC_MOUNTS_PATH=/nonexistent/path/to/mounts');
 
         pmssRequireHomeMounted('test');
         $this->assertTrue(true);
@@ -165,11 +127,16 @@ MOUNTS;
 
     public function testRequireHomeMountedPassesWhenMounted(): void
     {
+        $tmpFile = sys_get_temp_dir().'/pmss-test-mounts-'.getmypid();
+        file_put_contents($tmpFile, "/dev/sdb1 /home ext4 rw,relatime 0 0\n");
+
         putenv('PMSS_SKIP_HOME_MOUNT_CHECK=');
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=1');
+        putenv('PMSS_PROC_MOUNTS_PATH='.$tmpFile);
 
         pmssRequireHomeMounted('test');
         $this->assertTrue(true);
+
+        unlink($tmpFile);
     }
 
     public function testMountsFileWithVariousFormats(): void
@@ -180,7 +147,6 @@ MOUNTS;
         // Format with extra spaces.
         $content = "/dev/md0    /home    ext4    rw,relatime,data=ordered    0    0\n";
         file_put_contents($tmpFile, $content);
-        putenv('PMSS_HOME_MOUNTED_OVERRIDE=');
         putenv('PMSS_PROC_MOUNTS_PATH='.$tmpFile);
         $this->assertTrue(pmssIsHomeMounted(), 'Should match /home with extra spaces');
 

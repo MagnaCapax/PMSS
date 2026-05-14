@@ -18,7 +18,7 @@ class ResourceStatsAccumulatorTest extends TestCase
         $this->assertEquals([], (new \ResourceStatsAccumulator([]))->results()['daily']);
     }
 
-    public function testAccumulatesTotalsAndAverages(): void
+    public function testAccumulatesTotalsAndAverageWindowsAsSnapshot(): void
     {
         $now = time();
         $compare = ['day' => $now - 3600];
@@ -50,8 +50,8 @@ class ResourceStatsAccumulatorTest extends TestCase
         $this->assertEquals(150.0, $results['raw']['io_read']['day']);
         $this->assertEquals(15.0, $results['raw']['io_read_ops']['day']);
         $this->assertEquals(27.0, $results['raw']['io_write_ops']['day']);
-        $this->assertEquals(3.0, $results['tasks']['day']);
-        $this->assertEquals(1024 * 1024 * 1024, $results['memory']['day']);
+        $this->assertEquals(['day' => 3.0], $results['tasks']);
+        $this->assertEquals(['day' => 1024 * 1024 * 1024], $results['memory']);
     }
 
     public function testRamHoursUsesSampleIntervals(): void

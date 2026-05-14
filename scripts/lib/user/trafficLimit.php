@@ -18,6 +18,8 @@ if (is_file(dirname(__DIR__).'/lighttpd/userFileWrite.php')) {
     require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
 }
 
+require_once __DIR__.'/integerSetting.php';
+
 if (!function_exists('pmssTrafficLimitParseGiB')) {
     /**
      * Parse a traffic limit value expressed as an integer GiB.
@@ -34,44 +36,7 @@ if (!function_exists('pmssTrafficLimitParseGiB')) {
      */
     function pmssTrafficLimitParseGiB($raw, ?string &$error = null): ?int
     {
-        $error = null;
-
-        if ($raw === null || $raw === false || $raw === true) {
-            $error = ($raw === true) ? 'missing value' : 'missing';
-            return null;
-        }
-
-        if (is_int($raw)) {
-            $value = $raw;
-        } elseif (is_string($raw)) {
-            $trim = trim($raw);
-            if ($trim === '') {
-                $error = 'empty';
-                return null;
-            }
-            if (!preg_match('/^([0-9]+)(?:\\s*GiB)?$/i', $trim, $matches)) {
-                $error = 'invalid format';
-                return null;
-            }
-            $value = (int) $matches[1];
-        } elseif (is_float($raw)) {
-            // Floats are not expected from CLI parsing, but reject fractional values explicitly.
-            if (floor($raw) != $raw) {
-                $error = 'must be an integer';
-                return null;
-            }
-            $value = (int) $raw;
-        } else {
-            $error = 'invalid type';
-            return null;
-        }
-
-        if ($value < 0) {
-            $error = 'must be >= 0';
-            return null;
-        }
-
-        return $value;
+        return pmssIntegerSettingParseNonNegative($raw, 'GiB', $error);
     }
 }
 
@@ -81,14 +46,7 @@ if (!function_exists('pmssTrafficLimitReadGiBFile')) {
      */
     function pmssTrafficLimitReadGiBFile(string $path): int
     {
-        $raw = pmssReadRegularFileTrimmed($path);
-        if ($raw === null || $raw === '') {
-            return 0;
-        }
-
-        $error = null;
-        $value = pmssTrafficLimitParseGiB($raw, $error);
-        return $value !== null ? $value : 0;
+        return pmssIntegerSettingFileRead($path, 'pmssTrafficLimitParseGiB');
     }
 }
 
@@ -109,9 +67,7 @@ if (!function_exists('pmssTrafficLimitWriteGiBFile')) {
      */
     function pmssTrafficLimitWriteGiBFile(string $path, int $value): bool
     {
-        return $value >= 0
-            && function_exists('pmssAtomicWriteFile')
-            && pmssAtomicWriteFile($path, (string) $value);
+        return pmssIntegerSettingFileWrite($path, $value);
     }
 }
 
@@ -121,23 +77,7 @@ if (!function_exists('pmssTrafficLimitEnsureStorageDir')) {
      */
     function pmssTrafficLimitEnsureStorageDir(string $path): bool
     {
-        if (!function_exists('pmssPathTargetIsSafe') || !pmssPathTargetIsSafe($path, true)) {
-            return false;
-        }
-
-        if (function_exists('pmssEnsureDir')) {
-            return pmssEnsureDir($path, 0700, 'root', 'root') && is_dir($path) && !is_link($path);
-        }
-
-        if (!pmssDirEnsureExists($path, 0755)) {
-            return false;
-        }
-
-        if (!is_dir($path) || is_link($path)) {
-            return false;
-        }
-
-        return pmssTrafficLimitConvergeFileMode($path, 0700);
+        return pmssIntegerSettingStorageDirEnsure($path, 0700);
     }
 }
 
@@ -147,13 +87,7 @@ if (!function_exists('pmssTrafficLimitRemoveGiBFile')) {
      */
     function pmssTrafficLimitRemoveGiBFile(string $path): bool
     {
-        if (is_link($path) || (file_exists($path) && !is_file($path))) {
-            return false;
-        }
-
-        file_exists($path) && @unlink($path);
-        clearstatcache(true, $path);
-        return !file_exists($path) && !is_link($path);
+        return pmssIntegerSettingFileRemove($path);
     }
 }
 
@@ -163,18 +97,7 @@ if (!function_exists('pmssTrafficLimitConvergeFileMode')) {
      */
     function pmssTrafficLimitConvergeFileMode(string $path, int $mode): bool
     {
-        if ((!is_file($path) && !is_dir($path)) || is_link($path)) {
-            return false;
-        }
-
-        if (@chmod($path, $mode)) {
-            clearstatcache(true, $path);
-            return true;
-        }
-
-        clearstatcache(true, $path);
-        $perms = @fileperms($path);
-        return $perms !== false && (($perms & 0777) === ($mode & 0777));
+        return pmssIntegerSettingPathModeConverge($path, $mode);
     }
 }
 
@@ -182,21 +105,7 @@ if (!function_exists('pmssTrafficLimitPersistTargetModes')) {
     /** @param array<string,int> $targetModes */
     function pmssTrafficLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool
     {
-        $error = null;
-        if ($value < 0) { $error = 'invalid GiB value'; return false; }
-
-        foreach ($targetModes as $target => $mode) {
-            if ($value === 0) {
-                if (!file_exists($target) || pmssTrafficLimitRemoveGiBFile($target)) continue;
-                $error = 'refusing to remove non-file/symlink: '.$target;
-                return false;
-            }
-
-            if (!pmssTrafficLimitWriteGiBFile($target, $value)) { $error = 'failed to write '.$target; return false; }
-            if (!pmssTrafficLimitConvergeFileMode($target, (int) $mode)) { $error = 'failed to secure '.$target; return false; }
-        }
-
-        return true;
+        return pmssIntegerSettingTargetModesPersist($targetModes, $value, $error, 'invalid GiB value', true);
     }
 }
 

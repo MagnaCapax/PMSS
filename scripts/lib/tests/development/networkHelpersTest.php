@@ -18,4 +18,24 @@ class NetworkHelpersTest extends TestCase
     {
         $this->assertEquals([], \networkParseMonitoringCommands(''));
     }
+
+    public function testParseMonitoringCommandsRejectsShellControlTokens(): void
+    {
+        $raw = "/sbin/iptables -A OUTPUT -j ACCEPT; touch /tmp/pmss-bad\n".
+            "/sbin/iptables -A OUTPUT -m owner --uid-owner 1001 -j ACCEPT\n".
+            "echo unexpected\n".
+            "/sbin/iptables -A OUTPUT -j ACCEPT $(id)\n";
+
+        $this->assertEquals(
+            ['-A OUTPUT -m owner --uid-owner 1001 -j ACCEPT'],
+            \networkParseMonitoringCommands($raw)
+        );
+    }
+
+    public function testTrafficLogParsesMonitoringRulesBeforeApplying(): void
+    {
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'networkParseMonitoringCommands(');
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', "networkRunIptables('-F OUTPUT');");
+        $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', 'passthru($'.'monitoringRules)');
+    }
 }

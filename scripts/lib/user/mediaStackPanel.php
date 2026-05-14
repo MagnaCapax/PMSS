@@ -30,11 +30,7 @@ function pmssMediaStackPanelCurrentUserRead(string $home): string
 function pmssMediaStackPanelCurrentHostnameRead(): string
 {
     $hostname = function_exists('gethostname') ? (string) gethostname() : '';
-    if ($hostname !== '') {
-        return $hostname;
-    }
-
-    return (string) php_uname('n');
+    return $hostname !== '' ? $hostname : (string) php_uname('n');
 }
 
 /**
@@ -46,12 +42,7 @@ function pmssMediaStackPanelShellExecAvailable(): bool
         return false;
     }
 
-    $disabled = (string) ini_get('disable_functions');
-    if ($disabled === '') {
-        return true;
-    }
-
-    return !in_array('shell_exec', array_map('trim', explode(',', $disabled)), true);
+    return !in_array('shell_exec', array_map('trim', explode(',', (string) ini_get('disable_functions'))), true);
 }
 
 /**
@@ -67,12 +58,8 @@ function pmssMediaStackPanelInstalled(string $home): bool
  */
 function pmssMediaStackPanelDirectoryPopulated(string $path): bool
 {
-    if (!is_dir($path)) {
-        return false;
-    }
-
     $entries = @scandir($path);
-    return $entries !== false && count(array_diff($entries, array('.', '..'))) > 0;
+    return is_array($entries) && count(array_diff($entries, array('.', '..'))) > 0;
 }
 
 /**
@@ -82,21 +69,16 @@ function pmssMediaStackPanelDirectoryPopulated(string $path): bool
  */
 function pmssMediaStackPanelStartGateRead(string $home): array
 {
-    $scriptPath = pmssMediaStackPanelHomePath($home, 'install-media-stack.sh');
-    if (!is_file($scriptPath)) {
-        return array('ok' => false, 'message' => 'Media stack installer is missing from this account.');
-    }
-
-    if (!pmssMediaStackPanelShellExecAvailable()) {
-        return array('ok' => false, 'message' => 'PHP shell execution is unavailable on this host.');
-    }
-
-    if (pmssMediaStackPanelDirectoryPopulated(rtrim($home, '/').'/.bin')) {
-        return array('ok' => false, 'message' => 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.');
-    }
-
-    if (pmssMediaStackPanelDirectoryPopulated(rtrim($home, '/').'/.config/jellyfin')) {
-        return array('ok' => false, 'message' => 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.');
+    $home = rtrim($home, '/');
+    foreach (array(
+        array(!is_file(pmssMediaStackPanelHomePath($home, 'install-media-stack.sh')), 'Media stack installer is missing from this account.'),
+        array(!pmssMediaStackPanelShellExecAvailable(), 'PHP shell execution is unavailable on this host.'),
+        array(pmssMediaStackPanelDirectoryPopulated($home.'/.bin'), 'Web install is limited to the first run because existing ~/.bin content triggers interactive prompts.'),
+        array(pmssMediaStackPanelDirectoryPopulated($home.'/.config/jellyfin'), 'Web install is limited to the first run because existing Jellyfin data must be reviewed over SSH.'),
+    ) as $gate) {
+        if ($gate[0]) {
+            return array('ok' => false, 'message' => $gate[1]);
+        }
     }
 
     return array('ok' => true, 'message' => 'Ready to start the first-run media stack install.');
@@ -116,15 +98,7 @@ function pmssMediaStackPanelPidRead(string $home): int
  */
 function pmssMediaStackPanelPidRunning(int $pid): bool
 {
-    if ($pid <= 1) {
-        return false;
-    }
-
-    if (function_exists('posix_kill') && @posix_kill($pid, 0)) {
-        return true;
-    }
-
-    return is_dir('/proc/'.$pid);
+    return $pid > 1 && ((function_exists('posix_kill') && @posix_kill($pid, 0)) || is_dir('/proc/'.$pid));
 }
 
 /**

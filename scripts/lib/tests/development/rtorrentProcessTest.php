@@ -216,6 +216,68 @@ class RtorrentProcessTest extends TestCase
         $this->assertEquals(1, $result['count']);
     }
 
+    public function testStateFilePathSafetyAcceptsNormalTempFile(): void
+    {
+        $this->assertTrue(rtorrentProcessStateFilePathIsSafe($this->tempDir.'/state.ts'));
+    }
+
+    public function testStateFilePathSafetyRejectsRelativeAndTraversalPaths(): void
+    {
+        $this->assertFalse(rtorrentProcessStateFilePathIsSafe('state.ts'));
+        $this->assertFalse(rtorrentProcessStateFilePathIsSafe($this->tempDir.'/../state.ts'));
+        $this->assertFalse(rtorrentProcessStateFilePathIsSafe($this->tempDir."/state\0.ts"));
+    }
+
+    public function testStaleStateRefusesSymlinkParentWithoutWriting(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $targetDir = $this->tempDir.'/target';
+        $linkDir = $this->tempDir.'/link';
+        @mkdir($targetDir, 0755, true);
+        if (@symlink($targetDir, $linkDir) === false) {
+            throw new SkipTest('symlink() failed');
+        }
+
+        $result = rtorrentProcessCheckStaleState($linkDir.'/state.ts', 60);
+
+        $this->assertEquals('record', $result['action']);
+        $this->assertFalse(file_exists($targetDir.'/state.ts'), 'State marker must not be written through symlink parent');
+    }
+
+    public function testFailureCountStateRefusesDirectoryTarget(): void
+    {
+        $stateFile = $this->tempDir.'/state.count';
+        @mkdir($stateFile, 0755, true);
+
+        $result = rtorrentProcessCheckFailureCountState($stateFile, 4);
+
+        $this->assertEquals('record', $result['action']);
+        $this->assertEquals(1, $result['count']);
+        $this->assertTrue(is_dir($stateFile), 'Directory target should remain untouched');
+    }
+
+    public function testClearStaleStateRefusesSymlinkLeaf(): void
+    {
+        if (!function_exists('symlink')) {
+            throw new SkipTest('symlink unavailable');
+        }
+
+        $target = $this->tempDir.'/target-state.ts';
+        $link = $this->tempDir.'/linked-state.ts';
+        file_put_contents($target, '123');
+        if (@symlink($target, $link) === false) {
+            throw new SkipTest('symlink() failed');
+        }
+
+        rtorrentProcessClearStaleState($link);
+
+        $this->assertTrue(is_link($link), 'Symlink marker should remain untouched');
+        $this->assertTrue(is_file($target), 'Symlink target should remain untouched');
+    }
+
     /**
      * Test pgrep exact returns empty for nonexistent user.
      */

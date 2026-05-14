@@ -66,3 +66,12 @@ function pmssCliOption(array $parsed, string $long, ?string $short = null, $defa
     return $parsed['options'][$long]
         ?? ($short !== null ? ($parsed['options'][$short] ?? $default) : $default);
 }
+
+/**
+ * Return a non-empty string option value, or the caller's default.
+ */
+function pmssCliOptionString(array $parsed, string $long, ?string $short = null, ?string $default = null): ?string
+{
+    $value = pmssCliOption($parsed, $long, $short, $default);
+    return is_string($value) && $value !== '' ? $value : $default;
+}

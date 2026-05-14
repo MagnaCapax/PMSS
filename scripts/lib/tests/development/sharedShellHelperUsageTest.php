@@ -13,6 +13,18 @@ class SharedShellHelperUsageTest extends TestCase
         $this->assertStringContainsString('function pmssRunOrExit(string $cmd, bool $logFailure = true): void', $source);
     }
 
+    public function testShellRunnerRejectsEmptyCommandBeforePassthru(): void
+    {
+        $shellLib = var_export($this->pmssRepoPath('scripts/lib/shell.php'), true);
+        $output = $this->pmssRunInlinePhp(
+            'require_once '.$shellLib.'; echo pmssRun("   ", true);',
+            [],
+            '2>&1'
+        );
+
+        $this->assertEquals("Command failed (rc=1): empty command\n1", trim($output));
+    }
+
     public function testUserPermissionsRequiresSharedShellLibrary(): void
     {
         $source = $this->pmssReadRepoFile('scripts/util/userPermissions.php');

@@ -74,8 +74,6 @@ Signature: refer to file for full source; highlights below.
   - Exports `PMSS_JSON_LOG` path and keeps `PMSS_CORRELATION_ID` available for phase 2/child processes; dry-run or missing file emits `update_step2_skipped`.
   - Else runs `/scripts/util/update-step2.php`, logs start/end + duration, and on non-zero exit makes a best-effort `scripts/util/setupPermissions.php` pass before `fatal`.
 
-- runAutoremove(): void → `apt-get autoremove -y` with non-interactive dpkg opts; `fatal(EXIT_COPY)` on failure.
-
 - maybeRunDistUpgrade(bool|string $distUpgrade): void
   - If enabled, runs `pmssRunDistUpgrade(<max>)` from `scripts/lib/update/distUpgrade.php` and logs start/end events.
   - Restores root cron unless restoration is deferred to update-step2.
@@ -84,10 +82,13 @@ Signature: refer to file for full source; highlights below.
   - Orchestrator: ensure root → parse/normalize/parse spec → workdir fetch → stage →
     record version → cleanup → self-update handoff → dist-upgrade (optional) →
     run phase 2 or scripts-only path → log completion with duration.
-- Update lock: uses `PMSS_UPDATE_LOCK_FILE=/var/lib/pmss/update.lock` with an
-  exclusive flock; sets `PMSS_UPDATE_LOCK_ENV=1` when held so child re-exec
-  skips re-acquiring. Emits JSON events `update_lock_wait`, `update_lock_acquired`,
-  and `update_lock_released`. Events include `pmss_correlation_id` once initialized.
+- Update lock: uses `PMSS_UPDATE_LOCK_FILE=/var/lib/pmss/update.lock` with a
+  bounded non-blocking exclusive flock. It sets `PMSS_UPDATE_LOCK_ENV=1` when
+  held so child re-exec skips re-acquiring. Emits JSON events
+  `update_lock_wait`, `update_lock_busy`, `update_lock_busy_skip`,
+  `update_lock_acquired`, and `update_lock_released`. If the lock remains busy
+  after the bounded wait, the updater logs a warning and exits successfully
+  without staging so fleet orchestration does not hang on stale inherited FDs.
 
 Environment flags consumed: `PMSS_CORRELATION_ID` (generated early when missing; inherited by phase 2 and child commands).
 
@@ -500,7 +501,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 - scripts/util/update-step2.php
   - Behavior: Legacy consolidated phase-2 script (superseded by modular `lib/update/*`), retained for compatibility. Do not extend unless migrating behavior into modules.
   - Preflight: checks disk space on `/` and `/home` (fatal if <3 GiB), dpkg lock availability, APT cache writability, and basic network reachability; logs `preflight_ok` or `preflight_error` JSON events.
-  - Respects `PMSS_UPDATE_LOCK_ENV`; when absent, acquires the global update lock (`PMSS_UPDATE_LOCK_FILE`).
+  - Respects `PMSS_UPDATE_LOCK_ENV`; when absent, acquires the global update lock (`PMSS_UPDATE_LOCK_FILE`) with the same bounded non-blocking busy-skip behaviour as `scripts/update.php`.
   - Step classes: post-package orchestration can be classified as `must_succeed`, `soft_fail`, or `skip_if_missing`; `must_succeed` failures after package phase completion emit `step_failed` (`severity=error`) and abort phase 2.
 
 ---

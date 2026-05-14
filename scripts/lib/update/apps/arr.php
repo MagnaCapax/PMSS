@@ -33,14 +33,12 @@ function pmssArrAssetNameHasToken(string $assetName, array $tokens): bool
 function pmssArrAssetArchitectureTokens(): array
 {
     $architecture = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
-    if ($architecture === 'arm64') {
-        return ['arm64', 'aarch64'];
-    }
-    if ($architecture === 'armhf') {
-        return ['armhf', 'armv7', 'arm'];
-    }
+    $tokensByArchitecture = [
+        'arm64' => ['arm64', 'aarch64'],
+        'armhf' => ['armhf', 'armv7', 'arm'],
+    ];
 
-    return ['x64', 'amd64'];
+    return $tokensByArchitecture[$architecture] ?? ['x64', 'amd64'];
 }
 
 /** Build the canonical updater config for a supported Starr-family app. */

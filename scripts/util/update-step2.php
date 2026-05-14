@@ -60,6 +60,63 @@ if (!defined('PMSS_UPDATE_LOCK_FILE')) {
 if (!defined('PMSS_UPDATE_LOCK_ENV')) {
     define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');
 }
+if (!defined('PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS')) {
+    define('PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS', 30);
+}
+if (!defined('PMSS_UPDATE_LOCK_RETRY_SECONDS')) {
+    define('PMSS_UPDATE_LOCK_RETRY_SECONDS', 2);
+}
+
+/**
+ * Acquire the global phase-2 lock without allowing stale inherited FDs to hang.
+ */
+function pmssUpdateStep2AcquireUpdateLock(): void
+{
+    if (getenv(PMSS_UPDATE_LOCK_ENV) === '1') {
+        return;
+    }
+
+    pmssLogJson(['event' => 'update_lock_wait', 'path' => PMSS_UPDATE_LOCK_FILE, 'max_wait_seconds' => PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS]);
+    $deadline = microtime(true) + PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS;
+    $attempt = 0;
+
+    while (true) {
+        $busy = false;
+        $fh = pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, true, 'c', true, true, $busy);
+        if ($fh !== false) {
+            $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
+            putenv(PMSS_UPDATE_LOCK_ENV.'=1');
+            pmssLogJson(['event' => 'update_lock_acquired', 'path' => PMSS_UPDATE_LOCK_FILE]);
+            return;
+        }
+
+        if (!$busy) {
+            logmsg('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE);
+            exit(1);
+        }
+
+        $remaining = $deadline - microtime(true);
+        if ($remaining <= 0.0) {
+            logmsg('[WARN] update-step2 lock busy after '.PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS.'s; skipping standalone phase-2 run');
+            pmssLogJson([
+                'event' => 'update_lock_busy_skip',
+                'path' => PMSS_UPDATE_LOCK_FILE,
+                'wait_seconds' => PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS,
+            ]);
+            exit(0);
+        }
+
+        $attempt++;
+        $sleepSeconds = min(PMSS_UPDATE_LOCK_RETRY_SECONDS, max(1, (int) ceil($remaining)));
+        pmssLogJson([
+            'event' => 'update_lock_busy',
+            'path' => PMSS_UPDATE_LOCK_FILE,
+            'attempt' => $attempt,
+            'retry_seconds' => $sleepSeconds,
+        ]);
+        sleep($sleepSeconds);
+    }
+}
 
 /**
  * Switch legacy lighttpd instances to nginx and refresh configs.
@@ -248,18 +305,7 @@ function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void
 pmssUpdateStep2RegisterWebRefreshShutdownGuard();
 
 pmssRunProfiledCallable('Acquiring update-step2 lock', static function (): void {
-    if (getenv(PMSS_UPDATE_LOCK_ENV) === '1') {
-        return;
-    }
-    $fh = pmssLockFileAcquire(PMSS_UPDATE_LOCK_FILE, false, 'c', true);
-    if ($fh === false) {
-        logmsg('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE);
-        exit(1);
-    }
-    pmssLogJson(['event' => 'update_lock_wait', 'path' => PMSS_UPDATE_LOCK_FILE]);
-    $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
-    putenv(PMSS_UPDATE_LOCK_ENV.'=1');
-    pmssLogJson(['event' => 'update_lock_acquired', 'path' => PMSS_UPDATE_LOCK_FILE]);
+    pmssUpdateStep2AcquireUpdateLock();
     register_shutdown_function(static function (): void {
         if (!isset($GLOBALS['PMSS_UPDATE_LOCK_HANDLE'])) {
             return;

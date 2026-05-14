@@ -252,15 +252,9 @@ final class SystemStatusCharacterizationTest extends TestCase
 
             return $command === "command -v 'nginx'" ? '/usr/sbin/nginx' : '';
         };
-        $warnings = [];
+        $result = null;
 
-        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-            $warnings[] = [$severity, $message];
-
-            return true;
-        });
-
-        try {
+        $this->pmssAssertNoPhpWarnings(function () use (&$result, $runCommand): void {
             $result = pmssStatusBinaryProbeCheck(
                 'nginx',
                 ['componentName' => 'bin.nginx'],
@@ -269,11 +263,8 @@ final class SystemStatusCharacterizationTest extends TestCase
                     return $path === '/usr/sbin/nginx';
                 }
             );
-        } finally {
-            restore_error_handler();
-        }
+        });
 
-        $this->assertEquals([], $warnings);
         $this->assertSame(
             ['name' => 'Binary: nginx', 'status' => 'OK', 'detail' => 'present'],
             $result
@@ -321,15 +312,9 @@ final class SystemStatusCharacterizationTest extends TestCase
 
     public function testSharedProbeCollectorTreatsMissingCatalogBucketsAsEmptyArrays(): void
     {
-        $warnings = [];
+        $checks = null;
 
-        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-            $warnings[] = [$severity, $message];
-
-            return true;
-        });
-
-        try {
+        $this->pmssAssertNoPhpWarnings(function () use (&$checks): void {
             $checks = pmssStatusCollectProbeChecks(
                 [],
                 static function (string $binary, array $binarySpec): ?array {
@@ -339,11 +324,8 @@ final class SystemStatusCharacterizationTest extends TestCase
                     return pmssStatus('Path: '.(string) ($pathSpec['path'] ?? ''), 'OK', 'unexpected');
                 }
             );
-        } finally {
-            restore_error_handler();
-        }
+        });
 
-        $this->assertSame([], $warnings);
         $this->assertSame([], $checks);
     }
 

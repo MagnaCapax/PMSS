@@ -139,4 +139,14 @@ class ManagedPathTest extends TestCase
         $this->assertEquals("old\n", file_get_contents($target));
         $this->assertTrue($this->pmssMessagesContain($messages, 'Unsafe test target target'));
     }
+
+    public function testManagedRemoveLogsFailedUnlink(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-env-remove-missing-');
+        $path = $root.'/missing.conf';
+        $messages = [];
+
+        $this->assertFalse(\pmssRemoveManagedPathFile($path, 'test target', $this->pmssMakeArrayLogger($messages)));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'Unable to remove test target at '.$path));
+    }
 }

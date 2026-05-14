@@ -232,6 +232,64 @@ CONF;
 }
 
 /**
+     * Create a private temporary directory under the process temp root.
+     */
+    function pmssCreatePrivateTempDir(string $prefix): ?string
+    {
+        if ($prefix === '') {
+            return null;
+        }
+
+        $path = @tempnam(sys_get_temp_dir(), $prefix);
+        if ($path === false) {
+            return null;
+        }
+
+        if (!@unlink($path) || !@mkdir($path, 0700)) {
+            @unlink($path);
+            return null;
+        }
+
+        return $path;
+}
+
+/**
+     * Resolve a PMSS-owned temporary directory before destructive cleanup.
+     */
+    function pmssPrivateTempDirRealpath(string $path, string $prefix, ?callable $logger = null): ?string
+    {
+        $log = $logger ?: 'logMessage';
+        $base = realpath(sys_get_temp_dir());
+        $real = $path !== '' && !is_link($path) ? realpath($path) : false;
+
+        if ($prefix === '' || $base === false || $base === DIRECTORY_SEPARATOR || $real === false || !is_dir($real)) {
+            $log('[WARN] Refusing temporary directory cleanup for unresolved path: '.$path);
+            return null;
+        }
+
+        $basePrefix = rtrim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+        if (strpos($real, $basePrefix) !== 0 || strpos(basename($real), $prefix) !== 0) {
+            $log('[WARN] Refusing temporary directory cleanup outside PMSS temp scope: '.$real);
+            return null;
+        }
+
+        return $real;
+}
+
+/**
+     * Remove a PMSS-owned temporary directory after verifying its scope.
+     */
+    function pmssRemovePrivateTempDir(string $path, string $prefix, string $description): int
+    {
+        $real = pmssPrivateTempDirRealpath($path, $prefix);
+        if ($real === null) {
+            return 1;
+        }
+
+        return runStep($description, 'rm -rf '.escapeshellarg($real));
+}
+
+/**
      * Apply the baseline dpkg selection snapshot so required packages stay present.
      *
      * @return bool True when the baseline was parsed and applied successfully.
@@ -462,8 +520,8 @@ CONF;
                 logMessage('[WARN] pmssHoldLibssl3ForPeclSsh2Compat: apt simulate shows openssh removals; using dpkg-direct downgrade path');
                 runStep('Unholding libssl3/openssl for dpkg-direct downgrade', 'apt-mark unhold libssl3 openssl 2>/dev/null || true');
 
-                $tmpDir = sys_get_temp_dir().'/pmss-libssl-'.substr(md5(uniqid('', true)), 0, 8);
-                if (!@mkdir($tmpDir, 0700, true)) {
+                $tmpDir = pmssCreatePrivateTempDir('pmss-libssl-');
+                if ($tmpDir === null) {
                     logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: cannot create temporary directory for dpkg-direct downgrade');
                     throw new RuntimeException('Unable to create temporary directory for dpkg-direct downgrade');
                 }
@@ -474,7 +532,7 @@ CONF;
                     .' && apt-get download libssl3='.$targetVersion.' openssl='.$targetVersion.' 2>&1'
                 );
                 if ($downloadRc !== 0) {
-                    @runStep('Cleaning dpkg-direct download cache', 'rm -rf '.escapeshellarg($tmpDir));
+                    pmssRemovePrivateTempDir($tmpDir, 'pmss-libssl-', 'Cleaning dpkg-direct download cache');
                     logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: apt-get download failed; refusing unsafe fallback');
                     throw new RuntimeException('dpkg-direct downgrade blocked: download failed for libssl3/openssl '.$targetVersion);
                 }
@@ -482,7 +540,7 @@ CONF;
                 $debs = glob($tmpDir.'/*.deb') ?: [];
                 sort($debs);
                 if (count($debs) < 2) {
-                    @runStep('Cleaning dpkg-direct download cache', 'rm -rf '.escapeshellarg($tmpDir));
+                    pmssRemovePrivateTempDir($tmpDir, 'pmss-libssl-', 'Cleaning dpkg-direct download cache');
                     logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: missing downloaded .deb files; refusing unsafe fallback');
                     throw new RuntimeException('dpkg-direct downgrade blocked: expected .deb files were not downloaded');
                 }
@@ -491,7 +549,7 @@ CONF;
                     'Installing libssl3/openssl via dpkg-direct (openssh-safe path)',
                     'dpkg -i '.implode(' ', array_map('escapeshellarg', $debs))
                 );
-                runStep('Cleaning dpkg-direct download cache', 'rm -rf '.escapeshellarg($tmpDir));
+                pmssRemovePrivateTempDir($tmpDir, 'pmss-libssl-', 'Cleaning dpkg-direct download cache');
                 if ($installRc !== 0) {
                     logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: dpkg-direct install failed; refusing unsafe fallback');
                     throw new RuntimeException('dpkg-direct downgrade blocked: dpkg -i failed');

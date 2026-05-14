@@ -75,5 +75,7 @@ function pmssWriteManagedPathFileWithBackup(
 function pmssRemoveManagedPathFile(string $path, string $label, callable $logger): bool
 {
     if (!pmssManagedPathIsSafe($path, $label, $logger)) return false;
-    return @unlink($path);
+    if (@unlink($path)) return true;
+    $logger('[WARN] Unable to remove '.$label.' at '.$path);
+    return false;
 }

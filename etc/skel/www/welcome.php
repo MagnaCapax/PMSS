@@ -1119,7 +1119,7 @@ EOF;
 
 function createStackedGauge($titleText, $footerText, $percent, $segments) {
     if (!is_finite($percent)) $percent = 0;
-    $bars = '';
+    $barHtml = '';
     $filledPercent = 0;
     foreach ($segments as $segment) {
         $width = isset($segment['width']) && is_numeric($segment['width']) ? (float) $segment['width'] : 0;
@@ -1129,73 +1129,56 @@ function createStackedGauge($titleText, $footerText, $percent, $segments) {
         }
         $filledPercent += $width;
         $color = isset($segment['color']) ? (string) $segment['color'] : 'transparent';
-        $bars .= '<div style="float: left; width: '.$width.'%; background-color: '.$color.'; visibility: visible;">&nbsp;</div>';
+        $barHtml .= '<div style="float: left; width: '.$width.'%; background-color: '.$color.'; visibility: visible;">&nbsp;</div>';
     }
 
-    return <<<EOF
-    <table style="margin: 0; padding: 0;">
-        <tr>
-            <td id="meter-disk-td" title="{$titleText}">
-                <div id="meter-disk-holder">
-                    <span id="meter-disk-text" style="overflow-x: visible; overflow-y: visible;">{$percent}%</span>
-                    {$bars}
-                </div>
-            </td>
-        </tr>
-    </table>
-    <span style="font-size: 1.05em; float: right; text-align: right; line-height: 13px;">{$footerText}</span>
-EOF;
+    return createGaugeFrameHtml($titleText, $footerText, $percent, $barHtml);
 }
 
 function createGauge($titleText, $footerText, $percent, $percentMax = 0) {
     if (!is_finite($percent)) $percent = 0;
     if (!is_finite($percentMax)) $percentMax = 0;
     if ($percentMax == 0) $percentMax = $percent;
-    $gaugeBackgroundColor = gaugeColor($percent);
 
-    $template = <<<EOF
+    return createGaugeFrameHtml(
+        $titleText,
+        $footerText,
+        $percent,
+        '<div id="meter-disk-value" style="float: left; width: '.$percentMax.'%; background-color: #'.gaugeColor($percent).'; visibility: visible;">&nbsp;</div>'
+    );
+}
+
+function createGaugeFrameHtml($titleText, $footerText, $percent, $barHtml) {
+    return <<<EOF
     <table style="margin: 0; padding: 0;">
         <tr>
             <td id="meter-disk-td" title="{$titleText}">
                 <div id="meter-disk-holder">
                     <span id="meter-disk-text" style="overflow-x: visible; overflow-y: visible;">{$percent}%</span>
-                    <div id="meter-disk-value" style="float: left; width: {$percentMax}%; background-color: #{$gaugeBackgroundColor}; visibility: visible;">&nbsp;</div>
+                    {$barHtml}
                 </div>
             </td>
         </tr>
     </table>
     <span style="font-size: 1.05em; float: right; text-align: right; line-height: 13px;">{$footerText}</span>
 EOF;
-    return $template;
 }
 
 function gaugeColor($percent) {
     if (!is_finite($percent)) $percent = 0;
-    $startColor = array(hexdec('99'), hexdec('E6'), hexdec('99'));
-    $endColor   = array(hexdec('EE'), hexdec('99'), hexdec('99'));
-    $differenceColor = array(
-        $startColor[0] - $endColor[0],
-        $startColor[1] - $endColor[1],
-        $startColor[2] - $endColor[2]
-    );
 
     if ($percent > 100) {
         return 'FF4040';
     }
 
-    $offsetColor = array(
-        round($differenceColor[0] * ($percent / 100)),
-        round($differenceColor[1] * ($percent / 100)),
-        round($differenceColor[2] * ($percent / 100))
-    );
+    $startColor = array(0x99, 0xE6, 0x99);
+    $endColor = array(0xEE, 0x99, 0x99);
+    $channels = array();
+    foreach (array(0, 1, 2) as $index) {
+        $channels[] = dechex($startColor[$index] - round(($startColor[$index] - $endColor[$index]) * ($percent / 100)));
+    }
 
-    $chosenColor = array(
-        $startColor[0] - $offsetColor[0],
-        $startColor[1] - $offsetColor[1],
-        $startColor[2] - $offsetColor[2]
-    );
-
-    return dechex($chosenColor[0]) . dechex($chosenColor[1]) . dechex($chosenColor[2]);
+    return implode('', $channels);
 }
 
 function quotaCreateSection($quotaInfo, $bonusQuota = 0) {

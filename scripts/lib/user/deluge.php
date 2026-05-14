@@ -22,9 +22,8 @@ require_once __DIR__.'/passwords.php';
 function pmssDelugeCoreTemplatePath(?array $distro = null): string
 {
     $configDir = pmssResolvePathFromEnv('PMSS_SEEDBOX_CONFIG_DIR', '/etc/seedbox/config');
-    $version = (int) (($distro['version'] ?? 0));
 
-    return $version >= 12
+    return (int) (($distro['version'] ?? 0)) >= 12
         ? $configDir.'/template.deluge.core.nocache.conf'
         : $configDir.'/template.deluge.core.conf';
 }
@@ -65,8 +64,7 @@ function pmssDelugeTemplateRead(string $templatePath, string $label): string
 function pmssDelugeRenderCoreConfig(array $user, int $delugePort, string $uploadThrottle, ?array $distro = null): string
 {
     $username = (string) $user['name'];
-    $templatePath = pmssDelugeCoreTemplatePath($distro ?? pmssDetectDistro());
-    $template = pmssDelugeTemplateRead($templatePath, 'core');
+    $template = pmssDelugeTemplateRead(pmssDelugeCoreTemplatePath($distro ?? pmssDetectDistro()), 'core');
     if ($template === '') {
         return '';
     }
@@ -115,8 +113,7 @@ function userConfigureDeluge(array $user, array $configuration): void
     }
 
     file_put_contents("$configDir/core.conf", $coreConfig);
-    $hostlistConfig   = str_replace('##DAEMONPORT', $delugePort, $hostlistTemplate);
-    file_put_contents("$configDir/hostlist.conf", $hostlistConfig);
+    file_put_contents("$configDir/hostlist.conf", str_replace('##DAEMONPORT', $delugePort, $hostlistTemplate));
     if (!file_exists("$configDir/hostlist.conf.1.2")) {
         @symlink("$configDir/hostlist.conf", "$configDir/hostlist.conf.1.2");
     }
@@ -141,17 +138,6 @@ function userConfigureDeluge(array $user, array $configuration): void
     }
     pmssEnsureDelugeServicePassword($username);
 
-    if (!file_exists("$configDir/web.conf")) {
-        $webTemplatePath = pmssDelugeTemplatePath('template.deluge.web.conf');
-        if (!is_file($webTemplatePath)) {
-            pmssLogStatus('WARN', 'Skipping Deluge web template copy because the template is missing: '.$webTemplatePath, 1);
-        } else {
-            runStep('Provisioning Deluge web template', sprintf('cp %s %s',
-                escapeshellarg($webTemplatePath),
-                escapeshellarg("$configDir/web.conf")
-            ));
-        }
-    }
     runStep('Fixing Deluge ownership', sprintf('chown %1$s -R %2$s', escapeshellarg($username.':'.$username), escapeshellarg("$home/.config/")));
 
     // If the web config changed, restart deluge-web so base/port changes take effect.

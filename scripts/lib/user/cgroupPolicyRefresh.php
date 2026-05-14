@@ -15,9 +15,10 @@ require_once __DIR__.'/userConfigStore.php';
 /** Return true when the payload includes explicit io.latency/io.cost knobs. */
 function pmssCgroupRefreshHasExplicitIoPolicy(array $payload): bool
 {
-    return (isset($payload['ioLatencyMs']) && is_numeric($payload['ioLatencyMs']) && (int) $payload['ioLatencyMs'] > 0)
-        || (isset($payload['ioCostQos']) && trim((string) $payload['ioCostQos']) !== '')
-        || (isset($payload['ioCostModel']) && trim((string) $payload['ioCostModel']) !== '');
+    $latencyMs = $payload['ioLatencyMs'] ?? null;
+    return (is_numeric($latencyMs) && (int) $latencyMs > 0)
+        || trim((string) ($payload['ioCostQos'] ?? '')) !== ''
+        || trim((string) ($payload['ioCostModel'] ?? '')) !== '';
 }
 
 /** Build the canonical per-user cgroup refresh command from stored config. */
@@ -28,10 +29,10 @@ function pmssCgroupRefreshBuildCommand(string $username, array $payload): ?strin
         return null;
     }
 
-    $user = ['name' => $username, 'memory' => $memory];
-    foreach (pmssUserConfigCliPersistedStoredResources($payload) as $key => $value) {
-        $user[$key] = $value;
-    }
+    $user = array_merge(
+        ['name' => $username, 'memory' => $memory],
+        pmssUserConfigCliPersistedStoredResources($payload)
+    );
 
     $args = [
         '/scripts/util/userConfigCgroup.php',
@@ -71,4 +72,3 @@ function pmssCgroupPolicyRefreshRun(): int
 
     return 0;
 }
-

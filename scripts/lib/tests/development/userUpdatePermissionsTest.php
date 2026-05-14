@@ -70,6 +70,22 @@ class UserUpdatePermissionsTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function testRefreshPermissionsKeepsNonTimeoutFailureSoft(): void
+    {
+        $result = $this->runRefreshPermissionsWithStepRc(5);
+
+        $this->assertEquals('', $result['exception']);
+        $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
+    }
+
+    public function testRefreshPermissionsTimeoutRaisesException(): void
+    {
+        $result = $this->runRefreshPermissionsWithStepRc(124);
+
+        $this->assertStringContainsString('RuntimeException: userPermissions timeout after', $result['exception']);
+        $this->assertEquals(['Refreshing user permissions'], $result['descriptions']);
+    }
+
     public function testRefreshPermissionsSkipsDirectoryRcCustomWithoutWarnings(): void
     {
         \pmssTestInstallRunUserStepShim('profile');
@@ -99,6 +115,46 @@ class UserUpdatePermissionsTest extends TestCase
 
         $this->assertEquals(1, count($steps));
         $this->assertEquals('Refreshing user permissions', $firstStepDescription);
+    }
+
+    /**
+     * Run the permission helper in a subprocess so the runUserStep shim is deterministic.
+     */
+    private function runRefreshPermissionsWithStepRc(int $rc): array
+    {
+        $repoRoot = dirname(__DIR__, 4);
+        $script = <<<'PHP'
+$repoRoot = __REPO_ROOT__;
+$home = sys_get_temp_dir().'/pmss-perm-rc-'.bin2hex(random_bytes(4));
+@mkdir($home, 0755, true);
+$GLOBALS['PMSS_STEPS'] = [];
+function runUserStep(string $user, string $description, string $command): int
+{
+    $GLOBALS['PMSS_STEPS'][] = ['description' => $description, 'command' => $command];
+    return __STEP_RC__;
+}
+require $repoRoot.'/scripts/lib/update/users.php';
+$exception = '';
+try {
+    pmssUserRefreshPermissions(['user' => 'dummy', 'home' => $home, 'user_esc' => escapeshellarg('dummy')]);
+} catch (Throwable $throwable) {
+    $exception = get_class($throwable).': '.$throwable->getMessage();
+}
+$descriptions = array_map(static function (array $step): string {
+    return (string) $step['description'];
+}, $GLOBALS['PMSS_STEPS']);
+echo json_encode(['exception' => $exception, 'descriptions' => $descriptions]);
+@rmdir($home);
+PHP;
+
+        return $this->pmssRunInlinePhpJson(
+            str_replace(
+                ['__REPO_ROOT__', '__STEP_RC__'],
+                [var_export($repoRoot, true), (string) $rc],
+                $script
+            ),
+            ['PMSS_TEST_MODE' => '1']
+        );
     }
 }
 

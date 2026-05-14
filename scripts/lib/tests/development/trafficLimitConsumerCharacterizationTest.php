@@ -49,7 +49,17 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/cron/trafficLimits.php');
 
-        $this->assertStringContainsString('@chmod("/home/{$user}/.throttle", 0644);', $source);
+        $this->assertStringContainsString('@chmod($throttleFile, 0644);', $source);
+    }
+
+    public function testTrafficLimitCronValidatesThrottleFileBoundary(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/cron/trafficLimits.php');
+
+        $this->assertStringContainsString('function pmssTrafficLimitThrottleFilePath(string $user): ?string', $source);
+        $this->assertStringContainsString('pmssValidateUsername($user)', $source);
+        $this->assertStringContainsString('@realpath($home) !== $home', $source);
+        $this->assertStringContainsString('pmssUserFilePathIsSafe($path)', $source);
     }
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void

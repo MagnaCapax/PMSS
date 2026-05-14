@@ -52,12 +52,32 @@ function networkIptablesOwnerMatchAvailable(): bool
 
 function networkRunIptables(string $rule): void
 {
+    $rule = trim($rule);
+    if (!networkIptablesCommandSafe($rule)) {
+        file_put_contents(
+            '/var/log/pmss/iptables.log',
+            date('c')." ERROR rejected unsafe iptables rule: {$rule}\n",
+            FILE_APPEND
+        );
+        return;
+    }
+
     $cmd = '/sbin/iptables '.$rule;
     echo "Executing: {$cmd}\n";
     exec($cmd, $out, $ret);
     if ($ret !== 0) {
         file_put_contents('/var/log/pmss/iptables.log', date('c')." ERROR {$cmd}\n", FILE_APPEND);
     }
+}
+
+/**
+ * Keep shell-executed iptables arguments to a single argv-like rule.
+ */
+function networkIptablesCommandSafe(string $rule): bool
+{
+    return $rule !== ''
+        && $rule[0] === '-'
+        && preg_match('/[;&|`$<>\\\\\r\n]/', $rule) !== 1;
 }
 
 function networkParseMonitoringCommands(string $raw): array
@@ -76,6 +96,9 @@ function networkParseMonitoringCommands(string $raw): array
             $line = trim(substr($line, strlen('iptables ')));
         }
         if ($line === '' || strncmp($line, '-F', 2) === 0) {
+            continue;
+        }
+        if (!networkIptablesCommandSafe($line)) {
             continue;
         }
         $commands[] = $line;

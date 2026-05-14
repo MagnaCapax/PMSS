@@ -32,17 +32,15 @@ function pmssModprobeBlacklistBody(array $spec): string
 function pmssDirtyFragBlacklistBody(): string { return pmssModprobeBlacklistBody(PMSS_KERNEL_HARDENING['dirtyfrag']); }
 function pmssAlgifAeadBlacklistBody(): string { return pmssModprobeBlacklistBody(PMSS_KERNEL_HARDENING['copyfail']); }
 function pmssAlgifAeadBuiltInKernelWarning(): string { return (string) PMSS_KERNEL_HARDENING['copyfail']['builtin_warning']; }
-function pmssAlgifAeadKernelBuiltIn(): bool { return pmssKernelHardeningBuiltIn(PMSS_KERNEL_HARDENING['copyfail']); }
-function pmssDirtyFragModulesLoaded(): ?array { return pmssKernelHardeningLoadedModules(PMSS_KERNEL_HARDENING['dirtyfrag']['modules']); }
 
 function pmssApplyKernelHardening(callable $log, ?callable $runner = null): void
 {
-    foreach (PMSS_KERNEL_HARDENING as $name => $spec) {
-        pmssApplyModprobeBlacklist($name, $spec, $log, $runner);
+    foreach (PMSS_KERNEL_HARDENING as $spec) {
+        pmssApplyModprobeBlacklist($spec, $log, $runner);
     }
 }
 
-function pmssApplyModprobeBlacklist(string $name, array $spec, callable $log, ?callable $runner = null): void
+function pmssApplyModprobeBlacklist(array $spec, callable $log, ?callable $runner = null): void
 {
     $runner = $runner ?: 'runStep';
     if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
@@ -116,5 +114,5 @@ function pmssKernelHardeningLoadedModules(array $modules): ?array
     return $loaded;
 }
 
-function pmssEnsureDirtyFragBlacklist(callable $log, ?callable $runner = null): void { pmssApplyModprobeBlacklist('dirtyfrag', PMSS_KERNEL_HARDENING['dirtyfrag'], $log, $runner); }
-function pmssEnsureAlgifAeadBlacklist(callable $log, ?callable $runner = null): void { pmssApplyModprobeBlacklist('copyfail', PMSS_KERNEL_HARDENING['copyfail'], $log, $runner); }
+function pmssEnsureDirtyFragBlacklist(callable $log, ?callable $runner = null): void { pmssApplyModprobeBlacklist(PMSS_KERNEL_HARDENING['dirtyfrag'], $log, $runner); }
+function pmssEnsureAlgifAeadBlacklist(callable $log, ?callable $runner = null): void { pmssApplyModprobeBlacklist(PMSS_KERNEL_HARDENING['copyfail'], $log, $runner); }

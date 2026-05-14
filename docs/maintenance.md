@@ -38,12 +38,12 @@ still printed, and the profiler records each step with `status=SKIP`.
 - Combine with `--dry-run` for a rehearsal log you can share with teammates.
 
 ## 4. Review Log Rotation
-`/etc/logrotate.d/pmss-update` is installed automatically and rotates the text
-log, JSON log, and profile snapshot daily (7 copies, compressed, copytruncate).
-Verify the file exists and tweak the template under
-`etc/seedbox/config/template.logrotate.pmss` if retention needs to change.
-System stats snapshots append to `/var/log/pmss/system-stats.log` and are
-rotated by the same policy.
+`/etc/logrotate.d/pmss-update` is installed automatically and rotates PMSS
+update logs plus high-volume `/var/log/pmss/` runtime logs such as
+`users.log`, `users.jsonl`, `trafficStats.log`, and `check*.log`. Verify the
+file exists and tweak the template under `etc/seedbox/config/template.logrotate.pmss`
+if retention needs to change. System stats snapshots append to
+`/var/log/pmss/system-stats.log` and are rotated by the same policy.
 
 ## 5. Confirm Version Metadata
 After a real run, `/etc/seedbox/config/version` contains the canonical spec plus

@@ -19,6 +19,6 @@ if (!function_exists('runUserStep')) {
             $GLOBALS['PMSS_TEST_RUNUSERSTEP_LAST'] = ['user' => $user, 'description' => $description, 'command' => $command];
         }
 
-        return 0;
+        return (int) ($GLOBALS['PMSS_TEST_RUNUSERSTEP_RC'] ?? 0);
     }
 }

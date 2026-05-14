@@ -37,12 +37,6 @@
  */
 function pmssIsHomeMounted(): bool
 {
-    // Allow test harnesses to override mount detection.
-    $override = ['1' => true, 'true' => true, '0' => false, 'false' => false][strtolower((string) getenv('PMSS_HOME_MOUNTED_OVERRIDE'))] ?? null;
-    if ($override !== null) {
-        return $override;
-    }
-
     if (!is_string($mounts = @file_get_contents(((string) getenv('PMSS_PROC_MOUNTS_PATH')) ?: '/proc/mounts'))) {
         // If we cannot read /proc/mounts, assume not mounted to be safe.
         return false;

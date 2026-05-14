@@ -71,11 +71,18 @@ class DistUpgradeHelpersTest extends TestCase
 
     public function testBootReadinessParsers(): void
     {
-        $healthyMdstat = "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\n";
-        $degradedMdstat = "md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/1] [U_]\n";
+        $cases = [
+            ['', false],
+            ["Personalities : [raid1]\nunused devices: <none>\n", false],
+            ["md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\n", false],
+            ["md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/1] [U_]\n", true],
+            ["md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/1] [_U]\n", true],
+            ["md0 : active raid1 sda1[0] sdb1[1]\n      104320 blocks [2/2] [UU]\nmd1 : active raid1 sdc1[0] sdd1[1]\n      104320 blocks [2/1] [U_]\n", true],
+        ];
 
-        $this->assertTrue(!\pmssMdstatHasDegradedArrays($healthyMdstat));
-        $this->assertTrue(\pmssMdstatHasDegradedArrays($degradedMdstat));
+        foreach ($cases as [$mdstat, $expected]) {
+            $this->assertEquals($expected, \pmssMdstatHasDegradedArrays($mdstat));
+        }
     }
 
     public function testVerifyDistUpgradeBootReadinessLogsHealthyConfigs(): void

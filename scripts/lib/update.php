@@ -33,8 +33,22 @@ function pmssSkeletonBase(): string
  * @param string $user The username whose file should be updated.
  */
 function updateUserFile($file, $user) {
-    if (empty($file) || empty($user)) {
-        logMessage("[user:{$user}] updateUserFile skipped (invalid params or home missing): {$file}");
+    $logUser = is_scalar($user) ? (string) $user : 'invalid';
+    $logFile = is_scalar($file) ? (string) $file : 'invalid';
+    $logUser = str_replace(["\r", "\n", "\0"], '?', $logUser);
+    $logFile = str_replace(["\r", "\n", "\0"], '?', $logFile);
+    if (!is_string($file) || !is_string($user) || trim($file) === '' || trim($user) === '') {
+        logMessage("[user:{$logUser}] updateUserFile skipped (invalid params or home missing): {$logFile}");
+        return;
+    }
+
+    if ($user === '.' || $user === '..' || preg_match('#[/\r\n\0]#', $user) === 1) {
+        logMessage("[user:{$logUser}] updateUserFile skipped (unsafe user path segment): {$logFile}");
+        return;
+    }
+
+    if ($file[0] === '/' || preg_match('#(^|/)\.{1,2}(/|$)|[\r\n\0]#', $file) === 1) {
+        logMessage("[user:{$logUser}] updateUserFile skipped (unsafe relative path): {$logFile}");
         return;
     }
 
@@ -51,6 +65,11 @@ function updateUserFile($file, $user) {
 
     $sourceFile = pmssSkeletonBase().'/'.$file;
     $targetFile = $homeDir.'/'.$file;
+
+    if (is_link($targetFile)) {
+        logMessage("[user:{$user}] Target path is a symlink, skipping: {$file}");
+        return;
+    }
 
     if (!file_exists($sourceFile)) {
         logMessage("[user:{$user}] Source skeleton missing for {$file}");

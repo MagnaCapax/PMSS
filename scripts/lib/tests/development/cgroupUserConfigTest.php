@@ -34,16 +34,6 @@ class MockSystem implements SystemInterface
     public function getTotalMemoryMiB(): int { return $this->totalMemMiB; }
     public function resolveDevice(string $device): string { return $this->findmnt[$device] ?? '/dev/sda'; }
     public function requireRoot(): void { /* no-op for tests */ }
-    
-    // Helper to check if a specific property set command was issued
-    public function assertPropertySet(string $prop, string $value): bool {
-        foreach ($this->executedCommands as $cmd) {
-            if (strpos($cmd, 'systemctl set-property') !== false && strpos($cmd, "$prop=$value") !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
 
 class CgroupUserConfigTest extends TestCase

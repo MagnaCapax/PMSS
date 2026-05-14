@@ -135,21 +135,17 @@ function pmssSetupLetsEncryptRun(string $domain, string $email, string $codename
     // Debian 10 still needs the upstream virtualenv layout for a new enough certbot.
     if ($codename === 'buster') {
         if (!$fileExists($certbotVirtualenvBinary)) {
-            pmssSetupLetsEncryptRunCommand(
-                pmssSetupLetsEncryptCommandBuild('python3', array('-m', 'venv', '/opt/certbot/')),
-                'Create certbot virtualenv',
-                $commandRunner
-            );
-            pmssSetupLetsEncryptRunCommand(
-                pmssSetupLetsEncryptCommandBuild('/opt/certbot/bin/pip', array('install', '--upgrade', 'pip')),
-                'Upgrade certbot pip',
-                $commandRunner
-            );
-            pmssSetupLetsEncryptRunCommand(
-                pmssSetupLetsEncryptCommandBuild('/opt/certbot/bin/pip', array('install', 'certbot', 'certbot-nginx')),
-                'Install certbot virtualenv packages',
-                $commandRunner
-            );
+            foreach (array(
+                array('python3', array('-m', 'venv', '/opt/certbot/'), 'Create certbot virtualenv'),
+                array('/opt/certbot/bin/pip', array('install', '--upgrade', 'pip'), 'Upgrade certbot pip'),
+                array('/opt/certbot/bin/pip', array('install', 'certbot', 'certbot-nginx'), 'Install certbot virtualenv packages'),
+            ) as $step) {
+                pmssSetupLetsEncryptRunCommand(
+                    pmssSetupLetsEncryptCommandBuild($step[0], $step[1]),
+                    $step[2],
+                    $commandRunner
+                );
+            }
         }
 
         if (!$fileExists($certbotBinary)) {

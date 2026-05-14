@@ -57,6 +57,31 @@ class UserUpdateHttpTest extends TestCase
         $this->assertTrue(strpos($ini, 'error_log') !== false);
     }
 
+    public function testConfigureHttpRefusesSymlinkedPhpIni(): void
+    {
+        $tempHome = $this->pmssMakeTempDir('pmss-http-phpini-link-home-');
+        $target = $this->pmssMakeTempFile('pmss-http-phpini-link-target-');
+        mkdir($tempHome.'/.lighttpd', 0755, true);
+        file_put_contents($target, "display_errors = On\n");
+        $this->pmssCreateSymlinkOrSkip($target, $tempHome.'/.lighttpd/php.ini');
+
+        $ctx = [
+            'user'     => 'dummy',
+            'home'     => $tempHome,
+            'user_esc' => escapeshellarg('dummy'),
+        ];
+
+        ob_start();
+        try {
+            \pmssUserConfigureHttp($ctx);
+        } finally {
+            $output = (string) ob_get_clean();
+        }
+
+        $this->assertEquals("display_errors = On\n", (string) file_get_contents($target));
+        $this->assertTrue(strpos($output, 'Updated php.ini for user dummy') === false);
+    }
+
     public function testConfigureHttpRestoresQbittorrentManagedKeysWhenMissing(): void
     {
         $home = $this->pmssMakeTempDir('pmss-http-qbittorrent-missing-');

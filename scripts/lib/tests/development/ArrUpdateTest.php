@@ -23,14 +23,7 @@ class ArrUpdateTest extends TestCase
                 'PATH' => $shimDir.':'.(string) getenv('PATH'),
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                \pmssArrUpdate([
-                    'app' => $app,
-                    'install_path' => $installPath,
-                    'releases_url' => $metadataPath,
-                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
-                    'extract_dir' => $extractDir,
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
             $this->assertTrue(is_dir($installPath), 'expected install path to be created');
@@ -61,14 +54,7 @@ class ArrUpdateTest extends TestCase
                 'PATH' => $shimDir.':'.(string) getenv('PATH'),
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                \pmssArrUpdate([
-                    'app' => $app,
-                    'install_path' => $installPath,
-                    'releases_url' => $metadataPath,
-                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
-                    'extract_dir' => $extractDir,
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
@@ -97,14 +83,7 @@ class ArrUpdateTest extends TestCase
                 'PATH' => $shimDir.':'.(string) getenv('PATH'),
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                \pmssArrUpdate([
-                    'app' => $app,
-                    'install_path' => $installPath,
-                    'releases_url' => $metadataPath,
-                    'asset_pattern' => '/bundle-([0-9.]+)-.*\.tar\.gz/',
-                    'extract_dir' => $extractDir,
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)-.*\.tar\.gz/');
             });
 
             $this->assertEquals('x64', (string) @file_get_contents($installPath.'/marker.txt'));
@@ -130,14 +109,7 @@ class ArrUpdateTest extends TestCase
                 'PATH' => $shimDir.':'.(string) getenv('PATH'),
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                \pmssArrUpdate([
-                    'app' => $app,
-                    'install_path' => $installPath,
-                    'releases_url' => $metadataPath,
-                    'asset_pattern' => '/bundle-([0-9.]+)(?:-.*)?\.tar\.gz/',
-                    'extract_dir' => $extractDir,
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)(?:-.*)?\.tar\.gz/');
             });
 
             $this->assertEquals('generic', (string) @file_get_contents($installPath.'/marker.txt'));
@@ -154,14 +126,7 @@ class ArrUpdateTest extends TestCase
         try {
             $this->pmssWithEnv([], function () use ($baseDir, &$output): void {
                 ob_start();
-                \pmssArrUpdate([
-                    'app' => 'PmssArrUnsafeExtract',
-                    'install_path' => $baseDir.'/install',
-                    'releases_url' => $baseDir.'/missing-releases.json',
-                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
-                    'extract_dir' => '../PackageDir',
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate('PmssArrUnsafeExtract', $baseDir.'/install', $baseDir.'/missing-releases.json', '../PackageDir');
                 $output = (string) ob_get_clean();
             });
 
@@ -188,14 +153,7 @@ class ArrUpdateTest extends TestCase
                 'PATH' => $shimDir.':'.(string) getenv('PATH'),
             ], function () use ($app, $installPath, $metadataPath, $extractDir, &$output): void {
                 ob_start();
-                \pmssArrUpdate([
-                    'app' => $app,
-                    'install_path' => $installPath,
-                    'releases_url' => $metadataPath,
-                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
-                    'extract_dir' => $extractDir,
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
                 $output = (string) ob_get_clean();
             });
 
@@ -229,14 +187,7 @@ class ArrUpdateTest extends TestCase
                 'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                \pmssArrUpdate([
-                    'app' => $app,
-                    'install_path' => $installPath,
-                    'releases_url' => $metadataPath,
-                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
-                    'extract_dir' => $extractDir,
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
@@ -271,14 +222,7 @@ class ArrUpdateTest extends TestCase
                 'PMSS_ARR_TEST_TIMEOUT_MODE' => 'always-timeout',
                 'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
             ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                \pmssArrUpdate([
-                    'app' => $app,
-                    'install_path' => $installPath,
-                    'releases_url' => $metadataPath,
-                    'asset_pattern' => '/bundle-([0-9.]+)\.tar\.gz/',
-                    'extract_dir' => $extractDir,
-                    'user_agent' => 'PMSS-Test',
-                ]);
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
             $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
@@ -314,6 +258,23 @@ class ArrUpdateTest extends TestCase
         );
         $this->assertEquals(0, $rc, implode("\n", $output));
         return $archivePath;
+    }
+
+    private function runArrUpdate(
+        string $app,
+        string $installPath,
+        string $metadataPath,
+        string $extractDir,
+        string $assetPattern = '/bundle-([0-9.]+)\.tar\.gz/'
+    ): void {
+        \pmssArrUpdate([
+            'app' => $app,
+            'install_path' => $installPath,
+            'releases_url' => $metadataPath,
+            'asset_pattern' => $assetPattern,
+            'extract_dir' => $extractDir,
+            'user_agent' => 'PMSS-Test',
+        ]);
     }
 
     private function writeMetadata(string $baseDir, string $assetName, string $archivePath): string

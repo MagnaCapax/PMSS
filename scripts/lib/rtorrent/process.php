@@ -230,6 +230,64 @@ function rtorrentProcessKillPids(array $pids, int $signal): void
 }
 
 /**
+ * Validate a state marker path before writing or removing it.
+ *
+ * State files are operator-visible guardrails for watchdog recovery. Treat the
+ * path itself as untrusted so malformed usernames or partial-update callers
+ * cannot redirect writes through relative paths, dot segments, or symlinks.
+ *
+ * @param string $stateFile Candidate state marker path.
+ *
+ * @return bool True when the target can safely be treated as a regular file.
+ */
+function rtorrentProcessStateFilePathIsSafe(string $stateFile): bool
+{
+    $stateFile = rtrim($stateFile, '/');
+    if ($stateFile === '' || $stateFile[0] !== '/' || strpos($stateFile, "\0") !== false) {
+        return false;
+    }
+
+    $segments = explode('/', ltrim($stateFile, '/'));
+    $current = '';
+    $lastIndex = count($segments) - 1;
+    foreach ($segments as $index => $segment) {
+        if ($segment === '' || $segment === '.' || $segment === '..') {
+            return false;
+        }
+
+        $current .= '/'.$segment;
+        if (is_link($current)) {
+            return false;
+        }
+
+        $isLeaf = $index === $lastIndex;
+        if (!$isLeaf && file_exists($current) && !is_dir($current)) {
+            return false;
+        }
+        if ($isLeaf && file_exists($current) && !is_file($current)) {
+            return false;
+        }
+    }
+
+    $parent = dirname($stateFile);
+    return is_dir($parent) && !is_link($parent);
+}
+
+/**
+ * Write a watchdog state marker after validating the target path.
+ *
+ * @param string $stateFile Candidate state marker path.
+ * @param string $payload   Marker payload.
+ *
+ * @return bool True when the marker was written.
+ */
+function rtorrentProcessWriteStateFile(string $stateFile, string $payload): bool
+{
+    return rtorrentProcessStateFilePathIsSafe($stateFile)
+        && @file_put_contents($stateFile, $payload, LOCK_EX) !== false;
+}
+
+/**
  * Check and track a stale condition using a state file.
  *
  * Implements the pattern: first detection records timestamp, subsequent checks
@@ -243,11 +301,15 @@ function rtorrentProcessKillPids(array $pids, int $signal): void
 function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): array
 {
     $now = time();
+    if (!rtorrentProcessStateFilePathIsSafe($stateFile)) {
+        return ['action' => 'record', 'age' => 0];
+    }
+
     $firstSeen = pmssReadRegularFileInt($stateFile);
 
     // First time seeing this condition.
     if ($firstSeen <= 0) {
-        @file_put_contents($stateFile, (string) $now, LOCK_EX);
+        rtorrentProcessWriteStateFile($stateFile, (string) $now);
         return ['action' => 'record', 'age' => 0];
     }
 
@@ -271,9 +333,13 @@ function rtorrentProcessCheckStaleState(string $stateFile, int $gracePeriod): ar
 function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureThreshold): array
 {
     $failureThreshold = max(1, $failureThreshold);
+    if (!rtorrentProcessStateFilePathIsSafe($stateFile)) {
+        return ['action' => 'record', 'count' => 1];
+    }
+
     $count = max(0, pmssReadRegularFileInt($stateFile));
     $count++;
-    @file_put_contents($stateFile, (string) $count, LOCK_EX);
+    rtorrentProcessWriteStateFile($stateFile, (string) $count);
 
     if ($count >= $failureThreshold) {
         return ['action' => 'stale', 'count' => $count];
@@ -291,7 +357,7 @@ function rtorrentProcessCheckFailureCountState(string $stateFile, int $failureTh
  */
 function rtorrentProcessClearStaleState(string $stateFile): void
 {
-    if (is_file($stateFile)) { @unlink($stateFile); }
+    if (rtorrentProcessStateFilePathIsSafe($stateFile) && is_file($stateFile)) { @unlink($stateFile); }
 }
 
 /**
@@ -545,7 +611,7 @@ function rtorrentProcessRestart(
     $logFn("startRtorrent {$user} completed (rc={$rc})", true);
 
     // Record restart for backoff tracking.
-    @file_put_contents('/tmp/.pmss-rtorrent-restart-'.$user, (string) time(), LOCK_EX);
+    rtorrentProcessWriteStateFile('/tmp/.pmss-rtorrent-restart-'.$user, (string) time());
 
     // Capture after snapshot.
     $after = rtorrentProcessSnapshot($user);

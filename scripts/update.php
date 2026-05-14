@@ -53,6 +53,8 @@ const SCRIPTS_ONLY_FLAG     = '--scripts-only';
 const PMSS_CORRELATION_ENV  = 'PMSS_CORRELATION_ID';
 define('PMSS_UPDATE_LOCK_FILE', '/var/lib/pmss/update.lock');
 define('PMSS_UPDATE_LOCK_ENV', 'PMSS_UPDATE_LOCK_HELD');
+const PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS = 30;
+const PMSS_UPDATE_LOCK_RETRY_SECONDS = 2;
 
 $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;
 
@@ -166,9 +168,33 @@ function pmssAcquireUpdateLock(): void
         fatal('Unable to open update lock file: '.PMSS_UPDATE_LOCK_FILE, EXIT_COPY);
     }
 
-    logEvent('update_lock_wait', ['path' => PMSS_UPDATE_LOCK_FILE]);
-    if (!flock($fh, LOCK_EX)) {
-        fatal('Unable to acquire update lock (flock failed)', EXIT_COPY);
+    logEvent('update_lock_wait', ['path' => PMSS_UPDATE_LOCK_FILE, 'max_wait_seconds' => PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS]);
+    $deadline = microtime(true) + PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS;
+    $attempt = 0;
+    while (true) {
+        if (@flock($fh, LOCK_EX | LOCK_NB)) {
+            break;
+        }
+
+        $remaining = $deadline - microtime(true);
+        if ($remaining <= 0.0) {
+            @fclose($fh);
+            logmsg('[WARN] Update lock busy after '.PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS.'s; skipping this run');
+            logEvent('update_lock_busy_skip', [
+                'path' => PMSS_UPDATE_LOCK_FILE,
+                'wait_seconds' => PMSS_UPDATE_LOCK_MAX_WAIT_SECONDS,
+            ]);
+            exit(0);
+        }
+
+        $attempt++;
+        $sleepSeconds = min(PMSS_UPDATE_LOCK_RETRY_SECONDS, max(1, (int) ceil($remaining)));
+        logEvent('update_lock_busy', [
+            'path' => PMSS_UPDATE_LOCK_FILE,
+            'attempt' => $attempt,
+            'retry_seconds' => $sleepSeconds,
+        ]);
+        sleep($sleepSeconds);
     }
 
     $GLOBALS['PMSS_UPDATE_LOCK_HANDLE'] = $fh;
@@ -1000,17 +1026,6 @@ function checkDiskSpace(): void
         }
     }
     logmsg('[INFO] Preflight disk space check passed');
-}
-
-function runAutoremove(): void
-{
-    // Guardrail: this helper performs package removals via apt-get and must
-    // NEVER be invoked from `--scripts-only` flows. Scripts-only runs are
-    // explicitly defined to avoid any package manager side effects.
-    $cmd = 'DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none '
-        .'apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold '
-        .'autoremove -y';
-    runFatal($cmd, EXIT_COPY);
 }
 
 /**

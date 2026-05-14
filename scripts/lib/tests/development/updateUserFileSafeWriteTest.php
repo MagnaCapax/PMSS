@@ -106,6 +106,67 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->assertTrue(is_dir($target));
     }
 
+    public function testSkipsTraversalPathBeforeCopyingOutsideHome(): void
+    {
+        $home = $this->ensureUserHome();
+        file_put_contents(dirname(\pmssSkeletonBase()).'/escape.txt', 'escape');
+
+        $outsideTarget = dirname($home).'/escape.txt';
+        \updateUserFile('../escape.txt', $this->user);
+
+        $this->assertFalse(file_exists($outsideTarget));
+    }
+
+    public function testSkipsAbsoluteRelativeName(): void
+    {
+        $home = $this->ensureUserHome();
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), '/absolute.txt', 'data');
+
+        \updateUserFile('/absolute.txt', $this->user);
+
+        $this->assertFalse(file_exists($home.'/absolute.txt'));
+    }
+
+    public function testSkipsControlCharacterPath(): void
+    {
+        $home = $this->ensureUserHome();
+        $relative = $this->skelRelative("bad\nname.txt");
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
+
+        \updateUserFile($relative, $this->user);
+
+        $this->assertFalse(file_exists($home.'/'.$relative));
+    }
+
+    public function testSkipsUnsafeUserPathSegment(): void
+    {
+        $home = $this->ensureUserHome();
+        $relative = $this->skelRelative('unsafe-user.txt');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'data');
+
+        \updateUserFile($relative, '..');
+
+        $this->assertFalse(file_exists(dirname($home).'/../'.$relative));
+    }
+
+    public function testSkipsExistingSymlinkTarget(): void
+    {
+        $home = $this->ensureUserHome();
+        $relative = $this->skelRelative('linked-target.txt');
+        $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'new-data');
+
+        $outside = $this->pmssMakeTempFile('pmss-linked-target-');
+        file_put_contents($outside, 'keep-data');
+        $target = $home.'/'.$relative;
+        @mkdir(dirname($target), 0755, true);
+        $this->pmssCreateSymlinkOrSkip($outside, $target);
+
+        \updateUserFile($relative, $this->user);
+
+        $this->assertTrue(is_link($target));
+        $this->assertEquals('keep-data', file_get_contents($outside));
+    }
+
     public function testCopyToUserSpaceReturnsFalseWhenParentDirectoryMissing(): void
     {
         $source = $this->pmssMakeTempFile('pmss-copy-source-');

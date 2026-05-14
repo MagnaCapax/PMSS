@@ -9,25 +9,27 @@
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/runtime.php';
 require_once __DIR__.'/lib/traffic.php';
+require_once __DIR__.'/lib/cli/optionParser.php';
 
 pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');
 
 function pmssShowTrafficMain(array $argv): int
 {
-    $options = getopt('', ['json', 'show-missing', 'help', 'extended', 'sort:', 'color', 'no-color']);
-    $helpExitCode = isset($options['help']) ? 0 : null;
+    $parsed = pmssParseCliTokens($argv);
+    $helpExitCode = pmssCliOption($parsed, 'help', null, false) !== false ? 0 : null;
 
-    $asJson = isset($options['json']);
-    $showMissing = isset($options['show-missing']);
-    $extended = isset($options['extended']);
+    $asJson = pmssCliOption($parsed, 'json', null, false) !== false;
+    $showMissing = pmssCliOption($parsed, 'show-missing', null, false) !== false;
+    $extended = pmssCliOption($parsed, 'extended', null, false) !== false;
 
     $sort = 'name';
-    if ($helpExitCode === null && array_key_exists('sort', $options)) {
-        $sort = strtolower(trim((string) $options['sort']));
-        if ($sort === '') {
+    $sortOption = pmssCliOption($parsed, 'sort', null, null);
+    if ($helpExitCode === null && $sortOption !== null) {
+        if (!is_string($sortOption) || trim($sortOption) === '') {
             fwrite(STDERR, "Error: --sort expects a value.\n");
             return 2;
         }
+        $sort = strtolower(trim($sortOption));
     }
     $validSorts = ['name', 'month', 'pct', 'rate'];
     if ($helpExitCode === null && !in_array($sort, $validSorts, true)) {
@@ -52,8 +54,8 @@ TXT;
         return $helpExitCode;
     }
 
-    $colorRequested = array_key_exists('color', $options);
-    $noColorRequested = array_key_exists('no-color', $options);
+    $colorRequested = pmssCliOption($parsed, 'color', null, false) !== false;
+    $noColorRequested = pmssCliOption($parsed, 'no-color', null, false) !== false;
     if ($colorRequested && $noColorRequested) {
         fwrite(STDERR, "Error: --color and --no-color are mutually exclusive.\n");
         return 2;

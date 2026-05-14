@@ -338,20 +338,7 @@ function pmssVerifyDistUpgradeBootReadiness(
  */
 function pmssMdstatHasDegradedArrays(string $mdstat): bool
 {
-    if ($mdstat === '') {
-        return false;
-    }
-
-    if (preg_match_all('/\[[U_]+\]/', $mdstat, $matches) !== 1) {
-        return false;
-    }
-    foreach ($matches[0] as $state) {
-        if (strpos($state, '_') !== false) {
-            return true;
-        }
-    }
-
-    return false;
+    return $mdstat !== '' && preg_match('/\[[U_]*_[U_]*\]/', $mdstat) === 1;
 }
 
 /**

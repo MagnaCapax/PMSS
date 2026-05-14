@@ -35,6 +35,18 @@ class MediaStackPanelTest extends TestCase
         $this->assertFalse($status['canStart']);
     }
 
+    public function testStartGateReportsMissingInstallerBeforePopulatedBin(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-media-gate-priority-');
+        @mkdir($home.'/.bin', 0755, true);
+        @file_put_contents($home.'/.bin/existing', '1');
+
+        $gate = \pmssMediaStackPanelStartGateRead($home);
+
+        $this->assertFalse($gate['ok']);
+        $this->assertSame('Media stack installer is missing from this account.', $gate['message']);
+    }
+
     public function testStatusShowsInstalledUrlsWhenJellyfinConfigExists(): void
     {
         $home = $this->mediaHomeCreate('pmss-media-installed-');

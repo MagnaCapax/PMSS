@@ -6,6 +6,22 @@ require_once dirname(__DIR__, 2).'/certbotSetup.php';
 
 class SetupLetsEncryptTest extends TestCase
 {
+    /** Build the shared hermetic certbot setup options used by these tests. */
+    private function pmssLetsEncryptTestOptions(array $overrides = []): array
+    {
+        return array_replace([
+            'cronPath' => $this->pmssMakeTempDir('pmss-certbot-cron-').'/certbot',
+            'createNginxConfigCommand' => 'create-nginx',
+            'nginxRestartCommand' => 'restart-nginx',
+            'fileExists' => static function (string $path): bool {
+                return false;
+            },
+            'commandRunner' => static function (string $command, string $description): array {
+                return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
+            },
+        ], $overrides);
+    }
+
     public function testRejectsMissingEmailArgument(): void
     {
         $output = $this->pmssRunRepoPhpScript('scripts/util/setupLetsEncrypt.php');
@@ -58,18 +74,12 @@ class SetupLetsEncryptTest extends TestCase
     {
         $commands = [];
         list($ignored, $stdout) = $this->pmssCaptureStdout(function () use (&$commands): void {
-            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
-                'cronPath' => $this->pmssMakeTempDir('pmss-certbot-cron-').'/certbot',
-                'createNginxConfigCommand' => 'create-nginx',
-                'nginxRestartCommand' => 'restart-nginx',
-                'fileExists' => static function (string $path): bool {
-                    return $path === '/etc/cron.d/certbot';
-                },
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
                 'commandRunner' => static function (string $command, string $description) use (&$commands): array {
                     $commands[] = ['command' => $command, 'description' => $description];
                     return ['rc' => 0, 'stdout' => $description."\n", 'stderr' => ''];
                 },
-            ]);
+            ]));
         });
 
         $this->assertStringContainsString('Install certbot packages', $stdout);
@@ -87,10 +97,8 @@ class SetupLetsEncryptTest extends TestCase
         file_put_contents($cronPath, "existing\n");
 
         list($ignored, $stdout) = $this->pmssCaptureStdout(function () use (&$commands, $cronPath): void {
-            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
                 'cronPath' => $cronPath,
-                'createNginxConfigCommand' => 'create-nginx',
-                'nginxRestartCommand' => 'restart-nginx',
                 'fileExists' => static function (string $path) use ($cronPath): bool {
                     return $path === '/etc/letsencrypt/live/example.com' || $path === $cronPath;
                 },
@@ -98,7 +106,7 @@ class SetupLetsEncryptTest extends TestCase
                     $commands[] = ['command' => $command, 'description' => $description];
                     return ['rc' => 0, 'stdout' => $description."\n", 'stderr' => ''];
                 },
-            ]);
+            ]));
         });
 
         $this->assertStringContainsString('Install certbot packages', $stdout);
@@ -113,17 +121,12 @@ class SetupLetsEncryptTest extends TestCase
     {
         $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-missing-').'/certbot';
 
-        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
+        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
             'cronPath' => $cronPath,
-            'createNginxConfigCommand' => 'create-nginx',
-            'nginxRestartCommand' => 'restart-nginx',
             'fileExists' => static function (string $path): bool {
                 return $path === '/etc/letsencrypt/live/example.com';
             },
-            'commandRunner' => static function (string $command, string $description): array {
-                return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
-            },
-        ]);
+        ]));
 
         $this->assertEquals(\pmssSetupLetsEncryptRenewalCronContents(), (string) file_get_contents($cronPath));
         $this->assertEquals('644', substr(sprintf('%o', fileperms($cronPath)), -3));
@@ -134,10 +137,8 @@ class SetupLetsEncryptTest extends TestCase
         $cronPath = $this->pmssMakeTempDir('pmss-certbot-cron-fail-').'/certbot';
 
         try {
-            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', [
+            \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'bullseye', $this->pmssLetsEncryptTestOptions([
                 'cronPath' => $cronPath,
-                'createNginxConfigCommand' => 'create-nginx',
-                'nginxRestartCommand' => 'restart-nginx',
                 'fileExists' => static function (string $path): bool {
                     return $path === '/etc/letsencrypt/live/example.com';
                 },
@@ -147,7 +148,7 @@ class SetupLetsEncryptTest extends TestCase
                     }
                     return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
                 },
-            ]);
+            ]));
             $this->fail('Expected nginx restart failure to throw');
         } catch (\RuntimeException $exception) {
             $this->assertStringContainsString('Restart nginx failed (rc=1): restart failed', $exception->getMessage());
@@ -158,18 +159,12 @@ class SetupLetsEncryptTest extends TestCase
     {
         $commands = [];
 
-        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'buster', [
-            'cronPath' => $this->pmssMakeTempDir('pmss-certbot-cron-buster-').'/certbot',
-            'createNginxConfigCommand' => 'create-nginx',
-            'nginxRestartCommand' => 'restart-nginx',
-            'fileExists' => static function (string $path): bool {
-                return false;
-            },
+        \pmssSetupLetsEncryptRun('example.com', 'user@example.com', 'buster', $this->pmssLetsEncryptTestOptions([
             'commandRunner' => static function (string $command, string $description) use (&$commands): array {
                 $commands[] = $description;
                 return ['rc' => 0, 'stdout' => '', 'stderr' => ''];
             },
-        ]);
+        ]));
 
         $this->assertEquals(
             [

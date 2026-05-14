@@ -9,32 +9,18 @@
 class ResourceStatsAccumulator
 {
     public const RAW_METRICS = ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'];
+    private const AVERAGE_METRICS = ['memory', 'tasks'];
 
-    /** @var array */
     private $compareTimes;
-    /** @var array */
     private $rawTotals;
-    /** @var array */
-    private $memorySums;
-    /** @var array */
-    private $memoryCounts;
-    /** @var array */
-    private $taskSums;
-    /** @var array */
-    private $taskCounts;
-    /** @var array */
+    private $averageSums;
+    private $averageCounts;
     private $dailyTotals = [];
-    /** @var string */
     private $firstDay = '';
-    /** @var float */
     private $lastMemory = 0.0;
-    /** @var float */
     private $lastTasks = 0.0;
-    /** @var float|null */
     private $lastMemoryAnon = null;
-    /** @var float|null */
     private $lastMemoryFile = null;
-    /** @var int|null */
     private $prevTimestamp = null;
 
     public function __construct(array $compareTimes)
@@ -42,9 +28,12 @@ class ResourceStatsAccumulator
         $this->compareTimes = $compareTimes;
         $labels = array_keys($compareTimes);
         $windowZeros = array_fill_keys($labels, 0.0);
+        $windowCounts = array_fill_keys($labels, 0);
         $this->rawTotals = array_fill_keys(self::RAW_METRICS, $windowZeros);
-        $this->memorySums = $this->taskSums = $windowZeros;
-        $this->memoryCounts = $this->taskCounts = array_fill_keys($labels, 0);
+        foreach (self::AVERAGE_METRICS as $metric) {
+            $this->averageSums[$metric] = $windowZeros;
+            $this->averageCounts[$metric] = $windowCounts;
+        }
     }
 
     /**
@@ -73,6 +62,7 @@ class ResourceStatsAccumulator
             'cpu' => (float) $sample['cpu'],
             'ram_hours' => ($sampleMemory / 1024 / 1024 / 1024) * $intervalHours,
         ];
+        $sampleAverages = ['memory' => $sampleMemory, 'tasks' => $sampleTasks];
 
         foreach ($this->compareTimes as $label => $threshold) {
             if ($timestamp < $threshold) {
@@ -81,10 +71,10 @@ class ResourceStatsAccumulator
             foreach ($sampleMetrics as $metric => $value) {
                 $this->rawTotals[$metric][$label] += $value;
             }
-            $this->memorySums[$label] += $sampleMemory;
-            $this->memoryCounts[$label] += 1;
-            $this->taskSums[$label] += $sampleTasks;
-            $this->taskCounts[$label] += 1;
+            foreach ($sampleAverages as $metric => $value) {
+                $this->averageSums[$metric][$label] += $value;
+                $this->averageCounts[$metric][$label] += 1;
+            }
         }
 
         $currentDay = date('Y/m/d', $timestamp);
@@ -93,20 +83,19 @@ class ResourceStatsAccumulator
             return;
         }
         if (!isset($this->dailyTotals[$currentDay])) {
-            $this->dailyTotals[$currentDay] = array_fill_keys(
-                array_merge(self::RAW_METRICS, ['memory_sum', 'tasks_sum']),
-                0.0
-            ) + ['memory_count' => 0, 'tasks_count' => 0];
+            $this->dailyTotals[$currentDay] = array_fill_keys(self::RAW_METRICS, 0.0)
+                + array_fill_keys(['memory_sum', 'tasks_sum'], 0.0)
+                + array_fill_keys(['memory_count', 'tasks_count'], 0);
         }
 
         $dayTotals = &$this->dailyTotals[$currentDay];
         foreach ($sampleMetrics as $metric => $value) {
             $dayTotals[$metric] += $value;
         }
-        $dayTotals['memory_sum'] += $sampleMemory;
-        $dayTotals['memory_count'] += 1;
-        $dayTotals['tasks_sum'] += $sampleTasks;
-        $dayTotals['tasks_count'] += 1;
+        foreach ($sampleAverages as $metric => $value) {
+            $dayTotals[$metric.'_sum'] += $value;
+            $dayTotals[$metric.'_count'] += 1;
+        }
     }
 
     /**
@@ -125,16 +114,17 @@ class ResourceStatsAccumulator
         $daily = [];
         $metricKeys = array_flip(self::RAW_METRICS);
         foreach ($this->dailyTotals as $day => $totals) {
-            $daily[$day] = array_intersect_key($totals, $metricKeys) + [
-                'memory' => $totals['memory_count'] > 0 ? ($totals['memory_sum'] / $totals['memory_count']) : 0.0,
-                'tasks' => $totals['tasks_count'] > 0 ? ($totals['tasks_sum'] / $totals['tasks_count']) : 0.0,
-            ];
+            $daily[$day] = array_intersect_key($totals, $metricKeys);
+            foreach (self::AVERAGE_METRICS as $metric) {
+                $count = (int) ($totals[$metric.'_count'] ?? 0);
+                $daily[$day][$metric] = $count > 0 ? ($totals[$metric.'_sum'] / $count) : 0.0;
+            }
         }
 
         return [
             'raw' => $this->rawTotals,
-            'memory' => $this->computeAverages($this->memorySums, $this->memoryCounts),
-            'tasks' => $this->computeAverages($this->taskSums, $this->taskCounts),
+            'memory' => $this->computeAverages($this->averageSums['memory'], $this->averageCounts['memory']),
+            'tasks' => $this->computeAverages($this->averageSums['tasks'], $this->averageCounts['tasks']),
             'daily' => $daily,
             'current_memory' => $this->lastMemory,
             'current_tasks' => $this->lastTasks,

@@ -70,11 +70,6 @@ class WebdavSecurityTest extends TestCase
         );
     }
 
-    private function assertIsBool($value, string $msg = ''): void
-    {
-        $this->assertTrue(is_bool($value), $msg !== '' ? $msg : 'Expected value to be boolean');
-    }
-
     private function assertNotEmpty($value, string $msg = ''): void
     {
         $this->assertTrue(!empty($value), $msg !== '' ? $msg : 'Expected value to not be empty');

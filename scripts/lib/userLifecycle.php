@@ -672,36 +672,3 @@ function pmssUserLifecycleRefreshManagedNginxConfig(string $action, string $user
         $stepRunner
     );
 }
-
-/**
- * Log a user-facing fix notification.
- *
- * Writes to a user-readable log file in the user's home directory so they can
- * see what automated fixes have been applied to their service. Used by cron
- * maintenance scripts (checkRtorrent.php, checkLighttpd.php, quota handlers).
- *
- * @param string $username  Target user (must be a valid PMSS username)
- * @param string $component Component name (QUOTA, RTORRENT, LIGHTTPD, etc.)
- * @param string $message   Human-readable description of the fix applied
- */
-function pmssUserFixLog(string $username, string $component, string $message): void
-{
-    // Validate username to prevent path traversal
-    if (!pmssUsernameIsValid($username)) {
-        return;
-    }
-
-    $homeDir = "/home/{$username}";
-    if (!is_dir($homeDir)) {
-        return;
-    }
-
-    $logPath = "{$homeDir}/.pmss-fixes.log";
-    // Write the log entry
-    if (!pmssLogAppendTimestampedLine($logPath, $message, 'Y-m-d H:i:s', " [{$component}] ")) {
-        return;
-    }
-
-    // Ensure user can read their own log
-    @chown($logPath, $username);
-}

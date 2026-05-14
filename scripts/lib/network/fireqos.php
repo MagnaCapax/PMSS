@@ -25,13 +25,10 @@ function networkBuildFireqosConfig(array $networkConfig, array $users, array $lo
     $fireqosMark = 1;
     $limitStateDir = pmssResolvePathFromEnv('PMSS_TRAFFIC_LIMIT_STATE_DIR', '/var/run/pmss/trafficLimits');
     $homeDir = pmssResolvePathFromEnv('PMSS_HOME_DIR', '/home');
-    $defaultCapMbit = 100;
-    if (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throttle']['max'])) {
-        $defaultCapMbit = (int) $networkConfig['throttle']['max'];
-    }
-    if ($defaultCapMbit <= 0) {
-        $defaultCapMbit = 100;
-    }
+    $configuredCapMbit = $networkConfig['throttle']['max'] ?? 100;
+    $defaultCapMbit = is_numeric($configuredCapMbit) && (int) $configuredCapMbit > 0
+        ? (int) $configuredCapMbit
+        : 100;
 
     foreach ($users as $username) {
         if (!pmssValidateUsername($username)) {

@@ -11,6 +11,7 @@
  */
 
 require_once __DIR__.'/lib/runtime.php';
+require_once __DIR__.'/lib/cli/optionParser.php';
 
 pmssRequireCli();
 
@@ -29,16 +30,6 @@ function pmssStorageHealthColor(string $severity, string $text): string
 function pmssStorageHealthFormatInt($value, string $suffix = ''): string
 {
     return is_int($value) ? (string) $value.$suffix : '-';
-}
-
-function pmssStorageHealthOptionValue(array $argv, int $argc, int &$index, ?string $value): ?string
-{
-    if ($value === null && $index + 1 < $argc && strpos($argv[$index + 1], '--') !== 0) {
-        $index++;
-        $value = $argv[$index];
-    }
-
-    return ($value !== null && $value !== '') ? $value : null;
 }
 
 /**
@@ -197,39 +188,28 @@ $userNoticePath = '';
 $userNoticeRequested = false;
 $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
 
-$argc = count($argv);
-for ($i = 1; $i < $argc; $i++) {
-    $arg = $argv[$i];
-    [$key, $val] = array_pad(explode('=', $arg, 2), 2, null);
-    switch ($key) {
-        case '--json':
-            $jsonPath = pmssStorageHealthOptionValue($argv, $argc, $i, $val) ?? $jsonPath;
-            break;
-        case '--raw':
-            $raw = true;
-            break;
-        case '--only-problems':
-            $onlyProblems = true;
-            break;
-        case '--device':
-            $deviceFilter = pmssStorageHealthOptionValue($argv, $argc, $i, $val) ?? $deviceFilter;
-            break;
-        case '--user-notice':
-            $userNoticeRequested = true;
-            $userNoticePath = pmssStorageHealthOptionValue($argv, $argc, $i, $val) ?? $defaultNoticePath;
-            break;
-        case '--help':
-        case '-h':
-            echo "\nStorage health report\n";
-            echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
-            echo "  --json <path>   JSON Lines input (default /var/log/pmss/storage-health.jsonl)\n";
-            echo "  --raw           Print the latest JSON entries (per device) and exit\n";
-            echo "  --only-problems Show only warn/fail entries\n";
-            echo "  --device <id>   Filter to one device (kname like sda, or path like /dev/sda)\n";
-            echo "  --user-notice[=<path>]  Write/clear a user-facing performance notice when perf is limited\n";
-            echo "  --help          Show this help\n\n";
-            exit(0);
-    }
+$parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
+if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
+    echo "\nStorage health report\n";
+    echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
+    echo "  --json <path>   JSON Lines input (default /var/log/pmss/storage-health.jsonl)\n";
+    echo "  --raw           Print the latest JSON entries (per device) and exit\n";
+    echo "  --only-problems Show only warn/fail entries\n";
+    echo "  --device <id>   Filter to one device (kname like sda, or path like /dev/sda)\n";
+    echo "  --user-notice[=<path>]  Write/clear a user-facing performance notice when perf is limited\n";
+    echo "  --help          Show this help\n\n";
+    exit(0);
+}
+
+$jsonPath = pmssCliOptionString($parsed, 'json', null, $jsonPath) ?? $jsonPath;
+$raw = pmssCliOption($parsed, 'raw', null, false) !== false;
+$onlyProblems = pmssCliOption($parsed, 'only-problems', null, false) !== false;
+$deviceFilter = pmssCliOptionString($parsed, 'device', null, $deviceFilter);
+
+$userNoticeOption = pmssCliOption($parsed, 'user-notice', null, false);
+if ($userNoticeOption !== false) {
+    $userNoticeRequested = true;
+    $userNoticePath = pmssCliOptionString($parsed, 'user-notice', null, $defaultNoticePath) ?? $defaultNoticePath;
 }
 
 if (!is_file($jsonPath)) {

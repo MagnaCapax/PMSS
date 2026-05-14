@@ -6,7 +6,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/runtime/commands.php';
 require_once __DIR__.'/../user/directories.php';
 require_once __DIR__.'/../user/delugeManagedConfig.php';

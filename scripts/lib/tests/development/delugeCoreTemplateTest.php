@@ -11,20 +11,12 @@ class DelugeCoreTemplateTest extends TestCase
 
     protected function setUp(): void
     {
-        putenv('PMSS_SEEDBOX_CONFIG_DIR='.dirname(__DIR__, 4).'/etc/seedbox/config');
-        putenv('PMSS_HOME_DIR');
-        putenv('PMSS_DRY_RUN');
-        putenv('PMSS_DELUGE_AUTH_TEMPLATE_PATH');
-    }
-
-    protected function tearDown(): void
-    {
-        putenv('PMSS_SEEDBOX_CONFIG_DIR');
-        putenv('PMSS_HOME_DIR');
-        putenv('PMSS_DRY_RUN');
-        putenv('PMSS_DELUGE_AUTH_TEMPLATE_PATH');
-        $this->pmssCleanupTempDirProperty('homeRoot');
-        $this->pmssCleanupTempDirProperty('configRoot');
+        $this->pmssTrackEnvOverrides([
+            'PMSS_SEEDBOX_CONFIG_DIR' => dirname(__DIR__, 4).'/etc/seedbox/config',
+            'PMSS_HOME_DIR' => null,
+            'PMSS_DRY_RUN' => null,
+            'PMSS_DELUGE_AUTH_TEMPLATE_PATH' => null,
+        ]);
     }
 
     public function testBullseyeTemplateKeepsCacheSettings(): void

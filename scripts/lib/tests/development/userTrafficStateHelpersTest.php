@@ -266,6 +266,25 @@ class UserTrafficStateHelpersTest extends TestCase
         $this->pmssAssertMessagesContain($messages, '[WARN] Failed to write traffic state for alice at '.$homeTrafficPath);
     }
 
+    public function testTrafficStorageSavePreservesIngressLocalnetRouting(): void
+    {
+        $homeDir = $this->tempDir.'/home';
+        $statsDir = $this->tempDir.'/trafficStats';
+        $payload = ['raw' => ['month' => 4096], 'daily' => ['today' => 2048]];
+        @mkdir($homeDir.'/alice', 0755, true);
+        @mkdir($statsDir, 0755, true);
+
+        $storage = new \TrafficStorage([
+            'home_dir' => $homeDir,
+            'stats_dir' => $statsDir,
+            'traffic_mode' => 'ingress',
+        ]);
+        $storage->save('alice-localnet', $payload);
+
+        $this->assertEquals($payload, \pmssReadSerializedArrayFile($homeDir.'/alice/.trafficDataIngressLocal'));
+        $this->assertEquals($payload, \pmssReadSerializedArrayFile($statsDir.'/alice-localnet'));
+    }
+
     public function testTrafficStorageSaveRejectsInvalidUsername(): void
     {
         $storage = new \TrafficStorage([

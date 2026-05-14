@@ -5,6 +5,8 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class MediaStackNginxRedirectTest extends TestCase
 {
+    private const MEDIA_STACK_APPS = ['sabnzbd', 'lidarr', 'radarr', 'prowlarr', 'readarr', 'sonarr', 'jellyfin'];
+
     private function publicProxyBlock(): string
     {
         $template = $this->pmssReadRepoFile('etc/seedbox/config/template.nginx-user');
@@ -19,7 +21,7 @@ class MediaStackNginxRedirectTest extends TestCase
     {
         $block = $this->publicProxyBlock();
 
-        foreach (array('sabnzbd', 'lidarr', 'radarr', 'prowlarr', 'readarr', 'sonarr', 'jellyfin') as $app) {
+        foreach (self::MEDIA_STACK_APPS as $app) {
             $this->assertFalse(
                 strpos($block, 'proxy_redirect ~^(https?://[^/]+)?/'.$app.'(/.*)?$') !== false,
                 'Nginx public block must stay app-agnostic for '.$app.' redirects'
@@ -31,7 +33,7 @@ class MediaStackNginxRedirectTest extends TestCase
     {
         $block = $this->publicProxyBlock();
 
-        foreach (array('sabnzbd', 'lidarr', 'radarr', 'prowlarr', 'readarr', 'sonarr', 'jellyfin') as $app) {
+        foreach (self::MEDIA_STACK_APPS as $app) {
             $this->assertTrue(
                 strpos($block, 'proxy_cookie_path /'.$app.' /public-##username/'.$app.';') !== false,
                 'Nginx public block must restore cookie scope for '.$app

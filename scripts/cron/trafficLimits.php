@@ -25,7 +25,10 @@ foreach ([
         require_once $dependency;
     }
 }
-if (!file_exists('/var/run/pmss/trafficLimits')) `mkdir -p /var/run/pmss/trafficLimits`;
+if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {
+    fwrite(STDERR, "Unable to prepare traffic limit runtime directory\n");
+    exit(1);
+}
 
 $trafficLimitPeriod = 3 * 24 * 60 * 60;     // 3 days limiting period
 
@@ -204,10 +207,34 @@ foreach($users AS $thisUser) {
     }
 }
 
-function setRateLimit($user, $trafficCapMbit, $enable=true) {
-    if ($enable == false) { @unlink("/home/{$user}/.throttle"); return; }
+/**
+ * Resolve the throttle marker path after rechecking the user/home boundary.
+ */
+function pmssTrafficLimitThrottleFilePath(string $user): ?string
+{
+    $user = pmssNormalizeUsername($user);
+    if (!pmssValidateUsername($user)) {
+        return null;
+    }
 
-    if (@file_put_contents("/home/{$user}/.throttle", (int) $trafficCapMbit) !== false) {
-        @chmod("/home/{$user}/.throttle", 0644);
+    $home = "/home/{$user}";
+    if (!is_dir($home) || is_link($home) || @realpath($home) !== $home) {
+        return null;
+    }
+
+    $path = $home.'/.throttle';
+    return pmssUserFilePathIsSafe($path) ? $path : null;
+}
+
+function setRateLimit($user, $trafficCapMbit, $enable=true) {
+    $throttleFile = pmssTrafficLimitThrottleFilePath((string) $user);
+    if ($throttleFile === null) {
+        return;
+    }
+
+    if ($enable == false) { @unlink($throttleFile); return; }
+
+    if (@file_put_contents($throttleFile, (int) $trafficCapMbit) !== false) {
+        @chmod($throttleFile, 0644);
     }
 }

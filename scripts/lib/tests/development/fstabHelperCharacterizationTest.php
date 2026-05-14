@@ -37,13 +37,13 @@ class FstabHelperCharacterizationTest extends TestCase
 
     public function testMountOptionsEnsureCollapsesPrefixedDuplicatesByDefault(): void
     {
-        $lines = ['tmpfs /tmp tmpfs defaults,exec,size=1G,size=512M 0 0'];
+        $lines = ['tmpfs /tmp tmpfs defaults,exec,size=1G,size=512M,mode=1777,mode=0755 0 0'];
 
-        $plan = \pmssFstabMountOptionsEnsure($lines, '/tmp', ['noexec'], ['exec'], false, 'tmpfs', ['size=' => 'size=2G']);
+        $plan = \pmssFstabMountOptionsEnsure($lines, '/tmp', ['noexec'], ['exec'], false, 'tmpfs', ['size=' => 'size=2G', 'mode=' => 'mode=1777']);
 
         $this->assertTrue($plan['changed']);
-        $this->assertSame(['defaults', 'size=2G', 'noexec'], $plan['options']);
-        $this->assertSame("tmpfs\t/tmp\ttmpfs\tdefaults,size=2G,noexec\t0\t0", $lines[0]);
+        $this->assertSame(['defaults', 'size=2G', 'mode=1777', 'noexec'], $plan['options']);
+        $this->assertSame("tmpfs\t/tmp\ttmpfs\tdefaults,size=2G,mode=1777,noexec\t0\t0", $lines[0]);
     }
 
     public function testMountOptionsEnsureCanPreserveExtraPrefixedDuplicates(): void

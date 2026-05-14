@@ -127,7 +127,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 6) Configuration
 - Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, and URL base `/public-<user>/<app>`.
 - Jellyfin writes `~/.config/jellyfin/network.xml` likewise.
-- SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini` and adjusts url_base/port/whitelist.
+- SABnzbd writes `~/.config/sabnzbd/sabnzbd.ini` and adjusts url_base/port/whitelist plus `inet_exposure = 4` so the proxied first-run wizard is reachable.
 
 7) Aliases
 - Appends tmux aliases to `~/.bashrc.custom` that export `DOTNET_ROOT` and execute `<app>.dll` via `dotnet` (or Python venv for SABnzbd/Cloudplow).
@@ -265,7 +265,7 @@ The `/public-<username>/` path is **intentionally unauthenticated** at the proxy
 | Prowlarr | Disabled (`AuthenticationMethod: None`) | Enable Forms/Basic auth in Settings → General → Authentication |
 | SABnzbd | Setup wizard on first access | Complete wizard to set credentials |
 
-**Until users configure authentication, Radarr/Sonarr/Prowlarr are accessible to anyone who knows the URL.**
+**Until users configure authentication, Radarr/Sonarr/Prowlarr are accessible to anyone who knows the URL. SABnzbd's wizard is also reachable so users can set its credentials.**
 
 Additional security measures:
 - Randomized ports per user (not security, but obscurity layer)

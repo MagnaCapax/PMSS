@@ -71,3 +71,64 @@ function pmssWarnUnexpectedQuotaFiles(string $mountPoint, ?callable $logger = nu
     sort($unexpected, SORT_STRING);
     $log('[WARN] Unexpected quota files under '.$mountPoint.': '.implode(', ', $unexpected));
 }
+
+/** Escape filesystem paths before writing them to operator-facing logs. */
+function pmssQuotaEscapePathForLog(string $path): string
+{
+    return addcslashes($path, "\0..\37\177..\377");
+}
+
+/**
+ * Remove stale quota check files after validating the mount point boundary.
+ *
+ * quotacheck may leave temporary `aquota*new` files behind after an interrupted
+ * run. Only regular files directly under the mount point are eligible here.
+ */
+function pmssRemoveStaleQuotaCheckFiles(string $mountPoint = '/home', ?callable $logger = null): int
+{
+    $log = $logger ?: 'logMessage';
+    $mountPoint = rtrim(trim($mountPoint), '/');
+    if ($mountPoint === '') {
+        $mountPoint = '/';
+    }
+
+    if ($mountPoint[0] !== '/' || preg_match('/[\r\n\0]/', $mountPoint) === 1) {
+        $log('[quotaFix] WARNING: refusing unsafe quota cleanup path: '.pmssQuotaEscapePathForLog($mountPoint));
+        return 0;
+    }
+
+    $realMountPoint = realpath($mountPoint);
+    if ($realMountPoint === false || !is_dir($mountPoint) || is_link($mountPoint) || $realMountPoint !== $mountPoint) {
+        $log('[quotaFix] WARNING: refusing quota cleanup outside stable mount point: '.pmssQuotaEscapePathForLog($mountPoint));
+        return 0;
+    }
+
+    $staleFiles = glob($mountPoint.'/aquota*new');
+    if ($staleFiles === false) {
+        $log('[quotaFix] WARNING: unable to scan stale quota check files under '.pmssQuotaEscapePathForLog($mountPoint));
+        return 0;
+    }
+
+    if ($staleFiles === []) {
+        $log('[quotaFix] No stale files found');
+        return 0;
+    }
+
+    $removed = 0;
+    foreach ($staleFiles as $stale) {
+        if (dirname($stale) !== $mountPoint || is_link($stale) || !is_file($stale)) {
+            $log('[quotaFix] WARNING: skipped unsafe stale quota path: '.pmssQuotaEscapePathForLog($stale));
+            continue;
+        }
+
+        if (!@unlink($stale)) {
+            $log('[quotaFix] WARNING: failed to remove stale file: '.pmssQuotaEscapePathForLog($stale));
+            continue;
+        }
+
+        $removed++;
+        $log('[quotaFix] Removed stale file: '.pmssQuotaEscapePathForLog($stale));
+    }
+
+    return $removed;
+}

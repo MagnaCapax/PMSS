@@ -21,6 +21,19 @@
     sharedscripts
 }
 
+/var/log/pmss/users.log /var/log/pmss/users.jsonl /var/log/pmss/trafficStats.log {
+    daily
+    rotate 7
+    size 100M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    su root root
+    sharedscripts
+}
+
 /var/log/pmss/system-stats.log {
     daily
     rotate 7

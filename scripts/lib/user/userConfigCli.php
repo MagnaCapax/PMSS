@@ -42,9 +42,7 @@ function pmssUserConfigCliLegacyValue(array $parsed, string $option, array $args
 /** @return array<int,string> List shared long-option names for resource flags. */
 function pmssUserConfigCliResourceOptionNames(string $optionKey): array
 {
-    return array_values(array_filter(array_map(static function (array $spec) use ($optionKey): string {
-        return isset($spec[$optionKey]) ? (string) $spec[$optionKey] : '';
-    }, pmssUserConfigCliResourceSpecs())));
+    return array_values(array_filter(array_map('strval', array_column(pmssUserConfigCliResourceSpecs(), $optionKey)), 'strlen'));
 }
 
 /** Check whether a parsed long option carries an explicit scalar value. */
@@ -58,12 +56,6 @@ function pmssUserConfigCliHasExplicitOptionValue(array $parsed, string $option):
     return $value !== null && $value !== true && $value !== '';
 }
 
-/** Cast a shared resource value according to its specification. */
-function pmssUserConfigCliTypedResourceValue(array $spec, $value)
-{
-    return ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
-}
-
 /** @return array<string,mixed> Build a resource map from the shared spec list. */
 function pmssUserConfigCliBuildResourceMap(callable $resolver, bool $skipNull = false): array
 {
@@ -73,7 +65,7 @@ function pmssUserConfigCliBuildResourceMap(callable $resolver, bool $skipNull = 
         if ($skipNull && $value === null) {
             continue;
         }
-        $values[$key] = pmssUserConfigCliTypedResourceValue($spec, $value);
+        $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
     }
 
     return $values;
@@ -223,11 +215,7 @@ function pmssUserConfigCliBuildUserConfigPositionals(array $user): array
             $lastOptionalIndex = $index;
         }
     }
-    $positionals = [];
-    for ($index = 4; $index <= $lastOptionalIndex; $index++) {
-        $positionals[] = $optionalArgs[$index];
-    }
-    return $positionals;
+    return array_slice($optionalArgs, 0, max(0, $lastOptionalIndex - 3));
 }
 
 /** @return array<int,string> Translate shared resource keys into cgroup flags. */

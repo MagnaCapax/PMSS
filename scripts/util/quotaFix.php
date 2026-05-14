@@ -33,6 +33,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
+require_once __DIR__.'/../lib/update/services/quota.php';
 
 requireRoot();
 
@@ -50,15 +51,7 @@ echo shell_exec('quotaoff -av 2>&1');
 
 // 3. Remove any stale/interrupted check files from previous runs
 logMessage('[quotaFix] Cleaning stale quota check files');
-$staleFiles = glob('/home/aquota*new');
-if ($staleFiles !== false && count($staleFiles) > 0) {
-    foreach ($staleFiles as $stale) {
-        @unlink($stale);
-        logMessage('[quotaFix] Removed stale file: ' . $stale);
-    }
-} else {
-    logMessage('[quotaFix] No stale files found');
-}
+pmssRemoveStaleQuotaCheckFiles('/home');
 
 // 4. Perform full quota recalculation
 // Flags: -a (all filesystems), -v (verbose), -u (user quotas),

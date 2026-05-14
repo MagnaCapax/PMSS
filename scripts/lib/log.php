@@ -50,13 +50,49 @@ function pmssLogWritePathIsSafe(string $path): bool
         return false;
     }
 
-    if (is_link($path) || (file_exists($path) && !is_file($path))) {
+    if (!pmssLogWritePathSegmentsAreSafe($path)
+        || is_link($path)
+        || (file_exists($path) && !is_file($path))) {
         return false;
     }
 
     $directory = dirname($path);
     if ($directory === '' || !is_dir($directory) || is_link($directory)) {
         return false;
+    }
+
+    return true;
+}
+
+/** Reject traversal and symlinked ancestor components before writing logs. */
+function pmssLogWritePathSegmentsAreSafe(string $path): bool
+{
+    $path = rtrim($path, '/');
+    if ($path === '') {
+        return false;
+    }
+
+    $absolute = $path[0] === '/';
+    $segments = explode('/', ltrim($path, '/'));
+    $current = '';
+    $lastIndex = count($segments) - 1;
+    foreach ($segments as $index => $segment) {
+        if ($segment === '') {
+            continue;
+        }
+        if ($segment === '.' || $segment === '..') {
+            return false;
+        }
+
+        $current = $current === ''
+            ? ($absolute ? '/'.$segment : $segment)
+            : $current.'/'.$segment;
+        if (is_link($current)) {
+            return false;
+        }
+        if ($index < $lastIndex && file_exists($current) && !is_dir($current)) {
+            return false;
+        }
     }
 
     return true;

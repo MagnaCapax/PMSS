@@ -46,16 +46,12 @@ function pmssAddUserCliUsage(): string
         pmssCliHelpLine($resourceSpecs['iopsLimit']['usage'], $resourceHelp['iopsLimit']['description']),
         pmssCliHelpLine($resourceSpecs['trafficCapMbit']['usage'], $resourceHelp['trafficCapMbit']['description']),
         pmssCliHelpLine('--upload-throttle-kib=KIB', 'Persist torrent upload throttle in KiB/s; 0 removes it.'),
-        pmssCliHelpLine($resourceSpecs['CPUWeight']['usage'], $resourceHelp['CPUWeight']['description'].$derivedDefault),
-        pmssCliHelpLine($resourceSpecs['IOWeight']['usage'], $resourceHelp['IOWeight']['description'].$derivedDefault),
-        pmssCliHelpLine($resourceSpecs['IOReadBW']['usage'], $resourceHelp['IOReadBW']['description']),
-        pmssCliHelpLine($resourceSpecs['IOWriteBW']['usage'], $resourceHelp['IOWriteBW']['description']),
-        pmssCliHelpLine($resourceSpecs['IOReadIOPS']['usage'], $resourceHelp['IOReadIOPS']['description']),
-        pmssCliHelpLine($resourceSpecs['IOWriteIOPS']['usage'], $resourceHelp['IOWriteIOPS']['description']),
-        pmssCliHelpLine($resourceSpecs['cpuQuotaPercent']['usage'], $resourceHelp['cpuQuotaPercent']['description']),
-        pmssCliHelpLine($resourceSpecs['ioLatencyMs']['usage'], $resourceHelp['ioLatencyMs']['description']),
-        pmssCliHelpLine($resourceSpecs['ioCostQos']['usage'], $resourceHelp['ioCostQos']['description']),
-        pmssCliHelpLine($resourceSpecs['ioCostModel']['usage'], $resourceHelp['ioCostModel']['description']),
+    ];
+    foreach (['CPUWeight', 'IOWeight', 'IOReadBW', 'IOWriteBW', 'IOReadIOPS', 'IOWriteIOPS', 'cpuQuotaPercent', 'ioLatencyMs', 'ioCostQos', 'ioCostModel'] as $key) {
+        $suffix = in_array($key, ['CPUWeight', 'IOWeight'], true) ? $derivedDefault : '';
+        $lines[] = pmssCliHelpLine($resourceSpecs[$key]['usage'], $resourceHelp[$key]['description'].$suffix);
+    }
+    $lines = array_merge($lines, [
         pmssCliHelpLine('--docker-enabled=true|false', 'Persist the initial rootless Docker policy.'),
         pmssCliHelpLine('-h, --help', 'Show this help and exit.'),
         '',
@@ -68,7 +64,7 @@ function pmssAddUserCliUsage(): string
         '  - Named options override legacy positional values, so automation can skip intermediate optional slots safely.',
         '  - RAM_MiB is applied through userConfig.php and then userConfigCgroup.php; PMSS clamps the effective MemoryHigh floor to 250 MiB and derives MemoryMax at roughly 1.25x with at most 2048 MiB of headroom.',
         '  - If RAM_MiB is below 245 MiB, PMSS persists dockerEnabled=false for safety.',
-    ];
+    ]);
 
     return implode("\n", $lines);
 }

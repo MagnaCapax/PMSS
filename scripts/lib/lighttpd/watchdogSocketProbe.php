@@ -26,15 +26,9 @@ function pmssLighttpdWatchdogSocketProbeWithRetry(string $socketPath, array $opt
     $probe = isset($options['probe']) && is_callable($options['probe']) ? $options['probe'] : null;
     $sleep = isset($options['sleep']) && is_callable($options['sleep']) ? $options['sleep'] : 'sleep';
 
-    if ($attemptCount < 1) {
-        $attemptCount = 1;
-    }
-    if ($retryDelaySeconds < 0) {
-        $retryDelaySeconds = 0;
-    }
-    if ($timeoutSeconds < 1) {
-        $timeoutSeconds = 1;
-    }
+    $attemptCount = max(1, $attemptCount);
+    $retryDelaySeconds = max(0, $retryDelaySeconds);
+    $timeoutSeconds = max(1, $timeoutSeconds);
     if ($socketPath === '') {
         return array('ok' => false, 'errno' => 0, 'errstr' => 'socket path missing', 'attempts' => 1);
     }

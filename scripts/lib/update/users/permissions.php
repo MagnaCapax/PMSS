@@ -36,16 +36,22 @@ function pmssUserRefreshPermissions(array $ctx): void
         pmssUserLog($user, sprintf('[WARN] userPermissions timed out after %ds', $timeoutSeconds));
         throw new \RuntimeException(sprintf('userPermissions timeout after %ds', $timeoutSeconds));
     }
+    if ($rc !== 0) {
+        pmssUserLog($user, sprintf('[WARN] userPermissions returned rc=%d', $rc));
+    }
 
     $rcCustomPath = "{$home}/.rtorrent.rc.custom";
     $rcCustomContent = (!is_file($rcCustomPath) || is_link($rcCustomPath)) ? false : @file_get_contents($rcCustomPath);
     if (is_string($rcCustomContent)
         && in_array(sha1($rcCustomContent), ['dcf21704d49910d1670b3fdd04b37e640b755889', 'dd10dc08de4cc9a55f554d98bc0ee8c85666b63a'], true)) {
         $skelRcCustomPath = pmssResolvePathFromEnv('PMSS_SKEL_DIR', '/etc/skel').'/.rtorrent.rc.custom';
-        runUserStep(
+        $copyRc = runUserStep(
             $user,
             'Updating .rtorrent.rc.custom from skeleton',
-            sprintf('cp %s %s/', $skelRcCustomPath === '/etc/skel/.rtorrent.rc.custom' ? $skelRcCustomPath : escapeshellarg($skelRcCustomPath), escapeshellarg($home))
+            pmssBuildCommand('cp', [$skelRcCustomPath, $home.'/'])
         );
+        if ($copyRc !== 0) {
+            pmssUserLog($user, sprintf('[WARN] .rtorrent.rc.custom skeleton refresh failed rc=%d', $copyRc));
+        }
     }
 }

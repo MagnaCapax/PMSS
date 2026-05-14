@@ -3,6 +3,8 @@
  * Networking helpers for update-step2.
  *
  * Template mapping:
+ *   - `/etc/seedbox/config/template.network` seeds the user-editable
+ *     `/etc/seedbox/config/network` baseline when the user config is missing.
  *   - `setupNetwork.php` consumes `/etc/seedbox/config/template.fireqos` and
  *     replaces placeholders (`##IFACE##`, `##LINK##`, `##USERMATCHES##`) based on
  *     the values returned by `networkLoadConfig()`.
@@ -30,33 +32,19 @@ function pmssEnsureNetworkTemplate(?callable $logger = null): void
         return;
     }
 
-    $template = <<<PHP
-<?php
-#Default settings, change these to suit your system. Speeds are in mbits
-return array(
-    'interface' => 'eth0',
-    'speed' => '1000',
-    'throttle' => array(
-      'min' => 50,
-      'max' => 100,
-      'progressiveThrottleEnabled' => true,
-      'progressiveThrottleFloorPercent' => 2.5,
-      'progressiveThrottleGracePercent' => 0,
-      'overageStages' => array(
-        array('overagePercent' => 200, 'capMbit' => 1),
-        array('overagePercent' => 125, 'capMbit' => 1),
-        array('overagePercent' => 100, 'capMbit' => 10),
-        array('overagePercent' => 75, 'minOverageGiB' => 5120, 'capMbit' => 25),
-        array('overagePercent' => 50, 'minOverageGiB' => 3072, 'capMbit' => 50),
-      ),
-      'soft' => 250,
-      'limitSoft' => 80,
-      'limitExceedMax' => 20
-
-    )
-
-);
-PHP;
+    $configDir = getenv('PMSS_CONFIG_DIR');
+    $configDir = is_string($configDir) && trim($configDir) !== ''
+        ? rtrim($configDir, '/')
+        : '/etc/seedbox/config';
+    $templatePath = $configDir.'/template.network';
+    $template = @file_get_contents($templatePath);
+    if (!is_string($template) || trim($template) === '') {
+        $log('[WARN] Network configuration template missing: '.$templatePath);
+        return;
+    }
+    if (substr($template, -1) !== "\n") {
+        $template .= PHP_EOL;
+    }
 
     if (!pmssWriteManagedPathFile($path, $template, 'network configuration', $log)) {
         return;

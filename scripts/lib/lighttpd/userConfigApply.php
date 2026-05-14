@@ -532,11 +532,8 @@ function pmssUserConfigLighttpdConfigureUser(
             }
 
             $expectedBase = "/user-{$thisUser}/deluge/";
-            $expectedBaseNoSlash = "/user-{$thisUser}/deluge";
-            $legacyBase = "/deluge-{$thisUser}/";
-            $legacyBaseNoSlash = "/deluge-{$thisUser}";
             $base = $delugeParsed['config']['base'] ?? null;
-            if (is_string($base) && ($base === $legacyBase || $base === $legacyBaseNoSlash || $base === $expectedBaseNoSlash) && $base !== $expectedBase) {
+            if (is_string($base) && in_array($base, ["/user-{$thisUser}/deluge", "/deluge-{$thisUser}/", "/deluge-{$thisUser}"], true)) {
                 $delugeParsed['config']['base'] = $expectedBase;
                 $needsDelugeWebConfWrite = true;
             }

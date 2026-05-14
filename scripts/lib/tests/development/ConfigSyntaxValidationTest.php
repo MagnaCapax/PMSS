@@ -85,54 +85,6 @@ class ConfigSyntaxValidationTest extends TestCase
     }
 
     /**
-     * Create minimal nginx.conf that includes a test server block.
-     */
-    private function renderNginxConfig(): string
-    {
-        // Minimal nginx.conf wrapper for testing server blocks
-        $nginxConf = <<<'NGINX'
-worker_processes 1;
-error_log /dev/null;
-pid /tmp/pmss-nginx-test.pid;
-
-events {
-    worker_connections 1;
-}
-
-http {
-    access_log off;
-
-    # Test server block
-    server {
-        listen 127.0.0.1:39999;
-        server_name localhost;
-
-        location / {
-            return 200 'ok';
-        }
-
-        location /webdav-testuser/ {
-            proxy_pass http://127.0.0.1:30000/webdav-testuser/;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header Authorization $http_authorization;
-            proxy_http_version 1.1;
-            proxy_buffering off;
-
-            client_body_timeout 300s;
-            send_timeout 300s;
-            proxy_read_timeout 300s;
-            proxy_send_timeout 300s;
-        }
-    }
-}
-NGINX;
-
-        return $nginxConf;
-    }
-
-    /**
      * Extract and render WebDAV nginx blocks from createNginxConfig.php.
      */
     private function extractNginxWebdavBlocks(): string

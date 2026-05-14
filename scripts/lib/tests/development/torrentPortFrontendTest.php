@@ -235,6 +235,28 @@ class TorrentPortFrontendTest extends TestCase
         }
     }
 
+    public function testUserPatchWritableFileRejectsPathOutsideHomeRoot(): void
+    {
+        $outsidePath = $this->pmssMakeTempDir('pmss-user-patch-outside-').'/frontend.php';
+        file_put_contents($outsidePath, "legacy\n");
+
+        \pmssUserPatchWritableFile($outsidePath, static function (string $content): string {
+            return "patched\n";
+        });
+
+        $this->assertSame("legacy\n", (string) file_get_contents($outsidePath));
+    }
+
+    public function testUserDeletePathIfPresentRejectsPathOutsideHomeRoot(): void
+    {
+        $outsidePath = $this->pmssMakeTempDir('pmss-user-delete-outside-').'/legacy.php';
+        file_put_contents($outsidePath, "legacy\n");
+
+        \pmssUserDeletePathIfPresent($outsidePath);
+
+        $this->assertTrue(file_exists($outsidePath));
+    }
+
     private function context(): array { return $this->pmssUserHomeContext($this->homeRoot, $this->user); }
 
 }

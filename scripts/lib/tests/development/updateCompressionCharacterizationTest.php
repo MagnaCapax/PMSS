@@ -5,6 +5,11 @@ require_once __DIR__.'/../common/TestCase.php';
 
 class UpdateCompressionCharacterizationTest extends TestCase
 {
+    private function assertSourceOmitsFunction(string $source, string $symbol, string $message): void
+    {
+        $this->assertTrue(strpos($source, 'function '.$symbol.'(') === false, $message);
+    }
+
     public function testStartRtorrentReusesSharedProcessLookups(): void
     {
         $src = $this->pmssReadRepoFile('scripts/startRtorrent');
@@ -59,10 +64,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/processes.php');
         $symbol = 'pmssWaitFor'.'ProcessExit';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol) === false,
-            'process wait logic should be localized inside killProcess()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'process wait logic should be localized inside killProcess()');
         $this->assertStringContainsString("foreach (['TERM' => max(0, \$timeoutSeconds), 'KILL' => 5] as \$signal => \$waitSeconds)", $src);
         $this->assertStringContainsString("runStep(\$description.' (SIG'.\$signal.')'", $src);
         $this->assertStringContainsString('graceful stop', $src);
@@ -74,10 +76,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/processes.php');
         $symbol = 'pmssProcess'.'Running';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'process presence checks should stay localized inside killProcess()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'process presence checks should stay localized inside killProcess()');
         $this->assertStringContainsString("\$probeCommand = 'pgrep -x '.escapeshellarg(\$name).' >/dev/null 2>&1';", $src);
         $this->assertStringContainsString('exec($probeCommand, $_, $probeStatus);', $src);
         $this->assertStringContainsString('[SKIP] {$description} (no {$name} processes)', $src);
@@ -123,10 +122,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssReadSystemd'.'UnitExecStartBinary';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol) === false,
-            'userMaintenance.php should keep the docker ExecStart parse local to the stale-unit check'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'userMaintenance.php should keep the docker ExecStart parse local to the stale-unit check');
         $this->assertStringContainsString("if (strpos(\$trim, 'ExecStart=') !== 0)", $src);
         $this->assertStringContainsString("\$execBinary = trim(\$parts[0], \"\\\"'\");", $src);
     }
@@ -136,10 +132,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/logging.php');
         $symbol = 'pmssBuild'.'CorrelationId';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'logging.php should keep correlation ID generation inside pmssCorrelationId()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'logging.php should keep correlation ID generation inside pmssCorrelationId()');
         $this->assertStringContainsString("gmdate('Ymd-His')", $src);
         $this->assertStringContainsString("bin2hex(random_bytes(3))", $src);
         $this->assertStringContainsString("substr(hash('sha256', \$timestamp.\$host.microtime(true)), 0, 6)", $src);
@@ -150,10 +143,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/update.php');
         $symbol = 'pmssBuild'.'CorrelationId';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'update.php should keep correlation ID generation inside pmssCorrelationId()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'update.php should keep correlation ID generation inside pmssCorrelationId()');
         $this->assertStringContainsString("bin2hex(random_bytes(3))", $src);
         $this->assertStringContainsString("PMSS_CORRELATION_ENV.'='.\$generated", $src);
     }
@@ -163,10 +153,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/quotaSnapshot.php');
         $symbol = 'pmssQuotaSnapshotNormalize'.'SizeToken';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'quotaSnapshot.php should keep bare-size token normalization inside the line normalizer');
         $this->assertStringContainsString("preg_match('/^([0-9]+)(\\*)?$/', \$tokens[\$index], \$matches)", $src);
         $this->assertStringContainsString("\$tokens[\$index] = \$matches[1].'K'.(\$matches[2] ?? '');", $src);
     }
@@ -176,10 +163,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/user/torrentPort.php');
         $symbol = 'pmssTorrentPort'.'FileWrite';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'torrentPort.php should not grow a second qBittorrent file-writer helper'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'torrentPort.php should not grow a second qBittorrent file-writer helper');
         $this->assertStringContainsString("require_once __DIR__.'/qbittorrent.php';", $src);
         $this->assertStringContainsString('pmssQbittorrentConfigMutate(', $src);
         $this->pmssAssertStringNotContainsString(
@@ -195,10 +179,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $librarySrc = $this->pmssReadRepoFile('scripts/lib/user/qbittorrent.php');
         $symbol = 'userConfigure'.'Qbittorrent';
 
-        $this->assertTrue(
-            strpos($librarySrc, 'function '.$symbol.'(') === false,
-            'qbittorrent.php should no longer export a one-call user bootstrap wrapper'
-        );
+        $this->assertSourceOmitsFunction($librarySrc, $symbol, 'qbittorrent.php should no longer export a one-call user bootstrap wrapper');
         $this->assertStringContainsString('template.qbittorrent.conf', $userConfigSrc);
         $this->assertStringContainsString("pmssQbittorrentApplyUploadThrottle(\$user['name'], \$throttle);", $userConfigSrc);
     }
@@ -208,10 +189,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/suspend.php');
         $symbol = 'pmssRender'.'SuspendedHtml';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'suspend.php should keep suspended landing template selection inside pmssCreateSuspendedLanding()');
         $this->assertStringContainsString("/etc/seedbox/config/template.suspended.notice.html", $src);
         $this->assertStringContainsString("pmssSuspendedFallbackHtml(\$username)", $src);
         $this->assertStringContainsString("@file_put_contents(\$suspendRoot.'/index.html', \$html)", $src);
@@ -223,14 +201,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $splitSymbol = 'pmssShowTrafficSplit'.'LocalnetUser';
         $barSymbol = 'pmssShowTrafficRender'.'Bar';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$splitSymbol.'(') === false,
-            'showTraffic.php should reuse shared traffic user-key helpers instead of adding a local splitter'
-        );
-        $this->assertTrue(
-            strpos($src, 'function '.$barSymbol.'(') === false,
-            'showTraffic.php should keep the extended output bar rendering inside pmssShowTrafficMain()'
-        );
+        $this->assertSourceOmitsFunction($src, $splitSymbol, 'showTraffic.php should reuse shared traffic user-key helpers instead of adding a local splitter');
+        $this->assertSourceOmitsFunction($src, $barSymbol, 'showTraffic.php should keep the extended output bar rendering inside pmssShowTrafficMain()');
         $this->assertStringContainsString("pmssListManagedUsersResult(__DIR__.'/listUsers.php')", $src);
         $this->assertStringContainsString('pmssTrafficUserKeyBaseUser($thisUser)', $src);
         $this->assertStringContainsString("str_repeat('#', \$filled)", $src);
@@ -279,10 +251,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $snapshotSrc = $this->pmssReadRepoFile('scripts/util/storageHealthSnapshot.php');
         $helperSymbol = 'pmssStorageHealthSnapshot'.'ParseCli';
 
-        $this->assertTrue(
-            strpos($snapshotSrc, 'function '.$helperSymbol.'(') === false,
-            'storageHealthSnapshot.php should keep CLI option consumption inside pmssStorageHealthSnapshotMain()'
-        );
+        $this->assertSourceOmitsFunction($snapshotSrc, $helperSymbol, 'storageHealthSnapshot.php should keep CLI option consumption inside pmssStorageHealthSnapshotMain()');
         $this->assertStringContainsString("strpos(\$argv[\$i + 1], '--') !== 0", $snapshotSrc);
         $this->assertStringContainsString("\$val = \$argv[++\$i];", $snapshotSrc);
         $this->assertStringContainsString("if (\$key !== '--json') {", $snapshotSrc);
@@ -293,10 +262,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
         $helperSymbol = 'consume'.'CliValue';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$helperSymbol.'(') === false,
-            'storageBenchmark.php should inline CLI option consumption instead of keeping a standalone helper'
-        );
+        $this->assertSourceOmitsFunction($src, $helperSymbol, 'storageBenchmark.php should inline CLI option consumption instead of keeping a standalone helper');
         $this->assertStringContainsString("'--device-runtime'", $src);
         $this->assertStringContainsString("'--require-idle'", $src);
     }
@@ -338,10 +304,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update.php');
         $symbol = 'pmssSkeleton'.'Path';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'update.php should keep skeleton path joins inline inside updateUserFile()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'update.php should keep skeleton path joins inline inside updateUserFile()');
         $this->assertStringContainsString("pmssSkeletonBase().'/'.\$file", $src);
     }
 
@@ -370,10 +333,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $filesystemSrc = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
         $symbol = 'pmssUserPatch'.'TorrentFrontends';
 
-        $this->assertTrue(
-            strpos($filesystemSrc, 'function '.$symbol.'(') === false,
-            'filesystem.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()'
-        );
+        $this->assertSourceOmitsFunction($filesystemSrc, $symbol, 'filesystem.php should keep torrent frontend patch logic local to pmssUserApplySkeletonFiles()');
         $this->assertStringContainsString("require_once __DIR__.'/users/filesystem.php';", $src);
         $this->assertStringContainsString("\$guardedRequireLine = preg_replace('/^<\\?php\\s*/', '', \$requireLine, 1, \$count);", $filesystemSrc);
         $this->assertStringContainsString("str_replace(\"require_once '/scripts/lib/user/torrentPort.php';\\n\", \$guardedRequireLine, \$updated, \$replaced)", $filesystemSrc);
@@ -388,10 +348,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $rutorrentSrc = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
         $symbol = 'pmssUserUpgrade'.'Rutorrent';
 
-        $this->assertTrue(
-            strpos($usersSrc, 'function '.$symbol.'(') === false,
-            'users.php should stay thin and delegate ruTorrent maintenance'
-        );
+        $this->assertSourceOmitsFunction($usersSrc, $symbol, 'users.php should stay thin and delegate ruTorrent maintenance');
         $this->assertStringContainsString("require_once __DIR__.'/users/rutorrent.php';", $usersSrc);
         $this->assertStringContainsString('function pmssUserUpgradeRutorrent(', $rutorrentSrc);
         $this->assertStringContainsString('function pmssUserMaintainRutorrentPhpCompatibility(', $rutorrentSrc);
@@ -403,10 +360,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/osRelease.php');
         $symbol = 'pmssOsRelease'.'Path';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'osRelease.php should keep the os-release path lookup inline inside cache helpers'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'osRelease.php should keep the os-release path lookup inline inside cache helpers');
         $this->assertStringContainsString("pmssResolvePathFromEnv('PMSS_OS_RELEASE_PATH', '/etc/os-release')", $src);
     }
 
@@ -415,10 +369,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/runtime/profile.php');
         $symbol = 'pmssInit'.'ProfileStore';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'runtime/profile.php should keep profile-store initialization inside pmssRecordProfile()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'runtime/profile.php should keep profile-store initialization inside pmssRecordProfile()');
         $this->assertStringContainsString("if (!is_array(\$GLOBALS['PMSS_PROFILE'] ?? null))", $src);
         $this->assertStringContainsString("\$GLOBALS['PMSS_PROFILE'][] = \$entry;", $src);
     }
@@ -428,10 +379,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssRunUser'.'PostCheck';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'userMaintenance.php should keep optional htpasswd/lighttpd checks inside pmssUpdateAllUsers()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'userMaintenance.php should keep optional htpasswd/lighttpd checks inside pmssUpdateAllUsers()');
         $this->assertStringContainsString('Synchronizing per-user htpasswd', $src);
         $this->assertStringContainsString('Checking lighttpd instance', $src);
     }
@@ -441,10 +389,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssBuild'.'UserMaintenanceProfile';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'userMaintenance.php should keep per-user profile payload assembly inside pmssUpdateAllUsers()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'userMaintenance.php should keep per-user profile payload assembly inside pmssUpdateAllUsers()');
         $this->assertStringContainsString("'description'    => 'updateUser '.\$user", $src);
         $this->assertStringContainsString("'stdout_excerpt' => ''", $src);
         $this->assertStringContainsString("'stderr_excerpt' => \$stderrExcerpt", $src);
@@ -455,10 +400,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $symbol = 'pmssWrite'.'DockerDaemonConfig';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'userMaintenance.php should keep daemon.json write handling inside pmssEnsureDockerDependencies()'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'userMaintenance.php should keep daemon.json write handling inside pmssEnsureDockerDependencies()');
         $this->assertStringContainsString('JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES', $src);
         $this->assertStringContainsString("'native.cgroupdriver=cgroupfs'", $src);
     }
@@ -468,10 +410,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/repositories.php');
         $symbol = 'pmssSonarr'.'SourceLine';
 
-        $this->assertTrue(
-            strpos($src, 'function '.$symbol.'(') === false,
-            'repositories.php should keep Sonarr source detection inside signed-by rewriting'
-        );
+        $this->assertSourceOmitsFunction($src, $symbol, 'repositories.php should keep Sonarr source detection inside signed-by rewriting');
         $this->assertStringContainsString("preg_match('/^[ \\t]*#/', \$line) === 1", $src);
         $this->assertStringContainsString('signed-by=', $src);
     }
@@ -482,10 +421,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $pluginsSrc = $this->pmssReadRepoFile('scripts/lib/update/users/rutorrent.php');
         $symbol = 'pmssUserMaintain'.'Retracker';
 
-        $this->assertTrue(
-            strpos($pluginsSrc, 'function '.$symbol.'(') === false,
-            'rutorrent.php should keep retracker cleanup inside pmssUserEnsurePlugins()'
-        );
+        $this->assertSourceOmitsFunction($pluginsSrc, $symbol, 'rutorrent.php should keep retracker cleanup inside pmssUserEnsurePlugins()');
         $this->assertStringContainsString("require_once __DIR__.'/users/rutorrent.php';", $usersSrc);
         $this->assertStringContainsString('retrackers.dat', $pluginsSrc);
         $this->assertStringContainsString('Creating ruTorrent RSS settings directory', $pluginsSrc);
@@ -497,14 +433,8 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $contextSrc = $this->pmssReadRepoFile('scripts/lib/update/users/context.php');
         $httpSrc = $this->pmssReadRepoFile('scripts/lib/update/users/http.php');
 
-        $this->assertTrue(
-            strpos($usersSrc, 'function pmssBuildUserContext(') === false,
-            'users.php should delegate context building to a domain module'
-        );
-        $this->assertTrue(
-            strpos($usersSrc, 'function pmssUserConfigureHttp(') === false,
-            'users.php should delegate HTTP maintenance to a domain module'
-        );
+        $this->assertSourceOmitsFunction($usersSrc, 'pmssBuildUserContext', 'users.php should delegate context building to a domain module');
+        $this->assertSourceOmitsFunction($usersSrc, 'pmssUserConfigureHttp', 'users.php should delegate HTTP maintenance to a domain module');
         $this->assertStringContainsString("require_once __DIR__.'/users/context.php';", $usersSrc);
         $this->assertStringContainsString("require_once __DIR__.'/users/http.php';", $usersSrc);
         $this->assertStringContainsString('function pmssBuildUserContext(', $contextSrc);
@@ -518,10 +448,7 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $usersSrc = $this->pmssReadRepoFile('scripts/lib/update/users.php');
         $permissionsSrc = $this->pmssReadRepoFile('scripts/lib/update/users/permissions.php');
 
-        $this->assertTrue(
-            strpos($usersSrc, 'function pmssUserRefreshPermissions(') === false,
-            'users.php should delegate permission refresh to permissions.php'
-        );
+        $this->assertSourceOmitsFunction($usersSrc, 'pmssUserRefreshPermissions', 'users.php should delegate permission refresh to permissions.php');
         $this->assertStringContainsString("require_once __DIR__.'/users/permissions.php';", $usersSrc);
         $this->assertStringContainsString('function pmssUserRefreshPermissions(', $permissionsSrc);
         $this->assertStringContainsString('PMSS_USER_PERMISSIONS_TIMEOUT', $permissionsSrc);

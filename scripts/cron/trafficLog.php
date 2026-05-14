@@ -10,6 +10,7 @@
 
 require_once '/scripts/lib/logger.php';
 require_once '/scripts/lib/network/config.php';
+require_once '/scripts/lib/network/iptables.php';
 require_once '/scripts/lib/resources/log.php';
 require_once '/scripts/lib/traffic.php';
 require_once '/scripts/lib/user/userFilesystem.php';
@@ -35,9 +36,12 @@ $localnets = networkLoadLocalnets();
 
 // Debian 11 iptables -Z output doesn't work anymore .... we might miss a tiny fraction this way, but atleast not exponential growth
 $monitoringRules = shell_exec('/scripts/util/makeMonitoringRules.php');
-if (!empty($monitoringRules)) {
-    passthru('/sbin/iptables -F OUTPUT'); // let's first clear old rules
-    passthru($monitoringRules);
+$monitoringCommands = networkParseMonitoringCommands(is_string($monitoringRules) ? $monitoringRules : '');
+if ($monitoringCommands !== []) {
+    networkRunIptables('-F OUTPUT'); // let's first clear old rules
+    foreach ($monitoringCommands as $monitoringCommand) {
+        networkRunIptables($monitoringCommand);
+    }
 }
 
 $parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);

@@ -6,25 +6,50 @@ require_once dirname(__DIR__, 2).'/update/networking.php';
 
 class UpdateNetworkingTemplateTest extends TestCase
 {
-    public function testEnsureNetworkTemplateDefinesCanonicalConfigPath(): void
+    public function testEnsureNetworkTemplateWritesTemplateSnapshot(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/networking.php');
-        $hasCanonicalPath = strpos($source, "\$path = '/etc/seedbox/config/network';") !== false;
-        $hasEnvOverride = strpos($source, "getenv('PMSS_NETWORK_CONFIG')") !== false;
-        $this->assertTrue($hasCanonicalPath || $hasEnvOverride, 'Expected canonical path default or PMSS_NETWORK_CONFIG override');
+        $configDir = $this->pmssMakeTempDir('pmss-network-config-');
+        $targetDir = $this->pmssMakeTempDir('pmss-network-target-');
+        $target = $targetDir.'/network';
+        $template = $this->pmssReadRepoFile('etc/seedbox/config/template.network');
+        $this->pmssWriteRelativeFile($configDir, 'template.network', $template);
+        $messages = array();
+
+        $this->pmssWithEnv(
+            array('PMSS_CONFIG_DIR' => $configDir, 'PMSS_NETWORK_CONFIG' => $target),
+            function () use (&$messages): void {
+                \pmssEnsureNetworkTemplate($this->pmssMakeArrayLogger($messages));
+            }
+        );
+
+        $this->assertSame($template, (string) file_get_contents($target));
+        $config = include $target;
+        $this->assertTrue(is_array($config), 'Expected generated network config to return an array');
+        $this->assertSame('eth0', $config['interface']);
+        $this->assertSame('1000', $config['speed']);
+        $this->assertSame(true, $config['throttle']['progressiveThrottleEnabled']);
+        $this->assertSame(80, $config['throttle']['limitSoft']);
+        $this->assertSame(array('Created default network configuration'), $messages);
     }
 
-    public function testEnsureNetworkTemplateSeedsExpectedThrottleDefaultsInTemplate(): void
+    public function testEnsureNetworkTemplateLeavesExistingConfigUntouched(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/networking.php');
-        $this->assertStringContainsString("'interface' => 'eth0'", $source);
-        $this->assertStringContainsString("'progressiveThrottleEnabled' => true", $source);
-        $this->assertStringContainsString("'limitSoft' => 80", $source);
-    }
+        $configDir = $this->pmssMakeTempDir('pmss-network-config-');
+        $targetDir = $this->pmssMakeTempDir('pmss-network-target-');
+        $target = $targetDir.'/network';
+        $existing = "<?php\nreturn array('interface' => 'eno1');\n";
+        $this->pmssWriteRelativeFile($configDir, 'template.network', $this->pmssReadRepoFile('etc/seedbox/config/template.network'));
+        file_put_contents($target, $existing);
+        $messages = array();
 
-    public function testEnsureNetworkTemplateLogsCreationEvent(): void
-    {
-        $source = $this->pmssReadRepoFile('scripts/lib/update/networking.php');
-        $this->assertStringContainsString("\$log('Created default network configuration');", $source);
+        $this->pmssWithEnv(
+            array('PMSS_CONFIG_DIR' => $configDir, 'PMSS_NETWORK_CONFIG' => $target),
+            function () use (&$messages): void {
+                \pmssEnsureNetworkTemplate($this->pmssMakeArrayLogger($messages));
+            }
+        );
+
+        $this->assertSame($existing, (string) file_get_contents($target));
+        $this->assertSame(array(), $messages);
     }
 }

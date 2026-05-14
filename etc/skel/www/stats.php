@@ -384,6 +384,22 @@ pre {
 .traffic-ratio.na { color: #b0bec5; }
 </style>
 
+<script>
+function pmssStatsChartOptions() {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top' },
+            tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    };
+}
+</script>
+
 <div class="stats-container">
 
   <!-- LEFT: Base resources -->
@@ -793,17 +809,7 @@ Inbound:Outbound ratio (month): <span class="<?php echo $trafficRatioClass; ?>">
                             pointRadius: 3
                         }]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
-                        },
-                        scales: {
-                            y: { beginAtZero: true }
-                        }
-                    }
+                    options: pmssStatsChartOptions()
                 });
             });
             </script>
@@ -996,17 +1002,7 @@ Past 30 days total I/O operations: <?php echo pmssFormatIoOperationsShort($ioOpe
                             pointRadius: 3
                         }]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
-                        },
-                        scales: {
-                            y: { beginAtZero: true }
-                        }
-                    }
+                    options: pmssStatsChartOptions()
                 });
             });
             </script>
@@ -1031,17 +1027,7 @@ Past 30 days total I/O operations: <?php echo pmssFormatIoOperationsShort($ioOpe
                             pointRadius: 3
                         }]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
-                        },
-                        scales: {
-                            y: { beginAtZero: true }
-                        }
-                    }
+                    options: pmssStatsChartOptions()
                 });
             });
             </script>
@@ -1077,17 +1063,7 @@ CPU Time (month/week/day/hour): <?php echo $cpuDisplay['month'] ?? 'n/a'; ?> / <
                             pointRadius: 3
                         }]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
-                        },
-                        scales: {
-                            y: { beginAtZero: true }
-                        }
-                    }
+                    options: pmssStatsChartOptions()
                 });
             });
             </script>

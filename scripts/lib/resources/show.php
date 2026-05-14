@@ -85,8 +85,7 @@ TEXT;
     ['rows' => $rows, 'missing' => $missingStats, 'totals' => $totals] = pmssResourceBuildReport($statsDir, $users);
 
     if (isset($options['json'])) {
-        $payload = ['users' => $rows, 'totals' => $totals, 'missing' => $missingStats];
-        return pmssJsonEmitPayload($payload, 'Failed to encode resource report JSON.');
+        return pmssJsonEmitPayload(['users' => $rows, 'totals' => $totals, 'missing' => $missingStats], 'Failed to encode resource report JSON.');
     }
 
     $formatBytes = static function (float $bytes): string {

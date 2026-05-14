@@ -399,8 +399,6 @@ abstract class TestCase
         return ['month' => $month, 'week' => $week, 'day' => $day, 'hour' => $hour === null ? $day : $hour];
     }
 
-    protected function pmssBuildRawWindowMetric($month, $week = null, $day = null, $hour = null): array { return ['raw' => $this->pmssBuildWindowValues($month, $week, $day, $hour)]; }
-
     /** Build the serialized resource stats shape used by report-oriented tests. */
     protected function pmssBuildResourceStatsPayloadFromValues(array $values): array
     {
@@ -1120,12 +1118,6 @@ abstract class TestCase
     protected function pmssAssertRepoFileMatches(string $relativePath, string $pattern, string $message = ''): void
     {
         $this->assertMatches($pattern, $this->pmssReadRepoFile($relativePath), $message);
-    }
-
-    /** Read a repository file and assert ordered substrings. */
-    protected function pmssAssertRepoFileContainsOrderedStrings(string $relativePath, array $needles, string $missingPrefix = '', string $orderPrefix = ''): void
-    {
-        $this->assertOrderedStrings($needles, $this->pmssReadRepoFile($relativePath), $missingPrefix, $orderPrefix);
     }
 
     /** Read a repository file and assert that it omits multiple substrings. */

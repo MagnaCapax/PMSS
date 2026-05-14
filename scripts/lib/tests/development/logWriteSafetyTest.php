@@ -46,6 +46,25 @@ final class LogWriteSafetyTest extends TestCase
         $this->assertFalse(is_file($targetDir.'/events.log'));
     }
 
+    public function testLogAppendTimestampedLineRejectsNestedSymlinkedAncestorDirectory(): void
+    {
+        $targetDir = $this->pmssMakeTempDir('pmss-log-parent-real-');
+        mkdir($targetDir.'/nested');
+        $linkRoot = $this->pmssMakeTempDir('pmss-log-parent-link-');
+        $linkDir = $linkRoot.'/redirected';
+        $this->pmssCreateSymlinkOrSkip($targetDir, $linkDir);
+
+        $this->assertFalse(\pmssLogAppendTimestampedLine($linkDir.'/nested/events.log', 'blocked'));
+        $this->assertFalse(is_file($targetDir.'/nested/events.log'));
+    }
+
+    public function testLogWritePathIsSafeRejectsTraversalSegments(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-log-traversal-');
+
+        $this->assertFalse(\pmssLogWritePathIsSafe($baseDir.'/../events.log'));
+    }
+
     public function testLogAppendTimestampedLineWritesRegularFileTargets(): void
     {
         $path = $this->pmssMakeTempDir('pmss-log-write-dir-').'/events.log';

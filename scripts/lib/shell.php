@@ -23,6 +23,13 @@
  */
 function pmssRun(string $cmd, bool $logFailure = true): int
 {
+    if (trim($cmd) === '') {
+        if ($logFailure) {
+            fwrite(STDERR, "Command failed (rc=1): empty command\n");
+        }
+        return 1;
+    }
+
     $exitCode = 0;
     passthru($cmd, $exitCode);
     if ($exitCode !== 0 && $logFailure) {

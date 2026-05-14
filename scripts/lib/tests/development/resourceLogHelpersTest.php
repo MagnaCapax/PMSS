@@ -361,20 +361,12 @@ class ResourceLogHelpersTest extends TestCase
             'tasks' => 1,
             'ts' => 1,
         ]));
-        $warnings = [];
+        $result = null;
 
-        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-            $warnings[] = [$severity, $message];
-            return true;
+        $this->pmssAssertNoPhpWarnings(function () use (&$result, $statePath): void {
+            $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(10, 20, 30, 1024, 2));
         });
 
-        try {
-            $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(10, 20, 30, 1024, 2));
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertEquals([], $warnings);
         $this->assertEquals(10, $result['delta']['io_read']);
         $this->assertEquals(20, $result['delta']['io_write']);
         $this->assertEquals(30, $result['delta']['cpu_nsec']);
@@ -384,20 +376,12 @@ class ResourceLogHelpersTest extends TestCase
     {
         $root = $this->makeRoot();
         $statePath = $root.'/state.json';
-        $warnings = [];
+        $result = null;
 
-        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-            $warnings[] = [$severity, $message];
-            return true;
+        $this->pmssAssertNoPhpWarnings(function () use (&$result, $statePath): void {
+            $result = \pmssResourceLogUpdateState($statePath, ['memory' => 2048, 'tasks' => 3]);
         });
 
-        try {
-            $result = \pmssResourceLogUpdateState($statePath, ['memory' => 2048, 'tasks' => 3]);
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertEquals([], $warnings);
         $this->assertEquals(0, $result['delta']['io_read']);
         $this->assertEquals(0, $result['delta']['io_write']);
         $this->assertEquals(0, $result['delta']['cpu_nsec']);
@@ -409,20 +393,12 @@ class ResourceLogHelpersTest extends TestCase
     {
         $root = $this->makeRoot();
         $statePath = $root.'/state.json';
-        $warnings = [];
+        $result = null;
 
-        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-            $warnings[] = [$severity, $message];
-            return true;
+        $this->pmssAssertNoPhpWarnings(function () use (&$result, $statePath): void {
+            $result = \pmssCounterStateUpdate($statePath, ['io_read' => 9], ['io_read', 'io_write']);
         });
 
-        try {
-            $result = \pmssCounterStateUpdate($statePath, ['io_read' => 9], ['io_read', 'io_write']);
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertEquals([], $warnings);
         $this->assertEquals(9, $result['delta']['io_read']);
         $this->assertEquals(0, $result['delta']['io_write']);
     }

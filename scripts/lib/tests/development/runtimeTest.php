@@ -9,34 +9,15 @@ class RuntimeTest extends TestCase
 {
     public function testPmssPrepareCliEntrypointAppendsArgumentsToGlobalArgv(): void
     {
-        $originalGlobalArgv = $GLOBALS['argv'] ?? null;
-        $originalServerArgv = $_SERVER['argv'] ?? null;
-        $GLOBALS['argv'] = ['wrapper.php'];
-        $_SERVER['argv'] = ['wrapper.php'];
-
-        try {
+        $this->withRuntimeArgv(['wrapper.php'], function (): void {
             \pmssPrepareCliEntrypoint(false, ['--quiet']);
             $this->assertEquals(['wrapper.php', '--quiet'], $GLOBALS['argv']);
             $this->assertEquals($GLOBALS['argv'], $_SERVER['argv']);
-        } finally {
-            if ($originalGlobalArgv === null) {
-                unset($GLOBALS['argv']);
-            } else {
-                $GLOBALS['argv'] = $originalGlobalArgv;
-            }
-
-            if ($originalServerArgv === null) {
-                unset($_SERVER['argv']);
-            } else {
-                $_SERVER['argv'] = $originalServerArgv;
-            }
-        }
+        });
     }
 
     public function testPmssRequireCliEntrypointScriptLoadsTargetWithAdjustedArgv(): void
     {
-        $originalGlobalArgv = $GLOBALS['argv'] ?? null;
-        $originalServerArgv = $_SERVER['argv'] ?? null;
         $originalCapture = $GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] ?? null;
         $tempDir = $this->pmssMakeTempDir('pmss-runtime-entrypoint-');
         $scriptPath = $tempDir.'/capture.php';
@@ -49,29 +30,16 @@ class RuntimeTest extends TestCase
             "];\n"
         );
 
-        $GLOBALS['argv'] = ['wrapper.php'];
-        $_SERVER['argv'] = ['wrapper.php'];
-
         try {
-            \pmssRequireCliEntrypointScript($tempDir, 'capture.php', false, ['--json']);
-            $capture = $GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] ?? null;
-            $this->assertTrue(is_array($capture), 'Expected delegated entrypoint capture');
-            $this->assertEquals(['wrapper.php', '--json'], $capture['argv']);
-            $this->assertEquals($capture['argv'], $capture['serverArgv']);
+            $this->withRuntimeArgv(['wrapper.php'], function () use ($tempDir): void {
+                \pmssRequireCliEntrypointScript($tempDir, 'capture.php', false, ['--json']);
+                $capture = $GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT'] ?? null;
+                $this->assertTrue(is_array($capture), 'Expected delegated entrypoint capture');
+                $this->assertEquals(['wrapper.php', '--json'], $capture['argv']);
+                $this->assertEquals($capture['argv'], $capture['serverArgv']);
+            });
         } finally {
             $this->pmssRemoveTree($tempDir);
-            if ($originalGlobalArgv === null) {
-                unset($GLOBALS['argv']);
-            } else {
-                $GLOBALS['argv'] = $originalGlobalArgv;
-            }
-
-            if ($originalServerArgv === null) {
-                unset($_SERVER['argv']);
-            } else {
-                $_SERVER['argv'] = $originalServerArgv;
-            }
-
             if ($originalCapture === null) {
                 unset($GLOBALS['PMSS_RUNTIME_TEST_ENTRYPOINT']);
             } else {
@@ -228,4 +196,33 @@ class RuntimeTest extends TestCase
     }
 
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
+
+    private function withRuntimeArgv(array $argv, callable $callback): void
+    {
+        $originalGlobalArgv = $GLOBALS['argv'] ?? null;
+        $originalServerArgv = $_SERVER['argv'] ?? null;
+        $GLOBALS['argv'] = $argv;
+        $_SERVER['argv'] = $argv;
+
+        try {
+            $callback();
+        } finally {
+            $this->restoreRuntimeArgv($originalGlobalArgv, $originalServerArgv);
+        }
+    }
+
+    private function restoreRuntimeArgv($originalGlobalArgv, $originalServerArgv): void
+    {
+        if ($originalGlobalArgv === null) {
+            unset($GLOBALS['argv']);
+        } else {
+            $GLOBALS['argv'] = $originalGlobalArgv;
+        }
+
+        if ($originalServerArgv === null) {
+            unset($_SERVER['argv']);
+        } else {
+            $_SERVER['argv'] = $originalServerArgv;
+        }
+    }
 }

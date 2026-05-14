@@ -57,6 +57,92 @@ class DpkgBaselineApplySafetyTest extends TestCase
         @unlink((string) $path);
     }
 
+    public function testCreatePrivateTempDirUsesProcessTempRoot(): void
+    {
+        if (!function_exists('pmssCreatePrivateTempDir')) {
+            throw new SkipTest('pmssCreatePrivateTempDir helper not present in this baseline');
+        }
+
+        $path = \pmssCreatePrivateTempDir('pmss-libssl-');
+        $tmpDir = realpath(sys_get_temp_dir());
+        $realPath = is_string($path) ? realpath($path) : false;
+
+        $this->assertTrue(is_string($tmpDir) && $tmpDir !== '', 'Expected process temp root to resolve');
+        $this->assertTrue(is_string($realPath) && is_dir($realPath), 'Expected private temp directory to exist');
+        $this->assertSame($tmpDir.'/', substr((string) $realPath, 0, strlen($tmpDir) + 1));
+        $this->assertEquals(0700, fileperms((string) $path) & 0777);
+
+        @rmdir((string) $path);
+    }
+
+    public function testPrivateTempDirRealpathAcceptsOwnedPrefixUnderTempRoot(): void
+    {
+        if (!function_exists('pmssPrivateTempDirRealpath')) {
+            throw new SkipTest('pmssPrivateTempDirRealpath helper not present in this baseline');
+        }
+
+        $tmpDir = $this->pmssMakeTempDir('pmss-private-realpath-root-', 0700);
+        $ownedDir = $tmpDir.'/pmss-libssl-owned';
+        @mkdir($ownedDir, 0700);
+        $resolved = null;
+        $output = '';
+
+        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use ($ownedDir, &$resolved, &$output): void {
+            [$resolved, $output] = $this->pmssCaptureStdout(function () use ($ownedDir): ?string {
+                return \pmssPrivateTempDirRealpath($ownedDir, 'pmss-libssl-');
+            });
+        });
+
+        $this->assertSame(realpath($ownedDir), $resolved);
+        $this->assertEquals('', $output, 'Expected accepted private temp directory to stay quiet');
+    }
+
+    public function testPrivateTempDirRealpathRejectsWrongPrefixUnderTempRoot(): void
+    {
+        if (!function_exists('pmssPrivateTempDirRealpath')) {
+            throw new SkipTest('pmssPrivateTempDirRealpath helper not present in this baseline');
+        }
+
+        $tmpDir = $this->pmssMakeTempDir('pmss-private-reject-root-', 0700);
+        $wrongDir = $tmpDir.'/other-cache';
+        @mkdir($wrongDir, 0700);
+        $resolved = 'sentinel';
+        $output = '';
+
+        $this->pmssWithEnv(['TMPDIR' => $tmpDir], function () use ($wrongDir, &$resolved, &$output): void {
+            [$resolved, $output] = $this->pmssCaptureStdout(function () use ($wrongDir): ?string {
+                return \pmssPrivateTempDirRealpath($wrongDir, 'pmss-libssl-');
+            });
+        });
+
+        $this->assertSame(null, $resolved);
+        $this->assertStringContainsString('Refusing temporary directory cleanup outside PMSS temp scope', $output);
+    }
+
+    public function testRemovePrivateTempDirRejectsWrongPrefixBeforeRunStep(): void
+    {
+        if (!function_exists('pmssRemovePrivateTempDir')) {
+            throw new SkipTest('pmssRemovePrivateTempDir helper not present in this baseline');
+        }
+
+        $tmpDir = $this->pmssMakeTempDir('pmss-private-cleanup-root-', 0700);
+        $wrongDir = $tmpDir.'/other-cache';
+        @mkdir($wrongDir, 0700);
+        $result = 0;
+        $output = '';
+
+        $this->pmssWithEnv(['TMPDIR' => $tmpDir, 'PMSS_DRY_RUN' => '1'], function () use ($wrongDir, &$result, &$output): void {
+            $this->pmssResetRuntimeProfile();
+            [$result, $output] = $this->pmssCaptureStdout(function () use ($wrongDir): int {
+                return \pmssRemovePrivateTempDir($wrongDir, 'pmss-libssl-', 'Cleaning unit-test temp dir');
+            });
+        });
+
+        $this->assertSame(1, $result);
+        $this->assertStringContainsString('Refusing temporary directory cleanup outside PMSS temp scope', $output);
+        $this->assertSame(null, $this->pmssFindProfileCommand('Cleaning unit-test temp dir'));
+    }
+
     public function testWriteSanitisedDpkgSelectionsTempFileFailurePathOnlyWhenHelperExists(): void
     {
         if (!function_exists('pmssWriteSanitisedDpkgSelectionsTempFile')) {
