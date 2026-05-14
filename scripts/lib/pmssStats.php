@@ -640,7 +640,7 @@ function pmssStatsParseOptions(array $argv)
 {
     $parsed = pmssParseCliTokens($argv);
 
-    if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
+    if (pmssCliOptionPresent($parsed, 'help', 'h')) {
         $self = basename($argv[0] ?? 'pmss-stats.php');
         echo pmssCliHelpUsageOptions($self.' [--full] [--json] [--mini] [--no-header]', [
             ['--full', 'Show extra cgroup counters and I/O details.'],
@@ -653,10 +653,10 @@ function pmssStatsParseOptions(array $argv)
     }
 
     return [
-        'full' => pmssCliOption($parsed, 'full', null, false) !== false,
-        'json' => pmssCliOption($parsed, 'json', null, false) !== false,
-        'mini' => pmssCliOption($parsed, 'mini', null, false) !== false,
-        'no_header' => pmssCliOption($parsed, 'no-header', null, false) !== false,
+        'full' => pmssCliOptionPresent($parsed, 'full'),
+        'json' => pmssCliOptionPresent($parsed, 'json'),
+        'mini' => pmssCliOptionPresent($parsed, 'mini'),
+        'no_header' => pmssCliOptionPresent($parsed, 'no-header'),
     ];
 }
 

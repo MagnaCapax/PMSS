@@ -42,7 +42,7 @@ function pmssCreateNginxConfigMain(array $argv): int
     ], 21);
 
     $parsed = pmssParseCliTokens($argv);
-    if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
+    if (pmssCliOptionPresent($parsed, 'help', 'h')) {
         echo $usage;
         return 0;
     }
@@ -56,7 +56,7 @@ function pmssCreateNginxConfigMain(array $argv): int
         return 1;
     }
 
-    $restartNginx = pmssCliOption($parsed, 'restart', 'r', false) !== false;
+    $restartNginx = pmssCliOptionPresent($parsed, 'restart', 'r');
 
     $selection = pmssManagedUsersSelectFromCommand('/scripts/listUsers.php', $requestedUser, array('emitEmptyMessage' => true, 'invalidMessage' => "Invalid username: %s\n", 'notFoundMessage' => "Username not found: %s\n"));
     if ($selection['exitCode'] !== 0 || $selection['users'] === array()) return $selection['exitCode'];

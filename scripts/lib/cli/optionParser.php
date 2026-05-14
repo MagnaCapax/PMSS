@@ -68,11 +68,25 @@ function pmssCliOption(array $parsed, string $long, ?string $short = null, $defa
         ?? ($short !== null ? ($parsed['options'][$short] ?? $default) : $default);
 }
 
+/** Return whether a CLI option was present, accepting value-bearing flags too. */
+function pmssCliOptionPresent(array $parsed, string $long, ?string $short = null, bool $bareFlagOnly = false): bool
+{
+    $value = pmssCliOption($parsed, $long, $short, false);
+    return $bareFlagOnly ? $value === true : $value !== false;
+}
+
 /**
  * Return a non-empty string option value, or the caller's default.
  */
-function pmssCliOptionString(array $parsed, string $long, ?string $short = null, ?string $default = null): ?string
+function pmssCliOptionString(array $parsed, string $long, ?string $short = null, ?string $default = null, bool $allowEmpty = false): ?string
 {
     $value = pmssCliOption($parsed, $long, $short, $default);
-    return is_string($value) && $value !== '' ? $value : $default;
+    return is_string($value) && ($allowEmpty || $value !== '') ? $value : $default;
+}
+
+/** Return an integer option value while preserving bare-flag defaults. */
+function pmssCliOptionInt(array $parsed, string $long, ?string $short = null, int $default = 0): int
+{
+    $value = pmssCliOption($parsed, $long, $short, null);
+    return $value === null || $value === true ? $default : (int) $value;
 }

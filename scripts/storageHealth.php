@@ -189,7 +189,7 @@ $userNoticeRequested = false;
 $defaultNoticePath = getenv('PMSS_STORAGE_USER_NOTICE') ?: '/etc/seedbox/config/storagePerformanceNotice.json';
 
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
-if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
+if (pmssCliOptionPresent($parsed, 'help', 'h')) {
     echo "\nStorage health report\n";
     echo "Usage: storageHealth.php [--json <path>] [--raw] [--only-problems] [--device <kname|/dev/...>] [--user-notice[=<path>]]\n\n";
     echo "  --json <path>   JSON Lines input (default /var/log/pmss/storage-health.jsonl)\n";
@@ -202,12 +202,11 @@ if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
 }
 
 $jsonPath = pmssCliOptionString($parsed, 'json', null, $jsonPath) ?? $jsonPath;
-$raw = pmssCliOption($parsed, 'raw', null, false) !== false;
-$onlyProblems = pmssCliOption($parsed, 'only-problems', null, false) !== false;
+$raw = pmssCliOptionPresent($parsed, 'raw');
+$onlyProblems = pmssCliOptionPresent($parsed, 'only-problems');
 $deviceFilter = pmssCliOptionString($parsed, 'device', null, $deviceFilter);
 
-$userNoticeOption = pmssCliOption($parsed, 'user-notice', null, false);
-if ($userNoticeOption !== false) {
+if (pmssCliOptionPresent($parsed, 'user-notice')) {
     $userNoticeRequested = true;
     $userNoticePath = pmssCliOptionString($parsed, 'user-notice', null, $defaultNoticePath) ?? $defaultNoticePath;
 }

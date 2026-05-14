@@ -11,7 +11,7 @@ require_once __DIR__.'/../lib/users.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
 
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
-if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
+if (pmssCliOptionPresent($parsed, 'help', 'h')) {
     echo "Usage: checkUsers.php [--json]\n";
     exit(0);
 }
@@ -26,7 +26,7 @@ $homeOnly = array_values(array_diff($homeUsers, $cacheUsers));
 $passwdOnly = array_values(array_diff($passwdUsers, $cacheUsers, $homeUsers));
 $consistent = array_values(array_intersect($cacheUsers, $homeUsers, $passwdUsers));
 
-if (pmssCliOption($parsed, 'json', null, false) !== false) {
+if (pmssCliOptionPresent($parsed, 'json')) {
     echo json_encode([
         'consistent'   => $consistent,
         'db_only'      => $dbOnly,

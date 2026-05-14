@@ -16,11 +16,11 @@ pmssRunCliEntrypointWithArgv(__FILE__, 'pmssShowTrafficMain');
 function pmssShowTrafficMain(array $argv): int
 {
     $parsed = pmssParseCliTokens($argv);
-    $helpExitCode = pmssCliOption($parsed, 'help', null, false) !== false ? 0 : null;
+    $helpExitCode = pmssCliOptionPresent($parsed, 'help') ? 0 : null;
 
-    $asJson = pmssCliOption($parsed, 'json', null, false) !== false;
-    $showMissing = pmssCliOption($parsed, 'show-missing', null, false) !== false;
-    $extended = pmssCliOption($parsed, 'extended', null, false) !== false;
+    $asJson = pmssCliOptionPresent($parsed, 'json');
+    $showMissing = pmssCliOptionPresent($parsed, 'show-missing');
+    $extended = pmssCliOptionPresent($parsed, 'extended');
 
     $sort = 'name';
     $sortOption = pmssCliOption($parsed, 'sort', null, null);
@@ -50,8 +50,8 @@ function pmssShowTrafficMain(array $argv): int
         return $helpExitCode;
     }
 
-    $colorRequested = pmssCliOption($parsed, 'color', null, false) !== false;
-    $noColorRequested = pmssCliOption($parsed, 'no-color', null, false) !== false;
+    $colorRequested = pmssCliOptionPresent($parsed, 'color');
+    $noColorRequested = pmssCliOptionPresent($parsed, 'no-color');
     if ($colorRequested && $noColorRequested) {
         fwrite(STDERR, "Error: --color and --no-color are mutually exclusive.\n");
         return 2;

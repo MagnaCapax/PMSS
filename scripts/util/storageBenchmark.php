@@ -11,7 +11,6 @@
 
 require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
-require_once __DIR__.'/../lib/log.php';
 
 function usage(): void {
     echo <<<'USAGE'
@@ -55,24 +54,6 @@ $ddSize = '1G';
 $devRuntime = 30;
 $requireIdle=false; $idleLatencyMs=100; $idleUtilPct=85; $showLast=false;
 
-$stringOptions = [
-    'target' => 'targetDir',
-    'size' => 'fileSize',
-    'json' => 'jsonLog',
-    'label' => 'label',
-    'dd-size' => 'ddSize',
-];
-$intOptions = [
-    'runtime' => 'runtime',
-    'device-runtime' => 'devRuntime',
-    'idle-latency-ms' => 'idleLatencyMs',
-    'idle-util' => 'idleUtilPct',
-];
-$flagOptions = [
-    'devices' => 'testDevices',
-    'require-idle' => 'requireIdle',
-    'show-last' => 'showLast',
-];
 $valueOptionNames = [
     '--target',
     '--size',
@@ -87,21 +68,18 @@ $valueOptionNames = [
 // Keep long flag literals inline for CLI characterization coverage: '--require-idle'.
 $parsed = pmssParseCliTokens($argv, $valueOptionNames);
 if (pmssCliOption($parsed, 'help', 'h')) { usage(); exit(0); }
-foreach ($flagOptions as $option => $variable) {
-    ${$variable} = pmssCliOption($parsed, $option) === true;
-}
-foreach ($stringOptions as $option => $variable) {
-    $value = pmssCliOption($parsed, $option);
-    if ($value !== null && $value !== true) {
-        ${$variable} = (string) $value;
-    }
-}
-foreach ($intOptions as $option => $variable) {
-    $value = pmssCliOption($parsed, $option);
-    if ($value !== null && $value !== true) {
-        ${$variable} = (int) $value;
-    }
-}
+$testDevices = pmssCliOptionPresent($parsed, 'devices', null, true);
+$requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true);
+$showLast = pmssCliOptionPresent($parsed, 'show-last', null, true);
+$targetDir = pmssCliOptionString($parsed, 'target', null, $targetDir, true) ?? $targetDir;
+$fileSize = pmssCliOptionString($parsed, 'size', null, $fileSize, true) ?? $fileSize;
+$jsonLog = pmssCliOptionString($parsed, 'json', null, $jsonLog, true) ?? $jsonLog;
+$label = pmssCliOptionString($parsed, 'label', null, $label, true) ?? $label;
+$ddSize = pmssCliOptionString($parsed, 'dd-size', null, $ddSize, true) ?? $ddSize;
+$runtime = pmssCliOptionInt($parsed, 'runtime', null, $runtime);
+$devRuntime = pmssCliOptionInt($parsed, 'device-runtime', null, $devRuntime);
+$idleLatencyMs = pmssCliOptionInt($parsed, 'idle-latency-ms', null, $idleLatencyMs);
+$idleUtilPct = pmssCliOptionInt($parsed, 'idle-util', null, $idleUtilPct);
 
 function parseSizeSB(string $s): int { if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }
 function iopingAvg(?string $target): ?float { $bin=pmssCommandPath('ioping'); if($bin==='') return null; $cmd=escapeshellcmd($bin).' -c 10 -i 0.1 -D '.escapeshellarg($target).' 2>&1 | tail -n1'; $out=trim((string) shell_exec($cmd)); if(preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i',$out,$m)){ $v=(float)$m[1]; $u=strtolower($m[2]); return $u==='us'?$v/1000.0:($u==='s'?$v*1000.0:$v);} return null; }

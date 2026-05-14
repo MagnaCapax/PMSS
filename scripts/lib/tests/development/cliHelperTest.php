@@ -30,6 +30,15 @@ class CliHelperTest extends TestCase
         $this->assertEquals('alice', $fallback);
         $defaulted = \pmssCliOption($parsed, 'missing', 'm', 'fallback');
         $this->assertEquals('fallback', $defaulted);
+        $parsed = \pmssParseCliTokens(['script.php', '--json=0', '-p']);
+        foreach ([['json', null], ['pretty', 'p']] as $case) {
+            $this->assertTrue(\pmssCliOptionPresent($parsed, $case[0], $case[1]));
+        }
+        $this->assertFalse(\pmssCliOptionPresent($parsed, 'json', null, true));
+        $parsed = \pmssParseCliTokens(['script.php', '--runtime', '--idle-util=70', '--empty=']);
+        foreach ([['runtime', 60, 60], ['idle-util', 85, 70], ['empty', 85, 0]] as $case) {
+            $this->assertEquals($case[2], \pmssCliOptionInt($parsed, $case[0], null, $case[1]));
+        }
     }
 
     public function testSupportsSpaceSeparatedLongValues(): void

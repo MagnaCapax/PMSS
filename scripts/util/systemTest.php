@@ -11,7 +11,7 @@ require_once __DIR__.'/../lib/systemStatus.php';
 
 $parsed = pmssParseCliTokens($argv ?? ($_SERVER['argv'] ?? []));
 $format = strtolower((string) pmssCliOption($parsed, 'output', 'o', 'text')); $jsonFlag = pmssCliOption($parsed, 'json', 'j', false);
-$prettyFlag = pmssCliOption($parsed, 'pretty', 'p', false) !== false;
+$prettyFlag = pmssCliOptionPresent($parsed, 'pretty', 'p');
 $format = ($jsonFlag === true || $format === 'json') ? 'json' : 'text';
 
 $checks = pmssSystemStatusChecks(); $summary = pmssStatusSummary($checks);

@@ -382,8 +382,8 @@ Class `rtorrentConfig`
 
 - pmssParseCliTokens(array $argv): array
   - Output: `['options' => array, 'arguments' => array]` supporting GNU long options and short flags with or without values.
-- pmssCliOption(array $parsed, string $long, ?string $short=null, $default=null)
-  - Behavior: returns option by long or short alias when present, else default.
+- pmssCliOption(array $parsed, string $long, ?string $short=null, $default=null) and typed accessors (`pmssCliOptionPresent`, `pmssCliOptionString`, `pmssCliOptionInt`)
+  - Behavior: return option presence/value by long or short alias when present, else default.
 
 ---
 
