@@ -78,6 +78,7 @@ OVR_PROWLARR_URL=""; OVR_PROWLARR_BRANCH=""
 OVR_SAB_URL=""; OVR_SAB_VERSION=""
 OVR_JELLYFIN_URL=""
 OVR_JELLYFIN_FFMPEG=""
+JELLYFIN_INSTALL_ENABLED=1
 
 print_usage() {
   cat <<USAGE
@@ -314,69 +315,11 @@ jellyfin_ffmpeg_configure_fallback() {
     log_warn "System ffmpeg not found; Jellyfin requires FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
   fi
 
-  if [[ "$SERVARR_ARCH" == "x64" ]]; then
-    JELLYFIN_STATIC_FFMPEG_URL="$JELLYFIN_STATIC_FFMPEG_AMD64_URL"
-    OVR_JELLYFIN_FFMPEG="$home_ffmpeg"
-    log_warn "Will install user-local static FFmpeg for Jellyfin at $home_ffmpeg"
-  else
-    log_warn "Automatic static FFmpeg fallback is only available on amd64/x64; pass --jellyfin-ffmpeg=PATH for this architecture"
-  fi
-}
-
-install_jellyfin_static_ffmpeg_if_needed() {
-  local archive="$HOME/.bin/jellyfin-ffmpeg-static.tar.xz"
-  local extract_dir="$HOME/.bin/.jellyfin-ffmpeg-static.$$"
-  local ffmpeg_src=""
-  local ffprobe_src=""
-  local version=""
-
-  [[ -n "$JELLYFIN_STATIC_FFMPEG_URL" ]] || return 0
-
-  if [[ $DRY_RUN -eq 1 ]]; then
-    log_info "[dry-run] would install static FFmpeg from $JELLYFIN_STATIC_FFMPEG_URL to $HOME/.bin/ffmpeg"
-    fetch "$JELLYFIN_STATIC_FFMPEG_URL" "$archive"
-    return
-  fi
-
-  mkdir -p "$HOME/.bin" "$extract_dir"
-  if ! fetch "$JELLYFIN_STATIC_FFMPEG_URL" "$archive"; then
-    log_err "Failed to download static FFmpeg for Jellyfin"
-    rm -rf "$extract_dir" "$archive"
-    exit 1
-  fi
-  if ! verify_checksum "$archive" "$(basename "${JELLYFIN_STATIC_FFMPEG_URL%%\?*}")"; then
-    log_err "Static FFmpeg download failed integrity check — aborting"
-    rm -rf "$extract_dir" "$archive"
-    exit 1
-  fi
-  if ! tar -xaf "$archive" -C "$extract_dir" >/dev/null 2>&1; then
-    log_err "Failed to extract static FFmpeg archive; xz support may be missing"
-    rm -rf "$extract_dir" "$archive"
-    exit 1
-  fi
-
-  ffmpeg_src=$(printf '%s\n' "$extract_dir"/*/ffmpeg | head -n 1)
-  ffprobe_src=$(printf '%s\n' "$extract_dir"/*/ffprobe | head -n 1)
-  if [[ ! -f "$ffmpeg_src" ]]; then
-    log_err "Static FFmpeg archive did not contain an ffmpeg binary"
-    rm -rf "$extract_dir" "$archive"
-    exit 1
-  fi
-
-  cp "$ffmpeg_src" "$HOME/.bin/ffmpeg"
-  chmod 0750 "$HOME/.bin/ffmpeg"
-  if [[ -f "$ffprobe_src" ]]; then
-    cp "$ffprobe_src" "$HOME/.bin/ffprobe"
-    chmod 0750 "$HOME/.bin/ffprobe"
-  fi
-
-  rm -rf "$extract_dir" "$archive"
-  version=$(jellyfin_ffmpeg_binary_version "$HOME/.bin/ffmpeg" || true)
-  if ! jellyfin_ffmpeg_version_usable "$version"; then
-    log_err "Installed static FFmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
-    exit 1
-  fi
-  log_ok "Installed static FFmpeg ${version} for Jellyfin"
+  JELLYFIN_INSTALL_ENABLED=0
+  log_err "Skipping Jellyfin: FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is required for Jellyfin startup."
+  log_err "Install a user-local static FFmpeg at $home_ffmpeg, then rerun:"
+  log_err "  bash install-media-stack.sh --jellyfin-ffmpeg=$home_ffmpeg"
+  log_warn "Continuing with Radarr, Sonarr, Prowlarr, SABnzbd, and Cloudplow."
 }
 
 managed_install_path_reset() {
@@ -584,8 +527,6 @@ JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
 JELLYFIN_MIN_FFMPEG_VERSION="4.4"
-JELLYFIN_STATIC_FFMPEG_AMD64_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-JELLYFIN_STATIC_FFMPEG_URL=""
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
 
@@ -660,14 +601,16 @@ case "$ARCH" in
 	;;
 esac
 
+jellyfin_ffmpeg_configure_fallback
+
 # Preserve unrelated ~/.bin contents on reruns; only managed media-stack paths are refreshed.
 if [ -d "$HOME/.bin" ] && [ "$(ls -A "$HOME/.bin" 2>/dev/null)" ]; then
   log_info "Keeping existing ~/.bin contents outside PMSS-managed app paths."
   log_info "Managed media-stack binaries will be refreshed in place."
 fi
 
-# Safety check for existing Jellyfin config/data (can cause DB migration hang on rerun)
-if [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev/null)" ]; then
+# Safety check for existing Jellyfin config/data (can cause DB migration hang on rerun).
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev/null)" ]; then
     if [[ $DRY_RUN -eq 1 ]]; then
       log_warn "$HOME/.config/jellyfin exists and would be removed (dry-run); Jellyfin users, metadata, and watch state would be lost."
     else
@@ -676,16 +619,26 @@ if [ -d "$HOME/.config/jellyfin" ] && [ "$(ls -A "$HOME/.config/jellyfin" 2>/dev
       [[ $confirm == [yY] ]] || exit 1
       rm -rf "$HOME/.config/jellyfin"
     fi
-elif [ -d "$HOME/.config/jellyfin" ]; then
+elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]] && [ -d "$HOME/.config/jellyfin" ]; then
   [[ $DRY_RUN -eq 1 ]] || rm -rf "$HOME/.config/jellyfin"
+elif [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]] && [ -d "$HOME/.config/jellyfin" ]; then
+  log_warn "Leaving existing Jellyfin config untouched because this run will skip Jellyfin."
 fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
-  mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
-  chmod 700 "$HOME"/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}
+  mkdir -p "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
+  chmod 700 "$HOME"/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}
+  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+    mkdir -p "$HOME/.config/jellyfin"
+    chmod 700 "$HOME/.config/jellyfin"
+  fi
   mkdir -p "$HOME/.bin"
 else
-  log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}"
+  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+    log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,jellyfin,sabnzbd,cloudplow}"
+  else
+    log_info "[dry-run] would create ~/.config/{radarr,sonarr,prowlarr,sabnzbd,cloudplow}"
+  fi
   log_info "[dry-run] would create ~/.bin"
 fi
 
@@ -703,7 +656,9 @@ fi
 # Fetches from repo.jellyfin.org structure: files/server/linux/latest-stable/<arch>/
 JF_REPO_BASE="https://repo.jellyfin.org/files/server/linux/latest-stable/${JF_ARCH}/"
 # Find filename like jellyfin_10.X.Y-amd64.tar.gz
-if [[ -n "$OVR_JELLYFIN_URL" ]]; then
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 0 ]]; then
+  JELLYFIN_URL=""; JF_FILENAME="skipped"
+elif [[ -n "$OVR_JELLYFIN_URL" ]]; then
   JELLYFIN_URL="$OVR_JELLYFIN_URL"; JF_FILENAME="override"
 else
   JF_FILENAME=$(curl -s "$JF_REPO_BASE" | grep -oE "jellyfin_[0-9]+\\.[0-9]+\\.[0-9]+-${JF_ARCH}\\.tar\\.gz" | head -n 1)
@@ -720,12 +675,11 @@ ASPDOTNET_URL="https://aka.ms/dotnet/8.0/aspnetcore-runtime-linux-${DOTNET_ARCH}
 log_info "SABnzbd: ${SABNZBD_VERSION:-unknown}"
 log_info "Jellyfin: ${JF_FILENAME}"
 log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
-jellyfin_ffmpeg_configure_fallback
 
 # If verify-only, check URLs and exit
 if [[ $VERIFY_ONLY -eq 1 ]]; then
   log_step "Verifying URLs..."
-  urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}" "${JELLYFIN_STATIC_FFMPEG_URL:-}")
+  urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}")
   all_ok=true
   for url in "${urls_to_check[@]}"; do
     if [[ -n "$url" ]]; then
@@ -858,7 +812,11 @@ fi
 # Kill existing tmux sessions per app first
 log_step "Stopping existing sessions..."
 if [[ $DRY_RUN -eq 0 ]]; then
-	for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow; do
+	apps_to_stop=(sabnzbd radarr prowlarr sonarr cloudplow)
+	if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+		apps_to_stop=(jellyfin "${apps_to_stop[@]}")
+	fi
+	for app in "${apps_to_stop[@]}"; do
 		tmux kill-session -t "${app}" 2>/dev/null || true
 	done
 fi
@@ -1080,8 +1038,7 @@ export PATH' 'PMSS media stack installer'
 chmod 0640 "$HOME/.bashrc.custom" 2>/dev/null || true
 echo ""
 
-install_jellyfin_static_ffmpeg_if_needed
-
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
 # Install Jellyfin (URL, extract, no chmod)
 app="jellyfin"
 log_step "Installing ${app^^}..."
@@ -1203,6 +1160,9 @@ if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
   else
     log_warn "Jellyfin exited during smoke test — may have crashed"
     if [[ -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" ]]; then
+      if grep -qi "FfmpegException\|Failed.*ffmpeg" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
+        log_err "Jellyfin failed FFmpeg validation — pass --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+      fi
       if grep -qi "illegal instruction\|SIGILL\|signal 4" "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null; then
         log_err "Jellyfin crashed with Illegal Instruction — CPU lacks required instruction sets"
         log_err "SkiaSharp or other native libraries need SSE4.2/AVX which this CPU does not have"
@@ -1212,12 +1172,21 @@ if [[ $DRY_RUN -eq 0 ]] && [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
   fi
   rm -f "$JELLYFIN_LOG_DIR/jellyfin-smoke.log" 2>/dev/null || true
 fi
+else
+  log_warn "Skipping Jellyfin install; rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg after installing FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+fi
 echo ""
 
 # Aliases (Sonarr fix, PATH added above)
 # shellcheck disable=SC2016
-append_to_bashrc_custom_if_missing '# PMSS Media stack aliases (updated Nov 2025)
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+  append_to_bashrc_custom_if_missing '# PMSS Jellyfin alias (updated Nov 2025)
 alias jellyfin='\''tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; export JELLYFIN_CONFIG_DIR=\"$HOME/.config/jellyfin/config\"; export JELLYFIN_DATA_DIR=\"$HOME/.config/jellyfin/data\"; export JELLYFIN_LOG_DIR=\"$HOME/.config/jellyfin/log\"; ionice -c 3 nice -n 19 \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/jellyfin/jellyfin.dll\""'\''
+' 'alias jellyfin='
+fi
+
+# shellcheck disable=SC2016
+append_to_bashrc_custom_if_missing '# PMSS Media stack aliases (updated Nov 2025)
 alias sonarr='\''tmux new-session -d -s "sonarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Sonarr/Sonarr.dll\" --data=\"$HOME/.config/sonarr\""'\''
 alias radarr='\''tmux new-session -d -s "radarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Radarr/Radarr.dll\" --nobrowser --data=\"$HOME/.config/radarr\""'\''
 alias prowlarr='\''tmux new-session -d -s "prowlarr" "export DOTNET_ROOT=\"$HOME/.bin/dotnet\"; \"$HOME/.bin/dotnet/dotnet\" \"$HOME/.bin/Prowlarr/Prowlarr.dll\" --nobrowser --data=\"$HOME/.config/prowlarr\""'\''
@@ -1299,7 +1268,9 @@ url.redirect += (
     "/sonarr" => "/public-${USERNAME}/sonarr"
   ) )
 }
-
+EOF
+  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+    cat <<EOF >>"$HOME/.lighttpd/custom.d/media-stack.conf"
 \$HTTP["url"] =~ "^/jellyfin(\$|/)" {
   proxy.server = ( "" => ( (
     "host" => "127.0.0.1",
@@ -1315,6 +1286,7 @@ url.redirect += (
   ) )
 }
 EOF
+  fi
   chmod 640 "$HOME/.lighttpd/custom.d/media-stack.conf" 2>/dev/null || true
 else
   log_info "[dry-run] would create lighttpd config at ~/.lighttpd/custom.d/media-stack.conf"
@@ -1337,14 +1309,21 @@ if [[ $DRY_RUN -eq 0 ]]; then
     exit 1
   fi
   
-  # Ensure log directories exist
-  mkdir -p "$JELLYFIN_DATA_DIR/log" "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
+  # Ensure log directories exist.
+  mkdir -p "$HOME/.config/sonarr" "$HOME/.config/radarr" "$HOME/.config/prowlarr" "$HOME/.config/sabnzbd"
+  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+    mkdir -p "$JELLYFIN_DATA_DIR/log"
+  fi
   
-  # Start Jellyfin
-  if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
-    tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
+  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+    # Start Jellyfin only after the FFmpeg pre-flight passed.
+    if [[ -f "$HOME/.bin/jellyfin/jellyfin.dll" ]]; then
+      tmux new-session -d -s "jellyfin" "export DOTNET_ROOT=\"$DOTNET_ROOT_PATH\"; export JELLYFIN_CONFIG_DIR=\"$JELLYFIN_CONFIG_DIR\"; export JELLYFIN_DATA_DIR=\"$JELLYFIN_DATA_DIR\"; export JELLYFIN_LOG_DIR=\"$JELLYFIN_LOG_DIR\"; export ASPNETCORE_URLS=\"http://127.0.0.1:${JELLYFIN_PORT}\"; cd \"$HOME/.bin/jellyfin\" && ionice -c 3 nice -n 19 \"$DOTNET_ROOT_PATH/dotnet\" jellyfin.dll 2>&1 | tee -a \"$JELLYFIN_LOG_DIR/jellyfin.log\"" || log_warn "Failed to create jellyfin tmux session"
+    else
+      log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
+    fi
   else
-    log_err "Jellyfin DLL not found at $HOME/.bin/jellyfin/jellyfin.dll"
+    log_warn "Skipping Jellyfin start; FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured"
   fi
   
   # Start Sonarr
@@ -1385,7 +1364,11 @@ if [[ $DRY_RUN -eq 0 ]]; then
   # Wait a moment and verify sessions are still running
   sleep 3
   log_step "Verifying started applications..."
-  for app in jellyfin sonarr radarr prowlarr sabnzbd cloudplow; do
+  apps_to_verify=(sonarr radarr prowlarr sabnzbd cloudplow)
+  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+    apps_to_verify=(jellyfin "${apps_to_verify[@]}")
+  fi
+  for app in "${apps_to_verify[@]}"; do
     if tmux has-session -t "$app" 2>/dev/null; then
       log_ok "$app session is running"
     else
@@ -1408,7 +1391,11 @@ if [[ $DRY_RUN -eq 0 ]]; then
     fi
   done
 else
-  log_info "[dry-run] would start tmux sessions: jellyfin, sonarr, prowlarr, sabnzbd, cloudplow"
+  if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+    log_info "[dry-run] would start tmux sessions: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+  else
+    log_info "[dry-run] would start tmux sessions: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+  fi
 fi
 
 echo ""
@@ -1424,14 +1411,24 @@ echo "SONARR-URL = https://${HOSTNAME}/public-${USERNAME}/sonarr/"
 echo "PROWLARR-URL = https://${HOSTNAME}/public-${USERNAME}/prowlarr/"
 echo "SABNZBD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/"
 echo "SABNZBD-WIZARD-URL = https://${HOSTNAME}/public-${USERNAME}/sabnzbd/wizard/"
-echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
-echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+  echo "JELLYFIN-URL = https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+  echo "JELLYFIN-LOCAL-URL = http://127.0.0.1:${JELLYFIN_PORT}"
+else
+  echo "JELLYFIN-SKIPPED = install FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ under ~/.bin and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg"
+fi
 echo "PUBLIC-IP (do not expose ports): ${PUBLIC_IP}"
 
 echo ""
-echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
-echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Jellyfin=$HOME/.config/jellyfin | Cloudplow=$HOME/.config/cloudplow"
-echo "Tmux sessions running: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+  echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}, Jellyfin=${JELLYFIN_PORT}"
+  echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Jellyfin=$HOME/.config/jellyfin | Cloudplow=$HOME/.config/cloudplow"
+  echo "Tmux sessions running: jellyfin, sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+else
+  echo "Port summary: SABnzbd=${SABNZBD_PORT}, Radarr=${RADARR_PORT}, Sonarr=${SONARR_PORT}, Prowlarr=${PROWLARR_PORT}"
+  echo "Config dirs: SABnzbd=$HOME/.config/sabnzbd | Radarr=$HOME/.config/radarr | Sonarr=$HOME/.config/sonarr | Prowlarr=$HOME/.config/prowlarr | Cloudplow=$HOME/.config/cloudplow"
+  echo "Tmux sessions running: sonarr, radarr, prowlarr, sabnzbd, cloudplow"
+fi
 
 echo ""
 echo "To kill all applications use 'tmux kill-server'"
@@ -1454,9 +1451,14 @@ fi
 
 echo ""
 echo "================== SECURITY WARNING =================="
-echo "Jellyfin first-run requires creating an admin account."
-echo "Set a STRONG admin password immediately after opening:"
-echo "  https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+if [[ "$JELLYFIN_INSTALL_ENABLED" -eq 1 ]]; then
+  echo "Jellyfin first-run requires creating an admin account."
+  echo "Set a STRONG admin password immediately after opening:"
+  echo "  https://${HOSTNAME}/public-${USERNAME}/jellyfin/web/index.html"
+else
+  echo "Jellyfin was skipped because FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is not configured."
+  echo "Install user-local FFmpeg and rerun with --jellyfin-ffmpeg=$HOME/.bin/ffmpeg."
+fi
 echo "Services are bound to 127.0.0.1 via per-user lighttpd,"
 echo "but do NOT expose them publicly without authentication."
 echo "======================================================="

@@ -153,13 +153,27 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('dpkg --compare-versions "$version" ge "$JELLYFIN_MIN_FFMPEG_VERSION"', $this->script);
     }
 
-    public function testJellyfinFfmpegFallbackInstallsUserLocalStaticBuild(): void
+    public function testJellyfinFfmpegFallbackSkipsWithoutImplicitDownload(): void
     {
-        $this->assertStringContainsString('JELLYFIN_STATIC_FFMPEG_AMD64_URL=', $this->script);
-        $this->assertStringContainsString('install_jellyfin_static_ffmpeg_if_needed', $this->script);
-        $this->assertStringContainsString('cp "$ffmpeg_src" "$HOME/.bin/ffmpeg"', $this->script);
-        $this->assertStringContainsString('cp "$ffprobe_src" "$HOME/.bin/ffprobe"', $this->script);
-        $this->assertStringContainsString('${JELLYFIN_STATIC_FFMPEG_URL:-}', $this->script);
+        $this->assertStringContainsString('JELLYFIN_INSTALL_ENABLED=0', $this->script);
+        $this->assertStringContainsString('Skipping Jellyfin: FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+ is required', $this->script);
+        $this->assertStringContainsString('bash install-media-stack.sh --jellyfin-ffmpeg=$home_ffmpeg', $this->script);
+        $staticFfmpegPrefix = 'JELLYFIN_STATIC_'.'FFMPEG';
+        $this->assertTrue(
+            strpos($this->script, $staticFfmpegPrefix) === false,
+            'Installer must not auto-download third-party static FFmpeg builds'
+        );
+    }
+
+    public function testJellyfinFfmpegPreflightRunsBeforeDataLossPrompt(): void
+    {
+        $preflight = strpos($this->script, "esac\n\njellyfin_ffmpeg_configure_fallback");
+        $prompt = strpos($this->script, 'WARNING: %s exists and will be removed');
+
+        $this->assertTrue($preflight !== false, 'Jellyfin FFmpeg pre-flight call missing');
+        $this->assertTrue($prompt !== false, 'Jellyfin data-loss prompt missing');
+        $this->assertTrue($preflight < $prompt, 'FFmpeg pre-flight must run before Jellyfin config deletion prompt');
+        $this->assertStringContainsString('Leaving existing Jellyfin config untouched because this run will skip Jellyfin.', $this->script);
     }
 
     public function testLighttpdMediaStackFragmentPathExists(): void
@@ -247,7 +261,9 @@ class installMediaStackScriptTest extends TestCase
 
     public function testTmuxKillIsScopedToNamedSessions(): void
     {
-        $this->assertStringContainsString('for app in sabnzbd radarr prowlarr sonarr jellyfin cloudplow; do', $this->script);
+        $this->assertStringContainsString('apps_to_stop=(sabnzbd radarr prowlarr sonarr cloudplow)', $this->script);
+        $this->assertStringContainsString('apps_to_stop=(jellyfin "${apps_to_stop[@]}")', $this->script);
+        $this->assertStringContainsString('for app in "${apps_to_stop[@]}"; do', $this->script);
         $this->assertStringContainsString('tmux kill-session -t "${app}"', $this->script);
     }
 

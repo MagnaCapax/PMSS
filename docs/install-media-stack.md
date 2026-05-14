@@ -27,7 +27,7 @@ All apps bind to `127.0.0.1` and are reverse‑proxied by per‑user lighttpd to
 - Debian 11 (bullseye) and Debian 10 (buster): .NET 8 supported; Radarr GLIBC fallback:
   - If GLIBC < 2.33 on x64, Radarr is pinned to `v5.10.4.9218` linux‑core build to avoid sqlite/GLIBC loader errors. This matches observed errors like `GLIBC_2.33 not found`, `e_sqlite3.so missing` from newer Radarr builds.
 
-Note: Jellyfin requires FFmpeg 4.4+ for startup. The script uses distro ffmpeg when it meets that floor; on amd64/x64 hosts with an older or missing ffmpeg it installs a user-local static ffmpeg under `~/.bin` and stamps Jellyfin's `FFmpegPath`. Hardware-transcoding tuning remains an explicit, opt-in workflow; see `docs/hardware-transcoding.md`.
+Note: Jellyfin requires FFmpeg 4.4+ for startup. The script uses distro ffmpeg when it meets that floor, or an explicit `--jellyfin-ffmpeg` path when provided. On Debian 11 and other hosts with older or missing ffmpeg, Jellyfin is skipped with instructions to install a user-local static build under `~/.bin` and rerun with that flag. Hardware-transcoding tuning remains an explicit, opt-in workflow; see `docs/hardware-transcoding.md`.
 
 ## Prerequisites
 - `ss` (from iproute2), `curl` or `wget`, `tar`, `tmux`
@@ -40,7 +40,6 @@ Note: Jellyfin requires FFmpeg 4.4+ for startup. The script uses distro ffmpeg w
   - If GLIBC < 2.33 and x64: pin `https://github.com/Radarr/Radarr/releases/download/v5.10.4.9218/Radarr.master.5.10.4.9218.linux-core-x64.tar.gz`
 - Prowlarr: `https://prowlarr.servarr.com/v1/update/<branch>/updatefile?os=linux&runtime=netcore&arch=<arch>` (default branch: `master`)
 - Jellyfin: `https://repo.jellyfin.org/files/server/linux/latest-stable/<arch>/` (scraped for latest tarball), or explicit override
-- Jellyfin FFmpeg fallback: `https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz` when system ffmpeg is missing or below 4.4 on amd64/x64
 - SABnzbd: latest GitHub release `-src` asset
 
 Every URL may be overridden via CLI flags (below). The script verifies each URL in dry‑run/verify‑only mode.
@@ -123,8 +122,7 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - SABnzbd (venv + pip requirements)
 - Radarr, Prowlarr, Sonarr (download and extract into `~/.bin/<Name>`)
 - .NET 8 ASP.NET runtime (download to `~/.bin/dotnet`, exports PATH/DOTNET_ROOT in `~/.bashrc.custom` after system paths)
-- FFmpeg fallback (only when needed): if no usable FFmpeg 4.4+ is found and the host is amd64/x64, download static `ffmpeg` and `ffprobe` into `~/.bin`
-- Jellyfin (download/extract to `~/.bin/jellyfin`)
+- Jellyfin (download/extract to `~/.bin/jellyfin`) only when system ffmpeg is 4.4+ or `--jellyfin-ffmpeg=PATH` is supplied
 
 6) Configuration
 - Writes Servarr XML configs in `~/.config/<app>/config.xml` with randomized ports, localhost bind, and URL base `/public-<user>/<app>`.
@@ -163,11 +161,11 @@ Run `install-media-stack.sh --help` for the latest usage. Full options:
 - Check `~/.install-media-stack.log` for a full run transcript.
 - Use `--dry-run` to verify endpoint reachability and planned actions.
 - If Servarr apps fail to start on Debian 11 due to sqlite/GLIBC errors, confirm Radarr pinning occurred or pass `--radarr-version=v5.10.4.9218`.
-- If Jellyfin exits immediately with an FFmpeg validation error, verify `~/.config/jellyfin/config/system.xml` points to a usable FFmpeg 4.4+ binary. On amd64/x64 the installer should create `~/.bin/ffmpeg` automatically when the distro version is too old. Follow `docs/hardware-transcoding.md` for driver and acceleration troubleshooting.
+- If Jellyfin is skipped or exits immediately with an FFmpeg validation error, verify `~/.config/jellyfin/config/system.xml` points to a usable FFmpeg 4.4+ binary. On Debian 11, install a user-local static build under `~/.bin/ffmpeg` and rerun with `--jellyfin-ffmpeg=$HOME/.bin/ffmpeg`. Follow `docs/hardware-transcoding.md` for driver and acceleration troubleshooting.
 
 ## FFmpeg Options (Userland)
 
-Jellyfin depends on ffmpeg for startup and transcoding. On older distros, the packaged ffmpeg may be too old for Jellyfin 10.9+ or may lack codecs/hardware support you want. The installer handles the startup floor automatically on amd64/x64 by installing a user-local static build when no FFmpeg 4.4+ binary is available. You can also manage ffmpeg entirely in userspace without touching the system:
+Jellyfin depends on ffmpeg for startup and transcoding. On older distros, the packaged ffmpeg may be too old for Jellyfin 10.9+ or may lack codecs/hardware support you want. The installer does not download ffmpeg for you; install it explicitly in userspace and rerun with `--jellyfin-ffmpeg=PATH` when the distro package is below 4.4:
 
 - Static builds (recommended first):
   - BtbN FFmpeg-Builds: actively maintained, widely used. Download a `linux-64-gpl` archive and place `ffmpeg` under `~/.bin`.
@@ -177,7 +175,7 @@ Jellyfin depends on ffmpeg for startup and transcoding. On older distros, the pa
 Steps (example with BtbN):
 1) Ensure your user bin exists: `mkdir -p ~/.bin`
 2) Download and extract a static ffmpeg build to `~/.bin/ffmpeg` and `chmod +x ~/.bin/ffmpeg`.
-3) The installer appends `~/.bin` to your PATH in `~/.bashrc.custom` after system paths and writes Jellyfin's `FFmpegPath` when it chooses or receives an explicit user-local ffmpeg path. You can also set it in Jellyfin (Dashboard -> Playback) to `/home/<user>/.bin/ffmpeg`.
+3) The installer appends `~/.bin` to your PATH in `~/.bashrc.custom` after system paths and writes Jellyfin's `FFmpegPath` when it receives an explicit user-local ffmpeg path. You can also set it in Jellyfin (Dashboard -> Playback) to `/home/<user>/.bin/ffmpeg`.
 
 Hardware acceleration:
 - VAAPI/NVENC need matching user-accessible driver libraries. If you place libs under `~/.local/lib` or `~/.bin/lib`, export `LD_LIBRARY_PATH=$HOME/.local/lib:$HOME/.bin/lib:$LD_LIBRARY_PATH` before launching Jellyfin (the installer already sets DOTNET env; you can extend it in `~/.bashrc.custom`).
@@ -190,7 +188,7 @@ Compiling from source (advanced):
 
 Notes:
 - *ARR apps don’t require ffmpeg; only Jellyfin uses it.
-- The installer manages ffmpeg only to satisfy Jellyfin's startup floor on amd64/x64. Codec selection, GPU libraries, and hardware acceleration remain explicit user choices.
+- The installer does not manage ffmpeg binaries. Codec selection, GPU libraries, hardware acceleration, and static-binary updates remain explicit user choices.
 - You can pass `--jellyfin-ffmpeg=/home/<user>/.bin/ffmpeg` to stamp Jellyfin's FFmpeg path automatically in your user config and bypass fallback selection.
 
 ## Alternative: Docker Rootless (Not Recommended for Shared Hosting)
