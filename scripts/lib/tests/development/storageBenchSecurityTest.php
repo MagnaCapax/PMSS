@@ -13,6 +13,18 @@ class StorageBenchSecurityTest extends TestCase
         return $this->pmssRunStorageBenchmarkShowLast($path);
     }
 
+    private function assertBenchmarkInputGuard(array $arguments, string $expectedMessage): void
+    {
+        $run = $this->pmssRunRepoPhpScriptCommandWithTempStderr(
+            'scripts/util/storageBenchmark.php',
+            $arguments
+        );
+
+        $this->assertEquals(1, $run['result']['rc']);
+        $this->assertEquals('', $run['result']['output']);
+        $this->assertEquals($expectedMessage, (string) @file_get_contents($run['stderrPath']));
+    }
+
     public function testPathTraversalInJsonPathIsRead(): void
     {
         $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl'); @touch($log);
@@ -197,5 +209,53 @@ class StorageBenchSecurityTest extends TestCase
         $log = $this->pmssWriteStorageBenchmarkLog([['run_id'=>'nl','run_ts'=>date('c'),'label'=>$label,'test'=>'preflight-idle','ok'=>true]], 'pmss-bench-sec-');
         $out=$this->runShow($log);
         $this->assertStringContainsString('Storage benchmark (last run)', $out);
+    }
+
+    public function testInvalidFileSizeFailsBeforeBenchmarkWork(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--size=bogus'],
+            "Error: --size must be a positive size (examples: 1G, 512M, 1048576).\n"
+        );
+    }
+
+    public function testZeroFileSizeFailsBeforeBenchmarkWork(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--size=0'],
+            "Error: --size must be a positive size (examples: 1G, 512M, 1048576).\n"
+        );
+    }
+
+    public function testInvalidDeviceReadSizeFailsWhenDevicesEnabled(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--devices', '--dd-size=bad'],
+            "Error: --dd-size must be a positive size (examples: 1G, 512M, 1048576).\n"
+        );
+    }
+
+    public function testZeroDeviceReadSizeFailsWhenDevicesEnabled(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--devices', '--dd-size=0'],
+            "Error: --dd-size must be a positive size (examples: 1G, 512M, 1048576).\n"
+        );
+    }
+
+    public function testZeroRuntimeFailsBeforeBenchmarkWork(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--runtime=0'],
+            "Error: --runtime must be a positive integer.\n"
+        );
+    }
+
+    public function testZeroDeviceRuntimeFailsWhenDevicesEnabled(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--devices', '--device-runtime=0'],
+            "Error: --device-runtime must be a positive integer.\n"
+        );
     }
 }
