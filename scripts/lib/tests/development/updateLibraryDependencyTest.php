@@ -17,7 +17,7 @@ class UpdateLibraryDependencyTest extends TestCase
     public function testDirectLibraryConsumersKeepLeanIncludes(): void
     {
         foreach ([
-            ['scripts/util/configureOpenvpn.php', ["require_once __DIR__.'/../lib/logger.php';", "require_once __DIR__.'/../lib/update/runtime/commands.php';"], ["require_once __DIR__.'/../lib/update.php';"], 'configureOpenvpn.php should not pull scripts/lib/update.php just for runtime helpers'],
+            ['scripts/util/configureOpenvpn.php', ["require_once __DIR__.'/../lib/update/runtime/commands.php';"], ["require_once __DIR__.'/../lib/update.php';", "require_once __DIR__.'/../lib/logger.php';"], 'configureOpenvpn.php should rely on runtime/commands.php as its logging/runtime bootstrap'],
             ['scripts/util/setupLetsEncrypt.php', ["require_once __DIR__.'/../lib/update/distro.php';"], ["require_once __DIR__.'/../lib/update.php';"], 'setupLetsEncrypt.php should not pull scripts/lib/update.php just for distro detection'],
             ['scripts/util/userConfig.php', ["require_once __DIR__.'/../lib/rtorrentConfig.php';", "require_once __DIR__.'/../lib/update/runtime/commands.php';"], ["require_once __DIR__.'/../lib/update.php';"], 'userConfig.php should rely on direct subsystem requires'],
             ['scripts/util/userDocker.php', ["require_once __DIR__.'/../lib/user/userConfigStore.php';", 'pmssUserDockerEnabled($user, $userConfigStore)', 'pmssUserDockerMinRamMiB()'], ["function_exists('pmssUserDockerEnabled')", "function_exists('pmssUserDockerMinRamMiB')"], 'userDocker.php should rely on userConfigStore.php for Docker policy helpers'],

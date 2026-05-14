@@ -13,7 +13,6 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 // Shared runtime helpers are loaded directly above; package installation for
 // OpenVPN/EasyRSA remains owned by the central package phase.

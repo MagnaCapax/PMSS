@@ -11,7 +11,6 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 
 requireRoot();

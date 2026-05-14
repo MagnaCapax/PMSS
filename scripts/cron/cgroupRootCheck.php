@@ -13,7 +13,6 @@
 //  - applying changes
 // so the main flow reads as detect → decide → apply. Add dry-run toggle.
 
-require_once __DIR__.'/../lib/logger.php';
 require_once __DIR__.'/../lib/systemdSliceProperties.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
 
