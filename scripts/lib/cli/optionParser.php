@@ -8,6 +8,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
+require_once __DIR__.'/helpText.php';
 
 /**
  * Split argv tokens into associative options and positional arguments.

@@ -6,6 +6,7 @@
  * @author PMSS Team
  */
 require_once __DIR__.'/log.php';
+require_once dirname(__DIR__).'/cli/helpText.php';
 require_once dirname(__DIR__).'/resources.php';
 require_once dirname(__DIR__).'/userLifecycle.php';
 
@@ -47,17 +48,12 @@ function pmssShowResourcesMain(array $argv): int
     $options = getopt('', ['json', 'show-missing', 'user:', 'help']);
     if (isset($options['help'])) {
         $self = basename($_SERVER['SCRIPT_NAME'] ?? 'showResources.php');
-        echo <<<TEXT
-Usage: {$self} [--json] [--show-missing] [--user=<username>]
-
-Options:
-  --json          Emit JSON instead of human text output.
-  --show-missing  Print missing stats usernames (text mode only).
-  --user          Show only the named user.
-  --help          Show this help.
-
-TEXT;
-        echo PHP_EOL;
+        echo pmssCliHelpUsageOptions($self.' [--json] [--show-missing] [--user=<username>]', [
+            ['--json', 'Emit JSON instead of human text output.'],
+            ['--show-missing', 'Print missing stats usernames (text mode only).'],
+            ['--user', 'Show only the named user.'],
+            ['--help', 'Show this help.'],
+        ]);
         return 0;
     }
     $userFilter = trim((string) ($options['user'] ?? ''));

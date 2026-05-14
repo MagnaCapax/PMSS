@@ -642,17 +642,13 @@ function pmssStatsParseOptions(array $argv)
 
     if (pmssCliOption($parsed, 'help', 'h', false) !== false) {
         $self = basename($argv[0] ?? 'pmss-stats.php');
-        echo <<<TEXT
-Usage: {$self} [--full] [--json] [--mini] [--no-header]
-
-Options:
-  --full       Show extra cgroup counters and I/O details.
-  --json       Emit machine-readable JSON.
-  --mini       Show a compact four-line summary.
-  --no-header  Skip the title box.
-  --help       Show this help.
-
-TEXT;
+        echo pmssCliHelpUsageOptions($self.' [--full] [--json] [--mini] [--no-header]', [
+            ['--full', 'Show extra cgroup counters and I/O details.'],
+            ['--json', 'Emit machine-readable JSON.'],
+            ['--mini', 'Show a compact four-line summary.'],
+            ['--no-header', 'Skip the title box.'],
+            ['--help', 'Show this help.'],
+        ], 13);
         return false;
     }
 

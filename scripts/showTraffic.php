@@ -38,19 +38,15 @@ function pmssShowTrafficMain(array $argv): int
     }
     if ($helpExitCode !== null) {
         $self = basename(__FILE__);
-        echo <<<TXT
-Usage: {$self} [--json] [--show-missing] [--extended] [--sort=<mode>]
-
-Options:
-  --json          Emit JSON instead of human text output.
-  --show-missing  Print missing stats usernames (text mode only).
-  --extended      Show limit, percent, and rate units in text output.
-  --sort=<mode>   Sort output by name, month, pct, or rate (default: name).
-  --color         Force ANSI colors in extended text output.
-  --no-color      Disable ANSI colors in extended text output.
-  --help          Show this help.
-
-TXT;
+        echo pmssCliHelpUsageOptions($self.' [--json] [--show-missing] [--extended] [--sort=<mode>]', [
+            ['--json', 'Emit JSON instead of human text output.'],
+            ['--show-missing', 'Print missing stats usernames (text mode only).'],
+            ['--extended', 'Show limit, percent, and rate units in text output.'],
+            ['--sort=<mode>', 'Sort output by name, month, pct, or rate (default: name).'],
+            ['--color', 'Force ANSI colors in extended text output.'],
+            ['--no-color', 'Disable ANSI colors in extended text output.'],
+            ['--help', 'Show this help.'],
+        ]);
         return $helpExitCode;
     }
 

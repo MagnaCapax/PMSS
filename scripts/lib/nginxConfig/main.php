@@ -32,17 +32,14 @@ function pmssCreateNginxConfigChmodGlob(int $mode, string $pattern): void
 
 function pmssCreateNginxConfigMain(array $argv): int
 {
-    $usage = <<<TXT
-Usage:
-  /scripts/util/createNginxConfig.php [--user USERNAME] [--restart]
-  /scripts/util/createNginxConfig.php USERNAME [--restart]
-
-Options:
-  --user, -u USERNAME  Only regenerate nginx config for USERNAME (keeps other user configs intact)
-  --restart, -r        Restart nginx after writing configs (only if config test passes)
-  --help, -h           Show this help
-
-TXT;
+    $usage = pmssCliHelpUsageOptions([
+        '/scripts/util/createNginxConfig.php [--user USERNAME] [--restart]',
+        '/scripts/util/createNginxConfig.php USERNAME [--restart]',
+    ], [
+        ['--user, -u USERNAME', 'Only regenerate nginx config for USERNAME (keeps other user configs intact)'],
+        ['--restart, -r', 'Restart nginx after writing configs (only if config test passes)'],
+        ['--help, -h', 'Show this help'],
+    ], 21);
 
     $parsed = pmssParseCliTokens($argv);
     if (pmssCliOption($parsed, 'help', 'h', false) !== false) {

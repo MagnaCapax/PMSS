@@ -58,3 +58,22 @@ function pmssCliHelpLine(string $label, string $description, int $width = 40): s
 {
     return '  '.str_pad($label, $width).$description;
 }
+
+/**
+ * Render the common Usage + Options block used by small CLI tools.
+ * @param string|array<int,string>            $usage
+ * @param array<int,array{0:string,1:string}> $options
+ * @param array<int,string>                   $notes
+ */
+function pmssCliHelpUsageOptions($usage, array $options, int $width = 16, array $notes = [], bool $trailingBlank = true): string
+{
+    $lines = is_array($usage) ? array_merge(['Usage:'], array_map(static function (string $line): string { return '  '.$line; }, $usage)) : ['Usage: '.$usage];
+    array_push($lines, '', 'Options:');
+    foreach ($options as $option) $lines[] = pmssCliHelpLine($option[0], $option[1], $width);
+    if ($notes !== []) {
+        array_push($lines, '', 'Notes:');
+        foreach ($notes as $note) $lines[] = '  - '.$note;
+    }
+    if ($trailingBlank) $lines[] = '';
+    return implode("\n", $lines)."\n";
+}
