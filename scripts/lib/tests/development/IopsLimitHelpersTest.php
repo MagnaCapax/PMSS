@@ -52,6 +52,38 @@ class IopsLimitHelpersTest extends TestCase
         $this->assertSame(2000, \pmssReadUserMonthlyIopsUsage($path));
     }
 
+    public function testTargetModePersistenceWritesRuntimeAndHomeFiles(): void
+    {
+        $root = $this->pmssMakeTempDir('pmss-iops-targets-');
+        $runtimeRoot = $root.'/runtime';
+        $homeRoot = $root.'/home';
+        @mkdir($homeRoot.'/alice', 0755, true);
+
+        $targets = \pmssIopsLimitTargetModes('alice', $homeRoot, $runtimeRoot);
+        $error = null;
+
+        $this->assertTrue(\pmssIopsLimitPrepareTargetModes($targets));
+        $this->assertTrue(\pmssIopsLimitPersistTargetModes($targets, 777, $error));
+        $this->assertSame(null, $error);
+        $this->assertSame('777', trim((string) file_get_contents($runtimeRoot.'/iopsLimits/alice')));
+        $this->assertSame('777', trim((string) file_get_contents($homeRoot.'/alice/.iopsLimit')));
+        $this->assertSame(0600, fileperms($runtimeRoot.'/iopsLimits/alice') & 0777);
+        $this->assertSame(0664, fileperms($homeRoot.'/alice/.iopsLimit') & 0777);
+    }
+
+    public function testIopsHelpersUseCanonicalRequireOnceDeclarations(): void
+    {
+        $guardNeedle = "if (!function_exists('pmss"."IopsLimit";
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'scripts/lib/user/iopsLimit.php',
+            [$guardNeedle]
+        );
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'scripts/lib/user/iopsLimitEnforcer.php',
+            [$guardNeedle]
+        );
+    }
+
     public function testBuildsThrottleCommandAgainstHomeDevice(): void
     {
         $command = \pmssIopsLimitBuildThrottleCommand('alice', 100);
