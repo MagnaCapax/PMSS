@@ -91,6 +91,9 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame(4831838208, $status['memory_high']);
         $this->assertSame(5368709120, $status['memory_max']);
         $this->assertSame(17, $status['throttle_events']);
+        $this->assertSame(0, $status['max_events']);
+        $this->assertSame(0, $status['oom_events']);
+        $this->assertSame(0, $status['oom_kill_events']);
         $this->assertSame('MEDIUM', $status['status']);
         $this->assertStringContainsString('4.0 GiB / 5.0 GiB', $status['usage_text']);
     }
@@ -109,5 +112,38 @@ class WebCgroupMemoryStatusTest extends TestCase
         $this->assertSame('memory.high', $status['limit_source']);
         $this->assertSame(3221225472, $status['limit_bytes']);
         $this->assertStringContainsString('2.0 GiB / 3.0 GiB', $status['usage_text']);
+    }
+
+    public function testThrottleMessageUsesReducedSpeedCopyWithoutOomLanguage(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-web-cgroup-');
+        file_put_contents($dir.'/memory.current', "2147483648\n");
+        file_put_contents($dir.'/memory.high', "1073741824\n");
+        file_put_contents($dir.'/memory.max', "3221225472\n");
+        file_put_contents($dir.'/memory.events', "high 4\nmax 0\noom 0\noom_kill 0\n");
+        file_put_contents($dir.'/memory.pressure', "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+
+        $status = \pmssWebCgroupMemoryStatusRead(['cgroup_dir' => $dir]);
+
+        $this->assertSame('THROTTLED', $status['status']);
+        $this->assertSame('#d2691e', $status['status_color']);
+        $this->assertStringContainsString('reduced speed', $status['message']);
+        $this->assertStringContainsString('upgrading your plan', $status['message']);
+        $this->pmssAssertStringNotContainsString('killed', $status['message']);
+        $this->pmssAssertStringNotContainsString('OOM', $status['message']);
+    }
+
+    public function testWelcomePageSplitsThrottleAndOomWarningCopy(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
+
+        $this->assertStringContainsString('RAM THROTTLE ACTIVE', $source);
+        $this->assertStringContainsString('RAM LIMIT EXCEEDED', $source);
+        $this->assertStringContainsString('$isThrottleActive', $source);
+        $this->assertStringContainsString('$hasOomEvents', $source);
+        $this->assertTrue(
+            strpos($source, 'RAM THROTTLE ACTIVE') < strpos($source, 'RAM LIMIT EXCEEDED'),
+            'Throttle copy must be selected before the hard-limit/OOM warning copy.'
+        );
     }
 }

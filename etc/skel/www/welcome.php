@@ -973,6 +973,22 @@ EOF;
         $warningPercent = 0;
     }
 
+    $pressureStatus = null;
+    if (function_exists('pmssWebCgroupMemoryStatusRead')) {
+        $readPressureStatus = pmssWebCgroupMemoryStatusRead();
+        if (!empty($readPressureStatus['available'])) {
+            $pressureStatus = $readPressureStatus;
+        }
+    }
+
+    $hasOomEvents = is_array($pressureStatus)
+        && ((int) ($pressureStatus['max_events'] ?? 0) > 0
+            || (int) ($pressureStatus['oom_events'] ?? 0) > 0
+            || (int) ($pressureStatus['oom_kill_events'] ?? 0) > 0);
+    $isThrottleActive = is_array($pressureStatus)
+        && (string) ($pressureStatus['status'] ?? '') === 'THROTTLED'
+        && !$hasOomEvents;
+
     if ($processBytes !== null && $cacheBytes !== null) {
         $usedBytes = max($processBytes + $cacheBytes, $currentBytes !== null ? $currentBytes : 0);
         $usedPercent = round(($usedBytes / $limitBytes) * 100, 1);
@@ -1005,7 +1021,9 @@ EOF;
         $gauge = createGauge($titleText, $titleText, $percent);
     }
 
-    if ($warningPercent > 100) {
+    if ($isThrottleActive) {
+        $warning = '<br /><b style="color: #d2691e;">RAM THROTTLE ACTIVE</b><br />Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.<br />';
+    } elseif ($warningPercent > 100) {
         $warning = '<br /><b style="color: red;">RAM LIMIT EXCEEDED</b><br />Processes may be killed (OOM) until memory usage drops.<br />';
     } elseif ($warningPercent >= 80) {
         $warning = '<br /><b style="color: #d2691e;">RAM WARNING</b><br />You are close to your RAM limit. Consider reducing running services or upgrading your plan.<br />';
@@ -1014,19 +1032,16 @@ EOF;
     }
 
     $pressureIndicator = '';
-    if (function_exists('pmssWebCgroupMemoryStatusRead')) {
-        $pressureStatus = pmssWebCgroupMemoryStatusRead();
-        if (!empty($pressureStatus['available'])) {
-            $pressureParts = array(
-                '<br /><b>Memory pressure:</b> <span style="color: '.$pressureStatus['status_color'].';">&#9679; '.htmlspecialchars($pressureStatus['status'], ENT_QUOTES, 'UTF-8').'</span>',
-                '<br />Throttle events: '.number_format((int) $pressureStatus['throttle_events']),
-            );
-            if ($pressureStatus['message'] !== '') {
-                $pressureParts[] = '<br /><b style="color: '.$pressureStatus['status_color'].';">'.htmlspecialchars($pressureStatus['message'], ENT_QUOTES, 'UTF-8').'</b>';
-            }
-
-            $pressureIndicator = implode('', $pressureParts).'<br />';
+    if (is_array($pressureStatus)) {
+        $pressureParts = array(
+            '<br /><b>Memory pressure:</b> <span style="color: '.$pressureStatus['status_color'].';">&#9679; '.htmlspecialchars($pressureStatus['status'], ENT_QUOTES, 'UTF-8').'</span>',
+            '<br />Throttle events: '.number_format((int) $pressureStatus['throttle_events']),
+        );
+        if ($pressureStatus['message'] !== '') {
+            $pressureParts[] = '<br /><b style="color: '.$pressureStatus['status_color'].';">'.htmlspecialchars($pressureStatus['message'], ENT_QUOTES, 'UTF-8').'</b>';
         }
+
+        $pressureIndicator = implode('', $pressureParts).'<br />';
     }
 
     return <<<EOF

@@ -129,6 +129,10 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
     $memoryCurrent = ctype_digit($memoryCurrentRaw) ? (int) $memoryCurrentRaw : null;
     $memoryHigh = ctype_digit($memoryHighRaw) ? (int) $memoryHighRaw : null;
     $memoryMax = ctype_digit($memoryMaxRaw) ? (int) $memoryMaxRaw : null;
+    $throttleEvents = isset($events['high']) && ctype_digit((string) $events['high']) ? (int) $events['high'] : 0;
+    $maxEvents = isset($events['max']) && ctype_digit((string) $events['max']) ? (int) $events['max'] : 0;
+    $oomEvents = isset($events['oom']) && ctype_digit((string) $events['oom']) ? (int) $events['oom'] : 0;
+    $oomKillEvents = isset($events['oom_kill']) && ctype_digit((string) $events['oom_kill']) ? (int) $events['oom_kill'] : 0;
     $limitBytes = $memoryMax !== null ? $memoryMax : $memoryHigh;
     $usagePercent = ($memoryCurrent !== null && $limitBytes !== null && $limitBytes > 0)
         ? round(($memoryCurrent / $limitBytes) * 100, 1)
@@ -143,7 +147,7 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
         'high_percent' => $highPercent,
         'pressure_some_avg10' => isset($pressure['some']) && preg_match('/avg10=([0-9.]+)/', $pressure['some'], $matches) === 1 ? (float) $matches[1] : null,
         'pressure_full_avg10' => isset($pressure['full']) && preg_match('/avg10=([0-9.]+)/', $pressure['full'], $matches) === 1 ? (float) $matches[1] : null,
-        'throttle_events' => isset($events['high']) && ctype_digit((string) $events['high']) ? (int) $events['high'] : 0,
+        'throttle_events' => $throttleEvents,
     ]);
 
     return [
@@ -158,11 +162,14 @@ function pmssWebCgroupMemoryStatusRead(array $overrides = [])
         'high_percent' => $highPercent,
         'pressure_some_avg10' => isset($pressure['some']) && preg_match('/avg10=([0-9.]+)/', $pressure['some'], $matches) === 1 ? (float) $matches[1] : null,
         'pressure_full_avg10' => isset($pressure['full']) && preg_match('/avg10=([0-9.]+)/', $pressure['full'], $matches) === 1 ? (float) $matches[1] : null,
-        'throttle_events' => isset($events['high']) && ctype_digit((string) $events['high']) ? (int) $events['high'] : 0,
+        'throttle_events' => $throttleEvents,
+        'max_events' => $maxEvents,
+        'oom_events' => $oomEvents,
+        'oom_kill_events' => $oomKillEvents,
         'status' => $status,
-        'status_color' => ['LOW' => '#81c784', 'MEDIUM' => '#ffb74d', 'HIGH' => '#ef5350', 'THROTTLED' => '#d32f2f'][$status] ?? '#b0bec5',
+        'status_color' => ['LOW' => '#81c784', 'MEDIUM' => '#ffb74d', 'HIGH' => '#ef5350', 'THROTTLED' => '#d2691e'][$status] ?? '#b0bec5',
         'message' => $status === 'THROTTLED'
-            ? 'Your services are being slowed due to memory pressure. Reduce active downloads or disk cache settings.'
+            ? 'Your service is running at reduced speed due to memory pressure. Reducing active tasks or upgrading your plan will restore full speed.'
             : ($status === 'HIGH' ? 'Memory usage is close to the account limit.' : ''),
         'usage_text' => ($memoryCurrent !== null ? pmssWebCgroupMemoryStatusFormatBytes($memoryCurrent) : 'n/a')
             .' / '.($limitBytes !== null ? pmssWebCgroupMemoryStatusFormatBytes($limitBytes) : 'n/a')
