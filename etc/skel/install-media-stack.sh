@@ -270,6 +270,115 @@ extract_tgz(){
   echo "Installation files downloaded and extracted"
 }
 
+jellyfin_ffmpeg_binary_version() {
+  local binary="$1"
+  [[ -x "$binary" ]] || return 1
+  "$binary" -version 2>/dev/null | awk 'NR == 1 {print $3; exit}'
+}
+
+jellyfin_ffmpeg_version_usable() {
+  local version="$1"
+  [[ "$version" =~ ^[0-9] ]] || return 1
+  dpkg --compare-versions "$version" ge "$JELLYFIN_MIN_FFMPEG_VERSION"
+}
+
+jellyfin_ffmpeg_configure_fallback() {
+  local home_ffmpeg="$HOME/.bin/ffmpeg"
+  local system_ffmpeg=""
+  local version=""
+
+  if [[ -n "$OVR_JELLYFIN_FFMPEG" ]]; then
+    log_info "Using explicit Jellyfin FFmpeg path: $OVR_JELLYFIN_FFMPEG"
+    return 0
+  fi
+
+  if [[ -x "$home_ffmpeg" ]]; then
+    version=$(jellyfin_ffmpeg_binary_version "$home_ffmpeg" || true)
+    if jellyfin_ffmpeg_version_usable "$version"; then
+      OVR_JELLYFIN_FFMPEG="$home_ffmpeg"
+      log_info "Using existing user FFmpeg ${version} at $home_ffmpeg"
+      return 0
+    fi
+    log_warn "Existing $home_ffmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
+  fi
+
+  if command -v ffmpeg >/dev/null 2>&1; then
+    system_ffmpeg=$(command -v ffmpeg)
+    version=$(jellyfin_ffmpeg_binary_version "$system_ffmpeg" || true)
+    if jellyfin_ffmpeg_version_usable "$version"; then
+      log_info "System FFmpeg ${version} satisfies Jellyfin startup requirement"
+      return 0
+    fi
+    log_warn "System FFmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
+  else
+    log_warn "System ffmpeg not found; Jellyfin requires FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION}+"
+  fi
+
+  if [[ "$SERVARR_ARCH" == "x64" ]]; then
+    JELLYFIN_STATIC_FFMPEG_URL="$JELLYFIN_STATIC_FFMPEG_AMD64_URL"
+    OVR_JELLYFIN_FFMPEG="$home_ffmpeg"
+    log_warn "Will install user-local static FFmpeg for Jellyfin at $home_ffmpeg"
+  else
+    log_warn "Automatic static FFmpeg fallback is only available on amd64/x64; pass --jellyfin-ffmpeg=PATH for this architecture"
+  fi
+}
+
+install_jellyfin_static_ffmpeg_if_needed() {
+  local archive="$HOME/.bin/jellyfin-ffmpeg-static.tar.xz"
+  local extract_dir="$HOME/.bin/.jellyfin-ffmpeg-static.$$"
+  local ffmpeg_src=""
+  local ffprobe_src=""
+  local version=""
+
+  [[ -n "$JELLYFIN_STATIC_FFMPEG_URL" ]] || return 0
+
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log_info "[dry-run] would install static FFmpeg from $JELLYFIN_STATIC_FFMPEG_URL to $HOME/.bin/ffmpeg"
+    fetch "$JELLYFIN_STATIC_FFMPEG_URL" "$archive"
+    return
+  fi
+
+  mkdir -p "$HOME/.bin" "$extract_dir"
+  if ! fetch "$JELLYFIN_STATIC_FFMPEG_URL" "$archive"; then
+    log_err "Failed to download static FFmpeg for Jellyfin"
+    rm -rf "$extract_dir" "$archive"
+    exit 1
+  fi
+  if ! verify_checksum "$archive" "$(basename "${JELLYFIN_STATIC_FFMPEG_URL%%\?*}")"; then
+    log_err "Static FFmpeg download failed integrity check — aborting"
+    rm -rf "$extract_dir" "$archive"
+    exit 1
+  fi
+  if ! tar -xaf "$archive" -C "$extract_dir" >/dev/null 2>&1; then
+    log_err "Failed to extract static FFmpeg archive; xz support may be missing"
+    rm -rf "$extract_dir" "$archive"
+    exit 1
+  fi
+
+  ffmpeg_src=$(printf '%s\n' "$extract_dir"/*/ffmpeg | head -n 1)
+  ffprobe_src=$(printf '%s\n' "$extract_dir"/*/ffprobe | head -n 1)
+  if [[ ! -f "$ffmpeg_src" ]]; then
+    log_err "Static FFmpeg archive did not contain an ffmpeg binary"
+    rm -rf "$extract_dir" "$archive"
+    exit 1
+  fi
+
+  cp "$ffmpeg_src" "$HOME/.bin/ffmpeg"
+  chmod 0750 "$HOME/.bin/ffmpeg"
+  if [[ -f "$ffprobe_src" ]]; then
+    cp "$ffprobe_src" "$HOME/.bin/ffprobe"
+    chmod 0750 "$HOME/.bin/ffprobe"
+  fi
+
+  rm -rf "$extract_dir" "$archive"
+  version=$(jellyfin_ffmpeg_binary_version "$HOME/.bin/ffmpeg" || true)
+  if ! jellyfin_ffmpeg_version_usable "$version"; then
+    log_err "Installed static FFmpeg is below Jellyfin FFmpeg ${JELLYFIN_MIN_FFMPEG_VERSION} requirement (${version:-unknown})"
+    exit 1
+  fi
+  log_ok "Installed static FFmpeg ${version} for Jellyfin"
+}
+
 managed_install_path_reset() {
   local path="$1"
   if [[ $DRY_RUN -eq 1 ]]; then
@@ -474,6 +583,9 @@ DOTNET_ROOT_PATH="$HOME/.bin/dotnet"
 JELLYFIN_CONFIG_DIR="$HOME/.config/jellyfin/config"
 JELLYFIN_DATA_DIR="$HOME/.config/jellyfin/data"
 JELLYFIN_LOG_DIR="$HOME/.config/jellyfin/log"
+JELLYFIN_MIN_FFMPEG_VERSION="4.4"
+JELLYFIN_STATIC_FFMPEG_AMD64_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+JELLYFIN_STATIC_FFMPEG_URL=""
 # Determine public IP from default route (no external HTTP request needed)
 PUBLIC_IP=$(ip -4 route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "unavailable")
 
@@ -608,11 +720,12 @@ ASPDOTNET_URL="https://aka.ms/dotnet/8.0/aspnetcore-runtime-linux-${DOTNET_ARCH}
 log_info "SABnzbd: ${SABNZBD_VERSION:-unknown}"
 log_info "Jellyfin: ${JF_FILENAME}"
 log_info "ASP.NET: .NET 8 LTS (${DOTNET_ARCH})"
+jellyfin_ffmpeg_configure_fallback
 
 # If verify-only, check URLs and exit
 if [[ $VERIFY_ONLY -eq 1 ]]; then
   log_step "Verifying URLs..."
-  urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}")
+  urls_to_check=("${SABNZBD_URL:-}" "${JELLYFIN_URL:-}" "${ASPDOTNET_URL:-}" "${JELLYFIN_STATIC_FFMPEG_URL:-}")
   all_ok=true
   for url in "${urls_to_check[@]}"; do
     if [[ -n "$url" ]]; then
@@ -966,6 +1079,8 @@ esac
 export PATH' 'PMSS media stack installer'
 chmod 0640 "$HOME/.bashrc.custom" 2>/dev/null || true
 echo ""
+
+install_jellyfin_static_ffmpeg_if_needed
 
 # Install Jellyfin (URL, extract, no chmod)
 app="jellyfin"

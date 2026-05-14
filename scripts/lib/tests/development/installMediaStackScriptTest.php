@@ -145,6 +145,23 @@ class installMediaStackScriptTest extends TestCase
         $this->assertStringContainsString('127.0.0.1:', $this->script);
     }
 
+    public function testJellyfinFfmpegFallbackUsesExistingOverridePath(): void
+    {
+        $this->assertStringContainsString('JELLYFIN_MIN_FFMPEG_VERSION="4.4"', $this->script);
+        $this->assertStringContainsString('jellyfin_ffmpeg_configure_fallback', $this->script);
+        $this->assertStringContainsString('OVR_JELLYFIN_FFMPEG="$home_ffmpeg"', $this->script);
+        $this->assertStringContainsString('dpkg --compare-versions "$version" ge "$JELLYFIN_MIN_FFMPEG_VERSION"', $this->script);
+    }
+
+    public function testJellyfinFfmpegFallbackInstallsUserLocalStaticBuild(): void
+    {
+        $this->assertStringContainsString('JELLYFIN_STATIC_FFMPEG_AMD64_URL=', $this->script);
+        $this->assertStringContainsString('install_jellyfin_static_ffmpeg_if_needed', $this->script);
+        $this->assertStringContainsString('cp "$ffmpeg_src" "$HOME/.bin/ffmpeg"', $this->script);
+        $this->assertStringContainsString('cp "$ffprobe_src" "$HOME/.bin/ffprobe"', $this->script);
+        $this->assertStringContainsString('${JELLYFIN_STATIC_FFMPEG_URL:-}', $this->script);
+    }
+
     public function testLighttpdMediaStackFragmentPathExists(): void
     {
         $this->assertStringContainsString('/.lighttpd/custom.d/media-stack.conf', $this->script);
