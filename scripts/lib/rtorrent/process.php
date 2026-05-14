@@ -10,6 +10,7 @@
  * @license   Proprietary
  */
 
+require_once __DIR__.'/../pathSafety.php';
 require_once __DIR__.'/../runtime.php';
 
 // Signal constants for systems without pcntl.
@@ -242,35 +243,7 @@ function rtorrentProcessKillPids(array $pids, int $signal): void
  */
 function rtorrentProcessStateFilePathIsSafe(string $stateFile): bool
 {
-    $stateFile = rtrim($stateFile, '/');
-    if ($stateFile === '' || $stateFile[0] !== '/' || strpos($stateFile, "\0") !== false) {
-        return false;
-    }
-
-    $segments = explode('/', ltrim($stateFile, '/'));
-    $current = '';
-    $lastIndex = count($segments) - 1;
-    foreach ($segments as $index => $segment) {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
-
-        $current .= '/'.$segment;
-        if (is_link($current)) {
-            return false;
-        }
-
-        $isLeaf = $index === $lastIndex;
-        if (!$isLeaf && file_exists($current) && !is_dir($current)) {
-            return false;
-        }
-        if ($isLeaf && file_exists($current) && !is_file($current)) {
-            return false;
-        }
-    }
-
-    $parent = dirname($stateFile);
-    return is_dir($parent) && !is_link($parent);
+    return pmssPathTargetIsSafe($stateFile, false, true, false);
 }
 
 /**

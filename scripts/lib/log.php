@@ -10,6 +10,8 @@
  * @author PMSS Team
  */
 
+require_once __DIR__.'/pathSafety.php';
+
 if (!function_exists('logmsg')) {
     /** Historical logging function retained for backwards compatibility. */
     function logmsg(string $message): void
@@ -67,35 +69,7 @@ function pmssLogWritePathIsSafe(string $path): bool
 /** Reject traversal and symlinked ancestor components before writing logs. */
 function pmssLogWritePathSegmentsAreSafe(string $path): bool
 {
-    $path = rtrim($path, '/');
-    if ($path === '') {
-        return false;
-    }
-
-    $absolute = $path[0] === '/';
-    $segments = explode('/', ltrim($path, '/'));
-    $current = '';
-    $lastIndex = count($segments) - 1;
-    foreach ($segments as $index => $segment) {
-        if ($segment === '') {
-            continue;
-        }
-        if ($segment === '.' || $segment === '..') {
-            return false;
-        }
-
-        $current = $current === ''
-            ? ($absolute ? '/'.$segment : $segment)
-            : $current.'/'.$segment;
-        if (is_link($current)) {
-            return false;
-        }
-        if ($index < $lastIndex && file_exists($current) && !is_dir($current)) {
-            return false;
-        }
-    }
-
-    return true;
+    return pmssPathSegmentsAreSafe($path, true);
 }
 
 /** Append one payload to a JSON Lines file. */

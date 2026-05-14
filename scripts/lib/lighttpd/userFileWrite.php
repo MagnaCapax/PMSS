@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/../pathSafety.php';
+
 function pmssUserFilePathIsSafe(string $path): bool
 {
     return pmssPathTargetIsSafe($path, false, true);
@@ -37,53 +39,6 @@ function pmssPathWithinRootIsSafe(string $path, string $rootPath, bool $director
     }
 
     return $resolvedPath === $resolvedRoot || strpos($resolvedPath, $resolvedRoot.'/') === 0;
-}
-
-/**
- * Validate a filesystem target and reject symlinked path segments.
- */
-function pmssPathTargetIsSafe(string $path, bool $directoryTarget, bool $requireParentDirectory = false): bool
-{
-    $path = rtrim($path, '/');
-    if ($path === '' || $path[0] !== '/' || strpos($path, "\0") !== false) {
-        return false;
-    }
-
-    $segments = explode('/', ltrim($path, '/'));
-    $current = '';
-    $lastIndex = count($segments) - 1;
-    foreach ($segments as $index => $segment) {
-        if ($segment === '') {
-            continue;
-        }
-
-        // Reject dot segments so callers cannot escape intended roots via traversal.
-        if ($segment === '.' || $segment === '..') {
-            return false;
-        }
-
-        $current .= '/'.$segment;
-        if (is_link($current)) {
-            return false;
-        }
-
-        $isLeaf = $index === $lastIndex;
-        if (!$isLeaf && file_exists($current) && !is_dir($current)) {
-            return false;
-        }
-        if ($isLeaf && file_exists($current) && ($directoryTarget ? !is_dir($current) : !is_file($current))) {
-            return false;
-        }
-    }
-
-    if ($requireParentDirectory) {
-        $directory = dirname($path);
-        if (!is_dir($directory) || is_link($directory)) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 /**
