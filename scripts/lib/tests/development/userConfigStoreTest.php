@@ -229,13 +229,11 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserDockerEnabledRespectsFalse(): void
     {
         $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
+        $payload = $this->basePayload([
             'ramMiB'        => 512,
             'rtorrentPort'  => 5100,
-            'quota'         => 50,
-            'quotaBurst'    => 62,
             'dockerEnabled' => false,
-        ];
+        ]);
         $this->assertTrue($store->set('dockno', $payload));
         $this->assertEquals(false, \pmssUserDockerEnabled('dockno', $store));
     }
@@ -243,13 +241,11 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserDockerEnabledUsesRuntimeRamFloor(): void
     {
         $store = new UserConfigStoreRuntimeStub(200, $this->configDirPath());
-        $payload = [
+        $payload = $this->basePayload([
             'ramMiB'        => 512,
             'rtorrentPort'  => 5101,
-            'quota'         => 50,
-            'quotaBurst'    => 62,
             'dockerEnabled' => true,
-        ];
+        ]);
         $this->assertTrue($store->set('dockruntime', $payload));
         $this->assertEquals(false, \pmssUserDockerEnabled('dockruntime', $store));
     }
@@ -257,13 +253,11 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserDockerEnabledAllowsRuntimeRamAtFloor(): void
     {
         $store = new UserConfigStoreRuntimeStub(245, $this->configDirPath());
-        $payload = [
+        $payload = $this->basePayload([
             'ramMiB'        => 512,
             'rtorrentPort'  => 5102,
-            'quota'         => 50,
-            'quotaBurst'    => 62,
             'dockerEnabled' => true,
-        ];
+        ]);
         $this->assertTrue($store->set('dockok', $payload));
         $this->assertEquals(true, \pmssUserDockerEnabled('dockok', $store));
     }
@@ -283,13 +277,9 @@ class UserConfigStoreTest extends TestCase
     public function testPmssUserLighttpdEnabledRespectsFalse(): void
     {
         $store = new \UserConfigStore($this->configDirPath());
-        $payload = [
-            'ramMiB' => 512,
-            'rtorrentPort' => 5103,
-            'quota' => 50,
-            'quotaBurst' => 62,
+        $payload = $this->basePayload([
             'lighttpdEnabled' => false,
-        ];
+        ]);
         $this->assertTrue($store->set('lightno', $payload));
         $this->assertEquals(false, \pmssUserLighttpdEnabled('lightno', $store));
     }
@@ -303,12 +293,9 @@ class UserConfigStoreTest extends TestCase
     public function testUsernameNormalizationStaysConsistentAcrossStoreOperations(): void
     {
         $store = $this->newStore();
-        $payload = [
+        $payload = $this->basePayload([
             'ramMiB' => 256,
-            'rtorrentPort' => 5000,
-            'quota' => 10,
-            'quotaBurst' => 12,
-        ];
+        ]);
 
         $this->assertTrue($store->set(' Alice ', $payload));
         $this->assertTrue(is_array($store->get('ALICE')));
@@ -363,8 +350,7 @@ class UserConfigStoreTest extends TestCase
     public function testRemoveDeletesFile(): void
     {
         $store = $this->newStore();
-        $payload = $this->basePayload(['quota' => 10, 'quotaBurst' => 12]);
-        $this->assertTrue($store->set('erin', $payload));
+        $this->assertTrue($store->set('erin', $this->basePayload()));
         $userFile = $this->configDirPath().'/users/erin.json';
         $this->assertTrue(is_file($userFile));
         $this->assertTrue($store->remove('erin'));
@@ -374,7 +360,7 @@ class UserConfigStoreTest extends TestCase
     public function testLoadAllReturnsSortedByUsername(): void
     {
         $store = $this->newStore();
-        $payload = $this->basePayload(['quota' => 10, 'quotaBurst' => 12]);
+        $payload = $this->basePayload();
         $this->assertTrue($store->set('bob', $payload));
         $this->assertTrue($store->set('alice', $payload));
         $all = $store->loadAll();

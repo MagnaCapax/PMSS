@@ -25,11 +25,13 @@ class cgroupPolicyRefreshTest extends TestCase
         ]);
 
         $this->assertTrue(is_string($command));
-        $this->assertStringContainsString("'/scripts/util/userConfigCgroup.php' 'alice' '--apply' '--memory-high=1024'", $command);
-        $this->assertStringContainsString("'--cpu-weight=200'", $command);
-        $this->assertStringContainsString("'--io-latency-ms=50'", $command);
-        $this->assertStringContainsString("'--io-cost-qos=enable=1 ctrl=user'", $command);
-        $this->assertStringContainsString("'--io-cost-model=ctrl=user model=linear'", $command);
+        $this->assertStringContainsAllStrings([
+            "'/scripts/util/userConfigCgroup.php' 'alice' '--apply' '--memory-high=1024'",
+            "'--cpu-weight=200'",
+            "'--io-latency-ms=50'",
+            "'--io-cost-qos=enable=1 ctrl=user'",
+            "'--io-cost-model=ctrl=user model=linear'",
+        ], $command);
     }
 
     public function testBuildCommandReturnsNullWithoutMemoryBaseline(): void
@@ -52,4 +54,3 @@ class cgroupPolicyRefreshTest extends TestCase
         );
     }
 }
-

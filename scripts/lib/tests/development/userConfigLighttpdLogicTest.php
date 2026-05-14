@@ -204,16 +204,20 @@ LIGHTTPD;
     {
         $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
 
-        $this->assertStringContainsString("preg_match('/^memory_limit\\s*=.*$/m', \$phpIniContent)", $src);
-        $this->assertStringContainsString('pmssAtomicWriteFile($phpIniPath, $phpIniContent);', $src);
+        $this->assertStringContainsAllStrings([
+            "preg_match('/^memory_limit\\s*=.*$/m', \$phpIniContent)",
+            'pmssAtomicWriteFile($phpIniPath, $phpIniContent);',
+        ], $src);
     }
 
     public function testUserConfigApplyOwnsPhpIniUploadTmpDirUpdate(): void
     {
         $src = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
 
-        $this->assertStringContainsString("preg_match('/^\\s*;?\\s*upload_tmp_dir\\s*=.*$/m', \$phpIniContent)", $src);
-        $this->assertStringContainsString("'upload_tmp_dir = /home/'.\$thisUser.'/.lighttpd/upload'", $src);
+        $this->assertStringContainsAllStrings([
+            "preg_match('/^\\s*;?\\s*upload_tmp_dir\\s*=.*$/m', \$phpIniContent)",
+            "'upload_tmp_dir = /home/'.\$thisUser.'/.lighttpd/upload'",
+        ], $src);
     }
 
     public function testUserConfigApplyOwnsMovedHelperFunctions(): void

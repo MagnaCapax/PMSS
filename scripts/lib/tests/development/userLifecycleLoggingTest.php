@@ -46,12 +46,14 @@ class userLifecycleLoggingTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
 
-        $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['status'] ?? 'INFO')", $source);
-        $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['action'] ?? 'unknown')", $source);
-        $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['phase'] ?? 'unknown')", $source);
-        $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['username'] ?? '')", $source);
-        $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['message'])", $source);
-        $this->assertStringContainsString("pmssUserLifecycleFormatTextField(\$payload['step'])", $source);
+        $this->assertStringContainsAllStrings([
+            "pmssUserLifecycleFormatTextField(\$payload['status'] ?? 'INFO')",
+            "pmssUserLifecycleFormatTextField(\$payload['action'] ?? 'unknown')",
+            "pmssUserLifecycleFormatTextField(\$payload['phase'] ?? 'unknown')",
+            "pmssUserLifecycleFormatTextField(\$payload['username'] ?? '')",
+            "pmssUserLifecycleFormatTextField(\$payload['message'])",
+            "pmssUserLifecycleFormatTextField(\$payload['step'])",
+        ], $source);
     }
 
     public function testContextLogHelperDelegatesToBaseContextAndWriter(): void
@@ -66,10 +68,12 @@ class userLifecycleLoggingTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
 
-        $this->assertStringContainsString('function pmssUserLifecycleContextLogStatusMessage(', $source);
-        $this->assertStringContainsString('\'status\' => $status', $source);
-        $this->assertStringContainsString('\'message\' => $message', $source);
-        $this->assertStringContainsString('pmssUserLifecycleContextLog(', $source);
+        $this->assertStringContainsAllStrings([
+            'function pmssUserLifecycleContextLogStatusMessage(',
+            '\'status\' => $status',
+            '\'message\' => $message',
+            'pmssUserLifecycleContextLog(',
+        ], $source);
     }
 
     public function testRefreshNginxConfigKeepsFallbackOrder(): void

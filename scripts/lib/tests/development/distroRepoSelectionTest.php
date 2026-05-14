@@ -12,10 +12,9 @@ class DistroRepoSelectionTest extends TestCase
      */
     public function testVersionFromCodenameMapping(): void
     {
-        $this->assertEquals(10, \pmssVersionFromCodename('buster'));
-        $this->assertEquals(11, \pmssVersionFromCodename('BULLSEYE'));
-        $this->assertEquals(12, \pmssVersionFromCodename('bookworm'));
-        $this->assertEquals(0, \pmssVersionFromCodename('marsupial'));
+        foreach (['buster' => 10, 'BULLSEYE' => 11, 'bookworm' => 12, 'marsupial' => 0] as $codename => $version) {
+            $this->assertEquals($version, \pmssVersionFromCodename($codename));
+        }
     }
 
     /**

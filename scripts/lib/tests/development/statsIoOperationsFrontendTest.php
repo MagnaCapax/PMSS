@@ -9,16 +9,20 @@ class StatsIoOperationsFrontendTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/stats.php');
 
-        $this->assertStringContainsString('function pmssFormatIoOperationsShort($operations)', $source);
-        $this->assertStringContainsString('Past 30 days total I/O operations:', $source);
+        $this->assertStringContainsAllStrings([
+            'function pmssFormatIoOperationsShort($operations)',
+            'Past 30 days total I/O operations:',
+        ], $source);
     }
 
     public function testStatsPageBuildsDailyIoOperationsChartFromTotals(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/stats.php');
 
-        $this->assertStringContainsString('$ioDailyOperations[] = round($readOps + $writeOps, 2);', $source);
-        $this->assertStringContainsString("label: 'Daily I/O Operations'", $source);
+        $this->assertStringContainsAllStrings([
+            '$ioDailyOperations[] = round($readOps + $writeOps, 2);',
+            "label: 'Daily I/O Operations'",
+        ], $source);
         $this->assertStringNotContainsString('$iopsDailyAverage', $source);
     }
 }

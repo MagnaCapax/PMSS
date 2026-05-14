@@ -52,11 +52,9 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
     public function testAddUserWrapperDropsLegacyFatalFunctionExistsGuards(): void
     {
         $source = $this->pmssReadRepoFile('scripts/addUser.php');
-        $logGuard = "function_exists('".'logProvisionMessage'."')";
-        $finalizeGuard = "function_exists('".'finalizeProvision'."')";
 
-        $this->assertTrue(strpos($source, $logGuard) === false);
-        $this->assertTrue(strpos($source, $finalizeGuard) === false);
+        $this->pmssAssertStringNotContainsString("function_exists('logProvisionMessage')", $source);
+        $this->pmssAssertStringNotContainsString("function_exists('finalizeProvision')", $source);
         $this->assertStringContainsString('pmssAddUserFatalExit(', $source);
     }
 
@@ -64,7 +62,7 @@ final class AddUserFatalPathCharacterizationTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
 
-        $this->assertTrue(strpos($source, "finalizeProvision('FAIL', 'nginx_config_missing', 1)") === false);
+        $this->pmssAssertStringNotContainsString("finalizeProvision('FAIL', 'nginx_config_missing', 1)", $source);
         $this->assertStringContainsString("pmssAddUserFatalExit('FAIL', 'nginx config missing after regeneration; aborting provisioning', 'nginx_config_missing');", $source);
     }
 

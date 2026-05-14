@@ -22,15 +22,19 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         return $user !== '' ? $user : 'root';
     }
 
+    private function noOpLogFn(): callable
+    {
+        return static function (string $message, bool $force = true): void {
+        };
+    }
+
     public function testQuarantineMovesRegularFile(): void
     {
         $src = $this->tempHome.'/.rtorrent.rc.custom';
         @file_put_contents($src, "broken_line\n");
 
         $user = $this->resolveTestUser();
-        $logFn = function (string $message, bool $force = true): void {
-            // no-op for test
-        };
+        $logFn = $this->noOpLogFn();
 
         $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
         $this->assertTrue(is_string($dst) && $dst !== '');
@@ -41,8 +45,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
     public function testQuarantineSkipsMissingFile(): void
     {
         $user = $this->resolveTestUser();
-        $logFn = function (string $message, bool $force = true): void {
-        };
+        $logFn = $this->noOpLogFn();
         $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
         $this->assertTrue($dst === null);
     }
@@ -57,8 +60,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         }
 
         $user = $this->resolveTestUser();
-        $logFn = function (string $message, bool $force = true): void {
-        };
+        $logFn = $this->noOpLogFn();
         $dst = \rtorrentCustomConfigQuarantine($this->tempHome, $user, $logFn);
         $this->assertTrue($dst === null);
         $this->assertTrue(is_link($src), 'Symlink should remain untouched');
@@ -69,8 +71,7 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         $src = $this->tempHome.'/.rtorrent.rc.custom';
         @file_put_contents($src, "x\n");
 
-        $logFn = function (string $message, bool $force = true): void {
-        };
+        $logFn = $this->noOpLogFn();
         $dst = \rtorrentCustomConfigQuarantine($this->tempHome, 'root', $logFn);
         $this->assertTrue($dst === null, 'Should refuse when file is not owned by root for user=root');
         $this->assertTrue(is_file($src), 'Source file should remain in place');
