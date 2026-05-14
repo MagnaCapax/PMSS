@@ -32,6 +32,17 @@ class NetworkHelpersTest extends TestCase
         );
     }
 
+    public function testIptablesCommandSafetyRejectsNullBytes(): void
+    {
+        $this->assertFalse(\networkIptablesCommandSafe("-A OUTPUT\0 -j ACCEPT"));
+    }
+
+    public function testAtomicApplyRejectsUnsafeRulesBeforeRestore(): void
+    {
+        $this->assertFalse(\networkApplyIptablesAtomically(["-A OUTPUT\0 -j ACCEPT"], []));
+        $this->assertFalse(\networkApplyIptablesAtomically(['-A OUTPUT -j ACCEPT'], [['not' => 'a rule']]));
+    }
+
     public function testTrafficLogParsesMonitoringRulesBeforeApplying(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'networkParseMonitoringCommands(');

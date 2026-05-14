@@ -77,6 +77,7 @@ function networkIptablesCommandSafe(string $rule): bool
 {
     return $rule !== ''
         && $rule[0] === '-'
+        && strpos($rule, "\0") === false
         && preg_match('/[;&|`$<>\\\\\r\n]/', $rule) !== 1;
 }
 
@@ -108,6 +109,18 @@ function networkParseMonitoringCommands(string $raw): array
 
 function networkApplyIptablesAtomically(array $filterCommands, array $natCommands): bool
 {
+    foreach (array_merge($filterCommands, $natCommands) as $command) {
+        if (!is_string($command) || !networkIptablesCommandSafe($command)) {
+            $summary = is_scalar($command) ? str_replace("\0", '<NUL>', (string) $command) : gettype($command);
+            @file_put_contents(
+                '/var/log/pmss/iptables.log',
+                date('c')." ERROR rejected unsafe iptables-restore rule: {$summary}\n",
+                FILE_APPEND
+            );
+            return false;
+        }
+    }
+
     $sections = [];
     if ($filterCommands) {
         $filter = ['*filter', ':INPUT ACCEPT [0:0]', ':FORWARD ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]'];
@@ -132,10 +145,18 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
 
     $data = implode("\n", $sections)."\n";
     $tmp = tempnam(sys_get_temp_dir(), 'pmss-iptables-');
-    file_put_contents($tmp, $data);
+    if (!is_string($tmp) || $tmp === '') {
+        @file_put_contents('/var/log/pmss/iptables.log', date('c')." ERROR unable to allocate iptables-restore temp file\n", FILE_APPEND);
+        return false;
+    }
+    if (@file_put_contents($tmp, $data) === false) {
+        @unlink($tmp);
+        @file_put_contents('/var/log/pmss/iptables.log', date('c')." ERROR unable to write iptables-restore temp file\n", FILE_APPEND);
+        return false;
+    }
     $command = sprintf('sh -c %s', escapeshellarg('iptables-restore < '.escapeshellarg($tmp)));
     $result = runCommand($command, false, 'logMessage');
-    unlink($tmp);
+    @unlink($tmp);
     return $result === 0;
 }
 
