@@ -118,14 +118,12 @@ class ResourceStatsProcessorTest extends TestCase
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = $this->makeProcessor($stats);
 
-        $user = 'alice';
-        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
-        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+        $user = $this->seedManagedUser();
 
         $now = time();
-        $stats->map[$user] = implode("\n", [
-            date('Y-m-d H:i:s', $now - 120).' 1024 2048 10 20 3600 1048576 4',
-            date('Y-m-d H:i:s', $now - 3600).' 2048 4096 30 40 7200 2097152 6',
+        $this->setResourceData($stats, $user, [
+            $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
+            $this->resourceLine($now - 3600, '2048 4096 30 40 7200 2097152 6'),
         ]);
 
         $processor->processUser($user, \pmssStatsCompareTimesBuild());
@@ -155,14 +153,12 @@ class ResourceStatsProcessorTest extends TestCase
             'logger' => $this->pmssMakeArrayLogger($messages),
         ]);
 
-        $user = 'alice';
-        file_put_contents($paths['resource_dir'].'/'.$user, 'seed');
-        @mkdir($paths['home_dir'].'/'.$user, 0755, true);
+        $user = $this->seedManagedUser();
 
         $now = time();
-        $stats->map[$user] = implode("\n", [
-            date('Y-m-d H:i:s', $now - 120).' 1024 2048 10 20 3600 1048576 4',
-            date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6',
+        $this->setResourceData($stats, $user, [
+            $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
+            $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
         ]);
 
         $processor->processUser($user, \pmssStatsCompareTimesBuild());
@@ -179,14 +175,12 @@ class ResourceStatsProcessorTest extends TestCase
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = $this->makeProcessor($stats);
 
-        $user = 'alice';
-        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
-        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+        $user = $this->seedManagedUser();
 
         $now = time();
-        $stats->map[$user] = implode("\n", [
-            date('Y-m-d H:i:s', $now - 120).' 1048576 2097152 3600 7200 3600000000000 1073741824 4',
-            date('Y-m-d H:i:s', $now - 60).' 2097152 3145728 7200 10800 7200000000000 2147483648 6',
+        $this->setResourceData($stats, $user, [
+            $this->resourceLine($now - 120, '1048576 2097152 3600 7200 3600000000000 1073741824 4'),
+            $this->resourceLine($now - 60, '2097152 3145728 7200 10800 7200000000000 2147483648 6'),
         ]);
 
         $processor->processUser($user, \pmssStatsCompareTimesBuild());
@@ -228,14 +222,12 @@ class ResourceStatsProcessorTest extends TestCase
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = $this->makeProcessor($stats);
 
-        $user = 'alice';
-        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
-        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+        $user = $this->seedManagedUser();
 
         $now = time();
-        $stats->map[$user] = implode("\n", [
-            date('Y-m-d H:i:s', $now - 120).' 1024 2048 10 20 3600 1048576 4 524288 262144',
-            date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6 1048576 524288',
+        $this->setResourceData($stats, $user, [
+            $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4 524288 262144'),
+            $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6 1048576 524288'),
         ]);
 
         $processor->processUser($user, \pmssStatsCompareTimesBuild());
@@ -250,9 +242,9 @@ class ResourceStatsProcessorTest extends TestCase
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = $this->makeProcessor($stats);
 
-        $stats->map['ghost'] = implode("\n", [
-            date('Y-m-d H:i:s', time() - 120).' 1024 2048 1 1 3600 1024 1',
-            date('Y-m-d H:i:s', time() - 60).' 2048 4096 1 1 3600 1024 1',
+        $this->setResourceData($stats, 'ghost', [
+            $this->resourceLine(time() - 120, '1024 2048 1 1 3600 1024 1'),
+            $this->resourceLine(time() - 60, '2048 4096 1 1 3600 1024 1'),
         ]);
 
         $processor->processUser('ghost', \pmssStatsCompareTimesBuild());
@@ -265,10 +257,8 @@ class ResourceStatsProcessorTest extends TestCase
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = $this->makeProcessor($stats);
 
-        $user = 'alice';
-        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
-        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
-        $stats->map[$user] = date('Y-m-d H:i:s', time() - 120).' 1024 2048 1 1 3600 1024 1';
+        $user = $this->seedManagedUser();
+        $stats->map[$user] = $this->resourceLine(time() - 120, '1024 2048 1 1 3600 1024 1');
 
         $processor->processUser($user, \pmssStatsCompareTimesBuild());
 
@@ -279,15 +269,12 @@ class ResourceStatsProcessorTest extends TestCase
     {
         $stats = new StubResourceStatsProcessorStatistics();
         $processor = new SpyResourceStatsProcessor($stats, $this->paths);
-        $user = 'alice';
-
-        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
-        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+        $user = $this->seedManagedUser();
 
         $now = time();
-        $stats->map[$user] = implode("\n", [
-            date('Y-m-d H:i:s', $now - 120).' 1024 2048 10 20 3600 1048576 4',
-            date('Y-m-d H:i:s', $now - 60).' 2048 4096 30 40 7200 2097152 6',
+        $this->setResourceData($stats, $user, [
+            $this->resourceLine($now - 120, '1024 2048 10 20 3600 1048576 4'),
+            $this->resourceLine($now - 60, '2048 4096 30 40 7200 2097152 6'),
         ]);
 
         $this->assertEquals(0, $processor->runCli(['/scripts/cron/resourceStats.php', 'a!li@ce'], '/scripts/cron/resourceStats.php'));
@@ -348,6 +335,23 @@ class ResourceStatsProcessorTest extends TestCase
     private function makeProcessor(StubResourceStatsProcessorStatistics $stats): \ResourceStatsProcessor
     {
         return new \ResourceStatsProcessor($stats, $this->paths);
+    }
+
+    private function seedManagedUser(string $user = 'alice'): string
+    {
+        file_put_contents($this->paths['resource_dir'].'/'.$user, 'seed');
+        @mkdir($this->paths['home_dir'].'/'.$user, 0755, true);
+        return $user;
+    }
+
+    private function setResourceData(StubResourceStatsProcessorStatistics $stats, string $user, array $lines): void
+    {
+        $stats->map[$user] = implode("\n", $lines);
+    }
+
+    private function resourceLine(int $timestamp, string $payload): string
+    {
+        return date('Y-m-d H:i:s', $timestamp).' '.$payload;
     }
 
     /**

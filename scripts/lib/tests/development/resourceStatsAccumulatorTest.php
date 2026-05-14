@@ -6,6 +6,20 @@ require_once dirname(__DIR__, 2).'/resources/accumulator.php';
 
 class ResourceStatsAccumulatorTest extends TestCase
 {
+    private function sample(int $timestamp, array $overrides = []): array
+    {
+        return array_merge([
+            'timestamp' => $timestamp,
+            'io_read' => 0.0,
+            'io_write' => 0.0,
+            'io_read_ops' => 0.0,
+            'io_write_ops' => 0.0,
+            'cpu' => 0.0,
+            'memory' => 1024 * 1024 * 1024,
+            'tasks' => 1.0,
+        ], $overrides);
+    }
+
     public function testHasSamplesIsFalseBeforeAnySamples(): void
     {
         $acc = new \ResourceStatsAccumulator(['day' => time() - 3600]);
@@ -24,26 +38,22 @@ class ResourceStatsAccumulatorTest extends TestCase
         $compare = ['day' => $now - 3600];
         $acc = new \ResourceStatsAccumulator($compare);
 
-        $acc->addSample([
-            'timestamp' => $now - 300,
+        $acc->addSample($this->sample($now - 300, [
             'io_read' => 100.0,
             'io_write' => 200.0,
             'io_read_ops' => 10.0,
             'io_write_ops' => 20.0,
             'cpu' => 300.0,
-            'memory' => 1024 * 1024 * 1024,
             'tasks' => 2.0,
-        ]);
-        $acc->addSample([
-            'timestamp' => $now,
+        ]));
+        $acc->addSample($this->sample($now, [
             'io_read' => 50.0,
             'io_write' => 25.0,
             'io_read_ops' => 5.0,
             'io_write_ops' => 7.0,
             'cpu' => 100.0,
-            'memory' => 1024 * 1024 * 1024,
             'tasks' => 4.0,
-        ]);
+        ]));
 
         $results = $acc->results();
         $this->assertTrue($acc->hasSamples());
@@ -60,22 +70,8 @@ class ResourceStatsAccumulatorTest extends TestCase
         $compare = ['day' => $now - 3600];
         $acc = new \ResourceStatsAccumulator($compare);
 
-        $acc->addSample([
-            'timestamp' => $now - 600,
-            'io_read' => 0.0,
-            'io_write' => 0.0,
-            'cpu' => 0.0,
-            'memory' => 1024 * 1024 * 1024,
-            'tasks' => 1.0,
-        ]);
-        $acc->addSample([
-            'timestamp' => $now,
-            'io_read' => 0.0,
-            'io_write' => 0.0,
-            'cpu' => 0.0,
-            'memory' => 1024 * 1024 * 1024,
-            'tasks' => 1.0,
-        ]);
+        $acc->addSample($this->sample($now - 600));
+        $acc->addSample($this->sample($now));
 
         $results = $acc->results();
         $ramHours = $results['raw']['ram_hours']['day'];
@@ -88,22 +84,8 @@ class ResourceStatsAccumulatorTest extends TestCase
         $compare = ['day' => $now - (3 * 3600)];
         $acc = new \ResourceStatsAccumulator($compare);
 
-        $acc->addSample([
-            'timestamp' => $now - (2 * 3600),
-            'io_read' => 0.0,
-            'io_write' => 0.0,
-            'cpu' => 0.0,
-            'memory' => 1024 * 1024 * 1024,
-            'tasks' => 1.0,
-        ]);
-        $acc->addSample([
-            'timestamp' => $now,
-            'io_read' => 0.0,
-            'io_write' => 0.0,
-            'cpu' => 0.0,
-            'memory' => 1024 * 1024 * 1024,
-            'tasks' => 1.0,
-        ]);
+        $acc->addSample($this->sample($now - (2 * 3600)));
+        $acc->addSample($this->sample($now));
 
         $ramHours = $acc->results()['raw']['ram_hours']['day'];
         $this->assertTrue(abs($ramHours - (10 / 60)) < 0.01);
@@ -115,22 +97,18 @@ class ResourceStatsAccumulatorTest extends TestCase
         $day1 = strtotime('2026-02-12 00:00:00');
         $day2 = strtotime('2026-02-13 00:05:00');
 
-        $acc->addSample([
-            'timestamp' => $day1,
+        $acc->addSample($this->sample($day1, [
             'io_read' => 100.0,
             'io_write' => 200.0,
             'cpu' => 300.0,
-            'memory' => 1024 * 1024 * 1024,
             'tasks' => 2.0,
-        ]);
-        $acc->addSample([
-            'timestamp' => $day2,
+        ]));
+        $acc->addSample($this->sample($day2, [
             'io_read' => 50.0,
             'io_write' => 25.0,
             'cpu' => 100.0,
-            'memory' => 1024 * 1024 * 1024,
             'tasks' => 4.0,
-        ]);
+        ]));
 
         $daily = $acc->results()['daily'];
         $this->assertTrue(isset($daily['2026/02/13']));
@@ -144,18 +122,14 @@ class ResourceStatsAccumulatorTest extends TestCase
         $day1 = strtotime('2026-02-12 23:50:00');
         $day2 = strtotime('2026-02-13 00:05:00');
 
-        $acc->addSample([
-            'timestamp' => $day1,
+        $acc->addSample($this->sample($day1, [
             'io_read' => 1.0,
             'io_write' => 2.0,
             'io_read_ops' => 3.0,
             'io_write_ops' => 4.0,
             'cpu' => 5.0,
-            'memory' => 1024 * 1024 * 1024,
-            'tasks' => 1.0,
-        ]);
-        $acc->addSample([
-            'timestamp' => $day2,
+        ]));
+        $acc->addSample($this->sample($day2, [
             'io_read' => 10.0,
             'io_write' => 20.0,
             'io_read_ops' => 30.0,
@@ -163,7 +137,7 @@ class ResourceStatsAccumulatorTest extends TestCase
             'cpu' => 50.0,
             'memory' => 2 * 1024 * 1024 * 1024,
             'tasks' => 6.0,
-        ]);
+        ]));
 
         $daily = $acc->results()['daily'];
         $this->assertEquals(30.0, $daily['2026/02/13']['io_read_ops']);

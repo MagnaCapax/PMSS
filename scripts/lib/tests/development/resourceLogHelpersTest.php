@@ -34,6 +34,13 @@ class ResourceLogHelpersTest extends TestCase
         ];
     }
 
+    private function assertDeltaFields(array $result, array $expected): void
+    {
+        foreach ($expected as $field => $value) {
+            $this->assertEquals($value, $result['delta'][$field]);
+        }
+    }
+
     public function testEnsureDirRejectsRelative(): void
     {
         $this->assertTrue(!\pmssEnsureSafeDir('relative/path', 0700));
@@ -261,11 +268,7 @@ class ResourceLogHelpersTest extends TestCase
 
         $result = \pmssResourceLogUpdateState($statePath, $counters);
 
-        $this->assertEquals(10, $result['delta']['io_read']);
-        $this->assertEquals(20, $result['delta']['io_write']);
-        $this->assertEquals(0, $result['delta']['io_read_ops']);
-        $this->assertEquals(0, $result['delta']['io_write_ops']);
-        $this->assertEquals(30, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 10, 'io_write' => 20, 'io_read_ops' => 0, 'io_write_ops' => 0, 'cpu_nsec' => 30]);
         $this->assertEquals(4096, $result['state']['memory']);
         $this->assertEquals(7, $result['state']['tasks']);
         $this->assertTrue($result['state']['ts'] > 0);
@@ -301,11 +304,7 @@ class ResourceLogHelpersTest extends TestCase
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(8, 12, 150, 2048, 3, 16, 29));
 
-        $this->assertEquals(3, $result['delta']['io_read']);
-        $this->assertEquals(10, $result['delta']['io_write']);
-        $this->assertEquals(6, $result['delta']['io_read_ops']);
-        $this->assertEquals(9, $result['delta']['io_write_ops']);
-        $this->assertEquals(50, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 3, 'io_write' => 10, 'io_read_ops' => 6, 'io_write_ops' => 9, 'cpu_nsec' => 50]);
         $state = $this->pmssReadJsonArrayFile($statePath, []);
         $this->assertEquals(8, $state['io_read']);
         $this->assertEquals(12, $state['io_write']);
@@ -331,9 +330,7 @@ class ResourceLogHelpersTest extends TestCase
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(10, 20, 30, 1024, 2));
 
-        $this->assertEquals(10, $result['delta']['io_read']);
-        $this->assertEquals(20, $result['delta']['io_write']);
-        $this->assertEquals(30, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 10, 'io_write' => 20, 'cpu_nsec' => 30]);
     }
 
     public function testUpdateStateHandlesInvalidJson(): void
@@ -344,9 +341,7 @@ class ResourceLogHelpersTest extends TestCase
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(4, 5, 6, 2048, 1));
 
-        $this->assertEquals(4, $result['delta']['io_read']);
-        $this->assertEquals(5, $result['delta']['io_write']);
-        $this->assertEquals(6, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 4, 'io_write' => 5, 'cpu_nsec' => 6]);
     }
 
     public function testUpdateStateIgnoresMalformedPreviousCounterFields(): void
@@ -367,9 +362,7 @@ class ResourceLogHelpersTest extends TestCase
             $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(10, 20, 30, 1024, 2));
         });
 
-        $this->assertEquals(10, $result['delta']['io_read']);
-        $this->assertEquals(20, $result['delta']['io_write']);
-        $this->assertEquals(30, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 10, 'io_write' => 20, 'cpu_nsec' => 30]);
     }
 
     public function testUpdateStateDefaultsMissingCountersWithoutWarnings(): void
@@ -382,9 +375,7 @@ class ResourceLogHelpersTest extends TestCase
             $result = \pmssResourceLogUpdateState($statePath, ['memory' => 2048, 'tasks' => 3]);
         });
 
-        $this->assertEquals(0, $result['delta']['io_read']);
-        $this->assertEquals(0, $result['delta']['io_write']);
-        $this->assertEquals(0, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 0, 'io_write' => 0, 'cpu_nsec' => 0]);
         $this->assertEquals(2048, $result['state']['memory']);
         $this->assertEquals(3, $result['state']['tasks']);
     }
@@ -399,8 +390,7 @@ class ResourceLogHelpersTest extends TestCase
             $result = \pmssCounterStateUpdate($statePath, ['io_read' => 9], ['io_read', 'io_write']);
         });
 
-        $this->assertEquals(9, $result['delta']['io_read']);
-        $this->assertEquals(0, $result['delta']['io_write']);
+        $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 0]);
     }
 
     public function testUpdateStateReturnsDeltaWhenFileMissing(): void
@@ -410,9 +400,7 @@ class ResourceLogHelpersTest extends TestCase
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
 
-        $this->assertEquals(9, $result['delta']['io_read']);
-        $this->assertEquals(8, $result['delta']['io_write']);
-        $this->assertEquals(7, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
         $this->assertTrue(!is_file($statePath));
     }
 
@@ -422,9 +410,7 @@ class ResourceLogHelpersTest extends TestCase
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
 
-        $this->assertEquals(9, $result['delta']['io_read']);
-        $this->assertEquals(8, $result['delta']['io_write']);
-        $this->assertEquals(7, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
         $this->assertTrue(!is_file($statePath));
     }
 
@@ -438,9 +424,7 @@ class ResourceLogHelpersTest extends TestCase
 
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
 
-        $this->assertEquals(9, $result['delta']['io_read']);
-        $this->assertEquals(8, $result['delta']['io_write']);
-        $this->assertEquals(7, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
         $this->assertEquals(['io_read' => 1], $this->pmssReadJsonArrayFile($target, []));
     }
 
@@ -456,9 +440,7 @@ class ResourceLogHelpersTest extends TestCase
         $statePath = $stateDir.'/user.json';
         $result = \pmssResourceLogUpdateState($statePath, $this->makeCounters(9, 8, 7, 512, 1));
 
-        $this->assertEquals(9, $result['delta']['io_read']);
-        $this->assertEquals(8, $result['delta']['io_write']);
-        $this->assertEquals(7, $result['delta']['cpu_nsec']);
+        $this->assertDeltaFields($result, ['io_read' => 9, 'io_write' => 8, 'cpu_nsec' => 7]);
         $this->assertTrue(!is_file($targetDir.'/user.json'), 'must not write state via symlinked parent');
     }
 }
