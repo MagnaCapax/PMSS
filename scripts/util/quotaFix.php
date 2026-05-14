@@ -39,28 +39,56 @@ requireRoot();
 
 $exitCode = 0;
 
+/**
+ * Run a quota maintenance command while preserving legacy command output.
+ *
+ * @return array{ok:bool,rc:int,output:string}
+ */
+function pmssQuotaFixRunCommand(string $description, string $command, bool $critical, int &$exitCode): array
+{
+    logMessage($description);
+    $result = pmssQuotaCommandRun($command);
+    if ($result['output'] !== '') {
+        echo $result['output'];
+    }
+    if (!$result['ok']) {
+        logMessage('[quotaFix] WARNING: command failed (rc='.$result['rc'].'): '.$command);
+        if ($critical) {
+            $exitCode = 1;
+        }
+    }
+
+    return $result;
+}
+
 logMessage('[quotaFix] Starting quota integrity check');
 
 // 1. Report current status before any changes
-logMessage('[quotaFix] Current quota state:');
-echo shell_exec('repquota -as 2>&1');
+pmssQuotaFixRunCommand('[quotaFix] Current quota state:', 'repquota -as', false, $exitCode);
 
 // 2. Disable quotas to allow safe recalculation
-logMessage('[quotaFix] Disabling quotas for recalculation');
-echo shell_exec('quotaoff -av 2>&1');
+$quotaOffResult = pmssQuotaFixRunCommand('[quotaFix] Disabling quotas for recalculation', 'quotaoff -av', true, $exitCode);
 
-// 3. Remove any stale/interrupted check files from previous runs
-logMessage('[quotaFix] Cleaning stale quota check files');
-pmssRemoveStaleQuotaCheckFiles('/home');
+if ($quotaOffResult['ok']) {
+    // 3. Remove any stale/interrupted check files from previous runs
+    logMessage('[quotaFix] Cleaning stale quota check files');
+    pmssRemoveStaleQuotaCheckFiles('/home');
 
-// 4. Perform full quota recalculation
-// Flags: -a (all filesystems), -v (verbose), -u (user quotas),
-//        -g (group quotas), -m (don't remount ro), -n (use first found quota file)
-logMessage('[quotaFix] Recalculating quota usage from disk (this may take time on large filesystems)');
-$checkResult = shell_exec('quotacheck -avugmn 2>&1');
-echo $checkResult;
-if ($checkResult === null || strpos($checkResult, 'Cannot') !== false) {
-    logMessage('[quotaFix] WARNING: quotacheck may have encountered issues');
+    // 4. Perform full quota recalculation
+    // Flags: -a (all filesystems), -v (verbose), -u (user quotas),
+    //        -g (group quotas), -m (don't remount ro), -n (use first found quota file)
+    $checkResult = pmssQuotaFixRunCommand(
+        '[quotaFix] Recalculating quota usage from disk (this may take time on large filesystems)',
+        'quotacheck -avugmn',
+        true,
+        $exitCode
+    );
+    if (strpos($checkResult['output'], 'Cannot') !== false) {
+        logMessage('[quotaFix] WARNING: quotacheck may have encountered issues');
+        $exitCode = 1;
+    }
+} else {
+    logMessage('[quotaFix] WARNING: skipping quotacheck because quotaoff failed');
     $exitCode = 1;
 }
 
@@ -68,12 +96,10 @@ if ($checkResult === null || strpos($checkResult, 'Cannot') !== false) {
 usleep(500000);
 
 // 6. Re-enable quotas
-logMessage('[quotaFix] Re-enabling quotas');
-echo shell_exec('quotaon -av 2>&1');
+pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, $exitCode);
 
 // 7. Report final status for visual comparison
-logMessage('[quotaFix] Final quota state:');
-echo shell_exec('repquota -as 2>&1');
+pmssQuotaFixRunCommand('[quotaFix] Final quota state:', 'repquota -as', false, $exitCode);
 
 logMessage('[quotaFix] Quota integrity check complete');
 

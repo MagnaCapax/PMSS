@@ -79,6 +79,40 @@ function pmssQuotaEscapePathForLog(string $path): string
 }
 
 /**
+ * Run one quota maintenance command and return exit-code-aware output.
+ *
+ * @param callable|null $runner Test seam; receives the shell command and returns
+ *                              rc/stdout/stderr keys like pmssCommandCapture().
+ *
+ * @return array{ok:bool,rc:int,output:string}
+ */
+function pmssQuotaCommandRun(string $command, ?callable $runner = null): array
+{
+    $command = trim($command);
+    if ($command === '') {
+        return ['ok' => false, 'rc' => 1, 'output' => ''];
+    }
+
+    if ($runner === null) {
+        $runner = function (string $cmd): array {
+            return pmssCommandCapture($cmd);
+        };
+    }
+
+    $result = $runner($command);
+    if (!is_array($result)) {
+        return ['ok' => false, 'rc' => 1, 'output' => ''];
+    }
+
+    $rcRaw = $result['rc'] ?? 1;
+    $rc = is_int($rcRaw) ? $rcRaw : (is_numeric($rcRaw) ? (int) $rcRaw : 1);
+    $stdout = isset($result['stdout']) && is_string($result['stdout']) ? $result['stdout'] : '';
+    $stderr = isset($result['stderr']) && is_string($result['stderr']) ? $result['stderr'] : '';
+
+    return ['ok' => $rc === 0, 'rc' => $rc, 'output' => $stdout.$stderr];
+}
+
+/**
  * Remove stale quota check files after validating the mount point boundary.
  *
  * quotacheck may leave temporary `aquota*new` files behind after an interrupted
