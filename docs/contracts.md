@@ -527,8 +527,9 @@ Automation often invokes these utilities; below are expected inputs and effects.
     Emits `###ADDUSER:SUCCESS|FAIL|ERROR` summary markers for grep plus
     `###ADDUSER_JSON:{...}` with explicit `success`/`exit_code` fields for automation.
 
-- scripts/changePw.php USERNAME [PASSWORD]
+- scripts/changePw.php [--jsonl] USERNAME [PASSWORD]
   - Behavior: Sets Unix password (generated if omitted) and per-user htpasswd; prints the password.
+    With `--jsonl`, suppresses human status lines and emits one JSON object with the new credential and sync return codes.
 
 - scripts/recreateUser.php USERNAME RAM_MiB QUOTA_GiB
   - Behavior: Kills user processes; if `/home/<user>` exists, moves to `/home/backup-<user>`;

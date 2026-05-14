@@ -13,6 +13,34 @@ class changePwPasswdFailureGuardTest extends TestCase
         $this->assertStringContainsString('exec($cmd.\' 2>&1\', $passwdOutput, $passwdReturnCode);', $source, 'changePw must capture passwd stderr and return code');
     }
 
+    public function testPasswdCommandTreatsPasswordPayloadAsPrintfData(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/changePw.php');
+
+        $this->assertStringContainsString("printf '%%s' %s | passwd %s", $source);
+        $legacyPattern = "'printf ".'%s | passwd %s'."'";
+        $this->assertStringNotContainsString($legacyPattern, $source);
+    }
+
+    public function testGeneratedPasswordUsesSharedSafeAlphabet(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/changePw.php');
+
+        $this->assertStringContainsString('$alphabet = pmssUserPasswordGenerationAlphabet();', $source);
+        $this->assertStringNotContainsString('!@#$%', $source);
+    }
+
+    public function testJsonlModeKeepsDefaultHumanOutputGuarded(): void
+    {
+        $source = $this->pmssReadRepoFile('scripts/changePw.php');
+
+        $this->assertStringContainsString('$jsonlOutput = false;', $source);
+        $this->assertStringContainsString('$parseOptions = true;', $source);
+        $this->assertStringContainsString("if (\$parseOptions && \$token === '--jsonl') {", $source);
+        $this->assertStringContainsString('if (!$jsonlOutput) {', $source);
+        $this->assertStringContainsString('pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentReturnCode);', $source);
+    }
+
     public function testPasswdFailureExitsBeforeHttpCredentialSync(): void
     {
         $source = $this->pmssReadRepoFile('scripts/changePw.php');

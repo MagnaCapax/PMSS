@@ -16,7 +16,7 @@ require_once __DIR__.'/qbittorrent.php';
  */
 function pmssDelugeServicePasswordGenerate(int $length = 24): string
 {
-    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    $alphabet = pmssUserPasswordGenerationAlphabet();
     $maxIndex = strlen($alphabet) - 1;
     $password = '';
 
@@ -25,6 +25,14 @@ function pmssDelugeServicePasswordGenerate(int $length = 24): string
     }
 
     return $password;
+}
+
+/**
+ * Return the shared generated-password alphabet for CLI and service secrets.
+ */
+function pmssUserPasswordGenerationAlphabet(): string
+{
+    return 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_';
 }
 
 /**

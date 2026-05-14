@@ -36,7 +36,17 @@ class DelugeServicePasswordTest extends TestCase
     {
         $password = \pmssDelugeServicePasswordGenerate(32);
         $this->assertEquals(32, strlen($password));
-        $this->assertMatches('/^[A-Za-z0-9!@#$%]+$/', $password);
+        $this->assertMatches('/^[A-Za-z0-9_-]+$/', $password);
+    }
+
+    public function testSharedPasswordAlphabetAvoidsShellMetacharacters(): void
+    {
+        $alphabet = \pmssUserPasswordGenerationAlphabet();
+
+        $this->assertMatches('/^[A-Za-z0-9_-]+$/', $alphabet);
+        foreach (['!', '@', '#', '$', '%', '&', ':'] as $forbidden) {
+            $this->assertTrue(strpos($alphabet, $forbidden) === false, 'Forbidden generated-password character present: '.$forbidden);
+        }
     }
 
     public function testReadLocalclientPasswordReturnsEmptyWhenMissing(): void

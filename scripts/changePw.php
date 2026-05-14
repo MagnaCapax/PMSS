@@ -15,10 +15,26 @@
  *
  * @license GPL-3.0-only
  */
-$username = $argv[1] ?? '';
-$password = $argv[2] ?? '';
+$jsonlOutput = false;
+$arguments = [];
+$parseOptions = true;
+foreach (array_slice($argv, 1) as $token) {
+    if ($parseOptions && $token === '--') {
+        $parseOptions = false;
+        continue;
+    }
+    if ($parseOptions && $token === '--jsonl') {
+        $jsonlOutput = true;
+        continue;
+    }
 
-$usage = 'Usage: changePw.php USERNAME [PASSWORD]';
+    $arguments[] = $token;
+}
+
+$username = $arguments[0] ?? '';
+$password = $arguments[1] ?? '';
+
+$usage = 'Usage: changePw.php [--jsonl] USERNAME [PASSWORD]';
 if ($username === '') {
     die($usage . "\nPassword is optional - random one will be generated if it's empty\n");
 }
@@ -38,13 +54,15 @@ if ($password === '') {
     $password = generatePassword();
 }
 
-echo "\t *******  {$username}     new password:   {$password} \n";
+if (!$jsonlOutput) {
+    echo "\t *******  {$username}     new password:   {$password} \n";
+}
 
 // Feed the password via stdin to passwd using printf; quote arguments to avoid
 // injection even when passwords contain special characters.
 $pwPayload = $password."\n".$password."\n";
 $cmd = sprintf(
-    'printf %s | passwd %s',
+    "printf '%%s' %s | passwd %s",
     escapeshellarg($pwPayload),
     escapeshellarg($username)
 );
@@ -56,6 +74,9 @@ if ($passwdReturnCode !== 0) {
     if ($passwdOutput !== []) {
         fwrite(STDERR, implode("\n", $passwdOutput)."\n");
     }
+    if ($jsonlOutput) {
+        pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, null, null);
+    }
     exit(1);
 }
 
@@ -65,6 +86,9 @@ $htpasswdDir = dirname($htpasswdFile);
 
 if (!is_dir($htpasswdDir)) {
     fwrite(STDERR, "lighttpd credential directory missing for {$username}; aborting credential sync\n");
+    if ($jsonlOutput) {
+        pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, null, null);
+    }
     exit(1);
 }
 
@@ -84,6 +108,9 @@ if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {
     if ($htpasswdOutput !== []) {
         fwrite(STDERR, implode("\n", $htpasswdOutput)."\n");
     }
+    if ($jsonlOutput) {
+        pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, null);
+    }
     exit(1);
 }
 
@@ -99,6 +126,9 @@ if ($chownReturnCode !== 0) {
     if ($chownOutput !== []) {
         fwrite(STDERR, implode("\n", $chownOutput)."\n");
     }
+    if ($jsonlOutput) {
+        pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, null);
+    }
     exit(1);
 }
 
@@ -106,12 +136,17 @@ if ($chownReturnCode !== 0) {
 // Deluge is intentionally excluded: its auth file stores passwords in plaintext,
 // making account password sync a security risk (see GH#211).
 $qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);
+$qbittorrentReturnCode = 0;
 
 // Restart services if passwords were updated
 pmssRestartTorrentServicesAfterPasswordChange($username, false, $qbittorrentUpdated);
 
-if ($qbittorrentUpdated) {
+if ($qbittorrentUpdated && !$jsonlOutput) {
     echo "\t *******  qBittorrent password updated\n";
+}
+
+if ($jsonlOutput) {
+    pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentReturnCode);
 }
 
 function generatePassword(): string
@@ -121,7 +156,7 @@ function generatePassword(): string
     $suffix = substr($legacySeed, -2);
 
     $middleLength = random_int(4, 8);
-    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    $alphabet = pmssUserPasswordGenerationAlphabet();
     $middle = '';
     $alphabetLength = strlen($alphabet) - 1;
 
@@ -160,4 +195,21 @@ function legacyPasswordSeed(): string
     $pw .= substr($salts3, round(rand(0, 48)), 1);
 
     return $pw;
+}
+
+/**
+ * Emit one machine-readable credential sync result.
+ */
+function pmssChangePwEmitJsonl(string $username, string $password, ?int $passwdReturnCode, ?int $htpasswdReturnCode, ?int $qbittorrentReturnCode): void
+{
+    $payload = [
+        'username'       => $username,
+        'new_credential' => $password,
+        'passwd_rc'      => $passwdReturnCode,
+        'htpasswd_rc'    => $htpasswdReturnCode,
+        'qbittorrent_rc' => $qbittorrentReturnCode,
+        'ts'             => gmdate('Y-m-d\TH:i:s\Z'),
+    ];
+
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES)."\n";
 }
