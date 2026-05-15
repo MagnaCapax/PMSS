@@ -16,6 +16,7 @@
 require_once __DIR__.'/../update/runtime/commands.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../traffic/storage.php';
+require_once __DIR__.'/integerSetting.php';
 
 /**
  * Apply or refresh the user-specific traffic cap.
@@ -172,16 +173,12 @@ function pmssWriteTorrentThrottle(string $username, int $value): bool
         return false;
     }
 
-    if (is_link($path)) {
-        return false;
-    }
-
-    if (file_exists($path) && !is_file($path)) {
-        return false;
-    }
-
     if ($value <= 0) {
-        return !is_file($path) || @unlink($path);
+        return pmssIntegerSettingFileRemove($path);
+    }
+
+    if (is_link($path) || (file_exists($path) && !is_file($path))) {
+        return false;
     }
 
     $isRoot = function_exists('posix_geteuid') ? (posix_geteuid() === 0) : false;

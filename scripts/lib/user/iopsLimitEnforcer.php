@@ -93,13 +93,7 @@ function pmssIopsLimitWriteMarker(string $path): bool
 
 function pmssIopsLimitRemoveMarker(string $path): bool
 {
-    if (!file_exists($path)) {
-        return true;
-    }
-    if (is_link($path) || !is_file($path)) {
-        return false;
-    }
-    return @unlink($path);
+    return pmssIntegerSettingFileRemove($path);
 }
 
 function pmssIopsLimitsRun(): int
