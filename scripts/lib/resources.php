@@ -139,34 +139,30 @@ class resourceStatistics
      */
     public function parseLine($thisLine)
     {
-        if (!is_array($tokens = preg_split('/\s+/', trim((string) $thisLine))) || ($tokenCount = count($tokens)) < 7) {
+        if (!is_array($tokens = preg_split('/\s+/', trim((string) $thisLine))) || ($tokenCount = count($tokens)) < 7 || $tokenCount === 10) {
             return false;
         }
 
         $timestamp = strtotime($tokens[0].' '.$tokens[1]);
         if ($timestamp === false) return false;
-        $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(
-            ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'],
-            0.0
-        );
-        foreach (($tokenCount >= 9
+
+        $parsed = ['timestamp' => (int) $timestamp] + array_fill_keys(['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'memory', 'tasks'], 0.0);
+        $fields = $tokenCount >= 9
             ? [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks']
-            : [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks']) as $index => $field) {
+            : [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks'];
+        if ($tokenCount > 10) {
+            foreach (array_values(pmssResourceMemoryBreakdownFieldMap()) as $offset => $field) {
+                $fields[$offset + 9] = $field;
+            }
+        }
+
+        foreach ($fields as $index => $field) {
             if (!ctype_digit($tokens[$index] ?? '')) {
                 return false;
             }
             $parsed[$field] = (float) $tokens[$index];
         }
 
-        if ($tokenCount > 10) {
-            foreach (array_values(pmssResourceMemoryBreakdownFieldMap()) as $offset => $field) {
-                if (!ctype_digit($tokens[$offset + 9] ?? '')) {
-                    return false;
-                }
-                $parsed[$field] = (float) $tokens[$offset + 9];
-            }
-        }
-
-        return $tokenCount !== 10 ? $parsed : false;
+        return $parsed;
     }
 }

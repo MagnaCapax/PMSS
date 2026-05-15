@@ -42,7 +42,7 @@ function pmssResourceSnapshotRun(): int
                         'memory' => $results['memory']['day'],
                         'tasks' => $results['tasks']['day'],
                     ];
-                    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu', 'ram_hours'] as $metricName) {
+                    foreach (ResourceStatsAccumulator::RAW_METRICS as $metricName) {
                         $metrics[$metricName] = $results['raw'][$metricName]['day'];
                     }
                 }
