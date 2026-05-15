@@ -136,4 +136,27 @@ class rtorrentConfigCreateConfigTest extends TestCase
             );
         }
     }
+
+    public function testCreateConfigKeepsRenderingSilent(): void
+    {
+        $cfg = new \rtorrentConfig([
+            'ramBlock' => 250,
+            'peers' => ['minimum' => 1, 'maximum' => 2],
+            'uploadSlots' => 1,
+        ], "mem=##memoryMax\n");
+
+        ob_start();
+        $result = $cfg->createConfig([
+            'ram' => 500,
+            'scgiPort' => 5000,
+            'dhtPort' => 5001,
+            'listenPort' => 5002,
+            'pex' => 'auto',
+            'dht' => 'yes',
+        ]);
+        $output = ob_get_clean();
+
+        $this->assertEquals('', $output);
+        $this->assertEquals("mem=250M\n", (string) $result['configFile']);
+    }
 }

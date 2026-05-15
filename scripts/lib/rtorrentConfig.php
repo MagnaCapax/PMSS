@@ -127,7 +127,6 @@ class rtorrentConfig {
 		}
 
         
-		$this->_log('info', 'Configuration file: ' . $configFile);
 		return array('configFile' => $configFile, 'config' => $config);
 	}
 	
@@ -154,7 +153,6 @@ class rtorrentConfig {
 	    //  $config = file_get_contents($customConfigFile) . "\n\n" . $config;
 	    
 	    $file = '/home/' . $user . '/.rtorrent.rc';
-	    $this->_log('info', 'Writing .rtorrent.rc to: ' . $file . "\nContents:\n{$config}\n");
 	    if (!file_exists($file)) { touch($file); chmod($file, 0644); }
 	    return is_writable($file) && file_put_contents($file, $config) !== false;
 	}
@@ -310,13 +308,5 @@ class rtorrentConfig {
 			return $contents;
 		}
 		throw new RuntimeException('Unable to read rTorrent template: ' . self::TEMPLATE_PATH);
-	}
-	
-	protected function _log($level, $message) {
-	    if (class_exists('pmLogger')) {
-	        
-	    } else {
-	        //echo '[' . date('Y-m-d H:i:s') . '](' . $level . ') - ' . $message . "\n";
-	    }
 	}
 }
