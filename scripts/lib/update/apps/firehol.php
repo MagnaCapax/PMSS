@@ -17,25 +17,6 @@ if (file_exists('/usr/local/sbin/firehol')) {
 }
 
 logmsg('*** FireHOL missing; building from pinned source release');
-
-$archivePath = pmssFetchPinnedRemoteFile('FireHOL '.$fireholVersion.' source', $fireholUrl, $fireholSha256);
-if (!is_string($archivePath) || $archivePath === '') {
-    return;
-}
-
-try {
-    runStep('Building FireHOL from source', implode(' && ', [
-        'set -e',
-        'mkdir -p /root/compile',
-        'cd /root/compile',
-        'rm -rf '.escapeshellarg('firehol-'.$fireholVersion).' '.escapeshellarg($fireholArchive),
-        'cp '.escapeshellarg($archivePath).' '.escapeshellarg($fireholArchive),
-        'tar -xzf '.escapeshellarg($fireholArchive),
-        'cd '.escapeshellarg('firehol-'.$fireholVersion),
-        './configure',
-        'make -j6',
-        'make install',
-    ]));
-} finally {
-    @unlink($archivePath);
-}
+pmssRunPinnedRemoteArchiveStep('FireHOL '.$fireholVersion.' source', $fireholUrl, $fireholSha256, $fireholArchive, 'firehol-'.$fireholVersion, 'Building FireHOL from source', [
+    'cd '.escapeshellarg('firehol-'.$fireholVersion), './configure', 'make -j6', 'make install',
+]);

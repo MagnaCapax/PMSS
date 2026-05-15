@@ -25,21 +25,6 @@ if (file_exists('/usr/bin/syncthing')
 @unlink('/usr/bin/syncthing');
 echo "*** Syncthing not present, downloading and adding!\n";
 
-$archivePath = pmssFetchPinnedRemoteFile('Syncthing '.$syncthingVersion, $syncthingUrl, $syncthingSha256);
-if (!is_string($archivePath) || $archivePath === '') {
-    return;
-}
-
-try {
-    runStep('Installing Syncthing binary', implode(' && ', [
-        'set -e',
-        'mkdir -p /root/compile',
-        'cd /root/compile',
-        'rm -rf '.escapeshellarg('syncthing-linux-amd64-'.$syncthingVersion).' '.escapeshellarg($syncthingArchive),
-        'cp '.escapeshellarg($archivePath).' '.escapeshellarg($syncthingArchive),
-        'tar -xzf '.escapeshellarg($syncthingArchive),
-        'install -m 0755 '.escapeshellarg('/root/compile/syncthing-linux-amd64-'.$syncthingVersion.'/syncthing').' /usr/bin/syncthing',
-    ]));
-} finally {
-    @unlink($archivePath);
-}
+pmssRunPinnedRemoteArchiveStep('Syncthing '.$syncthingVersion, $syncthingUrl, $syncthingSha256, $syncthingArchive, 'syncthing-linux-amd64-'.$syncthingVersion, 'Installing Syncthing binary', [
+    'install -m 0755 '.escapeshellarg('/root/compile/syncthing-linux-amd64-'.$syncthingVersion.'/syncthing').' /usr/bin/syncthing',
+]);

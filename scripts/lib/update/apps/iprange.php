@@ -32,24 +32,6 @@ if (!empty($missing)) {
     return;
 }
 
-$archivePath = pmssFetchPinnedRemoteFile('iprange '.$iprangeVersion.' source', $iprangeUrl, $iprangeSha256);
-if (!is_string($archivePath) || $archivePath === '') {
-    return;
-}
-
-try {
-    runStep('Building iprange from source', implode(' && ', [
-        'set -e',
-        'mkdir -p /root/compile',
-        'cd /root/compile',
-        'rm -rf '.escapeshellarg('iprange-'.$iprangeVersion).' '.escapeshellarg($iprangeArchive),
-        'cp '.escapeshellarg($archivePath).' '.escapeshellarg($iprangeArchive),
-        'tar -xJf '.escapeshellarg($iprangeArchive),
-        'cd '.escapeshellarg('iprange-'.$iprangeVersion),
-        './configure',
-        'make -j6',
-        'make install'
-    ]));
-} finally {
-    @unlink($archivePath);
-}
+pmssRunPinnedRemoteArchiveStep('iprange '.$iprangeVersion.' source', $iprangeUrl, $iprangeSha256, $iprangeArchive, 'iprange-'.$iprangeVersion, 'Building iprange from source', [
+    'cd '.escapeshellarg('iprange-'.$iprangeVersion), './configure', 'make -j6', 'make install',
+]);

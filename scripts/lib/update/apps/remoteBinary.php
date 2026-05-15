@@ -70,6 +70,29 @@ function pmssFetchPinnedRemoteFile(string $label, string $url, string $expectedS
     return $tmp;
 }
 
+/** Download a verified archive, unpack it in the compile workspace, then run caller steps. */
+function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): void
+{
+    $archivePath = pmssFetchPinnedRemoteFile($label, $url, $expectedSha256);
+    if (!is_string($archivePath) || $archivePath === '') {
+        return;
+    }
+
+    $tarMode = substr($archiveName, -7) === '.tar.xz' ? '-xJf' : '-xzf';
+    $commands = ['set -e', 'mkdir -p '.escapeshellarg($workDir), 'cd '.escapeshellarg($workDir),
+        'rm -rf '.escapeshellarg($sourceDir).' '.escapeshellarg($archiveName),
+        'cp '.escapeshellarg($archivePath).' '.escapeshellarg($archiveName), 'tar '.$tarMode.' '.escapeshellarg($archiveName)];
+    foreach ($postExtractCommands as $command) {
+        $commands[] = (string) $command;
+    }
+
+    try {
+        runStep($description, implode(' && ', $commands));
+    } finally {
+        @unlink($archivePath);
+    }
+}
+
 /** Install a verified remote binary, refreshing only when needed. */
 function pmssInstallPinnedRemoteBinary(
     string $label,
