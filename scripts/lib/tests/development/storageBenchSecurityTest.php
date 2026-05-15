@@ -258,4 +258,22 @@ class StorageBenchSecurityTest extends TestCase
             "Error: --device-runtime must be a positive integer.\n"
         );
     }
+
+    public function testJsonLogParentFileFailsBeforeBenchmarkWork(): void
+    {
+        $parent = $this->pmssMakeTempFile('pmss-bench-parent-');
+        $this->assertBenchmarkInputGuard(
+            ['--json='.$parent.'/benchmark-storage.jsonl'],
+            "Error: failed to create JSON log directory: {$parent}\n"
+        );
+    }
+
+    public function testDirectoryJsonLogPathFailsBeforeBenchmarkWork(): void
+    {
+        $dir = $this->pmssMakeTempDir('pmss-bench-logdir-', 0700);
+        $this->assertBenchmarkInputGuard(
+            ['--json='.$dir],
+            "Error: unsafe JSON log path: {$dir}\n"
+        );
+    }
 }
