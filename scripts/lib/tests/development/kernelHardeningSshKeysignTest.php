@@ -19,7 +19,7 @@ class KernelHardeningSshKeysignTest extends TestCase
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->captureMessages($logs));
+            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
         });
 
         clearstatcache(true, $target);
@@ -36,7 +36,7 @@ class KernelHardeningSshKeysignTest extends TestCase
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->captureMessages($logs));
+            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
         });
 
         $this->assertEquals(0755, fileperms($target) & 07777, 'expected mode unchanged');
@@ -50,7 +50,7 @@ class KernelHardeningSshKeysignTest extends TestCase
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->captureMessages($logs));
+            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'ssh-keysign not installed'), 'expected absence log');
@@ -65,15 +65,11 @@ class KernelHardeningSshKeysignTest extends TestCase
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target, 'PMSS_DRY_RUN' => '1'], function () use (&$logs): void {
-            \pmssEnsureSshKeysignSuidStrip($this->captureMessages($logs));
+            \pmssEnsureSshKeysignSuidStrip($this->pmssMakeArrayLogger($logs));
         });
 
         $this->assertEquals(04755, fileperms($target) & 07777, 'expected SUID preserved in dry-run');
         $this->assertTrue($this->pmssMessagesContain($logs, 'ssh-keysign SUID strip: skipping mutation'), 'expected dry-run log');
     }
 
-    private function captureMessages(array &$messages): callable
-    {
-        return function (string $message) use (&$messages): void { $messages[] = $message; };
-    }
 }

@@ -8,12 +8,12 @@ class TerminateUserTrafficImmutableTest extends TestCase
     public function testTerminateUserClearsImmutableTrafficBeforeHomeRemoval(): void
     {
         $src = (string) file_get_contents(__DIR__.'/../../../terminateUser.php');
-        $posClear = strpos($src, "'clear_immutable_traffic'");
-        $posRemove = strpos($src, "'remove_home_initial'");
-
-        $this->assertTrue($posClear !== false, 'terminateUser.php should define a clear_immutable_traffic step');
-        $this->assertTrue($posRemove !== false, 'terminateUser.php should define a remove_home_initial step');
-        $this->assertTrue($posClear < $posRemove, 'terminateUser.php should clear immutable traffic files before removing the home directory');
+        $this->assertOrderedStrings(
+            ["'clear_immutable_traffic'", "'remove_home_initial'"],
+            $src,
+            'terminateUser.php should define step ',
+            'terminateUser.php should clear immutable traffic files before removing the home directory: '
+        );
         $this->assertStringContainsString('command -v chattr', $src, 'terminateUser.php should guard immutable clearing with a chattr presence check');
         $this->assertStringContainsString('array_values(pmssTrafficDataPaths($username))', $src, 'terminateUser.php should source all traffic files from the shared helper');
     }

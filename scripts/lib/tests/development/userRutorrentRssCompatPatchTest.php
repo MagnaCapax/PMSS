@@ -8,8 +8,7 @@ class UserRutorrentRssCompatPatchTest extends TestCase
     public function testCompatibilityPatchesLegacyRssObFlushCall(): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/plugins/rss');
-        $path = $home.'/www/rutorrent/plugins/rss/action.php';
-        file_put_contents($path, "before\nob_flush();\nafter\n");
+        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/rss/action.php', "before\nob_flush();\nafter\n");
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
         $content = (string) file_get_contents($path);
@@ -21,8 +20,7 @@ class UserRutorrentRssCompatPatchTest extends TestCase
     public function testCompatibilityLeavesPatchedRssObFlushCallUntouched(): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/plugins/rss');
-        $path = $home.'/www/rutorrent/plugins/rss/action.php';
-        file_put_contents($path, "before\n@ob_flush();\nafter\n");
+        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/rss/action.php', "before\n@ob_flush();\nafter\n");
 
         $before = (string) file_get_contents($path);
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
@@ -52,8 +50,7 @@ class UserRutorrentRssCompatPatchTest extends TestCase
     public function testCompatibilityLeavesNonMatchingRssContentUntouched(): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/plugins/rss');
-        $path = $home.'/www/rutorrent/plugins/rss/action.php';
-        file_put_contents($path, "before\nflush();\nafter\n");
+        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/rss/action.php', "before\nflush();\nafter\n");
 
         $before = (string) file_get_contents($path);
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);

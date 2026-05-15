@@ -8,8 +8,7 @@ class UserRutorrentHddquotaCompatPatchTest extends TestCase
     public function testCompatibilityPatchesLegacyHddquotaReturnCast(): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/plugins/hddquota');
-        $path = $home.'/www/rutorrent/plugins/hddquota/action.php';
-        file_put_contents($path, "prefix\n        return \$field;\nsuffix\n");
+        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/hddquota/action.php', "prefix\n        return \$field;\nsuffix\n");
 
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
         $content = (string) file_get_contents($path);
@@ -21,8 +20,7 @@ class UserRutorrentHddquotaCompatPatchTest extends TestCase
     public function testCompatibilityLeavesPatchedHddquotaReturnUntouched(): void
     {
         $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/plugins/hddquota');
-        $path = $home.'/www/rutorrent/plugins/hddquota/action.php';
-        file_put_contents($path, "prefix\n        return (int) \$field;\nsuffix\n");
+        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/plugins/hddquota/action.php', "prefix\n        return (int) \$field;\nsuffix\n");
 
         $before = (string) file_get_contents($path);
         \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);

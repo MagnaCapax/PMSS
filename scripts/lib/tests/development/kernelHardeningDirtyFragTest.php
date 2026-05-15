@@ -14,7 +14,7 @@ class KernelHardeningDirtyFragTest extends TestCase
 
         $this->pmssWithEnv($this->dirtyFragEnv($dir, "Module                  Size  Used by\n"), function () use ($dir, &$logs, &$calls): void {
             \pmssEnsureDirtyFragBlacklist(
-                $this->captureMessages($logs),
+                $this->pmssMakeArrayLogger($logs),
                 $this->captureKernelCalls($calls)
             );
 
@@ -33,7 +33,7 @@ class KernelHardeningDirtyFragTest extends TestCase
 
         $snapshot = "Module                  Size  Used by\nesp4                   20480  2\nrxrpc                  45056  1\n";
         $this->pmssWithEnv($this->dirtyFragEnv($dir, $snapshot), function () use ($dir, &$logs): void {
-            \pmssEnsureDirtyFragBlacklist($this->captureMessages($logs), $this->noopKernelRunner());
+            \pmssEnsureDirtyFragBlacklist($this->pmssMakeArrayLogger($logs), $this->noopKernelRunner());
         });
 
         $flagPath = $dir.'/runtime/dirtyfrag-modules-loaded';
@@ -49,7 +49,7 @@ class KernelHardeningDirtyFragTest extends TestCase
 
         $snapshot = "Module                  Size  Used by\nesp6                   20480  0\n";
         $this->pmssWithEnv($this->dirtyFragEnv($dir, $snapshot), function () use (&$logs): void {
-            \pmssEnsureDirtyFragBlacklist($this->captureMessages($logs), $this->noopKernelRunner());
+            \pmssEnsureDirtyFragBlacklist($this->pmssMakeArrayLogger($logs), $this->noopKernelRunner());
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Dirty Frag modules still loaded after unload attempt'), 'expected residual module warning');
@@ -77,7 +77,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         $env['PMSS_LSMOD_OUTPUT_PATH'] = $dir.'/missing-lsmod.txt';
 
         $this->pmssWithEnv($env, function () use (&$logs): void {
-            \pmssEnsureDirtyFragBlacklist($this->captureMessages($logs), $this->noopKernelRunner());
+            \pmssEnsureDirtyFragBlacklist($this->pmssMakeArrayLogger($logs), $this->noopKernelRunner());
         });
 
         $this->assertTrue($this->pmssMessagesContain($logs, 'Unable to inspect Dirty Frag modules'), 'expected missing snapshot warning');
@@ -93,7 +93,7 @@ class KernelHardeningDirtyFragTest extends TestCase
 
         $this->pmssWithEnv($env, function () use (&$logs, &$calls): void {
             \pmssEnsureDirtyFragBlacklist(
-                $this->captureMessages($logs),
+                $this->pmssMakeArrayLogger($logs),
                 $this->captureKernelCalls($calls)
             );
         });
@@ -118,8 +118,6 @@ class KernelHardeningDirtyFragTest extends TestCase
 
         return $env;
     }
-
-    private function captureMessages(array &$messages): callable { return function (string $message) use (&$messages): void { $messages[] = $message; }; }
 
     private function captureKernelCalls(array &$calls): callable { return function (string $description, string $command) use (&$calls): int { $calls[] = [$description, $command]; return 0; }; }
 

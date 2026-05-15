@@ -14,7 +14,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
 
         $this->pmssWithEnv($this->algifEnv($dir), function () use ($dir, &$logs, &$calls): void {
             \pmssEnsureAlgifAeadBlacklist(
-                $this->captureMessages($logs),
+                $this->pmssMakeArrayLogger($logs),
                 $this->captureKernelCalls($calls)
             );
         });
@@ -34,7 +34,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
 
         $this->pmssWithEnv($this->algifEnv($dir), function () use (&$logs, &$calls): void {
             \pmssEnsureAlgifAeadBlacklist(
-                $this->captureMessages($logs),
+                $this->pmssMakeArrayLogger($logs),
                 $this->captureKernelCalls($calls)
             );
         });
@@ -53,7 +53,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
 
         $this->pmssWithEnv($env, function () use (&$logs, &$calls): void {
             \pmssEnsureAlgifAeadBlacklist(
-                $this->captureMessages($logs),
+                $this->pmssMakeArrayLogger($logs),
                 $this->captureKernelCalls($calls)
             );
         });
@@ -72,7 +72,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         list($ignored, $stdout) = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
             $this->pmssWithEnv($env, function () use (&$logs): void {
                 \pmssEnsureAlgifAeadBlacklist(
-                    $this->captureMessages($logs),
+                    $this->pmssMakeArrayLogger($logs),
                     $this->noopKernelRunner()
                 );
             });
@@ -94,7 +94,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         $calls = [];
         $this->pmssWithEnv($this->dispatcherEnv($dir, "Module                  Size  Used by\n", "CONFIG_CRYPTO_USER_API_AEAD=m\n"), function () use (&$logs, &$calls): void {
             \pmssApplyKernelHardening(
-                $this->captureMessages($logs),
+                $this->pmssMakeArrayLogger($logs),
                 $this->captureKernelCalls($calls)
             );
         });
@@ -127,7 +127,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         list($ignored, $stdout) = $this->pmssCaptureStdout(function () use ($env, &$logs): void {
             $this->pmssWithEnv($env, function () use (&$logs): void {
                 \pmssApplyKernelHardening(
-                    $this->captureMessages($logs),
+                    $this->pmssMakeArrayLogger($logs),
                     $this->noopKernelRunner()
                 );
             });
@@ -187,8 +187,6 @@ class KernelHardeningAlgifAeadTest extends TestCase
             'PMSS_LSMOD_OUTPUT_PATH' => $this->pmssWriteTempFile('lsmod', $lsmodOutput),
         ];
     }
-
-    private function captureMessages(array &$messages): callable { return function (string $message) use (&$messages): void { $messages[] = $message; }; }
 
     private function captureKernelCalls(array &$calls): callable { return function (string $description, string $command) use (&$calls): int { $calls[] = [$description, $command]; return 0; }; }
 
