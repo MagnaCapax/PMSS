@@ -17,6 +17,47 @@ class UpdateServicesRuntimeTest extends TestCase
         $this->assertSame(1, substr_count($normalized, "\nKexAlgorithms curve25519-sha256@libssh.org"));
         $this->assertSame(1, substr_count($normalized, "\nMACs hmac-sha2-512-etm@openssh.com"));
         $this->assertStringContainsString('# HostKeyAlgorithms ssh-ed25519', $normalized);
+        $this->assertStringNotContainsString('hmac-ripemd160', $normalized);
+    }
+
+    public function testSshdLegacyParserNormalizationWarnsWhenCommentingSecurityDirectives(): void
+    {
+        $messages = [];
+        \pmssSshdLegacyParserTemplateNormalize(
+            "HostKeyAlgorithms +ssh-rsa\nPubkeyAcceptedKeyTypes +ssh-rsa\n",
+            $this->pmssMakeArrayLogger($messages)
+        );
+
+        $this->assertTrue($this->pmssMessagesContain($messages, 'HostKeyAlgorithms +ssh-rsa'));
+        $this->assertTrue($this->pmssMessagesContain($messages, 'PubkeyAcceptedKeyTypes +ssh-rsa'));
+    }
+
+    public function testSshdValidationCommandUsesAbsolutePathWhenExecutable(): void
+    {
+        $sshd = $this->pmssMakeTempDir('pmss-sshd-bin-').'/sshd';
+        $this->pmssWriteFile($sshd, "#!/bin/sh\nexit 0\n");
+        @chmod($sshd, 0755);
+
+        $this->assertSame(\pmssBuildCommand($sshd, ['-t']), \pmssSshdValidationCommand($sshd));
+    }
+
+    public function testSshdValidationCommandFallsBackToBareCommandWhenMissing(): void
+    {
+        $this->assertSame('sshd -t', \pmssSshdValidationCommand($this->pmssMakeTempPath('pmss-missing-sshd-')));
+    }
+
+    public function testSshdValidationRc127SkipsLegacyFallbackMutation(): void
+    {
+        $this->pmssResetRuntimeProfile();
+        $sshdConfig = $this->pmssMakeTempDir('pmss-sshd-config-').'/sshd_config';
+        $original = "Port 22\nCiphers +aes128-ctr\nHostKeyAlgorithms +ssh-rsa\nPubkeyAcceptedKeyTypes +ssh-rsa\n";
+        $this->pmssWriteFile($sshdConfig, $original);
+
+        $result = \pmssSshdValidateConfigWithLegacyFallback($sshdConfig, '/bin/sh -c '.escapeshellarg('exit 127'));
+
+        $this->assertFalse($result);
+        $this->assertSame($original, $this->pmssReadFileOrEmpty($sshdConfig));
+        $this->assertEquals(['/bin/sh -c '.escapeshellarg('exit 127')], $this->pmssProfileCommands());
     }
 
     public function testApplyRuntimeTemplatesLogsCommandsInStableOrderDuringDryRun(): void
@@ -42,7 +83,7 @@ class UpdateServicesRuntimeTest extends TestCase
             '/usr/bin/systemctl daemon-reexec',
             'cp /etc/seedbox/config/template.sshd_config /etc/ssh/sshd_config',
             'chmod 644 /etc/ssh/sshd_config',
-            'sshd -t',
+            \pmssSshdValidationCommand(),
             '/usr/bin/systemctl restart sshd',
         ], $commands);
     }
