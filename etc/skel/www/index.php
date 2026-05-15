@@ -349,10 +349,20 @@ function setHeights() {
         ?>
 };
 
-$('#tabs').tabs({ onShow: function() { setHeights(); } });
-
+// Run the height cascade BEFORE invoking the tabs plugin. setHeights()
+// depends only on jQuery core, not on the tabs plugin, so iframes get
+// sized correctly even when the plugin script failed to load.
 setHeights();
-setInterval('setHeights();', 300);
+setInterval(setHeights, 300);
+
+try {
+    $('#tabs').tabs({ onShow: setHeights });
+} catch (e) {
+    // Tabs plugin unavailable (external script load failure, blocked
+    // request, etc.). Panel remains usable: heights are already set, tab
+    // anchors still navigate via fragment links, loadFrame() handles tab
+    // content insertion onClick.
+}
 
 function loadFrame(frameId, frameSrc) {
  var frameIds = frameId + frameSrc;
