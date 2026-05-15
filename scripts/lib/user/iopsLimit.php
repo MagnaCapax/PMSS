@@ -47,6 +47,8 @@ function pmssIopsLimitEnsureStorageDir(string $path): bool
     return pmssIntegerSettingStorageDirEnsure($path, 0700);
 }
 
+function pmssIopsLimitRuntimeUserPath(string $bucket, string $username, ?string $runtimeDir = null): string { return rtrim(pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime'), '/').'/'.$bucket.'/'.$username; }
+
 /** @param array<string,int> $targetModes */
 function pmssIopsLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool
 {
@@ -55,8 +57,7 @@ function pmssIopsLimitPersistTargetModes(array $targetModes, int $value, ?string
 
 function pmssIopsLimitRuntimePath(string $username, ?string $runtimeDir = null): string
 {
-    $root = pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime');
-    return rtrim($root, '/').'/iopsLimits/'.$username;
+    return pmssIopsLimitRuntimeUserPath('iopsLimits', $username, $runtimeDir);
 }
 
 function pmssIopsLimitPath(string $username, ?string $homeDir = null): string

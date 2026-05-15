@@ -19,14 +19,12 @@ function pmssIopsLimitThrottleIops(): int
 
 function pmssIopsLimitMarkerPath(string $username, ?string $runtimeDir = null): string
 {
-    $root = pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime');
-    return rtrim($root, '/').'/iopsLimitEnforced/'.$username;
+    return pmssIopsLimitRuntimeUserPath('iopsLimitEnforced', $username, $runtimeDir);
 }
 
 function pmssIopsLimitResourceStatsPath(string $username, ?string $runtimeDir = null): string
 {
-    $root = pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime');
-    return rtrim($root, '/').'/resourceStats/'.$username;
+    return pmssIopsLimitRuntimeUserPath('resourceStats', $username, $runtimeDir);
 }
 
 function pmssIopsLimitBuildThrottleCommand(string $username, int $iops): string
