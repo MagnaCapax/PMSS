@@ -43,39 +43,6 @@ function pmssStatsContextUserNormalize(string $user): string
 }
 
 /**
- * Choose the safe default home root for a stats context user.
- */
-function pmssStatsContextDefaultHome(string $user): string
-{
-    return function_exists('pmssUsernameIsValid') && pmssUsernameIsValid($user)
-        ? '/home/'.$user
-        : '/home';
-}
-
-/**
- * Prefer explicit PMSS overrides before falling back to the shell HOME.
- */
-function pmssStatsContextHomeCandidate(array $overrides, string $defaultHome): string
-{
-    if (array_key_exists('home', $overrides)) {
-        return (string) $overrides['home'];
-    }
-
-    $statsHome = getenv('PMSS_STATS_HOME');
-    if (is_string($statsHome) && trim($statsHome) !== '') {
-        return $statsHome;
-    }
-
-    $statsUser = array_key_exists('user', $overrides) ? $overrides['user'] : getenv('PMSS_STATS_USER');
-    if (is_string($statsUser) && trim($statsUser) !== '') {
-        return $defaultHome;
-    }
-
-    $shellHome = getenv('HOME');
-    return (is_string($shellHome) && trim($shellHome) !== '') ? $shellHome : $defaultHome;
-}
-
-/**
  * Resolve one stats path override while rejecting malformed or relative input.
  */
 function pmssStatsContextPathResolve($candidate, string $default, bool $directoryPath = false): string
@@ -109,12 +76,19 @@ function pmssStatsResolveContext(array $overrides = []): array
     }
     $user = pmssStatsContextUserNormalize($user);
 
-    $defaultHome = pmssStatsContextDefaultHome($user);
-    $home = pmssStatsContextPathResolve(
-        pmssStatsContextHomeCandidate($overrides, $defaultHome),
-        $defaultHome,
-        true
-    );
+    $defaultHome = function_exists('pmssUsernameIsValid') && pmssUsernameIsValid($user) ? '/home/'.$user : '/home';
+    if (array_key_exists('home', $overrides)) {
+        $homeCandidate = (string) $overrides['home'];
+    } elseif (is_string($statsHome = getenv('PMSS_STATS_HOME')) && trim($statsHome) !== '') {
+        $homeCandidate = $statsHome;
+    } else {
+        $statsUser = array_key_exists('user', $overrides) ? $overrides['user'] : getenv('PMSS_STATS_USER');
+        $shellHome = getenv('HOME');
+        $homeCandidate = is_string($statsUser) && trim($statsUser) !== ''
+            ? $defaultHome
+            : ((is_string($shellHome) && trim($shellHome) !== '') ? $shellHome : $defaultHome);
+    }
+    $home = pmssStatsContextPathResolve($homeCandidate, $defaultHome, true);
 
     $configDir = pmssStatsContextPathResolve(
         $overrides['config_dir'] ?? getenv('PMSS_STATS_CONFIG_DIR') ?: '/etc/seedbox/config',

@@ -52,6 +52,30 @@ class PmssStatsContextSafetyTest extends TestCase
         $this->assertSame($baseDir.'/cgroup', $context['cgroup_dir']);
     }
 
+    public function testResolveContextUsesShellHomeOnlyWithoutStatsUser(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-stats-context-home-');
+        $this->pmssWithEnv([
+            'HOME' => $baseDir.'/shell-home',
+            'PMSS_STATS_HOME' => null,
+            'PMSS_STATS_USER' => null,
+        ], function () use ($baseDir): void {
+            $context = \pmssStatsResolveContext(['user' => '']);
+
+            $this->assertSame($baseDir.'/shell-home', $context['home']);
+        });
+
+        $this->pmssWithEnv([
+            'HOME' => $baseDir.'/shell-home',
+            'PMSS_STATS_HOME' => null,
+            'PMSS_STATS_USER' => 'alice',
+        ], function (): void {
+            $context = \pmssStatsResolveContext();
+
+            $this->assertSame('/home/alice', $context['home']);
+        });
+    }
+
     public function testResolveContextUsesSafeHomeFallbackForTraversalLikeUsers(): void
     {
         $context = \pmssStatsResolveContext(['user' => '../../escape']);
