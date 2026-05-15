@@ -7,7 +7,6 @@
  */
 
 require_once __DIR__.'/../update/runtime/commands.php';
-require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/userConfigCli.php';
 require_once __DIR__.'/userConfigStore.php';
@@ -115,7 +114,7 @@ function pmssIopsLimitsRun(): int
             );
             if ($rc === 0) {
                 pmssIopsLimitWriteMarker($markerPath);
-                function_exists('pmssUserLog') && pmssUserLog($user, sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, pmssIopsLimitThrottleIops()));
+                pmssUserLog($user, sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, pmssIopsLimitThrottleIops()));
             }
             continue;
         }
@@ -124,14 +123,14 @@ function pmssIopsLimitsRun(): int
             $payload = $store->applyFallbacks($user, $store->get($user) ?? []);
             $command = pmssIopsLimitBuildRestoreCommand($user, $payload);
             if ($command === null) {
-                function_exists('pmssUserLog') && pmssUserLog($user, '[WARN] IOPS throttle restore skipped: missing RAM baseline');
+                pmssUserLog($user, '[WARN] IOPS throttle restore skipped: missing RAM baseline');
                 continue;
             }
 
             $rc = runStep('Restoring baseline cgroup IOPS for '.$user, $command);
             if ($rc === 0) {
                 pmssIopsLimitRemoveMarker($markerPath);
-                function_exists('pmssUserLog') && pmssUserLog($user, sprintf('monthly IOPS throttle removed (limit=%d usage=%d)', $limit, $usage));
+                pmssUserLog($user, sprintf('monthly IOPS throttle removed (limit=%d usage=%d)', $limit, $usage));
             }
         }
     }

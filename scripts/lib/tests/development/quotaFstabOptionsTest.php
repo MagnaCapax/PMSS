@@ -40,6 +40,7 @@ class QuotaFstabOptionsTest extends TestCase
         $this->assertStringContainsString('grpjquota=aquota.group', $updated);
         $this->assertStringContainsString('jqfmt=vfsv1', $updated);
         $this->assertStringContainsString('defaults,noatime', $updated);
+        $this->assertEquals(1, preg_match_all('/\s\/home\s/', $updated), 'expected existing /home line updated in place');
 
         $backups = glob($fstab.'.pmss-backup-*') ?: [];
         $this->assertEquals(1, count($backups), 'expected exactly one backup');
