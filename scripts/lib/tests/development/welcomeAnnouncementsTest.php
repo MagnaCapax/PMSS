@@ -2,7 +2,10 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/welcomeAnnouncements.php';
+// Helper relocated from scripts/lib/ to etc/skel/www/ — customer PHP cannot
+// traverse /scripts/. See AGENTS.md "INVIOLABLE Customer-Facing PHP Tree
+// Separation" rule.
+require_once dirname(__DIR__, 4).'/etc/skel/www/welcomeAnnouncements.php';
 
 class WelcomeAnnouncementsTest extends TestCase
 {
