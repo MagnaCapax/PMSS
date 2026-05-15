@@ -14,8 +14,15 @@
  * @version 1.0
  */
 
-if (file_exists('/scripts/lib/welcomeAnnouncements.php')) {
-    require_once '/scripts/lib/welcomeAnnouncements.php';
+// Customer-side helpers MUST live in the customer tree (etc/skel/www/) because
+// per-user lighttpd runs as the customer UID and cannot traverse /scripts/
+// (intentionally 750 root:root — the operator-only security boundary).
+// Helpers in /scripts/lib/ are unreachable from customer PHP; file_exists()
+// returns false and the require_once is silently skipped, producing
+// fleet-wide invisible feature loss.
+$pmssWelcomeAnnouncementsLib = __DIR__.'/welcomeAnnouncements.php';
+if (file_exists($pmssWelcomeAnnouncementsLib)) {
+    require_once $pmssWelcomeAnnouncementsLib;
 }
 if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
     require_once '/scripts/lib/webCgroupMemoryStatus.php';

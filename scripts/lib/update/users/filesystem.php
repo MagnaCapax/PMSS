@@ -194,6 +194,7 @@ PHP;
         'www/rutorrent/php/settings.php',
         'www/rutorrent/plugins/theme/conf.php',
         'www/welcome.php',
+        'www/welcomeAnnouncements.php',
     ];
     foreach ($files as $file) {
         updateUserFile($file, $user);
