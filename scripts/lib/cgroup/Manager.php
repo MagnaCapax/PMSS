@@ -15,6 +15,10 @@ require_once __DIR__ . '/../update/runtime/commands.php'; // for runStep
 
 class Manager
 {
+    private const IO_CLI_PROPERTY_MAP = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
+    private const IO_POLICY_DEFAULT_MAP = ['ioWeight' => 'io-weight', 'cpuWeight' => 'cpu-weight', 'tasksMax' => 'tasks-max'];
+    private const IO_POLICY_LIMIT_MAP = ['readBw' => ['IOReadBandwidthMax', false], 'writeBw' => ['IOWriteBandwidthMax', false], 'readIops' => ['IOReadIOPSMax', true], 'writeIops' => ['IOWriteIOPSMax', true]];
+
     /** @var SystemInterface */
     private $sys;
 
@@ -66,7 +70,6 @@ class Manager
         $ioPairs = [];
         $policyIoPairs = [];
         $ioCostWrites = [];
-        $ioMap = ['io-read-bw' => 'IOReadBandwidthMax', 'io-write-bw' => 'IOWriteBandwidthMax', 'io-read-iops' => 'IOReadIOPSMax', 'io-write-iops' => 'IOWriteIOPSMax'];
         $optTargets = ['cpu-weight' => true, 'io-weight' => true, 'tasks-max' => true, 'memory-high' => true, 'memory-max' => true, 'cpu-quota-percent' => true, 'io-latency-ms' => true, 'cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
         $ioSpecs = [];
         $optLowercase = ['cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
@@ -81,7 +84,7 @@ class Manager
             $name = substr($flag, 2, $separator - 2);
             $value = substr($flag, $separator + 1);
 
-            if (isset($ioMap[$name])) {
+            if (isset(self::IO_CLI_PROPERTY_MAP[$name])) {
                 $ioSpecs[$name][] = $value;
                 $hasIoFlag = true;
                 continue;
@@ -98,7 +101,7 @@ class Manager
             }
         }
 
-        foreach ($ioMap as $flagName => $propertyName) {
+        foreach (self::IO_CLI_PROPERTY_MAP as $flagName => $propertyName) {
             foreach ($ioSpecs[$flagName] ?? [] as $spec) {
                 $parsedIoPair = $this->parseIoPropertyPair($propertyName, $spec);
                 if ($parsedIoPair === null) {
@@ -416,10 +419,9 @@ class Manager
                 continue;
             }
 
-            foreach ([['ioWeight', 'IODeviceWeight', true], ['readBw', 'IOReadBandwidthMax', false], ['writeBw', 'IOWriteBandwidthMax', false], ['readIops', 'IOReadIOPSMax', true], ['writeIops', 'IOWriteIOPSMax', true]] as $mapping) {
-                $policyKey = $mapping[0];
-                $propertyName = $mapping[1];
-                $numeric = $mapping[2];
+            foreach (['ioWeight' => ['IODeviceWeight', true]] + self::IO_POLICY_LIMIT_MAP as $policyKey => $mapping) {
+                $propertyName = $mapping[0];
+                $numeric = $mapping[1];
                 $value = $this->policyPositiveValue($mountPolicy, $policyKey, $numeric);
                 if ($value === null) {
                     continue;
@@ -568,9 +570,7 @@ class Manager
                     : ['defaults' => [], 'limits' => []];
                 $hasValidOverride = false;
 
-                foreach ([['ioWeight', 'io-weight'], ['cpuWeight', 'cpu-weight'], ['tasksMax', 'tasks-max']] as $mapping) {
-                    $policyKey = $mapping[0];
-                    $targetKey = $mapping[1];
+                foreach (self::IO_POLICY_DEFAULT_MAP as $policyKey => $targetKey) {
                     $value = $this->policyPositiveValue($profileConfig, $policyKey, true);
                     if ($value === null) {
                         continue;
@@ -579,8 +579,7 @@ class Manager
                     $hasValidOverride = true;
                 }
 
-                foreach ([['readBw', false], ['writeBw', false], ['readIops', true], ['writeIops', true]] as $mapping) {
-                    $limitKey = $mapping[0];
+                foreach (self::IO_POLICY_LIMIT_MAP as $limitKey => $mapping) {
                     $numeric = $mapping[1];
                     $limitValue = $this->policyPositiveValue($profileConfig, $limitKey, $numeric);
                     if ($limitValue === null) {
@@ -614,14 +613,8 @@ class Manager
             return;
         }
 
-        foreach ([
-            ['readBw', 'IOReadBandwidthMax'],
-            ['writeBw', 'IOWriteBandwidthMax'],
-            ['readIops', 'IOReadIOPSMax'],
-            ['writeIops', 'IOWriteIOPSMax'],
-        ] as $mapping) {
-            $limitKey = $mapping[0];
-            $propertyName = $mapping[1];
+        foreach (self::IO_POLICY_LIMIT_MAP as $limitKey => $mapping) {
+            $propertyName = $mapping[0];
             if (!array_key_exists($limitKey, $entry['limits'])) {
                 continue;
             }
