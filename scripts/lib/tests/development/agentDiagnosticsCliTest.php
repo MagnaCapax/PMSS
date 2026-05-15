@@ -27,15 +27,14 @@ final class agentDiagnosticsCliTest extends TestCase
         file_put_contents($versionPath, "git/main@2026-03-28\n");
 
         $binDir = $this->makeCommandStubs();
-        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json', '--pretty', '--user=alice'], [
+        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json', '--pretty', '--user=alice'], $this->pmssPathPrefixedEnvironment($binDir, [
             'PMSS_TEST_MODE' => '1',
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
             'PMSS_AGENT_DIAGNOSTICS_MOTD_PATH' => $motdPath,
             'PMSS_AGENT_DIAGNOSTICS_MDSTAT_PATH' => $mdstatPath,
             'PMSS_AGENT_DIAGNOSTICS_FSTAB_PATH' => $fstabPath,
             'PMSS_AGENT_DIAGNOSTICS_VERSION_PATH' => $versionPath,
-            'PATH' => $binDir.':'.(string) getenv('PATH'),
-        ]);
+        ]));
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame(
@@ -73,11 +72,10 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $scriptRoot = $this->makeScriptRoot();
         $binDir = $this->makeCommandStubs();
-        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', [], [
+        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', [], $this->pmssPathPrefixedEnvironment($binDir, [
             'PMSS_TEST_MODE' => '1',
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
-            'PATH' => $binDir.':'.(string) getenv('PATH'),
-        ]);
+        ]));
 
         $this->assertStringContainsAllStrings(['PMSS Agent Diagnostics', 'user: -', '== services =='], $output);
     }
@@ -86,11 +84,10 @@ final class agentDiagnosticsCliTest extends TestCase
     {
         $scriptRoot = $this->makeScriptRoot(true);
         $binDir = $this->makeCommandStubs();
-        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json'], [
+        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json'], $this->pmssPathPrefixedEnvironment($binDir, [
             'PMSS_TEST_MODE' => '1',
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
-            'PATH' => $binDir.':'.(string) getenv('PATH'),
-        ]);
+        ]));
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame('checkUsers.php --json failed', $payload['sections']['users']['consistency']['error']);
@@ -101,11 +98,10 @@ final class agentDiagnosticsCliTest extends TestCase
         $scriptRoot = $this->makeScriptRoot();
         unlink($scriptRoot.'/scripts/util/checkUsers.php');
         $binDir = $this->makeCommandStubs();
-        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json'], [
+        $output = $this->pmssRunRepoPhpScript('scripts/util/agentDiagnostics.php', ['--json'], $this->pmssPathPrefixedEnvironment($binDir, [
             'PMSS_TEST_MODE' => '1',
             'PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT' => $scriptRoot,
-            'PATH' => $binDir.':'.(string) getenv('PATH'),
-        ]);
+        ]));
         $payload = $this->pmssDecodeJsonArray($output);
 
         $this->assertSame('checkUsers.php --json failed', $payload['sections']['users']['consistency']['error']);

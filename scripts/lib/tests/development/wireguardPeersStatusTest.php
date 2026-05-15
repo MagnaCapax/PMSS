@@ -61,16 +61,12 @@ class WireGuardPeersStatusTest extends TestCase
         @file_put_contents($wgPath, $wgScript);
         @chmod($wgPath, 0755);
 
-        $path = getenv('PATH');
-        $path = ($path === false || $path === '') ? $binDir : $binDir.':'.$path;
-
         return $this->pmssRunPhpScript(
             dirname(__DIR__, 3).'/wireguardPeersStatus.php',
             [],
-            [
+            $this->pmssPathPrefixedEnvironment($binDir, [
                 'PMSS_WG_CONFIG_DIR' => $configDir,
-                'PATH' => $path,
-            ]
+            ])
         );
     }
 }

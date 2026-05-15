@@ -688,10 +688,17 @@ abstract class TestCase
         $property->setValue($this, '');
     }
 
+    /** Build a PATH value with a test stub directory first. */
+    protected function pmssPathWithPrefix(string $prefix): string
+    {
+        $originalPath = getenv('PATH');
+        return $prefix.(($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '');
+    }
+
     /** Build an environment array with a stub directory prepended to PATH. */
     protected function pmssPathPrefixedEnvironment(string $prefix, array $environment = []): array
     {
-        $environment['PATH'] = $prefix.':'.(string) getenv('PATH');
+        $environment['PATH'] = $this->pmssPathWithPrefix($prefix);
         return $environment;
     }
 
@@ -821,6 +828,12 @@ abstract class TestCase
         $this->pmssWithTrackedEnv($values, $callback);
     }
 
+    /** Apply temporary env overrides while prepending a stub directory to PATH. */
+    protected function pmssWithPathPrefixedEnv(string $prefix, array $values, callable $callback): void
+    {
+        $this->pmssWithEnv($this->pmssPathPrefixedEnvironment($prefix, $values), $callback);
+    }
+
     /**
      * Apply environment overrides for the current test and restore them automatically afterwards.
      *
@@ -863,10 +876,7 @@ abstract class TestCase
     /** Temporarily prepend a directory to PATH for a callback. */
     protected function pmssWithPathPrefix(string $prefix, callable $callback): void
     {
-        $originalPath = getenv('PATH');
-        $path = $prefix.(($originalPath !== false && $originalPath !== '') ? ':'.$originalPath : '');
-
-        $this->pmssWithEnv(['PATH' => $path], $callback);
+        $this->pmssWithPathPrefixedEnv($prefix, [], $callback);
     }
 
     /**
