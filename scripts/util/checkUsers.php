@@ -50,11 +50,5 @@ $sections = [
 
 foreach ($sections as $section) {
     echo $section['prefix'].$section['label']."\n";
-    if (empty($section['list'])) {
-        echo "  (none)\n";
-        continue;
-    }
-    foreach ($section['list'] as $name) {
-        echo "  - {$name}\n";
-    }
+    echo empty($section['list']) ? "  (none)\n" : "  - ".implode("\n  - ", $section['list'])."\n";
 }

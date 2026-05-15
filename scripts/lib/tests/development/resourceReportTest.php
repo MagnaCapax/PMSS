@@ -117,11 +117,7 @@ class ResourceReportTest extends TestCase
 
     public function testStoredPayloadReportRowMatchesSnapshot(): void
     {
-        $values = [
-            'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7), 'io_write' => $this->pmssBuildWindowValues(20, 19, 18, 17), 'io_read_ops' => $this->pmssBuildWindowValues(30, 29, 28, 27),
-            'io_write_ops' => $this->pmssBuildWindowValues(40, 39, 38, 37), 'cpu' => $this->pmssBuildWindowValues(50, 49, 48, 47), 'ram_hours' => $this->pmssBuildWindowValues(60, 59, 58, 57),
-            'memory_current' => 70, 'memory_avg_month' => 69, 'tasks_current' => 11,
-        ];
+        $values = $this->standardValues();
         $payload = $this->pmssBuildResourceStatsPayloadFromValues($values);
 
         $this->assertEquals($this->pmssBuildResourceReportRowFromValues($values), \pmssResourceStoredPayloadReportRow($payload));
@@ -129,11 +125,7 @@ class ResourceReportTest extends TestCase
 
     public function testBuildReportSingleUserMatchesSnapshot(): void
     {
-        $values = [
-            'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7), 'io_write' => $this->pmssBuildWindowValues(20, 19, 18, 17), 'io_read_ops' => $this->pmssBuildWindowValues(30, 29, 28, 27),
-            'io_write_ops' => $this->pmssBuildWindowValues(40, 39, 38, 37), 'cpu' => $this->pmssBuildWindowValues(50, 49, 48, 47), 'ram_hours' => $this->pmssBuildWindowValues(60, 59, 58, 57),
-            'memory_current' => 70, 'memory_avg_month' => 69, 'tasks_current' => 11,
-        ];
+        $values = $this->standardValues();
         $this->writeUserStats('alice', $values);
         $expectedRow = $this->pmssBuildResourceReportRowFromValues($values);
 
@@ -147,5 +139,14 @@ class ResourceReportTest extends TestCase
     private function writeUserData(string $user, array $data): void
     {
         $this->pmssWriteSerializedFixture($this->statsDir.'/'.$user, $data);
+    }
+
+    private function standardValues(): array
+    {
+        return [
+            'io_read' => $this->pmssBuildWindowValues(10, 9, 8, 7), 'io_write' => $this->pmssBuildWindowValues(20, 19, 18, 17), 'io_read_ops' => $this->pmssBuildWindowValues(30, 29, 28, 27),
+            'io_write_ops' => $this->pmssBuildWindowValues(40, 39, 38, 37), 'cpu' => $this->pmssBuildWindowValues(50, 49, 48, 47), 'ram_hours' => $this->pmssBuildWindowValues(60, 59, 58, 57),
+            'memory_current' => 70, 'memory_avg_month' => 69, 'tasks_current' => 11,
+        ];
     }
 }
