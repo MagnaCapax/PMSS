@@ -86,6 +86,10 @@ class rtorrentConfigCreateConfigTest extends TestCase
 
         $this->assertEquals($expected, (string) $result['configFile']);
         $this->assertEquals($input, $result['config']);
+
+        $defaults = new \rtorrentConfig(['custom' => true], "min=##minimumPeers\nmax=##maximumPeers\nus=##uploadSlots\nusg=##uploadSlotsGlobal\n");
+        $defaultResult = $defaults->createConfig($input);
+        $this->assertEquals("min=24\nmax=128\nus=28\nusg=168\n", $defaultResult['configFile']);
     }
 
     public function testCreateConfigAppliesMemoryHeadroomGuardrails(): void

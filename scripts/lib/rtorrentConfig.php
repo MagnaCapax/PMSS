@@ -123,7 +123,7 @@ class rtorrentConfig {
 		// Config for localnets, add preferred ipv4 filtering if defined
 		if (is_readable('/etc/seedbox/config/localnet')) {
 			$configFile .= "\nipv4_filter.load = /etc/seedbox/config/localnet, preferred";
-			shell_exec("chmod 664 /etc/seedbox/config/localnet;");
+			@chmod('/etc/seedbox/config/localnet', 0664);
 		}
 
         
@@ -153,13 +153,10 @@ class rtorrentConfig {
 	    //if (file_exists($customConfigFile) && is_readable($customConfigFile))
 	    //  $config = file_get_contents($customConfigFile) . "\n\n" . $config;
 	    
-		$file = '/home/' . $user . '/.rtorrent.rc';
-		$this->_log('info', 'Writing .rtorrent.rc to: ' . $file . "\nContents:\n{$config}\n");
-		if (!file_exists($file)) { touch($file); chmod($file, 0644); }
-		if (is_writable($file)) {
-			if (file_put_contents($file, $config)) return true;
-				else return false;
-		} else return false;
+	    $file = '/home/' . $user . '/.rtorrent.rc';
+	    $this->_log('info', 'Writing .rtorrent.rc to: ' . $file . "\nContents:\n{$config}\n");
+	    if (!file_exists($file)) { touch($file); chmod($file, 0644); }
+	    return is_writable($file) && file_put_contents($file, $config) !== false;
 	}
 	
 		/**
@@ -180,8 +177,7 @@ class rtorrentConfig {
 			#TODO Check mtime + permissions first. if root and no "other" write permission + mtime exceeds 2-3 months, we can be 99.9% certain it's right
 	                $data = file_get_contents( $file );
 			
-			if ($data !== $config) return $this->writeConfig($user, $config);
-			return null;
+			return $data !== $config ? $this->writeConfig($user, $config) : null;
 		}
     
 	    /**
@@ -195,10 +191,9 @@ class rtorrentConfig {
 	     * @return array|false Parsed configuration array or false on failure.
 	     */
 	    public function readUserConfig($user) {
-        if (!file_exists("/home/{$user}/.rtorrent.rc") or
-            is_dir("/home/{$user}/.rtorrent.rc") ) return false;
-        return $this->readConfig( "/home/{$user}/.rtorrent.rc" );
-    }
+	        $file = "/home/{$user}/.rtorrent.rc";
+	        return (!file_exists($file) || is_dir($file)) ? false : $this->readConfig($file);
+	    }
     
 	    /**
 	     * Read and parse a `.rtorrent.rc` style configuration file.
@@ -272,26 +267,14 @@ class rtorrentConfig {
 	 * Checks resource config template. This also defines config options for reference
 	 * 
 	 */
-	protected function _checkResourceConfig() {
-		// Legacy helper keeps downstream code resilient if config misses fields.
-		
-		$config = &$this->_resourceConfig;
-
-			// We use ram blocks for calculations, ram defined in Mb
-		if (!isset($config['ramBlock'])) $config['ramBlock'] = 250;
-		
-		if (!isset($config['peers'])) {
-			// These are set "per ram block"
-			$config['peers'] = array(
-				'minimum' => 6,
-				'maximum' => 32
-			);
+		protected function _checkResourceConfig() {
+			// Legacy defaults keep downstream code resilient if config misses fields.
+			$this->_resourceConfig += [
+				'ramBlock' => 250,
+				'peers' => ['minimum' => 6, 'maximum' => 32],
+				'uploadSlots' => 7,
+			];
 		}
-		
-		if (!isset($config['uploadSlots'])) {
-			$config['uploadSlots'] = 7;
-		}
-	}
 
 	/**
 	 * Load the default resource configuration JSON from disk.
