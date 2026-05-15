@@ -21,6 +21,8 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
         $this->assertTrue(is_file($target), 'Expected user@.service drop-in to be created');
         $body = (string)file_get_contents($target);
         $this->assertStringContainsString('LimitNOFILE=8192:16384', $body);
+        $this->assertSame(0644, fileperms($target) & 0777);
+        $this->assertTrue(!file_exists($target.'.tmp'), 'Temporary drop-in file should not remain after install');
     }
 
     public function testClampsHardLimitUpToSoftLimit(): void
@@ -80,5 +82,7 @@ class SystemdUserManagerNoFileLimitInstallTest extends TestCase
         $this->assertTrue(is_file($target), 'Expected user@.service log namespace drop-in to be created');
         $body = (string)file_get_contents($target);
         $this->assertStringContainsString('LogNamespace=user-%i', $body);
+        $this->assertSame(0644, fileperms($target) & 0777);
+        $this->assertTrue(!file_exists($target.'.tmp'), 'Temporary log namespace drop-in should not remain after install');
     }
 }

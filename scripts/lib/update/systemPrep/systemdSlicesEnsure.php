@@ -7,6 +7,17 @@
 
 require_once dirname(__DIR__).'/../runtime.php';
 
+/** Atomically install a systemd drop-in and keep failure logging consistent. */
+function pmssSystemdDropinInstall(string $target, string $body, callable $log, string $writeFailurePrefix, string $installFailurePrefix, ?string $successMessage = null): bool
+{
+    $tmpTarget = $target.'.tmp';
+    if (@file_put_contents($tmpTarget, $body) === false) { $log($writeFailurePrefix.$tmpTarget); return false; }
+    @chmod($tmpTarget, 0644);
+    if (!@rename($tmpTarget, $target)) { $log($installFailurePrefix.$target); @unlink($tmpTarget); return false; }
+    if ($successMessage !== null) { $log($successMessage); }
+    return true;
+}
+
 /**
  * Render and install LimitNOFILE drop-in for user@.service when configured.
  */
@@ -33,19 +44,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
 
     $target = $dropDir.'/20-pmss-limits.conf';
     $body = "# PMSS: per-user manager descriptor limits from cgroup.policy.php\n[Service]\nLimitNOFILE={$soft}:{$hard}\n";
-    if (@file_put_contents($tmpTarget = $target.'.tmp', $body) === false) {
-        $log('[WARN] Failed to write temp user@.service drop-in '.$tmpTarget);
-        return;
-    }
-    @chmod($tmpTarget, 0644);
-
-    if (!@rename($tmpTarget, $target)) {
-        $log('[WARN] Failed to install user@.service drop-in '.$target);
-        @unlink($tmpTarget);
-        return;
-    }
-
-    $log(sprintf('Installed %s with LimitNOFILE=%d:%d', $target, $soft, $hard));
+    pmssSystemdDropinInstall($target, $body, $log, '[WARN] Failed to write temp user@.service drop-in ', '[WARN] Failed to install user@.service drop-in ', sprintf('Installed %s with LimitNOFILE=%d:%d', $target, $soft, $hard));
 }
 
     /**
@@ -178,15 +177,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         }
 
         // Atomic write to avoid race conditions where the file is briefly missing
-        $tmpTarget = $target.'.tmp';
-        if (@file_put_contents($tmpTarget, $raw) === false) {
-            $log('[WARN] Failed to write temp user-.slice drop-in '.$tmpTarget);
-            return;
-        }
-        @chmod($tmpTarget, 0644);
-        if (!@rename($tmpTarget, $target)) {
-            $log('[WARN] Failed to atomically replace user-.slice drop-in '.$target);
-            @unlink($tmpTarget);
+        if (!pmssSystemdDropinInstall($target, $raw, $log, '[WARN] Failed to write temp user-.slice drop-in ', '[WARN] Failed to atomically replace user-.slice drop-in ')) {
             return;
         }
 
@@ -220,17 +211,7 @@ function pmssSystemdUserManagerNoFileLimitInstall(array $policy, callable $log):
         } else {
             $userAtTarget = $userAtDropDir.'/30-pmss-log-namespace.conf';
             $userAtBody = "# PMSS: isolate per-user manager logs in dedicated namespaces\n[Service]\nLogNamespace=user-%i\n";
-            if (@file_put_contents($userAtTmpTarget = $userAtTarget.'.tmp', $userAtBody) === false) {
-                $log('[WARN] Failed to write temp user@.service log namespace drop-in '.$userAtTmpTarget);
-            } else {
-                @chmod($userAtTmpTarget, 0644);
-                if (!@rename($userAtTmpTarget, $userAtTarget)) {
-                    $log('[WARN] Failed to install user@.service log namespace drop-in '.$userAtTarget);
-                    @unlink($userAtTmpTarget);
-                } else {
-                    $log('Installed '.$userAtTarget.' with LogNamespace=user-%i');
-                }
-            }
+            pmssSystemdDropinInstall($userAtTarget, $userAtBody, $log, '[WARN] Failed to write temp user@.service log namespace drop-in ', '[WARN] Failed to install user@.service log namespace drop-in ', 'Installed '.$userAtTarget.' with LogNamespace=user-%i');
         }
 
         if ($skipSystemctl) {

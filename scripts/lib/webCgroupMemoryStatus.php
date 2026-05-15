@@ -8,6 +8,8 @@
  * @license GPL-3.0-only
  */
 
+require_once __DIR__.'/runtime.php';
+
 /** Format bytes into a compact human-readable string. */
 function pmssWebCgroupMemoryStatusFormatBytes($bytes, $precision = 1)
 {
@@ -15,15 +17,7 @@ function pmssWebCgroupMemoryStatusFormatBytes($bytes, $precision = 1)
         return 'n/a';
     }
 
-    $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
-    $value = (float) $bytes;
-    $unitIndex = 0;
-    while ($value >= 1024.0 && $unitIndex < count($units) - 1) {
-        $value /= 1024.0;
-        $unitIndex++;
-    }
-
-    return number_format($value, $unitIndex === 0 ? 0 : (int) $precision, '.', '').' '.$units[$unitIndex];
+    return pmssFormatBytes((float) $bytes, (int) $precision);
 }
 
 /** Detect the readable user.slice directory for the current account. */

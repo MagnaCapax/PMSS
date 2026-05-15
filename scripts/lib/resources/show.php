@@ -84,15 +84,7 @@ function pmssShowResourcesMain(array $argv): int
         return pmssJsonEmitPayload(['users' => $rows, 'totals' => $totals, 'missing' => $missingStats], 'Failed to encode resource report JSON.');
     }
 
-    $formatBytes = static function (float $bytes): string {
-        foreach ([1099511627776.0 => 'TiB', 1073741824.0 => 'GiB', 1048576.0 => 'MiB'] as $divisor => $unit) {
-            if ($bytes >= $divisor) {
-                return number_format($bytes / $divisor, 2).' '.$unit;
-            }
-        }
-
-        return number_format($bytes / 1024, 2).' KiB';
-    };
+    $formatBytes = static function (float $bytes): string { return pmssFormatBytes($bytes, 2, 1); };
     $formatIoOperations = static function (float $operations): string {
         foreach ([1000000000.0 => 'B ops', 1000000.0 => 'M ops', 1000.0 => 'K ops'] as $divisor => $unit) {
             if ($operations >= $divisor) {

@@ -214,14 +214,7 @@ function pmssStatsReadQuotaSnapshot(string $home): array
  */
 function pmssStatsFormatBytes(float $bytes, int $precision = 1): string
 {
-    $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
-    $index = 0;
-    while ($bytes >= 1024.0 && $index < count($units) - 1) {
-        $bytes /= 1024.0;
-        $index++;
-    }
-
-    return number_format($bytes, $index === 0 ? 0 : $precision, '.', '').' '.$units[$index];
+    return pmssFormatBytes($bytes, $precision);
 }
 
 /**

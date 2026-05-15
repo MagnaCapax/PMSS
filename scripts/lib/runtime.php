@@ -98,6 +98,25 @@ if (!function_exists('pmssEnvValueIsTruthy')) {
     // Treat explicit enable values as truthy toggles.
     function pmssEnvValueIsTruthy($value): bool { return in_array(pmssEnvValueNormalized($value), ['1', 'true', 'yes', 'on'], true); }
 }
+if (!function_exists('pmssFormatBytes')) {
+    // Format byte counts with binary IEC units for compact human output.
+    function pmssFormatBytes(float $bytes, int $precision = 1, int $minimumUnitIndex = 0): string
+    {
+        $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+        $index = 0;
+        $minimumUnitIndex = max(0, min($minimumUnitIndex, count($units) - 1));
+        while ($index < $minimumUnitIndex && $index < count($units) - 1) {
+            $bytes /= 1024.0;
+            $index++;
+        }
+        while ($bytes >= 1024.0 && $index < count($units) - 1) {
+            $bytes /= 1024.0;
+            $index++;
+        }
+
+        return number_format($bytes, $index === 0 ? 0 : $precision, '.', '').' '.$units[$index];
+    }
+}
 if (!function_exists('pmssConfigLineTrimmed')) {
     // Trim a config line and drop blank/commented entries.
     function pmssConfigLineTrimmed(string $line, array $commentPrefixes = ['#']): string
