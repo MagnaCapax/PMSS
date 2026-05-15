@@ -209,20 +209,20 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $this->assertStringContainsString("str_repeat('-', 10 - \$filled)", $src);
     }
 
-    public function testStorageHealthSnapshotKeepsLsblkParsingLocal(): void
+    public function testStorageToolsShareLsblkDiskInventoryParser(): void
     {
         $snapshotSrc = $this->pmssReadRepoFile('scripts/util/storageHealthSnapshot.php');
+        $benchmarkSrc = $this->pmssReadRepoFile('scripts/util/storageBenchmark.php');
+        $commonSrc = $this->pmssReadRepoFile('scripts/lib/storageHealth/common.php');
         $libraryPath = dirname(__DIR__, 4).'/scripts/lib/storageHealth/disks.php';
         $facadeSrc = $this->pmssReadRepoFile('scripts/lib/storageHealth.php');
-        $symbol = 'pmssStorageHealthList'.'DisksFromLsblk';
+        $symbol = 'pmssStorageHealthDisk'.'InventoryFromLsblk';
 
         $this->assertTrue(!is_file($libraryPath), 'Expected one-call storageHealth/disks.php helper file to be removed');
-        $this->assertTrue(
-            strpos($snapshotSrc, $symbol.'(') === false,
-            'storageHealthSnapshot.php should keep lsblk parsing local to pmssStorageHealthSnapshotMain()'
-        );
-        $this->assertStringContainsString("preg_split('/\\r?\\n/', trim((string) \$lsblkOut))", $snapshotSrc);
-        $this->assertStringContainsString("strpos(\$kname, 'loop') === 0", $snapshotSrc);
+        $this->assertStringContainsString('function '.$symbol.'(', $commonSrc);
+        $this->assertStringContainsString($symbol.'((string) shell_exec', $snapshotSrc);
+        $this->assertStringContainsString($symbol.'((string) shell_exec', $benchmarkSrc);
+        $this->pmssAssertStringNotContainsString("preg_split('/\\r?\\n/', trim((string) \$lsblkOut))", $snapshotSrc, 'snapshot should not keep a local lsblk parser');
         $this->pmssAssertStringNotContainsString(
             "'disks'",
             $facadeSrc,
