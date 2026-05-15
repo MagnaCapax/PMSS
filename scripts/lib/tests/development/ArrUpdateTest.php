@@ -19,9 +19,7 @@ class ArrUpdateTest extends TestCase
         $workPattern = sys_get_temp_dir().'/'.strtolower($app).'-*';
 
         try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
@@ -49,9 +47,7 @@ class ArrUpdateTest extends TestCase
         @file_put_contents($installPath.'/marker.txt', 'existing');
 
         try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
             });
 
@@ -77,9 +73,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir, 'amd64');
 
         try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)-.*\.tar\.gz/');
             });
 
@@ -102,9 +96,7 @@ class ArrUpdateTest extends TestCase
         $shimDir = $this->writeCurlShim($baseDir, 'amd64');
 
         try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir, '/bundle-([0-9.]+)(?:-.*)?\.tar\.gz/');
             });
 
@@ -176,12 +168,11 @@ class ArrUpdateTest extends TestCase
         $this->writeTimeoutShim($shimDir);
 
         try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
-                'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
-                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
                 $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-            });
+            }, [
+                'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
+            ]);
 
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
             $timeoutOutput = (string) @file_get_contents($timeoutLog);
@@ -209,13 +200,12 @@ class ArrUpdateTest extends TestCase
         $this->writeTimeoutShim($shimDir);
 
         try {
-            $this->pmssWithPathPrefixedEnv($shimDir, [
+            $this->withArrShim($shimDir, function () use ($app, $installPath, $metadataPath, $extractDir): void {
+                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
+            }, [
                 'PMSS_ARR_TEST_TIMEOUT_LOG' => $timeoutLog,
                 'PMSS_ARR_TEST_TIMEOUT_MODE' => 'always-timeout',
-                'PMSS_LOG_FILE' => $baseDir.'/runtime.log',
-            ], function () use ($app, $installPath, $metadataPath, $extractDir): void {
-                $this->runArrUpdate($app, $installPath, $metadataPath, $extractDir);
-            });
+            ]);
 
             $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
             $timeoutOutput = (string) @file_get_contents($timeoutLog);
@@ -300,12 +290,19 @@ class ArrUpdateTest extends TestCase
         return $metadataPath;
     }
 
+    private function withArrShim(string $shimDir, callable $callback, array $env = []): void
+    {
+        $this->pmssWithPathPrefixedEnv($shimDir, array_merge([
+            'PMSS_LOG_FILE' => dirname($shimDir).'/runtime.log',
+        ], $env), $callback);
+    }
+
     private function writeCurlShim(string $baseDir, string $architecture = ''): string
     {
         $shimDir = $baseDir.'/bin';
         @mkdir($shimDir, 0755, true);
         $curl = $shimDir.'/curl';
-        @file_put_contents($curl, <<<'SH'
+        $this->pmssWriteExecutableFile($curl, <<<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 target=''
@@ -328,12 +325,10 @@ done
 cp "${source_url#file://}" "$target"
 SH
         );
-        @chmod($curl, 0755);
 
         if ($architecture !== '') {
             $dpkg = $shimDir.'/dpkg';
-            @file_put_contents($dpkg, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--print-architecture\" ]; then\n  printf '%s\\n' ".escapeshellarg($architecture)."\n  exit 0\nfi\nexit 1\n");
-            @chmod($dpkg, 0755);
+            $this->pmssWriteExecutableFile($dpkg, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--print-architecture\" ]; then\n  printf '%s\\n' ".escapeshellarg($architecture)."\n  exit 0\nfi\nexit 1\n");
         }
 
         return $shimDir;
@@ -341,14 +336,13 @@ SH
 
     private function writeVersionBinary(string $path, string $version): void
     {
-        @file_put_contents($path, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--version\" ] || [ \"\${1:-}\" = \"-v\" ]; then\n  printf '%s\\n' ".escapeshellarg($version)."\n  exit 0\nfi\nexit 1\n");
-        @chmod($path, 0755);
+        $this->pmssWriteExecutableFile($path, "#!/usr/bin/env bash\nif [ \"\${1:-}\" = \"--version\" ] || [ \"\${1:-}\" = \"-v\" ]; then\n  printf '%s\\n' ".escapeshellarg($version)."\n  exit 0\nfi\nexit 1\n");
     }
 
     private function writeTimeoutShim(string $shimDir): void
     {
         $timeout = $shimDir.'/timeout';
-        @file_put_contents($timeout, <<<'SH'
+        $this->pmssWriteExecutableFile($timeout, <<<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "${PMSS_ARR_TEST_TIMEOUT_LOG:?}"
@@ -362,7 +356,6 @@ shift
 exec "$@"
 SH
         );
-        @chmod($timeout, 0755);
     }
 
     private function cleanupGlob(string $pattern): void

@@ -5,56 +5,47 @@ require_once dirname(__DIR__, 2).'/update/users.php';
 
 class UserRutorrentCompatPatchTest extends TestCase
 {
-    public function testCompatibilityPatchesLegacyScheduleExpression(): void
+    public function testCompatibilityPatchesLegacyTargets(): void
     {
-        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
-        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "prefix\n((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\nsuffix\n");
-
-        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-        $content = (string) file_get_contents($path);
-
-        $this->assertTrue(strpos($content, '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),') !== false);
-        $this->assertTrue(strpos($content, '((integer)($tm["minutes"]/$interval))*$interval+$interval,') === false);
+        foreach ($this->compatPatchCases() as $case) {
+            $this->assertCompatibilityPatch($case);
+        }
     }
 
-    public function testCompatibilityLeavesPatchedScheduleExpressionUntouched(): void
+    public function testCompatibilityLeavesPatchedTargetsUntouched(): void
     {
-        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
-        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "prefix\n((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n");
-
-        $before = (string) file_get_contents($path);
-        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-        $this->assertEquals($before, (string) file_get_contents($path));
+        foreach ($this->compatPatchCases() as $case) {
+            $this->assertCompatibilityContentUntouched($case, $case['patched']);
+        }
     }
 
-    public function testCompatibilitySkipsMissingSettingsTarget(): void
+    public function testCompatibilitySkipsMissingTargets(): void
     {
-        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
+        foreach ($this->compatPatchCases() as $case) {
+            $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);
 
-        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-        $this->assertTrue(!file_exists($home.'/www/rutorrent/php/settings.php'));
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertTrue(!file_exists($home.'/'.$case['path']));
+        }
     }
 
-    public function testCompatibilitySkipsSymlinkedSettingsTarget(): void
+    public function testCompatibilitySkipsSymlinkedTargets(): void
     {
-        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
-        $target = $this->pmssMakeTempPhpPath('pmss-user-rutorrent-', 'symlink-target');
-        $link = $home.'/www/rutorrent/php/settings.php';
-        file_put_contents($target, "((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n");
-        @symlink($target, $link);
+        foreach ($this->compatPatchCases() as $case) {
+            $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);
+            $target = $this->pmssWriteFile($this->pmssMakeTempPhpPath('pmss-user-rutorrent-', 'symlink-target'), $case['legacy']);
+            @symlink($target, $home.'/'.$case['path']);
 
-        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-        $this->assertEquals("((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\n", (string) file_get_contents($target));
+            \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+            $this->assertEquals($case['legacy'], (string) file_get_contents($target));
+        }
     }
 
-    public function testCompatibilityLeavesNonMatchingSettingsContentUntouched(): void
+    public function testCompatibilityLeavesNonMatchingContentUntouched(): void
     {
-        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', 'www/rutorrent/php');
-        $path = $this->pmssWriteRelativeFile($home, 'www/rutorrent/php/settings.php', "prefix\n\$interval = \$interval * 60;\nsuffix\n");
-
-        $before = (string) file_get_contents($path);
-        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
-        $this->assertEquals($before, (string) file_get_contents($path));
+        foreach ($this->compatUntouchedCases() as $case) {
+            $this->assertCompatibilityContentUntouched($case, $case['content']);
+        }
     }
 
     public function testCompatibilityPatchesAllKnownTargetsInSinglePass(): void
@@ -69,6 +60,81 @@ class UserRutorrentCompatPatchTest extends TestCase
         $this->assertStringContainsString('((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),', (string) file_get_contents($settingsPath));
         $this->assertStringContainsString('@ob_flush();', (string) file_get_contents($rssPath));
         $this->assertStringContainsString('return (int) $field;', (string) file_get_contents($hddquotaPath));
+    }
+
+    public function testSkeletonHddquotaActionReturnsInt(): void
+    {
+        $path = dirname(__DIR__, 4).'/etc/skel/www/rutorrent/plugins/hddquota/action.php';
+        $content = (string) file_get_contents($path);
+
+        $this->assertStringContainsString('return (int) $field;', $content);
+    }
+
+    private function assertCompatibilityPatch(array $case): void
+    {
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);
+        $path = $this->pmssWriteRelativeFile($home, $case['path'], $case['legacy']);
+
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $content = (string) file_get_contents($path);
+
+        $this->assertStringContainsString($case['expected'], $content);
+        $this->pmssAssertStringNotContainsString($case['unexpected'], $content);
+    }
+
+    private function assertCompatibilityContentUntouched(array $case, string $content): void
+    {
+        $home = $this->pmssMakeTrackedUserHomeTree('pmss-rutorrent-root-', 'dummy', $case['dir']);
+        $path = $this->pmssWriteRelativeFile($home, $case['path'], $content);
+
+        \pmssUserMaintainRutorrentPhpCompatibility(['home' => $home]);
+        $this->assertEquals($content, (string) file_get_contents($path));
+    }
+
+    private function compatPatchCases(): array
+    {
+        return [
+            [
+                'dir' => 'www/rutorrent/php',
+                'path' => 'www/rutorrent/php/settings.php',
+                'legacy' => "prefix\n((integer)(\$tm[\"minutes\"]/\$interval))*\$interval+\$interval,\nsuffix\n",
+                'patched' => "prefix\n((integer)(\$tm[\"minutes\"]/((int)\$interval)))*((int)\$interval)+((int)\$interval),\nsuffix\n",
+                'expected' => '((integer)($tm["minutes"]/((int)$interval)))*((int)$interval)+((int)$interval),',
+                'unexpected' => '((integer)($tm["minutes"]/$interval))*$interval+$interval,',
+            ],
+            [
+                'dir' => 'www/rutorrent/plugins/rss',
+                'path' => 'www/rutorrent/plugins/rss/action.php',
+                'legacy' => "before\nob_flush();\nafter\n",
+                'patched' => "before\n@ob_flush();\nafter\n",
+                'expected' => '@ob_flush();',
+                'unexpected' => "\nob_flush();\n",
+            ],
+            [
+                'dir' => 'www/rutorrent/plugins/hddquota',
+                'path' => 'www/rutorrent/plugins/hddquota/action.php',
+                'legacy' => "prefix\n        return \$field;\nsuffix\n",
+                'patched' => "prefix\n        return (int) \$field;\nsuffix\n",
+                'expected' => 'return (int) $field;',
+                'unexpected' => 'return $field;',
+            ],
+        ];
+    }
+
+    private function compatUntouchedCases(): array
+    {
+        return [
+            [
+                'dir' => 'www/rutorrent/php',
+                'path' => 'www/rutorrent/php/settings.php',
+                'content' => "prefix\n\$interval = \$interval * 60;\nsuffix\n",
+            ],
+            [
+                'dir' => 'www/rutorrent/plugins/rss',
+                'path' => 'www/rutorrent/plugins/rss/action.php',
+                'content' => "before\nflush();\nafter\n",
+            ],
+        ];
     }
 
 }
