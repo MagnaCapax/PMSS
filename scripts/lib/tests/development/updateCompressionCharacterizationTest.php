@@ -44,6 +44,12 @@ class UpdateCompressionCharacterizationTest extends TestCase
         );
     }
 
+    public function testNginxSubdomainTemplateOutputSnapshot(): void
+    {
+        require_once dirname(__DIR__, 3).'/lib/nginxConfig/templates.php';
+        $this->assertSame('95465b64de312fef404c8dc00c7512cd184f5ea8d582effe0726f0fdb09bc3fe', hash('sha256', implode("\n---PMSS-TEMPLATE---\n", \pmssNginxUserSubdomainTemplates())), 'nginx subdomain template output changed');
+    }
+
     public function testUpdateStep2OwnsWebStackConfiguration(): void
     {
         $step2Src = $this->pmssReadRepoFile('scripts/util/update-step2.php');

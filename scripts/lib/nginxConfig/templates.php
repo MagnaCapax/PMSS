@@ -3,15 +3,14 @@
  * Nginx per-user subdomain templates.
  *
  * These templates are rendered by createNginxConfig.php when subdomains are
- * enabled (valid FQDN hostname). Kept in a dedicated module so the entrypoint
- * stays small while preserving stable template content for tests.
+ * enabled (valid FQDN hostname).
  *
  * @license GPL-3.0-only
  */
 
-function pmssNginxUserPrivateProxyDefaults(): string
+function pmssNginxUserSubdomainTemplates(): array
 {
-    return <<<'NGINX'
+    $privateProxyDefaults = <<<'NGINX'
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         include /etc/nginx/proxy_params;
@@ -21,11 +20,6 @@ function pmssNginxUserPrivateProxyDefaults(): string
         limit_conn addr 16;
         error_page 502 /error-502-##user##.html;
 NGINX;
-}
-
-function pmssNginxUserSubdomainTemplates(): array
-{
-    $privateProxyDefaults = pmssNginxUserPrivateProxyDefaults();
     $publicSubdomainTemplate = <<<'NGINX'
 # PMSS public subdomain for ##user## (maps to /public-##user##/).
 server {
