@@ -206,7 +206,8 @@ LIGHTTPD;
 
         $this->assertStringContainsAllStrings([
             "preg_match('/^memory_limit\\s*=.*$/m', \$phpIniContent)",
-            'pmssAtomicWriteFile($phpIniPath, $phpIniContent);',
+            'if (!pmssAtomicWriteFile($phpIniPath, $phpIniContent))',
+            'Failed to update php.ini; skipping user',
         ], $src);
     }
 

@@ -642,7 +642,10 @@ function pmssUserConfigLighttpdConfigureUser(
         } else {
             $phpIniContent = rtrim($phpIniContent, "\n")."\n".$uploadTmpDirLine."\n";
         }
-        pmssAtomicWriteFile($phpIniPath, $phpIniContent);
+        if (!pmssAtomicWriteFile($phpIniPath, $phpIniContent)) {
+            fwrite(STDERR, "[user:{$thisUser}] Failed to update php.ini; skipping user\n");
+            return;
+        }
     }
     @chmod($phpIniPath, 0751);
     if (function_exists('posix_geteuid') && @posix_geteuid() === 0) {
