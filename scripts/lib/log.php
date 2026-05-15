@@ -35,12 +35,7 @@ if (!function_exists('logmsg')) {
  */
 function pmssJsonEncodeSafe(array $payload, int $flags = 0): ?string
 {
-    $jsonFlags = $flags;
-    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-        $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
-    }
-
-    $encoded = json_encode($payload, $jsonFlags);
+    $encoded = json_encode($payload, $flags | JSON_INVALID_UTF8_SUBSTITUTE);
     return is_string($encoded) ? $encoded : null;
 }
 

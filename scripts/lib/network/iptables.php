@@ -122,21 +122,19 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
     }
 
     $sections = [];
-    if ($filterCommands) {
-        $filter = ['*filter', ':INPUT ACCEPT [0:0]', ':FORWARD ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]'];
-        foreach ($filterCommands as $cmd) {
-            $filter[] = $cmd;
+    foreach ([
+        [$filterCommands, ['*filter', ':INPUT ACCEPT [0:0]', ':FORWARD ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]']],
+        [$natCommands, ['*nat', ':PREROUTING ACCEPT [0:0]', ':INPUT ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]', ':POSTROUTING ACCEPT [0:0]']],
+    ] as $sectionSpec) {
+        if (!$sectionSpec[0]) {
+            continue;
         }
-        $filter[] = 'COMMIT';
-        $sections[] = implode("\n", $filter);
-    }
-    if ($natCommands) {
-        $nat = ['*nat', ':PREROUTING ACCEPT [0:0]', ':INPUT ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]', ':POSTROUTING ACCEPT [0:0]'];
-        foreach ($natCommands as $cmd) {
-            $nat[] = $cmd;
+        $section = $sectionSpec[1];
+        foreach ($sectionSpec[0] as $cmd) {
+            $section[] = $cmd;
         }
-        $nat[] = 'COMMIT';
-        $sections[] = implode("\n", $nat);
+        $section[] = 'COMMIT';
+        $sections[] = implode("\n", $section);
     }
 
     if (!$sections) {
@@ -162,10 +160,9 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
 
 function networkApplyIptablesFallback(array $filterCommands, array $natCommands, array $replacements): void
 {
-    networkRunIptables('-F INPUT');
-    networkRunIptables('-F FORWARD');
-    networkRunIptables('-F OUTPUT');
-    networkRunIptables('-t nat -F POSTROUTING');
+    foreach (['-F INPUT', '-F FORWARD', '-F OUTPUT', '-t nat -F POSTROUTING'] as $flushCommand) {
+        networkRunIptables($flushCommand);
+    }
 
     foreach ($filterCommands as $cmd) {
         networkRunIptables(str_replace(array_keys($replacements), array_values($replacements), $cmd));

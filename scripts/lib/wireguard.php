@@ -773,9 +773,7 @@ function wgDistributeToUsers(string $content): void
 function pmssWireguardConfigure(?callable $logger = null): void
 {
     $log = $logger ?: 'logMessage';
-    if (function_exists('requireRoot')) {
-        requireRoot();
-    }
+    requireRoot();
 
     $configDir = wgConfigDir();
     pmssDirEnsureExists($configDir, 0750);

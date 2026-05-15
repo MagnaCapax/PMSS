@@ -21,30 +21,6 @@ trait FilesystemCleanupTrait
         return $this->pmssMakeTempDir($prefix, $mode);
     }
 
-    /** Assign a temporary directory to a test property so setup code stays shared. */
-    protected function pmssAssignTempDirProperty(
-        string $propertyName,
-        string $prefix,
-        int $mode = 0755,
-        ?string $baseDir = null
-    ): void {
-        $this->{$propertyName} = $this->pmssMakeNamedTempDir($prefix, $mode, $baseDir);
-    }
-
-    /** Reuse an assigned temp directory property instead of rebuilding it in local helpers. */
-    protected function pmssEnsureTempDirProperty(
-        string $propertyName,
-        string $prefix,
-        int $mode = 0755,
-        ?string $baseDir = null
-    ): void {
-        if ((string) ($this->{$propertyName} ?? '') !== '') {
-            return;
-        }
-
-        $this->pmssAssignTempDirProperty($propertyName, $prefix, $mode, $baseDir);
-    }
-
     /** Create a fixture user home under a tracked PMSS_HOME_DIR root. */
     protected function pmssMakeTrackedUserHomeTree(string $prefix, string $user, string $relativeDir = ''): string
     {
@@ -55,18 +31,6 @@ trait FilesystemCleanupTrait
         }
 
         return $home;
-    }
-
-    /** Remove a temporary directory stored on a test property and clear the slot. */
-    protected function pmssCleanupTempDirProperty(string $propertyName): void
-    {
-        $path = (string)($this->{$propertyName} ?? '');
-        if ($path === '') {
-            return;
-        }
-
-        $this->cleanup($path);
-        $this->{$propertyName} = '';
     }
 
     /** Ensure a directory exists for hermetic filesystem fixtures. */

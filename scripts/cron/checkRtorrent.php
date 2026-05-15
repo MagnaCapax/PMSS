@@ -217,7 +217,9 @@ foreach ($users as $user) {
     if (pmssUserWebRootUnavailable($user)) {
         $null = [];
         $rc = 0;
-        @exec('killall -9 -u '.escapeshellarg($user).' rtorrent 2>/dev/null; killall -9 -u '.escapeshellarg($user).' .rtorrentExecute.php 2>/dev/null', $null, $rc);
+        foreach (['rtorrent', '.rtorrentExecute.php'] as $processName) {
+            @exec('killall -9 -u '.escapeshellarg($user).' '.escapeshellarg($processName).' 2>/dev/null', $null, $rc);
+        }
         pmssCheckRtorrentLogBoth($user, "suspended; cleanup (killall rc={$rc})", $debug);
         continue;
     }

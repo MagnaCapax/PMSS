@@ -20,10 +20,7 @@ class SkipTest extends \Exception {}
 
 abstract class TestCase
 {
-    use FilesystemCleanupTrait {
-        pmssMakeNamedTempDir as private pmssTraitMakeNamedTempDir;
-        cleanup as private pmssTraitCleanup;
-    }
+    use FilesystemCleanupTrait;
 
     /**
      * @var array<int, array{0:bool|string,1:string,2:?string}>
@@ -616,18 +613,6 @@ abstract class TestCase
         return '<?php return '.var_export($policy, true).";\n";
     }
 
-    /** Keep named temp-dir creation available to child test cases via an explicit wrapper. */
-    protected function pmssMakeNamedTempDir(string $prefix, int $mode = 0755, ?string $baseDir = null): string
-    {
-        return $this->pmssTraitMakeNamedTempDir($prefix, $mode, $baseDir);
-    }
-
-    /** Keep recursive cleanup available to child test cases via an explicit wrapper. */
-    protected function cleanup(string $path): void
-    {
-        $this->pmssTraitCleanup($path);
-    }
-
     /** Create an executable test stub in a fresh PATH directory. */
     protected function pmssMakeExecutableStub(string $binaryName, string $script, string $dirPrefix): string
     {
@@ -665,7 +650,7 @@ abstract class TestCase
         int $mode = 0755,
         ?string $baseDir = null
     ): void {
-        $path = $this->pmssTraitMakeNamedTempDir($prefix, $mode, $baseDir);
+        $path = $this->pmssMakeNamedTempDir($prefix, $mode, $baseDir);
         if (!in_array($path, $this->tempPaths, true)) {
             $this->tempPaths[] = $path;
         }
@@ -699,7 +684,7 @@ abstract class TestCase
             return;
         }
 
-        $this->pmssTraitCleanup($path);
+        $this->cleanup($path);
         $property->setValue($this, '');
     }
 
