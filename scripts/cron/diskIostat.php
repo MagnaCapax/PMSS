@@ -23,8 +23,20 @@ if (count($devices) == 0) die("No block devices detected\n");
 // Sample code:
 // iostat -xm 1 2 -g grp1 sda sdb sdc sdd | awk '/grp1/ { print $4,$5,$6,$7,$10,$13,$14}'
 // For debian 10 took r_await as that's what we are more interested, both read and write await is now exposed #TODO eventually this
+// 2026-05-15 (verified Debian 12 / sysstat 12.6.1): %util column is at $23, not $16. Fixed last field only.
+// The remaining fields ($2,$3,$4,$5,$10,$15) are still positionally wrong vs sysstat 12 layout
+// (only $2=iopsRead happens to be right); diskAwait/diskServiceTime/throughputRead/Write/iopsWrite all
+// pull shifted columns. Empirical fleet impact: serviceTimeWeek non-zero numbers are bogus shifted data
+// (not actual ms), diskUtil was always 0 because $16=drqm/s. Oversale algo thresholds tuned against
+// these are tuned against garbage.
+// #TODO replace positional awk with header-row parse — read the first non-data line, build a
+// name->index map (r/s, w/s, rMB/s, wMB/s, r_await, %util), then extract by name. Robust across
+// sysstat versions and survives future column additions. Also: svctm was removed in sysstat 12,
+// so diskServiceTime should be retired or aliased to r_await ms. Will require coordinated update
+// of pmssCallbacks::nodeIostat field-name expectations and provisioningApi::updateNodeResources
+// oversale thresholds (currently 25ms is SSD-scale on a field that wasn't actually ms).
 $iostat = $debianVersion == 10
-    ? `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $2,$3,$4,$5,$10,$15,$16}'`
+    ? `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $2,$3,$4,$5,$10,$15,$23}'`
     : `iostat -xm 120 2 -g grp1 {$deviceList} | awk '/grp1/ { print $4,$5,$6,$7,$10,$13,$14}'`;
 
 $iostatRaw = $iostat;
