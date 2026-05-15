@@ -9,8 +9,23 @@
  * @license GPL-3.0-only
  */
 
+function pmssNginxUserPrivateProxyDefaults(): string
+{
+    return <<<'NGINX'
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+        limit_rate_after 1024m;
+        limit_rate 102400k;
+        limit_conn addr 16;
+        error_page 502 /error-502-##user##.html;
+NGINX;
+}
+
 function pmssNginxUserSubdomainTemplates(): array
 {
+    $privateProxyDefaults = pmssNginxUserPrivateProxyDefaults();
     $publicSubdomainTemplate = <<<'NGINX'
 # PMSS public subdomain for ##user## (maps to /public-##user##/).
 server {
@@ -87,14 +102,7 @@ server {
         # Legacy Deluge URL path: proxy to lighttpd so POST clients don't trip on redirects.
         proxy_pass http://127.0.0.1:##port##/deluge-##user##/;
         proxy_cookie_path /deluge-##user##/ /deluge-##user##/;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        include /etc/nginx/proxy_params;
-        proxy_http_version 1.1;
-        limit_rate_after 1024m;
-        limit_rate 102400k;
-        limit_conn addr 16;
-        error_page 502 /error-502-##user##.html;
+##private_proxy_defaults##
     }
 
     # When apps generate absolute /user-<user>/... URLs, avoid double-prefixing
@@ -103,26 +111,12 @@ server {
         proxy_pass http://127.0.0.1:##port##;
         # Deluge map-urlpath can double cookie paths; normalize to canonical base.
         proxy_cookie_path ~^/user-##user##/deluge/user-##user##/deluge/.* /user-##user##/deluge/;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        include /etc/nginx/proxy_params;
-        proxy_http_version 1.1;
-        limit_rate_after 1024m;
-        limit_rate 102400k;
-        limit_conn addr 16;
-        error_page 502 /error-502-##user##.html;
+##private_proxy_defaults##
     }
 
     location / {
         proxy_pass http://127.0.0.1:##port##/user-##user##/;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        include /etc/nginx/proxy_params;
-        proxy_http_version 1.1;
-        limit_rate_after 1024m;
-        limit_rate 102400k;
-        limit_conn addr 16;
-        error_page 502 /error-502-##user##.html;
+##private_proxy_defaults##
     }
 
     location /webdav-##user##/ {
@@ -146,6 +140,11 @@ server {
     }
 }
 NGINX;
+    $privateSubdomainTemplate = str_replace(
+        '##private_proxy_defaults##',
+        $privateProxyDefaults,
+        $privateSubdomainTemplate
+    );
 
     $publicSuspendedTemplate = <<<'NGINX'
 # PMSS suspended subdomain for ##user##.
