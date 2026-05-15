@@ -42,13 +42,13 @@ if (pmssCliOptionPresent($parsed, 'json')) {
 echo "== User Dataset Comparison ==\n";
 
 $sections = [
-    ['prefix' => '', 'label' => 'Users present in DB + /home + /etc/passwd:', 'list' => $consistent],
-    ['prefix' => "\n", 'label' => 'Users only in JSON database (likely stale):', 'list' => $dbOnly],
-    ['prefix' => "\n", 'label' => 'Users only in /home (missing from DB):', 'list' => $homeOnly],
-    ['prefix' => "\n", 'label' => 'Users only in /etc/passwd (no home directory/DB entry):', 'list' => $passwdOnly],
+    ['', 'Users present in DB + /home + /etc/passwd:', $consistent],
+    ["\n", 'Users only in JSON database (likely stale):', $dbOnly],
+    ["\n", 'Users only in /home (missing from DB):', $homeOnly],
+    ["\n", 'Users only in /etc/passwd (no home directory/DB entry):', $passwdOnly],
 ];
 
-foreach ($sections as $section) {
-    echo $section['prefix'].$section['label']."\n";
-    echo empty($section['list']) ? "  (none)\n" : "  - ".implode("\n  - ", $section['list'])."\n";
+foreach ($sections as [$prefix, $label, $list]) {
+    echo $prefix.$label."\n";
+    echo empty($list) ? "  (none)\n" : "  - ".implode("\n  - ", $list)."\n";
 }

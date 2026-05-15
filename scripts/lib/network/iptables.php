@@ -125,12 +125,11 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
     foreach ([
         [$filterCommands, ['*filter', ':INPUT ACCEPT [0:0]', ':FORWARD ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]']],
         [$natCommands, ['*nat', ':PREROUTING ACCEPT [0:0]', ':INPUT ACCEPT [0:0]', ':OUTPUT ACCEPT [0:0]', ':POSTROUTING ACCEPT [0:0]']],
-    ] as $sectionSpec) {
-        if (!$sectionSpec[0]) {
+    ] as [$commands, $section]) {
+        if (!$commands) {
             continue;
         }
-        $section = $sectionSpec[1];
-        foreach ($sectionSpec[0] as $cmd) {
+        foreach ($commands as $cmd) {
             $section[] = $cmd;
         }
         $section[] = 'COMMIT';

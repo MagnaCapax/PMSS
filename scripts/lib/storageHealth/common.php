@@ -116,12 +116,7 @@ function pmssStorageHealthHomeArrayResolve(?string $mountsPath = null): ?string
  */
 function pmssStorageHealthRaidActivitySummaryParse(string $activityLine): array
 {
-    $summary = [
-        'operation' => '',
-        'progress' => '',
-        'eta' => '',
-        'speed' => '',
-    ];
+    $summary = array_fill_keys(['operation', 'progress', 'eta', 'speed'], '');
 
     foreach (
         [

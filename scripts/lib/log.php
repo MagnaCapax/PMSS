@@ -54,11 +54,7 @@ function pmssLogWritePathIsSafe(string $path): bool
     }
 
     $directory = dirname($path);
-    if ($directory === '' || !is_dir($directory) || is_link($directory)) {
-        return false;
-    }
-
-    return true;
+    return $directory !== '' && is_dir($directory) && !is_link($directory);
 }
 
 /** Append one payload to a JSON Lines file. */

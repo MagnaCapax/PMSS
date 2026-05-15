@@ -276,7 +276,6 @@ foreach ($users as $user) {
         $socketPath = rtorrentScgiSocketPath($user);
         pmssCheckRtorrentCleanupStaleSocket($user, $socketPath, $unresponsiveState, $debug);
 
-        $persistentFailureCount = 0;
         if (is_file($startMarkerState)) {
             $persistentFailureState = rtorrentProcessCheckFailureCountState(
                 $startFailureState,
