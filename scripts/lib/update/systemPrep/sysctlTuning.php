@@ -279,7 +279,13 @@ function pmssSysctlSettingsBuild(array $profile): array
             'fs.file-max' => '3000000',
             'fs.protected_regular' => '2',
             'fs.protected_fifos' => '2',
-            'kernel.yama.ptrace_scope' => '1',
+            // scope=2 (admin-only ptrace) blocks pidfd_getfd-via-mm=NULL exploit class
+            // (Linus commit 31e62c2ebbfd, Qualys-reported 2026-05-14, ssh-keysign-pwn).
+            // scope=1 allows ptrace of descendants - attacker forks the SUID target,
+            // child IS descendant, scope=1 permits attach. scope=2 requires CAP_SYS_PTRACE.
+            // Customer impact on PMSS: none verified (no debuggers installed by default,
+            // no PMSS scripts use ptrace, no customer ptrace activity observed in fleet sample).
+            'kernel.yama.ptrace_scope' => '2',
             'kernel.kptr_restrict' => '1',
             'net.ipv4.conf.all.rp_filter' => '1',
             'net.ipv4.conf.all.accept_source_route' => '0',

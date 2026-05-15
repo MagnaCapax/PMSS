@@ -116,3 +116,33 @@ function pmssKernelHardeningLoadedModules(array $modules): ?array
 
 function pmssEnsureDirtyFragBlacklist(callable $log, ?callable $runner = null): void { pmssApplyModprobeBlacklist(PMSS_KERNEL_HARDENING['dirtyfrag'], $log, $runner); }
 function pmssEnsureAlgifAeadBlacklist(callable $log, ?callable $runner = null): void { pmssApplyModprobeBlacklist(PMSS_KERNEL_HARDENING['copyfail'], $log, $runner); }
+
+/**
+ * Strip SUID from /usr/lib/openssh/ssh-keysign.
+ *
+ * ssh-keysign opens host private keys before dropping privs (ssh-keysign.c:203-211),
+ * then bails on EnableSSHKeysign=no with fds open. Combined with pre-31e62c2ebbfd
+ * kernel pidfd_getfd-via-mm=NULL race, an unprivileged user can steal the host-key
+ * file descriptors. PMSS does not use HostbasedAuthentication; the binary is unused.
+ * Reapplied on every PMSS update so apt reinstalls cannot resurrect the SUID bit.
+ */
+function pmssEnsureSshKeysignSuidStrip(callable $log): void
+{
+    if (pmssEnvFlagEnabled('PMSS_DRY_RUN')) {
+        $log('[DRY-RUN] ssh-keysign SUID strip: skipping mutation');
+        return;
+    }
+    $path = pmssResolvePathFromEnv('PMSS_SSH_KEYSIGN_PATH', '/usr/lib/openssh/ssh-keysign');
+    if (!is_file($path)) {
+        $log('[SKIP] ssh-keysign not installed at '.$path);
+        return;
+    }
+    $mode = @fileperms($path);
+    if ($mode === false) { $log('[WARN] Failed to stat '.$path); return; }
+    if (!($mode & 04000)) {
+        $log('[SKIP] ssh-keysign already non-SUID at '.$path);
+        return;
+    }
+    if (!@chmod($path, 0755)) { $log('[WARN] Failed to chmod 0755 '.$path); return; }
+    $log('Stripped SUID from '.$path.' (ssh-keysign-pwn mitigation)');
+}

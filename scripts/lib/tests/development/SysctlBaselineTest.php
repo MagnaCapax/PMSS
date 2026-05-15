@@ -64,7 +64,7 @@ class SysctlBaselineTest extends TestCase
         $this->assertStringContainsString('net.ipv4.tcp_congestion_control = bbr', $content);
         $this->assertStringContainsString('net.netfilter.nf_conntrack_max = 524288', $content);
         $this->assertStringContainsString('kernel.kptr_restrict = 1', $content);
-        $this->assertStringContainsString('kernel.yama.ptrace_scope = 1', $content);
+        $this->assertStringContainsString('kernel.yama.ptrace_scope = 2', $content);
         $this->assertStringContainsString('fs.protected_regular = 2', $content);
         $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->systemPrepSource());
 

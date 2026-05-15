@@ -561,6 +561,7 @@ pmssRunProfiledCallable('Applying boot defaults', 'pmssEnsureBootDefaults', ['lo
 pmssRunProfiledCallable('Applying legacy sysctl baseline', 'pmssEnsureLegacySysctlBaseline', ['logmsg']);
 pmssRunProfiledCallable('Applying Copy Fail algif_aead blacklist', 'pmssEnsureAlgifAeadBlacklist', ['logmsg']);
 pmssRunProfiledCallable('Applying Dirty Frag kernel blacklist', 'pmssEnsureDirtyFragBlacklist', ['logmsg']);
+pmssRunProfiledCallable('Stripping ssh-keysign SUID', 'pmssEnsureSshKeysignSuidStrip', ['logmsg']);
 pmssRunProfiledCallable('Applying boot-time tuning', 'pmssEnsureBootTuning', ['logmsg']);
 pmssRunProfiledCallable('Configuring root shell defaults', 'pmssConfigureRootShellDefaults', ['logmsg']);
 runStep('Restricting world access to /home', 'chmod o-rw /home');
