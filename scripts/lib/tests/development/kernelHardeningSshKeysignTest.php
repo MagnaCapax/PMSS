@@ -12,12 +12,17 @@ class KernelHardeningSshKeysignTest extends TestCase
         $target = $dir.'/ssh-keysign';
         file_put_contents($target, '#!/bin/sh'.PHP_EOL);
         chmod($target, 04755);
+        clearstatcache(true, $target);
+        if ((fileperms($target) & 04000) === 0) {
+            throw new SkipTest('filesystem rejects SUID bit on regular files (nosuid mount); cannot exercise strip path');
+        }
         $logs = [];
 
         $this->pmssWithEnv(['PMSS_SSH_KEYSIGN_PATH' => $target], function () use (&$logs): void {
             \pmssEnsureSshKeysignSuidStrip($this->captureMessages($logs));
         });
 
+        clearstatcache(true, $target);
         $this->assertEquals(0755, fileperms($target) & 07777, 'expected SUID bit cleared');
         $this->assertTrue($this->pmssMessagesContain($logs, 'Stripped SUID from '.$target), 'expected strip log');
     }
