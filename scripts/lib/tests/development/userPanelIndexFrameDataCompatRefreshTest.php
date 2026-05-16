@@ -54,11 +54,21 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $this->assertEquals($this->fixedPanelIndexSource(), file_get_contents($this->home.'/www/index.php'));
     }
 
-    public function testRefreshLeavesCustomInitializedPanelCopyAlone(): void
+    public function testSkeletonApplyFlowRefreshesLegacyPanelIndexFromSkeleton(): void
+    {
+        $this->writeUserPanelIndex($this->legacyPanelIndexSource());
+
+        \pmssUserApplySkeletonFiles($this->context());
+
+        $this->assertEquals($this->fixedPanelIndexSource(), file_get_contents($this->home.'/www/index.php'));
+    }
+
+    public function testTargetedRefreshLeavesCustomInitializedPanelCopyAloneInIsolation(): void
     {
         $custom = $this->customInitializedPanelSource();
         $this->writeUserPanelIndex($custom);
 
+        // The full skeleton apply flow may still refresh this file via updateUserFile().
         \pmssUserRefreshPanelIndexForFrameDataCompat($this->context());
 
         $this->assertEquals($custom, file_get_contents($this->home.'/www/index.php'));

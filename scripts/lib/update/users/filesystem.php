@@ -95,6 +95,9 @@ function pmssUserPanelIndexNeedsFrameDataCompatRefresh(string $content): bool
 
 /**
  * Force-refresh only the known broken legacy panel index.php variant.
+ *
+ * This explicit migration runs before the broad updateUserFile() SHA1 sync so
+ * the PHP 8 frameData repair stays visible as its own compatibility path.
  */
 function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
 {

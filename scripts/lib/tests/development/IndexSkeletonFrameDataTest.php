@@ -151,6 +151,22 @@ class IndexSkeletonFrameDataTest extends TestCase
         );
     }
 
+    public function testPanelIndexMigrationGuardTracksCurrentSkeletonHelperSignature(): void
+    {
+        $guard = 'function pmssFrameOpensInNewWindow(array $frame): bool';
+
+        $this->assertStringContainsString(
+            $guard,
+            $this->pmssReadRepoFile('etc/skel/www/index.php'),
+            'Skeleton helper signature changed: '
+        );
+        $this->assertStringContainsString(
+            $guard,
+            $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'),
+            'Panel index migration guard should track the current skeleton helper signature: '
+        );
+    }
+
     private function loadIndexFrameHelpers(): void
     {
         if (function_exists('pmssLocalFrameWelcomeUrlBuild')) {
