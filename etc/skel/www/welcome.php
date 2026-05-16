@@ -24,8 +24,9 @@ $pmssWelcomeAnnouncementsLib = __DIR__.'/welcomeAnnouncements.php';
 if (file_exists($pmssWelcomeAnnouncementsLib)) {
     require_once $pmssWelcomeAnnouncementsLib;
 }
-if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
-    require_once '/scripts/lib/webCgroupMemoryStatus.php';
+$pmssWebCgroupMemoryStatusLib = __DIR__.'/webCgroupMemoryStatus.php';
+if (file_exists($pmssWebCgroupMemoryStatusLib)) {
+    require_once $pmssWebCgroupMemoryStatusLib;
 }
 if (file_exists('/scripts/lib/user/mediaStackPanel.php')) {
     require_once '/scripts/lib/user/mediaStackPanel.php';

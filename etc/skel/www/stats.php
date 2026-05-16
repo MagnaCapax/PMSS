@@ -104,8 +104,9 @@ if (file_exists('/scripts/lib/webDockerInactiveNote.php')) {
     require_once '/scripts/lib/webDockerInactiveNote.php';
 }
 
-if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
-    require_once '/scripts/lib/webCgroupMemoryStatus.php';
+$pmssWebCgroupMemoryStatusLib = __DIR__.'/webCgroupMemoryStatus.php';
+if (file_exists($pmssWebCgroupMemoryStatusLib)) {
+    require_once $pmssWebCgroupMemoryStatusLib;
 }
 
 // Customer-side traffic-limit reader: see userTrafficLimit.php for rationale.
