@@ -151,9 +151,7 @@ class resourceStatistics
             ? [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks']
             : [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks'];
         if ($tokenCount > 10) {
-            foreach (array_values(pmssResourceMemoryBreakdownFieldMap()) as $offset => $field) {
-                $fields[$offset + 9] = $field;
-            }
+            $fields += array_combine([9, 10], array_values(pmssResourceMemoryBreakdownFieldMap()));
         }
 
         foreach ($fields as $index => $field) {

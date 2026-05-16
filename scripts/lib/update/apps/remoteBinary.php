@@ -112,7 +112,7 @@ function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expe
     }
 
     $archivePath = pmssFetchPinnedRemoteFile($label, $url, $expectedSha256);
-    if (!is_string($archivePath) || $archivePath === '') {
+    if ($archivePath === null) {
         return;
     }
 

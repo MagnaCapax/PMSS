@@ -148,10 +148,6 @@ class rtorrentConfig {
 	    if (empty($config)) throw new Exception('rtorrentConfig->writeConfig: Config cannot be empty!');
 	    if (empty($user)) throw new Exception('rtorrentConfig->writeConfig: User cannot be empty!');
 
-	    //$customConfigFile = "/home/{$user}/.rtorrent.rc.custom";
-	    //if (file_exists($customConfigFile) && is_readable($customConfigFile))
-	    //  $config = file_get_contents($customConfigFile) . "\n\n" . $config;
-	    
 	    $file = '/home/' . $user . '/.rtorrent.rc';
 	    if (!file_exists($file)) { touch($file); chmod($file, 0644); }
 	    return is_writable($file) && file_put_contents($file, $config) !== false;
@@ -254,8 +250,6 @@ class rtorrentConfig {
         }
 
         return $port;
-        
-        
     }
     
 	

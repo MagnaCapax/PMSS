@@ -12,9 +12,10 @@
  */
 
 $target = __DIR__.'/checkRtorrent.php';
-if (!is_file($target)) {
-    fwrite(STDERR, date('c')." ERROR: {$target} missing; cannot run rTorrent watchdog\n");
-    exit(1);
+if (is_file($target)) {
+    require $target;
+    return;
 }
 
-require $target;
+fwrite(STDERR, date('c')." ERROR: {$target} missing; cannot run rTorrent watchdog\n");
+exit(1);

@@ -15,7 +15,5 @@ return array(
       'soft' => 250,
       'limitSoft' => 80,
       'limitExceedMax' => 20
-
     )
-
 );
