@@ -48,6 +48,17 @@ function pmssQbittorrentManagedConfigEntries(): array
     ];
 }
 
+/** Render normalized qBittorrent config lines with the original newline style. */
+function pmssQbittorrentConfigJoinLines(array $lines, bool $hadTrailingNewline, string $lineEnding): string
+{
+    $updated = implode("\n", $lines);
+    if ($updated !== '' && $hadTrailingNewline) {
+        $updated .= "\n";
+    }
+
+    return str_replace("\n", $lineEnding, $updated);
+}
+
 /**
  * Replace or restore one managed qBittorrent key inside the target section.
  */
@@ -95,12 +106,7 @@ function pmssQbittorrentConfigUpsert(string $config, string $section, string $ke
     }
 
     if ($found) {
-        $updated = implode("\n", $lines);
-        if ($updated !== '' && $hadTrailingNewline) {
-            $updated .= "\n";
-        }
-
-        return str_replace("\n", $lineEnding, $updated);
+        return pmssQbittorrentConfigJoinLines($lines, $hadTrailingNewline, $lineEnding);
     }
 
     if ($sectionStart === null) {
@@ -112,12 +118,7 @@ function pmssQbittorrentConfigUpsert(string $config, string $section, string $ke
     } else {
         for ($index = $sectionStart + 1; $index < $sectionEnd; $index++) {
             if ($lines[$index] === $managedLine) {
-                $updated = implode("\n", $lines);
-                if ($updated !== '' && $hadTrailingNewline) {
-                    $updated .= "\n";
-                }
-
-                return str_replace("\n", $lineEnding, $updated);
+                return pmssQbittorrentConfigJoinLines($lines, $hadTrailingNewline, $lineEnding);
             }
         }
 
@@ -129,12 +130,7 @@ function pmssQbittorrentConfigUpsert(string $config, string $section, string $ke
         array_splice($lines, $sectionEnd, 0, [$managedLine]);
     }
 
-    $updated = implode("\n", $lines);
-    if ($updated !== '' && $hadTrailingNewline) {
-        $updated .= "\n";
-    }
-
-    return str_replace("\n", $lineEnding, $updated);
+    return pmssQbittorrentConfigJoinLines($lines, $hadTrailingNewline, $lineEnding);
 }
 
 /**
