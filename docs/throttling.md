@@ -71,19 +71,17 @@ When `usage > limit`:
 2. Compute `effectiveCapMbit` via tiered overage stages OR progressive throttle (see below)
 3. `setRateLimit(user, effectiveCapMbit)` → writes `/home/<user>/.throttle` (Mbit value)
 
-### Tiered overage stages (default profile)
+### Post-cap default profile
 
-Defined in `pmssTrafficLimitDefaultOverageStages()` (file: `scripts/lib/user/trafficLimit.php`). Stage selection runs from highest threshold down; first match wins.
+Defined in `pmssTrafficLimitDefaultOverageStages()` (file: `scripts/lib/user/trafficLimit.php`). The default profile holds post-cap users at 100 Mbit/s for any overage and never raises a lower per-user `trafficCapMbit` override.
 
 | Overage % over limit | Min absolute overage | Cap (Mbit) |
 |---|---|---|
-| 200%+ | 0 GiB | **1** |
-| 125%+ | 0 GiB | **1** |
-| 100%+ | 0 GiB | **10** |
-| 75%+ | 5,120 GiB | 25 |
-| 50%+ | 3,072 GiB | 50 |
+| 0%+ | 0 GiB | **100** |
 
-If no tier matches AND `progressiveThrottleEnabled` is true (default), `pmssTrafficLimitComputeProgressiveCapMbit()` returns a continuous formula instead of a tier.
+Custom `overageStages` in `/etc/seedbox/config/network` still use highest-threshold-first matching. The exact PMSS-owned legacy five-tier table is treated as stale generated config and falls back to the current default so old hosts stop enforcing the 1 Mbit floor without overwriting operator-edited network files.
+
+If no tier matches AND `progressiveThrottleEnabled` is true, `pmssTrafficLimitComputeProgressiveCapMbit()` returns a continuous formula instead of a tier.
 
 ### Cooldown
 

@@ -413,14 +413,25 @@ if (!function_exists('pmssTrafficLimitComputeProgressiveCapMbit')) {
 
 if (!function_exists('pmssTrafficLimitDefaultOverageStages')) {
     /**
-     * Default tiered post-cap throttling profile.
-     *
-     * The profile mirrors the historical overage policy request from issue #60.
-     * Stage matching is evaluated from highest overage threshold to lowest.
+     * Default post-cap throttling profile.
      *
      * @return array<int, array<string, float|int>>
      */
     function pmssTrafficLimitDefaultOverageStages(): array
+    {
+        return [
+            ['overagePercent' => 0.0, 'minOverageGiB' => 0.0, 'capMbit' => 100],
+        ];
+    }
+}
+
+if (!function_exists('pmssTrafficLimitLegacyOverageStages')) {
+    /**
+     * Return the legacy PMSS-owned tier table shipped before the May 2026 policy.
+     *
+     * @return array<int, array<string, float|int>>
+     */
+    function pmssTrafficLimitLegacyOverageStages(): array
     {
         return [
             ['overagePercent' => 200.0, 'minOverageGiB' => 0.0,    'capMbit' => 1],
@@ -429,6 +440,83 @@ if (!function_exists('pmssTrafficLimitDefaultOverageStages')) {
             ['overagePercent' => 75.0,  'minOverageGiB' => 5120.0, 'capMbit' => 25],
             ['overagePercent' => 50.0,  'minOverageGiB' => 3072.0, 'capMbit' => 50],
         ];
+    }
+}
+
+if (!function_exists('pmssTrafficLimitNormalizeOverageStages')) {
+    /**
+     * Normalize operator-provided overage stages, dropping malformed rows.
+     *
+     * @param array<int, array<string, float|int|string|bool|array|object>> $rawStages
+     * @return array<int, array{overagePercent:float,minOverageGiB:float,capMbit:int,index:int}>
+     */
+    function pmssTrafficLimitNormalizeOverageStages(array $rawStages): array
+    {
+        $normalizedStages = [];
+        foreach ($rawStages as $index => $stage) {
+            if (!is_array($stage) ||
+                !isset($stage['overagePercent']) || !is_numeric($stage['overagePercent']) ||
+                !isset($stage['capMbit']) || !is_numeric($stage['capMbit'])) {
+                continue;
+            }
+
+            $stageCapMbit = (int) $stage['capMbit'];
+            if ($stageCapMbit <= 0) {
+                continue;
+            }
+
+            $stageMinOverageGiB = 0.0;
+            if (isset($stage['minOverageGiB']) && is_numeric($stage['minOverageGiB'])) {
+                $stageMinOverageGiB = max(0.0, (float) $stage['minOverageGiB']);
+            }
+
+            $normalizedStages[] = [
+                'overagePercent' => max(0.0, (float) $stage['overagePercent']),
+                'minOverageGiB'  => $stageMinOverageGiB,
+                'capMbit'        => $stageCapMbit,
+                'index'          => (int) $index,
+            ];
+        }
+
+        return $normalizedStages;
+    }
+}
+
+if (!function_exists('pmssTrafficLimitSortOverageStages')) {
+    /**
+     * Sort normalized overage stages into first-match evaluation order.
+     *
+     * @param array<int, array{overagePercent:float,minOverageGiB:float,capMbit:int,index:int}> $normalizedStages
+     */
+    function pmssTrafficLimitSortOverageStages(array &$normalizedStages): void
+    {
+        usort($normalizedStages, static function (array $left, array $right): int {
+            return ($right['overagePercent'] <=> $left['overagePercent'])
+                ?: ($right['minOverageGiB'] <=> $left['minOverageGiB'])
+                ?: ($left['index'] <=> $right['index']);
+        });
+    }
+}
+
+if (!function_exists('pmssTrafficLimitOverageStagesMatchLegacyDefault')) {
+    /**
+     * Detect exactly the old PMSS default so generated configs follow new policy.
+     *
+     * @param array<int, array<string, float|int|string|bool|array|object>> $rawStages
+     */
+    function pmssTrafficLimitOverageStagesMatchLegacyDefault(array $rawStages): bool
+    {
+        $candidate = pmssTrafficLimitNormalizeOverageStages($rawStages);
+        $legacy = pmssTrafficLimitNormalizeOverageStages(pmssTrafficLimitLegacyOverageStages());
+        pmssTrafficLimitSortOverageStages($candidate);
+        pmssTrafficLimitSortOverageStages($legacy);
+
+        $stripIndex = static function (array $stage): array {
+            unset($stage['index']);
+            return $stage;
+        };
+
+        return array_map($stripIndex, $candidate) === array_map($stripIndex, $legacy);
     }
 }
 
@@ -460,41 +548,12 @@ if (!function_exists('pmssTrafficLimitSelectTieredCapMbit')) {
         $overagePercent = max(0.0, $overagePercent);
         $overageGiB = max(0.0, $overageGiB);
 
-        $normalizedStages = [];
-        foreach ($rawStages as $index => $stage) {
-            if (!is_array($stage) ||
-                !isset($stage['overagePercent']) || !is_numeric($stage['overagePercent']) ||
-                !isset($stage['capMbit']) || !is_numeric($stage['capMbit'])) {
-                continue;
-            }
-
-            $stageCapMbit = (int) $stage['capMbit'];
-            if ($stageCapMbit <= 0) {
-                continue;
-            }
-
-            $stageMinOverageGiB = 0.0;
-            if (isset($stage['minOverageGiB']) && is_numeric($stage['minOverageGiB'])) {
-                $stageMinOverageGiB = max(0.0, (float) $stage['minOverageGiB']);
-            }
-
-            $normalizedStages[] = [
-                'overagePercent' => max(0.0, (float) $stage['overagePercent']),
-                'minOverageGiB'  => $stageMinOverageGiB,
-                'capMbit'        => $stageCapMbit,
-                'index'          => (int) $index,
-            ];
-        }
-
+        $normalizedStages = pmssTrafficLimitNormalizeOverageStages($rawStages);
         if (empty($normalizedStages)) {
             return ['effective' => $postCapMbit, 'matched' => null];
         }
 
-        usort($normalizedStages, static function (array $left, array $right): int {
-            return ($right['overagePercent'] <=> $left['overagePercent'])
-                ?: ($right['minOverageGiB'] <=> $left['minOverageGiB'])
-                ?: ($left['index'] <=> $right['index']);
-        });
+        pmssTrafficLimitSortOverageStages($normalizedStages);
 
         foreach ($normalizedStages as $stage) {
             if ($overagePercent < $stage['overagePercent']) {

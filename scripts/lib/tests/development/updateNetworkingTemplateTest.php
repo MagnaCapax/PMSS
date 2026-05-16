@@ -27,7 +27,8 @@ class UpdateNetworkingTemplateTest extends TestCase
         $this->assertTrue(is_array($config), 'Expected generated network config to return an array');
         $this->assertSame('eth0', $config['interface']);
         $this->assertSame('1000', $config['speed']);
-        $this->assertSame(true, $config['throttle']['progressiveThrottleEnabled']);
+        $this->assertSame(false, $config['throttle']['progressiveThrottleEnabled']);
+        $this->assertSame(array('overagePercent' => 0, 'capMbit' => 100), $config['throttle']['overageStages'][0]);
         $this->assertSame(80, $config['throttle']['limitSoft']);
         $this->assertSame(array('Created default network configuration'), $messages);
     }

@@ -116,76 +116,70 @@ class TrafficLimitParserTest extends TestCase
         $this->assertEquals(0.0, $result['adjustedOverage']);
     }
 
-    public function testTieredCapSelectsFiftyPercentStageWhenGiBThresholdMatches(): void
+    public function testDefaultTieredCapHoldsPostCapAtOneHundredMbit(): void
     {
         $result = pmssTrafficLimitSelectTieredCapMbit(
-            50.0,
-            3072.0,
-            100,
-            pmssTrafficLimitDefaultOverageStages()
-        );
-        $this->assertEquals(50, $result['effective']);
-        $this->assertEquals(50.0, $result['matched']['overagePercent']);
-    }
-
-    public function testTieredCapSkipsFiftyPercentStageWhenGiBThresholdIsLow(): void
-    {
-        $result = pmssTrafficLimitSelectTieredCapMbit(
-            60.0,
-            2048.0,
+            206.0,
+            515.0,
             100,
             pmssTrafficLimitDefaultOverageStages()
         );
         $this->assertEquals(100, $result['effective']);
-        $this->assertEquals(null, $result['matched']);
+        $this->assertEquals(0.0, $result['matched']['overagePercent']);
     }
 
-    public function testTieredCapSelectsSeventyFivePercentStage(): void
+    public function testDefaultTieredCapAppliesAtSmallPostCapOverage(): void
     {
         $result = pmssTrafficLimitSelectTieredCapMbit(
-            80.0,
-            6000.0,
+            1.0,
+            1.0,
             100,
             pmssTrafficLimitDefaultOverageStages()
         );
-        $this->assertEquals(25, $result['effective']);
-        $this->assertEquals(75.0, $result['matched']['overagePercent']);
+        $this->assertEquals(100, $result['effective']);
+        $this->assertEquals(0.0, $result['matched']['overagePercent']);
     }
 
-    public function testTieredCapSelectsHundredPercentStageWithoutGiBFloor(): void
+    public function testDefaultTieredCapAppliesAtHeavyPostCapOverage(): void
     {
         $result = pmssTrafficLimitSelectTieredCapMbit(
-            100.0,
-            16.0,
+            400.0,
+            10000.0,
             100,
             pmssTrafficLimitDefaultOverageStages()
         );
-        $this->assertEquals(10, $result['effective']);
-        $this->assertEquals(100.0, $result['matched']['overagePercent']);
+        $this->assertEquals(100, $result['effective']);
+        $this->assertEquals(0.0, $result['matched']['overagePercent']);
     }
 
-    public function testTieredCapSelectsHighestMatchingThresholdFirst(): void
+    public function testDefaultTieredCapNeverIncreasesLowerBaseCap(): void
     {
         $result = pmssTrafficLimitSelectTieredCapMbit(
-            220.0,
-            9000.0,
-            100,
+            206.0,
+            515.0,
+            50,
             pmssTrafficLimitDefaultOverageStages()
         );
-        $this->assertEquals(1, $result['effective']);
-        $this->assertEquals(200.0, $result['matched']['overagePercent']);
+        $this->assertEquals(50, $result['effective']);
+        $this->assertEquals(0.0, $result['matched']['overagePercent']);
     }
 
-    public function testTieredCapNeverIncreasesLowerBaseCap(): void
+    public function testLegacyDefaultOverageStagesAreDetected(): void
     {
-        $result = pmssTrafficLimitSelectTieredCapMbit(
-            80.0,
-            6000.0,
-            20,
-            pmssTrafficLimitDefaultOverageStages()
-        );
-        $this->assertEquals(20, $result['effective']);
-        $this->assertEquals(75.0, $result['matched']['overagePercent']);
+        $this->assertTrue(pmssTrafficLimitOverageStagesMatchLegacyDefault([
+            ['overagePercent' => 200, 'capMbit' => 1],
+            ['overagePercent' => 125, 'capMbit' => 1],
+            ['overagePercent' => 100, 'capMbit' => 10],
+            ['overagePercent' => 75, 'minOverageGiB' => 5120, 'capMbit' => 25],
+            ['overagePercent' => 50, 'minOverageGiB' => 3072, 'capMbit' => 50],
+        ]));
+    }
+
+    public function testCustomOverageStagesAreNotTreatedAsLegacyDefault(): void
+    {
+        $this->assertFalse(pmssTrafficLimitOverageStagesMatchLegacyDefault([
+            ['overagePercent' => 0, 'capMbit' => 100],
+        ]));
     }
 
     public function testTieredCapIgnoresInvalidStages(): void

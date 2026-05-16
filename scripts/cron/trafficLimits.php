@@ -67,7 +67,11 @@ if (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) &&
 $progressiveThrottleGracePercent = max(0.0, $progressiveThrottleGracePercent);
 $overageThrottleStages = pmssTrafficLimitDefaultOverageStages();
 if (isset($networkConfig['throttle']['overageStages']) && is_array($networkConfig['throttle']['overageStages'])) {
-    $overageThrottleStages = $networkConfig['throttle']['overageStages'];
+    $configuredOverageStages = $networkConfig['throttle']['overageStages'];
+    if (!function_exists('pmssTrafficLimitOverageStagesMatchLegacyDefault') ||
+        !pmssTrafficLimitOverageStagesMatchLegacyDefault($configuredOverageStages)) {
+        $overageThrottleStages = $configuredOverageStages;
+    }
 }
 $userConfigStore = new UserConfigStore();
 
