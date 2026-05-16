@@ -139,9 +139,8 @@ class resourceStatistics
      */
     public function parseLine($thisLine)
     {
-        if (!is_array($tokens = preg_split('/\s+/', trim((string) $thisLine))) || ($tokenCount = count($tokens)) < 7 || $tokenCount === 10) {
-            return false;
-        }
+        $tokenCount = count($tokens = preg_split('/\s+/', trim((string) $thisLine)) ?: []);
+        if ($tokenCount < 7 || $tokenCount === 10) return false;
 
         $timestamp = strtotime($tokens[0].' '.$tokens[1]);
         if ($timestamp === false) return false;
@@ -151,7 +150,7 @@ class resourceStatistics
             ? [2 => 'io_read', 3 => 'io_write', 4 => 'io_read_ops', 5 => 'io_write_ops', 6 => 'cpu', 7 => 'memory', 8 => 'tasks']
             : [2 => 'io_read', 3 => 'io_write', 4 => 'cpu', 5 => 'memory', 6 => 'tasks'];
         if ($tokenCount > 10) {
-            $fields += array_combine([9, 10], array_values(pmssResourceMemoryBreakdownFieldMap()));
+            $fields += [9 => 'memory_anon', 10 => 'memory_file'];
         }
 
         foreach ($fields as $index => $field) {

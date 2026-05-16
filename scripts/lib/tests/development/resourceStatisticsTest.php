@@ -83,71 +83,42 @@ class ResourceStatisticsTest extends TestCase
     public function testParseLineValid(): void
     {
         $stats = new \resourceStatistics();
-        $line = $this->resourceLine(time(), '1024 2048 3000 4096 7');
-        $parsed = $stats->parseLine($line);
-        $this->assertTrue($parsed !== false);
-        $this->assertEquals(1024.0, $parsed['io_read']);
-        $this->assertEquals(0.0, $parsed['io_read_ops']);
-        $this->assertEquals(7.0, $parsed['tasks']);
-    }
+        $timestamp = strtotime('2026-05-16 12:34:56');
+        $base = [
+            'timestamp' => $timestamp,
+            'io_read' => 1024.0,
+            'io_write' => 2048.0,
+            'io_read_ops' => 0.0,
+            'io_write_ops' => 0.0,
+            'cpu' => 3000.0,
+            'memory' => 4096.0,
+            'tasks' => 7.0,
+        ];
 
-    public function testParseLineWithOpsFields(): void
-    {
-        $stats = new \resourceStatistics();
-        $line = $this->resourceLine(time(), '1024 2048 12 34 3000 4096 7');
-        $parsed = $stats->parseLine($line);
-        $this->assertTrue($parsed !== false);
-        $this->assertEquals(12.0, $parsed['io_read_ops']);
-        $this->assertEquals(34.0, $parsed['io_write_ops']);
-        $this->assertEquals(3000.0, $parsed['cpu']);
-    }
-
-    public function testParseLineIgnoresLegacyTrailingTokenOutsideOpsShape(): void
-    {
-        $stats = new \resourceStatistics();
-        $line = $this->resourceLine(time(), '1024 2048 3000 4096 7 ignored');
-        $parsed = $stats->parseLine($line);
-        $this->assertTrue($parsed !== false);
-        $this->assertEquals(0.0, $parsed['io_read_ops']);
-        $this->assertEquals(3000.0, $parsed['cpu']);
-        $this->assertEquals(7.0, $parsed['tasks']);
-    }
-
-    public function testParseLineWithMemoryBreakdownFields(): void
-    {
-        $stats = new \resourceStatistics();
-        $line = $this->resourceLine(time(), '1024 2048 12 34 3000 4096 7 512 1024');
-        $parsed = $stats->parseLine($line);
-        $this->assertTrue($parsed !== false);
-        $this->assertEquals(512.0, $parsed[array_values(\pmssResourceMemoryBreakdownFieldMap())[0]]);
-        $this->assertEquals(1024.0, $parsed[array_values(\pmssResourceMemoryBreakdownFieldMap())[1]]);
-        $this->assertEquals(7.0, $parsed['tasks']);
-    }
-
-    public function testParseLineRejectsPartialMemoryBreakdownFields(): void
-    {
-        $stats = new \resourceStatistics();
-        $line = $this->resourceLine(time(), '1024 2048 12 34 3000 4096 7 512');
-        $this->assertTrue($stats->parseLine($line) === false);
+        foreach ([
+            'legacy' => ['1024 2048 3000 4096 7', $base],
+            'legacy_extra' => ['1024 2048 3000 4096 7 ignored', $base],
+            'ops' => ['1024 2048 12 34 3000 4096 7', array_merge($base, ['io_read_ops' => 12.0, 'io_write_ops' => 34.0])],
+            'memory_breakdown' => ['1024 2048 12 34 3000 4096 7 512 1024', array_merge($base, ['io_read_ops' => 12.0, 'io_write_ops' => 34.0, 'memory_anon' => 512.0, 'memory_file' => 1024.0])],
+            'memory_breakdown_extra' => ['1024 2048 12 34 3000 4096 7 512 1024 ignored', array_merge($base, ['io_read_ops' => 12.0, 'io_write_ops' => 34.0, 'memory_anon' => 512.0, 'memory_file' => 1024.0])],
+        ] as $label => $case) {
+            $this->assertEquals($case[1], $stats->parseLine($this->resourceLine($timestamp, $case[0])), $label);
+        }
     }
 
     public function testParseLineRejectsMalformed(): void
     {
         $stats = new \resourceStatistics();
-        $this->assertTrue($stats->parseLine('bad data') === false);
-    }
+        $timestamp = time();
 
-    public function testParseLineRejectsNonNumeric(): void
-    {
-        $stats = new \resourceStatistics();
-        $line = $this->resourceLine(time(), '1 2 nope 4 5');
-        $this->assertTrue($stats->parseLine($line) === false);
-    }
-
-    public function testParseLineRejectsMissingTokens(): void
-    {
-        $stats = new \resourceStatistics();
-        $line = $this->resourceLine(time(), '1 2 3');
-        $this->assertTrue($stats->parseLine($line) === false);
+        foreach ([
+            'bad data',
+            $this->resourceLine($timestamp, '1 2 nope 4 5'),
+            $this->resourceLine($timestamp, '1 2 3'),
+            $this->resourceLine($timestamp, '1024 2048 12 34 3000 4096 7 512'),
+            'not-a-date 12:34:56 1024 2048 3000 4096 7',
+        ] as $line) {
+            $this->assertTrue($stats->parseLine($line) === false, $line);
+        }
     }
 }
