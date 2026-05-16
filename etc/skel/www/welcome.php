@@ -717,11 +717,13 @@ function pmssWelcomeContextualMessageBuild($quotaInfo) {
 }
 
 function pmssWelcomeHomeRaidNoticeHtmlRead() {
-    if (!file_exists('/scripts/lib/storageHealth.php')) {
+    // Customer-side storage-health notice (see storageHealthNotice.php).
+    $pmssStorageHealthNoticeLib = __DIR__.'/storageHealthNotice.php';
+    if (!file_exists($pmssStorageHealthNoticeLib)) {
         return '';
     }
 
-    require_once '/scripts/lib/storageHealth.php';
+    require_once $pmssStorageHealthNoticeLib;
     if (!function_exists('pmssStorageHealthHomeRaidActivity')) {
         return '';
     }

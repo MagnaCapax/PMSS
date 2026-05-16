@@ -13,8 +13,13 @@
 
 $pmssHomeRaidActivity = null;
 $pmssHomeRaidNoticeHtml = '';
-if (file_exists('/scripts/lib/storageHealth.php')) {
-    require_once '/scripts/lib/storageHealth.php';
+// Customer-side storage-health notice: see storageHealthNotice.php for rationale.
+// The full /scripts/lib/storageHealth.php (with SMART/NVMe paths) remains
+// operator-side; customer only needs the /proc/mdstat reader subset which
+// has been inlined.
+$pmssStorageHealthNoticeLib = __DIR__.'/storageHealthNotice.php';
+if (file_exists($pmssStorageHealthNoticeLib)) {
+    require_once $pmssStorageHealthNoticeLib;
     if (function_exists('pmssStorageHealthHomeRaidActivity')) {
         $pmssHomeRaidActivity = pmssStorageHealthHomeRaidActivity();
         $pmssHomeRaidNoticeHtml = pmssStorageHealthHomeRaidNoticeHtmlBuild($pmssHomeRaidActivity);

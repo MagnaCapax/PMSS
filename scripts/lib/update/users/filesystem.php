@@ -197,6 +197,7 @@ PHP;
         'www/welcomeAnnouncements.php',
         'www/userTrafficLimit.php',
         'www/webCgroupMemoryStatus.php',
+        'www/storageHealthNotice.php',
     ];
     foreach ($files as $file) {
         updateUserFile($file, $user);
