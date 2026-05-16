@@ -195,6 +195,7 @@ PHP;
         'www/rutorrent/plugins/theme/conf.php',
         'www/welcome.php',
         'www/welcomeAnnouncements.php',
+        'www/userTrafficLimit.php',
     ];
     foreach ($files as $file) {
         updateUserFile($file, $user);

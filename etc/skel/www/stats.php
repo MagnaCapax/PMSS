@@ -108,8 +108,10 @@ if (file_exists('/scripts/lib/webCgroupMemoryStatus.php')) {
     require_once '/scripts/lib/webCgroupMemoryStatus.php';
 }
 
-if (file_exists('/scripts/lib/user/trafficLimit.php')) {
-    require_once '/scripts/lib/user/trafficLimit.php';
+// Customer-side traffic-limit reader: see userTrafficLimit.php for rationale.
+$pmssUserTrafficLimitLib = __DIR__.'/userTrafficLimit.php';
+if (file_exists($pmssUserTrafficLimitLib)) {
+    require_once $pmssUserTrafficLimitLib;
 }
 if (file_exists('/scripts/lib/traffic/storage.php')) {
     require_once '/scripts/lib/traffic/storage.php';
