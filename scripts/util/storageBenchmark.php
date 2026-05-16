@@ -13,7 +13,20 @@ require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/storageHealth/common.php';
 
-function usage(): void {
+$valueOptionNames = [
+    '--target',
+    '--size',
+    '--json',
+    '--label',
+    '--dd-size',
+    '--runtime',
+    '--device-runtime',
+    '--idle-latency-ms',
+    '--idle-util',
+];
+// Keep long flag literals inline for CLI characterization coverage: '--require-idle'.
+$parsed = pmssParseCliTokens($argv, $valueOptionNames);
+if (pmssCliOption($parsed, 'help', 'h')) {
     echo <<<'USAGE'
 
 Storage benchmark (non-destructive)
@@ -42,45 +55,20 @@ Other:
   --help                    Show this help
 
 USAGE;
+    exit(0);
 }
-
-// Parameters
-$targetDir = '/home';
-$fileSize  = '500G';
-$runtime   = 60;
-$jsonLog   = '/var/log/pmss/benchmark-storage.jsonl';
-$label     = '';
-$testDevices = false;
-$ddSize = '1G';
-$devRuntime = 30;
-$requireIdle=false; $idleLatencyMs=100; $idleUtilPct=85; $showLast=false;
-
-$valueOptionNames = [
-    '--target',
-    '--size',
-    '--json',
-    '--label',
-    '--dd-size',
-    '--runtime',
-    '--device-runtime',
-    '--idle-latency-ms',
-    '--idle-util',
-];
-// Keep long flag literals inline for CLI characterization coverage: '--require-idle'.
-$parsed = pmssParseCliTokens($argv, $valueOptionNames);
-if (pmssCliOption($parsed, 'help', 'h')) { usage(); exit(0); }
 $testDevices = pmssCliOptionPresent($parsed, 'devices', null, true);
 $requireIdle = pmssCliOptionPresent($parsed, 'require-idle', null, true);
 $showLast = pmssCliOptionPresent($parsed, 'show-last', null, true);
-$targetDir = pmssCliOptionString($parsed, 'target', null, $targetDir, true) ?? $targetDir;
-$fileSize = pmssCliOptionString($parsed, 'size', null, $fileSize, true) ?? $fileSize;
-$jsonLog = pmssCliOptionString($parsed, 'json', null, $jsonLog, true) ?? $jsonLog;
-$label = pmssCliOptionString($parsed, 'label', null, $label, true) ?? $label;
-$ddSize = pmssCliOptionString($parsed, 'dd-size', null, $ddSize, true) ?? $ddSize;
-$runtime = pmssCliOptionInt($parsed, 'runtime', null, $runtime);
-$devRuntime = pmssCliOptionInt($parsed, 'device-runtime', null, $devRuntime);
-$idleLatencyMs = pmssCliOptionInt($parsed, 'idle-latency-ms', null, $idleLatencyMs);
-$idleUtilPct = pmssCliOptionInt($parsed, 'idle-util', null, $idleUtilPct);
+$targetDir = (string) pmssCliOptionString($parsed, 'target', null, '/home', true);
+$fileSize = (string) pmssCliOptionString($parsed, 'size', null, '500G', true);
+$jsonLog = (string) pmssCliOptionString($parsed, 'json', null, '/var/log/pmss/benchmark-storage.jsonl', true);
+$label = (string) pmssCliOptionString($parsed, 'label', null, '', true);
+$ddSize = (string) pmssCliOptionString($parsed, 'dd-size', null, '1G', true);
+$runtime = pmssCliOptionInt($parsed, 'runtime', null, 60);
+$devRuntime = pmssCliOptionInt($parsed, 'device-runtime', null, 30);
+$idleLatencyMs = pmssCliOptionInt($parsed, 'idle-latency-ms', null, 100);
+$idleUtilPct = pmssCliOptionInt($parsed, 'idle-util', null, 85);
 
 function parseSizeSB(string $s): int { $s=trim($s); if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }
 function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $bytes=parseSizeSB($value); if($bytes<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return $bytes; }
