@@ -162,10 +162,6 @@ function networkApplyIptablesFallback(array $filterCommands, array $natCommands,
     }
     foreach ($natCommands as $cmd) {
         $rendered = str_replace(array_keys($replacements), array_values($replacements), $cmd);
-        if (strpos($rendered, '-t nat') !== 0) {
-            networkRunIptables('-t nat '.$rendered);
-        } else {
-            networkRunIptables($rendered);
-        }
+        networkRunIptables(strpos($rendered, '-t nat') !== 0 ? '-t nat '.$rendered : $rendered);
     }
 }

@@ -155,17 +155,8 @@ function pmssCheckRtorrentRecoverMissingConfig(string $user, string $home, bool 
         return false;
     }
 
-    $resources = [];
     $resourceFile = '/etc/seedbox/config/system.rtorrent.resources';
-    if (is_file($resourceFile)) {
-        $resourceData = @file_get_contents($resourceFile);
-        if (is_string($resourceData)) {
-            $loadedResources = @unserialize($resourceData);
-            if (is_array($loadedResources)) {
-                $resources = $loadedResources;
-            }
-        }
-    }
+    $resources = is_file($resourceFile) ? (pmssReadSerializedArrayFile($resourceFile) ?? []) : [];
 
     $configInput = [
         'ram' => $ramMiB,

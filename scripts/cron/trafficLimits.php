@@ -82,7 +82,6 @@ foreach($users AS $thisUser) {
         continue;
     }
     $trafficLimit = (float) $trafficLimitState['effectiveLimitGiB'];
-//    var_dump($data);
     $trafficUsageGiB = ($data['raw']['month'] / 1024);   // Set to GiB
     $trafficCapMbit = $defaultTrafficCapMbit;
     $userConfig = $userConfigStore->get($thisUser);
@@ -102,12 +101,10 @@ foreach($users AS $thisUser) {
     $overLimit = ($trafficUsageGiB > $trafficLimit);
 
     // Needs to stay within the limit for X period of time, hence we can always touch & update the limit file
-    if ($overLimit) { // Should be limited
+    if ($overLimit) {
 
         $effectiveCapMbit = (int) $trafficCapMbit;
-        $overageGiB = ($trafficUsageGiB > $trafficLimit)
-            ? ($trafficUsageGiB - $trafficLimit)
-            : 0.0;
+        $overageGiB = $trafficUsageGiB - $trafficLimit;
         $overagePercent = ($trafficLimit > 0)
             ? ($overageGiB / $trafficLimit) * 100
             : 0.0;
@@ -142,7 +139,7 @@ foreach($users AS $thisUser) {
         touch( $userTrafficLimitEnabledFile );
 
         chmod( $userTrafficLimitEnabledFile, 0600);
-        setRatelimit($thisUser, $effectiveCapMbit);    // Apply rate limiting
+        setRateLimit($thisUser, $effectiveCapMbit);    // Apply rate limiting
         if (function_exists('pmssUserLog')) {
             if (is_array($matchedOverageStage)) {
                 pmssUserLog(
