@@ -12,12 +12,6 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__).'/runtime.php';
-
-if (is_file(dirname(__DIR__).'/lighttpd/userFileWrite.php')) {
-    require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
-}
-
 require_once __DIR__.'/integerSetting.php';
 
 if (!function_exists('pmssTrafficLimitParseGiB')) {
@@ -297,7 +291,7 @@ if (!function_exists('pmssTrafficLimitCliTargetModes')) {
     /** @return array<string,int> */
     function pmssTrafficLimitCliTargetModes(string $userName, string $homeDir): array
     {
-        return ['/etc/seedbox/runtime/trafficLimits/'.$userName => 0600, $homeDir.'/.trafficLimit' => 0664];
+        return [pmssIntegerSettingRuntimeUserPath('trafficLimits', $userName) => 0600, pmssIntegerSettingUserHomePath($userName, '.trafficLimit', $homeDir) => 0664];
     }
 }
 

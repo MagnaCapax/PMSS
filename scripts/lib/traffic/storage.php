@@ -9,6 +9,7 @@
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../userLifecycle.php';
+require_once __DIR__.'/../user/integerSetting.php';
 
 /** @return array<string,string> Resolve the canonical per-user traffic data files. */
 function pmssTrafficDataPaths(string $username, ?string $homeDir = null): array
@@ -42,7 +43,7 @@ function pmssTrafficUserKeyIsValid(string $user): bool
 /** Resolve the per-user persisted traffic limit path. */
 function pmssTrafficLimitPath(string $username, ?string $homeDir = null): string
 {
-    return pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home').'/'.$username.'/.trafficLimit';
+    return pmssIntegerSettingUserHomePath($username, '.trafficLimit', $homeDir);
 }
 
 /** Resolve the runtime traffic statistics cache path for a user key. */

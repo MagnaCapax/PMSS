@@ -81,6 +81,16 @@ if (!function_exists('pmssIntegerSettingFileWrite')) {
     }
 }
 
+if (!function_exists('pmssIntegerSettingRuntimeUserPath')) {
+    /** Resolve an integer-setting runtime bucket path for one user. */
+    function pmssIntegerSettingRuntimeUserPath(string $bucket, string $username, ?string $runtimeDir = null): string { return rtrim(pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime'), '/').'/'.$bucket.'/'.$username; }
+}
+
+if (!function_exists('pmssIntegerSettingUserHomePath')) {
+    /** Resolve an integer-setting file path under one user home. */
+    function pmssIntegerSettingUserHomePath(string $username, string $filename, ?string $homeDir = null): string { return rtrim(pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home'), '/').'/'.$username.'/'.ltrim($filename, '/'); }
+}
+
 if (!function_exists('pmssIntegerSettingPathModeConverge')) {
     function pmssIntegerSettingPathModeConverge(string $path, int $mode): bool
     {

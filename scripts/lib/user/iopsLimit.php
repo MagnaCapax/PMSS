@@ -13,12 +13,6 @@
  * @author PMSS Team
  */
 
-require_once dirname(__DIR__).'/runtime.php';
-
-if (is_file(dirname(__DIR__).'/lighttpd/userFileWrite.php')) {
-    require_once dirname(__DIR__).'/lighttpd/userFileWrite.php';
-}
-
 require_once __DIR__.'/integerSetting.php';
 
 /** @param mixed $raw */
@@ -27,7 +21,7 @@ function pmssIopsLimitParseMonthlyOperations($raw, ?string &$error = null): ?int
     return pmssIntegerSettingParseNonNegative($raw, 'ops', $error);
 }
 
-function pmssIopsLimitRuntimeUserPath(string $bucket, string $username, ?string $runtimeDir = null): string { return rtrim(pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime'), '/').'/'.$bucket.'/'.$username; }
+function pmssIopsLimitRuntimeUserPath(string $bucket, string $username, ?string $runtimeDir = null): string { return pmssIntegerSettingRuntimeUserPath($bucket, $username, $runtimeDir); }
 
 function pmssIopsLimitRuntimePath(string $username, ?string $runtimeDir = null): string
 {
@@ -36,8 +30,7 @@ function pmssIopsLimitRuntimePath(string $username, ?string $runtimeDir = null):
 
 function pmssIopsLimitPath(string $username, ?string $homeDir = null): string
 {
-    $root = pmssDirPathResolve($homeDir, 'PMSS_HOME_DIR', '/home');
-    return rtrim($root, '/').'/'.$username.'/.iopsLimit';
+    return pmssIntegerSettingUserHomePath($username, '.iopsLimit', $homeDir);
 }
 
 /** @return array<string,int> */
