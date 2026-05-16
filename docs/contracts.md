@@ -437,6 +437,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
 
 - scripts/cron/checkLighttpdInstances.php [<user>]
   - Behavior: Keeps per-user `lighttpd` and `php-cgi` healthy, regenerates missing configs, and refreshes per-user 502 pages while the web stack is unhealthy.
+  - Behavior: Restarts the per-user lighttpd/php-cgi stack when the rendered config, `~/.lighttpd/custom`, or `~/.lighttpd/custom.d/*.conf` fragments are newer than the running lighttpd process.
   - Per-user toggle: when user config `lighttpdEnabled` is false, kills any running `lighttpd`/`php-cgi` for that user, removes the watchdog error page, and skips restart. Default remains true.
 
 - scripts/util/createNginxConfig.php

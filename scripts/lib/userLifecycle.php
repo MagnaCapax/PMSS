@@ -230,6 +230,37 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
     @exec('pgrep -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
     return $exitCode === 0 && $matches !== array();
 }
+/** Return the oldest /proc start marker for exact process-name matches. */
+function pmssUserWatchdogProcessStartTime(string $username, string $processName, string $procRoot = '/proc'): ?int
+{
+    if ($processName === '') {
+        return null;
+    }
+
+    $matches = array();
+    $exitCode = 1;
+    @exec('pgrep -u '.escapeshellarg($username).' -x '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
+    if ($exitCode !== 0 || $matches === array()) {
+        return null;
+    }
+
+    $oldest = null;
+    $procRoot = rtrim($procRoot, '/');
+    foreach ($matches as $rawPid) {
+        $pid = trim((string) $rawPid);
+        if ($pid === '' || preg_match('/^[0-9]+$/', $pid) !== 1) {
+            continue;
+        }
+
+        $mtime = @filemtime($procRoot.'/'.$pid);
+        if (!is_int($mtime)) {
+            continue;
+        }
+        $oldest = $oldest === null ? $mtime : min($oldest, $mtime);
+    }
+
+    return $oldest;
+}
 function pmssUserWatchdogStartCommand(string $username, string $serviceLabel, string $command, string $userLogMessage): void
 {
     if ($command === '') { return; }

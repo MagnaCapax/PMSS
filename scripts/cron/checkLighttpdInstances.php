@@ -58,6 +58,16 @@ foreach($users AS $thisUser) {
         }
     }
     $lighttpdRunningBeforeRestart = pmssUserWatchdogProcessRunning($thisUser, 'lighttpd');
+    $lighttpdStartTime = $lighttpdRunningBeforeRestart
+        ? pmssUserWatchdogProcessStartTime($thisUser, 'lighttpd')
+        : null;
+    $configChangedAfterStart = $lighttpdRunningBeforeRestart
+        && pmssLighttpdConfigNewerThanProcess($homeDir, $homeDir.'/.lighttpd.conf', $lighttpdStartTime);
+    if ($configChangedAfterStart) {
+        echo "lighttpd config newer than running process, for user: {$thisUser}. Restarting lighttpd instances.\n";
+        pmssUserLog($thisUser, 'lighttpd restart requested (config newer than process)');
+    }
+
     if ($socketError || !$lighttpdRunningBeforeRestart) {
         pmssLighttpdWatchdogWriteErrorPage(
             $thisUser,
@@ -67,12 +77,23 @@ foreach($users AS $thisUser) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser);
     }
 
-    $lighttpdRunning = pmssUserWatchdogRestartProcessesIf($thisUser, $socketError || $lighttpdRunningBeforeRestart, ['lighttpd', 'php-cgi'], static function () use ($socketError): bool { return $socketError; }, 'lighttpd restart requested', 15, static function () use ($thisUser): void {
-        echo "Killing (if any) lighttpd for user: {$thisUser}\n";
-        pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 15);
-        sleep(5);
-        pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 9);
-        usleep(50000);
-    });
+    $restartRequired = $socketError || $configChangedAfterStart;
+    $lighttpdRunning = pmssUserWatchdogRestartProcessesIf(
+        $thisUser,
+        $socketError || $lighttpdRunningBeforeRestart,
+        ['lighttpd', 'php-cgi'],
+        static function () use ($restartRequired): bool {
+            return $restartRequired;
+        },
+        'lighttpd restart requested',
+        15,
+        static function () use ($thisUser): void {
+            echo "Killing (if any) lighttpd for user: {$thisUser}\n";
+            pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 15);
+            sleep(5);
+            pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 9);
+            usleep(50000);
+        }
+    );
     pmssUserWatchdogEnsureServices($thisUser, [['processName' => 'lighttpd', 'command' => '/scripts/startLighttpd ' . $thisUser, 'userLogMessage' => 'lighttpd start requested']], ['lighttpd' => $lighttpdRunning]);
 }

@@ -201,6 +201,54 @@ function pmssLighttpdWatchdogSocketPaths(string $homeDir, string $configPath): a
     }, range(0, $expectedSockets - 1));
 }
 
+/**
+ * Return the lighttpd config files whose mtimes affect reloads.
+ *
+ * @return array<int, string>
+ */
+function pmssLighttpdWatchedConfigPaths(string $homeDir, string $configPath): array
+{
+    $paths = [$configPath, rtrim($homeDir, '/').'/.lighttpd/custom'];
+    $customDir = rtrim($homeDir, '/').'/.lighttpd/custom.d';
+    foreach (glob($customDir.'/*.conf') ?: [] as $path) {
+        $paths[] = $path;
+    }
+
+    return array_values(array_filter($paths, static function (string $path): bool {
+        return is_file($path) && !is_link($path);
+    }));
+}
+
+/**
+ * Return the newest mtime among lighttpd config files, or null when none exist.
+ */
+function pmssLighttpdNewestConfigMtime(string $homeDir, string $configPath): ?int
+{
+    $newest = null;
+    foreach (pmssLighttpdWatchedConfigPaths($homeDir, $configPath) as $path) {
+        $mtime = @filemtime($path);
+        if (!is_int($mtime)) {
+            continue;
+        }
+        $newest = $newest === null ? $mtime : max($newest, $mtime);
+    }
+
+    return $newest;
+}
+
+/**
+ * Detect when on-disk lighttpd config was written after the daemon started.
+ */
+function pmssLighttpdConfigNewerThanProcess(string $homeDir, string $configPath, ?int $processStartTime): bool
+{
+    if ($processStartTime === null) {
+        return false;
+    }
+
+    $configMtime = pmssLighttpdNewestConfigMtime($homeDir, $configPath);
+    return $configMtime !== null && $configMtime > $processStartTime;
+}
+
 function pmssPrepareLighttpdUserDirectories(string $user, string $homeDir, bool $deflateEnabled): bool
 {
     if (!pmssValidateUsername($user) || !is_dir($homeDir) || is_link($homeDir)) {
