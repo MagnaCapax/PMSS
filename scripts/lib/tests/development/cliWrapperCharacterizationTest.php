@@ -46,4 +46,11 @@ final class CliWrapperCharacterizationTest extends TestCase
             $this->pmssAssertRepoFileContainsAllStrings($path, ['pmssRunCliEntrypointWithArgv(__FILE__,']);
         }
     }
+
+    public function testLegacyCheckInstancesWrapperDelegatesInProcess(): void
+    {
+        $path = 'scripts/cron/checkInstances.php';
+        $this->pmssAssertRepoFileContainsAllStrings($path, ["\$target = __DIR__.'/checkRtorrent.php';", 'missing; cannot run rTorrent watchdog', 'require $target;']);
+        $this->pmssAssertRepoFileNotContainsStrings($path, ['pmss-check'.'Instances.lock', 'passthru($cmd', 'array_shift($args)', 'escapeshellarg($target)']);
+    }
 }

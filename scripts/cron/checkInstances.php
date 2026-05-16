@@ -11,25 +11,10 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../lib/runtime.php';
-if (pmssLockFileAcquire(pmssRuntimeLockPath('pmss-checkInstances.lock'), true) === false) {
-    exit(0);
-}
-
 $target = __DIR__.'/checkRtorrent.php';
 if (!is_file($target)) {
     fwrite(STDERR, date('c')." ERROR: {$target} missing; cannot run rTorrent watchdog\n");
     exit(1);
 }
 
-$args = isset($argv) ? $argv : (isset($_SERVER['argv']) ? $_SERVER['argv'] : []);
-array_shift($args);
-
-$cmd = escapeshellarg($target);
-if (!empty($args)) {
-    $cmd .= ' '.implode(' ', array_map('escapeshellarg', $args));
-}
-
-$rc = 0;
-passthru($cmd, $rc);
-exit($rc);
+require $target;
