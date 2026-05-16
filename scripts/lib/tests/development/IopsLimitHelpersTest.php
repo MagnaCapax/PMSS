@@ -60,10 +60,12 @@ class IopsLimitHelpersTest extends TestCase
         @mkdir($homeRoot.'/alice', 0755, true);
 
         $targets = \pmssIopsLimitTargetModes('alice', $homeRoot, $runtimeRoot);
+        $runtimePath = array_key_first($targets);
         $error = null;
 
-        $this->assertTrue(\pmssIopsLimitPrepareTargetModes($targets));
-        $this->assertTrue(\pmssIopsLimitPersistTargetModes($targets, 777, $error));
+        $this->assertTrue(is_string($runtimePath) && $runtimePath !== '');
+        $this->assertTrue(\pmssIntegerSettingStorageDirEnsure(dirname($runtimePath), 0700));
+        $this->assertTrue(\pmssIntegerSettingTargetModesPersist($targets, 777, $error, 'invalid operations value'));
         $this->assertSame(null, $error);
         $this->assertSame('777', trim((string) file_get_contents($runtimeRoot.'/iopsLimits/alice')));
         $this->assertSame('777', trim((string) file_get_contents($homeRoot.'/alice/.iopsLimit')));

@@ -169,9 +169,12 @@ if ($uploadThrottleKib !== null) {
 userApplyTrafficLimit($user);
 if (array_key_exists('iopsLimit', $user) && $user['iopsLimit'] !== null) {
     $targetModes = pmssIopsLimitTargetModes($user['name'], dirname($expectedHome));
+    $runtimePath = array_key_first($targetModes);
     $persistError = null;
-    if (!pmssIopsLimitPrepareTargetModes($targetModes)
-        || !pmssIopsLimitPersistTargetModes($targetModes, (int) $user['iopsLimit'], $persistError)
+    if (!is_string($runtimePath)
+        || $runtimePath === ''
+        || !pmssIntegerSettingStorageDirEnsure(dirname($runtimePath), 0700)
+        || !pmssIntegerSettingTargetModesPersist($targetModes, (int) $user['iopsLimit'], $persistError, 'invalid operations value')
     ) {
         fwrite(STDERR, "Warning: failed to persist IOPS limit for {$user['name']}: ".($persistError ?: 'unable to prepare runtime targets')."\n");
     }

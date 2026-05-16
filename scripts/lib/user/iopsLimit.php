@@ -27,33 +27,7 @@ function pmssIopsLimitParseMonthlyOperations($raw, ?string &$error = null): ?int
     return pmssIntegerSettingParseNonNegative($raw, 'ops', $error);
 }
 
-function pmssIopsLimitReadOperationsFile(string $path): int
-{
-    return pmssIntegerSettingFileRead($path, 'pmssIopsLimitParseMonthlyOperations');
-}
-
-function pmssIopsLimitWriteOperationsFile(string $path, int $value): bool
-{
-    return pmssIntegerSettingFileWrite($path, $value);
-}
-
-function pmssIopsLimitConvergeFileMode(string $path, int $mode): bool
-{
-    return pmssIntegerSettingPathModeConverge($path, $mode);
-}
-
-function pmssIopsLimitEnsureStorageDir(string $path): bool
-{
-    return pmssIntegerSettingStorageDirEnsure($path, 0700);
-}
-
 function pmssIopsLimitRuntimeUserPath(string $bucket, string $username, ?string $runtimeDir = null): string { return rtrim(pmssDirPathResolve($runtimeDir, 'PMSS_RUNTIME_DIR', '/etc/seedbox/runtime'), '/').'/'.$bucket.'/'.$username; }
-
-/** @param array<string,int> $targetModes */
-function pmssIopsLimitPersistTargetModes(array $targetModes, int $value, ?string &$error = null): bool
-{
-    return pmssIntegerSettingTargetModesPersist($targetModes, $value, $error, 'invalid operations value');
-}
 
 function pmssIopsLimitRuntimePath(string $username, ?string $runtimeDir = null): string
 {
@@ -73,15 +47,6 @@ function pmssIopsLimitTargetModes(string $username, ?string $homeDir = null, ?st
         pmssIopsLimitRuntimePath($username, $runtimeDir) => 0600,
         pmssIopsLimitPath($username, $homeDir) => 0664,
     ];
-}
-
-/** @param array<string,int> $targetModes */
-function pmssIopsLimitPrepareTargetModes(array $targetModes): bool
-{
-    $runtimePath = array_key_first($targetModes);
-    return is_string($runtimePath)
-        && $runtimePath !== ''
-        && pmssIopsLimitEnsureStorageDir(dirname($runtimePath));
 }
 
 function pmssReadUserMonthlyIopsUsage(string $path): int

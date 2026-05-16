@@ -12,21 +12,6 @@ require_once __DIR__.'/userConfigCli.php';
 require_once __DIR__.'/userConfigStore.php';
 require_once __DIR__.'/iopsLimit.php';
 
-function pmssIopsLimitThrottleIops(): int
-{
-    return 100;
-}
-
-function pmssIopsLimitMarkerPath(string $username, ?string $runtimeDir = null): string
-{
-    return pmssIopsLimitRuntimeUserPath('iopsLimitEnforced', $username, $runtimeDir);
-}
-
-function pmssIopsLimitResourceStatsPath(string $username, ?string $runtimeDir = null): string
-{
-    return pmssIopsLimitRuntimeUserPath('resourceStats', $username, $runtimeDir);
-}
-
 function pmssIopsLimitBuildThrottleCommand(string $username, int $iops): string
 {
     return pmssBuildCommand('php', [
@@ -82,15 +67,10 @@ function pmssIopsLimitEnforcementPlan(int $limit, int $usage, bool $markerExists
 
 function pmssIopsLimitWriteMarker(string $path): bool
 {
-    return pmssIopsLimitEnsureStorageDir(dirname($path))
+    return pmssIntegerSettingStorageDirEnsure(dirname($path), 0700)
         && function_exists('pmssAtomicWriteFile')
         && pmssAtomicWriteFile($path, (string) time(), 0600)
-        && pmssIopsLimitConvergeFileMode($path, 0600);
-}
-
-function pmssIopsLimitRemoveMarker(string $path): bool
-{
-    return pmssIntegerSettingFileRemove($path);
+        && pmssIntegerSettingPathModeConverge($path, 0600);
 }
 
 function pmssIopsLimitsRun(): int
@@ -99,20 +79,21 @@ function pmssIopsLimitsRun(): int
     $store = new UserConfigStore();
 
     foreach ($users as $user) {
-        $limit = pmssIopsLimitReadOperationsFile(pmssIopsLimitRuntimePath($user));
-        $usage = pmssReadUserMonthlyIopsUsage(pmssIopsLimitResourceStatsPath($user));
-        $markerPath = pmssIopsLimitMarkerPath($user);
+        $limit = pmssIntegerSettingFileRead(pmssIopsLimitRuntimePath($user), 'pmssIopsLimitParseMonthlyOperations');
+        $usage = pmssReadUserMonthlyIopsUsage(pmssIopsLimitRuntimeUserPath('resourceStats', $user));
+        $markerPath = pmssIopsLimitRuntimeUserPath('iopsLimitEnforced', $user);
         $markerExists = is_file($markerPath) && !is_link($markerPath);
         $plan = pmssIopsLimitEnforcementPlan($limit, $usage, $markerExists);
 
         if ($plan['action'] === 'enforce') {
+            $throttleIops = 100;
             $rc = runStep(
                 'Applying monthly IOPS throttle for '.$user,
-                pmssIopsLimitBuildThrottleCommand($user, pmssIopsLimitThrottleIops())
+                pmssIopsLimitBuildThrottleCommand($user, $throttleIops)
             );
             if ($rc === 0) {
                 pmssIopsLimitWriteMarker($markerPath);
-                pmssUserLog($user, sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, pmssIopsLimitThrottleIops()));
+                pmssUserLog($user, sprintf('monthly IOPS throttle enabled (limit=%d usage=%d cap=%d)', $limit, $usage, $throttleIops));
             }
             continue;
         }
@@ -127,7 +108,7 @@ function pmssIopsLimitsRun(): int
 
             $rc = runStep('Restoring baseline cgroup IOPS for '.$user, $command);
             if ($rc === 0) {
-                pmssIopsLimitRemoveMarker($markerPath);
+                pmssIntegerSettingFileRemove($markerPath);
                 pmssUserLog($user, sprintf('monthly IOPS throttle removed (limit=%d usage=%d)', $limit, $usage));
             }
         }

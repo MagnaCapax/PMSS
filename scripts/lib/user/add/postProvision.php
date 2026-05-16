@@ -48,6 +48,6 @@ function pmssAddUserPostProvision(array $user, string $homePath): void
     }
     if (empty($user['iopsLimit'])) {
         $iopsLimitPath = pmssIopsLimitPath($user['name'], dirname($homePath));
-        pmssIopsLimitWriteOperationsFile($iopsLimitPath, 0) && pmssIopsLimitConvergeFileMode($iopsLimitPath, 0664);
+        pmssIntegerSettingFileWrite($iopsLimitPath, 0) && pmssIntegerSettingPathModeConverge($iopsLimitPath, 0664);
     }
 }
