@@ -8,6 +8,12 @@
 
 require_once __DIR__.'/../runtime.php';
 
+/** Append a best-effort iptables log entry without surfacing logging failures. */
+function networkIptablesLog(string $level, string $message): void
+{
+    @file_put_contents('/var/log/pmss/iptables.log', date('c')." {$level} {$message}\n", FILE_APPEND);
+}
+
 /**
  * Verify that the iptables owner match is available (xt_owner/ipt_owner).
  *
@@ -37,11 +43,7 @@ function networkIptablesOwnerMatchAvailable(): bool
         if ($message === '') {
             $message = 'no output';
         }
-        file_put_contents(
-            '/var/log/pmss/iptables.log',
-            date('c')." WARN owner match unavailable (rc={$rc}): {$message}\n",
-            FILE_APPEND
-        );
+        networkIptablesLog('WARN', "owner match unavailable (rc={$rc}): {$message}");
         $cached = false;
         return $cached;
     }
@@ -54,11 +56,7 @@ function networkRunIptables(string $rule): void
 {
     $rule = trim($rule);
     if (!networkIptablesCommandSafe($rule)) {
-        file_put_contents(
-            '/var/log/pmss/iptables.log',
-            date('c')." ERROR rejected unsafe iptables rule: {$rule}\n",
-            FILE_APPEND
-        );
+        networkIptablesLog('ERROR', "rejected unsafe iptables rule: {$rule}");
         return;
     }
 
@@ -66,7 +64,7 @@ function networkRunIptables(string $rule): void
     echo "Executing: {$cmd}\n";
     exec($cmd, $out, $ret);
     if ($ret !== 0) {
-        file_put_contents('/var/log/pmss/iptables.log', date('c')." ERROR {$cmd}\n", FILE_APPEND);
+        networkIptablesLog('ERROR', $cmd);
     }
 }
 
@@ -112,11 +110,7 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
     foreach (array_merge($filterCommands, $natCommands) as $command) {
         if (!is_string($command) || !networkIptablesCommandSafe($command)) {
             $summary = is_scalar($command) ? str_replace("\0", '<NUL>', (string) $command) : gettype($command);
-            @file_put_contents(
-                '/var/log/pmss/iptables.log',
-                date('c')." ERROR rejected unsafe iptables-restore rule: {$summary}\n",
-                FILE_APPEND
-            );
+            networkIptablesLog('ERROR', "rejected unsafe iptables-restore rule: {$summary}");
             return false;
         }
     }
@@ -143,12 +137,12 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
     $data = implode("\n", $sections)."\n";
     $tmp = tempnam(sys_get_temp_dir(), 'pmss-iptables-');
     if (!is_string($tmp) || $tmp === '') {
-        @file_put_contents('/var/log/pmss/iptables.log', date('c')." ERROR unable to allocate iptables-restore temp file\n", FILE_APPEND);
+        networkIptablesLog('ERROR', 'unable to allocate iptables-restore temp file');
         return false;
     }
     if (@file_put_contents($tmp, $data) === false) {
         @unlink($tmp);
-        @file_put_contents('/var/log/pmss/iptables.log', date('c')." ERROR unable to write iptables-restore temp file\n", FILE_APPEND);
+        networkIptablesLog('ERROR', 'unable to write iptables-restore temp file');
         return false;
     }
     $command = sprintf('sh -c %s', escapeshellarg('iptables-restore < '.escapeshellarg($tmp)));

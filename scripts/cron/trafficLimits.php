@@ -36,35 +36,26 @@ $users = pmssListManagedUsers('/scripts/listUsers.php');
 if (count($users) == 0) die("No users in this system!\n");
 
 $networkConfig = networkLoadConfig();
-$defaultTrafficCapMbit = 100;
-if (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throttle']['max'])) {
-    $defaultTrafficCapMbit = (int) $networkConfig['throttle']['max'];
-}
+$defaultTrafficCapMbit = (isset($networkConfig['throttle']['max']) && is_numeric($networkConfig['throttle']['max']))
+    ? (int) $networkConfig['throttle']['max']
+    : 100;
 $defaultTrafficCapMbit = ($defaultTrafficCapMbit > 0) ? $defaultTrafficCapMbit : 100;
-$progressiveThrottleEnabled = true;
-if (isset($networkConfig['throttle']['progressiveThrottleEnabled'])) {
-    $raw = $networkConfig['throttle']['progressiveThrottleEnabled'];
-    if (is_bool($raw)) {
-        $progressiveThrottleEnabled = $raw;
-    } elseif (is_numeric($raw)) {
-        $progressiveThrottleEnabled = ((int) $raw) !== 0;
-    } elseif (is_string($raw)) {
-        $value = strtolower(trim($raw));
-        $progressiveThrottleEnabled = !in_array($value, ['0', 'false', 'no', 'off'], true);
-    }
-}
-$progressiveThrottleFloorPercent = 2.5;
-if (isset($networkConfig['throttle']['progressiveThrottleFloorPercent']) &&
-    is_numeric($networkConfig['throttle']['progressiveThrottleFloorPercent'])) {
-    $progressiveThrottleFloorPercent = (float) $networkConfig['throttle']['progressiveThrottleFloorPercent'];
-}
-$progressiveThrottleFloorPercent = max(0.0, min(100.0, $progressiveThrottleFloorPercent));
-$progressiveThrottleGracePercent = 0.0;
-if (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) &&
-    is_numeric($networkConfig['throttle']['progressiveThrottleGracePercent'])) {
-    $progressiveThrottleGracePercent = (float) $networkConfig['throttle']['progressiveThrottleGracePercent'];
-}
-$progressiveThrottleGracePercent = max(0.0, $progressiveThrottleGracePercent);
+$progressiveThrottleRaw = $networkConfig['throttle']['progressiveThrottleEnabled'] ?? true;
+$progressiveThrottleEnabled = is_bool($progressiveThrottleRaw)
+    ? $progressiveThrottleRaw
+    : !in_array(pmssEnvValueNormalized($progressiveThrottleRaw), ['0', 'false', 'no', 'off'], true);
+$progressiveThrottleFloorPercent = max(0.0, min(
+    100.0,
+    (isset($networkConfig['throttle']['progressiveThrottleFloorPercent']) && is_numeric($networkConfig['throttle']['progressiveThrottleFloorPercent']))
+        ? (float) $networkConfig['throttle']['progressiveThrottleFloorPercent']
+        : 2.5
+));
+$progressiveThrottleGracePercent = max(
+    0.0,
+    (isset($networkConfig['throttle']['progressiveThrottleGracePercent']) && is_numeric($networkConfig['throttle']['progressiveThrottleGracePercent']))
+        ? (float) $networkConfig['throttle']['progressiveThrottleGracePercent']
+        : 0.0
+);
 $overageThrottleStages = pmssTrafficLimitDefaultOverageStages();
 if (isset($networkConfig['throttle']['overageStages']) && is_array($networkConfig['throttle']['overageStages'])) {
     $configuredOverageStages = $networkConfig['throttle']['overageStages'];

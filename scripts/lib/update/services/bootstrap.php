@@ -132,11 +132,9 @@ function pmssSshdConfigWriteUpdated(
 /** Build the sshd syntax validation command without depending on operator PATH. */
 function pmssSshdValidationCommand(string $sshdPath = '/usr/sbin/sshd'): string
 {
-    if (!is_executable($sshdPath)) {
-        return 'sshd -t';
-    }
-
-    return $sshdPath === '/usr/sbin/sshd' ? '/usr/sbin/sshd -t' : pmssBuildCommand($sshdPath, ['-t']);
+    return !is_executable($sshdPath)
+        ? 'sshd -t'
+        : ($sshdPath === '/usr/sbin/sshd' ? '/usr/sbin/sshd -t' : pmssBuildCommand($sshdPath, ['-t']));
 }
 
 /**

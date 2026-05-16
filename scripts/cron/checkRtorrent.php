@@ -109,6 +109,19 @@ function pmssCheckRtorrentStart(string $user, string $startMarkerState, bool $de
     @file_put_contents($startMarkerState, (string) time(), LOCK_EX);
 }
 
+// Delay starts shortly after reboot so many users do not hit storage at once.
+function pmssCheckRtorrentStaggerAfterRecentReboot(string $user, string $messagePrefix, bool $debug): bool
+{
+    if (!rtorrentProcessRecentReboot(600)) {
+        return false;
+    }
+
+    $delay = rtorrentProcessStaggerDelay($user, 300);
+    pmssCheckRtorrentLogBoth($user, "{$messagePrefix}staggering start by {$delay}s (post-reboot)", $debug);
+    sleep($delay);
+    return true;
+}
+
 /**
  * Rebuild a missing per-user rTorrent config from the canonical templates.
  *
@@ -252,10 +265,9 @@ foreach ($users as $user) {
         rtorrentProcessClearStaleState($missingState);
     }
     if (!empty($rtorrentPids) || $executorPresent) {
-        rtorrentProcessClearStaleState($startMarkerState);
-        rtorrentProcessClearStaleState($startFailureState);
-        rtorrentProcessClearStaleState($sessionResetState);
-        rtorrentProcessClearStaleState($escalationState);
+        foreach ([$startMarkerState, $startFailureState, $sessionResetState, $escalationState] as $statePath) {
+            rtorrentProcessClearStaleState($statePath);
+        }
     }
 
     // --- Anomaly: Multiple processes ---
@@ -318,16 +330,7 @@ foreach ($users as $user) {
             }
         }
 
-        // Solution 1: Stagger starts after reboot to prevent I/O storm.
-        if (rtorrentProcessRecentReboot(600)) {
-            $delay = rtorrentProcessStaggerDelay($user, 300);
-            pmssCheckRtorrentLogBoth(
-                $user,
-                "rTorrent missing; staggering start by {$delay}s (post-reboot)",
-                $debug
-            );
-            sleep($delay);
-        } else {
+        if (!pmssCheckRtorrentStaggerAfterRecentReboot($user, 'rTorrent missing; ', $debug)) {
             pmssCheckRtorrentLogBoth($user, 'rTorrent missing; starting', $debug);
         }
 
@@ -378,16 +381,7 @@ foreach ($users as $user) {
             $debug
         );
 
-        // Solution 1: Stagger starts after reboot.
-        if (rtorrentProcessRecentReboot(600)) {
-            $delay = rtorrentProcessStaggerDelay($user, 300);
-            pmssCheckRtorrentLogBoth(
-                $user,
-                "staggering start by {$delay}s (post-reboot)",
-                $debug
-            );
-            sleep($delay);
-        }
+        pmssCheckRtorrentStaggerAfterRecentReboot($user, '', $debug);
 
         rtorrentProcessRestart($user, [], $executorAllPids, $logCallback, $debug);
         rtorrentProcessClearStaleState($missingState);
