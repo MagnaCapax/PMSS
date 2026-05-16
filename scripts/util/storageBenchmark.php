@@ -73,7 +73,40 @@ $idleUtilPct = pmssCliOptionInt($parsed, 'idle-util', null, 85);
 function parseSizeSB(string $s): int { $s=trim($s); if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }
 function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $bytes=parseSizeSB($value); if($bytes<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return $bytes; }
 function storageBenchmarkRequirePositiveIntOption(string $optionName, int $value): void { if($value<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive integer.\n"); exit(1); } }
-function storageBenchmarkRequireJsonLogPath(string $jsonLog): void { $jsonDir=dirname($jsonLog); if($jsonDir==='' || !pmssDirEnsureExists($jsonDir,0755)){ fwrite(STDERR,"Error: failed to create JSON log directory: {$jsonDir}\n"); exit(1); } if(!pmssLogWritePathIsSafe($jsonLog)){ fwrite(STDERR,"Error: unsafe JSON log path: {$jsonLog}\n"); exit(1); } }
+function storageBenchmarkJsonLogPathPreflightIsSafe(string $jsonLog): bool
+{
+    $path = rtrim($jsonLog, '/');
+    if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1) return false;
+    $absolute = $path[0] === '/';
+    $segments = explode('/', ltrim($path, '/'));
+    $current = '';
+    $lastIndex = count($segments) - 1;
+    foreach ($segments as $index => $segment) {
+        if ($segment === '') continue;
+        if ($segment === '.' || $segment === '..') return false;
+        $current = $current === '' ? ($absolute ? '/'.$segment : $segment) : $current.'/'.$segment;
+        if (is_link($current)) return false;
+        // Preserve the existing mkdir failure path for non-directory parents.
+        if ($index < $lastIndex && file_exists($current) && !is_dir($current)) return true;
+    }
+    return true;
+}
+function storageBenchmarkRequireJsonLogPath(string $jsonLog): void
+{
+    if (!storageBenchmarkJsonLogPathPreflightIsSafe($jsonLog)) {
+        fwrite(STDERR, "Error: unsafe JSON log path: {$jsonLog}\n");
+        exit(1);
+    }
+    $jsonDir = dirname($jsonLog);
+    if ($jsonDir === '' || !pmssDirEnsureExists($jsonDir, 0755)) {
+        fwrite(STDERR, "Error: failed to create JSON log directory: {$jsonDir}\n");
+        exit(1);
+    }
+    if (!pmssLogWritePathIsSafe($jsonLog)) {
+        fwrite(STDERR, "Error: unsafe JSON log path: {$jsonLog}\n");
+        exit(1);
+    }
+}
 function storageBenchmarkAppendJsonLine(string $jsonLog, array $entry): void { if(!pmssJsonLineAppend($jsonLog,$entry)){ fwrite(STDERR,"Error: failed to append JSON log entry: {$jsonLog}\n"); exit(1); } }
 function iopingAvg(?string $target): ?float { $bin=pmssCommandPath('ioping'); if($bin==='') return null; $cmd=escapeshellcmd($bin).' -c 10 -i 0.1 -D '.escapeshellarg($target).' 2>&1 | tail -n1'; $out=trim((string) shell_exec($cmd)); if(preg_match('/min\/avg\/max\/mdev\s*=\s*[^\/]+\/\s*([0-9.]+)\s*(us|ms|s)\s*\//i',$out,$m)){ $v=(float)$m[1]; $u=strtolower($m[2]); return $u==='us'?$v/1000.0:($u==='s'?$v*1000.0:$v);} return null; }
 function storageBenchmarkShowLast(string $jsonLog): int { if (!is_file($jsonLog)) { fwrite(STDERR,"No log at {$jsonLog}\n"); return 1; } $entries=[]; $lastId=''; $lastTs=''; foreach (file($jsonLog, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) ?: [] as $line) { $entry=json_decode($line,true); if (!is_array($entry) || !isset($entry['run_id']) || !is_string($entry['run_id']) || $entry['run_id']==='') continue; $entries[]=$entry; $runTs=(isset($entry['run_ts']) && is_string($entry['run_ts'])) ? $entry['run_ts'] : ''; if ($runTs>$lastTs){$lastTs=$runTs;$lastId=$entry['run_id'];} } if ($lastId===''){ echo "No runs found.\n"; return 0; } $run=array_values(array_filter($entries, function ($entry) use ($lastId) { return (($entry['run_id'] ?? '') === $lastId); })); $first=$run[0]; $labelStr=(isset($first['label']) && $first['label']!=='') ? ('  Label: '.$first['label']) : ''; echo "\n== Storage benchmark (last run) ==\nRun ID: {$lastId}  Time: ".($first['run_ts'] ?? '').$labelStr."\n\n"; foreach ($run as $entry) { if (($entry['test'] ?? '')==='preflight-idle'){ echo "Preflight: ioping=".($entry['ioping_avg_ms']??'n/a')." ms util=".($entry['iostat_util_pct']??'n/a')."%\n\n"; break; } } echo "File-backed tests\n"; echo "test\tread_MB/s\twrite_MB/s\tread_IOPS\twrite_IOPS\tread_p95\twrite_p95\n"; foreach ($run as $entry){ if (isset($entry['test']) && empty($entry['device']) && (($entry['params']['rw']??'')!=='')) { $metrics=$entry['metrics']??[]; printf("%s\t%.2f\t%.2f\t%.1f\t%.1f\t%.2f\t%.2f\n",$entry['test'],$metrics['read_bw_MBps']??0,$metrics['write_bw_MBps']??0,$metrics['read_iops']??0,$metrics['write_iops']??0,$metrics['read_p95_ms']??0,$metrics['write_p95_ms']??0); } } echo "\nPer-device tests\n"; $devices=[]; foreach($run as $entry){ if(isset($entry['device'])) $devices[$entry['device']][]=$entry; } foreach ($devices as $device=>$entries){ echo $device."\n"; foreach ($entries as $entry){ $test=$entry['test']; $metrics=$entry['metrics']??[]; if($test==='device-seqread-dd') printf("  %-18s seq_MB/s=%.2f t=%.2fs\n",$test,$metrics['seqread_MBps']??0,$metrics['elapsed_s']??0); elseif(strpos($test,'dev-randread')===0) printf("  %-18s read_MB/s=%.2f IOPS=%.1f p95=%.2fms\n",$test,$metrics['read_bw_MBps']??0,$metrics['read_iops']??0,$metrics['read_p95_ms']??0); elseif($test==='device-ioping') printf("  %-18s avg_ms=%.2f\n",$test,$metrics['ioping_avg_ms']??0);} } return 0; }

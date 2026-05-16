@@ -276,4 +276,30 @@ class StorageBenchSecurityTest extends TestCase
             "Error: unsafe JSON log path: {$dir}\n"
         );
     }
+
+    public function testUnsafeJsonLogTraversalDoesNotCreateParents(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-bench-traversal-', 0700);
+        $log = $base.'/unsafe/../blocked/benchmark-storage.jsonl';
+        $this->assertBenchmarkInputGuard(
+            ['--json='.$log],
+            "Error: unsafe JSON log path: {$log}\n"
+        );
+        $this->assertFalse(is_dir($base.'/unsafe'), 'unsafe traversal prefix should not be created');
+        $this->assertFalse(is_dir($base.'/blocked'), 'unsafe traversal target should not be created');
+    }
+
+    public function testSymlinkJsonLogParentDoesNotCreateBehindLink(): void
+    {
+        $real = $this->pmssMakeTempDir('pmss-bench-real-', 0700);
+        $link = sys_get_temp_dir().'/pmss-bench-link-'.bin2hex(random_bytes(2));
+        $this->pmssCreateSymlinkOrSkip($real, $link);
+
+        $log = $link.'/child/benchmark-storage.jsonl';
+        $this->assertBenchmarkInputGuard(
+            ['--json='.$log],
+            "Error: unsafe JSON log path: {$log}\n"
+        );
+        $this->assertFalse(is_dir($real.'/child'), 'symlinked parent should not receive new benchmark directories');
+    }
 }
