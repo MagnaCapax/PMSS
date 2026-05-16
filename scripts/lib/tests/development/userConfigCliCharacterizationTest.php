@@ -62,6 +62,7 @@ class userConfigCliCharacterizationTest extends TestCase
             ['alice'],
             [
                 'io-weight' => '300',
+                'cpu-weight' => '',
                 'io-latency-ms' => '50',
                 'traffic-cap-mbit' => '0',
             ]

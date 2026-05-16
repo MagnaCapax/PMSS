@@ -56,42 +56,34 @@ function pmssUserConfigCliHasExplicitOptionValue(array $parsed, string $option):
     return $value !== null && $value !== true && $value !== '';
 }
 
-/** @return array<string,mixed> Build a resource map from the shared spec list. */
-function pmssUserConfigCliBuildResourceMap(callable $resolver, bool $skipNull = false): array
-{
-    $values = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        $value = $resolver($key, $spec);
-        if ($skipNull && $value === null) {
-            continue;
-        }
-        $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
-    }
-
-    return $values;
-}
-
 /** @return array<string,mixed> Parse resource values with named options overriding positional slots. */
 function pmssUserConfigCliResolvedResources(array $parsed, array $args, string $optionKey, string $indexKey): array
 {
-    return pmssUserConfigCliBuildResourceMap(static function (string $key, array $spec) use ($parsed, $args, $optionKey, $indexKey) {
+    $values = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
         $legacyIndex = isset($spec[$indexKey]) ? (int) $spec[$indexKey] : -1;
-        return pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $legacyIndex, $spec['default']);
-    });
+        $value = pmssUserConfigCliLegacyValue($parsed, $spec[$optionKey], $args, $legacyIndex, $spec['default']);
+        $values[$key] = ($spec['parse'] === 'int' && $value !== null) ? (int) $value : $value;
+    }
+    return $values;
 }
 
 /** @return array<string,mixed> Parse only explicitly provided resource values. */
 function pmssUserConfigCliExplicitResources(array $parsed, array $args, string $optionKey, string $indexKey): array
 {
-    return pmssUserConfigCliBuildResourceMap(static function (string $key, array $spec) use ($parsed, $args, $optionKey, $indexKey) {
+    $values = [];
+    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
         $value = null;
         if (pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])) {
             $value = $parsed['options'][$spec[$optionKey]];
         } elseif (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '') {
             $value = $args[$spec[$indexKey]];
         }
-        return $value;
-    }, true);
+        if ($value !== null) {
+            $values[$key] = ($spec['parse'] === 'int') ? (int) $value : $value;
+        }
+    }
+    return $values;
 }
 
 /** Parse the optional Docker toggle while keeping legacy CLI semantics. */
@@ -132,23 +124,13 @@ function pmssUserConfigCliParseUploadThrottleOption($rawOption, string $negative
 /** @param array<int,mixed> $args @return array<string,mixed> Parse positional resources. */
 function pmssUserConfigCliPositionalResources(array $args, string $indexKey): array
 {
-    return pmssUserConfigCliBuildResourceMap(static function (string $key, array $spec) use ($args, $indexKey) {
-        return (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args)) ? $args[$spec[$indexKey]] : $spec['default'];
-    });
+    return pmssUserConfigCliResolvedResources(['options' => []], $args, 'addUserOption', $indexKey);
 }
 
 /** @param array<int,mixed> $args @return array<string,bool> Track explicit persisted resources. */
 function pmssUserConfigCliPersistedPositionalPresence(array $args): array
 {
-    $presence = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (empty($spec['persist'])) {
-            continue;
-        }
-        $presence[$key] = isset($spec['userConfigIndex']) && array_key_exists($spec['userConfigIndex'], $args)
-            && $args[$spec['userConfigIndex']] !== '';
-    }
-    return $presence;
+    return pmssUserConfigCliPersistedResourcePresence(['options' => []], $args, 'addUserOption', 'userConfigIndex');
 }
 
 /** @return array<string,bool> Track explicit persisted resources from named options or positionals. */
