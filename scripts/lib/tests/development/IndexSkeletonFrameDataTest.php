@@ -135,6 +135,28 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertSame('welcome.php', \pmssLocalFrameWelcomeUrlBuild($invalidPath));
     }
 
+    public function testRemoteDisabledRenderCarriesQuotaInWelcomeIframe(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-index-home-', 0755);
+        @mkdir($home.'/www', 0755, true);
+        file_put_contents(
+            $home.'/.quota',
+            "Disk quotas for user panel (uid 1000):\n"
+            ."     Filesystem   space   quota   limit   grace   files   quota   limit   grace\n"
+            ."       /dev/md4    594G   1380G   1725G            5642    690k    863k\n"
+        );
+
+        $script = 'chdir('.var_export($home.'/www', true).'); '
+            .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; $html = ob_get_clean(); '
+            .'if (preg_match(\'/<iframe id="welcomeFrame"[^>]*src="([^"]+)"/\', $html, $m) !== 1) { fwrite(STDERR, "missing welcome iframe\n"); exit(2); } '
+            .'echo html_entity_decode($m[1], ENT_QUOTES, "UTF-8");';
+
+        $src = trim($this->pmssRunInlinePhp($script, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'), '2>&1'));
+
+        $quotaInfo = $this->quotaInfoFromWelcomeUrl($src);
+        $this->assertSame(594 * 1024 * 1024 * 1024, $quotaInfo['usedBytes']);
+    }
+
     public function testUserSkeletonSyncIncludesIndexTemplate(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
