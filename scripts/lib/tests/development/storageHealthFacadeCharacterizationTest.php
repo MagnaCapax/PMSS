@@ -23,6 +23,26 @@ final class StorageHealthFacadeCharacterizationTest extends TestCase
         );
     }
 
+    public function testDiskInventoryParserRejectsUnsafeKernelNames(): void
+    {
+        require_once dirname(__DIR__, 2).'/storageHealth/common.php';
+
+        $lsblk = "../sda disk 0 Bad Traversal BAD 1T\n"
+            ."sdb/evil disk 0 Bad Slash BAD 1T\n"
+            ."sdc\\evil disk 0 Bad Backslash BAD 1T\n"
+            .". disk 0 Bad Dot BAD 1T\n"
+            ."dm-0 disk 0 MapperVol DMSER 1T\n"
+            ."cciss!c0d0 disk 1 SmartArray HPSER 1T\n";
+
+        $this->assertSame(
+            [
+                ['path' => '/dev/dm-0', 'kname' => 'dm-0', 'rota' => 0, 'model' => 'MapperVol', 'serial' => 'DMSER', 'size' => '1T'],
+                ['path' => '/dev/cciss!c0d0', 'kname' => 'cciss!c0d0', 'rota' => 1, 'model' => 'SmartArray', 'serial' => 'HPSER', 'size' => '1T'],
+            ],
+            \pmssStorageHealthDiskInventoryFromLsblk($lsblk)
+        );
+    }
+
     public function testFacadeOwnsNvmeAndRaidSnapshotEntrypoints(): void
     {
         $facadePath = dirname(__DIR__, 4).'/scripts/lib/storageHealth.php';
