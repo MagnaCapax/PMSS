@@ -125,7 +125,7 @@ function pmssUserRefreshPanelIndexForFrameDataCompat(array $ctx): void
 
     if (!pmssUserPanelIndexNeedsFrameDataCompatRefresh($targetContent)
         || strpos($sourceContent, '$frameData = array();') === false
-        || strpos($sourceContent, 'function pmssFrameOpensInNewWindow(array $frame): bool') === false) {
+        || strpos($sourceContent, 'function pmssFrameOpensInNewWindow(array $frame)') === false) {
         return;
     }
 

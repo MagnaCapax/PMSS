@@ -141,7 +141,7 @@ PHP;
     {
         return <<<'PHP'
 <?php
-function pmssFrameOpensInNewWindow(array $frame): bool
+function pmssFrameOpensInNewWindow(array $frame)
 {
     return isset($frame['target']) && $frame['target'] === '_blank';
 }

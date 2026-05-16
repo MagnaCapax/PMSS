@@ -27,7 +27,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $this->assertOrderedStrings(
             [
-                'function pmssFrameOpensInNewWindow(array $frame): bool',
+                'function pmssFrameOpensInNewWindow(array $frame)',
                 "'wiki' => array(",
                 "'target'   => '_blank',",
             ],
@@ -59,7 +59,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
         $this->assertOrderedStrings(
             [
-                'function pmssLocalFrameWelcomeUrlBuild(string $quotaPath = \'../.quota\'): string',
+                'function pmssLocalFrameWelcomeUrlBuild($quotaPath = \'../.quota\')',
                 "'url'      => pmssLocalFrameWelcomeUrlBuild(),",
             ],
             $source,
@@ -175,7 +175,7 @@ class IndexSkeletonFrameDataTest extends TestCase
 
     public function testPanelIndexMigrationGuardTracksCurrentSkeletonHelperSignature(): void
     {
-        $guard = 'function pmssFrameOpensInNewWindow(array $frame): bool';
+        $guard = 'function pmssFrameOpensInNewWindow(array $frame)';
 
         $this->assertStringContainsString(
             $guard,
@@ -186,6 +186,22 @@ class IndexSkeletonFrameDataTest extends TestCase
             $guard,
             $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php'),
             'Panel index migration guard should track the current skeleton helper signature: '
+        );
+    }
+
+    public function testIndexSkeletonAvoidsPhp7FunctionDeclarations(): void
+    {
+        $source = $this->pmssReadRepoFile('etc/skel/www/index.php');
+
+        $this->assertEquals(
+            0,
+            preg_match('/function\s+\w+\([^)]*\)\s*:\s*\??[A-Za-z_][A-Za-z0-9_]*/', $source),
+            'Customer panel index.php must parse on PHP 5.6, so function return types are not allowed.'
+        );
+        $this->assertEquals(
+            0,
+            preg_match('/function\s+\w+\([^)]*\b(?:string|int|bool|float)\s+\$/', $source),
+            'Customer panel index.php must parse on PHP 5.6, so scalar parameter types are not allowed.'
         );
     }
 

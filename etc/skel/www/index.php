@@ -17,13 +17,13 @@ $frames   = array();
 $useLocalFrames = false;
 
 /** Detect frames that must open outside the iframe tab container. */
-function pmssFrameOpensInNewWindow(array $frame): bool
+function pmssFrameOpensInNewWindow(array $frame)
 {
     return isset($frame['target']) && $frame['target'] === '_blank';
 }
 
 /** Parse a human-readable quota token into bytes. */
-function pmssLocalFrameQuotaSizeToBytes(string $value): ?int
+function pmssLocalFrameQuotaSizeToBytes($value)
 {
     $value = trim(str_replace('*', '', $value));
     if ($value === '') {
@@ -48,7 +48,7 @@ function pmssLocalFrameQuotaSizeToBytes(string $value): ?int
  *
  * @return array<string,int|bool>
  */
-function pmssLocalFrameQuotaInfoBuild(string $used, string $softLimit, string $hardLimit): array
+function pmssLocalFrameQuotaInfoBuild($used, $softLimit, $hardLimit)
 {
     $usedBytes = pmssLocalFrameQuotaSizeToBytes($used);
     $totalSpace = pmssLocalFrameQuotaSizeToBytes($softLimit);
@@ -71,7 +71,7 @@ function pmssLocalFrameQuotaInfoBuild(string $used, string $softLimit, string $h
  *
  * @return array<string,int|bool>
  */
-function pmssLocalFrameQuotaInfoRead(string $quotaPath = '../.quota'): array
+function pmssLocalFrameQuotaInfoRead($quotaPath = '../.quota')
 {
     $raw = @file_get_contents($quotaPath);
     if (!is_string($raw) || trim($raw) === '') {
@@ -100,7 +100,7 @@ function pmssLocalFrameQuotaInfoRead(string $quotaPath = '../.quota'): array
 }
 
 /** Build the welcome iframe URL with local quota data when available. */
-function pmssLocalFrameWelcomeUrlBuild(string $quotaPath = '../.quota'): string
+function pmssLocalFrameWelcomeUrlBuild($quotaPath = '../.quota')
 {
     $quotaInfo = pmssLocalFrameQuotaInfoRead($quotaPath);
     if (count($quotaInfo) == 0) {
