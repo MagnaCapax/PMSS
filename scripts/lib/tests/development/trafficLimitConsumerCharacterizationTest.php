@@ -14,10 +14,12 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testWebConsumersNoLongerInlineTrafficLimitFileReads(): void
     {
-        $this->pmssAssertStringNotContainsString("file_get_contents('../.trafficLimit')", $this->pmssReadRepoFile('etc/skel/www/stats.php'));
-        $this->pmssAssertStringNotContainsString("file_get_contents('../.bonusTraffic')", $this->pmssReadRepoFile('etc/skel/www/stats.php'));
-        $this->pmssAssertStringNotContainsString("file_get_contents('../.trafficLimit')", $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
-        $this->pmssAssertStringNotContainsString("pmssWelcomeInteger"."FileRead('../.bonusTraffic'", $this->pmssReadRepoFile('etc/skel/www/welcome.php'));
+        foreach ([
+            'etc/skel/www/stats.php' => ["file_get_contents('../.trafficLimit')", "file_get_contents('../.bonusTraffic')"],
+            'etc/skel/www/welcome.php' => ["file_get_contents('../.trafficLimit')", "pmssWelcomeInteger"."FileRead('../.bonusTraffic'"],
+        ] as $path => $needles) {
+            $this->pmssAssertRepoFileNotContainsStrings($path, $needles);
+        }
     }
 
     public function testPmssStatsNoLongerCarriesLocalIntegerReader(): void
@@ -35,12 +37,11 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testLegacyWebConsumersNoLongerInlineUnserializeFileReads(): void
     {
-        $statsSource = $this->pmssReadRepoFile('etc/skel/www/stats.php');
-        $welcomeSource = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
-
-        $this->pmssAssertStringNotContainsString('@unserialize(@file_get_contents(', $statsSource);
-        $this->pmssAssertStringNotContainsString('@unserialize(trim(@file_get_contents(', $welcomeSource);
-        $this->pmssAssertStringNotContainsString('function readUserResourceData() {'.PHP_EOL.'    $resourcePath = \'../.resourceData\';', $welcomeSource);
+        $this->pmssAssertRepoFileNotContainsString('etc/skel/www/stats.php', '@unserialize(@file_get_contents(');
+        $this->pmssAssertRepoFileNotContainsStrings('etc/skel/www/welcome.php', [
+            '@unserialize(trim(@file_get_contents(',
+            'function readUserResourceData() {'.PHP_EOL.'    $resourcePath = \'../.resourceData\';',
+        ]);
     }
 
     public function testTrafficLimitCronWritesReadableThrottleFile(): void
@@ -65,9 +66,8 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $slidingKey = 'sliding'.'ThrottleStart';
         $legacyFileKey = 'throttle'.'_mbit';
 
-        $this->pmssAssertStringNotContainsString($slidingKey, $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
-        $this->pmssAssertStringNotContainsString($legacyFileKey, $this->pmssReadRepoFile('scripts/cron/trafficLimits.php'));
-        $this->pmssAssertStringNotContainsString($legacyFileKey, $this->pmssReadRepoFile('scripts/lib/network/fireqos.php'));
-        $this->pmssAssertStringNotContainsString($slidingKey, $this->pmssReadRepoFile('scripts/lib/update/networking.php'));
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/cron/trafficLimits.php', [$slidingKey, $legacyFileKey]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/network/fireqos.php', $legacyFileKey);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/update/networking.php', $slidingKey);
     }
 }

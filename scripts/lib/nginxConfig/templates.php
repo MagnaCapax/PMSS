@@ -10,6 +10,15 @@
 
 function pmssNginxUserSubdomainTemplates(): array
 {
+    $publicProxyDefaults = <<<'NGINX'
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+        limit_rate_after 100m;
+        limit_rate 32768k;
+        limit_conn addr 8;
+NGINX;
     $privateProxyDefaults = <<<'NGINX'
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -20,6 +29,17 @@ function pmssNginxUserSubdomainTemplates(): array
         limit_conn addr 16;
         error_page 502 /error-502-##user##.html;
 NGINX;
+    $webdavProxyDefaults = <<<'NGINX'
+        include /etc/nginx/proxy_params;
+        proxy_http_version 1.1;
+
+        # WebDAV: allow large uploads.
+        client_max_body_size 0;
+
+        limit_rate_after 100m;
+        limit_rate 102400k;
+        limit_conn addr 16;
+NGINX;
     $publicSubdomainTemplate = <<<'NGINX'
 # PMSS public subdomain for ##user## (maps to /public-##user##/).
 server {
@@ -28,13 +48,7 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:##port##/public-##user##/;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        include /etc/nginx/proxy_params;
-        proxy_http_version 1.1;
-        limit_rate_after 100m;
-        limit_rate 32768k;
-        limit_conn addr 8;
+##public_proxy_defaults##
     }
 
     location /webdav-##user##/ {
@@ -49,29 +63,20 @@ server {
 ##ssl_block##
     location / {
         proxy_pass http://127.0.0.1:##port##/public-##user##/;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        include /etc/nginx/proxy_params;
-        proxy_http_version 1.1;
-        limit_rate_after 100m;
-        limit_rate 32768k;
-        limit_conn addr 8;
+##public_proxy_defaults##
     }
 
     location /webdav-##user##/ {
         proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
-        include /etc/nginx/proxy_params;
-        proxy_http_version 1.1;
-
-        # WebDAV: allow large uploads.
-        client_max_body_size 0;
-
-        limit_rate_after 100m;
-        limit_rate 102400k;
-        limit_conn addr 16;
+##webdav_proxy_defaults##
     }
 }
 NGINX;
+    $publicSubdomainTemplate = str_replace(
+        ['##public_proxy_defaults##', '##webdav_proxy_defaults##'],
+        [$publicProxyDefaults, $webdavProxyDefaults],
+        $publicSubdomainTemplate
+    );
 
     $privateSubdomainTemplate = <<<'NGINX'
 # PMSS private subdomain for ##user## (maps to /user-##user##/).
@@ -115,15 +120,7 @@ server {
 
     location /webdav-##user##/ {
         proxy_pass http://127.0.0.1:##port##/webdav-##user##/;
-        include /etc/nginx/proxy_params;
-        proxy_http_version 1.1;
-
-        # WebDAV: allow large uploads.
-        client_max_body_size 0;
-
-        limit_rate_after 100m;
-        limit_rate 102400k;
-        limit_conn addr 16;
+##webdav_proxy_defaults##
         error_page 502 /error-502-##user##.html;
     }
 
@@ -135,8 +132,8 @@ server {
 }
 NGINX;
     $privateSubdomainTemplate = str_replace(
-        '##private_proxy_defaults##',
-        $privateProxyDefaults,
+        ['##private_proxy_defaults##', '##webdav_proxy_defaults##'],
+        [$privateProxyDefaults, $webdavProxyDefaults],
         $privateSubdomainTemplate
     );
 

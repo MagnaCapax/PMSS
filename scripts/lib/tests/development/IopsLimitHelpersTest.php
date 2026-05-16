@@ -7,39 +7,24 @@ require_once dirname(__DIR__, 2).'/user/iopsLimitEnforcer.php';
 
 class IopsLimitHelpersTest extends TestCase
 {
-    public function testParsesPlainIntegerOps(): void
+    public function testParsesValidMonthlyOperationValues(): void
     {
-        $error = null;
-        $this->assertSame(123456, \pmssIopsLimitParseMonthlyOperations('123456', $error));
-        $this->assertSame(null, $error);
+        foreach ([['123456', 123456], [' 42 OPS ', 42]] as $case) {
+            $error = null;
+
+            $this->assertSame($case[1], \pmssIopsLimitParseMonthlyOperations($case[0], $error));
+            $this->assertSame(null, $error);
+        }
     }
 
-    public function testParsesOpsSuffixCaseInsensitive(): void
+    public function testRejectsInvalidMonthlyOperationValues(): void
     {
-        $error = null;
-        $this->assertSame(42, \pmssIopsLimitParseMonthlyOperations(' 42 OPS ', $error));
-        $this->assertSame(null, $error);
-    }
+        foreach ([['1.5', 'invalid format'], [true, 'missing value'], [-1.5, 'must be an integer']] as $case) {
+            $error = null;
 
-    public function testRejectsFractionalOps(): void
-    {
-        $error = null;
-        $this->assertSame(null, \pmssIopsLimitParseMonthlyOperations('1.5', $error));
-        $this->assertSame('invalid format', $error);
-    }
-
-    public function testRejectsMissingFlagValue(): void
-    {
-        $error = null;
-        $this->assertSame(null, \pmssIopsLimitParseMonthlyOperations(true, $error));
-        $this->assertSame('missing value', $error);
-    }
-
-    public function testRejectsNegativeFloat(): void
-    {
-        $error = null;
-        $this->assertSame(null, \pmssIopsLimitParseMonthlyOperations(-1.5, $error));
-        $this->assertSame('must be an integer', $error);
+            $this->assertSame(null, \pmssIopsLimitParseMonthlyOperations($case[0], $error));
+            $this->assertSame($case[1], $error);
+        }
     }
 
     public function testReadsMonthlyIopsUsageFromSerializedResourcePayload(): void
@@ -124,14 +109,10 @@ class IopsLimitHelpersTest extends TestCase
         $this->assertSame(null, \pmssIopsLimitBuildRestoreCommand('alice', ['IOWeight' => 300]));
     }
 
-    public function testPlanEnforcesOnlyOnFirstOveragePass(): void
+    public function testPlanTransitions(): void
     {
-        $this->assertSame('enforce', \pmssIopsLimitEnforcementPlan(1000, 1001, false)['action']);
-        $this->assertSame('none', \pmssIopsLimitEnforcementPlan(1000, 1001, true)['action']);
-    }
-
-    public function testPlanRestoresAfterBudgetFallsBackUnderLimit(): void
-    {
-        $this->assertSame('restore', \pmssIopsLimitEnforcementPlan(1000, 900, true)['action']);
+        foreach ([[1000, 1001, false, 'enforce'], [1000, 1001, true, 'none'], [1000, 900, true, 'restore']] as $case) {
+            $this->assertSame($case[3], \pmssIopsLimitEnforcementPlan($case[0], $case[1], $case[2])['action']);
+        }
     }
 }
