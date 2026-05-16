@@ -22,10 +22,8 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testPmssStatsNoLongerCarriesLocalIntegerReader(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/pmssStats.php');
-
-        $this->pmssAssertStringNotContainsString('function '.'pmssStats'.'ReadIntegerFile(', $source);
-        $this->assertStringContainsString("require_once __DIR__.'/user/trafficLimit.php';", $source);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/pmssStats.php', 'function '.'pmssStats'.'ReadIntegerFile(');
+        $this->pmssAssertRepoFileContainsString('scripts/lib/pmssStats.php', "require_once __DIR__.'/user/trafficLimit.php';");
     }
 
     public function testSerializedStateConsumersUseSharedArrayReader(): void
@@ -54,12 +52,12 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
 
     public function testTrafficLimitCronValidatesThrottleFileBoundary(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/cron/trafficLimits.php');
-
-        $this->assertStringContainsString('function pmssTrafficLimitThrottleFilePath(string $user): ?string', $source);
-        $this->assertStringContainsString('pmssValidateUsername($user)', $source);
-        $this->assertStringContainsString('@realpath($home) !== $home', $source);
-        $this->assertStringContainsString('pmssUserFilePathIsSafe($path)', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
+            'function pmssTrafficLimitThrottleFilePath(string $user): ?string',
+            'pmssValidateUsername($user)',
+            '@realpath($home) !== $home',
+            'pmssUserFilePathIsSafe($path)',
+        ]);
     }
 
     public function testThrottlePolicyNoLongerUsesSlidingStateFiles(): void

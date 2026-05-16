@@ -45,29 +45,29 @@ class SetupLetsEncryptTest extends TestCase
 
     public function testRequiresSharedHostnameValidationForLetsEncryptDomain(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/setupLetsEncrypt.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/userTransfer/cliParse.php';", $source);
-        $this->assertStringContainsString('pmssUserTransferHostnameIsValid($domain)', $source);
-        $this->assertStringContainsString("strpos(\$domain, '.') === false", $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupLetsEncrypt.php', [
+            "require_once __DIR__.'/../lib/userTransfer/cliParse.php';",
+            'pmssUserTransferHostnameIsValid($domain)',
+            "strpos(\$domain, '.') === false",
+        ]);
     }
 
     public function testCliDelegatesToSharedSetupLibraryWithoutShellExec(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/setupLetsEncrypt.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/certbotSetup.php';", $source);
-        $this->assertStringContainsString('pmssSetupLetsEncryptRun($domain, $email, $codename);', $source);
-        $this->assertStringNotContainsString('shell_exec(', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupLetsEncrypt.php', [
+            "require_once __DIR__.'/../lib/certbotSetup.php';",
+            'pmssSetupLetsEncryptRun($domain, $email, $codename);',
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/setupLetsEncrypt.php', 'shell_exec(');
     }
 
     public function testSharedSetupUsesCheckedCommandsAndPhpCronWrites(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/certbotSetup.php');
-
-        $this->assertStringContainsString('pmssCommandCapture($command)', $source);
-        $this->assertStringContainsString('@file_put_contents($cronPath, pmssSetupLetsEncryptRenewalCronContents()) === false', $source);
-        $this->assertStringNotContainsString('shell_exec(', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/certbotSetup.php', [
+            'pmssCommandCapture($command)',
+            '@file_put_contents($cronPath, pmssSetupLetsEncryptRenewalCronContents()) === false',
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/lib/certbotSetup.php', 'shell_exec(');
     }
 
     public function testSharedSetupBuildsShellEscapedCertbotCommand(): void

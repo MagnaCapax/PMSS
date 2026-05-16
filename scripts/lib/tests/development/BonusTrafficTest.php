@@ -65,20 +65,23 @@ final class BonusTrafficTest extends TestCase
 
     public function testBonusTrafficCliLivesInSharedTrafficLimitLibrary(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/user/trafficLimit.php');
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/user/trafficLimit.php', [
+            'function pmssUserBonusTrafficCli(array $argv): int',
+            'pmssUserGiBSettingCli($argv, [',
+            "'valueOption'         => 'bonus'",
+            "'targetModesResolver' => static function",
+        ]);
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/user/trafficLimit.php', [
+            'function '.'pmssBonusTraffic'.'ReadGiB(',
+            'function '.'pmssBonusTraffic'.'WriteGiB(',
+            'function '.'pmssBonusTraffic'.'Remove(',
+        ]);
 
-        $this->assertStringContainsString('function pmssUserBonusTrafficCli(array $argv): int', $source);
-        $this->assertStringContainsString('pmssUserGiBSettingCli($argv, [', $source);
-        $this->assertStringContainsString("'valueOption'         => 'bonus'", $source);
-        $this->assertStringContainsString("'targetModesResolver' => static function", $source);
-        $this->pmssAssertStringNotContainsString('function '.'pmssBonusTraffic'.'ReadGiB(', $source);
-        $this->pmssAssertStringNotContainsString('function '.'pmssBonusTraffic'.'WriteGiB(', $source);
-        $this->pmssAssertStringNotContainsString('function '.'pmssBonusTraffic'.'Remove(', $source);
-
-        $shimSource = $this->pmssReadRepoFile('scripts/lib/user/bonusTraffic.php');
-        $this->assertStringContainsString("require_once __DIR__.'/trafficLimit.php';", $shimSource);
-        $this->pmssAssertStringNotContainsString('function pmssUserBonusTrafficCli(array $argv): int', $shimSource);
-        $this->pmssAssertStringNotContainsString('pmssParseCliTokens($argv)', $shimSource);
+        $this->pmssAssertRepoFileContainsString('scripts/lib/user/bonusTraffic.php', "require_once __DIR__.'/trafficLimit.php';");
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/user/bonusTraffic.php', [
+            'function pmssUserBonusTrafficCli(array $argv): int',
+            'pmssParseCliTokens($argv)',
+        ]);
     }
 
     /**

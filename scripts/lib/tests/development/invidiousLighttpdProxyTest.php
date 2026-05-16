@@ -15,10 +15,11 @@ class InvidiousLighttpdProxyTest extends TestCase
 
     public function testUserConfigApplyWiresOptionalPortFileAndManagedFragment(): void
     {
-        $contents = $this->pmssReadRepoFile('scripts/lib/lighttpd/userConfigApply.php');
-        $this->assertStringContainsString(".invidiousPort", $contents);
-        $this->assertStringContainsString("pmssLighttpdManagedProxyFragment('invidious'", $contents);
-        $this->assertStringContainsString("pmss-invidious.conf", $contents);
-        $this->assertStringContainsString("@unlink(\$invidiousConfPath);", $contents);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/lighttpd/userConfigApply.php', [
+            ".invidiousPort",
+            "pmssLighttpdManagedProxyFragment('invidious'",
+            "pmss-invidious.conf",
+            "@unlink(\$invidiousConfPath);",
+        ]);
     }
 }

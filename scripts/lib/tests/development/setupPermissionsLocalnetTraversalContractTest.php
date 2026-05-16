@@ -7,10 +7,10 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 {
     public function testSeedboxParentTraversalStepRemainsInPermissionTargets(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/util/setupPermissions.php');
-
-        $this->assertStringContainsString("'/etc/seedbox' => [", $src);
-        $this->assertStringContainsString("'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']", $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/setupPermissions.php', [
+            "'/etc/seedbox' => [",
+            "'directory' => ['Ensuring /etc/seedbox is traversable', 'chmod o+x /etc/seedbox']",
+        ]);
     }
 
     public function testSeedboxParentTraversalRunsBeforeConfigTreeNormalization(): void
@@ -34,20 +34,20 @@ class SetupPermissionsLocalnetTraversalContractTest extends TestCase
 
     public function testSystemTestChecksBothSeedboxTraversalDirectories(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/systemStatus.php');
-
-        $this->assertStringContainsString('function pmssSystemStatusChecks(', $src);
-        $this->assertStringContainsString("foreach (['/etc/seedbox', '/etc/seedbox/config'] as \$dir)", $src);
-        $this->assertStringContainsString('missing world-exec (users cannot traverse to localnet)', $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/systemStatus.php', [
+            'function pmssSystemStatusChecks(',
+            "foreach (['/etc/seedbox', '/etc/seedbox/config'] as \$dir)",
+            'missing world-exec (users cannot traverse to localnet)',
+        ]);
     }
 
     public function testStartRtorrentKeepsLocalnetReadabilityPreflightAndHint(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/startRtorrent');
-
-        $this->assertStringContainsString("escapeshellarg('test -r '.\$localnet)", $src);
-        $this->assertStringContainsString("@filesize(\$localnet) === 0", $src);
-        $this->assertStringContainsString('is empty; rTorrent will likely fail with a localnet ip filter error.', $src);
-        $this->assertStringContainsString('ls -ld /etc/seedbox /etc/seedbox/config {$localnet}', $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/startRtorrent', [
+            "escapeshellarg('test -r '.\$localnet)",
+            "@filesize(\$localnet) === 0",
+            'is empty; rTorrent will likely fail with a localnet ip filter error.',
+            'ls -ld /etc/seedbox /etc/seedbox/config {$localnet}',
+        ]);
     }
 }

@@ -36,10 +36,7 @@ class CronInlineCharacterizationTest extends TestCase
                 ['pmssUserWatchdogRunService(', 'pmssUserWatchdogRestartProcessesIf(', "'deluge restarted to apply upload throttle'", "'deluged start requested'", "'deluge-web start requested'"],
             ],
         ] as $case) {
-            $src = $this->pmssReadRepoFile($case[0]);
-            foreach ($case[1] as $needle) {
-                $this->assertStringContainsString($needle, $src);
-            }
+            $this->pmssAssertRepoFileContainsAllStrings($case[0], $case[1]);
         }
     }
 
@@ -51,10 +48,7 @@ class CronInlineCharacterizationTest extends TestCase
             ['scripts/cron/checkRcloneInstances.php', 'pmssUserWatchdogRunService(', "'rclone stopped due to suspension'", "'rclone start requested'"],
             ['scripts/cron/checkDelugeInstances.php', 'pmssUserWatchdogRunService(', "'deluge stopped due to suspension'", "'deluged start requested'"],
         ] as $case) {
-            $src = $this->pmssReadRepoFile($case[0]);
-            $this->assertStringContainsString($case[1], $src);
-            $this->assertStringContainsString($case[2], $src);
-            $this->assertStringContainsString($case[3], $src);
+            $this->pmssAssertRepoFileContainsAllStrings($case[0], array_slice($case, 1));
         }
     }
 
@@ -75,32 +69,32 @@ class CronInlineCharacterizationTest extends TestCase
 
     public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/cron/checkLighttpdInstances.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';", $src);
-        $this->assertStringContainsString("pmssUserLighttpdEnabled(\$thisUser)", $src);
-        $this->assertStringContainsString("pmssLighttpdWatchdogDeleteErrorPage(\$thisUser)", $src);
-        $this->assertStringContainsString('pmssLighttpdWatchdogWriteErrorPage(', $src);
-        $this->assertStringContainsString('pmssLighttpdWatchdogDetectReason(', $src);
-        $this->assertStringContainsString('pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);', $src);
-        $this->assertStringContainsString('pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')', $src);
-        $this->assertStringContainsString('pmssUserWatchdogRestartProcessesIf(', $src);
-        $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);', $src);
-        $this->assertStringContainsString('pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 9);', $src);
-        $this->assertStringContainsString('pmssUserWatchdogEnsureServices($thisUser, [[\'processName\' => \'lighttpd\'', $src);
-        $this->assertStringContainsString('lighttpd disabled by config; terminating web stack', $src);
-        $this->assertStringContainsString('Killing (if any) lighttpd for user: {$thisUser}', $src);
-        $this->assertStringContainsString("'lighttpd restart requested'", $src);
-        $this->assertStringContainsString("'lighttpd start requested'", $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/checkLighttpdInstances.php', [
+            "require_once __DIR__.'/../lib/lighttpd/watchdogSocketProbe.php';",
+            "pmssUserLighttpdEnabled(\$thisUser)",
+            "pmssLighttpdWatchdogDeleteErrorPage(\$thisUser)",
+            'pmssLighttpdWatchdogWriteErrorPage(',
+            'pmssLighttpdWatchdogDetectReason(',
+            'pmssLighttpdWatchdogSocketProbeWithRetry($socketPath);',
+            'pmssUserWatchdogProcessRunning($thisUser, \'php-cgi\')',
+            'pmssUserWatchdogRestartProcessesIf(',
+            'pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 15);',
+            'pmssUserWatchdogTerminateProcesses($thisUser, [\'lighttpd\', \'php-cgi\'], 9);',
+            'pmssUserWatchdogEnsureServices($thisUser, [[\'processName\' => \'lighttpd\'',
+            'lighttpd disabled by config; terminating web stack',
+            'Killing (if any) lighttpd for user: {$thisUser}',
+            "'lighttpd restart requested'",
+            "'lighttpd start requested'",
+        ]);
     }
 
     public function testServiceWatchdogsUseSharedWatchdogSpecHelpers(): void
     {
-        $src = $this->pmssReadRepoFile('scripts/lib/userLifecycle.php');
-
-        $this->assertStringContainsString('function pmssUserWatchdogRestartProcessesIf(', $src);
-        $this->assertStringContainsString('function pmssUserWatchdogEnsureServices(', $src);
-        $this->assertStringContainsString('function pmssUserWatchdogRunService(', $src);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userLifecycle.php', [
+            'function pmssUserWatchdogRestartProcessesIf(',
+            'function pmssUserWatchdogEnsureServices(',
+            'function pmssUserWatchdogRunService(',
+        ]);
     }
 
 }

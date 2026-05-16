@@ -30,13 +30,13 @@ class QuotaFixGuardTest extends TestCase
 
     public function testQuotaFixUsesExitAwareRunnerForDestructiveCommands(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/quotaFix.php');
-
-        $this->assertStringContainsString('pmssQuotaFixRunCommand(', $source);
-        $this->assertStringContainsString("pmssQuotaFixRunCommand('[quotaFix] Disabling quotas for recalculation', 'quotaoff -av', true, \$exitCode);", $source);
-        $this->assertStringContainsString("'quotacheck -avugmn'", $source);
-        $this->assertStringContainsString("pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, \$exitCode);", $source);
-        $this->assertStringNotContainsString('shell_exec(', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/quotaFix.php', [
+            'pmssQuotaFixRunCommand(',
+            "pmssQuotaFixRunCommand('[quotaFix] Disabling quotas for recalculation', 'quotaoff -av', true, \$exitCode);",
+            "'quotacheck -avugmn'",
+            "pmssQuotaFixRunCommand('[quotaFix] Re-enabling quotas', 'quotaon -av', true, \$exitCode);",
+        ]);
+        $this->pmssAssertRepoFileNotContainsString('scripts/util/quotaFix.php', 'shell_exec(');
     }
 
     public function testQuotaFixSkipsQuotacheckWhenQuotaoffFails(): void

@@ -57,12 +57,14 @@ class NginxConfigWriteGuardTest extends TestCase
 
     public function testGeneratorUsesGuardedWriterForNginxOutputs(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/lib/nginxConfig/userConfigsGenerate.php');
-
-        $this->assertStringContainsString("require_once __DIR__.'/../lighttpd/userFileWrite.php';", $source);
-        $this->assertStringContainsString('function pmssCreateNginxConfigWriteFile(string $path, string $content, string $user, string $label): bool', $source);
-        $this->assertStringContainsString('pmssWriteManagedFile($path, $content, \'root\', \'root\', 0640)', $source);
-        $this->assertFalse(strpos($source, 'file_put_contents($subdomainConfigDir') !== false);
-        $this->assertFalse(strpos($source, 'file_put_contents("/etc/nginx/users/') !== false);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [
+            "require_once __DIR__.'/../lighttpd/userFileWrite.php';",
+            'function pmssCreateNginxConfigWriteFile(string $path, string $content, string $user, string $label): bool',
+            'pmssWriteManagedFile($path, $content, \'root\', \'root\', 0640)',
+        ]);
+        $this->pmssAssertRepoFileNotContainsStrings('scripts/lib/nginxConfig/userConfigsGenerate.php', [
+            'file_put_contents($subdomainConfigDir',
+            'file_put_contents("/etc/nginx/users/',
+        ]);
     }
 }

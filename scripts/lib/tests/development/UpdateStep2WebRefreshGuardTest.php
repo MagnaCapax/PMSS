@@ -10,13 +10,13 @@ class UpdateStep2WebRefreshGuardTest extends TestCase
 {
     public function testUpdateStep2RegistersShutdownGuardForWebRefresh(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/util/update-step2.php');
-
-        $this->assertStringContainsString('function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void', $source);
-        $this->assertStringContainsString('pmssUpdateStep2RegisterWebRefreshShutdownGuard();', $source);
-        $this->assertStringContainsString('pmssUpdateStep2MarkWebRefreshRequired();', $source);
-        $this->assertStringContainsString('pmssUpdateStep2MarkWebRefreshCompleted();', $source);
-        $this->assertStringContainsString("/scripts/util/createNginxConfig.php --restart", $source);
-        $this->assertStringContainsString("'PMSS_UPDATE_STEP2_COMPLETED'", $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/util/update-step2.php', [
+            'function pmssUpdateStep2RegisterWebRefreshShutdownGuard(): void',
+            'pmssUpdateStep2RegisterWebRefreshShutdownGuard();',
+            'pmssUpdateStep2MarkWebRefreshRequired();',
+            'pmssUpdateStep2MarkWebRefreshCompleted();',
+            "/scripts/util/createNginxConfig.php --restart",
+            "'PMSS_UPDATE_STEP2_COMPLETED'",
+        ]);
     }
 }

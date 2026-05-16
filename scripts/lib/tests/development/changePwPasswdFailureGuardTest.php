@@ -32,13 +32,13 @@ class changePwPasswdFailureGuardTest extends TestCase
 
     public function testJsonlModeKeepsDefaultHumanOutputGuarded(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertStringContainsString('$jsonlOutput = false;', $source);
-        $this->assertStringContainsString('$parseOptions = true;', $source);
-        $this->assertStringContainsString("if (\$parseOptions && \$token === '--jsonl') {", $source);
-        $this->assertStringContainsString('if (!$jsonlOutput) {', $source);
-        $this->assertStringContainsString('pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentReturnCode);', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/changePw.php', [
+            '$jsonlOutput = false;',
+            '$parseOptions = true;',
+            "if (\$parseOptions && \$token === '--jsonl') {",
+            'if (!$jsonlOutput) {',
+            'pmssChangePwEmitJsonl($username, $password, $passwdReturnCode, $htpasswdReturnCode, $qbittorrentReturnCode);',
+        ]);
     }
 
     public function testPasswdFailureExitsBeforeHttpCredentialSync(): void
@@ -60,11 +60,11 @@ class changePwPasswdFailureGuardTest extends TestCase
 
     public function testHtpasswdCommandUsesExitCodeAwareExecCall(): void
     {
-        $source = $this->pmssReadRepoFile('scripts/changePw.php');
-
-        $this->assertStringContainsString('$htpasswdOutput = [];', $source);
-        $this->assertStringContainsString('$htpasswdReturnCode = 0;', $source);
-        $this->assertStringContainsString('if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {', $source);
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/changePw.php', [
+            '$htpasswdOutput = [];',
+            '$htpasswdReturnCode = 0;',
+            'if ($htpasswdReturnCode !== 0 || !is_file($htpasswdFile)) {',
+        ]);
     }
 
     public function testHtpasswdFailureExitsBeforeOwnershipUpdate(): void
