@@ -10,6 +10,32 @@ function pmssPinnedRemoteChecksum(string $path): string
     return is_string($checksum) ? strtolower($checksum) : '';
 }
 
+function pmssPinnedRemoteExpectedSha256IsValid(string $expectedSha256): bool
+{
+    return preg_match('/\A[a-f0-9]{64}\z/', $expectedSha256) === 1;
+}
+
+function pmssPinnedRemoteArchiveComponentIsSafe(string $value): bool
+{
+    return $value !== ''
+        && $value !== '.'
+        && $value !== '..'
+        && strpos($value, '/') === false
+        && strpos($value, '\\') === false
+        && strpos($value, "\0") === false;
+}
+
+function pmssPinnedRemoteArchiveWorkDirIsSafe(string $workDir): bool
+{
+    $trimmed = rtrim($workDir, '/');
+
+    return $workDir !== ''
+        && strpos($workDir, '/') === 0
+        && strpos($workDir, "\0") === false
+        && $trimmed !== ''
+        && strpos($trimmed.'/', '/../') === false;
+}
+
 // Download a pinned artifact to a temp file; caller owns cleanup.
 function pmssDownloadPinnedRemoteTempFile(
     string $label,
@@ -20,6 +46,11 @@ function pmssDownloadPinnedRemoteTempFile(
     string $artifactLabel = ''
 ): ?string {
     $expectedSha256 = strtolower($expectedSha256);
+    if (!pmssPinnedRemoteExpectedSha256IsValid($expectedSha256)) {
+        logmsg("[WARN] Refusing invalid SHA-256 pin for {$label}");
+        return null;
+    }
+
     if (strpos($url, 'https://') !== 0) {
         logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
         return null;
@@ -73,6 +104,13 @@ function pmssFetchPinnedRemoteFile(string $label, string $url, string $expectedS
 /** Download a verified archive, unpack it in the compile workspace, then run caller steps. */
 function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): void
 {
+    if (!pmssPinnedRemoteArchiveComponentIsSafe($archiveName)
+        || !pmssPinnedRemoteArchiveComponentIsSafe($sourceDir)
+        || !pmssPinnedRemoteArchiveWorkDirIsSafe($workDir)) {
+        logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
+        return;
+    }
+
     $archivePath = pmssFetchPinnedRemoteFile($label, $url, $expectedSha256);
     if (!is_string($archivePath) || $archivePath === '') {
         return;

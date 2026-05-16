@@ -87,6 +87,16 @@ SH
         });
     }
 
+    public function testFetchPinnedRemoteFileRejectsMalformedChecksumBeforeDownload(): void
+    {
+        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => 'payload'], function ($root, $commandLog): void {
+            $path = \pmssFetchPinnedRemoteFile('demo archive', 'https://example.invalid/archive', 'not-a-sha256');
+
+            $this->assertTrue($path === null, 'Expected malformed checksum to be rejected');
+            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+        });
+    }
+
     public function testFetchPinnedRemoteFileCleansChecksumMismatchTemps(): void
     {
         $before = glob(sys_get_temp_dir().'/pmss-remote-bin-*') ?: [];
@@ -98,6 +108,39 @@ SH
             $this->assertTrue($path === null, 'Expected checksum mismatch to reject the download');
             $this->assertEquals([], array_values(array_diff($after, $before)), 'Checksum mismatch should not leave temp files behind');
         });
+    }
+
+    public function testRunPinnedRemoteArchiveStepRejectsUnsafeExtractionInputsBeforeDownload(): void
+    {
+        $body = 'payload';
+        $expectedSha256 = hash('sha256', $body);
+        $cases = [
+            ['../archive.tar.gz', 'source', 'compile'],
+            ['archive.tar.gz', 'source/child', 'compile'],
+            ['', 'source', 'compile'],
+            ['archive.tar.gz', '..', 'compile'],
+            ['archive.tar.gz', 'source', ''],
+            ['archive.tar.gz', 'source', 'compile/../outside'],
+        ];
+
+        foreach ($cases as $case) {
+            $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256, $case): void {
+                $workDir = $case[2] === '' ? '' : $root.'/'.$case[2];
+
+                \pmssRunPinnedRemoteArchiveStep(
+                    'demo archive',
+                    'https://example.invalid/archive',
+                    $expectedSha256,
+                    $case[0],
+                    $case[1],
+                    'Extracting demo archive',
+                    [],
+                    $workDir
+                );
+
+                $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+            });
+        }
     }
 
     public function testInstallPinnedRemoteBinarySkipsDownloadWhenChecksumAlreadyMatches(): void
