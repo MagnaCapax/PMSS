@@ -43,6 +43,45 @@ class NetworkHelpersTest extends TestCase
         $this->assertFalse(\networkApplyIptablesAtomically(['-A OUTPUT -j ACCEPT'], [['not' => 'a rule']]));
     }
 
+    public function testFallbackRenderValidatesRulesBeforeFlush(): void
+    {
+        $this->assertSame(
+            [
+                '-A INPUT -i eth0 -j ACCEPT',
+                '-t nat -A POSTROUTING -o eth0 -j MASQUERADE',
+            ],
+            \networkIptablesFallbackRenderedCommands(
+                ['-A INPUT -i ##IFACE## -j ACCEPT'],
+                ['-A POSTROUTING -o ##IFACE## -j MASQUERADE'],
+                ['##IFACE##' => 'eth0']
+            )
+        );
+    }
+
+    public function testFallbackRenderRejectsUnsafeReplacementBeforeFlush(): void
+    {
+        $this->assertSame(
+            null,
+            \networkIptablesFallbackRenderedCommands(
+                ['-A INPUT -i ##IFACE## -j ACCEPT'],
+                [],
+                ['##IFACE##' => 'eth0; touch /tmp/pmss-bad']
+            )
+        );
+    }
+
+    public function testFallbackRenderRejectsNonStringRuleBeforeFlush(): void
+    {
+        $this->assertSame(
+            null,
+            \networkIptablesFallbackRenderedCommands(
+                [['not' => 'a rule']],
+                [],
+                ['##IFACE##' => 'eth0']
+            )
+        );
+    }
+
     public function testTrafficLogParsesMonitoringRulesBeforeApplying(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'networkParseMonitoringCommands(');

@@ -147,15 +147,57 @@ function networkApplyIptablesAtomically(array $filterCommands, array $natCommand
 
 function networkApplyIptablesFallback(array $filterCommands, array $natCommands, array $replacements): void
 {
+    $renderedCommands = networkIptablesFallbackRenderedCommands($filterCommands, $natCommands, $replacements);
+    if ($renderedCommands === null) {
+        return;
+    }
+
     foreach (['-F INPUT', '-F FORWARD', '-F OUTPUT', '-t nat -F POSTROUTING'] as $flushCommand) {
         networkRunIptables($flushCommand);
     }
 
-    foreach ($filterCommands as $cmd) {
-        networkRunIptables(str_replace(array_keys($replacements), array_values($replacements), $cmd));
+    foreach ($renderedCommands as $cmd) {
+        networkRunIptables($cmd);
     }
-    foreach ($natCommands as $cmd) {
-        $rendered = str_replace(array_keys($replacements), array_values($replacements), $cmd);
-        networkRunIptables(strpos($rendered, '-t nat') !== 0 ? '-t nat '.$rendered : $rendered);
+}
+
+/**
+ * Render and validate sequential fallback rules before any chains are flushed.
+ *
+ * @param array<int, mixed> $filterCommands
+ * @param array<int, mixed> $natCommands
+ * @param array<string, mixed> $replacements
+ * @return ?array<int, string>
+ */
+function networkIptablesFallbackRenderedCommands(array $filterCommands, array $natCommands, array $replacements): ?array
+{
+    foreach ($replacements as $search => $replace) {
+        if (!is_string($search) || !is_string($replace)) {
+            networkIptablesLog('ERROR', 'rejected non-string iptables fallback replacement');
+            return null;
+        }
     }
+
+    $renderedCommands = [];
+    $search = array_keys($replacements);
+    $replace = array_values($replacements);
+    foreach ([$filterCommands, $natCommands] as $index => $commands) {
+        foreach ($commands as $cmd) {
+            if (!is_string($cmd)) {
+                networkIptablesLog('ERROR', 'rejected non-string iptables fallback rule: '.gettype($cmd));
+                return null;
+            }
+            $rendered = str_replace($search, $replace, $cmd);
+            if ($index === 1 && strpos($rendered, '-t nat') !== 0) {
+                $rendered = '-t nat '.$rendered;
+            }
+            if (!networkIptablesCommandSafe($rendered)) {
+                networkIptablesLog('ERROR', "rejected unsafe rendered iptables fallback rule: {$rendered}");
+                return null;
+            }
+            $renderedCommands[] = $rendered;
+        }
+    }
+
+    return $renderedCommands;
 }
