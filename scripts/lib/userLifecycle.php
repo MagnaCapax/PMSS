@@ -357,7 +357,18 @@ function pmssManagedUsersSelectFromList(array $managedUsers, string $rawUsername
 /** @return array{exitCode:int,username:string,users:array<int,string>} */
 function pmssManagedUsersSelectFromCommand(string $command = '/scripts/listUsers.php', string $rawUsername = '', array $options = array()): array
 {
-    return pmssManagedUsersSelectFromList(pmssListManagedUsers($command), $rawUsername, $options);
+    $listUsersResult = pmssListManagedUsersResult($command);
+    $exitCode = (int) ($listUsersResult['exitCode'] ?? 1);
+    if ($exitCode !== 0) {
+        $message = isset($options['commandFailedMessage']) ? (string) $options['commandFailedMessage'] : "Error: listUsers.php failed; aborting.\n";
+        if ($message !== '') {
+            fwrite(STDERR, strpos($message, '%d') === false ? $message : sprintf($message, $exitCode));
+        }
+
+        return array('exitCode' => $exitCode, 'username' => pmssNormalizeUsername($rawUsername), 'users' => array());
+    }
+
+    return pmssManagedUsersSelectFromList((array) ($listUsersResult['users'] ?? array()), $rawUsername, $options);
 }
 
 /** @return array{name:string,uid:int,gid:int,dir:string}|null */

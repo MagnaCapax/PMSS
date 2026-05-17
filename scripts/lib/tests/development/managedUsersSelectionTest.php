@@ -59,6 +59,23 @@ class ManagedUsersSelectionTest extends TestCase
         $this->assertEquals(['user2'], $selection['users']);
     }
 
+    public function testManagedUsersSelectFromCommandPropagatesCommandFailure(): void
+    {
+        $this->writeListUsersScript("echo \"user1\\n\"; exit(7);");
+
+        list($selection) = $this->pmssCaptureStdout(function (): array {
+            return \pmssManagedUsersSelectFromCommand(
+                $this->listUsersScript,
+                '',
+                ['commandFailedMessage' => '']
+            );
+        });
+
+        $this->assertEquals(7, $selection['exitCode']);
+        $this->assertEquals('', $selection['username']);
+        $this->assertEquals([], $selection['users']);
+    }
+
     public function testManagedUsersSelectFromCommandRejectsInvalidUsername(): void
     {
         $this->writeListUsersScript("echo \"user1\\n\";");
