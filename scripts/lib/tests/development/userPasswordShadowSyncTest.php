@@ -2,7 +2,8 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/user/passwords.php';
+require_once dirname(__DIR__, 2).'/user/shadow.php';
+require_once dirname(__DIR__, 2).'/lighttpd/htpasswd.php';
 
 class userPasswordShadowSyncTest extends TestCase
 {
@@ -87,12 +88,12 @@ class userPasswordShadowSyncTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/unsuspend.php');
 
-        $requirePos = strpos($source, "require_once __DIR__.'/lib/user/passwords.php';");
+        $requirePos = strpos($source, "require_once __DIR__.'/lib/lighttpd/htpasswd.php';");
         $unlockPos = strpos($source, "'unlock_account'");
         $syncPos = strpos($source, 'pmssUserHtpasswdSyncFromShadow($username)');
         $startRtorrentPos = strpos($source, "'start_rtorrent'");
 
-        $this->assertTrue($requirePos !== false, 'unsuspend.php must load the password sync helper');
+        $this->assertTrue($requirePos !== false, 'unsuspend.php must load the htpasswd shadow sync helper');
         $this->assertTrue($unlockPos !== false, 'unsuspend.php must still unlock the Unix account');
         $this->assertTrue($syncPos !== false, 'unsuspend.php must resync per-user htpasswd from shadow');
         $this->assertTrue($startRtorrentPos !== false, 'unsuspend.php must still restart rTorrent');

@@ -14,7 +14,7 @@
  */
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
-require_once __DIR__.'/lib/user/passwords.php';
+require_once __DIR__.'/lib/lighttpd/htpasswd.php';
 
 // Guard: PMSS requires /home to be a separately mounted filesystem. Unsuspending
 // a user when /home is unavailable would fail or act on stale paths.
