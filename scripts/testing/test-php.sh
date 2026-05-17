@@ -13,7 +13,10 @@ ROOT_DIR="$ROOT_DIR" bash "$ROOT_DIR/scripts/testing/customer-php-tree-isolation
 echo "[customer-context-fatal-scan]" >&2
 PMSS_CUSTOMER_CONTEXT_SCAN_ROOT="$ROOT_DIR" php "$ROOT_DIR/scripts/testing/customer-context-fatal-scan.php"
 
+echo "[customer-panel-render-harness]" >&2
+PMSS_CUSTOMER_PANEL_RENDER_ROOT="$ROOT_DIR" php "$ROOT_DIR/scripts/testing/customer-panel-render-harness.php" >/dev/null
+
 echo "[dev-tests]" >&2
 php "$ROOT_DIR/scripts/lib/tests/development/Runner.php"
 
-echo "OK: PHP lint + customer-tree isolation + customer-context fatal scan + dev tests" >&2
+echo "OK: PHP lint + customer-tree isolation + customer-context fatal scan + customer panel render + dev tests" >&2
