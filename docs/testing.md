@@ -6,7 +6,7 @@ PMSS splits tests into two tiers:
 
 ## Local Testing Scripts
 Utility scripts under `scripts/testing/` orchestrate common checks:
-- `test-php.sh` — PHP syntax lint and development suite.
+- `test-php.sh` — PHP syntax lint, customer-tree checks, panel render harness, and development suite.
 - `test-bash.sh` — bash syntax check and optional lint/format when tools are present.
 - `test-all.sh` — runs both of the above.
 - `customer-context-fatal-scan.php` — token-aware customer PHP check that reports `OPERATOR_TREE_FUNCTION_LEAK` when `etc/skel/www/*.php` calls a bare function unavailable from the customer tree or PHP built-ins.

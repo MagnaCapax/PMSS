@@ -38,12 +38,13 @@ function pmssCustomerContextFatalScan(string $root): array
     $www = $skel.'/www';
     if (!is_dir($www)) return [];
 
-    $customerDefs = pmssCustomerContextDefinitions(array_merge(pmssCustomerContextFiles($skel, false), pmssCustomerContextFiles($www, false)));
+    $wwwFiles = pmssCustomerContextFiles($www, false);
+    $customerDefs = pmssCustomerContextDefinitions(array_merge(pmssCustomerContextFiles($skel, false), $wwwFiles));
     $operatorDefs = pmssCustomerContextDefinitions(pmssCustomerContextFiles($root.'/scripts/lib', true));
     $builtins = pmssCustomerContextBuiltins();
     $violations = [];
 
-    foreach (pmssCustomerContextFiles($www, false) as $file) {
+    foreach ($wwwFiles as $file) {
         $tokens = pmssCustomerContextTokens($file);
         foreach (pmssCustomerContextCalls($tokens) as $call) {
             $key = strtolower($call['function']);
@@ -112,9 +113,7 @@ function pmssCustomerContextDefinitions(array $files): array
 /** @return array<string, true> */
 function pmssCustomerContextBuiltins(): array
 {
-    $out = [];
-    foreach ((get_defined_functions()['internal'] ?? []) as $name) $out[strtolower($name)] = true;
-    return $out;
+    return array_fill_keys(array_map('strtolower', get_defined_functions()['internal'] ?? []), true);
 }
 
 /** @return array<int, array{index:int,function:string,line:int}> */
@@ -143,9 +142,7 @@ function pmssCustomerContextGuarded(array $tokens, int $call, string $name): boo
 /** @return array<int, string> */
 function pmssCustomerContextGuardNames(string $name): array
 {
-    $guards = [$name];
-    if (strpos($name, 'zip_') === 0) $guards[] = 'zip_open';
-    return array_values(array_unique($guards));
+    return strpos($name, 'zip_') === 0 && $name !== 'zip_open' ? [$name, 'zip_open'] : [$name];
 }
 
 /** Detect short-circuit guards like function_exists('x') && x(). */

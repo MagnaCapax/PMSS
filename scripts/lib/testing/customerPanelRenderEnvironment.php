@@ -66,7 +66,7 @@ function pmssCustomerPanelRenderPrepare(string $sourceWww, string $home, string 
         return ['ok' => false, 'error' => 'missing customer source tree: '.$sourceWww];
     }
 
-    foreach ([$home, $www, $home.'/.config/deluge', $home.'/.config', $home.'/.lighttpd'] as $dir) {
+    foreach ([$home, $www, $home.'/.config/deluge', $home.'/.lighttpd'] as $dir) {
         if (!pmssDirEnsureExists($dir, 0700)) {
             return ['ok' => false, 'error' => 'unable to create mock directory: '.$dir];
         }

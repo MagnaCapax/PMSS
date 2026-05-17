@@ -39,17 +39,15 @@ function pmssCustomerPanelRenderMain(): int
         return 1;
     }
 
-    foreach (pmssCustomerPanelRenderExpectations() as $page => $expectation) {
-        $result['pages'][] = pmssCustomerPanelRenderPage($www, $bootstrap, $homeRoot, $home, $page, $expectation);
-    }
-
     $allStdout = '';
-    foreach ($result['pages'] as $index => $pageResult) {
+    foreach (pmssCustomerPanelRenderExpectations() as $page => $expectation) {
+        $pageResult = pmssCustomerPanelRenderPage($www, $bootstrap, $homeRoot, $home, $page, $expectation);
         $allStdout .= $pageResult['stdout'];
         foreach ($pageResult['errors'] as $error) {
             $result['errors'][] = $pageResult['page'].': '.$error;
         }
-        unset($result['pages'][$index]['stdout']);
+        unset($pageResult['stdout']);
+        $result['pages'][] = $pageResult;
     }
 
     foreach (pmssCustomerPanelRenderRequiredMarkers() as $marker) {
@@ -59,16 +57,14 @@ function pmssCustomerPanelRenderMain(): int
     }
 
     $result['ok'] = $result['errors'] === [];
-    if ($result['ok']) {
-        fwrite(STDERR, "[customer-panel-render-harness] OK - ".count($result['pages'])." page(s) rendered cleanly\n");
-        echo json_encode($result, JSON_PRETTY_PRINT)."\n";
-        return 0;
-    }
-
-    fwrite(STDERR, "[customer-panel-render-harness] FAIL - ".count($result['errors'])." render issue(s)\n");
-    foreach ($result['errors'] as $error) {
-        fwrite(STDERR, "  - ".$error."\n");
+    fwrite(STDERR, $result['ok']
+        ? "[customer-panel-render-harness] OK - ".count($result['pages'])." page(s) rendered cleanly\n"
+        : "[customer-panel-render-harness] FAIL - ".count($result['errors'])." render issue(s)\n");
+    if (!$result['ok']) {
+        foreach ($result['errors'] as $error) {
+            fwrite(STDERR, "  - ".$error."\n");
+        }
     }
     echo json_encode($result, JSON_PRETTY_PRINT)."\n";
-    return 1;
+    return $result['ok'] ? 0 : 1;
 }

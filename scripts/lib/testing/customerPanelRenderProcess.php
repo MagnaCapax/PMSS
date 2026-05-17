@@ -27,12 +27,9 @@ function pmssCustomerPanelRenderExpectations(): array
 /** Return required feature markers across all rendered output. */
 function pmssCustomerPanelRenderRequiredMarkers(): array
 {
-    $disabled = getenv('PMSS_CUSTOMER_PANEL_RENDER_DISABLE_MARKERS');
-    if ($disabled === '1') {
-        return [];
-    }
-
-    return ['<h6>Announcements</h6>', 'Traffic limit:', 'RAM Info', 'ruTorrent'];
+    return getenv('PMSS_CUSTOMER_PANEL_RENDER_DISABLE_MARKERS') === '1'
+        ? []
+        : ['<h6>Announcements</h6>', 'Traffic limit:', 'RAM Info', 'ruTorrent'];
 }
 
 /** Render one customer panel page and classify runtime errors. */
