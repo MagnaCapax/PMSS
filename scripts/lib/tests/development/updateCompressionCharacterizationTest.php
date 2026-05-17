@@ -499,11 +499,17 @@ class UpdateCompressionCharacterizationTest extends TestCase
         $src = $this->pmssReadRepoFile('scripts/lib/update/userMaintenance.php');
         $updatePos = strpos($src, 'pmssUpdateUserEnvironment($userTrim, $rutorrentIndexSha);');
         $lingerPos = strpos($src, 'pmssEnsureLingerAndDocker($userTrim);');
+        $lighttpdPostCheckPos = strpos($src, "\$postChecks['Checking lighttpd instance'] = '/scripts/cron/checkLighttpdInstances.php';");
+        $postCheckLoopPos = strpos($src, 'foreach ($postChecks as $label => $helperPath)');
 
         $this->assertStringContainsString('Environment (HTTP/ruTorrent/permissions + linger/systemd/rootless Docker)', $src);
         $this->assertTrue($updatePos !== false, 'userMaintenance.php should update the user environment directly');
         $this->assertTrue($lingerPos !== false, 'userMaintenance.php should keep linger wiring in the main per-user loop');
+        $this->assertTrue($lighttpdPostCheckPos !== false, 'userMaintenance.php should keep the per-user lighttpd watchdog post-check');
+        $this->assertTrue($postCheckLoopPos !== false, 'userMaintenance.php should run post-check helpers after environment convergence');
         $this->assertTrue($lingerPos > $updatePos, 'linger wiring should run after environment convergence');
+        $this->assertTrue($postCheckLoopPos > $updatePos, 'lighttpd post-checks must run after custom.d fragments are written');
+        $this->assertTrue($postCheckLoopPos > $lingerPos, 'lighttpd post-checks should run after linger wiring in the per-user loop');
         $this->assertStringContainsString("pmssUserLog(\$userTrim, '[WARN] update-step2 user maintenance aborted: '.\$reason);", $src);
         $this->assertStringContainsString('pmssLogJson([', $src);
         $this->pmssAssertStringNotContainsString(
