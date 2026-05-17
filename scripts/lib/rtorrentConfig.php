@@ -90,12 +90,8 @@ class rtorrentConfig {
 
 		// Reserve headroom for lighttpd/php-cgi and wrappers inside the user slice.
 		$ramMiB = max(0, (int)$config['ram']);
-		$gapMiB = (int) floor($ramMiB * 0.25);
-		$gapMiB = max(250, min(1000, $gapMiB));
-		$piecesMemoryMiB = $ramMiB - $gapMiB;
-		if ($piecesMemoryMiB < 170) {
-			$piecesMemoryMiB = 170;
-		}
+		$gapMiB = max(250, min(1000, (int) floor($ramMiB * 0.25)));
+		$piecesMemoryMiB = max(170, $ramMiB - $gapMiB);
 
 		$uploadThrottleLine = '';
 		if (isset($config['uploadThrottle']) && is_numeric($config['uploadThrottle'])) {
@@ -206,9 +202,8 @@ class rtorrentConfig {
         $configRaw = file_get_contents($file);
         if (empty($configRaw) or $configRaw == false) return false;
         
-        $configLines = explode("\n", $configRaw);
         $config = array();
-        foreach ($configLines AS $thisLine) {
+        foreach (explode("\n", $configRaw) AS $thisLine) {
             $thisLine = trim($thisLine);
             if (empty($thisLine)) continue;
             

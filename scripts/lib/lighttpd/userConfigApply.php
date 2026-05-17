@@ -10,6 +10,7 @@
 
 require_once __DIR__.'/../systemdSliceProperties.php';
 require_once __DIR__.'/userFileWrite.php';
+require_once __DIR__.'/../user/delugeManagedConfig.php';
 
 function pmssClampLighttpdBandwidthLimits(string $config): string
 {
@@ -312,8 +313,8 @@ function pmssEnsureWebdavLockDatabase(string $user, string $homeDir): void
     }
 }
 
-// Deluge web.conf parsing and writing helpers stay here because only the
-// lighttpd apply flow consumes them at runtime.
+// Deluge web.conf wrappers stay here, while the dual-JSON codec is shared with
+// Deluge core.conf maintenance to avoid divergent parsing rules.
 function pmssDelugeSessionsListDetected(string $raw): bool
 {
     return preg_match('/"sessions"\\s*:\\s*\\[\\s*\\]/', $raw) === 1;
@@ -335,75 +336,20 @@ function pmssDelugeReadWebConf(string $path): ?array
     if (!is_string($raw)) {
         return null;
     }
-    if (strpos($raw, "\0") !== false) {
-        // Deluge web.conf is expected to be plain text JSON (two objects).
-        // Treat NUL bytes as corruption/malicious input and refuse to parse.
-        return null;
-    }
 
-    $length = strlen($raw);
-    $start = strspn($raw, " \t\n\r");
-    if ($start >= $length || $raw[$start] !== '{') {
-        return null;
-    }
-
-    $depth = 0;
-    $inString = false;
-    $escape = false;
-    $firstObjectEnd = null;
-    for ($index = $start; $index < $length; $index++) {
-        $ch = $raw[$index];
-        if ($inString) {
-            if ($escape) {
-                $escape = false;
-                continue;
-            }
-            if ($ch === '\\') {
-                $escape = true;
-                continue;
-            }
-            if ($ch === '"') {
-                $inString = false;
-            }
-            continue;
-        }
-        if ($ch === '"') {
-            $inString = true;
-            continue;
-        }
-        if ($ch === '{') {
-            $depth++;
-            continue;
-        }
-        if ($ch === '}') {
-            $depth--;
-            if ($depth === 0) {
-                $firstObjectEnd = $index + 1;
-                break;
-            }
-        }
-    }
-    if ($firstObjectEnd === null
-        || !is_array($meta = json_decode(substr($raw, $start, $firstObjectEnd - $start), true))
-        || !is_array($config = json_decode(ltrim(substr($raw, $firstObjectEnd)), true))) {
-        return null;
-    }
-
-    return ['meta' => $meta, 'config' => $config];
+    return pmssDelugeConfigDecode($raw);
 }
 
 function pmssDelugeWriteWebConf(string $path, array $meta, array $config, string $owner): bool
 {
     $existingMode = @fileperms($path);
     $mode = is_int($existingMode) ? ($existingMode & 0777) : 0600;
-
-    $metaJson = json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    $configJson = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    if ($metaJson === false || $configJson === false) {
+    $encoded = pmssDelugeConfigEncode($meta, $config);
+    if (!is_string($encoded)) {
         return false;
     }
 
-    return pmssWriteUserFile($path, $metaJson.$configJson, $owner, $mode);
+    return pmssWriteUserFile($path, $encoded, $owner, $mode);
 }
 
 function pmssLighttpdProxyRuleFragment(

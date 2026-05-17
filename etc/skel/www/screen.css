@@ -5,7 +5,8 @@ body {
     background: #0f1720;
     color: #e6edf3;
     font-family: Arial, Helvetica, sans-serif;
-    line-height: 1.5;
+    font-size: 13px;
+    line-height: 1.35;
 }
 
 /* Keep typography legible even when the legacy static host is unavailable. */
@@ -20,7 +21,7 @@ a:focus {
 
 #wrap {
     min-height: 100vh;
-    padding: 24px 16px;
+    padding: 12px 10px;
     box-sizing: border-box;
     background: linear-gradient(180deg, #111827 0%, #0f1720 100%);
 }
@@ -33,7 +34,7 @@ a:focus {
 /* The legacy shell keeps the familiar framed card layout. */
 .full_top_nohd,
 .full_bottom {
-    height: 12px;
+    height: 8px;
     background: #111827;
     border: 1px solid #223042;
 }
@@ -51,7 +52,7 @@ a:focus {
 }
 
 .full_body {
-    padding: 24px;
+    padding: 14px;
     background: #111827;
     border-left: 1px solid #223042;
     border-right: 1px solid #223042;
@@ -62,27 +63,27 @@ a:focus {
 .portfoliobox {
     display: flex;
     flex-wrap: wrap;
-    gap: 24px;
+    gap: 16px;
 }
 
 .portfolioimg,
 .portfoliodesc,
 #stats {
-    flex: 1 1 360px;
+    flex: 1 1 320px;
     min-width: 0;
 }
 
 h1 {
-    margin: 0 0 18px;
+    margin: 0 0 12px;
     color: #ffffff;
-    font-size: 2rem;
+    font-size: 1.45rem;
 }
 
 h6 {
-    margin: 24px 0 10px;
+    margin: 14px 0 6px;
     color: #4fc3f7;
-    font-size: 1.05rem;
-    letter-spacing: 0.03em;
+    font-size: 0.92rem;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
 }
 
@@ -96,13 +97,14 @@ pre {
 
 ul,
 ol {
+    margin-bottom: 8px;
     padding-left: 20px;
 }
 
 hr {
     border: 0;
     border-top: 1px solid #2e3b4f;
-    margin: 20px 0;
+    margin: 10px 0;
 }
 
 table {
@@ -112,12 +114,12 @@ table {
 
 td,
 th {
-    padding: 8px 10px;
+    padding: 4px 6px;
     vertical-align: top;
 }
 
 pre {
-    padding: 12px;
+    padding: 8px;
     border: 1px solid #2e3b4f;
     background: #0b1220;
     color: inherit;
@@ -128,12 +130,44 @@ pre {
 input[type="button"],
 input[type="submit"],
 button {
-    padding: 9px 14px;
+    padding: 5px 9px;
     border: 1px solid #4fc3f7;
-    border-radius: 6px;
+    border-radius: 4px;
     background: #13293d;
     color: #f8fafc;
     cursor: pointer;
+}
+
+/* Keep legacy quota/traffic gauges compact and readable without remote CSS. */
+#meter-disk-td {
+    width: 100%;
+    padding: 0;
+}
+
+#meter-disk-holder {
+    position: relative;
+    height: 15px;
+    overflow: hidden;
+    border: 1px solid #2e3b4f;
+    background: #0b1220;
+    line-height: 15px;
+}
+
+#meter-disk-holder div {
+    height: 15px;
+}
+
+#meter-disk-text {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 2;
+    color: #f8fafc;
+    font-size: 11px;
+    line-height: 15px;
+    text-align: center;
+    text-shadow: 0 1px 1px #000;
 }
 
 input[type="button"]:disabled,
@@ -145,10 +179,10 @@ button:disabled {
 
 @media (max-width: 720px) {
     #wrap {
-        padding: 16px 10px;
+        padding: 8px;
     }
 
     .full_body {
-        padding: 16px;
+        padding: 12px;
     }
 }

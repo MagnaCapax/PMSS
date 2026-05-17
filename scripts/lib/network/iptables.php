@@ -94,10 +94,7 @@ function networkParseMonitoringCommands(string $raw): array
         if (strpos($line, 'iptables ') === 0) {
             $line = trim(substr($line, strlen('iptables ')));
         }
-        if ($line === '' || strncmp($line, '-F', 2) === 0) {
-            continue;
-        }
-        if (!networkIptablesCommandSafe($line)) {
+        if ($line === '' || strncmp($line, '-F', 2) === 0 || !networkIptablesCommandSafe($line)) {
             continue;
         }
         $commands[] = $line;
