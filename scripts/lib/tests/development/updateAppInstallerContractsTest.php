@@ -107,6 +107,21 @@ class UpdateAppInstallerContractsTest extends TestCase
         $this->assertStringContainsString("'tar '.\$tarMode", $contents);
     }
 
+    public function testPinnedDownloadInstallersReuseRemoteBinaryHelper(): void
+    {
+        foreach (['aiToolsInstall.php', 'deluge.php', 'rtorrent.php'] as $installer) {
+            $contents = $this->pmssReadUpdateAppFile($installer);
+
+            $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
+            $this->assertTrue(
+                strpos($contents, 'pmssDownloadPinnedRemoteTempFile(') !== false || strpos($contents, 'pmssFetchPinnedRemoteFile(') !== false,
+                $installer.' should call a remoteBinary.php pinned download helper'
+            );
+            $this->assertTrue(strpos($contents, "pmssBuildCommand('wget'") === false, $installer.' should delegate pinned downloads to remoteBinary.php');
+            $this->assertTrue(strpos($contents, "@hash_file('sha256'") === false, $installer.' should delegate checksum verification to remoteBinary.php');
+        }
+    }
+
     public function testRcloneInstallerKeepsLatestFetchAndRelocationGuards(): void
     {
         $contents = $this->pmssReadUpdateAppFile('rclone.php');

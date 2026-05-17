@@ -8,8 +8,7 @@
 // #TODO Refactor this installer to use virtualenv instead of system-wide pip. (GH #125)
 // #TODO Pin Python package versions explicitly; avoid unbounded upgrades. (GH #125)
 // #TODO Replace passthru/backticks with runStep wrappers for consistent logging. (GH #125)
-require_once __DIR__.'/../runtime/commands.php';
-require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/remoteBinary.php';
 
 /**
  * Legacy Debian 10 dependency set for the Deluge 2.0.5 source build.
@@ -315,28 +314,8 @@ if ($isDebian10) {
             pmssBuildCommand('pip', array_merge(['install'], pmssDelugeLegacyPipDependencyPackages()))
         );
 
-        $tmp = tempnam(sys_get_temp_dir(), 'pmss-deluge-');
-        if ($tmp === false || $tmp === '') {
-            $log('[WARN] Unable to create temp file for Deluge source download');
-            return;
-        }
-
-        $downloadCmd = pmssBuildCommand('wget', ['-q', '-O', $tmp, $delugeTarballUrl]);
-        $rc = runStep("Downloading {$delugeTarballLabel}", $downloadCmd);
-        if ($rc !== 0) {
-            @unlink($tmp);
-            return;
-        }
-
-        if ($dryRun) {
-            @unlink($tmp);
-            return;
-        }
-
-        $actualSha = @hash_file('sha256', $tmp);
-        if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($delugeTarballSha256)) {
-            $log("[WARN] Checksum mismatch for {$delugeTarballLabel}; aborting");
-            @unlink($tmp);
+        $tmp = pmssFetchPinnedRemoteFile($delugeTarballLabel, $delugeTarballUrl, $delugeTarballSha256);
+        if ($tmp === null) {
             return;
         }
 

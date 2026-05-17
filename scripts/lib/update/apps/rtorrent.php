@@ -22,8 +22,7 @@
  * @license GPL-3.0-only
  */
 
-require_once __DIR__.'/../runtime/commands.php';
-require_once __DIR__.'/../logging.php';
+require_once __DIR__.'/remoteBinary.php';
 require_once __DIR__.'/../distro.php';
 
 /**
@@ -201,7 +200,6 @@ if (getenv('PMSS_RTORRENT_NO_ENTRYPOINT') === '1') {
     return;
 }
 
-$dryRun = pmssEnvFlagEnabled('PMSS_DRY_RUN');
 $log = 'logmsg';
 
 $rtorrentVersion = shell_exec('rtorrent -h');
@@ -222,40 +220,6 @@ $checksums = [
     'rtorrent-0.9.6.tar.gz' => '1e69c24f1f26f8f07d58d673480dc392bfc4317818c1115265b08a7813ff5b0e',
     'libtorrent-0.13.6.tar.gz' => '2838a08c96edfd936aff8fbf99ecbb930c2bfca3337dd1482eb5fccdb80d5a04',
 ];
-
-$fetchCheckedTarball = function ($label, $url, $expectedSha256) use ($dryRun, $log) {
-    if (strpos($url, 'https://') !== 0) {
-        $log("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
-        return null;
-    }
-
-    $tmp = tempnam(sys_get_temp_dir(), 'pmss-rtorrent-');
-    if ($tmp === false || $tmp === '') {
-        $log("[WARN] Unable to create temp file for {$label} download");
-        return null;
-    }
-
-    $downloadCmd = pmssBuildCommand('wget', ['-q', '-O', $tmp, $url]);
-    $rc = runStep("Downloading {$label}", $downloadCmd);
-    if ($rc !== 0) {
-        @unlink($tmp);
-        return null;
-    }
-
-    if ($dryRun) {
-        @unlink($tmp);
-        return null;
-    }
-
-    $actualSha = @hash_file('sha256', $tmp);
-    if (!is_string($actualSha) || strtolower($actualSha) !== strtolower($expectedSha256)) {
-        $log("[WARN] Checksum mismatch for {$label}; aborting");
-        @unlink($tmp);
-        return null;
-    }
-
-    return $tmp;
-};
 
 if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  // Yeah i know kinda stupid place to look if we got the latest but ...
     echo "*** Updating rTorrent\n";
@@ -296,11 +260,11 @@ if (strpos($rtorrentVersion, "version {$rtorrentVersionTarget}.") === false) {  
 
     $rtorrentUrl = "https://pulsedmedia.com/remote/pkg/{$rtorrentTarball}";
     $libtorrentUrl = "https://pulsedmedia.com/remote/pkg/{$libtorrentTarball}";
-    $rtorrentTmp = $fetchCheckedTarball("rtorrent {$rtorrentVersionTarget} source", $rtorrentUrl, $rtorrentSha);
+    $rtorrentTmp = pmssFetchPinnedRemoteFile("rtorrent {$rtorrentVersionTarget} source", $rtorrentUrl, $rtorrentSha);
     if ($rtorrentTmp === null) {
         return;
     }
-    $libtorrentTmp = $fetchCheckedTarball("libtorrent {$rtorrentVersionTargetLib} source", $libtorrentUrl, $libtorrentSha);
+    $libtorrentTmp = pmssFetchPinnedRemoteFile("libtorrent {$rtorrentVersionTargetLib} source", $libtorrentUrl, $libtorrentSha);
     if ($libtorrentTmp === null) {
         @unlink($rtorrentTmp);
         return;
