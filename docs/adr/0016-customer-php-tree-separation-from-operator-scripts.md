@@ -1,7 +1,7 @@
 # ADR 0016: Customer-Facing PHP Tree Separation from Operator `/scripts/`
 
 Date: 2026-05-17
-Category: architecture, security
+Category: architecture
 
 ## Status
 Accepted (inviolable rule, codified in AGENTS.md).
