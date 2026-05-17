@@ -51,6 +51,26 @@ final class trafficLimitConsumerCharacterizationTest extends TestCase
         $this->assertStringContainsString('@chmod($throttleFile, 0644);', $source);
     }
 
+    public function testTrafficLimitCronChecksListUsersExitCode(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
+            '$listUsersResult = pmssListManagedUsersResult(\'/scripts/listUsers.php\');',
+            '$users = pmssListManagedUsersFromResult($listUsersResult);',
+            'if ($users === null) {',
+            'exit(1);',
+        ]);
+    }
+
+    public function testTrafficLimitCronChecksRuntimeMarkerWrites(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [
+            'function pmssTrafficLimitMarkerTouch(string $user, string $path): bool',
+            'function pmssTrafficLimitMarkerRemove(string $user, string $path): bool',
+            'if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {',
+            'if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {',
+        ]);
+    }
+
     public function testTrafficLimitCronValidatesThrottleFileBoundary(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings('scripts/cron/trafficLimits.php', [

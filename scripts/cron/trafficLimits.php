@@ -28,7 +28,11 @@ if (!pmssDirEnsureExists('/var/run/pmss/trafficLimits', 0755)) {
 
 $trafficLimitPeriod = 3 * 24 * 60 * 60;     // 3 days limiting period
 
-$users = pmssListManagedUsers('/scripts/listUsers.php');
+$listUsersResult = pmssListManagedUsersResult('/scripts/listUsers.php');
+$users = pmssListManagedUsersFromResult($listUsersResult);
+if ($users === null) {
+    exit(1);
+}
 if (count($users) == 0) die("No users in this system!\n");
 
 $networkConfig = networkLoadConfig();
@@ -130,9 +134,9 @@ foreach($users AS $thisUser) {
             $floorMbit = $progressive['floorMbit'];
         }
 
-        touch( $userTrafficLimitEnabledFile );
-
-        chmod( $userTrafficLimitEnabledFile, 0600);
+        if (!pmssTrafficLimitMarkerTouch($thisUser, $userTrafficLimitEnabledFile)) {
+            continue;
+        }
         setRateLimit($thisUser, $effectiveCapMbit);    // Apply rate limiting
         if (function_exists('pmssUserLog')) {
             if (is_array($matchedOverageStage)) {
@@ -180,7 +184,9 @@ foreach($users AS $thisUser) {
     } else if (file_exists($userTrafficLimitEnabledFile)) {     // Now let's see if it's time to remove it?
 
         if ((time() - (int) filemtime($userTrafficLimitEnabledFile)) > $trafficLimitPeriod) {   // Time to remove the limit
-            unlink( $userTrafficLimitEnabledFile );
+            if (!pmssTrafficLimitMarkerRemove($thisUser, $userTrafficLimitEnabledFile)) {
+                continue;
+            }
             if (function_exists('pmssUserLog')) {
                 pmssUserLog($thisUser, 'traffic throttle removed after cooldown');
             }
@@ -191,6 +197,51 @@ foreach($users AS $thisUser) {
         }
 
     }
+}
+
+/**
+ * Emit traffic-limit safety warnings to cron output and the per-user log.
+ */
+function pmssTrafficLimitLog(string $user, string $message): void
+{
+    echo date('Y-m-d H:i:s') . ": {$message}\n";
+    if (function_exists('pmssUserLog') && pmssValidateUsername($user)) {
+        pmssUserLog($user, $message);
+    }
+}
+
+/**
+ * Refresh the active-throttle marker and report marker write failures.
+ */
+function pmssTrafficLimitMarkerTouch(string $user, string $path): bool
+{
+    if (!@touch($path)) {
+        pmssTrafficLimitLog($user, "traffic throttle marker touch failed ({$path})");
+        return false;
+    }
+
+    if (!@chmod($path, 0600)) {
+        pmssTrafficLimitLog($user, "traffic throttle marker chmod failed ({$path})");
+    }
+
+    return true;
+}
+
+/**
+ * Remove the active-throttle marker only when filesystem state confirms it.
+ */
+function pmssTrafficLimitMarkerRemove(string $user, string $path): bool
+{
+    if (!file_exists($path)) {
+        return true;
+    }
+
+    if (@unlink($path) || !file_exists($path)) {
+        return true;
+    }
+
+    pmssTrafficLimitLog($user, "traffic throttle marker removal failed ({$path})");
+    return false;
 }
 
 /**

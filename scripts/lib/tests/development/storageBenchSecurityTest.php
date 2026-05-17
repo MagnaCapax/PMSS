@@ -259,6 +259,32 @@ class StorageBenchSecurityTest extends TestCase
         );
     }
 
+    public function testUnsafeTargetTraversalFailsBeforeBenchmarkWork(): void
+    {
+        $base = $this->pmssMakeTempDir('pmss-bench-target-', 0700);
+        @mkdir($base.'/safe', 0700, true);
+        $target = $base.'/safe/../safe';
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
+
+        $this->assertBenchmarkInputGuard(
+            ['--target='.$target, '--json='.$log],
+            "Error: unsafe target directory: {$target}\n"
+        );
+    }
+
+    public function testSymlinkTargetFailsBeforeBenchmarkWork(): void
+    {
+        $real = $this->pmssMakeTempDir('pmss-bench-target-real-', 0700);
+        $link = sys_get_temp_dir().'/pmss-bench-target-link-'.bin2hex(random_bytes(2));
+        $this->pmssCreateSymlinkOrSkip($real, $link);
+        $log = $this->pmssMakeJsonLogPath('pmss-bench-sec-', 'benchmark-storage.jsonl');
+
+        $this->assertBenchmarkInputGuard(
+            ['--target='.$link, '--json='.$log],
+            "Error: unsafe target directory: {$link}\n"
+        );
+    }
+
     public function testJsonLogParentFileFailsBeforeBenchmarkWork(): void
     {
         $parent = $this->pmssMakeTempFile('pmss-bench-parent-');

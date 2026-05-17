@@ -437,7 +437,6 @@ abstract class TestCase
                 'scripts/util/makeMonitoringRules.php',
             ],
             "pmssListManagedUsers('/scripts/listUsers.php')" => [
-                'scripts/cron/trafficLimits.php',
                 'scripts/cron/updateQuotas.php',
                 'scripts/util/checkRutorrentPlugins.php',
                 'scripts/util/setupNetwork.php',
@@ -450,6 +449,7 @@ abstract class TestCase
                 'scripts/lib/nginxConfig/main.php',
             ],
             'pmssListManagedUsersResult(' => [
+                'scripts/cron/trafficLimits.php',
                 'scripts/cron/checkRtorrent.php',
                 'scripts/cron/userTrackerCleaner.php',
                 'scripts/lib/resources/show.php',
