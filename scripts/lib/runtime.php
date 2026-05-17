@@ -1214,43 +1214,25 @@ if (!function_exists('pmssSnapshotLogOpen')) {
     }
 }
 
-if (!function_exists('pmssWithSnapshotLog')) {
-    /**
-     * Run a snapshot job with the shared root-only log lifecycle.
-     *
-     * The callback receives the opened log handle and must return an integer
-     * exit status so cron entrypoints can keep their existing semantics.
-     */
-    function pmssWithSnapshotLog(string $scriptName, string $logPath, callable $callback): int
-    {
-        $oldUmask = null;
-        $handle = false;
-
-        try {
-            $handle = pmssSnapshotLogOpen($scriptName, $logPath, $oldUmask);
-            if ($handle === false) {
-                return 1;
-            }
-
-            return (int) $callback($handle);
-        } finally {
-            if ($handle !== false) {
-                @fclose($handle);
-            }
-
-            if ($oldUmask !== null) {
-                umask($oldUmask);
-            }
-        }
-    }
-}
-
 if (!function_exists('pmssRunSnapshotLogTask')) {
     /** Resolve env log path, stamp time once, and run a snapshot callback. */
     function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defaultLogPath, callable $callback): int
     {
         $timestamp = date('Y-m-d\\TH:i:s');
-        return pmssWithSnapshotLog($scriptName, pmssResolvePathFromEnv($envKey, $defaultLogPath), static function ($handle) use ($callback, $timestamp): int { return (int) $callback($handle, $timestamp); });
+        $oldUmask = null;
+        $handle = false;
+
+        try {
+            $handle = pmssSnapshotLogOpen($scriptName, pmssResolvePathFromEnv($envKey, $defaultLogPath), $oldUmask);
+            if ($handle === false) {
+                return 1;
+            }
+
+            return (int) $callback($handle, $timestamp);
+        } finally {
+            if ($handle !== false) @fclose($handle);
+            if ($oldUmask !== null) umask($oldUmask);
+        }
     }
 }
 

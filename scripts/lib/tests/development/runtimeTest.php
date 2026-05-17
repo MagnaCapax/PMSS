@@ -195,6 +195,21 @@ class RuntimeTest extends TestCase
         }
     }
 
+    public function testSnapshotLogTaskKeepsLifecycleContract(): void
+    {
+        $logPath = $this->pmssMakeTempPath('pmss-runtime-snapshot-', '.log');
+        $runtime = var_export(dirname(__DIR__, 3).'/lib/runtime.php', true);
+        $script = "require {$runtime}; \$logPath=getenv('PMSS_TEST_SNAPSHOT_LOG'); \$rc=pmssRunSnapshotLogTask('snapshot-test.php','PMSS_TEST_SNAPSHOT_LOG','/tmp/unused.log',static function(\$handle,string \$timestamp): int { pmssSnapshotWriteLine(\$handle,\$timestamp.' SNAPSHOT_BEGIN'); pmssSnapshotWriteWarn(\$handle,\$timestamp,'sample_warn',['rc'=>2],['alpha','beta']); return 7; }); echo json_encode(['rc'=>\$rc,'exists'=>is_file(\$logPath),'mode'=>is_file(\$logPath)?sprintf('%04o',fileperms(\$logPath)&0777):'','body'=>is_file(\$logPath)?file_get_contents(\$logPath):'']);";
+        $result = $this->pmssRunInlinePhpJson($script, ['PMSS_TEST_SNAPSHOT_LOG' => $logPath]);
+        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+            $this->assertEquals(['rc' => 1, 'exists' => false, 'mode' => '', 'body' => ''], $result);
+            return;
+        }
+        $this->assertEquals([7, true, '0600'], [$result['rc'], $result['exists'], $result['mode']]);
+        $this->assertStringContainsString(' SNAPSHOT_BEGIN', $result['body']);
+        $this->assertStringContainsString(' WARN sample_warn rc=2 msg=alpha beta', $result['body']);
+    }
+
     // Note: logMessage() in lib/update.php targets a fixed log location; avoid writing system logs here.
 
     private function withRuntimeArgv(array $argv, callable $callback): void
