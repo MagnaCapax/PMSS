@@ -109,7 +109,7 @@ if ($welcomeOnlyMode) {
         fwrite(STDERR, "Error: failed to persist welcome message for {$user['name']}\n");
         exit(1);
     }
-    $payload = pmssUserConfigClearWelcomeMessage($payload);
+    unset($payload['welcomeMessage']);
     if (!$store->persist($user['name'], $payload)) {
         fwrite(STDERR, "Error: failed to persist user config for {$user['name']}\n");
         exit(1);
@@ -151,7 +151,7 @@ if ($welcomeMessage !== null) {
     if (!pmssWelcomeUserMessageSet($user['name'], $expectedHome, $welcomeMessage)) {
         fwrite(STDERR, "Warning: failed to persist welcome message for {$user['name']}\n");
     }
-    $payload = pmssUserConfigClearWelcomeMessage($payload);
+    unset($payload['welcomeMessage']);
 }
 
 if (!$store->persist($user['name'], $payload)) {

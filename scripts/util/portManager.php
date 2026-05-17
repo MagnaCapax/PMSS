@@ -13,20 +13,6 @@ require_once __DIR__.'/../lib/userLifecycle.php';
 const PMSS_PORT_MANAGER_USAGE = 'Usage: portManager.php [view|assign|release] USER [SERVICE]';
 
 /**
- * Service names are persisted in filenames, so keep them path-safe.
- */
-function pmssPortManagerServiceIsValid(string $service): bool
-{
-    return preg_match('/^[a-z][a-z0-9-]{0,31}$/', $service) === 1;
-}
-
-/** Keep port-manager username validation on the shared PMSS rules. */
-function pmssPortManagerUserIsValid(string $user): bool
-{
-    return pmssValidateUsername($user);
-}
-
-/**
  * Write a port assignment event to the shared user logs when available.
  */
 function pmssPortManagerLog(string $user, string $action, string $service, ?int $port, string $status, string $message): void
@@ -73,12 +59,13 @@ function pmssPortManagerMain(array $argv): int
     }
 
     $user = trim((string) $argv[2]);
-    if (!pmssPortManagerUserIsValid($user)) {
+    if (!pmssValidateUsername($user)) {
         return pmssPortManagerFail("Error: invalid username\n");
     }
 
     $service = isset($argv[3]) ? strtolower(trim((string) $argv[3])) : 'lighttpd';
-    if (!pmssPortManagerServiceIsValid($service)) {
+    // Service names are persisted in filenames, so keep them path-safe.
+    if (preg_match('/^[a-z][a-z0-9-]{0,31}$/', $service) !== 1) {
         return pmssPortManagerFail("Error: invalid service\n");
     }
 

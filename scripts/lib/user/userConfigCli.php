@@ -116,18 +116,6 @@ function pmssUserConfigCliParseUploadThrottleOption($rawOption, string $negative
     return $value;
 }
 
-/** @param array<int,mixed> $args @return array<string,mixed> Parse positional resources. */
-function pmssUserConfigCliPositionalResources(array $args, string $indexKey): array
-{
-    return pmssUserConfigCliResolvedResources(['options' => []], $args, 'addUserOption', $indexKey);
-}
-
-/** @param array<int,mixed> $args @return array<string,bool> Track explicit persisted resources. */
-function pmssUserConfigCliPersistedPositionalPresence(array $args): array
-{
-    return pmssUserConfigCliPersistedResourcePresence(['options' => []], $args, 'addUserOption', 'userConfigIndex');
-}
-
 /** @return array<string,bool> Track explicit persisted resources from named options or positionals. */
 function pmssUserConfigCliPersistedResourcePresence(array $parsed, array $args, string $optionKey, string $indexKey): array
 {
@@ -167,13 +155,6 @@ function pmssUserConfigCliApplyPersistedResources(array $payload, array $user, a
             $payload[$key] = $user[$key];
         }
     }
-    return $payload;
-}
-
-/** @return array<string,mixed> Remove the legacy embedded welcome banner from config. */
-function pmssUserConfigClearWelcomeMessage(array $payload): array
-{
-    unset($payload['welcomeMessage']);
     return $payload;
 }
 

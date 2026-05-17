@@ -27,8 +27,10 @@ class userConfigCliCharacterizationTest extends TestCase
         ]);
         $this->assertSame(['', '200', '', '/dev/sda:5M', '', '', '', '150'], $positionals);
 
-        $parsed = \pmssUserConfigCliPositionalResources(
+        $parsed = \pmssUserConfigCliResolvedResources(
+            ['options' => []],
             $this->userConfigCommandArgs($positionals),
+            'addUserOption',
             'userConfigIndex'
         );
 
@@ -79,7 +81,7 @@ class userConfigCliCharacterizationTest extends TestCase
 
     public function testPersistedPresenceSkipsTransientTrafficLimit(): void
     {
-        $presence = \pmssUserConfigCliPersistedPositionalPresence($this->userConfigCommandArgs([
+        $presence = \pmssUserConfigCliPersistedResourcePresence(['options' => []], $this->userConfigCommandArgs([
             '',
             '200',
             '',
@@ -88,7 +90,7 @@ class userConfigCliCharacterizationTest extends TestCase
             '',
             '',
             '150',
-        ]));
+        ]), 'addUserOption', 'userConfigIndex');
 
         $this->assertFalse(array_key_exists('trafficLimit', $presence));
         $this->assertTrue($presence['CPUWeight']);
@@ -109,7 +111,7 @@ class userConfigCliCharacterizationTest extends TestCase
 
     public function testPersistedPresenceKeepsExplicitZeroTrafficCap(): void
     {
-        $presence = \pmssUserConfigCliPersistedPositionalPresence($this->userConfigCommandArgs([
+        $presence = \pmssUserConfigCliPersistedResourcePresence(['options' => []], $this->userConfigCommandArgs([
             '',
             '',
             '',
@@ -119,7 +121,7 @@ class userConfigCliCharacterizationTest extends TestCase
             '',
             '',
             '0',
-        ]));
+        ]), 'addUserOption', 'userConfigIndex');
 
         $this->assertTrue($presence['trafficCapMbit']);
         $this->assertFalse($presence['CPUWeight']);
@@ -194,17 +196,6 @@ class userConfigCliCharacterizationTest extends TestCase
             'ioCostQos' => 'enable=1 ctrl=user',
             'ioCostModel' => 'ctrl=user model=linear',
         ], $values);
-    }
-
-    public function testClearWelcomeMessageRemovesLegacyBannerKey(): void
-    {
-        $withoutBanner = \pmssUserConfigClearWelcomeMessage([
-            'quota' => 100,
-            'welcomeMessage' => '<b>Hello</b>',
-        ]);
-
-        $this->assertFalse(array_key_exists('welcomeMessage', $withoutBanner));
-        $this->assertSame(100, $withoutBanner['quota']);
     }
 
     public function testCgroupResourceArgsUseSharedFlagMapOnce(): void

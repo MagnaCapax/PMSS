@@ -130,7 +130,11 @@ class userConfigCommandContractsTest extends TestCase
         $source = $this->loadUserConfigSubsystemSource();
 
         $this->assertStringContainsString("pmssWelcomeUserMessageSet(\$user['name'], \$expectedHome, \$welcomeMessage)", $source);
-        $this->assertStringContainsString("pmssUserConfigClearWelcomeMessage(\$payload)", $source);
+        $this->assertStringContainsString("unset(\$payload['welcomeMessage']);", $source);
+        $this->assertTrue(
+            strpos($source, 'pmssUserConfigClear'.'WelcomeMessage') === false,
+            'userConfig.php should clear legacy welcome banners inline'
+        );
         $this->assertStringContainsString("\$store->persist(\$user['name'], \$payload)", $source);
         $this->assertTrue(
             strpos($source, 'writeUserCache(') === false,
