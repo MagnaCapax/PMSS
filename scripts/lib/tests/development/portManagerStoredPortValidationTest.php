@@ -38,6 +38,16 @@ class PortManagerStoredPortValidationTest extends TestCase
         $this->assertSame(null, \pmssPortManagerReadAssignedPort($path));
     }
 
+    public function testReadAssignedPortRejectsSymlink(): void
+    {
+        $realPath = $this->portDir.'/real';
+        $linkPath = $this->portDir.'/lighttpd-alice';
+        file_put_contents($realPath, "22000\n");
+        $this->pmssCreateSymlinkOrSkip($realPath, $linkPath);
+
+        $this->assertSame(null, \pmssPortManagerReadAssignedPort($linkPath));
+    }
+
     public function testViewFailsWhenStoredAssignmentIsMalformed(): void
     {
         file_put_contents($this->portDir.'/lighttpd-alice', "22000oops\n");

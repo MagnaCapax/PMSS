@@ -25,6 +25,10 @@ function pmssPortManagerLog(string $user, string $action, string $service, ?int 
  */
 function pmssPortManagerReadAssignedPort(string $portFile): ?int
 {
+    if (!is_file($portFile) || is_link($portFile)) {
+        return null;
+    }
+
     $raw = @file_get_contents($portFile);
     if ($raw === false) return null;
     $portText = trim((string) $raw);
@@ -34,6 +38,34 @@ function pmssPortManagerReadAssignedPort(string $portFile): ?int
 
     $port = (int) $portText;
     return $port >= 1 && $port <= 65535 ? $port : null;
+}
+
+/**
+ * Ensure the assignment directory is an absolute, non-symlinked filesystem path.
+ */
+function pmssPortManagerEnsurePortDir(string $portDir): bool
+{
+    return function_exists('pmssPathTargetIsSafe')
+        && pmssPathTargetIsSafe($portDir, true)
+        && pmssDirEnsureExists($portDir, 0755)
+        && is_dir($portDir)
+        && !is_link($portDir);
+}
+
+/**
+ * Guard assignment file reads/writes/removals against symlink and type tricks.
+ */
+function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile): bool
+{
+    $portDir = rtrim($portDir, '/');
+    if ($portDir === '' || dirname($portFile) !== $portDir) {
+        return false;
+    }
+
+    return is_dir($portDir)
+        && !is_link($portDir)
+        && !is_link($portFile)
+        && (!file_exists($portFile) || is_file($portFile));
 }
 
 /** Emit the public error text and optionally mirror it to user logs. */
@@ -69,12 +101,16 @@ function pmssPortManagerMain(array $argv): int
         return pmssPortManagerFail("Error: invalid service\n");
     }
 
-    $portDir = pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', '/etc/seedbox/runtime/ports');
-    if (!pmssDirEnsureExists($portDir, 0755)) {
+    $portDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', '/etc/seedbox/runtime/ports'), '/');
+    if (!pmssPortManagerEnsurePortDir($portDir)) {
         return pmssPortManagerFail("Error: unable to initialize port directory\n");
     }
 
     $portFile = $portDir.'/'.$service.'-'.$user;
+    $portFilePresent = file_exists($portFile) || is_link($portFile);
+    if ($portFilePresent && !pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) {
+        return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');
+    }
 
     $lockHandle = false;
     if ($action !== 'view') {
@@ -86,7 +122,7 @@ function pmssPortManagerMain(array $argv): int
 
     try {
         if ($action === 'view') {
-            if (!file_exists($portFile)) {
+            if (!$portFilePresent) {
                 echo 'No port assigned';
                 return 0;
             }
@@ -96,7 +132,7 @@ function pmssPortManagerMain(array $argv): int
             return 0;
         }
 
-        if ($action === 'assign' && file_exists($portFile)) {
+        if ($action === 'assign' && $portFilePresent) {
             $existing = pmssPortManagerReadAssignedPort($portFile);
             if ($existing === null) return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'ERR', 'invalid_existing_assignment');
             echo $existing;
@@ -115,6 +151,7 @@ function pmssPortManagerMain(array $argv): int
             do {
                 $port = rand(2000, 38000);
             } while (isset($used[$port]));
+            if (!pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) return pmssPortManagerFail("Error: invalid port assignment path\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');
             if (@file_put_contents($portFile, $port, LOCK_EX) === false) return pmssPortManagerFail("Error: failed to persist port assignment\n", $user, $action, $service, $port, 'ERR', 'write_failed');
             !@chmod($portFile, 0640) && pmssPortManagerLog($user, $action, $service, $port, 'WARN', 'chmod_failed');
             echo $port;
@@ -122,10 +159,11 @@ function pmssPortManagerMain(array $argv): int
             return 0;
         }
 
-        if (!file_exists($portFile)) {
+        if (!$portFilePresent) {
             echo 'No port assigned';
             return 0;
         }
+        if (!pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) return pmssPortManagerFail("Error: invalid stored port assignment\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');
         if (!@unlink($portFile)) return pmssPortManagerFail("Error: failed to release port\n", $user, $action, $service, null, 'ERR', 'release_failed');
         echo 'Port released';
         pmssPortManagerLog($user, $action, $service, null, 'OK', 'released');

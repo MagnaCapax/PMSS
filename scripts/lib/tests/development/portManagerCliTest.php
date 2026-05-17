@@ -129,6 +129,53 @@ final class PortManagerCliTest extends TestCase
         $this->assertStringContainsString('Error: unable to initialize port directory', $result['output']);
     }
 
+    public function testRejectsSymlinkedPortDirectory(): void
+    {
+        $realDir = $this->pmssMakeTempDir('pmss-port-real-', 0755);
+        $linkDir = $this->pmssMakeTempPath('pmss-port-link-');
+        $this->pmssCreateSymlinkOrSkip($realDir, $linkDir);
+
+        $result = $this->runPortManager(
+            ['assign', 'alice', 'lighttpd'],
+            ['PMSS_PORT_MANAGER_DIR' => $linkDir]
+        );
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Error: unable to initialize port directory', $result['output']);
+        $this->assertFalse(file_exists($realDir.'/lighttpd-alice'));
+    }
+
+    public function testAssignRejectsBrokenSymlinkAssignment(): void
+    {
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $outsideTarget = $this->pmssMakeTempPath('pmss-port-outside-');
+        $portFile = $portDir.'/lighttpd-alice';
+        $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);
+
+        $result = $this->runPortManager(['assign', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
+        $this->assertTrue(is_link($portFile));
+        $this->assertFalse(file_exists($outsideTarget));
+    }
+
+    public function testReleaseRejectsSymlinkAssignmentWithoutRemovingTarget(): void
+    {
+        $portDir = $this->pmssMakeTempDir('pmss-port-dir-', 0755);
+        $outsideTarget = $this->pmssMakeTempFile('pmss-port-outside-');
+        file_put_contents($outsideTarget, "24567\n");
+        $portFile = $portDir.'/lighttpd-alice';
+        $this->pmssCreateSymlinkOrSkip($outsideTarget, $portFile);
+
+        $result = $this->runPortManager(['release', 'alice', 'lighttpd'], ['PMSS_PORT_MANAGER_DIR' => $portDir]);
+
+        $this->assertSame(1, $result['rc']);
+        $this->assertStringContainsString('Error: invalid stored port assignment', $result['output']);
+        $this->assertTrue(is_link($portFile));
+        $this->assertSame("24567\n", (string) file_get_contents($outsideTarget));
+    }
+
     public function testInvalidActionKeepsUsageContract(): void
     {
         $result = $this->runPortManager(['dance', 'alice']);
