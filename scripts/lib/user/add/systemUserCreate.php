@@ -6,6 +6,8 @@
  * @author PMSS Team
  */
 
+require_once dirname(__DIR__, 2).'/userLifecycle.php';
+
 /**
  * Create the underlying Unix account and validate that `/home/<user>` is sane.
  *
@@ -27,10 +29,7 @@ function pmssAddUserSystemUserCreate(array $user, string $homePath): void
         pmssAddUserFailureRollbackMarkSystemUserCreated();
     }
 
-    $pwEntry = null;
-    if (function_exists('posix_getpwnam')) {
-        $pwEntry = @posix_getpwnam($user['name']);
-    }
+    $pwEntry = pmssUserAccountLookup($user['name']);
     if (!is_dir($homePath)) {
         pmssAddUserFatalExit('FAIL', 'Home directory missing after useradd; aborting provisioning', 'home_missing');
     }

@@ -107,7 +107,7 @@ class userFilesystem
         // Filter out users that do not exist in the system user database
         $valid = [];
         foreach (array_keys($combined) as $name) {
-            if (posix_getpwnam($name) !== false) {
+            if (pmssUserAccountLookup($name) !== null) {
                 $valid[] = $name;
             }
         }
