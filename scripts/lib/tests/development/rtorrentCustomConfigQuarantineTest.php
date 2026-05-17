@@ -86,41 +86,36 @@ class rtorrentCustomConfigQuarantineTest extends TestCase
         $this->assertEquals([], \rtorrentCustomConfigFindLegacyDirectives($content));
     }
 
-    public function testLegacyDirectiveDetectorFindsRemovedAliases(): void
-    {
-        $content = "schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\n"
-            ."schedule_remove = watch\n"
-            ."execute = sh,-c,echo ok\n";
-
-        $this->assertEquals(
-            ['schedule', 'schedule_remove', 'execute'],
-            \rtorrentCustomConfigFindLegacyDirectives($content)
-        );
-    }
-
-    public function testLegacyDirectiveDetectorFindsNormalizedTemplateOptions(): void
+    public function testLegacyDirectiveDetectorPreservesDirectiveOrderSnapshot(): void
     {
         $content = "tracker_numwant = -1\n"
             ."use_udp_trackers = yes\n"
             ."port_range = 50000-60000\n"
             ."check_hash = no\n"
+            ."schedule = watch,1,1,\"load_start=~/watch/*.torrent\"\n"
+            ."schedule_remove = watch\n"
             ."load_start = ~/watch/test.torrent\n"
-            ."load_start_verbose = ~/watch/test-verbose.torrent\n";
-
-        $this->assertEquals(
-            ['tracker_numwant', 'use_udp_trackers', 'port_range', 'check_hash', 'load_start', 'load_start_verbose'],
-            \rtorrentCustomConfigFindLegacyDirectives($content)
-        );
-    }
-
-    public function testLegacyDirectiveDetectorFindsObsoleteRemovedOptions(): void
-    {
-        $content = "umask = 0002\n"
+            ."load_start_verbose = ~/watch/test-verbose.torrent\n"
+            ."execute = sh,-c,echo ok\n"
+            ."umask = 0002\n"
             ."hash_interval = 300\n"
             ."hash_max_tries = 2\n";
 
         $this->assertEquals(
-            ['umask', 'hash_interval', 'hash_max_tries'],
+            [
+                'tracker_numwant',
+                'use_udp_trackers',
+                'port_range',
+                'check_hash',
+                'schedule',
+                'schedule_remove',
+                'load_start',
+                'load_start_verbose',
+                'execute',
+                'umask',
+                'hash_interval',
+                'hash_max_tries',
+            ],
             \rtorrentCustomConfigFindLegacyDirectives($content)
         );
     }

@@ -408,23 +408,22 @@ function rtorrentCustomConfigFindLegacyDirectives(string $content): array
         return [];
     }
 
-    $patterns = [
-        'tracker_numwant' => '/^\s*tracker_numwant\s*=/m',
-        'use_udp_trackers' => '/^\s*use_udp_trackers\s*=/m',
-        'port_range' => '/^\s*port_range\s*=/m',
-        'check_hash' => '/^\s*check_hash\s*=/m',
-        'schedule' => '/^\s*schedule\s*=/m',
-        'schedule_remove' => '/^\s*schedule_remove\s*=/m',
-        'load_start' => '/^\s*load_start\s*=/m',
-        'load_start_verbose' => '/^\s*load_start_verbose\s*=/m',
-        'execute' => '/^\s*execute\s*=/m',
-        'umask' => '/^\s*umask\s*=/m',
-        'hash_interval' => '/^\s*hash_interval\s*=/m',
-        'hash_max_tries' => '/^\s*hash_max_tries\s*=/m',
-    ];
-
     $matches = [];
-    foreach ($patterns as $label => $pattern) {
+    foreach ([
+        'tracker_numwant',
+        'use_udp_trackers',
+        'port_range',
+        'check_hash',
+        'schedule',
+        'schedule_remove',
+        'load_start',
+        'load_start_verbose',
+        'execute',
+        'umask',
+        'hash_interval',
+        'hash_max_tries',
+    ] as $label) {
+        $pattern = '/^\s*'.preg_quote($label, '/').'\s*=/m';
         if (preg_match($pattern, $content) === 1) {
             $matches[] = $label;
         }
