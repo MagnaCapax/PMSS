@@ -109,6 +109,25 @@ GATE 4: Prefer inlining over indirection.
 If you find trivial wrappers / helpers (delegate-only), inline them and delete the wrapper.
 (Trivial wrapper = calls another function/method with no logic.)
 
+GATE 5: Over-extraction in etc/skel/www/ — HUNT and SHRINK.
+Customer-side helpers in etc/skel/www/ that exceed 2x the LOC of their actual
+customer-call-path usage are bloat. The 2026-05-17 fleet-wide welcomeMessage.php
+fatal incident traced to 1369 LOC extracted across 8 helpers where ~500 LOC
+would have sufficed. Detection cue: a customer-side helper that includes
+admin/write functions never called from welcome.php / info.php / stats.php.
+
+When you see such a helper:
+1. List functions called from etc/skel/www/{welcome,info,stats}.php via grep
+2. Strip the helper to ONLY those functions + their inlined deps
+3. Inline tiny operator-tree helpers (path-safety, json_decode wrapper,
+   format-bytes, atomic-write) directly — do NOT import operator-tree libs
+4. Target: <= 80 LOC per single-purpose customer helper
+5. Verify via `sudo -u <user> php welcome.php` before commit; no PHP fatals
+
+Companion sysadmin lesson (private agent memory):
+  20260517-over-extraction-bloat-1369-lines-extracted-...
+ADR: docs/adr/0016-customer-php-tree-separation-from-operator-scripts.md
+
 ----------------------------------------------------------------------
 HELPER / EXTRACTION ROI (MECHANICAL GATE)
 ----------------------------------------------------------------------
