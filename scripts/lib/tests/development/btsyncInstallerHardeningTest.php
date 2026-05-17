@@ -46,4 +46,12 @@ class BtsyncInstallerHardeningTest extends TestCase
         $this->assertTrue(strpos($contents, "require_once __DIR__.'/../runtime/commands.php';") === false, 'BTSync installer should rely on remoteBinary.php for runtime helper bootstrap');
         $this->assertTrue(strpos($contents, "require_once __DIR__.'/../logging.php';") === false, 'BTSync installer should not duplicate remoteBinary.php logging bootstrap');
     }
+
+    public function testResilioRefreshDecisionStaysInRemoteBinaryHelper(): void
+    {
+        $contents = $this->pmssReadUpdateAppFile('btsync.php');
+
+        $this->assertStringContainsString("pmssInstallPinnedRemoteBinary('Resilio Sync'", $contents);
+        $this->assertTrue(strpos($contents, "@hash_file('sha256', \$rslsyncBinary)") === false, 'BTSync installer should not duplicate the helper checksum decision for rslsync');
+    }
 }

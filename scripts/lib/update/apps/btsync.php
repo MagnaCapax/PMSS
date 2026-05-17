@@ -61,16 +61,7 @@ if (file_exists($btsyncPath) && !is_link($btsyncPath)) {
 if (!file_exists($btsyncPath)) {
     runStep('Linking btsync shim', pmssBuildCommand('ln', ['-s', '/usr/bin/btsync2.2', '/usr/bin/btsync']));
 }
-// Install Resilio Sync if required.
 $rslsyncBinary = '/usr/bin/rslsync';
 $rslsyncSha256 = 'f8c71f6d447a2a9aec93bde7c316bbb7ac6be98d0bcb9dc645f4ca4e347bc333';
-
-if (is_string($installedSha = is_file($rslsyncBinary) ? @hash_file('sha256', $rslsyncBinary) : false)
-    && strtolower($installedSha) === strtolower($rslsyncSha256)) {
-    logmsg('*** Resilio Sync already matches pinned checksum; skipping download');
-    return;
-}
-
-logmsg('*** Resilio Sync missing/out of date; refreshing rslsync binary');
 
 pmssInstallPinnedRemoteBinary('Resilio Sync', 'https://pulsedmedia.com/remote/pkg/rslsync', $rslsyncSha256, $rslsyncBinary, true);
