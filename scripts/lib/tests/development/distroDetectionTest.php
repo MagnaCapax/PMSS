@@ -11,25 +11,34 @@ class DistroDetectionTest extends TestCase
 {
     public function testVersionFromCodenameMapsKnownReleases(): void
     {
-        $this->assertEquals(8, \pmssVersionFromCodename('jessie'));
-        $this->assertEquals(9, \pmssVersionFromCodename('stretch'));
-        $this->assertEquals(10, \pmssVersionFromCodename('buster'));
-        $this->assertEquals(11, \pmssVersionFromCodename('bullseye'));
-        $this->assertEquals(12, \pmssVersionFromCodename('bookworm'));
-        $this->assertEquals(13, \pmssVersionFromCodename('trixie'));
-        $this->assertEquals(0, \pmssVersionFromCodename('unknown'));
-        $this->assertEquals(11, \pmssVersionFromCodename('Bullseye'));
+        foreach ([
+            'jessie' => 8,
+            'stretch' => 9,
+            'buster' => 10,
+            'bullseye' => 11,
+            'bookworm' => 12,
+            'trixie' => 13,
+            'unknown' => 0,
+            'Bullseye' => 11,
+            'BULLSEYE' => 11,
+        ] as $codename => $version) {
+            $this->assertEquals($version, \pmssVersionFromCodename($codename), 'Unexpected version for '.$codename);
+        }
     }
 
     public function testDebianCodenameFromMajorMapsKnownReleases(): void
     {
-        $this->assertEquals('jessie', \pmssDebianCodenameFromMajor(8));
-        $this->assertEquals('stretch', \pmssDebianCodenameFromMajor(9));
-        $this->assertEquals('buster', \pmssDebianCodenameFromMajor(10));
-        $this->assertEquals('bullseye', \pmssDebianCodenameFromMajor(11));
-        $this->assertEquals('bookworm', \pmssDebianCodenameFromMajor(12));
-        $this->assertEquals('trixie', \pmssDebianCodenameFromMajor(13));
-        $this->assertEquals('', \pmssDebianCodenameFromMajor(99));
+        foreach ([
+            8 => 'jessie',
+            9 => 'stretch',
+            10 => 'buster',
+            11 => 'bullseye',
+            12 => 'bookworm',
+            13 => 'trixie',
+            99 => '',
+        ] as $version => $codename) {
+            $this->assertEquals($codename, \pmssDebianCodenameFromMajor($version), 'Unexpected codename for Debian '.$version);
+        }
     }
 
     public function testStandaloneDistroLibraryStillBootstrapsLegacyLogmsg(): void
@@ -46,11 +55,16 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectPrefersCodenameWhenVersionMismatches(): void
     {
-        $this->pmssAssertDetectedDistro([
-            'ID'                => 'debian',
-            'VERSION_ID'        => '11',
-            'VERSION_CODENAME'  => 'bookworm',
-        ], 'debian', 12, 'bookworm');
+        foreach ([
+            ['versionId' => '11', 'codename' => 'bookworm', 'expectedVersion' => 12],
+            ['versionId' => '10', 'codename' => 'bullseye', 'expectedVersion' => 11],
+        ] as $case) {
+            $this->pmssAssertDetectedDistro([
+                'ID'                => 'debian',
+                'VERSION_ID'        => $case['versionId'],
+                'VERSION_CODENAME'  => $case['codename'],
+            ], 'debian', $case['expectedVersion'], $case['codename']);
+        }
     }
 
     /**
@@ -70,10 +84,28 @@ class DistroDetectionTest extends TestCase
     public function testDetectNormalisesCodenameCase(): void
     {
         $this->pmssAssertDetectedDistro([
-            'ID'                => 'debian',
-            'VERSION_CODENAME'  => 'Bullseye',
+            'ID'                => 'Debian',
+            'VERSION_CODENAME'  => 'BULLSEYE',
             'VERSION_ID'        => '',
         ], 'debian', 11, 'bullseye');
+    }
+
+    public function testDetectTrimsCodenameWhitespace(): void
+    {
+        $this->pmssAssertDetectedDistro([
+            'ID'                => 'debian',
+            'VERSION_ID'        => '13',
+            'VERSION_CODENAME'  => '  trixie  ',
+        ], 'debian', 13, 'trixie');
+    }
+
+    public function testDetectKeepsVersionForUnknownCodename(): void
+    {
+        $this->pmssAssertDetectedDistro([
+            'ID'                => 'debian',
+            'VERSION_ID'        => '77',
+            'VERSION_CODENAME'  => 'aurora',
+        ], 'debian', 77, 'aurora');
     }
 
     public function testOsReleaseHelpersNormalizeCodenameAndMajorVersion(): void
@@ -127,18 +159,37 @@ class DistroDetectionTest extends TestCase
      */
     public function testUpdateAptSourcesWritesTemplate(): void
     {
+        $initial = "deb https://old.invalid stable main\n";
         $template = "deb https://mirror.invalid bookworm main\n";
-        $this->pmssWithRepoTemplates(['bookworm' => $template], function () use ($template): void {
+        $this->pmssWithRepoTemplates(['bookworm' => $template], function () use ($initial, $template): void {
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
-            $this->pmssWithTempAptSources("deb https://old.invalid stable main\n", function (string $sources) use ($template, $logger, &$logs): void {
+            $this->pmssWithTempAptSources($initial, function (string $sources) use ($initial, $template, $logger, &$logs): void {
                 \pmssUpdateAptSources('debian', 12, sha1('different'), $this->pmssDebianRepoTemplates([
                     'bookworm' => $template,
                 ]), $logger);
                 $this->assertEquals($template, file_get_contents($sources));
+                $this->assertEquals($initial, file_get_contents($sources.'.pmss-backup'));
                 $this->pmssAssertMessagesContain($logs, 'Applied Debian Bookworm repository config');
             });
+        });
+    }
+
+    public function testUpdateAptSourcesEolSuiteLogsTestModeSkip(): void
+    {
+        $initial = "deb http://mirror.invalid bullseye main\n";
+        $template = "deb http://mirror.example buster main\n";
+        $this->pmssWithTempAptSources($initial, function (string $target) use ($template): void {
+            $logs = [];
+            $logger = $this->pmssMakeArrayLogger($logs);
+
+            \pmssUpdateAptSources('debian', 10, sha1($initial), $this->pmssDebianRepoTemplates([
+                'buster' => $template,
+            ]), $logger);
+
+            $this->assertEquals($template, file_get_contents($target));
+            $this->pmssAssertMessagesContain($logs, 'PMSS_TEST_MODE: skipping apt conf/clean (Buster)', 'Expected EOL post-hook to log test-mode skip');
         });
     }
 
@@ -210,6 +261,32 @@ class DistroDetectionTest extends TestCase
         $this->assertEquals('trixie', $specs[13]['repo']);
         $this->assertTrue($specs[13]['sources_template']);
         $this->assertTrue($specs[13]['eol'] === false);
+    }
+
+    public function testDetectDistroResetCacheSwitchesFiles(): void
+    {
+        $first = $this->pmssWriteTempFile('os-release', $this->pmssRenderOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '11',
+            'VERSION_CODENAME' => 'bullseye',
+        ]));
+        $second = $this->pmssWriteTempFile('os-release', $this->pmssRenderOsRelease([
+            'ID' => 'debian',
+            'VERSION_ID' => '12',
+            'VERSION_CODENAME' => 'bookworm',
+        ]));
+
+        $this->pmssWithEnv(['PMSS_OS_RELEASE_PATH' => $first], function () use ($second): void {
+            \pmssResetOsReleaseCache();
+            $firstInfo = \pmssDetectDistro();
+            $this->assertEquals(11, $firstInfo['version']);
+
+            $this->pmssWithEnv(['PMSS_OS_RELEASE_PATH' => $second], function (): void {
+                \pmssResetOsReleaseCache();
+                $secondInfo = \pmssDetectDistro();
+                $this->assertEquals(12, $secondInfo['version']);
+            });
+        });
     }
 
 }

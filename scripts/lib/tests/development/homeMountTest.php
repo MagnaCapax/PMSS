@@ -48,27 +48,13 @@ MOUNTS
         $this->assertFalse(pmssIsHomeMounted());
     }
 
-    public function testRequireHomeMountedSkipsWhenEnvSet(): void
+    public function testRequireHomeMountedSkipsWhenEnvEnabled(): void
     {
-        $this->stageMissingMounts('1');
+        foreach (['1', 'true', 'TRUE'] as $skip) {
+            $this->stageMissingMounts($skip);
 
-        pmssRequireHomeMounted('test');
-        $this->assertTrue(true);
-    }
-
-    public function testRequireHomeMountedSkipsWhenEnvSetToTrue(): void
-    {
-        $this->stageMissingMounts('true');
-
-        pmssRequireHomeMounted('test');
-        $this->assertTrue(true);
-    }
-
-    public function testRequireHomeMountedSkipsWhenEnvSetToUppercaseTrue(): void
-    {
-        $this->stageMissingMounts('TRUE');
-
-        pmssRequireHomeMounted('test');
+            pmssRequireHomeMounted('test');
+        }
         $this->assertTrue(true);
     }
 

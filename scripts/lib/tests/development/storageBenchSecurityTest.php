@@ -211,68 +211,22 @@ class StorageBenchSecurityTest extends TestCase
         $this->assertStringContainsString('Storage benchmark (last run)', $out);
     }
 
-    public function testInvalidFileSizeFailsBeforeBenchmarkWork(): void
+    public function testBenchmarkInputGuardsRejectInvalidScalarOptions(): void
     {
-        $this->assertBenchmarkInputGuard(
-            ['--size=bogus'],
-            "Error: --size must be a positive size (examples: 1G, 512M, 1048576).\n"
-        );
-    }
-
-    public function testZeroFileSizeFailsBeforeBenchmarkWork(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--size=0'],
-            "Error: --size must be a positive size (examples: 1G, 512M, 1048576).\n"
-        );
-    }
-
-    public function testInvalidDeviceReadSizeFailsWhenDevicesEnabled(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--devices', '--dd-size=bad'],
-            "Error: --dd-size must be a positive size (examples: 1G, 512M, 1048576).\n"
-        );
-    }
-
-    public function testZeroDeviceReadSizeFailsWhenDevicesEnabled(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--devices', '--dd-size=0'],
-            "Error: --dd-size must be a positive size (examples: 1G, 512M, 1048576).\n"
-        );
-    }
-
-    public function testZeroRuntimeFailsBeforeBenchmarkWork(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--runtime=0'],
-            "Error: --runtime must be a positive integer.\n"
-        );
-    }
-
-    public function testMalformedRuntimeFailsBeforeBenchmarkWork(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--runtime=15junk'],
-            "Error: --runtime must be a positive integer.\n"
-        );
-    }
-
-    public function testZeroDeviceRuntimeFailsWhenDevicesEnabled(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--devices', '--device-runtime=0'],
-            "Error: --device-runtime must be a positive integer.\n"
-        );
-    }
-
-    public function testMalformedIdleThresholdFailsBeforeBenchmarkWork(): void
-    {
-        $this->assertBenchmarkInputGuard(
-            ['--idle-util=85percent'],
-            "Error: --idle-util must be a non-negative integer.\n"
-        );
+        $sizeError = "Error: --size must be a positive size (examples: 1G, 512M, 1048576).\n";
+        $deviceSizeError = "Error: --dd-size must be a positive size (examples: 1G, 512M, 1048576).\n";
+        foreach ([
+            [['--size=bogus'], $sizeError],
+            [['--size=0'], $sizeError],
+            [['--devices', '--dd-size=bad'], $deviceSizeError],
+            [['--devices', '--dd-size=0'], $deviceSizeError],
+            [['--runtime=0'], "Error: --runtime must be a positive integer.\n"],
+            [['--runtime=15junk'], "Error: --runtime must be a positive integer.\n"],
+            [['--devices', '--device-runtime=0'], "Error: --device-runtime must be a positive integer.\n"],
+            [['--idle-util=85percent'], "Error: --idle-util must be a non-negative integer.\n"],
+        ] as $case) {
+            $this->assertBenchmarkInputGuard($case[0], $case[1]);
+        }
     }
 
     public function testUnsafeTargetTraversalFailsBeforeBenchmarkWork(): void
