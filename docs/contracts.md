@@ -317,23 +317,14 @@ iptables helpers:
 
 ---
 
-## Legacy Package Queue Helpers (not in update-step2 main flow)
+## Package State Helpers
 
-`update-step2.php` now relies on dpkg baseline selections as the sole package
-authority. The helpers below remain in-tree for compatibility and targeted
-maintenance tooling, but are no longer part of the default package phase path.
+`update-step2.php` relies on dpkg baseline selections as the sole package
+authority. The former per-app package queue has been removed; package helpers are
+read-only probes used by baseline sanitization and source-build guards.
 
-- pmssQueuePackages(array $packages, ?string $target=null): void → queue package names under `__default__` or suite (e.g., `buster-backports`), deduped.
-- pmssPackageQueueBaselineInstallSet(string $baselinePath): array → parse install-state package names from a selections baseline (supports `pkg install` and short-form `pkg` rows).
-- pmssReportPackageQueueBaselineDiff(?string $baselinePath=null): array → compares queued packages against the selected baseline; logs queued/installed packages missing from baseline and returns summary buckets.
-- pmssFlushPackageQueue(): void → install each queue; split available vs missing with `apt-cache policy`, run `apt-get install` (with `-t <suite>`), retry with `--fix-broken`; run post-install commands; set env counters `PMSS_PACKAGE_INSTALL_WARNINGS|ERRORS`, log JSON event on errors.
 - pmssPackageStatus(string $package): string → dpkg status string or `''`.
 - pmssPackageAvailable(string $package): bool → checks cached `apt-cache pkgnames` set (fast path), falls back to `apt-cache policy` (cached).
-- pmssInstallBestEffort(array $items, string $label=''): void → from each list item (string or list of fallbacks) picks the first available and queues.
-- pmssInstallProftpdStack(int $distroVersion): void → queues proftpd stack (+nftables for >=10), unmask unit pre-install, and enqueues a `dpkg --configure` recovery command.
-
-System/app groups:
-- `scripts/lib/update/apps/packages.php` → queues the standard utility set (ncurses/python3 family/zip/unzip/irssi/etc.), media/network/backup tooling, and the ZNC package group inline; each group logs the historical v<10 warning and skips only that group, and Debian 10 still queues kernels/firmware from `buster-backports`.
 
 ---
 

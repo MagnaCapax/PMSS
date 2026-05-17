@@ -53,7 +53,7 @@ are true:
 
 1. **Provision a clean host** with the target OS and run the current PMSS
    updater (`install.sh` + `/scripts/update.php git/main`). Make sure the run
-   completes without package queue warnings.
+   completes without package-phase warnings.
 2. **Refresh package metadata** and clean strays:
    ```bash
    apt-get update

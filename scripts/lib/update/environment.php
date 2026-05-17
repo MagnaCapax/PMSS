@@ -3,9 +3,9 @@
  * Environment bootstrap helpers for update-step2.
  *
  * Package-phase invariant: update-step2 must run the non-interactive apt setup,
- * complete pending dpkg work, apply the baseline selections, then flush any
- * queued installs before other modules execute. Keep this ordering intact—the
- * codebase is converging on the dpkg baseline as the sole package source.
+ * complete pending dpkg work, then apply the baseline selections before other
+ * modules execute. Keep this ordering intact: dpkg baselines are the sole
+ * package source in the default update flow.
  *
  * @license GPL-3.0-only
  * @author PMSS Team
@@ -13,7 +13,7 @@
 
 require_once __DIR__.'/logging.php';
 require_once __DIR__.'/runtime/commands.php';
-require_once __DIR__.'/apps/packages/helpers.php';
+require_once __DIR__.'/packageState.php';
 require_once __DIR__.'/managedPath.php';
 
 /**

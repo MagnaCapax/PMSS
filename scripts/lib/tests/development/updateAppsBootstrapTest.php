@@ -84,6 +84,7 @@ class UpdateAppsBootstrapTest extends TestCase
         $this->assertStringContainsString("'arr.php'", $contents);
         $this->assertStringContainsString("'pythonVenv.php'", $contents);
         $this->assertStringContainsString("'remoteBinary.php'", $contents);
+        $this->pmssAssertStringNotContainsString("'packages.php'", $contents, 'retired package module should not remain in app loader skip list');
     }
 
     public function testPythonVenvInstallersAvoidPackageQueueHelpers(): void
@@ -93,8 +94,8 @@ class UpdateAppsBootstrapTest extends TestCase
 
             $this->assertStringContainsString("require_once __DIR__.'/pythonVenv.php';", $contents);
             $this->assertTrue(
-                strpos($contents, "packages/helpers.php") === false,
-                $installer.' should not pull package queue helpers when it only needs the shared venv runtime'
+                strpos($contents, "packageState.php") === false && strpos($contents, "packages/helpers.php") === false,
+                $installer.' should not pull package-state helpers when it only needs the shared venv runtime'
             );
         }
     }

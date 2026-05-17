@@ -118,7 +118,7 @@ the sshd AuthorizedKeysFile convergence), and web stack configuration.
 `pmssRefreshRepositories()` ensures external repo prerequisites (currently the
 Docker deb822+keyring and Sonarr scoped keyring) exist before it runs `apt update`.
 ProFTPD remains a notorious dpkg failure mode when hostnames or TLS assets are
-missing, so `pmssInstallProftpdStack()` keeps the unit unmasked and retries
+missing, so `pmssCompletePendingDpkg()` keeps the unit unmasked and retries
 `dpkg --configure` to stop the package manager from wedging mid-run.
 
 ### External Repository Trust Inventory (Phase A)
@@ -140,7 +140,6 @@ table only tracks external/non-Debian sources.
 
 | Module | Installs / Tasks | External Sources & Expectations |
 | --- | --- | --- |
-| `packages.php` | Legacy queue module retained for compatibility tooling; skipped by update-step2. | No longer part of runtime package orchestration. |
 | `aiToolsInstall.php` | Installs system-wide Gemini CLI, Claude Code, and pinned Codex CLI for all users. | Downloads pinned Node.js/Codex artifacts over HTTPS and installs npm packages into `/opt/pmss/ai-tools`. |
 | `btsync.php` | Maintains BTSync 1.4/2.2 binaries and Resilio `rslsync` under `/usr/bin`. | Downloads binaries from `http://pulsedmedia.com/remote/pkg/`; needs write access to `/usr/bin`. |
 | `deluge.php` | Installs or upgrades Deluge; Debian 10 path builds from source, newer releases lean on apt packages. | Debian 10 run pulls PyPI wheels and `https://ftp.osuosl.org/pub/deluge/source/2.0/deluge-2.0.5.tar.xz`; requires `pip`. |

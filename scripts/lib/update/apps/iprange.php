@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/packages/helpers.php';
+require_once __DIR__.'/../packageState.php';
 require_once __DIR__.'/remoteBinary.php';
 
 $iprangeVersion = '1.0.4';

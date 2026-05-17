@@ -15,5 +15,5 @@ if (($distroVersion = pmssDistroVersionFromEnv()) > 0 && $distroVersion < 10) {
 
 $venvDir = '/opt/pyload';
 
-// Required Python toolchain packages are queued centrally via packages.php
+// Required Python toolchain packages are supplied by the dpkg baseline.
 pmssPythonVenvInstallCli($venvDir, 'pyLoad', [['Installing pyLoad (pyload-ng)', 'pyload-ng']], $venvDir.'/bin/pyload', '/usr/local/bin/pyload', '[WARN] Skipping pyLoad setup: python3 missing from PATH', '[WARN] pyLoad binary missing after install', 'logmsg');

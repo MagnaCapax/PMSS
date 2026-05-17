@@ -536,11 +536,8 @@ pmssRunProfiledCallable(
     [$effectiveRepoVersion > 0 ? $effectiveRepoVersion : null]
 );
 
-// Package convergence: dpkg selections are now the authoritative source of
-// package state. The legacy per-app queue module remains in-tree for
-// compatibility tooling, but update-step2 no longer executes it.
-putenv('PMSS_PACKAGE_INSTALL_WARNINGS=0');
-putenv('PMSS_PACKAGE_INSTALL_ERRORS=0');
+// Package convergence: dpkg selections are the authoritative source of package
+// state.
 logmsg('[OK] Package phase relies on dpkg baseline selections only');
 
 runStep('Attempting apt fix-broken install (post-package phase)', aptCmd('--fix-broken install -y'));
@@ -583,12 +580,12 @@ runStep('Configuring netconsole', 'php /scripts/util/netconsoleConfigure.php');
 
 // Load application installers automatically (sorted for deterministic order),
 // but skip helper-only modules and legacy app scripts that are superseded by
-// dedicated utilities or retired package-phase orchestration.
+// dedicated utilities.
 $apps = glob('/scripts/lib/update/apps/*.php') ?: [];
 sort($apps);
 foreach ($apps as $app) {
     $appBase = basename($app);
-    if (in_array($appBase, ['arr.php', 'openvpn.php', 'packages.php', 'pythonVenv.php', 'remoteBinary.php'], true)) {
+    if (in_array($appBase, ['arr.php', 'openvpn.php', 'pythonVenv.php', 'remoteBinary.php'], true)) {
         continue;
     }
     pmssRunProfiledStep('Loading app installer '.basename($app), static function () use ($app): void {
