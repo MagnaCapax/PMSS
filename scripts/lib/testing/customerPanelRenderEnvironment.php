@@ -5,6 +5,8 @@
  * @license GPL-3.0-only
  */
 
+require_once dirname(__DIR__).'/runtime.php';
+
 const PMSS_CUSTOMER_PANEL_RENDER_BASE = '/pmss-render-test';
 
 /** Resolve the repository root, allowing tests to point at a fixture root. */
@@ -22,12 +24,10 @@ function pmssCustomerPanelRenderRepoRoot(): string
 function pmssCustomerPanelRenderTempRoot(): string
 {
     $base = rtrim(sys_get_temp_dir(), '/').PMSS_CUSTOMER_PANEL_RENDER_BASE;
-    if (!is_dir($base)) {
-        @mkdir($base, 0700, true);
-    }
+    pmssDirEnsureExists($base, 0700);
 
     $root = $base.'/run-'.bin2hex(random_bytes(8));
-    @mkdir($root, 0700, true);
+    pmssDirEnsureExists($root, 0700);
     return $root;
 }
 
@@ -67,7 +67,7 @@ function pmssCustomerPanelRenderPrepare(string $sourceWww, string $home, string 
     }
 
     foreach ([$home, $www, $home.'/.config/deluge', $home.'/.config', $home.'/.lighttpd'] as $dir) {
-        if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
+        if (!pmssDirEnsureExists($dir, 0700)) {
             return ['ok' => false, 'error' => 'unable to create mock directory: '.$dir];
         }
     }
@@ -123,7 +123,7 @@ function pmssCustomerPanelRenderCopyTree(string $source, string $destination): b
         $sourcePath = $item->getPathname();
         $target = $destination.'/'.substr($sourcePath, strlen($source) + 1);
         if ($item->isLink()) {
-            if (!is_dir(dirname($target)) && !@mkdir(dirname($target), 0700, true)) {
+            if (!pmssDirEnsureExists(dirname($target), 0700)) {
                 return false;
             }
             $linkTarget = readlink($sourcePath);
@@ -133,12 +133,12 @@ function pmssCustomerPanelRenderCopyTree(string $source, string $destination): b
             continue;
         }
         if ($item->isDir()) {
-            if (!is_dir($target) && !@mkdir($target, 0700, true)) {
+            if (!pmssDirEnsureExists($target, 0700)) {
                 return false;
             }
             continue;
         }
-        if (!is_dir(dirname($target)) && !@mkdir(dirname($target), 0700, true)) {
+        if (!pmssDirEnsureExists(dirname($target), 0700)) {
             return false;
         }
         if (!@copy($sourcePath, $target)) {
