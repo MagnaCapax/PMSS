@@ -118,8 +118,9 @@ function userDockerRunAs(string $user, string $cmd, ?int $timeoutSeconds = null,
         }
         if ($timeoutBin !== null) {
             $wrapper = sprintf(
-                '%s %s %s',
+                '%s --kill-after=%s %s %s',
                 escapeshellarg($timeoutBin),
+                escapeshellarg('5s'),
                 escapeshellarg($timeoutSeconds.'s'),
                 $wrapper
             );

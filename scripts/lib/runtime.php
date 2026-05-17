@@ -17,6 +17,8 @@ const PMSS_STATE_DIR_DEFAULT = '/var/lib/pmss';
 const PMSS_RUNTIME_FALLBACK_LOG = PMSS_LOG_DIR_DEFAULT.'/runtime.log';
 const PMSS_COMMAND_TIMEOUT_DEFAULT = 1200;
 const PMSS_COMMAND_TIMEOUT_APT_DEFAULT = 1200;
+const PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT = 5;
+const PMSS_TIMEOUT_FIRE_LOG_DEFAULT = '/var/log/pmss-timeout-fires.jsonl';
 
 if (!function_exists('pmssResolvePathFromEnv')) {
     // Resolve a filesystem path from an environment variable with a default.
@@ -388,6 +390,67 @@ if (!function_exists('pmssCommandOutputPipesSetNonBlocking')) {
     }
 }
 
+if (!function_exists('pmssTimeoutFireLogPath')) {
+    /** Resolve the per-host timeout-fire JSONL path, allowing hermetic tests. */
+    function pmssTimeoutFireLogPath(): string
+    {
+        $path = getenv('PMSS_TIMEOUT_FIRE_LOG');
+        return is_string($path) && trim($path) !== '' ? trim($path) : PMSS_TIMEOUT_FIRE_LOG_DEFAULT;
+    }
+}
+
+if (!function_exists('pmssTimeoutCommandForLog')) {
+    /** Keep timeout command payloads single-line and bounded for JSONL logs. */
+    function pmssTimeoutCommandForLog(string $command): string
+    {
+        $command = trim((string) preg_replace('/[\r\n\0\t ]+/', ' ', $command));
+        return strlen($command) > 500 ? substr($command, 0, 500).'...' : $command;
+    }
+}
+
+if (!function_exists('pmssTimeoutFireLog')) {
+    /** Emit one structured timeout-fire event to the dedicated host log and JSON stream. */
+    function pmssTimeoutFireLog(string $command, int $intendedSeconds, float $actualSeconds, string $signal, int $exitStatus): void
+    {
+        $payload = [
+            'timestamp'        => date('c'),
+            'event'            => 'timeout_fired',
+            'command'          => pmssTimeoutCommandForLog($command),
+            'intended_seconds' => $intendedSeconds,
+            'actual_seconds'   => (float) sprintf('%.3f', max(0.0, $actualSeconds)),
+            'signal'           => $signal,
+            'exit_status'      => $exitStatus,
+            'correlation_id'   => pmssCorrelationId(),
+        ];
+
+        pmssJsonLineAppend(pmssTimeoutFireLogPath(), $payload);
+        pmssLogJson($payload);
+    }
+}
+
+if (!function_exists('pmssCommandTimeoutTerminate')) {
+    /** Send SIGTERM, then SIGKILL after a short grace period when the child lingers. */
+    function pmssCommandTimeoutTerminate($process, int $killAfterSeconds = PMSS_COMMAND_TIMEOUT_KILL_AFTER_DEFAULT): string
+    {
+        if (!is_resource($process) || !function_exists('proc_terminate')) {
+            return 'SIGTERM';
+        }
+
+        @proc_terminate($process, 15);
+        $deadline = microtime(true) + max(0, $killAfterSeconds);
+        while (microtime(true) < $deadline) {
+            $status = @proc_get_status($process);
+            if (!is_array($status) || empty($status['running'])) {
+                return 'SIGTERM';
+            }
+            usleep(100000);
+        }
+
+        @proc_terminate($process, 9);
+        return 'SIGKILL';
+    }
+}
+
 if (!function_exists('pmssCommandCapture')) {
     /**
      * Execute a shell command and capture stdout/stderr without streaming.
@@ -478,8 +541,11 @@ if (!function_exists('pmssCommandCapture')) {
         $closePipe($pipes[2]);
 
         if ($timedOut) {
-            $closeProcess($process);
-            return ['rc' => 124, 'stdout' => $stdout, 'stderr' => $stderr];
+            $signal = pmssCommandTimeoutTerminate($process);
+            @proc_close($process);
+            $rc = $signal === 'SIGKILL' ? 137 : 124;
+            pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $rc);
+            return ['rc' => $rc, 'stdout' => $stdout, 'stderr' => $stderr];
         }
 
         $rc = proc_close($process);
@@ -976,10 +1042,10 @@ if (!function_exists('runCommand')) {
             }
 
             if ($timedOut) {
-                if (function_exists('proc_terminate')) {
-                    @proc_terminate($process);
-                }
-                $exitCode = 124;
+                $signal = pmssCommandTimeoutTerminate($process);
+                @proc_close($process);
+                $exitCode = $signal === 'SIGKILL' ? 137 : 124;
+                pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $exitCode);
             } else {
                 $exitCode = proc_close($process);
             }
@@ -1061,11 +1127,10 @@ if (!function_exists('runCommand')) {
         fclose($pipes[2]);
 
         if ($timedOut) {
-            // Best-effort termination; do not abort the whole script.
-            if (function_exists('proc_terminate')) {
-                @proc_terminate($process);
-            }
-            $exitCode = 124;
+            $signal = pmssCommandTimeoutTerminate($process);
+            @proc_close($process);
+            $exitCode = $signal === 'SIGKILL' ? 137 : 124;
+            pmssTimeoutFireLog($cmd, $timeoutSec, microtime(true) - $startedAt, $signal, $exitCode);
         } else {
             $exitCode = proc_close($process);
         }

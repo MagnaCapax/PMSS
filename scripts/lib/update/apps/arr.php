@@ -145,10 +145,49 @@ function pmssArrVersionExtract(string $payload): ?string
         : null;
 }
 
+/** Return the hard timeout for ARR binary version probes. */
+function pmssArrVersionProbeTimeoutSeconds(): int
+{
+    return 50;
+}
+
+/** Return the SIGKILL grace window for ARR binary version probes. */
+function pmssArrVersionProbeKillAfterSeconds(): int
+{
+    return 5;
+}
+
 /** Build a bounded ARR version probe so daemonizing binaries cannot wedge updates. */
 function pmssArrVersionProbeCommand(string $binary, string $flag): string
 {
-    return 'timeout 10 '.escapeshellarg($binary).' '.escapeshellarg($flag).' 2>/dev/null';
+    return sprintf(
+        'timeout --kill-after=%ds %ds %s %s 2>/dev/null',
+        pmssArrVersionProbeKillAfterSeconds(),
+        pmssArrVersionProbeTimeoutSeconds(),
+        escapeshellarg($binary),
+        escapeshellarg($flag)
+    );
+}
+
+/** Run an ARR version probe and log timeout fires when the guard trips. */
+function pmssArrVersionProbeRun(string $binary, string $flag): string
+{
+    $command = pmssArrVersionProbeCommand($binary, $flag);
+    $startedAt = microtime(true);
+    $output = [];
+    $rc = 0;
+    @exec($command, $output, $rc);
+    if (($rc === 124 || $rc === 137) && function_exists('pmssTimeoutFireLog')) {
+        pmssTimeoutFireLog(
+            $command,
+            pmssArrVersionProbeTimeoutSeconds(),
+            microtime(true) - $startedAt,
+            $rc === 137 ? 'SIGKILL' : 'SIGTERM',
+            $rc
+        );
+    }
+
+    return implode("\n", $output);
 }
 
 /** Prefer cheap version files, then bounded binary probes, to detect installed ARR versions. */
@@ -174,8 +213,8 @@ function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
         }
 
         foreach (['--version', '-v'] as $flag) {
-            $output = @shell_exec(pmssArrVersionProbeCommand($binary, $flag));
-            if (!is_string($output) || $output === '') {
+            $output = pmssArrVersionProbeRun($binary, $flag);
+            if ($output === '') {
                 continue;
             }
 

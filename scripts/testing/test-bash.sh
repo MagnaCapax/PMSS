@@ -19,6 +19,9 @@ fi
 echo "[bash trailing test return lint]" >&2
 "$ROOT_DIR/scripts/testing/check-bash-trailing-test-return.sh"
 
+echo "[timeout audit]" >&2
+"$ROOT_DIR/scripts/testing/test-timeout-audit.sh"
+
 if command -v shfmt >/dev/null 2>&1; then
 	echo "[shfmt check]" >&2
 	# Check only filtered files, not entire tree

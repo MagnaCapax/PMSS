@@ -10,7 +10,8 @@ class ArrProbeTimeoutPolicyTest extends TestCase
     {
         $command = \pmssArrVersionProbeCommand('/opt/Prowlarr/Prowlarr', '--version');
 
-        $this->assertStringContainsString('timeout 10 ', $command);
+        $this->assertStringContainsString('timeout --kill-after=5s 50s ', $command);
+        $this->assertStringNotContainsString('timeout 10 ', $command);
         $this->assertStringContainsString("'/opt/Prowlarr/Prowlarr'", $command);
         $this->assertStringContainsString("'--version'", $command);
         $this->assertStringContainsString('2>/dev/null', $command);

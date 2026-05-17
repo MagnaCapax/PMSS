@@ -154,6 +154,38 @@ class RuntimeTest extends TestCase
         $this->assertTrue(strpos($out, 'apt-get') !== false);
     }
 
+    public function testRunCommandTimeoutWritesStructuredTimeoutFireLog(): void
+    {
+        $timeoutLog = $this->pmssMakeTempFile('pmss-timeout-fire-');
+        $rc = null;
+        $previousCorrelationId = $GLOBALS['PMSS_CORRELATION_ID_CACHE'] ?? null;
+
+        try {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = null;
+            $this->pmssWithEnv([
+                'PMSS_COMMAND_TIMEOUT' => '1',
+                'PMSS_TIMEOUT_FIRE_LOG' => $timeoutLog,
+                'PMSS_CORRELATION_ID' => 'runtime-timeout-test',
+            ], function () use (&$rc): void {
+                $rc = \runCommand('php -r '.escapeshellarg('sleep(2);'), false, function (string $m): void {});
+            });
+        } finally {
+            $GLOBALS['PMSS_CORRELATION_ID_CACHE'] = $previousCorrelationId;
+        }
+
+        $this->assertEquals(124, $rc);
+        $lines = file($timeoutLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $this->assertTrue(is_array($lines) && count($lines) >= 1, 'expected timeout-fire JSONL entry');
+        $data = json_decode((string) end($lines), true);
+        $this->assertTrue(is_array($data), 'expected timeout-fire JSON payload');
+        $this->assertEquals('timeout_fired', $data['event'] ?? '');
+        $this->assertEquals(1, $data['intended_seconds'] ?? 0);
+        $this->assertEquals(124, $data['exit_status'] ?? 0);
+        $this->assertEquals('SIGTERM', $data['signal'] ?? '');
+        $this->assertEquals('runtime-timeout-test', $data['correlation_id'] ?? '');
+        $this->assertTrue(($data['actual_seconds'] ?? 0) >= 1.0);
+    }
+
     public function testReadRegularFileIntReturnsParsedDigits(): void
     {
         $tempDir = $this->pmssMakeTempDir('pmss-runtime-int-');

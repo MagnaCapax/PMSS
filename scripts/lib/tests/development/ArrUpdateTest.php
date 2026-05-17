@@ -176,7 +176,7 @@ class ArrUpdateTest extends TestCase
 
             $this->assertEquals('existing', (string) @file_get_contents($installPath.'/marker.txt'));
             $timeoutOutput = (string) @file_get_contents($timeoutLog);
-            $this->assertStringContainsString('10 '.($installPath.'/'.$app).' --version', $timeoutOutput);
+            $this->assertStringContainsString('--kill-after=5s 50s '.($installPath.'/'.$app).' --version', $timeoutOutput);
             $this->assertStringNotContainsString(' -v', $timeoutOutput, 'expected --version probe to satisfy the version check without a fallback probe');
         } finally {
             $this->cleanup($baseDir);
@@ -209,8 +209,8 @@ class ArrUpdateTest extends TestCase
 
             $this->assertEquals('replacement', (string) @file_get_contents($installPath.'/marker.txt'));
             $timeoutOutput = (string) @file_get_contents($timeoutLog);
-            $this->assertStringContainsString('10 '.($installPath.'/'.$app).' --version', $timeoutOutput);
-            $this->assertStringContainsString('10 '.($installPath.'/'.$app).' -v', $timeoutOutput);
+            $this->assertStringContainsString('--kill-after=5s 50s '.($installPath.'/'.$app).' --version', $timeoutOutput);
+            $this->assertStringContainsString('--kill-after=5s 50s '.($installPath.'/'.$app).' -v', $timeoutOutput);
         } finally {
             $this->cleanup($baseDir);
         }
@@ -349,10 +349,17 @@ printf '%s\n' "$*" >> "${PMSS_ARR_TEST_TIMEOUT_LOG:?}"
 if [ "${PMSS_ARR_TEST_TIMEOUT_MODE:-pass-through}" = "always-timeout" ]; then
   exit 124
 fi
-if [ "$#" -lt 2 ]; then
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --kill-after=*) shift ;;
+    --) shift; break ;;
+    -*) shift ;;
+    *) shift; break ;;
+  esac
+done
+if [ "$#" -lt 1 ]; then
   exit 125
 fi
-shift
 exec "$@"
 SH
         );
