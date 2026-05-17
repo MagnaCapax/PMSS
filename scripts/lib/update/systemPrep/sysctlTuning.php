@@ -13,13 +13,8 @@ function pmssSystemPrepReadBoolEnv(string $key): ?bool
         return null;
     }
 
-    $value = strtolower(trim((string) $override));
-    if ($value === '1' || $value === 'true' || $value === 'yes') {
-        return true;
-    }
-    if ($value === '0' || $value === 'false' || $value === 'no') {
-        return false;
-    }
+    if (pmssValueMatchesNormalized($override, ['1', 'true', 'yes'])) return true;
+    if (pmssValueMatchesNormalized($override, ['0', 'false', 'no'])) return false;
 
     return null;
 }

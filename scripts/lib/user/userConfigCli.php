@@ -95,13 +95,8 @@ function pmssUserConfigParseDockerEnabledOption($rawOption): ?bool
     if ($rawOption === true || $rawOption === '') {
         throw new InvalidArgumentException('--docker-enabled requires true or false');
     }
-    $normalized = strtolower(trim((string) $rawOption));
-    if (in_array($normalized, ['true', '1', 'yes', 'on'], true)) {
-        return true;
-    }
-    if (in_array($normalized, ['false', '0', 'no', 'off'], true)) {
-        return false;
-    }
+    if (pmssValueMatchesNormalized($rawOption, ['true', '1', 'yes', 'on'])) return true;
+    if (pmssValueMatchesNormalized($rawOption, ['false', '0', 'no', 'off'])) return false;
     throw new InvalidArgumentException('Invalid --docker-enabled value');
 }
 

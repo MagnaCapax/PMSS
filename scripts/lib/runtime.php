@@ -90,13 +90,17 @@ if (!function_exists('pmssEnvValueNormalized')) {
     // Normalize environment values so flag parsing stays consistent.
     function pmssEnvValueNormalized($value): string { return strtolower(trim((string) $value)); }
 }
+if (!function_exists('pmssValueMatchesNormalized')) {
+    // Compare a normalized scalar value against a caller-owned token set.
+    function pmssValueMatchesNormalized($value, array $tokens): bool { return in_array(pmssEnvValueNormalized($value), $tokens, true); }
+}
 if (!function_exists('pmssEnvValueIsFalsey')) {
     // Treat empty and explicit disable values as falsey toggles.
-    function pmssEnvValueIsFalsey($value): bool { return in_array(pmssEnvValueNormalized($value), ['', '0', 'false', 'no'], true); }
+    function pmssEnvValueIsFalsey($value): bool { return pmssValueMatchesNormalized($value, ['', '0', 'false', 'no']); }
 }
 if (!function_exists('pmssEnvValueIsTruthy')) {
     // Treat explicit enable values as truthy toggles.
-    function pmssEnvValueIsTruthy($value): bool { return in_array(pmssEnvValueNormalized($value), ['1', 'true', 'yes', 'on'], true); }
+    function pmssEnvValueIsTruthy($value): bool { return pmssValueMatchesNormalized($value, ['1', 'true', 'yes', 'on']); }
 }
 if (!function_exists('pmssFormatBytes')) {
     // Format byte counts with binary IEC units for compact human output.

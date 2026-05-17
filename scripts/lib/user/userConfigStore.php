@@ -55,7 +55,7 @@ function pmssUserConfigNormaliseToggleValue(array $payload, string $key, bool $d
     $value = $payload[$key];
 
     return is_string($value)
-        ? !in_array(strtolower(trim($value)), ['false', '0', 'no', 'off', ''], true)
+        ? !pmssValueMatchesNormalized($value, ['false', '0', 'no', 'off', ''])
         : (bool) $value;
 }
 

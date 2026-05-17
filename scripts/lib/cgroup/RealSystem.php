@@ -29,7 +29,7 @@ class RealSystem implements SystemInterface
     {
         // In test mode we avoid shelling out to real systemctl/findmnt.
         if ((defined('PMSS_TEST_MODE') && PMSS_TEST_MODE)
-            || in_array(strtolower((string) getenv('PMSS_TEST_MODE')), ['1', 'true', 'yes'], true)) {
+            || \pmssValueMatchesNormalized(getenv('PMSS_TEST_MODE'), ['1', 'true', 'yes'])) {
             return '';
         }
 

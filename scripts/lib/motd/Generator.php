@@ -36,9 +36,7 @@ class Motd
         $rendered = self::renderMotdTemplate(
             $tpl,
             $model,
-            ($colorEnabled === false || $colorEnabled === '')
-                ? true
-                : in_array(strtolower((string) $colorEnabled), ['1', 'true', 'yes', 'on'], true)
+            ($colorEnabled === false || $colorEnabled === '') ? true : pmssEnvValueIsTruthy($colorEnabled)
         );
         pmssWriteManagedFile($outPath, $rendered, 'root', 'root', 0644);
 
