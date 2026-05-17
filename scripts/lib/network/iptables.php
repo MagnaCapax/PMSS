@@ -90,10 +90,7 @@ function networkParseMonitoringCommands(string $raw): array
         if ($line === '' || $line[0] === '#') {
             continue;
         }
-        $line = trim(preg_replace('/^\/?sbin\/iptables\s+/', '', $line));
-        if (strpos($line, 'iptables ') === 0) {
-            $line = trim(substr($line, strlen('iptables ')));
-        }
+        $line = trim(preg_replace('/^(\/sbin\/iptables|sbin\/iptables|iptables)\s+/', '', $line));
         if ($line === '' || strncmp($line, '-F', 2) === 0 || !networkIptablesCommandSafe($line)) {
             continue;
         }
