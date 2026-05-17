@@ -478,6 +478,7 @@ Automation often invokes these utilities; below are expected inputs and effects.
   - Help: `-h` / `--help` prints structured usage and exits successfully.
   - Welcome-only mode: `scripts/util/userConfig.php <user> --welcome-message=<HTML>` updates only the welcome banner override file and exits without running service/quota orchestration.
   - Docker floor: when `ramMiB < 245`, persists `dockerEnabled=false` for the user. Storage Box product payloads also default `dockerEnabled=false` unless explicitly overridden.
+  - rTorrent restart guard: when `~/session/rtorrent.lock` exists, parses only a positive lock-file PID greater than 1 and sends `kill -9` only when `/proc/<pid>` still belongs to the target UID and has an `rtorrent*` command name.
 
 - scripts/productConfig.php <product> --welcome-message=<HTML>
   - Behavior: Sets/clears product-level welcome banner templates in `/etc/seedbox/config/welcomeMessages.json`.

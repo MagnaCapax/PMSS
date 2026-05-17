@@ -17,6 +17,7 @@ foreach (['traffic', 'iopsLimit', 'deluge', 'qbittorrent', 'userConfigStore'] as
 }
 require_once __DIR__.'/../lib/cli/optionParser.php';
 require_once __DIR__.'/../lib/user/userConfigCli.php';
+require_once __DIR__.'/../lib/user/userConfigRuntime.php';
 require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/rutorrent/config.php';
 require_once __DIR__.'/../lib/update/runtime/commands.php';
@@ -247,10 +248,11 @@ pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
 userApplyDiskQuota($user);
 $lockFile = sprintf('/home/%s/session/rtorrent.lock', $user['name']);
 if (file_exists($lockFile)) {
-    $pidChunk = explode(':+', (string)file_get_contents($lockFile));
-    $pid = (int) $pidChunk;
-    if ($pid > 0) {
+    $pid = pmssUserConfigRtorrentLockPid($lockFile);
+    if ($pid !== null && pmssUserConfigRtorrentProcessOwnedBy($pid, $user['id'])) {
         runStep('Restarting rTorrent', sprintf('kill -9 %d', $pid));
+    } elseif ($pid !== null) {
+        fwrite(STDERR, "Warning: refusing to restart rTorrent for {$user['name']}: lock PID is not an owned rTorrent process\n");
     }
 }
 if (file_exists('/bin/bash')) {

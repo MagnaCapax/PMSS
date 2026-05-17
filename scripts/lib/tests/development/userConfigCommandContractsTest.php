@@ -23,7 +23,10 @@ class userConfigCommandContractsTest extends TestCase
         $source = $this->loadUserConfigSubsystemSource();
 
         $this->assertStringContainsString("'/home/%s/session/rtorrent.lock'", $source);
+        $this->assertStringContainsString('pmssUserConfigRtorrentLockPid($lockFile)', $source);
+        $this->assertStringContainsString("pmssUserConfigRtorrentProcessOwnedBy(\$pid, \$user['id'])", $source);
         $this->assertStringContainsString("runStep('Restarting rTorrent', sprintf('kill -9 %d', \$pid));", $source);
+        $this->assertStringNotContainsString('(int) $pid'.'Chunk', $source);
     }
 
     public function testShellNormalizationContractRemainsStable(): void
