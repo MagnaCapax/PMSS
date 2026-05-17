@@ -519,13 +519,10 @@ function pmssStatsChartOptions() {
         <span class="value">
 <?php
 $ipUrl = 'https://pulsedmedia.com/remote/myip.php';
-$ipContext = stream_context_create(array(
-    'http' => array(
-        'timeout'    => 5,
-        'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
-    )
-));
-$ip = @file_get_contents($ipUrl, false, $ipContext);
+if (file_exists(__DIR__.'/welcomeMessage.php')) require_once __DIR__.'/welcomeMessage.php';
+$ip = function_exists('pmssWelcomeHttpContextCreate')
+    ? @file_get_contents($ipUrl, false, pmssWelcomeHttpContextCreate())
+    : false;
 echo htmlspecialchars($ip !== false ? trim($ip) : 'unknown');
 ?>
         </span>

@@ -32,6 +32,14 @@ if (!function_exists('pmssWelcomeMessageCustomerPathIsSafe')) {
 }
 
 /**
+ * Build the standard remote-request context used by PMSS GUI pages.
+ */
+function pmssWelcomeHttpContextCreate()
+{
+    return stream_context_create(array('http' => array('timeout' => 5, 'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)')));
+}
+
+/**
  * Read a JSON file into an associative array.
  */
 function pmssWelcomeReadJson(string $path): array

@@ -16,6 +16,8 @@ $htmlHead = '';
 $frames   = array();
 $useLocalFrames = false;
 
+if (file_exists(__DIR__.'/welcomeMessage.php')) require_once __DIR__.'/welcomeMessage.php';
+
 /** Detect frames that must open outside the iframe tab container. */
 function pmssFrameOpensInNewWindow(array $frame)
 {
@@ -114,14 +116,9 @@ function pmssLocalFrameWelcomeUrlBuild($quotaPath = '../.quota')
 // deployments by exporting PMSS_DISABLE_REMOTE_FRAMES=1.
 if (!getenv('PMSS_DISABLE_REMOTE_FRAMES')) {
     $framesUrl = 'https://pulsedmedia.com/remote/guiFrames.php?v=2';
-    $context = stream_context_create(array(
-        'http' => array(
-            'timeout'    => 5,
-            'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
-        )
-    ));
-
-    $remoteFrames = @file_get_contents($framesUrl, false, $context);
+    $remoteFrames = function_exists('pmssWelcomeHttpContextCreate')
+        ? @file_get_contents($framesUrl, false, pmssWelcomeHttpContextCreate())
+        : false;
     if ($remoteFrames !== false && $remoteFrames !== '') {
         $decoded = @base64_decode($remoteFrames, true);
         if ($decoded !== false) {

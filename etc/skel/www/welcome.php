@@ -800,16 +800,9 @@ function pmssWelcomeAnnouncementItemsHtmlBuild() {
 }
 
 function pmssWelcomeRemoteFetch($url) {
-    return @file_get_contents($url, false, pmssWelcomeHttpContextCreate());
-}
-
-function pmssWelcomeHttpContextCreate() {
-    return stream_context_create(array(
-        'http' => array(
-            'timeout'    => 5,
-            'user_agent' => 'PMSS-GUI (+https://pulsedmedia.com)'
-        )
-    ));
+    return function_exists('pmssWelcomeHttpContextCreate')
+        ? @file_get_contents($url, false, pmssWelcomeHttpContextCreate())
+        : false;
 }
 
 function bonusQuotaDisplay($bonusQuota) {
