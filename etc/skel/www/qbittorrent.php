@@ -1,8 +1,12 @@
 <?php
 require_once __DIR__.'/../.scriptsInc.php';
-if (is_readable('/scripts/lib/user/torrentPort.php')) {
-    require_once '/scripts/lib/user/torrentPort.php';
-}
+// /scripts/lib/user/torrentPort.php require removed 2026-05-17 per ADR 0016:
+// customer PHP cannot read /scripts/ (operator-only 750 root:root). The
+// is_readable() guard above always returned false silently. Port
+// enforcement (assigning the right WebUI port to the customer's
+// qBittorrent config) is operator-cron territory and runs out-of-band;
+// customer's startQbittorrent() falls through the function_exists check
+// below when the enforcer is absent, with no functional change.
 /**
 * PMSS: User Frontend: qBittorrent start/disable/restart file
 *

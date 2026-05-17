@@ -8,7 +8,10 @@
  * Copyright (C) 2010-2026 Magna Capax Finland Oy
  */
 
-require_once '/scripts/lib/user/mediaStackPanel.php';
+// Customer-side helper relocated to etc/skel/www/userMediaStackPanel.php
+// per ADR 0016 (commit 78a21364). /scripts/ is operator-only, unreachable
+// from customer PHP.
+require_once __DIR__.'/userMediaStackPanel.php';
 
 $home = dirname(__DIR__);
 $username = pmssMediaStackPanelCurrentUserRead($home);

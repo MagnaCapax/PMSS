@@ -204,6 +204,7 @@ PHP;
         'www/welcomeMessage.php',
         'www/userMediaStackPanel.php',
         'www/webDockerInactiveNote.php',
+        'www/userPasswords.php',
     ];
     foreach ($files as $file) {
         updateUserFile($file, $user);

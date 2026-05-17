@@ -1,8 +1,9 @@
 <?php
 require_once __DIR__.'/../.scriptsInc.php';
-if (is_readable('/scripts/lib/user/torrentPort.php')) {
-    require_once '/scripts/lib/user/torrentPort.php';
-}
+// /scripts/lib/user/torrentPort.php require removed 2026-05-17 per ADR 0016:
+// customer PHP cannot read /scripts/ (operator-only 750 root:root). The
+// is_readable() guard above always returned false silently. Port
+// enforcement is operator-cron territory.
 /**
 * PMSS: User Frontend: Deluge start/disable/restart file
 *

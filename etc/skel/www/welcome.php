@@ -741,16 +741,22 @@ function pmssWelcomeHomeRaidNoticeHtmlRead() {
 }
 
 function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
-    if (file_exists('/scripts/lib/user/passwords.php')) {
-        require_once '/scripts/lib/user/passwords.php';
+    // Customer-side password display: see userPasswords.php (ADR 0016).
+    // Display works as soon as the read helper is available; the rotate
+    // path is operator-side and may degrade independently — UI shows the
+    // rotate button only when pmssDelugeServicePasswordRotate is defined.
+    $pmssUserPasswordsLib = __DIR__.'/userPasswords.php';
+    if (file_exists($pmssUserPasswordsLib)) {
+        require_once $pmssUserPasswordsLib;
     }
 
-    $helpersAvailable = function_exists('pmssDelugeAuthReadLocalclientPassword')
-        && function_exists('pmssDelugeServicePasswordRotate');
+    $canRead = function_exists('pmssDelugeAuthReadLocalclientPassword');
+    $canRotate = function_exists('pmssDelugeServicePasswordRotate');
+    $helpersAvailable = $canRead;
     $passwordNotice = '';
     $password = '';
 
-    if ($helpersAvailable && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
+    if ($canRotate && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
         $newDelugePassword = pmssDelugeServicePasswordRotate((string) $username);
         $passwordUpdated = $newDelugePassword !== '';
         $passwordNotice = $passwordUpdated
@@ -758,12 +764,13 @@ function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
             : 'Deluge password rotation failed. Please try again.';
     }
 
-    if ($helpersAvailable) {
+    if ($canRead) {
         $password = pmssDelugeAuthReadLocalclientPassword($delugeAuthPath);
     }
 
     return array(
         'helpersAvailable' => $helpersAvailable,
+        'canRotate' => $canRotate,
         'passwordNotice' => $passwordNotice,
         'password' => $password,
     );

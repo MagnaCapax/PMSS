@@ -70,8 +70,12 @@ class TorrentPortFrontendTest extends TestCase
 
         $this->assertTrue(strpos($src, "require_once __DIR__.'/../.scriptsInc.php';") !== false);
         $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
-        $this->assertTrue(strpos($src, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
-        $this->assertTrue(strpos($src, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
+        // ADR 0016: customer PHP no longer require_once'es /scripts/ — the
+        // is_readable() guard was silently failing for customer UID anyway.
+        // Port enforcement is operator-cron territory; the function_exists()
+        // check inside startDeluge() handles graceful degradation when the
+        // helper is absent from customer space.
+        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") === false);
         $this->assertTrue(strpos($src, 'pmssDelugePortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($src, '.delugePort.py') === false);
     }
@@ -82,8 +86,8 @@ class TorrentPortFrontendTest extends TestCase
 
         $this->assertTrue(strpos($src, "require_once __DIR__.'/../.scriptsInc.php';") !== false);
         $this->assertTrue(strpos($src, 'pmssFrontendToggleAction(') !== false);
-        $this->assertTrue(strpos($src, "if (is_readable('/scripts/lib/user/torrentPort.php')) {") !== false);
-        $this->assertTrue(strpos($src, "<?php\nrequire_once '/scripts/lib/user/torrentPort.php';") === false);
+        // ADR 0016: customer PHP no longer require_once'es /scripts/.
+        $this->assertTrue(strpos($src, "require_once '/scripts/lib/user/torrentPort.php';") === false);
         $this->assertTrue(strpos($src, 'pmssQbittorrentPortEnsureCurrentUser') !== false);
         $this->assertTrue(strpos($src, '.qbittorrentPort.py') === false);
     }
