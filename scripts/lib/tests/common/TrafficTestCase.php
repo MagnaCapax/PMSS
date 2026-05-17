@@ -26,6 +26,14 @@ trait TrafficStatisticsStubTrait
 }
 
 /**
+ * Named statistics stub so static analysis can see the in-memory fields.
+ */
+class TrafficStatisticsStub extends \trafficStatistics
+{
+    use TrafficStatisticsStubTrait;
+}
+
+/**
  * Shared traffic-test fixtures for hermetic processor and statistics suites.
  */
 abstract class TrafficTestCase extends TestCase
@@ -69,11 +77,9 @@ abstract class TrafficTestCase extends TestCase
     }
 
     /** Build a stubbed statistics instance with in-memory input and saved payloads. */
-    protected function makeTrafficStatisticsStub(): \trafficStatistics
+    protected function makeTrafficStatisticsStub(): TrafficStatisticsStub
     {
-        return new class extends \trafficStatistics {
-            use TrafficStatisticsStubTrait;
-        };
+        return new TrafficStatisticsStub();
     }
 
     /** Build a processor fixture backed by a fresh in-memory statistics stub. */

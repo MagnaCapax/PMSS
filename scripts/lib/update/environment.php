@@ -469,7 +469,8 @@ CONF;
             return;
         }
 
-        $rawVer = trim((string) @shell_exec("dpkg-query -W -f='\\${Version}' libssl3 2>/dev/null"));
+        $versionQuery = 'dpkg-query -W -f='.escapeshellarg('${Version}').' libssl3 2>/dev/null';
+        $rawVer = trim((string) @shell_exec($versionQuery));
         if ($rawVer === '') {
             logMessage('[SKIP] pmssHoldLibssl3ForPeclSsh2Compat: libssl3 is not installed');
             return;
@@ -566,7 +567,7 @@ CONF;
             $downgraded = true;
         }
 
-        $postVer = trim((string) @shell_exec("dpkg-query -W -f='\\${Version}' libssl3 2>/dev/null"));
+        $postVer = trim((string) @shell_exec($versionQuery));
         if ($postVer === '') {
             logMessage('[ERROR] pmssHoldLibssl3ForPeclSsh2Compat: unable to read libssl3 version after convergence');
             throw new RuntimeException('Unable to read libssl3 version after convergence');

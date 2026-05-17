@@ -32,7 +32,7 @@ class KernelHardeningDirtyFragTest extends TestCase
         $logs = [];
 
         $snapshot = "Module                  Size  Used by\nesp4                   20480  2\nrxrpc                  45056  1\n";
-        $this->pmssWithEnv($this->dirtyFragEnv($dir, $snapshot), function () use ($dir, &$logs): void {
+        $this->pmssWithEnv($this->dirtyFragEnv($dir, $snapshot), function () use (&$logs): void {
             \pmssEnsureDirtyFragBlacklist($this->pmssMakeArrayLogger($logs), $this->noopKernelRunner());
         });
 

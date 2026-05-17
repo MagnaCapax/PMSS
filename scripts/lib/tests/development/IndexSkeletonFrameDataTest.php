@@ -78,7 +78,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             ."       /dev/md4    594G   1380G   1725G            5642    690k    863k\n"
         );
 
-        $quotaInfo = $this->quotaInfoFromWelcomeUrl(\pmssLocalFrameWelcomeUrlBuild($quotaPath));
+        $quotaInfo = $this->quotaInfoFromWelcomeUrl($this->localFrameWelcomeUrlBuild($quotaPath));
 
         $this->assertSame(
             array(
@@ -103,7 +103,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             ."                  1.5T      2T      3T               0       0       0\n"
         );
 
-        $quotaInfo = \pmssLocalFrameQuotaInfoRead($quotaPath);
+        $quotaInfo = $this->localFrameQuotaInfoRead($quotaPath);
 
         $this->assertSame((int) round(1.5 * $tib), $quotaInfo['usedBytes']);
         $this->assertSame((int) round(2 * $tib), $quotaInfo['totalSpace']);
@@ -119,7 +119,7 @@ class IndexSkeletonFrameDataTest extends TestCase
             ."       /dev/md4      4T      2T      3T               0       0       0\n"
         );
 
-        $quotaInfo = \pmssLocalFrameQuotaInfoRead($quotaPath);
+        $quotaInfo = $this->localFrameQuotaInfoRead($quotaPath);
 
         $this->assertSame(true, $quotaInfo['overQuota']);
         $this->assertTrue($quotaInfo['freeSpace'] < 0, 'Quota payload should preserve over-soft-limit free-space debt.');
@@ -131,8 +131,8 @@ class IndexSkeletonFrameDataTest extends TestCase
         $missingPath = $this->pmssMakeTempPath('pmss-index-missing-quota-', '.txt');
         $invalidPath = $this->writeQuotaSnapshotContent("Disk quotas for user panel (uid 1000):\ninvalid\n");
 
-        $this->assertSame('welcome.php', \pmssLocalFrameWelcomeUrlBuild($missingPath));
-        $this->assertSame('welcome.php', \pmssLocalFrameWelcomeUrlBuild($invalidPath));
+        $this->assertSame('welcome.php', $this->localFrameWelcomeUrlBuild($missingPath));
+        $this->assertSame('welcome.php', $this->localFrameWelcomeUrlBuild($invalidPath));
     }
 
     public function testRemoteDisabledRenderCarriesQuotaInWelcomeIframe(): void
@@ -219,6 +219,22 @@ class IndexSkeletonFrameDataTest extends TestCase
         $fixture = $this->pmssMakeTempPath('pmss-index-frame-helpers-', '.php');
         file_put_contents($fixture, "<?php\n".substr($source, $start, $end - $start));
         require_once $fixture;
+    }
+
+    private function localFrameWelcomeUrlBuild(string $quotaPath): string
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(string): string $builder */
+        $builder = 'pmssLocalFrameWelcomeUrlBuild';
+        return $builder($quotaPath);
+    }
+
+    private function localFrameQuotaInfoRead(string $quotaPath): array
+    {
+        $this->loadIndexFrameHelpers();
+        /** @var callable(string): array<string,mixed> $reader */
+        $reader = 'pmssLocalFrameQuotaInfoRead';
+        return $reader($quotaPath);
     }
 
     private function writeQuotaSnapshotContent(string $content): string

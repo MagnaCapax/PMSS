@@ -73,7 +73,6 @@ class Manager
         $optTargets = ['cpu-weight' => true, 'io-weight' => true, 'tasks-max' => true, 'memory-high' => true, 'memory-max' => true, 'cpu-quota-percent' => true, 'io-latency-ms' => true, 'cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
         $ioSpecs = [];
         $optLowercase = ['cpu-profile' => true, 'mem-profile' => true, 'tasks-profile' => true];
-        $scalarTargets = ['device' => 'device', 'io-profile' => 'ioProfile', 'io-cost-qos' => 'ioCostQos', 'io-cost-model' => 'ioCostModel'];
 
         // Scan value flags once, then replay IO specs in canonical property order.
         foreach ($flags as $flag) {
@@ -90,9 +89,20 @@ class Manager
                 continue;
             }
 
-            if (isset($scalarTargets[$name])) {
-                $target = $scalarTargets[$name];
-                $$target = ($name === 'io-profile') ? strtolower($value) : $value;
+            if ($name === 'device') {
+                $device = $value;
+                continue;
+            }
+            if ($name === 'io-profile') {
+                $ioProfile = strtolower($value);
+                continue;
+            }
+            if ($name === 'io-cost-qos') {
+                $ioCostQos = $value;
+                continue;
+            }
+            if ($name === 'io-cost-model') {
+                $ioCostModel = $value;
                 continue;
             }
 

@@ -219,6 +219,7 @@ class DpkgBaselineApplySafetyTest extends TestCase
             $installCommand = $this->pmssFindProfileCommand('Installing packages from selection baseline');
         });
 
+        $matches = [];
         $this->assertTrue($result, 'Expected dry-run dpkg baseline application to succeed when staging works');
         $this->assertTrue(
             is_string($applyCommand) && preg_match("/^dpkg --set-selections < '([^']+)'$/", $applyCommand, $matches) === 1,

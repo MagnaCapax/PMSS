@@ -11,13 +11,13 @@ class WelcomeAnnouncementsTest extends TestCase
 {
     public function testEmptyFeedReturnsEmptyHtml(): void
     {
-        $this->assertEquals('', \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw(''));
+        $this->assertEquals('', $this->welcomeAnnouncementItemsHtmlBuildFromRaw(''));
     }
 
     public function testMalformedUtf8ReturnsEmptyHtml(): void
     {
         $rss = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss><channel><item><title>bad\x97text</title></item></channel></rss>";
-        $this->assertEquals('', \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss));
+        $this->assertEquals('', $this->welcomeAnnouncementItemsHtmlBuildFromRaw($rss));
     }
 
     public function testMalformedFeedRestoresLibxmlInternalErrorsSetting(): void
@@ -29,7 +29,7 @@ class WelcomeAnnouncementsTest extends TestCase
 
         $previous = libxml_use_internal_errors(false);
         try {
-            \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw('<rss><channel><item>');
+            $this->welcomeAnnouncementItemsHtmlBuildFromRaw('<rss><channel><item>');
             $this->assertTrue(libxml_use_internal_errors() === false, 'libxml internal error mode should be restored');
         } finally {
             if (function_exists('libxml_clear_errors')) {
@@ -43,7 +43,7 @@ class WelcomeAnnouncementsTest extends TestCase
     public function testFeedWithoutItemsReturnsEmptyHtml(): void
     {
         $rss = $this->rssFeed([], '<title>News</title>');
-        $this->assertEquals('', \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss));
+        $this->assertEquals('', $this->welcomeAnnouncementItemsHtmlBuildFromRaw($rss));
     }
 
     public function testSingleItemFeedRendersOneListItem(): void
@@ -52,7 +52,7 @@ class WelcomeAnnouncementsTest extends TestCase
             $this->rssItem('Only', 'https://example.test/only', 'Tue, 17 Mar 2026 10:00:00 +0000'),
         ]);
 
-        $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
+        $html = $this->welcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
         $this->assertEquals(1, substr_count($html, '<li>'));
         $this->assertStringContainsString('Only', $html);
@@ -68,7 +68,7 @@ class WelcomeAnnouncementsTest extends TestCase
             $this->rssItem('Five', 'https://example.test/5', 'Tue, 17 Mar 2026 14:00:00 +0000'),
         ]);
 
-        $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
+        $html = $this->welcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
         $this->assertEquals(4, substr_count($html, '<li>'));
         $this->assertStringContainsString('One', $html);
@@ -82,7 +82,7 @@ class WelcomeAnnouncementsTest extends TestCase
             $this->rssItem('Ready', 'https://example.test/ok', 'Tue, 17 Mar 2026 11:00:00 +0000'),
         ]);
 
-        $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
+        $html = $this->welcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
         $this->assertEquals(1, substr_count($html, '<li>'));
         $this->assertStringContainsString('Ready', $html);
@@ -95,7 +95,7 @@ class WelcomeAnnouncementsTest extends TestCase
             $this->rssItem('&lt;b&gt;bold&lt;/b&gt;', 'https://example.test/x', 'Tue, 17 Mar 2026 10:00:00 +0000'),
         ]);
 
-        $html = \pmssWelcomeAnnouncementItemsHtmlBuildFromRaw($rss);
+        $html = $this->welcomeAnnouncementItemsHtmlBuildFromRaw($rss);
 
         $this->assertStringContainsString('&lt;b&gt;bold&lt;/b&gt;', $html);
         $this->assertTrue(strpos($html, '<b>bold</b>') === false, 'Rendered title must stay escaped');
@@ -104,6 +104,13 @@ class WelcomeAnnouncementsTest extends TestCase
     private function rssFeed(array $items, string $channelPrefix = ''): string
     {
         return '<?xml version="1.0" encoding="UTF-8"?><rss><channel>'.$channelPrefix.implode('', $items).'</channel></rss>';
+    }
+
+    private function welcomeAnnouncementItemsHtmlBuildFromRaw(string $rssRaw): string
+    {
+        /** @var callable(string): string $builder */
+        $builder = 'pmssWelcomeAnnouncementItemsHtmlBuildFromRaw';
+        return $builder($rssRaw);
     }
 
     private function rssItem(string $title, string $link, string $pubDate): string

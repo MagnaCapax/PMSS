@@ -12,7 +12,7 @@ class KernelHardeningAlgifAeadTest extends TestCase
         $logs = [];
         $calls = [];
 
-        $this->pmssWithEnv($this->algifEnv($dir), function () use ($dir, &$logs, &$calls): void {
+        $this->pmssWithEnv($this->algifEnv($dir), function () use (&$logs, &$calls): void {
             \pmssEnsureAlgifAeadBlacklist(
                 $this->pmssMakeArrayLogger($logs),
                 $this->captureKernelCalls($calls)

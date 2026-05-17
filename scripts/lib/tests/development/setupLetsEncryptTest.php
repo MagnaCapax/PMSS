@@ -84,9 +84,11 @@ class SetupLetsEncryptTest extends TestCase
 
         $this->assertStringContainsString('Install certbot packages', $stdout);
         $this->assertStringContainsString('Request Let\'s Encrypt certificate', $stdout);
+        $this->assertTrue(isset($commands[1]['command']), 'Expected certbot request command to be recorded');
+        $certRequestCommand = isset($commands[1]['command']) ? $commands[1]['command'] : '';
         $this->assertStringContainsString(
             "/usr/bin/certbot 'certonly' '-d' 'example.com' '-n' '--nginx' '--agree-tos' '--email' 'user@example.com'",
-            $commands[1]['command']
+            $certRequestCommand
         );
     }
 

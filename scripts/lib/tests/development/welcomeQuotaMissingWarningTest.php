@@ -58,8 +58,8 @@ final class welcomeQuotaMissingWarningTest extends TestCase
                 'colors' => array('-10' => '90ee99', '0' => '99e699', '50' => 'c4bf99', '100' => 'ee9999', '101' => 'FF4040'),
             ),
             array(
-                'single' => hash('sha256', \createGauge('Used / Limit', 'Used / Limit<br />Bonus', 75, 90)),
-                'stacked' => hash('sha256', \createStackedGauge(
+                'single' => hash('sha256', $this->createGauge('Used / Limit', 'Used / Limit<br />Bonus', 75, 90)),
+                'stacked' => hash('sha256', $this->createStackedGauge(
                     'Process: 1 | Cache: 2',
                     'Process: 1 | Cache: 2',
                     66.7,
@@ -69,8 +69,29 @@ final class welcomeQuotaMissingWarningTest extends TestCase
                         array('width' => 44.5, 'color' => 'transparent'),
                     )
                 )),
-                'colors' => array('-10' => \gaugeColor(-10), '0' => \gaugeColor(0), '50' => \gaugeColor(50), '100' => \gaugeColor(100), '101' => \gaugeColor(101)),
+                'colors' => array('-10' => $this->gaugeColor(-10), '0' => $this->gaugeColor(0), '50' => $this->gaugeColor(50), '100' => $this->gaugeColor(100), '101' => $this->gaugeColor(101)),
             )
         );
+    }
+
+    private function createGauge($titleText, $footerText, $percent, $percentMax = 0): string
+    {
+        /** @var callable(mixed,mixed,mixed,mixed): string $builder */
+        $builder = 'createGauge';
+        return $builder($titleText, $footerText, $percent, $percentMax);
+    }
+
+    private function createStackedGauge($titleText, $footerText, $percent, array $segments): string
+    {
+        /** @var callable(mixed,mixed,mixed,array<int,array<string,mixed>>): string $builder */
+        $builder = 'createStackedGauge';
+        return $builder($titleText, $footerText, $percent, $segments);
+    }
+
+    private function gaugeColor($percent): string
+    {
+        /** @var callable(mixed): string $color */
+        $color = 'gaugeColor';
+        return $color($percent);
     }
 }
