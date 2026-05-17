@@ -1026,13 +1026,33 @@ Past 30 days total I/O operations: <?php echo pmssFormatIoOperationsShort($ioOpe
                     'borderColor' => 'rgb(244, 67, 54)',
                 ),
             ));
-            pmssStatsRenderLineChart('iopsChart', $ioDailyLabels, array(array(
-                'label' => 'Daily I/O Operations',
-                'data' => $ioDailyOperations,
-                'backgroundColor' => 'rgba(255, 193, 7, 0.2)',
-                'borderColor' => 'rgb(255, 193, 7)',
-            )));
             ?>
+            <div class="traffic-chart">
+                <canvas id="iopsChart" width="600" height="250"></canvas>
+            </div>
+            <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                if (typeof Chart === 'undefined') return;
+                const element = document.getElementById('iopsChart');
+                if (!element) return;
+                new Chart(element.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode($ioDailyLabels); ?>,
+                        datasets: [{
+                            label: 'Daily I/O Operations',
+                            data: <?php echo json_encode($ioDailyOperations); ?>,
+                            fill: true,
+                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                            borderColor: 'rgb(255, 193, 7)',
+                            tension: 0.4,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: pmssStatsChartOptions()
+                });
+            });
+            </script>
         <?php else: ?>
             <div class="docker-note">Chart requires 2+ days of data.</div>
         <?php endif; ?>
