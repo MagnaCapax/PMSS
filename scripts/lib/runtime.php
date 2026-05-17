@@ -1245,6 +1245,15 @@ if (!function_exists('pmssWithSnapshotLog')) {
     }
 }
 
+if (!function_exists('pmssRunSnapshotLogTask')) {
+    /** Resolve env log path, stamp time once, and run a snapshot callback. */
+    function pmssRunSnapshotLogTask(string $scriptName, string $envKey, string $defaultLogPath, callable $callback): int
+    {
+        $timestamp = date('Y-m-d\\TH:i:s');
+        return pmssWithSnapshotLog($scriptName, pmssResolvePathFromEnv($envKey, $defaultLogPath), static function ($handle) use ($callback, $timestamp): int { return (int) $callback($handle, $timestamp); });
+    }
+}
+
 if (!function_exists('pmssSnapshotWriteLine')) {
     // Append one newline-terminated line to a snapshot log.
     function pmssSnapshotWriteLine($handle, string $line): void

@@ -40,12 +40,9 @@ function pmssQuotaSnapshotParseRepquotaUserRows(array $lines): array
 function pmssQuotaSnapshotRun(): int
 {
     $mountPath = getenv('PMSS_QUOTA_SNAPSHOT_MOUNT') ?: PMSS_QUOTA_SNAPSHOT_MOUNT_DEFAULT;
-    $logPath = pmssResolvePathFromEnv('PMSS_QUOTA_SNAPSHOT_LOG', PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT);
     $mountLabel = preg_replace('/\\s+/', '', $mountPath);
 
-    $ts = date('Y-m-d\\TH:i:s');
-
-    return pmssWithSnapshotLog(__FILE__, $logPath, static function ($fh) use ($mountLabel, $mountPath, $ts): int {
+    return pmssRunSnapshotLogTask(__FILE__, 'PMSS_QUOTA_SNAPSHOT_LOG', PMSS_QUOTA_SNAPSHOT_LOG_DEFAULT, static function ($fh, string $ts) use ($mountLabel, $mountPath): int {
         $repquota = pmssCommandPath('repquota');
         if ($repquota === '') {
             pmssSnapshotWriteWarn($fh, $ts, 'repquota_missing');
