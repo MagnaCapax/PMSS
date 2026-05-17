@@ -11,6 +11,11 @@ function pmssPinnedRemoteChecksum(string $path): string
     return is_string($checksum) ? strtolower($checksum) : '';
 }
 
+function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): bool
+{
+    return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
+}
+
 function pmssPinnedRemoteArchiveComponentIsSafe(string $value): bool
 {
     return $value !== ''

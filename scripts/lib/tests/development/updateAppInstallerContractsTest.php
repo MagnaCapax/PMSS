@@ -78,7 +78,7 @@ class UpdateAppInstallerContractsTest extends TestCase
 
         $this->assertStringContainsString("require_once __DIR__.'/remoteBinary.php';", $contents);
         $this->assertStringContainsString("syncthing version 2>/dev/null", $contents);
-        $this->assertStringContainsString("['x86_64', 'amd64']", $contents);
+        $this->assertStringContainsString('pmssPinnedRemoteAmd64ArtifactsSupported()', $contents);
         $this->assertStringContainsString('https://github.com/syncthing/syncthing/releases/download/', $contents);
         $this->assertStringContainsString('syncthing-linux-amd64-', $contents);
         $this->assertStringContainsString("pmssRunPinnedRemoteArchiveStep('Syncthing '.\$syncthingVersion", $contents);

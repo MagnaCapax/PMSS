@@ -15,12 +15,10 @@
  * @license GPL-3.0-only
  */
 // #TODO Migrate to dpkg baseline/repo-driven install. (GH #131)
-
 require_once __DIR__.'/remoteBinary.php';
 
 $arch = php_uname('m');
-
-if (!in_array($arch, ['x86_64', 'amd64'], true)) {
+if (!pmssPinnedRemoteAmd64ArtifactsSupported($arch)) {
     logmsg("[SKIP] btsync/rslsync bootstrap skipped on unsupported architecture: {$arch}");
     return;
 }
@@ -63,8 +61,6 @@ if (file_exists($btsyncPath) && !is_link($btsyncPath)) {
 if (!file_exists($btsyncPath)) {
     runStep('Linking btsync shim', pmssBuildCommand('ln', ['-s', '/usr/bin/btsync2.2', '/usr/bin/btsync']));
 }
-
-
 // Install Resilio Sync if required.
 $rslsyncBinary = '/usr/bin/rslsync';
 $rslsyncSha256 = 'f8c71f6d447a2a9aec93bde7c316bbb7ac6be98d0bcb9dc645f4ca4e347bc333';
