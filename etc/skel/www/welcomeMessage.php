@@ -8,8 +8,27 @@
  * @license GPL-3.0-only
  */
 
-if (!function_exists('pmssReplaceUserFile') && is_file(__DIR__.'/lighttpd/userFileWrite.php')) {
-    require_once __DIR__.'/lighttpd/userFileWrite.php';
+// Customer-side path-safety + JSON helpers inlined from
+// /scripts/lib/lighttpd/userFileWrite.php (operator-only). Customer PHP
+// cannot traverse /scripts/, per ADR 0016.
+if (!function_exists('pmssWelcomeMessageCustomerPathIsSafe')) {
+    function pmssWelcomeMessageCustomerPathIsSafe(string $path): bool
+    {
+        if ($path === '' || strpos($path, "\0") !== false || is_link($path)) {
+            return false;
+        }
+        $homeRoot = getenv('PMSS_HOME_DIR');
+        $homeRoot = (is_string($homeRoot) && trim($homeRoot) !== '') ? rtrim($homeRoot, '/') : '/home';
+        $real = realpath($path);
+        if ($real === false) {
+            $real = realpath(dirname($path));
+            if ($real === false) {
+                return false;
+            }
+            $real .= '/'.basename($path);
+        }
+        return strpos($real, $homeRoot.'/') === 0;
+    }
 }
 
 /**
@@ -17,7 +36,14 @@ if (!function_exists('pmssReplaceUserFile') && is_file(__DIR__.'/lighttpd/userFi
  */
 function pmssWelcomeReadJson(string $path): array
 {
-    return pmssJsonFileReadAssoc($path, true) ?? [];
+    if ($path === '' || !pmssWelcomeMessageCustomerPathIsSafe($path) || !is_file($path) || is_link($path)) {
+        return [];
+    }
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || trim($raw) === '') {
+        return [];
+    }
+    return is_array($decoded = json_decode($raw, true)) ? $decoded : [];
 }
 
 /**
