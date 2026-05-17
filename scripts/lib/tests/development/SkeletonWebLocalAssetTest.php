@@ -13,6 +13,35 @@ class SkeletonWebLocalAssetTest extends TestCase
         }
     }
 
+    public function testBundledScreenStylesheetKeepsWelcomePanelCompact(): void
+    {
+        $this->pmssAssertRepoFileContainsAllStrings(
+            'etc/skel/www/screen.css',
+            [
+                'font-size: 11px;',
+                'line-height: 1.25;',
+                'padding: 6px;',
+                'gap: 8px;',
+                'font-size: 1.15rem;',
+                'font-size: 0.8rem;',
+                'height: 12px;',
+            ],
+            'Missing compact welcome stylesheet rule: '
+        );
+
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'etc/skel/www/screen.css',
+            [
+                'padding: 24px 16px;',
+                'gap: 24px;',
+                'font-size: 2rem;',
+                'font-size: 1.05rem;',
+                'padding: 9px 14px;',
+            ],
+            'Large welcome stylesheet rule should not return: '
+        );
+    }
+
     public function testIndexLocalFallbackUsesBundledTabsAssets(): void
     {
         $this->pmssAssertRepoFileContainsAllStrings(
