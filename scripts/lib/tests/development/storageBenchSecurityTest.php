@@ -251,11 +251,27 @@ class StorageBenchSecurityTest extends TestCase
         );
     }
 
+    public function testMalformedRuntimeFailsBeforeBenchmarkWork(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--runtime=15junk'],
+            "Error: --runtime must be a positive integer.\n"
+        );
+    }
+
     public function testZeroDeviceRuntimeFailsWhenDevicesEnabled(): void
     {
         $this->assertBenchmarkInputGuard(
             ['--devices', '--device-runtime=0'],
             "Error: --device-runtime must be a positive integer.\n"
+        );
+    }
+
+    public function testMalformedIdleThresholdFailsBeforeBenchmarkWork(): void
+    {
+        $this->assertBenchmarkInputGuard(
+            ['--idle-util=85percent'],
+            "Error: --idle-util must be a non-negative integer.\n"
         );
     }
 

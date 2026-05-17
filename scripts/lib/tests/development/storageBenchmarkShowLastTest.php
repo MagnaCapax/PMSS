@@ -60,6 +60,18 @@ class StorageBenchmarkShowLastTest extends TestCase
         $this->assertStringContainsString('randread-small', (string)$out);
     }
 
+    public function testShowLastIgnoresMalformedBenchmarkRuntimeOptions(): void
+    {
+        $runId = '20250202020204-readonly';
+        $runTs = '2025-02-02T02:02:04Z';
+        $log = $this->pmssWriteStorageBenchmarkLog([
+            ['timestamp'=>$runTs,'run_id'=>$runId,'run_ts'=>$runTs,'test'=>'preflight-idle','ok'=>true],
+        ]);
+
+        $out = $this->pmssRunStorageBenchmarkShowLast($log, ['--runtime=bad']);
+        $this->assertStringContainsString('Run ID: '.$runId, (string) $out);
+    }
+
     public function testShowLastTreatsShortHelpTokenAsJsonPathValue(): void
     {
         $out = $this->pmssRunRepoPhpScript('scripts/util/storageBenchmark.php', ['--show-last', '--json', '-h']);

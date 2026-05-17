@@ -65,12 +65,22 @@ $fileSize = (string) pmssCliOptionString($parsed, 'size', null, '500G', true);
 $jsonLog = (string) pmssCliOptionString($parsed, 'json', null, '/var/log/pmss/benchmark-storage.jsonl', true);
 $label = (string) pmssCliOptionString($parsed, 'label', null, '', true);
 $ddSize = (string) pmssCliOptionString($parsed, 'dd-size', null, '1G', true);
-$runtime = pmssCliOptionInt($parsed, 'runtime', null, 60);
-$devRuntime = pmssCliOptionInt($parsed, 'device-runtime', null, 30);
-$idleLatencyMs = pmssCliOptionInt($parsed, 'idle-latency-ms', null, 100);
-$idleUtilPct = pmssCliOptionInt($parsed, 'idle-util', null, 85);
-
 function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $s=trim($value); $bytes=0; if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); $bytes=$u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } if($bytes<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return $bytes; }
+// Reject malformed numeric knobs before they reach fio/dd runtime settings.
+function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int $default, int $minimum, string $minimumLabel): int
+{
+    $value = pmssCliOption($parsed, $optionName, null, null);
+    if ($value === null || $value === true) {
+        return $default;
+    }
+
+    if (!is_string($value) || !ctype_digit($value) || (int) $value < $minimum) {
+        fwrite(STDERR, "Error: --{$optionName} must be a {$minimumLabel} integer.\n");
+        exit(1);
+    }
+
+    return (int) $value;
+}
 function storageBenchmarkJsonLogPathPreflightIsSafe(string $jsonLog): bool
 {
     $path = rtrim($jsonLog, '/');
@@ -124,9 +134,11 @@ function storageBenchmarkShowLast(string $jsonLog): int { if (!is_file($jsonLog)
 
 if ($showLast) exit(storageBenchmarkShowLast($jsonLog));
 
+$runtime = storageBenchmarkRequireIntOption($parsed, 'runtime', 60, 1, 'positive');
+$devRuntime = $testDevices ? storageBenchmarkRequireIntOption($parsed, 'device-runtime', 30, 1, 'positive') : 30;
+$idleLatencyMs = storageBenchmarkRequireIntOption($parsed, 'idle-latency-ms', 100, 0, 'non-negative');
+$idleUtilPct = storageBenchmarkRequireIntOption($parsed, 'idle-util', 85, 0, 'non-negative');
 $requested = storageBenchmarkRequirePositiveSizeBytes('--size', $fileSize); $ddSizeBytes = $testDevices ? storageBenchmarkRequirePositiveSizeBytes('--dd-size', $ddSize) : 0;
-if($runtime<=0){ fwrite(STDERR,"Error: --runtime must be a positive integer.\n"); exit(1); }
-if($testDevices && $devRuntime<=0){ fwrite(STDERR,"Error: --device-runtime must be a positive integer.\n"); exit(1); }
 storageBenchmarkRequireJsonLogPath($jsonLog);
 $targetDir = storageBenchmarkRequireTargetDir($targetDir);
 
