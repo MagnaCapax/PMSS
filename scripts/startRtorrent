@@ -24,14 +24,9 @@ if ($argc !== 2) {
 
 // Validate username defensively even when invoked from internal scripts.
 // Treat any internal tool output as untrusted (ADR 0005).
-$userLifecycleLib = __DIR__.'/lib/userLifecycle.php';
-if (is_file($userLifecycleLib)) {
-    require_once $userLifecycleLib;
-}
+require_once __DIR__.'/lib/userLifecycle.php';
 
-$user = function_exists('pmssUsernameNormalizeIfValid')
-    ? pmssUsernameNormalizeIfValid((string) $argv[1])
-    : null;
+$user = pmssUsernameNormalizeIfValid((string) $argv[1]);
 if ($user === null) {
     $user = strtolower(trim((string) $argv[1]));
     logmsg("Invalid username: {$user}");

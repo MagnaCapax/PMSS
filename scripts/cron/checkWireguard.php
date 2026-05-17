@@ -6,8 +6,7 @@
  * @license GPL-3.0-only
  * @author PMSS Team
  */
-if (is_file($pmssUserLogPath = __DIR__.'/../lib/user/log.php')) { require_once $pmssUserLogPath; }
-if (is_file($pmssUserLifecyclePath = __DIR__.'/../lib/userLifecycle.php')) { require_once $pmssUserLifecyclePath; }
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 $args = $argv ?? ($_SERVER['argv'] ?? []);
 $debug = in_array('--debug', $args, true);
@@ -22,7 +21,7 @@ if (!file_exists('/etc/wireguard/wg0.conf')) {
 
 function pmssWireguardLogUsers(array $users, string $message): void
 {
-    if (empty($users) || !function_exists('pmssUserLog')) {
+    if (empty($users)) {
         return;
     }
     foreach ($users as $user) {
@@ -37,7 +36,7 @@ if (is_array($lines)) {
         $line = trim($line);
         if (preg_match('/^#\s*user\s*=\s*([A-Za-z0-9._-]+)\s*$/', $line, $matches)) {
             $user = $matches[1];
-            if (function_exists('pmssValidateUsername') && !pmssValidateUsername($user)) {
+            if (!pmssValidateUsername($user)) {
                 continue;
             }
             $peerUsers[$user] = true;

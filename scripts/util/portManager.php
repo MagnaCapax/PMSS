@@ -8,11 +8,7 @@
  */
 
 require_once __DIR__.'/../lib/runtime.php';
-
-$lifecyclePath = __DIR__.'/../lib/userLifecycle.php';
-if (is_file($lifecyclePath)) {
-    require_once $lifecyclePath;
-}
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 const PMSS_PORT_MANAGER_USAGE = 'Usage: portManager.php [view|assign|release] USER [SERVICE]';
 
@@ -24,12 +20,10 @@ function pmssPortManagerServiceIsValid(string $service): bool
     return preg_match('/^[a-z][a-z0-9-]{0,31}$/', $service) === 1;
 }
 
-/** Username validation falls back to the historic local regex when needed. */
+/** Keep port-manager username validation on the shared PMSS rules. */
 function pmssPortManagerUserIsValid(string $user): bool
 {
-    return function_exists('pmssValidateUsername')
-        ? pmssValidateUsername($user)
-        : preg_match('/^[a-z][a-z0-9]{0,7}$/', $user) === 1;
+    return pmssValidateUsername($user);
 }
 
 /**
@@ -37,7 +31,6 @@ function pmssPortManagerUserIsValid(string $user): bool
  */
 function pmssPortManagerLog(string $user, string $action, string $service, ?int $port, string $status, string $message): void
 {
-    if (!function_exists('pmssUserWriteLogs') || !function_exists('pmssUserBaseContext')) return;
     pmssUserWriteLogs(pmssUserBaseContext('port', $action, $user, array('status' => $status, 'service' => $service, 'port' => $port, 'message' => $message)));
 }
 

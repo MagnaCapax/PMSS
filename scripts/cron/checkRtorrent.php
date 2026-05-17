@@ -38,10 +38,7 @@ require_once __DIR__.'/../lib/rtorrentConfig.php';
 require_once __DIR__.'/../lib/user/userConfigStore.php';
 require_once __DIR__.'/../lib/user/traffic.php';
 
-$lifecycle = __DIR__.'/../lib/userLifecycle.php';
-if (is_file($lifecycle)) {
-    require_once $lifecycle;
-}
+require_once __DIR__.'/../lib/userLifecycle.php';
 
 $args = $argv ?? ($_SERVER['argv'] ?? []);
 $debug = in_array('--debug', $args, true);

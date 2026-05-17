@@ -24,7 +24,7 @@ foreach($users AS $thisUser) {
         pmssLighttpdWatchdogDeleteErrorPage($thisUser);
         continue;
     }
-    if (function_exists('pmssUserLighttpdEnabled') && !pmssUserLighttpdEnabled($thisUser)) {
+    if (!pmssUserLighttpdEnabled($thisUser)) {
         echo "User {$thisUser}: lighttpd disabled by config; terminating web stack.\n";
         pmssUserWatchdogTerminateProcesses($thisUser, ['lighttpd', 'php-cgi'], 15);
         pmssLighttpdWatchdogDeleteErrorPage($thisUser);
