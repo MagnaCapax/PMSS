@@ -166,6 +166,57 @@ if (!function_exists('pmssInfoSetDockerEnabled')) {
     }
 }
 
+if (!function_exists('pmssStatsRenderLineChart')) {
+    /**
+     * Render a Chart.js line chart with the shared PMSS stats defaults.
+     */
+    function pmssStatsRenderLineChart($canvasId, array $labels, array $datasets)
+    {
+        $normalizedDatasets = array();
+        foreach ($datasets as $dataset) {
+            if (!is_array($dataset) || !isset($dataset['label'], $dataset['data'], $dataset['backgroundColor'], $dataset['borderColor'])) {
+                continue;
+            }
+
+            $normalizedDatasets[] = array(
+                'label' => (string)$dataset['label'],
+                'data' => array_values((array)$dataset['data']),
+                'fill' => array_key_exists('fill', $dataset) ? (bool)$dataset['fill'] : true,
+                'backgroundColor' => (string)$dataset['backgroundColor'],
+                'borderColor' => (string)$dataset['borderColor'],
+                'tension' => array_key_exists('tension', $dataset) ? (float)$dataset['tension'] : 0.4,
+                'pointRadius' => array_key_exists('pointRadius', $dataset) ? (int)$dataset['pointRadius'] : 3,
+            );
+        }
+
+        if ($normalizedDatasets === array()) {
+            return;
+        }
+
+        $encodedLabels = json_encode(array_values($labels));
+        $encodedDatasets = json_encode($normalizedDatasets, JSON_UNESCAPED_SLASHES);
+        $encodedCanvasId = json_encode((string)$canvasId);
+        if (!is_string($encodedLabels) || !is_string($encodedDatasets) || !is_string($encodedCanvasId)) {
+            return;
+        }
+
+        $safeCanvasId = htmlspecialchars((string)$canvasId, ENT_QUOTES, 'UTF-8');
+        echo '<div class="traffic-chart"><canvas id="'.$safeCanvasId.'" width="600" height="250"></canvas></div>'."\n";
+        echo "<script>\n";
+        echo "document.addEventListener('DOMContentLoaded', () => {\n";
+        echo "    if (typeof Chart === 'undefined') return;\n";
+        echo "    const element = document.getElementById({$encodedCanvasId});\n";
+        echo "    if (!element) return;\n";
+        echo "    new Chart(element.getContext('2d'), {\n";
+        echo "        type: 'line',\n";
+        echo "        data: { labels: {$encodedLabels}, datasets: {$encodedDatasets} },\n";
+        echo "        options: pmssStatsChartOptions()\n";
+        echo "    });\n";
+        echo "});\n";
+        echo "</script>\n";
+    }
+}
+
 $pmssStatsUsername = '';
 $pmssStatsUserResult = pmssInfoShellExec('whoami', 'Username');
 if ($pmssStatsUserResult['error'] === null && is_string($pmssStatsUserResult['output'])) {
@@ -789,35 +840,17 @@ Inbound:Outbound ratio (month): <span class="<?php echo $trafficRatioClass; ?>">
         </pre>
 
         <?php if ($trafficData !== null && !empty($trafficData['daily']) && count($trafficData['daily']) >= 2): ?>
-            <div class="traffic-chart">
-                <canvas id="trafficChart" width="600" height="250"></canvas>
-            </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                if (typeof Chart === 'undefined') return;
-                const ctx = document.getElementById('trafficChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: <?php echo json_encode(array_keys($trafficData['daily'])); ?>,
-                        datasets: [{
-                            label: 'Daily Traffic (MiB)',
-                            data: <?php
-                                $values = array_values($trafficData['daily']);
-                                foreach ($values as &$v) $v = round((float)$v, 2);
-                                echo json_encode($values);
-                            ?>,
-                            fill: true,
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            borderColor: 'rgb(75, 192, 192)',
-                            tension: 0.4,
-                            pointRadius: 3
-                        }]
-                    },
-                    options: pmssStatsChartOptions()
-                });
-            });
-            </script>
+            <?php
+            $trafficValues = array_values($trafficData['daily']);
+            foreach ($trafficValues as &$v) $v = round((float)$v, 2);
+            unset($v);
+            pmssStatsRenderLineChart('trafficChart', array_keys($trafficData['daily']), array(array(
+                'label' => 'Daily Traffic (MiB)',
+                'data' => $trafficValues,
+                'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
+                'borderColor' => 'rgb(75, 192, 192)',
+            )));
+            ?>
         <?php elseif ($trafficData !== null): ?>
             <div class="docker-note">Chart requires 2+ days of data.</div>
         <?php endif; ?>
@@ -978,64 +1011,28 @@ Past 30 days total I/O operations: <?php echo pmssFormatIoOperationsShort($ioOpe
         </pre>
 
         <?php if (count($ioDailyLabels) >= 2): ?>
-            <div class="traffic-chart">
-                <canvas id="ioChart" width="600" height="250"></canvas>
-            </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                if (typeof Chart === 'undefined') return;
-                const ctx = document.getElementById('ioChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: <?php echo json_encode($ioDailyLabels); ?>,
-                        datasets: [{
-                            label: 'Daily I/O Read (MiB)',
-                            data: <?php echo json_encode($ioDailyRead); ?>,
-                            fill: true,
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            borderColor: 'rgb(75, 192, 192)',
-                            tension: 0.4,
-                            pointRadius: 3
-                        }, {
-                            label: 'Daily I/O Write (MiB)',
-                            data: <?php echo json_encode($ioDailyWrite); ?>,
-                            fill: true,
-                            backgroundColor: 'rgba(244, 67, 54, 0.2)',
-                            borderColor: 'rgb(244, 67, 54)',
-                            tension: 0.4,
-                            pointRadius: 3
-                        }]
-                    },
-                    options: pmssStatsChartOptions()
-                });
-            });
-            </script>
-            <div class="traffic-chart">
-                <canvas id="iopsChart" width="600" height="250"></canvas>
-            </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                if (typeof Chart === 'undefined') return;
-                const ctx = document.getElementById('iopsChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: <?php echo json_encode($ioDailyLabels); ?>,
-                        datasets: [{
-                            label: 'Daily I/O Operations',
-                            data: <?php echo json_encode($ioDailyOperations); ?>,
-                            fill: true,
-                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                            borderColor: 'rgb(255, 193, 7)',
-                            tension: 0.4,
-                            pointRadius: 3
-                        }]
-                    },
-                    options: pmssStatsChartOptions()
-                });
-            });
-            </script>
+            <?php
+            pmssStatsRenderLineChart('ioChart', $ioDailyLabels, array(
+                array(
+                    'label' => 'Daily I/O Read (MiB)',
+                    'data' => $ioDailyRead,
+                    'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
+                    'borderColor' => 'rgb(75, 192, 192)',
+                ),
+                array(
+                    'label' => 'Daily I/O Write (MiB)',
+                    'data' => $ioDailyWrite,
+                    'backgroundColor' => 'rgba(244, 67, 54, 0.2)',
+                    'borderColor' => 'rgb(244, 67, 54)',
+                ),
+            ));
+            pmssStatsRenderLineChart('iopsChart', $ioDailyLabels, array(array(
+                'label' => 'Daily I/O Operations',
+                'data' => $ioDailyOperations,
+                'backgroundColor' => 'rgba(255, 193, 7, 0.2)',
+                'borderColor' => 'rgb(255, 193, 7)',
+            )));
+            ?>
         <?php else: ?>
             <div class="docker-note">Chart requires 2+ days of data.</div>
         <?php endif; ?>
@@ -1047,31 +1044,14 @@ Past 30 days total I/O operations: <?php echo pmssFormatIoOperationsShort($ioOpe
 CPU Time (month/week/day/hour): <?php echo $cpuDisplay['month'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['week'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['day'] ?? 'n/a'; ?> / <?php echo $cpuDisplay['hour'] ?? 'n/a'; ?>
         </pre>
         <?php if (count($cpuDailyHours) >= 2): ?>
-            <div class="traffic-chart">
-                <canvas id="cpuChart" width="600" height="250"></canvas>
-            </div>
-            <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                if (typeof Chart === 'undefined') return;
-                const ctx = document.getElementById('cpuChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: <?php echo json_encode($ioDailyLabels); ?>,
-                        datasets: [{
-                            label: 'Daily CPU (hours)',
-                            data: <?php echo json_encode($cpuDailyHours); ?>,
-                            fill: true,
-                            backgroundColor: 'rgba(129, 199, 132, 0.2)',
-                            borderColor: 'rgb(129, 199, 132)',
-                            tension: 0.4,
-                            pointRadius: 3
-                        }]
-                    },
-                    options: pmssStatsChartOptions()
-                });
-            });
-            </script>
+            <?php
+            pmssStatsRenderLineChart('cpuChart', $ioDailyLabels, array(array(
+                'label' => 'Daily CPU (hours)',
+                'data' => $cpuDailyHours,
+                'backgroundColor' => 'rgba(129, 199, 132, 0.2)',
+                'borderColor' => 'rgb(129, 199, 132)',
+            )));
+            ?>
         <?php else: ?>
             <div class="docker-note">Chart requires 2+ days of data.</div>
         <?php endif; ?>
