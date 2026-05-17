@@ -2,9 +2,8 @@
 /**
  * Token-aware customer PHP fatal-call scanner.
  *
- * Customer-facing PHP cannot load operator-only helpers from `/scripts`, so this
- * scanner catches bare function calls that are neither PHP built-ins nor defined
- * inside the customer-readable skeleton tree.
+ * Customer-facing PHP cannot load operator-only helpers from `/scripts`, so
+ * unresolved bare function calls are treated as ADR 0016/0017 regressions.
  *
  * @license GPL-3.0-only
  */
@@ -14,120 +13,73 @@ const PMSS_CUSTOMER_CONTEXT_ANTIPATTERN = 'OPERATOR_TREE_FUNCTION_LEAK';
 /** Execute the customer context fatal scanner CLI. */
 function pmssCustomerContextFatalScanMain(array $argv): int
 {
-    $rootDir = pmssCustomerContextScanRoot();
-    $violations = pmssCustomerContextFatalScan($rootDir);
-
+    $root = pmssCustomerContextRoot();
+    $violations = pmssCustomerContextFatalScan($root);
     if ($violations === []) {
         fwrite(STDERR, "[customer-context-fatal-scan] OK - customer-side bare function calls resolve safely\n");
         return 0;
     }
 
     fwrite(STDERR, '[customer-context-fatal-scan] FAIL - '.PMSS_CUSTOMER_CONTEXT_ANTIPATTERN.': '.count($violations)." unresolved customer PHP function call(s):\n");
-    foreach ($violations as $violation) {
-        $source = $violation['operator_tree_source'] !== ''
-            ? ' (operator tree definition: '.$violation['operator_tree_source'].')'
-            : '';
-        fwrite(STDERR, '  '.$violation['file'].':'.$violation['line'].' - '.$violation['function']."()".$source."\n");
+    foreach ($violations as $v) {
+        $source = $v['operator_tree_source'] !== '' ? ' (operator tree definition: '.$v['operator_tree_source'].')' : '';
+        fwrite(STDERR, '  '.$v['file'].':'.$v['line'].' - '.$v['function']."()".$source."\n");
     }
     fwrite(STDERR, "\nPer ADR 0016 and ADR 0017, customer PHP must not depend on operator-tree functions.\n");
     fwrite(STDERR, "Move the customer-side subset into etc/skel/www/ or split operator-write/customer-read behavior.\n");
-
     return 1;
 }
 
 /** Return unresolved bare function calls in customer-facing PHP. */
-function pmssCustomerContextFatalScan(string $rootDir): array
+function pmssCustomerContextFatalScan(string $root): array
 {
-    $rootDir = rtrim($rootDir, '/');
-    $customerRoot = $rootDir.'/etc/skel';
-    $customerWww = $customerRoot.'/www';
-    if (!is_dir($customerWww)) {
-        return [];
-    }
+    $root = rtrim($root, '/');
+    $skel = $root.'/etc/skel';
+    $www = $skel.'/www';
+    if (!is_dir($www)) return [];
 
-    $customerFiles = pmssCustomerContextCustomerDefinitionFiles($customerRoot, $customerWww);
-    $targetFiles = pmssCustomerContextPhpFiles($customerWww, false);
-    $customerFunctions = pmssCustomerContextFunctionDefinitions($customerFiles);
-    $operatorFunctions = pmssCustomerContextFunctionDefinitions(pmssCustomerContextPhpFiles($rootDir.'/scripts/lib', true));
-    $builtins = pmssCustomerContextBuiltinFunctions();
+    $customerDefs = pmssCustomerContextDefinitions(array_merge(pmssCustomerContextFiles($skel, false), pmssCustomerContextFiles($www, false)));
+    $operatorDefs = pmssCustomerContextDefinitions(pmssCustomerContextFiles($root.'/scripts/lib', true));
+    $builtins = pmssCustomerContextBuiltins();
     $violations = [];
 
-    foreach ($targetFiles as $file) {
+    foreach (pmssCustomerContextFiles($www, false) as $file) {
         $tokens = pmssCustomerContextTokens($file);
-        foreach (pmssCustomerContextBareFunctionCalls($tokens) as $call) {
-            $nameKey = strtolower($call['function']);
-            if (isset($builtins[$nameKey]) || isset($customerFunctions[$nameKey])) {
+        foreach (pmssCustomerContextCalls($tokens) as $call) {
+            $key = strtolower($call['function']);
+            if (isset($builtins[$key]) || isset($customerDefs[$key]) || pmssCustomerContextGuarded($tokens, $call['index'], $key)) {
                 continue;
             }
-            if (pmssCustomerContextCallHasFunctionExistsGuard($tokens, $call['index'], $call['function'])) {
-                continue;
-            }
-
             $violations[] = [
-                'file' => pmssCustomerContextRelativePath($rootDir, $file),
+                'file' => pmssCustomerContextRelative($root, $file),
                 'line' => $call['line'],
                 'function' => $call['function'],
-                'operator_tree_source' => isset($operatorFunctions[$nameKey])
-                    ? pmssCustomerContextRelativePath($rootDir, $operatorFunctions[$nameKey])
-                    : '',
+                'operator_tree_source' => isset($operatorDefs[$key]) ? pmssCustomerContextRelative($root, $operatorDefs[$key]) : '',
             ];
         }
     }
-
     return $violations;
 }
 
 /** Resolve the repository root, allowing tests to provide a hermetic fixture. */
-function pmssCustomerContextScanRoot(): string
+function pmssCustomerContextRoot(): string
 {
     $override = getenv('PMSS_CUSTOMER_CONTEXT_SCAN_ROOT');
-    if (is_string($override) && trim($override) !== '') {
-        return rtrim($override, '/');
-    }
-
-    return dirname(__DIR__, 2);
+    return is_string($override) && trim($override) !== '' ? rtrim($override, '/') : dirname(__DIR__, 2);
 }
 
 /** @return array<int, string> */
-function pmssCustomerContextCustomerDefinitionFiles(string $customerRoot, string $customerWww): array
+function pmssCustomerContextFiles(string $dir, bool $recursive): array
 {
-    $files = array_merge(
-        pmssCustomerContextPhpFiles($customerRoot, false),
-        pmssCustomerContextPhpFiles($customerWww, false)
-    );
-    $files = array_values(array_unique($files));
-    sort($files);
-    return $files;
-}
-
-/** @return array<int, string> */
-function pmssCustomerContextPhpFiles(string $dir, bool $recursive): array
-{
-    if (!is_dir($dir)) {
-        return [];
-    }
-
+    if (!is_dir($dir)) return [];
     $files = [];
-    if (!$recursive) {
-        $iterator = new DirectoryIterator($dir);
-        foreach ($iterator as $file) {
-            if (!$file->isFile() || $file->getExtension() !== 'php') {
-                continue;
-            }
-            $files[] = $file->getPathname();
-        }
-        sort($files);
-        return $files;
-    }
-
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
-    );
+    $iterator = $recursive
+        ? new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS))
+        : new DirectoryIterator($dir);
     foreach ($iterator as $file) {
         $path = $file->getPathname();
-        if ($file->getExtension() !== 'php' || strpos($path, '/tests/') !== false || strpos($path, '/devristo/') !== false) {
-            continue;
-        }
+        if (!$file->isFile() || $file->getExtension() !== 'php') continue;
+        if ($recursive && (strpos($path, '/tests/') !== false || strpos($path, '/devristo/') !== false)) continue;
         $files[] = $path;
     }
     sort($files);
@@ -137,346 +89,227 @@ function pmssCustomerContextPhpFiles(string $dir, bool $recursive): array
 /** @return array<int, mixed> */
 function pmssCustomerContextTokens(string $file): array
 {
-    $contents = file_get_contents($file);
-    return token_get_all(is_string($contents) ? $contents : '');
+    $content = file_get_contents($file);
+    return token_get_all(is_string($content) ? $content : '');
 }
 
 /** @return array<string, string> */
-function pmssCustomerContextFunctionDefinitions(array $files): array
+function pmssCustomerContextDefinitions(array $files): array
 {
-    $definitions = [];
-    foreach ($files as $file) {
+    $defs = [];
+    foreach (array_values(array_unique($files)) as $file) {
         $tokens = pmssCustomerContextTokens($file);
-        $count = count($tokens);
-        for ($i = 0; $i < $count; $i++) {
-            if (!pmssCustomerContextTokenIs($tokens[$i], T_FUNCTION)) {
-                continue;
-            }
-            $nameIndex = pmssCustomerContextNextSignificantIndex($tokens, $i);
-            if ($nameIndex !== null && pmssCustomerContextTokenText($tokens[$nameIndex]) === '&') {
-                $nameIndex = pmssCustomerContextNextSignificantIndex($tokens, $nameIndex);
-            }
-            if ($nameIndex !== null && pmssCustomerContextTokenIs($tokens[$nameIndex], T_STRING)) {
-                $definitions[strtolower($tokens[$nameIndex][1])] = $file;
-            }
+        for ($i = 0, $n = count($tokens); $i < $n; $i++) {
+            if (!pmssCustomerContextIs($tokens[$i], T_FUNCTION)) continue;
+            $name = pmssCustomerContextNext($tokens, $i);
+            if ($name !== null && pmssCustomerContextText($tokens[$name]) === '&') $name = pmssCustomerContextNext($tokens, $name);
+            if ($name !== null && pmssCustomerContextIs($tokens[$name], T_STRING)) $defs[strtolower($tokens[$name][1])] = $file;
         }
     }
-    return $definitions;
+    return $defs;
 }
 
 /** @return array<string, true> */
-function pmssCustomerContextBuiltinFunctions(): array
+function pmssCustomerContextBuiltins(): array
 {
-    $defined = get_defined_functions();
-    $builtins = [];
-    foreach (($defined['internal'] ?? []) as $function) {
-        $builtins[strtolower($function)] = true;
-    }
-    return $builtins;
+    $out = [];
+    foreach ((get_defined_functions()['internal'] ?? []) as $name) $out[strtolower($name)] = true;
+    return $out;
 }
 
 /** @return array<int, array{index:int,function:string,line:int}> */
-function pmssCustomerContextBareFunctionCalls(array $tokens): array
+function pmssCustomerContextCalls(array $tokens): array
 {
     $calls = [];
-    foreach ($tokens as $index => $token) {
-        if (!pmssCustomerContextTokenIs($token, T_STRING)) {
-            continue;
-        }
-        $next = pmssCustomerContextNextSignificantIndex($tokens, $index);
-        if ($next === null || pmssCustomerContextTokenText($tokens[$next]) !== '(') {
-            continue;
-        }
-        if (pmssCustomerContextIsDeclarationName($tokens, $index) || pmssCustomerContextIsMemberOrConstructorCall($tokens, $index)) {
-            continue;
-        }
-        $calls[] = ['index' => $index, 'function' => $token[1], 'line' => $token[2]];
+    foreach ($tokens as $i => $token) {
+        if (!pmssCustomerContextIs($token, T_STRING)) continue;
+        $next = pmssCustomerContextNext($tokens, $i);
+        if ($next === null || pmssCustomerContextText($tokens[$next]) !== '(') continue;
+        if (pmssCustomerContextDeclarationName($tokens, $i) || pmssCustomerContextMemberOrConstructor($tokens, $i)) continue;
+        $calls[] = ['index' => $i, 'function' => $token[1], 'line' => $token[2]];
     }
     return $calls;
 }
 
-/** Return true when a missing function call is guarded by function_exists(). */
-function pmssCustomerContextCallHasFunctionExistsGuard(array $tokens, int $callIndex, string $functionName): bool
+/** Return true when function_exists() proves a missing call cannot fatal. */
+function pmssCustomerContextGuarded(array $tokens, int $call, string $name): bool
 {
-    $guardNames = pmssCustomerContextGuardNamesForFunction($functionName);
-    return pmssCustomerContextSameExpressionHasGuard($tokens, $callIndex, $guardNames)
-        || pmssCustomerContextEnclosingIfHasGuard($tokens, $callIndex, $guardNames)
-        || pmssCustomerContextPreviousIfReturnsWhenMissing($tokens, $callIndex, $guardNames);
+    $guards = pmssCustomerContextGuardNames($name);
+    return pmssCustomerContextSameExpressionGuarded($tokens, $call, $guards)
+        || pmssCustomerContextEnclosingIfGuarded($tokens, $call, $guards)
+        || pmssCustomerContextPreviousIfReturns($tokens, $call, $guards);
 }
 
-/** Detect short-circuit guards like function_exists('x') && x(). */
-function pmssCustomerContextSameExpressionHasGuard(array $tokens, int $callIndex, array $guardNames): bool
+/** @return array<int, string> */
+function pmssCustomerContextGuardNames(string $name): array
 {
-    $start = pmssCustomerContextPreviousBoundaryIndex($tokens, $callIndex);
-    for ($i = $start + 1; $i < $callIndex; $i++) {
-        $guard = pmssCustomerContextFunctionExistsGuardAt($tokens, $i, $guardNames);
-        if ($guard === null) {
-            continue;
-        }
-        $operator = pmssCustomerContextGuardOperatorBetween($tokens, $guard['end'], $callIndex);
-        if ((!$guard['negated'] && ($operator === 'and' || $operator === 'ternary')) || ($guard['negated'] && $operator === 'or')) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/** Detect enclosing guards like if (function_exists('x')) { x(); }. */
-function pmssCustomerContextEnclosingIfHasGuard(array $tokens, int $callIndex, array $guardNames): bool
-{
-    $searchIndex = $callIndex;
-    while (($openBrace = pmssCustomerContextNearestOpenBrace($tokens, $searchIndex)) !== null) {
-        $closeParen = pmssCustomerContextPreviousSignificantIndex($tokens, $openBrace);
-        $openParen = ($closeParen !== null && pmssCustomerContextTokenText($tokens[$closeParen]) === ')')
-            ? pmssCustomerContextMatchingOpenParen($tokens, $closeParen)
-            : null;
-        if ($openParen !== null && pmssCustomerContextConditionHasFunctionExistsGuard($tokens, $openParen, $closeParen, $guardNames, false)) {
-            return true;
-        }
-        $searchIndex = $openBrace;
-    }
-    return false;
-}
-
-/** @return array{end:int,negated:bool}|null */
-function pmssCustomerContextFunctionExistsGuardAt(array $tokens, int $index, array $guardNames): ?array
-{
-    if (!pmssCustomerContextTokenIs($tokens[$index], T_STRING) || strtolower($tokens[$index][1]) !== 'function_exists') {
-        return null;
-    }
-    $openParen = pmssCustomerContextNextSignificantIndex($tokens, $index);
-    $literal = $openParen === null ? null : pmssCustomerContextNextSignificantIndex($tokens, $openParen);
-    if ($openParen === null || $literal === null || pmssCustomerContextTokenText($tokens[$openParen]) !== '(' || !pmssCustomerContextTokenIs($tokens[$literal], T_CONSTANT_ENCAPSED_STRING)) {
-        return null;
-    }
-    if (!in_array(strtolower(pmssCustomerContextStringLiteral($tokens[$literal])), $guardNames, true)) {
-        return null;
-    }
-    $closeParen = pmssCustomerContextNextSignificantIndex($tokens, $literal);
-    $previous = pmssCustomerContextPreviousSignificantIndex($tokens, $index);
-    return [
-        'end' => $closeParen !== null ? $closeParen : $literal,
-        'negated' => $previous !== null && pmssCustomerContextTokenText($tokens[$previous]) === '!',
-    ];
-}
-
-/** Return guard function names that prove the requested function family exists. */
-function pmssCustomerContextGuardNamesForFunction(string $functionName): array
-{
-    $name = strtolower($functionName);
     $guards = [$name];
-    if (strpos($name, 'zip_') === 0) {
-        $guards[] = 'zip_open';
-    }
+    if (strpos($name, 'zip_') === 0) $guards[] = 'zip_open';
     return array_values(array_unique($guards));
 }
 
-/** Detect a preceding if (!function_exists('x')) { return; } guard. */
-function pmssCustomerContextPreviousIfReturnsWhenMissing(array $tokens, int $callIndex, array $guardNames): bool
+/** Detect short-circuit guards like function_exists('x') && x(). */
+function pmssCustomerContextSameExpressionGuarded(array $tokens, int $call, array $guards): bool
 {
-    $boundary = pmssCustomerContextPreviousBoundaryIndex($tokens, $callIndex);
-    if ($boundary < 0 || pmssCustomerContextTokenText($tokens[$boundary]) !== '}') {
-        return false;
-    }
-    $openBrace = pmssCustomerContextMatchingOpenBraceForClose($tokens, $boundary);
-    if ($openBrace === null || !pmssCustomerContextBlockHasTerminalReturn($tokens, $openBrace, $boundary)) {
-        return false;
-    }
-    $closeParen = pmssCustomerContextPreviousSignificantIndex($tokens, $openBrace);
-    $openParen = ($closeParen !== null && pmssCustomerContextTokenText($tokens[$closeParen]) === ')')
-        ? pmssCustomerContextMatchingOpenParen($tokens, $closeParen)
-        : null;
-    return $openParen !== null
-        && pmssCustomerContextConditionHasFunctionExistsGuard($tokens, $openParen, $closeParen, $guardNames, true);
-}
-
-/** Return true when an if condition contains the expected function_exists guard. */
-function pmssCustomerContextConditionHasFunctionExistsGuard(array $tokens, int $openParen, int $closeParen, array $guardNames, bool $requireNegated): bool
-{
-    $beforeParen = pmssCustomerContextPreviousSignificantIndex($tokens, $openParen);
-    if ($beforeParen === null || !pmssCustomerContextTokenIs($tokens[$beforeParen], T_IF)) {
-        return false;
-    }
-    for ($i = $openParen + 1; $i < $closeParen; $i++) {
-        $guard = pmssCustomerContextFunctionExistsGuardAt($tokens, $i, $guardNames);
-        if ($guard !== null && $guard['negated'] === $requireNegated) {
-            return true;
-        }
+    for ($i = pmssCustomerContextBoundary($tokens, $call) + 1; $i < $call; $i++) {
+        $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
+        if ($guard === null) continue;
+        $operator = pmssCustomerContextGuardOperator($tokens, $guard['end'], $call);
+        if ((!$guard['negated'] && ($operator === 'and' || $operator === 'ternary')) || ($guard['negated'] && $operator === 'or')) return true;
     }
     return false;
 }
 
-/** Return true when a guard block exits before the guarded call can run. */
-function pmssCustomerContextBlockHasTerminalReturn(array $tokens, int $openBrace, int $closeBrace): bool
+/** Detect ancestor blocks guarded by if (function_exists('x')). */
+function pmssCustomerContextEnclosingIfGuarded(array $tokens, int $call, array $guards): bool
 {
-    for ($i = $openBrace + 1; $i < $closeBrace; $i++) {
-        if (pmssCustomerContextTokenIs($tokens[$i], T_RETURN) || pmssCustomerContextTokenIs($tokens[$i], T_EXIT)) {
-            return true;
-        }
+    $cursor = $call;
+    while (($brace = pmssCustomerContextNearestOpenBrace($tokens, $cursor)) !== null) {
+        $closeParen = pmssCustomerContextPrev($tokens, $brace);
+        $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
+        if ($openParen !== null && pmssCustomerContextConditionGuarded($tokens, $openParen, $closeParen, $guards, false)) return true;
+        $cursor = $brace;
     }
     return false;
 }
 
-/** Return the short-circuit operator between a guard and guarded call. */
-function pmssCustomerContextGuardOperatorBetween(array $tokens, int $start, int $end): string
+/** Detect immediately preceding if (!function_exists('x')) { return; }. */
+function pmssCustomerContextPreviousIfReturns(array $tokens, int $call, array $guards): bool
+{
+    $boundary = pmssCustomerContextBoundary($tokens, $call);
+    if ($boundary < 0 || pmssCustomerContextText($tokens[$boundary]) !== '}') return false;
+    $openBrace = pmssCustomerContextMatchOpen($tokens, $boundary, '{', '}');
+    if ($openBrace === null || !pmssCustomerContextBlockReturns($tokens, $openBrace, $boundary)) return false;
+    $closeParen = pmssCustomerContextPrev($tokens, $openBrace);
+    $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
+    return $openParen !== null && pmssCustomerContextConditionGuarded($tokens, $openParen, $closeParen, $guards, true);
+}
+
+/** @return array{end:int,negated:bool}|null */
+function pmssCustomerContextFunctionExistsAt(array $tokens, int $i, array $guards): ?array
+{
+    if (!pmssCustomerContextIs($tokens[$i], T_STRING) || strtolower($tokens[$i][1]) !== 'function_exists') return null;
+    $open = pmssCustomerContextNext($tokens, $i);
+    $literal = $open === null ? null : pmssCustomerContextNext($tokens, $open);
+    if ($open === null || $literal === null || pmssCustomerContextText($tokens[$open]) !== '(' || !pmssCustomerContextIs($tokens[$literal], T_CONSTANT_ENCAPSED_STRING)) return null;
+    if (!in_array(strtolower(stripcslashes(substr((string) $tokens[$literal][1], 1, -1))), $guards, true)) return null;
+    $previous = pmssCustomerContextPrev($tokens, $i);
+    return ['end' => pmssCustomerContextNext($tokens, $literal) ?? $literal, 'negated' => $previous !== null && pmssCustomerContextText($tokens[$previous]) === '!'];
+}
+
+/** Return true when an if condition contains the requested guard polarity. */
+function pmssCustomerContextConditionGuarded(array $tokens, int $open, int $close, array $guards, bool $negated): bool
+{
+    $before = pmssCustomerContextPrev($tokens, $open);
+    if ($before === null || !pmssCustomerContextIs($tokens[$before], T_IF)) return false;
+    for ($i = $open + 1; $i < $close; $i++) {
+        $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
+        if ($guard !== null && $guard['negated'] === $negated) return true;
+    }
+    return false;
+}
+
+/** Return short-circuit operator between a guard and a guarded call. */
+function pmssCustomerContextGuardOperator(array $tokens, int $start, int $end): string
 {
     for ($i = $start + 1; $i < $end; $i++) {
-        if (pmssCustomerContextTokenIs($tokens[$i], T_BOOLEAN_AND) || pmssCustomerContextTokenText($tokens[$i]) === '&&') {
-            return 'and';
-        }
-        if (pmssCustomerContextTokenIs($tokens[$i], T_BOOLEAN_OR) || pmssCustomerContextTokenText($tokens[$i]) === '||') {
-            return 'or';
-        }
-        if (pmssCustomerContextTokenText($tokens[$i]) === '?') {
-            return 'ternary';
-        }
+        if (pmssCustomerContextIs($tokens[$i], T_BOOLEAN_AND) || pmssCustomerContextText($tokens[$i]) === '&&') return 'and';
+        if (pmssCustomerContextIs($tokens[$i], T_BOOLEAN_OR) || pmssCustomerContextText($tokens[$i]) === '||') return 'or';
+        if (pmssCustomerContextText($tokens[$i]) === '?') return 'ternary';
     }
     return '';
 }
 
-/** Return true when the T_STRING is the declared function name. */
-function pmssCustomerContextIsDeclarationName(array $tokens, int $index): bool
+function pmssCustomerContextDeclarationName(array $tokens, int $i): bool
 {
-    $previous = pmssCustomerContextPreviousSignificantIndex($tokens, $index);
-    if ($previous !== null && pmssCustomerContextTokenIs($tokens[$previous], T_FUNCTION)) {
-        return true;
-    }
-    $beforeReference = $previous !== null && pmssCustomerContextTokenText($tokens[$previous]) === '&'
-        ? pmssCustomerContextPreviousSignificantIndex($tokens, $previous)
-        : null;
-    return $beforeReference !== null && pmssCustomerContextTokenIs($tokens[$beforeReference], T_FUNCTION);
+    $prev = pmssCustomerContextPrev($tokens, $i);
+    if ($prev !== null && pmssCustomerContextIs($tokens[$prev], T_FUNCTION)) return true;
+    $beforeRef = $prev !== null && pmssCustomerContextText($tokens[$prev]) === '&' ? pmssCustomerContextPrev($tokens, $prev) : null;
+    return $beforeRef !== null && pmssCustomerContextIs($tokens[$beforeRef], T_FUNCTION);
 }
 
-/** Return true for method, static-method, and constructor-like calls. */
-function pmssCustomerContextIsMemberOrConstructorCall(array $tokens, int $index): bool
+function pmssCustomerContextMemberOrConstructor(array $tokens, int $i): bool
 {
-    $previous = pmssCustomerContextPreviousSignificantIndex($tokens, $index);
-    if ($previous === null) {
-        return false;
-    }
-    if (pmssCustomerContextTokenIs($tokens[$previous], T_OBJECT_OPERATOR) || pmssCustomerContextTokenIs($tokens[$previous], T_DOUBLE_COLON) || pmssCustomerContextTokenIs($tokens[$previous], T_NEW)) {
-        return true;
-    }
-    return pmssCustomerContextTokenText($tokens[$previous]) === '\\';
+    $prev = pmssCustomerContextPrev($tokens, $i);
+    if ($prev === null) return false;
+    return pmssCustomerContextIs($tokens[$prev], T_OBJECT_OPERATOR)
+        || pmssCustomerContextIs($tokens[$prev], T_DOUBLE_COLON)
+        || pmssCustomerContextIs($tokens[$prev], T_NEW)
+        || pmssCustomerContextText($tokens[$prev]) === '\\';
 }
 
-/** Return nearest unmatched opening brace before a token index. */
-function pmssCustomerContextNearestOpenBrace(array $tokens, int $index): ?int
+function pmssCustomerContextBlockReturns(array $tokens, int $open, int $close): bool
+{
+    for ($i = $open + 1; $i < $close; $i++) {
+        if (pmssCustomerContextIs($tokens[$i], T_RETURN) || pmssCustomerContextIs($tokens[$i], T_EXIT)) return true;
+    }
+    return false;
+}
+
+function pmssCustomerContextNearestOpenBrace(array $tokens, int $i): ?int
 {
     $depth = 0;
-    for ($i = $index - 1; $i >= 0; $i--) {
-        $text = pmssCustomerContextTokenText($tokens[$i]);
-        if ($text === '}') {
-            $depth++;
-        } elseif ($text === '{') {
-            if ($depth === 0) {
-                return $i;
-            }
-            $depth--;
-        }
+    for ($j = $i - 1; $j >= 0; $j--) {
+        $text = pmssCustomerContextText($tokens[$j]);
+        if ($text === '}') $depth++;
+        if ($text === '{' && $depth-- === 0) return $j;
     }
     return null;
 }
 
-/** Return matching opening parenthesis for a closing parenthesis token. */
-function pmssCustomerContextMatchingOpenParen(array $tokens, int $closeIndex): ?int
+function pmssCustomerContextMatchOpen(array $tokens, int $close, string $openText, string $closeText): ?int
 {
     $depth = 0;
-    for ($i = $closeIndex; $i >= 0; $i--) {
-        $text = pmssCustomerContextTokenText($tokens[$i]);
-        if ($text === ')') {
-            $depth++;
-        } elseif ($text === '(') {
-            $depth--;
-            if ($depth === 0) {
-                return $i;
-            }
-        }
+    for ($i = $close; $i >= 0; $i--) {
+        $text = pmssCustomerContextText($tokens[$i]);
+        if ($text === $closeText) $depth++;
+        if ($text === $openText && --$depth === 0) return $i;
     }
     return null;
 }
 
-/** Return matching opening brace for a closing brace token. */
-function pmssCustomerContextMatchingOpenBraceForClose(array $tokens, int $closeIndex): ?int
+function pmssCustomerContextBoundary(array $tokens, int $i): int
 {
-    $depth = 0;
-    for ($i = $closeIndex; $i >= 0; $i--) {
-        $text = pmssCustomerContextTokenText($tokens[$i]);
-        if ($text === '}') {
-            $depth++;
-        } elseif ($text === '{') {
-            $depth--;
-            if ($depth === 0) {
-                return $i;
-            }
-        }
-    }
-    return null;
-}
-
-/** Return previous statement or block boundary index. */
-function pmssCustomerContextPreviousBoundaryIndex(array $tokens, int $index): int
-{
-    for ($i = $index - 1; $i >= 0; $i--) {
-        if (in_array(pmssCustomerContextTokenText($tokens[$i]), [';', '{', '}'], true)) {
-            return $i;
-        }
+    for ($j = $i - 1; $j >= 0; $j--) {
+        if (in_array(pmssCustomerContextText($tokens[$j]), [';', '{', '}'], true)) return $j;
     }
     return -1;
 }
 
-/** Return the next non-whitespace/comment token index. */
-function pmssCustomerContextNextSignificantIndex(array $tokens, int $index): ?int
+function pmssCustomerContextNext(array $tokens, int $i): ?int
 {
-    $count = count($tokens);
-    for ($i = $index + 1; $i < $count; $i++) {
-        if (!pmssCustomerContextIsTrivia($tokens[$i])) {
-            return $i;
-        }
+    for ($j = $i + 1, $n = count($tokens); $j < $n; $j++) {
+        if (!pmssCustomerContextTrivia($tokens[$j])) return $j;
     }
     return null;
 }
 
-/** Return the previous non-whitespace/comment token index. */
-function pmssCustomerContextPreviousSignificantIndex(array $tokens, int $index): ?int
+function pmssCustomerContextPrev(array $tokens, int $i): ?int
 {
-    for ($i = $index - 1; $i >= 0; $i--) {
-        if (!pmssCustomerContextIsTrivia($tokens[$i])) {
-            return $i;
-        }
+    for ($j = $i - 1; $j >= 0; $j--) {
+        if (!pmssCustomerContextTrivia($tokens[$j])) return $j;
     }
     return null;
 }
 
-/** Return true for whitespace and comments ignored by token adjacency checks. */
-function pmssCustomerContextIsTrivia($token): bool
+function pmssCustomerContextTrivia($token): bool
 {
     return is_array($token) && in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true);
 }
 
-/** Return true when a token array has the requested token id. */
-function pmssCustomerContextTokenIs($token, int $tokenId): bool
+function pmssCustomerContextIs($token, int $id): bool
 {
-    return is_array($token) && $token[0] === $tokenId;
+    return is_array($token) && $token[0] === $id;
 }
 
-/** Return source text for array and single-character tokens. */
-function pmssCustomerContextTokenText($token): string
+function pmssCustomerContextText($token): string
 {
     return is_array($token) ? (string) $token[1] : (string) $token;
 }
 
-/** Decode a simple PHP string literal token. */
-function pmssCustomerContextStringLiteral(array $token): string
+function pmssCustomerContextRelative(string $root, string $path): string
 {
-    $value = (string) $token[1];
-    return stripcslashes(substr($value, 1, -1));
-}
-
-/** Return a stable repository-relative path when possible. */
-function pmssCustomerContextRelativePath(string $rootDir, string $path): string
-{
-    $rootDir = rtrim(str_replace('\\', '/', $rootDir), '/');
+    $root = rtrim(str_replace('\\', '/', $root), '/');
     $path = str_replace('\\', '/', $path);
-    return strpos($path, $rootDir.'/') === 0 ? substr($path, strlen($rootDir) + 1) : $path;
+    return strpos($path, $root.'/') === 0 ? substr($path, strlen($root) + 1) : $path;
 }
