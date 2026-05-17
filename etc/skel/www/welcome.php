@@ -39,9 +39,11 @@ $pmssUserTrafficLimitLib = __DIR__.'/userTrafficLimit.php';
 if (file_exists($pmssUserTrafficLimitLib)) {
     require_once $pmssUserTrafficLimitLib;
 }
-if (file_exists('/scripts/lib/traffic/storage.php')) {
-    require_once '/scripts/lib/traffic/storage.php';
-}
+// /scripts/lib/traffic/storage.php require removed 2026-05-17: dead code
+// — no function from traffic/storage.php was called from customer PHP.
+// pmssTrafficLimitStateRead (the only function welcome.php / stats.php use)
+// lives in customer-readable userTrafficLimit.php (see ADR 0016).
+
 
 $pageState = pmssWelcomePageStateBuild();
 $quotaInfo = $pageState['quotaInfo'];
