@@ -46,15 +46,11 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectPrefersCodenameWhenVersionMismatches(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID'                => 'debian',
             'VERSION_ID'        => '11',
             'VERSION_CODENAME'  => 'bookworm',
-        ], function (): void {
-            $detected = \pmssDetectDistro();
-            $this->assertEquals(12, $detected['version']);
-            $this->assertEquals('bookworm', $detected['codename']);
-        });
+        ], 'debian', 12, 'bookworm');
     }
 
     /**
@@ -62,14 +58,10 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectFallsBackToVersionId(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID'         => 'debian',
             'VERSION_ID' => '11',
-        ], function (): void {
-            $detected = \pmssDetectDistro();
-            $this->assertEquals(11, $detected['version']);
-            $this->assertEquals('', $detected['codename']);
-        }, true);
+        ], 'debian', 11, '', true);
     }
 
     /**
@@ -77,15 +69,11 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectNormalisesCodenameCase(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID'                => 'debian',
             'VERSION_CODENAME'  => 'Bullseye',
             'VERSION_ID'        => '',
-        ], function (): void {
-            $detected = \pmssDetectDistro();
-            $this->assertEquals('bullseye', $detected['codename']);
-            $this->assertEquals(11, $detected['version']);
-        });
+        ], 'debian', 11, 'bullseye');
     }
 
     public function testOsReleaseHelpersNormalizeCodenameAndMajorVersion(): void
@@ -105,12 +93,9 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectHandlesMissingVersionSignals(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID' => 'debian',
-        ], function (): void {
-            $detected = \pmssDetectDistro();
-            $this->assertEquals(0, $detected['version']);
-        }, true);
+        ], 'debian', 0, '', true);
     }
 
     /**
@@ -118,13 +103,10 @@ class DistroDetectionTest extends TestCase
      */
     public function testDetectParsesMessyVersionId(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID'         => 'debian',
             'VERSION_ID' => '12 (testing snapshot)',
-        ], function (): void {
-            $detected = \pmssDetectDistro();
-            $this->assertEquals(12, $detected['version']);
-        }, true);
+        ], 'debian', 12, '', true);
     }
 
     /**

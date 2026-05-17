@@ -901,6 +901,17 @@ abstract class TestCase
         }
     }
 
+    /** Assert distro detection output from a staged os-release fixture. */
+    protected function pmssAssertDetectedDistro(array $fields, string $expectedName, int $expectedVersion, string $expectedCodename, bool $maskLsbRelease = false): void
+    {
+        $this->pmssWithOsRelease($fields, function () use ($expectedCodename, $expectedName, $expectedVersion): void {
+            $detected = \pmssDetectDistro();
+            $this->assertEquals($expectedName, $detected['name']);
+            $this->assertEquals($expectedVersion, $detected['version']);
+            $this->assertEquals($expectedCodename, $detected['codename']);
+        }, $maskLsbRelease);
+    }
+
     /**
      * Render an os-release fixture body from key/value pairs.
      *

@@ -9,55 +9,38 @@ class DistroRepoSelectionEdgeTest extends TestCase
 {
     public function testDetectDistroLowercasesId(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID' => 'Debian',
             'VERSION_ID' => '11',
             'VERSION_CODENAME' => 'BULLSEYE',
-        ], function (): void {
-            $info = \pmssDetectDistro();
-            $this->assertEquals('debian', $info['name']);
-            $this->assertEquals(11, $info['version']);
-            $this->assertEquals('bullseye', $info['codename']);
-        });
+        ], 'debian', 11, 'bullseye');
     }
 
     public function testDetectDistroNormalisesUppercaseCodename(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID' => 'debian',
             'VERSION_ID' => '12',
             'VERSION_CODENAME' => 'BOOKWORM',
-        ], function (): void {
-            $info = \pmssDetectDistro();
-            $this->assertEquals('bookworm', $info['codename']);
-            $this->assertEquals(12, $info['version']);
-        });
+        ], 'debian', 12, 'bookworm');
     }
 
     public function testDetectDistroUnknownCodenameKeepsVersion(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID' => 'debian',
             'VERSION_ID' => '77',
             'VERSION_CODENAME' => 'aurora',
-        ], function (): void {
-            $info = \pmssDetectDistro();
-            $this->assertEquals(77, $info['version']);
-            $this->assertEquals('aurora', $info['codename']);
-        });
+        ], 'debian', 77, 'aurora');
     }
 
     public function testDetectDistroWhitespaceInCodename(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID' => 'debian',
             'VERSION_ID' => '13',
             'VERSION_CODENAME' => '  trixie  ',
-        ], function (): void {
-            $info = \pmssDetectDistro();
-            $this->assertEquals('trixie', $info['codename']);
-            $this->assertEquals(13, $info['version']);
-        });
+        ], 'debian', 13, 'trixie');
     }
 
     public function testDetectDistroResetCacheSwitchesFiles(): void

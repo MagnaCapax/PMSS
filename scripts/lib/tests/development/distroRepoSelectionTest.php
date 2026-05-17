@@ -22,16 +22,11 @@ class DistroRepoSelectionTest extends TestCase
      */
     public function testDetectDistroTrustsCodenameForVersion(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID' => 'debian',
             'VERSION_ID' => '10',
             'VERSION_CODENAME' => 'bullseye',
-        ], function (): void {
-            $info = \pmssDetectDistro();
-            $this->assertEquals('debian', $info['name']);
-            $this->assertEquals('bullseye', $info['codename']);
-            $this->assertEquals(11, $info['version']);
-        });
+        ], 'debian', 11, 'bullseye');
     }
 
     /**
@@ -39,15 +34,11 @@ class DistroRepoSelectionTest extends TestCase
      */
     public function testDetectDistroFallsBackToVersionDigits(): void
     {
-        $this->pmssWithOsRelease([
+        $this->pmssAssertDetectedDistro([
             'ID' => 'debian',
             'VERSION_ID' => '42',
             'VERSION_CODENAME' => 'hyperion',
-        ], function (): void {
-            $info = \pmssDetectDistro();
-            $this->assertEquals(42, $info['version']);
-            $this->assertEquals('hyperion', $info['codename']);
-        });
+        ], 'debian', 42, 'hyperion');
     }
 
     /**
