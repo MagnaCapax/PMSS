@@ -11,17 +11,6 @@ function pmssPinnedRemoteChecksum(string $path): string
     return is_string($checksum) ? strtolower($checksum) : '';
 }
 
-/** Validate pinned artifact URLs before logging or invoking wget. */
-function pmssPinnedRemoteUrlIsSafe(string $url): bool
-{
-    $host = parse_url($url, PHP_URL_HOST);
-
-    return strpos($url, 'https://') === 0
-        && preg_match('/[\x00-\x1F\x7F]/', $url) !== 1
-        && is_string($host)
-        && $host !== '';
-}
-
 function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): bool
 {
     return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
@@ -48,12 +37,6 @@ function pmssPinnedRemoteArchiveWorkDirIsSafe(string $workDir): bool
         && strpos($trimmed.'/', '/../') === false;
 }
 
-/** Validate a binary install destination before crossing into `install(1)`. */
-function pmssPinnedRemoteDestinationIsSafe(string $destination): bool
-{
-    return pmssPathTargetIsSafe($destination, false, true);
-}
-
 // Download a pinned artifact to a temp file; caller owns cleanup.
 function pmssDownloadPinnedRemoteTempFile(
     string $label,
@@ -69,7 +52,12 @@ function pmssDownloadPinnedRemoteTempFile(
         return null;
     }
 
-    if (!pmssPinnedRemoteUrlIsSafe($url)) {
+    $host = parse_url($url, PHP_URL_HOST);
+    if (strpos($url, 'https://') !== 0
+        || preg_match('/[\x00-\x1F\x7F]/', $url) === 1
+        || !is_string($host)
+        || $host === ''
+    ) {
         logmsg("[WARN] Refusing unsafe remote URL for {$label}");
         return null;
     }
@@ -157,7 +145,7 @@ function pmssInstallPinnedRemoteBinary(
     string $destination,
     bool $refreshWhenPresent
 ): void {
-    if (!pmssPinnedRemoteDestinationIsSafe($destination)) {
+    if (!pmssPathTargetIsSafe($destination, false, true)) {
         logmsg("[WARN] Refusing unsafe install destination for {$label}: {$destination}");
         return;
     }

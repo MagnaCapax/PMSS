@@ -43,18 +43,6 @@ function pmssPortManagerReadAssignedPort(string $portFile): ?int
 }
 
 /**
- * Ensure the assignment directory is an absolute, non-symlinked filesystem path.
- */
-function pmssPortManagerEnsurePortDir(string $portDir): bool
-{
-    return function_exists('pmssPathTargetIsSafe')
-        && pmssPathTargetIsSafe($portDir, true)
-        && pmssDirEnsureExists($portDir, 0755)
-        && is_dir($portDir)
-        && !is_link($portDir);
-}
-
-/**
  * Guard assignment file reads/writes/removals against symlink and type tricks.
  */
 function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile): bool
@@ -125,7 +113,11 @@ function pmssPortManagerMain(array $argv): int
     }
 
     $portDir = rtrim(pmssResolvePathFromEnv('PMSS_PORT_MANAGER_DIR', '/etc/seedbox/runtime/ports'), '/');
-    if (!pmssPortManagerEnsurePortDir($portDir)) {
+    if (!pmssPathTargetIsSafe($portDir, true)
+        || !pmssDirEnsureExists($portDir, 0755)
+        || !is_dir($portDir)
+        || is_link($portDir)
+    ) {
         return pmssPortManagerFail("Error: unable to initialize port directory\n");
     }
 

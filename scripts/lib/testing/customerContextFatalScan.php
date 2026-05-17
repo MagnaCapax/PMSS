@@ -41,7 +41,7 @@ function pmssCustomerContextFatalScan(string $root): array
     $wwwFiles = pmssCustomerContextFiles($www, false);
     $customerDefs = pmssCustomerContextDefinitions(array_merge(pmssCustomerContextFiles($skel, false), $wwwFiles));
     $operatorDefs = pmssCustomerContextDefinitions(pmssCustomerContextFiles($root.'/scripts/lib', true));
-    $builtins = pmssCustomerContextBuiltins();
+    $builtins = array_fill_keys(array_map('strtolower', get_defined_functions()['internal'] ?? []), true);
     $violations = [];
 
     foreach ($wwwFiles as $file) {
@@ -110,12 +110,6 @@ function pmssCustomerContextDefinitions(array $files): array
     return $defs;
 }
 
-/** @return array<string, true> */
-function pmssCustomerContextBuiltins(): array
-{
-    return array_fill_keys(array_map('strtolower', get_defined_functions()['internal'] ?? []), true);
-}
-
 /** @return array<int, array{index:int,function:string,line:int}> */
 function pmssCustomerContextCalls(array $tokens): array
 {
@@ -133,16 +127,10 @@ function pmssCustomerContextCalls(array $tokens): array
 /** Return true when function_exists() proves a missing call cannot fatal. */
 function pmssCustomerContextGuarded(array $tokens, int $call, string $name): bool
 {
-    $guards = pmssCustomerContextGuardNames($name);
+    $guards = strpos($name, 'zip_') === 0 && $name !== 'zip_open' ? [$name, 'zip_open'] : [$name];
     return pmssCustomerContextSameExpressionGuarded($tokens, $call, $guards)
         || pmssCustomerContextEnclosingIfGuarded($tokens, $call, $guards)
         || pmssCustomerContextPreviousIfReturns($tokens, $call, $guards);
-}
-
-/** @return array<int, string> */
-function pmssCustomerContextGuardNames(string $name): array
-{
-    return strpos($name, 'zip_') === 0 && $name !== 'zip_open' ? [$name, 'zip_open'] : [$name];
 }
 
 /** Detect short-circuit guards like function_exists('x') && x(). */

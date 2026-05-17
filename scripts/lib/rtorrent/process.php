@@ -530,11 +530,7 @@ function rtorrentProcessRecentReboot(int $threshold = 600): bool
 function rtorrentProcessStaggerDelay(string $user, int $maxDelay = 300): int
 {
     $hash = crc32($user);
-    // crc32 returns signed int, convert to positive
-    if ($hash < 0) {
-        $hash = $hash & 0x7FFFFFFF;
-    }
-    return $hash % ($maxDelay + 1);
+    return ($hash < 0 ? $hash & 0x7FFFFFFF : $hash) % ($maxDelay + 1);
 }
 
 /**
