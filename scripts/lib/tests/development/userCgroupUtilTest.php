@@ -32,6 +32,11 @@ class UserCgroupUtilTest extends TestCase
         return new Manager($stub);
     }
 
+    private function makeManagerWithSystem(SystemInterface $stub): Manager
+    {
+        return new Manager($stub);
+    }
+
     public function testComputePropsClampsMemory(): void
     {
         $mgr = $this->makeManager();
@@ -116,6 +121,72 @@ class UserCgroupUtilTest extends TestCase
             $this->assertStringContainsString('IOReadIOPSMax=/dev/sdb 44', $out);
             $this->assertStringNotContainsString('IOWriteBandwidthMax=/dev/sdb', $out);
             $this->assertStringNotContainsString('IOWriteIOPSMax=/dev/sdb', $out);
+        });
+    }
+
+    public function testRejectsUnsafeDeviceSelectorBeforeResolution(): void
+    {
+        $stub = new class implements SystemInterface {
+            /** @var bool */
+            public $resolved = false;
+
+            public function getCgroupMode(): string { return 'v2'; }
+            public function getUid(string $user): int { return 1000; }
+            public function execute(string $command): ?string { return ''; }
+            public function readFile(string $path): ?string { return null; }
+            public function getTotalMemoryMiB(): int { return 0; }
+            public function resolveDevice(string $device): string { $this->resolved = true; return '/dev/sdb'; }
+            public function requireRoot(): void {}
+        };
+
+        $mgr = $this->makeManagerWithSystem($stub);
+        list($rc) = $this->pmssCaptureStdout(function () use ($mgr): int {
+            return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--device=/mnt/data set', '--io-profile=hdd']);
+        });
+
+        $this->assertEquals(2, $rc);
+        $this->assertFalse($stub->resolved, 'unsafe device selectors must not be resolved through findmnt');
+    }
+
+    public function testIoLatencySkipsUnsafeResolvedHomeDevice(): void
+    {
+        $stub = new class implements SystemInterface {
+            public function getCgroupMode(): string { return 'v2'; }
+            public function getUid(string $user): int { return 1000; }
+            public function execute(string $command): ?string { return ''; }
+            public function readFile(string $path): ?string { return null; }
+            public function getTotalMemoryMiB(): int { return 0; }
+            public function resolveDevice(string $device): string { return '/dev/bad target'; }
+            public function requireRoot(): void {}
+        };
+
+        $mgr = $this->makeManagerWithSystem($stub);
+        list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
+            return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--io-latency-ms=50']);
+        });
+
+        $this->assertEquals(0, $rc);
+        $this->assertStringContainsString('IODeviceLatencyTargetSec skipped', $out);
+        $this->assertStringNotContainsString('IODeviceLatencyTargetSec=/dev/bad target', $out);
+    }
+
+    public function testPolicyDefaultsSkipUnsafeDeviceTargets(): void
+    {
+        $cfgDir = $this->pmssMakeTempDir('pmss-cgroup-policy-');
+        $this->pmssWriteFile($cfgDir.'/cgroup.policy.php', '<?php return '.var_export([
+            'mounts' => [
+                '/dev/bad target' => ['ioWeight' => 200],
+            ],
+        ], true).";\n");
+
+        $this->pmssWithEnv(['PMSS_CONFIG_DIR' => $cfgDir], function (): void {
+            $mgr = $this->makeManager();
+            list($rc, $out) = $this->pmssCaptureStdout(function () use ($mgr): int {
+                return $mgr->run(['userConfigCgroup.php', 'testuser', '--dry-run', '--defaults']);
+            });
+
+            $this->assertEquals(0, $rc);
+            $this->assertStringNotContainsString('IODeviceWeight=/dev/bad target', $out);
         });
     }
 }

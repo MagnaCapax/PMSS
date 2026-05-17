@@ -138,6 +138,11 @@ class Manager
         // Profiles
         $this->expandProfiles($opt);
 
+        if (($invalidDeviceMessage = $this->validateDeviceSelector($device)) !== null) {
+            fwrite(STDERR, $invalidDeviceMessage."\n");
+            return 2;
+        }
+
         // IO Device resolution
         $devResolved = '';
         if ($device !== '') {
@@ -146,15 +151,19 @@ class Manager
             } else {
                 $devResolved = $this->sys->resolveDevice($device);
             }
-        }
 
-        if ($device !== '' && preg_match('/\s/', $device) === 1) {
-            fwrite(STDERR, "Invalid --device value: whitespace is not allowed\n");
-            return 2;
+            if ($devResolved !== '' && !$this->deviceTargetIsSafe($devResolved)) {
+                fwrite(STDERR, "Invalid resolved --device target: expected /dev/... without whitespace or NUL bytes\n");
+                return 2;
+            }
         }
 
         if (isset($opt['io-latency-ms']) && $devResolved === '') {
             $devResolved = $this->sys->resolveDevice('/home');
+            if ($devResolved !== '' && !$this->deviceTargetIsSafe($devResolved)) {
+                echo "[WARN] IODeviceLatencyTargetSec skipped: unsafe /home backing device target\n";
+                $devResolved = '';
+            }
         }
 
         // IO Profile
@@ -424,8 +433,8 @@ class Manager
 
             $devicePath = strpos($mountPath, '/dev/') === 0
                 ? trim($mountPath)
-                : trim($this->sys->resolveDevice($mountPath));
-            if ($devicePath === '') {
+                : ($this->validateDeviceSelector($mountPath) === null ? trim($this->sys->resolveDevice($mountPath)) : '');
+            if ($devicePath === '' || !$this->deviceTargetIsSafe($devicePath)) {
                 continue;
             }
 
@@ -661,6 +670,10 @@ class Manager
             $messages[] = '[WARN] io.cost skipped: unable to resolve /home backing device';
             return ['writes' => $writes, 'messages' => $messages];
         }
+        if (!$this->deviceTargetIsSafe($resolvedDevice)) {
+            $messages[] = '[WARN] io.cost skipped: unsafe backing device target';
+            return ['writes' => $writes, 'messages' => $messages];
+        }
 
         $majorMinor = $this->resolveIoCostMajorMinor($resolvedDevice);
         if ($majorMinor === '') {
@@ -722,6 +735,28 @@ class Manager
         }
 
         return '';
+    }
+
+    /** Reject shell-sensitive device selectors before mount resolution. */
+    private function validateDeviceSelector(string $device): ?string
+    {
+        if ($device === '') {
+            return null;
+        }
+
+        if (strpos($device, "\0") !== false || preg_match('/\s/', $device) === 1) {
+            return 'Invalid --device value: whitespace or NUL bytes are not allowed';
+        }
+
+        return null;
+    }
+
+    /** Keep systemd IO property device targets to plain /dev paths. */
+    private function deviceTargetIsSafe(string $device): bool
+    {
+        return strpos($device, '/dev/') === 0
+            && strpos($device, "\0") === false
+            && preg_match('/\s/', $device) !== 1;
     }
 
     /** Prefix plain nested keys with the resolved major:minor device token. */
