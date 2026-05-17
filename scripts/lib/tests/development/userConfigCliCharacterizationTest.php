@@ -79,27 +79,6 @@ class userConfigCliCharacterizationTest extends TestCase
         ], $resolved);
     }
 
-    public function testPersistedPresenceSkipsTransientTrafficLimit(): void
-    {
-        $presence = \pmssUserConfigCliPersistedResourcePresence(['options' => []], $this->userConfigCommandArgs([
-            '',
-            '200',
-            '',
-            '/dev/sda:5M',
-            '',
-            '',
-            '',
-            '150',
-        ]), 'addUserOption', 'userConfigIndex');
-
-        $this->assertFalse(array_key_exists('trafficLimit', $presence));
-        $this->assertTrue($presence['CPUWeight']);
-        $this->assertFalse($presence['IOWeight']);
-        $this->assertTrue($presence['IOReadBW']);
-        $this->assertTrue($presence['cpuQuotaPercent']);
-        $this->assertFalse($presence['trafficCapMbit']);
-    }
-
     public function testBuildUserConfigPositionalsKeepsExplicitZeroValues(): void
     {
         $positionals = \pmssUserConfigCliBuildUserConfigPositionals([
@@ -109,11 +88,14 @@ class userConfigCliCharacterizationTest extends TestCase
         $this->assertSame(['', '', '', '', '', '', '', '', '0'], $positionals);
     }
 
-    public function testPersistedPresenceKeepsExplicitZeroTrafficCap(): void
+    public function testExplicitResourcesDrivePersistedResourceUpdates(): void
     {
-        $presence = \pmssUserConfigCliPersistedResourcePresence(['options' => []], $this->userConfigCommandArgs([
-            '',
-            '',
+        [$parsed, $args] = $this->parsedInvocation([
+            'alice',
+            '512',
+            '100',
+            '900',
+            '200',
             '',
             '',
             '',
@@ -121,33 +103,20 @@ class userConfigCliCharacterizationTest extends TestCase
             '',
             '',
             '0',
-        ]), 'addUserOption', 'userConfigIndex');
+            '45',
+            'enable=1 ctrl=user',
+        ]);
+        $explicit = \pmssUserConfigCliExplicitResources($parsed, $args, 'addUserOption', 'userConfigIndex');
+        $presence = array_fill_keys(array_keys($explicit), true);
 
-        $this->assertTrue($presence['trafficCapMbit']);
-        $this->assertFalse($presence['CPUWeight']);
-    }
+        $this->assertSame([
+            'trafficLimit',
+            'trafficCapMbit',
+            'CPUWeight',
+            'ioLatencyMs',
+            'ioCostQos',
+        ], array_keys($explicit));
 
-    public function testPersistedPresenceTracksNamedResourceOptions(): void
-    {
-        [$parsed, $args] = $this->parsedInvocation(
-            ['alice'],
-            [
-                'cpu-weight' => '250',
-                'io-latency-ms' => '45',
-                'traffic-cap-mbit' => '0',
-            ]
-        );
-
-        $presence = \pmssUserConfigCliPersistedResourcePresence($parsed, $args, 'addUserOption', 'userConfigIndex');
-
-        $this->assertTrue($presence['CPUWeight']);
-        $this->assertTrue($presence['ioLatencyMs']);
-        $this->assertTrue($presence['trafficCapMbit']);
-        $this->assertFalse($presence['IOWeight']);
-    }
-
-    public function testApplyPersistedResourcesUsesSharedPersistedKeyList(): void
-    {
         $payload = \pmssUserConfigCliApplyPersistedResources(
             [
                 'CPUWeight' => 100,
@@ -160,13 +129,7 @@ class userConfigCliCharacterizationTest extends TestCase
                 'ioLatencyMs' => 45,
                 'ioCostQos' => 'enable=1 ctrl=user',
             ],
-            [
-                'CPUWeight' => true,
-                'trafficCapMbit' => true,
-                'trafficLimit' => true,
-                'ioLatencyMs' => true,
-                'ioCostQos' => true,
-            ]
+            $presence
         );
 
         $this->assertSame(200, $payload['CPUWeight']);

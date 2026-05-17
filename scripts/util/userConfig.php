@@ -131,7 +131,7 @@ if ($namedConfigMode) {
     $user = array_merge($user, $explicitResourceOverrides);
 }
 
-$presence = pmssUserConfigCliPersistedResourcePresence($parsed, $args, 'addUserOption', 'userConfigIndex');
+$presence = array_fill_keys(array_keys($explicitResourceOverrides), true);
 
 $payload = $existing;
 $payload['ramMiB'] = $user['memory'];

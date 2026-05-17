@@ -116,21 +116,6 @@ function pmssUserConfigCliParseUploadThrottleOption($rawOption, string $negative
     return $value;
 }
 
-/** @return array<string,bool> Track explicit persisted resources from named options or positionals. */
-function pmssUserConfigCliPersistedResourcePresence(array $parsed, array $args, string $optionKey, string $indexKey): array
-{
-    $presence = [];
-    foreach (pmssUserConfigCliResourceSpecs() as $key => $spec) {
-        if (empty($spec['persist'])) {
-            continue;
-        }
-
-        $presence[$key] = pmssUserConfigCliHasExplicitOptionValue($parsed, $spec[$optionKey])
-            || (isset($spec[$indexKey]) && array_key_exists($spec[$indexKey], $args) && $args[$spec[$indexKey]] !== '');
-    }
-    return $presence;
-}
-
 /** @return array<string,mixed> Copy persisted shared resources from stored payloads. */
 function pmssUserConfigCliPersistedStoredResources(array $payload): array
 {

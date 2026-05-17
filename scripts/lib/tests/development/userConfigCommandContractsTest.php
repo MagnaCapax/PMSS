@@ -58,6 +58,7 @@ class userConfigCommandContractsTest extends TestCase
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'welcome-message')", $source);
         $this->assertStringContainsString("pmssCliOption(\$parsed, 'docker-enabled')", $source);
         $this->assertStringContainsString("pmssUserConfigCliExplicitResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
+        $this->assertStringContainsString("\$presence = array_fill_keys(array_keys(\$explicitResourceOverrides), true);", $source);
         $this->assertTrue(
             strpos($source, "strpos(\$arg, '--upload-throttle-kib=')") === false,
             'userConfig.php should not keep a manual --upload-throttle-kib scan'
@@ -107,10 +108,13 @@ class userConfigCommandContractsTest extends TestCase
         $source = $this->loadUserConfigSubsystemSource();
 
         $this->assertStringContainsString("pmssUserConfigCliResolvedResources(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
-        $this->assertStringContainsString("pmssUserConfigCliPersistedResourcePresence(\$parsed, \$args, 'addUserOption', 'userConfigIndex')", $source);
         $this->assertStringContainsString("pmssUserConfigCliPersistedStoredResources(\$existing)", $source);
         $this->assertStringContainsString("pmssUserConfigCliApplyPersistedResources(\$payload, \$user, \$presence)", $source);
         $this->assertStringContainsString("pmssUserConfigCliBuildCgroupResourceArgs(\$user)", $source);
+        $this->assertTrue(
+            strpos($source, 'pmssUserConfigCli'.'PersistedResourcePresence') === false,
+            'userConfig.php should derive persisted presence from explicit resource overrides'
+        );
         $this->assertTrue(
             strpos($source, "'--cpu-weight=' . \$user['CPUWeight']") === false,
             'userConfig.php should not keep a duplicated cpu-weight flag path'
