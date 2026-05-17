@@ -87,6 +87,26 @@ SH
         });
     }
 
+    public function testFetchPinnedRemoteFileRejectsMalformedUrlsBeforeDownload(): void
+    {
+        $body = 'payload';
+        $expectedSha256 = hash('sha256', $body);
+        $cases = [
+            'https://example.invalid/archive'."\n".'next',
+            'https://',
+            '',
+        ];
+
+        foreach ($cases as $url) {
+            $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256, $url): void {
+                $path = \pmssFetchPinnedRemoteFile('demo archive', $url, $expectedSha256);
+
+                $this->assertTrue($path === null, 'Expected malformed URL to be rejected');
+                $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+            });
+        }
+    }
+
     public function testFetchPinnedRemoteFileRejectsMalformedChecksumBeforeDownload(): void
     {
         $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => 'payload'], function ($root, $commandLog): void {

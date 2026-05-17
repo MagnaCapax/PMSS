@@ -11,6 +11,17 @@ function pmssPinnedRemoteChecksum(string $path): string
     return is_string($checksum) ? strtolower($checksum) : '';
 }
 
+/** Validate pinned artifact URLs before logging or invoking wget. */
+function pmssPinnedRemoteUrlIsSafe(string $url): bool
+{
+    $host = parse_url($url, PHP_URL_HOST);
+
+    return strpos($url, 'https://') === 0
+        && preg_match('/[\x00-\x1F\x7F]/', $url) !== 1
+        && is_string($host)
+        && $host !== '';
+}
+
 function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): bool
 {
     return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
@@ -58,8 +69,8 @@ function pmssDownloadPinnedRemoteTempFile(
         return null;
     }
 
-    if (strpos($url, 'https://') !== 0) {
-        logmsg("[WARN] Refusing non-HTTPS URL for {$label}: {$url}");
+    if (!pmssPinnedRemoteUrlIsSafe($url)) {
+        logmsg("[WARN] Refusing unsafe remote URL for {$label}");
         return null;
     }
 
