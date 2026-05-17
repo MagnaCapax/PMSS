@@ -137,4 +137,15 @@ class userConfigCommandContractsTest extends TestCase
             'userConfig.php should not bypass the shared persist flow'
         );
     }
+
+    public function testGeneratedPortAndQbittorrentWritesAreChecked(): void
+    {
+        $source = $this->loadUserConfigSubsystemSource();
+
+        $this->assertStringContainsString('@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false', $source);
+        $this->assertStringContainsString('Warning: failed to write rclone port', $source);
+        $this->assertStringContainsString('Warning: failed to create qBittorrent config directory', $source);
+        $this->assertStringContainsString('@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false', $source);
+        $this->assertStringContainsString('Warning: failed to write qBittorrent port', $source);
+    }
 }

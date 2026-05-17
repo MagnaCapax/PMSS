@@ -212,15 +212,20 @@ echo "Changing ruTorrent config\n";
 updateRutorrentConfig($user['name'], $scgiPort);
 $rclonePortFile = sprintf('/home/%s/.rclonePort', $user['name']);
 if (!file_exists($rclonePortFile)) {
-    file_put_contents($rclonePortFile, rand(1500, 65500));
+    if (@file_put_contents($rclonePortFile, (string) rand(1500, 65500)) === false) {
+        fwrite(STDERR, "Warning: failed to write rclone port for {$user['name']}\n");
+    }
 }
 userConfigureDeluge($user, $configuration);
 $qbittorrentConfigDir = sprintf('/home/%s/.config/qBittorrent', $user['name']);
 $qbittorrentConfigFile = $qbittorrentConfigDir.'/qBittorrent.conf';
 if (!file_exists($qbittorrentConfigFile)) {
     $qbittorrentPort = (int) round(rand(1500, 65500));
-    if (!file_exists($qbittorrentConfigDir)) {
-        mkdir($qbittorrentConfigDir, 0770, true);
+    if (!is_dir($qbittorrentConfigDir)
+        && !@mkdir($qbittorrentConfigDir, 0770, true)
+        && !is_dir($qbittorrentConfigDir)
+    ) {
+        fwrite(STDERR, "Warning: failed to create qBittorrent config directory for {$user['name']}\n");
     }
 
     try {
@@ -230,19 +235,21 @@ if (!file_exists($qbittorrentConfigFile)) {
         exit(1);
     }
 
-    file_put_contents(
-        $qbittorrentConfigFile,
-        str_replace(
-            ['##username', '##port', '##uploadThrottleLine'],
-            [
-                $user['name'],
-                $qbittorrentPort,
-                ($throttle !== null && $throttle > 0) ? 'Connection\\GlobalUPLimit='.(int) $throttle : '',
-            ],
-            $qbittorrentTemplate
-        )
+    $qbittorrentConfig = str_replace(
+        ['##username', '##port', '##uploadThrottleLine'],
+        [
+            $user['name'],
+            $qbittorrentPort,
+            ($throttle !== null && $throttle > 0) ? 'Connection\\GlobalUPLimit='.(int) $throttle : '',
+        ],
+        $qbittorrentTemplate
     );
-    file_put_contents(sprintf('/home/%s/.qbittorrentPort', $user['name']), $qbittorrentPort);
+    if (@file_put_contents($qbittorrentConfigFile, $qbittorrentConfig) === false) {
+        fwrite(STDERR, "Warning: failed to write qBittorrent config for {$user['name']}\n");
+    }
+    if (@file_put_contents(sprintf('/home/%s/.qbittorrentPort', $user['name']), (string) $qbittorrentPort) === false) {
+        fwrite(STDERR, "Warning: failed to write qBittorrent port for {$user['name']}\n");
+    }
 }
 pmssQbittorrentApplyUploadThrottle($user['name'], $throttle);
 userApplyDiskQuota($user);
