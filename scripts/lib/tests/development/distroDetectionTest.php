@@ -180,7 +180,7 @@ class DistroDetectionTest extends TestCase
     {
         $initial = "deb http://mirror.invalid bullseye main\n";
         $template = "deb http://mirror.example buster main\n";
-        $this->pmssWithTempAptSources($initial, function (string $target) use ($template): void {
+        $this->pmssWithTempAptSources($initial, function (string $target) use ($initial, $template): void {
             $logs = [];
             $logger = $this->pmssMakeArrayLogger($logs);
 
