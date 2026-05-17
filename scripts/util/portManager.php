@@ -11,6 +11,8 @@ require_once __DIR__.'/../lib/runtime.php';
 require_once __DIR__.'/../lib/userLifecycle.php';
 
 const PMSS_PORT_MANAGER_USAGE = 'Usage: portManager.php [view|assign|release] USER [SERVICE]';
+const PMSS_PORT_MANAGER_MIN_PORT = 2000;
+const PMSS_PORT_MANAGER_MAX_PORT = 38000;
 
 /**
  * Write a port assignment event to the shared user logs when available.
@@ -66,6 +68,27 @@ function pmssPortManagerAssignmentPathIsSafe(string $portDir, string $portFile):
         && !is_link($portDir)
         && !is_link($portFile)
         && (!file_exists($portFile) || is_file($portFile));
+}
+
+/**
+ * Pick one free service port without risking an unbounded collision loop.
+ *
+ * @param array<int, bool> $used
+ */
+function pmssPortManagerSelectAvailablePort(array $used): ?int
+{
+    $available = [];
+    for ($port = PMSS_PORT_MANAGER_MIN_PORT; $port <= PMSS_PORT_MANAGER_MAX_PORT; $port++) {
+        if (!isset($used[$port])) {
+            $available[] = $port;
+        }
+    }
+
+    if ($available === []) {
+        return null;
+    }
+
+    return $available[rand(0, count($available) - 1)];
 }
 
 /** Emit the public error text and optionally mirror it to user logs. */
@@ -148,9 +171,8 @@ function pmssPortManagerMain(array $argv): int
                     $used[$assignedPort] = true;
                 }
             }
-            do {
-                $port = rand(2000, 38000);
-            } while (isset($used[$port]));
+            $port = pmssPortManagerSelectAvailablePort($used);
+            if ($port === null) return pmssPortManagerFail("Error: no free port available\n", $user, $action, $service, null, 'ERR', 'port_range_exhausted');
             if (!pmssPortManagerAssignmentPathIsSafe($portDir, $portFile)) return pmssPortManagerFail("Error: invalid port assignment path\n", $user, $action, $service, null, 'ERR', 'unsafe_assignment_path');
             if (@file_put_contents($portFile, $port, LOCK_EX) === false) return pmssPortManagerFail("Error: failed to persist port assignment\n", $user, $action, $service, $port, 'ERR', 'write_failed');
             !@chmod($portFile, 0640) && pmssPortManagerLog($user, $action, $service, $port, 'WARN', 'chmod_failed');

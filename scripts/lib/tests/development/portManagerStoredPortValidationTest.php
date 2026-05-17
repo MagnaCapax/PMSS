@@ -48,6 +48,27 @@ class PortManagerStoredPortValidationTest extends TestCase
         $this->assertSame(null, \pmssPortManagerReadAssignedPort($linkPath));
     }
 
+    public function testSelectAvailablePortReturnsNullWhenRangeExhausted(): void
+    {
+        $used = [];
+        for ($port = \PMSS_PORT_MANAGER_MIN_PORT; $port <= \PMSS_PORT_MANAGER_MAX_PORT; $port++) {
+            $used[$port] = true;
+        }
+
+        $this->assertSame(null, \pmssPortManagerSelectAvailablePort($used));
+    }
+
+    public function testSelectAvailablePortFindsOnlyGap(): void
+    {
+        $used = [];
+        for ($port = \PMSS_PORT_MANAGER_MIN_PORT; $port <= \PMSS_PORT_MANAGER_MAX_PORT; $port++) {
+            $used[$port] = true;
+        }
+        unset($used[24567]);
+
+        $this->assertSame(24567, \pmssPortManagerSelectAvailablePort($used));
+    }
+
     public function testViewFailsWhenStoredAssignmentIsMalformed(): void
     {
         file_put_contents($this->portDir.'/lighttpd-alice', "22000oops\n");
