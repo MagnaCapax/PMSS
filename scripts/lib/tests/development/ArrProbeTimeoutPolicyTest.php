@@ -6,11 +6,11 @@ require_once dirname(__DIR__, 2).'/update/apps/arr.php';
 
 class ArrProbeTimeoutPolicyTest extends TestCase
 {
-    public function testVersionProbeCommandKeepsProwlarrProbeBounded(): void
+    public function testVersionProbeCommandUsesHardKillAfterGracePeriod(): void
     {
         $command = \pmssArrVersionProbeCommand('/opt/Prowlarr/Prowlarr', '--version');
 
-        $this->assertStringContainsString('timeout 10 ', $command);
+        $this->assertStringContainsString('timeout --kill-after=5 60 ', $command);
         $this->assertStringContainsString("'/opt/Prowlarr/Prowlarr'", $command);
         $this->assertStringContainsString("'--version'", $command);
         $this->assertStringContainsString('2>/dev/null', $command);

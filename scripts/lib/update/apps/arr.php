@@ -148,7 +148,7 @@ function pmssArrVersionExtract(string $payload): ?string
 /** Build a bounded ARR version probe so daemonizing binaries cannot wedge updates. */
 function pmssArrVersionProbeCommand(string $binary, string $flag): string
 {
-    return 'timeout 10 '.escapeshellarg($binary).' '.escapeshellarg($flag).' 2>/dev/null';
+    return 'timeout --kill-after=5 60 '.escapeshellarg($binary).' '.escapeshellarg($flag).' 2>/dev/null';
 }
 
 /** Prefer cheap version files, then bounded binary probes, to detect installed ARR versions. */
