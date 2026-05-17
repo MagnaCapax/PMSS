@@ -3,6 +3,7 @@
 
 require_once __DIR__.'/../runtime/commands.php';
 require_once __DIR__.'/../logging.php';
+require_once dirname(__DIR__, 2).'/pathSafety.php';
 
 function pmssPinnedRemoteChecksum(string $path): string
 {
@@ -29,6 +30,12 @@ function pmssPinnedRemoteArchiveWorkDirIsSafe(string $workDir): bool
         && strpos($workDir, "\0") === false
         && $trimmed !== ''
         && strpos($trimmed.'/', '/../') === false;
+}
+
+/** Validate a binary install destination before crossing into `install(1)`. */
+function pmssPinnedRemoteDestinationIsSafe(string $destination): bool
+{
+    return pmssPathTargetIsSafe($destination, false, true);
 }
 
 // Download a pinned artifact to a temp file; caller owns cleanup.
@@ -134,6 +141,11 @@ function pmssInstallPinnedRemoteBinary(
     string $destination,
     bool $refreshWhenPresent
 ): void {
+    if (!pmssPinnedRemoteDestinationIsSafe($destination)) {
+        logmsg("[WARN] Refusing unsafe install destination for {$label}: {$destination}");
+        return;
+    }
+
     $expectedSha256 = strtolower($expectedSha256);
     if (is_file($destination)) {
         if (!$refreshWhenPresent) {

@@ -159,6 +159,41 @@ SH
         });
     }
 
+    public function testInstallPinnedRemoteBinaryWritesSafeMissingDestination(): void
+    {
+        $body = 'payload';
+        $expectedSha256 = hash('sha256', $body);
+
+        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($body, $expectedSha256): void {
+            $destination = $root.'/safe-binary';
+
+            \pmssInstallPinnedRemoteBinary('demo binary', 'https://example.invalid/binary', $expectedSha256, $destination, true);
+
+            $this->assertEquals($body, (string) file_get_contents($destination));
+            $this->assertStringContainsString('install ', $this->pmssReadFileOrEmpty($commandLog));
+        });
+    }
+
+    public function testInstallPinnedRemoteBinaryRejectsUnsafeDestinationsBeforeDownload(): void
+    {
+        $body = 'payload';
+        $expectedSha256 = hash('sha256', $body);
+
+        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($body, $expectedSha256): void {
+            $realDestination = $root.'/real-binary';
+            $linkDestination = $root.'/link-binary';
+            file_put_contents($realDestination, 'original');
+            $this->pmssCreateSymlinkOrSkip($realDestination, $linkDestination);
+
+            foreach ([$root.'/missing-parent/binary', $root.'/safe/../binary', $linkDestination] as $destination) {
+                \pmssInstallPinnedRemoteBinary('demo binary', 'https://example.invalid/binary', $expectedSha256, $destination, true);
+            }
+
+            $this->assertEquals('', $this->pmssReadFileOrEmpty($commandLog));
+            $this->assertEquals('original', (string) file_get_contents($realDestination));
+        });
+    }
+
     public function testInstallPinnedRemoteDebPackageInvokesDpkgForMatchingPackage(): void
     {
         $body = 'package-payload';

@@ -9,6 +9,7 @@ Utility scripts under `scripts/testing/` orchestrate common checks:
 - `test-php.sh` — PHP syntax lint and development suite.
 - `test-bash.sh` — bash syntax check and optional lint/format when tools are present.
 - `test-all.sh` — runs both of the above.
+- `customer-context-fatal-scan.php` — token-aware customer PHP check that reports `OPERATOR_TREE_FUNCTION_LEAK` when `etc/skel/www/*.php` calls a bare function unavailable from the customer tree or PHP built-ins.
 - `doctrine-lint.sh` — ADR doctrine guardrails (H1, Category, no indexes). Always on in `test-all.sh`.
 - `camelcase-lint.sh` — filename lint for selected first-party PHP directories (lower camelCase filenames). Opt-in via `PMSS_LINT_CAMEL=1`.
 - `docblock-lint.sh` — requires docblocks for classes and public methods in first-party PHP. Opt-in via `PMSS_LINT_DOCBLOCK=1`.

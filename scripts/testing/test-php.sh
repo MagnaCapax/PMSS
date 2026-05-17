@@ -10,7 +10,10 @@ pmss_testing_find_php_files "$ROOT_DIR" \
 echo "[customer-php-tree-isolation]" >&2
 ROOT_DIR="$ROOT_DIR" bash "$ROOT_DIR/scripts/testing/customer-php-tree-isolation.sh"
 
+echo "[customer-context-fatal-scan]" >&2
+PMSS_CUSTOMER_CONTEXT_SCAN_ROOT="$ROOT_DIR" php "$ROOT_DIR/scripts/testing/customer-context-fatal-scan.php"
+
 echo "[dev-tests]" >&2
 php "$ROOT_DIR/scripts/lib/tests/development/Runner.php"
 
-echo "OK: PHP lint + customer-tree isolation + dev tests" >&2
+echo "OK: PHP lint + customer-tree isolation + customer-context fatal scan + dev tests" >&2
