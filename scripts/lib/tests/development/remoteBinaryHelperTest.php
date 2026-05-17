@@ -179,7 +179,7 @@ SH
         $body = 'payload';
         $expectedSha256 = hash('sha256', $body);
 
-        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($body, $expectedSha256): void {
+        $this->withFakeCommands(['PMSS_TEST_WGET_BODY' => $body], function ($root, $commandLog) use ($expectedSha256): void {
             $realDestination = $root.'/real-binary';
             $linkDestination = $root.'/link-binary';
             file_put_contents($realDestination, 'original');
