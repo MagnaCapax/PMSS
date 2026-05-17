@@ -58,6 +58,16 @@ class IopsLimitHelpersTest extends TestCase
         $this->assertSame(0664, fileperms($homeRoot.'/alice/.iopsLimit') & 0777);
     }
 
+    public function testTargetModePersistenceRemovesZeroValuesWhenRequested(): void
+    {
+        $path = $this->pmssWriteTempFile('pmss-iops-remove-', '15');
+        $error = null;
+
+        $this->assertTrue(\pmssIntegerSettingTargetModesPersist([$path => 0600], 0, $error, 'invalid operations value', true));
+        $this->assertSame(null, $error);
+        $this->assertFalse(file_exists($path));
+    }
+
     public function testIopsHelpersUseCanonicalRequireOnceDeclarations(): void
     {
         $guardNeedle = "if (!function_exists('pmss"."IopsLimit";
@@ -68,6 +78,10 @@ class IopsLimitHelpersTest extends TestCase
         $this->pmssAssertRepoFileNotContainsStrings(
             'scripts/lib/user/iopsLimitEnforcer.php',
             [$guardNeedle]
+        );
+        $this->pmssAssertRepoFileNotContainsStrings(
+            'scripts/lib/user/integerSetting.php',
+            ["if (!function_exists('pmss"."IntegerSetting"]
         );
     }
 
