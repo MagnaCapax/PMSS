@@ -9,7 +9,7 @@ class addUserQbittorrentPasswordSyncTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/lib/user/add/userConfigApply.php');
 
-        $this->assertStringContainsString("require_once __DIR__.'/../passwords.php';", $source);
+        $this->assertStringContainsString("require_once __DIR__.'/../qbittorrent.php';", $source);
     }
 
     public function testProvisioningSyncsQbittorrentPasswordAfterUserConfig(): void

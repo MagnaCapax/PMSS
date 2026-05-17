@@ -2,7 +2,6 @@
 require_once __DIR__.'/../runtime.php';
 require_once __DIR__.'/../lighttpd/userConfigApply.php';
 require_once __DIR__.'/../lighttpd/userFileWrite.php';
-require_once __DIR__.'/qbittorrent.php';
 
 /**
  * Password synchronization helpers for torrent clients.
@@ -241,18 +240,6 @@ function pmssDelugeServicePasswordRotate(string $username): string
 // password here would expose it in a readable file under the user's home
 // directory. Deluge service credentials are managed separately and mirrored
 // into web.conf via pmssEnsureDelugeServicePassword()/pmssDelugeServicePasswordRotate().
-
-/**
- * Update qBittorrent config with new password hash.
- *
- * @param string $username Username to update
- * @param string $password New plaintext password
- * @return bool True on success, false if config doesn't exist
- */
-function pmssUpdateQbittorrentPassword(string $username, string $password): bool
-{
-    return pmssQbittorrentApplyPassword($username, $password);
-}
 
 /**
  * Restart user services gracefully after password change.

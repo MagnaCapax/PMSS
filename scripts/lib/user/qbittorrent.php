@@ -241,3 +241,11 @@ function pmssQbittorrentApplyPassword(string $username, string $password, ?strin
         $configFile
     );
 }
+
+/**
+ * Update qBittorrent config with a new WebUI password hash.
+ */
+function pmssUpdateQbittorrentPassword(string $username, string $password): bool
+{
+    return pmssQbittorrentApplyPassword($username, $password);
+}

@@ -6,7 +6,7 @@
  * @author PMSS Team
  */
 
-require_once __DIR__.'/../passwords.php';
+require_once __DIR__.'/../qbittorrent.php';
 require_once __DIR__.'/../userConfigCli.php';
 /**
  * Build the canonical userConfig command for addUser provisioning.

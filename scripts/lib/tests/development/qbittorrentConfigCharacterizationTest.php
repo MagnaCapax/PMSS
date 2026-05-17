@@ -3,7 +3,6 @@ namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
 require_once dirname(__DIR__, 2).'/user/qbittorrent.php';
-require_once dirname(__DIR__, 2).'/user/passwords.php';
 require_once dirname(__DIR__, 2).'/user/torrentPort.php';
 
 final class QbittorrentConfigCharacterizationTest extends TestCase
