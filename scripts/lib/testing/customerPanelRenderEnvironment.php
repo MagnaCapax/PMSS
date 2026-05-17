@@ -6,6 +6,7 @@
  */
 
 require_once dirname(__DIR__).'/runtime.php';
+require_once __DIR__.'/filesystem.php';
 
 const PMSS_CUSTOMER_PANEL_RENDER_BASE = '/pmss-render-test';
 
@@ -39,24 +40,7 @@ function pmssCustomerPanelRenderCleanup(string $runRoot): void
         return;
     }
 
-    pmssCustomerPanelRenderRemoveTree($runRoot);
-}
-
-/** Recursively delete a temporary tree without shelling out. */
-function pmssCustomerPanelRenderRemoveTree(string $path): void
-{
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST
-    );
-    foreach ($iterator as $item) {
-        if ($item->isDir() && !$item->isLink()) {
-            @rmdir($item->getPathname());
-            continue;
-        }
-        @unlink($item->getPathname());
-    }
-    @rmdir($path);
+    pmssTestingRemoveTree($runRoot);
 }
 
 /** Copy the customer tree and seed the synthetic customer state files. */
@@ -72,7 +56,7 @@ function pmssCustomerPanelRenderPrepare(string $sourceWww, string $home, string 
         }
     }
 
-    if (!pmssCustomerPanelRenderCopyTree($sourceWww, $www)) {
+    if (!pmssTestingCopyTree($sourceWww, $www, 0700)) {
         return ['ok' => false, 'error' => 'unable to copy customer source tree'];
     }
 
@@ -109,42 +93,4 @@ function pmssCustomerPanelRenderPrepare(string $sourceWww, string $home, string 
     }
 
     return ['ok' => true, 'error' => ''];
-}
-
-/** Recursively copy the customer web skeleton into the mock home. */
-function pmssCustomerPanelRenderCopyTree(string $source, string $destination): bool
-{
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($source, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::SELF_FIRST
-    );
-
-    foreach ($iterator as $item) {
-        $sourcePath = $item->getPathname();
-        $target = $destination.'/'.substr($sourcePath, strlen($source) + 1);
-        if ($item->isLink()) {
-            if (!pmssDirEnsureExists(dirname($target), 0700)) {
-                return false;
-            }
-            $linkTarget = readlink($sourcePath);
-            if (!is_string($linkTarget) || !@symlink($linkTarget, $target)) {
-                return false;
-            }
-            continue;
-        }
-        if ($item->isDir()) {
-            if (!pmssDirEnsureExists($target, 0700)) {
-                return false;
-            }
-            continue;
-        }
-        if (!pmssDirEnsureExists(dirname($target), 0700)) {
-            return false;
-        }
-        if (!@copy($sourcePath, $target)) {
-            return false;
-        }
-    }
-
-    return true;
 }

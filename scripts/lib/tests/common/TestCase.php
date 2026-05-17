@@ -14,6 +14,7 @@ namespace {
 
 namespace PMSS\Tests {
 
+require_once __DIR__.'/../../testing/filesystem.php';
 require_once __DIR__.'/FilesystemCleanupTrait.php';
 
 class SkipTest extends \Exception {}
@@ -714,27 +715,7 @@ abstract class TestCase
     /** Remove a temporary directory tree created during tests. */
     protected function pmssRemoveTree(string $path): void
     {
-        if (!file_exists($path)) {
-            return;
-        }
-
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $item) {
-            if ($item->isLink() || $item->isFile()) {
-                @unlink($item->getPathname());
-                continue;
-            }
-
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-                continue;
-            }
-        }
-
-        @rmdir($path);
+        \pmssTestingRemoveTree($path);
     }
 
     /** Remove tracked temporary paths created by the test harness. */

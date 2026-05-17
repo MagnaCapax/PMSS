@@ -5,33 +5,7 @@ require_once __DIR__.'/../common/TestCase.php';
 
 function pmssTestRemoveTree(string $path): void
 {
-    if (!file_exists($path) && !is_link($path)) {
-        return;
-    }
-
-    if (is_file($path) || is_link($path)) {
-        @unlink($path);
-        return;
-    }
-
-    $iterator = new \RecursiveIteratorIterator(
-        new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
-        \RecursiveIteratorIterator::CHILD_FIRST
-    );
-
-    foreach ($iterator as $item) {
-        if ($item->isLink() || $item->isFile()) {
-            @unlink($item->getPathname());
-            continue;
-        }
-
-        if ($item->isDir()) {
-            @rmdir($item->getPathname());
-            continue;
-        }
-    }
-
-    @rmdir($path);
+    \pmssTestingRemoveTree($path);
 }
 
 /**
