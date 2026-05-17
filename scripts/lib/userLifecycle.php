@@ -231,6 +231,17 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
     return $exitCode === 0 && $matches !== array();
 }
 function pmssUserWatchdogSuCommand(string $username, string $innerCommand): string { return 'su '.escapeshellarg($username).' -c '.escapeshellarg($innerCommand); }
+/** Read a watchdog-owned local TCP port, failing closed on malformed files. */
+function pmssUserWatchdogLocalPortRead(string $path): ?int
+{
+    $raw = pmssReadRegularFileTrimmed($path);
+    if ($raw === null || preg_match('/^[0-9]+$/', $raw) !== 1) {
+        return null;
+    }
+
+    $port = (int) $raw;
+    return ($port >= 1 && $port <= 65535) ? $port : null;
+}
 /** Return the oldest /proc start marker for exact process-name matches. */
 function pmssUserWatchdogProcessStartTime(string $username, string $processName, string $procRoot = '/proc'): ?int
 {

@@ -122,4 +122,45 @@ class UserLifecycleWatchdogTest extends TestCase
 
         $this->assertTrue(file_exists($marker));
     }
+
+    public function testLocalPortReadAcceptsTrimmedNumericPort(): void
+    {
+        $path = $this->pmssMakeTempFile('watchdog-port-');
+        file_put_contents($path, "1500\n");
+
+        $this->assertSame(1500, pmssUserWatchdogLocalPortRead($path));
+    }
+
+    public function testLocalPortReadRejectsMissingFile(): void
+    {
+        $path = $this->pmssMakeTempPath('watchdog-port-missing-');
+
+        $this->assertSame(null, pmssUserWatchdogLocalPortRead($path));
+    }
+
+    public function testLocalPortReadRejectsMalformedFile(): void
+    {
+        $path = $this->pmssMakeTempFile('watchdog-port-bad-');
+        file_put_contents($path, '1500; touch /tmp/bad');
+
+        $this->assertSame(null, pmssUserWatchdogLocalPortRead($path));
+    }
+
+    public function testLocalPortReadRejectsOutOfRangePort(): void
+    {
+        $path = $this->pmssMakeTempFile('watchdog-port-high-');
+        file_put_contents($path, '65536');
+
+        $this->assertSame(null, pmssUserWatchdogLocalPortRead($path));
+    }
+
+    public function testLocalPortReadRejectsSymlink(): void
+    {
+        $target = $this->pmssMakeTempFile('watchdog-port-target-');
+        file_put_contents($target, '1500');
+        $link = $this->pmssMakeTempPath('watchdog-port-link-');
+        symlink($target, $link);
+
+        $this->assertSame(null, pmssUserWatchdogLocalPortRead($link));
+    }
 }
