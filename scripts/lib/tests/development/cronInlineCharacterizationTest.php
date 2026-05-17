@@ -62,9 +62,10 @@ class CronInlineCharacterizationTest extends TestCase
             $src = $this->pmssReadRepoFile($path);
             $unsafeNeedle = 'su '.'{$thisUser}';
             $this->assertStringNotContainsString($unsafeNeedle, $src);
-            $this->assertStringContainsString('escapeshellarg($thisUser)', $src);
-            $this->assertStringContainsString('escapeshellarg($innerCommand)', $src);
+            $this->assertStringContainsString('pmssUserWatchdogSuCommand($thisUser,', $src);
         }
+
+        $this->pmssAssertRepoFileContainsAllStrings('scripts/lib/userLifecycle.php', ['function pmssUserWatchdogSuCommand(', 'escapeshellarg($username)', 'escapeshellarg($innerCommand)']);
     }
 
     public function testLighttpdWatchdogUsesSharedHelpersAndKeepsRestartFlow(): void

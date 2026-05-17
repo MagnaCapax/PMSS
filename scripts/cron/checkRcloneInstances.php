@@ -11,8 +11,7 @@ pmssUserWatchdogRunService('Rclone', 'rcloneEnable', ['rclone'], 'rclone stopped
     'processName' => 'rclone',
     'command' => static function (string $thisUser): string {
         $port = (int) file_get_contents("/home/{$thisUser}/.rclonePort");
-        $innerCommand = "cd ~; nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &";
-        return 'su '.escapeshellarg($thisUser).' -c '.escapeshellarg($innerCommand);
+        return pmssUserWatchdogSuCommand($thisUser, "cd ~; nohup rclone rcd --rc-web-gui --rc-addr 127.0.0.1:{$port} --rc-htpasswd /home/$(whoami)/.lighttpd/.htpasswd --rc-baseurl user-$(whoami)/rclone/ --log-file /home/$(whoami)/.rcloneLog --log-level INFO >> /dev/null 2>&1 &");
     },
     'userLogMessage' => 'rclone start requested',
 ]]);

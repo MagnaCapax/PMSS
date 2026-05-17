@@ -230,6 +230,7 @@ function pmssUserWatchdogProcessRunning(string $username, string $processName): 
     @exec('pgrep -u '.escapeshellarg($username).' '.escapeshellarg($processName).' 2>/dev/null', $matches, $exitCode);
     return $exitCode === 0 && $matches !== array();
 }
+function pmssUserWatchdogSuCommand(string $username, string $innerCommand): string { return 'su '.escapeshellarg($username).' -c '.escapeshellarg($innerCommand); }
 /** Return the oldest /proc start marker for exact process-name matches. */
 function pmssUserWatchdogProcessStartTime(string $username, string $processName, string $procRoot = '/proc'): ?int
 {
