@@ -31,6 +31,12 @@ class SkeletonWebLocalAssetTest extends TestCase
     public function testLocalTabsHelperAddsNavigationClass(): void
     {
         $this->pmssAssertRepoFileContainsString(
+            'etc/skel/www/index.php',
+            '<ul class="tabs-nav">',
+            'index.php must emit styled tab navigation even when JavaScript fails to load.'
+        );
+
+        $this->pmssAssertRepoFileContainsString(
             'etc/skel/www/pmssTabs.js',
             "container.find('> ul').addClass('tabs-nav');",
             'pmssTabs.js must add the tabs-nav class required by jquery.tabs.css.'

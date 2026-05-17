@@ -21,11 +21,9 @@ function pmssIopsLimitParseMonthlyOperations($raw, ?string &$error = null): ?int
     return pmssIntegerSettingParseNonNegative($raw, 'ops', $error);
 }
 
-function pmssIopsLimitRuntimeUserPath(string $bucket, string $username, ?string $runtimeDir = null): string { return pmssIntegerSettingRuntimeUserPath($bucket, $username, $runtimeDir); }
-
 function pmssIopsLimitRuntimePath(string $username, ?string $runtimeDir = null): string
 {
-    return pmssIopsLimitRuntimeUserPath('iopsLimits', $username, $runtimeDir);
+    return pmssIntegerSettingRuntimeUserPath('iopsLimits', $username, $runtimeDir);
 }
 
 function pmssIopsLimitPath(string $username, ?string $homeDir = null): string

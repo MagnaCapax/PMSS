@@ -10,11 +10,6 @@ function pmssPinnedRemoteChecksum(string $path): string
     return is_string($checksum) ? strtolower($checksum) : '';
 }
 
-function pmssPinnedRemoteExpectedSha256IsValid(string $expectedSha256): bool
-{
-    return preg_match('/\A[a-f0-9]{64}\z/', $expectedSha256) === 1;
-}
-
 function pmssPinnedRemoteArchiveComponentIsSafe(string $value): bool
 {
     return $value !== ''
@@ -46,7 +41,7 @@ function pmssDownloadPinnedRemoteTempFile(
     string $artifactLabel = ''
 ): ?string {
     $expectedSha256 = strtolower($expectedSha256);
-    if (!pmssPinnedRemoteExpectedSha256IsValid($expectedSha256)) {
+    if (preg_match('/\A[a-f0-9]{64}\z/', $expectedSha256) !== 1) {
         logmsg("[WARN] Refusing invalid SHA-256 pin for {$label}");
         return null;
     }

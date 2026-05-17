@@ -286,7 +286,7 @@ echo $styleList . '{';
 <body>
 
 <div id="tabs">
-        <ul>
+        <ul class="tabs-nav">
 <?php
 foreach($frames AS $thisId => $thisFrame) {
     if (pmssFrameOpensInNewWindow($thisFrame)) {

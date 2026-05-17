@@ -70,9 +70,7 @@ $devRuntime = pmssCliOptionInt($parsed, 'device-runtime', null, 30);
 $idleLatencyMs = pmssCliOptionInt($parsed, 'idle-latency-ms', null, 100);
 $idleUtilPct = pmssCliOptionInt($parsed, 'idle-util', null, 85);
 
-function parseSizeSB(string $s): int { $s=trim($s); if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); return $u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } return 0; }
-function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $bytes=parseSizeSB($value); if($bytes<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return $bytes; }
-function storageBenchmarkRequirePositiveIntOption(string $optionName, int $value): void { if($value<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive integer.\n"); exit(1); } }
+function storageBenchmarkRequirePositiveSizeBytes(string $optionName, string $value): int { $s=trim($value); $bytes=0; if(preg_match('/^([0-9]+)([KMGTP]i?B?)?$/i',$s,$m)){ $n=(int)$m[1]; $u=strtolower($m[2]??''); $bytes=$u==='k'||$u==='kb'||$u==='kib'?$n*1024:($u==='m'||$u==='mb'||$u==='mib'?$n*1024*1024:($u==='g'||$u==='gb'||$u==='gib'?$n*1024*1024*1024:$n)); } if($bytes<=0){ fwrite(STDERR,"Error: {$optionName} must be a positive size (examples: 1G, 512M, 1048576).\n"); exit(1); } return $bytes; }
 function storageBenchmarkJsonLogPathPreflightIsSafe(string $jsonLog): bool
 {
     $path = rtrim($jsonLog, '/');
@@ -115,8 +113,8 @@ if ($showLast) exit(storageBenchmarkShowLast($jsonLog));
 
 $requested = storageBenchmarkRequirePositiveSizeBytes('--size', $fileSize);
 $ddSizeBytes = $testDevices ? storageBenchmarkRequirePositiveSizeBytes('--dd-size', $ddSize) : 0;
-storageBenchmarkRequirePositiveIntOption('--runtime', $runtime);
-if ($testDevices) storageBenchmarkRequirePositiveIntOption('--device-runtime', $devRuntime);
+if($runtime<=0){ fwrite(STDERR,"Error: --runtime must be a positive integer.\n"); exit(1); }
+if($testDevices && $devRuntime<=0){ fwrite(STDERR,"Error: --device-runtime must be a positive integer.\n"); exit(1); }
 storageBenchmarkRequireJsonLogPath($jsonLog);
 
 if (pmssCommandPath('fio')===''){ fwrite(STDERR,"Error: 'fio' not found.\n"); exit(1);} 
