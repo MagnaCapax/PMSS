@@ -7,7 +7,7 @@
  * Responsibilities:
  *  - Fetch remote frame definitions from pulsedmedia.com when available.
  *  - Fallback to a local tab set when remote frames cannot be loaded.
- *  - Merge per-user custom tabs from ~/.customFrames (one tab per line).
+ *  - Merge per-user custom tabs and enabled app tabs into the frame list.
  *
  * Copyright (C) 2010-2025 Magna Capax Finland Oy
  */
@@ -255,9 +255,9 @@ if (file_exists('../.customFrames')) {
     $file = new SplFileObject('../.customFrames');
     while (!$file->eof()) {
         $line = trim($file->fgets());
-        if (strpos($line, "#") === 0) continue;
+        if ($line === '' || strpos($line, "#") === 0) continue;
         $frameArray = explode("|", $line);
-        if (!$frameArray[3]) continue; // Drop invalid lines
+        if (count($frameArray) < 4 || $frameArray[3] === '') continue; // Drop invalid lines
         $frameData[$frameArray[0]] = array(
             'title' => $frameArray[1],
             'linkText' => $frameArray[2],
@@ -265,6 +265,13 @@ if (file_exists('../.customFrames')) {
         );
     }
     $file = null;
+}
+if (file_exists('../.delugeEnable') && file_exists('deluge.php') && !isset($frames['deluge']) && !isset($frameData['deluge'])) {
+    $frameData['deluge'] = array(
+        'title' => 'Deluge - Torrent web UI',
+        'linkText' => 'Deluge',
+        'url' => 'deluge/'
+    );
 }
 $frames = array_merge($frames, $frameData);
 

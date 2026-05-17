@@ -157,6 +157,33 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertSame(594 * 1024 * 1024 * 1024, $quotaInfo['usedBytes']);
     }
 
+    public function testRemoteDisabledRenderAddsDelugeFrameWhenEnabled(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-index-deluge-home-', 0755);
+        @mkdir($home.'/www', 0755, true);
+        touch($home.'/.delugeEnable');
+        touch($home.'/www/deluge.php');
+
+        $html = $this->renderIndexFromHome($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        $this->assertStringContainsString('<a href="#deluge"', $html);
+        $this->assertStringContainsString('title="Deluge - Torrent web UI"', $html);
+        $this->assertStringContainsString("loadFrame('deluge', 'deluge/')", $html);
+        $this->assertStringContainsString('<div id="deluge" class="tabs-container"></div>', $html);
+    }
+
+    public function testCustomFrameParserIgnoresBlankLinesBeforeFieldAccess(): void
+    {
+        $home = $this->pmssMakeTempDir('pmss-index-custom-home-', 0755);
+        @mkdir($home.'/www', 0755, true);
+        file_put_contents($home.'/.customFrames', "custom|Custom tooltip|Custom|custom/\n\n");
+
+        $output = $this->renderIndexFromHomeWithDisplayedErrors($home, array('PMSS_DISABLE_REMOTE_FRAMES' => '1'));
+
+        $this->assertStringContainsString('<a href="#custom"', $output);
+        $this->assertStringNotContainsString('Undefined array key', $output);
+    }
+
     public function testUserSkeletonSyncIncludesIndexTemplate(): void
     {
         $source = $this->pmssReadRepoFile('scripts/lib/update/users/filesystem.php');
@@ -253,5 +280,21 @@ class IndexSkeletonFrameDataTest extends TestCase
         $this->assertTrue(is_array($quotaInfo), 'welcome URL quota payload should decode to an array');
 
         return $quotaInfo;
+    }
+
+    private function renderIndexFromHome(string $home, array $environment = []): string
+    {
+        $script = 'chdir('.var_export($home.'/www', true).'); '
+            .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; echo ob_get_clean();';
+
+        return $this->pmssRunInlinePhp($script, $environment, '2>&1');
+    }
+
+    private function renderIndexFromHomeWithDisplayedErrors(string $home, array $environment = []): string
+    {
+        $script = 'error_reporting(E_ALL); ini_set("display_errors", "1"); chdir('.var_export($home.'/www', true).'); '
+            .'ob_start(); include '.var_export($this->pmssRepoPath('etc/skel/www/index.php'), true).'; echo ob_get_clean();';
+
+        return $this->pmssRunInlinePhp($script, $environment, '2>&1');
     }
 }
