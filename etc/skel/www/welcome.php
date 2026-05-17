@@ -52,7 +52,7 @@ $trafficLimitState = $pageState['trafficLimitState'];
 $bonusTraffic = $trafficLimitState['bonusGiB'];
 $vendor = $pageState['vendor'];
 $contextualWelcomeMessage = $pageState['contextualWelcomeMessage'];
-$delugePasswordHelpersAvailable = $pageState['delugePasswordHelpersAvailable'];
+$delugePasswordCanRotate = $pageState['delugePasswordCanRotate'];
 $delugePasswordNotice = $pageState['delugePasswordNotice'];
 $delugePassword = $pageState['delugePassword'];
 $mediaStackStatus = $pageState['mediaStackStatus'];
@@ -336,7 +336,7 @@ if ((file_exists('/usr/bin/deluged') || file_exists('/usr/local/bin/deluged')) &
                         <h6>Deluge</h6>
                         <p>Deluge Web UI password: <b><?php echo htmlspecialchars($delugePassword === '' ? 'Unavailable' : $delugePassword, ENT_QUOTES, 'UTF-8'); ?></b> (also used for the daemon connection; separate from your account password)</p>
 <?php
-    if ($delugePasswordHelpersAvailable) {
+    if ($delugePasswordCanRotate) {
 ?>
                         <form method="post" action="">
                             <input type="hidden" name="delugePasswordRotate" value="1" />
@@ -550,7 +550,7 @@ function pmssWelcomePageStateBuild() {
         'trafficLimitState' => $trafficLimitState,
         'vendor' => pmssWelcomeVendorRead(),
         'contextualWelcomeMessage' => pmssWelcomeContextualMessageBuild($quotaInfo),
-        'delugePasswordHelpersAvailable' => $delugeState['helpersAvailable'],
+        'delugePasswordCanRotate' => $delugeState['canRotate'],
         'delugePasswordNotice' => $delugeState['passwordNotice'],
         'delugePassword' => $delugeState['password'],
         'mediaStackStatus' => $mediaStackStatus,
@@ -742,35 +742,23 @@ function pmssWelcomeHomeRaidNoticeHtmlRead() {
 
 function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
     // Customer-side password display: see userPasswords.php (ADR 0016).
-    // Display works as soon as the read helper is available; the rotate
-    // path is operator-side and may degrade independently — UI shows the
-    // rotate button only when pmssDelugeServicePasswordRotate is defined.
+    // Rotation stays operator-side; customer PHP must not call helpers that
+    // are defined only under /scripts/lib.
     $pmssUserPasswordsLib = __DIR__.'/userPasswords.php';
     if (file_exists($pmssUserPasswordsLib)) {
         require_once $pmssUserPasswordsLib;
     }
 
     $canRead = function_exists('pmssDelugeAuthReadLocalclientPassword');
-    $canRotate = function_exists('pmssDelugeServicePasswordRotate');
-    $helpersAvailable = $canRead;
     $passwordNotice = '';
     $password = '';
-
-    if ($canRotate && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
-        $newDelugePassword = pmssDelugeServicePasswordRotate((string) $username);
-        $passwordUpdated = $newDelugePassword !== '';
-        $passwordNotice = $passwordUpdated
-            ? 'Deluge password rotated. Re-login in Deluge Web UI with the new password below.'
-            : 'Deluge password rotation failed. Please try again.';
-    }
 
     if ($canRead) {
         $password = pmssDelugeAuthReadLocalclientPassword($delugeAuthPath);
     }
 
     return array(
-        'helpersAvailable' => $helpersAvailable,
-        'canRotate' => $canRotate,
+        'canRotate' => false,
         'passwordNotice' => $passwordNotice,
         'password' => $password,
     );
