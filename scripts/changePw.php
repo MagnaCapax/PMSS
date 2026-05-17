@@ -41,7 +41,6 @@ if ($username === '') {
 
 require_once __DIR__.'/lib/userLifecycle.php';
 require_once __DIR__.'/lib/homeMount.php';
-require_once __DIR__.'/lib/user/passwords.php';
 require_once __DIR__.'/lib/user/qbittorrent.php';
 require_once __DIR__.'/lib/user/userFilesystem.php';
 
