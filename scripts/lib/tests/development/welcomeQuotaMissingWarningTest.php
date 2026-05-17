@@ -39,11 +39,11 @@ final class welcomeQuotaMissingWarningTest extends TestCase
         $this->pmssAssertStringNotContainsString('Deluge password: <b>', $source);
     }
 
-    public function testWelcomePageDoesNotCallOperatorDelugePasswordRotationHelper(): void
+    public function testWelcomePageUsesCustomerDelugePasswordRotationHelper(): void
     {
         $source = $this->pmssReadRepoFile('etc/skel/www/welcome.php');
 
-        $this->pmssAssertStringNotContainsString('pmssDelugeServicePasswordRotate(', $source);
+        $this->assertStringContainsString('pmssDelugeServicePasswordRotate((string) $username)', $source);
         $this->pmssAssertStringNotContainsString('pmssDelugeAuthWriteLocalclientPassword($delugeAuthPath, $newDelugePassword)', $source);
     }
 

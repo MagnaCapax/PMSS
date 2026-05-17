@@ -742,23 +742,31 @@ function pmssWelcomeHomeRaidNoticeHtmlRead() {
 
 function pmssWelcomeDelugeStateBuild($username, $delugeAuthPath) {
     // Customer-side password display: see userPasswords.php (ADR 0016).
-    // Rotation stays operator-side; customer PHP must not call helpers that
-    // are defined only under /scripts/lib.
+    // Rotation is allowed only when the customer-tree helper defines it
+    // locally; customer PHP must not call helpers defined only in /scripts/lib.
     $pmssUserPasswordsLib = __DIR__.'/userPasswords.php';
     if (file_exists($pmssUserPasswordsLib)) {
         require_once $pmssUserPasswordsLib;
     }
 
     $canRead = function_exists('pmssDelugeAuthReadLocalclientPassword');
+    $canRotate = function_exists('pmssDelugeServicePasswordRotate');
     $passwordNotice = '';
     $password = '';
+
+    if ($canRotate && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['delugePasswordRotate'])) {
+        $newDelugePassword = pmssDelugeServicePasswordRotate((string) $username);
+        $passwordNotice = $newDelugePassword !== ''
+            ? 'Deluge password rotated. Re-login in Deluge Web UI with the new password below.'
+            : 'Deluge password rotation failed. Please try again.';
+    }
 
     if ($canRead) {
         $password = pmssDelugeAuthReadLocalclientPassword($delugeAuthPath);
     }
 
     return array(
-        'canRotate' => false,
+        'canRotate' => $canRotate,
         'passwordNotice' => $passwordNotice,
         'password' => $password,
     );
