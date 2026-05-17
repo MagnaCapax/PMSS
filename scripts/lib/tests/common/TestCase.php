@@ -385,8 +385,7 @@ abstract class TestCase
     /** Persist serialized fixture data while ensuring the parent path exists. */
     protected function pmssWriteSerializedFixture(string $path, $value): void
     {
-        @mkdir(dirname($path), 0755, true);
-        @file_put_contents($path, serialize($value));
+        $this->pmssWriteFile($path, serialize($value));
     }
 
     protected function pmssBuildWindowValues($month, $week = null, $day = null, $hour = null): array

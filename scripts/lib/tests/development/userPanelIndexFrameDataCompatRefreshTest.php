@@ -24,8 +24,7 @@ class UserPanelIndexFrameDataCompatRefreshTest extends TestCase
         $this->skelIndex = $skelBase.'/www/index.php';
 
         @mkdir($this->home.'/www', 0755, true);
-        @mkdir(dirname($this->skelIndex), 0755, true);
-        file_put_contents($this->skelIndex, $this->fixedPanelIndexSource());
+        $this->pmssWriteFile($this->skelIndex, $this->fixedPanelIndexSource());
     }
 
     protected function tearDown(): void

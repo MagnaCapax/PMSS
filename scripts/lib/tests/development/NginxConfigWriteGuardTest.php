@@ -29,8 +29,7 @@ class NginxConfigWriteGuardTest extends TestCase
     public function testWriteFileReplacesExistingRegularFile(): void
     {
         $path = $this->tempDir.'/users/alice';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, "old\n");
+        $this->pmssWriteFile($path, "old\n");
 
         $this->assertTrue(\pmssCreateNginxConfigWriteFile($path, "new\n", 'alice', 'user config'));
         $this->assertEquals("new\n", (string) file_get_contents($path));

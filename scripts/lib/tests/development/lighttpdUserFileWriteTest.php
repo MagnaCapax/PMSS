@@ -26,8 +26,7 @@ class LighttpdUserFileWriteTest extends TestCase
     public function testAppendUserFilePreservesExistingContent(): void
     {
         $path = $this->tempDir.'/user/.lighttpd/.htpasswd';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, "first:hash\n");
+        $this->pmssWriteFile($path, "first:hash\n");
 
         $this->assertTrue(\pmssAppendUserFile($path, "second:hash\n", $this->pmssCurrentOwner(), 0640));
         $this->assertEquals("first:hash\nsecond:hash\n", file_get_contents($path));

@@ -52,8 +52,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'same');
 
         $target = $home.'/'.$relative;
-        @mkdir(dirname($target), 0755, true);
-        file_put_contents($target, 'same');
+        $this->pmssWriteFile($target, 'same');
         chmod($target, 0644);
         $beforePerms = fileperms($target) & 0777;
 
@@ -71,8 +70,7 @@ class UpdateUserFileSafeWriteTest extends TestCase
         $this->pmssWriteRelativeFile(\pmssSkeletonBase(), $relative, 'new');
 
         $target = $home.'/'.$relative;
-        @mkdir(dirname($target), 0755, true);
-        file_put_contents($target, 'old');
+        $this->pmssWriteFile($target, 'old');
 
         \updateUserFile($relative, $this->user);
 

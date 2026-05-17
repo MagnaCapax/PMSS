@@ -12,8 +12,7 @@ class ConfigBackupsTest extends TestCase
         $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/ssh/sshd_config';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "Port 22\n");
+        $this->pmssWriteFile($source, "Port 22\n");
 
         $backup = \pmssBackupCriticalConfig('sshd', $source, array(
             'backupRoot' => $backupRoot,
@@ -54,8 +53,7 @@ class ConfigBackupsTest extends TestCase
         $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/nginx/nginx.conf';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "worker_processes auto;\n");
+        $this->pmssWriteFile($source, "worker_processes auto;\n");
 
         $script = 'require '.var_export(dirname(__DIR__, 2).'/configBackups.php', true).'; '
             .'$backup = pmssBackupCriticalConfig('.var_export('nginx', true).', '.var_export($source, true).', '
@@ -85,8 +83,7 @@ class ConfigBackupsTest extends TestCase
         $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/ssh/sshd_config';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "Port 22\n");
+        $this->pmssWriteFile($source, "Port 22\n");
 
         $serviceDir = $backupRoot.'/sshd';
         @mkdir($serviceDir, 0700, true);
@@ -122,8 +119,7 @@ class ConfigBackupsTest extends TestCase
         $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/nginx/nginx.conf';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "worker_processes auto;\n");
+        $this->pmssWriteFile($source, "worker_processes auto;\n");
 
         $serviceDir = $backupRoot.'/nginx';
         @mkdir($serviceDir, 0700, true);
@@ -155,8 +151,7 @@ class ConfigBackupsTest extends TestCase
         $backupRoot = $this->pmssMakeTempDir('pmss-backups-root-');
 
         $source = $root.'/etc/ssh/sshd_config';
-        @mkdir(dirname($source), 0755, true);
-        file_put_contents($source, "Port 22\n");
+        $this->pmssWriteFile($source, "Port 22\n");
 
         [, $messages] = $this->pmssArrayLoggerCapture(function (callable $logger) use ($backupRoot, $source): void {
             \pmssPruneCriticalConfigBackups('sshd', $source, array(

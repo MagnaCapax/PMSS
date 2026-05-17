@@ -38,8 +38,7 @@ class DelugeCommandSymlinkTest extends TestCase
     {
         $systemPath = $this->makeExecutable('usr/bin/deluge-web');
         $localPath = $this->tempDir.'/usr/local/bin/deluge-web';
-        @mkdir(dirname($localPath), 0755, true);
-        file_put_contents($localPath, "#!/bin/sh\necho legacy\n");
+        $this->pmssWriteFile($localPath, "#!/bin/sh\necho legacy\n");
         @chmod($localPath, 0755);
 
         $result = \pmssEnsureDelugeCommandSymlink('deluge-web', $systemPath, $localPath, false, $this->logger);
@@ -53,9 +52,8 @@ class DelugeCommandSymlinkTest extends TestCase
     {
         $systemPath = $this->makeExecutable('usr/bin/deluged');
         $localPath = $this->tempDir.'/usr/local/bin/deluged';
-        @mkdir(dirname($localPath), 0755, true);
         $legacy = "#!/bin/sh\necho legacy\n";
-        file_put_contents($localPath, $legacy);
+        $this->pmssWriteFile($localPath, $legacy);
         @chmod($localPath, 0755);
 
         $result = \pmssEnsureDelugeCommandSymlink('deluged', $systemPath, $localPath, true, $this->logger);
@@ -108,8 +106,7 @@ class DelugeCommandSymlinkTest extends TestCase
     private function makeExecutable(string $relativePath): string
     {
         $path = $this->tempDir.'/'.$relativePath;
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, "#!/bin/sh\nexit 0\n");
+        $this->pmssWriteFile($path, "#!/bin/sh\nexit 0\n");
         @chmod($path, 0755);
         return $path;
     }

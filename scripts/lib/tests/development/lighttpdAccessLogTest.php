@@ -21,8 +21,7 @@ class LighttpdAccessLogTest extends TestCase
     public function testTrimFileTruncatesOversizedRegularFile(): void
     {
         $path = $this->tempDir.'/alice/.lighttpd/access.log';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, str_repeat('x', 128));
+        $this->pmssWriteFile($path, str_repeat('x', 128));
 
         $result = \pmssLighttpdAccessLogTrimFile($path, 64);
 
@@ -34,8 +33,7 @@ class LighttpdAccessLogTest extends TestCase
     public function testTrimFileSkipsLogsBelowThreshold(): void
     {
         $path = $this->tempDir.'/alice/.lighttpd/access.log';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, str_repeat('x', 16));
+        $this->pmssWriteFile($path, str_repeat('x', 16));
 
         $result = \pmssLighttpdAccessLogTrimFile($path, 64);
 
@@ -63,8 +61,7 @@ class LighttpdAccessLogTest extends TestCase
     {
         $path = $this->tempDir.'/alice/.lighttpd/access.log';
         $linkedPath = $this->tempDir.'/linked-access.log';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, str_repeat('x', 128));
+        $this->pmssWriteFile($path, str_repeat('x', 128));
         link($path, $linkedPath);
 
         $result = \pmssLighttpdAccessLogTrimFile($path, 64);
@@ -78,8 +75,7 @@ class LighttpdAccessLogTest extends TestCase
     public function testTrimFileSkipsBusyLog(): void
     {
         $path = $this->tempDir.'/alice/.lighttpd/access.log';
-        @mkdir(dirname($path), 0755, true);
-        file_put_contents($path, str_repeat('x', 128));
+        $this->pmssWriteFile($path, str_repeat('x', 128));
 
         $lockHandle = fopen($path, 'c+');
         $this->assertTrue(is_resource($lockHandle));
