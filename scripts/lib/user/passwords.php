@@ -15,7 +15,7 @@ require_once __DIR__.'/../lighttpd/userFileWrite.php';
  */
 function pmssDelugeServicePasswordGenerate(int $length = 24): string
 {
-    $alphabet = pmssUserPasswordGenerationAlphabet();
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_';
     $maxIndex = strlen($alphabet) - 1;
     $password = '';
 
@@ -24,14 +24,6 @@ function pmssDelugeServicePasswordGenerate(int $length = 24): string
     }
 
     return $password;
-}
-
-/**
- * Return the shared generated-password alphabet for CLI and service secrets.
- */
-function pmssUserPasswordGenerationAlphabet(): string
-{
-    return 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_';
 }
 
 /**
@@ -60,10 +52,7 @@ function pmssDelugeWebConfPath(string $username): string
     return rtrim($homeRoot, '/').'/'.$username.'/.config/deluge/web.conf';
 }
 
-/**
- * Read the localclient password from a Deluge auth file.
- */
-function pmssDelugeAuthReadLocalclientPassword(string $authPath): string
+function pmssDelugeAuthLocalclientPasswordRead(string $authPath): string
 {
     if (!is_file($authPath) || is_link($authPath)) {
         return '';
@@ -126,7 +115,7 @@ function pmssDelugeTemplateLocalclientPassword(): string
         $templatePath = '/etc/seedbox/config/template.deluge.auth';
     }
 
-    $password = pmssDelugeAuthReadLocalclientPassword($templatePath);
+    $password = pmssDelugeAuthLocalclientPasswordRead($templatePath);
     return $password !== '' ? $password : 'db1f077e3ae178fad7608c327f2cd12dfe63ca67';
 }
 
@@ -200,7 +189,7 @@ function pmssDelugeServicePasswordApply(string $username, string $password): boo
 function pmssEnsureDelugeServicePassword(string $username): string
 {
     $authPath = pmssDelugeAuthPath($username);
-    $currentPassword = pmssDelugeAuthReadLocalclientPassword($authPath);
+    $currentPassword = pmssDelugeAuthLocalclientPasswordRead($authPath);
     $templatePassword = pmssDelugeTemplateLocalclientPassword();
 
     if ($currentPassword !== '' && $currentPassword !== $templatePassword) {
@@ -240,21 +229,3 @@ function pmssDelugeServicePasswordRotate(string $username): string
 // password here would expose it in a readable file under the user's home
 // directory. Deluge service credentials are managed separately and mirrored
 // into web.conf via pmssEnsureDelugeServicePassword()/pmssDelugeServicePasswordRotate().
-
-/**
- * Restart user services gracefully after password change.
- *
- * @param string $username Username whose services to restart
- * @param bool $delugeUpdated Whether Deluge password was updated
- * @param bool $qbittorrentUpdated Whether qBittorrent password was updated
- */
-function pmssRestartTorrentServicesAfterPasswordChange(string $username, bool $delugeUpdated, bool $qbittorrentUpdated): void
-{
-    // Kill torrent daemons gracefully - watchdog cron will restart them.
-    foreach (['deluged' => $delugeUpdated, 'qbittorrent-nox' => $qbittorrentUpdated] as $daemon => $enabled) {
-        if (!$enabled) {
-            continue;
-        }
-        shell_exec(sprintf('killall -u %s -TERM %s 2>/dev/null', escapeshellarg($username), $daemon));
-    }
-}

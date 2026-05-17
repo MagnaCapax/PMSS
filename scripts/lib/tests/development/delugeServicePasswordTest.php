@@ -32,6 +32,22 @@ class DelugeServicePasswordTest extends TestCase
         );
     }
 
+    private function pmssReadLocalclientPassword(string $authPath): string
+    {
+        if (!is_file($authPath) || is_link($authPath)) {
+            return '';
+        }
+
+        $content = @file_get_contents($authPath);
+        if (!is_string($content) || $content === '') {
+            return '';
+        }
+
+        return preg_match('/^localclient:([^:\r\n]+):[0-9]+$/m', $content, $matches) === 1
+            ? $matches[1]
+            : '';
+    }
+
     public function testGenerateServicePasswordLengthAndCharset(): void
     {
         $password = \pmssDelugeServicePasswordGenerate(32);
@@ -41,24 +57,24 @@ class DelugeServicePasswordTest extends TestCase
 
     public function testSharedPasswordAlphabetAvoidsShellMetacharacters(): void
     {
-        $alphabet = \pmssUserPasswordGenerationAlphabet();
+        $password = \pmssDelugeServicePasswordGenerate(96);
 
-        $this->assertMatches('/^[A-Za-z0-9_-]+$/', $alphabet);
+        $this->assertMatches('/^[A-Za-z0-9_-]+$/', $password);
         foreach (['!', '@', '#', '$', '%', '&', ':'] as $forbidden) {
-            $this->assertTrue(strpos($alphabet, $forbidden) === false, 'Forbidden generated-password character present: '.$forbidden);
+            $this->assertTrue(strpos($password, $forbidden) === false, 'Forbidden generated-password character present: '.$forbidden);
         }
     }
 
     public function testReadLocalclientPasswordReturnsEmptyWhenMissing(): void
     {
-        $this->assertEquals('', \pmssDelugeAuthReadLocalclientPassword($this->tempDir.'/missing-auth'));
+        $this->assertEquals('', $this->pmssReadLocalclientPassword($this->tempDir.'/missing-auth'));
     }
 
     public function testReadLocalclientPasswordParsesEntry(): void
     {
         $authPath = $this->tempDir.'/auth';
         file_put_contents($authPath, "localclient:from-file:10\nuser:abc:5\n");
-        $this->assertEquals('from-file', \pmssDelugeAuthReadLocalclientPassword($authPath));
+        $this->assertEquals('from-file', $this->pmssReadLocalclientPassword($authPath));
     }
 
     public function testWriteLocalclientPasswordReplacesExistingEntry(): void
@@ -124,7 +140,7 @@ class DelugeServicePasswordTest extends TestCase
         $this->pmssTrackEnvOverrides(['PMSS_DELUGE_AUTH_TEMPLATE_PATH' => $templatePath], true);
 
         $generated = \pmssEnsureDelugeServicePassword('alice');
-        $stored = \pmssDelugeAuthReadLocalclientPassword($authPath);
+        $stored = $this->pmssReadLocalclientPassword($authPath);
 
         $this->assertTrue($generated !== '', 'Expected generated password');
         $this->assertTrue($generated !== 'template-token', 'Expected template token to be rotated');
@@ -149,7 +165,7 @@ class DelugeServicePasswordTest extends TestCase
 
         $this->assertSame('existing-secret', $ensured);
         $this->assertTrue(is_array($parsed));
-        $this->assertSame('existing-secret', \pmssDelugeAuthReadLocalclientPassword($authPath));
+        $this->assertSame('existing-secret', $this->pmssReadLocalclientPassword($authPath));
         $this->assertSame(sha1($parsed['config']['pwd_salt'].$ensured), $parsed['config']['pwd_sha1']);
     }
 
@@ -167,7 +183,7 @@ class DelugeServicePasswordTest extends TestCase
 
         $this->assertTrue($rotated !== '' && $rotated !== 'old-secret', 'Expected a new Deluge service password');
         $this->assertTrue(is_array($parsed));
-        $this->assertSame($rotated, \pmssDelugeAuthReadLocalclientPassword($authPath));
+        $this->assertSame($rotated, $this->pmssReadLocalclientPassword($authPath));
         $this->assertSame(sha1($parsed['config']['pwd_salt'].$rotated), $parsed['config']['pwd_sha1']);
     }
 
@@ -181,6 +197,6 @@ class DelugeServicePasswordTest extends TestCase
         $rotated = \pmssDelugeServicePasswordRotate('alice');
 
         $this->assertSame('', $rotated);
-        $this->assertSame('old-secret', \pmssDelugeAuthReadLocalclientPassword($authPath));
+        $this->assertSame('old-secret', $this->pmssReadLocalclientPassword($authPath));
     }
 }

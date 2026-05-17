@@ -26,7 +26,7 @@ class changePwPasswdFailureGuardTest extends TestCase
     {
         $source = $this->pmssReadRepoFile('scripts/changePw.php');
 
-        $this->assertStringContainsString('$alphabet = pmssUserPasswordGenerationAlphabet();', $source);
+        $this->assertStringContainsString('$alphabet = \'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_\';', $source);
         $this->assertStringNotContainsString('!@#$%', $source);
     }
 

@@ -139,8 +139,10 @@ if ($chownReturnCode !== 0) {
 $qbittorrentUpdated = pmssUpdateQbittorrentPassword($username, $password);
 $qbittorrentReturnCode = 0;
 
-// Restart services if passwords were updated
-pmssRestartTorrentServicesAfterPasswordChange($username, false, $qbittorrentUpdated);
+// Kill updated torrent daemons gracefully; watchdog cron will restart them.
+if ($qbittorrentUpdated) {
+    shell_exec(sprintf('killall -u %s -TERM %s 2>/dev/null', escapeshellarg($username), 'qbittorrent-nox'));
+}
 
 if ($qbittorrentUpdated && !$jsonlOutput) {
     echo "\t *******  qBittorrent password updated\n";
@@ -157,7 +159,7 @@ function generatePassword(): string
     $suffix = substr($legacySeed, -2);
 
     $middleLength = random_int(4, 8);
-    $alphabet = pmssUserPasswordGenerationAlphabet();
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_';
     $middle = '';
     $alphabetLength = strlen($alphabet) - 1;
 
