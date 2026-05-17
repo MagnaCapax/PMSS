@@ -100,8 +100,9 @@ if (!function_exists('pmssInfoResolveDockerEnabled')) {
     }
 }
 
-if (file_exists('/scripts/lib/webDockerInactiveNote.php')) {
-    require_once '/scripts/lib/webDockerInactiveNote.php';
+$pmssWebDockerInactiveNoteLib = __DIR__.'/webDockerInactiveNote.php';
+if (file_exists($pmssWebDockerInactiveNoteLib)) {
+    require_once $pmssWebDockerInactiveNoteLib;
 }
 
 $pmssWebCgroupMemoryStatusLib = __DIR__.'/webCgroupMemoryStatus.php';

@@ -28,8 +28,9 @@ $pmssWebCgroupMemoryStatusLib = __DIR__.'/webCgroupMemoryStatus.php';
 if (file_exists($pmssWebCgroupMemoryStatusLib)) {
     require_once $pmssWebCgroupMemoryStatusLib;
 }
-if (file_exists('/scripts/lib/user/mediaStackPanel.php')) {
-    require_once '/scripts/lib/user/mediaStackPanel.php';
+$pmssUserMediaStackPanelLib = __DIR__.'/userMediaStackPanel.php';
+if (file_exists($pmssUserMediaStackPanelLib)) {
+    require_once $pmssUserMediaStackPanelLib;
 }
 // Customer-side traffic-limit reader: see userTrafficLimit.php for rationale.
 // The operator-side write/CLI lives at /scripts/lib/user/trafficLimit.php
@@ -694,11 +695,12 @@ function pmssWelcomeVendorRead() {
 }
 
 function pmssWelcomeContextualMessageBuild($quotaInfo) {
-    if (!file_exists('/scripts/lib/welcomeMessage.php')) {
+    $pmssWelcomeMessageLib = __DIR__.'/welcomeMessage.php';
+    if (!file_exists($pmssWelcomeMessageLib)) {
         return '';
     }
 
-    require_once '/scripts/lib/welcomeMessage.php';
+    require_once $pmssWelcomeMessageLib;
     if (!function_exists('pmssWelcomeMessageForUser')) {
         return '';
     }

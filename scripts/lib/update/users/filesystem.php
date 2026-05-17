@@ -201,6 +201,9 @@ PHP;
         'www/userTrafficLimit.php',
         'www/webCgroupMemoryStatus.php',
         'www/storageHealthNotice.php',
+        'www/welcomeMessage.php',
+        'www/userMediaStackPanel.php',
+        'www/webDockerInactiveNote.php',
     ];
     foreach ($files as $file) {
         updateUserFile($file, $user);
