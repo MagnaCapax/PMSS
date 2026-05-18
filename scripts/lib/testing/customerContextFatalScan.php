@@ -102,8 +102,8 @@ function pmssCustomerContextDefinitions(array $files): array
         $tokens = pmssCustomerContextTokens($file);
         for ($i = 0, $n = count($tokens); $i < $n; $i++) {
             if (!pmssCustomerContextIs($tokens[$i], T_FUNCTION)) continue;
-            $name = pmssCustomerContextNext($tokens, $i);
-            if ($name !== null && pmssCustomerContextText($tokens[$name]) === '&') $name = pmssCustomerContextNext($tokens, $name);
+            $name = pmssCustomerContextWalk($tokens, $i, 1);
+            if ($name !== null && pmssCustomerContextText($tokens[$name]) === '&') $name = pmssCustomerContextWalk($tokens, $name, 1);
             if ($name !== null && pmssCustomerContextIs($tokens[$name], T_STRING)) $defs[strtolower($tokens[$name][1])] = $file;
         }
     }
@@ -116,9 +116,9 @@ function pmssCustomerContextCalls(array $tokens): array
     $calls = [];
     foreach ($tokens as $i => $token) {
         if (!pmssCustomerContextIs($token, T_STRING)) continue;
-        $next = pmssCustomerContextNext($tokens, $i);
+        $next = pmssCustomerContextWalk($tokens, $i, 1);
         if ($next === null || pmssCustomerContextText($tokens[$next]) !== '(') continue;
-        if (pmssCustomerContextDeclarationName($tokens, $i) || pmssCustomerContextMemberOrConstructor($tokens, $i)) continue;
+        if (pmssCustomerContextCallExcluded($tokens, $i)) continue;
         $calls[] = ['index' => $i, 'function' => $token[1], 'line' => $token[2]];
     }
     return $calls;
@@ -150,7 +150,7 @@ function pmssCustomerContextEnclosingIfGuarded(array $tokens, int $call, array $
 {
     $cursor = $call;
     while (($brace = pmssCustomerContextNearestOpenBrace($tokens, $cursor)) !== null) {
-        $closeParen = pmssCustomerContextPrev($tokens, $brace);
+        $closeParen = pmssCustomerContextWalk($tokens, $brace, -1);
         $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
         if ($openParen !== null && pmssCustomerContextConditionGuarded($tokens, $openParen, $closeParen, $guards, false)) return true;
         $cursor = $brace;
@@ -165,7 +165,7 @@ function pmssCustomerContextPreviousIfReturns(array $tokens, int $call, array $g
     if ($boundary < 0 || pmssCustomerContextText($tokens[$boundary]) !== '}') return false;
     $openBrace = pmssCustomerContextMatchOpen($tokens, $boundary, '{', '}');
     if ($openBrace === null || !pmssCustomerContextBlockReturns($tokens, $openBrace, $boundary)) return false;
-    $closeParen = pmssCustomerContextPrev($tokens, $openBrace);
+    $closeParen = pmssCustomerContextWalk($tokens, $openBrace, -1);
     $openParen = ($closeParen !== null && pmssCustomerContextText($tokens[$closeParen]) === ')') ? pmssCustomerContextMatchOpen($tokens, $closeParen, '(', ')') : null;
     return $openParen !== null && pmssCustomerContextConditionGuarded($tokens, $openParen, $closeParen, $guards, true);
 }
@@ -174,18 +174,18 @@ function pmssCustomerContextPreviousIfReturns(array $tokens, int $call, array $g
 function pmssCustomerContextFunctionExistsAt(array $tokens, int $i, array $guards): ?array
 {
     if (!pmssCustomerContextIs($tokens[$i], T_STRING) || strtolower($tokens[$i][1]) !== 'function_exists') return null;
-    $open = pmssCustomerContextNext($tokens, $i);
-    $literal = $open === null ? null : pmssCustomerContextNext($tokens, $open);
+    $open = pmssCustomerContextWalk($tokens, $i, 1);
+    $literal = $open === null ? null : pmssCustomerContextWalk($tokens, $open, 1);
     if ($open === null || $literal === null || pmssCustomerContextText($tokens[$open]) !== '(' || !pmssCustomerContextIs($tokens[$literal], T_CONSTANT_ENCAPSED_STRING)) return null;
     if (!in_array(strtolower(stripcslashes(substr((string) $tokens[$literal][1], 1, -1))), $guards, true)) return null;
-    $previous = pmssCustomerContextPrev($tokens, $i);
-    return ['end' => pmssCustomerContextNext($tokens, $literal) ?? $literal, 'negated' => $previous !== null && pmssCustomerContextText($tokens[$previous]) === '!'];
+    $previous = pmssCustomerContextWalk($tokens, $i, -1);
+    return ['end' => pmssCustomerContextWalk($tokens, $literal, 1) ?? $literal, 'negated' => $previous !== null && pmssCustomerContextText($tokens[$previous]) === '!'];
 }
 
 /** Return true when an if condition contains the requested guard polarity. */
 function pmssCustomerContextConditionGuarded(array $tokens, int $open, int $close, array $guards, bool $negated): bool
 {
-    $before = pmssCustomerContextPrev($tokens, $open);
+    $before = pmssCustomerContextWalk($tokens, $open, -1);
     if ($before === null || !pmssCustomerContextIs($tokens[$before], T_IF)) return false;
     for ($i = $open + 1; $i < $close; $i++) {
         $guard = pmssCustomerContextFunctionExistsAt($tokens, $i, $guards);
@@ -205,18 +205,13 @@ function pmssCustomerContextGuardOperator(array $tokens, int $start, int $end): 
     return '';
 }
 
-function pmssCustomerContextDeclarationName(array $tokens, int $i): bool
+function pmssCustomerContextCallExcluded(array $tokens, int $i): bool
 {
-    $prev = pmssCustomerContextPrev($tokens, $i);
-    if ($prev !== null && pmssCustomerContextIs($tokens[$prev], T_FUNCTION)) return true;
-    $beforeRef = $prev !== null && pmssCustomerContextText($tokens[$prev]) === '&' ? pmssCustomerContextPrev($tokens, $prev) : null;
-    return $beforeRef !== null && pmssCustomerContextIs($tokens[$beforeRef], T_FUNCTION);
-}
-
-function pmssCustomerContextMemberOrConstructor(array $tokens, int $i): bool
-{
-    $prev = pmssCustomerContextPrev($tokens, $i);
+    $prev = pmssCustomerContextWalk($tokens, $i, -1);
     if ($prev === null) return false;
+    if (pmssCustomerContextIs($tokens[$prev], T_FUNCTION)) return true;
+    $beforeRef = pmssCustomerContextText($tokens[$prev]) === '&' ? pmssCustomerContextWalk($tokens, $prev, -1) : null;
+    if ($beforeRef !== null && pmssCustomerContextIs($tokens[$beforeRef], T_FUNCTION)) return true;
     return pmssCustomerContextIs($tokens[$prev], T_OBJECT_OPERATOR)
         || pmssCustomerContextIs($tokens[$prev], T_DOUBLE_COLON)
         || pmssCustomerContextIs($tokens[$prev], T_NEW)
@@ -261,17 +256,10 @@ function pmssCustomerContextBoundary(array $tokens, int $i): int
     return -1;
 }
 
-function pmssCustomerContextNext(array $tokens, int $i): ?int
+function pmssCustomerContextWalk(array $tokens, int $i, int $step): ?int
 {
-    for ($j = $i + 1, $n = count($tokens); $j < $n; $j++) {
-        if (!pmssCustomerContextTrivia($tokens[$j])) return $j;
-    }
-    return null;
-}
-
-function pmssCustomerContextPrev(array $tokens, int $i): ?int
-{
-    for ($j = $i - 1; $j >= 0; $j--) {
+    $step = $step < 0 ? -1 : 1;
+    for ($j = $i + $step, $n = count($tokens); $j >= 0 && $j < $n; $j += $step) {
         if (!pmssCustomerContextTrivia($tokens[$j])) return $j;
     }
     return null;
