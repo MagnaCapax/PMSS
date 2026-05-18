@@ -20,7 +20,10 @@ while IFS= read -r file; do
 			/^[[:space:]]*(#|\/\/|\*)/ { next }
 			{
 				line = $0
-				if (line ~ /(^|[^[:alnum:]_\/.-])timeout([[:space:]]+--[A-Za-z0-9_-]+(=[^[:space:]]+)?)*[[:space:]]+[0-9]+[smhd]?([[:space:]]|$)/ &&
+				command = "(^|[^[:alnum:]_.-])((/[[:alnum:]_.-]+)+/)?timeout"
+				options = "([[:space:]]+--[A-Za-z0-9_-]+(=[^[:space:]]+)?)*"
+				duration = "[[:space:]]+[0-9]+[smhd]?([[:space:]]|$)"
+				if (line ~ command options duration &&
 					line !~ /--kill-after/) {
 					printf "%s:%d: timeout invocation lacks --kill-after: %s\n", file, NR, line
 				}
