@@ -41,21 +41,6 @@ function networkLocalnetEntryIsValid(string $entry): bool
         && (string) (int) $parts[1] === $parts[1];
 }
 
-/**
- * Return only local network entries that remain safe as policy tokens.
- */
-function networkLocalnetsFilterValid(array $localnets): array
-{
-    $valid = [];
-    foreach ($localnets as $localnet) {
-        $localnet = trim((string) $localnet);
-        if (networkLocalnetEntryIsValid($localnet)) {
-            $valid[] = $localnet;
-        }
-    }
-    return $valid;
-}
-
 function networkLoadLocalnets(): array
 {
     $path = pmssResolvePathFromEnv('PMSS_LOCALNET_FILE', '/etc/seedbox/config/localnet');
@@ -101,5 +86,12 @@ function networkLoadLocalnets(): array
         return $loadDefaultLocalnets();
     }
 
-    return networkLocalnetsFilterValid(preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY));
+    $valid = [];
+    foreach (preg_split('/\r?\n/', $cfg, -1, PREG_SPLIT_NO_EMPTY) as $localnet) {
+        $localnet = trim((string) $localnet);
+        if (networkLocalnetEntryIsValid($localnet)) {
+            $valid[] = $localnet;
+        }
+    }
+    return $valid;
 }

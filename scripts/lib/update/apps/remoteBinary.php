@@ -16,27 +16,6 @@ function pmssPinnedRemoteAmd64ArtifactsSupported(?string $architecture = null): 
     return in_array($architecture ?? php_uname('m'), ['x86_64', 'amd64'], true);
 }
 
-function pmssPinnedRemoteArchiveComponentIsSafe(string $value): bool
-{
-    return $value !== ''
-        && $value !== '.'
-        && $value !== '..'
-        && strpos($value, '/') === false
-        && strpos($value, '\\') === false
-        && strpos($value, "\0") === false;
-}
-
-function pmssPinnedRemoteArchiveWorkDirIsSafe(string $workDir): bool
-{
-    $trimmed = rtrim($workDir, '/');
-
-    return $workDir !== ''
-        && strpos($workDir, '/') === 0
-        && strpos($workDir, "\0") === false
-        && $trimmed !== ''
-        && strpos($trimmed.'/', '/../') === false;
-}
-
 // Download a pinned artifact to a temp file; caller owns cleanup.
 function pmssDownloadPinnedRemoteTempFile(
     string $label,
@@ -110,9 +89,19 @@ function pmssFetchPinnedRemoteFile(string $label, string $url, string $expectedS
 /** Download a verified archive, unpack it in the compile workspace, then run caller steps. */
 function pmssRunPinnedRemoteArchiveStep(string $label, string $url, string $expectedSha256, string $archiveName, string $sourceDir, string $description, array $postExtractCommands, string $workDir = '/root/compile'): void
 {
-    if (!pmssPinnedRemoteArchiveComponentIsSafe($archiveName)
-        || !pmssPinnedRemoteArchiveComponentIsSafe($sourceDir)
-        || !pmssPinnedRemoteArchiveWorkDirIsSafe($workDir)) {
+    $trimmedWorkDir = rtrim($workDir, '/');
+    foreach ([$archiveName, $sourceDir] as $component) {
+        if ($component === '' || $component === '.' || $component === '..' || strpos($component, '/') !== false || strpos($component, '\\') !== false || strpos($component, "\0") !== false) {
+            logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
+            return;
+        }
+    }
+    if ($workDir === ''
+        || strpos($workDir, '/') !== 0
+        || strpos($workDir, "\0") !== false
+        || $trimmedWorkDir === ''
+        || strpos($trimmedWorkDir.'/', '/../') !== false
+    ) {
         logmsg("[WARN] Refusing unsafe archive extraction path for {$label}");
         return;
     }

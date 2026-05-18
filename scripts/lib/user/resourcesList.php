@@ -9,7 +9,6 @@
  */
 
 require_once __DIR__.'/../cli/optionParser.php';
-require_once __DIR__.'/../cli/helpText.php';
 require_once __DIR__.'/../systemdSliceProperties.php';
 require_once __DIR__.'/../userLifecycle.php';
 require_once __DIR__.'/traffic.php';
