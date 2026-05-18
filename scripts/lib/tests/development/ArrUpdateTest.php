@@ -125,6 +125,25 @@ class ArrUpdateTest extends TestCase
         }
     }
 
+    public function testUpdateRejectsUnsafeInstallPathBeforeFetchingMetadata(): void
+    {
+        $baseDir = $this->pmssMakeTempDir('pmss-arr-update-unsafe-install-');
+        $output = '';
+
+        try {
+            $this->pmssWithEnv([], function () use ($baseDir, &$output): void {
+                ob_start();
+                $this->runArrUpdate('PmssArrUnsafeInstall', $baseDir.'/../install', $baseDir.'/missing-releases.json', 'PackageDir');
+                $output = (string) ob_get_clean();
+            });
+
+            $this->assertStringContainsString('Invalid updater configuration: install_path', $output);
+            $this->assertStringNotContainsString('Unable to fetch release metadata', $output);
+        } finally {
+            $this->cleanup($baseDir);
+        }
+    }
+
     public function testUpdateDoesNotReportInstalledWhenInstallParentIsMissing(): void
     {
         $baseDir = $this->pmssMakeTempDir('pmss-arr-update-move-fail-');

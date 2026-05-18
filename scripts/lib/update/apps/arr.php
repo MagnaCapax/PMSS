@@ -74,6 +74,24 @@ function pmssArrIsSafeConfigValue(string $value): bool
 }
 
 /**
+ * Reject absolute paths that could resolve outside the intended target.
+ */
+function pmssArrInstallPathIsSafe(string $path): bool
+{
+    if ($path === '' || $path[0] !== '/' || $path === '/') {
+        return false;
+    }
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || $segment === '.' || $segment === '..') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Normalize required config and fail closed on unsafe runtime inputs.
  */
 function pmssArrNormalizeConfig(array $config, callable $log): ?array
@@ -85,7 +103,7 @@ function pmssArrNormalizeConfig(array $config, callable $log): ?array
         }
     }
 
-    if ($config['install_path'][0] !== '/' || $config['install_path'] === '/') {
+    if (!pmssArrInstallPathIsSafe($config['install_path'])) {
         $log('Invalid updater configuration: install_path');
         return null;
     }
