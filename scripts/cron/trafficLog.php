@@ -29,9 +29,9 @@ $localnets = networkLoadLocalnets();
 	require_once '/scripts/lib/networkInfo.php';
 	$linkSpeed = isset($linkSpeed) && is_numeric($linkSpeed) ? (float) $linkSpeed : null;
 
-	    // Collect the current iptables stats and then reset the counters
-	$usage = `/sbin/iptables -nvx -L OUTPUT | grep -v " MARK "; /sbin/iptables -Z OUTPUT`;
-	if (empty($usage)) die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
+	    // Collect the current iptables stats and then reset the counters.
+	$usage = pmssTrafficCollectOutputUsage(null, [$logger, 'msg']);
+	if ($usage === null || trim($usage) === '') die(date('Y-m-d H:i:s') . " **** FATAL: Empty output from iptables???\n");
 
 // Debian 11 iptables -Z output doesn't work anymore .... we might miss a tiny fraction this way, but atleast not exponential growth
 $monitoringRules = shell_exec('/scripts/util/makeMonitoringRules.php');

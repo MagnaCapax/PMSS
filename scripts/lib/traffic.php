@@ -24,6 +24,59 @@ function pmssTrafficParseOutputRule(string $line): ?array
     if (!is_array($columns) || count($columns) < 11 || !ctype_digit($columns[1]) || $columns[2] !== 'ACCEPT' || $ownerIndex === false || $ownerIndex < 1 || !isset($columns[$ownerIndex + 3]) || $columns[$ownerIndex + 1] !== 'UID' || $columns[$ownerIndex + 2] !== 'match' || !ctype_digit($columns[$ownerIndex + 3])) return null;
     return ['bytes' => (int) $columns[1], 'destination' => $columns[$ownerIndex - 1], 'uid' => (int) $columns[$ownerIndex + 3]];
 }
+
+/**
+ * Collect OUTPUT counters only after proving the list command succeeded.
+ *
+ * @param ?callable $executor Test hook matching exec(string, array&, int&).
+ * @param ?callable $logger   Optional warning sink for collection failures.
+ * @return ?string Filtered iptables listing, or null when collection is unsafe.
+ */
+function pmssTrafficCollectOutputUsage(?callable $executor = null, ?callable $logger = null): ?string
+{
+    $executor = $executor ?? static function (string $command, array &$output, int &$rc): void {
+        $output = [];
+        exec($command, $output, $rc);
+    };
+
+    $listOutput = [];
+    $listRc = 1;
+    $executor('/sbin/iptables -nvx -L OUTPUT', $listOutput, $listRc);
+    if ($listRc !== 0) {
+        if ($logger !== null) {
+            $logger("Failed to list iptables OUTPUT counters before reset (rc={$listRc}).");
+        }
+        return null;
+    }
+
+    $usageLines = [];
+    foreach ($listOutput as $line) {
+        $line = (string) $line;
+        if (strpos($line, ' MARK ') === false) {
+            $usageLines[] = $line;
+        }
+    }
+
+    $usage = implode("\n", $usageLines);
+    if (trim($usage) === '') {
+        if ($logger !== null) {
+            $logger('iptables OUTPUT counter listing returned no usable rows; counters were not reset.');
+        }
+        return null;
+    }
+
+    $resetOutput = [];
+    $resetRc = 1;
+    $executor('/sbin/iptables -Z OUTPUT', $resetOutput, $resetRc);
+    if ($resetRc !== 0) {
+        if ($logger !== null) {
+            $logger("Failed to zero iptables OUTPUT counters after collection (rc={$resetRc}).");
+        }
+    }
+
+    return $usage;
+}
+
 /** Parse OUTPUT chain accounting into external/local per-UID byte totals. */
 function pmssTrafficParseOutputUsage(string $usage, array $localnets): array
 {

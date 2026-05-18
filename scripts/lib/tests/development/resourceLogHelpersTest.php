@@ -147,6 +147,8 @@ class ResourceLogHelpersTest extends TestCase
     public function testTrafficLogUsesSharedUsageParserInsteadOfTempFileGreps(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', '$parsedUsage = pmssTrafficParseOutputUsage($usage, $localnets);');
+        $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'pmssTrafficCollectOutputUsage(');
+        $this->pmssAssertRepoFileNotContainsString('scripts/cron/trafficLog.php', '/sbin/iptables -nvx -L OUTPUT |');
         $this->pmssAssertRepoFileContainsString('scripts/lib/traffic.php', 'function pmssTrafficBudgetExceeded(');
         $this->pmssAssertRepoFileContainsString('scripts/cron/trafficLog.php', 'pmssTrafficBudgetExceeded(');
         $this->pmssAssertRepoFileContainsString('scripts/cron/trafficIngressLog.php', 'pmssTrafficBudgetExceeded(');
@@ -154,6 +156,97 @@ class ResourceLogHelpersTest extends TestCase
             'scripts/cron/trafficLog.php',
             ['$thisUsageFile', 'grep "0.0.0.0/0', 'grep "Chain OUTPUT ("', 'unlink($thisUsageFile)']
         );
+    }
+
+    public function testTrafficOutputUsageCollectorListsBeforeReset(): void
+    {
+        $commands = [];
+        $usage = \pmssTrafficCollectOutputUsage(
+            static function (string $command, array &$output, int &$rc) use (&$commands): void {
+                $commands[] = $command;
+                if ($command === '/sbin/iptables -nvx -L OUTPUT') {
+                    $output = [
+                        'Chain OUTPUT (policy ACCEPT 1 packets, 123 bytes)',
+                        '1 111 MARK all -- * * 0.0.0.0/0 0.0.0.0/0 MARK set 0x1',
+                        '1 100 ACCEPT all -- * * 0.0.0.0/0 0.0.0.0/0 owner UID match 1000',
+                    ];
+                    $rc = 0;
+                    return;
+                }
+
+                $output = [];
+                $rc = $command === '/sbin/iptables -Z OUTPUT' ? 0 : 127;
+            }
+        );
+
+        $this->assertSame(['/sbin/iptables -nvx -L OUTPUT', '/sbin/iptables -Z OUTPUT'], $commands);
+        $this->assertTrue(is_string($usage));
+        $this->assertStringContainsString('Chain OUTPUT (policy ACCEPT 1 packets, 123 bytes)', $usage);
+        $this->assertStringContainsString('owner UID match 1000', $usage);
+        $this->assertStringNotContainsString(' MARK ', $usage);
+    }
+
+    public function testTrafficOutputUsageCollectorDoesNotResetAfterListFailure(): void
+    {
+        $commands = [];
+        $warnings = [];
+        $usage = \pmssTrafficCollectOutputUsage(
+            static function (string $command, array &$output, int &$rc) use (&$commands): void {
+                $commands[] = $command;
+                $output = [];
+                $rc = 4;
+            },
+            static function (string $message) use (&$warnings): void {
+                $warnings[] = $message;
+            }
+        );
+
+        $this->assertSame(null, $usage);
+        $this->assertSame(['/sbin/iptables -nvx -L OUTPUT'], $commands);
+        $this->assertSame(['Failed to list iptables OUTPUT counters before reset (rc=4).'], $warnings);
+    }
+
+    public function testTrafficOutputUsageCollectorDoesNotResetEmptyListings(): void
+    {
+        $commands = [];
+        $warnings = [];
+        $usage = \pmssTrafficCollectOutputUsage(
+            static function (string $command, array &$output, int &$rc) use (&$commands): void {
+                $commands[] = $command;
+                $output = ['  ', '1 111 MARK all -- * * 0.0.0.0/0 0.0.0.0/0 MARK set 0x1'];
+                $rc = 0;
+            },
+            static function (string $message) use (&$warnings): void {
+                $warnings[] = $message;
+            }
+        );
+
+        $this->assertSame(null, $usage);
+        $this->assertSame(['/sbin/iptables -nvx -L OUTPUT'], $commands);
+        $this->assertSame(['iptables OUTPUT counter listing returned no usable rows; counters were not reset.'], $warnings);
+    }
+
+    public function testTrafficOutputUsageCollectorWarnsButReturnsUsageWhenResetFails(): void
+    {
+        $warnings = [];
+        $usage = \pmssTrafficCollectOutputUsage(
+            static function (string $command, array &$output, int &$rc): void {
+                if ($command === '/sbin/iptables -nvx -L OUTPUT') {
+                    $output = ['Chain OUTPUT (policy ACCEPT 1 packets, 222 bytes)'];
+                    $rc = 0;
+                    return;
+                }
+
+                $output = [];
+                $rc = 7;
+            },
+            static function (string $message) use (&$warnings): void {
+                $warnings[] = $message;
+            }
+        );
+
+        $this->assertSame('Chain OUTPUT (policy ACCEPT 1 packets, 222 bytes)', $usage);
+        $this->assertSame(['Failed to zero iptables OUTPUT counters after collection (rc=7).'], $warnings);
     }
 
     public function testUserValidationRejectsUppercase(): void
