@@ -193,6 +193,39 @@ function pmssArrInstalledVersionRead(string $installPath, string $app): ?string
     return null;
 }
 
+/** Select the release asset matching the host architecture, or a generic build.
+ * @return array{0:string,1:string,2:string}|null
+ */
+function pmssArrReleaseAssetSelect(array $releases, string $assetPattern, string $architecture): ?array
+{
+    $targetArchitectureTokens = ['arm64' => ['arm64', 'aarch64'], 'armhf' => ['armhf', 'armv7', 'arm']][$architecture] ?? ['x64', 'amd64'];
+    $knownArchitectureTokens = ['x64', 'amd64', 'arm64', 'aarch64', 'armhf', 'armv7', 'arm'];
+    $genericAsset = null;
+
+    foreach ($releases as $release) {
+        if (empty($release['assets']) || !is_array($release['assets'])) { continue; }
+        foreach ($release['assets'] as $candidateAsset) {
+            $name = (string) ($candidateAsset['name'] ?? '');
+            if (!pmssArrIsSafeConfigValue($name) || basename($name) !== $name
+                || strpos($name, '/') !== false || strpos($name, '\\') !== false
+                || !preg_match($assetPattern, $name, $match)) {
+                continue;
+            }
+            $url = (string) ($candidateAsset['browser_download_url'] ?? '');
+            if ($url === '') { continue; }
+            $candidate = [$match[1], $url, $name];
+            if (pmssArrAssetNameHasToken($name, $targetArchitectureTokens)) {
+                return $candidate;
+            }
+            if ($genericAsset === null && !pmssArrAssetNameHasToken($name, $knownArchitectureTokens)) {
+                $genericAsset = $candidate;
+            }
+        }
+    }
+
+    return $genericAsset;
+}
+
 function pmssArrUpdate(array $config): void
 {
     $app = isset($config['app']) && is_string($config['app']) && $config['app'] !== ''
@@ -229,47 +262,8 @@ function pmssArrUpdate(array $config): void
     $releases = json_decode($payload, true);
     if (!is_array($releases)) { $log('Invalid release metadata payload'); return; }
 
-    $asset = null;
-    $genericAsset = null;
     $architecture = trim((string) @shell_exec('dpkg --print-architecture 2>/dev/null'));
-    $targetArchitectureTokens = [
-        'arm64' => ['arm64', 'aarch64'],
-        'armhf' => ['armhf', 'armv7', 'arm'],
-    ][$architecture] ?? ['x64', 'amd64'];
-    $knownArchitectureTokens = ['x64', 'amd64', 'arm64', 'aarch64', 'armhf', 'armv7', 'arm'];
-    foreach ($releases as $release) {
-        if (empty($release['assets']) || !is_array($release['assets'])) {
-            continue;
-        }
-        foreach ($release['assets'] as $candidateAsset) {
-            $name = (string) ($candidateAsset['name'] ?? '');
-            if (!pmssArrIsSafeConfigValue($name)
-                || basename($name) !== $name
-                || strpos($name, '/') !== false
-                || strpos($name, '\\') !== false
-            ) {
-                continue;
-            }
-            if (!preg_match($config['asset_pattern'], $name, $match)) {
-                continue;
-            }
-            $url = (string) ($candidateAsset['browser_download_url'] ?? '');
-            if ($url === '') {
-                continue;
-            }
-            $candidate = [$match[1], $url, $name];
-            if (pmssArrAssetNameHasToken($name, $targetArchitectureTokens)) {
-                $asset = $candidate;
-                break 2;
-            }
-            if ($genericAsset === null && !pmssArrAssetNameHasToken($name, $knownArchitectureTokens)) {
-                $genericAsset = $candidate;
-            }
-        }
-    }
-    if ($asset === null) {
-        $asset = $genericAsset;
-    }
+    $asset = pmssArrReleaseAssetSelect($releases, $config['asset_pattern'], $architecture);
     if ($asset === null) { $log('No suitable linux release asset found'); return; }
     [$latestVersion, $downloadUrl, $assetName] = $asset;
 

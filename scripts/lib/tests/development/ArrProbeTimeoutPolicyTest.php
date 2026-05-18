@@ -29,4 +29,19 @@ class ArrProbeTimeoutPolicyTest extends TestCase
             $this->assertSame('/opt/'.$app, (string) $config['install_path']);
         }
     }
+
+    public function testReleaseAssetSelectionPrefersTargetArchitectureOverGenericBuild(): void
+    {
+        $asset = \pmssArrReleaseAssetSelect([
+            [
+                'assets' => [
+                    ['name' => 'Radarr.develop.1.2.3.linux-arm64.tar.gz', 'browser_download_url' => 'https://example.invalid/arm64'],
+                    ['name' => 'Radarr.develop.1.2.3.linux.tar.gz', 'browser_download_url' => 'https://example.invalid/generic'],
+                    ['name' => 'Radarr.develop.1.2.3.linux-x64.tar.gz', 'browser_download_url' => 'https://example.invalid/x64'],
+                ],
+            ],
+        ], '/Radarr\.(?:develop|master)\.([0-9.]+).*linux.*tar\.gz/i', 'amd64');
+
+        $this->assertSame(['1.2.3.', 'https://example.invalid/x64', 'Radarr.develop.1.2.3.linux-x64.tar.gz'], $asset);
+    }
 }
