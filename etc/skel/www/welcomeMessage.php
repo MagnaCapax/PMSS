@@ -55,14 +55,6 @@ function pmssWelcomeReadJson(string $path): array
 }
 
 /**
- * Read the product template map regardless of root-file shape.
- */
-function pmssWelcomeProductMessageMap(array $rootMap): array
-{
-    return is_array($rootMap['products'] ?? null) ? $rootMap['products'] : $rootMap;
-}
-
-/**
  * Set or clear a product-level welcome message template.
  */
 function pmssWelcomeProductMessageSet(
@@ -76,7 +68,7 @@ function pmssWelcomeProductMessageSet(
     }
 
     $rootMap = pmssWelcomeReadJson($productMessagesPath);
-    $productMap = pmssWelcomeProductMessageMap($rootMap);
+    $productMap = is_array($rootMap['products'] ?? null) ? $rootMap['products'] : $rootMap;
 
     if (trim($template) === '') {
         unset($productMap[$normalizedProductKey]);
@@ -197,7 +189,8 @@ function pmssWelcomeMessageForUser(
             : '';
     }
     if ($template === '' && $productKey !== '') {
-        $messageMap = pmssWelcomeProductMessageMap(pmssWelcomeReadJson($productMessagesPath));
+        $messageRootMap = pmssWelcomeReadJson($productMessagesPath);
+        $messageMap = is_array($messageRootMap['products'] ?? null) ? $messageRootMap['products'] : $messageRootMap;
         if (!is_string($template = $messageMap[$productKey] ?? null)) {
             $template = '';
             foreach ($messageMap as $mapKey => $mapValue) {

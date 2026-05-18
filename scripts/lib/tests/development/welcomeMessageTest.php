@@ -240,6 +240,41 @@ class WelcomeMessageTest extends TestCase
             $this->assertEquals('<p>{{product}}/{{username}}</p>', $nestedDecoded['products']['m1000'] ?? null);
     }
 
+    public function testPlainAndNestedProductStoresRenderWithoutRewrite(): void
+    {
+            $home = $this->makeUserHome();
+            @file_put_contents($home.'/.config/pmss-user.json', json_encode(['product' => 'm1000'], JSON_UNESCAPED_SLASHES));
+
+            $plainPath = $this->tempDir.'/welcomeMessages-direct-plain.json';
+            $nestedPath = $this->tempDir.'/welcomeMessages-direct-nested.json';
+            @file_put_contents($plainPath, json_encode(['m1000' => 'plain {{username}}'], JSON_UNESCAPED_SLASHES));
+            @file_put_contents($nestedPath, json_encode(['products' => ['m1000' => 'nested {{username}}']], JSON_UNESCAPED_SLASHES));
+
+            $this->assertEquals('plain alice', \pmssWelcomeMessageForUser([], $home, 'alice', $plainPath));
+            $this->assertEquals('nested alice', \pmssWelcomeMessageForUser([], $home, 'alice', $nestedPath));
+    }
+
+    public function testCustomerWelcomeMessageRendersPlainAndNestedStores(): void
+    {
+            $homeRoot = $this->tempDir.'/customer-home';
+            $home = $homeRoot.'/alice';
+            $script = ''
+                .'$lib = '.var_export($this->pmssRepoPath('etc/skel/www/welcomeMessage.php'), true).';'
+                .'$home = '.var_export($home, true).';'
+                .'$root = '.var_export($homeRoot, true).';'
+                .'@mkdir($home."/.config", 0755, true);'
+                .'file_put_contents($home."/.config/pmss-user.json", json_encode(["product" => "m1000"]));'
+                .'file_put_contents($root."/plain.json", json_encode(["m1000" => "plain {{username}}"]));'
+                .'file_put_contents($root."/nested.json", json_encode(["products" => ["m1000" => "nested {{username}}"]]));'
+                .'require $lib;'
+                .'echo json_encode(["plain" => pmssWelcomeMessageForUser([], $home, "alice", $root."/plain.json"), "nested" => pmssWelcomeMessageForUser([], $home, "alice", $root."/nested.json")]);';
+
+            $this->assertEquals(
+                ['plain' => 'plain alice', 'nested' => 'nested alice'],
+                $this->pmssRunInlinePhpJson($script, ['PMSS_HOME_DIR' => $homeRoot])
+            );
+    }
+
     public function testProductConfigUsesUnifiedWelcomeLibrary(): void
     {
         $this->pmssAssertRepoFileContainsString('scripts/productConfig.php', "require_once __DIR__.'/lib/welcomeMessage.php';");

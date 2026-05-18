@@ -13,22 +13,6 @@ if (!function_exists('pmssReplaceUserFile') && is_file(__DIR__.'/lighttpd/userFi
 }
 
 /**
- * Read a JSON file into an associative array.
- */
-function pmssWelcomeReadJson(string $path): array
-{
-    return pmssJsonFileReadAssoc($path, true) ?? [];
-}
-
-/**
- * Read the product template map regardless of root-file shape.
- */
-function pmssWelcomeProductMessageMap(array $rootMap): array
-{
-    return is_array($rootMap['products'] ?? null) ? $rootMap['products'] : $rootMap;
-}
-
-/**
  * Set or clear a product-level welcome message template.
  */
 function pmssWelcomeProductMessageSet(
@@ -41,8 +25,8 @@ function pmssWelcomeProductMessageSet(
         return false;
     }
 
-    $rootMap = pmssWelcomeReadJson($productMessagesPath);
-    $productMap = pmssWelcomeProductMessageMap($rootMap);
+    $rootMap = pmssJsonFileReadAssoc($productMessagesPath, true) ?? [];
+    $productMap = is_array($rootMap['products'] ?? null) ? $rootMap['products'] : $rootMap;
 
     if (trim($template) === '') {
         unset($productMap[$normalizedProductKey]);
@@ -143,7 +127,7 @@ function pmssWelcomeMessageForUser(
     string $productMessagesPath = '/etc/seedbox/config/welcomeMessages.json'
 ): string {
     $userHome = rtrim($userHome, '/');
-    $userConfig = pmssWelcomeReadJson($userHome.'/.config/pmss-user.json');
+    $userConfig = pmssJsonFileReadAssoc($userHome.'/.config/pmss-user.json', true) ?? [];
     $productKey = '';
     foreach (['product', 'productName'] as $candidateKey) {
         if (is_string($candidateValue = $userConfig[$candidateKey] ?? null) && ($productKey = trim($candidateValue)) !== '') {
@@ -163,7 +147,8 @@ function pmssWelcomeMessageForUser(
             : '';
     }
     if ($template === '' && $productKey !== '') {
-        $messageMap = pmssWelcomeProductMessageMap(pmssWelcomeReadJson($productMessagesPath));
+        $messageRootMap = pmssJsonFileReadAssoc($productMessagesPath, true) ?? [];
+        $messageMap = is_array($messageRootMap['products'] ?? null) ? $messageRootMap['products'] : $messageRootMap;
         if (!is_string($template = $messageMap[$productKey] ?? null)) {
             $template = '';
             foreach ($messageMap as $mapKey => $mapValue) {
