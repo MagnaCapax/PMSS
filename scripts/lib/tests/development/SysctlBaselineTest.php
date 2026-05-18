@@ -54,18 +54,12 @@ class SysctlBaselineTest extends TestCase
         $this->runBaseline($target, $messages, false);
 
         $this->assertTrue(file_exists($target), 'expected sysctl file to be written');
-        $content = (string)file_get_contents($target);
-        $this->assertStringContainsString('# Pulsed Media Config', $content);
-        $this->assertStringContainsString('vm.swappiness = 100', $content);
-        $this->assertStringContainsString('vm.vfs_cache_pressure = 2', $content);
-        $this->assertStringContainsString('vm.min_free_kbytes = 2621440', $content);
-        $this->assertStringContainsString('net.core.rmem_max = 67108864', $content);
-        $this->assertStringContainsString('net.core.default_qdisc = fq', $content);
-        $this->assertStringContainsString('net.ipv4.tcp_congestion_control = bbr', $content);
-        $this->assertStringContainsString('net.netfilter.nf_conntrack_max = 524288', $content);
-        $this->assertStringContainsString('kernel.kptr_restrict = 1', $content);
-        $this->assertStringContainsString('kernel.yama.ptrace_scope = 2', $content);
-        $this->assertStringContainsString('fs.protected_regular = 2', $content);
+        $this->assertStringContainsAllStrings([
+            '# Pulsed Media Config', 'vm.swappiness = 100', 'vm.vfs_cache_pressure = 2', 'vm.min_free_kbytes = 2621440',
+            'net.core.rmem_max = 67108864', 'net.core.default_qdisc = fq', 'net.ipv4.tcp_congestion_control = bbr',
+            'net.netfilter.nf_conntrack_max = 524288', 'kernel.kptr_restrict = 1', 'kernel.yama.ptrace_scope = 2',
+            'fs.protected_regular = 2',
+        ], (string)file_get_contents($target));
         $this->assertStringContainsString("/etc/sysctl.d/99-pmss.conf", $this->systemPrepSource());
 
         $this->cleanup($dir);

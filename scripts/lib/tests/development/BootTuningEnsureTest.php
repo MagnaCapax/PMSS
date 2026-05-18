@@ -31,13 +31,10 @@ class BootTuningEnsureTest extends TestCase
         [$script, $service] = $this->runBootTuning($dir, $messages);
 
         $this->assertTrue(file_exists($script), 'expected boot tuning script to be written');
-        $content = (string)file_get_contents($script);
-        $this->assertStringContainsString('/sys/kernel/mm/lru_gen/enabled', $content);
-        $this->assertStringContainsString('/sys/module/zswap/parameters/enabled', $content);
-        $this->assertStringContainsString('/md/stripe_cache_size', $content);
-        $this->assertStringContainsString('target_file="$target_dir/hardware.json"', $content);
-        $this->assertStringContainsString('"swap_is_fast":', $content);
-        $this->assertStringContainsString('"nic_speed_mbps":', $content);
+        $this->assertStringContainsAllStrings([
+            '/sys/kernel/mm/lru_gen/enabled', '/sys/module/zswap/parameters/enabled', '/md/stripe_cache_size',
+            'target_file="$target_dir/hardware.json"', '"swap_is_fast":', '"nic_speed_mbps":',
+        ], (string)file_get_contents($script));
         $this->assertTrue(file_exists($service), 'expected boot tuning service to be written');
     }
 
