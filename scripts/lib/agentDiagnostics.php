@@ -9,8 +9,10 @@ require_once __DIR__.'/cli/optionParser.php';
 require_once __DIR__.'/runtime.php';
 require_once __DIR__.'/userLifecycle.php';
 
+const PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT = 60;
+
 /** Execute a repository PHP script relative to the diagnostics script root. */
-function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = []): array
+function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = [], int $timeoutSec = PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT): array
 {
     $scriptPath = pmssResolvePathFromEnv('PMSS_AGENT_DIAGNOSTICS_SCRIPT_ROOT', dirname(__DIR__, 2)).'/'.ltrim($relativePath, '/');
     if (!is_file($scriptPath) || !is_readable($scriptPath)) return ['rc' => 1, 'stdout' => '', 'stderr' => 'Diagnostics script missing or unreadable: '.$relativePath];
@@ -18,7 +20,7 @@ function pmssAgentDiagnosticsPhpScript(string $relativePath, array $arguments = 
     foreach ($arguments as $argument) {
         $command .= ' '.escapeshellarg((string) $argument);
     }
-    return pmssCommandCapture($command, 0, false, 'Failed to launch command');
+    return pmssCommandCapture($command, max(1, $timeoutSec), false, 'Failed to launch command');
 }
 
 /** Build the stable ordered section spec for the diagnostics payload. */
@@ -73,6 +75,19 @@ function pmssAgentDiagnosticsSpecLabel(array $spec): string
     return $args === [] ? basename($path) : basename($path).' '.implode(' ', $args);
 }
 
+/** Resolve the bounded timeout for a diagnostics command spec. */
+function pmssAgentDiagnosticsSpecTimeout(array $spec): int
+{
+    $timeout = $spec['timeout'] ?? PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT;
+    if (is_string($timeout) && ctype_digit($timeout)) {
+        $timeout = (int) $timeout;
+    }
+    if (!is_int($timeout) || $timeout < 1) {
+        return PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT;
+    }
+    return min($timeout, PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT);
+}
+
 /** Collect one diagnostics spec node through a single recursive path. */
 function pmssAgentDiagnosticsSpecCollect(array $spec)
 {
@@ -89,9 +104,10 @@ function pmssAgentDiagnosticsSpecCollect(array $spec)
         return isset($spec['wrap']) ? [(string) $spec['wrap'] => $value] : $value;
     }
 
+    $timeoutSec = pmssAgentDiagnosticsSpecTimeout($spec);
     $result = ((string) ($spec['type'] ?? '') === 'php')
-        ? pmssAgentDiagnosticsPhpScript((string) $spec['path'], (array) ($spec['args'] ?? []))
-        : pmssCommandCapture((string) $spec['command'], 0, false, 'Failed to launch command');
+        ? pmssAgentDiagnosticsPhpScript((string) $spec['path'], (array) ($spec['args'] ?? []), $timeoutSec)
+        : pmssCommandCapture((string) $spec['command'], $timeoutSec, false, 'Failed to launch command');
     $stdout = trim((string) ($result['stdout'] ?? ''));
     $format = (string) ($spec['format'] ?? 'text');
 

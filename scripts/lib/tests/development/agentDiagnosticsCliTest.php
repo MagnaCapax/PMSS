@@ -147,6 +147,29 @@ final class agentDiagnosticsCliTest extends TestCase
         $this->assertSame(['raw' => 'uid=1001(alice)'], $section);
     }
 
+    public function testSpecTimeoutBoundsInvalidAndLargeValues(): void
+    {
+        $default = (int) constant('PMSS_AGENT_DIAGNOSTICS_COMMAND_TIMEOUT_DEFAULT');
+
+        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout([]));
+        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout(['timeout' => 'bad']));
+        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout(['timeout' => 0]));
+        $this->assertSame($default, \pmssAgentDiagnosticsSpecTimeout(['timeout' => $default + 1]));
+        $this->assertSame(1, \pmssAgentDiagnosticsSpecTimeout(['timeout' => '1']));
+    }
+
+    public function testSpecCollectStopsSlowCommandAtTimeout(): void
+    {
+        $section = \pmssAgentDiagnosticsSpecCollect([
+            'type' => 'command',
+            'command' => "printf 'before\\n'; sleep 2; printf 'after\\n'",
+            'timeout' => 1,
+        ]);
+
+        $this->assertStringContainsString('before', (string) $section);
+        $this->assertStringNotContainsString('after', (string) $section);
+    }
+
     public function testSpecLabelDerivesStablePhpErrorLabels(): void
     {
         $this->assertSame(
