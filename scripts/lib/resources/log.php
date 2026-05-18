@@ -49,31 +49,6 @@ function pmssAppendRootTimestampedLogEntry(string $path, string $message, int $m
     return pmssAppendUserFile($path, date('Y-m-d H:i:s').$message, 'root', $mode);
 }
 
-/**
- * Read one integer field without emitting undefined-index notices.
- */
-function pmssResourceLogArrayIntField(array $values, string $field): int
-{
-    return array_key_exists($field, $values) ? (int) $values[$field] : 0;
-}
-
-/**
- * Read one previously persisted monotonic counter field when it stays numeric.
- */
-function pmssResourceLogArrayNullableCounterField(array $values, string $field): ?int
-{
-    if (!array_key_exists($field, $values)) {
-        return null;
-    }
-
-    $value = $values[$field];
-    if (is_int($value)) {
-        return $value >= 0 ? $value : null;
-    }
-
-    return is_string($value) && ctype_digit($value) ? (int) $value : null;
-}
-
 /** Persist counter state under lock and return deltas for the selected fields.
  *
  * @return array{delta: array<string, int>, previous_state: array<string, mixed>, state: array<string, int>}
@@ -86,8 +61,16 @@ function pmssCounterStateUpdate(string $statePath, array $state, array $deltaFie
         : [];
     $delta = [];
     foreach ($deltaFields as $field) {
-        $currentValue = pmssResourceLogArrayIntField($state, $field);
-        $previousValue = pmssResourceLogArrayNullableCounterField($previousState, $field);
+        $currentValue = array_key_exists($field, $state) ? (int) $state[$field] : 0;
+        $previousValue = null;
+        if (array_key_exists($field, $previousState)) {
+            $previous = $previousState[$field];
+            if (is_int($previous) && $previous >= 0) {
+                $previousValue = $previous;
+            } elseif (is_string($previous) && ctype_digit($previous)) {
+                $previousValue = (int) $previous;
+            }
+        }
         $delta[$field] = $previousValue !== null && $currentValue >= $previousValue
             ? $currentValue - $previousValue
             : $currentValue;
@@ -179,8 +162,14 @@ function pmssResourceLogReadMemoryBreakdown(int $uid, ?string $cgroupRoot = null
  */
 function pmssResourceLogUpdateState(string $statePath, array $counters): array
 {
-    $state = ['memory' => pmssResourceLogArrayIntField($counters, 'memory'), 'tasks' => pmssResourceLogArrayIntField($counters, 'tasks'), 'ts' => time()];
-    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) { $state[$field] = pmssResourceLogArrayIntField($counters, $field); }
+    $state = [
+        'memory' => array_key_exists('memory', $counters) ? (int) $counters['memory'] : 0,
+        'tasks' => array_key_exists('tasks', $counters) ? (int) $counters['tasks'] : 0,
+        'ts' => time(),
+    ];
+    foreach (['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec'] as $field) {
+        $state[$field] = array_key_exists($field, $counters) ? (int) $counters[$field] : 0;
+    }
     foreach (pmssResourceMemoryBreakdownFieldMap() as $field) { array_key_exists($field, $counters) && $state[$field] = (int) $counters[$field]; }
 
     $result = pmssCounterStateUpdate($statePath, $state, ['io_read', 'io_write', 'io_read_ops', 'io_write_ops', 'cpu_nsec']);

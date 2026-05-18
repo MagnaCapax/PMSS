@@ -36,6 +36,17 @@ class CounterStateCharacterizationTest extends TestCase
         $this->assertEquals(['ingress' => 100, 'egress' => 200, 'ts' => 1], $result['previous_state']);
     }
 
+    public function testSharedStateAcceptsOnlyNonNegativePersistedIntegerCounters(): void
+    {
+        $path = $this->makeRoot().'/state.json';
+        $this->pmssWriteFile($path, json_encode(['ingress' => '100', 'egress' => -1, 'cpu_nsec' => true, 'ts' => 1]));
+
+        $result = \pmssCounterStateUpdate($path, ['ingress' => 160, 'egress' => 50, 'cpu_nsec' => 20, 'ts' => 2], ['ingress', 'egress', 'cpu_nsec']);
+
+        $this->assertEquals(['ingress' => 60, 'egress' => 50, 'cpu_nsec' => 20], $result['delta']);
+        $this->assertEquals(['ingress' => '100', 'egress' => -1, 'cpu_nsec' => true, 'ts' => 1], $result['previous_state']);
+    }
+
     public function testSharedStateTreatsCounterResetAsCurrentValue(): void
     {
         $path = $this->makeRoot().'/state.json';
