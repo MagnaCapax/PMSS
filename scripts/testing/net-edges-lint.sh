@@ -13,47 +13,41 @@ PATTERN='curl\b|wget\b|\bnc\b|telnet\b'
 VIOL=0
 
 scanMatches() {
-  local file="$1"
-  grep -nE "$PATTERN" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true
+	local file="$1"
+	grep -nE "$PATTERN" "$file" | cut -d: -f1-2 --output-delimiter=': ' || true
 }
 
 phpScan() {
-  local file raw
-  while IFS= read -r -d '' file; do
-    case "$file" in
-      */scripts/lib/tests/*) continue ;;
-    esac
-    while IFS= read -r raw; do
-      # Permit when inside runStep command string
-      if grep -Eq "runStep\s*\(.*(curl|wget|nc|telnet).*\)" <<<"$raw"; then
-        continue
-      fi
-      echo "PHP net edge: $file: ${raw}" >&2
-      VIOL=$((VIOL+1))
-    done < <(scanMatches "$file")
-  done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
+	local file raw
+	while IFS= read -r -d '' file; do
+		case "$file" in
+		*/scripts/lib/tests/*) continue ;;
+		esac
+		while IFS= read -r raw; do
+			# Permit when inside runStep command string
+			if grep -Eq "runStep\s*\(.*(curl|wget|nc|telnet).*\)" <<<"$raw"; then
+				continue
+			fi
+			echo "PHP net edge: $file: ${raw}" >&2
+			VIOL=$((VIOL + 1))
+		done < <(scanMatches "$file")
+	done < <(pmss_testing_find_first_party_php_files "$ROOT_DIR")
 }
 
 shScan() {
-  local file raw
-  while IFS= read -r -d '' file; do
-    case "$file" in
-      */etc/skel/*|*/scripts/testing/net-edges-lint.sh) continue ;;
-    esac
-    while IFS= read -r raw; do
-      echo "Shell net edge: $file: ${raw}" >&2
-      VIOL=$((VIOL+1))
-    done < <(scanMatches "$file")
-  done < <(pmss_testing_find_bash_files "$ROOT_DIR")
+	local file raw
+	while IFS= read -r -d '' file; do
+		case "$file" in
+		*/etc/skel/* | */scripts/testing/net-edges-lint.sh) continue ;;
+		esac
+		while IFS= read -r raw; do
+			echo "Shell net edge: $file: ${raw}" >&2
+			VIOL=$((VIOL + 1))
+		done < <(scanMatches "$file")
+	done < <(pmss_testing_find_bash_files "$ROOT_DIR")
 }
 
 phpScan
 shScan
 
-if [[ $VIOL -gt 0 ]]; then
-  echo "net-edges lint: $VIOL issue(s) found" >&2
-  if [[ "$STRICT" == "1" ]]; then
-    exit 1
-  fi
-fi
-echo "net-edges lint: OK (advisory)"
+pmss_testing_count_lint_finish "$VIOL" "net-edges lint: $VIOL issue(s) found" "net-edges lint: OK (advisory)" "$STRICT"

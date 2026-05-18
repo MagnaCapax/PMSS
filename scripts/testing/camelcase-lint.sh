@@ -10,24 +10,24 @@ source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 VIOLATIONS=0
 
 is_camel_file() {
-  local base="$1"
-  case "$base" in
-    update-step2.php) return 0 ;;
-  esac
-  [[ "$base" =~ ^[a-z][a-zA-Z0-9]*\.php$ ]]
+	local base="$1"
+	case "$base" in
+	update-step2.php) return 0 ;;
+	esac
+	[[ "$base" =~ ^[a-z][a-zA-Z0-9]*\.php$ ]]
 }
 
 check_tree() {
-  local dir="$1"
-  shift
-  [[ -d "$dir" ]] || return 0
-  while IFS= read -r -d '' f; do
-    base="$(basename "$f")"
-    if ! is_camel_file "$base"; then
-      echo "filename violation: $f" >&2
-      VIOLATIONS=$((VIOLATIONS+1))
-    fi
-  done < <(find "$dir" "$@" -type f -name "*.php" -print0)
+	local dir="$1"
+	shift
+	[[ -d "$dir" ]] || return 0
+	while IFS= read -r -d '' f; do
+		base="$(basename "$f")"
+		if ! is_camel_file "$base"; then
+			echo "filename violation: $f" >&2
+			VIOLATIONS=$((VIOLATIONS + 1))
+		fi
+	done < <(find "$dir" "$@" -type f -name "*.php" -print0)
 }
 
 # Enforce for selected first-party directories
@@ -40,8 +40,4 @@ check_tree "$ROOT_DIR/scripts/lib/traffic"
 
 # Explicitly skip: tests, devristo, user class libs (mixed historical casing), web skel
 
-if [[ $VIOLATIONS -gt 0 ]]; then
-  echo "camelCase filename lint: $VIOLATIONS violation(s) found" >&2
-  exit 1
-fi
-echo "camelCase filename lint: OK"
+pmss_testing_count_lint_finish "$VIOLATIONS" "camelCase filename lint: $VIOLATIONS violation(s) found" "camelCase filename lint: OK"

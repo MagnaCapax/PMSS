@@ -128,9 +128,4 @@ while IFS= read -r -d '' file; do
 	scan_file "$file"
 done < <(pmss_testing_find_bash_files "$ROOT_DIR")
 
-if [[ $VIOL -gt 0 ]]; then
-	echo "bash trailing test return lint: $VIOL file(s) with issue(s)" >&2
-	exit 1
-fi
-
-echo "bash trailing test return lint: OK"
+pmss_testing_count_lint_finish "$VIOL" "bash trailing test return lint: $VIOL file(s) with issue(s)" "bash trailing test return lint: OK"

@@ -20,12 +20,12 @@ source "$(cd "$(dirname "$0")" && pwd)/testingPaths.sh"
 VIOLATIONS=0
 
 scan_file() {
-  local file="$1"
-  local rel="${file#"$ROOT_DIR"/}"
-  if command -v git >/dev/null 2>&1 && ! git -C "$ROOT_DIR" ls-files --error-unmatch "$rel" >/dev/null 2>&1; then
-    return
-  fi
-  awk -v FILE="$file" '
+	local file="$1"
+	local rel="${file#"$ROOT_DIR"/}"
+	if command -v git >/dev/null 2>&1 && ! git -C "$ROOT_DIR" ls-files --error-unmatch "$rel" >/dev/null 2>&1; then
+		return
+	fi
+	awk -v FILE="$file" '
     BEGIN { in_doc=0; pending_doc=""; violations=0; min_words=6; min_chars=30 }
     function has_description(doc){ return doc ~ /\*[ \t]*[^@][A-Za-z0-9]/ }
     function has_return(doc){ return doc ~ /@return[ \t]+/ }
@@ -86,21 +86,17 @@ scan_file() {
       }
     }
     END { if (violations>0) exit 1; }
-  ' "$file" || VIOLATIONS=$((VIOLATIONS+1))
+  ' "$file" || VIOLATIONS=$((VIOLATIONS + 1))
 }
 
 # Collect target files (updater libraries only)
 mapfile -t FILES < <(
-  find "$ROOT_DIR/scripts/lib/update" -type f -name "*.php" | sort -u
-  find "$ROOT_DIR/scripts/lib" -maxdepth 1 -type f -name "*.php" | sort -u
+	find "$ROOT_DIR/scripts/lib/update" -type f -name "*.php" | sort -u
+	find "$ROOT_DIR/scripts/lib" -maxdepth 1 -type f -name "*.php" | sort -u
 )
 
 for f in "${FILES[@]}"; do
-  scan_file "$f"
+	scan_file "$f"
 done
 
-if [[ $VIOLATIONS -gt 0 ]]; then
-  echo "docblock lint: $VIOLATIONS violation(s) found" >&2
-  exit 1
-fi
-echo "docblock lint: OK"
+pmss_testing_count_lint_finish "$VIOLATIONS" "docblock lint: $VIOLATIONS violation(s) found" "docblock lint: OK"
