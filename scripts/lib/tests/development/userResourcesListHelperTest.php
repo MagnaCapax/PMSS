@@ -68,4 +68,26 @@ class UserResourcesListHelperTest extends TestCase
         $this->assertEquals('inf', $row[17]);
         $this->assertEquals('yes', $row[18]);
     }
+
+    public function testRowBuildBriefModeSnapshot(): void
+    {
+        $row = \pmssUserResourcesListRowBuild([
+            'user' => 'longusername',
+            'uid' => 1002,
+            'memory_high' => 536870912,
+            'memory_max' => null,
+            'cpu_weight' => null,
+            'cpu_quota_percent' => 75,
+            'io_weight' => 250,
+            'io_read_bandwidth' => null,
+            'io_write_bandwidth' => 1048576,
+            'io_read_iops' => null,
+            'io_write_iops' => 300,
+        ], 'brief');
+
+        $this->assertSame(
+            ['longuserna', '1002', '512M', '-', '-', '75%', '250', '-', '1M', '-', '300'],
+            $row
+        );
+    }
 }

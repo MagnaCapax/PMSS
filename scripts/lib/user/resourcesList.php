@@ -183,27 +183,21 @@ function pmssUserResourcesListMain(array $argv): int
         fwrite(STDERR, "Error: choose either --brief or --full (not both).\n");
         return 1;
     }
-    $displayMode = $fullMode ? 'full' : 'brief';
-    $modes = [
-        'brief' => [
-            'format' => "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s\n",
-            'headers' => ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS"],
-            'separator' => 120,
-        ],
-        'full' => [
-            'format' => "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s\n",
-            'headers' => ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS", "DskQ", "DskB", "InoQ", "InoB", "NetLim", "NetUsed", "ProcMax", "Suspended"],
-            'separator' => 180,
-        ],
-    ];
+    $format = $fullMode
+        ? "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s %-6s %-6s %-7s %-7s %-7s %-7s %-8s %-9s\n"
+        : "%-10s %-5s %-8s %-8s %-6s %-6s %-6s %-6s %-6s %-7s %-7s\n";
+    $headers = $fullMode
+        ? ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS", "DskQ", "DskB", "InoQ", "InoB", "NetLim", "NetUsed", "ProcMax", "Suspended"]
+        : ["User", "UID", "MemHigh", "MemMax", "CPUWt", "CPUQt", "BlkWt", "RdBW", "WrBW", "RdIOPS", "WrIOPS"];
+    $separator = $fullMode ? 180 : 120;
     $users = pmssListManagedUsers('/scripts/listUsers.php');
     if ($users === []) {
         echo $outputJson ? "[]\n" : ($outputJsonl ? '' : "No users found.\n");
         return 0;
     }
     if (!$outputJson && !$outputJsonl) {
-        printf($modes[$displayMode]['format'], ...$modes[$displayMode]['headers']);
-        echo str_repeat('-', $modes[$displayMode]['separator'])."\n";
+        printf($format, ...$headers);
+        echo str_repeat('-', $separator)."\n";
     }
     $allData = [];
     $sliceKeys = ['MemoryHigh', 'MemoryMax', 'CPUWeight', 'IOWeight', 'CPUQuotaPerSecUSec', 'CPUQuotaPeriodUSec', 'CPUQuota', 'IOReadBandwidthMax', 'IOWriteBandwidthMax', 'IOReadIOPSMax', 'IOWriteIOPSMax', 'TasksMax'];
@@ -218,7 +212,7 @@ function pmssUserResourcesListMain(array $argv): int
         } elseif ($outputJson) {
             $allData[] = $resourceData;
         } else {
-            printf($modes[$displayMode]['format'], ...pmssUserResourcesListRowBuild($resourceData, $displayMode));
+            printf($format, ...pmssUserResourcesListRowBuild($resourceData, $fullMode ? 'full' : 'brief'));
         }
     }
     if ($outputJson) {
