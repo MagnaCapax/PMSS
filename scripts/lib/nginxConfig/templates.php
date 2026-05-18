@@ -8,8 +8,14 @@
  * @license GPL-3.0-only
  */
 
+function pmssNginxSuspendedLocationBlock(): string
+{
+    return "    location = /error-suspended.html {\n        root /var/www;\n    }\n    location / {\n        return 302 /error-suspended.html;\n    }";
+}
+
 function pmssNginxUserSubdomainTemplates(): array
 {
+    $suspendedLocations = pmssNginxSuspendedLocationBlock();
     $publicProxyDefaults = <<<'NGINX'
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -144,12 +150,7 @@ server {
     server_name ##host##;
     root /var/www;
 
-    location = /error-suspended.html {
-        root /var/www;
-    }
-    location / {
-        return 302 /error-suspended.html;
-    }
+##suspended_locations##
 }
 
 server {
@@ -158,14 +159,10 @@ server {
     root /var/www;
 
 ##ssl_block##
-    location = /error-suspended.html {
-        root /var/www;
-    }
-    location / {
-        return 302 /error-suspended.html;
-    }
+##suspended_locations##
 }
 NGINX;
+    $publicSuspendedTemplate = str_replace('##suspended_locations##', $suspendedLocations, $publicSuspendedTemplate);
 
     $privateSuspendedTemplate = <<<'NGINX'
 # PMSS suspended private subdomain for ##user##.
@@ -181,14 +178,10 @@ server {
     root /var/www;
 
 ##ssl_block##
-    location = /error-suspended.html {
-        root /var/www;
-    }
-    location / {
-        return 302 /error-suspended.html;
-    }
+##suspended_locations##
 }
 NGINX;
+    $privateSuspendedTemplate = str_replace('##suspended_locations##', $suspendedLocations, $privateSuspendedTemplate);
 
     return [
         'public' => $publicSubdomainTemplate,
