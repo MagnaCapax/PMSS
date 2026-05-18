@@ -1,7 +1,7 @@
 <?php
 namespace PMSS\Tests;
 
-require_once dirname(__DIR__, 2).'/webDockerInactiveNote.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/webDockerInactiveNote.php';
 require_once __DIR__.'/../common/TestCase.php';
 
 class webDockerInactiveNoteTest extends TestCase

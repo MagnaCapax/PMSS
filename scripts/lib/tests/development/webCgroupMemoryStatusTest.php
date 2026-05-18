@@ -2,7 +2,7 @@
 namespace PMSS\Tests;
 
 require_once __DIR__.'/../common/TestCase.php';
-require_once dirname(__DIR__, 2).'/webCgroupMemoryStatus.php';
+require_once dirname(__DIR__, 4).'/etc/skel/www/webCgroupMemoryStatus.php';
 
 class WebCgroupMemoryStatusTest extends TestCase
 {
