@@ -57,6 +57,30 @@ function pmssLogWritePathIsSafe(string $path): bool
     return $directory !== '' && is_dir($directory) && !is_link($directory);
 }
 
+/** Prepare a log parent directory without crossing unsafe path segments. */
+function pmssLogWriteDirectoryPrepare(
+    string $directory,
+    int $mode = 0755,
+    ?string &$error = null,
+    bool $allowExistingLeafFile = false
+): bool {
+    $error = null;
+    if ($directory === '') {
+        $error = 'unsafe';
+        return false;
+    }
+    if ($directory !== '.' && !pmssPathSegmentsAreSafe($directory, true, true, !$allowExistingLeafFile, true)) {
+        $error = 'unsafe';
+        return false;
+    }
+    if ($directory !== '.' && !(is_dir($directory) || @mkdir($directory, $mode, true) || is_dir($directory))) {
+        $error = 'create';
+        return false;
+    }
+
+    return true;
+}
+
 /** Append one payload to a JSON Lines file. */
 function pmssJsonLineAppend(string $path, array $payload): bool
 {

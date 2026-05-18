@@ -81,33 +81,16 @@ function storageBenchmarkRequireIntOption(array $parsed, string $optionName, int
 
     return (int) $value;
 }
-function storageBenchmarkJsonLogPathPreflightIsSafe(string $jsonLog): bool
-{
-    $path = rtrim($jsonLog, '/');
-    if ($path === '' || preg_match('/[\r\n\0]/', $path) === 1) return false;
-    $absolute = $path[0] === '/';
-    $segments = explode('/', ltrim($path, '/'));
-    $current = '';
-    $lastIndex = count($segments) - 1;
-    foreach ($segments as $index => $segment) {
-        if ($segment === '') continue;
-        if ($segment === '.' || $segment === '..') return false;
-        $current = $current === '' ? ($absolute ? '/'.$segment : $segment) : $current.'/'.$segment;
-        if (is_link($current)) return false;
-        // Preserve the existing mkdir failure path for non-directory parents.
-        if ($index < $lastIndex && file_exists($current) && !is_dir($current)) return true;
-    }
-    return true;
-}
 function storageBenchmarkRequireJsonLogPath(string $jsonLog): void
 {
-    if (!storageBenchmarkJsonLogPathPreflightIsSafe($jsonLog)) {
-        fwrite(STDERR, "Error: unsafe JSON log path: {$jsonLog}\n");
-        exit(1);
-    }
     $jsonDir = dirname($jsonLog);
-    if ($jsonDir === '' || !pmssDirEnsureExists($jsonDir, 0755)) {
-        fwrite(STDERR, "Error: failed to create JSON log directory: {$jsonDir}\n");
+    $jsonDirError = null;
+    if (!pmssLogWriteDirectoryPrepare($jsonDir, 0755, $jsonDirError, true)) {
+        if ($jsonDirError === 'create') {
+            fwrite(STDERR, "Error: failed to create JSON log directory: {$jsonDir}\n");
+            exit(1);
+        }
+        fwrite(STDERR, "Error: unsafe JSON log path: {$jsonLog}\n");
         exit(1);
     }
     if (!pmssLogWritePathIsSafe($jsonLog)) {
